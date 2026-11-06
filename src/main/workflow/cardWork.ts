@@ -1,6 +1,6 @@
 // A card's work, read from the board (#1223): its facts folded into the work view (shared/workflow/workView.ts) for the
 // window's IPC, the badges of every live card at once, and the Agent API's rows of a card's facts. Reads only: one
-// snapshot of hive.db each. A board waiting for its upgrade to 1.0 has no facts: no view.
+// snapshot of combwork.db each. A board waiting for its upgrade to 1.0 has no facts: no view.
 
 import type { Db } from '../db'
 import { boardRead } from '../boardStore'
@@ -44,7 +44,7 @@ function headsOf(db: Db['reader'], numbers: readonly number[]): Map<number, stri
 
 /**
  * These cards' facts' heads (HI-1780: what a read kept per card is made from, facts being only ever added), from one
- * snapshot of hive.db; empty on a board waiting for its 1.0 upgrade.
+ * snapshot of combwork.db; empty on a board waiting for its 1.0 upgrade.
  */
 export function factHeadsOf(ws: WorkspaceService, numbers: readonly number[]): Map<number, string> {
   if (!numbers.length) return new Map()
@@ -160,7 +160,7 @@ function stagesReader(db: Db['reader']): (ruleset: string) => StageId[] | null {
   }
 }
 
-/** The stages of these stored rulesets (a lane's recorded one, #1421), by id: one snapshot of hive.db. */
+/** The stages of these stored rulesets (a lane's recorded one, #1421), by id: one snapshot of combwork.db. */
 export function rulesetStages(ws: WorkspaceService, ids: readonly string[]): Map<string, StageId[] | null> {
   const out = new Map<string, StageId[] | null>()
   if (!ids.length) return out

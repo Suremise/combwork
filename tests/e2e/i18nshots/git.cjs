@@ -2,7 +2,7 @@
 // (commits and tags), Branches & remotes (upstream, branches, remotes, worktrees, commit identity), its forms (each
 // checked to follow a change of language while it is open), the failed-load and failed-refresh notes, the status
 // bar's tooltip and the .combwork notice with its Untrack dialog, reached for the i18nshots route (#756's design, section
-// 4) with locale-independent means only: git run on the project, IPC failures (HIVE_TEST_FAIL_IPC), the
+// 4) with locale-independent means only: git run on the project, IPC failures (CW_TEST_FAIL_IPC), the
 // language-changed event, command ids and structural hooks (data-section, data-action, data-git-*, classes), never
 // English text. See tests/e2e/i18nshots.cjs for ctx.
 const fs = require('fs')
@@ -29,7 +29,7 @@ async function cancelDialog(ctx) {
 
 /** Makes calls on an IPC channel fail: the next one (`*1`), or all until failing(ctx, ''): tests/e2e/README.md. */
 const failing = (ctx, calls) => ctx.app.evaluate((_, c) => {
-  process.env.HIVE_TEST_FAIL_IPC = c
+  process.env.CW_TEST_FAIL_IPC = c
 }, calls)
 
 /** git in the project, with an identity of its own for the commits these cases make (never the machine's config). */
@@ -121,7 +121,24 @@ const PSEUDO = 'en-XA'
 
 /** Tells the window its language changed, as Settings → General → Language does (the language-changed event). */
 const sendLanguage = (ctx, language) =>
-  ctx.app.evaluate(({ BrowserWindow }, l) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', { type: 'language-changed', language: l }), language)
+  ctx.app.evaluate(({ BrowserWindow }, l) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', { type: 'language-changed', language: l }), language)
+
+/**
+ * The notices closed. Putting .git back (closeInit) raises "Version control changed in alpha" at the window's bottom
+ * right, over the Tags heading's Create tag button: where a language's label is long enough (fr, pl), the button's
+ * middle is under it and its click never lands (HI-2601).
+ */
+async function noNotices(ctx) {
+  const { page, lib } = ctx
+  const dismiss = () => page.locator('.toasts .toast .icon-btn').first().click({ timeout: 2000 }).then(() => false, () => false)
+  if (!(await lib.until(async () => (await page.locator('.toasts .toast').count()) === 0 || (await dismiss()), ctx.hungMs))) throw new Error("the notices didn't close")
+}
+
+/** The window back in the run's language, its switch landed (the page's lang). */
+async function restoreLanguage(ctx, info) {
+  await sendLanguage(ctx, info)
+  if (!(await ctx.lib.until(async () => (await ctx.page.evaluate(() => document.documentElement.lang)) === info.code, ctx.hungMs))) throw new Error(`the window didn't switch back to ${info.code}`)
+}
 
 /**
  * A Git form opened in English that then follows the change to the run's language (#804, round 1: an open form keeps
@@ -129,13 +146,25 @@ const sendLanguage = (ctx, language) =>
  * was typed must stay. Under the pseudo-locale every message differs from its English, so its title, help, labels and
  * button must each change; a language may rightly keep a word ("URL") or not have it translated yet (English, its
  * fallback), so there only the switch landing (the page's lang) is waited for. Throws otherwise, so the screen isn't
- * reached. The form is left open in the run's language, for its screenshots.
+ * reached, with the window switched back to the run's language first, so the screens after it aren't in English
+ * (HI-2601). The form is left open in the run's language, for its screenshots.
  */
 async function formFollowsLanguage(ctx, action, what) {
-  const { page, lib } = ctx
   const info = (await ctx.inv('app:info')).language
+  if (info.code === 'en') return openFollowing(ctx, action, what, info)
+  try {
+    return await openFollowing(ctx, action, what, info)
+  } catch (e) {
+    await restoreLanguage(ctx, info).catch(() => {})
+    throw e
+  }
+}
+
+async function openFollowing(ctx, action, what, info) {
+  const { page, lib } = ctx
   const english = info.code === 'en'
   const pseudo = info.code === PSEUDO
+  await noNotices(ctx)
   if (!english) await sendLanguage(ctx, { ...info, code: 'en', locale: 'en', messages: {} })
   await page.locator(`[data-action="${action}"]`).first().click()
   const dialog = await shown(ctx, page.locator('.dialog', { has: page.locator('.git-form') }).last(), what)
@@ -205,7 +234,7 @@ async function statusBar(ctx) {
 }
 
 /** The .combwork notice in Project Settings: a file in .combwork committed to git. */
-async function hiveNotice(ctx) {
+async function combworkNotice(ctx) {
   const { page, inv, project } = ctx
   await page.mouse.move(5, 5)
   fs.mkdirSync(path.join(project, '.combwork'), { recursive: true })
@@ -214,12 +243,12 @@ async function hiveNotice(ctx) {
   git(ctx, 'commit', '-qm', 'Commit a file in .combwork')
   await inv('workspace:refresh')
   await ctx.command('project.tab.settings')
-  return shown(ctx, page.locator('.hive-vcs-notice').first(), 'the .combwork notice')
+  return shown(ctx, page.locator('.cw-vcs-notice').first(), 'the .combwork notice')
 }
 
 /** Its Untrack… asks first, listing the files. */
 async function untrackDialog(ctx) {
-  await ctx.page.locator('.hive-vcs-notice button.primary').first().click()
+  await ctx.page.locator('.cw-vcs-notice button.primary').first().click()
   return shown(ctx, ctx.page.locator('.dialog').last(), 'the Untrack dialog')
 }
 
@@ -243,7 +272,7 @@ module.exports = {
     { name: 'add-remote-form', open: addRemote, close: cancelDialog },
     { name: 'identity-form', open: identityForm, close: cancelDialog },
     { name: 'status-bar', open: statusBar },
-    { name: 'hive-notice', open: hiveNotice },
+    { name: 'combwork-notice', open: combworkNotice },
     { name: 'untrack-dialog', open: untrackDialog, close: closeLast }
   ]
 }

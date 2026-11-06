@@ -57,14 +57,14 @@ const check = (name, ok, extra = '') => {
   const api = copilot ? await startFakeCopilotApi({ log: apiLog, systems: true }) : null
   const copilotEnv = api ? copilotTestEnv(api, copilotDir, { above: lib.WORK }) : {}
   const PORT = lib.port(47816)
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: PORT, CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, ...copilotEnv })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: PORT, CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, ...copilotEnv })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   try {
     await lib.fitWindow(app, page, { width: 1400, height: 850 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.waitForProvider(inv, 'codex')
     if (copilot) await lib.waitForProvider(inv, 'copilot')
     await lib.openWorkspace(inv, page, ws)
@@ -150,7 +150,7 @@ const check = (name, ok, extra = '') => {
     check(`${codexW.name} starts`, !!(await ready(codexW.id)))
     await lib.until(async () => lines(path.join(codexHome, 'fake-launches.jsonl')).length > launches, HUNG_MS, 200)
     check('switched off, the next launch gets none of it', !codexTold(codexW.cwd).includes('NOTE-ALL'), codexTold(codexW.cwd).slice(-300))
-    // Claude Code keeps a conversation's first system prompt on resume (since 2.1.267): one Hive gave the note to is
+    // Claude Code keeps a conversation's first system prompt on resume (since 2.1.267): one Combwork gave the note to is
     // resumed with it rendered fresh, so the note is gone from it too, by another agent in its folder as well (HR5's
     // rounds 1–2: the record is the conversation's, SessionRecord.promptAdded).
     const claudeSession = (await live(claudeP.id))?.sessionId
@@ -166,8 +166,8 @@ const check = (name, ok, extra = '') => {
 
     // --- A project agent reads the note but can't write it; a script with the workspace's token can.
     const launch = lines(path.join(claudeHome, 'fake-launches.jsonl')).filter((x) => x.cwd.toLowerCase() === claudeP.cwd.toLowerCase()).at(-1)
-    const hiveEnv = JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork.env
-    const agentToken = JSON.parse(fs.readFileSync(hiveEnv.CW_API_TOKEN_FILE, 'utf8')).token
+    const combworkEnv = JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork.env
+    const agentToken = JSON.parse(fs.readFileSync(combworkEnv.CW_API_TOKEN_FILE, 'utf8')).token
     const workspaceToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
     const call = async (token, method, p, body) => {
       const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })

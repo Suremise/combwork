@@ -40,10 +40,10 @@ vi.mock('../src/main/git', async (original) => {
 
 const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
 const files = await import('../src/main/files')
-const { onHiveEvent } = await import('../src/main/events')
+const { onCombworkEvent } = await import('../src/main/events')
 
 const BUSY = { err: 'fatal: .git/index: index file open failed: Permission denied' }
-const base = tempDir('hive-ignore-')
+const base = tempDir('cw-ignore-')
 const ws = join(base, 'ws')
 const proj = join(ws, 'proj')
 mkdirSync(join(proj, 'dist'), { recursive: true })
@@ -66,7 +66,7 @@ beforeEach(() => {
 const dimmed = async (rel = '') => (await files.listDir(proj, rel)).filter((f) => f.ignored).map((f) => f.name)
 const relists = () => {
   const seen: string[][] = []
-  const off = onHiveEvent((e) => e.type === 'files-changed' && seen.push(e.dirs))
+  const off = onCombworkEvent((e) => e.type === 'files-changed' && seen.push(e.dirs))
   return { seen, off }
 }
 
@@ -142,11 +142,11 @@ describe('Files tab: a failed git check-ignore (#222)', () => {
         listings++
       }
     }
-    // At least the stress's time (HIVE_STRESS_MS, 4 s), and on until enough listings ran beside enough adds, however
+    // At least the stress's time (CW_STRESS_MS, 4 s), and on until enough listings ran beside enough adds, however
     // long load makes that (#1480: a fixed 4 s did 13 listings in a loaded full run, failing a count, not the behaviour).
     const loops = [writer(), writer(), writer(), reader(), reader(), reader()]
     const began = Date.now()
-    const atLeastMs = Number(process.env.HIVE_STRESS_MS) || 4000
+    const atLeastMs = Number(process.env.CW_STRESS_MS) || 4000
     try {
       await vi.waitFor(() => expect({ listings: listings >= ENOUGH, adds: adds >= ENOUGH, time: Date.now() - began >= atLeastMs }).toEqual({ listings: true, adds: true, time: true }), { timeout: atLeastMs + STRESS_HUNG_MS, interval: 50 })
     } finally {
@@ -155,7 +155,7 @@ describe('Files tab: a failed git check-ignore (#222)', () => {
     }
     console.log(`#222 stress: ${listings} listings, ${adds} adds in ${Date.now() - began} ms, ${realFailures} check-ignore failures absorbed`)
     // Once under four unit suites at once (#560), never since: if it comes back, what git answered says whether it's git
-    // or Hive (#222's handling).
+    // or Combwork (#222's handling).
     expect(undimmed, `listings showing dist undimmed; git's answers without it: ${JSON.stringify(unnamed.slice(0, 5))}`).toEqual([])
   }, 600000)
 })

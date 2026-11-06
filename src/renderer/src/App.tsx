@@ -3,7 +3,7 @@ import { NewProjectsNotice } from './components/PresetStep'
 import { fmt, msg, tr } from '@shared/i18n'
 import { useAntivirusOffer } from './components/Antivirus'
 import { useEffect, useRef, useState } from 'react'
-import type { HiveEvent } from '@shared/types'
+import type { CombworkEvent } from '@shared/types'
 import { call } from './api'
 import { playChime } from './chime'
 import { matchKeybinding, runCommand, runCommandAsync } from './commands'
@@ -92,11 +92,11 @@ let lastChimeAt: number | null = null
 /** The run each agent terminal's epoch was made for (HI-2213). */
 const epochBook = sessionEpochBook()
 let chimesPlayed = 0
-;(window as unknown as { __hiveChimes?: () => number }).__hiveChimes = () => chimesPlayed
+;(window as unknown as { __cwChimes?: () => number }).__cwChimes = () => chimesPlayed
 // The bell's list as the tests read it (HI-2320): each entry, whether it was quiet (no pop-up), its buttons and what it says once resolved.
-;(window as unknown as { __hiveBell?: () => unknown[] }).__hiveBell = () => get().notifications.map((t) => ({ id: t.id, title: t.title, kind: t.kind ?? null, level: t.level, quiet: !!t.quiet, resolved: t.resolved ?? null, actions: t.actions?.map((x) => x.label) ?? [], target: t.target?.kind ?? null }))
+;(window as unknown as { __cwBell?: () => unknown[] }).__cwBell = () => get().notifications.map((t) => ({ id: t.id, title: t.title, kind: t.kind ?? null, level: t.level, quiet: !!t.quiet, resolved: t.resolved ?? null, actions: t.actions?.map((x) => x.label) ?? [], target: t.target?.kind ?? null }))
 
-function handleEvent(e: HiveEvent): void {
+function handleEvent(e: CombworkEvent): void {
   switch (e.type) {
     case 'workspace-progress':
       setLoaded({ openProgress: e.progress })
@@ -338,7 +338,7 @@ function handleEvent(e: HiveEvent): void {
       const before = get().assistantQuestions
       set({ assistantQuestions: e.questions })
       // With the panel hidden, the question comes as a notification the user can answer: main tells it once, as the
-      // routing table says (HI-2320: a pop-up, or a Windows notification with Hive in the background), and its entry
+      // routing table says (HI-2320: a pop-up, or a Windows notification with Combwork in the background), and its entry
       // says Answered once the question no longer waits.
       if (!get().assistantOpen) {
         for (const q of e.questions.filter((x) => !before.some((b) => b.id === x.id))) void call('assistant:tellQuestion', q.id).catch(() => undefined)
@@ -365,7 +365,7 @@ function handleEvent(e: HiveEvent): void {
 }
 
 let tasksTimer: number | undefined
-/** Reads the board again shortly (one change can come as several events: Hive's own and the folder watcher's). */
+/** Reads the board again shortly (one change can come as several events: Combwork's own and the folder watcher's). */
 /** What this window's agents left running (#507), replacing what the store had (another workspace's). */
 async function loadLeftovers(): Promise<void> {
   const all = await call('session:leftovers').catch(() => [])
@@ -411,7 +411,7 @@ export function App() {
   useEffect(() => {
     // What another window changes while this one loads must outlive the older snapshot it loads (#295).
     const early = startupReplay(handleEvent)
-    const off = window.hive.onEvent((e) => {
+    const off = window.combwork.onEvent((e) => {
       handleEvent(e)
       early.note(e)
     })
@@ -428,7 +428,7 @@ export function App() {
       ])
       // A startup cleaned up meanwhile (StrictMode's first, in development) leaves the window to the newer one (#337).
       if (!early.active()) return
-      set({ settings: s, sidebarWidth: ui.sidebarWidth, sidebarVisible: ui.sidebarVisible, sidebarCompact: !!ui.sidebarCompact, panes: ui.panes ?? {}, skillsProvider: ui.skillsProvider ?? {}, skillsFold: ui.skillsFold ?? {}, sessionsTree: ui.sessionsTree ?? {}, hiveVcsNotice: ui.hiveVcsNotice ?? {}, assistantFold: ui.assistantFold ?? {}, boardFold: ui.boardFold ?? {}, progressFilter: ui.progressFilter ?? {}, tabs: ui.tabs ?? {}, laneOrder: ui.laneOrder ?? {}, tips: tipsState(ui.tips), workspace: ws, recent, providers: ag, api, appInfo: info })
+      set({ settings: s, sidebarWidth: ui.sidebarWidth, sidebarVisible: ui.sidebarVisible, sidebarCompact: !!ui.sidebarCompact, panes: ui.panes ?? {}, skillsProvider: ui.skillsProvider ?? {}, skillsFold: ui.skillsFold ?? {}, sessionsTree: ui.sessionsTree ?? {}, combworkVcsNotice: ui.combworkVcsNotice ?? {}, assistantFold: ui.assistantFold ?? {}, boardFold: ui.boardFold ?? {}, progressFilter: ui.progressFilter ?? {}, tabs: ui.tabs ?? {}, laneOrder: ui.laneOrder ?? {}, tips: tipsState(ui.tips), workspace: ws, recent, providers: ag, api, appInfo: info })
       early.settle()
       set({ assistantOpen: assistantWasOpen(ws?.path) })
       // A window restored on top (its workspace was left pinned) shows its pin lit from the start.

@@ -1,7 +1,7 @@
 // The developer console's window (#637): hidden (no Help item, no palette entry, the shortcut does nothing, opening is
 // refused) until Settings → Advanced → Show developer features is on; then Help → Developer Console opens it as a window
 // of its own, whose page calls only the console's channels; picking a source shows a fake Claude Code's launch and hooks
-// live, each event's raw payload beside what Hive made of it; event type, provider and search filter the list; pause
+// live, each event's raw payload beside what Combwork made of it; event type, provider and search filter the list; pause
 // holds it (new events counted) and resume fills it in; clear empties it; the shortcut brings the open window forward;
 // it remembers its size; closing it ends capture; Clear while paused drops what was held for good; a console belongs to
 // its window's workspace (switching or closing it there closes the console and ends its capture, another window's
@@ -46,14 +46,14 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), ...claudeEnv })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), ...claudeEnv })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1400, height: 850 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     await lib.waitForProvider(inv)
     const b1 = await lib.addAgent(inv, alpha, { name: 'B1' })
@@ -108,22 +108,22 @@ const check = (name, ok, extra = '') => {
     await dc.locator('.dc-source').waitFor({ timeout: HUNG_MS })
     const title = await lib.until(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => w.getTitle()).find((x) => x.startsWith('Developer Console — consolewindow-ws')) ?? null), HUNG_MS)
     check('…titled for its workspace', !!title, String(title))
-    const outside = await dc.evaluate(() => window.hive.invoke('settings:update', { general: { userName: 'console-page' } }).then(() => 'allowed', (e) => e.message))
+    const outside = await dc.evaluate(() => window.combwork.invoke('settings:update', { general: { userName: 'console-page' } }).then(() => 'allowed', (e) => e.message))
     check("…and its page may call only the console's channels", /Not allowed/.test(outside) && (await inv('settings:get')).general.userName !== 'console-page', outside)
     check('…watching nothing until a source is picked', (await dc.locator('.dc-live').textContent()).includes('Not watching') && (await inv('console:sources')).every((s) => !s.capturing))
 
-    // --- The source picker: Combwork itself, the Assistant, and the project's agent (HI-2511: the app's name, never Hive's).
+    // --- The source picker: Combwork itself, the Assistant, and the project's agent (HI-2511: the app's name).
     const options = await lib.until(async () => {
       const o = await dc.locator('.dc-source option').evaluateAll((els) => els.map((e) => [e.value, e.textContent, e.parentElement.getAttribute('label')]))
       return o.some(([, t]) => t.startsWith('B1')) ? o : null
     }, HUNG_MS)
-    check('the picker lists Combwork, the Assistant and the project\'s agents', options?.some(([v, t, g]) => v.startsWith('hive:') && t.startsWith('Combwork') && g === 'Combwork') && options.some(([v, t, g]) => v.includes('#assistant') && t.startsWith('Assistant') && g === 'Combwork') && options.some(([, t, g]) => t.startsWith('B1') && g === 'alpha') && !options.some(([, t, g]) => /Hive/.test(`${t} ${g ?? ''}`)), JSON.stringify(options))
+    check('the picker lists Combwork, the Assistant and the project\'s agents', options?.some(([v, t, g]) => v.startsWith('combwork:') && t.startsWith('Combwork') && g === 'Combwork') && options.some(([v, t, g]) => v.includes('#assistant') && t.startsWith('Assistant') && g === 'Combwork') && options.some(([, t, g]) => t.startsWith('B1') && g === 'alpha') && options.filter(([, , g]) => g === 'Combwork').every(([, t]) => t.startsWith('Combwork') || t.startsWith('Assistant')), JSON.stringify(options))
     const b1Option = options.find(([, t]) => t.startsWith('B1'))[0]
     await dc.locator('.dc-source').selectOption(b1Option)
     await lib.until(async () => (await inv('console:sources')).find((s) => s.agentId === b1.id)?.capturing, HUNG_MS)
     check('picking B1 starts its capture, shown live', (await dc.locator('.dc-live').textContent()).includes('Live'))
 
-    // --- B1's launch and hooks arrive, each with what Hive made of it.
+    // --- B1's launch and hooks arrive, each with what Combwork made of it.
     await inv('session:start', alpha, { agentId: b1.id })
     const rows = () => dc.locator('.dc-row').evaluateAll((els) => els.map((e) => ({ seq: Number(e.dataset.seq), kind: e.dataset.kind, name: e.querySelector('.dc-name').textContent, summary: e.querySelector('.dc-summary').textContent })))
     const row = (pred) => lib.until(async () => (await rows()).find(pred), HUNG_MS)
@@ -135,7 +135,7 @@ const check = (name, ok, extra = '') => {
     await detail.waitFor({ timeout: HUNG_MS })
     const raw = await detail.locator('.dc-raw').textContent()
     const made = await detail.locator('.dc-made').textContent()
-    check('a picked event shows its raw payload beside what Hive made of it', raw.includes('hook_event_name') && raw.includes('"SessionStart"') && made.includes('event') && made.includes('"start"'), `${raw.slice(0, 200)} | ${made.slice(0, 200)}`)
+    check('a picked event shows its raw payload beside what Combwork made of it', raw.includes('hook_event_name') && raw.includes('"SessionStart"') && made.includes('event') && made.includes('"start"'), `${raw.slice(0, 200)} | ${made.slice(0, 200)}`)
     await dc.screenshot({ path: path.join(lib.WORK, 'consolewindow-detail.png') })
     await detail.locator('.icon-btn[aria-label="Close (Esc)"]').click()
     await lib.until(async () => (await inv('session:live')).find((s) => s.agentId === b1.id)?.status === 'ready', HUNG_MS)
@@ -185,7 +185,7 @@ const check = (name, ok, extra = '') => {
     const lastShown = Math.max(0, ...(await rows()).map((r) => r.seq))
     await lib.sendPrompt(inv, key, 'edit a.ts', { submitted: async () => /\(\d+ new\)/.test(await dc.locator('.dc-live').textContent()) })
     await lib.until(async () => (await inv('session:live')).find((s) => s.agentId === b1.id)?.status === 'ready', HUNG_MS)
-    const ring = () => dc.evaluate((src) => window.hive.invoke('console:snapshot', src, 0), b1Option)
+    const ring = () => dc.evaluate((src) => window.combwork.invoke('console:snapshot', src, 0), b1Option)
     const heldTurn = await lib.until(async () => {
       const r = (await ring()).filter((e) => e.seq > lastShown)
       return r.some((e) => e.name === 'Stop') ? r : null
@@ -235,7 +235,7 @@ const check = (name, ok, extra = '') => {
     const plain = await recordTurn(`edit a.ts ${SPOKEN}`, false)
     check('Record writes the source to a file, and the bar says where', !!plain.saved && plain.lines.length > 2, String(plain.saved))
     const plainHead = plain.lines[0]
-    check("…its header: Hive's version, the CLIs' installed and tested-with versions, no text", plainHead?.type === 'recording' && plainHead.text === false && plainHead.source?.kind === 'session' && plainHead.clis?.some((c) => c.provider === 'claude-code' && c.version), JSON.stringify(plainHead))
+    check("…its header: Combwork's version, the CLIs' installed and tested-with versions, no text", plainHead?.type === 'recording' && plainHead.text === false && plainHead.source?.kind === 'session' && plainHead.clis?.some((c) => c.provider === 'claude-code' && c.version), JSON.stringify(plainHead))
     check('…its events, the prompt among them, and its end', plain.lines.some((l) => l.type === 'event' && l.name === 'UserPromptSubmit') && plain.lines.at(-1)?.type === 'end' && plain.lines.at(-1).reason === 'stopped')
     check('…redacted: the prompt\'s words are not in it', !JSON.stringify(plain.lines).includes(SPOKEN))
     const spoken = await recordTurn(`edit a.ts ${SPOKEN}`, true)
@@ -253,7 +253,7 @@ const check = (name, ok, extra = '') => {
     // until it does there is no row (#723). The read is slowed here so it always comes last, and the checks wait for the
     // newest recording's row rather than reading once.
     await app.evaluate(() => {
-      process.env.HIVE_TEST_SLOW_IPC = 'console:recordings=1500'
+      process.env.CW_TEST_SLOW_IPC = 'console:recordings=1500'
     })
     await openDiagnostics()
     const offer = page.locator('.diagnostics-recording')
@@ -283,7 +283,7 @@ const check = (name, ok, extra = '') => {
     check('a recording with text is never offered', !!(await lib.until(notOffered, HUNG_MS)), JSON.stringify(await page.locator('.diagnostics-recording').allTextContents()))
     check("…nor the last open's row while its read is pending (#723)", staleOffer === 0, `a checkbox showed in ${staleOffer} looks`)
     await app.evaluate(() => {
-      delete process.env.HIVE_TEST_SLOW_IPC
+      delete process.env.CW_TEST_SLOW_IPC
     })
     await page.keyboard.press('Escape')
     await lib.until(async () => (await page.locator('.diagnostics-preview').count()) === 0, HUNG_MS)
@@ -291,8 +291,8 @@ const check = (name, ok, extra = '') => {
     await dc.locator('.dc-record').click()
     await dc.locator('.dc-record-start').click()
     const switched = await lib.until(async () => (await recordingText()).trim().match(/^Recording \d+ events to (console-\S+\.jsonl)/)?.[1] ?? null, HUNG_MS)
-    const hiveOption = (await dc.locator('.dc-source option').evaluateAll((els) => els.map((e) => e.value))).find((v) => v.startsWith('hive:'))
-    await dc.locator('.dc-source').selectOption(hiveOption)
+    const combworkOption = (await dc.locator('.dc-source option').evaluateAll((els) => els.map((e) => e.value))).find((v) => v.startsWith('combwork:'))
+    await dc.locator('.dc-source').selectOption(combworkOption)
     // The file's end line is written before the window hears it ended: wait for both.
     const switchedEnd = await lib.until(async () => {
       const end = readRecording(switched).find((l) => l.type === 'end')
@@ -314,19 +314,19 @@ const check = (name, ok, extra = '') => {
     check('…the shortcut and Help open the same window, not another', consoles().length === 1)
 
     // --- Closing it while a recording's start is still on its way (#638 round 2): nothing records, nothing captures.
-    const hiveLog = path.join(userData, 'logs', 'hive.log')
-    const notStarted = () => (fs.readFileSync(hiveLog, 'utf8').match(/recording not started/g) ?? []).length
+    const combworkLog = path.join(userData, 'logs', 'combwork.log')
+    const notStarted = () => (fs.readFileSync(combworkLog, 'utf8').match(/recording not started/g) ?? []).length
     const refusedBefore = notStarted()
     const filesBefore = new Set(fs.readdirSync(recordingsDir))
     await app.evaluate(() => {
-      process.env.HIVE_TEST_SLOW_IPC = 'console:record=1500*1'
+      process.env.CW_TEST_SLOW_IPC = 'console:record=1500*1'
     })
     await dc.locator('.dc-record').click()
     await dc.locator('.dc-record-start').click()
 
     // --- Closing it ends capture; it opens again at its size.
     await dc.close()
-    // The start, held back until after the close, is refused (Hive logs it), and makes no recording.
+    // The start, held back until after the close, is refused (Combwork logs it), and makes no recording.
     await lib.until(() => notStarted() > refusedBefore, HUNG_MS)
     const madeSince = fs.readdirSync(recordingsDir).filter((n) => !filesBefore.has(n))
     check('a recording started just as its console closes never records', madeSince.length === 0 && !(await inv('console:recordings')).latest?.recording, JSON.stringify(madeSince))
@@ -350,25 +350,25 @@ const check = (name, ok, extra = '') => {
     const page2 = await nextWindow
     page2.on('pageerror', (e) => check('no page errors (second window)', false, e.message))
     await lib.appReady(page2)
-    const inv2 = (ch, ...a) => page2.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv2 = (ch, ...a) => page2.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv2, page2, ws2)
     await inv2('console:open')
     // The console showing a workspace's sources, by its folder's name.
     const consoleOn = (name) =>
       lib.until(async () => {
         for (const c of consoles()) {
-          const list = await c.evaluate(() => window.hive.invoke('console:sources')).catch(() => null)
+          const list = await c.evaluate(() => window.combwork.invoke('console:sources')).catch(() => null)
           if (list?.length && list.every((x) => x.workspacePath.toLowerCase().endsWith(name))) return c
         }
         return null
       }, HUNG_MS)
     const dc2 = await consoleOn('consolewindow-ws2')
-    const hive2 = (await inv2('console:sources')).find((x) => x.kind === 'hive')
-    await lib.until(async () => (await dc2.locator('.dc-source option').evaluateAll((els) => els.map((e) => e.value))).includes(hive2.id), HUNG_MS)
-    await dc2.locator('.dc-source').selectOption(hive2.id)
-    const hive2Live = async () => !!(await inv2('console:sources')).find((x) => x.kind === 'hive')?.capturing && (await dc2.locator('.dc-live').textContent()).includes('Live')
-    await lib.until(hive2Live, HUNG_MS)
-    check("a second window's console watches its own workspace", await hive2Live())
+    const combwork2 = (await inv2('console:sources')).find((x) => x.kind === 'combwork')
+    await lib.until(async () => (await dc2.locator('.dc-source option').evaluateAll((els) => els.map((e) => e.value))).includes(combwork2.id), HUNG_MS)
+    await dc2.locator('.dc-source').selectOption(combwork2.id)
+    const combwork2Live = async () => !!(await inv2('console:sources')).find((x) => x.kind === 'combwork')?.capturing && (await dc2.locator('.dc-live').textContent()).includes('Live')
+    await lib.until(combwork2Live, HUNG_MS)
+    check("a second window's console watches its own workspace", await combwork2Live())
 
     await inv('session:stop', alpha, b1.id)
     await lib.until(async () => (await inv('session:live')).find((s) => s.agentId === b1.id)?.status !== 'ready', HUNG_MS)
@@ -377,21 +377,21 @@ const check = (name, ok, extra = '') => {
     check('another workspace opened in its window closes its console', !consoles().includes(again))
     const leftEnd = await lib.until(() => readRecording(leftRecording).find((l) => l.type === 'end') ?? null, HUNG_MS)
     check('…ending its recording', ['closed', 'workspace'].includes(leftEnd?.reason), JSON.stringify(leftEnd))
-    check("…and the other window's console carries on", consoles().includes(dc2) && (await hive2Live()))
+    check("…and the other window's console carries on", consoles().includes(dc2) && (await combwork2Live()))
     await inv('console:open')
     const dc3 = await consoleOn('consolewindow-ws3')
-    const ws3Sources = await dc3.evaluate(() => window.hive.invoke('console:sources'))
+    const ws3Sources = await dc3.evaluate(() => window.combwork.invoke('console:sources'))
     check('opened again, it shows the new workspace only', ws3Sources.every((x) => x.workspacePath.toLowerCase().endsWith('consolewindow-ws3')), JSON.stringify(ws3Sources.map((x) => x.id)))
-    const oldWatch = await dc3.evaluate((id) => window.hive.invoke('console:subscribe', [id]), b1Option)
-    const oldRead = await dc3.evaluate((id) => window.hive.invoke('console:snapshot', id, 0), b1Option)
+    const oldWatch = await dc3.evaluate((id) => window.combwork.invoke('console:subscribe', [id]), b1Option)
+    const oldRead = await dc3.evaluate((id) => window.combwork.invoke('console:snapshot', id, 0), b1Option)
     check("…and can't watch or read the old workspace's sources", JSON.stringify(oldWatch) === '{}' && oldRead.length === 0, `${JSON.stringify(oldWatch)} ${oldRead.length}`)
-    const hive3 = ws3Sources.find((x) => x.kind === 'hive')
-    await dc3.locator('.dc-source').selectOption(hive3.id)
-    await lib.until(async () => (await inv('console:sources')).find((x) => x.kind === 'hive')?.capturing, HUNG_MS)
+    const combwork3 = ws3Sources.find((x) => x.kind === 'combwork')
+    await dc3.locator('.dc-source').selectOption(combwork3.id)
+    await lib.until(async () => (await inv('console:sources')).find((x) => x.kind === 'combwork')?.capturing, HUNG_MS)
     await inv('workspace:close')
     await lib.until(() => !consoles().includes(dc3), HUNG_MS)
     check('closing the workspace closes its console', !consoles().includes(dc3))
-    check("…the other window's still carrying on", await hive2Live())
+    check("…the other window's still carrying on", await combwork2Live())
     await lib.openWorkspace(inv, page, ws)
     const back = await inv('console:sources')
     check('back in the first workspace, nothing of the old watch is captured or kept', back.length > 0 && back.every((x) => !x.capturing && x.events === 0), JSON.stringify(back))

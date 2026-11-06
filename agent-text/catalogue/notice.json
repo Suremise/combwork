@@ -5,7 +5,7 @@
   },
   "notice.decision.flag": {
     "text": "{cards} since you last read {n, plural, one {it} other {them}}: read {n, plural, one {the card} other {each card}} (cw_read_task) at your next checkpoint.",
-    "note": "#357: the flag after \"[Hive] \" in a hive tool's reply, when decisions were recorded or changed on the agent's cards since it last read them. cards: each card's decisions (notice.decision.card); n: how many cards."
+    "note": "#357: the flag after \"[CW] \" in a cw_ tool's reply, when decisions were recorded or changed on the agent's cards since it last read them. cards: each card's decisions (notice.decision.card); n: how many cards."
   },
   "notice.intent.already": {
     "text": "{card} is already {column}: carry on.",
@@ -13,7 +13,7 @@
   },
   "notice.intent.armed": {
     "text": "Combwork watches {card} for you, for {what, select, review {its review (a verdict, a move or a comment)} other {its next round in Review}}, up to {limit}: end your turn, and it wakes you.",
-    "note": "#1639: an intent's reply in a running lane: the card watch Hive armed for the agent. what: review after a builder's submit, round after a reviewer's failed verdict; limit: the lane's wait (\"2h\")."
+    "note": "#1639: an intent's reply in a running lane: the card watch Combwork armed for the agent. what: review after a builder's submit, round after a reviewer's failed verdict; limit: the lane's wait (\"2h\")."
   },
   "notice.intent.ownCovers": {
     "text": "You already watch {card} ({label}): end your turn.",
@@ -33,7 +33,7 @@
   },
   "notice.orphan.running": {
     "text": "{n, plural, one {A process your command started is} other {{count} processes your commands started are}} still running with the shell that started {n, plural, one {it} other {them}} gone: {list}. End {n, plural, one {it} other {them}} if not needed; Combwork won't.",
-    "note": "After \"[Hive] \", at the agent's next tool call or turn's end: processes its commands started still run with their shell gone (HI-2111), told once; Hive doesn't end them. n and count: how many; list: each process (notice.orphan.process), joined by \"; \"."
+    "note": "After \"[CW] \", at the agent's next tool call or turn's end: processes its commands started still run with their shell gone (HI-2111), told once; Combwork doesn't end them. n and count: how many; list: each process (notice.orphan.process), joined by \"; \"."
   },
   "notice.outage.after": {
     "text": "(Settings → Advanced: Resume agents after a connection drops.)",
@@ -49,15 +49,15 @@
   },
   "notice.outage.gaveUp": {
     "text": "{agent}'s connection dropped again after {resumes} resumes in an hour: Combwork stopped resuming it. The PC's network may not have recovered; the user was told the likely fixes (ipconfig /renew, ipconfig /flushdns, a restart).",
-    "note": "HI-1612: the Assistant's notice that Hive stopped resuming an agent whose connection kept dropping. agent: its name; resumes: how many in the past hour. ipconfig /renew and /flushdns are Windows commands."
+    "note": "HI-1612: the Assistant's notice that Combwork stopped resuming an agent whose connection kept dropping. agent: its name; resumes: how many in the past hour. ipconfig /renew and /flushdns are Windows commands."
   },
   "notice.outage.resumed": {
     "text": "{agent}'s connection dropped at {dropped}; it came back at {back} and Combwork resumed it.",
-    "note": "HI-1612: the Assistant's notice that an agent's dropped connection came back and Hive resumed it. agent: its name; dropped, back: times of day (notice.outage.clock)."
+    "note": "HI-1612: the Assistant's notice that an agent's dropped connection came back and Combwork resumed it. agent: its name; dropped, back: times of day (notice.outage.clock)."
   },
   "notice.outage.timedOut": {
     "text": "{agent}'s connection didn't come back within {minutes} minutes: Combwork stopped waiting. The user was told the likely fixes.",
-    "note": "HI-1612: the Assistant's notice that Hive stopped waiting for an agent's connection. agent: its name; minutes: how long it waited."
+    "note": "HI-1612: the Assistant's notice that Combwork stopped waiting for an agent's connection. agent: its name; minutes: how long it waited."
   },
   "notice.parked.background": {
     "text": "{n} background task(s)",
@@ -105,7 +105,7 @@
   },
   "notice.parked.state": {
     "text": "its state is {status}",
-    "note": "HI-2081: an agent the check can't take as parked: its status (status: Hive's code for it) isn't one it knows."
+    "note": "HI-2081: an agent the check can't take as parked: its status (status: Combwork's code for it) isn't one it knows."
   },
   "notice.parked.writer": {
     "text": "holds {slot}, whose processes still run",
@@ -113,19 +113,19 @@
   },
   "notice.restart.assistant": {
     "text": "Combwork restarted{quit, select, yes { after a quit} other { for an update}}{versions}. Resumed: {hasResumed, select, yes {{resumed}} other {none}}.{hasNot, select, yes { Not resumed: {not}.} other {}} Each resumed agent was told where it was; check their lanes carry on.",
-    "note": "HI-1707: the Assistant's notice after Hive resumed agents at a start. quit: yes after a quit (else an update, an install or a restart); versions: ' (1.0.0 → 1.0.1)' or nothing; resumed: those resumed, each 'name (project)', ', ' between; not: those not resumed, each 'name (project): state, why' (codes), '; ' between."
+    "note": "HI-1707: the Assistant's notice after Combwork resumed agents at a start. quit: yes after a quit (else an update, an install or a restart); versions: ' (1.0.0 → 1.0.1)' or nothing; resumed: those resumed, each 'name (project)', ', ' between; not: those not resumed, each 'name (project): state, why' (codes), '; ' between."
   },
   "notice.restart.restarting": {
     "text": "Combwork is restarting for an update. Your work is saved; you'll be resumed.",
-    "note": "HI-1707: the notice an agent finds in its inbox as Hive closes for an update, an install or a restart."
+    "note": "HI-1707: the notice an agent finds in its inbox as Combwork closes for an update, an install or a restart."
   },
   "notice.restart.resumed": {
     "text": "{reason, select, quit {Combwork was quit and started again} restart {Combwork restarted} other {Combwork restarted for an update}}{versions} at {time} UTC; your session was stopped and is resumed now.{where}{watch, select, yes { Carry on: re-arm your card watch if you were waiting.} other { Carry on where you were.}}",
-    "note": "HI-1707: the first prompt a resumed agent is given. reason: quit, restart or update (an install too); versions: \" (1.0.0 → 1.0.1)\" when the version changed, or nothing; time: when Hive closed (\"10:00\"); where: what it was on (notice.restart.where), after a space, or nothing; watch: yes when it was watching or in a lane."
+    "note": "HI-1707: the first prompt a resumed agent is given. reason: quit, restart or update (an install too); versions: \" (1.0.0 → 1.0.1)\" when the version changed, or nothing; time: when Combwork closed (\"10:00\"); where: what it was on (notice.restart.where), after a space, or nothing; watch: yes when it was watching or in a lane."
   },
   "notice.restart.where": {
     "text": "{onCard, select, yes {You were on {card}{hasRound, select, yes {, round {round}} other {}}{inLane, select, yes {, in lane ''{lane}'' (its {role, select, builder {builder} other {reviewer}})} other {}}} other {You were in lane ''{lane}'' (its {role, select, builder {builder} other {reviewer}})}}.",
-    "note": "HI-1707: what a resumed agent was on as Hive closed. onCard: yes with its card (card: \"HI-12\"; round: its round when hasRound is yes); inLane: yes with its lane (lane: its name or id; role: builder or reviewer). One of the two at least."
+    "note": "HI-1707: what a resumed agent was on as Combwork closed. onCard: yes with its card (card: \"HI-12\"; round: its round when hasRound is yes); inLane: yes with its lane (lane: its name or id; role: builder or reviewer). One of the two at least."
   },
   "notice.retry.after": {
     "text": "(Settings → Advanced: Retry wait: tell the Assistant after.)",

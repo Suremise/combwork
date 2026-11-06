@@ -1,9 +1,9 @@
 // The Assistant's journal in Settings (#1031): Settings → Assistant → Journal shows it on, work only by default, with no
-// journal yet; Hive's facts fill it (a card into Done) and its size shows; a kind ticked, its two numbers (a blank or
+// journal yet; Combwork's facts fill it (a card into Done) and its size shows; a kind ticked, its two numbers (a blank or
 // out-of-range box saving nothing, HI-2345), the journal turned off (the
 // entries kept) and on again are saved in the workspace's workspace.json; Delete Journal… asks, then the file goes to the
 // trash, and the copy starts with tips off. Both themes. No agents (its tools are measured in replysize). Dev build, or
-// a packaged one with HIVE_EXE (#1599: its deletion goes to the suite's trash folder too). Throwaway profile and workspace.
+// a packaged one with CW_EXE (#1599: its deletion goes to the suite's trash folder too). Throwaway profile and workspace.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -33,7 +33,7 @@ const saved = () => {
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)
-    // A test copy starts with tips off (HIVE_TEST_TIPS=off), packaged with HIVE_EXE too (#1599).
+    // A test copy starts with tips off (CW_TEST_TIPS=off), packaged with CW_EXE too (#1599).
     check('tips are off in a test copy, and no tip card shows', (await inv('settings:get')).general.showTips === false && (await page.locator('.tip-card').count()) === 0)
     const openSection = async () => {
       await page.keyboard.press('Control+,')
@@ -53,7 +53,7 @@ const saved = () => {
     check('no journal yet, kept on this computer only', /No journal yet\. Kept on this computer only/.test(await panel.innerText()), await panel.innerText())
     check('nothing to delete yet', await panel.getByRole('button', { name: 'Delete Journal…' }).isDisabled())
 
-    // A card into Done: a fact by Hive, and the size shows.
+    // A card into Done: a fact by Combwork, and the size shows.
     const card = await inv('tasks:create', { title: 'Shipped it', project: 'alpha' })
     await inv('tasks:update', card.number, { column: 'done' })
     await openSection()
@@ -105,7 +105,7 @@ const saved = () => {
     check('off is saved, and says the entries are kept', !!(await lib.until(async () => saved()?.enabled === false && /the entries are kept/.test(await panel.innerText()), HUNG_MS)))
     const other = await inv('tasks:create', { title: 'While off', project: 'alpha' })
     await inv('tasks:update', other.number, { column: 'done' })
-    check('while off, Hive writes nothing; the entry is kept', (await inv('journal:status')).entries === 1)
+    check('while off, Combwork writes nothing; the entry is kept', (await inv('journal:status')).entries === 1)
     await panel.getByRole('switch').click()
     check('on again', !!(await lib.until(() => saved()?.enabled === true, HUNG_MS)))
 

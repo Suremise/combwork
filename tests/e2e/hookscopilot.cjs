@@ -1,9 +1,9 @@
-// Hooks health, part 2, for Copilot (#1371): its hooks carry no turn id, and Hive has no screen reading of its turns, so
+// Hooks health, part 2, for Copilot (#1371): its hooks carry no turn id, and Combwork has no screen reading of its turns, so
 // before this a Copilot agent whose hooks stopped arriving was never flagged. Now its events.jsonl names each turn (an
 // interactionId), and a worked turn no hook came after is flagged. The real Copilot CLI, offline against the scripted
-// stand-in model (fake-copilot-api.cjs), in a home of the suite's own; Hive loses its hooks while a file is there
-// (HIVE_TEST_DROP_HOOKS: a Copilot hook can't be stopped at Copilot's end), and holds its checks while another is
-// (HIVE_TEST_HOOKS_HOLD), so each turn is over before any check looks. Hive's bound at 3 s.
+// stand-in model (fake-copilot-api.cjs), in a home of the suite's own; Combwork loses its hooks while a file is there
+// (CW_TEST_DROP_HOOKS: a Copilot hook can't be stopped at Copilot's end), and holds its checks while another is
+// (CW_TEST_HOOKS_HOLD), so each turn is over before any check looks. Combwork's bound at 3 s.
 // - a healthy quick turn is never flagged; with its hooks lost, a quick marked turn is: "transcript", naming that turn's
 //   interactionId, never the healthy one's;
 // - its hooks back, the next turn's hook clears it.
@@ -59,7 +59,7 @@ const jsonl = (file) => {
   fs.writeFileSync(path.join(userData, 'advanced.json'), JSON.stringify({ format: 1, values: { 'cw.hooks.missingSeconds': 3 } }, null, 2))
 
   const api = await startFakeCopilotApi({ log: apiLog })
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47847), HIVE_TEST_TIPS: 'off', HIVE_TEST_HOOKS_HOLD: hold, HIVE_TEST_DROP_HOOKS: drop, ...copilotTestEnv(api, copilotDir, { above: lib.WORK }) })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47847), CW_TEST_TIPS: 'off', CW_TEST_HOOKS_HOLD: hold, CW_TEST_DROP_HOOKS: drop, ...copilotTestEnv(api, copilotDir, { above: lib.WORK }) })
   // The folder is trusted already: Copilot goes straight to loading.
   fs.writeFileSync(path.join(copilotHome, 'config.json'), JSON.stringify({ trustedFolders: [proj] }, null, 2))
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
@@ -68,7 +68,7 @@ const jsonl = (file) => {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1200, height: 800 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     const info = await lib.until(async () => { const i = (await inv('provider:info')).copilot; return i && !i.checking ? i : null }, 60000, 500)
     check('Copilot found', !!info?.found, JSON.stringify(info && { found: info.found, path: info.path }))
     console.log(`Copilot CLI ${info?.version ?? '?'} (${info?.source ?? '?'}), offline against the stand-in at ${api.url}`)
@@ -89,7 +89,7 @@ const jsonl = (file) => {
       const stopped = all.slice(i).some((e) => e.type === 'hook.end' && e.data?.hookType === 'agentStop')
       return worked && stopped ? id : null
     }
-    /** One quick turn with Hive's checks held until it is over in Copilot's own records. Its interactionId. */
+    /** One quick turn with Combwork's checks held until it is over in Copilot's own records. Its interactionId. */
     const quickTurn = async (text) => {
       fs.writeFileSync(hold, '')
       await inv('pty:write', key, text)

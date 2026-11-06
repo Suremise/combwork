@@ -10,7 +10,7 @@ import { cardChange, readCondition, wakeAbout, wakeLine, watchLabel } from '../s
 import type { TaskCard } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-columns-')
+const base = tempDir('cw-columns-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -134,20 +134,20 @@ describe('waiting on the new columns', () => {
 
   it("another agent's card in Passed: who passed it, and that Passed isn't merged; in Done (merged), no such note", () => {
     const history = [
-      { at: at(1), by: 'Claude (hive)', what: 'Moved to Review' },
-      { at: at(2), by: 'Codex (hive)', what: 'Review passed' },
-      { at: at(2), by: 'Codex (hive)', what: 'Moved to Passed' }
+      { at: at(1), by: 'Claude (demo)', what: 'Moved to Review' },
+      { at: at(2), by: 'Codex (demo)', what: 'Review passed' },
+      { at: at(2), by: 'Codex (demo)', what: 'Moved to Passed' }
     ]
-    expect(line(card({ agent: 'a1', agentName: 'Claude', column: 'passed', history }))).toMatch(/^\[CW\] #7 \(Claude's card\) is in Passed: Codex \(hive\) passed it \(Passed isn't merged\)\. /)
-    const merged = [...history, { at: at(3), by: 'Claude (hive)', what: 'Moved to Done' }]
-    expect(line(card({ agent: 'a1', agentName: 'Claude', column: 'done', history: merged }))).toMatch(/^\[CW\] #7 \(Claude's card\) is in Done: Codex \(hive\) passed it\. /)
+    expect(line(card({ agent: 'a1', agentName: 'Claude', column: 'passed', history }))).toMatch(/^\[CW\] #7 \(Claude's card\) is in Passed: Codex \(demo\) passed it \(Passed isn't merged\)\. /)
+    const merged = [...history, { at: at(3), by: 'Claude (demo)', what: 'Moved to Done' }]
+    expect(line(card({ agent: 'a1', agentName: 'Claude', column: 'done', history: merged }))).toMatch(/^\[CW\] #7 \(Claude's card\) is in Done: Codex \(demo\) passed it\. /)
     // The watcher's own card says nothing of whose it is or of merging.
     expect(line(card({ agent: 'a2', column: 'passed', history }), 'a2')).toMatch(/^\[CW\] #7 is in Passed\. /)
   })
 
   it('a card moved On Hold starts a new round: an earlier verdict no longer speaks for it', () => {
     const history = [
-      { at: at(1), by: 'Codex (hive)', what: 'Review passed' },
+      { at: at(1), by: 'Codex (demo)', what: 'Review passed' },
       { at: at(2), by: 'You', what: 'Moved to On Hold' },
       { at: at(3), by: 'You', what: 'Moved to Passed' }
     ]

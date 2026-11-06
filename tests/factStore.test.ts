@@ -1,6 +1,6 @@
-// The fact store in the workspace's hive.db (#1215, SPEC §16.4): facts, actions and the stage cache written in the board's
+// The fact store in the workspace's combwork.db (#1215, SPEC §16.4): facts, actions and the stage cache written in the board's
 // transaction (a change undone leaves none of them), the actions worker (each action's effect once, also when run
-// again after a crash or at the same time: claimed before it runs, or found delivered, #1266), two Hives observing one transition writing it once, and the runtime's
+// again after a crash or at the same time: claimed before it runs, or found delivered, #1266), two Combworks observing one transition writing it once, and the runtime's
 // columns of a card kept by the board's own saves while the card's JSON stays as it was.
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -10,7 +10,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
 import { writeCardOutside } from './boardDb'
 
-const base = tempDir('hive-fact-store-')
+const base = tempDir('cw-fact-store-')
 // The longest a wait here waits for what it waits on: a bound for a hung run (tests/README.md).
 const HUNG_MS = 10_000
 mkdirSync(join(base, 'profile'), { recursive: true })
@@ -63,7 +63,7 @@ describe('the facts step (#1215)', () => {
   })
 })
 
-describe('the fact store in hive.db (#1215)', () => {
+describe('the fact store in combwork.db (#1215)', () => {
   it("writes inside the caller's board change: undone with it, a fact, an action and the stage leave nothing", async () => {
     const { ws, w } = await workspace()
     const facts = FactStore.forBoard(w, scope)
@@ -113,11 +113,11 @@ describe('the fact store in hive.db (#1215)', () => {
   it('a restart runs a claimed action a crash left pending, once; one claimed before the crash is not run again (#1266)', async () => {
     const { ws, w } = await workspace()
     const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Crashed', project: 'p' }, user))).number
-    // Written by another Hive's connection (no worker there runs them): left pending, as a crash right after the commit.
+    // Written by another Combwork's connection (no worker there runs them): left pending, as a crash right after the commit.
     const other = FactStore.open(store.boardFile(ws), scope)
     stores.push(other)
     const [first, second] = other.tx((tx) => [tx.action(card, 'notice', { n: 1 }, null), tx.action(card, 'notice', { n: 2 }, null)])
-    // The second was claimed (marked done before its effect), and Hive ended before its effect: at most once, never again.
+    // The second was claimed (marked done before its effect), and Combwork ended before its effect: at most once, never again.
     other.markAction(second, 'done')
     const ran: unknown[] = []
     worker.onAction('notice', (a) => void ran.push(a.payload.n))
@@ -156,7 +156,7 @@ describe('the fact store in hive.db (#1215)', () => {
     expect(actionsOf(ws)).toMatchObject([{ id: first, state: 'done' }, { id: second, state: 'done' }])
   })
 
-  it('two runs at once, as two Hives would: each claimed action runs once', async () => {
+  it('two runs at once, as two Combworks would: each claimed action runs once', async () => {
     const { ws, w } = await workspace()
     const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Twice', project: 'p' }, user))).number
     const other = FactStore.open(store.boardFile(ws), scope)
@@ -176,7 +176,7 @@ describe('the fact store in hive.db (#1215)', () => {
     stores.push(other)
     const id = other.tx((tx) => tx.action(card, 'wake', { agent: 'r1' }, null))
     expect(other.deliver({ action: id, kind: 'wake', target: 'r1', payload: { agent: 'r1' } })).toBe(true)
-    // Again (a restart, another Hive's runner): the unique row is there.
+    // Again (a restart, another Combwork's runner): the unique row is there.
     const again = FactStore.open(store.boardFile(ws), scope)
     stores.push(again)
     expect(again.deliver({ action: id, kind: 'wake', target: 'r1', payload: { agent: 'r1' } })).toBe(false)
@@ -193,7 +193,7 @@ describe('the fact store in hive.db (#1215)', () => {
     // A copy each time: changing one read leaves the next as it was.
     facts.facts(card).push({} as never)
     expect(factsOf(facts, card)).toEqual([])
-    // Another connection's commit (another Hive's): read again.
+    // Another connection's commit (another Combwork's): read again.
     const other = FactStore.open(store.boardFile(ws), scope)
     stores.push(other)
     other.tx((tx) => tx.appendObserved(card, seen('a')))
@@ -253,7 +253,7 @@ describe('the fact store in hive.db (#1215)', () => {
     expect(factsOf(facts, card)).toEqual(['HeadMoved'])
   })
 
-  it('two Hives (two connections) observing one transition write it once; the loser reads what is there', async () => {
+  it('two Combworks (two connections) observing one transition write it once; the loser reads what is there', async () => {
     const { ws, w } = await workspace()
     const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Observed', project: 'p' }, user))).number
     const a = FactStore.open(store.boardFile(ws), scope)
@@ -717,9 +717,9 @@ describe("a card by its key (#1294)", () => {
   })
 
   it('the name form trailers were written with still finds a card where its name is no key; a card without a key keeps that name', () => {
-    const { file, ids } = board([['other', 1], ['hive', 1], ['alpha-web', null]], [['p-other', 'OT', true], ['p-hive', 'HI', true]])
-    const hive = storeOf(file, 'hive')
-    expect(byKey(hive, [`hive-${ids[1]}`, 'HI-1', 'hive-1'])).toEqual({ [`hive-${ids[1]}`]: ids[1], 'HI-1': ids[1], 'hive-1': null })
+    const { file, ids } = board([['other', 1], ['demo', 1], ['alpha-web', null]], [['p-other', 'OT', true], ['p-demo', 'DE', true]])
+    const demo = storeOf(file, 'demo')
+    expect(byKey(demo, [`demo-${ids[1]}`, 'DE-1', 'demo-1'])).toEqual({ [`demo-${ids[1]}`]: ids[1], 'DE-1': ids[1], 'demo-1': null })
     const web = storeOf(file, 'alpha-web')
     expect([web.projectKey(), web.card(ids[2]).key, web.cardByKey(`alpha-web-${ids[2]}`)?.id]).toEqual(['alpha-web', `alpha-web-${ids[2]}`, ids[2]])
   })

@@ -2,7 +2,7 @@
 // terminal had another size, stayed at the old width (stacked "Loading" frames, rules cut short) until the window was
 // resized. The real Copilot CLI, offline against the scripted stand-in model (fake-copilot-api.cjs), in a folder it
 // already trusts. Started while Settings hides its pane and the window changes size: its terminal is the process's size
-// meanwhile (not xterm's 80 × 24); shown, it is fitted, and Hive gives Copilot a size refresh once it is ready. Started
+// meanwhile (not xterm's 80 × 24); shown, it is fitted, and Combwork gives Copilot a size refresh once it is ready. Started
 // while the window changes size several times: the same. Switched live to Plan and back: a refresh after each.
 // Restarted in another mode (Ask): the new process starts at the pane's size. Each time the screen is checked: one
 // prompt, one header, full-width rules, no loading frames left; then the pane shows it, as drawn (HI-2277: a clean
@@ -43,17 +43,17 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
   const api = await startFakeCopilotApi({ log: apiLog })
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47820), ...copilotTestEnv(api, copilotDir, { above: lib.WORK }) })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47820), ...copilotTestEnv(api, copilotDir, { above: lib.WORK }) })
   // The folder is trusted already (as "Yes, and remember this folder" saves it): Copilot goes straight to loading.
   fs.writeFileSync(path.join(copilotHome, 'config.json'), JSON.stringify({ trustedFolders: [proj] }, null, 2))
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
-  const hiveLog = path.join(userData, 'logs', 'hive.log')
-  /** The size refreshes Hive has given Copilot so far ("cols × rows"). */
+  const combworkLog = path.join(userData, 'logs', 'combwork.log')
+  /** The size refreshes Combwork has given Copilot so far ("cols × rows"). */
   const refreshes = () => {
     try {
-      return [...fs.readFileSync(hiveLog, 'utf8').matchAll(/size refresh .*?: (\d+) × (\d+)/g)].map((m) => `${m[1]}x${m[2]}`)
+      return [...fs.readFileSync(combworkLog, 'utf8').matchAll(/size refresh .*?: (\d+) × (\d+)/g)].map((m) => `${m[1]}x${m[2]}`)
     } catch {
       return []
     }
@@ -61,7 +61,7 @@ const check = (name, ok, extra = '') => {
   try {
     await lib.fitWindow(app, page, { width: 1000, height: 800 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     const info = await lib.until(async () => { const i = (await inv('provider:info')).copilot; return i && !i.checking ? i : null }, 60000, 500)
     check('Copilot found', !!info?.found, JSON.stringify(info && { found: info.found, path: info.path }))
     console.log(`Copilot CLI ${info?.version ?? '?'} (${info?.source ?? '?'}), offline against the stand-in at ${api.url}`)
@@ -72,8 +72,8 @@ const check = (name, ok, extra = '') => {
     const status = async () => (await live())?.status
     const ready = (ms = 30000) => lib.until(async () => (await status()) === 'ready', ms, 100)
     const stopped = () => lib.until(async () => !(await live()), 30000, 200)
-    const term = () => page.evaluate((k) => window.__hiveTerminalState?.(k) ?? null, key)
-    const lines = () => page.evaluate((k) => window.__hiveTerminalLines?.(k) ?? null, key)
+    const term = () => page.evaluate((k) => window.__cwTerminalState?.(k) ?? null, key)
+    const lines = () => page.evaluate((k) => window.__cwTerminalLines?.(k) ?? null, key)
     const settingsBtn = page.locator('.activity-btn[aria-label="Settings"]')
     const projectsBtn = page.locator('.activity-btn[aria-label="Projects"]')
     const resizeAt = (steps) => steps.map(([ms, w, h]) => new Promise((r) => setTimeout(() => void lib.fitWindow(app, page, { width: w, height: h }).then(r), ms)))
@@ -81,11 +81,11 @@ const check = (name, ok, extra = '') => {
     /**
      * What a clean Copilot screen holds once it has settled, at the terminal's size: its header once, its prompt once,
      * every rule (a line of ─) as wide as the terminal, and no loading frame left over. A screen drawn at another
-     * width has short rules, and stacked frames repeat the prompt or leave "Loading:" lines. Checked once Hive has given
+     * width has short rules, and stacked frames repeat the prompt or leave "Loading:" lines. Checked once Combwork has given
      * Copilot its size refresh (the `refreshed`-th) and Copilot has redrawn: the screen as it is then, or after 10 s.
      */
     const cleanScreen = async (label, refreshed) => {
-      check(`${label}: Hive gave Copilot a size refresh once it was ready`, !!(await lib.until(() => refreshes().length >= refreshed, 10000, 100)), JSON.stringify(refreshes()))
+      check(`${label}: Combwork gave Copilot a size refresh once it was ready`, !!(await lib.until(() => refreshes().length >= refreshed, 10000, 100)), JSON.stringify(refreshes()))
       const look = async () => {
         const t = await term()
         const pty = await inv('pty:size', key)
@@ -128,7 +128,7 @@ const check = (name, ok, extra = '') => {
         // Never getContext here: on a canvas without one it would make one (a WebGL context of the probe's own).
         const canvases = [...h.querySelectorAll('canvas')].map((c) => `${c.width}x${c.height}${c.isConnected ? '' : ' detached'}`)
         const rows = h.querySelector('.xterm-rows')
-        return { host: true, box: r ? { x: r.x, y: r.y, width: r.width, height: r.height } : null, bg: getComputedStyle(h).getPropertyValue('--terminal-bg').trim(), connected: !!h.querySelector('.xterm')?.isConnected, canvases, domRows: rows ? rows.children.length : null, domText: rows ? (rows.textContent ?? '').replace(/\s+/g, '').length : null, webgl: window.__hiveWebglCount?.() ?? null }
+        return { host: true, box: r ? { x: r.x, y: r.y, width: r.width, height: r.height } : null, bg: getComputedStyle(h).getPropertyValue('--terminal-bg').trim(), connected: !!h.querySelector('.xterm')?.isConnected, canvases, domRows: rows ? rows.children.length : null, domText: rows ? (rows.textContent ?? '').replace(/\s+/g, '').length : null, webgl: window.__cwWebglCount?.() ?? null }
       }, key)
       const box = state.box
       if (!box || box.width < 10 || box.height < 10) return { ink: 0, state }
@@ -199,7 +199,7 @@ const check = (name, ok, extra = '') => {
     check('…its size refresh ends at the terminal’s size', after.length >= 1 && after.every((s) => s === `${t2?.cols}x${t2?.rows}`), JSON.stringify({ after, t2 }))
     await page.screenshot({ path: path.join(lib.WORK, 'copilotsize-2-load.png') })
 
-    // Accept edits (Copilot's default): Hive's badge says why Copilot's own footer still says Manual Approval.
+    // Accept edits (Copilot's default): Combwork's badge says why Copilot's own footer still says Manual Approval.
     check('Accept edits: the session runs in it', (await live())?.permissionMode === 'accept-edits', (await live())?.permissionMode)
     const badge = page.locator('.mode-badge', { hasText: 'Accept edits' }).first()
     await badge.hover()

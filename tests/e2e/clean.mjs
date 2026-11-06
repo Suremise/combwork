@@ -1,4 +1,4 @@
-// Housekeeping for %LOCALAPPDATA%\hive-test (#253): what the tests leave behind there is removed once it is no longer
+// Housekeeping for %LOCALAPPDATA%\combwork-test (#253): what the tests leave behind there is removed once it is no longer
 // needed, so the folder stays small without anyone tidying it by hand.
 //
 //   npm run test:clean                  removes what is stale and prints each area's size
@@ -14,8 +14,8 @@
 //   pruned: logs.mjs, #285), and anything left from before suites had folders of their own, whatever their age. In an idle
 //   scenario lane: numbered copies (`<scenario>-2`…) whatever their age, the rest (what --keep left) by age.
 // - In the e2e work folder: anything but `lanes` and `logs` older than the age (suites run on their own, probes).
-// - Anything else in hive-test older than the age (one-off folders and files: reviewers' and builders' probes).
-//   `scratch\<agent>-<date>` is the place for probes that must be under hive-test: its folders go by the same age.
+// - Anything else in combwork-test older than the age (one-off folders and files: reviewers' and builders' probes).
+//   `scratch\<agent>-<date>` is the place for probes that must be under combwork-test: its folders go by the same age.
 // - In `tmp` (the test runs' temp folders: tests/runTemp.mts, #992, HI-2102): anything older than a day (TMP_DAYS; --days less
 //   than that goes by --days). Each test removes its own; this is for what a stopped run left.
 // - In the Codex test home (#404, codexPlan), under its lease (codexHomeLock.mjs; nothing while a run holds it): rollouts
@@ -50,7 +50,7 @@ export const PRUNE_DAYS = 3
 export const TMP_DAYS = 1
 const DAY = 24 * 60 * 60_000
 
-/** What stays in hive-test whatever its age, and why (the names of its own folders and files). */
+/** What stays in combwork-test whatever its age, and why (the names of its own folders and files). */
 export const KEPT = {
   codex: 'the Codex test home (its sign-in; old rollouts, package copies and unfinished downloads go: codexPlan)',
   claude: 'the Claude Code test home (its sign-in)',
@@ -108,7 +108,7 @@ export function lastChanged(p) {
 }
 
 /**
- * What the clean-up would do in root (hive-test): [{ path, rel, remove, why }] for each thing it looked at (not the
+ * What the clean-up would do in root (combwork-test): [{ path, rel, remove, why }] for each thing it looked at (not the
  * kept areas), in order. held(k): whether lane k's claim is held (the clean-up claims an idle lane before removing
  * anything in it: clean()). ev: the evidence rules (evidence.cjs), which keep what cards cite and, while the board
  * can't be read, everything.
@@ -318,7 +318,7 @@ function laneOf(root, p) {
  * { items, removed: [{ rel, size }], failed: [{ rel, error }], freed, stopped }.
  */
 // The lanes it prunes, root's e2e/lanes/<k> and scenarios/lanes/<k>, are the machine pool's, so the claims that protect
-// them are the machine pool's too (#1133): a runner with a pool of its own (HIVE_TEST_LANES_DIR: the concurrency check's
+// them are the machine pool's too (#1133): a runner with a pool of its own (CW_TEST_LANES_DIR: the concurrency check's
 // waiting runs) read its own pool's claims, found lanes 0 and 1 free there as it ended, and removed the machine lanes'
 // folders under other worktrees' running suites (their fake CLIs' homes, which no process held open; the fakes died).
 export async function clean({ root = runContext.TEST_ROOT, lanesDir = runContext.MACHINE_LANES_DIR, days = PRUNE_DAYS, dryRun = false, budgetMs = Infinity, ev, now = Date.now(), alive = processAlive, owner = process.pid, acquire = acquireCodexHome } = {}) {
@@ -410,11 +410,11 @@ export const mb = (bytes) => (bytes >= 1024 ** 3 ? `${(bytes / 1024 ** 3).toFixe
 export async function autoClean({ root, ev = evidenceFor(root), log = console.log, budgetMs = 60_000 } = {}) {
   try {
     const r = await clean({ budgetMs, ev })
-    if (r.blocked) log(`\nHousekeeping (hive-test): nothing removed: ${r.blocked}.`)
+    if (r.blocked) log(`\nHousekeeping (combwork-test): nothing removed: ${r.blocked}.`)
     else if (r.removed.length || r.failed.length || r.stopped)
-      log(`\nHousekeeping (hive-test): removed ${r.removed.length} stale item${r.removed.length === 1 ? '' : 's'} (${mb(r.freed)})${r.failed.length ? `, ${r.failed.length} kept (in use, or cited meanwhile)` : ''}${r.stopped ? '; the rest next time' : ''}. npm run test:clean -- --dry-run lists what is there.`)
+      log(`\nHousekeeping (combwork-test): removed ${r.removed.length} stale item${r.removed.length === 1 ? '' : 's'} (${mb(r.freed)})${r.failed.length ? `, ${r.failed.length} kept (in use, or cited meanwhile)` : ''}${r.stopped ? '; the rest next time' : ''}. npm run test:clean -- --dry-run lists what is there.`)
   } catch (e) {
-    log(`\nHousekeeping (hive-test) didn't run: ${e.message}`)
+    log(`\nHousekeeping (combwork-test) didn't run: ${e.message}`)
   }
 }
 
@@ -444,9 +444,10 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     console.error(`Usage: npm run test:clean [-- --dry-run] [--days N]${unknown.length ? ` (unknown: ${unknown.join(' ')})` : ''}`)
     process.exit(2)
   }
+  require('../testArea.cjs').assertReady() // not before the test area's move (HI-2590)
   const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
   const ev = evidenceFor(root)
-  console.log(`hive-test: ${runContext.TEST_ROOT}`)
+  console.log(`combwork-test: ${runContext.TEST_ROOT}`)
   if (!ev.ok) console.log(`Nothing is removed: ${ev.why}.`)
   const r = await clean({ days, dryRun, ev })
   for (const i of r.items.filter((x) => !x.remove && !x.why.startsWith('newer than '))) console.log(`  kept: ${i.rel} (${i.why})`)

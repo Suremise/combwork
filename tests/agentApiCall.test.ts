@@ -1,4 +1,4 @@
-// The hive MCP server's Agent API calls (#371): Node's http rather than fetch, whose 300 s limit on a reply's headers
+// The combwork MCP server's Agent API calls (#371): Node's http rather than fetch, whose 300 s limit on a reply's headers
 // cut waits short. Against a fake slow server: a reply whose headers come late still arrives; the call's own deadline
 // is the only limit, and ends the request; errors and the request itself come through as before.
 import { createServer, type IncomingMessage, type Server } from 'http'
@@ -42,16 +42,16 @@ describe('agentApiCall (#371)', () => {
   it('waits for headers as long as its deadline allows, sending the method, headers and body', async () => {
     const s = await slowServer(1200, 200, '{"changes":[]}')
     const started = Date.now()
-    const r = await agentApiCall(`${s.url}/v1/tasks/wait`, 'POST', { Authorization: 'Bearer t', 'Content-Type': 'application/json', 'X-Hive-Workspace': 'C%3A%5Cws' }, JSON.stringify({ cards: [3], timeoutSeconds: 600 }), 10_000)
+    const r = await agentApiCall(`${s.url}/v1/tasks/wait`, 'POST', { Authorization: 'Bearer t', 'Content-Type': 'application/json', 'X-Combwork-Workspace': 'C%3A%5Cws' }, JSON.stringify({ cards: [3], timeoutSeconds: 600 }), 10_000)
     expect(Date.now() - started).toBeGreaterThanOrEqual(1100)
     expect(r).toEqual({ status: 200, text: '{"changes":[]}' })
     expect(s.got[0]).toMatchObject({ method: 'POST', body: '{"cards":[3],"timeoutSeconds":600}' })
-    expect(s.got[0].headers).toMatchObject({ authorization: 'Bearer t', 'content-type': 'application/json', 'x-hive-workspace': 'C%3A%5Cws', 'content-length': '34' })
+    expect(s.got[0].headers).toMatchObject({ authorization: 'Bearer t', 'content-type': 'application/json', 'x-combwork-workspace': 'C%3A%5Cws', 'content-length': '34' })
   })
 
   it('a reply later than its deadline fails, saying so, and the request ends (the server sees it go)', async () => {
     const s = await slowServer(3000)
-    await expect(agentApiCall(`${s.url}/v1/agents/wait`, 'POST', {}, '{}', 300)).rejects.toThrow("Hive didn't reply within 1 s")
+    await expect(agentApiCall(`${s.url}/v1/agents/wait`, 'POST', {}, '{}', 300)).rejects.toThrow("Combwork didn't reply within 1 s")
     await expect.poll(() => s.closed.length, { timeout: HUNG_MS }).toBe(1)
   })
 
@@ -62,7 +62,7 @@ describe('agentApiCall (#371)', () => {
     expect(s.got[0].headers['content-length']).toBeUndefined()
   })
 
-  it('no Hive listening: the call fails at once', async () => {
+  it('no Combwork listening: the call fails at once', async () => {
     const s = await slowServer(0)
     const url = s.url
     await new Promise<void>((r) => server!.close(() => r()))
@@ -76,14 +76,26 @@ describe('agentApiCall (#371)', () => {
     expect((await agentApiCall(`${s.url}/v1/tasks/1`, 'GET', {}, undefined)).text).toBe(reply)
   })
 
-  it("passes on Hive's X-Hive-Notice header (#357's new-decision flag), still encoded", async () => {
+  it("passes on Combwork's X-Combwork-Notice header (#357's new-decision flag), still encoded", async () => {
     const line = encodeURIComponent('[CW] #4 has 1 new decision since you last read it: read the card (cw_read_task) at your next checkpoint.')
     server = createServer((_req, res) => {
-      res.setHeader('X-Hive-Notice', line)
+      res.setHeader('X-Combwork-Notice', line)
       res.end('{}')
     })
     await new Promise<void>((r) => server!.listen(0, '127.0.0.1', () => r()))
     const url = `http://127.0.0.1:${(server!.address() as AddressInfo).port}`
     expect(await agentApiCall(`${url}/v1/projects/alpha`, 'GET', {}, undefined)).toEqual({ status: 200, text: '{}', notice: line })
+  })
+
+  it('HI-2588: a notice header by any other name (X-Other-Notice) is not read', async () => {
+    server = createServer((_req, res) => {
+      res.setHeader('X-Other-Notice', encodeURIComponent('[CW] an old notice'))
+      res.end('{}')
+    })
+    await new Promise<void>((r) => server!.listen(0, '127.0.0.1', () => r()))
+    const url = `http://127.0.0.1:${(server!.address() as AddressInfo).port}`
+    const r = await agentApiCall(`${url}/v1/projects/alpha`, 'GET', {}, undefined)
+    expect(r).toMatchObject({ status: 200, text: '{}' })
+    expect(r.notice ?? null).toBeNull()
   })
 })

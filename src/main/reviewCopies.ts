@@ -12,7 +12,7 @@
 //   reviewer's session ended: tasks.ts ends its reviews) at the pools' next look (`over`). A pass made stale by a
 //   decision (§16.4.6) is reviewed again: that start review leases one again.
 // - Not leased: with review copies off (Settings → Advanced, Reviewers review in review copies) or workflow rules not
-//   enforced (Workflow rules are enforced: off, Hive records facts and acts on none, so nothing is leased, a review
+//   enforced (Workflow rules are enforced: off, Combwork records facts and acts on none, so nothing is leased, a review
 //   waiting for one is dropped and told, and one leased as it was turned off is returned; copies out are still returned
 //   and freed), or for a session that wasn't granted the folder (a provider without `extraDirs`, a session started before it was on): its reviewer reviews
 //   the builder's folder read-only as before.
@@ -346,8 +346,8 @@ function reviewCopiesOff(): Reason | null {
  * the background (the pools' look) as often as not, where no scope is open.
  */
 export async function tellReviewer(projectPath: string, agent: Reviewer, card: number, text: () => string): Promise<void> {
-  // agent-protocol: the sender is the product's name, Hive
-  await leaveMessage(projectPath, agent.id, agent.name, { kind: 'hive', name: 'Combwork' }, inDialectOf({ projectPath, agentId: agent.id }, text), card) // i18n-ignore: the sender's name agents read
+  // agent-protocol: the sender is the product's name, Combwork
+  await leaveMessage(projectPath, agent.id, agent.name, { kind: 'combwork', name: 'Combwork' }, inDialectOf({ projectPath, agentId: agent.id }, text), card) // i18n-ignore: the sender's name agents read
 }
 
 /** A project's review copies in a workspace (made on first use, for the workspace's life). */

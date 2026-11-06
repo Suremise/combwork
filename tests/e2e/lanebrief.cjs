@@ -1,8 +1,8 @@
 // A lane's brief reaches the conversation that works its cards (HI-1795, SPEC §16.10.2), on fake Claude Code agents, the
 // Assistant off: alpha builds cards in slots. B1, running in the project folder, starts its own lane with a brief
-// (`POST /v1/lanes` `brief`), then its first card: Hive places it in its slot in a new conversation, and that
+// (`POST /v1/lanes` `brief`), then its first card: Combwork places it in its slot in a new conversation, and that
 // conversation's first prompt carries the card and the brief. Then, in its turn, it edits the brief and moves on to the
-// next card; Hive is quit with that card's placement owed (B1 busy), and the next start resumes B1's conversation there
+// next card; Combwork is quit with that card's placement owed (B1 busy), and the next start resumes B1's conversation there
 // (HI-1746) with the card and the edited brief. A list change racing a lane's end (HI-2097): a script's start just after
 // B2's lane ended carries its brief and name, leaves out the Done card, and POST /v1/lanes' note says so.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
@@ -19,7 +19,7 @@ const home = at('claude-home')
 const alpha = path.join(ws, 'alpha')
 const root = path.join(`${ws}.worktrees`, 'alpha')
 const PORT = Number(lib.port(47794))
-const identity = { name: 'Hive Slot Test', email: 'slots@example.com' }
+const identity = { name: 'Combwork Slot Test', email: 'slots@example.com' }
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -42,7 +42,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
 
   let h = null
   const start = async () => {
-    h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off' } })
+    h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off' } })
     h.page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.waitForProvider(h.inv)
     await lib.openWorkspace(h.inv, h.page, ws)
@@ -60,8 +60,8 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     if (!(await live(id))) await inv('session:start', alpha, { agentId: id })
     const sessionId = await until(async () => (await live(id))?.sessionId, HUNG_MS)
     const launch = await until(() => launches().filter((l) => l.sessionId === sessionId && l.opts['--mcp-config'] && fs.existsSync(l.opts['--mcp-config'])).at(-1), HUNG_MS)
-    const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
-    return hive ? JSON.parse(fs.readFileSync(hive.env.CW_API_TOKEN_FILE, 'utf8')).token : null
+    const server = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
+    return server ? JSON.parse(fs.readFileSync(server.env.CW_API_TOKEN_FILE, 'utf8')).token : null
   }
   const api = async (token, route, body) => {
     const res = await fetch(`http://127.0.0.1:${PORT}${route}`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).catch(() => null)
@@ -84,7 +84,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
 
   try {
     await start()
-    await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'hiveMerges', folder: 'slots', target: 'integration', style: 'merge', preChecks: [], mergeChecks: [], identity, okBefore: { mode: 'never', labels: [] } } })
+    await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'combworkMerges', folder: 'slots', target: 'integration', style: 'merge', preChecks: [], mergeChecks: [], identity, okBefore: { mode: 'never', labels: [] } } })
     const b1 = await lib.addAgent(inv, alpha, { name: 'B1', workflowRole: 'builder' })
     await lib.addAgent(inv, alpha, { name: 'R1', workflowRole: 'reviewer' })
     const create = async (title) => (await inv('tasks:create', { title, project: 'alpha' })).number
@@ -108,7 +108,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     check('1. …B1 works it in its slot, in that new conversation', !!working, JSON.stringify(await live(b1.id)))
     check("1. …whose first prompt carries the card and the lane's brief", !!(await until(async () => /Work on task .* from the Combwork task board/.test(await transcript(working.sessionId)) && /LANE-BRIEF-ONE: stay off src\/renderer; card one first\./.test(await transcript(working.sessionId)), HUNG_MS)), (await transcript(working?.sessionId)).slice(0, 600))
 
-    // --- 2. In its turn, it edits the brief and moves on to card two (card one put back); Hive is quit with card two's
+    // --- 2. In its turn, it edits the brief and moves on to card two (card one put back); Combwork is quit with card two's
     // placement owed; the next start resumes its conversation there with card two and the edited brief.
     const t2 = await tokenOf(b1.id)
     await until(async () => ['ready', 'finished'].includes((await live(b1.id))?.status), HUNG_MS)

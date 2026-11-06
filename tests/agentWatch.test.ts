@@ -18,7 +18,7 @@ import { follow } from './followDoorbell'
 const HUNG_MS = 10000
 
 const nowOf = (over: Partial<AgentNow> = {}): AgentNow => ({ status: 'working', runId: 'r1', prompts: 1, pending: false, ...over })
-const b6 = { projectPath: 'C:\\ws\\hive', agentId: 'b6', name: 'B6', project: 'hive' }
+const b6 = { projectPath: 'C:\\ws\\demo', agentId: 'b6', name: 'B6', project: 'demo' }
 
 describe('what an agent watch counts', () => {
   it('working, starting, a typed prompt not yet taken, and background tasks (unless ignored) are working', () => {
@@ -45,21 +45,21 @@ describe('what an agent watch counts', () => {
 
   it('the wake line names each agent with the start of its reply, within the size; the limit line says to check on it', () => {
     expect(agentWakeLine([{ agent: b6, event: 'finished', now: nowOf({ status: 'finished', reply: 'The installer for Reinstall 12 is built.\nMore.' }) }])).toBe(
-      '[CW] B6 (hive) finished: "The installer for Reinstall 12 is built. More.". Your agent watch has ended: carry on (cw_agent_activity for more).'
+      '[CW] B6 (demo) finished: "The installer for Reinstall 12 is built. More.". Your agent watch has ended: carry on (cw_agent_activity for more).'
     )
     const two = agentWakeLine([
       { agent: b6, event: 'waiting', now: nowOf({ status: 'waiting', statusMessage: 'Allow Bash: npm run dist?' }) },
       { agent: { ...b6, agentId: 'b7', name: 'B7' }, event: 'stopped', now: nowOf({ status: 'stopped' }) }
     ])
-    expect(two).toBe('[CW] B6 (hive) is waiting for the user: "Allow Bash: npm run dist?"; B7 (hive) stopped. Your agent watch has ended: carry on (cw_agent_activity for more).')
+    expect(two).toBe('[CW] B6 (demo) is waiting for the user: "Allow Bash: npm run dist?"; B7 (demo) stopped. Your agent watch has ended: carry on (cw_agent_activity for more).')
     // Long replies from many agents: cut, never past the line's limit, one line.
     const many = agentWakeLine(Array.from({ length: 20 }, (_, i) => ({ agent: { ...b6, agentId: `a${i}`, name: `Agent ${i}` }, event: 'finished' as const, now: nowOf({ status: 'finished', reply: '評'.repeat(500) }) })))
     expect(Buffer.byteLength(JSON.stringify(many))).toBeLessThanOrEqual(WAKE_MAX_BYTES)
     expect(many).not.toMatch(/\n/)
     expect(many).toContain('Agent 19')
-    expect(agentPart(b6, 'finished', nowOf({ status: 'watching', watch: 'Waiting for #12 → Review' }))).toBe('B6 (hive) finished (now waiting for #12 → Review)')
-    expect(agentPart(b6, 'finished', nowOf({ status: 'ready', backgroundTasks: 2 }), 200, true)).toBe('B6 (hive) is idle (2 background tasks still running)')
-    expect(agentPart(b6, 'untaken', nowOf({ status: 'ready' }))).toBe("B6 (hive) is idle: its CLI hasn't taken the prompt it was given")
+    expect(agentPart(b6, 'finished', nowOf({ status: 'watching', watch: 'Waiting for #12 → Review' }))).toBe('B6 (demo) finished (now waiting for #12 → Review)')
+    expect(agentPart(b6, 'finished', nowOf({ status: 'ready', backgroundTasks: 2 }), 200, true)).toBe('B6 (demo) is idle (2 background tasks still running)')
+    expect(agentPart(b6, 'untaken', nowOf({ status: 'ready' }))).toBe("B6 (demo) is idle: its CLI hasn't taken the prompt it was given")
     expect(agentLimitLine({ agents: [b6], ignoreBackground: false }, 120)).toMatch(/^\[CW\] B6 is still working after 2 h: your agent watch has ended\. Check on it \(cw_agent_activity\)/)
     expect(agentWatchLabel({ agents: [b6, { ...b6, agentId: 'b7', name: 'B7' }], ignoreBackground: false })).toBe('Waiting for B6, B7 to finish')
   })
@@ -78,17 +78,17 @@ describe('what an agent watch counts', () => {
       for (const c of changes) expect(line).toContain(`#${c.number}`)
     }
     // Short enough, everything in full: the reply's text and each card's state.
-    const small = cardWakeLine([{ number: 7, column: 'review', changes: ['column'], by: 'You', comment: null }], [{ agentName: 'B1', cards: [7, 9], text: 'C, the hive cell' }])
-    expect(small).toEqual({ line: '[CW] User replied to B1 on #7, #9: "C, the hive cell"; #7 is in Review. Your card watch has ended: carry on (cw_read_task with latestComment on each card for its comment in full).', repliesTold: true })
+    const small = cardWakeLine([{ number: 7, column: 'review', changes: ['column'], by: 'You', comment: null }], [{ agentName: 'B1', cards: [7, 9], text: 'C, the demo cell' }])
+    expect(small).toEqual({ line: '[CW] User replied to B1 on #7, #9: "C, the demo cell"; #7 is in Review. Your card watch has ended: carry on (cw_read_task with latestComment on each card for its comment in full).', repliesTold: true })
   })
 
   it("names the user in the Assistant's reply lines (#426): Settings → General → Your name, else User", () => {
-    const reply = [{ agentName: 'B1', cards: [7], text: 'C, the hive cell' }]
-    expect(cardWakeLine([], reply, [], 'Darren').line).toBe('[CW] Darren replied to B1 on #7: "C, the hive cell". Your card watch has ended: carry on (cw_read_task for the card, cw_agent_activity for the agent).')
+    const reply = [{ agentName: 'B1', cards: [7], text: 'C, the demo cell' }]
+    expect(cardWakeLine([], reply, [], 'Darren').line).toBe('[CW] Darren replied to B1 on #7: "C, the demo cell". Your card watch has ended: carry on (cw_read_task for the card, cw_agent_activity for the agent).')
     expect(cardWakeLine([], reply).line).toMatch(/^\[CW\] User replied to B1 on #7/)
     const now = nowOf()
-    expect(agentWakeLine([{ agent: { projectPath: 'C:/ws/hive', agentId: 'b1', name: 'B1', project: 'hive' }, event: null, now, reply: 'Ship it' }], 'Darren')).toBe('[CW] Darren replied to B1 (hive): "Ship it". Your agent watch has ended: carry on (cw_agent_activity for more).')
-    expect(agentWakeLine([{ agent: { projectPath: 'C:/ws/hive', agentId: 'b1', name: 'B1', project: 'hive' }, event: null, now, reply: 'Ship it' }])).toMatch(/^\[CW\] User replied to B1 \(hive\)/)
+    expect(agentWakeLine([{ agent: { projectPath: 'C:/ws/demo', agentId: 'b1', name: 'B1', project: 'demo' }, event: null, now, reply: 'Ship it' }], 'Darren')).toBe('[CW] Darren replied to B1 (demo): "Ship it". Your agent watch has ended: carry on (cw_agent_activity for more).')
+    expect(agentWakeLine([{ agent: { projectPath: 'C:/ws/demo', agentId: 'b1', name: 'B1', project: 'demo' }, event: null, now, reply: 'Ship it' }])).toMatch(/^\[CW\] User replied to B1 \(demo\)/)
     // Whatever was typed in the setting: one line, a few words; empty or blank is User.
     expect(userNameOf('  Darren  ')).toBe('Darren')
     expect(userNameOf('Dar\nren\t M')).toBe('Dar ren M')
@@ -100,7 +100,7 @@ describe('what an agent watch counts', () => {
 
   it('a long name and many agents: the short forms still say the user replied, by name, within the size (#426)', () => {
     const user = userNameOf('Ünïcødé 🐝 '.repeat(10))
-    const agents = Array.from({ length: 20 }, (_, i) => ({ projectPath: 'C:/ws/hive', agentId: `a${i}`, name: `Agent ${i} ${'建造者'.repeat(i % 3 ? 1 : 30)}`, project: 'hive' }))
+    const agents = Array.from({ length: 20 }, (_, i) => ({ projectPath: 'C:/ws/demo', agentId: `a${i}`, name: `Agent ${i} ${'建造者'.repeat(i % 3 ? 1 : 30)}`, project: 'demo' }))
     const long = 'reply '.repeat(200)
     const fits = (line: string): void => {
       expect(Buffer.byteLength(JSON.stringify(line))).toBeLessThanOrEqual(WAKE_MAX_BYTES)
@@ -143,10 +143,10 @@ describe('what an agent watch counts', () => {
       'Waiting for B6 to finish. End your turn now: Combwork types a line into this session when one finishes, waits for the user or stops, or at 2026-10-08T14:00:00.000Z if none does. Nothing runs meanwhile.'
     )
     expect(agentWatchText({ watching: 'Waiting for B6 to finish', limitAt: 'x', replaced: 'Waiting for #12 → Review' })).toMatch(/It replaces your card watch \(waiting for #12 → Review\)\.$/)
-    expect(agentWatchText({ watching: 'Waiting for B6 to finish', limitAt: 'x', dropped: ['R6 (hive)', 'B5 (hive)'] })).toMatch(/It replaces your watch on R6 \(hive\), B5 \(hive\): pass every agent you're following\.$/)
-    expect(agentWatchText({ already: ['B6 (hive) is idle: "Done."'] })).toBe('Already: B6 (hive) is idle: "Done.".')
-    expect(agentWatchText({ already: ['B6 (hive) is idle: "Done."'], dropped: ['R6 (hive)'] })).toBe(`Already: B6 (hive) is idle: "Done.". Your watch on R6 (hive) has ended: watch again, passing every agent you're following.`)
-    expect(agentWatchText({ already: ['B6 (hive) is idle: "Done."'], replaced: 'Waiting for #12 → Review' })).toBe('Already: B6 (hive) is idle: "Done.". Your card watch (waiting for #12 → Review) has ended.')
+    expect(agentWatchText({ watching: 'Waiting for B6 to finish', limitAt: 'x', dropped: ['R6 (demo)', 'B5 (demo)'] })).toMatch(/It replaces your watch on R6 \(demo\), B5 \(demo\): pass every agent you're following\.$/)
+    expect(agentWatchText({ already: ['B6 (demo) is idle: "Done."'] })).toBe('Already: B6 (demo) is idle: "Done.".')
+    expect(agentWatchText({ already: ['B6 (demo) is idle: "Done."'], dropped: ['R6 (demo)'] })).toBe(`Already: B6 (demo) is idle: "Done.". Your watch on R6 (demo) has ended: watch again, passing every agent you're following.`)
+    expect(agentWatchText({ already: ['B6 (demo) is idle: "Done."'], replaced: 'Waiting for #12 → Review' })).toBe('Already: B6 (demo) is idle: "Done.". Your card watch (waiting for #12 → Review) has ended.')
     expect(agentWatchText({ done: 'Cancelled your agent watch.' })).toBe('Cancelled your agent watch.')
     // HI-1987: replacing a lane watch while its lanes run says what it drops, and the watch that keeps them.
     expect(agentWatchText({ watching: 'Waiting for LB2 to finish', limitAt: 'x', replaced: 'Waiting on all running lanes', lanesLeft: ['LB1', 'LB2'] })).toMatch(/if none does\. Nothing runs meanwhile\. This replaces your lane watch: 2 running lanes \(LB1, LB2\) are no longer followed\. To follow them as well, watch them with this instead: cw_wait_for_tasks with lanes, and agents or cards\.$/)
@@ -159,14 +159,14 @@ describe('what an agent watch counts', () => {
 })
 
 describe('agent watches (main/watches.ts)', async () => {
-  const base = tempDir('hive-agentwatch-')
+  const base = tempDir('cw-agentwatch-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   afterAll(() => rmSync(base, { recursive: true, force: true }))
   const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
   const tasks = await import('../src/main/tasks')
   const watches = await import('../src/main/watches')
   watches.testHooks.settleMs = 0
-  // A check reads what Hive did after `await watches.settled()`: deliveries run in the background (#570).
+  // A check reads what Combwork did after `await watches.settled()`: deliveries run in the background (#570).
   const { sessions } = await import('../src/main/sessions')
   /** The watches a workspace has saved (#1018: rows in its database, what watches.json's `watches` held). */
   // oxlint-disable-next-line typescript/no-explicit-any -- saved entries read as JSON, as the file's were
@@ -185,8 +185,8 @@ describe('agent watches (main/watches.ts)', async () => {
     return { w, path, alpha, beta }
   }
   /**
-   * Stand-in sessions: the watcher a1 (its status, the user typing, what Hive typed and what it read: #650, it follows
-   * Hive's doorbell with cw_inbox, as a model does) and the agents it watches.
+   * Stand-in sessions: the watcher a1 (its status, the user typing, what Combwork typed and what it read: #650, it follows
+   * Combwork's doorbell with cw_inbox, as a model does) and the agents it watches.
    */
   const fake = (alpha: string) => {
     const state = { status: 'watching' as string, typing: false, typed: [] as string[], told: [] as string[], agents: new Map<string, AgentNow | null>() }
@@ -212,7 +212,7 @@ describe('agent watches (main/watches.ts)', async () => {
   }
   const reviewer = (alpha: string) => ({ projectPath: alpha, agentId: 'a2', name: 'Reviewer', project: 'alpha' })
   const second = (alpha: string) => ({ projectPath: alpha, agentId: 'a3', name: 'Second', project: 'alpha' })
-  /** An agent's new state, told to the watches as its status event is in Hive (noteAgentStatus). */
+  /** An agent's new state, told to the watches as its status event is in Combwork (noteAgentStatus). */
   const move = (st: ReturnType<typeof fake>, alpha: string, id: string, now: AgentNow) => {
     st.agents.set(id, now)
     watches.noteAgentStatus({ projectPath: alpha, agentId: id, status: now.status, runId: now.runId ?? '', statusMessage: now.statusMessage ?? undefined } as never)
@@ -268,7 +268,7 @@ describe('agent watches (main/watches.ts)', async () => {
     await disposeWorkspaceService(w)
   })
 
-  it("a project renamed while Hive runs: an agent watch follows both its watcher and the agents it watches (#508)", async () => {
+  it("a project renamed while Combwork runs: an agent watch follows both its watcher and the agents it watches (#508)", async () => {
     const { w, path, alpha } = await open()
     const st = fake(alpha)
     move(st, alpha, 'a2', nowOf())
@@ -295,7 +295,7 @@ describe('agent watches (main/watches.ts)', async () => {
     await disposeWorkspaceService(w)
   })
 
-  it('the whole workspace moved while Hive was closed: an agent watch comes with its watcher, its agents and their marks, and is delivered (#508 round 3)', async () => {
+  it('the whole workspace moved while Combwork was closed: an agent watch comes with its watcher, its agents and their marks, and is delivered (#508 round 3)', async () => {
     const { w, path, alpha, beta } = await open()
     const st = fake(alpha)
     move(st, alpha, 'a2', nowOf())
@@ -344,7 +344,7 @@ describe('agent watches (main/watches.ts)', async () => {
     writeFileSync(join(beta, '.combwork', 'project.json'), JSON.stringify({ version: 2, id: 'p-ffffffffffff', agents: [{ id: 'b1', name: 'Other' }] }))
     Object.assign(sessions, { agentNow: (p: string, id: string) => (p.toLowerCase() === beta.toLowerCase() && id === 'b1' ? { status: 'finished', runId: 'r9', prompts: 3, pending: false, statusMessage: null, backgroundTasks: 0, reply: 'NEW PROJECT REPLY' } : agentNow(p, id)) })
     watches.noteAgentStatus({ projectPath: beta, agentId: 'b1', status: 'finished', runId: 'r9' } as never)
-    // Read back first (Hive reopened), then checked.
+    // Read back first (Combwork reopened), then checked.
     watches.forgetWatches(w)
     await w.projectIds({ fresh: true })
     await watches.stampWatchProjects(w)
@@ -406,7 +406,7 @@ describe('agent watches (main/watches.ts)', async () => {
     await watches.settled()
     expect(st.typed).toHaveLength(1)
     expect(st.told[0]).toMatch(/is waiting for the user: "Trust this folder\?"/)
-    // The user answers it (ready, no turn ran), and Hive gives it a task: watched again, nothing is told yet.
+    // The user answers it (ready, no turn ran), and Combwork gives it a task: watched again, nothing is told yet.
     st.status = 'watching'
     move(st, alpha, 'a2', nowOf({ status: 'ready', runId: 'r1', prompts: 0 }))
     move(st, alpha, 'a2', nowOf({ status: 'ready', runId: 'r1', prompts: 0, pending: true }))
@@ -468,9 +468,9 @@ describe('agent watches (main/watches.ts)', async () => {
     // A card watch on #c (the Assistant's) and an agent watch on Reviewer (a project agent's): the reply.
     await watches.registerWatch(w, home, 'assistant', { cards: [c.number], changes: ['column'], column: 'review' })
     await watches.registerAgentWatch(w, alpha, 'a1', { agents: [reviewer(alpha)], ignoreBackground: false })
-    watches.noteUserReply(alpha, 'a2', 'Reviewer', 'C, the hive cell\nand more')
+    watches.noteUserReply(alpha, 'a2', 'Reviewer', 'C, the demo cell\nand more')
     await vi.waitFor(() => expect(assistant.told).toHaveLength(1), { timeout: HUNG_MS })
-    expect(assistant.told[0]).toBe(`[CW] User replied to Reviewer on #${c.number}: "C, the hive cell". Your card watch has ended: carry on (cw_read_task for the card, cw_agent_activity for the agent).`)
+    expect(assistant.told[0]).toBe(`[CW] User replied to Reviewer on #${c.number}: "C, the demo cell". Your card watch has ended: carry on (cw_read_task for the card, cw_agent_activity for the agent).`)
     await watches.evaluateAgentWatches(w)
     await watches.settled()
     expect(st.typed).toEqual([])
@@ -591,7 +591,7 @@ describe('agent watches (main/watches.ts)', async () => {
       a.status = 'working'
       watches.noteUserReply(alpha, 'a2', 'Reviewer', 'PRIVATE queued reply')
       await watches.settled()
-      // Many more replies since, to an agent it doesn't follow: the queued one is no longer among those Hive keeps.
+      // Many more replies since, to an agent it doesn't follow: the queued one is no longer among those Combwork keeps.
       for (let i = 0; i < 201; i++) watches.noteUserReply(alpha, 'a3', 'Second', `unfollowed ${i}`)
       await watches.settled()
       config.settings.assistant.tellReplies = false
@@ -611,8 +611,8 @@ describe('agent watches (main/watches.ts)', async () => {
       config.settings.assistant.tellReplies = true
       expect(await inboxText()).not.toContain('PRIVATE while revoked')
 
-      // One made before a restart (another run of Hive): given while replies are told, not once they are off.
-      await deliveries.createDelivery(home, { agentId: 'assistant', kind: 'card-event', from: { kind: 'hive', name: 'Hive' }, body: '[CW] User replied to Reviewer (alpha): "EARLIER RUN".', source: 'reply', ref: 'reply:1', meta: { generation: 0, run: 'an-earlier-run' } })
+      // One made before a restart (another run of Combwork): given while replies are told, not once they are off.
+      await deliveries.createDelivery(home, { agentId: 'assistant', kind: 'card-event', from: { kind: 'combwork', name: 'Combwork' }, body: '[CW] User replied to Reviewer (alpha): "EARLIER RUN".', source: 'reply', ref: 'reply:1', meta: { generation: 0, run: 'an-earlier-run' } })
       config.settings.assistant.tellReplies = false
       expect(await inboxText()).not.toContain('EARLIER RUN')
     } finally {
@@ -803,7 +803,7 @@ describe('agent watches (main/watches.ts)', async () => {
     }
   })
 
-  /** The Assistant as a watcher here: its status, what Hive typed into it and what it read (the agents' stand-ins stay as they are). */
+  /** The Assistant as a watcher here: its status, what Combwork typed into it and what it read (the agents' stand-ins stay as they are). */
   const assistantOf = (home: string) => {
     const a = { status: 'watching' as string, typed: [] as string[], told: [] as string[] }
     const liveFor = sessions.liveFor
@@ -1023,7 +1023,7 @@ describe('agent watches (main/watches.ts)', async () => {
       move(st, alpha, 'a2', nowOf())
       await watches.registerWatch(w, home, 'assistant', { cards: ns, changes: ['column'], column: 'review' })
       a.status = 'working'
-      const long = `${'Use the hive cell, '.repeat(6)}and nothing else`.slice(0, 120)
+      const long = `${'Use the demo cell, '.repeat(6)}and nothing else`.slice(0, 120)
       watches.noteUserReply(alpha, 'a2', 'Reviewer', long)
       for (const num of ns) await inWorkspace(w, () => tasks.updateTask(num, { column: 'review' }, { kind: 'user' }))
       await watches.evaluateWatches(w)
@@ -1562,7 +1562,7 @@ describe('agent watches (main/watches.ts)', async () => {
   describe('usage watches (HI-2195)', async () => {
     const { config } = await import('../src/main/config')
     const { emit } = await import('../src/main/events')
-    // Hive's own wiring of the watches to its events (a usage report among them), as it starts.
+    // Combwork's own wiring of the watches to its events (a usage report among them), as it starts.
     watches.initWatches()
     const watch = [{ account: 'a-acct1', name: 'Max 1', percent: 98, limit: 'weekly' as const }]
     const weekly = (used: number) => ({ provider: 'claude-code' as const, plan: null, limits: [{ id: 'seven_day', label: 'weekly', windowMinutes: 10080, usedPercent: used, resetsAt: new Date(Date.now() + 48 * 3600e3).toISOString() }], updatedAt: new Date().toISOString() })

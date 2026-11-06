@@ -1,5 +1,5 @@
 // An agent launch's token ending (HI-2416): when its agent's launch ends, or a new launch replaces it, the token stops
-// working and Hive's listeners are told which launch it was, once, so what it opened (the Agent API's event streams,
+// working and Combwork's listeners are told which launch it was, once, so what it opened (the Agent API's event streams,
 // servers.ts endLaunchStreams) ends with it. An end for an older launch, after a restart, changes and tells nothing.
 import { mkdirSync } from 'fs'
 import { join } from 'path'
@@ -7,7 +7,7 @@ import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-agent-token-end-')
+const base = tempDir('cw-agent-token-end-')
 const profile = join(base, 'profile')
 mkdirSync(profile, { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => profile

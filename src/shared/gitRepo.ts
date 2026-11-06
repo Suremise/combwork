@@ -39,7 +39,7 @@ export interface GitRepoSummary {
   fetchedAt: number | null
   /**
    * The folder isn't a repository's own top but inside one (a workspace kept in git): that repository's folder. The view
-   * shows it, read-only: Hive changes only a project's own repository.
+   * shows it, read-only: Combwork changes only a project's own repository.
    */
   parentRepo?: string
 }
@@ -84,7 +84,7 @@ export interface BranchUpdatePlan {
   /** The target's commits the branch hasn't, and its own commits the target hasn't. */
   behind: number
   ahead: number
-  /** Where it runs: the folder the branch is checked out in; a temporary one Hive makes when it is checked out nowhere. */
+  /** Where it runs: the folder the branch is checked out in; a temporary one Combwork makes when it is checked out nowhere. */
   where: 'project' | 'slot' | 'worktree' | 'temporary'
   folder: string | null
   slot: string | null
@@ -105,10 +105,10 @@ export type BranchUpdateHow = 'merge' | 'rebase'
 
 /** A remote branch as Branches & remotes groups it (#1642). */
 export interface GitRemoteBranchRow {
-  /** As git names it: nas/hive/hb1. */
+  /** As git names it: nas/cw/hb1. */
   name: string
   remote: string
-  /** On the remote: hive/hb1. */
+  /** On the remote: cw/hb1. */
   branch: string
   sha: string
   date: number
@@ -141,7 +141,7 @@ export interface PushedRef {
 
 /**
  * `git push --porcelain`'s lines, one per ref (`<flag>\t<from>:<to>\t<summary>`): `=` up to date, `!` refused (rejected
- * by the remote, or not a fast-forward: Hive never forces), anything else pushed. Other lines (To …, Done) are skipped.
+ * by the remote, or not a fast-forward: Combwork never forces), anything else pushed. Other lines (To …, Done) are skipped.
  */
 export function parsePushPorcelain(out: string): PushedRef[] {
   const refs: PushedRef[] = []
@@ -162,8 +162,8 @@ export interface GitWorktreeRow {
   path: string
   branch: string | null
   head: string | null
-  /** One of Hive's own (HI-1710): a review copy, or the merge queue's folder. Never an unused worktree, never removed here. */
-  hive?: 'copy' | 'queue'
+  /** One of Combwork's own (HI-1710): a review copy, or the merge queue's folder. Never an unused worktree, never removed here. */
+  combwork?: 'copy' | 'queue'
 }
 
 export interface GitIdentityPart {
@@ -604,7 +604,7 @@ export function remoteNameProblemData(name: string): Text | null {
 /** remoteNameProblemData in the language shown (a dialog's check). */
 export const remoteNameProblem = (name: string): string | null => inLanguage(remoteNameProblemData(name))
 
-/** A remote URL Hive passes to git: one line, not an option. */
+/** A remote URL Combwork passes to git: one line, not an option. */
 export function remoteUrlProblemData(url: string): Text | null {
   const u = url.trim()
   if (!u) return M.enterUrl

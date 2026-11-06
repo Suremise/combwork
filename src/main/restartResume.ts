@@ -13,7 +13,7 @@ import type { RunningAgent } from '../shared/unexpectedClose'
 import { advanced } from './advanced'
 import { assistantHome } from './assistantControl'
 import { createDelivery, leaveDelivery, roundOf } from './deliveries'
-import { onHiveEvent, toast } from './events'
+import { onCombworkEvent, toast } from './events'
 import { dropOfferActions, resolveOffer } from './notify'
 import { OUTCOME } from './outcomes'
 import { placeKey, samePlace } from './fsutil'
@@ -24,10 +24,10 @@ import { allTasks } from './tasks'
 import { onGateSettled } from './openGate'
 import { inWorkspace, openWorkspaces, workspaceOf, type WorkspaceService } from './workspace'
 import { pausedFor } from './teamPause'
-import { dataFolder } from './hiveFolder'
+import { dataFolder } from './combworkFolder'
 
 /**
- * Restarts announced and resumed (HI-1707, shared/restartResume.ts). As Hive closes for an update, an install or a
+ * Restarts announced and resumed (HI-1707, shared/restartResume.ts). As Combwork closes for an update, an install or a
  * restart, the agents that were working, watching or in a running lane are recorded and told; at the next start they
  * resume in their conversations one at a time, each after the last is ready (Darren's decision), with a note of where
  * they were. An ordinary quit records them too, and the next start offers to resume them. The record (restart.json in
@@ -35,14 +35,14 @@ import { dataFolder } from './hiveFolder'
  * the one owner of these resumes (lastRun.ts leaves it the agents it lists).
  */
 const log = createLogger('restart')
-const HIVE = { kind: 'hive', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
+const COMBWORK = { kind: 'combwork', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
 const RECORD_FILE = 'restart.json'
 
 const T = {
   assistant: agentMsg({
     id: 'notice.restart.assistant',
     text: "Combwork restarted{quit, select, yes { after a quit} other { for an update}}{versions}. Resumed: {hasResumed, select, yes {{resumed}} other {none}}.{hasNot, select, yes { Not resumed: {not}.} other {}} Each resumed agent was told where it was; check their lanes carry on.",
-    note: "HI-1707: the Assistant's notice after Hive resumed agents at a start. quit: yes after a quit (else an update, an install or a restart); versions: ' (1.0.0 → 1.0.1)' or nothing; resumed: those resumed, each 'name (project)', ', ' between; not: those not resumed, each 'name (project): state, why' (codes), '; ' between."
+    note: "HI-1707: the Assistant's notice after Combwork resumed agents at a start. quit: yes after a quit (else an update, an install or a restart); versions: ' (1.0.0 → 1.0.1)' or nothing; resumed: those resumed, each 'name (project)', ', ' between; not: those not resumed, each 'name (project): state, why' (codes), '; ' between."
   })
 }
 
@@ -58,7 +58,7 @@ const queuedAt = new Map<string, number>()
 let pumping = false
 let stopping = false
 /**
- * Bumped as Hive starts closing (stopRestartRecovery, recordClosing): an attempt that began before it starts nothing and
+ * Bumped as Combwork starts closing (stopRestartRecovery, recordClosing): an attempt that began before it starts nothing and
  * changes nothing after it, so the closing snapshot (which put the attempt's entry back to pending) stands.
  */
 let generation = 0
@@ -162,7 +162,7 @@ export function isResuming(projectPath: string, agentId: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// As Hive closes: the snapshot, and the agents told.
+// As Combwork closes: the snapshot, and the agents told.
 // ---------------------------------------------------------------------------
 
 /** How an agent being stopped counts: working, waiting, with background tasks, or watching (a card loop). */
@@ -221,7 +221,7 @@ export async function enrich(base: readonly RestartEntry[]): Promise<RestartEntr
 }
 
 /**
- * Hive is closing (quitNow): its agents recorded, before they are stopped. Every running conversation is written at
+ * Combwork is closing (quitNow): its agents recorded, before they are stopped. Every running conversation is written at
  * once; then, within `snapshotMs`, narrowed to those working, watching or in a lane, with their cards and lanes. One
  * that takes longer keeps every conversation (an idle agent resumed is a lesser harm than a working one lost). For an
  * update, an install or a restart they are told too, best effort, within `tellMs` (a line in each one's inbox: an idle
@@ -245,17 +245,17 @@ export async function recordClosing(reason: RestartReason, o: { snapshotMs?: num
   const base = baseEntries().filter((e) => !inFlight.has(agentKey(e)))
   record = mergeSnapshot(record, base, reason)
   await save()
-  const enriched = await bounded(enrich(base).catch((e) => (log.warn('Reading the cards and lanes of the agents as Hive closes', e), null)), o.snapshotMs ?? 2000, null)
+  const enriched = await bounded(enrich(base).catch((e) => (log.warn('Reading the cards and lanes of the agents as Combwork closes', e), null)), o.snapshotMs ?? 2000, null)
   let snapshot = base
   if (enriched) {
     const narrowed = new Set(base.map(agentKey))
     record = mergeSnapshot({ version: 1, reason, entries: (record?.entries ?? []).filter((e) => !narrowed.has(agentKey(e))) }, enriched, reason)
     snapshot = enriched
     await save()
-  } else log.warn(`Reading the cards and lanes of the agents took over ${o.snapshotMs ?? 2000} ms as Hive closed: every running conversation is kept to resume`)
-  if (snapshot.length) log.info(`Recorded ${snapshot.length} agent(s) as Hive closes (${reason}): ${snapshot.map((e) => `${userText(e.agentName)} in ${userText(e.project)}`).join(', ')}`) // i18n-ignore: a line of hive.log
+  } else log.warn(`Reading the cards and lanes of the agents took over ${o.snapshotMs ?? 2000} ms as Combwork closed: every running conversation is kept to resume`)
+  if (snapshot.length) log.info(`Recorded ${snapshot.length} agent(s) as Combwork closes (${reason}): ${snapshot.map((e) => `${userText(e.agentName)} in ${userText(e.project)}`).join(', ')}`) // i18n-ignore: a line of combwork.log
   if (reason !== 'quit' && snapshot.length) {
-    const tell = Promise.allSettled(snapshot.map((e) => inWorkspace(workspaceOf(e.projectPath), () => createDelivery(e.projectPath, { agentId: e.agentId, agentName: e.agentName, kind: 'control', from: HIVE, body: inDialectOf({ projectPath: e.projectPath, agentId: e.agentId }, restartingLine) }))))
+    const tell = Promise.allSettled(snapshot.map((e) => inWorkspace(workspaceOf(e.projectPath), () => createDelivery(e.projectPath, { agentId: e.agentId, agentName: e.agentName, kind: 'control', from: COMBWORK, body: inDialectOf({ projectPath: e.projectPath, agentId: e.agentId }, restartingLine) }))))
     await bounded(tell, o.tellMs ?? 1500, [])
   }
   return snapshot.length
@@ -273,7 +273,7 @@ export function adoptInstalledRun(agents: readonly RunningAgent[], from: string,
   if (!entries.length) return
   record = mergeSnapshot(record, entries, 'install')
   void save()
-  log.info(`The last run (Hive ${from}) was ended for an install without being asked to close: ${entries.length} agent(s) recorded to resume`)
+  log.info(`The last run (Combwork ${from}) was ended for an install without being asked to close: ${entries.length} agent(s) recorded to resume`)
 }
 
 // ---------------------------------------------------------------------------
@@ -284,13 +284,13 @@ export function adoptInstalledRun(agents: readonly RunningAgent[], from: string,
 const workspaceValues = (ws: WorkspaceService | undefined): Record<string, unknown> | null => ws?.config?.advanced ?? null
 
 /**
- * Whether an entry resumes on its own: Hive last closed for an update, an install or a restart (the record's policy),
- * with Resume agents after an update on for the entry's workspace (its own value, else Hive's).
+ * Whether an entry resumes on its own: Combwork last closed for an update, an install or a restart (the record's policy),
+ * with Resume agents after an update on for the entry's workspace (its own value, else Combwork's).
  */
 const auto = (ws: WorkspaceService | undefined): boolean => policy() !== 'quit' && advanced.get<boolean>(RESUME_AFTER_UPDATE, workspaceValues(ws)) !== false
 
 /**
- * Once Hive's window is up: entries already offered (or held) are offered again in one notice, and the queue started.
+ * Once Combwork's window is up: entries already offered (or held) are offered again in one notice, and the queue started.
  * Each pending entry is decided once its workspace is ready (pump): queued to resume, or offered.
  */
 export async function startRestartRecovery(): Promise<void> {
@@ -306,7 +306,7 @@ export async function startRestartRecovery(): Promise<void> {
   if (offer.length) tellOffer()
   await save()
   // A team resuming (HI-2081): what waited for it is decided now.
-  onHiveEvent((ev) => {
+  onCombworkEvent((ev) => {
     if (ev.type === 'team-pause-changed' && !ev.pause) pump()
   })
   pump()
@@ -338,13 +338,13 @@ function tellOffer(): void {
   const n = entries.length
   const names = fmt.list(entries.map((e) => `${e.agentName} (${e.project})`))
   const quit = policy() === 'quit'
-  const title = tr(msg({ id: 'main.restart.offerTitle', defaultMessage: '{n, plural, one {Resume the agent that was working?} other {Resume the # agents that were working?}}', description: "A notice at start: Hive was quit (or restarted for an update with resuming turned off) while agents worked. {n} is how many; Resume starts them again in their conversations." }), { n })
+  const title = tr(msg({ id: 'main.restart.offerTitle', defaultMessage: '{n, plural, one {Resume the agent that was working?} other {Resume the # agents that were working?}}', description: "A notice at start: Combwork was quit (or restarted for an update with resuming turned off) while agents worked. {n} is how many; Resume starts them again in their conversations." }), { n })
   const body = quit
     ? tr(msg({ id: 'main.restart.offerQuit', defaultMessage: 'Combwork was quit while they were working or in a card loop: {names}. Resume starts each again in its conversation, one at a time.', description: 'The notice offering to resume agents after an ordinary quit. {names} lists them, each with its project.' }), { names })
     : tr(msg({ id: 'main.restart.offerUpdate', defaultMessage: 'Combwork restarted for an update while they were working or in a card loop: {names}. Resume starts each again in its conversation, one at a time.', description: 'The notice offering to resume agents after an update, with Settings → Advanced → Resume agents after an update turned off. {names} lists them, each with its project.' }), { names })
   const actions: ToastAction[] = [
-    { label: tr(msg({ id: 'main.restart.resume', defaultMessage: 'Resume', description: 'A button in the notice offering to resume the agents that were working when Hive closed.' })), command: RESUME_COMMAND },
-    { label: tr(msg({ id: 'main.restart.dismiss', defaultMessage: "Don't Resume", description: "A button in the notice offering to resume the agents that were working when Hive closed: resumes none, and the offer is not made again (the notice's × only closes it)." })), command: DISMISS_COMMAND }
+    { label: tr(msg({ id: 'main.restart.resume', defaultMessage: 'Resume', description: 'A button in the notice offering to resume the agents that were working when Combwork closed.' })), command: RESUME_COMMAND },
+    { label: tr(msg({ id: 'main.restart.dismiss', defaultMessage: "Don't Resume", description: "A button in the notice offering to resume the agents that were working when Combwork closed: resumes none, and the offer is not made again (the notice's × only closes it)." })), command: DISMISS_COMMAND }
   ]
   log.info(`Offered to resume ${n} agent(s): ${entries.map((e) => userText(e.agentName)).join(', ')}`)
   // Its offer (HI-2320): Resume's report, or Don't Resume, is what it says once taken.
@@ -381,7 +381,7 @@ export async function dismissOffered(): Promise<number> {
   return offered.length
 }
 
-/** Hive is quitting: no more starts from the queue, and an attempt under way changes nothing (it stays pending). */
+/** Combwork is quitting: no more starts from the queue, and an attempt under way changes nothing (it stays pending). */
 export function stopRestartRecovery(): void {
   stopping = true
   generation++
@@ -508,7 +508,7 @@ let following = false
 function followWorkspaces(): void {
   if (following) return
   following = true
-  onHiveEvent((ev) => {
+  onCombworkEvent((ev) => {
     if (ev.type === 'workspace-changed' || (ev.type === 'session-exit' && stuckRun)) pump()
   })
 }
@@ -516,7 +516,7 @@ function followWorkspaces(): void {
 /** The statuses of an agent that has taken its first prompt (a resume's note). */
 const TOOK_NOTE = new Set(['working', 'finished', 'waiting', 'background'])
 
-/** How long a resumed agent has to be ready (Settings → Advanced, its workspace's own value or Hive's). */
+/** How long a resumed agent has to be ready (Settings → Advanced, its workspace's own value or Combwork's). */
 const readyMs = (ws: WorkspaceService): number => readyMsForTests ?? Math.max(10, Number(advanced.get<number>(RESTART_READY_SECONDS, workspaceValues(ws))) || 90) * 1000
 
 /** Waits for a condition, polled, up to `ms`. */
@@ -533,7 +533,7 @@ async function until(fn: () => boolean, ms: number): Promise<boolean> {
  * One agent: checked again just before it starts (its workspace ready, the agent still there and not running, its
  * conversation still its last, no slot hold), after every await too; started in its conversation with its note, and
  * waited for until it is ready. Not ready in time: its launch stopped, and confirmed gone, before the next one starts.
- * `gen`: the queue's generation; Hive closing meanwhile cancels it ('cancelled': nothing changed), a workspace closing
+ * `gen`: the queue's generation; Combwork closing meanwhile cancels it ('cancelled': nothing changed), a workspace closing
  * puts it back to pending.
  */
 /** A resume refused as it spawns because its team is paused now (HI-2081): pending again, not failed. */
@@ -541,7 +541,7 @@ class TeamPausedNow extends Error {}
 
 async function resumeOne(e: RestartEntry, gen: number): Promise<'done' | 'cancelled'> {
   const cancelled = (): boolean => gen !== generation || stopping
-  // Its workspace closed (not Hive): back to pending, for when it opens again.
+  // Its workspace closed (not Combwork): back to pending, for when it opens again.
   const closed = (): 'done' => {
     setState(e, 'pending')
     return 'done'
@@ -587,12 +587,12 @@ async function resumeOne(e: RestartEntry, gen: number): Promise<'done' | 'cancel
   if (again) return skip(again)
   const ms = readyMs(ws)
   // Ready once it has taken its note (its first prompt): seen working, or past a turn, in any status change of this
-  // launch. Not `ready` (a resumed conversation's transcript is there before its CLI is, and Hive's fallback reads that
+  // launch. Not `ready` (a resumed conversation's transcript is there before its CLI is, and Combwork's fallback reads that
   // as ready), nor `watching` (a watch the conversation had shows as it starts). Everything after the start is about
   // this launch only (its runId): a session the user started meanwhile is never counted, waited for or stopped as it.
   let runId: string | null = null
   let took = false
-  const off = onHiveEvent((ev) => {
+  const off = onCombworkEvent((ev) => {
     if (ev.type === 'session-status' && runId !== null && ev.state.runId === runId && TOOK_NOTE.has(ev.state.status)) took = true
   })
   const mine = (): LiveSessionState | null => {
@@ -612,19 +612,19 @@ async function resumeOne(e: RestartEntry, gen: number): Promise<'done' | 'cancel
       if (err instanceof TeamPausedNow || (err instanceof Error && err.cause instanceof TeamPausedNow)) return closed()
       throw err
     }
-    // Its launch ending meanwhile (stopped by the user, or its CLI exited), Hive closing, or its workspace closing end
+    // Its launch ending meanwhile (stopped by the user, or its CLI exited), Combwork closing, or its workspace closing end
     // the wait too.
     ready = await until(() => took || TOOK_NOTE.has(mine()?.status ?? 'stopped') || !mine() || cancelled() || !openWorkspaceOf(e), ms)
     ready &&= took || TOOK_NOTE.has(mine()?.status ?? 'stopped')
   } finally {
     off()
   }
-  // Hive closing: its sessions stop with it, and the closing snapshot has this agent; nothing here changes the record.
+  // Combwork closing: its sessions stop with it, and the closing snapshot has this agent; nothing here changes the record.
   if (cancelled()) return 'cancelled'
   if (ready) {
     setState(e, 'resumed')
     done.resumed.push(e)
-    log.info(`Resumed ${userText(e.agentName)} in ${userText(e.project)} after Hive restarted (${policy()})`)
+    log.info(`Resumed ${userText(e.agentName)} in ${userText(e.project)} after Combwork restarted (${policy()})`)
     return 'done'
   }
   if (!openWorkspaceOf(e)) return closed()
@@ -657,21 +657,21 @@ async function resumeOne(e: RestartEntry, gen: number): Promise<'done' | 'cancel
 function whyText(e: RestartEntry): string {
   switch (e.why) {
     case 'removed':
-      return tr(msg({ id: 'main.restart.why.removed', defaultMessage: 'it was removed', description: 'Why an agent was not resumed after Hive restarted: the agent has been removed from its project.' }))
+      return tr(msg({ id: 'main.restart.why.removed', defaultMessage: 'it was removed', description: 'Why an agent was not resumed after Combwork restarted: the agent has been removed from its project.' }))
     case 'running':
-      return tr(msg({ id: 'main.restart.why.running', defaultMessage: 'it is running already', description: 'Why an agent was not resumed after Hive restarted: it is running already.' }))
+      return tr(msg({ id: 'main.restart.why.running', defaultMessage: 'it is running already', description: 'Why an agent was not resumed after Combwork restarted: it is running already.' }))
     case 'movedOn':
-      return tr(msg({ id: 'main.restart.why.movedOn', defaultMessage: 'it has a newer conversation', description: 'Why an agent was not resumed after Hive restarted: it was started in another conversation since.' }))
+      return tr(msg({ id: 'main.restart.why.movedOn', defaultMessage: 'it has a newer conversation', description: 'Why an agent was not resumed after Combwork restarted: it was started in another conversation since.' }))
     case 'notReady':
-      return tr(msg({ id: 'main.restart.why.notReady', defaultMessage: "it didn't get ready in time, so it was stopped", description: 'Why an agent was not resumed after Hive restarted: its CLI did not become ready within the time allowed (Settings → Advanced), so Hive stopped it.' }))
+      return tr(msg({ id: 'main.restart.why.notReady', defaultMessage: "it didn't get ready in time, so it was stopped", description: 'Why an agent was not resumed after Combwork restarted: its CLI did not become ready within the time allowed (Settings → Advanced), so Combwork stopped it.' }))
     case 'notStopped':
-      return tr(msg({ id: 'main.restart.why.notStopped', defaultMessage: "it didn't get ready in time and hasn't stopped yet; the others resume once it has", description: 'Why an agent was not resumed after Hive restarted: its CLI did not become ready in time, and it did not end when Hive stopped it; Hive starts no other agent until it has ended.' }))
+      return tr(msg({ id: 'main.restart.why.notStopped', defaultMessage: "it didn't get ready in time and hasn't stopped yet; the others resume once it has", description: 'Why an agent was not resumed after Combwork restarted: its CLI did not become ready in time, and it did not end when Combwork stopped it; Combwork starts no other agent until it has ended.' }))
     case 'stopped':
-      return tr(msg({ id: 'main.restart.why.stopped', defaultMessage: 'it was stopped while it started', description: 'Why an agent was not resumed after Hive restarted: its launch ended (the user stopped it, or its CLI exited) before it was ready.' }))
+      return tr(msg({ id: 'main.restart.why.stopped', defaultMessage: 'it was stopped while it started', description: 'Why an agent was not resumed after Combwork restarted: its launch ended (the user stopped it, or its CLI exited) before it was ready.' }))
     case 'expired':
-      return tr(msg({ id: 'main.restart.why.expired', defaultMessage: 'it waited more than a day', description: 'Why an agent was not resumed after Hive restarted: the restart was over a day ago.' }))
+      return tr(msg({ id: 'main.restart.why.expired', defaultMessage: 'it waited more than a day', description: 'Why an agent was not resumed after Combwork restarted: the restart was over a day ago.' }))
     default:
-      return e.state === 'held' ? tr(msg({ id: 'main.restart.why.held', defaultMessage: 'its working folder is held for other work (resume it by hand)', description: "Why an agent was not resumed after Hive restarted: the slot (working folder) its conversation ran in is free or holds other work, so only the user's own Resume may take it." })) : (e.why ?? '')
+      return e.state === 'held' ? tr(msg({ id: 'main.restart.why.held', defaultMessage: 'its working folder is held for other work (resume it by hand)', description: "Why an agent was not resumed after Combwork restarted: the slot (working folder) its conversation ran in is free or holds other work, so only the user's own Resume may take it." })) : (e.why ?? '')
   }
 }
 
@@ -681,11 +681,11 @@ function report(): void {
   if (!resumed.length && !failed.length && !held.length && !skipped.length) return
   const update = policy() !== 'quit'
   const lines: string[] = []
-  if (resumed.length) lines.push(tr(msg({ id: 'main.restart.resumedLine', defaultMessage: 'Resumed: {names}.', description: 'A line of the notice after Hive resumed agents when it started again. {names} lists them, each with its project.' }), { names: fmt.list(resumed.map((e) => `${e.agentName} (${e.project})`)) }))
-  for (const e of [...failed, ...held, ...skipped]) lines.push(tr(msg({ id: 'main.restart.notResumedLine', defaultMessage: 'Not resumed: {agent} ({project}): {why}.', description: 'A line of the notice after Hive resumed agents when it started again: one it did not resume, and why.' }), { agent: e.agentName, project: e.project, why: whyText(e) }))
+  if (resumed.length) lines.push(tr(msg({ id: 'main.restart.resumedLine', defaultMessage: 'Resumed: {names}.', description: 'A line of the notice after Combwork resumed agents when it started again. {names} lists them, each with its project.' }), { names: fmt.list(resumed.map((e) => `${e.agentName} (${e.project})`)) }))
+  for (const e of [...failed, ...held, ...skipped]) lines.push(tr(msg({ id: 'main.restart.notResumedLine', defaultMessage: 'Not resumed: {agent} ({project}): {why}.', description: 'A line of the notice after Combwork resumed agents when it started again: one it did not resume, and why.' }), { agent: e.agentName, project: e.project, why: whyText(e) }))
   const title = update
-    ? tr(msg({ id: 'main.restart.reportUpdate', defaultMessage: '{n, plural, one {Resumed one agent after the update} other {Resumed # agents after the update}}', description: "A notice's title: Hive restarted for an update and resumed the agents that were working. {n} is how many resumed." }), { n: resumed.length })
-    : tr(msg({ id: 'main.restart.reportResume', defaultMessage: '{n, plural, one {Resumed one agent} other {Resumed # agents}}', description: "A notice's title: the agents that were working when Hive was quit were resumed, as the user asked. {n} is how many." }), { n: resumed.length })
+    ? tr(msg({ id: 'main.restart.reportUpdate', defaultMessage: '{n, plural, one {Resumed one agent after the update} other {Resumed # agents after the update}}', description: "A notice's title: Combwork restarted for an update and resumed the agents that were working. {n} is how many resumed." }), { n: resumed.length })
+    : tr(msg({ id: 'main.restart.reportResume', defaultMessage: '{n, plural, one {Resumed one agent} other {Resumed # agents}}', description: "A notice's title: the agents that were working when Combwork was quit were resumed, as the user asked. {n} is how many." }), { n: resumed.length })
   // The offers whose Resume was taken: each notice says how it went, in place of its buttons (HI-2320); else a notice of
   // its own. An offer still open (its buttons not used) stays open.
   const text = `${title}\n${lines.join('\n')}`
@@ -709,12 +709,12 @@ async function tellAssistants(resumed: readonly RestartEntry[], not: readonly Re
     }
   for (const [ws, r] of byWs) {
     const home = assistantHome(ws)
-    if (!existsSync(join(dataFolder(home, 'assistant'), 'project.json'))) continue
+    if (!existsSync(join(dataFolder(home), 'project.json'))) continue
     const first = r.resumed[0] ?? r.not[0]
     const versions = first.from && first.from !== app.getVersion() ? ` (${first.from} → ${app.getVersion()})` : ''
     const resumedList = r.resumed.map((e) => `${e.agentName} (${e.project})`).join(', ')
     const body = inDialectOf({ projectPath: home, agentId: ASSISTANT_AGENT_ID }, () => say(T.assistant, { quit: policy() === 'quit' ? 'yes' : 'no', versions, hasResumed: resumedList ? 'yes' : 'no', resumed: resumedList, hasNot: r.not.length ? 'yes' : 'no', not: r.not.map((e) => `${e.agentName} (${e.project}): ${e.state}${e.why ? `, ${e.why}` : ''}`).join('; ') }))
-    await leaveDelivery(home, { agentId: ASSISTANT_AGENT_ID, kind: 'control', from: HIVE, body }).catch((e) => log.warn('telling the Assistant what was resumed after the restart', e))
+    await leaveDelivery(home, { agentId: ASSISTANT_AGENT_ID, kind: 'control', from: COMBWORK, body }).catch((e) => log.warn('telling the Assistant what was resumed after the restart', e))
   }
 }
 
@@ -729,7 +729,7 @@ let checking = false
 let checkAgain = false
 
 /**
- * Watches Hive's profile for the installer's request (and checks once now: one left from an earlier process is removed,
+ * Watches Combwork's profile for the installer's request (and checks once now: one left from an earlier process is removed,
  * never acted on). A request for this process and copy, fresh and whole, is taken (renamed), acknowledged, and
  * `onRequest` called, once.
  */
@@ -801,7 +801,7 @@ function handleRequest(dir: string, onRequest: () => void): void {
     log.warn("Taking the installer's request to close", e)
     return
   }
-  log.info(`The installer asked Hive to close for an install (${userText(r.request.exe)}): closing`)
+  log.info(`The installer asked Combwork to close for an install (${userText(r.request.exe)}): closing`)
   onRequest()
 }
 

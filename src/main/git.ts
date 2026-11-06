@@ -8,7 +8,7 @@ import type { GitDiff, GitStatus } from '../shared/types'
 import { gitProblemData } from '../shared/gitTool'
 import { withValues } from '../shared/advanced'
 import { msg, tr } from '../shared/i18n'
-import { hiveError } from './hiveError'
+import { combworkError } from './combworkError'
 import { createLogger, userText } from './logger'
 import { runGit, type GitOutcome, type GitReply, type GitRequest, type RefsRequest } from './gitWorker'
 import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
@@ -29,10 +29,10 @@ export interface GitResult {
    * takes it for git's own "no" (exit 1: a config key not set, HEAD detached, not an ancestor).
    */
   code: number
-  /** Git couldn't be started: not installed, or not on Hive's PATH (#346). Never an answer about the repository. */
+  /** Git couldn't be started: not installed, or not on Combwork's PATH (#346). Never an answer about the repository. */
   missing?: boolean
   /**
-   * HI-2019: git didn't run to an exit of its own for another reason, as Node or Hive's worker said it (`EAGAIN`, a
+   * HI-2019: git didn't run to an exit of its own for another reason, as Node or Combwork's worker said it (`EAGAIN`, a
    * busy machine; `ERR_GIT_WORKER`, the worker ended; the output bound; ended by a signal): a failure to try again, never
    * git's answer, and never git missing.
    */
@@ -42,7 +42,7 @@ export interface GitResult {
 }
 
 /**
- * What every git command Hive runs starts with. Hive's git calls run in the background, beside the user's and agents'
+ * What every git command Combwork runs starts with. Combwork's git calls run in the background, beside the user's and agents'
  * own git commands, so they never write the index as a side effect (#212): `status` refreshes it opportunistically
  * (taking index.lock, so a `git add` or `commit` at that moment fails with "index.lock: File exists") unless optional
  * locks are off, and `diff` against the working tree does it whatever that says unless autoRefreshIndex is off. Locks a
@@ -96,7 +96,7 @@ export function gitRouted(): boolean {
 }
 
 export function git(cwd: string, args: string[], maxBuffer = 16 * 1024 * 1024, input?: string, opts: GitRunOptions = {}): Promise<GitResult> {
-  // HI-2137: the git Hive starts (Git for Windows' real git rather than its launcher, where it found one).
+  // HI-2137: the git Combwork starts (Git for Windows' real git rather than its launcher, where it found one).
   const run = (a: string[] = args): Promise<GitResult> => gitAs(opts.exe !== undefined ? { exe: opts.exe } : gitExe(), cwd, a, maxBuffer, input, opts)
   return changesWorktrees(args) ? worktreeQueueKey(cwd).then((repo) => oneWorktreeChange(repo, () => worktreeChange(cwd, args, run))) : run()
 }
@@ -116,7 +116,7 @@ export function halfMadeEntry(err: string): string | null {
 /**
  * HI-2349: a worktree change, run again when it failed on another git's half-made entry once that entry is written (or
  * gone), at most worktreeRetry.times. oneWorktreeChange keeps this process's own changes apart (HI-2322); this covers
- * the gits it can't queue: another Hive on the same repository, an agent's or the user's own `git worktree add`. An
+ * the gits it can't queue: another Combwork on the same repository, an agent's or the user's own `git worktree add`. An
  * entry still unwritten after the wait (one a crashed git left) isn't waited for again: git's failure is the answer.
  */
 async function worktreeChange(cwd: string, args: string[], run: (a: string[]) => Promise<GitResult>): Promise<GitResult> {
@@ -247,7 +247,7 @@ async function gitAs(use: GitExe, cwd: string, args: string[], maxBuffer: number
   const notRun = !ranToExit && !missing ? String(errCode ?? err?.signal ?? 'error') : undefined
   const code = err ? (typeof errCode === 'number' ? errCode : -1) : 0
   if (opts.exe === undefined) {
-    // HI-2137: the real git Hive found couldn't start (uninstalled, moved): it never ran, so once more with PATH's,
+    // HI-2137: the real git Combwork found couldn't start (uninstalled, moved): it never ran, so once more with PATH's,
     // whether or not another command found it gone first.
     if (missing && use.exe !== PATH_GIT.exe) {
       gitExeGone(use.exe)
@@ -330,7 +330,7 @@ class GitThread {
 }
 
 /** A command's outcome when git's worker ended while it was under way: one that couldn't start (never git's answer). */
-const lostOutcome = (why: string): GitOutcome => ({ stdout: new Uint8Array(), stderr: Buffer.from(`Hive's git worker ended (${why})`), error: { code: 'ERR_GIT_WORKER', killed: false, signal: null }, cwdExists: true }) // i18n-ignore: git's error text, for the log and the caller's message
+const lostOutcome = (why: string): GitOutcome => ({ stdout: new Uint8Array(), stderr: Buffer.from(`Combwork's git worker ended (${why})`), error: { code: 'ERR_GIT_WORKER', killed: false, signal: null }, cwdExists: true }) // i18n-ignore: git's error text, for the log and the caller's message
 
 /** The observer's read of a repository's refs (observe.ts), off main's thread: see GitThread.refs. */
 export const readRefsOffMain = (common: string, max: number): Promise<RepoRefs> => thread.refs(common, max)
@@ -374,7 +374,7 @@ export const tooLargeDiff = (path: string, bytes: number): GitDiff => ({ path, o
 
 /** Why a git command failed, for an error the window shows: git missing, else git's own first line. `command` is the git command, as it is. */
 export function failure(command: string, r: GitResult): Error {
-  return hiveError(M.failed, { command, why: gitProblemData(gitTool()) ?? (r.err.split(/\r?\n/)[0] || withValues(M.exitCode, { code: r.code })) })
+  return combworkError(M.failed, { command, why: gitProblemData(gitTool()) ?? (r.err.split(/\r?\n/)[0] || withValues(M.exitCode, { code: r.code })) })
 }
 
 /** The commit where HEAD left base, or null if there is none (git's exit 1). Throws when git can't say (#346). */
@@ -471,7 +471,7 @@ export function isBinary(buf: Buffer): boolean {
 
 export async function gitDiff(projectPath: string, file: string, base?: string): Promise<GitDiff> {
   const abs = resolve(projectPath, file)
-  if (!abs.toLowerCase().startsWith(resolve(projectPath).toLowerCase() + sep)) throw hiveError(M.outside)
+  if (!abs.toLowerCase().startsWith(resolve(projectPath).toLowerCase() + sep)) throw combworkError(M.outside)
   const ref = (base && (await mergeBase(projectPath, base))) || 'HEAD'
   const head = await git(projectPath, ['show', `${ref}:${file.replace(/\\/g, '/')}`], MAX_DIFF_BYTES * 2)
   const original = head.ok ? head.buf : Buffer.alloc(0)
@@ -482,7 +482,7 @@ export async function gitDiff(projectPath: string, file: string, base?: string):
     if (s.isSymbolicLink()) modified = Buffer.from(await readlink(abs), 'utf8')
     else {
       // Nor a file reached through a linked folder that leads outside.
-      if (!insideReal(abs, [projectPath])) throw Object.assign(hiveError(M.outside), { outside: true })
+      if (!insideReal(abs, [projectPath])) throw Object.assign(combworkError(M.outside), { outside: true })
       if (s.size > MAX_DIFF_BYTES) return tooLargeDiff(file, s.size)
       modified = await readFile(abs)
     }

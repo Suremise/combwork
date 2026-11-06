@@ -40,13 +40,13 @@ export function fingerprint(root = process.cwd()) {
 /** The real CLIs a run can use (suites.mjs `needs`): the provider each one is, by its id and name. */
 export const REAL_CLIS = { claude: { id: 'claude-code', name: 'Claude Code' }, codex: { id: 'codex', name: 'Codex' }, copilot: { id: 'copilot', name: 'GitHub Copilot' } }
 
-/** The file in a suite's folder where its test copies of Hive note the CLIs they selected (HIVE_TEST_CLI_LOG). */
-export const CLI_LOG = 'hive-clis.jsonl'
+/** The file in a suite's folder where its test copies of Combwork note the CLIs they selected (CW_TEST_CLI_LOG). */
+export const CLI_LOG = 'cw-clis.jsonl'
 
 /**
- * The CLIs a suite's test copies of Hive selected (#365): each provider's executable and version as Hive's own
- * detection chose them (main's noteSelectedCli writes a line per check to HIVE_TEST_CLI_LOG), once each. Not a probe of
- * the runner's: what the suite ran is what Hive picked (a standalone CLI, never an editor extension's copy).
+ * The CLIs a suite's test copies of Combwork selected (#365): each provider's executable and version as Combwork's own
+ * detection chose them (main's noteSelectedCli writes a line per check to CW_TEST_CLI_LOG), once each. Not a probe of
+ * the runner's: what the suite ran is what Combwork picked (a standalone CLI, never an editor extension's copy).
  */
 export function readCliLog(text) {
   const seen = new Map()
@@ -57,14 +57,14 @@ export function readCliLog(text) {
       const home = typeof o?.home === 'string' && o.home ? { home: o.home } : {}
       if (typeof o?.provider === 'string' && typeof o?.version === 'string') seen.set(`${o.provider}\0${o.version}\0${o.path ?? ''}\0${home.home ?? ''}`, { provider: o.provider, version: o.version, path: typeof o.path === 'string' ? o.path : null, ...home })
     } catch {
-      // Not a line Hive wrote (a partial one): ignored.
+      // Not a line Combwork wrote (a partial one): ignored.
     }
   }
   return [...seen.values()]
 }
 
 /**
- * The homes each real suite's own CLI ran in (#368), from what its Hive noted: `homes` a line per suite ("claude-real:
+ * The homes each real suite's own CLI ran in (#368), from what its Combwork noted: `homes` a line per suite ("claude-real:
  * Claude Code in C:\…\claude-real-claude-home"), and `own` the suites that ran one in the user's own home
  * (%USERPROFILE%\.claude, .codex or .copilot), which no suite may: the record isn't valid then.
  */
@@ -90,7 +90,7 @@ export function realCliHomes(results, suites, userProfile = process.env.USERPROF
 }
 
 /**
- * The versions of each real CLI that the real suites of it ran, from what their Hive selected: { claude: ['2.1.292'] }.
+ * The versions of each real CLI that the real suites of it ran, from what their Combwork selected: { claude: ['2.1.292'] }.
  * More than one means the suites ran different versions.
  */
 export function realCliVersions(results, suites) {
@@ -133,7 +133,7 @@ export function selectionLine(sel, max = 5) {
 /**
  * The record as data (run-record.json beside run-record.md), for scripts: `npm run tested-clis` makes the release's
  * tested-with manifest from it (#365). The code, whether it can be trusted, the real CLIs' versions, each suite's
- * result (the last run's, for a repeat: a valid record had every run pass) with the CLIs its Hive selected.
+ * result (the last run's, for a repeat: a valid record had every run pass) with the CLIs its Combwork selected.
  */
 export function recordJson({ code, when, results, problems = [], notRun = [], clis = {}, selection = null, packaged = null }) {
   return {
@@ -175,7 +175,7 @@ export function recordMarkdown({ code, when, jobs, results, logDir, summary, pro
   const cell = (r) => (!r ? '–' : r.notRun || r.skipped ? result(r) : `${result(r)} ${r.seconds ?? '–'}s`)
   // A record that can't be trusted says so first, so nobody matches its fingerprint by mistake.
   const warning = problems.length ? [`**Not valid — don't trust this record:** ${problems.join('; ')}.`, ''] : []
-  const head = `**e2e run record** · code \`${code}\` · ${when} · ${jobs > 1 ? `${jobs} at a time` : 'one at a time'}${packaged ? ` · packaged build \`${packaged}\` (HIVE_EXE)` : ''}`
+  const head = `**e2e run record** · code \`${code}\` · ${when} · ${jobs > 1 ? `${jobs} at a time` : 'one at a time'}${packaged ? ` · packaged build \`${packaged}\` (CW_EXE)` : ''}`
   const envSkipped = [...new Set((runs ?? [{ results }]).flatMap((r) => r.results.filter((x) => x.environment).map((x) => x.name)))]
   const windows = results.filter((r) => windowsOf(r).length).map((r) => `${r.name}: ${windowsOf(r).join('; ')}`)
   const devOnly = results.filter((r) => r.notRun).map((r) => r.name)
@@ -183,7 +183,7 @@ export function recordMarkdown({ code, when, jobs, results, logDir, summary, pro
   const notes = [
     ...(selection ? [selectionLine(selection)] : []),
     ...(windows.length ? [`Windows codes (#599): ${windows.join(' · ')}.`] : []),
-    ...(Object.keys(clis).length ? [`Real CLIs (as Hive selected them): ${cliLine(clis)}.`] : []),
+    ...(Object.keys(clis).length ? [`Real CLIs (as Combwork selected them): ${cliLine(clis)}.`] : []),
     ...(homes.length ? [`Real CLIs' homes (#368): ${homes.join('; ')}.`] : []),
     ...(notRun.length ? [`Not run: the real tier (\`--real\`): ${notRun.join(', ')}.`] : []),
     ...(devOnly.length ? [`**Not run on the packaged build** (they would test the dev build; why in the table): ${devOnly.join(', ')}.`] : []),

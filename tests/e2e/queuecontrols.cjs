@@ -1,4 +1,4 @@
-// The merge queue's controls in the app (#1353, SPEC §16.9.3, OP-9): a project set to "Hive merges" into `integration`
+// The merge queue's controls in the app (#1353, SPEC §16.9.3, OP-9): a project set to "Combwork merges" into `integration`
 // (queueFixture.cjs), fake Claude Code agents acting by their own tokens.
 // - Pause queue (the window's): an approved card waits, unmerged, the pause kept with who; Resume merges it;
 // - Remove from queue during its check, then a restart: never merged (S33a);
@@ -25,7 +25,7 @@ const TARGET = 'integration'
 
 ;(async () => {
   q.prepare(fx)
-  let h = await q.startHive(fx, { port: PORT })
+  let h = await q.startCombwork(fx, { port: PORT })
   let removed = null
   let removedAt = null
   let headAtClose = null
@@ -36,7 +36,7 @@ const TARGET = 'integration'
     const column = async (n) => (await h.card(n))?.column
     const done = async (n) => (await until(async () => (await column(n)) === 'done', HUNG_MS)) === true
     const view = async () => (await h.inv('queue:list', fx.alpha, TARGET))[0]
-    /** The queue at rest: no run of this Hive's going, nothing being tested. */
+    /** The queue at rest: no run of this Combwork's going, nothing being tested. */
     const idle = (v) => !!v && !v.runHere && !v.testing
     const api = async (token, method, p, body) => {
       const res = await fetch(`http://127.0.0.1:${h.port}${p}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
@@ -186,13 +186,13 @@ const TARGET = 'integration'
   // --- S33a: after a restart, the removed card is never merged.
   if (removed !== null) {
     try {
-      h = await q.startHive(fx, { port: PORT, keepOptions: true })
+      h = await q.startCombwork(fx, { port: PORT, keepOptions: true })
       const rest = await until(async () => {
         const v = (await h.inv('queue:list', fx.alpha, TARGET))[0]
         return v && !v.runHere && !v.testing && !v.queued.length ? v : null
       }, HUNG_MS)
       const kinds = await h.kinds(removed)
-      check('S33a: restarted, the removed card is still Passed, never merged, the target where Hive left it', !!rest && (await h.card(removed))?.column === 'passed' && !kinds.includes('Integrated') && !kinds.includes('IntegrationStarted') && q.head(fx) === headAtClose, JSON.stringify({ kinds, head: q.head(fx), headAtClose }))
+      check('S33a: restarted, the removed card is still Passed, never merged, the target where Combwork left it', !!rest && (await h.card(removed))?.column === 'passed' && !kinds.includes('Integrated') && !kinds.includes('IntegrationStarted') && q.head(fx) === headAtClose, JSON.stringify({ kinds, head: q.head(fx), headAtClose }))
     } catch (e) {
       check('no exception after the restart', false, e.stack)
     } finally {

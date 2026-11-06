@@ -11,7 +11,7 @@ import type { Fact, FactData, StageId } from './workflow/facts'
  * Cost per card and per lane (#602, Darren's decision of 11 Oct). Usage is the card's while an agent held it: its
  * builder while it is in Doing, its reviewer from its review's start to its verdict (TaskCard.held). What a lane's agents
  * used while holding no card is the lane's overhead (merges, watching, compactions). Each provider's usage is as it
- * reported it: Hive's estimates marked ≈, and what isn't known is unknown, never $0.
+ * reported it: Combwork's estimates marked ≈, and what isn't known is unknown, never $0.
  */
 
 /** Holds kept on a card: the newest. */
@@ -55,11 +55,11 @@ export function trackHolds(card: TaskCard, at: string): void {
 const COLUMN_BY_LABEL = new Map(TASK_COLUMNS.map((c) => [c.label.toLowerCase(), c.id]))
 const MOVED = /^Moved to (?:the (?:top|bottom) of )?(On Hold|Todo|Doing|Review|Passed|Done)\b/
 const CREATED = /^Created in (On Hold|Todo|Doing|Review|Passed|Done)\b/
-/** "HB5 (hive)": an agent's name as history gives who did it. */
+/** "B5 (demo)": an agent's name as history gives who did it. */
 const agentNamed = (by: string): string => by.replace(/\s+\([^()]*\)$/, '')
 
 /**
- * A card's holds as its history tells them, for a card from before Hive kept them: who it was given to and when it was
+ * A card's holds as its history tells them, for a card from before Combwork kept them: who it was given to and when it was
  * in Doing, who started reviewing it and their verdicts. By names (history has no ids), except where the name is the
  * card's agent's or reviewer's now. A history cut short (the oldest entries dropped) gives what it still has.
  */
@@ -175,7 +175,7 @@ export function sharedSpans(spans: Span[], others: Span[][]): Map<number, Span[]
 
 /**
  * A part's usage and cost times f (its share of time an agent held several cards); how many parts were priced or not
- * stays. A share is Hive's, so it is marked ≈ (cost and tokens).
+ * stays. A share is Combwork's, so it is marked ≈ (cost and tokens).
  */
 export function scalePart(p: CostPart, f: number): CostPart {
   if (f === 1) return p
@@ -202,17 +202,17 @@ export interface CostPart {
   cacheReadTokens: number
   requests: number
   cost: number
-  /** Some of the cost is Hive's estimate (≈). */
+  /** Some of the cost is Combwork's estimate (≈). */
   estimated: boolean
   priced: number
-  /** Parts whose cost isn't known (no price for the model, or usage Hive can't place in time): never counted as $0. */
+  /** Parts whose cost isn't known (no price for the model, or usage Combwork can't place in time): never counted as $0. */
   unpriced: number
   /**
-   * Parts whose tokens aren't known (Copilot's before its launch exits, a session Hive can't place in time): the token
+   * Parts whose tokens aren't known (Copilot's before its launch exits, a session Combwork can't place in time): the token
    * counts are only what is known, never 0 for them.
    */
   tokensUnknown: number
-  /** Some of the tokens are Hive's share of a total (Copilot's spread over its requests, a card held with others): ≈. */
+  /** Some of the tokens are Combwork's share of a total (Copilot's spread over its requests, a card held with others): ≈. */
   tokensEstimated: boolean
 }
 
@@ -249,11 +249,11 @@ export interface SessionSlice {
 
 /**
  * What a session used in some spans of time: each row of its timeline (a second, mostly) by how much of it the spans
- * cover. Its cost: a reported charge (UsageTimeline.reports) is split only between the rows it covers, by Hive's
+ * cover. Its cost: a reported charge (UsageTimeline.reports) is split only between the rows it covers, by Combwork's
  * estimate for their tokens (else their tokens, their requests, or equally), and is exact where all of a charge's rows
- * are inside, ≈ where the spans split it; rows no charge covers are Hive's estimate (≈), and so is everything when the
+ * are inside, ≈ where the spans split it; rows no charge covers are Combwork's estimate (≈), and so is everything when the
  * user chose their own prices over the provider's (#436). Unknown where there is no price, or no tokens to price yet. A
- * session active in the spans whose timeline or usage Hive doesn't have is an unknown part. Null when it wasn't active
+ * session active in the spans whose timeline or usage Combwork doesn't have is an unknown part. Null when it wasn't active
  * in them.
  */
 export function sliceSession(s: SessionSlice, spans: Span[], settings?: Pick<AppSettings, 'providers'> | null): CostPart | null {
@@ -292,7 +292,7 @@ export function sliceSession(s: SessionSlice, spans: Span[], settings?: Pick<App
     if (shares && r[6] >= 0) {
       costKnown = true
       out.cost += shares[i] * f
-      // The spans take part of the charge: its split is Hive's.
+      // The spans take part of the charge: its split is Combwork's.
       if (!whole.get(r[6])) out.estimated = true
       return
     }
@@ -326,7 +326,7 @@ export interface CardCost {
   total: CostPart
   /** When it was last held (ISO), or now while it is. */
   lastHeld: string | null
-  /** Holds whose agent has no session Hive knows of: their usage is unknown. */
+  /** Holds whose agent has no session Combwork knows of: their usage is unknown. */
   unmatched: number
 }
 
@@ -521,7 +521,7 @@ const partTokenSum = (p: CostPart): number => p.inputTokens + p.outputTokens + p
 /**
  * A role's part of a card's cost (the ledger's, as the card's total counts it) shared out between the pieces of it
  * (HI-1906): by what the timelines give each (cost, else tokens), else by how long each held the card, else equally, so
- * the shares add up to the part. A share of less than all of it is Hive's (≈). What isn't known stays unknown: in the
+ * the shares add up to the part. A share of less than all of it is Combwork's (≈). What isn't known stays unknown: in the
  * pieces whose own use isn't known, or in each piece with a share when none says which.
  */
 export function shareRole(ledger: CostPart, pieces: RolePiece[]): CostPart[] {
@@ -628,7 +628,7 @@ const tok = (n: number): string => fmt.number(Math.round(n), { notation: 'compac
 
 /**
  * A part's tokens in words, for a hover: "in 12K · out 3K · cache write 40K · cache read 1.2M · 31 requests"; "≈ " when
- * some are Hive's share of a total, "+ unknown" when some aren't known, "tokens unknown" when none are.
+ * some are Combwork's share of a total, "+ unknown" when some aren't known, "tokens unknown" when none are.
  */
 export function partTokens(p: CostPart): string {
   if (!p.priced && !p.unpriced && !p.tokensUnknown) return tr(msg({ id: 'board.cost.nothingUsed', defaultMessage: 'nothing used', description: "A card's or lane's token use, in a cost hover: no tokens at all. Lower case: it follows a cost." }))
@@ -636,7 +636,7 @@ export function partTokens(p: CostPart): string {
   const requests = Math.round(p.requests)
   if (p.tokensUnknown && !known) return tr(msg({ id: 'board.cost.tokensUnknown', defaultMessage: 'tokens unknown{requests, plural, =0 {} one { · # request} other { · # requests}}', description: "A card's or lane's token use, in a cost hover: the provider didn't say how many tokens, then how many requests (none: leave that branch empty). Lower case: it follows a cost." }), { requests })
   const values = { input: tok(p.inputTokens), output: tok(p.outputTokens), cacheWrite: tok(p.cacheWriteTokens), cacheRead: tok(p.cacheReadTokens), estimated: p.tokensEstimated ? 'yes' : 'no', unknown: p.tokensUnknown ? 'yes' : 'no', requests }
-  return tr(msg({ id: 'board.cost.tokens', defaultMessage: '{estimated, select, yes {≈ } other {}}in {input} · out {output} · cache write {cacheWrite} · cache read {cacheRead}{unknown, select, yes { + unknown} other {}}{requests, plural, =0 {} one { · # request} other { · # requests}}', description: "A card's or lane's token use, in a cost hover: input, output, cache write and cache read tokens (\"12K\"); ≈ first when some are Hive's estimate; + unknown when some aren't known; then how many requests (none: leave that branch empty). Lower case: it follows a cost." }), values)
+  return tr(msg({ id: 'board.cost.tokens', defaultMessage: '{estimated, select, yes {≈ } other {}}in {input} · out {output} · cache write {cacheWrite} · cache read {cacheRead}{unknown, select, yes { + unknown} other {}}{requests, plural, =0 {} one { · # request} other { · # requests}}', description: "A card's or lane's token use, in a cost hover: input, output, cache write and cache read tokens (\"12K\"); ≈ first when some are Combwork's estimate; + unknown when some aren't known; then how many requests (none: leave that branch empty). Lower case: it follows a cost." }), values)
 }
 
 /** Cost per finished card ("≈ $2.10 a finished card"), when any finished and the cost is known. */

@@ -41,7 +41,7 @@ const alive = (pid) => ids.has(pid) && lib.stillSame([ids.get(pid)]).length === 
   cfg.settings.sessions = { ...cfg.settings.sessions, confirmStop: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const h = await lib.launch({ userData, env: { ...env, HIVE_TEST_TIPS: 'off' } })
+  const h = await lib.launch({ userData, env: { ...env, CW_TEST_TIPS: 'off' } })
   const { app, page, inv } = h
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -56,7 +56,7 @@ const alive = (pid) => ids.has(pid) && lib.stillSame([ids.get(pid)]).length === 
     await pageB.waitForLoadState('domcontentloaded')
     await lib.appReady(pageB)
     pageB.on('pageerror', (e) => check('no page errors (B)', false, e.message))
-    const invB = (ch, ...a) => pageB.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const invB = (ch, ...a) => pageB.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await invB('workspace:open', wsB)
     await until(async () => (await invB('workspace:get'))?.path?.toLowerCase() === wsB.toLowerCase(), HUNG_MS)
     const homeB = (await invB('workspace:refresh')).assistant.path

@@ -1,5 +1,5 @@
 // Agent watches (#416): cw_wait_for_agents with wake, on fake Claude Code agents (fake-claude/). A watcher asks to be
-// told when another agent is done and ends its turn at once (watching, "Waiting for Worker to finish"); Hive types one
+// told when another agent is done and ends its turn at once (watching, "Waiting for Worker to finish"); Combwork types one
 // line into it when the agent finishes its turn (with its reply), starts waiting for the user, or stops; exactly once
 // each. Also: an agent not working is the answer at once; nothing is typed while the watcher works or the user types
 // there; limitMinutes ends a watch with a "still working" line; cancel ends one. Dev build, throwaway profile,
@@ -9,7 +9,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-// A fake's hive tool call took 20 s under a loaded machine (#667).
+// A fake's Combwork tool call took 20 s under a loaded machine (#667).
 const HUNG_MS = 60000
 
 const userData = path.join(lib.WORK, 'agentwatch-profile')
@@ -41,13 +41,13 @@ const check = (name, ok, extra = '') => {
   cfg.settings.assistant = { ...cfg.settings.assistant, typingPause: 4, enterEndsPause: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const apiToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
   const api = async (method, route, body) => {
@@ -71,10 +71,10 @@ const check = (name, ok, extra = '') => {
   }
   /** Types a prompt into an agent (as the user does), Enter included. */
   const say = async (id, text) => {
-    // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+    // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
     await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
   }
-  const watchOn = (name, extra = {}) => `hive cw_wait_for_agents ${JSON.stringify({ agents: [{ project: 'alpha', agent: name }], wake: true, ...extra })}`
+  const watchOn = (name, extra = {}) => `cw cw_wait_for_agents ${JSON.stringify({ agents: [{ project: 'alpha', agent: name }], wake: true, ...extra })}`
   /** Lets a fake's turn go on (holduntil NAME) or ask (askwhen NAME): the file it waits for, in its home. */
   const go = (name) => fs.writeFileSync(path.join(claudeHome, name), '')
   /**
@@ -120,7 +120,7 @@ const check = (name, ok, extra = '') => {
   // …and that answer ends a watch it had, saying so, the busy agent asked about again included (#1530, HR2's rounds 1-2).
   await say(watcher.id, watchOn('Slow'))
   await until(async () => (await live(watcher.id))?.status === 'watching', HUNG_MS)
-  await say(watcher.id, `hive cw_wait_for_agents ${JSON.stringify({ agents: [{ project: 'alpha', agent: 'Slow' }, { project: 'alpha', agent: 'Worker' }], wake: true })}`)
+  await say(watcher.id, `cw cw_wait_for_agents ${JSON.stringify({ agents: [{ project: 'alpha', agent: 'Slow' }, { project: 'alpha', agent: 'Worker' }], wake: true })}`)
   await until(async () => ((await lastWaitReply(watcher.id)) ?? '').startsWith('Already: ') && (await idle(watcher.id)), HUNG_MS)
   const ended = await lastWaitReply(watcher.id)
   check("…and ends a watch it had, saying so: every agent it followed", (ended ?? '').startsWith('Already: Worker (alpha) is idle') && (ended ?? '').endsWith(" Your watch on Slow (alpha) has ended: watch again, passing every agent you're following.") && !(await live(watcher.id))?.watch, ended)
@@ -227,7 +227,7 @@ const check = (name, ok, extra = '') => {
   await say(worker.id, 'holduntil agentwatch-cancelled')
   await until(async () => (await live(worker.id))?.status === 'working', HUNG_MS)
   await watchWorker('cancel')
-  await say(watcher.id, 'hive cw_wait_for_agents {"cancel":true}')
+  await say(watcher.id, 'cw cw_wait_for_agents {"cancel":true}')
   await until(async () => (await lastWaitReply(watcher.id)) === 'Cancelled your agent watch.' && (await idle(watcher.id)), HUNG_MS)
   check('cancel ends the agent watch', (await lastWaitReply(watcher.id)) === 'Cancelled your agent watch.' && !(await live(watcher.id))?.watch, await lastWaitReply(watcher.id))
   go('agentwatch-cancelled')

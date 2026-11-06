@@ -1,4 +1,4 @@
-// Card attachments (HI-1700), on the real board (a temp hive.db) with two projects: kept in the card's folder with a row
+// Card attachments (HI-1700), on the real board (a temp combwork.db) with two projects: kept in the card's folder with a row
 // each; the same bytes once; the limits checked up front and while streaming (a file that grows); a batch all or nothing;
 // undone with the change; removed and deleted through the cards' trash, to the Recycle Bin once committed; a crash at any
 // step settled at the next open from the operations' records and the committed board; a move copying the files; never a
@@ -10,7 +10,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { junction } from './pathAliases'
 
-const base = tempDir('hive-cardattach-')
+const base = tempDir('cw-cardattach-')
 const trashDir = join(base, 'trash')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -28,10 +28,10 @@ advanced.load(join(base, 'profile'))
 type WS = ReturnType<typeof createWorkspaceService>
 const opened: WS[] = []
 beforeAll(() => {
-  process.env.HIVE_TEST_TRASH_DIR = trashDir
+  process.env.CW_TEST_TRASH_DIR = trashDir
 })
 afterAll(async () => {
-  delete process.env.HIVE_TEST_TRASH_DIR
+  delete process.env.CW_TEST_TRASH_DIR
   advanced.stop()
   for (const w of opened) await disposeWorkspaceService(w)
   store.closeAllBoards()
@@ -174,7 +174,7 @@ describe('recovering what an interrupted operation left (HI-1700, s13)', () => {
     expect(trashed().some((t) => t.endsWith(a.file))).toBe(true)
   })
 
-  it("a record naming a path outside its folder, or an id Hive never makes, is left as it is: nothing it names is touched (HR4's round 1)", async () => {
+  it("a record naming a path outside its folder, or an id Combwork never makes, is left as it is: nothing it names is touched (HR4's round 1)", async () => {
     const { w, root } = await workspace()
     const c = await card(w)
     const host = join(root, 'p')
@@ -194,12 +194,12 @@ describe('recovering what an interrupted operation left (HI-1700, s13)', () => {
     const { w, root } = await workspace()
     const c = await card(w)
     const elsewhere = join(base, `elsewhere-${++n}`)
-    const kept = file(join(elsewhere, 'files'), 'precious.txt', 'not Hive’s')
+    const kept = file(join(elsewhere, 'files'), 'precious.txt', 'not Combwork’s')
     writeFileSync(join(elsewhere, OP_FILE), JSON.stringify({ kind: 'delete', card: 999999 }))
     mkdirSync(join(att.cardsRoot(join(root, 'p')), TRASH), { recursive: true })
     junction(elsewhere, join(att.cardsRoot(join(root, 'p')), TRASH, 'op-link'))
     await inWorkspace(w, () => att.recoverCardAttachments(w))
-    expect(readFileSync(kept, 'utf8')).toBe('not Hive’s')
+    expect(readFileSync(kept, 'utf8')).toBe('not Combwork’s')
     // A whole cards folder that is a junction: left as it is.
     const other = join(base, `elsewhere-${++n}`)
     const theirs = file(join(other, String(c)), 'theirs.txt', 'theirs')
@@ -307,12 +307,12 @@ describe("never a session's (HI-1700)", () => {
 })
 
 describe('where a file may come from (HI-1700, s13 §2)', () => {
-  it("a project's agent: its project, its slots and the temp folder; never another project's, nested or through a junction, nor Hive's own folders", async () => {
+  it("a project's agent: its project, its slots and the temp folder; never another project's, nested or through a junction, nor Combwork's own folders", async () => {
     const { w, root } = await workspace()
     const agent = { kind: 'agent', project: 'p' } as const
     const own = file(join(root, 'p', 'src'), 'mine.png', 'mine')
     const slot = file(join(w.worktreesRoot, 'p', 'slot-a'), 'slot.png', 'slot')
-    const shot = file(tempDir('hive-shot-'), 'screenshot.png', 'shot')
+    const shot = file(tempDir('cw-shot-'), 'screenshot.png', 'shot')
     for (const ok of [own, slot, shot]) expect(await att.attachableSource(w, agent, ok)).toBeTruthy()
     // Another project: refused, though the test workspace is itself in the temp folder.
     await expect(att.attachableSource(w, agent, file(join(root, 'q'), 'theirs.png', 'theirs'))).rejects.toThrow(/not a file that can be attached/)
@@ -337,18 +337,18 @@ describe('where a file may come from (HI-1700, s13 §2)', () => {
     await expect(att.attachableSource(w, ws, join(root, 'q', '.combwork', 'project.json'))).rejects.toThrow()
   })
 
-  // HI-2480: a folder the user lists (Settings → Advanced → Card attachments: more folders, Hive's or the workspace's).
+  // HI-2480: a folder the user lists (Settings → Advanced → Card attachments: more folders, Combwork's or the workspace's).
   it('more folders: a file under one attaches; outside every accepted folder it is refused, saying which are and where to add one', async () => {
     const { w, root } = await workspace()
     const agent = { kind: 'agent', project: 'p' } as const
     const script = { kind: 'workspace' } as const
     // Everything a test makes is in the run's temp folder: the temp folder is one of its own here, so the rest is outside it.
-    const was = process.env.HIVE_EVIDENCE
-    const temp = tempDir('hive-temp-')
+    const was = process.env.CW_EVIDENCE
+    const temp = tempDir('cw-temp-')
     att.attachTestHooks.temp = temp
-    const evidence = tempDir('hive-evidence-')
+    const evidence = tempDir('cw-evidence-')
     const zip = file(join(evidence, 'run4'), 'run4.zip', 'zip bytes')
-    const elsewhere = file(tempDir('hive-elsewhere-'), 'other.zip', 'other')
+    const elsewhere = file(tempDir('cw-elsewhere-'), 'other.zip', 'other')
     try {
       // Not listed: refused, naming the accepted folders, Temp's path and where to add one.
       const refused = await att.attachableSource(w, agent, zip).then(() => 'attached', (e: Error) => e.message)
@@ -356,9 +356,9 @@ describe('where a file may come from (HI-1700, s13 §2)', () => {
       await expect(att.attachableSource(w, script, zip)).rejects.toThrow(/Files can come from the workspace and its projects, the temp folder/)
       expect(await att.attachableSource(w, agent, file(temp, 'shot.png', 's'))).toBeTruthy()
 
-      // Hive's own list, with a variable at its start: the agent's and the script's file attaches; elsewhere is still refused.
-      process.env.HIVE_EVIDENCE = evidence
-      await advanced.set(CARD_ATTACHMENT_FOLDERS_ID, '%hive_evidence%; Q:\\not\\there')
+      // Combwork's own list, with a variable at its start: the agent's and the script's file attaches; elsewhere is still refused.
+      process.env.CW_EVIDENCE = evidence
+      await advanced.set(CARD_ATTACHMENT_FOLDERS_ID, '%cw_evidence%; Q:\\not\\there')
       expect(att.extraFolders(w)).toEqual([evidence, 'Q:\\not\\there'])
       expect(await att.attachableSource(w, agent, zip)).toBe(zip)
       expect(await att.attachableSource(w, script, zip)).toBe(zip)
@@ -373,13 +373,13 @@ describe('where a file may come from (HI-1700, s13 §2)', () => {
       await expect(att.attachableSource(w, agent, file(join(root, 'q'), 'theirs.png', 't'))).rejects.toThrow(/not a file that can be attached/)
       await expect(att.attachableSource(w, agent, file(join(root, '.combwork'), 'x.txt', 'x'))).rejects.toThrow(/not a file that can be attached/)
 
-      // The workspace's own list over Hive's; unset, Hive's again. A variable that isn't set leaves its folder out.
+      // The workspace's own list over Combwork's; unset, Combwork's again. A variable that isn't set leaves its folder out.
       await w.setAdvanced(CARD_ATTACHMENT_FOLDERS_ID, [evidence])
       expect(att.extraFolders(w)).toEqual([evidence])
-      await w.setAdvanced(CARD_ATTACHMENT_FOLDERS_ID, '%HIVE_NOT_SET_2480%\\x')
+      await w.setAdvanced(CARD_ATTACHMENT_FOLDERS_ID, '%CW_NOT_SET_2480%\\x')
       expect(att.extraFolders(w)).toEqual([])
       await expect(att.attachableSource(w, agent, zip)).rejects.toThrow(/not a file that can be attached/)
-      // A workspace's [] (written by hand or the API) is Hive's list, as its emptied box in Settings is.
+      // A workspace's [] (written by hand or the API) is Combwork's list, as its emptied box in Settings is.
       await w.setAdvanced(CARD_ATTACHMENT_FOLDERS_ID, [])
       expect(att.extraFolders(w)).toEqual([root])
       await w.setAdvanced(CARD_ATTACHMENT_FOLDERS_ID, null)
@@ -387,8 +387,8 @@ describe('where a file may come from (HI-1700, s13 §2)', () => {
     } finally {
       await advanced.set(CARD_ATTACHMENT_FOLDERS_ID, null)
       att.attachTestHooks.temp = null
-      if (was === undefined) delete process.env.HIVE_EVIDENCE
-      else process.env.HIVE_EVIDENCE = was
+      if (was === undefined) delete process.env.CW_EVIDENCE
+      else process.env.CW_EVIDENCE = was
     }
   })
 
@@ -409,10 +409,10 @@ describe('where a file may come from (HI-1700, s13 §2)', () => {
   })
 
   it('a list of folders round-trips exactly: parsed and written with ";", spaces around each trimmed (HI-2538)', () => {
-    const two = ['%LOCALAPPDATA%\\combwork-cli', '%LOCALAPPDATA%\\hive-test\\scratch']
-    for (const typed of ['%LOCALAPPDATA%\\combwork-cli;%LOCALAPPDATA%\\hive-test\\scratch', '%LOCALAPPDATA%\\combwork-cli; %LOCALAPPDATA%\\hive-test\\scratch', ' %LOCALAPPDATA%\\combwork-cli ;  %LOCALAPPDATA%\\hive-test\\scratch ;'])
+    const two = ['%LOCALAPPDATA%\\combwork-cli', '%LOCALAPPDATA%\\combwork-test\\scratch']
+    for (const typed of ['%LOCALAPPDATA%\\combwork-cli;%LOCALAPPDATA%\\combwork-test\\scratch', '%LOCALAPPDATA%\\combwork-cli; %LOCALAPPDATA%\\combwork-test\\scratch', ' %LOCALAPPDATA%\\combwork-cli ;  %LOCALAPPDATA%\\combwork-test\\scratch ;'])
       expect(folderList(typed), typed).toEqual(two)
-    expect(foldersText(two)).toBe('%LOCALAPPDATA%\\combwork-cli;%LOCALAPPDATA%\\hive-test\\scratch')
+    expect(foldersText(two)).toBe('%LOCALAPPDATA%\\combwork-cli;%LOCALAPPDATA%\\combwork-test\\scratch')
     expect(folderList(foldersText(two))).toEqual(two)
     const def = advancedDef(CARD_ATTACHMENT_FOLDERS_ID)!
     // What the tools and Settings show is what was typed with ";": never a comma, never a space added.
@@ -472,7 +472,7 @@ describe("a card's change with files (HI-1700, s11 §3–4)", () => {
 
   it("an agent's files with no draft are linked at the end of the description; the reply says what was stored", async () => {
     const { w } = await workspace()
-    const shot = file(tempDir('hive-shot2-'), 'shot.png', 'agent shot')
+    const shot = file(tempDir('cw-shot2-'), 'shot.png', 'agent shot')
     const real = await att.attachableSource(w, { kind: 'agent', project: 'p' }, shot)
     const staging = await att.stage(join(w.path!, 'p'), null, [{ path: real, name: 'shot.png' }])
     const made = await inWorkspace(w, () => tasks.changeWithAttachments({ kind: 'agent', name: 'B1' }, { staging, drafts: [null] }, 'description', () => tasks.createTask({ title: 'With a shot', project: 'p', description: 'See the screenshot.' }, user)))

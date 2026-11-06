@@ -37,13 +37,13 @@ const check = (name, ok, extra = '') => {
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47897), CODEX_HOME: lib.CODEX_HOME, PATH: lib.pathWithoutStoreAliases() })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47897), CODEX_HOME: lib.CODEX_HOME, PATH: lib.pathWithoutStoreAliases() })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('demo', { exact: true }).first().click()
   await lib.addAgent(inv, proj, { name: 'Codex', provider: 'codex', model: 'gpt-6-luna', effort: 'low' })
@@ -64,13 +64,13 @@ const check = (name, ok, extra = '') => {
   await inv('session:start', proj, { agentId: agent.id })
   check('Codex starts', !!(await until((s) => s?.status === 'ready', 60000)))
   const key = lib.ptyKey(proj, agent.id)
-  // Printing only the id is the form that went uncounted (#162): Hive mustn't depend on what the script prints.
+  // Printing only the id is the form that went uncounted (#162): Combwork mustn't depend on what the script prints.
   const prompt =
     `Call exec_command once with cmd "Start-Sleep -Seconds 40; Set-Content -Path ${marker} -Value done" and yield_time_ms 1000. It will return a session id while the command keeps running: do not wait for it, poll it or call write_stdin. If you call it from a script, print only its session id (text(r.session_id)). Reply with the single word STARTED and end your turn.`
   // Codex answering the prompt is the CLI's part (a usage limit or the network there is the environment's: lib.cliStep).
   diagnosticWindow = { from: Date.now(), peersBefore: runningCliSuites() }
   const t0 = await lib.cliStep('the prompt’s turn', { session: key }, async () => {
-    // Typed the way Hive types prompts (a long text at once is a paste to Codex, and Enter then adds a line).
+    // Typed the way Combwork types prompts (a long text at once is a paste to Codex, and Enter then adds a line).
     for (let i = 0; i < prompt.length; i += 8) {
       await inv('pty:write', key, prompt.slice(i, i + 8))
       await lib.sleep(15)
@@ -86,7 +86,7 @@ const check = (name, ok, extra = '') => {
     if (!running) diagnostics(lib.plainText(await inv('pty:buffer', key)))
     return started
   })
-  // Hive's part: counting what the turn left running.
+  // Combwork's part: counting what the turn left running.
   const counted = await until((s) => s?.backgroundTasks === 1 && s, 10000)
   check('the running command is counted', counted?.backgroundTasks === 1, JSON.stringify(counted && { tasks: counted.backgroundTasks }))
   if (!counted) diagnostics(lib.plainText(await inv('pty:buffer', key)))

@@ -28,7 +28,7 @@ export function recordFinish(tx: Tx, card: number, actor: Actor, ruleset: string
   const override = written.findLast((f): f is Fact<'Override'> => f.kind === 'Override')?.data
   const accepted = !!cycle.accepted
   const moved = written.findLast((f): f is Fact<'Moved'> => f.kind === 'Moved' && (f.data as FactData['Moved']).to === 'done')?.data
-  const how: FinishHow = integrated ? (integrated.by === 'hive' && integrated.method !== 'committed' ? 'queue' : 'reported') : accepted ? 'accepted' : override ? 'override' : !o.board && (o.claimed || moved?.cause === 'intent') ? 'unchecked' : 'board'
+  const how: FinishHow = integrated ? (integrated.by === 'combwork' && integrated.method !== 'committed' ? 'queue' : 'reported') : accepted ? 'accepted' : override ? 'override' : !o.board && (o.claimed || moved?.cause === 'intent') ? 'unchecked' : 'board'
   const data: FactData['Finished'] = {
     how,
     verified: integrated?.result ?? null,

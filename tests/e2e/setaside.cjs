@@ -1,4 +1,5 @@
-// Cards an older Hive saved after the board moved to its database (#1017's downgrade), set aside, and their review
+// Cards an older version saved after the board moved to its database (#1017's downgrade), set aside by the names upgrade
+// as it retires the board's stub (HI-2594; no version writes the stub since 1.1, HI-2624), and their review
 // (#1044, Darren's decision on #1017: the only way they reach the board): the notice offers Review…, whose dialog lists
 // each card (its old number, whether it is free, who made it, a preview); Add to Board keeps a free old number, gives a
 // taken one the next free number, with a history line by Repair; Discard… asks, then sends the file to the trash. The
@@ -35,21 +36,30 @@ const olderCard = (number, fields) =>
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)
-    // The board as 0.9 keeps it: #1 and #2, and the stub an older Hive reads.
+    // The board: #1 and #2. Since 1.1 no stub for older versions is written (HI-2594, SPEC §4.1.1).
     const one = await inv('tasks:create', { title: 'On the board', project: 'alpha' })
     const two = await inv('tasks:create', { title: 'Links to #1', project: 'alpha' })
     await inv('tasks:update', two.number, { links: [one.number] })
     const stub = path.join(ws, '.combwork', 'tasks')
-    check('the stub is there for older versions', fs.existsSync(path.join(stub, 'board.json')))
+    check('no stub is written for older versions (HI-2594)', !fs.existsSync(stub))
+    const free = Math.max(...(await inv('tasks:list')).map((c) => c.number)) + 1
 
-    // Another workspace meanwhile; then an older Hive saves three files in the stub: a card with a free number, one
-    // whose number the board has, and a damaged one.
+    // Another workspace meanwhile; then the workspace is put back as 1.0 left it, with the stub 0.9 to 1.0 kept (its
+    // board.json and README) and no record of the names upgrade, and an older version saves three files in the stub: a
+    // card with a free number, one whose number the board has, and a damaged one. The names upgrade at the next open
+    // sets them aside (moveOldStub) and the board's notice says so.
     await lib.openWorkspace(inv, page, other)
-    const free = Number(JSON.parse(fs.readFileSync(path.join(stub, 'board.json'), 'utf8')).next)
+    fs.mkdirSync(stub)
+    fs.writeFileSync(path.join(stub, 'board.json'), JSON.stringify({ version: 1, next: free }, null, 2) + '\n')
+    // old-name: begin v09-stub-readme
+    fs.writeFileSync(path.join(stub, 'README.txt'), 'The board is in hive.db since 0.9.\n')
+    // old-name: end v09-stub-readme
+    fs.rmSync(path.join(ws, '.combwork', 'combwork-names.json'), { force: true })
     fs.writeFileSync(path.join(stub, `${free}.json`), olderCard(free, { title: 'Made in the older Combwork', description: 'Written **while** the workspace was open in 0.8.\n\nIt has a second paragraph.', labels: ['old'], comments: [{ at: '2026-10-05T09:31:00.000Z', by: 'You', text: 'A comment from then', id: 'c1' }] }))
     fs.writeFileSync(path.join(stub, `${one.number}.json`), olderCard(one.number, { title: 'Also made as #1', createdBy: 'Assistant', column: 'review' }))
     fs.writeFileSync(path.join(stub, `${free + 1}.json`), '{ damaged')
     await lib.openWorkspace(inv, page, ws)
+    check('the names upgrade retired the stub', !fs.existsSync(stub), fs.existsSync(stub) ? fs.readdirSync(stub).join() : '')
 
     // The notice, with Review….
     const toast = page.locator('.toast', { hasText: 'made by an older Combwork' })

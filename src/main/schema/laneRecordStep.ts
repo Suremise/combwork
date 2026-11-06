@@ -9,7 +9,7 @@ import { LOOP_ROUNDS, LOOP_WAIT_HOURS } from '../../shared/lanes'
  *
  * Nothing a runtime lane holds is lost. It joins lanes.ts's lane of its id only when that lane is the same one: of its
  * project, with the same cards in the same order, running or ended alike; only what the runtime kept is added (and its
- * cards' reviewer, if lanes.ts's lane has none). Any other becomes a lane of its own, by Hive (no agent registered it:
+ * cards' reviewer, if lanes.ts's lane has none). Any other becomes a lane of its own, by the app itself (no agent registered it:
  * lanes.ts's builder fields need one), with its cards, state and its cards' reviewer, under its own id if no lane has it
  * and no other runtime lane keeps it, else the first `<id>-<n>` that no lane, runtime lane or id given before has.
  * lanes.ts keeps no lane without cards: one whose list is empty takes its queued list as its cards (its next card
@@ -39,7 +39,11 @@ interface Source {
 
 const same = (a: readonly number[], b: readonly number[]): boolean => a.length === b.length && a.every((c, i) => c === b[i])
 
-/** Moves the runtime's lanes into lanes.ts's tables and drops its own (the step's whole work). */
+/**
+ * Moves the runtime's lanes into lanes.ts's tables and drops its own (the step's whole work). Its code is the released
+ * 1.0.0's (combworkMove10.test.ts holds it there): the lanes it adds are by 1.0's own name, which the names upgrade's values
+ * step (valuesStep.ts) makes Combwork's. A new board has no runtime lanes, so it adds none (HI-2611): nothing of 1.0's.
+ */
 export function moveLaneRecords(db: DatabaseSync, now = new Date().toISOString()): LanesMoved {
   for (const sql of LANE_RECORD_ADD) db.exec(sql)
   const out: LanesMoved = { lanes: 0, added: 0, dropped: 0 }
@@ -90,8 +94,10 @@ export function moveLaneRecords(db: DatabaseSync, now = new Date().toISOString()
     if (join) {
       if (s.reviewer) db.prepare('UPDATE lanes SET reviewer_id = ?, reviewer_name = ? WHERE id = ? AND reviewer_id IS NULL').run(s.reviewer, s.reviewer, id) // i18n-ignore: SQL
     } else {
+      // old-name: begin lanes-10-values
       db.prepare(`INSERT INTO lanes (id, ord, project, project_id, name, builder_id, builder_name, reviewer_id, reviewer_name, rounds, wait_minutes, state, started_by, started_at, updated_at, ended_at, merge_commit, extra)
         VALUES (?, ?, ?, NULL, NULL, 'hive', 'Hive', ?, ?, ?, ?, ?, 'Hive', ?, ?, ?, NULL, NULL)`).run(id, ord++, s.project, s.reviewer, s.reviewer, LOOP_ROUNDS, LOOP_WAIT_HOURS * 60, s.ended ? 'ended' : 'active', now, now, s.ended ? now : null) // i18n-ignore: SQL
+      // old-name: end lanes-10-values
       s.cards.forEach((c, i) => insCard.run(id, i, c))
       out.added++
     }

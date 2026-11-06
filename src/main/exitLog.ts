@@ -5,7 +5,7 @@ import { createLogger } from './logger'
 import { memoryLine } from './memory'
 
 /**
- * Why Hive stopped (#985): crash dumps kept in the profile, never sent anywhere, and a line in hive.log for every way
+ * Why Combwork stopped (#985): crash dumps kept in the profile, never sent anywhere, and a line in combwork.log for every way
  * the app can end, so a run that stops without a word (17 Oct 2026) leaves something to go on. The logger's writer thread
  * (HI-1730) writes lines within moments; at the process's exit what it hasn't written is written at once (flushLogs), so
  * a line logged just before the end is on disk when the process goes. A crash of the whole process can lose the last few
@@ -13,13 +13,22 @@ import { memoryLine } from './memory'
  */
 const log = createLogger('exit')
 
-/** The ways Hive itself ends or restarts the app; each call goes through exitBy() and is logged with its caller. */
+/** The ways Combwork itself ends or restarts the app; each call goes through exitBy() and is logged with its caller. */
 export type ExitWay = 'app.quit' | 'app.exit' | 'process.exit' | 'app.relaunch' | 'autoUpdater.quitAndInstall'
 
-/** Ends (or restarts) the app by `how`, after logging it with who asked: the only place Hive's main process does. */
+/** Ends (or restarts) the app by `how`, after logging it with who asked: the only place Combwork's main process does. */
 export function exitBy(how: ExitWay, caller: string, act: () => void): void {
   log.info(`Leaving by ${how}: ${caller}`)
   act()
+}
+
+/**
+ * The one way out that isn't logged: a start refused before its profile folder is chosen (HI-2594, a move of 1.0's
+ * folder it couldn't make; index.ts says why on stderr and in an error box). The log is in the profile: a line written
+ * then would make Electron's default profile folder, Combwork's, which the next start would take for the profile.
+ */
+export function exitBeforeProfile(code: number): never {
+  process.exit(code)
 }
 
 /** The folder of the profile's crash dumps (Crashpad's database; the dumps themselves are in its reports folder). */
@@ -35,8 +44,8 @@ export function crashDumpsDir(): string {
 export function startCrashDumps(): void {
   try {
     app.setPath('crashDumps', crashDumpsDir())
-    // It names Hive's crash handler in CHROME_CRASHPAD_PIPE_NAME, which Chromium's own processes need (taken out of
-    // main's environment, a page's crash leaves no dump): what Hive starts doesn't get it (childEnv, CHILD_ENV_STRIP).
+    // It names Combwork's crash handler in CHROME_CRASHPAD_PIPE_NAME, which Chromium's own processes need (taken out of
+    // main's environment, a page's crash leaves no dump): what Combwork starts doesn't get it (childEnv, CHILD_ENV_STRIP).
     crashReporter.start({ uploadToServer: false, compress: true })
   } catch (e) {
     log.warn("Couldn't start keeping crash dumps", e)
@@ -70,7 +79,7 @@ export function crashDumps(dir = join(crashDumpsDir(), 'reports')): CrashDump[] 
 export function crashDumpLines(dumps: CrashDump[], dir: string): string[] {
   if (!dumps.length) return ['None.']
   const newest = dumps[0]
-  return [`- ${dumps.length} in \`${dir}\`; the newest from ${new Date(newest.at).toISOString()}: \`${basename(newest.file)}\` (${Math.round(newest.bytes / 1024)} KB)`, '- Saved on this PC only: Hive never sends them. Attach one to an issue yourself if asked.'] // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
+  return [`- ${dumps.length} in \`${dir}\`; the newest from ${new Date(newest.at).toISOString()}: \`${basename(newest.file)}\` (${Math.round(newest.bytes / 1024)} KB)`, '- Saved on this PC only: Combwork never sends them. Attach one to an issue yourself if asked.'] // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
 }
 
 /** What a process that went says of itself, for the log. */
@@ -113,7 +122,7 @@ export function startExitLog(): void {
   void app.whenReady().then(() => {
     for (const w of BrowserWindow.getAllWindows()) watchWindow(w)
     powerMonitor.on('suspend', () => log.info('The PC is going to sleep'))
-    // Waking up is logged where Hive acts on it (power.ts).
+    // Waking up is logged where Combwork acts on it (power.ts).
     powerMonitor.on('shutdown', () => log.info('The PC is shutting down'))
     powerMonitor.on('lock-screen', () => log.info('The screen was locked'))
     powerMonitor.on('unlock-screen', () => log.info('The screen was unlocked'))
@@ -125,7 +134,7 @@ export const CRASH_DUMPS_KEPT = 3
 
 /**
  * Removes all but the newest `keep` dumps (newest first, as crashDumps gives them), as old heap snapshots are (not to
- * the Recycle Bin: Hive's own diagnostics in its profile). Returns the dumps left; one that can't be removed stays.
+ * the Recycle Bin: Combwork's own diagnostics in its profile). Returns the dumps left; one that can't be removed stays.
  */
 export function pruneCrashDumps(dumps: CrashDump[], keep = CRASH_DUMPS_KEPT): { kept: CrashDump[]; removed: number; bytes: number } {
   let removed = 0

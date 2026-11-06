@@ -1,6 +1,6 @@
 // Archiving and deleting sessions checks nothing has them in use (#239): running in any window, a CLI still writing
-// the transcript, Hive reading it or showing it in another window, or another program holding the CLI's transcript or
-// Hive's copy open. Each session is all or nothing (a failure after the first move or trash puts everything back), and
+// the transcript, Combwork reading it or showing it in another window, or another program holding the CLI's transcript or
+// Combwork's copy open. Each session is all or nothing (a failure after the first move or trash puts everything back), and
 // a bulk action skips those in use and says why. The CLI's own transcripts are never touched. Sub-sessions are found
 // for old adopted records too, and in the folders of worktree agents.
 import { spawn, type ChildProcess } from 'child_process'
@@ -11,7 +11,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import type { SessionBulkProgress } from '../src/shared/types'
 
-const base = tempDir('hive-inuse-')
+const base = tempDir('cw-inuse-')
 // The CLIs' homes are the test's (never ~/.claude or ~/.codex).
 process.env.CLAUDE_CONFIG_DIR = join(base, 'claude-home')
 process.env.CODEX_HOME = join(base, 'codex-home')
@@ -31,7 +31,7 @@ const { sessions, SessionInUse } = await import('../src/main/sessions')
 const { usageHistory } = await import('../src/main/usageHistory')
 const { setViewing, whileReading } = await import('../src/main/transcriptReads')
 const { encodeProjectPath } = await import('../src/main/providers/claude/usage')
-const { onHiveEvent } = await import('../src/main/events')
+const { onCombworkEvent } = await import('../src/main/events')
 
 const wsPath = join(base, 'ws')
 const p = join(wsPath, 'proj')
@@ -60,7 +60,7 @@ const write = (file: string, text: string, at: Date = old): void => {
 const backup = (id: string, archived = false): string => join(p, '.combwork', archived ? 'archive' : 'sessions', `${id}.jsonl`)
 const cliFile = (id: string): string => join(cli, `${id}.jsonl`)
 
-/** One of Hive's sessions: its record, Hive's backup and the CLI's transcript (written long ago unless `at`). */
+/** One of Combwork's sessions: its record, Combwork's backup and the CLI's transcript (written long ago unless `at`). */
 async function session(opts: { archivedCopy?: boolean; at?: Date } = {}): Promise<string> {
   const id = newId()
   await run(() => workspace.upsertSession(p, { id, agent: 'claude-code', name: id, lastActiveAt: old.toISOString() }))
@@ -152,7 +152,7 @@ describe.runIf(process.platform === 'win32')('archiving and deleting sessions in
   it('Delete all skips what is in use, says why, and deletes the rest; later items go on after a skipped one', async () => {
     const live = await session()
     const held = await session()
-    // Started outside Hive, its CLI still writing it (a Codex guardian review still going, say).
+    // Started outside Combwork, its CLI still writing it (a Codex guardian review still going, say).
     const writing = newId()
     write(cliFile(writing), transcript(writing), new Date())
     const reading = await session()
@@ -181,11 +181,11 @@ describe.runIf(process.platform === 'win32')('archiving and deleting sessions in
     for (const id of [live, held, writing, reading, free1, free2]) expect(existsSync(cliFile(id))).toBe(true)
   })
 
-  it("one of Hive's sessions whose CLI Hive saw exit archives at once; one written just now by a CLI Hive doesn't run waits", async () => {
+  it("one of Combwork's sessions whose CLI Combwork saw exit archives at once; one written just now by a CLI Combwork doesn't run waits", async () => {
     const id = await session({ at: new Date() })
-    // Adopted, and resumed in a terminal: written a moment ago, and Hive never saw that CLI.
+    // Adopted, and resumed in a terminal: written a moment ago, and Combwork never saw that CLI.
     expect(await run(() => sessions.archive(p, id, true)).catch((e) => e.reason)).toBe('in-use')
-    // Hive ran it, and saw its CLI exit (Archive and Start New archives one just stopped).
+    // Combwork ran it, and saw its CLI exit (Archive and Start New archives one just stopped).
     s.noteExit(id)
     await run(() => sessions.archive(p, id, true))
     // Archived copies are compressed (#1110).
@@ -208,7 +208,7 @@ describe.runIf(process.platform === 'win32')('archiving and deleting sessions in
     expect(await records()).toContain(id)
   })
 
-  it("Archive all skips sessions started outside Hive (Hive has nothing of theirs to keep) and unarchives what's archived", async () => {
+  it("Archive all skips sessions started outside Combwork (Combwork has nothing of theirs to keep) and unarchives what's archived", async () => {
     const mine = await session()
     const outside = newId()
     write(cliFile(outside), transcript(outside))
@@ -227,7 +227,7 @@ describe.runIf(process.platform === 'win32')('archiving and deleting sessions in
     write(cliFile(outside), transcript(outside))
     const ids = [mine[0], outside, ...mine.slice(1), '../not-an-id']
     const seen: SessionBulkProgress[][] = []
-    const off = onHiveEvent((e) => {
+    const off = onCombworkEvent((e) => {
       if (e.type === 'session-bulk' && e.projectPath === p) seen.push(e.runs)
     })
     let at = 0
@@ -266,7 +266,7 @@ describe.runIf(process.platform === 'win32')('archiving and deleting sessions in
     const outside = newId()
     write(cliFile(outside), transcript(outside))
     const seen: SessionBulkProgress[][] = []
-    const off = onHiveEvent((e) => {
+    const off = onCombworkEvent((e) => {
       if (e.type === 'session-bulk' && e.projectPath === p) seen.push(e.runs)
     })
     // The long one's archives wait until released: it is still running when the short one ends.
@@ -281,7 +281,7 @@ describe.runIf(process.platform === 'win32')('archiving and deleting sessions in
       const long = run(() => sessions.bulk(p, 'archive', held))
       await vi.waitFor(() => expect(seen.at(-1)?.length).toBe(1), { timeout: HUNG_MS })
       const longId = seen.at(-1)![0].id
-      // A second one, quickly skipped (started outside Hive): it ends first.
+      // A second one, quickly skipped (started outside Combwork): it ends first.
       const short = await run(() => sessions.bulk(p, 'archive', [outside]))
       expect(short.skipped).toEqual([{ id: outside, reason: 'external' }])
       expect(seen.at(-1)).toEqual([{ id: longId, action: 'archive', done: 0, total: 2 }])

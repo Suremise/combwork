@@ -1,4 +1,4 @@
-// A skill's source can change while Hive copies it for a session. The copy keeps the size limits (bytes read, entries,
+// A skill's source can change while Combwork copies it for a session. The copy keeps the size limits (bytes read, entries,
 // depth) as it goes, is checked before it is published, and what is recorded as delivered is the copy's own revision:
 // a source grown past the limits, or with a file gone or unreadable mid-copy, never replaces a usable copy (Codex keeps
 // its old one and says why) and is never left half-copied for a session (Claude Code: no copy, and why). A source that
@@ -49,23 +49,23 @@ const { claudeCode } = await import('../src/main/providers/claude/adapter')
 type Delivery = { revision: string | null; problem?: string; lasting?: true }
 
 // The entry and byte limits lowered for this file (HI-2453), as revisions.test.ts does (#215, #666): the copy and the
-// check read HASH_LIMITS as they go, so the same limits are kept over a tenth of the files and a 1 MB file. At Hive's own
+// check read HASH_LIMITS as they go, so the same limits are kept over a tenth of the files and a 1 MB file. At Combwork's own
 // 2000 entries and 64 MB a test wrote and copied 2000 files or 65 MB, and under a loaded full run one passed even its
 // 180 s bound. The real values are checked below, before they are lowered.
-const HIVE_LIMITS = { ...HASH_LIMITS }
+const CW_LIMITS = { ...HASH_LIMITS }
 const LIMITS = { entries: 200, depth: HASH_LIMITS.depth, bytes: 1024 * 1024 }
 beforeAll(() => {
   Object.assign(HASH_LIMITS, LIMITS)
 })
 afterAll(() => {
-  Object.assign(HASH_LIMITS, HIVE_LIMITS)
+  Object.assign(HASH_LIMITS, CW_LIMITS)
 })
 
-it("Hive's own limits, lowered for this file: 2000 entries, 12 folders deep, 64 MB", () => {
-  expect(HIVE_LIMITS).toEqual({ entries: 2000, depth: 12, bytes: 64 * MB })
+it("Combwork's own limits, lowered for this file: 2000 entries, 12 folders deep, 64 MB", () => {
+  expect(CW_LIMITS).toEqual({ entries: 2000, depth: 12, bytes: 64 * MB })
 })
 
-const base = tempDir('hive-copy-limits-')
+const base = tempDir('cw-copy-limits-')
 beforeEach(() => {
   hooks.beforeWrite = null
   hooks.deny = null
@@ -123,7 +123,7 @@ describe('Codex: a source changing while it is copied', () => {
       const old = await contentHash(copy)
       // A new version, then the change while it is copied.
       writeFileSync(join(bad, 'SKILL.md'), '---\nname: bad\n---\n\nv2\n')
-      hooks.beforeWrite = { match: /cw-bad\.hive-new-[^\\/]*[\\/]a\.md$/, run: () => changes[kind](bad) }
+      hooks.beforeWrite = { match: /cw-bad\.cw-new-[^\\/]*[\\/]a\.md$/, run: () => changes[kind](bad) }
       const out = await launch(cwd, [{ name: 'bad', sourcePath: bad }, { name: 'ok', sourcePath: ok }])
       const lasting = kind === 'bytes' || kind === 'entries' || kind === 'depth'
       expect(out.bad).toEqual({ revision: old, problem: `${reason[kind]}, so it kept its old copy`, ...(lasting ? { lasting: true } : {}) })
@@ -139,7 +139,7 @@ describe('Codex: a source changing while it is copied', () => {
     const cwd = join(root, 'project')
     mkdirSync(cwd, { recursive: true })
     const bad = source(root, 'bad')
-    hooks.beforeWrite = { match: /cw-bad\.hive-new-[^\\/]*[\\/]a\.md$/, run: () => changes.bytes(bad) }
+    hooks.beforeWrite = { match: /cw-bad\.cw-new-[^\\/]*[\\/]a\.md$/, run: () => changes.bytes(bad) }
     const out = await launch(cwd, [{ name: 'bad', sourcePath: bad }])
     expect(out.bad).toEqual({ revision: null, problem: reason.bytes, lasting: true })
     expect(readdirSync(join(cwd, '.agents', 'skills'))).toEqual([])
@@ -150,13 +150,13 @@ describe('Codex: a source changing while it is copied', () => {
     const cwd = join(root, 'project')
     mkdirSync(cwd, { recursive: true })
     const s = source(root, 'mine')
-    hooks.beforeWrite = { match: /cw-mine\.hive-new-[^\\/]*[\\/]a\.md$/, run: () => changes.valid(s) }
+    hooks.beforeWrite = { match: /cw-mine\.cw-new-[^\\/]*[\\/]a\.md$/, run: () => changes.valid(s) }
     const out = await launch(cwd, [{ name: 'mine', sourcePath: s }])
     const copy = join(cwd, '.agents', 'skills', 'cw-mine')
     expect(readFileSync(join(copy, 'b.md'), 'utf8')).toBe('b, edited while it was being copied')
     expect(out.mine).toEqual({ revision: await contentHash(copy) })
     expect(await contentHash(copy)).toBe(await contentHash(s))
-    expect(JSON.parse(readFileSync(join(copy, '.hive-copy'), 'utf8')).hash).toBe(await contentHash(s))
+    expect(JSON.parse(readFileSync(join(copy, '.combwork-copy'), 'utf8')).hash).toBe(await contentHash(s))
     const again = await launch(cwd, [{ name: 'mine', sourcePath: s }])
     expect(again.mine).toEqual({ revision: await contentHash(s) })
   })
@@ -164,7 +164,7 @@ describe('Codex: a source changing while it is copied', () => {
 
 describe('Claude Code: a source changing while it is copied', () => {
   const launch = (project: string, skills: { name: string; sourcePath: string }[]) =>
-    claudeCode.prepareLaunch({ projectPath: project, agentId: 'a1', cwd: project, skills, mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=x', env: {}, extraArgs: [], hookAuthFile: 'C:/hive/hook-auth/x.txt', privateDir: `${project}-private` } as never) as Promise<Record<string, Delivery>>
+    claudeCode.prepareLaunch({ projectPath: project, agentId: 'a1', cwd: project, skills, mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=x', env: {}, extraArgs: [], hookAuthFile: 'C:/demo/hook-auth/x.txt', privateDir: `${project}-private` } as never) as Promise<Record<string, Delivery>>
 
   for (const kind of ['bytes', 'entries', 'depth', 'vanish', 'unreadable'] as const) {
     it(`${kind}: not copied for the session (no partial copy), and why; a later skill is still delivered`, async () => {
@@ -227,7 +227,7 @@ describe('writes that take less than they are given', () => {
     mkdirSync(project, { recursive: true })
     const s = rich(root, 'rich')
     hooks.writes = 'short'
-    const out = (await claudeCode.prepareLaunch({ projectPath: project, agentId: 'a1', cwd: project, skills: [{ name: 'rich', sourcePath: s }], mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=x', env: {}, extraArgs: [], hookAuthFile: 'C:/hive/hook-auth/x.txt', privateDir: `${project}-private` } as never)) as Record<string, Delivery>
+    const out = (await claudeCode.prepareLaunch({ projectPath: project, agentId: 'a1', cwd: project, skills: [{ name: 'rich', sourcePath: s }], mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=x', env: {}, extraArgs: [], hookAuthFile: 'C:/demo/hook-auth/x.txt', privateDir: `${project}-private` } as never)) as Record<string, Delivery>
     const copy = join(project, '.combwork', 'launch-a1', 'plugin', 'skills', 'rich')
     for (const f of ['SKILL.md', 'refs/data.bin']) same(s, copy, f)
     expect(out.rich).toEqual({ revision: await contentHash(s) })
@@ -262,7 +262,7 @@ describe('writes that take less than they are given', () => {
 
     const project = join(root, 'claude')
     mkdirSync(project, { recursive: true })
-    const claude = (await claudeCode.prepareLaunch({ projectPath: project, agentId: 'a1', cwd: project, skills: [{ name: 'stuck', sourcePath: s }], mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=x', env: {}, extraArgs: [], hookAuthFile: 'C:/hive/hook-auth/x.txt', privateDir: `${project}-private` } as never)) as Record<string, Delivery>
+    const claude = (await claudeCode.prepareLaunch({ projectPath: project, agentId: 'a1', cwd: project, skills: [{ name: 'stuck', sourcePath: s }], mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=x', env: {}, extraArgs: [], hookAuthFile: 'C:/demo/hook-auth/x.txt', privateDir: `${project}-private` } as never)) as Record<string, Delivery>
     expect(claude.stuck).toEqual({ revision: null, problem: 'it could not be copied (EIO)' })
     expect(existsSync(join(project, '.combwork', 'launch-a1', 'plugin', 'skills', 'stuck'))).toBe(false)
   })
@@ -278,9 +278,9 @@ describe('a skill at the entry limit', () => {
   const launchCodex = (cwd: string, skills: { name: string; sourcePath: string }[]) =>
     codex.prepareLaunch({ projectPath: cwd, agentId: 'a1', runId: `limit${++n}`, cwd, skills, mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=x', env: {}, executable: 'codex' } as never) as Promise<Record<string, Delivery>>
   const launchClaude = (project: string, skills: { name: string; sourcePath: string }[]) =>
-    claudeCode.prepareLaunch({ projectPath: project, agentId: 'a1', cwd: project, skills, mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=x', env: {}, extraArgs: [], hookAuthFile: 'C:/hive/hook-auth/x.txt', privateDir: `${project}-private` } as never) as Promise<Record<string, Delivery>>
+    claudeCode.prepareLaunch({ projectPath: project, agentId: 'a1', cwd: project, skills, mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=x', env: {}, extraArgs: [], hookAuthFile: 'C:/demo/hook-auth/x.txt', privateDir: `${project}-private` } as never) as Promise<Record<string, Delivery>>
 
-  // At the file's lowered limit (LIMITS, above), not Hive's 2000: the same boundary over a tenth of the file work, which
+  // At the file's lowered limit (LIMITS, above), not Combwork's 2000: the same boundary over a tenth of the file work, which
   // at 2000 passed even a 180 s bound under a loaded full run (#356, HI-2423, HI-2453). The test hashes the source only
   // once itself: the next launch's revision is its copy's own hash, so its equal to the first, the source's, says the
   // copy is the source.
@@ -292,7 +292,7 @@ describe('a skill at the entry limit', () => {
     const s = sized(root, 'full', full)
     const first = await launchCodex(cwd, [{ name: 'full', sourcePath: s }])
     const copy = join(cwd, '.agents', 'skills', 'cw-full')
-    expect(existsSync(join(copy, '.hive-copy'))).toBe(true)
+    expect(existsSync(join(copy, '.combwork-copy'))).toBe(true)
     expect(first.full).toEqual({ revision: await contentHash(s) })
     expect(await launchCodex(cwd, [{ name: 'full', sourcePath: s }])).toEqual(first)
   })

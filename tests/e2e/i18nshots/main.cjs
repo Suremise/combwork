@@ -1,8 +1,8 @@
 // Screenshot cases for the `main` area (#796): text the main process shows, reached for the i18nshots route
 // (tests/e2e/i18nshots.cjs has the case format) with locale-independent means only: IPC, command ids, the notify log,
 // stand-ins for native dialogs and structural hooks, never English text. What Windows or Electron draws (a
-// notification, a message box) can't be photographed in the window, so its text, as Hive recorded it, is drawn on the
-// page and photographed there; the install-folder message, drawn by Hive itself to a picture (HIVE_TEST_DIALOG_SNAPSHOT)
+// notification, a message box) can't be photographed in the window, so its text, as Combwork recorded it, is drawn on the
+// page and photographed there; the install-folder message, drawn by Combwork itself to a picture (CW_TEST_DIALOG_SNAPSHOT)
 // by a start of its own in the language, is shown the same way.
 const fs = require('fs')
 const path = require('path')
@@ -19,7 +19,7 @@ async function shown(ctx, locator, what) {
   return locator.first()
 }
 
-/** Draws what Hive said outside the window (each { title, body, buttons }, or a picture) on top of the page. */
+/** Draws what Combwork said outside the window (each { title, body, buttons }, or a picture) on top of the page. */
 async function overlay(ctx, items) {
   await ctx.page.evaluate(
     ([attr, list]) => {
@@ -84,12 +84,12 @@ const liveOf = async (ctx) => {
 
 /** The notify log's entries (the route's, as its test copy writes it). */
 async function notes(ctx) {
-  const file = await ctx.app.evaluate(() => process.env.HIVE_TEST_NOTIFY_LOG)
+  const file = await ctx.app.evaluate(() => process.env.CW_TEST_NOTIFY_LOG)
   if (!file || !fs.existsSync(file)) return []
   return fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l))
 }
 
-/** Two agents finish together while Hive is in the background: the Windows notification (main's bursts) it records. */
+/** Two agents finish together while Combwork is in the background: the Windows notification (main's bursts) it records. */
 async function finishedNotification(ctx) {
   const { inv, lib, project } = ctx
   const agents = ctx.agents.slice(0, 2)
@@ -143,7 +143,7 @@ async function closeHang(ctx) {
 }
 
 /**
- * Hive started from a folder whose permissions it can't fix (as tests/e2e/installdir.cjs makes one): the message it
+ * Combwork started from a folder whose permissions it can't fix (as tests/e2e/installdir.cjs makes one): the message it
  * shows before it is ready, in the language, drawn to a picture by that start of its own, which then quits.
  */
 async function installFolder(ctx) {
@@ -158,7 +158,7 @@ async function installFolder(ctx) {
   fs.mkdirSync(locked, { recursive: true })
   icacls(locked, '/grant:r', '*S-1-3-4:(OI)(CI)(RX)', `*${PACKAGE}:(OI)(CI)(RX)`, '/inheritance:r')
   icacls(locked, '/grant', FOLDER_ENTRY)
-  const env = lib.hiveEnv({ HIVE_USER_DATA: path.join(base, 'profile'), HIVE_API_PORT: lib.port(47883), HIVE_LANG: lang, HIVE_TEST_INSTALL_DIR: locked, HIVE_TEST_NOTIFY_LOG: log, HIVE_TEST_DIALOG_SNAPSHOT: snapshot })
+  const env = lib.combworkEnv({ CW_USER_DATA: path.join(base, 'profile'), CW_API_PORT: lib.port(47883), CW_LANG: lang, CW_TEST_INSTALL_DIR: locked, CW_TEST_NOTIFY_LOG: log, CW_TEST_DIALOG_SNAPSHOT: snapshot })
   const child = spawn(lib.ELECTRON, [lib.ROOT], { cwd: lib.ROOT, env, stdio: 'ignore' })
   let code = null
   child.on('exit', (c) => (code = c ?? -1))

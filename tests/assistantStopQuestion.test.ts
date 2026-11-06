@@ -1,6 +1,6 @@
-// The question the Assistant's stop asks the user (HI-1994) is the window's text (HI-2449): shown in the language Hive
+// The question the Assistant's stop asks the user (HI-1994) is the window's text (HI-2449): shown in the language Combwork
 // shows, in the panel and in its notification, while its English (the log's, the event stream's title) is word for word
-// what Hive asked before.
+// what Combwork asked before.
 import { join } from 'path'
 import { mkdirSync, readFileSync } from 'fs'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -9,13 +9,13 @@ import { tempDir } from './tempDir'
 import { setLanguage } from '../src/shared/i18n'
 import { shownText } from '../src/shared/advanced'
 
-const base = tempDir('hive-stop-question-')
+const base = tempDir('cw-stop-question-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { stopQuestion } = await import('../src/main/assistantControl')
 
-/** The question as Hive asked it before HI-2449, from servers.ts's code then: the English it keeps. */
+/** The question as Combwork asked it before HI-2449, from servers.ts's code then: the English it keeps. */
 const STATUS_WORDS: Record<string, string> = {
   working: 'working',
   waiting: 'waiting for the user',
@@ -44,14 +44,14 @@ describe("the Assistant's stop question", () => {
         expect(stopQuestion({ agent: 'b1', project: 'webapp', status, reason }), `${status} ${reason}`).toMatchObject(before('b1', 'webapp', status, reason))
   })
 
-  it("is shown in the language Hive shows, while its English stays the log's", () => {
+  it("is shown in the language Combwork shows, while its English stays the log's", () => {
     setLanguage('de', german())
     const q = stopQuestion({ agent: 'b1', project: 'webapp', status: 'waiting', reason: 'es hängt' })
     expect(shownText(q.text!.title)).toBe('b1 in webapp stoppen?')
     expect(shownText(q.text!.message)).toBe('Der Assistent möchte b1 stoppen, der gerade auf dich wartet. Seine Begründung: es hängt. Die Unterhaltung bleibt erhalten und lässt sich fortsetzen.')
     expect([shownText(q.text!.yes), shownText(q.text!.no)]).toEqual(['Stoppen', 'Nicht stoppen'])
     expect(q.title).toBe('Stop b1 in webapp?')
-    // A status the window has no words for is named as Hive names it.
+    // A status the window has no words for is named as Combwork names it.
     expect(shownText(stopQuestion({ agent: 'b1', project: 'webapp', status: 'somethingNew', reason: '' }).text!.message)).toContain('der gerade somethingNew.')
   })
 })

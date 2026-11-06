@@ -33,7 +33,7 @@ describe("the e2e runners' claims lock (HI-1800)", () => {
 
   for (const code of ['EPERM', 'EACCES']) {
     it(`is taken once its folder, refused with ${code} while the last holder's removal ends, can be made`, async () => {
-      const dir = tempDir('hive-lanes-lock-')
+      const dir = tempDir('cw-lanes-lock-')
       Object.assign(refuse, { refusals: 3, code })
       expect(await withLock(dir, async () => 'held')).toBe('held')
       expect(refuse.tried).toBe(4)
@@ -44,7 +44,7 @@ describe("the e2e runners' claims lock (HI-1800)", () => {
   }
 
   it('fails, with the cause, when its folder is refused for longer than the lock is ever held', async () => {
-    const dir = tempDir('hive-lanes-lock-')
+    const dir = tempDir('cw-lanes-lock-')
     Object.assign(refuse, { refusals: Number.MAX_SAFE_INTEGER, code: 'EPERM' })
     // The bound is the lock's (4 × 10 s): its clock moved on rather than waited for.
     const start = Date.now()

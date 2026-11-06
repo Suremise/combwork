@@ -32,7 +32,7 @@ const TAIL_LINES = 12
 const M = {
   heading: msg({ id: 'board.workQueue.heading', defaultMessage: 'Merge queue', description: "A sub-heading in the card dialog's Work section: where the card stands in the merge queue follows. Glossary 2.5: merge queue." }),
   queued: msg({ id: 'board.workQueue.queued', defaultMessage: 'Queued for {target}: {position, selectordinal, one {#st} two {#nd} few {#rd} other {#th}} in line', description: "The card dialog's Work section: the card waits in the merge queue for the branch {target}, at place {position} (1st: next; the card testing now counts). Glossary 2.5: merge queue." }),
-  queuedNoPlace: msg({ id: 'board.workQueue.queuedNoPlace', defaultMessage: 'Queued for {target}', description: "The card dialog's Work section: the card waits in the merge queue for the branch {target} (its place isn't known here: another Hive runs the queue)." }),
+  queuedNoPlace: msg({ id: 'board.workQueue.queuedNoPlace', defaultMessage: 'Queued for {target}', description: "The card dialog's Work section: the card waits in the merge queue for the branch {target} (its place isn't known here: another Combwork runs the queue)." }),
   approved: msg({ id: 'board.workQueue.approved', defaultMessage: 'Approved revision', description: "A label in the card dialog's Work section's merge queue part: the revision that was approved and is merged follows (a short commit id). Glossary: revision." }),
   testing: msg({ id: 'board.workQueue.testing', defaultMessage: 'Testing now: {step}', description: "The card dialog's Work section: the merge queue is testing the card now, at a step ({step}: test merge, merge checks, check: unit, merging into main). Glossary 2.5: merge queue." }),
   showRun: msg({ id: 'board.workQueue.showRun', defaultMessage: 'Show the run', description: "A button in the card dialog's Work section: shows the merge check running now in the Progress panel's Runs tab." }),
@@ -51,7 +51,7 @@ const M = {
   retryConfirm: msg({ id: 'board.workQueue.retryConfirm', defaultMessage: 'Retry merge', description: 'The button confirming Retry merge. Keep it short.' }),
   retryFailed: msg({ id: 'board.workQueue.retryFailed', defaultMessage: "Couldn't retry the merge", description: "An error's title: Retry merge failed (the card dialog); its message says why." }),
   retried: msg({ id: 'board.workQueue.retried', defaultMessage: 'Queued again by Retry merge.', description: "The card dialog's Work section: the card's revision was queued again, unchanged, by the user's Retry merge." }),
-  cancelled: msg({ id: 'board.workQueue.cancelled', defaultMessage: '{reason, select, removed {Taken out of the queue (Remove from queue).} stale {Taken out of the queue: its pass no longer counts.} hold {Taken out of the queue: the card went On Hold.} decision {Taken out of the queue: a decision was recorded.} integratedOutside {Taken out of the queue: it was merged outside Combwork.} followUp {Taken out of the queue for a follow-up: queued again once its reviewer checks it.} other {Taken out of the queue.}}', description: "The card dialog's Work section: the card's merge queue entry was cancelled, and why. Keep the select keys. Glossary: merge queue, On Hold, decision, outside Hive, follow-up." }),
+  cancelled: msg({ id: 'board.workQueue.cancelled', defaultMessage: '{reason, select, removed {Taken out of the queue (Remove from queue).} stale {Taken out of the queue: its pass no longer counts.} hold {Taken out of the queue: the card went On Hold.} decision {Taken out of the queue: a decision was recorded.} integratedOutside {Taken out of the queue: it was merged outside Combwork.} followUp {Taken out of the queue for a follow-up: queued again once its reviewer checks it.} other {Taken out of the queue.}}', description: "The card dialog's Work section: the card's merge queue entry was cancelled, and why. Keep the select keys. Glossary: merge queue, On Hold, decision, outside Combwork, follow-up." }),
   paused: msg({ id: 'board.workQueue.paused', defaultMessage: 'The queue for {target} is paused', description: "A heading line in the card dialog's Work section: the merge queue for the branch {target} is paused (why follows)." }),
   resume: msg({ id: 'board.queue.resume', defaultMessage: 'Resume queue', description: "A button on a paused merge queue's card in the Progress panel: clears the pause once its cause is fixed. Glossary 2.5: Resume queue." }),
   resumeFailed: msg({ id: 'board.queue.resumeFailed', defaultMessage: "Couldn't resume the merge queue", description: "An error's title: Resume queue failed (Progress panel)." }),
@@ -66,7 +66,7 @@ const M = {
   result: msg({ id: 'board.workQueue.result', defaultMessage: 'The merge', description: "A label in the card dialog's Work section: the merged commit follows." }),
   files: msg({ id: 'board.workQueue.files', defaultMessage: '{n, plural, one {# file, and where it is} other {# files, and where each is}}', description: "A sub-heading in the card dialog's Work section, over the files a stopped merge left: how many ({n}), and for each whether it is as before the merge, as merged, or neither." }),
   side: msg({ id: 'board.workQueue.side', defaultMessage: '{side, select, expected {as before the merge} result {as merged} other {neither}}', description: "Beside a file in the card dialog's Work section: whether its contents are as before the merge, as merged, or neither. Keep the select keys." }),
-  commands: msg({ id: 'board.workQueue.commands', defaultMessage: 'Commands (PowerShell): nothing runs them for you', description: "A sub-heading in the card dialog's Work section, over the git commands that finish or undo a stopped merge: the user runs them in PowerShell; Hive doesn't." }),
+  commands: msg({ id: 'board.workQueue.commands', defaultMessage: 'Commands (PowerShell): nothing runs them for you', description: "A sub-heading in the card dialog's Work section, over the git commands that finish or undo a stopped merge: the user runs them in PowerShell; Combwork doesn't." }),
   command: msg({ id: 'board.workQueue.command', defaultMessage: '{purpose, select, finish {To finish it} other {To undo it}}, in {folder}', description: "Above a command in the card dialog's Work section: what it does (finish or undo the stopped merge) and the folder to run it in ({folder}: its name, such as alpha; the full path on hover). Keep the select keys." }),
   noCommands: msg({ id: 'board.workQueue.noCommands', defaultMessage: 'Its files are neither as they were nor as merged: put them right by hand.', description: "In the card dialog's Work section when no command can settle a stopped merge: the user fixes the files by hand." }),
   copy: msg({ id: 'board.workQueue.copy', defaultMessage: 'Copy', description: "A button beside a command in the card dialog's Work section: copies it. Keep it short." }),
@@ -83,7 +83,7 @@ const M = {
 }
 
 /** The window event For you's "Show the files and commands" sends: the card dialog's Work section shows its queue part. */
-export const SHOW_QUEUE_WORK = 'hive:show-queue-work'
+export const SHOW_QUEUE_WORK = 'cw:show-queue-work'
 
 /** The card's place in its target's queue, counting the one testing (1: next), or null when not known here. */
 function placeOf(v: QueueView | null, entry: string): number | null {
@@ -248,19 +248,19 @@ function Returned({ card, q, queue, short, runs, stage, retried }: { card: TaskC
 /** A conflict's files and hunks (HI-1181), as the queue's folder had them: read-only. */
 const C = {
   count: msg({ id: 'board.conflicts.count', defaultMessage: '{n, plural, one {# conflict} other {# conflicts}}', description: "Beside a file in conflict in the card dialog's Work section (HI-1181): how many conflict regions git left in it." }),
-  notRead: msg({ id: 'board.conflicts.notRead', defaultMessage: "{why, select, link {not read: it is a link} outside {not read: outside the queue's folder} missing {not read: not a file there} binary {not read: not text (binary)} notText {not read: not UTF-8 text} budget {not read: past how much Combwork reads} other {not read: it couldn't be read}}", description: "Beside a file in conflict in the card dialog's Work section (HI-1181): Hive didn't read its text, and why (select: translate each): a link it never follows, a path outside the merge queue's folder, not a file there (deleted on one side), binary, not UTF-8 text, past the amount Hive reads for one return, or an error." }),
-  noText: msg({ id: 'board.conflicts.noText', defaultMessage: 'no text conflict', description: "Beside a file in conflict in the card dialog's Work section (HI-1181): Hive read the whole file and git left no conflict markers in it (a conflict over the file itself: deleted, renamed, its mode)." }),
-  readInPart: msg({ id: 'board.conflicts.readInPart', defaultMessage: 'read in part: it may have more', description: "Beside a file in conflict in the card dialog's Work section (HI-1181): it is large, so Hive read only its start; there may be more conflicts than shown." }),
+  notRead: msg({ id: 'board.conflicts.notRead', defaultMessage: "{why, select, link {not read: it is a link} outside {not read: outside the queue's folder} missing {not read: not a file there} binary {not read: not text (binary)} notText {not read: not UTF-8 text} budget {not read: past how much Combwork reads} other {not read: it couldn't be read}}", description: "Beside a file in conflict in the card dialog's Work section (HI-1181): Combwork didn't read its text, and why (select: translate each): a link it never follows, a path outside the merge queue's folder, not a file there (deleted on one side), binary, not UTF-8 text, past the amount Combwork reads for one return, or an error." }),
+  noText: msg({ id: 'board.conflicts.noText', defaultMessage: 'no text conflict', description: "Beside a file in conflict in the card dialog's Work section (HI-1181): Combwork read the whole file and git left no conflict markers in it (a conflict over the file itself: deleted, renamed, its mode)." }),
+  readInPart: msg({ id: 'board.conflicts.readInPart', defaultMessage: 'read in part: it may have more', description: "Beside a file in conflict in the card dialog's Work section (HI-1181): it is large, so Combwork read only its start; there may be more conflicts than shown." }),
   more: msg({ id: 'board.conflicts.more', defaultMessage: '{n, plural, one {# more not shown} other {# more not shown}}', description: "Beside a file in conflict in the card dialog's Work section (HI-1181): it has {n} more conflict regions than are shown (an exact count)." }),
-  mayHaveMore: msg({ id: 'board.conflicts.mayHaveMore', defaultMessage: 'it may have more, not shown', description: "Beside a file in conflict in the card dialog's Work section (HI-1181): Hive stopped recording its conflicts (it had shown enough), so there may be more than shown." }),
+  mayHaveMore: msg({ id: 'board.conflicts.mayHaveMore', defaultMessage: 'it may have more, not shown', description: "Beside a file in conflict in the card dialog's Work section (HI-1181): Combwork stopped recording its conflicts (it had shown enough), so there may be more than shown." }),
   line: msg({ id: 'board.conflicts.line', defaultMessage: 'From line {line, number}', description: "Above a conflict's text in the card dialog's Work section (HI-1181): the line of the file where the conflict starts." }),
   base: msg({ id: 'board.conflicts.base', defaultMessage: 'Common ancestor', description: "A label inside a conflict's text in the card dialog's Work section (HI-1181): the lines both sides started from (git's diff3 base) follow." }),
   cut: msg({ id: 'board.conflicts.cut', defaultMessage: '{n, plural, one {# line left out} other {# lines left out}}', description: "Inside a conflict's text in the card dialog's Work section (HI-1181): this side has {n} more lines than are shown." }),
-  clipped: msg({ id: 'board.conflicts.clipped', defaultMessage: '{n, plural, one {# long line shortened} other {# long lines shortened}}', description: "Under a conflict's text in the card dialog's Work section (HI-1181): {n} of its lines were longer than Hive keeps, so only their start is shown." }),
-  filesLeft: msg({ id: 'board.conflicts.filesLeft', defaultMessage: '{n, plural, one {# more file in conflict, not read} other {# more files in conflict, not read}}', description: "Under the files in conflict in the card dialog's Work section (HI-1181): git named {n} more conflicting files than Hive reads for one return." })
+  clipped: msg({ id: 'board.conflicts.clipped', defaultMessage: '{n, plural, one {# long line shortened} other {# long lines shortened}}', description: "Under a conflict's text in the card dialog's Work section (HI-1181): {n} of its lines were longer than Combwork keeps, so only their start is shown." }),
+  filesLeft: msg({ id: 'board.conflicts.filesLeft', defaultMessage: '{n, plural, one {# more file in conflict, not read} other {# more files in conflict, not read}}', description: "Under the files in conflict in the card dialog's Work section (HI-1181): git named {n} more conflicting files than Combwork reads for one return." })
 }
 
-/** What Hive knows of a file's conflicts, in a few words: never "no conflict" for a file it didn't read whole. */
+/** What Combwork knows of a file's conflicts, in a few words: never "no conflict" for a file it didn't read whole. */
 function conflictSummary(f: ConflictFile): string {
   if (f.notRead) return tr(C.notRead, { why: f.notRead })
   if (!f.hunks.length && !f.partial) return tr(C.noText)
@@ -383,7 +383,7 @@ function Paused({ queue, projectPath }: { queue: QueueView; projectPath: string 
 
 /**
  * The OK an update of a checked-out target waits for (Ask each time): the same answer as For you's. Approve takes an
- * optional note, a comment on the card (HI-2286: Hive's own gate, never a decision); Decline asks why, as For you's does.
+ * optional note, a comment on the card (HI-2286: Combwork's own gate, never a decision); Decline asks why, as For you's does.
  */
 function Advance({ card, request, target }: { card: TaskCard; request: string; target: string }) {
   const [note, setNote] = useState('')
@@ -411,7 +411,7 @@ function Advance({ card, request, target }: { card: TaskCard; request: string; t
   )
 }
 
-/** An advance stopped part way (§16.9.2's terminal state): the state as Hive found it, each file's side, the commands. */
+/** An advance stopped part way (§16.9.2's terminal state): the state as Combwork found it, each file's side, the commands. */
 function Stuck({ stuck: st, target, short, projectPath }: { stuck: QueueStuck; target: string; short: (id: string) => string; projectPath: string }) {
   // Where each command runs, named one way (the Assistant's #1357 review): the folder's name, its full path on hover.
   const where = (place: 'project' | 'folder'): string => (place === 'project' ? projectPath : st.folder)

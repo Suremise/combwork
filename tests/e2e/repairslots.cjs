@@ -1,7 +1,7 @@
 // Repair a Moved Workspace on slots (#1447, SPEC §16.10.2), on fake Claude Code agents, the Assistant off: alpha (Pair
-// with Hive merges into integration, cards in slots) with B1's 0.9 worktree hb1 (adopted: carried), R1's own worktree
+// with Combwork merges into integration, cards in slots) with B1's 0.9 worktree hb1 (adopted: carried), R1's own worktree
 // hr1 (a retired home), a lane of B2's whose card started in slot-a, and a review copy copy-1. B1 has a conversation in
-// hb1. The workspace and its worktrees folder are moved together; Hive opens it there:
+// hb1. The workspace and its worktrees folder are moved together; Combwork opens it there:
 // - the plan names each by its slot, copy or home ("hb2 (carried, HB2)", "slot-a (B2, AL-1)", "copy-1", "R1's old
 //   folder"), screenshots in light and dark;
 // - Repair relinks them all: git lists them at their new folders, their rows follow, the card in slot-a follows its
@@ -24,7 +24,7 @@ const after = at('after')
 const wsOf = (root) => path.join(root, 'ws')
 const treesOf = (root) => path.join(root, 'ws.worktrees', 'alpha')
 const PORT = Number(lib.port(47936))
-const identity = { name: 'Hive Slot Test', email: 'slots@example.com' }
+const identity = { name: 'Combwork Slot Test', email: 'slots@example.com' }
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -57,8 +57,8 @@ const isIn = (dir, rev, ref) => {
   // The identity its commits use, in its git config: G12 reads it from git each time (HI-2266, HI-2283).
   lib.git(alpha0, ['config', 'user.name', identity.name])
   lib.git(alpha0, ['config', 'user.email', identity.email])
-  lib.git(alpha0, ['worktree', 'add', '-q', '-b', 'hive/hb1', path.join(treesOf(before), 'hb1'), 'integration'])
-  lib.git(alpha0, ['worktree', 'add', '-q', '-b', 'hive/hr1', path.join(treesOf(before), 'hr1'), 'main'])
+  lib.git(alpha0, ['worktree', 'add', '-q', '-b', 'cw/hb1', path.join(treesOf(before), 'hb1'), 'integration'])
+  lib.git(alpha0, ['worktree', 'add', '-q', '-b', 'cw/hr1', path.join(treesOf(before), 'hr1'), 'main'])
   fs.mkdirSync(path.join(alpha0, '.combwork'), { recursive: true })
   fs.writeFileSync(
     path.join(alpha0, '.combwork', 'project.json'),
@@ -66,8 +66,8 @@ const isIn = (dir, rev, ref) => {
       version: 2,
       platform: 'git',
       agents: [
-        { id: 'b1', name: 'B1', provider: 'claude-code', workflowRole: 'builder', worktree: { path: path.join(treesOf(before), 'hb1'), branch: 'hive/hb1', base: 'integration' } },
-        { id: 'r1', name: 'R1', provider: 'claude-code', workflowRole: 'reviewer', worktree: { path: path.join(treesOf(before), 'hr1'), branch: 'hive/hr1', base: 'main' } },
+        { id: 'b1', name: 'B1', provider: 'claude-code', workflowRole: 'builder', worktree: { path: path.join(treesOf(before), 'hb1'), branch: 'cw/hb1', base: 'integration' } },
+        { id: 'r1', name: 'R1', provider: 'claude-code', workflowRole: 'reviewer', worktree: { path: path.join(treesOf(before), 'hr1'), branch: 'cw/hr1', base: 'main' } },
         { id: 'b2', name: 'B2', provider: 'claude-code', workflowRole: 'builder' }
       ]
     }, null, 2)
@@ -83,7 +83,7 @@ const isIn = (dir, rev, ref) => {
 
   let h = null
   const start = async (wsPath) => {
-    h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off' }, viewport: { width: 1500, height: 900 } })
+    h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off' }, viewport: { width: 1500, height: 900 } })
     h.page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.waitForProvider(h.inv)
     await lib.openWorkspace(h.inv, h.page, wsPath)
@@ -100,8 +100,8 @@ const isIn = (dir, rev, ref) => {
   const tokenOf = async (p, id) => {
     const sessionId = await until(async () => (await live(p, id))?.sessionId, HUNG_MS)
     const launch = await until(() => launches().filter((l) => l.sessionId === sessionId && l.opts['--mcp-config'] && fs.existsSync(l.opts['--mcp-config'])).at(-1), HUNG_MS)
-    const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
-    return hive ? JSON.parse(fs.readFileSync(hive.env.CW_API_TOKEN_FILE, 'utf8')).token : null
+    const server = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
+    return server ? JSON.parse(fs.readFileSync(server.env.CW_API_TOKEN_FILE, 'utf8')).token : null
   }
   const intent = async (token, n, name, body = {}) => {
     const res = await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${encodeURIComponent(`#${n}`)}/${name}`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -120,8 +120,11 @@ const isIn = (dir, rev, ref) => {
     // --- Before the move: the slots, a lane on slot-a, B1's conversation in hb1.
     await start(wsOf(before))
     const alpha = path.join(wsOf(before), 'alpha')
-    await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'hiveMerges', folder: 'slots', target: 'integration', style: 'merge', preChecks: [], mergeChecks: [], identity, okBefore: { mode: 'never', labels: [] } } })
+    await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'combworkMerges', folder: 'slots', target: 'integration', style: 'merge', preChecks: [], mergeChecks: [], identity, okBefore: { mode: 'never', labels: [] } } })
+    // Blocked as the lane starts, so it isn't due then: Combwork would start a lane's first card due on its stopped
+    // builder with the brief (HI-2558), prepared and placed at once. Unblocked once B2 is in its turn (below).
     const c1 = (await inv('tasks:create', { title: 'Moved along', project: 'alpha' })).number
+    await inv('tasks:update', c1, { blocked: 'not yet (repairslots)' })
     const key = (await card(c1)).key
     const hb1 = await until(async () => (await inv('slots:list', alpha)).find((s) => s.name === 'hb1' && s.lease?.kind === 'carried'), HUNG_MS)
     check('hb1 is B1’s carried slot', !!hb1, JSON.stringify(await inv('slots:list', alpha)))
@@ -134,19 +137,20 @@ const isIn = (dir, rev, ref) => {
     await until(async () => same((await live(alpha, 'b2'))?.cwd, slotA) && (await idle(alpha, 'b2')), HUNG_MS)
     const tb2Before = await tokenOf(alpha, 'b2')
     // B2 in a turn (until a file the test never makes): its card's slot is prepared only once it is quiet, so the
-    // preparation is still owed as Hive closes, and runs after Repair (HI-1791: in slot-a's new folder).
+    // preparation is still owed as Combwork closes, and runs after Repair (HI-1791: in slot-a's new folder).
     await lib.typeLine(inv, lib.ptyKey(alpha, 'b2'), home, null, 'holduntil repairslots-never', { live: () => live(alpha, 'b2') })
     check('…B2 in its turn', !!(await until(async () => (await live(alpha, 'b2'))?.status === 'working', HUNG_MS)))
+    await inv('tasks:update', c1, { blocked: null })
     const s1 = await intent(tb2Before, c1, 'start')
     check(`${key} starts in slot-a`, s1.status === 200 && same(s1.body?.data?.folder, slotA), JSON.stringify(s1.body))
-    check('…its preparation owed as Hive closes (B2 busy)', !(await inv('tasks:facts', c1)).some((f) => f.kind === 'SlotPrepared') && (await live(alpha, 'b2'))?.status === 'working', JSON.stringify((await inv('tasks:facts', c1)).map((f) => f.kind)))
+    check('…its preparation owed as Combwork closes (B2 busy)', !(await inv('tasks:facts', c1)).some((f) => f.kind === 'SlotPrepared') && (await live(alpha, 'b2'))?.status === 'working', JSON.stringify((await inv('tasks:facts', c1)).map((f) => f.kind)))
     await h.app.close()
     h = null
     // A review copy, as #1435's pool keeps one (its worktree, detached, and its row).
     const copy = path.join(treesOf(before), 'copies', 'copy-1')
     lib.git(alpha0, ['worktree', 'add', '-q', '--detach', copy])
     const id = JSON.parse(fs.readFileSync(path.join(alpha0, '.combwork', 'project.json'), 'utf8')).id
-    const db = new DatabaseSync(path.join(wsOf(before), '.combwork', 'hive.db'), { timeout: 5000 })
+    const db = new DatabaseSync(path.join(wsOf(before), '.combwork', 'combwork.db'), { timeout: 5000 })
     try {
       const now = new Date().toISOString()
       db.prepare("INSERT INTO copies (project, name, folder, state, created_at, used_at) VALUES (?, 'copy-1', ?, 'free', ?, ?)").run(id, copy, now, now)
@@ -190,7 +194,7 @@ const isIn = (dir, rev, ref) => {
       return k.filter((x) => x === 'SlotPrepared').length === 1 && k.filter((x) => x === 'BuilderPlaced').length === 1
     }, HUNG_MS)), JSON.stringify(await kindsNow()))
     // Fenced and logged at slot-a where it is now, never at the folder from before the move (HI-1791).
-    const log = fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8')
+    const log = fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8')
     const preparing = log.slice(log.lastIndexOf('Repairing a move')).split(/\r?\n/).filter((l) => l.includes('preparing a slot'))
     check('…its preparation fenced slot-a at its new folder, never the old one (HI-1791)', preparing.length > 0 && preparing.every((l) => l.toLowerCase().includes(path.join(treesOf(after), 'slot-a').toLowerCase())), JSON.stringify(preparing))
 
@@ -209,7 +213,7 @@ const isIn = (dir, rev, ref) => {
     const tr1 = await tokenOf(alpha2, 'r1')
     const passed = (await intent(tb2, c1, 'submit', { summary: 'Moved along' })).status === 200 && (await intent(tr1, c1, 'start-review')).status === 200 && (await intent(tr1, c1, 'verdict', { pass: true, comment: 'Moved along: passed' })).status === 200
     check('the lane carries on: submitted, reviewed and passed', passed)
-    check('…and merged by Hive’s queue', !!(await until(async () => (await card(c1))?.column === 'done', HUNG_MS)) && isIn(alpha2, rev, 'integration'), (await card(c1))?.column)
+    check('…and merged by Combwork’s queue', !!(await until(async () => (await card(c1))?.column === 'done', HUNG_MS)) && isIn(alpha2, rev, 'integration'), (await card(c1))?.column)
   } catch (e) {
     check('no exception', false, e?.stack ?? String(e))
   } finally {

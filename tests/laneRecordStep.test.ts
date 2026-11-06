@@ -8,7 +8,7 @@ import * as electron from 'electron'
 import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-lane-record-')
+const base = tempDir('cw-lane-record-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -57,8 +57,8 @@ const card = (num: number, project: string): Record<string, unknown> => ({
 
 /** A board as the 1.0 group left it before this step (a P3 board), its cards and runtime lanes written by `fill`. */
 function boardBefore(fill: (db: DatabaseSync) => void): string {
-  const file = join(base, `db-${++n}`, 'hive.db')
-  openDb(file, { migrations: BEFORE, hiveVersion: '1.0.0' }).close()
+  const file = join(base, `db-${++n}`, 'combwork.db')
+  openDb(file, { migrations: BEFORE, appVersion: '1.0.0' }).close()
   const db = new DatabaseSync(file)
   try {
     db.exec('PRAGMA foreign_keys = ON')
@@ -73,7 +73,7 @@ function boardBefore(fill: (db: DatabaseSync) => void): string {
 
 /** The board opened with every step: this one runs as a later step of the 1.0 group. */
 function upgrade(file: string): { tables: string[]; cardCols: string[]; version: number; lanesDocs: unknown[] } {
-  const db = openDb(file, { migrations: store.BOARD_MIGRATIONS, hiveVersion: '1.0.0', approve: () => true })
+  const db = openDb(file, { migrations: store.BOARD_MIGRATIONS, appVersion: '1.0.0', approve: () => true })
   try {
     const r = db.reader
     return {
@@ -131,9 +131,9 @@ describe('the one lane record step (#1291)', () => {
     expect(up.tables).not.toEqual(expect.arrayContaining(['workflow_lane_cards']))
     expect(up.cardCols).not.toContain('lane')
     expect(up.cardCols).not.toContain('lane_reviewer')
-    // Every lane reads as lanes.ts keeps one (else its next save would drop it), the runtime's by Hive.
+    // Every lane reads as lanes.ts keeps one (else its next save would drop it), the runtime's by Combwork.
     expect(up.lanesDocs.map((d) => readLane(d)?.id).sort()).toEqual(['C', 'C-2', 'E', 'K', 'L'])
-    expect(readLane(up.lanesDocs.find((d) => (d as { id: string }).id === 'L'))).toMatchObject({ project: 'p', builder: { id: 'hive', name: 'Hive' }, reviewer: { id: 'R1', name: 'R1' }, cards: [1, 2], state: 'active', endedAt: null })
+    expect(readLane(up.lanesDocs.find((d) => (d as { id: string }).id === 'L'))).toMatchObject({ project: 'p', builder: { id: 'combwork', name: 'Combwork' }, reviewer: { id: 'R1', name: 'R1' }, cards: [1, 2], state: 'active', endedAt: null })
     expect(readLane(up.lanesDocs.find((d) => (d as { id: string }).id === 'E'))).toMatchObject({ cards: [4], state: 'ended', reviewer: null })
     // lanes.ts's own lane keeps its row; its reviewer comes from its cards.
     expect(readLane(up.lanesDocs.find((d) => (d as { id: string }).id === 'K'))).toMatchObject({ builder: { id: 'b1', name: 'B1' }, reviewer: { id: 'R2' }, cards: [5] })
@@ -224,9 +224,9 @@ describe("lanes.ts's saves keep the runtime's part of a lane (#1291)", () => {
   async function workspace(): Promise<{ ws: string; w: WS }> {
     const ws = join(base, `ws-${++n}`)
     mkdirSync(join(ws, 'p', '.combwork'), { recursive: true })
-    // `hive`: the builder the runtime's own lane gets (FactStore.startLane), one of the project's agents here, so lanes.ts's
+    // `combwork`: the builder the runtime's own lane gets (FactStore.startLane), one of the project's agents here, so lanes.ts's
     // refresh 300 ms after a save never abandons that lane as an agent's no longer in its project (#1399: a loaded run).
-    writeFileSync(join(ws, 'p', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }, { id: 'b2', name: 'B2' }, { id: 'hive', name: 'Hive' }] }))
+    writeFileSync(join(ws, 'p', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }, { id: 'b2', name: 'B2' }, { id: 'combwork', name: 'Combwork' }] }))
     const w = createWorkspaceService()
     await w.open(ws)
     opened.push(w)

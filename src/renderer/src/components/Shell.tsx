@@ -33,13 +33,13 @@ const M = {
   performance: msg({ id: 'workspace.activity.performance', defaultMessage: 'Performance', description: "The activity bar (left edge): the Performance view (how agents' turns perform)." }),
   board: msg({ id: 'workspace.activity.board', defaultMessage: 'Task Board', description: 'The activity bar (left edge): the task board.' }),
   notes: msg({ id: 'workspace.activity.notes', defaultMessage: 'Shared Notes', description: 'The activity bar (left edge): the workspace\'s shared notes.' }),
-  skills: msg({ id: 'workspace.activity.skills', defaultMessage: 'Skills', description: "The activity bar (left edge): the workspace's Hive skills." }),
-  dialects: msg({ id: 'workspace.activity.dialects', defaultMessage: 'Dialects', description: "The activity bar (left edge): the Dialects view (HI-2444), where the wording Hive gives agents is tuned per model and CLI. Glossary: dialect." }),
+  skills: msg({ id: 'workspace.activity.skills', defaultMessage: 'Skills', description: "The activity bar (left edge): the workspace's Combwork skills." }),
+  dialects: msg({ id: 'workspace.activity.dialects', defaultMessage: 'Dialects', description: "The activity bar (left edge): the Dialects view (HI-2444), where the wording Combwork gives agents is tuned per model and CLI. Glossary: dialect." }),
   templates: msg({ id: 'workspace.activity.templates', defaultMessage: 'Templates', description: "The activity bar (left edge): agent templates." }),
   mcp: msg({ id: 'workspace.activity.mcp', defaultMessage: 'MCP Servers', description: "The activity bar (left edge): the workspace's MCP servers." }),
-  assistant: msg({ id: 'workspace.activity.assistant', defaultMessage: 'Assistant', description: "The activity bar (left edge): the Hive Assistant's view. Hive's name stays as it is." }),
-  docs: msg({ id: 'workspace.activity.docs', defaultMessage: 'Documentation', description: "The activity bar (left edge): Hive's documentation." }),
-  settings: msg({ id: 'workspace.activity.settings', defaultMessage: 'Settings', description: "The activity bar (left edge): Hive's settings." }),
+  assistant: msg({ id: 'workspace.activity.assistant', defaultMessage: 'Assistant', description: "The activity bar (left edge): the Combwork Assistant's view. Combwork's name stays as it is." }),
+  docs: msg({ id: 'workspace.activity.docs', defaultMessage: 'Documentation', description: "The activity bar (left edge): Combwork's documentation." }),
+  settings: msg({ id: 'workspace.activity.settings', defaultMessage: 'Settings', description: "The activity bar (left edge): Combwork's settings." }),
   withKey: msg({ id: 'workspace.activity.withKey', defaultMessage: '{label} ({key})', description: 'Tooltip on an activity bar button: its name and its shortcut ({key}: "Ctrl+Shift+E").' }),
   notifications: msg({ id: 'workspace.activity.notifications', defaultMessage: 'Notifications', description: 'The activity bar: the button that shows the notifications.' }),
   notificationsTip: msg({ id: 'workspace.activity.notificationsTip', defaultMessage: '{unread, plural, =0 {Notifications} other {Notifications (# unread)}}', description: 'Tooltip on the notifications button.' }),
@@ -49,10 +49,10 @@ const M = {
   openWorkspace: msg({ id: 'workspace.statusBar.openWorkspace', defaultMessage: 'Open a workspace', description: 'The status bar with no workspace open: opens one.' }),
   running: msg({ id: 'workspace.statusBar.running', defaultMessage: '{count, plural, other {# running session(s)}}: {working} working, {background, plural, =0 {} other {# waiting on background tasks, }}{waiting} waiting for you', description: "The status bar's running sessions (English keeps session(s); use your language's plural forms): how many, working, waiting on background tasks (only when some are) and waiting for you." }),
   workspace: msg({ id: 'workspace.statusBar.workspace', defaultMessage: 'Workspace: {path}', description: "Tooltip on the status bar's workspace." }),
-  apiOn: msg({ id: 'workspace.statusBar.apiOn', defaultMessage: 'Agent API listening on {url}', description: "Tooltip on the status bar's API: Hive's Agent API is on ({url}: its address)." }),
+  apiOn: msg({ id: 'workspace.statusBar.apiOn', defaultMessage: 'Agent API listening on {url}', description: "Tooltip on the status bar's API: Combwork's Agent API is on ({url}: its address)." }),
   apiError: msg({ id: 'workspace.statusBar.apiError', defaultMessage: 'Agent API: {error}', description: "Tooltip on the status bar's API: it couldn't start; {error} says why." }),
   apiOff: msg({ id: 'workspace.statusBar.apiOff', defaultMessage: 'Agent API is off', description: "Tooltip on the status bar's API." }),
-  api: msg({ id: 'workspace.statusBar.api', defaultMessage: 'API', description: "The status bar's item for Hive's Agent API. Keep it short." }),
+  api: msg({ id: 'workspace.statusBar.api', defaultMessage: 'API', description: "The status bar's item for Combwork's Agent API. Keep it short." }),
   awakeTip: msg({ id: 'workspace.statusBar.awakeTip', defaultMessage: "Windows won't sleep until the agents finish (the screen may still turn off). Settings → General → Keep the PC awake while agents work.", description: "Tooltip on the status bar's keep-awake note. Keep the setting's path as Settings shows it." }),
   shortLimit: msg({ id: 'workspace.statusBar.shortLimit', defaultMessage: '{window, select, fiveHour {5h} weekly {Week} other {{label}}}', description: "The status bar's plan limits, before each one's percent: the 5-hour window, the weekly one, or the provider's own name for another. Keep it very short." }),
   connectionLine: msg({ id: 'workspace.statusBar.connectionLine', defaultMessage: '{name} ({provider}{hasPlan, select, yes {, {plan} plan} other {}})', description: "The first line of a connection's plan limits tooltip in the status bar (HI-1756): the connection's name the user gave it ({name}: \"Max 1\"), its coding agent ({provider}: Claude Code) and its plan's name ({plan}: max, pro…)." }),
@@ -70,7 +70,7 @@ const M = {
 }
 
 /** The activity bar's icon for the Assistant: its own mark rather than a codicon. */
-const ASSISTANT_ICON = 'hive-assistant'
+const ASSISTANT_ICON = 'cw-assistant'
 
 const ACTIVITIES: { id: Activity; icon: string; label: Msg; command: string }[] = [
   { id: 'projects', icon: 'files', label: M.projects, command: 'view.projects' },
@@ -83,7 +83,7 @@ const ACTIVITIES: { id: Activity; icon: string; label: Msg; command: string }[] 
   { id: 'dialects', icon: 'symbol-string', label: M.dialects, command: 'view.dialects' },
   { id: 'templates', icon: 'library', label: M.templates, command: 'view.templates' },
   { id: 'mcp', icon: 'plug', label: M.mcp, command: 'view.mcp' },
-  // The Assistant's own mark (#979: the queen's crown on a hive cell, not a robot), drawn by AssistantMark.
+  // The Assistant's own mark (#979: the queen's crown on a honeycomb cell, not a robot), drawn by AssistantMark.
   { id: 'assistant', icon: ASSISTANT_ICON, label: M.assistant, command: 'view.assistant' }
 ]
 
@@ -241,7 +241,7 @@ function TeamPausedStatusItem() {
 }
 
 const TEAM_STATUS = {
-  paused: msg({ id: 'shell.status.teamPaused', defaultMessage: 'Team paused', description: "A status bar item while the team is paused before an update (HI-2081): Hive starts no lane card and wakes no agent until it resumes. Click: opens the Progress panel." }),
+  paused: msg({ id: 'shell.status.teamPaused', defaultMessage: 'Team paused', description: "A status bar item while the team is paused before an update (HI-2081): Combwork starts no lane card and wakes no agent until it resumes. Click: opens the Progress panel." }),
   parked: msg({ id: 'shell.status.teamParked', defaultMessage: 'Team parked', description: 'The status bar item (HI-2081) once the paused team has parked: nothing runs, so an update can be installed.' }),
   tip: msg({ id: 'shell.status.teamPausedTip', defaultMessage: "The team is paused: no lane starts a card and no agent is woken until you resume it. The Progress panel's Lanes says what still runs.", description: 'Tooltip of the status bar item while the team is paused (HI-2081).' })
 }
@@ -268,7 +268,7 @@ function shortLimit(l: PlanLimit): string {
 }
 
 /**
- * Each enabled provider's plan limits, as Hive keeps them from its sessions' reports (the highest in each reset period,
+ * Each enabled provider's plan limits, as Combwork keeps them from its sessions' reports (the highest in each reset period,
  * #383): one item per provider. A limit whose reset has passed with no new report is left out, not shown as it was.
  * A CLI with accounts (HI-1756; HI-2107) shows one item per account a session of this window's workspace runs on, by its
  * name now, all of them in the one order of accounts across every CLI (HI-2119), each that login's own limits; its
@@ -386,7 +386,7 @@ function ProviderStatusItems() {
   )
 }
 
-/** Git, only when it can't run or is older than Hive needs (#346): every worktree, merge and Changes view depends on it. */
+/** Git, only when it can't run or is older than Combwork needs (#346): every worktree, merge and Changes view depends on it. */
 function GitStatusItem() {
   const git = useStore((s) => s.gitTool)
   if (!git || git.state === 'ok' || git.state === 'unknown') return null

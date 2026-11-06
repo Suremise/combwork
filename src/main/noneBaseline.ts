@@ -13,7 +13,7 @@ const log = createLogger('noneBaseline')
 
 /**
  * A None project's whole-project read, off main's thread (HI-2340, `noneBaselineWorker.ts`): one worker for the process,
- * as the repository lock's, started with the first read and never keeping Hive open. Bounded:
+ * as the repository lock's, started with the first read and never keeping Combwork open. Bounded:
  * - reads asked alike (the project, its folders left out, and the adapter's `generation`) share one not sent yet, never
  *   one under way (it may have read a file before a write since): at most one read per project and generation waits
  *   beside the one in flight, and a newer generation drops that project's reads not yet sent;

@@ -42,7 +42,7 @@ describe('what a text of a file shows', () => {
   })
 })
 
-const base = tempDir('hive-dialects-view-')
+const base = tempDir('cw-dialects-view-')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 let n = 0
 const folder = (): string => {
@@ -128,7 +128,7 @@ describe('import tokens', () => {
     const w = rememberPick('b', 3, 'W', 0)
     const v = rememberPick('c', 4, 'V', 0)
     forgetPicks({ window: 3 })
-    forgetPicks({ hiveDir: 'v' })
+    forgetPicks({ combworkDir: 'v' })
     expect(pickOfToken(w, 3, 'W', 1)).toBeNull()
     expect(pickOfToken(v, 4, 'V', 1)).toBeNull()
     const many = Array.from({ length: 9 }, (_, i) => rememberPick(`f${i}`, 5, 'W', 100 + i))
@@ -138,17 +138,17 @@ describe('import tokens', () => {
 })
 
 describe('the Workspace file before it is made', () => {
-  it('is listed and opens empty, its first Save making it; Hive writes nothing until then', async () => {
-    const hive = join(base, `h-${++n}`)
-    mkdirSync(join(hive, 'dialects', 'claude-code'), { recursive: true })
-    writeFileSync(join(hive, 'dialects', 'claude-code', 'cli.json'), '{ "name": "Claude Code", "texts": {} }')
-    const rows = await listDialects(hive)
+  it('is listed and opens empty, its first Save making it; Combwork writes nothing until then', async () => {
+    const data = join(base, `h-${++n}`)
+    mkdirSync(join(data, 'dialects', 'claude-code'), { recursive: true })
+    writeFileSync(join(data, 'dialects', 'claude-code', 'cli.json'), '{ "name": "Claude Code", "texts": {} }')
+    const rows = await listDialects(data)
     expect(rows[0]).toMatchObject({ path: 'workspace.json', kind: 'workspace', overrides: 0, on: true })
-    const view = await dialectFileView(hive, 'workspace.json')
+    const view = await dialectFileView(data, 'workspace.json')
     expect(view).toMatchObject({ raw: '', file: { name: 'Workspace', texts: {} }, below: [] })
-    expect(() => readFileSync(join(hive, 'dialects', 'workspace.json'))).toThrow()
-    expect(await dialectFileView(hive, 'claude-code/Missing.json')).toBeNull()
-    const dir = join(hive, 'dialects')
+    expect(() => readFileSync(join(data, 'dialects', 'workspace.json'))).toThrow()
+    expect(await dialectFileView(data, 'claude-code/Missing.json')).toBeNull()
+    const dir = join(data, 'dialects')
     expect(await saveDialect(dir, 'workspace.json', { name: 'Workspace', texts: {} }, SCHEMA, { base: view!.raw })).toBeNull()
     expect(text(dir, 'workspace.json')).toContain('"Workspace"')
   })

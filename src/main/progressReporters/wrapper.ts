@@ -1,6 +1,6 @@
-// hive-progress: runs a command with its output passed through and its exit code returned, and reports it to the Hive
+// cw-progress: runs a command with its output passed through and its exit code returned, and reports it to the Combwork
 // that launched the agent (report.mts) as a run with an estimate and, when the command prints step lines, steps.
-// Outside Hive, or with Hive unreachable, it just runs the command. Node built-ins only (it runs outside the asar).
+// Outside Combwork, or with Combwork unreachable, it just runs the command. Node built-ins only (it runs outside the asar).
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, statSync } from 'node:fs'
@@ -10,8 +10,8 @@ import { startLauncher } from '../workflow/launcher'
 import { agentMsg, inDefaultDialect, say, type AgentMsg } from '../../shared/agentText'
 
 /**
- * What hive-progress says (agent text, HI-2065): its usage, refusals and run lines. It runs as the session's own process,
- * so it speaks the session's dialect (processDialect.ts, loaded first by hive-progress.ts). "hive-progress: " before a
+ * What cw-progress says (agent text, HI-2065): its usage, refusals and run lines. It runs as the session's own process,
+ * so it speaks the session's dialect (processDialect.ts, loaded first by cw-progress.ts). "cw-progress: " before a
  * line is the command's name, as a shell's error says it: protocol, not wording.
  */
 const A = {
@@ -63,7 +63,7 @@ CW_PROGRESS=0 turns reporting off.`,
   revisionForm: agentMsg({
     id: 'progress.revision.form',
     text: 'revision is a commit (its id, or a name git knows)',
-    note: "Checked with git itself when Hive can't check it (reporting off, outside Hive), in the same words as Hive's refusal (check.link.revisionForm)."
+    note: "Checked with git itself when Combwork can't check it (reporting off, outside Combwork), in the same words as Combwork's refusal (check.link.revisionForm)."
   }),
   nothingCheckedOut: agentMsg({
     id: 'progress.revision.nothingCheckedOut',
@@ -79,17 +79,17 @@ CW_PROGRESS=0 turns reporting off.`,
   slow: agentMsg({
     id: 'progress.unanswered.slow',
     text: 'Combwork is slow to answer: no reply {lend, select, yes {to lend a check copy} other {to look up the command for {check}}} in {seconds} s{retried, select, yes {, asked {asked} times} other {}}, so nothing was run. Try again; Settings → Advanced → "cw-progress: Combwork\'s reply time" gives it longer.',
-    note: "HI-1892: Hive is there but busy. lend: yes for an isolated check's copy (#1435), else the check's command (check) was asked for. retried: yes when it was asked more than once (asked)."
+    note: "HI-1892: Combwork is there but busy. lend: yes for an isolated check's copy (#1435), else the check's command (check) was asked for. retried: yes when it was asked more than once (asked)."
   }),
   refused: agentMsg({
     id: 'progress.unanswered.refused',
     text: "Combwork couldn't be reached {lend, select, yes {to lend a check copy} other {to look up the command for {check}}} (connection {refused, select, yes {refused} other {not allowed: {detail}}} at {url}), so nothing was run. Is Combwork running? A sandbox that blocks local network access (Claude Code's Bash sandbox does) stops it too: run the command outside the sandbox.",
-    note: "HI-1892: nothing listens at Hive's address, or this process may not reach it. refused: yes for a refused connection, else detail is the error's code (EACCES, EPERM). url: Hive's address."
+    note: "HI-1892: nothing listens at Combwork's address, or this process may not reach it. refused: yes for a refused connection, else detail is the error's code (EACCES, EPERM). url: Combwork's address."
   }),
   answered: agentMsg({
     id: 'progress.unanswered.answered',
     text: "Combwork couldn't be reached {lend, select, yes {to lend a check copy} other {to look up the command for {check}}} (Combwork answered {status, select, none {with an error} other {{status}}}), so nothing was run.",
-    note: 'HI-1892: Hive answered with no link (an older Hive without the call, an error). status: its HTTP status, or none.'
+    note: 'HI-1892: Combwork answered with no link (an older Combwork without the call, an error). status: its HTTP status, or none.'
   }),
   failed: agentMsg({
     id: 'progress.unanswered.failed',
@@ -99,14 +99,14 @@ CW_PROGRESS=0 turns reporting off.`,
   noStart: agentMsg({
     id: 'progress.unrecorded.noStart',
     text: "Combwork didn't take this run's report (no reply in time), so check {check} wasn't recorded: run it again.",
-    note: "HI-1892: Hive never took the run's start."
+    note: "HI-1892: Combwork never took the run's start."
   }),
   noReply: agentMsg({
     id: 'progress.unrecorded.noReply',
     text: "Combwork didn't confirm it recorded check {check} (no reply to its result, asked twice): if submitting says it hasn't passed, run it again.",
     note: "HI-1892: the run's finish got no reply, sent twice."
   }),
-  refusedResult: agentMsg({ id: 'progress.unrecorded.refused', text: "Combwork refused this run's result, so check {check} may not be recorded: run it again.", note: "HI-1892: Hive answered the finish with an error." }),
+  refusedResult: agentMsg({ id: 'progress.unrecorded.refused', text: "Combwork refused this run's result, so check {check} may not be recorded: run it again.", note: "HI-1892: Combwork answered the finish with an error." }),
   endedBefore: agentMsg({
     id: 'progress.unrecorded.endedBefore',
     text: "Combwork recorded check {check}, but its reply was lost, so how it counted isn't known.",
@@ -136,21 +136,21 @@ CW_PROGRESS=0 turns reporting off.`,
   revisionChanged: agentMsg({ id: 'progress.uncounted.revisionChanged', text: "not counted as check {check}: the card's declared files changed while it ran. Run it again.", note: '#1654: a card on the None platform (#1233).' }),
   changeReflog: agentMsg({ id: 'progress.change.reflog', text: 'a commit or checkout', note: "What a write log's :reflog mark records, in the list of what changed while a check ran." }),
   changeEdit: agentMsg({ id: 'progress.change.edit', text: "an agent's edit", note: "What a write log's :edit mark records, in the list of what changed while a check ran." }),
-  checkOutsideHive: agentMsg({
-    id: 'progress.check.outsideHive',
+  checkOutsideCombwork: agentMsg({
+    id: 'progress.check.outsideCombwork',
     text: "--check runs the project's command for {check}, which only Combwork knows: run it in a session Combwork started, with reporting on.",
     note: '#1220.'
   }),
-  waiting: agentMsg({ id: 'progress.check.waiting', text: 'waiting for {what}', note: '#1435: no check copy is free. what: what it waits for, in Hive\'s words.' }),
+  waiting: agentMsg({ id: 'progress.check.waiting', text: 'waiting for {what}', note: '#1435: no check copy is free. what: what it waits for, in Combwork\'s words.' }),
   exitCode: agentMsg({ id: 'progress.run.exitCode', text: 'exit code {code}', note: "A failed run's detail, stored with the run (the Default's words, whoever reads it)." }),
   launcherDidntStart: agentMsg({ id: 'progress.isolated.launcherDidntStart', text: "the check's launcher didn't start", note: '#1435.' }),
-  notRunError: agentMsg({ id: 'progress.isolated.notRun', text: "the check wasn't run: {why}", note: "#1435: the launcher wasn't put in its copy's job. why: Hive's reason, or the error." }),
-  notRunStatus: agentMsg({ id: 'progress.isolated.notRunStatus', text: "the check wasn't run: Combwork answered {status}", note: "#1435: Hive answered with an error and no reason. status: its HTTP status." }),
+  notRunError: agentMsg({ id: 'progress.isolated.notRun', text: "the check wasn't run: {why}", note: "#1435: the launcher wasn't put in its copy's job. why: Combwork's reason, or the error." }),
+  notRunStatus: agentMsg({ id: 'progress.isolated.notRunStatus', text: "the check wasn't run: Combwork answered {status}", note: "#1435: Combwork answered with an error and no reason. status: its HTTP status." }),
   notRunUnreachable: agentMsg({ id: 'progress.isolated.notRunUnreachable', text: "the check wasn't run: Combwork couldn't be reached ({detail})", note: "#1435. detail: the error's message." }),
   commandNotFound: agentMsg({ id: 'progress.run.commandNotFound', text: '{file}: command not found', note: "The command doesn't exist (ENOENT), as a shell says it; exit code 127." })
 }
 
-/** What `hive-progress --help` prints, and what follows a wrong option (said at call time: the session's dialect). */
+/** What `cw-progress --help` prints, and what follows a wrong option (said at call time: the session's dialect). */
 export const usage = (): string => say(A.usage)
 
 /** What the options say: a title, and what the run is for (#1220): its card, its revision, the check it runs. */
@@ -194,27 +194,23 @@ export function parseArgs(argv: string[]): WrapperArgs {
   return done([], false)
 }
 
+/** Step lines' opening, the only one read (HI-2594): any other line is the command's own output. */
 const STEP_PREFIX = '##cw-progress'
-/**
- * Step lines' opening before HI-2463, still read: a project's own scripts and test runners print it (it was documented),
- * and keep working. Combwork prints only STEP_PREFIX.
- */
-const LEGACY_STEP_PREFIX = '##hive-progress'
 
 /** What a step line says: the step starting now (from 1), how many there are, and its name; or a log the command wrote. */
 export interface StepLine {
   step?: number
   total?: number
   name?: string
-  /** "##hive-progress log=<path>": a log or run record (the rest of the line), for the run's details. */
+  /** "##cw-progress log=<path>": a log or run record (the rest of the line), for the run's details. */
   log?: string
-  /** "##hive-progress wait=<what>": it waits for that (the rest of the line, #549); '' when it waits no more. */
+  /** "##cw-progress wait=<what>": it waits for that (the rest of the line, #549); '' when it waits no more. */
   wait?: string
 }
 
-/** A step line ("##hive-progress step=4 total=12 name=carddialog": name, log and wait are the rest of the line), or null. */
+/** A step line ("##cw-progress step=4 total=12 name=carddialog": name, log and wait are the rest of the line), or null. */
 export function stepLine(line: string): StepLine | null {
-  const m = /^##(?:cw|hive)-progress(?:[ \t]+(.*?))?[ \t]*\r?\n?$/.exec(line)
+  const m = /^##cw-progress(?:[ \t]+(.*?))?[ \t]*\r?\n?$/.exec(line)
   if (!m) return null
   const u: StepLine = {}
   let rest = m[1] ?? ''
@@ -236,13 +232,13 @@ export function stepLine(line: string): StepLine | null {
 
 /**
  * Passes output through, taking out step lines. A line is held back only while it may still turn out to be one
- * (it starts like "##hive-progress" and hasn't ended); any other partial line goes out at once, so prompts and
+ * (it starts like "##cw-progress" and hasn't ended); any other partial line goes out at once, so prompts and
  * progress bars without a newline still show.
  */
 export class StepFilter {
   private held: Buffer = Buffer.alloc(0)
   private atLineStart = true
-  private readonly prefixes = [Buffer.from(STEP_PREFIX), Buffer.from(LEGACY_STEP_PREFIX)]
+  private readonly prefixes = [Buffer.from(STEP_PREFIX)]
   constructor(
     private readonly write: (b: Buffer) => void,
     private readonly onStep: (u: StepLine) => void
@@ -340,12 +336,12 @@ export function spawnSpec(command: string[], env: Record<string, string | undefi
   return { file: env.ComSpec ?? env.COMSPEC ?? 'cmd.exe', args: ['/d', '/s', '/c', `"${line}"`], verbatim: true }
 }
 
-/** A revision as git takes one, never an option: a commit id, a branch or tag, HEAD~1 (as Hive checks it). */
+/** A revision as git takes one, never an option: a commit id, a branch or tag, HEAD~1 (as Combwork checks it). */
 const REVISION = /^[\w./@^~{}-]{1,100}$/
 
 /**
- * Why `revision` isn't what's checked out in `cwd`, or null when it is: checked with git itself when Hive can't check it,
- * in the same words as Hive's refusal. A folder git can't read refuses too: a revision that can't be checked isn't taken.
+ * Why `revision` isn't what's checked out in `cwd`, or null when it is: checked with git itself when Combwork can't check it,
+ * in the same words as Combwork's refusal. A folder git can't read refuses too: a revision that can't be checked isn't taken.
  */
 export function revisionProblem(cwd: string, revision: string, env: Record<string, string | undefined>): string | null {
   const named = revision.trim()
@@ -387,23 +383,23 @@ export interface WrapperIo {
   stdout: { write(b: Buffer | string): unknown }
   stderr: { write(b: Buffer | string): unknown }
   stdin?: 'inherit' | 'ignore'
-  /** For tests: how often at most output tells Hive the run still goes (default KEEPALIVE_MS). */
+  /** For tests: how often at most output tells Combwork the run still goes (default KEEPALIVE_MS). */
   keepAliveMs?: number
   /** For tests: the API calls (report.mts's fetch) and the update interval. */
   fetch?: Fetch
   minIntervalMs?: number
   /**
-   * How long it waits for Hive to say what the run is for, and for its start to be taken (default: Hive's setting, which
+   * How long it waits for Combwork to say what the run is for, and for its start to be taken (default: Combwork's setting, which
    * it hands sessions as CW_PROGRESS_REPLY_SECONDS; `replyTimeoutMs`).
    */
   resolveTimeoutMs?: number
-  /** How long it waits before asking Hive again, once, when a check's ask or finish got no reply (default 1 s, HI-1892). */
+  /** How long it waits before asking Combwork again, once, when a check's ask or finish got no reply (default 1 s, HI-1892). */
   retryMs?: number
-  /** How long a check's finish waits for Hive's reply (default CHECK_FINISH_WAIT_MS); tests shorten it. */
+  /** How long a check's finish waits for Combwork's reply (default CHECK_FINISH_WAIT_MS); tests shorten it. */
   checkFinishWaitMs?: number
   /** How long the run waits for a step line with the total before it is reported without (default 2 s). */
   startWaitMs?: number
-  /** Whether hive-progress runs in Hive's executable as Node (default: whether it does); tests set it. */
+  /** Whether cw-progress runs in Combwork's executable as Node (default: whether it does); tests set it. */
   viaElectron?: boolean
   /** The stop signals it listens for (default STOP_SIGNALS); tests pass none, or their own. */
   signals?: NodeJS.Signals[]
@@ -412,9 +408,9 @@ export interface WrapperIo {
 }
 
 /**
- * How long hive-progress waits for Hive's reply (HI-1892: a fixed 5 s gave up on a Hive whose main was slow): Settings →
- * Advanced, "hive-progress: Hive's reply time" (cw.progress.replySeconds), handed to sessions as
- * CW_PROGRESS_REPLY_SECONDS; without it, 15 s. Kept within 1 s to 2 minutes whatever is set, so a hung Hive never holds
+ * How long cw-progress waits for Combwork's reply (HI-1892: a fixed 5 s gave up on a Combwork whose main was slow): Settings →
+ * Advanced, "cw-progress: Combwork's reply time" (cw.progress.replySeconds), handed to sessions as
+ * CW_PROGRESS_REPLY_SECONDS; without it, 15 s. Kept within 1 s to 2 minutes whatever is set, so a hung Combwork never holds
  * a command for long.
  */
 export const REPLY_DEFAULT_S = 15
@@ -427,8 +423,8 @@ export function replyTimeoutMs(env: Record<string, string | undefined>): number 
 const RETRY_MS = 1000
 
 /**
- * Why Hive gave no answer to a run that needed one, and that nothing was run (HI-1892). `check`: the check whose command
- * the answer was for, or null when it was to lend a check copy (`--isolated`, #1435). Slow: Hive is there but busy (try again; the setting gives it longer); refused:
+ * Why Combwork gave no answer to a run that needed one, and that nothing was run (HI-1892). `check`: the check whose command
+ * the answer was for, or null when it was to lend a check copy (`--isolated`, #1435). Slow: Combwork is there but busy (try again; the setting gives it longer); refused:
  * nothing listens at its address, or this process may not reach it (a sandbox that blocks local network access, as
  * Claude Code's Bash sandbox does); anything else, with what happened.
  */
@@ -441,7 +437,7 @@ export function unansweredLine(u: Unreachable, check: string | null, waitedMs: n
 }
 
 /**
- * What hive-progress says when a check's result may not have been recorded (HI-1892), or null when it was: Hive never
+ * What cw-progress says when a check's result may not have been recorded (HI-1892), or null when it was: Combwork never
  * took the run's start, gave no reply to its finish (asked twice), or took a finish sent again after the first had
  * arrived (how it counted not said).
  */
@@ -453,7 +449,7 @@ export function unrecordedLine(outcome: FinishOutcome | null, check: string): st
   return null
 }
 
-/** How often an isolated check waiting for a check copy asks Hive again (#1435), for the wait's first minute. */
+/** How often an isolated check waiting for a check copy asks Combwork again (#1435), for the wait's first minute. */
 const ISOLATED_POLL_MS = 2000
 /** After that each ask comes half as long again later, up to this (HI-1831: an hour's wait was 1,800 asks). */
 const ISOLATED_POLL_PROMPT_MS = 60_000
@@ -468,10 +464,10 @@ export function isolatedPollDelay(waitedMs: number, lastMs: number, firstMs = IS
   return Math.max(firstMs, Math.min(ISOLATED_POLL_MAX_MS, Math.round(lastMs * 1.5)))
 }
 
-/** How often at most a command's output tells Hive its run still goes (HI-1993): well within a quiet run's grace (STALE_GRACE_MS). */
+/** How often at most a command's output tells Combwork its run still goes (HI-1993): well within a quiet run's grace (STALE_GRACE_MS). */
 export const KEEPALIVE_MS = 60_000
 
-/** Whether output at `now` tells Hive the run still goes: once `every` ms have passed since it last did (or since its start or last step). */
+/** Whether output at `now` tells Combwork the run still goes: once `every` ms have passed since it last did (or since its start or last step). */
 export function keepAliveDue(lastAlive: number, now: number, every = KEEPALIVE_MS): boolean {
   return now - lastAlive >= every
 }
@@ -493,7 +489,7 @@ class WrappedRun {
   private waiting = ''
   private waitStart = 0
   private waitedBefore = 0
-  /** When it last told Hive the command still goes (output), ms. */
+  /** When it last told Combwork the command still goes (output), ms. */
   private lastAlive = 0
   constructor(
     private readonly start: () => { title: string; command: string; titleFromCommand: boolean; estimateMs?: number; started: number; link: Partial<ProgressStart> },
@@ -555,7 +551,7 @@ class WrappedRun {
     this.run.update({ ...(late !== undefined ? { total: late, step: this.step ?? 0 } : {}), ...(u.step !== undefined ? { step: this.step } : {}), ...(u.name !== undefined ? { stepName: u.name } : {}) })
   }
 
-  /** Hive's answer to the finish (null: none in `waitMs`); `retry`: sent once more after that many ms when it got no reply. */
+  /** Combwork's answer to the finish (null: none in `waitMs`); `retry`: sent once more after that many ms when it got no reply. */
   finish(ok: boolean, summary: string | undefined, exitCode: number, stopped = false, waitMs?: number, retry?: number): Promise<unknown> {
     this.begin()
     return this.run!.finish(ok, summary, waitMs, { exitCode, ...(this.log ? { logPath: this.log } : {}), ...(stopped ? { stopped: true } : {}) }, retry)
@@ -567,7 +563,7 @@ class WrappedRun {
   }
 }
 
-/** How long a check's finish waits for Hive to say how it counted (Hive answers within 8 s: servers.ts CHECK_REPLY_MS). */
+/** How long a check's finish waits for Combwork to say how it counted (Combwork answers within 8 s: servers.ts CHECK_REPLY_MS). */
 const CHECK_FINISH_WAIT_MS = 9000
 
 /** What's said for each reason a check run didn't count (#1654): what happened, then what to do. */
@@ -577,7 +573,7 @@ const UNCOUNTED: Record<string, AgentMsg> = { notCheck: A.notCheck, notContained
 const MARKS: Record<string, AgentMsg> = { ':reflog': A.changeReflog, ':edit': A.changeEdit }
 
 /**
- * The line hive-progress prints when Hive says a check's run didn't count (#1654), or null (it counted, or Hive didn't
+ * The line cw-progress prints when Combwork says a check's run didn't count (#1654), or null (it counted, or Combwork didn't
  * say): why, and what to do, so an agent isn't left running the same command again for a submit that keeps refusing.
  */
 export function uncountedLine(answer: unknown, isolated: boolean): string | null {
@@ -590,7 +586,7 @@ export function uncountedLine(answer: unknown, isolated: boolean): string | null
 }
 
 /**
- * The command's environment: the caller's, without what hive-progress was started with. Run by Hive's executable as
+ * The command's environment: the caller's, without what cw-progress was started with. Run by Combwork's executable as
  * Node (its shims), ELECTRON_RUN_AS_NODE is the shims' own: the command gets the caller's value back (kept in
  * CW_PROGRESS_RUN_AS_NODE; usually none), so an Electron app it starts runs as an app.
  */
@@ -607,7 +603,7 @@ export function commandEnv(env: Record<string, string | undefined>, viaElectron:
 
 /**
  * Whether the command ended by an interrupt (#549): Windows' STATUS_CONTROL_C_EXIT (0xC000013A, what a console program
- * Ctrl+C ends exits with), a shell's 130 (128 + SIGINT), or a signal; or hive-progress itself was sent one.
+ * Ctrl+C ends exits with), a shell's 130 (128 + SIGINT), or a signal; or cw-progress itself was sent one.
  */
 export function wasInterrupted(code: number, signal: NodeJS.Signals | null, signalled: boolean): boolean {
   return signalled || signal === 'SIGINT' || signal === 'SIGTERM' || signal === 'SIGBREAK' || code === 0xc000013a || code === -1073741510 || code === 130
@@ -615,7 +611,7 @@ export function wasInterrupted(code: number, signal: NodeJS.Signals | null, sign
 
 /** The signals that mean "stop" (Ctrl+C, Ctrl+Break, the console closing, a polite kill), where the wrapper gets them. */
 const STOP_SIGNALS: NodeJS.Signals[] = ['SIGINT', 'SIGBREAK', 'SIGHUP', 'SIGTERM']
-/** How long the command gets to end by itself after hive-progress is told to stop, before it is ended. */
+/** How long the command gets to end by itself after cw-progress is told to stop, before it is ended. */
 const STOP_GRACE_MS = 5000
 /** Once the command has been ended, how long its output may stay open (a descendant that got away) before the run ends anyway. */
 const CLOSE_AFTER_KILL_MS = 2000
@@ -696,12 +692,12 @@ export function endTree(child: ChildProcess, platform = process.platform): void 
 }
 
 /**
- * Runs hive-progress with these arguments; resolves to the exit code to end with (the command's own).
+ * Runs cw-progress with these arguments; resolves to the exit code to end with (the command's own).
  *
- * Stopping (#549), as Windows lets it be seen: run by Hive's shims, hive-progress is Electron run as Node, a program with
+ * Stopping (#549), as Windows lets it be seen: run by Combwork's shims, cw-progress is Electron run as Node, a program with
  * no console, and its command gets a hidden console of its own, so a Ctrl+C typed in the agent's terminal reaches
  * neither; an agent (or the user) stopping the command ends the whole process tree at once, which no process can see.
- * That run is told by Hive, from its pid being gone: "ended without a report". Where hive-progress does get a stop
+ * That run is told by Combwork, from its pid being gone: "ended without a report". Where cw-progress does get a stop
  * signal (run by Node in a console: Ctrl+C, Ctrl+Break, the console closing), it doesn't die at once: the command
  * (which got the same Ctrl+C) has a moment to end, is ended if it doesn't, and the run is reported as stopped. A command
  * that ended by an interrupt itself (STATUS_CONTROL_C_EXIT, 130) is reported as stopped too, not failed.
@@ -718,18 +714,18 @@ export async function runWrapped(argv: string[], io: WrapperIo): Promise<number>
   }
   const target = progressTarget(io.env)
   const replyMs = io.resolveTimeoutMs ?? replyTimeoutMs(io.env)
-  // A check's command is the project's (#1220), which only Hive knows.
+  // A check's command is the project's (#1220), which only Combwork knows.
   if (parsed.check !== undefined && !target) {
-    io.stderr.write(`cw-progress: ${say(A.checkOutsideHive, { check: parsed.check })}\n`)
+    io.stderr.write(`cw-progress: ${say(A.checkOutsideCombwork, { check: parsed.check })}\n`)
     return 2
   }
   // What the run is for, checked before anything runs: a revision that isn't checked out, an unknown card or a check
-  // with no command is refused here. An older Hive, or one that doesn't answer, just doesn't link it.
+  // with no command is refused here. An older Combwork, or one that doesn't answer, just doesn't link it.
   let link: RunLink | null = null
   if (target) {
     const ask = { folder: io.cwd, ...(parsed.card !== undefined ? { card: parsed.card } : {}), ...(parsed.revision !== undefined ? { revision: parsed.revision } : {}), ...(parsed.check !== undefined ? { check: parsed.check } : {}), ...(parsed.isolated ? { isolated: true as const } : {}) }
-    // A check needs the answer (its command is Hive's): asked once more if it got none (HI-1892), but never an isolated
-    // check's first ask, which may lend a copy Hive is still setting up (it is asked again with its ticket below).
+    // A check needs the answer (its command is Combwork's): asked once more if it got none (HI-1892), but never an isolated
+    // check's first ask, which may lend a copy Combwork is still setting up (it is asked again with its ticket below).
     const retry = parsed.check !== undefined && !parsed.isolated ? (io.retryMs ?? RETRY_MS) : undefined
     let r = await resolveRun(target, ask, { fetch: io.fetch, timeoutMs: replyMs, retry })
     // No check copy free (#1435): said once, then asked again until one is (Ctrl+C stops waiting).
@@ -741,7 +737,7 @@ export async function runWrapped(argv: string[], io: WrapperIo): Promise<number>
       if (r.wait !== said) io.stderr.write(`cw-progress: ${say(A.waiting, { what: (said = r.wait) })}\n`)
       delay = isolatedPollDelay(Date.now() - waitFrom, delay, io.isolatedPollMs)
       await new Promise((res) => setTimeout(res, delay))
-      // Asked again with its ticket: the copy Hive is setting up for this run (none: a new ask).
+      // Asked again with its ticket: the copy Combwork is setting up for this run (none: a new ask).
       r = await resolveRun(target, { ...ask, ...(r.ticket ? { ticket: r.ticket } : {}) }, { fetch: io.fetch, timeoutMs: replyMs })
     }
     if ('refused' in r) {
@@ -754,7 +750,7 @@ export async function runWrapped(argv: string[], io: WrapperIo): Promise<number>
       return 2
     }
   }
-  // A revision named is checked whether or not Hive can (reporting off, outside Hive, Hive unreachable): here, with git.
+  // A revision named is checked whether or not Combwork can (reporting off, outside Combwork, Combwork unreachable): here, with git.
   if (!link && parsed.revision !== undefined) {
     const wrong = revisionProblem(io.cwd, parsed.revision, io.env)
     if (wrong) {
@@ -768,9 +764,9 @@ export async function runWrapped(argv: string[], io: WrapperIo): Promise<number>
   const spec = checkCommand !== undefined ? shellSpec(checkCommand, io.env) : spawnSpec(parsed.command, io.env, io.cwd)
   const env = commandEnv(io.env, io.viaElectron ?? !!process.versions.electron)
   const started = Date.now()
-  // Not reporting: the command runs as if hive-progress weren't there (its own console, no filtering).
+  // Not reporting: the command runs as if cw-progress weren't there (its own console, no filtering).
   if (!target) return run(spec, env, io, null)
-  // Its run is this one: a reporter inside it (Hive's test runners, another hive-progress) prints step lines instead
+  // Its run is this one: a reporter inside it (Combwork's test runners, another cw-progress) prints step lines instead
   // of reporting a second row (report.mts).
   env.CW_PROGRESS_WRAPPED = '1'
   const label = checkCommand ?? commandLabel(parsed.command)
@@ -850,7 +846,7 @@ function run(
     let child: ChildProcess
     try {
       if (isolated) {
-        // Its launcher, waiting: put in the copy's job by Hive, then told to run the command (its output is the command's).
+        // Its launcher, waiting: put in the copy's job by Combwork, then told to run the command (its output is the command's).
         const l = startLauncher({ command: spec.file, args: spec.args, verbatim: spec.verbatim }, { cwd: isolated.folder, env: env as NodeJS.ProcessEnv })
         child = l.child
         const giveUp = (why: string): void => {
@@ -915,7 +911,7 @@ function run(
       resolve(code ?? (signal ? 1 : 0))
     }
     child.on('close', done)
-    // Ended by hive-progress: its output may be held open by something that got away; the run ends a moment after it.
+    // Ended by cw-progress: its output may be held open by something that got away; the run ends a moment after it.
     child.on('exit', (code, signal) => {
       if (forced?.at) setTimeout(() => done(code, signal), CLOSE_AFTER_KILL_MS).unref()
     })

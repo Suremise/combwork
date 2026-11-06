@@ -9,7 +9,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-lane-briefs-')
+const base = tempDir('cw-lane-briefs-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const tasks = await import('../src/main/tasks')
@@ -82,7 +82,7 @@ describe("a lane's brief kept with the lane, and delivered outside slots (HI-179
     expect(await briefOf(l.id)).toMatchObject({ rev: 1 })
     await start([a, b], 'Stay off the renderer.')
     expect(await briefOf(l.id)).toMatchObject({ text: 'Stay off the renderer.', rev: 2 })
-    // Read back from the board by a Hive started again (the workspace closed, then opened by a new service).
+    // Read back from the board by a Combwork started again (the workspace closed, then opened by a new service).
     await disposeWorkspaceService(w)
     w = createWorkspaceService()
     await w.open(wsPath)

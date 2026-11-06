@@ -1,4 +1,4 @@
-// The Hive Assistant's attachments (#243, #387): listed from its home (a session host, not a project), grouped by
+// The Combwork Assistant's attachments (#243, #387): listed from its home (a session host, not a project), grouped by
 // conversation; deleting one, or a conversation's group, has the checks of deleting sessions (#239): none while the conversation
 // runs, and none if another program has one open (all or nothing).
 import { spawn, type ChildProcess } from 'child_process'
@@ -8,7 +8,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-aattach-')
+const base = tempDir('cw-aattach-')
 process.env.CLAUDE_CONFIG_DIR = join(base, 'claude-home')
 process.env.CODEX_HOME = join(base, 'codex-home')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')

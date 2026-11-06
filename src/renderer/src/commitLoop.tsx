@@ -12,9 +12,9 @@ function Loop({ n, done }: { n: number; done: () => void }): null {
   return null
 }
 
-const w = window as unknown as { __hiveCommitBurst?: unknown; __hiveTestCommitLoop?: (n: number) => Promise<void> }
-if (w.__hiveCommitBurst) {
-  w.__hiveTestCommitLoop = (n) =>
+const w = window as unknown as { __cwCommitBurst?: unknown; __cwTestCommitLoop?: (n: number) => Promise<void> }
+if (w.__cwCommitBurst) {
+  w.__cwTestCommitLoop = (n) =>
     new Promise<void>((resolve) => {
       const host = document.createElement('div')
       const root = createRoot(host)

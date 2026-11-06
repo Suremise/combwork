@@ -37,7 +37,7 @@ const check = (name, ok, extra = '') => {
   fs.mkdirSync(claudeHome, { recursive: true })
   lib.gitProject(alpha)
   lib.fakeClaude(userData, claudeHome, [alpha])
-  let { app, page, inv } = await lib.launch({ userData, env: { CLAUDE_CONFIG_DIR: claudeHome, HIVE_API_PORT: lib.port(47825) }, viewport: { width: 1500, height: 900 } })
+  let { app, page, inv } = await lib.launch({ userData, env: { CLAUDE_CONFIG_DIR: claudeHome, CW_API_PORT: lib.port(47825) }, viewport: { width: 1500, height: 900 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)
@@ -187,7 +187,7 @@ const check = (name, ok, extra = '') => {
     // measuring it again and again took the window down).
     const runDone = path.join(lib.WORK, 'tilesview-run-done')
     const runTitle = 'A very long progress run title that should be truncated cleanly in every narrow tile'
-    await prompts('A').type(`shell: hive-progress --title "${runTitle}" -- node -e "setInterval(() => require('fs').existsSync(process.argv[1]) && process.exit(0), 100)" ${runDone}`)
+    await prompts('A').type(`shell: cw-progress --title "${runTitle}" -- node -e "setInterval(() => require('fs').existsSync(process.argv[1]) && process.exit(0), 100)" ${runDone}`)
     const progressShown = () => tile('A').evaluate((el) => el.querySelector('.tile-progress-text')?.textContent ?? '')
     check("A's tile shows its progress run", !!(await lib.until(async () => (await progressShown()).startsWith(runTitle), HUNG_MS)), await progressShown())
     const during = await heights()
@@ -360,14 +360,14 @@ const check = (name, ok, extra = '') => {
     check('…the drag has ended: no drop targets left', !!(await lib.until(async () => (await page.locator('.tile-drop, .tile-pages button.drop-target').count()) === 0, HUNG_MS)))
     // A move shown while its save is held (#1229): a refresh meanwhile reads the order from before it, and its report
     // reaches the window (seen by a listener after the window's own, then drawn); the tiles keep the move.
-    await app.evaluate(() => void (process.env.HIVE_TEST_SLOW_IPC = 'agents:move=20000*1'))
+    await app.evaluate(() => void (process.env.CW_TEST_SLOW_IPC = 'agents:move=20000*1'))
     await tile('C').focus()
     await page.keyboard.press('Control+Alt+Shift+ArrowRight')
     const held = ['B', 'C', 'A', ...NAMES.slice(3)]
     check('Move Agent Right on C, its save held: shown at once, not saved yet', !!(await lib.until(async () => (await tileNames()).join() === order(held.slice(0, 12)), HUNG_MS)) && saved() === order(swapped), `${saved()} / ${(await tileNames()).join()}`)
     await page.evaluate(() => {
       window.__olderOrder = null
-      window.hive.onEvent((e) => {
+      window.combwork.onEvent((e) => {
         const p = e.type === 'workspace-changed' && window.__olderOrder === null ? e.workspace?.projects.find((x) => x.name === 'alpha') : null
         if (p) window.__olderOrder = p.agents.map((a) => a.name).join()
       })
@@ -377,7 +377,7 @@ const check = (name, ok, extra = '') => {
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
     check('…a refresh meanwhile reports the order from before the move', older === order(swapped), String(older))
     check('…and the tiles keep the move', (await tileNames()).join() === order(held.slice(0, 12)), (await tileNames()).join())
-    await app.evaluate(() => void (process.env.HIVE_TEST_SLOW_IPC = ''))
+    await app.evaluate(() => void (process.env.CW_TEST_SLOW_IPC = ''))
     // Bound: the save's hold left over, plus a hung run's.
     check('…saved once its save goes on, still shown', !!(await lib.until(async () => saved() === order(held) && (await tileNames()).join() === order(held.slice(0, 12)), 20000 + HUNG_MS)), `${saved()} / ${(await tileNames()).join()}`)
     await tile('C').focus()
@@ -456,9 +456,9 @@ const check = (name, ok, extra = '') => {
     const blockedCard = await card('Chip blocked', 'E', 'doing')
     await inv('tasks:update', blockedCard, { blocked: 'Waiting for an answer' })
     // A reviews D's card with its own tool call, then watches it into Passed.
-    await prompts('A').type(`hive cw_update_task ${JSON.stringify({ number: reviewCard, review: 'start' })}`)
+    await prompts('A').type(`cw cw_update_task ${JSON.stringify({ number: reviewCard, review: 'start' })}`)
     await lib.until(async () => (await inv('tasks:list')).find((c) => c.number === reviewCard)?.review?.agent === ids.A, HUNG_MS)
-    await prompts('A').type(`hive cw_wait_for_tasks ${JSON.stringify({ cards: [reviewCard], column: 'passed', changes: ['verdict', 'column'], wake: true })}`)
+    await prompts('A').type(`cw cw_wait_for_tasks ${JSON.stringify({ cards: [reviewCard], column: 'passed', changes: ['verdict', 'column'], wake: true })}`)
     await lib.until(async () => (await live(ids.A))?.status === 'watching', HUNG_MS)
     await page.locator('.session-toolbar .tile-pages button').nth(0).click()
     await tile('A').click()
@@ -528,7 +528,7 @@ const check = (name, ok, extra = '') => {
     await inv('session:stop', alpha).catch(() => undefined)
     await lib.until(async () => (await inv('session:live').catch(() => [])).length === 0, HUNG_MS)
     await app.close()
-    ;({ app, page, inv } = await lib.launch({ userData, env: { CLAUDE_CONFIG_DIR: claudeHome, HIVE_API_PORT: lib.port(47825) }, viewport: { width: 1500, height: 900 } }))
+    ;({ app, page, inv } = await lib.launch({ userData, env: { CLAUDE_CONFIG_DIR: claudeHome, CW_API_PORT: lib.port(47825) }, viewport: { width: 1500, height: 900 } }))
     page.on('pageerror', (e) => check('no page errors (restarted)', false, e.message))
     for (const w of app.windows().slice(1)) await w.close().catch(() => undefined)
     await lib.openWorkspace(inv, page, ws)

@@ -54,7 +54,7 @@
       "text": "plain"
     }
   },
-  "brief.record.byHive": {
+  "brief.record.byCombwork": {
     "placeholders": {
       "agent": "plain"
     }
@@ -115,10 +115,10 @@
   "brief.rule.finish.agentMerges": {
     "placeholders": {}
   },
-  "brief.rule.finish.committed": {
+  "brief.rule.finish.combworkMerges": {
     "placeholders": {}
   },
-  "brief.rule.finish.hiveMerges": {
+  "brief.rule.finish.committed": {
     "placeholders": {}
   },
   "brief.rule.finish.notChecked": {
@@ -172,6 +172,9 @@
     "placeholders": {}
   },
   "brief.start.firstCard": {
+    "placeholders": {}
+  },
+  "brief.start.firstWithBrief": {
     "placeholders": {}
   },
   "brief.start.fromUser": {

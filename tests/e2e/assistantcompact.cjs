@@ -1,4 +1,4 @@
-// The Hive Assistant's Compact highlight (#290): Settings → Assistant → Highlight Compact over (500,000 by default, its
+// The Combwork Assistant's Compact highlight (#290): Settings → Assistant → Highlight Compact over (500,000 by default, its
 // own, not Settings → Sessions' 200,000 for project agents). At or past it, Compact… in the Assistant's ⋯ (#979) is
 // recommended ("Recommended: the context is over your threshold." under it) and its footer's context turns amber (with
 // "— consider compacting"), as an agent's do; below it, or with Never, neither. A change in Settings shows at once. The
@@ -31,17 +31,17 @@ const check = (name, ok, extra = '') => {
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.providers['claude-code'].executablePath = path.join(__dirname, 'fake-claude', 'fake-claude.cmd')
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
-  // As saved by a Hive from before the setting: Settings → Assistant without it.
+  // As saved by a Combwork from before the setting: Settings → Assistant without it.
   delete cfg.settings.assistant?.compactSuggestTokens
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47917), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47917), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const home = (await inv('workspace:refresh')).assistant.path
   const live = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === home.toLowerCase() && s.agentId === 'assistant')

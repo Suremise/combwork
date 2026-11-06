@@ -5,7 +5,7 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 
-// Hive's terminals, recorded instead (no process runs).
+// Combwork's terminals, recorded instead (no process runs).
 const pty = vi.hoisted(() => ({ onData: null as ((d: string) => void) | null, open: new Set<string>(), typed: [] as { at: number; keys: string }[] }))
 vi.mock('../src/main/ptyHost', async (original) => ({
   ...(await original<object>()),
@@ -32,7 +32,7 @@ const loading = stream.indexOf('loading')
 const version = stream.indexOf('(v0.160.0)')
 /** The first spinner frame in its title, and its end (the plain title the fixture ends with). */
 const spinner = stream.indexOf('\x1b]0;⠹')
-const spinnerEnd = stream.lastIndexOf('\x1b]0;hive-codex-setup\x07')
+const spinnerEnd = stream.lastIndexOf('\x1b]0;demo-codex-setup\x07')
 // The terminal parses what it is given asynchronously, and the gate sets `ready` when it has parsed the screen. The wait is
 // for that: every write the terminals have been given has been parsed (its callback ran), or its screen was disposed (no
 // callback comes). A fixed delay raced the parser: about 15 ms a write on an idle machine, and not much less than 20 ms

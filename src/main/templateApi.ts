@@ -7,7 +7,7 @@ import { overlayTemplateWorkflow, TEMPLATE_PLATFORMS, type TemplateOptions, type
 import { nameTaken, suggestTemplateAgentName } from '../shared/agentNames'
 import { workspaceAgents } from './agentNames'
 import { noteChange } from './assistantChanges'
-import { HiveError } from './hiveError'
+import { CombworkError } from './combworkError'
 import { agentField } from '../shared/advanced'
 import { projectKeyOf } from './projectKeys'
 import { applyConnections, connectionsPlan, listAllTemplates, listTemplates, loadTemplateWith, templatePlanEnglish } from './templates'
@@ -18,19 +18,19 @@ import { checkWorkflowChange, setWorkflowOptions, workflowForm, WorkflowRefused,
 import { workspaceOf } from './workspace'
 
 /**
- * The Hive Assistant's template load through the Agent API (HI-1502, SPEC §16.10.6): its templates listed, a load
+ * The Combwork Assistant's template load through the Agent API (HI-1502, SPEC §16.10.6): its templates listed, a load
  * planned, and loaded with the window's load (templates.ts `loadTemplateWith`: its plan, checks, lock and fence), names
  * given for some of its agents, and its workflow (HI-1910) saved as the project's options, never Git set up. What it
  * changes is recorded for undo (assistantUndo.ts' `undoLoaded`). Its replies and refusals are English: agents read them.
  */
 
 /** A refusal of the Agent API's, in English: its text said where it is made, in the caller's scope. */
-const refused = (text: string, kind: 'invalid' | 'notFound' | 'conflict'): HiveError => new HiveError({ lines: [text] }, { kind })
+const refused = (text: string, kind: 'invalid' | 'notFound' | 'conflict'): CombworkError => new CombworkError({ lines: [text] }, { kind })
 
 /** The template routes' agent text (dialects, HI-2447): refusals and what a load or Choose Connections couldn't do. */
 const T = {
   required: agentMsg({ id: 'template.find.required', text: 'template is required: its file or name, as list gives them', note: 'A template call named none.' }),
-  scope: agentMsg({ id: 'template.find.scope', text: 'scope is hive, workspace or project', note: "A template call's scope isn't one of the three. They are the argument's values." }),
+  scope: agentMsg({ id: 'template.find.scope', text: 'scope is combwork, workspace or project', note: "A template call's scope isn't one of the three. They are the argument's values." }),
   from: agentMsg({ id: 'template.find.from', text: 'from is a project name', note: "A template call's from isn't text." }),
   none: agentMsg({ id: 'template.find.none', text: 'No template "{template}"{scoped, select, yes { in the {scope} scope} other {}}{fromProject, select, yes { kept in {from}} other {}}: list gives them.', note: 'No template has that file or name, in the scope or project named, if any.' }),
   several: agentMsg({ id: 'template.find.several', text: 'Several templates are called "{template}": name one by scope and file ({choices}).', note: 'More than one template has that name: never one picked for the caller. {choices} lists each as "scope: file".' }),
@@ -53,7 +53,7 @@ const T = {
   connAmbiguous: agentMsg({ id: 'template.connections.ambiguous', text: 'connections: several are called "{ref}": name one by its id ({ids}).', note: 'An answer in connections names several connections usable here. {ids} lists their ids.' }),
   connUnknown: agentMsg({ id: 'template.connections.unknown', text: 'connections: no connection "{ref}" can be used here (options lists those that can).', note: 'An answer in connections names no connection usable here.' }),
   connNone: agentMsg({ id: 'template.connections.none', text: 'none', note: 'No connection is usable here: the end of template.connections.required.' }),
-  needsGit: agentMsg({ id: 'template.load.needsGit', text: "Its workflow is for Git and this project has no version control: set up Git in the project's Version Control first (that is the user's choice), or load with workflow: false for its agents alone.", note: "Why a template's workflow can't be loaded (HI-1910): Hive never sets up Git for the Assistant." }),
+  needsGit: agentMsg({ id: 'template.load.needsGit', text: "Its workflow is for Git and this project has no version control: set up Git in the project's Version Control first (that is the user's choice), or load with workflow: false for its agents alone.", note: "Why a template's workflow can't be loaded (HI-1910): Combwork never sets up Git for the Assistant." }),
   notYet: agentMsg({ id: 'template.load.notYet', text: "The template can't be loaded yet: {blocked}", note: 'A load refused: {blocked} is each reason, joined by spaces.' }),
   workflowCant: agentMsg({ id: 'template.load.workflowCant', text: "Its workflow can't be saved here: {problems}", note: "A load refused: the template's workflow doesn't fit this project. {problems} is each reason." }),
   optionsChanged: agentMsg({ id: 'template.load.optionsChanged', text: "its options changed meanwhile, so they weren't saved: set them in the project's Version Control", note: "Why a loaded template's workflow wasn't saved: the project's options changed while it loaded." }),
@@ -84,7 +84,7 @@ const rowOf = (e: TemplateEntry): TemplateRow => ({
   ...(e.problem ? { problem: agentField(e.problem, e.problemText) } : {})
 })
 
-/** The templates a project can use (Hive's own, the workspace's and its own), as rows. */
+/** The templates a project can use (Combwork's own, the workspace's and its own), as rows. */
 export async function templateRows(projectPath: string): Promise<TemplateRow[]> {
   return (await listTemplates(projectPath)).map(rowOf)
 }
@@ -97,7 +97,7 @@ export async function templateRows(projectPath: string): Promise<TemplateRow[]> 
 export async function findTemplate(projectPath: string, a: { template?: unknown; scope?: unknown; from?: unknown }): Promise<TemplateEntry> {
   const template = typeof a.template === 'string' ? a.template.trim() : ''
   if (!template) throw refused(say(T.required), 'invalid')
-  if (a.scope !== undefined && a.scope !== 'hive' && a.scope !== 'workspace' && a.scope !== 'project') throw refused(say(T.scope), 'invalid')
+  if (a.scope !== undefined && a.scope !== 'combwork' && a.scope !== 'workspace' && a.scope !== 'project') throw refused(say(T.scope), 'invalid')
   if (a.from !== undefined && typeof a.from !== 'string') throw refused(say(T.from), 'invalid')
   const from = typeof a.from === 'string' && a.from.trim() ? a.from.trim().toLowerCase() : null
   const all = from ? (await listAllTemplates()).filter((e) => e.scope === 'project' && !!e.project && basename(e.project).toLowerCase() === from) : await listTemplates(projectPath)
@@ -229,7 +229,7 @@ async function suggestions(projectPath: string, taken: readonly { name: string; 
 }
 
 /** A load refused for names another project's agent has: each with a free one to give in names. */
-async function takenRefusal(projectPath: string, taken: readonly { name: string; project: string }[], chosen: readonly string[]): Promise<HiveError> {
+async function takenRefusal(projectPath: string, taken: readonly { name: string; project: string }[], chosen: readonly string[]): Promise<CombworkError> {
   const free = await suggestions(projectPath, taken, chosen)
   return refused(say(T.taken, { taken: free.map((t) => say(T.takenOne, { name: t.name, project: t.project, suggestion: t.suggestion })).join('; ') }), 'conflict')
 }
@@ -368,7 +368,7 @@ interface Recorded {
 const kept = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T
 
 /**
- * Loads a template into the project as the Hive Assistant asked (the route's assistantChange holds it): refused first
+ * Loads a template into the project as the Combwork Assistant asked (the route's assistantChange holds it): refused first
  * with a free name for each taken one, and, with `applyWorkflow`, when its workflow needs Git or can't be saved here.
  * The load itself checks its workflow again inside its guard (`check`), on the plan it stages, so the agents and the
  * options saved are one read of the template; the options are saved once the agents are published, against the
@@ -438,7 +438,7 @@ export interface ConnectionsApplyReply {
 const SKIPPED = { running: T.skippedRunning, gone: T.skippedGone } as const
 
 /**
- * Choose Connections… for the Hive Assistant (HI-2109): the project's existing agents given connections by `connections`
+ * Choose Connections… for the Combwork Assistant (HI-2109): the project's existing agents given connections by `connections`
  * (`*`, a role or an agent's name → a connection's id or name), nothing loaded or replaced, each change recorded for undo
  * (as Agent Settings' are) and the guard checked in each agent's write. Every answer is checked first; none given lists
  * the agents and options without changing anything.

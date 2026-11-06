@@ -38,7 +38,7 @@ export async function countedWrite<T>(workspacePath: string, fn: () => Promise<T
 
 /**
  * The writes under way to a place (its `placeKey`), whatever spelling each was given: `spelt`, the workspace's path as
- * Hive has it, matches without a look at the disk.
+ * Combwork has it, matches without a look at the disk.
  */
 export function writesAt(place: string, spelt?: string): number {
   const own = spelt ? keyOf(spelt) : null

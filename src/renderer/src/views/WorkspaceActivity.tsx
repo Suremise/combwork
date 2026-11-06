@@ -21,7 +21,7 @@ const LISTS_AT_ONCE = 2
  * tick for what runs now) reads them from a test copy's window.
  */
 const counts = { now: 0, lists: 0, turns: 0, cardAgents: 0, renders: 0, active: false }
-;(window as unknown as { __hiveWorkspaceActivity?: typeof counts }).__hiveWorkspaceActivity = counts
+;(window as unknown as { __cwWorkspaceActivity?: typeof counts }).__cwWorkspaceActivity = counts
 
 /**
  * A store value taken in only while the view is active: hidden (the window minimised), the store's changes (agents'
@@ -54,7 +54,7 @@ const activityAgents = (h: ProjectInfo): ActivityAgent[] =>
     const l = a.live
     if (!l) return { id: a.id, name: a.name, live: null }
     const state = agentState(l)
-    return { id: a.id, name: a.name, live: { sessionId: l.sessionId, sessionName: l.sessionName, startedAt: l.startedAt, status: l.status, text: statusText(l), working: state === 'working', waiting: state === 'waiting', failed: state === 'stalled' } }
+    return { id: a.id, name: a.name, live: { sessionId: l.sessionId, sessionName: l.sessionName, startedAt: l.startedAt, status: l.status, text: statusText(l), working: state === 'working', waiting: state === 'waiting', failed: state === 'stalled', ...(l.modelSwitch ? { modelSwitch: { launched: l.modelSwitch.launched, running: l.modelSwitch.running, provider: l.provider } } : {}) } }
   })
 
 /** A card as the Activity tab takes it. */
@@ -563,7 +563,7 @@ const M = {
   wholeTip: msg({ id: 'activity.workspace.wholeTip', defaultMessage: "Every project's running agents, grouped by project, and the Assistant when it runs.", description: "Tooltip of the Activity view's Whole workspace row." }),
   projects: msg({ id: 'activity.workspace.projects', defaultMessage: 'Projects', description: "A section heading in the Activity view's sidebar, over a row per project." }),
   projectTip: msg({ id: 'activity.workspace.projectTip', defaultMessage: "Open {project}'s Activity tab.", description: "Tooltip of a project's row in the Activity view's sidebar: opens that project's own Activity tab. {project} is its name." }),
-  assistant: msg({ id: 'activity.workspace.assistant', defaultMessage: 'Assistant', description: "The Assistant's group heading among the Activity view's agent tabs (its tabs grouped by project; the Hive Assistant is its own group)." }),
+  assistant: msg({ id: 'activity.workspace.assistant', defaultMessage: 'Assistant', description: "The Assistant's group heading among the Activity view's agent tabs (its tabs grouped by project; the Combwork Assistant is its own group)." }),
   agentIn: msg({ id: 'activity.workspace.agentIn', defaultMessage: '{project} · {agent}', description: "An entry of the Activity view's Agents menu: an agent ({agent}) and its project ({project})." }),
   empty: msg({ id: 'activity.workspace.empty', defaultMessage: 'Nothing is running in this workspace. Start an agent to see what it runs here.', description: "Activity's workspace level when no agent of any project runs anything." }),
   forCard: msg({ id: 'activity.workspace.forCard', defaultMessage: 'Card {card}', description: "A chip above Activity's workspace level when it was opened from a card, naming the filter (not saying anyone works on it): only the agents working on that card ({card}: its key, such as HI-12) now have tabs." }),

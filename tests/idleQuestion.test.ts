@@ -1,5 +1,5 @@
 // Claude Code 2.1.312's offer to teach auto mode about the environment (HI-1959): a question it puts on its screen by
-// itself after a turn, with no hook. HB4's wake was typed into it, Hive's Enter again answered it, and the line it took
+// itself after a turn, with no hook. HB4's wake was typed into it, Combwork's Enter again answered it, and the line it took
 // left the agent held behind an empty input. The adapter reads the question and its input box from recorded screens;
 // with the real SessionManager and the terminal's writes caught, the agent waits for the user with the question, nothing
 // is typed or pressed meanwhile, and a held line gone from the input is let go only on a second look that says the same.
@@ -54,7 +54,9 @@ describe("Claude Code's question by itself and its input box, on its screen (2.1
   })
 
   it("reads what its input holds: the recorded line, an empty box, wrapped rows joined; none under a dialog or a menu's ❯", () => {
+    // old-name: begin recorded-input
     expect(claudeCode.promptText(fixture('advanced/input-claude-2.1.312.txt'))).toBe('hive wake line typed and not sent')
+    // old-name: end recorded-input
     expect(claudeCode.promptText(fixture('screen-claude-2.1.296-idle.txt'))).toBe('')
     expect(claudeCode.promptText(`${RULE}\n❯ [CW] New in your inbox: 1 task (HI-1959)\n  (m21559). Call cw_inbox to read it\n${RULE}\n  ⏵⏵ auto mode on`)).toBe('[CW] New in your inbox: 1 task (HI-1959) (m21559). Call cw_inbox to read it')
     // The last box drawn is the input: an earlier one scrolled up is not.
@@ -64,7 +66,7 @@ describe("Claude Code's question by itself and its input box, on its screen (2.1
     expect(claudeCode.promptText('')).toBeNull()
   })
 
-  it("2.1.312's screens still match what else Hive reads of them: its auto mode footer, its turn's done line", () => {
+  it("2.1.312's screens still match what else Combwork reads of them: its auto mode footer, its turn's done line", () => {
     const re = (id: string): RegExp => new RegExp(String(ADVANCED_DEFS.find((d) => d.id === id)!.default), ADVANCED_DEFS.find((d) => d.id === id)!.flags ?? '')
     expect(re('claude-code.footer.auto').test(fixture('advanced/input-claude-2.1.312.txt'))).toBe(true)
     expect(re('claude-code.trust.prompt').test(fixture('advanced/input-claude-2.1.312.txt'))).toBe(false)
@@ -143,7 +145,7 @@ describe('the agent and its question by itself (HI-1959)', () => {
     vi.restoreAllMocks()
   })
 
-  it('nothing is typed into the question and no Enter pressed: the agent is refused with why, and so is a line of Hive\'s', async () => {
+  it('nothing is typed into the question and no Enter pressed: the agent is refused with why, and so is a line of Combwork\'s', async () => {
     const writes: string[] = []
     vi.spyOn(pty, 'writePty').mockImplementation((_k, data) => void writes.push(data))
     const e = running()
@@ -342,14 +344,14 @@ describe('a held line the screen took (HI-1959, the 12:47 comment)', () => {
   })
 })
 describe("a Claude Code launch's settings: the offer turned off (HI-1959)", () => {
-  const base = tempDir('hive-envsetup-')
+  const base = tempDir('cw-envsetup-')
   afterAll(() => rmSync(base, { recursive: true, force: true }))
   const launch = async (name: string, extraArgs: string[] = []) => {
     const cwd = join(base, `${name}-project`)
     mkdirSync(cwd, { recursive: true })
     const ctx = {
       projectPath: cwd, agentId: 'a1', executable: 'C:\\bin\\claude.exe', cwd, workspacePath: cwd, runId: 'r', sessionId: '00000000-0000-4000-8000-000000000000',
-      resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs, hookUrl: 'http://127.0.0.1:9/hook?run=r', hookAuthFile: 'C:/hive/hook-auth/r.txt', privateDir: join(base, `${name}-private`), guidance: '', env: {}, allowBackgroundSessions: true, use200kContext: false
+      resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs, hookUrl: 'http://127.0.0.1:9/hook?run=r', hookAuthFile: 'C:/cw/hook-auth/r.txt', privateDir: join(base, `${name}-private`), guidance: '', env: {}, allowBackgroundSessions: true, use200kContext: false
     }
     await claudeCode.prepareLaunch(ctx as never)
     return JSON.parse(readFileSync(join(ctx.privateDir, 'settings.json'), 'utf8')) as Record<string, unknown>

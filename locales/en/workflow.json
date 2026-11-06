@@ -1,7 +1,11 @@
 {
   "workflow.approveNote": {
     "defaultMessage": "{becomes, select, decision {Note (optional): also recorded as your decision} reason {Note (optional): the reason for what the agent asked} other {Note (optional): added as your comment}}",
-    "description": "The label and placeholder of an optional text box beside Approve (For you, the card dialog's merge queue): a note sent with the approval. It says what the note becomes: on an agent's question (decision), one of the card's decisions as well as the user's comment; on a question that offers one action (reason), the reason for that action; on Hive's own requests (other), the user's comment on the card. Keep the select keys as they are; translate each choice. Glossary: decision."
+    "description": "The label and placeholder of an optional text box beside Approve (For you, the card dialog's merge queue): a note sent with the approval. It says what the note becomes: on an agent's question (decision), one of the card's decisions as well as the user's comment; on a question that offers one action (reason), the reason for that action; on Combwork's own requests (other), the user's comment on the card. Keep the select keys as they are; translate each choice. Glossary: decision."
+  },
+  "workflow.contradiction.combworkMergesNeedsGit": {
+    "defaultMessage": "Merging needs Git: without version control, work is accepted where it is.",
+    "description": "Why workflow options cannot be saved: a merge option was set for a project with no version control."
   },
   "workflow.contradiction.committedNeedsFolder": {
     "defaultMessage": "“Committed is done” needs everyone in the project folder.",
@@ -10,10 +14,6 @@
   "workflow.contradiction.focusedNeedsRunner": {
     "defaultMessage": "Each card’s focused tests need the command that runs them.",
     "description": "Why workflow options cannot be saved (G20): “Each card’s focused tests” is on but the project has no command to run them (its runner, focused.run)."
-  },
-  "workflow.contradiction.hiveMergesNeedsGit": {
-    "defaultMessage": "Merging needs Git: without version control, work is accepted where it is.",
-    "description": "Why workflow options cannot be saved: a merge option was set for a project with no version control."
   },
   "workflow.contradiction.mergeNeedsSlots": {
     "defaultMessage": "When Combwork or the agent merges, each card needs its own folder.",
@@ -41,7 +41,7 @@
   },
   "workflow.contradiction.subfolderTarget": {
     "defaultMessage": "This project is inside a larger repository: name the branch its work merges into.",
-    "description": "Why workflow options cannot be saved (OP-29): Hive or the agent merges, but the project is a subfolder of a bigger Git repository and its own options name no target branch (merges would affect the whole repository)."
+    "description": "Why workflow options cannot be saved (OP-29): Combwork or the agent merges, but the project is a subfolder of a bigger Git repository and its own options name no target branch (merges would affect the whole repository)."
   },
   "workflow.contradiction.upToDateNeedsSlots": {
     "defaultMessage": "Slots are brought up to date only when each card has its own folder.",
@@ -57,23 +57,23 @@
   },
   "workflow.forYou.lineAsk": {
     "defaultMessage": "{line} still has {card}'s work, squashed into {target}: approve and Combwork brings the branch up to date once, or decline and do it yourself before {next} starts.",
-    "description": "A For you request (approve or decline, §16.19.2): Settings → Advanced has Hive ask before moving an agent's branch after a squash merge. Approving lets Hive move it this once (git reset --keep, which never overwrites uncommitted work); declining leaves it to the user. {line} a branch name; {card} and {next} card keys like AM-12; {target} the branch merged into."
+    "description": "A For you request (approve or decline, §16.19.2): Settings → Advanced has Combwork ask before moving an agent's branch after a squash merge. Approving lets Combwork move it this once (git reset --keep, which never overwrites uncommitted work); declining leaves it to the user. {line} a branch name; {card} and {next} card keys like AM-12; {target} the branch merged into."
   },
   "workflow.forYou.lineRefused": {
     "defaultMessage": "Git wouldn't bring {line} up to date with {target}: {reason}. {next} starts once the branch is up to date.",
-    "description": "A For you request (Decide, §16.19.2): Hive tried to move the builder's branch after a squash merge and git refused; the lane waits. {line} a branch name, {target} the branch merged into, {reason} git's own message (English), {next} a card key."
+    "description": "A For you request (Decide, §16.19.2): Combwork tried to move the builder's branch after a squash merge and git refused; the lane waits. {line} a branch name, {target} the branch merged into, {reason} git's own message (English), {next} a card key."
   },
   "workflow.forYou.lineUnfinished": {
     "defaultMessage": "Combwork's move of {line} to {to} didn't finish and couldn't be put back. Bring the branch to {target} with its files and index clean, or back where it was: {next} starts once it is settled.",
-    "description": "A For you request (Decide, §16.19.2): moving the builder's branch failed part way and Hive couldn't undo it, so the branch, its files or its index may disagree; the lane waits. {line} a branch name, {to} a short commit id, {target} the branch merged into, {next} a card key."
+    "description": "A For you request (Decide, §16.19.2): moving the builder's branch failed part way and Combwork couldn't undo it, so the branch, its files or its index may disagree; the lane waits. {line} a branch name, {to} a short commit id, {target} the branch merged into, {next} a card key."
   },
   "workflow.forYou.lineWork": {
     "defaultMessage": "{line} has work that isn't in {target}: {commits}. Decide what happens to it: {next} starts once the branch is up to date.",
-    "description": "A For you request (Decide, §16.19.2): the builder's branch has commits that weren't merged (made after the card was approved, say), so Hive won't move the branch and lose them; the lane waits. {line} a branch name, {target} the branch merged into, {commits} a list of short commit ids with their subjects, {next} a card key."
+    "description": "A For you request (Decide, §16.19.2): the builder's branch has commits that weren't merged (made after the card was approved, say), so Combwork won't move the branch and lose them; the lane waits. {line} a branch name, {target} the branch merged into, {commits} a list of short commit ids with their subjects, {next} a card key."
   },
   "workflow.forYou.mergeChoice": {
     "defaultMessage": "How should Combwork merge {project}'s cards into {target}? Choose the merge style and the commit message: until now Combwork made a merge commit with its own message (the card's key and title, with trailers). The merge queue waits for your answer.",
-    "description": "A For you request (Decide, HI-1697): a project from before Hive 1.0 reached the merge queue for the first time, and nobody chose how its cards are merged, so the queue asks. {project} is a project's name, {target} the branch merged into. Merge style and Commit message are workflow options' names (glossary 2.6): use their words. Trailers: git's “Key: value” lines at a message's end."
+    "description": "A For you request (Decide, HI-1697): a project from before 1.0 reached the merge queue for the first time, and nobody chose how its cards are merged, so the queue asks. {project} is a project's name, {target} the branch merged into. Merge style and Commit message are workflow options' names (glossary 2.6): use their words. Trailers: git's “Key: value” lines at a message's end."
   },
   "workflow.forYou.newDecision": {
     "defaultMessage": "{card} has a new decision: your review again?",
@@ -105,7 +105,7 @@
   },
   "workflow.forYou.slotDirty": {
     "defaultMessage": "{card} is Done, but {slot} has uncommitted changes, so it stays on {line}. Commit or discard them there: Combwork then detaches the slot at {target}, ready for its next card.",
-    "description": "A For you request (Decide, HI-2014): a card reached Done while its slot (a reused working folder, such as slot-b) had uncommitted changes, so Hive left the slot on the card's branch {line} instead of detaching it at the target branch {target}. {card} is a card key like AM-12; {slot}, {line} and {target} are names, kept as they are."
+    "description": "A For you request (Decide, HI-2014): a card reached Done while its slot (a reused working folder, such as slot-b) had uncommitted changes, so Combwork left the slot on the card's branch {line} instead of detaching it at the target branch {target}. {card} is a card key like AM-12; {slot}, {line} and {target} are names, kept as they are."
   },
   "workflow.forYouKind": {
     "defaultMessage": "{kind, select, approve {Approve} decide {Decide} test {Test} signIn {Sign in} other {Other}}",
@@ -141,7 +141,7 @@
   },
   "workflow.form.changedMeanwhile": {
     "defaultMessage": "The workflow options changed meanwhile, so nothing was saved. They’re shown as they are now.",
-    "description": "A notification: saving the Workflow section was refused because the options changed after it was read (in another window, or by the Hive Assistant); the section reloads them."
+    "description": "A notification: saving the Workflow section was refused because the options changed after it was read (in another window, or by the Combwork Assistant); the section reloads them."
   },
   "workflow.form.changesHead": {
     "defaultMessage": "What changes:",
@@ -185,7 +185,7 @@
   },
   "workflow.form.fileLocksNote": {
     "defaultMessage": "Applies to agents working in the same folder, outside a slot.",
-    "description": "Under the workflow option “File locks”: a slot is a folder Hive lends to a card or its lane (glossary 2.5: slot), so agents in different slots never share a file."
+    "description": "Under the workflow option “File locks”: a slot is a folder Combwork lends to a card or its lane (glossary 2.5: slot), so agents in different slots never share a file."
   },
   "workflow.form.focusedPick": {
     "defaultMessage": "Command that chooses the tests (optional)",
@@ -201,7 +201,7 @@
   },
   "workflow.form.from.global": {
     "defaultMessage": "From Combwork defaults",
-    "description": "Where a workflow option’s value comes from: Hive’s own default."
+    "description": "Where a workflow option’s value comes from: Combwork’s own default."
   },
   "workflow.form.from.here": {
     "defaultMessage": "Set here",
@@ -241,7 +241,7 @@
   },
   "workflow.form.heirElsewhere": {
     "defaultMessage": "Project {project} (workspace {workspace}): {options}",
-    "description": "A project of another open workspace inheriting a change of Hive’s workflow defaults, in the dialog before saving them: its name, its workspace’s name, then the options that change for it, as a list."
+    "description": "A project of another open workspace inheriting a change of Combwork’s workflow defaults, in the dialog before saving them: its name, its workspace’s name, then the options that change for it, as a list."
   },
   "workflow.form.heirLanes": {
     "defaultMessage": "{n, plural, one {Its running lane keeps the old rules until it ends:} other {Its # running lanes keep the old rules until they end:}}",
@@ -269,7 +269,7 @@
   },
   "workflow.form.inherit": {
     "defaultMessage": "Inherit",
-    "description": "A button beside a workflow option set for this project: stop setting it here, and use the workspace’s or Hive’s value."
+    "description": "A button beside a workflow option set for this project: stop setting it here, and use the workspace’s or Combwork’s value."
   },
   "workflow.form.inheritTip": {
     "defaultMessage": "Use the inherited value: {value}",
@@ -413,7 +413,7 @@
   },
   "workflow.form.pasteBad": {
     "defaultMessage": "That isn’t workflow options copied from Combwork.",
-    "description": "An error pasting workflow options: the text isn’t the JSON Hive copies."
+    "description": "An error pasting workflow options: the text isn’t the JSON Combwork copies."
   },
   "workflow.form.pasteMessage": {
     "defaultMessage": "Paste options copied from a project with the same version control. They replace the form’s, to save afterwards.",
@@ -453,7 +453,7 @@
   },
   "workflow.form.readOnly": {
     "defaultMessage": "{agents} can’t be given review copies by their coding agent, so they review the builder’s folder read-only.",
-    "description": "Under “Reviewers” (G17) when some reviewing agents use a coding agent that Hive can’t give review copies (folders at the exact revision, glossary 2.5: review copy). {agents} is a list of agent names."
+    "description": "Under “Reviewers” (G17) when some reviewing agents use a coding agent that Combwork can’t give review copies (folders at the exact revision, glossary 2.5: review copy). {agents} is a list of agent names."
   },
   "workflow.form.removeCheck": {
     "defaultMessage": "Remove",
@@ -601,7 +601,7 @@
   },
   "workflow.option.commitMessage.title": {
     "defaultMessage": "Commit message",
-    "description": "A workflow option (glossary 2.6, G19): the message of the commit Hive’s merge queue makes when it merges a card (a merge commit, or a squash’s one commit)."
+    "description": "A workflow option (glossary 2.6, G19): the message of the commit Combwork’s merge queue makes when it merges a card (a merge commit, or a squash’s one commit)."
   },
   "workflow.option.dependenciesDone.desc": {
     "defaultMessage": "A card that waits for others can’t start before their work is in.",
@@ -645,11 +645,11 @@
   },
   "workflow.option.focusedTests.title": {
     "defaultMessage": "Each card’s focused tests pass on the merged result",
-    "description": "A workflow option (glossary 2.6, G20): the tests a card’s change needs are chosen when it is submitted, and Hive’s merge queue runs them on its work merged with the target branch."
+    "description": "A workflow option (glossary 2.6, G20): the tests a card’s change needs are chosen when it is submitted, and Combwork’s merge queue runs them on its work merged with the target branch."
   },
   "workflow.option.folder.desc": {
     "defaultMessage": "In its own folder, a slot Combwork lends to the card or its lane, each card is built on a branch of its own, apart from other agents’ work; in the project folder, everyone sees each other’s unfinished changes.",
-    "description": "What the workflow option “Where cards are built” does (glossary 2.5: slot, a worktree Hive lends to a card or a lane)."
+    "description": "What the workflow option “Where cards are built” does (glossary 2.5: slot, a worktree Combwork lends to a card or a lane)."
   },
   "workflow.option.folder.title": {
     "defaultMessage": "Where cards are built",
@@ -693,15 +693,15 @@
   },
   "workflow.option.loopWakes.title": {
     "defaultMessage": "Wake reviewers and builders",
-    "description": "A workflow option, under Card loops: Hive wakes the agents of a card loop for its handoffs (glossary: card loop)."
+    "description": "A workflow option, under Card loops: Combwork wakes the agents of a card loop for its handoffs (glossary: card loop)."
   },
   "workflow.option.maxAgents.desc": {
     "defaultMessage": "Your team size: the most agents this project has, whoever adds them (you, the Assistant or a program using the Agent API), and lowering it removes none.",
-    "description": "What the workflow option “Maximum agents” does (HI-2058: it binds the user too). Agent API is the name of a Hive feature."
+    "description": "What the workflow option “Maximum agents” does (HI-2058: it binds the user too). Agent API is the name of a Combwork feature."
   },
   "workflow.option.maxAgents.title": {
     "defaultMessage": "Maximum agents",
-    "description": "A workflow option (HI-2001): the most agents the project has, its team size. Nobody adds agents past it: the user, the Hive Assistant or a program (HI-2058)."
+    "description": "A workflow option (HI-2001): the most agents the project has, its team size. Nobody adds agents past it: the user, the Combwork Assistant or a program (HI-2058)."
   },
   "workflow.option.mergeChecks.desc": {
     "defaultMessage": "Combwork’s merge queue runs these named commands on the card’s work merged with the target branch, and moves the target only once each one has passed.",
@@ -709,7 +709,7 @@
   },
   "workflow.option.mergeChecks.title": {
     "defaultMessage": "Checks pass on the merged result",
-    "description": "A workflow option (glossary 2.6, G9): named commands Hive’s merge queue runs on a card’s work merged with the target branch."
+    "description": "A workflow option (glossary 2.6, G9): named commands Combwork’s merge queue runs on a card’s work merged with the target branch."
   },
   "workflow.option.mergeInstall.desc": {
     "defaultMessage": "Before the checks on the merged result, the merge queue installs the dependencies afresh, and always does when the lock file or manifests changed.",
@@ -749,7 +749,7 @@
   },
   "workflow.option.pushTarget.title": {
     "defaultMessage": "Push the target branch after merging",
-    "description": "A workflow option (glossary 2.6, G18): after Hive’s merge queue merges a card, it pushes the target branch to its remote."
+    "description": "A workflow option (glossary 2.6, G18): after Combwork’s merge queue merges a card, it pushes the target branch to its remote."
   },
   "workflow.option.review.desc": {
     "defaultMessage": "A card goes to Review when its builder submits it and moves on only once it passes, waiting for your OK after the reviewer when you check too.",
@@ -829,7 +829,7 @@
   },
   "workflow.option.strict.title": {
     "defaultMessage": "Work is up to date with its target branch before it merges",
-    "description": "A workflow option (glossary 2.6, G8, strict): a card’s work must contain the target branch’s latest commit before it is merged; Hive’s merge queue brings it up to date itself."
+    "description": "A workflow option (glossary 2.6, G8, strict): a card’s work must contain the target branch’s latest commit before it is merged; Combwork’s merge queue brings it up to date itself."
   },
   "workflow.option.style.desc": {
     "defaultMessage": "How a card’s work is merged into the target branch.",
@@ -925,7 +925,7 @@
   },
   "workflow.refused.evidence.changed.message": {
     "defaultMessage": "What Combwork read for {card} changed while it decided.",
-    "description": "A refused intent: a branch head, a file or another card the rule depends on changed between Hive's reading it and recording the move. {card} is a card key."
+    "description": "A refused intent: a branch head, a file or another card the rule depends on changed between Combwork's reading it and recording the move. {card} is a card key."
   },
   "workflow.refused.evidence.changed.next": {
     "defaultMessage": "Try again: Combwork reads it afresh.",
@@ -965,7 +965,7 @@
   },
   "workflow.refused.lane.lineBehind.change": {
     "defaultMessage": "Settings → Advanced → Bring an agent's branch up to date after a squash merge says whether Combwork moves it or asks first.",
-    "description": "Where it is decided whether Hive moves the branch itself or asks the user first (a setting name: use it as Hive shows it)."
+    "description": "Where it is decided whether Combwork moves the branch itself or asks the user first (a setting name: use it as Combwork shows it)."
   },
   "workflow.refused.lane.lineBehind.message": {
     "defaultMessage": "{card} can't start yet: {line} still has {earlier}'s work, which was squashed into {target}.",
@@ -973,11 +973,11 @@
   },
   "workflow.refused.lane.lineBehind.next": {
     "defaultMessage": "{reader, select, you {Leave it as it is: Combwork brings {line} up to date with {target} once the agent is idle, or asks you first, and tells the agent when {card} can start.} other {Leave it as it is: Combwork brings {line} up to date with {target} once you are idle, or asks the user, and tells you when {card} can start.}}",
-    "description": "The next step after a start refused because the branch still has squashed work: wait (end the turn); Hive moves the branch, or asks the user first, and says when the card can start. {line} a branch name, {target} the branch merged into, {card} a card key. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
+    "description": "The next step after a start refused because the branch still has squashed work: wait (end the turn); Combwork moves the branch, or asks the user first, and says when the card can start. {line} a branch name, {target} the branch merged into, {card} a card key. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
   },
   "workflow.refused.lane.oneAtATime.change": {
     "defaultMessage": "A lane always takes one card at a time; turning off Settings → Advanced → Workflow rules are enforced turns every rule off.",
-    "description": "Where the rule that a lane takes one card at a time is changed: it has no option of its own; the switch that turns every workflow rule off (a setting name: use it as Hive shows it)."
+    "description": "Where the rule that a lane takes one card at a time is changed: it has no option of its own; the switch that turns every workflow rule off (a setting name: use it as Combwork shows it)."
   },
   "workflow.refused.lane.oneAtATime.message": {
     "defaultMessage": "{card} can't start yet: {earlier}, before it in its lane, isn't Done.",
@@ -1021,11 +1021,11 @@
   },
   "workflow.refused.loop.roundLimit.message": {
     "defaultMessage": "{card} reached its round limit: it goes on once its round-limit question is answered.",
-    "description": "A refused submission or move: the card failed as many reviews as its card loop allows (Settings → Card loops), and Hive asked how to go on (For you); until that question is answered, its loop is paused. Read by agents and shown in the window alike: it names no one (never \"the user\"). {card} is a card key."
+    "description": "A refused submission or move: the card failed as many reviews as its card loop allows (Settings → Card loops), and Combwork asked how to go on (For you); until that question is answered, its loop is paused. Read by agents and shown in the window alike: it names no one (never \"the user\"). {card} is a card key."
   },
   "workflow.refused.loop.roundLimit.next": {
     "defaultMessage": "The question is on the card (For you): once it is answered, Combwork wakes the agents waiting on it.",
-    "description": "The next step while a card waits at its round limit for its question (For you, a label: use it as Hive shows it) to be answered. Read by agents and shown in the window alike: it names no one (never \"the user\"); Hive then wakes the agents that wait on the card."
+    "description": "The next step while a card waits at its round limit for its question (For you, a label: use it as Combwork shows it) to be answered. Read by agents and shown in the window alike: it names no one (never \"the user\"); Combwork then wakes the agents that wait on the card."
   },
   "workflow.refused.loop.staleStep.message": {
     "defaultMessage": "{card}: that is about {design}, but the one waiting for its check now is {waiting}.",
@@ -1053,7 +1053,7 @@
   },
   "workflow.refused.loop.tooEarly.change": {
     "defaultMessage": "How long is set in Project Settings → Card loops → Design check wait.",
-    "description": "Where the wait for a design check is changed (#1382). Names of settings: keep them as Hive shows them."
+    "description": "Where the wait for a design check is changed (#1382). Names of settings: keep them as Combwork shows them."
   },
   "workflow.refused.loop.tooEarly.message": {
     "defaultMessage": "{card}: its design's check is due in {minutes, plural, one {# minute} other {# minutes}}.",
@@ -1063,61 +1063,61 @@
     "defaultMessage": "Wait for the answer; with none by then, go ahead as posted.",
     "description": "The next step after going ahead with a design too early (#1382)."
   },
-  "workflow.refused.merge.hiveMerges.change": {
+  "workflow.refused.merge.combworkMerges.change": {
     "defaultMessage": "This rule is set in Version Control → Who merges. A card keeps the rules it started with.",
-    "description": "Where the rule that Hive merges cards is changed; a card keeps the rules it started under unless the change is applied to it."
+    "description": "Where the rule that Combwork merges cards is changed; a card keeps the rules it started under unless the change is applied to it."
   },
-  "workflow.refused.merge.hiveMerges.message": {
+  "workflow.refused.merge.combworkMerges.message": {
     "defaultMessage": "Combwork merges {card}: agents don't merge it or report its merge.",
-    "description": "A refused report of a merge, or a claim of the merge slot, for a card whose rules say Hive merges it (the merge queue). {card} is a card key like AM-12."
+    "description": "A refused report of a merge, or a claim of the merge slot, for a card whose rules say Combwork merges it (the merge queue). {card} is a card key like AM-12."
   },
-  "workflow.refused.merge.hiveMerges.next": {
+  "workflow.refused.merge.combworkMerges.next": {
     "defaultMessage": "Once it is approved, the merge queue merges it and moves it to Done: wait for that, or for it to come back.",
-    "description": "The next step after a refused merge of a card Hive merges, when it isn't in the merge queue yet."
+    "description": "The next step after a refused merge of a card Combwork merges, when it isn't in the merge queue yet."
   },
-  "workflow.refused.merge.hiveMerges.nextMerged": {
+  "workflow.refused.merge.combworkMerges.nextMerged": {
     "defaultMessage": "The merge queue has merged it already: nothing is left to do.",
-    "description": "The next step after a refused merge of a card Hive has already merged."
+    "description": "The next step after a refused merge of a card Combwork has already merged."
   },
-  "workflow.refused.merge.hiveMerges.nextPaused": {
+  "workflow.refused.merge.combworkMerges.nextPaused": {
     "defaultMessage": "{reader, select, you {It is in the merge queue for {target}, which is paused until you resume it; it moves to Done once merged, or comes back.} other {It is in the merge queue for {target}, which is paused until it is resumed: wait for Done, or for it to come back.}}",
     "description": "The next step after a refused merge of a card in a paused merge queue. {target} is a branch name. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
   },
-  "workflow.refused.merge.hiveMerges.nextPausedAnswer": {
+  "workflow.refused.merge.combworkMerges.nextPausedAnswer": {
     "defaultMessage": "{reader, select, you {It is in the merge queue for {target}, which is paused until you answer in For you; it moves to Done once merged, or comes back.} other {It is in the merge queue for {target}, which is paused until the user answers in For you: wait for Done, or for it to come back.}}",
-    "description": "The next step after a refused merge of a card in a merge queue paused for the user's answer (in For you: whether to update the branch now, or how to settle a merge Hive couldn't finish). {target} is a branch name. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
+    "description": "The next step after a refused merge of a card in a merge queue paused for the user's answer (in For you: whether to update the branch now, or how to settle a merge Combwork couldn't finish). {target} is a branch name. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
   },
-  "workflow.refused.merge.hiveMerges.nextPausedFix": {
+  "workflow.refused.merge.combworkMerges.nextPausedFix": {
     "defaultMessage": "{reader, select, you {It is in the merge queue for {target}, which is paused until you fix what stopped it and resume it; it moves to Done once merged, or comes back.} other {It is in the merge queue for {target}, which is paused until the user fixes what stopped it and resumes it: wait for Done, or for it to come back.}}",
     "description": "The next step after a refused merge of a card in a merge queue paused by something only the user can fix (an error from git, say), then Resume. {target} is a branch name. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
   },
-  "workflow.refused.merge.hiveMerges.nextPausedFolder": {
+  "workflow.refused.merge.combworkMerges.nextPausedFolder": {
     "defaultMessage": "{reader, select, you {It is in the merge queue for {target}, which is paused until you put right the folder {target} is checked out in and resume it; it moves to Done once merged, or comes back.} other {It is in the merge queue for {target}, which is paused until the user puts right the folder {target} is checked out in and resumes it: wait for Done, or for it to come back.}}",
     "description": "The next step after a refused merge of a card in a merge queue paused for the folder its branch is checked out in (on another branch, files staged or changed, agents at work there). {target} is a branch name. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
   },
-  "workflow.refused.merge.hiveMerges.nextPausedRules": {
+  "workflow.refused.merge.combworkMerges.nextPausedRules": {
     "defaultMessage": "{reader, select, you {It is in the merge queue for {target}, which paused while workflow rules were off and moves on once they are enforced again (if they already are, once you resume it); it moves to Done once merged, or comes back.} other {It is in the merge queue for {target}, which paused while workflow rules were off and moves on once they are enforced again (if they already are, once the user resumes it): wait for Done, or for it to come back.}}",
-    "description": "The next step after a refused merge of a card in a merge queue that paused while the workflow rules were turned off: Hive resumes it when they are turned on again. {target} is a branch name. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
+    "description": "The next step after a refused merge of a card in a merge queue that paused while the workflow rules were turned off: Combwork resumes it when they are turned on again. {target} is a branch name. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
   },
-  "workflow.refused.merge.hiveMerges.nextQueued": {
+  "workflow.refused.merge.combworkMerges.nextQueued": {
     "defaultMessage": "It is in the merge queue for {target} (position {n, number}) and moves to Done once merged: wait for that, or for it to come back.",
-    "description": "The next step after a refused merge of a card Hive merges, waiting in the merge queue. {target} is a branch name; {n} its place in the queue (1 is next)."
+    "description": "The next step after a refused merge of a card Combwork merges, waiting in the merge queue. {target} is a branch name; {n} its place in the queue (1 is next)."
   },
-  "workflow.refused.merge.hiveMerges.nextReturned": {
+  "workflow.refused.merge.combworkMerges.nextReturned": {
     "defaultMessage": "It came back from the merge queue: fix it in your worktree, commit and submit again.",
     "description": "The next step after a refused merge of a card the merge queue returned to its builder (a conflict, failed checks, a hook)."
   },
-  "workflow.refused.merge.hiveMerges.nextStale": {
+  "workflow.refused.merge.combworkMerges.nextStale": {
     "defaultMessage": "Its pass is stale: its line changed since it passed review (it is at {current}). Submit it again for review; it is queued once it passes again.",
-    "description": "The next step after a refused merge of a card Hive merges, approved but its pass stale: its branch has commits the review didn't cover. {current} is a commit's short hash."
+    "description": "The next step after a refused merge of a card Combwork merges, approved but its pass stale: its branch has commits the review didn't cover. {current} is a commit's short hash."
   },
-  "workflow.refused.merge.hiveMerges.nextTesting": {
+  "workflow.refused.merge.combworkMerges.nextTesting": {
     "defaultMessage": "The merge queue is merging it into {target} now and moves it to Done once merged: wait for that, or for it to come back.",
     "description": "The next step after a refused merge of a card the merge queue is testing or merging now. {target} is a branch name."
   },
   "workflow.refused.move.doingNobody.message": {
     "defaultMessage": "{card} would be in {stage} with nobody on it{also, select, yes {, and the move skips: {rules}} other {}}.",
-    "description": "A refused move into the Active stage by the Hive Assistant (HI-2062): the card {card} (its key, like AM-12) would have no agent on it. {stage} is the stage's name. {also} (select): yes when the move also skips other rules, listed in {rules}; translate both branches."
+    "description": "A refused move into the Active stage by the Combwork Assistant (HI-2062): the card {card} (its key, like AM-12) would have no agent on it. {stage} is the stage's name. {also} (select): yes when the move also skips other rules, listed in {rules}; translate both branches."
   },
   "workflow.refused.move.doingNobody.next": {
     "defaultMessage": "{reader, select, you {Choose nobody on it, an agent on it, or an agent started on it.} other {Ask the user which they want: nobody on it (move it again with override and their reason), an agent on it (agent), or an agent started on it (cw_start_task).}}",
@@ -1125,7 +1125,7 @@
   },
   "workflow.refused.move.needsOverride.change": {
     "defaultMessage": "{reader, select, you {These rules are set in Version Control, where you can change them.} other {These rules are set in Version Control, where the user can change them.}}",
-    "description": "Where the rules a move would skip are changed: the project's Version Control tab (a tab name: use it as Hive shows it). {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
+    "description": "Where the rules a move would skip are changed: the project's Version Control tab (a tab name: use it as Combwork shows it). {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
   },
   "workflow.refused.move.needsOverride.message": {
     "defaultMessage": "Moving {card} to {stage} skips: {rules}.",
@@ -1133,11 +1133,11 @@
   },
   "workflow.refused.move.needsOverride.next": {
     "defaultMessage": "{reader, select, you {Moving it anyway needs your reason: one you gave for it, or one you give once told which rules this skips.} other {Move it anyway only with the user's reason. One they gave with their request is enough (\"I merged it by hand\", say): move it again with override and that reason, in their words. With none, tell them which rules this skips and ask for theirs.}}",
-    "description": "The next step for a move that skips rules (said to the Hive Assistant): move anyway (an override) only with the user's own reason, given with the request (then the agent moves it at once, HI-2260) or after being told which rules the move skips. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
+    "description": "The next step for a move that skips rules (said to the Combwork Assistant): move anyway (an override) only with the user's own reason, given with the request (then the agent moves it at once, HI-2260) or after being told which rules the move skips. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
   },
   "workflow.refused.move.noStage.change": {
     "defaultMessage": "A project's steps follow its options in Version Control.",
-    "description": "Where the stages a project has are set: its Version Control options (a tab name: use it as Hive shows it)."
+    "description": "Where the stages a project has are set: its Version Control options (a tab name: use it as Combwork shows it)."
   },
   "workflow.refused.move.noStage.message": {
     "defaultMessage": "{card} can't go to {stage}: this project's rules have no such step.",
@@ -1165,7 +1165,7 @@
   },
   "workflow.refused.move.notFromHere.nextDone": {
     "defaultMessage": "{reader, select, you {It's finished. More work on it that you ask for takes it back to Doing; separate follow-up work goes on a new card.} other {It's finished. More work on it that the user asked for: move it back with cw_update_task (column: doing), then work on it as usual. Separate follow-up work goes on a new card (cw_create_task).}}",
-    "description": "The next step after an agent's start or submit was refused on a card in Done (HI-2227): more work on that card the user asked for moves it back to Doing; separate follow-up work is a new card. cw_update_task, cw_create_task and column: doing are a tool, its argument and value: keep them as they are. Doing is a column name: use it as Hive shows it. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
+    "description": "The next step after an agent's start or submit was refused on a card in Done (HI-2227): more work on that card the user asked for moves it back to Doing; separate follow-up work is a new card. cw_update_task, cw_create_task and column: doing are a tool, its argument and value: keep them as they are. Doing is a column name: use it as Combwork shows it. {reader} (select): you is the window's wording, other the agent's (the user named as the user); translate both whole sentences."
   },
   "workflow.refused.move.notFromHere.nextNone": {
     "defaultMessage": "Nothing waits to be done there now.",
@@ -1173,7 +1173,7 @@
   },
   "workflow.refused.move.notFromHere.nextReviewer": {
     "defaultMessage": "{back, select, yes {Its review is over: it went back for more work. Leave it where it is, with no verdict, and wait for it to come back to Review.} other {Its review is over: it has moved on from Review. Leave it where it is, with no verdict.}}",
-    "description": "The next step after a reviewer's review or verdict was refused because the card is no longer in Review (#1604): its review ended. back (select): yes when the card went back to be worked on (Todo or Active), other when it moved on (approved, merged). Review is a stage name: use it as Hive shows it. Read by agents and shown in the window alike: it names no one. Translate each sentence."
+    "description": "The next step after a reviewer's review or verdict was refused because the card is no longer in Review (#1604): its review ended. back (select): yes when the card went back to be worked on (Todo or Active), other when it moved on (approved, merged). Review is a stage name: use it as Combwork shows it. Read by agents and shown in the window alike: it names no one. Translate each sentence."
   },
   "workflow.refused.move.useIntent.message": {
     "defaultMessage": "Agents don't move cards between columns.",
@@ -1197,7 +1197,7 @@
   },
   "workflow.refused.platform.unknown.next": {
     "defaultMessage": "Check Provider Setup or the folder, then try again.",
-    "description": "The next step when Hive could not read what a rule needs."
+    "description": "The next step when Combwork could not read what a rule needs."
   },
   "workflow.refused.platform.unknown.nextGone": {
     "defaultMessage": "{reader, select, you {The project's Git repository is gone: restore it, or switch the project to None in its Version Control tab (from the next card).} other {The project's Git repository is gone: ask the user to restore it, or to switch the project to None in its Version Control tab (from the next card).}}",
@@ -1385,7 +1385,7 @@
   },
   "workflow.refused.submit.identity.next": {
     "defaultMessage": "{missing, select, yes {Set the project's identity in Version Control → Branches & remotes → Commit identity (or with {command}), then submit again.} other {Set the identity, run {command}, then submit again.}}",
-    "description": "The next step after a refused submit for a commit's identity: {command} is the git command to use (kept as typed). {missing} (select; keep the keys): yes when git has no identity for the project; Version Control → Branches & remotes → Commit identity is where Hive's window sets it (use the names Hive shows for the tab, its section and heading)."
+    "description": "The next step after a refused submit for a commit's identity: {command} is the git command to use (kept as typed). {missing} (select; keep the keys): yes when git has no identity for the project; Version Control → Branches & remotes → Commit identity is where Combwork's window sets it (use the names Combwork shows for the tab, its section and heading)."
   },
   "workflow.refused.submit.notDuplicate.message": {
     "defaultMessage": "{card} is already submitted at {revision} and waits for review or merging.",
@@ -1429,11 +1429,11 @@
   },
   "workflow.refused.submit.trailer.message": {
     "defaultMessage": "{card}: commit {commit} has no card trailer, and another card's agent works in this folder.",
-    "description": "A refused submit in a shared folder: a commit lacks the Hive-Card trailer. {commit} is a short commit id."
+    "description": "A refused submit in a shared folder: a commit lacks the Combwork-Card trailer. {commit} is a short commit id."
   },
   "workflow.refused.submit.trailer.next": {
-    "defaultMessage": "Run {command}, then submit again.",
-    "description": "The next step after a refused submit for a missing trailer: {command} is the git command to run."
+    "defaultMessage": "{at, select, head {Run {command}, then submit again.} other {Other commits follow it, so amending or rebasing would rewrite them, other agents' work among them: do neither. Report it with cw_cannot_within_rules (rule submit.trailer), and the user decides.}}",
+    "description": "The next step after a refused submit for a missing trailer (HI-2562). {at} (select): head when the commit is the folder's newest, so amending it is safe; other when commits follow it. {command} is the git command to run, kept as typed; cw_cannot_within_rules is a tool's name, kept as typed."
   },
   "workflow.refused.submit.unchanged.message": {
     "defaultMessage": "{card}: its files haven't changed since it started.",
@@ -1509,7 +1509,7 @@
   },
   "workflow.rule.move.doingNobody": {
     "defaultMessage": "A card in Active has someone on it, unless you say otherwise",
-    "description": "A rule of the workflow, named where a move skips it (HI-2062): the Hive Assistant moves a card into Active with nobody on it only with the user's reason (glossary: override). Active is a stage's name."
+    "description": "A rule of the workflow, named where a move skips it (HI-2062): the Combwork Assistant moves a card into Active with nobody on it only with the user's reason (glossary: override). Active is a stage's name."
   },
   "workflow.rule.requeue.allowed": {
     "defaultMessage": "Unchanged work is queued again only after a failure outside it",
@@ -1585,7 +1585,7 @@
   },
   "workflow.slots.archive": {
     "defaultMessage": "Archive script",
-    "description": "A setting under “Slots and copies”: the command Hive runs in a slot before removing it."
+    "description": "A setting under “Slots and copies”: the command Combwork runs in a slot before removing it."
   },
   "workflow.slots.archiveDesc": {
     "defaultMessage": "Runs in a slot before Combwork removes it. If it fails, the slot is kept.",
@@ -1601,7 +1601,7 @@
   },
   "workflow.slots.copiesDefault": {
     "defaultMessage": "{n, number} (the default)",
-    "description": "The placeholder of the setting “Review and check copies” while it isn’t set: the number Hive keeps."
+    "description": "The placeholder of the setting “Review and check copies” while it isn’t set: the number Combwork keeps."
   },
   "workflow.slots.copiesNow": {
     "defaultMessage": "{n, plural, =0 {No copies yet.} one {# copy now, {leased, number} in use.} other {# copies now, {leased, number} in use.}}",
@@ -1629,15 +1629,15 @@
   },
   "workflow.slots.fromSetup": {
     "defaultMessage": "From the project’s setup command before 1.0",
-    "description": "Where the setting “Setup script” comes from while it isn’t set: the setup command the project had for agents’ worktrees before Hive 1.0."
+    "description": "Where the setting “Setup script” comes from while it isn’t set: the setup command the project had for agents’ worktrees before 1.0."
   },
   "workflow.slots.heading": {
     "defaultMessage": "Slots and copies",
-    "description": "A heading of the Version Control tab’s Workflow section (Git): the project’s slots (worktrees Hive lends to cards and lanes) and its review and check copies (glossary 2.5: slot, review copy)."
+    "description": "A heading of the Version Control tab’s Workflow section (Git): the project’s slots (worktrees Combwork lends to cards and lanes) and its review and check copies (glossary 2.5: slot, review copy)."
   },
   "workflow.slots.held": {
     "defaultMessage": "Held by an ended session of agent {agent}",
-    "description": "In the list of slots (Version Control → Slots and copies): the agent's ({agent}) last session there has ended, but Hive doesn't know that everything it started has, so nothing else uses the slot until it is released (#1506). A noun before the name (glossary §1 rule 4)."
+    "description": "In the list of slots (Version Control → Slots and copies): the agent's ({agent}) last session there has ended, but Combwork doesn't know that everything it started has, so nothing else uses the slot until it is released (#1506). A noun before the name (glossary §1 rule 4)."
   },
   "workflow.slots.inUse": {
     "defaultMessage": "Slots in use and ready",
@@ -1645,7 +1645,7 @@
   },
   "workflow.slots.inherit": {
     "defaultMessage": "Inherit",
-    "description": "A button beside a slot setting set for this project: stop setting it here, and use the inherited value again (the workspace’s, Hive’s or the default)."
+    "description": "A button beside a slot setting set for this project: stop setting it here, and use the inherited value again (the workspace’s, Combwork’s or the default)."
   },
   "workflow.slots.lentCard": {
     "defaultMessage": "{agent}, for {card}",
@@ -1657,7 +1657,7 @@
   },
   "workflow.slots.levelInherit": {
     "defaultMessage": "Inherit",
-    "description": "A button beside a slot default set at this level (Settings → Workflow defaults or Settings → Workspace): stop setting it here, and use the inherited value (Hive’s, or the default)."
+    "description": "A button beside a slot default set at this level (Settings → Workflow defaults or Settings → Workspace): stop setting it here, and use the inherited value (Combwork’s, or the default)."
   },
   "workflow.slots.levelNone": {
     "defaultMessage": "Set here: none",
@@ -1709,7 +1709,7 @@
   },
   "workflow.slots.setup": {
     "defaultMessage": "Setup script",
-    "description": "A setting under “Slots and copies”: the command Hive runs in a new slot, and again when its lock files change (glossary 2.5: slot)."
+    "description": "A setting under “Slots and copies”: the command Combwork runs in a new slot, and again when its lock files change (glossary 2.5: slot)."
   },
   "workflow.slots.setupDesc": {
     "defaultMessage": "Runs in a new slot, and again in a slot whose lock files changed since its last install, e.g. npm ci. Review and check copies run it too.",
@@ -1725,7 +1725,7 @@
   },
   "workflow.slots.state.gone": {
     "defaultMessage": "Folder missing",
-    "description": "A slot’s state in the list under “Slots and copies”: its folder is gone (Hive recreates it)."
+    "description": "A slot’s state in the list under “Slots and copies”: its folder is gone (Combwork recreates it)."
   },
   "workflow.slots.state.lent": {
     "defaultMessage": "In use",
@@ -1741,7 +1741,7 @@
   },
   "workflow.slots.useNone": {
     "defaultMessage": "Set to none",
-    "description": "A button beside a slot setting this project inherits (from the workspace, Hive’s settings or before 1.0): set it to nothing for this project (no script runs, no files are copied)."
+    "description": "A button beside a slot setting this project inherits (from the workspace, Combwork’s settings or before 1.0): set it to nothing for this project (no script runs, no files are copied)."
   },
   "workflow.stage.active": {
     "defaultMessage": "Active",
@@ -1761,7 +1761,7 @@
   },
   "workflow.stage.merging": {
     "defaultMessage": "Merging",
-    "description": "A stage of the board inside Approved (glossary 2.2: Merging): cards in Hive's merge queue."
+    "description": "A stage of the board inside Approved (glossary 2.2: Merging): cards in Combwork's merge queue."
   },
   "workflow.stage.review": {
     "defaultMessage": "Review",
@@ -1817,154 +1817,154 @@
   },
   "workflow.unreadable.branch": {
     "defaultMessage": "the branch checked out in {folder}",
-    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\". {folder} is a folder path."
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\". {folder} is a folder path."
   },
   "workflow.unreadable.branchedOff": {
     "defaultMessage": "where {a} and {b} branched off",
-    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the commit two lines of work have in common. {a} and {b} are commit ids or branch names."
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": the commit two lines of work have in common. {a} and {b} are commit ids or branch names."
   },
   "workflow.unreadable.branchedOffTarget": {
     "defaultMessage": "where the work branched off its target",
-    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the commit the card's work and the branch it merges into have in common."
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": the commit the card's work and the branch it merges into have in common."
   },
   "workflow.unreadable.cardPathsFiles": {
     "defaultMessage": "the card's paths: they hold over {n, plural, one {# file} other {# files}}",
-    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the files a card names hold too many files. {n} is the limit."
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": the files a card names hold too many files. {n} is the limit."
   },
   "workflow.unreadable.cardPathsSize": {
     "defaultMessage": "the card's paths: they hold over {n, number} GB",
-    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the files a card names are too large. {n} is a size in gigabytes (GB, of 1024 MB): write the unit as your language does."
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": the files a card names are too large. {n} is a size in gigabytes (GB, of 1024 MB): write the unit as your language does."
   },
   "workflow.unreadable.change": {
     "defaultMessage": "the change from {from} to {to}",
-    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\" (glossary 2.3: change). {from} and {to} are short commit ids."
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\" (glossary 2.3: change). {from} and {to} are short commit ids."
   },
   "workflow.unreadable.changeFingerprint": {
     "defaultMessage": "the change's fingerprint",
-    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": what tells a change apart from others (glossary 2.3: change)."
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": what tells a change apart from others (glossary 2.3: change)."
   },
   "workflow.unreadable.commitsOf": {
     "defaultMessage": "the commits of {range}",
-    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\". {range} is a Git range of commits, like a1b2c3d..e4f5a6b."
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\". {range} is a Git range of commits, like a1b2c3d..e4f5a6b."
   },
   "workflow.unreadable.commitsOn": {
     "defaultMessage": "the commits on {target}",
-    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\". {target} is a branch name."
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\". {target} is a branch name."
   },
   "workflow.unreadable.commitsSince": {
     "defaultMessage": "the commits of {revision} since {base}",
-    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\". {revision} and {base} are short commit ids."
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\". {revision} and {base} are short commit ids."
   },
   "workflow.unreadable.contains": {
     "defaultMessage": "whether {revision} is in {target}",
-    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\". {revision} and {target} are short commit ids."
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\". {revision} and {target} are short commit ids."
   },
   "workflow.unreadable.defaultBranch": {
     "defaultMessage": "the default branch of {folder}",
-    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the branch work merges into by default. {folder} is a folder path."
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": the branch work merges into by default. {folder} is a folder path."
   },
   "workflow.unreadable.deliverables": {
     "defaultMessage": "the work in {project}: it has over {n, plural, one {# file} other {# files}}",
-    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": a project without version control has too many files to read its work. {project} is a project name, {n} the limit."
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": a project without version control has too many files to read its work. {project} is a project name, {n} the limit."
   },
   "workflow.unreadable.files": {
     "defaultMessage": "the files of {revision}",
-    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the files as they are at a revision. {revision} is a commit id or name."
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": the files as they are at a revision. {revision} is a commit id or name."
   },
   "workflow.unreadable.filesChanged": {
     "defaultMessage": "the files changed from {from} to {to}",
-    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\". {from} and {to} are short commit ids."
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\". {from} and {to} are short commit ids."
   },
   "workflow.unreadable.folderFor": {
     "defaultMessage": "a folder for {branch}",
-    "description": "What Hive couldn't make, the object of \"Hive couldn't read …\": a working folder (a Git worktree) for a branch. {branch} is its name."
+    "description": "What Combwork couldn't make, the object of \"Combwork couldn't read …\": a working folder (a Git worktree) for a branch. {branch} is its name."
   },
   "workflow.unreadable.gitFolder": {
     "defaultMessage": "the Git folder of {folder}",
-    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the repository's .git folder. {folder} is a folder path."
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": the repository's .git folder. {folder} is a folder path."
   },
   "workflow.unreadable.head": {
     "defaultMessage": "the latest commit in {where}",
-    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the commit checked out in a folder, or at the tip of a branch. {where} is a folder path or a branch name."
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": the commit checked out in a folder, or at the tip of a branch. {where} is a folder path or a branch name."
   },
   "workflow.unreadable.history": {
     "defaultMessage": "the history of {target}",
-    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the commits of a branch. {target} is a branch name."
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": the commits of a branch. {target} is a branch name."
   },
   "workflow.unreadable.holdsChange": {
     "defaultMessage": "whether {where} holds the change",
-    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": whether the card's change is already in a commit or branch (glossary 2.3: change). {where} is a short commit id or a branch name."
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": whether the card's change is already in a commit or branch (glossary 2.3: change). {where} is a short commit id or a branch name."
   },
   "workflow.unreadable.ignored": {
     "defaultMessage": "what Git ignores in {folder}",
-    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the files Git is told to leave out. {folder} is a folder path."
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": the files Git is told to leave out. {folder} is a folder path."
   },
   "workflow.unreadable.line": {
     "defaultMessage": "the branch {branch}",
-    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": a Git branch. {branch} is its name."
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": a Git branch. {branch} is its name."
   },
   "workflow.unreadable.pathOutside": {
     "defaultMessage": "the path {path}, which is outside the project",
-    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": a card's path that isn't in its project. {path} is the path."
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": a card's path that isn't in its project. {path} is the path."
   },
   "workflow.unreadable.replay": {
     "defaultMessage": "{revision} applied onto {onto}",
-    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the result of applying a revision's change onto another commit. {revision} and {onto} are short commit ids."
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": the result of applying a revision's change onto another commit. {revision} and {onto} are short commit ids."
   },
   "workflow.unreadable.replayedFiles": {
     "defaultMessage": "the files of the change applied again",
-    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the result of applying the change again on another commit, to tell whether two revisions are the same change."
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": the result of applying the change again on another commit, to tell whether two revisions are the same change."
   },
   "workflow.unreadable.reviewers": {
     "defaultMessage": "whether the reviewers of {card} are still running",
-    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\" (HI-2487): which of the agents reviewing the card are still in the project with their sessions running. {card} is a card key like AM-12."
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\" (HI-2487): which of the agents reviewing the card are still in the project with their sessions running. {card} is a card key like AM-12."
   },
   "workflow.unreadable.revision": {
     "defaultMessage": "the revision {revision}",
-    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\" (glossary 2.3: revision). {revision} is a commit id or name."
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\" (glossary 2.3: revision). {revision} is a commit id or name."
   },
   "workflow.unreadable.revisionIn": {
     "defaultMessage": "the revision in {folder}",
-    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the revision checked out in a folder (glossary 2.3: revision). {folder} is a folder path."
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": the revision checked out in a folder (glossary 2.3: revision). {folder} is a folder path."
   },
   "workflow.unreadable.state": {
     "defaultMessage": "the state of {folder}",
-    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": whether a merge or rebase is going on in the folder. {folder} is a folder path."
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": whether a merge or rebase is going on in the folder. {folder} is a folder path."
   },
   "workflow.unreadable.target": {
     "defaultMessage": "the target branch {target}",
-    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the branch the work merges into. {target} is its name."
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": the branch the work merges into. {target} is its name."
   },
   "workflow.unreadable.uncommitted": {
     "defaultMessage": "the uncommitted changes in {folder}",
-    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\". {folder} is a folder path."
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\". {folder} is a folder path."
   },
   "workflow.unreadable.worktrees": {
     "defaultMessage": "the worktrees of {folder}",
-    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": the Git worktrees of a repository. {folder} is its folder path."
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": the Git worktrees of a repository. {folder} is its folder path."
   },
   "workflow.unreadable.writes": {
     "defaultMessage": "the files written in {folder}",
-    "description": "What Hive couldn't read, the object of \"Hive couldn't read …\": which files changed in a folder. {folder} is a folder path."
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": which files changed in a folder. {folder} is a folder path."
   },
   "workflow.value.commitMessage.branch": {
     "defaultMessage": "The branch’s own, with no card key or trailers",
-    "description": "A value of the workflow option “Commit message” (glossary 2.6, G19): the commit takes the message the branch’s commits have (with several, the first one’s subject and each one’s message), never the card’s key or Hive’s trailers. Trailers: git’s “Key: value” lines at a message’s end."
+    "description": "A value of the workflow option “Commit message” (glossary 2.6, G19): the commit takes the message the branch’s commits have (with several, the first one’s subject and each one’s message), never the card’s key or Combwork’s trailers. Trailers: git’s “Key: value” lines at a message’s end."
   },
-  "workflow.value.commitMessage.hive": {
+  "workflow.value.commitMessage.cw": {
     "defaultMessage": "Combwork’s: the card’s key and title, with trailers",
-    "description": "A value of the workflow option “Commit message” (glossary 2.6, G19): the commit is titled with the card’s key and title (HI-12: Fix the login) and ends with Hive’s trailers (Hive-Card: HI-12 and others). Trailers: git’s “Key: value” lines at a message’s end."
+    "description": "A value of the workflow option “Commit message” (glossary 2.6, G19): the commit is titled with the card’s key and title (HI-12: Fix the login) and ends with Combwork’s trailers (Combwork-Card: HI-12 and others). Trailers: git’s “Key: value” lines at a message’s end."
   },
   "workflow.value.finish.agentMerges": {
     "defaultMessage": "The agent merges, Combwork checks",
     "description": "A value of the workflow option “Who merges” (glossary 2.6, G5)."
   },
-  "workflow.value.finish.committed": {
-    "defaultMessage": "Committed is done",
+  "workflow.value.finish.combworkMerges": {
+    "defaultMessage": "Combwork merges",
     "description": "A value of the workflow option “Who merges” (glossary 2.6, G5)."
   },
-  "workflow.value.finish.hiveMerges": {
-    "defaultMessage": "Combwork merges",
+  "workflow.value.finish.committed": {
+    "defaultMessage": "Committed is done",
     "description": "A value of the workflow option “Who merges” (glossary 2.6, G5)."
   },
   "workflow.value.finish.notChecked": {
@@ -1977,7 +1977,7 @@
   },
   "workflow.value.folder.slots": {
     "defaultMessage": "Each card in its own folder",
-    "description": "A value of the workflow option “Where cards are built” (glossary 2.6, G11). The folder is a slot, a worktree Hive lends to the card or its lane (glossary 2.5: slot)."
+    "description": "A value of the workflow option “Where cards are built” (glossary 2.6, G11). The folder is a slot, a worktree Combwork lends to the card or its lane (glossary 2.5: slot)."
   },
   "workflow.value.mergeInstall.always": {
     "defaultMessage": "Before every merge",
@@ -2041,7 +2041,7 @@
   },
   "workflow.value.style.rebase": {
     "defaultMessage": "Rebase and fast-forward",
-    "description": "A value of the workflow option “Merge style” (glossary 2.6, G6; #1184): Hive’s merge queue rebases the card’s commits onto the target branch and moves the branch forward to them, so the history stays linear, with no merge commit."
+    "description": "A value of the workflow option “Merge style” (glossary 2.6, G6; #1184): Combwork’s merge queue rebases the card’s commits onto the target branch and moves the branch forward to them, so the history stays linear, with no merge commit."
   },
   "workflow.value.style.squash": {
     "defaultMessage": "Squash",
@@ -2049,7 +2049,7 @@
   },
   "workflow.why.commitMessage": {
     "defaultMessage": "Card titles can name people and details a public history shouldn’t keep; choose Combwork’s for the card’s key, linking each merge to its card.",
-    "description": "Why the presets set “Commit message” to the branch’s own (HI-1997), and what choosing Hive’s (the card’s key and title, with trailers) gives instead."
+    "description": "Why the presets set “Commit message” to the branch’s own (HI-1997), and what choosing Combwork’s (the card’s key and title, with trailers) gives instead."
   },
   "workflow.why.dependenciesDone": {
     "defaultMessage": "It’s cheap, and no card is built on work that isn’t in yet.",
@@ -2081,7 +2081,7 @@
   },
   "workflow.why.mergeChecks": {
     "defaultMessage": "The checks run on the work as it will be once merged, not only as it was built.",
-    "description": "Why the presets set “Checks pass on the merged result” when Hive merges."
+    "description": "Why the presets set “Checks pass on the merged result” when Combwork merges."
   },
   "workflow.why.mergeInstall": {
     "defaultMessage": "A clean install before every merge catches a dependency that only worked on the builder’s machine.",

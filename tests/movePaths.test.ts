@@ -11,43 +11,43 @@ import { tempDir } from './tempDir'
 
 describe('rebase', () => {
   it('moves a path under the old folder, keeping the case of the rest', () => {
-    expect(rebase('D:\\Dev\\HIVE\\alpha\\Src', 'D:\\Dev\\HIVE', 'E:\\Work\\HIVE')).toBe('E:\\Work\\HIVE\\alpha\\Src')
-    expect(rebase('D:\\Dev\\HIVE', 'D:\\Dev\\HIVE', 'E:\\Work\\HIVE')).toBe('E:\\Work\\HIVE')
+    expect(rebase('D:\\Dev\\ACME\\alpha\\Src', 'D:\\Dev\\ACME', 'E:\\Work\\ACME')).toBe('E:\\Work\\ACME\\alpha\\Src')
+    expect(rebase('D:\\Dev\\ACME', 'D:\\Dev\\ACME', 'E:\\Work\\ACME')).toBe('E:\\Work\\ACME')
   })
   it('compares without case and with either separator, as Windows does', () => {
-    expect(rebase('d:\\dev\\hive\\alpha', 'D:\\Dev\\HIVE', 'E:\\HIVE')).toBe('E:\\HIVE\\alpha')
-    expect(rebase('D:/Dev/HIVE/alpha', 'D:\\Dev\\HIVE\\', 'E:\\HIVE')).toBe('E:\\HIVE\\alpha')
+    expect(rebase('d:\\dev\\acme\\alpha', 'D:\\Dev\\ACME', 'E:\\ACME')).toBe('E:\\ACME\\alpha')
+    expect(rebase('D:/Dev/ACME/alpha', 'D:\\Dev\\ACME\\', 'E:\\ACME')).toBe('E:\\ACME\\alpha')
   })
   it('only at a folder boundary, and only under the old folder', () => {
-    expect(rebase('D:\\Dev\\HIVE2\\alpha', 'D:\\Dev\\HIVE', 'E:\\HIVE')).toBeNull()
-    expect(rebase('D:\\Dev\\HIV', 'D:\\Dev\\HIVE', 'E:\\HIVE')).toBeNull()
-    expect(rebase('C:\\Other\\alpha', 'D:\\Dev\\HIVE', 'E:\\HIVE')).toBeNull()
-    expect(rebase('D:\\Dev\\HIVE\\alpha', '', 'E:\\HIVE')).toBeNull()
+    expect(rebase('D:\\Dev\\ACME2\\alpha', 'D:\\Dev\\ACME', 'E:\\ACME')).toBeNull()
+    expect(rebase('D:\\Dev\\ACM', 'D:\\Dev\\ACME', 'E:\\ACME')).toBeNull()
+    expect(rebase('C:\\Other\\alpha', 'D:\\Dev\\ACME', 'E:\\ACME')).toBeNull()
+    expect(rebase('D:\\Dev\\ACME\\alpha', '', 'E:\\ACME')).toBeNull()
   })
   it('the deepest move that contains a path wins', () => {
     const moves = [
-      { from: 'D:\\Dev\\HIVE', to: 'E:\\HIVE' },
-      { from: 'D:\\Dev\\HIVE\\alpha', to: 'E:\\Renamed' }
+      { from: 'D:\\Dev\\ACME', to: 'E:\\ACME' },
+      { from: 'D:\\Dev\\ACME\\alpha', to: 'E:\\Renamed' }
     ]
-    expect(rebaseAny('D:\\Dev\\HIVE\\alpha\\x', moves)).toBe('E:\\Renamed\\x')
-    expect(rebaseAny('D:\\Dev\\HIVE\\beta', moves)).toBe('E:\\HIVE\\beta')
+    expect(rebaseAny('D:\\Dev\\ACME\\alpha\\x', moves)).toBe('E:\\Renamed\\x')
+    expect(rebaseAny('D:\\Dev\\ACME\\beta', moves)).toBe('E:\\ACME\\beta')
     expect(rebaseAny('F:\\elsewhere', moves)).toBeNull()
   })
   it('samePath', () => {
-    expect(samePath('D:\\Dev\\HIVE\\', 'd:/dev/hive')).toBe(true)
-    expect(samePath('D:\\Dev\\HIVE', 'D:\\Dev\\HIVE2')).toBe(false)
+    expect(samePath('D:\\Dev\\ACME\\', 'd:/dev/acme')).toBe(true)
+    expect(samePath('D:\\Dev\\ACME', 'D:\\Dev\\ACME2')).toBe(false)
   })
 })
 
 describe('worktreeCandidates', () => {
-  const ws = { from: 'D:\\Dev\\HIVE', to: 'E:\\HIVE' }
-  const project = { from: 'D:\\Dev\\HIVE\\hive', to: 'E:\\HIVE\\hive' }
-  it("in Hive's worktrees folder beside the workspace: moved along with it, else where it was", () => {
-    expect(worktreeCandidates('D:\\Dev\\HIVE.worktrees\\hive\\claudio', ws, project)).toEqual(['E:\\HIVE.worktrees\\hive\\claudio', 'D:\\Dev\\HIVE.worktrees\\hive\\claudio'])
+  const ws = { from: 'D:\\Dev\\ACME', to: 'E:\\ACME' }
+  const project = { from: 'D:\\Dev\\ACME\\acme', to: 'E:\\ACME\\acme' }
+  it("in Combwork's worktrees folder beside the workspace: moved along with it, else where it was", () => {
+    expect(worktreeCandidates('D:\\Dev\\ACME.worktrees\\acme\\claudio', ws, project)).toEqual(['E:\\ACME.worktrees\\acme\\claudio', 'D:\\Dev\\ACME.worktrees\\acme\\claudio'])
   })
   it('inside the project or the workspace: moved along with it first', () => {
-    expect(worktreeCandidates('D:\\Dev\\HIVE\\hive\\wt', ws, project)).toEqual(['E:\\HIVE\\hive\\wt', 'D:\\Dev\\HIVE\\hive\\wt'])
-    expect(worktreeCandidates('D:\\Dev\\HIVE\\trees\\wt', ws, project)).toEqual(['E:\\HIVE\\trees\\wt', 'D:\\Dev\\HIVE\\trees\\wt'])
+    expect(worktreeCandidates('D:\\Dev\\ACME\\acme\\wt', ws, project)).toEqual(['E:\\ACME\\acme\\wt', 'D:\\Dev\\ACME\\acme\\wt'])
+    expect(worktreeCandidates('D:\\Dev\\ACME\\trees\\wt', ws, project)).toEqual(['E:\\ACME\\trees\\wt', 'D:\\Dev\\ACME\\trees\\wt'])
   })
   it('anywhere else: only where it was', () => {
     expect(worktreeCandidates('C:\\trees\\wt\\', ws, project)).toEqual(['C:\\trees\\wt'])
@@ -56,14 +56,14 @@ describe('worktreeCandidates', () => {
 
 describe('moveHasWork', () => {
   const plan = (folders: Partial<PathDataCopy>[], more: Partial<MovePlan> = {}): MovePlan => ({
-    from: 'D:\\HIVE',
-    to: 'E:\\HIVE',
+    from: 'D:\\ACME',
+    to: 'E:\\ACME',
     projects: ['alpha'],
     pending: [],
     running: [],
     recent: false,
     working: [],
-    hosts: [{ path: 'E:\\HIVE\\alpha', name: 'alpha', from: 'D:\\HIVE\\alpha', folder: 'E:\\HIVE\\alpha', worktrees: [], sessions: 0, folders: folders.map((f) => ({ provider: 'claude-code', from: 'a', to: 'b', copy: 0, kept: [], ...f })) }],
+    hosts: [{ path: 'E:\\ACME\\alpha', name: 'alpha', from: 'D:\\ACME\\alpha', folder: 'E:\\ACME\\alpha', worktrees: [], sessions: 0, folders: folders.map((f) => ({ provider: 'claude-code', from: 'a', to: 'b', copy: 0, kept: [], ...f })) }],
     ...more
   })
   it('nothing left: no worktree, session, file, Recent or Working on', () => {
@@ -85,14 +85,14 @@ describe('moveHasWork', () => {
 
 describe("Claude Code's folder for a path", () => {
   it('turns backslashes, colons and dots into dashes', () => {
-    expect(encodeProjectPath('D:\\Development\\HIVE.worktrees\\hive\\claude')).toBe('D--Development-HIVE-worktrees-hive-claude')
+    expect(encodeProjectPath('D:\\Projects\\ACME.worktrees\\acme\\claude')).toBe('D--Projects-ACME-worktrees-acme-claude')
     expect(encodeProjectPath('E:\\My Work\\v1.2\\app')).toBe('E--My-Work-v1-2-app')
   })
 })
 
 describe('copyMissing', () => {
   const setup = async (): Promise<{ src: string; dest: string }> => {
-    const root = tempDir('hive-copymissing-')
+    const root = tempDir('cw-copymissing-')
     const src = join(root, 'old')
     const dest = join(root, 'new')
     await mkdir(join(src, 'memory'), { recursive: true })

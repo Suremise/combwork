@@ -5,12 +5,12 @@ import type { ViewerToken } from '../shared/types'
 import { agentMsg, inDefaultDialect, say } from '../shared/agentText'
 import { readJson, writeJsonAtomic } from './fsutil'
 import { msg } from '../shared/i18n'
-import { hiveError } from './hiveError'
+import { combworkError } from './combworkError'
 
 /**
  * The Agent API's read-only viewer tokens (#620): made and revoked by the user in Settings → Agent API, each named for
  * the app it is for ("Apiary"). A viewer reads and follows the workspace like the workspace token (every GET and the
- * event stream) and changes nothing: the API refuses its every other request. Kept beside the workspace token in Hive's
+ * event stream) and changes nothing: the API refuses its every other request. Kept beside the workspace token in Combwork's
  * profile (`agent-api-viewers.json`), never in a project.
  */
 const MAX_VIEWERS = 20
@@ -72,17 +72,17 @@ const REFUSED = {
   noName: msg({ id: 'main.viewerTokens.noName', defaultMessage: 'Give the viewer token a name, such as the app it is for', description: 'Why a viewer token was not made (Settings → Agent API → Viewer tokens): its name is empty. Shown under "Could not make the viewer token".' }),
   tooLong: msg({ id: 'main.viewerTokens.tooLong', defaultMessage: "A viewer token's name is at most {most, number} characters", description: 'Why a viewer token was not made: its name is too long. {most} is the most characters a name may have (40).' }),
   taken: msg({ id: 'main.viewerTokens.taken', defaultMessage: 'There is already a viewer token named "{name}"', description: 'Why a viewer token was not made: another one has that name (letter case aside). {name} is the name the user gave it.' }),
-  tooMany: msg({ id: 'main.viewerTokens.tooMany', defaultMessage: 'Combwork keeps at most {most, number} viewer tokens: revoke one first', description: 'Why a viewer token was not made: Hive already keeps the most it keeps. {most} is that number (20). Revoke is the button beside each token.' })
+  tooMany: msg({ id: 'main.viewerTokens.tooMany', defaultMessage: 'Combwork keeps at most {most, number} viewer tokens: revoke one first', description: 'Why a viewer token was not made: Combwork already keeps the most it keeps. {most} is that number (20). Revoke is the button beside each token.' })
 }
 
 /** A new viewer token named `name`. Refuses an empty or taken name, and more than 20 tokens. */
 export function createViewerToken(name: string): Promise<ViewerToken> {
   const n = String(name ?? '').trim()
-  if (!n) return Promise.reject(hiveError(REFUSED.noName, undefined, { kind: 'invalid' })) // window: Settings → Agent API → Viewer tokens (api:createViewer only)
-  if (n.length > MAX_NAME) return Promise.reject(hiveError(REFUSED.tooLong, { most: MAX_NAME }, { kind: 'invalid' })) // window: Settings → Agent API → Viewer tokens (api:createViewer only)
+  if (!n) return Promise.reject(combworkError(REFUSED.noName, undefined, { kind: 'invalid' })) // window: Settings → Agent API → Viewer tokens (api:createViewer only)
+  if (n.length > MAX_NAME) return Promise.reject(combworkError(REFUSED.tooLong, { most: MAX_NAME }, { kind: 'invalid' })) // window: Settings → Agent API → Viewer tokens (api:createViewer only)
   return change(() => {
-    if (viewers.some((v) => v.name.toLowerCase() === n.toLowerCase())) throw hiveError(REFUSED.taken, { name: n }, { kind: 'conflict' }) // window: Settings → Agent API → Viewer tokens (api:createViewer only)
-    if (viewers.length >= MAX_VIEWERS) throw hiveError(REFUSED.tooMany, { most: MAX_VIEWERS }, { kind: 'conflict' }) // window: Settings → Agent API → Viewer tokens (api:createViewer only)
+    if (viewers.some((v) => v.name.toLowerCase() === n.toLowerCase())) throw combworkError(REFUSED.taken, { name: n }, { kind: 'conflict' }) // window: Settings → Agent API → Viewer tokens (api:createViewer only)
+    if (viewers.length >= MAX_VIEWERS) throw combworkError(REFUSED.tooMany, { most: MAX_VIEWERS }, { kind: 'conflict' }) // window: Settings → Agent API → Viewer tokens (api:createViewer only)
     const v: ViewerToken = { id: randomUUID(), name: n, token: randomBytes(32).toString('hex'), createdAt: new Date().toISOString() }
     viewers = [...viewers, v]
     return { ...v }

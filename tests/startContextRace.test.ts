@@ -24,7 +24,7 @@ vi.mock('../src/main/docSections', async (original) => {
   }
 })
 
-const base = tempDir('hive-startcontext-')
+const base = tempDir('cw-startcontext-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 ;(electron.shell as unknown as { trashItem: (p: string) => Promise<void> }).trashItem = (p) => rm(p, { recursive: true, force: true })
 
@@ -41,7 +41,7 @@ describe('a Start whose card changes while its references are checked', () => {
   let release = (): void => {}
   const user = { kind: 'user' } as const
   beforeEach(async () => {
-    const ws = tempDir('hive-startcontext-ws-')
+    const ws = tempDir('cw-startcontext-ws-')
     alpha = join(ws, 'alpha')
     for (const p of [alpha, join(ws, 'beta')]) {
       mkdirSync(join(p, '.combwork'), { recursive: true })

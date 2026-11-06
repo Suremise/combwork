@@ -1,5 +1,5 @@
 // For you, the main side (#1269, SPEC §16.8.5, §16.11.4), on fake Claude Code agents (fake-claude/): a builder and a
-// reviewer in a lane with a round limit of 1. The reviewer fails the card on the board: Hive asks the user (a request in
+// reviewer in a lane with a round limit of 1. The reviewer fails the card on the board: Combwork asks the user (a request in
 // `tasks:forYou`, Decide, with its message for the window), the lane pauses on the card, and a notice says so. The
 // user's answer (`tasks:answer`: carry on, one more round) clears it, the lane runs again and the builder is woken with
 // the choice, once; an answer to it again is refused. The window (#1276): in a project whose review is the user's,
@@ -51,14 +51,14 @@ const check = (name, ok, extra = '') => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off', HIVE_TEST_NOTIFY_LOG: notifyLog })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off', CW_TEST_NOTIFY_LOG: notifyLog })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1400, height: 900 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
     const idle = async (id) => ['ready', 'finished'].includes((await live(id))?.status)
@@ -68,7 +68,7 @@ const check = (name, ok, extra = '') => {
     }
     const told = () => (fs.existsSync(notifyLog) ? fs.readFileSync(notifyLog, 'utf8') : '')
     const say = async (id, text) => {
-      // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+      // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
       await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
     }
     const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
@@ -83,7 +83,7 @@ const check = (name, ok, extra = '') => {
     await inv('tasks:update', n, { column: 'doing', agent: builder.id })
     const key = (await card(n)).key
     // The builder registers its lane (card-loop does) with one round before the user is asked.
-    await say(builder.id, `hive cw_lane ${JSON.stringify({ action: 'start', cards: [n], reviewer: 'Reviewer', rounds: 1 })}`)
+    await say(builder.id, `cw cw_lane ${JSON.stringify({ action: 'start', cards: [n], reviewer: 'Reviewer', rounds: 1 })}`)
     check('the lane is registered, with one round', !!(await lib.until(async () => (await lane())?.rounds === 1, HUNG_MS)), JSON.stringify(await lane()))
     await lib.until(() => idle(builder.id), HUNG_MS)
     check('nothing waits for the user yet', (await inv('tasks:forYou')).count === 0)
@@ -103,6 +103,14 @@ const check = (name, ok, extra = '') => {
     check('…in the project too', (await inv('tasks:forYou', 'alpha')).count === 1 && (await inv('tasks:forYou', 'beta')).count === 0)
     check('the lane pauses on it', !!(await lib.until(async () => (await lane())?.state === 'paused' && (await lane())?.pausedOn === n, HUNG_MS)), JSON.stringify(await lane()))
     check('the user is told', !!(await lib.until(async () => told().includes('failed 1 review: carry on with more rounds'), HUNG_MS)), told())
+    // HI-2583: the chip's tooltip names the app, Combwork, as who asks its own requests.
+    await showBoard(page)
+    const ownChip = page.locator(`.task-card[data-task="${n}"] .task-for-you`)
+    await lib.until(async () => (await ownChip.count()) === 1, HUNG_MS)
+    const ownTip = await lib.hoverTip(page, ownChip, (t) => t.includes('asks you to decide'), HUNG_MS)
+    check("…the chip's tooltip says Combwork asks", ownTip.includes('Combwork asks you to decide'), ownTip)
+    await page.locator('.tip:visible').last().screenshot({ path: path.join(lib.WORK, 'foryou-own-request-tip.png') }).catch(() => {})
+    await page.mouse.move(5, 5)
 
     // An answer that doesn't fit (an approval) is refused; the user's carry on is taken.
     const refused = await inv('tasks:answer', n, item.request, { outcome: 'approved' }).then(() => null, (e) => String(e.message ?? e))
@@ -119,9 +127,9 @@ const check = (name, ok, extra = '') => {
     check('an answer to it again is refused', !!again, String(again))
     await lib.until(() => idle(builder.id), HUNG_MS)
     check('…and the builder was woken once for it', wakes('Builder').filter(answerWake).length === 1, JSON.stringify(wakes('Builder')))
-    // The card's history says whom Hive told of the answer (#1269 round 2), as the card dialog shows it.
+    // The card's history says whom Combwork told of the answer (#1269 round 2), as the card dialog shows it.
     const toldLine = 'Told agent Builder (alpha) of your answer'
-    check("the card's history says whom Hive told of the answer", !!(await lib.until(async () => (await card(n))?.history.some((h) => h.by === 'Combwork' && h.what === toldLine), HUNG_MS)), JSON.stringify((await card(n))?.history.map((h) => h.what)))
+    check("the card's history says whom Combwork told of the answer", !!(await lib.until(async () => (await card(n))?.history.some((h) => h.by === 'Combwork' && h.what === toldLine), HUNG_MS)), JSON.stringify((await card(n))?.history.map((h) => h.what)))
     await showBoard(page)
     await openByTitle(page, n)
     const dialog = lib.cardDialog(page, await lib.cardLabel(inv, n))
@@ -143,7 +151,7 @@ const check = (name, ok, extra = '') => {
     const makerIdle = async () => ['ready', 'finished'].includes((await liveIn(beta, maker.id))?.status)
     const makerSays = async (text) => {
       await lib.until(makerIdle, HUNG_MS)
-      // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+      // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
       await lib.typeLine(inv, lib.ptyKey(beta, maker.id), claudeHome, null, text, { live: () => liveIn(beta, maker.id) })
     }
     await inv('session:start', beta, { agentId: maker.id })
@@ -155,7 +163,7 @@ const check = (name, ok, extra = '') => {
     const wakeAbout = (text) => wakes('Maker').some((w) => w.startsWith(`[CW] ${qKey}`) && w.includes(text))
 
     // #922's case: its builder asks for a push OK.
-    await makerSays(`hive cw_ask_user ${JSON.stringify({ card: `#${q}`, kind: 'approve', text: 'OK to push the release tag?' })}`)
+    await makerSays(`cw cw_ask_user ${JSON.stringify({ card: `#${q}`, kind: 'approve', text: 'OK to push the release tag?' })}`)
     const chip = page.locator(`.task-card[data-task="${q}"] .task-for-you`)
     await showBoard(page)
     check('an agent’s ask shows the For you chip on its card', !!(await lib.until(async () => (await chip.count()) === 1, HUNG_MS)))
@@ -231,7 +239,7 @@ const check = (name, ok, extra = '') => {
     await page.keyboard.press('Escape')
 
     // A Decide question: the reply reaches the builder.
-    await makerSays(`hive cw_cannot_within_rules ${JSON.stringify({ card: `#${q}`, rule: 'submit.checksPassed', why: 'Which database should the tests use?' })}`)
+    await makerSays(`cw cw_cannot_within_rules ${JSON.stringify({ card: `#${q}`, rule: 'submit.checksPassed', why: 'Which database should the tests use?' })}`)
     qDialog = await openQ()
     check('a Decide question shows with a reply box', !!(await lib.until(async () => (await section.locator('textarea').count()) === 1, HUNG_MS)), await section.innerText().catch(() => ''))
     await section.locator('textarea').fill('SQLite in memory')
@@ -276,14 +284,14 @@ const check = (name, ok, extra = '') => {
     const base = (await inv('app:info')).language
     const dir = path.join(lib.ROOT, 'locales', 'pl')
     const messages = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))))
-    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language })
+    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
     await speak({ ...base, code: 'pl', locale: 'pl', messages })
     check('the section in Polish', !!(await lib.until(async () => /dla ciebie/i.test(await rSection.innerText().catch(() => '')) && (await rSection.innerText().catch(() => '')).includes('Zatwierdź'), HUNG_MS)), await rSection.innerText().catch(() => ''))
     await rSection.screenshot({ path: path.join(lib.WORK, 'foryou-dialog-pl.png') })
     await speak(base)
     await lib.until(async () => (await rSection.innerText().catch(() => '')).includes('Approve'), HUNG_MS)
-    // HI-2286: on Hive's own OK the note is a comment only.
-    check("Approve's note on Hive's OK says it is your comment", ((await rSection.locator('.for-you-approve-note').getAttribute('placeholder')) ?? '').includes('added as your comment'), await rSection.locator('.for-you-approve-note').getAttribute('placeholder'))
+    // HI-2286: on Combwork's own OK the note is a comment only.
+    check("Approve's note on Combwork's OK says it is your comment", ((await rSection.locator('.for-you-approve-note').getAttribute('placeholder')) ?? '').includes('added as your comment'), await rSection.locator('.for-you-approve-note').getAttribute('placeholder'))
     await rSection.getByRole('button', { name: 'Approve' }).click()
     const toldR = () => wakes('Maker').some((w) => w.startsWith(`[CW] ${rKey}`) && w.includes('merge it and report the merge'))
     check('the OK given: the builder is told to merge it', !!(await lib.until(async () => toldR() && (await rSection.count()) === 0, HUNG_MS)), JSON.stringify(wakes('Maker')))
@@ -294,7 +302,7 @@ const check = (name, ok, extra = '') => {
     const s = (await inv('tasks:create', { title: 'Done elsewhere', project: 'beta' })).number
     await inv('tasks:move', s, 'doing', { agent: maker.id })
     const sKey = (await card(s)).key
-    await makerSays(`hive cw_ask_user ${JSON.stringify({ card: `#${s}`, kind: 'decide', text: 'Already done by #1277: how do I close it?', actions: [{ kind: 'done', reason: 'already done by #1277' }, { kind: 'unblock' }] })}`)
+    await makerSays(`cw cw_ask_user ${JSON.stringify({ card: `#${s}`, kind: 'decide', text: 'Already done by #1277: how do I close it?', actions: [{ kind: 'done', reason: 'already done by #1277' }, { kind: 'unblock' }] })}`)
     await openByTitle(page, s)
     const sDialog = page.locator('.dialog').filter({ has: page.locator('.task-title-input') })
     await sDialog.waitFor({ timeout: HUNG_MS })
@@ -321,7 +329,7 @@ const check = (name, ok, extra = '') => {
     await inv('workflow:setOptions', beta, { preset: null, options: { ...betaOptions, review: 'you', okBefore: { mode: 'never', labels: [] } } })
     const k = (await inv('tasks:create', { title: 'Checks only', project: 'beta' })).number
     await inv('tasks:move', k, 'doing', { agent: maker.id })
-    await makerSays(`hive cw_ask_user ${JSON.stringify({ card: `#${k}`, kind: 'decide', text: 'May we skip review for this checks-only change?', actions: [{ kind: 'skipReview' }] })}`)
+    await makerSays(`cw cw_ask_user ${JSON.stringify({ card: `#${k}`, kind: 'decide', text: 'May we skip review for this checks-only change?', actions: [{ kind: 'skipReview' }] })}`)
     await openByTitle(page, k)
     const kDialog = page.locator('.dialog').filter({ has: page.locator('.task-title-input') })
     await kDialog.waitFor({ timeout: HUNG_MS })
@@ -358,7 +366,7 @@ const check = (name, ok, extra = '') => {
       '',
       ...Array.from({ length: 8 }, (_, i) => `A further paragraph ${i + 1}, so the question is longer than the fold.`)
     ].join('\n')
-    await makerSays(`hive cw_ask_user ${JSON.stringify({ card: `#${m}`, kind: 'decide', text: design })}`)
+    await makerSays(`cw cw_ask_user ${JSON.stringify({ card: `#${m}`, kind: 'decide', text: design })}`)
     await openByTitle(page, m)
     const mDialog = page.locator('.dialog').filter({ has: page.locator('.task-title-input') })
     await mDialog.waitFor({ timeout: HUNG_MS })
@@ -383,7 +391,7 @@ const check = (name, ok, extra = '') => {
     const f = (await inv('tasks:create', { title: 'Fits at first', project: 'beta' })).number
     await inv('tasks:move', f, 'doing', { agent: maker.id })
     const fits = Array.from({ length: 6 }, (_, i) => `Line ${i + 1}: a sentence that fits on one line here, and wraps once the window is zoomed in.`).join('\n')
-    await makerSays(`hive cw_ask_user ${JSON.stringify({ card: `#${f}`, kind: 'decide', text: fits })}`)
+    await makerSays(`cw cw_ask_user ${JSON.stringify({ card: `#${f}`, kind: 'decide', text: fits })}`)
     await openByTitle(page, f)
     const fDialog = page.locator('.dialog').filter({ has: page.locator('.task-title-input') })
     await fDialog.waitFor({ timeout: HUNG_MS })
@@ -409,7 +417,7 @@ const check = (name, ok, extra = '') => {
     const before = await needCount()
     const t = (await inv('tasks:create', { title: 'Three questions', project: 'beta' })).number
     await inv('tasks:move', t, 'doing', { agent: maker.id })
-    for (const text of ['First: which icon?', 'Second: which colour?', 'Third: ship it today?']) await makerSays(`hive cw_ask_user ${JSON.stringify({ card: `#${t}`, kind: 'decide', text })}`)
+    for (const text of ['First: which icon?', 'Second: which colour?', 'Third: ship it today?']) await makerSays(`cw cw_ask_user ${JSON.stringify({ card: `#${t}`, kind: 'decide', text })}`)
     const forYouOf = async (num) => ((await inv('tasks:forYou')).items ?? []).filter((i) => i.card === num).length
     check('three requests on one card', !!(await lib.until(async () => (await forYouOf(t)) === 3, HUNG_MS)), String(await forYouOf(t)))
     check('…the status bar counts the card once', !!(await lib.until(async () => (await needCount()) === before + 1, HUNG_MS)), JSON.stringify({ before, now: await needCount() }))
@@ -432,7 +440,7 @@ const check = (name, ok, extra = '') => {
     // HI-1932: the user's answer, given in a chat with the Assistant, recorded by it as a decision naming the questions
     // it answers, closes those: in one write, the asker told, the card's resolved list and history saying who recorded
     // it. Maker's lane on the card pauses while any question waits for the user, and goes on once none does.
-    await makerSays(`hive cw_lane ${JSON.stringify({ action: 'start', cards: [`#${t}`] })}`)
+    await makerSays(`cw cw_lane ${JSON.stringify({ action: 'start', cards: [`#${t}`] })}`)
     const betaLane = async () => (await inv('lanes:list')).find((l) => l.project === 'beta' && l.cards.some((c) => c.number === t))
     check("Maker's lane on the card pauses: waiting for the user", !!(await lib.until(async () => (await betaLane())?.state === 'paused' && (await betaLane())?.pausedOn === t, HUNG_MS)), JSON.stringify(await betaLane()))
     const home = (await inv('workspace:refresh')).assistant.path

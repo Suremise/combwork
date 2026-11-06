@@ -1,10 +1,10 @@
 // Stop an agent and switch workspace at once (#297). The switch stops every live session of the workspace, and the
 // agent just stopped was still live (its process hadn't exited yet), so its terminal was killed a second time. On
 // Windows node-pty closes the pseudoconsole a moment after a kill, and a second kill before the first had finished
-// corrupted the heap: Hive's main process died, with nothing in its log (replysize's page closed this way under load).
-// Twelve rounds, two agents each (one stopped just before the switch, one still working): Hive survives every switch, and
+// corrupted the heap: Combwork's main process died, with nothing in its log (replysize's page closed this way under load).
+// Twelve rounds, two agents each (one stopped just before the switch, one still working): Combwork survives every switch, and
 // each switch leaves no session running. Fake Claude Code; dev build, throwaway profile and workspaces, quiet.
-// A round counts only once both its agents are running, and "no session running" is read from Hive's own list of every
+// A round counts only once both its agents are running, and "no session running" is read from Combwork's own list of every
 // live session and the agents' processes (exited only when Windows says there is no such process), and any error fails
 // the suite (#339).
 const lib = require('./lib.cjs')
@@ -31,7 +31,7 @@ const check = (name, ok, extra = '') => {
   // Switching stops the agents without asking, as after the user says so.
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  const { app, page, inv } = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: lib.port(47922) } })
+  const { app, page, inv } = await lib.launch({ userData, env: { ...env, CW_API_PORT: lib.port(47922) } })
   let gone = null
   page.on('close', () => (gone ??= new Date().toISOString()))
   const mainPid = await app.evaluate(() => process.pid)
@@ -44,10 +44,10 @@ const check = (name, ok, extra = '') => {
     }
   }
   const agents = {}
-  // Hive's list of every live session, whichever workspace it's in: session:list checks the project is the window's,
+  // Combwork's list of every live session, whichever workspace it's in: session:list checks the project is the window's,
   // which a switch has just changed, so its error can't be read as "none running" (#339).
   const liveIn = async (proj) => (await inv('session:live')).filter((s) => s.projectPath.toLowerCase() === proj.toLowerCase())
-  // What a project still runs: its sessions in Hive's list and the processes of the agents last started there.
+  // What a project still runs: its sessions in Combwork's list and the processes of the agents last started there.
   const pids = {}
   const runningIn = async (proj) => ({ sessions: (await liveIn(proj)).length, processes: (pids[proj] ?? []).filter(lib.processRunning).length })
   // The switch waits a moment for its sessions to end, then goes on: wait for the project to run nothing, and say what
@@ -72,7 +72,7 @@ const check = (name, ok, extra = '') => {
       const [one, two] = agents[proj]
       await inv('session:start', proj, { agentId: one.id })
       await inv('session:start', proj, { agentId: two.id })
-      // Both running, in Hive's list and as processes, before the stop and the switch: a round without them proves nothing.
+      // Both running, in Combwork's list and as processes, before the stop and the switch: a round without them proves nothing.
       const both = await lib.until(async () => {
         const l = await liveIn(proj)
         return l.length === 2 && l.every((s) => s.pid) && l
@@ -96,7 +96,7 @@ const check = (name, ok, extra = '') => {
     // never "no session running" (#339).
     check(`the rounds and the final switch ran without an error (stopped at round ${rounds})`, false, String(e?.message ?? e).split('\n')[0])
   }
-  check('Hive survives stopping an agent and switching workspace at once, twelve times', !gone && alive() && rounds === 12, JSON.stringify({ rounds, pageClosed: gone, mainAlive: alive() }))
+  check('Combwork survives stopping an agent and switching workspace at once, twelve times', !gone && alive() && rounds === 12, JSON.stringify({ rounds, pageClosed: gone, mainAlive: alive() }))
 
   await app.close()
   console.log(failed ? `\n${failed} check(s) FAILED` : '\nALL PASSED')

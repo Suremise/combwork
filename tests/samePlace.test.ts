@@ -3,7 +3,7 @@
 // Repair's Locate), project removal's guards (and Delete) and resuming a session compare places
 // (`samePlace`/`containsPlace`), not spellings. Each test uses a junction, which makes another name on any machine
 // (tests/pathAliases.ts). Windows (windowShowing, switching a window's workspace) are in the e2e suite `windows`. The
-// Agent API's X-Hive-Workspace header finds a workspace named another way, and locked files and transcript paths read
+// Agent API's X-Combwork-Workspace header finds a workspace named another way, and locked files and transcript paths read
 // relative to a folder named the other way (#494).
 import { execFileSync } from 'child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
@@ -14,7 +14,7 @@ import type { AgentDef } from '../src/shared/types'
 import { junction } from './pathAliases'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-places-')
+const base = tempDir('cw-places-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -40,7 +40,7 @@ const aliases = join(base, 'aliases')
 const alias = (target: string, name: string): string => junction(target, join(aliases, name))
 let w: ReturnType<typeof createWorkspaceService>
 /** An agent with a worktree at `path`. */
-const agent = (id: string, path: string): AgentDef => ({ id, name: id.toUpperCase(), provider: 'claude-code', worktree: { path, branch: `hive/${id}`, base: 'main' } }) as AgentDef
+const agent = (id: string, path: string): AgentDef => ({ id, name: id.toUpperCase(), provider: 'claude-code', worktree: { path, branch: `cw/${id}`, base: 'main' } }) as AgentDef
 
 beforeAll(async () => {
   mkdirSync(proj, { recursive: true })
@@ -50,7 +50,7 @@ beforeAll(async () => {
   git(proj, 'add', '-A')
   git(proj, 'commit', '-qm', 'a')
   git(proj, 'worktree', 'add', '-q', '-b', 'other', other)
-  git(proj, 'worktree', 'add', '-q', '-b', 'hive/a', tree)
+  git(proj, 'worktree', 'add', '-q', '-b', 'cw/a', tree)
   w = createWorkspaceService()
   await w.open(wsPath)
 })
@@ -98,7 +98,7 @@ describe('places by real path (#455)', () => {
   it("Repair's Locate of an agent's own worktree by another name changes nothing; another worktree is located", async () => {
     try {
       // The project moved (its recorded folder is elsewhere), so Repair looks at its agents' worktrees.
-      await w.mutateProjectConfig(proj, () => ({ lastPath: join(base, 'elsewhere', 'proj'), agents: [{ id: 'l', name: 'L', provider: 'claude-code', worktree: { path: tree, branch: 'hive/a', base: 'main' } } as AgentDef] }))
+      await w.mutateProjectConfig(proj, () => ({ lastPath: join(base, 'elsewhere', 'proj'), agents: [{ id: 'l', name: 'L', provider: 'claude-code', worktree: { path: tree, branch: 'cw/a', base: 'main' } } as AgentDef] }))
       const worktrees = async (picked: string): Promise<unknown[]> => (await movePlan(w, { locate: { [`${proj}#l`]: picked } }))!.hosts.find((h) => samePlace(h.path, proj))!.worktrees
       expect(await worktrees(alias(tree, 'tree-locate'))).toEqual([])
       expect(await worktrees(other)).toEqual([expect.objectContaining({ agentId: 'l', how: 'located', to: other })])
@@ -149,11 +149,11 @@ describe('places by real path (#455)', () => {
 
     it('Delete moves the project and its own worktree to the trash, never a folder those guards protect', async () => {
       const trashDir = join(base, 'trash')
-      const was = process.env.HIVE_TEST_TRASH_DIR
-      process.env.HIVE_TEST_TRASH_DIR = trashDir
+      const was = process.env.CW_TEST_TRASH_DIR
+      process.env.CW_TEST_TRASH_DIR = trashDir
       try {
         const agents = [agent('z', alias(q, 'q-delete')), agent('y', alias(outer, 'outer-delete')), agent('x', alias(q2, 'q2-delete')), agent('s', alias(spare, 'spare-delete'))]
-        // Under project.json's lock, as Hive writes it (#1238): written beside it, a write the opened workspace began
+        // Under project.json's lock, as Combwork writes it (#1238): written beside it, a write the opened workspace began
         // before (its project ids, 250 ms on) put back the config from before, and Delete found no agents.
         await w2.mutateProjectConfig(q, () => ({ agents }))
         const { warnings } = await inWorkspace(w2, () => removeProject(q, 'delete'))
@@ -163,8 +163,8 @@ describe('places by real path (#455)', () => {
         expect(gone.map((p) => p.toLowerCase())).toEqual([q, join(aliases, 'spare-delete')].map((p) => p.toLowerCase()))
         for (const kept of [outer, ws2, q2, join(outer, 'a.txt'), join(aliases, 'outer-delete'), join(aliases, 'q2-delete')]) expect(existsSync(kept)).toBe(true)
       } finally {
-        if (was === undefined) delete process.env.HIVE_TEST_TRASH_DIR
-        else process.env.HIVE_TEST_TRASH_DIR = was
+        if (was === undefined) delete process.env.CW_TEST_TRASH_DIR
+        else process.env.CW_TEST_TRASH_DIR = was
       }
     })
   })
@@ -176,7 +176,7 @@ describe('places by real path (#455)', () => {
     config.settings.providers['claude-code'].enabled = true
     try {
       const named = alias(tree, 'tree-resume')
-      await w.mutateProjectConfig(proj, () => ({ worktreeSetup: 'echo setup', agents: [{ id: 'r', name: 'R', provider: 'claude-code', needsSetup: true, worktree: { path: named, branch: 'hive/a', base: 'main' } } as AgentDef] }))
+      await w.mutateProjectConfig(proj, () => ({ worktreeSetup: 'echo setup', agents: [{ id: 'r', name: 'R', provider: 'claude-code', needsSetup: true, worktree: { path: named, branch: 'cw/a', base: 'main' } } as AgentDef] }))
       const id = '6f1d3b52-1c1e-4a39-9d5e-2f7a1b0c4d11'
       await w.upsertSession(proj, { id, agent: 'claude-code', agentId: 'r', name: 'Earlier', cwd: tree, createdAt: new Date().toISOString(), lastActiveAt: new Date().toISOString(), archived: false })
       // Stopped just before its terminal would start (the worktree's setup), past every check of the folder.
@@ -190,7 +190,7 @@ describe('places by real path (#455)', () => {
     }
   })
 
-  it('the X-Hive-Workspace header finds the open workspace named through a junction', () => {
+  it('the X-Combwork-Workspace header finds the open workspace named through a junction', () => {
     const ws = alias(wsPath, 'ws-header')
     expect(findWorkspace(ws)).toBe(w)
     expect(findWorkspace(join(ws, '.'))).toBe(w)
@@ -221,7 +221,7 @@ describe('places by real path (#455)', () => {
     }
     const edit = (st: Record<string, unknown>) =>
       inWorkspace(w, async () => sessions.preToolUse(st.runId as string, { hook_event_name: 'PreToolUse', session_id: st.sessionId, cwd: proj, tool_name: 'apply_patch', tool_input: { command: '*** Begin Patch\n*** Update File: a.txt\n@@\n+x\n*** End Patch' } }))
-    // File locks as Hive's workflow default (HI-1766), for either platform the project is detected as.
+    // File locks as Combwork's workflow default (HI-1766), for either platform the project is detected as.
     const was = config.settings.workflow
     config.settings.workflow = { none: { fileLocks: 'warn' }, git: { fileLocks: 'warn' } }
     try {

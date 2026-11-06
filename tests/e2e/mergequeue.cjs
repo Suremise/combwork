@@ -1,7 +1,7 @@
-// The merge queue in the app (#1348, SPEC §16.9.1, §16.9.3): a project set to "Hive merges" into `integration` (checked
+// The merge queue in the app (#1348, SPEC §16.9.1, §16.9.3): a project set to "Combwork merges" into `integration` (checked
 // out in no folder), fake Claude Code agents acting by their own tokens, the Assistant off. Each card is approved by its
-// builder and the reviewer (queueFixture.cjs), and Hive's queue takes it from there:
-// - merged: Done, `Integrated` with the result, the target at it, Hive's trailers;
+// builder and the reviewer (queueFixture.cjs), and Combwork's queue takes it from there:
+// - merged: Done, `Integrated` with the result, the target at it, Combwork's trailers;
 // - a conflict with the target: back to its builder with the files; a red check: back with its log;
 // - a check that couldn't start (transient): back, and the builder's resubmission of the same revision goes straight
 //   into the queue (requeue) and is merged;
@@ -9,10 +9,10 @@
 // - the target moved during its check (S27): tested again on the new head, never an untested advance;
 // - the project's options moved to the agent merge during its check: merged all the same (the card's ruleset);
 // - workflow rules turned off during its check: no advance (paused); on again, it is merged;
-// - Hive ended right after the target moved, before `Integrated` (S33c): the next start records it, once.
+// - Combwork ended right after the target moved, before `Integrated` (S33c): the next start records it, once.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
-// Builders on slots (#1578). S33c ends Hive at a crash seam (HIVE_TEST_QUEUE_CRASH): NOT RUN on a packaged build
-// (HIVE_EXE), where the rest runs.
+// Builders on slots (#1578). S33c ends Combwork at a crash seam (CW_TEST_QUEUE_CRASH): NOT RUN on a packaged build
+// (CW_EXE), where the rest runs.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const q = require('./queueFixture.cjs')
@@ -29,7 +29,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
 
 ;(async () => {
   q.prepare(fx)
-  let h = await q.startHive(fx, { port: PORT })
+  let h = await q.startCombwork(fx, { port: PORT })
   try {
     h.page.on('pageerror', (e) => check('no page errors', false, e.message))
     const reviewer = await q.agent(fx, h, 'R1')
@@ -54,13 +54,13 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     check('the card is approved (start, submit, review, pass)', Object.values(one.steps).every((s) => s.status === 200), JSON.stringify(one.steps))
     check('the queue merges it: Done', (await done(one.n)), JSON.stringify(await h.kinds(one.n)))
     const [i1] = await integrated(one.n)
-    check('…Integrated by Hive with the result, the target at it', i1?.data?.by === 'hive' && i1.data.result === q.head(fx) && i1.data.target === 'integration', JSON.stringify(i1))
+    check('…Integrated by Combwork with the result, the target at it', i1?.data?.by === 'combwork' && i1.data.result === q.head(fx) && i1.data.target === 'integration', JSON.stringify(i1))
     const message = lib.git(fx.alpha, ['log', '-1', '--format=%B', 'integration'])
-    check("…a merge commit with Hive's trailers, its revision the builder's", message.includes(`Hive-Card: ${(await h.card(one.n)).key}`) && message.includes(`Hive-Revision: ${one.revision}`), message)
+    check("…a merge commit with Combwork's trailers, its revision the builder's", message.includes(`Combwork-Card: ${(await h.card(one.n)).key}`) && message.includes(`Combwork-Revision: ${one.revision}`), message)
     check('…main untouched (the project folder\'s branch)', lib.git(fx.alpha, ['rev-parse', 'main']).trim() !== q.head(fx))
     const key1 = (await h.card(one.n)).key
-    const refs = () => lib.git(fx.alpha, ['for-each-ref', '--format=%(refname)', 'refs/hive/']).split(/\r?\n/).filter(Boolean)
-    check("…its test merge's ref dropped once it had its outcome; its submission still pinned", !refs().some((r) => r === `refs/hive/queue/${key1}`) && refs().some((r) => r.startsWith(`refs/hive/cards/${key1.toLowerCase()}/`)), JSON.stringify(refs()))
+    const refs = () => lib.git(fx.alpha, ['for-each-ref', '--format=%(refname)', 'refs/cw/']).split(/\r?\n/).filter(Boolean)
+    check("…its test merge's ref dropped once it had its outcome; its submission still pinned", !refs().some((r) => r === `refs/cw/queue/${key1}`) && refs().some((r) => r.startsWith(`refs/cw/cards/${key1.toLowerCase()}/`)), JSON.stringify(refs()))
     // Archived: its pin goes at the queue's next run (the next card's).
     await h.inv('tasks:archive', one.n, true)
 
@@ -98,9 +98,9 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     await h.page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
     await h.page.keyboard.press('Escape')
     // The run prunes once its queue is drained, after the outcome above is recorded.
-    const pinGone = await until(() => !refs().some((r) => r.startsWith(`refs/hive/cards/${key1.toLowerCase()}/`)), HUNG_MS)
+    const pinGone = await until(() => !refs().some((r) => r.startsWith(`refs/cw/cards/${key1.toLowerCase()}/`)), HUNG_MS)
     const key2 = (await h.card(two.n)).key.toLowerCase()
-    check("…the archived card's pin removed at the queue's next run; the next card's kept", !!pinGone && refs().some((r) => r.startsWith(`refs/hive/cards/${key2}/`)), JSON.stringify(refs()))
+    check("…the archived card's pin removed at the queue's next run; the next card's kept", !!pinGone && refs().some((r) => r.startsWith(`refs/cw/cards/${key2}/`)), JSON.stringify(refs()))
 
     // --- A red check: back with its log.
     q.steer(fx, 'fail', 'three is broken')
@@ -128,7 +128,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     fs.writeFileSync(fx.go, 'go')
     check('…the hand merge is observed: Done', (await done(five.n)), JSON.stringify(await h.kinds(five.n)))
     const [i5] = await integrated(five.n)
-    check('…Integrated by someone outside Hive, the target where the hand merge left it (no second merge)', i5?.data?.by === 'outside' && q.head(fx) === byHand, `${JSON.stringify(i5)} head ${q.head(fx)} by hand ${byHand}
+    check('…Integrated by someone outside Combwork, the target where the hand merge left it (no second merge)', i5?.data?.by === 'outside' && q.head(fx) === byHand, `${JSON.stringify(i5)} head ${q.head(fx)} by hand ${byHand}
 ${lib.git(fx.alpha, ['log', '--oneline', '--graph', '-8', 'integration'])}
 ${JSON.stringify(await h.kinds(five.n))}`)
 
@@ -150,7 +150,7 @@ ${JSON.stringify(await h.kinds(five.n))}`)
     check('options: its check is running', (await checkRunning()))
     await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { finish: 'agentMerges' }) })
     fs.writeFileSync(fx.go, 'go')
-    check("…merged all the same under the card's ruleset: Done, Integrated by Hive", (await done(seven.n)) && (await integrated(seven.n))[0]?.data?.by === 'hive', JSON.stringify(await h.kinds(seven.n)))
+    check("…merged all the same under the card's ruleset: Done, Integrated by Combwork", (await done(seven.n)) && (await integrated(seven.n))[0]?.data?.by === 'combwork', JSON.stringify(await h.kinds(seven.n)))
     await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx) })
 
     // --- Workflow rules off during its check: no advance; on again, merged.
@@ -172,21 +172,21 @@ ${JSON.stringify(await h.kinds(five.n))}`)
     await h.app.close().catch(() => {})
   }
 
-  if (q.devSeam('S33c (Hive ended right after the advance, HIVE_TEST_QUEUE_CRASH)')) {
-    // --- S33c: Hive ends right after the target moved, before Integrated; the next start records it, once.
+  if (q.devSeam('S33c (Combwork ended right after the advance, CW_TEST_QUEUE_CRASH)')) {
+    // --- S33c: Combwork ends right after the target moved, before Integrated; the next start records it, once.
     let crashed = null
     try {
-      h = await q.startHive(fx, { port: PORT, env: { HIVE_TEST_QUEUE_CRASH: 'afterAdvance' }, keepOptions: true })
+      h = await q.startCombwork(fx, { port: PORT, env: { CW_TEST_QUEUE_CRASH: 'afterAdvance' }, keepOptions: true })
       // Its process's end, seen as it happens (the page goes with it).
       const proc = h.app.process()
       let ended = false
       proc.once('exit', () => (ended = true))
       const reviewer = await q.agent(fx, h, 'R2')
       q.steer(fx, 'pass')
-      // Approved: the queue merges it and Hive ends as the target moves (a reply may not come back).
+      // Approved: the queue merges it and Combwork ends as the target moves (a reply may not come back).
       crashed = await q.approve(fx, h, reviewer, 'Nine', { 'nine.txt': 'nine\n' }).catch(() => null)
       check('S33c: the card was approved', !!crashed)
-      check('S33c: Hive ended right after the advance', !!(await until(() => ended, HUNG_MS)))
+      check('S33c: Combwork ended right after the advance', !!(await until(() => ended, HUNG_MS)))
     } catch (e) {
       check('no exception before the crash', false, e.stack)
     } finally {
@@ -194,14 +194,14 @@ ${JSON.stringify(await h.kinds(five.n))}`)
     }
     if (crashed) {
       const afterCrash = q.head(fx)
-      const queueRefs = () => lib.git(fx.alpha, ['for-each-ref', '--format=%(refname)', 'refs/hive/queue/']).split(/\r?\n/).filter(Boolean)
+      const queueRefs = () => lib.git(fx.alpha, ['for-each-ref', '--format=%(refname)', 'refs/cw/queue/']).split(/\r?\n/).filter(Boolean)
       const refsAtCrash = queueRefs()
       try {
-        h = await q.startHive(fx, { port: PORT, keepOptions: true })
+        h = await q.startCombwork(fx, { port: PORT, keepOptions: true })
         const restartedDone = await until(async () => (await h.card(crashed.n))?.column === 'done', HUNG_MS)
         const integ = (await h.facts(crashed.n)).filter((f) => f.kind === 'Integrated')
         check('…restarted: Done, Integrated (observed) once, its result the target as the crash left it', !!restartedDone && integ.length === 1 && integ[0].data.result === afterCrash && q.head(fx) === afterCrash, JSON.stringify(integ))
-        const crashedRef = `refs/hive/queue/${(await h.card(crashed.n)).key}`
+        const crashedRef = `refs/cw/queue/${(await h.card(crashed.n)).key}`
         check("…its test merge's ref, there at the crash, dropped by the recovery", refsAtCrash.includes(crashedRef) && !!(await until(() => !queueRefs().includes(crashedRef), HUNG_MS)), JSON.stringify({ refsAtCrash, now: queueRefs() }))
       } catch (e) {
         check('no exception after the restart', false, e.stack)

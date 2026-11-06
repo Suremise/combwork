@@ -1,7 +1,7 @@
 // Initialise repository (#701): a project that isn't a git repository becomes one from its Version Control tab (#1416;
 // HI-1905: Git chosen before the folder is a repository, Git's page offering only Initialise repository…), then gets an
 // agent with a worktree straight away, an empty project (an empty first commit) too. None's page says the folder has no
-// version control and offers no Initialise; Git's page does. Its first Initialise fails (HIVE_TEST_FAIL_IPC): the
+// version control and offers no Initialise; Git's page does. Its first Initialise fails (CW_TEST_FAIL_IPC): the
 // failure stays on Git's page and nothing is made or switched. Its dialog offers a starter .gitignore and, as git has no identity here, asks for the name and email; Initialise makes the
 // repository on main with a first commit (the .gitignore and the project's files, never .combwork) and saves the identity to
 // that repository's config only, not the global one. The project then switches to Git (HI-1905: it was chosen), its
@@ -10,7 +10,7 @@
 // first commit stays on Git's page, with Make first commit…. Git's global config is the suite's own, with no identity (GIT_CONFIG_GLOBAL), and
 // no system config (GIT_CONFIG_NOSYSTEM). Dev build, throwaway profile and workspace.
 // Dev build only (#1580): 0.9 worktrees on purpose: Tree, Blank Tree and Late Tree are 0.9 worktree agents
-// (agents:testLegacy, refused by a packaged build), checking a worktree from a repository Hive initialised.
+// (agents:testLegacy, refused by a packaged build), checking a worktree from a repository Combwork initialised.
 const lib = require('./lib.cjs')
 const { execFileSync } = require('child_process')
 const fs = require('fs')
@@ -51,13 +51,13 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitini
   fs.writeFileSync(path.join(proj, 'node_modules', 'dep', 'index.js'), 'module.exports = 1\n')
   const claude = lib.fakeClaude(userData, claudeHome, [proj, blank, late])
 
-  const { app, page } = await lib.launch({ userData, env: { ...claude, HIVE_API_PORT: lib.port(47877), HIVE_TEST_FAIL_IPC: 'git:init*1', GIT_CONFIG_GLOBAL: globalConfig, GIT_CONFIG_NOSYSTEM: '1' }, viewport: { width: 1400, height: 900 } })
+  const { app, page } = await lib.launch({ userData, env: { ...claude, CW_API_PORT: lib.port(47877), CW_TEST_FAIL_IPC: 'git:init*1', GIT_CONFIG_GLOBAL: globalConfig, GIT_CONFIG_NOSYSTEM: '1' }, viewport: { width: 1400, height: 900 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     const text = (loc) => loc.innerText().catch(() => '')
-    // Hive made the project's .combwork when it opened the workspace: it must stay out of the first commit.
+    // Combwork made the project's .combwork when it opened the workspace: it must stay out of the first commit.
     check('the project has a .combwork', !!(await lib.until(() => fs.existsSync(path.join(proj, '.combwork')), HUNG_MS)))
 
     // --- The Version Control tab of a project without git: None's page has no Initialise; Git's page has it (HI-1905).
@@ -78,7 +78,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitini
       await dialog.locator('#git-init-name').fill('Fresh Person')
       await dialog.locator('#git-init-email').fill('1+fresh@users.noreply.github.com')
     }
-    // A failed init (HIVE_TEST_FAIL_IPC: the first git:init fails before it does anything).
+    // A failed init (CW_TEST_FAIL_IPC: the first git:init fails before it does anything).
     await fill()
     await dialog.getByRole('button', { name: 'Initialise', exact: true }).click()
     check('a failed init: the dialog says so', !!(await lib.until(async () => /git:init failed/.test(await text(dialog.locator('.dialog-error'))), HUNG_MS)), await text(dialog))

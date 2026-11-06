@@ -30,6 +30,8 @@
   "activity.liveTip": "Przejdź na żywo: pokazuj to, co działa, w miarę zmian. Zakładka otwiera się zamrożona, jako migawka z chwili otwarcia.",
   "activity.loadFailed": "Nie udało się wczytać aktywności: {error}",
   "activity.loading": "Wczytywanie…",
+  "activity.modelSwitch": "Model zmieniony: {launched} → {running}",
+  "activity.modelSwitch.tip": "Jego agent kodujący zmienił model sam albo przy własnym pytaniu. Widoczne, dopóki działa na innym modelu; uruchom agenta ponownie, aby wrócić do modelu jego połączenia.",
   "activity.noPrompt": "(prompt bez tekstu)",
   "activity.notEnded": "{why, select, notOwn {{label} nie jest już procesem tego agenta: nic nie zakończono.} cli {{label} to CLI agenta: użyj Zatrzymaj, aby je zakończyć.} other {Nie udało się zakończyć: {label}. Może nadal działać.}}",
   "activity.notRunning": "Nie działa",

@@ -40,7 +40,7 @@ describe('control characters (#1040)', () => {
   })
 
   it('finds one in a source file, tracked or new, and passes tabs, line endings, escapes and other text files', () => {
-    const repo = tempDir('hive-ctrl-')
+    const repo = tempDir('cw-ctrl-')
     try {
       const git = (...args: string[]) => execFileSync('git', ['-c', 'core.autocrlf=false', ...args], { cwd: repo, env: baseEnv(), encoding: 'utf8' })
       git('init', '-q')

@@ -123,11 +123,11 @@ export function checkOptions(platform: PlatformId, levels: OptionLevels): { reso
   for (const k of Object.keys(own.set)) origins[k as keyof WorkflowOptions] = 'project'
   delete options.targetOwn
   if (ownsTarget(options, origins.target)) options.targetOwn = true
-  // A project inside a larger repository (OP-29, #1419): Hive's or the agent's merges only into a branch it names itself.
+  // A project inside a larger repository (OP-29, #1419): Combwork's or the agent's merges only into a branch it names itself.
   const subfolder = !!levels.folder && options.platform === 'git' && !!detect(levels.folder).subfolder
   const problems: OptionsProblem[] = [
     ...contradictions(options, { subfolder }).map((id) => ({ kind: 'contradiction' as const, id })),
-    // Each stage's name (N5) against every other's, in English and in the language Hive shows.
+    // Each stage's name (N5) against every other's, in English and in the language Combwork shows.
     ...stageNameProblems(options.stageNames, tr).map((p) => ({ kind: 'stageName' as const, ...p }))
   ]
   return { resolved: { options, origins, invalid: null }, problems }
@@ -161,7 +161,7 @@ export function resolveLogged(project: string, platform: PlatformId, levels: Opt
 
 /**
  * A project's options from its config as read (the runtime, the recorder's start, the adoption: #1278 lets a project set
- * only some options), over the workspace's and Hive's; a project's options for another platform don't apply.
+ * only some options), over the workspace's and Combwork's; a project's options for another platform don't apply.
  */
 export function resolvedOf(ws: Pick<WorkspaceService, 'config'>, projectPath: string, platform: PlatformId, cfg: Pick<ProjectConfig, 'workflow'>): ResolvedOptions {
   return resolveLogged(projectPath, platform, { global: config.settings.workflow, workspace: ws.config.workflow, project: cfg.workflow?.options })

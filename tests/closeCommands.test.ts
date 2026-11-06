@@ -1,6 +1,6 @@
-// HI-1368's close commands as Hive runs them: a close of a workspace joined by others for the same open (one close, one
+// HI-1368's close commands as Combwork runs them: a close of a workspace joined by others for the same open (one close, one
 // run, the first reason's); with no command an ordinary close, nothing drained or run; a workspace not finished being
-// written runs nothing and says so; When Hive quits doesn't run when a workspace didn't drain, nor with none set. The
+// written runs nothing and says so; When Combwork quits doesn't run when a workspace didn't drain, nor with none set. The
 // window, the drain and the runner are stood in for.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -30,8 +30,8 @@ vi.mock('../src/main/closeCommand/runs', async (orig) => {
 
 const { closeCommandState, closeWithCommand, dontWait, quitRunsAny, runQuitCommand } = await import('../src/main/closeCommand/closeCommands')
 const { fillCommand } = await import('../src/shared/commands')
-/** Hive's commands with When Hive quits running `command` (none: nothing), as Settings saves them (HI-1954). */
-const hive = (command: string, onUpdate = false) => ({ list: command ? [{ id: 'c-0000000f', name: 'Quit', command }] : [], onQuit: { run: command ? [{ scope: 'hive' as const, id: 'c-0000000f' }] : [], ...(onUpdate ? { onUpdate } : {}) } })
+/** Combwork's commands with When Combwork quits running `command` (none: nothing), as Settings saves them (HI-1954). */
+const combwork = (command: string, onUpdate = false) => ({ list: command ? [{ id: 'c-0000000f', name: 'Quit', command }] : [], onQuit: { run: command ? [{ scope: 'combwork' as const, id: 'c-0000000f' }] : [], ...(onUpdate ? { onUpdate } : {}) } })
 const { EventEmitter } = await import('events')
 
 let windows = 0
@@ -103,7 +103,7 @@ describe('a workspace closing with its command', () => {
     expect(state.started).toHaveLength(0)
   })
 
-  it("a test copy of Hive: closed, the command not run", async () => {
+  it("a test copy of Combwork: closed, the command not run", async () => {
     state.runs = false
     const ws = fakeWs('D:\\ws\\Work', 'backup')
     await expect(closeWithCommand(ws as never, 'window', null)).resolves.toBe('skipped')
@@ -131,7 +131,7 @@ describe('a workspace closing with its command', () => {
   })
 })
 
-describe("a quit with When Hive quits to run (HR6's round 1, findings 1 and 3; the saving step)", () => {
+describe("a quit with When Combwork quits to run (HR6's round 1, findings 1 and 3; the saving step)", () => {
   it('a workspace with no command of its own is drained all the same, and one not drained blocks it', async () => {
     const ws = fakeWs('D:\\ws\\Plain')
     const r = closeWithCommand(ws as never, 'quit', null, { drain: true })
@@ -164,7 +164,7 @@ describe("a quit with When Hive quits to run (HR6's round 1, findings 1 and 3; t
     expect(state.drains).toHaveLength(0)
   })
 
-  it("a close held, and Skip the command at its saving step: the panel stays and the close goes on; released, its command and When Hive quits are skipped and nothing starts (Darren's decision, 15:30)", async () => {
+  it("a close held, and Skip the command at its saving step: the panel stays and the close goes on; released, its command and When Combwork quits are skipped and nothing starts (Darren's decision, 15:30)", async () => {
     for (const command of ['backup', '']) {
       const held = gate()
       const ws = fakeWs('D:\\ws\\Work', command, held.wait)
@@ -243,23 +243,23 @@ describe("a quit with When Hive quits to run (HR6's round 1, findings 1 and 3; t
   }
 })
 
-describe('When Hive quits, run', () => {
+describe('When Combwork quits, run', () => {
   it("doesn't run after a workspace that wasn't finished being written, nor with none set", async () => {
-    await expect(runQuitCommand(hive('backup all'), 'quit', null, 'failed')).resolves.toBe('notDrained')
-    await expect(runQuitCommand(hive('backup all'), 'quit', null, 'left')).resolves.toBe('leftSaving')
-    await expect(runQuitCommand(hive(''), 'quit', null, null)).resolves.toBe('skipped')
+    await expect(runQuitCommand(combwork('backup all'), 'quit', null, 'failed')).resolves.toBe('notDrained')
+    await expect(runQuitCommand(combwork('backup all'), 'quit', null, 'left')).resolves.toBe('leftSaving')
+    await expect(runQuitCommand(combwork(''), 'quit', null, null)).resolves.toBe('skipped')
     expect(state.started).toHaveLength(0)
-    await expect(runQuitCommand(hive('backup all {reason}'), 'quit', null, null)).resolves.toBe('failed')
+    await expect(runQuitCommand(combwork('backup all {reason}'), 'quit', null, null)).resolves.toBe('failed')
     expect(state.started).toEqual(['backup all quit'])
   })
 
   it('a quit has something to run only with a command set somewhere, and never in a test copy', () => {
     const plain = fakeWs('D:\\ws\\A')
     const withOne = fakeWs('D:\\ws\\B', 'backup')
-    expect(quitRunsAny([plain] as never, hive(''))).toBe(false)
-    expect(quitRunsAny([plain, withOne] as never, hive(''))).toBe(true)
-    expect(quitRunsAny([plain] as never, hive('x'))).toBe(true)
+    expect(quitRunsAny([plain] as never, combwork(''))).toBe(false)
+    expect(quitRunsAny([plain, withOne] as never, combwork(''))).toBe(true)
+    expect(quitRunsAny([plain] as never, combwork('x'))).toBe(true)
     state.runs = false
-    expect(quitRunsAny([withOne] as never, hive('x'))).toBe(false)
+    expect(quitRunsAny([withOne] as never, combwork('x'))).toBe(false)
   })
 })

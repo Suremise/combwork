@@ -1,6 +1,6 @@
 // Decisions reach an agent waiting for the user (#401), on a fake Claude Code agent (fake-claude/): it works on a card,
 // asks the user and its turn ends; two decisions recorded on the card within the settle give exactly one line ("#n has 2
-// new decisions from the user…"), which it takes and acts on (it reads the card); the card's history says whom Hive told.
+// new decisions from the user…"), which it takes and acts on (it reads the card); the card's history says whom Combwork told.
 // A decision recorded while it works isn't typed over its work: it hears of it once its turn ends. Nor while the user
 // types in its terminal: once the typing pause has passed. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -8,7 +8,7 @@ const { _electron } = require('playwright-core')
 const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
-// Under load a doorbell Hive re-offered was read 24 s after the decisions (#729).
+// Under load a doorbell Combwork re-offered was read 24 s after the decisions (#729).
 const HUNG_MS = 60000
 
 const userData = path.join(lib.WORK, 'decisionwake-profile')
@@ -41,14 +41,14 @@ const check = (name, ok, extra = '') => {
   cfg.settings.assistant = { ...cfg.settings.assistant, typingPause: 4, enterEndsPause: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  // A short settle (15 s in Hive), so the decisions recorded together are still told together, quickly.
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off', HIVE_TEST_DECISION_SETTLE_MS: '2500', HIVE_TEST_MCP_LOG: mcpLog })
+  // A short settle (15 s in Combwork), so the decisions recorded together are still told together, quickly.
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off', CW_TEST_DECISION_SETTLE_MS: '2500', CW_TEST_MCP_LOG: mcpLog })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
   const until = async (fn, ms = 30000) => {
@@ -72,8 +72,8 @@ const check = (name, ok, extra = '') => {
   const named = `${(await card(n)).key}`
   check('the card has a key of its project', /^[A-Z]{2,4}-\d+$/.test(named), named)
   await inv('tasks:update', n, { column: 'doing', agent: agent.id })
-  // What it does when Hive's line comes: reads the card's decisions, as work-on-card says.
-  fs.writeFileSync(path.join(claudeHome, 'fake-wakes-Asker.txt'), `hive cw_read_task {"number":${n}}\nhive cw_read_task {"number":${n}}\nhive cw_read_task {"number":${n}}\n`)
+  // What it does when Combwork's line comes: reads the card's decisions, as work-on-card says.
+  fs.writeFileSync(path.join(claudeHome, 'fake-wakes-Asker.txt'), `cw cw_read_task {"number":${n}}\ncw cw_read_task {"number":${n}}\ncw cw_read_task {"number":${n}}\n`)
   await inv('session:start', alpha, { agentId: agent.id })
   check('the agent starts', !!(await until(() => idle(agent.id), HUNG_MS)))
   // Its own turns, typed once it takes prompts and waited for to their end (#729: an idle wait returned before the fake,
@@ -91,7 +91,7 @@ const check = (name, ok, extra = '') => {
   await lib.sleep(4000) // A fixed wait on purpose: this checks that a second line does NOT come.
   check('…exactly one, naming the card and both', wakes().length === 1 && wakes()[0] === `[CW] ${named} has 2 new decisions from the user: read them (cw_read_task) and carry on from where you asked.`, JSON.stringify(wakes()))
   check('it reads them', !!(await until(async () => reads(n).length >= 1, HUNG_MS)))
-  check("the card's history says whom Hive told", !!(await until(async () => (await card(n))?.history.some((h) => h.by === 'Combwork' && h.what === 'Told Asker (alpha) of 2 new decisions'), HUNG_MS)), JSON.stringify((await card(n))?.history.map((h) => h.what)))
+  check("the card's history says whom Combwork told", !!(await until(async () => (await card(n))?.history.some((h) => h.by === 'Combwork' && h.what === 'Told Asker (alpha) of 2 new decisions'), HUNG_MS)), JSON.stringify((await card(n))?.history.map((h) => h.what)))
   await takesPrompts('after the decisions')
 
   // A decision while it works: nothing typed into its work; one line once its turn ends. Its turn is held until the

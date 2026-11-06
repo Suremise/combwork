@@ -13,7 +13,7 @@
 //
 // Once, durably, whatever runs it (HR5's rounds 1 and 2): each project is settled at most once, recorded in project.json's
 // `stepsDone` in the same write as its change (one locked, atomic write: never a change published without its record),
-// and checked under that lock with the step's `board_meta` mark (set once every project is done). So a second Hive
+// and checked under that lock with the step's `board_meta` mark (set once every project is done). So a second Combwork
 // running it meanwhile, or a run again after one that failed or stopped anywhere, never touches a project already
 // settled, nor a choice the user made since. Only dev and test workspaces have such values: no release has P5 or P6.
 
@@ -74,13 +74,13 @@ export function settledSlotsUpToDate(wf: ProjectWorkflow | null | undefined, pro
   return keptChanged ? { ...written, kept } : written
 }
 
-/** The options' problems as a save checks them, at this workspace's levels (Hive's and the workspace's defaults). */
+/** The options' problems as a save checks them, at this workspace's levels (Combwork's and the workspace's defaults). */
 const problemsIn =
   (ws: WorkspaceService, folder: string): ProblemsOf =>
   (platform, options) =>
     checkOptions(platform, { global: config.settings.workflow, workspace: ws.config.workflow, project: options, folder }).problems.map((p) => (p.kind === 'contradiction' ? p.id : p.kind))
 
-/** For tests: awaited before each project is looked at and after its write (a second Hive, or a failure, part way through). */
+/** For tests: awaited before each project is looked at and after its write (a second Combwork, or a failure, part way through). */
 export interface StepHooks {
   beforeProject?: (folder: string) => Promise<void> | void
   afterProject?: (folder: string) => Promise<void> | void

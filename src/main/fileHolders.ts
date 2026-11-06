@@ -3,7 +3,7 @@ import { join } from 'path'
 
 /**
  * The processes that have a file open (HI-1749), as Windows' Restart Manager lists them (RmGetList): what held project.json
- * when its save failed with EPERM, which hive.log couldn't say. Through PowerShell (a C# helper compiled for the call, a
+ * when its save failed with EPERM, which combwork.log couldn't say. Through PowerShell (a C# helper compiled for the call, a
  * second or two), so only after a write has failed; read-only (it registers the file and lists, never ends anything).
  * Each as "<pid> <application name>"; empty when none or it couldn't tell (another OS, PowerShell refused, a timeout).
  */
@@ -15,7 +15,7 @@ $src = @"
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
-public static class HiveFileHolders {
+public static class CombworkFileHolders {
   [StructLayout(LayoutKind.Sequential)] struct RM_UNIQUE_PROCESS { public int dwProcessId; public System.Runtime.InteropServices.ComTypes.FILETIME ProcessStartTime; }
   [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)] struct RM_PROCESS_INFO {
     public RM_UNIQUE_PROCESS Process;
@@ -45,13 +45,13 @@ public static class HiveFileHolders {
 }
 "@
 Add-Type -TypeDefinition $src
-[HiveFileHolders]::Of($env:HIVE_HOLDER_PATH)
+[CombworkFileHolders]::Of($env:CW_HOLDER_PATH)
 `
 
 export function fileHolders(path: string): Promise<string[]> {
   if (process.platform !== 'win32') return Promise.resolve([])
   return new Promise((res) => {
-    execFile(POWERSHELL, ['-NoProfile', '-NonInteractive', '-Command', SCRIPT], { windowsHide: true, encoding: 'utf8', timeout: 20_000, env: { ...process.env, HIVE_HOLDER_PATH: path } }, (err, out) =>
+    execFile(POWERSHELL, ['-NoProfile', '-NonInteractive', '-Command', SCRIPT], { windowsHide: true, encoding: 'utf8', timeout: 20_000, env: { ...process.env, CW_HOLDER_PATH: path } }, (err, out) =>
       res(err ? [] : String(out).split(/\r?\n/).map((l) => l.trim()).filter(Boolean))
     )
   })

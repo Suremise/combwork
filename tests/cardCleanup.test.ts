@@ -1,4 +1,4 @@
-// Archived cards' attachments cleaned up (HI-1842, Darren's decisions of 27 Oct 2026), on the real board (a temp hive.db):
+// Archived cards' attachments cleaned up (HI-1842, Darren's decisions of 27 Oct 2026), on the real board (a temp combwork.db):
 // only archived cards, the project's days after archiving (30 by default, Never keeps them); open and Done cards keep theirs,
 // as do cards brought back from the archive, or archived with their hidden or removed project. Round 2 (HR5's review): a
 // plan and an apply that checks it again in each card's change: only planned files
@@ -15,7 +15,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { junction } from './pathAliases'
 
-const base = tempDir('hive-cardcleanup-')
+const base = tempDir('cw-cardcleanup-')
 const trashDir = join(base, 'trash')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -32,10 +32,10 @@ advanced.load(join(base, 'profile'))
 type WS = ReturnType<typeof createWorkspaceService>
 const opened: WS[] = []
 beforeAll(() => {
-  process.env.HIVE_TEST_TRASH_DIR = trashDir
+  process.env.CW_TEST_TRASH_DIR = trashDir
 })
 afterAll(async () => {
-  delete process.env.HIVE_TEST_TRASH_DIR
+  delete process.env.CW_TEST_TRASH_DIR
   advanced.stop()
   for (const w of opened) await disposeWorkspaceService(w)
   store.closeAllBoards()
@@ -113,7 +113,7 @@ describe('the rules (shared/cardCleanup.ts)', () => {
 })
 
 describe("cleaning up archived cards' attachments (HI-1842)", () => {
-  it("an archived card's files go to the Recycle Bin after the days, rows and all, with Hive's comment; open and Done cards keep theirs", async () => {
+  it("an archived card's files go to the Recycle Bin after the days, rows and all, with Combwork's comment; open and Done cards keep theirs", async () => {
     const { w, p } = await workspace()
     const archived = await card(w, { archived: true })
     const open = await card(w)
@@ -135,7 +135,7 @@ describe("cleaning up archived cards' attachments (HI-1842)", () => {
     const said = after.comments.at(-1)!
     expect(said.by).toBe('Combwork')
     expect(said.text).toMatch(/^Removed 2 attachments \(.*shot\.png.*\): this project removes archived cards' attachments 30 days after archiving \(Project Settings → Storage\)\. They are in the Recycle Bin\.$/)
-    expect(said.hiveText).toBeTruthy()
+    expect(said.appText).toBeTruthy()
     expect([rows(w, open.n), rows(w, done.n)]).toEqual([2, 2])
     expect([...open.paths, ...done.paths].every((f) => existsSync(f))).toBe(true)
     // Used once: its Move again is refused, and the automatic run finds nothing more.

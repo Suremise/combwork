@@ -1,10 +1,10 @@
-// Text on Hive's amber reads at WCAG AA (4.5:1) in both themes, measured as drawn (computed colours in the window):
+// Text on Combwork's amber reads at WCAG AA (4.5:1) in both themes, measured as drawn (computed colours in the window):
 // - menus (#362): a hovered or keyboard-chosen entry, and the command palette's chosen row: its label, icon, shortcut
 //   and second line on the fill, a greyed entry's label too, and Recent's ✕; on a real context menu (a project's, in
 //   the sidebar) with entries of each kind added to it. A session action's entry keeps its own wash (#344);
 // - the status bar (#384): its items resting and hovered, a secondary part, and the caution, warning, update and
 //   update-ready items (added beside its own); the activity bar's and a project's count badges.
-// Throwaway profile and workspace, quiet; no agent is started. Empty Claude Code and Codex homes of its own: Hive looks
+// Throwaway profile and workspace, quiet; no agent is started. Empty Claude Code and Codex homes of its own: Combwork looks
 // for both CLIs when it starts, and their sign-in checks must never read the user's.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -193,7 +193,7 @@ function measure([selector, parts]) {
     const vp = page.viewportSize()
     await shot(`${theme}-statusbar`, { x: 0, y: vp.height - 60, width: vp.width, height: 60 })
 
-    // The count badges: the activity bar's and a project's (#384), added where Hive shows them.
+    // The count badges: the activity bar's and a project's (#384), added where Combwork shows them.
     await page.evaluate(() => {
       const a = document.querySelector('.activitybar .activity-btn')
       const s = document.createElement('span')

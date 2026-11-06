@@ -34,12 +34,12 @@ const post = (url, token, body) =>
   lib.trustForCodex(proj)
   fs.rmSync(userData, { recursive: true, force: true })
   lib.enableProviders(userData, ['claude-code', 'codex'])
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47894), CODEX_HOME: lib.CODEX_HOME, PATH: lib.pathWithoutStoreAliases() })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47894), CODEX_HOME: lib.CODEX_HOME, PATH: lib.pathWithoutStoreAliases() })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], env })
   const page = await app.firstWindow()
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await inv('project:updateConfig', proj, { layout: 'columns2' })
   await lib.setOwnOptions(inv, proj, { fileLocks: 'ask' })
@@ -113,7 +113,7 @@ const post = (url, token, body) =>
   // --- "Ask me" lock: agent 2 holds notes.txt (a claim made through the hook server), agent 1 edits it.
   await inv('session:start', proj, { agentId: a2.id })
   const l2 = await waitFor(a2.id, (x) => x?.status === 'ready', 60000)
-  // The token isn't in the log (Hive hides it): read it from agent 2's Codex command line.
+  // The token isn't in the log (Combwork hides it): read it from agent 2's Codex command line.
   const hook = lib.codexHook(l2.runId)
   const m = hook ? [null, hook.token, hook.url] : null
   check('hook url and token found', !!m)
@@ -130,7 +130,7 @@ const post = (url, token, body) =>
   check('lock shows on agent 2', held.some((f) => /notes\.txt$/i.test(f)), JSON.stringify(held))
   const asking = page.locator('.toast', { hasText: 'wants to edit notes.txt' })
   const notes = () => fs.readFileSync(path.join(proj, 'notes.txt'), 'utf8')
-  // A turn of agent 1's: typed until Codex takes it (its status moves on: lib.sendPrompt), then until Hive asks, the
+  // A turn of agent 1's: typed until Codex takes it (its status moves on: lib.sendPrompt), then until Combwork asks, the
   // file changes or the turn ends. Waiting on the status alone returned at once with the last turn's "finished" (#201).
   const turn = async (prompt) => {
     const since = (await live(a1.id))?.statusSince
@@ -139,9 +139,9 @@ const post = (url, token, body) =>
     return live(a1.id)
   }
   let w
-  // Hive asks only once Codex tries the edit. The small test model sometimes answers without trying (once it replied
+  // Combwork asks only once Codex tries the edit. The small test model sometimes answers without trying (once it replied
   // READY again, from the turn before the compaction): then it is asked again, more firmly, up to twice. Codex
-  // answering is the CLI's part (lib.cliStep); Hive holding the edit back and asking is Hive's.
+  // answering is the CLI's part (lib.cliStep); Combwork holding the edit back and asking is Combwork's.
   await lib.cliStep('the locked edit', { session: key1 }, async () => {
     for (let attempt = 0; attempt < 3; attempt++) {
       w = await turn(attempt ? 'Edit notes.txt now: call the apply_patch tool to append the line "from agent 1". Do not answer in text.' : 'Use apply_patch to add the line "from agent 1" at the end of notes.txt. Do nothing else.')
@@ -156,7 +156,7 @@ const post = (url, token, body) =>
     check('Combwork asks with an Allow button', (await asking.getByRole('button', { name: 'Allow', exact: true }).count()) > 0)
   })
   const notes0 = notes()
-  // Allow as soon as Hive asks, as a user does: usually while Codex is still replying to the refusal, so Hive's
+  // Allow as soon as Combwork asks, as a user does: usually while Codex is still replying to the refusal, so Combwork's
   // go-ahead waits for that turn's end (#201); after it, the go-ahead goes at once.
   console.log(`Allow clicked while agent 1 is ${(await live(a1.id))?.status}`)
   await asking.getByRole('button', { name: 'Allow', exact: true }).first().click().catch(() => undefined)

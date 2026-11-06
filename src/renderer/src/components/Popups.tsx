@@ -11,7 +11,7 @@ import { TipPopup } from './Tips'
 import { Icon } from './ui'
 
 /**
- * Hive's one pop-up system (HI-2320): every notification this window is given (components/Popups, from the store's
+ * Combwork's one pop-up system (HI-2320): every notification this window is given (components/Popups, from the store's
  * `toasts`) and the tip, in one place (Settings → Notifications → Pop-up position; bottom right by default, left of the
  * Assistant's panel), with one look, one stacking, one timing, hover and keyboard handling. The bell's list
  * (Overlays.tsx NotificationCenter) shows the same entries with the same text and buttons.
@@ -23,7 +23,7 @@ const M = {
   dismiss: msg({ id: 'shell.toast.dismiss', defaultMessage: 'Dismiss', description: 'Button on a notice in the corner: closes it.' }),
   agent: msg({ id: 'shell.toast.openAgent', defaultMessage: "Open {agent}'s pane", description: "Tooltip on a notification an agent or the Assistant sent about an agent (HI-1961): clicking it shows that agent's pane (where its terminal is). {agent} is the agent's name." }),
   card: msg({ id: 'shell.toast.openCard', defaultMessage: 'Open {card}', description: 'Tooltip on a notification an agent or the Assistant sent about a card (HI-1961): clicking it opens the card ({card}, its key, e.g. HI-12).' }),
-  unfinished: msg({ id: 'shell.entry.unfinished', defaultMessage: "Didn't finish: try again", description: "What a notification says above its buttons when one of them, run in another Hive window, didn't say it had finished (that window reloaded, closed, or took too long; HI-2320). The buttons stay, to try again." }),
+  unfinished: msg({ id: 'shell.entry.unfinished', defaultMessage: "Didn't finish: try again", description: "What a notification says above its buttons when one of them, run in another Combwork window, didn't say it had finished (that window reloaded, closed, or took too long; HI-2320). The buttons stay, to try again." }),
   project: msg({ id: 'shell.toast.openProject', defaultMessage: 'Show {project}', description: 'Tooltip on a notification about a project (HI-2320): clicking it shows the project ({project}, its name).' })
 }
 
@@ -144,7 +144,7 @@ export function EntryActions({ t, onNavigate }: { t: ToastMessage; onNavigate?: 
 
 /**
  * One pop-up: closes by itself after its time (shared/notify.ts popupMs), kept while the pointer or the keyboard focus
- * is on it, or while the window isn't focused (HI-2320: Hive's own messages wait for you to come back); one that waits
+ * is on it, or while the window isn't focused (HI-2320: Combwork's own messages wait for you to come back); one that waits
  * for you stays until handled. Escape with the focus in it closes it.
  */
 function Popup({ t }: { t: ToastMessage }) {

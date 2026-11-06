@@ -1,7 +1,7 @@
 {
   "tips.activityTab.text": {
     "defaultMessage": "The Activity tab has a tab per running agent: its card, its turn and tool call, its background tasks, subagents and processes. It opens as a snapshot; Play follows it live. An agent's ⋯ menu opens it on that agent.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.activityTab.title": {
     "defaultMessage": "See what each agent is running",
@@ -9,7 +9,7 @@
   },
   "tips.activityWorkspace.text": {
     "defaultMessage": "Activity, in the activity bar, shows every project's running agents together, their tabs grouped by project. A card in progress opens it on the agents working on that card, and a run or a lane in the Progress panel on its agents (Show in Activity).",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.activityWorkspace.title": {
     "defaultMessage": "Everything running, in one place",
@@ -17,7 +17,7 @@
   },
   "tips.advancedSettings.text": {
     "defaultMessage": "After a coding agent's update, Combwork no longer sees its trust question or its sign-in errors? Settings → Advanced has the text and fields Combwork looks for, and its timeouts: change one, with the default beside it, or edit advanced.json.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.advancedSettings.title": {
     "defaultMessage": "Fix a CLI change yourself",
@@ -25,7 +25,7 @@
   },
   "tips.agentConsole.text": {
     "defaultMessage": "Settings → Agent API → Let agents read the developer console gives agents a read-only tool showing their CLI's hooks and status line next to what Combwork made of each, redacted, so they can debug what Combwork sees.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.agentConsole.title": {
     "defaultMessage": "Let agents see what their CLI sends",
@@ -33,7 +33,7 @@
   },
   "tips.agentHooks.text": {
     "defaultMessage": "Hooks… in an agent's ⋯ menu lists the hooks its session has, yours too, and the last hooks Combwork received: what Combwork replied, and whether it applied or ignored each one and why.",
-    "description": "A tip. ⋯ is the button on an agent's pane header: keep it. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. ⋯ is the button on an agent's pane header: keep it. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.agentHooks.title": {
     "defaultMessage": "See why an agent's hooks went quiet",
@@ -41,7 +41,7 @@
   },
   "tips.agentInSlot.text": {
     "defaultMessage": "Beside an agent's name on its pane: in slot-b while it builds a card in a slot (click it for Branches & remotes), carried: hb2 in the slot kept for it, home: hr4 for a reviewer's retired home. The project's hover lists them in a Slot column.",
-    "description": "A tip. A slot is a working folder (a worktree) Hive lends to a card or a lane; in slot-b, carried: hb2 and home: hr4 are examples of agents.place.short, as Hive shows them. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: slot."
+    "description": "A tip. A slot is a working folder (a worktree) Combwork lends to a card or a lane; in slot-b, carried: hb2 and home: hr4 are examples of agents.place.short, as Combwork shows them. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Glossary: slot."
   },
   "tips.agentInSlot.title": {
     "defaultMessage": "See where each agent works",
@@ -49,7 +49,7 @@
   },
   "tips.agentLayouts.text": {
     "defaultMessage": "Each agent has its own pane: choose a layout at the right of the session toolbar, and drag a pane by its header to rearrange them. File locks stop two agents editing the same file.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.agentLayouts.title": {
     "defaultMessage": "Several agents side by side",
@@ -57,7 +57,7 @@
   },
   "tips.agentMenu.text": {
     "defaultMessage": "An agent's pane header keeps to its state, its card and Stop. Compact, Hand Over, Merge…, its settings and anything that needs a look (a dot on ⋯ says so) are in its ⋯ menu, or right-click the header. {key}",
-    "description": "A tip. {key} is a shortcut (its keys, or the command's name when it has none). ⋯ is the button on an agent's pane header: keep it. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. {key} is a shortcut (its keys, or the command's name when it has none). ⋯ is the button on an agent's pane header: keep it. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.agentMenu.title": {
     "defaultMessage": "Everything else is under an agent's ⋯",
@@ -65,7 +65,7 @@
   },
   "tips.agentSettings.text": {
     "defaultMessage": "Click an agent's model in its footer for Agent Settings: give a reviewer a faster model while another agent codes with the strongest.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.agentSettings.title": {
     "defaultMessage": "A model per agent",
@@ -73,7 +73,7 @@
   },
   "tips.agentStates.text": {
     "defaultMessage": "Each agent has one of four states, told apart by shape as well as colour: a diamond waits for you, a square is stalled, a pulsing dot is working and a ring is idle. The project header counts them: \"1 waiting · 2 working\".",
-    "description": "A tip. The four shapes are the marks Hive draws for an agent's state; keep the example's wording as the header's state line translates it."
+    "description": "A tip. The four shapes are the marks Combwork draws for an agent's state; keep the example's wording as the header's state line translates it."
   },
   "tips.agentStates.title": {
     "defaultMessage": "Read your agents at a glance",
@@ -81,7 +81,7 @@
   },
   "tips.agentWorkflowRole.text": {
     "defaultMessage": "Each agent's Role in the workflow, in Agent Settings, says whether it builds cards, reviews them, or either. Start Lane offers builders and reviewers by it.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: workflow role."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Glossary: workflow role."
   },
   "tips.agentWorkflowRole.title": {
     "defaultMessage": "Builders and reviewers",
@@ -89,7 +89,7 @@
   },
   "tips.agentsTempFolder.text": {
     "defaultMessage": "Agents write scripts and other temporary files to Windows' Temp folder as they work. Set Settings → Advanced → Agents' temp folder to a folder of your own, such as one you exclude from antivirus scans, and each agent gets a folder there instead.",
-    "description": "A tip (HI-2496). Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Agents' temp folder is an advanced setting's title)."
+    "description": "A tip (HI-2496). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Agents' temp folder is an advanced setting's title)."
   },
   "tips.agentsTempFolder.title": {
     "defaultMessage": "Keep agents' temp files out of Windows' Temp",
@@ -97,7 +97,7 @@
   },
   "tips.allKeysToCli.text": {
     "defaultMessage": "In an agent's pane, Combwork's shortcuts take their keys. Turn on Settings → Advanced → All keys go to the CLI to send every key to the CLI instead, but the command palette's (Show All Commands), so every command is still in reach.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.allKeysToCli.title": {
     "defaultMessage": "Give every key to the agent's CLI",
@@ -105,7 +105,7 @@
   },
   "tips.alwaysOnTop.text": {
     "defaultMessage": "The pin in the title bar (or Ctrl+Alt+O) keeps the window above your other apps, so a test run or an emulator can work underneath. Each window has its own, remembered for its workspace.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.alwaysOnTop.title": {
     "defaultMessage": "Keep a Combwork window on top",
@@ -113,7 +113,7 @@
   },
   "tips.antivirus.text": {
     "defaultMessage": "On Windows, Microsoft Defender scans every file builds, tests and git touch. Settings → Workspace → Antivirus scanning shows whether it scans your workspace and can exclude its folders, with your consent.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.antivirus.title": {
     "defaultMessage": "Antivirus and your workspace",
@@ -121,7 +121,7 @@
   },
   "tips.archiveNew.text": {
     "defaultMessage": "The cheapest way to carry on after a long session: archive it and start clean, so nothing old is re-cached. Write a handover first so the new one knows where to pick up.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.archiveNew.title": {
     "defaultMessage": "Archive and Start New",
@@ -129,7 +129,7 @@
   },
   "tips.assistant.text": {
     "defaultMessage": "The panel on the right oversees the workspace: ask what the agents are doing, what things cost, or for a plan. {key}",
-    "description": "A tip. {key} is a shortcut (its keys, or the command's name when it has none). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. {key} is a shortcut (its keys, or the command's name when it has none). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.assistant.title": {
     "defaultMessage": "Ask the Assistant",
@@ -137,7 +137,7 @@
   },
   "tips.assistantAgentRequests.text": {
     "defaultMessage": "An agent that needs something only the Assistant or you can do on a card, such as parking a card On Hold on your answer, asks the Assistant directly instead of leaving a comment. The request wakes it, and it acts only within its Control and what you decided.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands (On Hold, a board column; Control, a setting): keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands (On Hold, a board column; Control, a setting): keep them as Combwork shows them."
   },
   "tips.assistantAgentRequests.title": {
     "defaultMessage": "Agents can ask the Assistant",
@@ -145,7 +145,7 @@
   },
   "tips.assistantBatch.text": {
     "defaultMessage": "The Assistant can move or label up to {cards, plural, one {# card} other {# cards}} in one step, each card still listed on its own.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {cards} is how many cards one step can change (100)."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. {cards} is how many cards one step can change (100)."
   },
   "tips.assistantBatch.title": {
     "defaultMessage": "Many cards in one step",
@@ -153,7 +153,7 @@
   },
   "tips.assistantCompact.text": {
     "defaultMessage": "The Assistant usually works with a bigger context than your agents, so its Compact button turns orange later: past {tokens, plural, one {# token} other {# tokens}} by default. Settings → Assistant → Highlight Compact over changes that, or Never turns it off.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {tokens} is the default (500,000)."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. {tokens} is the default (500,000)."
   },
   "tips.assistantCompact.title": {
     "defaultMessage": "When the Assistant suggests compacting",
@@ -161,7 +161,7 @@
   },
   "tips.assistantConnection.text": {
     "defaultMessage": "Assistant Settings → Connection picks the setup it runs on, for this workspace: keep it on your agents' model and effort, since a lighter one makes it careless. A server account such as DeepSeek works too, with caveats the guide lists.",
-    "description": "A tip (HI-2108). Names of Hive's menus, views, settings and commands: keep them as Hive shows them. DeepSeek is a product's name."
+    "description": "A tip (HI-2108). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. DeepSeek is a product's name."
   },
   "tips.assistantConnection.title": {
     "defaultMessage": "Choose what the Assistant runs on",
@@ -169,7 +169,7 @@
   },
   "tips.assistantControl.text": {
     "defaultMessage": "Settings → Assistant → Control decides what it may do: only advise, or also add, start and brief agents and start cards when you ask.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.assistantControl.title": {
     "defaultMessage": "Let the Assistant run agents",
@@ -177,7 +177,7 @@
   },
   "tips.assistantImages.text": {
     "defaultMessage": "The Assistant view's Attachments shows every screenshot and file you've pasted or dropped into its conversations, by conversation. Click a conversation's name to read it again.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.assistantImages.title": {
     "defaultMessage": "What you've attached to the Assistant",
@@ -185,7 +185,7 @@
   },
   "tips.assistantJournal.text": {
     "defaultMessage": "The Assistant keeps a journal in each workspace: decisions, plans and what happened, recalled a few lines at a time after a restart. Settings → Assistant → Journal chooses what it may store, or turns it off.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.assistantJournal.title": {
     "defaultMessage": "The Assistant remembers",
@@ -193,7 +193,7 @@
   },
   "tips.assistantJournalBrowser.text": {
     "defaultMessage": "The Assistant view's Journal shows what the Assistant keeps in its journal, newest first. Search it, open an entry to correct or delete it, or use Forget These… to remove everything a search finds.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.assistantJournalBrowser.title": {
     "defaultMessage": "Read what the Assistant remembers",
@@ -201,7 +201,7 @@
   },
   "tips.assistantLaneWatch.text": {
     "defaultMessage": "Running several lanes, the Assistant waits on all of them at once and is woken only for a failed review, a blocked or stalled card, a lane ready to merge or one that ended.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.assistantLaneWatch.title": {
     "defaultMessage": "One watch for all the lanes",
@@ -209,7 +209,7 @@
   },
   "tips.assistantLanes.text": {
     "defaultMessage": "When the Assistant starts an agent on its next set of cards, it gives it a new conversation in the same step (the old one stays in the Sessions tab). Short conversations cost much less: ask it to do the same for any new card.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.assistantLanes.title": {
     "defaultMessage": "A new conversation for each lane",
@@ -217,7 +217,7 @@
   },
   "tips.assistantMcp.textAdded": {
     "defaultMessage": "The Assistant gets a workspace MCP server only once you add it for it, as for a project: + in MCP Servers in its view on the activity bar, or tick Assistant in Add to… in the MCP view. A server with your own notes can reach it and no project.",
-    "description": "A tip (HI-1472, HI-2059). Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Hive Assistant is a box to tick; + is a button)."
+    "description": "A tip (HI-1472, HI-2059). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Combwork Assistant is a box to tick; + is a button)."
   },
   "tips.assistantMcp.title": {
     "defaultMessage": "MCP servers for the Assistant only",
@@ -225,7 +225,7 @@
   },
   "tips.assistantMessages.text": {
     "defaultMessage": "The Assistant can't give a waiting or working agent a new task, but it can leave it a message, such as your answer: delivered as soon as the agent can take it. Its pane shows it as unread (✉) until then; click that to cancel it.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.assistantMessages.title": {
     "defaultMessage": "The Assistant can reach a busy agent",
@@ -233,7 +233,7 @@
   },
   "tips.assistantNoticeOpens.text": {
     "defaultMessage": "A notification from the Assistant or an agent about one agent or one card opens it when you click it: the agent's pane, or the card. Older ones are in the Notifications panel, and open from there too.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.assistantNoticeOpens.title": {
     "defaultMessage": "Click a notification to go to it",
@@ -241,7 +241,7 @@
   },
   "tips.assistantReplies.text": {
     "defaultMessage": "When you answer an agent in its pane while the Assistant watches it or its card, the Assistant is told the first line, so it doesn't ask you again. Settings → General → Your name sets how it names you; Settings → Assistant turns it off.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.assistantReplies.title": {
     "defaultMessage": "The Assistant hears your answers to agents",
@@ -249,7 +249,7 @@
   },
   "tips.assistantSettings.text": {
     "defaultMessage": "Not sure which setting would help? Ask the Assistant: it explains any of them and says where it is. With Settings → Assistant → Control → Change settings on, it can make the change, which you can revert from its panel.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.assistantSettings.title": {
     "defaultMessage": "Ask the Assistant about a setting",
@@ -257,7 +257,7 @@
   },
   "tips.assistantSide.text": {
     "defaultMessage": "Windows notifications or another app covering the right of the screen? View → Move Assistant Panel to the Left puts the Assistant beside the project list.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.assistantSide.title": {
     "defaultMessage": "The Assistant on the left",
@@ -265,7 +265,7 @@
   },
   "tips.assistantStatus.text": {
     "defaultMessage": "The line under the Assistant's header says what it is doing, and which cards it waits on and until when: click one to open it. Done by the Assistant at its end lists what it did. Under Workspace, hover an agent's mark for what it's doing; click to go there.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.assistantStatus.title": {
     "defaultMessage": "What the Assistant is doing",
@@ -273,7 +273,7 @@
   },
   "tips.assistantTeam.text": {
     "defaultMessage": "With three or more agents, or builders and reviewers, ask the Assistant in Coordinator mode to run your cards as lanes: it splits them by the files they touch, briefs each pair and watches every lane to the end. With one or two agents it keeps out of the way.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.assistantTeam.title": {
     "defaultMessage": "The Assistant runs your team",
@@ -281,7 +281,7 @@
   },
   "tips.assistantTemplates.text": {
     "defaultMessage": "Ask the Assistant to load a template into a project, naming any agent you like: it shows what would change first, applies the template's workflow, and Undo puts the old agents back.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.assistantTemplates.title": {
     "defaultMessage": "Have the Assistant set up a team",
@@ -289,7 +289,7 @@
   },
   "tips.assistantToldWaiting.text": {
     "defaultMessage": "While the Assistant watches the lanes, an agent showing a permission prompt or asking you something wakes it, and it tells you which agent, its card and what it asks. It never answers for you. Its watch can follow a release card outside the lanes too.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.assistantToldWaiting.title": {
     "defaultMessage": "The Assistant tells you when an agent needs you",
@@ -297,7 +297,7 @@
   },
   "tips.assistantUndo.text": {
     "defaultMessage": "Done by the Assistant lists its changes by your message. Undo on a change puts it back, and Undo on a message puts back all of them; whatever you or an agent changed since is kept.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: undo, changed since."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Glossary: undo, changed since."
   },
   "tips.assistantUndo.title": {
     "defaultMessage": "Undo the Assistant's changes",
@@ -305,7 +305,7 @@
   },
   "tips.assistantWaits.text": {
     "defaultMessage": "Ask the Assistant to let you know when an agent finishes a build or a test run: it waits without checking in, and Combwork wakes it when the agent finishes, needs you or stops.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.assistantWaits.title": {
     "defaultMessage": "Have the Assistant tell you when an agent is done",
@@ -313,7 +313,7 @@
   },
   "tips.attachFiles.text": {
     "defaultMessage": "Drop a PDF, a log or any file onto an agent's terminal: Combwork keeps a copy with the session and pastes its path. A chip shows what's attached, and says when the agent's CLI doesn't read that kind of file itself, so the agent opens it by its path.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.attachFiles.title": {
     "defaultMessage": "Attach any file to a prompt",
@@ -321,7 +321,7 @@
   },
   "tips.attachmentsTabs.text": {
     "defaultMessage": "The Attachments tab has Pane attachments and Card attachments. Show in Attachments, beside a card's attachments, opens Card attachments at that card; Show Session's Attachments, in an agent's ⋯ menu, opens Pane attachments at its session.",
-    "description": "A tip (HI-1841). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip (HI-1841). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.attachmentsTabs.title": {
     "defaultMessage": "Jump to a card's or a session's files",
@@ -329,7 +329,7 @@
   },
   "tips.autoModeSetup.text": {
     "defaultMessage": "In auto mode, Claude Code may offer to teach auto mode about your environment. Combwork never answers it: the agent shows Needs input, and nothing is typed into it, until you do. Settings → Advanced → Claude Code can turn the offer off.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Claude Code is a product name, and auto mode its permission mode."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Claude Code is a product name, and auto mode its permission mode."
   },
   "tips.autoModeSetup.title": {
     "defaultMessage": "Claude Code's offer waits for you",
@@ -337,7 +337,7 @@
   },
   "tips.backupRetention.text": {
     "defaultMessage": "Combwork compresses its transcript backups once a session ends, and Storage shows what they hold. To let old ones go, set Settings → Sessions → Keep transcript backups: only copies of sessions the CLI still has go to the Recycle Bin.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.backupRetention.title": {
     "defaultMessage": "Backups take less room, and can expire",
@@ -345,7 +345,7 @@
   },
   "tips.banners.text": {
     "defaultMessage": "Each thing is told once: a pop-up while you use Combwork, a Windows notification while it is in the background, and either way it is kept under the bell, with its buttons while they apply. Settings → Notifications chooses where pop-ups go.",
-    "description": "A tip. The bell is the Notifications panel's button at the bottom of the activity bar. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. The bell is the Notifications panel's button at the bottom of the activity bar. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.banners.title": {
     "defaultMessage": "Every notification is under the bell",
@@ -353,7 +353,7 @@
   },
   "tips.board.text": {
     "defaultMessage": "Cards in On Hold, Todo, Active, Review, Approved and Done, each for a project. Start… gives a card to an agent with the card as its prompt. {key}",
-    "description": "A tip. {key} is a shortcut (its keys, or the command's name when it has none). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. {key} is a shortcut (its keys, or the command's name when it has none). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.board.title": {
     "defaultMessage": "Plan work on the task board",
@@ -361,7 +361,7 @@
   },
   "tips.boardArchive.text": {
     "defaultMessage": "Tick Archived on the board for a table of archived cards: sort and filter them by project, label or the column they came from, and Unarchive one or a whole selection.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.boardArchive.title": {
     "defaultMessage": "Find an archived card",
@@ -369,7 +369,7 @@
   },
   "tips.boardArchiveAll.text": {
     "defaultMessage": "A column's ⋯ has Archive All in Done (n)…, and the board's ⋯ has Archive All Cards… for every column. Cards agents are on are skipped unless you say, and Undo puts everything back where it was.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.boardArchiveAll.title": {
     "defaultMessage": "Clear a column in one go",
@@ -377,7 +377,7 @@
   },
   "tips.boardDoing.text": {
     "defaultMessage": "Drag a card into Active and Combwork asks: nobody yet, an agent without starting anything, or an agent that starts on it now.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.boardDoing.title": {
     "defaultMessage": "Choose who works on a card in Active",
@@ -385,7 +385,7 @@
   },
   "tips.boardDone.text": {
     "defaultMessage": "A reviewer moves a card that passes its review to Approved; Done means merged, and an agent moves its cards there after merging its work. Say \"merged, move #65 to done\" and it does; the card's history shows who moved it.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.boardDone.title": {
     "defaultMessage": "Approved, then Done once merged",
@@ -393,7 +393,7 @@
   },
   "tips.boardExport.text": {
     "defaultMessage": "The board is kept in the workspace's database. Export Board to JSON… in the board's ⋯ menu saves every card as a JSON file, archived ones too, in a folder you choose.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.boardExport.title": {
     "defaultMessage": "Your board as plain files",
@@ -401,7 +401,7 @@
   },
   "tips.boardFold.text": {
     "defaultMessage": "Collapse a column to a narrow strip with the « in its header, and fold cards to one line with their ▾; a column's ⋯ collapses or expands all its cards. Combwork remembers them for the workspace.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.boardFold.title": {
     "defaultMessage": "Fold the board to what matters",
@@ -409,7 +409,7 @@
   },
   "tips.boardHygiene.text": {
     "defaultMessage": "Ask the Assistant to tidy the board: it links duplicate cards for you to archive, records your answers as decisions on their cards, and raises blocked reasons that are out of date.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Decisions are what the user decided about a card, as the card shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Decisions are what the user decided about a card, as the card shows them."
   },
   "tips.boardHygiene.title": {
     "defaultMessage": "Ask the Assistant to tidy the board",
@@ -417,7 +417,7 @@
   },
   "tips.boardOrder.text": {
     "defaultMessage": "Drag the most important cards to the top, or ask the Assistant or an agent to prioritise: they reorder the board itself.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.boardOrder.title": {
     "defaultMessage": "A column's order is its priority",
@@ -425,7 +425,7 @@
   },
   "tips.boardReview.text": {
     "defaultMessage": "Say \"review #87\" to another agent: the card stays in Review with the agent that did the work, shows who is reviewing it, and gets the verdict as a comment. When it passes, the reviewer moves it to Approved.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.boardReview.title": {
     "defaultMessage": "Have an agent review a card",
@@ -433,7 +433,7 @@
   },
   "tips.boardSetAside.text": {
     "defaultMessage": "Opened in an older Combwork, a workspace gets its cards set aside when this one opens it again. Review… on the notice, or Set-Aside Cards… in the board's ⋯ menu, adds each to the board or discards it.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.boardSetAside.title": {
     "defaultMessage": "Cards made by an older Combwork",
@@ -448,8 +448,8 @@
     "description": "A tip's title (glossary 2.2: stage; 2.1: workflow)."
   },
   "tips.boardUpgrade.text": {
-    "defaultMessage": "Combwork keeps the 0.9 board it upgraded to 1.0. Help → Restore the 0.9 Board Backup… puts it back, after keeping a copy of the board as it is, so a 0.9 Combwork can change it again.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "defaultMessage": "Combwork keeps the 0.9 board it upgraded to 1.0. Help → Restore the 0.9 Board Backup… puts it back, after keeping a copy of the board as it is, so version 0.9 can change it again.",
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.boardUpgrade.title": {
     "defaultMessage": "Back to 0.9 after the upgrade",
@@ -457,7 +457,7 @@
   },
   "tips.branchCards.text": {
     "defaultMessage": "In Version Control → Branches & remotes, a branch a card works on shows the card and its stage, and in Review the revision under review. Click the card to open it.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (glossary 2.1: Version Control; 2.2: stage)."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (glossary 2.1: Version Control; 2.2: stage)."
   },
   "tips.branchCards.title": {
     "defaultMessage": "See which card a branch is for",
@@ -465,7 +465,7 @@
   },
   "tips.branchCleanup.text": {
     "defaultMessage": "Version Control → Branches & remotes groups the branches as In use, Merged and Not merged. Clean Up Merged Branches… deletes the merged ones nothing uses, and offers the merged ones on your remotes apart, never ticked for you.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.branchCleanup.title": {
     "defaultMessage": "Clean up merged branches",
@@ -473,7 +473,7 @@
   },
   "tips.cardAttachments.text": {
     "defaultMessage": "Paste or drop files into a card's description or comment: they are kept with the card when you save or post, shown in it, and listed for the agent that starts it. The pin on a pane's attachment chip copies a file to the agent's card.",
-    "description": "A tip (HI-1700). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip (HI-1700). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.cardAttachments.title": {
     "defaultMessage": "Keep a screenshot with its card",
@@ -481,7 +481,7 @@
   },
   "tips.cardAttachmentsCleanup.text": {
     "defaultMessage": "Files kept with a card go to the Recycle Bin 30 days after it is archived. Choose 3, 7 or 90 days, or Never, in Project Settings → Storage, where Clean Up Now… removes what is due at once. Open and Done cards keep theirs.",
-    "description": "A tip (HI-1842). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip (HI-1842). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.cardAttachmentsCleanup.title": {
     "defaultMessage": "Archived cards' screenshots clean up after themselves",
@@ -489,7 +489,7 @@
   },
   "tips.cardAttachmentsFolders.text": {
     "defaultMessage": "Agents attach files to cards from their own project and the temp folder. Keep test evidence in a folder of your own? List it in Settings → Advanced → Card attachments: more folders, and they can attach from there without copying into Temp.",
-    "description": "A tip (HI-2480). Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Card attachments: more folders is an advanced setting's title)."
+    "description": "A tip (HI-2480). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Card attachments: more folders is an advanced setting's title)."
   },
   "tips.cardAttachmentsFolders.title": {
     "defaultMessage": "Let agents attach your test evidence where it is",
@@ -497,7 +497,7 @@
   },
   "tips.cardCost.text": {
     "defaultMessage": "A card's panel says what its agents used while they held it, \"{example}\", with the builder's and reviewer's parts and tokens on hover. Performance lists every card's cost, and a lane's hover in the Progress panel its overhead.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {example} is a card's cost line as the board shows it (\"cost: ≈ $1.84 · 2 rounds\")."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. {example} is a card's cost line as the board shows it (\"cost: ≈ $1.84 · 2 rounds\")."
   },
   "tips.cardCost.title": {
     "defaultMessage": "What a card cost",
@@ -505,7 +505,7 @@
   },
   "tips.cardCostRounds.text": {
     "defaultMessage": "A card's Work section ends with its cost by round: the builder's and reviewer's parts in each round, adding up to the card's cost. See whether extra rounds or one long read drove it.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Work is a section of the card dialog)."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Work is a section of the card dialog)."
   },
   "tips.cardCostRounds.title": {
     "defaultMessage": "What each review round cost",
@@ -513,7 +513,7 @@
   },
   "tips.cardDecisions.text": {
     "defaultMessage": "A card's Decisions, above its comments, hold what you decided: agents check their work against them before Review, and reviewers fail work that ignores one. Tell the Assistant a decision and it records it there; an agent waiting for your answer is told.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.cardDecisions.title": {
     "defaultMessage": "Put what you decide on the card",
@@ -521,7 +521,7 @@
   },
   "tips.cardLinks.text": {
     "defaultMessage": "Card numbers an agent or the Assistant prints, like #12, are links: hover one for its title and column, and Ctrl+click it to open the card.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.cardLinks.title": {
     "defaultMessage": "Ctrl+click a card number in the terminal",
@@ -529,7 +529,7 @@
   },
   "tips.cardLoop.text": {
     "defaultMessage": "Tell one agent to work through some cards as the builder and another to review them: each waits for the other at no cost, and Combwork wakes it when the card changes.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.cardLoop.title": {
     "defaultMessage": "Let two agents build and review in turn",
@@ -537,7 +537,7 @@
   },
   "tips.cardMove.text": {
     "defaultMessage": "Drag any dialog by its header (a card, Add Agent, Agent Settings…) to see what's behind it; Escape while dragging puts it back.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.cardMove.title": {
     "defaultMessage": "Move a dialog out of the way",
@@ -545,7 +545,7 @@
   },
   "tips.cardReadFirst.text": {
     "defaultMessage": "In a card's Read first, list the doc sections it needs, like docs/PLAN.md#setup: the agent's start prompt lists them, so it reads those sections instead of a whole plan. Click one to read it in Combwork.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Keep docs/PLAN.md#setup as it is."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Keep docs/PLAN.md#setup as it is."
   },
   "tips.cardReadFirst.title": {
     "defaultMessage": "Point a card at the docs it needs",
@@ -553,7 +553,7 @@
   },
   "tips.cardSummaries.text": {
     "defaultMessage": "Agents start a card's report or review verdict with one line saying what is ready or what was found, the details below; they and the Assistant read just those lines when that's enough.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.cardSummaries.title": {
     "defaultMessage": "Reports start with the gist",
@@ -561,7 +561,7 @@
   },
   "tips.cardWork.text": {
     "defaultMessage": "Open a card: its Work section lists each revision submitted for review, with its round, files, verdicts and checks, and how it was merged. On the board, a card shows its revision and last verdict.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands (Work): keep them as Hive shows them. Glossary: work, revision, verdict, check."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands (Work): keep them as Combwork shows them. Glossary: work, revision, verdict, check."
   },
   "tips.cardWork.title": {
     "defaultMessage": "See what a card’s work went through",
@@ -569,7 +569,7 @@
   },
   "tips.chooseConnections.text": {
     "defaultMessage": "Project Settings → Agents → Choose Connections… picks a connection for each role of the project's agents (or one for all, or per agent), changing nothing else. Loading a template offers the same choice.",
-    "description": "A tip (HI-2109). A connection is a named setup on an account (model, effort, mode). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip (HI-2109). A connection is a named setup on an account (model, effort, mode). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.chooseConnections.title": {
     "defaultMessage": "High effort for every builder, in one go",
@@ -577,7 +577,7 @@
   },
   "tips.claudeStatusLine.text": {
     "defaultMessage": "Combwork's status line feeds an agent's footer and shows nothing in the pane. Turn off Settings → Advanced → Combwork's status line in place of yours to see the one in your Claude Code settings again: Combwork still reads the status.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.claudeStatusLine.title": {
     "defaultMessage": "Keep your own Claude Code status line",
@@ -585,7 +585,7 @@
   },
   "tips.cliOverrides.text": {
     "defaultMessage": "Combwork changes a little of how each CLI behaves in its sessions, such as Copilot not updating itself or Codex's terminal title. Each change can be turned off in Settings → Advanced, under its CLI, which says what Combwork can no longer do without it.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.cliOverrides.title": {
     "defaultMessage": "Keep a CLI as it is outside Combwork",
@@ -593,7 +593,7 @@
   },
   "tips.cliOwnMode.text": {
     "defaultMessage": "Choose The CLI's own setting as an agent's or a project's permission mode and Combwork passes none: the CLI starts in the mode its own config sets. The badge says CLI's own, and switching a running session restarts it.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.cliOwnMode.title": {
     "defaultMessage": "Let the CLI's own config choose the mode",
@@ -601,7 +601,7 @@
   },
   "tips.closeCommands.text": {
     "defaultMessage": "Settings → Workspace → When this workspace closes, run: Combwork runs your command once it has closed the workspace and finished writing its files, and shows it running until it ends.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.closeCommands.title": {
     "defaultMessage": "Run a backup as a workspace closes",
@@ -609,7 +609,7 @@
   },
   "tips.closeWindow.text": {
     "defaultMessage": "With several windows open, File → Close Window ({key}) closes just this one, as its X does. Exit Combwork (all windows) closes every window and stops all their agents.",
-    "description": "A tip. {key} is a shortcut (its keys, or the command's name when it has none). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. {key} is a shortcut (its keys, or the command's name when it has none). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.closeWindow.title": {
     "defaultMessage": "Close one window, or all of them",
@@ -617,7 +617,7 @@
   },
   "tips.codexSandboxConnections.text": {
     "defaultMessage": "Codex connections keep asking for Administrator permission? Each one's admin sandbox setup resets the others'. Settings → Advanced → Codex → Connections: use Codex's non-admin sandbox runs them all without it, at the cost of separate sandbox accounts.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Connections: use Codex's non-admin sandbox is an advanced setting's title). Codex is a product's name."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Connections: use Codex's non-admin sandbox is an advanced setting's title). Codex is a product's name."
   },
   "tips.codexSandboxConnections.title": {
     "defaultMessage": "Several Codex connections, no admin prompts",
@@ -625,11 +625,35 @@
   },
   "tips.codexScriptCalls.text": {
     "defaultMessage": "Codex in code mode runs its tools from a script. In the Sessions tab, a Script line says how many calls it made and which; open it to read each call with its own result.",
-    "description": "A tip (HI-2240). Codex is a product name; Script is the transcript's name for it, kept as Hive shows it. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip (HI-2240). Codex is a product name; Script is the transcript's name for it, kept as Combwork shows it. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.codexScriptCalls.title": {
     "defaultMessage": "See what a Codex script did",
     "description": "A tip's title (HI-2240). Codex is a product name; a script is the code Codex runs to call its tools."
+  },
+  "tips.combworkFolder.text": {
+    "defaultMessage": "Combwork keeps each project's .combwork folder (sessions, backups, launch settings) out of git by itself. Where it can't, say with no git, another version control system, or a folder OneDrive or Dropbox syncs, the project's Overview tells you.",
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
+  },
+  "tips.combworkFolder.title": {
+    "defaultMessage": "A project's .combwork stays on this computer",
+    "description": "A tip's title."
+  },
+  "tips.combworkMerges.text": {
+    "defaultMessage": "In Version Control → Workflow, choose Pair, or set Who merges to Combwork merges: Combwork’s merge queue merges each approved card once its checks pass on the merged result, so red work never reaches the target branch.",
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (glossary 2.1: merge queue)."
+  },
+  "tips.combworkMerges.title": {
+    "defaultMessage": "Let Combwork merge approved cards",
+    "description": "A tip's title."
+  },
+  "tips.combworkSkills.text": {
+    "defaultMessage": "Agents and the Assistant get Combwork's own skills: work-on-card, review-agent-work, handover and more. Combwork keeps them up to date; ones you edit stay yours.",
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
+  },
+  "tips.combworkSkills.title": {
+    "defaultMessage": "Skills for working with Combwork",
+    "description": "A tip's title."
   },
   "tips.commandName": {
     "defaultMessage": "“{command}”",
@@ -637,7 +661,7 @@
   },
   "tips.compactFocus.text": {
     "defaultMessage": "Compact summarises the conversation so every later message costs less. Give it a focus (\"keep the API decisions, drop the test output\") and the agent keeps what matters. {key}",
-    "description": "A tip. {key} is a shortcut (its keys, or the command's name when it has none). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. {key} is a shortcut (its keys, or the command's name when it has none). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.compactFocus.title": {
     "defaultMessage": "Compact with a focus",
@@ -645,7 +669,7 @@
   },
   "tips.compactSidebar.text": {
     "defaultMessage": "Toggle Compact Sidebar turns the project list into a narrow rail of tiles with each project's agents, leaving more room for the terminals.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.compactSidebar.title": {
     "defaultMessage": "A compact project list",
@@ -653,7 +677,7 @@
   },
   "tips.compactionHistory.text": {
     "defaultMessage": "The Overview's compaction history pages, filters and sorts a long session's compactions; click one to read it in the transcript, with the summary the agent carried on from.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.compactionHistory.title": {
     "defaultMessage": "Read a compaction where it happened",
@@ -661,7 +685,7 @@
   },
   "tips.compareBranches.text": {
     "defaultMessage": "Version Control → Changes compares any two local branches without checking anything out: pick one under Branches to see the commits each has that the other hasn't, the files it changes, and each file's diff.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.compareBranches.title": {
     "defaultMessage": "Compare two branches, such as 1.0.0 with main",
@@ -669,7 +693,7 @@
   },
   "tips.conflictHunks.text": {
     "defaultMessage": "When the merge queue sends a card back for a conflict, its Work section lists the files: click one to see its conflicts, the target's side and the card's under their names, as the queue's test merge had them.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.conflictHunks.title": {
     "defaultMessage": "See a returned card's conflicts",
@@ -677,7 +701,7 @@
   },
   "tips.connectionOrder.text": {
     "defaultMessage": "Drag accounts into your order in Settings → Accounts & Connections: a new agent gets the first connection of the first account that's on in the workspace. Running agents keep theirs.",
-    "description": "A tip (HI-2107). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip (HI-2107). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.connectionOrder.title": {
     "defaultMessage": "Put your accounts in order",
@@ -685,7 +709,7 @@
   },
   "tips.connectionSetups.text": {
     "defaultMessage": "Add Connection under an account in Settings → Accounts & Connections makes another setup on the same sign-in, say \"Claude · High\" beside \"Claude · Medium\". Agents choose a connection, so one edit changes every agent on it.",
-    "description": "A tip (HI-2107). Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Add Connection is a button). \"Claude · High\" and \"Claude · Medium\" are example names of connections."
+    "description": "A tip (HI-2107). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Add Connection is a button). \"Claude · High\" and \"Claude · Medium\" are example names of connections."
   },
   "tips.connectionSetups.title": {
     "defaultMessage": "Several setups on one sign-in",
@@ -693,7 +717,7 @@
   },
   "tips.connectionTags.text": {
     "defaultMessage": "Give connections on both accounts the same tag, such as Builders or Assistant (the Tag box in a connection's dialog): when a usage move sends agents to the other account, each goes to the connection with its tag, and the Assistant moves too.",
-    "description": "A tip (HI-2530). Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Builders and Assistant are example tags."
+    "description": "A tip (HI-2530). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Builders and Assistant are example tags."
   },
   "tips.connectionTags.title": {
     "defaultMessage": "Tag connections so moved agents keep their kind",
@@ -701,7 +725,7 @@
   },
   "tips.connectionTrust.text": {
     "defaultMessage": "A new connection's Set Up asks Claude Code once, in the workspace folder, to trust every project in it. Codex agents never ask: each trusts its own folder for that launch (Settings → Advanced → Codex).",
-    "description": "A tip (HI-1871): how a new connection's coding agent CLIs come to trust the workspace's folders. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Set Up is a button)."
+    "description": "A tip (HI-1871): how a new connection's coding agent CLIs come to trust the workspace's folders. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Set Up is a button)."
   },
   "tips.connectionTrust.title": {
     "defaultMessage": "Trust a workspace in one answer",
@@ -709,7 +733,7 @@
   },
   "tips.connections.text": {
     "defaultMessage": "Settings → Accounts & Connections keeps several Claude Code and Codex sign-ins, or a server such as Ollama on this PC. Each workspace chooses which accounts are on, and each agent runs on the connection it chose: pick another in Agent Settings.",
-    "description": "A tip (HI-2107). Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Ollama is a product's name."
+    "description": "A tip (HI-2107). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Ollama is a product's name."
   },
   "tips.connections.title": {
     "defaultMessage": "Run agents on different sign-ins",
@@ -717,7 +741,7 @@
   },
   "tips.consoleRecording.text": {
     "defaultMessage": "In the developer console, Record writes what an agent's CLI sends Combwork to a file, redacted unless you tick text for that recording, and Copy Diagnostics can attach it to a bug report.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.consoleRecording.title": {
     "defaultMessage": "Record what a CLI sends",
@@ -725,7 +749,7 @@
   },
   "tips.consoleText.text": {
     "defaultMessage": "Settings → Advanced → Developer console: show prompt, reply and command text shows them in the developer console, under a banner saying so, and ticks text for new recordings. Tokens and sign-ins stay masked, and agents' cw_console stays redacted.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.consoleText.title": {
     "defaultMessage": "See the text in the developer console",
@@ -733,7 +757,7 @@
   },
   "tips.copilot.text": {
     "defaultMessage": "Agents can use the GitHub Copilot CLI, Copilot Free included. Provider Setup installs it and says who it is signed in as: its own login or the GitHub CLI’s.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.copilot.title": {
     "defaultMessage": "Run agents on GitHub Copilot",
@@ -741,7 +765,7 @@
   },
   "tips.copilotModes.text": {
     "defaultMessage": "Copilot agents start in Accept edits: they edit files in their own folder and use the Combwork tools without asking, and ask before other commands, other MCP tools and web access. Choose Ask to approve each edit too, or Allow all to approve everything.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.copilotModes.title": {
     "defaultMessage": "What Copilot agents ask before",
@@ -749,7 +773,7 @@
   },
   "tips.copyDiagnostics.text": {
     "defaultMessage": "Help → Copy Diagnostics… gathers Combwork's version, your coding agents, key settings and the end of the log for a bug report, with names, folders and tokens taken out.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.copyDiagnostics.title": {
     "defaultMessage": "Found a bug? Copy Diagnostics",
@@ -757,7 +781,7 @@
   },
   "tips.ctrlCvToCli.text": {
     "defaultMessage": "In an agent's pane Ctrl+C copies a selection and Ctrl+V pastes. Turn on Settings → Advanced → Ctrl+C and Ctrl+V go to the CLI to send both keys to the CLI instead, as in any other terminal; right-click still copies and pastes.",
-    "description": "A tip. Ctrl+C and Ctrl+V name keys: use the key names your language uses. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Ctrl+C and Ctrl+V name keys: use the key names your language uses. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.ctrlCvToCli.title": {
     "defaultMessage": "Give Ctrl+C and Ctrl+V to the agent's CLI",
@@ -765,7 +789,7 @@
   },
   "tips.customCommands.text": {
     "defaultMessage": "Name a command once in Settings → Commands and run it from the command palette (Run Command), or pick it for when a workspace opens or closes: a local server or a database your agents need, say. As a workspace opens, its agents start once they are done.",
-    "description": "A tip (HI-1954). Names of Hive's menus, views, settings and commands (Settings → Commands, Run Command): keep them as Hive shows them."
+    "description": "A tip (HI-1954). Names of Combwork's menus, views, settings and commands (Settings → Commands, Run Command): keep them as Combwork shows them."
   },
   "tips.customCommands.title": {
     "defaultMessage": "Your own commands, one click away",
@@ -773,7 +797,7 @@
   },
   "tips.dateFormat.text": {
     "defaultMessage": "Combwork shows dates as {date} and times as {time}. Settings → General → Date format and Time format change them everywhere, sessions named by when they started too.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {date} and {time} are an example date and time (4 October 2026, 14:05) in the formats chosen now."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. {date} and {time} are an example date and time (4 October 2026, 14:05) in the formats chosen now."
   },
   "tips.dateFormat.title": {
     "defaultMessage": "Dates your way",
@@ -781,7 +805,7 @@
   },
   "tips.designCheck.text": {
     "defaultMessage": "Ask a card loop’s builder for a design first: it posts it on the card, Combwork wakes the reviewer to check it, and the answer wakes the builder. With no answer within the Design check wait (Version Control → Workflow → Card loops), it goes ahead as posted.",
-    "description": "A tip (#1382). Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Design check wait, Version Control, Workflow, Card loops)."
+    "description": "A tip (#1382). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Design check wait, Version Control, Workflow, Card loops)."
   },
   "tips.designCheck.title": {
     "defaultMessage": "Have a design checked before the build",
@@ -789,7 +813,7 @@
   },
   "tips.developerConsole.text": {
     "defaultMessage": "Turn on Settings → Advanced → Show developer features, then Help → Developer Console opens a window of its own: pick an agent and see each hook and status line beside what Combwork made of it, redacted. Filter, search and pause as it runs.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.developerConsole.title": {
     "defaultMessage": "Watch what a CLI sends Combwork",
@@ -797,7 +821,7 @@
   },
   "tips.dialects.text": {
     "defaultMessage": "The Dialects view shows every text Combwork gives agents, and lets a model, a CLI or the workspace word some of them its own way. Duplicate a file to try a change on one agent (Agent Settings → Dialect); it applies at the agent's next launch.",
-    "description": "A tip (HI-2444). Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: dialect."
+    "description": "A tip (HI-2444). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Glossary: dialect."
   },
   "tips.dialects.title": {
     "defaultMessage": "Tune the words Combwork gives agents",
@@ -805,7 +829,7 @@
   },
   "tips.dialectsNewModel.text": {
     "defaultMessage": "In the Dialects view, New Model File on a CLI's group starts a file for a model, even one no agent runs yet: type its ID. Duplicate can name the copy's model too, and Set Model gives one of your files to a model. It applies at each agent's next launch.",
-    "description": "A tip (HI-2523). Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: dialect."
+    "description": "A tip (HI-2523). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Glossary: dialect."
   },
   "tips.dialectsNewModel.title": {
     "defaultMessage": "A dialect file for any model",
@@ -813,7 +837,7 @@
   },
   "tips.editTemplates.text": {
     "defaultMessage": "Select a template in the Templates view and choose Edit…: add, copy, reorder or remove its agents, change each in the Agent Settings dialog (its Save saves the template too), rename it and pick its layout.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.editTemplates.title": {
     "defaultMessage": "Edit a template in place",
@@ -821,7 +845,7 @@
   },
   "tips.fileLinks.text": {
     "defaultMessage": "File paths an agent prints, like src/app.ts:42, are links: Ctrl+click one to open the file in the Files tab at that line.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.fileLinks.title": {
     "defaultMessage": "Ctrl+click a path in the terminal",
@@ -829,7 +853,7 @@
   },
   "tips.filesTab.text": {
     "defaultMessage": "The Files tab browses and edits the project, previews Markdown, CSV, HTML and images, and keeps unsaved edits as you switch.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.filesTab.title": {
     "defaultMessage": "Edit files without leaving Combwork",
@@ -837,7 +861,7 @@
   },
   "tips.flightRecorder.text": {
     "defaultMessage": "Turn on a flight recorder trigger in Settings → Advanced (safeguard stops, something unknown from a CLI, a CLI version change, an agent gone silent), and Combwork saves the agent's recent developer console events, redacted, when it happens, with a notice.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.flightRecorder.title": {
     "defaultMessage": "Catch rare events by themselves",
@@ -845,15 +869,15 @@
   },
   "tips.focusedTests.text": {
     "defaultMessage": "With Combwork merging, Version Control → Workflow can run each card’s focused tests on the merged result: your project’s command chooses the tests a change needs when the card is submitted, and the merge queue runs them before it merges.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: merge queue."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Glossary: merge queue."
   },
   "tips.focusedTests.title": {
     "defaultMessage": "Each card’s own tests before it merges",
-    "description": "A tip's title: the workflow option that has Hive's merge queue run the tests a card's change needs on the merged result (G20)."
+    "description": "A tip's title: the workflow option that has Combwork's merge queue run the tests a card's change needs on the merged result (G20)."
   },
   "tips.followUpCheck.text": {
     "defaultMessage": "When you ask for a change to a card in Review or Approved for its reviewer to check, its builder posts the change as a follow-up: Combwork wakes the reviewer, and the answer wakes the builder. One left unanswered for 15 minutes shows its card as stalled.",
-    "description": "A tip (#1467). Review and Approved are board columns. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip (#1467). Review and Approved are board columns. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.followUpCheck.title": {
     "defaultMessage": "Have a follow-up checked without a new round",
@@ -861,7 +885,7 @@
   },
   "tips.forYou.text": {
     "defaultMessage": "A card with a For you chip waits for you: an approval, a decision or a question. The Task Board icon counts them, and For you on the board shows only those. Open the card to approve, decline or answer: the agent waiting on it hears at once.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: For you, approve."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Glossary: For you, approve."
   },
   "tips.forYou.title": {
     "defaultMessage": "Answer what waits for you",
@@ -869,7 +893,7 @@
   },
   "tips.forYouActions.text": {
     "defaultMessage": "When an agent's question is about something only you can do on its card, it can offer it as a button under the question: Move to Done, Make It No Code or Unblock, with its suggested reason, which you can change. One click does it and answers the agent.",
-    "description": "A tip (#1630). Done is a board column. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: For you, no-code card."
+    "description": "A tip (#1630). Done is a board column. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Glossary: For you, no-code card."
   },
   "tips.forYouActions.title": {
     "defaultMessage": "Answer with one click",
@@ -877,7 +901,7 @@
   },
   "tips.forYouApproveNote.text": {
     "defaultMessage": "Approve takes an optional note. On an agent's question it's recorded as your decision on the card, so the agent works to it and its reviewer checks it; on Combwork's own requests it's your comment. Left empty, Approve is one click.",
-    "description": "A tip (HI-2286). Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: approve, decision, For you."
+    "description": "A tip (HI-2286). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Glossary: approve, decision, For you."
   },
   "tips.forYouApproveNote.title": {
     "defaultMessage": "Approve, but change something",
@@ -885,7 +909,7 @@
   },
   "tips.generalistRole.text": {
     "defaultMessage": "Give an agent the Generalist role in the workflow (Agent Settings) and it does whatever you ask in its pane: it is never put in a lane or asked to review. A card it takes still follows the project’s workflow.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Generalist is a role's name (Glossary: generalist)."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Generalist is a role's name (Glossary: generalist)."
   },
   "tips.generalistRole.title": {
     "defaultMessage": "An agent for whatever you ask",
@@ -893,7 +917,7 @@
   },
   "tips.gitCheck.text": {
     "defaultMessage": "Help → Provider Setup… shows the git Combwork found and its version. Worktree agents, merging and the Version Control tab’s Git sections need Git for Windows 2.38 or later.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.gitCheck.title": {
     "defaultMessage": "Is git ready for worktrees?",
@@ -901,7 +925,7 @@
   },
   "tips.gitHistory.text": {
     "defaultMessage": "Version Control → History opens on the branch your work merges into. Pick another in its heading, yours or a remote’s, and page back through older commits under the list.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.gitHistory.title": {
     "defaultMessage": "See the history of any branch",
@@ -909,7 +933,7 @@
   },
   "tips.gitInit.text": {
     "defaultMessage": "A project without git? Its Version Control tab's Initialise repository… makes it one on main, keeps .combwork out, adds a starter .gitignore if you like and makes the first commit, so agents can work in worktrees at once.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.gitInit.title": {
     "defaultMessage": "Make a project a git repository in one click",
@@ -917,7 +941,7 @@
   },
   "tips.gitRemotes.text": {
     "defaultMessage": "Version Control → Branches & remotes: Push to… sends this branch, or every branch and tag, to any remote without changing what the branch tracks. A remote can be renamed or removed there, and a branch's Track… chooses what Pull and Push use.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.gitRemotes.title": {
     "defaultMessage": "Push to a backup remote",
@@ -925,7 +949,7 @@
   },
   "tips.gitView.text": {
     "defaultMessage": "In a Git project, the Version Control tab shows its branch, remotes, history and tags, and lets you switch or create a branch, fetch, pull, push, tag and set its commit identity. The status bar shows \"{example}\": click it to get there.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {example} is the status bar's git item as Hive shows it (\"main · origin · ↑2 ↓0\": the branch, its remote, and how many commits it is ahead and behind)."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. {example} is the status bar's git item as Combwork shows it (\"main · origin · ↑2 ↓0\": the branch, its remote, and how many commits it is ahead and behind)."
   },
   "tips.gitView.title": {
     "defaultMessage": "See and change a project's git",
@@ -933,7 +957,7 @@
   },
   "tips.gotoProject.text": {
     "defaultMessage": "Press {key} and type a few letters of its name.",
-    "description": "A tip. {key} is a shortcut (its keys, or the command's name when it has none). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. {key} is a shortcut (its keys, or the command's name when it has none). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.gotoProject.title": {
     "defaultMessage": "Jump to a project",
@@ -945,7 +969,7 @@
   },
   "tips.group.assistant": {
     "defaultMessage": "Assistant",
-    "description": "A heading of Help → Tips: tips about the Hive Assistant."
+    "description": "A heading of Help → Tips: tips about the Combwork Assistant."
   },
   "tips.group.board": {
     "defaultMessage": "Board",
@@ -961,11 +985,11 @@
   },
   "tips.group.shortcuts": {
     "defaultMessage": "Shortcuts",
-    "description": "A heading of Help → Tips: shortcuts and other ways to get around Hive."
+    "description": "A heading of Help → Tips: shortcuts and other ways to get around Combwork."
   },
   "tips.handoverSelf.text": {
     "defaultMessage": "When an agent's transcript size turns amber, click it and choose the agent itself: it writes a handover, and a new conversation picks up from it, short and fast again.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.handoverSelf.title": {
     "defaultMessage": "A long conversation? Hand it over to itself",
@@ -973,47 +997,23 @@
   },
   "tips.hardwareAcceleration.text": {
     "defaultMessage": "If your graphics driver leaves Combwork's window blank, flickering or crashing, turn on Settings → Advanced → Disable hardware acceleration and restart Combwork. A window that doesn't draw at all: start Combwork once with --disable-gpu.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. --disable-gpu is a command-line option: keep it."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. --disable-gpu is a command-line option: keep it."
   },
   "tips.hardwareAcceleration.title": {
     "defaultMessage": "A blank or flickering window?",
     "description": "A tip's title."
   },
-  "tips.hiveFolder.text": {
-    "defaultMessage": "Combwork keeps each project's .combwork folder (sessions, backups, launch settings) out of git by itself. Where it can't, say with no git, another version control system, or a folder OneDrive or Dropbox syncs, the project's Overview tells you.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
-  },
-  "tips.hiveFolder.title": {
-    "defaultMessage": "A project's .combwork stays on this computer",
-    "description": "A tip's title."
-  },
-  "tips.hiveMerges.text": {
-    "defaultMessage": "In Version Control → Workflow, choose Pair, or set Who merges to Combwork merges: Combwork’s merge queue merges each approved card once its checks pass on the merged result, so red work never reaches the target branch.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (glossary 2.1: merge queue)."
-  },
-  "tips.hiveMerges.title": {
-    "defaultMessage": "Let Combwork merge approved cards",
-    "description": "A tip's title."
-  },
-  "tips.hiveSkills.text": {
-    "defaultMessage": "Agents and the Assistant get Combwork's own skills: work-on-card, review-agent-work, handover and more. Combwork keeps them up to date; ones you edit stay yours.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
-  },
-  "tips.hiveSkills.title": {
-    "defaultMessage": "Skills for working with Combwork",
-    "description": "A tip's title."
-  },
   "tips.hooksMissing.text": {
     "defaultMessage": "If a CLI update or a policy stops an agent’s hooks reaching Combwork, its pane says Status unknown instead of a status that may be wrong, nothing is typed into it and its lane pauses. The banner over its pane says why when Combwork can tell.",
-    "description": "A tip. Hooks: the calls an agent's coding agent makes to Hive as it works. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Hooks: the calls an agent's coding agent makes to Combwork as it works. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.hooksMissing.title": {
     "defaultMessage": "When an agent’s hooks stop arriving",
-    "description": "A tip's title. Hooks: the calls an agent's coding agent makes to Hive as it works."
+    "description": "A tip's title. Hooks: the calls an agent's coding agent makes to Combwork as it works."
   },
   "tips.howDoYouWork.text": {
     "defaultMessage": "A new project’s Version Control tab asks “How do you work?”: Solo, Pair or Team, the one that fits its agents suggested. Choose sets it up in one click; Not Now keeps your defaults.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (glossary 2.1: Version Control, preset). The quoted question is the step's heading: use it as Hive shows it."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (glossary 2.1: Version Control, preset). The quoted question is the step's heading: use it as Combwork shows it."
   },
   "tips.howDoYouWork.title": {
     "defaultMessage": "Start a new project with a preset",
@@ -1021,7 +1021,7 @@
   },
   "tips.imagesTab.text": {
     "defaultMessage": "The Attachments tab keeps each screenshot and file pasted or dropped into the project's sessions, grouped by session, with previews and a filter by kind, ready to insert again.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.imagesTab.title": {
     "defaultMessage": "Everything you attached, in one place",
@@ -1029,7 +1029,7 @@
   },
   "tips.improveTranslation.text": {
     "defaultMessage": "Spotted a clumsy or wrong word in your language? Help → Improve This Translation shows how to fix it, or add a language, with a pull request on GitHub.",
-    "description": "A tip. Help → Improve This Translation is a name in Hive: keep it as Hive shows it. GitHub is a name."
+    "description": "A tip. Help → Improve This Translation is a name in Combwork: keep it as Combwork shows it. GitHub is a name."
   },
   "tips.improveTranslation.title": {
     "defaultMessage": "Make Combwork read better in your language",
@@ -1037,7 +1037,7 @@
   },
   "tips.inboxCarryingOn.text": {
     "defaultMessage": "Combwork tells a working agent of new messages at a tool's end, keeps it going to read them before it stops, and wakes it when idle. Each has a switch in Settings → Advanced, and a project can set its own; with wakes off, the pane's Deliver Now types the line.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.inboxCarryingOn.title": {
     "defaultMessage": "Choose how agents hear of their inbox",
@@ -1045,7 +1045,7 @@
   },
   "tips.inboxNotices.text": {
     "defaultMessage": "A message the Assistant leaves a working agent reaches it at its next tool call, or before its turn ends, as a short notice from Combwork: nothing is typed over its work. The agent reads and acks it in its inbox; its pane shows it as unread (✉) until it does.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.inboxNotices.title": {
     "defaultMessage": "Messages reach a busy agent between steps",
@@ -1053,7 +1053,7 @@
   },
   "tips.isolatedChecks.text": {
     "defaultMessage": "In a shared folder, another agent's edit during a check makes it not count. cw-progress --check typecheck --isolated runs it in a copy of its own at the card's revision, which nothing else writes. Stop in the Progress panel ends it and all it started.",
-    "description": "A tip. cw-progress --check typecheck --isolated is a command: keep it as it is. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. cw-progress --check typecheck --isolated is a command: keep it as it is. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.isolatedChecks.title": {
     "defaultMessage": "A check nobody else can spoil",
@@ -1061,7 +1061,7 @@
   },
   "tips.keepAwake.text": {
     "defaultMessage": "While an agent works, Combwork stops Windows from sleeping (the screen can still lock), and lets it sleep once they're done. Choose when in Settings → General.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.keepAwake.title": {
     "defaultMessage": "Leave agents working, the PC stays awake",
@@ -1069,15 +1069,15 @@
   },
   "tips.laneApplyNow.text": {
     "defaultMessage": "In Start Lane for a lane's builder, Apply now changes the order at once: the card being worked goes back to Todo with its work kept on its branch, and the builder is told.",
-    "description": "A tip (HI-1995). Start Lane and Apply now are a dialog and its checkbox; Todo is a board column. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip (HI-1995). Start Lane and Apply now are a dialog and its checkbox; Todo is a board column. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.laneApplyNow.title": {
     "defaultMessage": "Reorder a running lane now",
-    "description": "A tip's title (HI-1995). A lane is Hive's record of a card loop (a builder and a reviewer taking cards in turn)."
+    "description": "A tip's title (HI-1995). A lane is Combwork's record of a card loop (a builder and a reviewer taking cards in turn)."
   },
   "tips.laneBranchSquash.text": {
     "defaultMessage": "After an agent's card is squash-merged, Combwork brings its branch up to date before its next card, so each review shows only that card's work. What it can't do safely it asks under For you; Settings → Advanced makes it ask every time.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. For you is the board's list of what waits for the user."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. For you is the board's list of what waits for the user."
   },
   "tips.laneBranchSquash.title": {
     "defaultMessage": "An agent's branch kept up to date between cards",
@@ -1085,39 +1085,39 @@
   },
   "tips.laneGates.text": {
     "defaultMessage": "In the Progress panel, a lane says why it waits in its header, and a red notch on a card’s segment means its last request was refused: hover it for why and what next.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: lane, refused."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Glossary: lane, refused."
   },
   "tips.laneGates.title": {
     "defaultMessage": "See why a lane isn’t moving",
-    "description": "A tip's title. A lane is Hive's record of a card loop (glossary 2.5: lane)."
+    "description": "A tip's title. A lane is Combwork's record of a card loop (glossary 2.5: lane)."
   },
   "tips.laneNext.text": {
     "defaultMessage": "With workflow rules on, once a lane's card is Done Combwork gives the next one to its builder as soon as the builder's turn is over, so the lane goes on without a prompt from you or the Assistant.",
-    "description": "A tip (HI-1990). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip (HI-1990). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.laneNext.title": {
     "defaultMessage": "Combwork starts a lane's next card",
-    "description": "A tip's title (HI-1990). A lane is Hive's record of a card loop (a builder and a reviewer taking cards in turn)."
+    "description": "A tip's title (HI-1990). A lane is Combwork's record of a card loop (a builder and a reviewer taking cards in turn)."
   },
   "tips.laneNotices.text": {
     "defaultMessage": "Combwork notifies you when a lane's review fails, a card is blocked or stalls, or every card has passed so its merge is due, one notice per lane. Settings → Notifications decides where they appear.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.laneNotices.title": {
     "defaultMessage": "Hear how a lane goes, without the Assistant",
-    "description": "A tip's title. A lane is Hive's record of a card loop (a builder and a reviewer taking cards in turn)."
+    "description": "A tip's title. A lane is Combwork's record of a card loop (a builder and a reviewer taking cards in turn)."
   },
   "tips.laneSlots.text": {
     "defaultMessage": "In the Progress panel, a lane names its slot after its agents (· slot-b): point at it for the branch being built there and whether the slot is ready, or click it for Branches & remotes.",
-    "description": "A tip. A slot is a working folder Hive lends to a lane (glossary 2.5: slot). Branches & remotes is a section of the Version Control tab: keep its name as Hive shows it."
+    "description": "A tip. A slot is a working folder Combwork lends to a lane (glossary 2.5: slot). Branches & remotes is a section of the Version Control tab: keep its name as Combwork shows it."
   },
   "tips.laneSlots.title": {
     "defaultMessage": "See where a lane builds",
-    "description": "A tip's title. A lane is Hive's record of a card loop (glossary 2.5: lane)."
+    "description": "A tip's title. A lane is Combwork's record of a card loop (glossary 2.5: lane)."
   },
   "tips.laneStart.text": {
     "defaultMessage": "Right-click the Todo column and choose Start Lane with These Cards…: pick the builder and the reviewer, put the cards in order, and both start with a brief. End or abandon a lane from its row in the Progress panel.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: lane."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Glossary: lane."
   },
   "tips.laneStart.title": {
     "defaultMessage": "Start a lane yourself",
@@ -1125,15 +1125,15 @@
   },
   "tips.lanesLegend.text": {
     "defaultMessage": "Hover over the Lanes bar in the Progress panel for its legend: each colour is a category, with the stages in it. A lane marked old rules keeps the workflow options it started with until it ends.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: lane, stage, category, workflow options."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Glossary: lane, stage, category, workflow options."
   },
   "tips.lanesLegend.title": {
     "defaultMessage": "What a lane’s colours mean",
-    "description": "A tip's title. A lane is Hive's record of a card loop (glossary 2.5: lane)."
+    "description": "A tip's title. A lane is Combwork's record of a card loop (glossary 2.5: lane)."
   },
   "tips.language.text": {
     "defaultMessage": "Combwork follows Windows' display language when it has it. Settings → General → Language picks another; languages translated by AI are marked, and improvements are welcome. Agents are still spoken to in English.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.language.title": {
     "defaultMessage": "Combwork in your language",
@@ -1141,7 +1141,7 @@
   },
   "tips.leftRunning.text": {
     "defaultMessage": "A process an agent's command started that keeps running after its shell has gone shows in Activity as Left running, with its CPU time and End It. Past ten minutes, a notice says so once, and the agent is told too.",
-    "description": "A tip (HI-2111). Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Left running is a row's label; End It a button)."
+    "description": "A tip (HI-2111). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Left running is a row's label; End It a button)."
   },
   "tips.leftRunning.title": {
     "defaultMessage": "Spot what a command left running",
@@ -1149,7 +1149,7 @@
   },
   "tips.leftoverBranches.text": {
     "defaultMessage": "Version Control → Changes lists leftover branches: a superseded or archived card’s, an agent’s from before slots. Compare one with your target first, then Delete… it; one with commits of its own lists them before it goes.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.leftoverBranches.title": {
     "defaultMessage": "Clean up branches nothing uses",
@@ -1157,7 +1157,7 @@
   },
   "tips.leftoverProcesses.text": {
     "defaultMessage": "A preview server or a tail -f an agent started can keep running after it stops, holding the project's folder or a port. Combwork lists them in the ⋯ menu on the agent's pane and offers to end them; Settings → Agents can end them every time.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.leftoverProcesses.title": {
     "defaultMessage": "End what a stopped agent left running",
@@ -1173,7 +1173,7 @@
   },
   "tips.loopDefaults.text": {
     "defaultMessage": "Rounds and Wait under Card loops in Settings → Version Control set what loops use when you don't say ({rounds, plural, one {# round} other {# rounds}} and {hours, plural, one {# hour} other {# hours}} to start with); a workspace and a project can set their own. Saying \"rounds: 3\" when you start one still wins.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {rounds} and {hours} are the defaults (10 and 6). \"rounds: 3\" is what the user types to an agent: keep it in English."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. {rounds} and {hours} are the defaults (10 and 6). \"rounds: 3\" is what the user types to an agent: keep it in English."
   },
   "tips.loopDefaults.title": {
     "defaultMessage": "Your rounds and wait for every loop",
@@ -1181,7 +1181,7 @@
   },
   "tips.loopLanes.text": {
     "defaultMessage": "When two agents build and review cards in turn, Combwork keeps the loop as a lane: its cards in order, the one it's on, and whether it's paused on a blocked card. Ask the Assistant which lanes are running.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.loopLanes.title": {
     "defaultMessage": "Combwork keeps your card loops as lanes",
@@ -1189,7 +1189,7 @@
   },
   "tips.loopWakes.text": {
     "defaultMessage": "When a card arrives in Review, Combwork wakes its reviewer, and on the verdict its builder, even if one forgot to wait. To drive reviews by hand, turn off Wake reviewers and builders in the project's Version Control → Workflow → Card loops.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.loopWakes.title": {
     "defaultMessage": "Loops keep going on their own",
@@ -1197,7 +1197,7 @@
   },
   "tips.mainProcessStalls.text": {
     "defaultMessage": "Typing lagged a moment? Performance → Main process stalls lists the times Combwork's main process was busy since it started: how long, whether it was working or waiting, and what was under way.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Main process stalls is a section of the Performance view)."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Main process stalls is a section of the Performance view)."
   },
   "tips.mainProcessStalls.title": {
     "defaultMessage": "See why Combwork felt slow",
@@ -1205,7 +1205,7 @@
   },
   "tips.maxAgents.text": {
     "defaultMessage": "Maximum agents in Version Control → Workflow is how many agents a project has, so nobody brings in agents you didn’t plan for, the Assistant included. Each preset sets its team: Solo one agent, Pair a builder and a reviewer. Raise it there to add more.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Maximum agents is a workflow option (HI-2001); Solo and Pair are presets."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Maximum agents is a workflow option (HI-2001); Solo and Pair are presets."
   },
   "tips.maxAgents.title": {
     "defaultMessage": "Your team size",
@@ -1213,7 +1213,7 @@
   },
   "tips.mcpCatalogue.text": {
     "defaultMessage": "The MCP view's Catalogue lists servers you can install, Combwork's own first. Each download is checked against its catalogue and shows what it runs; updates are offered, never automatic. Add a company's catalogue in Settings → MCP Catalogues.",
-    "description": "A tip (HI-545). The MCP view, Catalogue and Settings → MCP Catalogues are names in Hive: keep them as Hive shows them."
+    "description": "A tip (HI-545). The MCP view, Catalogue and Settings → MCP Catalogues are names in Combwork: keep them as Combwork shows them."
   },
   "tips.mcpCatalogue.title": {
     "defaultMessage": "Install a server from a catalogue",
@@ -1221,7 +1221,7 @@
   },
   "tips.mcpFromFile.textAdded": {
     "defaultMessage": "Got a server as a .json definition or a .zip of its folder? Add MCP Server from File in the MCP view shows what it runs and adds it to the workspace: then add it to the projects that need it, with Add to… or in their MCP tab.",
-    "description": "A tip (HI-2059). Add MCP Server from File, the MCP view, Add to… and the MCP tab are names in Hive: keep them as Hive shows them."
+    "description": "A tip (HI-2059). Add MCP Server from File, the MCP view, Add to… and the MCP tab are names in Combwork: keep them as Combwork shows them."
   },
   "tips.mcpFromFile.title": {
     "defaultMessage": "Add an MCP server from a file",
@@ -1229,7 +1229,7 @@
   },
   "tips.mcpPerAgent.text": {
     "defaultMessage": "In an agent's settings, MCP servers: Only these gives it just the servers it needs, such as a sandbox server for a release tester, and keeps the others' tools out of its context.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.mcpPerAgent.title": {
     "defaultMessage": "MCP servers for some agents only",
@@ -1237,7 +1237,7 @@
   },
   "tips.mcpPerProject.textAdded": {
     "defaultMessage": "A workspace MCP server runs only where it is added: Add Server… in a project's MCP tab picks one, showing what it runs. Its tools stay out of the other projects' agents' context, and the tab lists only what that project uses.",
-    "description": "A tip (HI-2059). The MCP tab and Add Server… are names in Hive: keep them as Hive shows them."
+    "description": "A tip (HI-2059). The MCP tab and Add Server… are names in Combwork: keep them as Combwork shows them."
   },
   "tips.mcpPerProject.title": {
     "defaultMessage": "MCP servers only where they are needed",
@@ -1245,7 +1245,7 @@
   },
   "tips.mcpSearch.text": {
     "defaultMessage": "The MCP view and Add Server… search your servers by name, description and tags (a definition's \"tags\" list), and show those added somewhere or nowhere.",
-    "description": "A tip (HI-2059). The MCP view and Add Server… are names in Hive: keep them as Hive shows them; \"tags\" is a field of a server’s JSON definition: keep it."
+    "description": "A tip (HI-2059). The MCP view and Add Server… are names in Combwork: keep them as Combwork shows them; \"tags\" is a field of a server’s JSON definition: keep it."
   },
   "tips.mcpSearch.title": {
     "defaultMessage": "Find a server in a long list",
@@ -1253,7 +1253,7 @@
   },
   "tips.memorySnapshot.text": {
     "defaultMessage": "Turn on Settings → Advanced → Save a memory snapshot if Combwork is about to run out of memory, to find out what filled it. Snapshots can be gigabytes, hold what Combwork had in memory (card text, transcripts, possibly tokens) and stay on this PC.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.memorySnapshot.title": {
     "defaultMessage": "Combwork closed running out of memory?",
@@ -1261,7 +1261,7 @@
   },
   "tips.mergeBranch.text": {
     "defaultMessage": "⑂ beside a branch in Version Control → Branches & remotes merges it into the branch you pick, one merge at a time. A card's branch that isn't Done asks first, and the card is marked merged outside the rules.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: outside the rules."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Glossary: outside the rules."
   },
   "tips.mergeBranch.title": {
     "defaultMessage": "Merge a branch by hand",
@@ -1269,23 +1269,23 @@
   },
   "tips.mergeMessage.text": {
     "defaultMessage": "With Combwork merging, Version Control → Workflow sets the merge’s commit message: Combwork’s names the card, the branch’s own keeps card keys out of your history. With Squash, each card then lands as one commit with its builder’s message.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Squash is a merge style's name: use the word Hive shows for it."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Squash is a merge style's name: use the word Combwork shows for it."
   },
   "tips.mergeMessage.title": {
     "defaultMessage": "Merges with your own commit messages",
-    "description": "A tip's title (G19): the workflow option that sets the message of the commit Hive's merge queue makes."
+    "description": "A tip's title (G19): the workflow option that sets the message of the commit Combwork's merge queue makes."
   },
   "tips.mergePush.text": {
     "defaultMessage": "With Combwork merging, Version Control → Workflow can push the target branch after each merge, never forced. If the remote refuses it, the queue pauses and says why: pull and resume, or turn it off and resume.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: merge queue."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Glossary: merge queue."
   },
   "tips.mergePush.title": {
     "defaultMessage": "Push each merge to your remote",
-    "description": "A tip's title (G18): the workflow option that has Hive's merge queue push the target branch after each merge."
+    "description": "A tip's title (G18): the workflow option that has Combwork's merge queue push the target branch after each merge."
   },
   "tips.mergeQueueFolder.text": {
     "defaultMessage": "When the merge queue merges into a branch checked out in a folder (main in the project folder), it updates the folder too, but pauses rather than touch a file you are changing. Settings → Advanced can have it ask you under For you first.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. For you is the board's list of what waits for the user."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. For you is the board's list of what waits for the user."
   },
   "tips.mergeQueueFolder.title": {
     "defaultMessage": "Merging into the folder you work in",
@@ -1293,7 +1293,7 @@
   },
   "tips.mergeQueuePanel.text": {
     "defaultMessage": "The Progress panel's Merges tab shows each merge queue: the card it is testing and how long its checks usually take, the cards waiting, and a card it returned until you've seen it. Pause queue and Resume queue are there too.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary 2.5: merge queue, Pause queue / Resume queue; 2.4: returned."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Glossary 2.5: merge queue, Pause queue / Resume queue; 2.4: returned."
   },
   "tips.mergeQueuePanel.title": {
     "defaultMessage": "Watch the merge queue",
@@ -1301,7 +1301,7 @@
   },
   "tips.mergeQueueRecent.text": {
     "defaultMessage": "Under each merge queue in the Progress panel's Merges tab, Recent merges lists its latest merges, returns and pauses, with why, when and how long each took. Click one to open its card.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary 2.5: merge queue; 2.4: returned."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Glossary 2.5: merge queue; 2.4: returned."
   },
   "tips.mergeQueueRecent.title": {
     "defaultMessage": "See what the merge queue did lately",
@@ -1309,7 +1309,7 @@
   },
   "tips.mergeRebase.text": {
     "defaultMessage": "With Combwork merging, set Merge style to Rebase and fast-forward in Version Control → Workflow: the merge queue rebases each card onto the target, tests exactly that, and moves the target forward to it.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands, and the option's value: keep them as Hive shows them. Glossary: merge queue."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands, and the option's value: keep them as Combwork shows them. Glossary: merge queue."
   },
   "tips.mergeRebase.title": {
     "defaultMessage": "A linear history, with no merge commits",
@@ -1317,7 +1317,7 @@
   },
   "tips.mergeSlot.text": {
     "defaultMessage": "When several agents finish at once, each claims the project's merge slot before it merges main in, checks and merges, so nobody's checks have to run twice. Who holds it and who waits shows in the Overview and the Progress panel.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.mergeSlot.title": {
     "defaultMessage": "Agents take turns to merge",
@@ -1325,15 +1325,15 @@
   },
   "tips.mergeStrict.text": {
     "defaultMessage": "With Combwork merging, Version Control → Workflow can have work up to date with its target before it merges: the merge queue updates a card in its own folder, never on the builder’s branch, and the review still counts if it’s the same change.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: merge queue, builder, review."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Glossary: merge queue, builder, review."
   },
   "tips.mergeStrict.title": {
     "defaultMessage": "Work up to date before it merges",
-    "description": "A tip's title: the workflow option that has Hive's merge queue bring a card's work up to date with its target branch first (G8, strict)."
+    "description": "A tip's title: the workflow option that has Combwork's merge queue bring a card's work up to date with its target branch first (G8, strict)."
   },
   "tips.messageReceipts.text": {
     "defaultMessage": "Every message the Assistant leaves an agent has an id and is kept, even across a restart: it is received once the agent reads its inbox, and acked once the agent acted on it. One not acked within {minutes, plural, one {# minute} other {# minutes}} shows as overdue (✉) in its pane.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {minutes} is how long before a message shows as overdue (30)."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. {minutes} is how long before a message shows as overdue (30)."
   },
   "tips.messageReceipts.title": {
     "defaultMessage": "See where a message got to",
@@ -1341,15 +1341,23 @@
   },
   "tips.modelFallbacks.text": {
     "defaultMessage": "Combwork asks Claude Code and Codex which models they have and which effort levels each takes. If a CLI can't say, the model, effort and price lists on its Settings page are yours to edit.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.modelFallbacks.title": {
     "defaultMessage": "New models without a Combwork update",
     "description": "A tip's title."
   },
+  "tips.modelSwitched.text": {
+    "defaultMessage": "If an agent ends up on another model than its connection gave it (Codex's offer of a cheaper model near your limit, or /model), its footer marks the model with a warning and Activity says Model changed. Restart the agent to go back.",
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Codex is a product name; /model is its command: keep it. A connection is the account Combwork starts an agent on."
+  },
+  "tips.modelSwitched.title": {
+    "defaultMessage": "An agent on another model is marked",
+    "description": "A tip's title (HI-2609): an agent running another model than Combwork started it with."
+  },
   "tips.modes.text": {
     "defaultMessage": "Coordinator runs the agents, Planner shapes work, QA triager turns reports into cards, Release manager takes a release through its checklist. Switch mode from the panel at once, keeping the conversation, or write your own.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.modes.title": {
     "defaultMessage": "Modes for the Assistant",
@@ -1357,7 +1365,7 @@
   },
   "tips.moreAgents.text": {
     "defaultMessage": "Need more than {usual, plural, one {# agent} other {# agents}} in a project? Raise Maximum agents in Version Control → Workflow, up to {most, number}, then add them. Above {usual, number} it shows what they cost: the memory your running agents take, and how much is free.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {usual} is how many agents a project has by default (12), {most} the most it can have (24). Maximum agents is a workflow option (HI-2001)."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. {usual} is how many agents a project has by default (12), {most} the most it can have (24). Maximum agents is a workflow option (HI-2001)."
   },
   "tips.moreAgents.title": {
     "defaultMessage": "More than {usual, plural, one {# agent} other {# agents}}",
@@ -1365,7 +1373,7 @@
   },
   "tips.moveAnyway.text": {
     "defaultMessage": "Dragging a card past a rule of its project (to Done before its review, say) asks first and names the rules it skips. Move Anyway records an override on the card, with your reason: an open lock on its tile says who, which rules and why.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: rule, override, Move anyway."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Glossary: rule, override, Move anyway."
   },
   "tips.moveAnyway.title": {
     "defaultMessage": "Move a card past its rules, with a reason",
@@ -1373,7 +1381,7 @@
   },
   "tips.myPrices.text": {
     "defaultMessage": "Claude Code's cost is its own figure, from its price table. On other rates (a discount, another tier)? Set Session costs to My prices, and Combwork prices every session from your table instead.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.myPrices.title": {
     "defaultMessage": "Your own prices for Claude Code",
@@ -1381,7 +1389,7 @@
   },
   "tips.newCard.text": {
     "defaultMessage": "Press {key} for a new card for the project you are in, without leaving what you are doing.",
-    "description": "A tip. {key} is a shortcut (its keys, or the command's name when it has none). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. {key} is a shortcut (its keys, or the command's name when it has none). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.newCard.title": {
     "defaultMessage": "Jot down a card",
@@ -1389,7 +1397,7 @@
   },
   "tips.noCodeCards.text": {
     "defaultMessage": "A decision, a write-up or a trial has nothing to commit: tick No code in the New Card dialog. Its work is submitted with a summary and goes to Done with nothing to merge.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Glossary: no-code card."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Glossary: no-code card."
   },
   "tips.noCodeCards.title": {
     "defaultMessage": "Cards with no code",
@@ -1397,7 +1405,7 @@
   },
   "tips.off.message": {
     "defaultMessage": "Help → Tips… still has them, and Settings → General turns them back on.",
-    "description": "More in the notice after the tips were turned off. Help → Tips… and Settings → General are names in Hive: keep them as Hive shows them."
+    "description": "More in the notice after the tips were turned off. Help → Tips… and Settings → General are names in Combwork: keep them as Combwork shows them."
   },
   "tips.off.title": {
     "defaultMessage": "Tips are off",
@@ -1405,7 +1413,7 @@
   },
   "tips.outageResume.text": {
     "defaultMessage": "Turn on Settings → Advanced → Resume agents after a connection drops, and an agent stopped by a router restart or a Wi-Fi blip waits for the connection, then reruns what was cut off by itself. Never for a usage limit or an expired sign-in.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.outageResume.title": {
     "defaultMessage": "Agents can carry on after a connection drops",
@@ -1413,7 +1421,7 @@
   },
   "tips.overview.text": {
     "defaultMessage": "The Workspace Overview shows what every project used, what runs now and the board, by day. {key}",
-    "description": "A tip. {key} is a shortcut (its keys, or the command's name when it has none). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. {key} is a shortcut (its keys, or the command's name when it has none). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.overview.title": {
     "defaultMessage": "The whole workspace at a glance",
@@ -1421,7 +1429,7 @@
   },
   "tips.ownShortcuts.text": {
     "defaultMessage": "Settings → Keyboard Shortcuts changes any shortcut, and Project Settings can change them for one project.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.ownShortcuts.title": {
     "defaultMessage": "Make the shortcuts yours",
@@ -1429,7 +1437,7 @@
   },
   "tips.palette.text": {
     "defaultMessage": "Press {key} and type: every command, with its shortcut.",
-    "description": "A tip. {key} is a shortcut (its keys, or the command's name when it has none). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. {key} is a shortcut (its keys, or the command's name when it has none). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.palette.title": {
     "defaultMessage": "Everything is in the command palette",
@@ -1437,7 +1445,7 @@
   },
   "tips.paneCells.text": {
     "defaultMessage": "Drag a pane by its header onto an empty pane to move it there, or onto another to swap them. Each layout keeps where you put them, so switching layouts and back restores it.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.paneCells.title": {
     "defaultMessage": "Put an agent in any pane",
@@ -1445,7 +1453,7 @@
   },
   "tips.pasteScreenshot.text": {
     "defaultMessage": "Press Ctrl+V in an agent's terminal with an image on the clipboard, or drop an image onto it: the agent sees it, and Combwork keeps a copy.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.pasteScreenshot.title": {
     "defaultMessage": "Paste a screenshot into a session",
@@ -1461,7 +1469,7 @@
   },
   "tips.pauseTeam.text": {
     "defaultMessage": "Pause the Team, in the Progress panel's Lanes, stops lanes starting cards and agents being woken, tells each agent to park, and lists what still runs until it's safe to install: then Install Now.",
-    "description": "A tip (HI-2081). Pause the Team, the Progress panel, Lanes and Install Now are names in Hive: keep them as Hive shows them."
+    "description": "A tip (HI-2081). Pause the Team, the Progress panel, Lanes and Install Now are names in Combwork: keep them as Combwork shows them."
   },
   "tips.pauseTeam.title": {
     "defaultMessage": "Pause the team before an update",
@@ -1469,7 +1477,7 @@
   },
   "tips.perfCompare.text": {
     "defaultMessage": "Performance → Compare: keep the current view before a change and again after it, and see whether Combwork’s traffic fell while the work still got done.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.perfCompare.title": {
     "defaultMessage": "Before and after a change",
@@ -1477,7 +1485,7 @@
   },
   "tips.perfCompareAgents.text": {
     "defaultMessage": "Comparing two scenario benchmarks? Open a scenario in Performance → Compare: its measures show the session under test first, then the other agents (a lane’s builder and reviewer) and all of them together, with each agent’s Combwork tool calls.",
-    "description": "A tip (HI-2186). Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Keep Combwork (the app's name). Glossary: builder, reviewer."
+    "description": "A tip (HI-2186). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Keep Combwork (the app's name). Glossary: builder, reviewer."
   },
   "tips.perfCompareAgents.title": {
     "defaultMessage": "Which agent a change came from",
@@ -1485,7 +1493,7 @@
   },
   "tips.performance.text": {
     "defaultMessage": "Performance, in the activity bar, shows what Combwork's API, tools and guidance cost for the last day, week or month: the whole workspace or one project. Each project has its own Performance tab too.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.performance.title": {
     "defaultMessage": "What Combwork itself costs",
@@ -1493,7 +1501,7 @@
   },
   "tips.permissionMode.text": {
     "defaultMessage": "Click the mode in an agent's footer, or press {key}, to move between asking first, accepting edits and planning.",
-    "description": "A tip. {key} is a shortcut (its keys, or the command's name when it has none). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. {key} is a shortcut (its keys, or the command's name when it has none). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.permissionMode.title": {
     "defaultMessage": "Switch permission mode",
@@ -1501,7 +1509,7 @@
   },
   "tips.progressCard.text": {
     "defaultMessage": "A run in the Progress panel shows the card and the revision it ran on under the agent, such as #1061 · a3f2c1d: click the card to open it, or the revision to copy it.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. #1061 is a card's number and a3f2c1d a commit's short id: keep them as they are."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. #1061 is a card's number and a3f2c1d a commit's short id: keep them as they are."
   },
   "tips.progressCard.title": {
     "defaultMessage": "Which card was that run for?",
@@ -1509,7 +1517,7 @@
   },
   "tips.progressCheck.text": {
     "defaultMessage": "A run for a card is recorded as a check of the card's revision. Its details in the Progress panel say Counts as check, or why not: it wasn't started as the check, the folder had uncommitted changes, or files changed while it ran.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. \"Counts as check\" is how a run's details say it counts: keep it as the details do."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. \"Counts as check\" is how a run's details say it counts: keep it as the details do."
   },
   "tips.progressCheck.title": {
     "defaultMessage": "Did that run count as a check?",
@@ -1517,7 +1525,7 @@
   },
   "tips.progressCommand.text": {
     "defaultMessage": "Agents run long commands such as tests and builds through cw-progress, so the Progress panel shows them under the agent's name, with about how long is left from the second time. Settings can have them do it only when you ask.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.progressCommand.title": {
     "defaultMessage": "Progress for any command",
@@ -1525,7 +1533,7 @@
   },
   "tips.progressDetails.text": {
     "defaultMessage": "Click a run in the Progress panel, or one under Recent, for its details: the whole command, when it ran and how long it took, its exit code, the log it wrote and why it failed.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.progressDetails.title": {
     "defaultMessage": "What did that run do?",
@@ -1533,7 +1541,7 @@
   },
   "tips.progressFilter.text": {
     "defaultMessage": "When several projects run tests and builds, the dropdown at the top of the Progress panel shows just one project's runs, or one agent's. Each workspace remembers the choice.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.progressFilter.title": {
     "defaultMessage": "Only one project's runs",
@@ -1541,7 +1549,7 @@
   },
   "tips.progressHistory.text": {
     "defaultMessage": "The Runs tab of the Progress panel keeps the last {kept, plural, one {# run} other {# runs}}, even after Combwork restarts: by day, a run and its retries in one line. Find them by their words, or show only failures, a lane’s or an agent’s.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Runs: the Progress panel's tab of runs). {kept} is how many runs Hive keeps (200)."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Runs: the Progress panel's tab of runs). {kept} is how many runs Combwork keeps (200)."
   },
   "tips.progressHistory.title": {
     "defaultMessage": "What ran this morning?",
@@ -1549,7 +1557,7 @@
   },
   "tips.progressLanes.text": {
     "defaultMessage": "When pairs of agents work through cards, the bottom of the Progress panel shows each lane as a bar, a segment per card coloured by where it is. Hover one for its card and round; click to open it. A merge going on shows as a teal card at the top.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.progressLanes.title": {
     "defaultMessage": "How far along is each pair?",
@@ -1557,7 +1565,7 @@
   },
   "tips.progressLanesHeight.text": {
     "defaultMessage": "The Progress panel shows up to four lanes. Drag the line above Lanes up to see more, a whole lane at a time; double-click it to go back to four. Each workspace remembers it.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.progressLanesHeight.title": {
     "defaultMessage": "See more lanes at once",
@@ -1565,7 +1573,7 @@
   },
   "tips.progressLanesOrder.text": {
     "defaultMessage": "Drag a running lane up or down in the Progress panel, or focus it and press Alt+Up or Alt+Down. Each workspace keeps your order; a new lane comes in on top, and merged ones drop to the bottom.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.progressLanesOrder.title": {
     "defaultMessage": "Put your lanes in order",
@@ -1573,7 +1581,7 @@
   },
   "tips.progressPanel.text": {
     "defaultMessage": "When agents run tests or builds that report progress, the Progress panel on the right shows each run: the agent, how far along it is and the time left, and Combwork's taskbar button fills as they go. {key} shows it.",
-    "description": "A tip. {key} is a shortcut (its keys, or the command's name when it has none). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. {key} is a shortcut (its keys, or the command's name when it has none). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.progressPanel.title": {
     "defaultMessage": "How long until the tests finish?",
@@ -1581,7 +1589,7 @@
   },
   "tips.progressTabs.text": {
     "defaultMessage": "The Progress panel has four tabs: Pulse for what is going on now, then Merges, Runs and Lanes. A red number on Runs counts the runs that failed with nothing passing since; Pulse has a line for them too.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (the tabs: Pulse, Merges, Runs, Lanes)."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (the tabs: Pulse, Merges, Runs, Lanes)."
   },
   "tips.progressTabs.title": {
     "defaultMessage": "Pulse, Merges, Runs, Lanes",
@@ -1589,7 +1597,7 @@
   },
   "tips.projectCards.text": {
     "defaultMessage": "A project's Overview starts with its cards: how many are in each column, stalled or blocked. Click a number to open its Tasks tab.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.projectCards.title": {
     "defaultMessage": "A project's cards at a glance",
@@ -1597,7 +1605,7 @@
   },
   "tips.projectKeys.text": {
     "defaultMessage": "Each project has a key of 2 to 4 letters that names its cards: AM-12. Search the board or the command palette for AM-12, or AM- for all of that project’s cards; an old #12 still works. Change a key in Project Settings.",
-    "description": "A tip. AM-12 and AM- are examples of a card's name and a project's key: keep them as they are. Names of Hive's menus, views, settings and commands (Project Settings): keep them as Hive shows them."
+    "description": "A tip. AM-12 and AM- are examples of a card's name and a project's key: keep them as they are. Names of Combwork's menus, views, settings and commands (Project Settings): keep them as Combwork shows them."
   },
   "tips.projectKeys.title": {
     "defaultMessage": "Cards are named by their project’s key",
@@ -1605,7 +1613,7 @@
   },
   "tips.projectTabs.text": {
     "defaultMessage": "When space is short, a project's tabs shrink to icons, and the tab you're on keeps its name while it fits. Hover a tab for its name and shortcut.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.projectTabs.title": {
     "defaultMessage": "Tabs that make room",
@@ -1613,7 +1621,7 @@
   },
   "tips.projectTabsKeys.text": {
     "defaultMessage": "Alt+1 to Alt+8 open a project's tabs in the order they show, Session to Git. Memory, Skills, Templates and MCP are in More ▾ at the end, and in the menu bar's Project menu.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. More ▾ is the button's name with its arrow."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. More ▾ is the button's name with its arrow."
   },
   "tips.projectTabsKeys.title": {
     "defaultMessage": "Alt and a number for each tab",
@@ -1621,7 +1629,7 @@
   },
   "tips.projectTabsSettings.text": {
     "defaultMessage": "The last item of More ▾, at the end of a project's tabs, is Project Settings…, with its shortcut (Alt+0 unless you change it).",
-    "description": "A tip (HI-1840). Names of Hive's menus, views, settings and commands: keep them as Hive shows them. More ▾ is the button's name with its arrow; Project Settings… is the menu item's name, with its …."
+    "description": "A tip (HI-1840). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. More ▾ is the button's name with its arrow; Project Settings… is the menu item's name, with its …."
   },
   "tips.projectTabsSettings.title": {
     "defaultMessage": "Project Settings from More ▾",
@@ -1629,7 +1637,7 @@
   },
   "tips.quitWhenDone.text": {
     "defaultMessage": "Quitting while an agent works offers Quit when agents finish: Combwork hides and quits by itself once they're done. Conversations are always kept.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.quitWhenDone.title": {
     "defaultMessage": "Quit when agents finish",
@@ -1637,7 +1645,7 @@
   },
   "tips.recentWorkspaces.text": {
     "defaultMessage": "Remove a workspace from File → Open Recent or the welcome page with its ✕, or right-click it. Clear Recently Opened forgets them all; folders that are gone show as not found.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.recentWorkspaces.title": {
     "defaultMessage": "Tidy your recent workspaces",
@@ -1645,7 +1653,7 @@
   },
   "tips.removeAll.text": {
     "defaultMessage": "Remove All in the project header removes all of a project's agents after one question. Worktrees are kept unless you tick the box, which deletes only merged, clean ones.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.removeAll.title": {
     "defaultMessage": "Remove every agent at once",
@@ -1653,7 +1661,7 @@
   },
   "tips.resumeAfterUpdate.text": {
     "defaultMessage": "Installing a new version tells the agents that were working or in a card loop, and when Combwork restarts it resumes them in their conversations, one at a time, each told its card, round and lane. After you quit, the next start offers to resume them instead.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.resumeAfterUpdate.title": {
     "defaultMessage": "Updates leave your agents where they were",
@@ -1661,7 +1669,7 @@
   },
   "tips.resumeAll.text": {
     "defaultMessage": "After a restart, Resume All Agents in the project header resumes every stopped agent's last session in one go.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.resumeAll.title": {
     "defaultMessage": "Resume all agents at once",
@@ -1677,7 +1685,7 @@
   },
   "tips.reviewCopies.text": {
     "defaultMessage": "A reviewer reviews in a review copy: a folder at exactly the submitted revision, which nothing else writes, so the builder can carry on meanwhile. Its checks there count for that submission. Settings → Advanced turns it off.",
-    "description": "A tip. A review copy: a folder Hive keeps at exactly the revision under review. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. A review copy: a folder Combwork keeps at exactly the revision under review. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.reviewCopies.title": {
     "defaultMessage": "Reviewers test exactly what was submitted",
@@ -1685,7 +1693,7 @@
   },
   "tips.reviewSkip.text": {
     "defaultMessage": "Building an installer or a quick trial needs no reviewer? Tick Skip review in the New Card dialog: submitting the card finishes it, and a code card still goes on to its merge, with its merge checks.",
-    "description": "A tip (#1625). Names of Hive's menus, views, settings and commands: keep them as Hive shows them (Skip review is the New Card dialog's tick box)."
+    "description": "A tip (#1625). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Skip review is the New Card dialog's tick box)."
   },
   "tips.reviewSkip.title": {
     "defaultMessage": "Cards that don't need a review",
@@ -1693,15 +1701,15 @@
   },
   "tips.reviewerPool.text": {
     "defaultMessage": "With the workflow option Reviewers set to A shared pool, Start Lane offers the reviewer pool: each card submitted goes to the next free reviewer, oldest first, never to its own builder.",
-    "description": "A tip. Reviewers and A shared pool are a workflow option and its value; Start Lane is a dialog: keep them as Hive shows them. Glossary: reviewer pool, builder."
+    "description": "A tip. Reviewers and A shared pool are a workflow option and its value; Start Lane is a dialog: keep them as Combwork shows them. Glossary: reviewer pool, builder."
   },
   "tips.reviewerPool.title": {
     "defaultMessage": "Share reviewers between lanes",
-    "description": "A tip's title. A lane is Hive's record of a card loop (glossary 2.5: lane)."
+    "description": "A tip's title. A lane is Combwork's record of a card loop (glossary 2.5: lane)."
   },
   "tips.safeguardStops.text": {
     "defaultMessage": "A shield beside an agent's status means its CLI's safety classifier stopped a response: hover it for when, the model, and the agent's last tool calls before it. Orange means its model changed since, or it waits on you.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.safeguardStops.title": {
     "defaultMessage": "See when a safety classifier stops an agent",
@@ -1709,7 +1717,7 @@
   },
   "tips.saveTemplate.text": {
     "defaultMessage": "Set agents up once and reuse them: + Add ▾ → Templates → Save Template… in the session toolbar keeps their settings, roles and layout, and the same menu loads them into any project.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.saveTemplate.title": {
     "defaultMessage": "Save your agents as a template",
@@ -1717,7 +1725,7 @@
   },
   "tips.searchClear.text": {
     "defaultMessage": "Every search and filter box has an × while it has text: click it, or press Escape, to see everything again. In a dialog or the palette, the next Escape closes it.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.searchClear.title": {
     "defaultMessage": "Clear a search in one go",
@@ -1725,7 +1733,7 @@
   },
   "tips.searchTranscripts.text": {
     "defaultMessage": "The Sessions tab searches every session's name, date and transcript (Ctrl+F there): the tree keeps what matches, and a hit opens the conversation at that message.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.searchTranscripts.title": {
     "defaultMessage": "Search every past session",
@@ -1733,7 +1741,7 @@
   },
   "tips.sessionCleanup.text": {
     "defaultMessage": "The Sessions tab's Clean Up Old Sessions… button archives or deletes every session last active more than {hours, plural, one {# hour} other {# hours}}, {week, plural, one {# day} other {# days}} or {month, plural, one {# day} other {# days}} ago. Running sessions and the one you're reading are left alone.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. {hours}, {week} and {month} are its choices of age (24 hours, 7 days and 30 days)."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. {hours}, {week} and {month} are its choices of age (24 hours, 7 days and 30 days)."
   },
   "tips.sessionCleanup.title": {
     "defaultMessage": "Clear out old sessions",
@@ -1741,7 +1749,7 @@
   },
   "tips.sessionSizes.text": {
     "defaultMessage": "The Sessions tab shows each session's transcript size. One in amber is past Warn when a transcript is over: hand its work over to a new conversation to keep things quick.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.sessionSizes.title": {
     "defaultMessage": "Spot the conversations that grew too long",
@@ -1749,7 +1757,7 @@
   },
   "tips.sessionToolbar.text": {
     "defaultMessage": "The chip above the panes counts your agents by state; its ▾ lists them, most urgent first: choose one to go to it. Panes | Tiles beside it switches between the agents' terminals and a small tile each.",
-    "description": "A tip. Panes and Tiles: the toggle's words, as Hive shows them."
+    "description": "A tip. Panes and Tiles: the toggle's words, as Combwork shows them."
   },
   "tips.sessionToolbar.title": {
     "defaultMessage": "Jump to any agent, or see them all as tiles",
@@ -1757,7 +1765,7 @@
   },
   "tips.sessionTree.text": {
     "defaultMessage": "In the Sessions tab, right-click a provider, an agent or a session with sub-sessions to archive or delete everything in it at once. Running sessions and ones in use are skipped, and Combwork says which.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.sessionTree.title": {
     "defaultMessage": "Clear out a whole branch of sessions",
@@ -1765,7 +1773,7 @@
   },
   "tips.shareTemplates.text": {
     "defaultMessage": "The Templates view (activity bar) and a project's Templates tab list every template. Export… saves one as a file for teammates; Import… brings one in, for the workspace or a project.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.shareTemplates.title": {
     "defaultMessage": "Share agent templates",
@@ -1773,7 +1781,7 @@
   },
   "tips.sharedNotes.text": {
     "defaultMessage": "Shared notes and handovers live in the workspace, so every project's agents can read them with Combwork's tools.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.sharedNotes.title": {
     "defaultMessage": "Notes every project shares",
@@ -1781,7 +1789,7 @@
   },
   "tips.signInExpired.text": {
     "defaultMessage": "If Claude Code's or Codex's sign-in expires, its agents show Needs sign-in (a violet dot) and you're told once. Sign in again, then Resume All Agents in the project header carries on the ones that stopped.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.signInExpired.title": {
     "defaultMessage": "When a sign-in expires",
@@ -1789,7 +1797,7 @@
   },
   "tips.silentUnknown.text": {
     "defaultMessage": "Combwork never guesses an agent is idle: when its turn has been silent for a while with no sign of its end, its pane says so. If its terminal waits at its prompt, Mark idle puts it right.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.silentUnknown.title": {
     "defaultMessage": "An agent silent with its state unknown",
@@ -1797,7 +1805,7 @@
   },
   "tips.skillFiles.text": {
     "defaultMessage": "Agents read a skill's SKILL.md whenever they use it, and a file it links only when they need that part. A skill's page shows each of its files in a tab, to read and edit; a link to one opens its tab.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. SKILL.md is a file name: keep it in English."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. SKILL.md is a file name: keep it in English."
   },
   "tips.skillFiles.title": {
     "defaultMessage": "A skill can link files beside its SKILL.md",
@@ -1805,7 +1813,7 @@
   },
   "tips.skillsDelivered.text": {
     "defaultMessage": "The switch beside each Combwork skill, in the Skills view or a project's Skills tab, says whether agents get it (Delivered to agents). Copies Combwork puts in a folder for Codex and Copilot are removed once no agent works there, as Settings → Advanced says.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Codex and Copilot are CLIs' names."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Codex and Copilot are CLIs' names."
   },
   "tips.skillsDelivered.title": {
     "defaultMessage": "Choose which skills agents get",
@@ -1813,23 +1821,23 @@
   },
   "tips.slotHeld.text": {
     "defaultMessage": "When Combwork can't tell that everything an agent's session started in a slot has ended, it keeps the slot for it rather than guess. Release Slot… in the agent's ⋯ menu shows what Combwork knows, ends what it lists if you want, and frees the slot.",
-    "description": "A tip. A slot: a folder Hive lends to a card or a lane. Release Slot… is a menu item: keep it as Hive shows it; ⋯ is the agent's menu button."
+    "description": "A tip. A slot: a folder Combwork lends to a card or a lane. Release Slot… is a menu item: keep it as Combwork shows it; ⋯ is the agent's menu button."
   },
   "tips.slotHeld.title": {
     "defaultMessage": "Free a slot held after Combwork closed",
-    "description": "A tip's title (#1506). A slot: a folder Hive lends to a card or a lane."
+    "description": "A tip's title (#1506). A slot: a folder Combwork lends to a card or a lane."
   },
   "tips.slotOptions.text": {
     "defaultMessage": "Version Control → Workflow → Slots and copies holds the script run in a new slot, the files copied into it and the slots in use, and how many review copies the project keeps. They save as you change them.",
-    "description": "A tip. A slot: a folder Hive lends to a card or a lane; a review copy: a folder at exactly the revision a reviewer reviews. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. A slot: a folder Combwork lends to a card or a lane; a review copy: a folder at exactly the revision a reviewer reviews. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.slotOptions.title": {
     "defaultMessage": "Set up slots in Version Control",
-    "description": "A tip's title. A slot: a folder Hive lends to a card or a lane."
+    "description": "A tip's title. A slot: a folder Combwork lends to a card or a lane."
   },
   "tips.slotResume.text": {
     "defaultMessage": "A builder's conversation stays in its card's slot. Once the card ends, Resume All leaves it so the slot stays free for new work; its own Resume takes the slot back while nothing else has used it.",
-    "description": "A tip. A slot is a worktree Hive lends to a card. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. A slot is a worktree Combwork lends to a card. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.slotResume.title": {
     "defaultMessage": "A conversation resumes where it was made",
@@ -1837,23 +1845,23 @@
   },
   "tips.slots.text": {
     "defaultMessage": "With Where cards are built set to Each card in its own folder, starting a card lends its builder a slot, a ready worktree, and makes the card's branch there. A lane keeps its slot from card to card; with every slot in use, it waits for one.",
-    "description": "A tip. A slot is a working folder (a worktree) Hive lends to a card or a lane. Names of Hive's menus, views, settings and commands (Where cards are built is a workflow option, Each card in its own folder its value; glossary 2.6, G11): keep them as Hive shows them."
+    "description": "A tip. A slot is a working folder (a worktree) Combwork lends to a card or a lane. Names of Combwork's menus, views, settings and commands (Where cards are built is a workflow option, Each card in its own folder its value; glossary 2.6, G11): keep them as Combwork shows them."
   },
   "tips.slots.title": {
     "defaultMessage": "Each card on a branch of its own",
-    "description": "A tip's title. A slot is a working folder (a worktree) Hive lends to a card or a lane."
+    "description": "A tip's title. A slot is a working folder (a worktree) Combwork lends to a card or a lane."
   },
   "tips.slotsAdopted.text": {
     "defaultMessage": "Since the upgrade, each builder's own worktree is a slot kept for it until its next card or lane takes it over. Release Slot… in the agent's ⋯ menu gives one up; once free, Combwork renames its folder to a slot name, taking its conversations with it.",
-    "description": "A tip. A slot is a working folder (a worktree) Hive lends to a card or a lane. Release Slot… is a menu item: keep it as Hive shows it; ⋯ is the agent's menu button."
+    "description": "A tip. A slot is a working folder (a worktree) Combwork lends to a card or a lane. Release Slot… is a menu item: keep it as Combwork shows it; ⋯ is the agent's menu button."
   },
   "tips.slotsAdopted.title": {
     "defaultMessage": "Your agents' worktrees are slots now",
-    "description": "A tip's title, after upgrading from Hive 0.9. A slot is a working folder (a worktree) Hive lends to a card or a lane."
+    "description": "A tip's title, after upgrading from version 0.9. A slot is a working folder (a worktree) Combwork lends to a card or a lane."
   },
   "tips.sortTables.text": {
     "defaultMessage": "Click a column's header in Combwork's tables (shortcuts, Performance, Storage, the Overviews) to sort by it, again for the other way. Combwork remembers each table's sort and rows per page.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.sortTables.title": {
     "defaultMessage": "Sort any table",
@@ -1861,7 +1869,7 @@
   },
   "tips.staleMessages.text": {
     "defaultMessage": "When the Assistant relays something about a card's current round, it ties the message to that card: if the card passes or starts another round before the agent reads it, Combwork drops it as stale, so no agent reopens a passed card for an old finding.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.staleMessages.title": {
     "defaultMessage": "A message about a round goes stale, not late",
@@ -1869,7 +1877,7 @@
   },
   "tips.startFreshIdle.text": {
     "defaultMessage": "Long conversations cost more. Start Fresh (Idle Agents) in the project header's Agents menu gives every idle agent a new one in one step, and Combwork suggests it when a project's work has finished.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.startFreshIdle.title": {
     "defaultMessage": "Start idle agents fresh when work is done",
@@ -1877,7 +1885,7 @@
   },
   "tips.startNewAll.text": {
     "defaultMessage": "Start New in the project header's Agents menu gives every agent a new session after one question; Archive and Start New archives their old ones first. Their conversations stay in the Sessions tab.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.startNewAll.title": {
     "defaultMessage": "Fresh sessions for every agent",
@@ -1885,7 +1893,7 @@
   },
   "tips.stoppedPane.text": {
     "defaultMessage": "When an agent's session ends, its pane is dimmed and its bar says when and why (stopped by you, its lane ended, its CLI exited…). Its last output stays readable, and Resume or New Session there starts it again.",
-    "description": "A tip (HI-1881). Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip (HI-1881). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.stoppedPane.title": {
     "defaultMessage": "A stopped agent looks stopped",
@@ -1893,7 +1901,7 @@
   },
   "tips.storageCleanup.text": {
     "defaultMessage": "Project Settings → Storage shows how much space a project's backups, archive, attachments and worktrees take. Clean Up… moves old attachments and backups to the Recycle Bin, and shows you exactly what goes first.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.storageCleanup.title": {
     "defaultMessage": "See what Combwork keeps, and clean up",
@@ -1901,7 +1909,7 @@
   },
   "tips.storagePurge.text": {
     "defaultMessage": "Purge… in Project Settings → Storage, or Purge Combwork's Files… on a session, removes everything Combwork keeps for sessions: backups, attachments and leftovers. It lists every file first; the coding agents' own files and your usage totals stay.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.storagePurge.title": {
     "defaultMessage": "Purge what Combwork keeps",
@@ -1909,7 +1917,7 @@
   },
   "tips.taskbarBadge.text": {
     "defaultMessage": "Combwork's taskbar button shows how many agents need you, and flashes when one asks you something while Combwork is in the background.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.taskbarBadge.title": {
     "defaultMessage": "Glance at the taskbar",
@@ -1917,7 +1925,7 @@
   },
   "tips.teamPreset.text": {
     "defaultMessage": "Team, in Version Control → Workflow, is Pair with stricter checks: the unit tests pass before review and on the merged result, dependencies are installed from scratch before every merge, and cards labelled ui or release wait for your OK.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (glossary 2.1: Team, Pair)."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (glossary 2.1: Team, Pair)."
   },
   "tips.teamPreset.title": {
     "defaultMessage": "Several builders? Try the Team preset",
@@ -1925,7 +1933,7 @@
   },
   "tips.teamTemplates.text": {
     "defaultMessage": "The Templates view’s Combwork group has ready-made teams: Solo, Pair, Pair: one provider, Team 3×3, Team 6×6 and Team 6 + pool, with builders and reviewers paired. Loading one offers to switch the project to the preset it suits.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands, and of Hive's own templates: keep them as Hive shows them. Glossary: builder, reviewer, preset."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands, and of Combwork's own templates: keep them as Combwork shows them. Glossary: builder, reviewer, preset."
   },
   "tips.teamTemplates.title": {
     "defaultMessage": "Start from one of Combwork’s templates",
@@ -1933,7 +1941,7 @@
   },
   "tips.templateNames.text": {
     "defaultMessage": "Agent names are unique across the workspace. Loading a template from another project, give its agents new names in the list beside the template's own: Load template waits until none is taken.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.templateNames.title": {
     "defaultMessage": "Name a template's agents as you load it",
@@ -1941,7 +1949,7 @@
   },
   "tips.templateWorkflow.text": {
     "defaultMessage": "Save Template… can keep the project's workflow too: its rules, never its branch or commands. Loading it shows what changes, then opens Version Control → Workflow filled in, to save there.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.templateWorkflow.title": {
     "defaultMessage": "Keep your workflow in a template",
@@ -1949,7 +1957,7 @@
   },
   "tips.testedClis.text": {
     "defaultMessage": "Claude Code, Codex and Copilot update on their own. Provider Setup shows the version this Combwork release was tested with next to the one you have, and says when yours is newer or older.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.testedClis.title": {
     "defaultMessage": "See which CLI versions Combwork was tested with",
@@ -1957,7 +1965,7 @@
   },
   "tips.tileStrip.text": {
     "defaultMessage": "In an agent's focus view (Tiles), the strip on the left shows each agent's card as a small chip, tinted with the colour of the board column it is in; click one to open the card. Drag the strip's edge to make it wider, and double-click the edge to reset it.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands (Tiles): keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands (Tiles): keep them as Combwork shows them."
   },
   "tips.tileStrip.title": {
     "defaultMessage": "Each agent's card, beside its name",
@@ -1965,7 +1973,7 @@
   },
   "tips.tileStripOrder.text": {
     "defaultMessage": "In an agent's focus view (Tiles), drag an agent up or down the strip on the left, or press Alt+Up or Alt+Down on it. The tiles and the panes follow the same order.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands (Tiles): keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands (Tiles): keep them as Combwork shows them."
   },
   "tips.tileStripOrder.title": {
     "defaultMessage": "Reorder agents from the focus view",
@@ -1973,7 +1981,7 @@
   },
   "tips.tilesView.text": {
     "defaultMessage": "Tiles shows each agent as a small tile: its state, status, card, progress and latest reply, twelve to a page. Click one to open its pane large beside the others; Esc goes back. Settings → Sessions → Tile order can put the agents waiting for you first.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands (Tiles, Tile order): keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands (Tiles, Tile order): keep them as Combwork shows them."
   },
   "tips.tilesView.title": {
     "defaultMessage": "See a whole team at once as tiles",
@@ -1981,15 +1989,15 @@
   },
   "tips.triageReport.text": {
     "defaultMessage": "Tell the Assistant in QA triager mode what you did and saw, or paste a screenshot. It finds the cause in the code, checks for a card that already covers it (even one not merged yet), then files a card with the evidence.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.triageReport.title": {
     "defaultMessage": "Report a problem to the QA triager",
-    "description": "A tip's title. QA triager is a mode of the Hive Assistant: keep its name as Hive shows it."
+    "description": "A tip's title. QA triager is a mode of the Combwork Assistant: keep its name as Combwork shows it."
   },
   "tips.twoProviders.text": {
     "defaultMessage": "Agents in one project can use different providers: say a Codex reviewer next to a Claude Code agent. Hand Over to… passes work between them.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.twoProviders.title": {
     "defaultMessage": "Mix Claude Code and Codex",
@@ -2017,7 +2025,7 @@
   },
   "tips.ui.off": {
     "defaultMessage": "Don't show tips",
-    "description": "A link on the tip card: turns off the tip when Hive starts."
+    "description": "A link on the tip card: turns off the tip when Combwork starts."
   },
   "tips.ui.search": {
     "defaultMessage": "Search tips",
@@ -2025,7 +2033,7 @@
   },
   "tips.ui.showOnStart": {
     "defaultMessage": "Show a tip when Combwork starts",
-    "description": "A switch in Help → Tips: shows a tip of the day when Hive starts (the same as Settings → General → Show a tip when Hive starts)."
+    "description": "A switch in Help → Tips: shows a tip of the day when Combwork starts (the same as Settings → General → Show a tip when Combwork starts)."
   },
   "tips.ui.tip": {
     "defaultMessage": "Tip",
@@ -2041,7 +2049,7 @@
   },
   "tips.unexpectedClose.text": {
     "defaultMessage": "If Combwork was ended without quitting (a crash, or something closed it), the next start says when it was last seen and which agents were running, with Resume All. Settings → Sessions → Resume agents after an unexpected close resumes them by itself.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.unexpectedClose.title": {
     "defaultMessage": "Know when Combwork closed unexpectedly",
@@ -2049,7 +2057,7 @@
   },
   "tips.unmerged.text": {
     "defaultMessage": "The agent's tab shows how many commits aren't merged yet, Merge… in its ⋯ menu says what is left, and Version Control → Changes shows everything the agent changed since it branched.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.unmerged.title": {
     "defaultMessage": "See what a worktree agent has to merge",
@@ -2057,7 +2065,7 @@
   },
   "tips.unusedWorktrees.text": {
     "defaultMessage": "Removed an agent but kept its worktree? Version Control → Changes opens on the worktrees no agent uses, saying who made each: open one to see its work and merge it, or remove the merged ones with their branches.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.unusedWorktrees.title": {
     "defaultMessage": "Tidy kept worktrees",
@@ -2065,7 +2073,7 @@
   },
   "tips.updateFromTarget.text": {
     "defaultMessage": "Version Control → Branches & remotes: a branch behind the target has Update. Merge the target in or rebase onto it, where the branch is checked out; a conflict is undone at once, naming its files.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.updateFromTarget.title": {
     "defaultMessage": "Bring a branch up to date with its target",
@@ -2073,7 +2081,7 @@
   },
   "tips.usageMoves.text": {
     "defaultMessage": "In Settings → Accounts & Connections, open an account’s ⋯ → Account Settings… and tick When it reaches 98% of its weekly limit, move its agents to another account: they move once their turn is over and carry on there.",
-    "description": "A tip (HI-2195). Names of Hive's menus, views, settings and commands: keep them as Hive shows them; the rule is quoted as the setting shows it."
+    "description": "A tip (HI-2195). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them; the rule is quoted as the setting shows it."
   },
   "tips.usageMoves.title": {
     "defaultMessage": "Move agents before a plan runs out",
@@ -2081,7 +2089,7 @@
   },
   "tips.versionControlSwitch.text": {
     "defaultMessage": "Click None or Git atop a project’s Version Control tab to switch it from its next card; cards in flight keep the old rules. Each keeps its own workflow options, and when the folder changes (git init, say), Combwork offers the switch there.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (glossary 2.1: None, Git, Version Control, old rules, workflow). Keep git init as it is (a command)."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (glossary 2.1: None, Git, Version Control, old rules, workflow). Keep git init as it is (a command)."
   },
   "tips.versionControlSwitch.title": {
     "defaultMessage": "Switch between None and Git",
@@ -2089,7 +2097,7 @@
   },
   "tips.versionControlTab.text": {
     "defaultMessage": "A project’s Version Control tab says what Combwork found in its folder, and starts with Workflow: who reviews, which checks pass first and who merges. Its header names the preset, and a click on it opens them.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (glossary 2.1: Version Control, Workflow, preset)."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (glossary 2.1: Version Control, Workflow, preset)."
   },
   "tips.versionControlTab.title": {
     "defaultMessage": "One tab for version control and workflow",
@@ -2097,15 +2105,23 @@
   },
   "tips.viewerTokens.text": {
     "defaultMessage": "An app that shows what your agents are doing, such as Apiary, needs only a viewer token: Settings → Agent API → Viewer tokens makes one that can read everything and change nothing, and revokes it again.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.viewerTokens.title": {
     "defaultMessage": "Let another app watch Combwork",
     "description": "A tip's title."
   },
+  "tips.waitingOnPurpose.text": {
+    "defaultMessage": "A card in Active held for a quiet window, or waiting for an answer? Right-click it, Mark as Waiting…, and say why: Combwork stops reporting it as stalled until you clear it or it leaves Active. Its agent keeps running.",
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Mark as Waiting… is a card's menu item, Active a board stage)."
+  },
+  "tips.waitingOnPurpose.title": {
+    "defaultMessage": "A card that waits on purpose",
+    "description": "A tip's title (HI-2618): a card in Active marked as waiting on purpose, so it isn't reported as stalled."
+  },
   "tips.workflowDefaults.text": {
     "defaultMessage": "Settings → Version Control sets the options every project starts from: Combwork defaults, for every workspace, and the open workspace’s over them. A project’s own options still win, and saving lists the projects that inherit the change.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (glossary 2.1: workflow)."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (glossary 2.1: workflow)."
   },
   "tips.workflowDefaults.title": {
     "defaultMessage": "Set a workflow once for every project",
@@ -2113,7 +2129,7 @@
   },
   "tips.workflowOptions.text": {
     "defaultMessage": "Version Control → Workflow sets who reviews a card’s work, which checks pass first and who merges it. Pick a preset, or set each option: a change applies from the next card that starts.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.workflowOptions.title": {
     "defaultMessage": "Choose how cards get to Done",
@@ -2121,7 +2137,7 @@
   },
   "tips.workflowPresetsWhy.text": {
     "defaultMessage": "In Version Control → Workflow, click Solo, Pair or Team: it lists each option it sets and why, and marks what it would change. Nothing changes until you use it and save.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them (glossary 2.1: Solo, Pair, Team)."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (glossary 2.1: Solo, Pair, Team)."
   },
   "tips.workflowPresetsWhy.title": {
     "defaultMessage": "See what a preset does before you use it",
@@ -2129,7 +2145,7 @@
   },
   "tips.workspaceMoved.text": {
     "defaultMessage": "Moved the workspace folder, say to another drive? Open it from its new place and choose Repair… in the banner: agents' worktrees, their sessions, and Claude Code's conversations and memory follow it.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.workspaceMoved.title": {
     "defaultMessage": "Move a workspace without losing its agents",
@@ -2137,7 +2153,7 @@
   },
   "tips.workspaceMovedDefender.text": {
     "defaultMessage": "If Combwork had Defender skip the workspace's folders, Repair… after a move offers to move those exclusions to the new folders, with one administrator prompt, so none is left on a folder that's gone. Exclusions you made yourself stay as they are.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.workspaceMovedDefender.title": {
     "defaultMessage": "Defender exclusions follow a moved workspace",
@@ -2145,7 +2161,7 @@
   },
   "tips.workspaceNotes.text": {
     "defaultMessage": "Workspace notes, pinned first in Shared Notes, is for what's true of this machine, like a full path. Every agent gets it when it starts, in any folder, so it needn't go in a committed AGENTS.md. A section headed with a project's name is that project's alone.",
-    "description": "A tip. Names of Hive's menus, views, settings and commands: keep them as Hive shows them. Workspace notes is a shared note's name and AGENTS.md a file name: keep both in English."
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Workspace notes is a shared note's name and AGENTS.md a file name: keep both in English."
   },
   "tips.workspaceNotes.title": {
     "defaultMessage": "Notes about this machine for every agent",

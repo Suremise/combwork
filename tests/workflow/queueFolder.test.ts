@@ -27,8 +27,8 @@ afterEach(() => {
   env = null
 })
 
-// Hive's commit message (G19, chosen: the branch's own is every preset's since HI-1997), so each merge names its card.
-const pair = (): Env => (env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [], commitMessage: 'hive' }))
+// Combwork's commit message (G19, chosen: the branch's own is every preset's since HI-1997), so each merge names its card.
+const pair = (): Env => (env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [], commitMessage: 'combwork' }))
 
 async function queued(e: Env, title = 'A', file = 'a.txt', content = `${title}\n`) {
   const card = e.wf.createCard({ title })
@@ -41,7 +41,7 @@ async function queued(e: Env, title = 'A', file = 'a.txt', content = `${title}\n
   return card
 }
 
-/** Another Hive (a restart): its own store connection, Workflow and queue on the same files. */
+/** Another Combwork (a restart): its own store connection, Workflow and queue on the same files. */
 function restarted(e: Env, cfg: Partial<QueueConfig> = {}): { wf: Workflow; q: MergeQueue } {
   const store = e.reopen()
   extra.push(store)
@@ -52,7 +52,7 @@ function restarted(e: Env, cfg: Partial<QueueConfig> = {}): { wf: Workflow; q: M
 const head = (e: Env, ref = 'main'): string => sh(e.project, 'rev-parse', ref)
 const crashAt = (point: QueueHook): Partial<QueueConfig> => ({ hooks: { [point]: () => Promise.reject(new Error('crash')) } })
 const integratedFacts = (e: Env, card: number) => e.store.facts(card).filter((f) => f.kind === 'Integrated')
-/** Hive's merge commits of a card on main: never two. */
+/** Combwork's merge commits of a card on main: never two. */
 const merges = (e: Env, key: string): number => sh(e.project, 'log', '--format=%s', 'main').split('\n').filter((s) => s.startsWith(`${key}:`)).length
 /** Moves main as another git client would: a commit on its tree, the ref moved to it (the folder's files untouched). */
 const moveMain = (e: Env, branch = 'main'): string => {
@@ -63,7 +63,7 @@ const moveMain = (e: Env, branch = 'main'): string => {
 }
 
 /**
- * Runs a line in Windows PowerShell in a folder, as the user would paste it (HR4's #1351 round 1: the commands Hive
+ * Runs a line in Windows PowerShell in a folder, as the user would paste it (HR4's #1351 round 1: the commands Combwork
  * gives must reach the program with their arguments as written). Its output.
  */
 const powershell = (cwd: string, line: string): string =>
@@ -183,7 +183,7 @@ describe('the journal (§16.9.2)', () => {
       hooks: {
         beforeRef: () => {
           moveMain(e)
-          writeFileSync(join(e.project, 'a.txt'), 'edited while Hive merged\n')
+          writeFileSync(join(e.project, 'a.txt'), 'edited while Combwork merged\n')
         }
       }
     })
@@ -192,7 +192,7 @@ describe('the journal (§16.9.2)', () => {
     const p = e.store.queuePause('main')!
     expect(p.stuck).toMatchObject({ folder: e.project, branch: 'main', expected: before, phase: 'rollback', files: [{ path: 'a.txt', side: 'other' }], commands: [] })
     expect(p.stuck!.ref).not.toBe(before)
-    expect(readFileSync(join(e.project, 'a.txt'), 'utf8')).toBe('edited while Hive merged\n')
+    expect(readFileSync(join(e.project, 'a.txt'), 'utf8')).toBe('edited while Combwork merged\n')
     const ask = e.wf.state(card).requests.find((r) => r.gate === QUEUE_STUCK_GATE)
     expect(ask).toMatchObject({ kind: 'decide', requestText: { id: 'workflow.forYou.queueStuck', values: { how: 'none', folder: e.project, target: 'main' } } })
     // Paused: the queue runs nothing more until it is settled.
@@ -489,7 +489,7 @@ describe("every target write authorised in the lock, from state read there (HR4'
     expect(e.kinds(card.id)).not.toContain('IntegrationStarted')
   })
 
-  it("a terminal pause freezes the target: put back but not answered, a fresh queue's or another Hive's recovery writes nothing", async () => {
+  it("a terminal pause freezes the target: put back but not answered, a fresh queue's or another Combwork's recovery writes nothing", async () => {
     const e = pair()
     const card = await queued(e)
     const before = head(e)

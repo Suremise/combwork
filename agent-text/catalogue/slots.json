@@ -6,7 +6,7 @@
   },
   "slots.release.live": {
     "text": "{slot}'s writer is still running in this Combwork: stop the agent, or end or keep what it left running, first.",
-    "note": "Release Slot… refused: the session writing in the slot ({slot}) still runs in this Hive, or Hive still follows the processes it left running (End or Keep Running in the agent's ⋯ menu settles them).",
+    "note": "Release Slot… refused: the session writing in the slot ({slot}) still runs in this Combwork, or Combwork still follows the processes it left running (End or Keep Running in the agent's ⋯ menu settles them).",
     "audience": "both"
   },
   "slots.release.notEnded": {
@@ -14,9 +14,9 @@
     "note": "Release Slot… with \"End these processes first\": ending the listed processes failed (Windows refused), so the slot ({slot}) was left as it was.",
     "audience": "both"
   },
-  "slots.release.otherHive": {
+  "slots.release.otherCombwork": {
     "text": "{slot} is held by another Combwork that is still running (process {pid}): release it there, or quit that Combwork first.",
-    "note": "Release Slot… refused: another running copy of Hive (its process id {pid}) holds the slot ({slot}).",
+    "note": "Release Slot… refused: another running copy of Combwork (its process id {pid}) holds the slot ({slot}).",
     "audience": "both"
   },
   "slots.setting.bad": {

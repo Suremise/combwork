@@ -31,7 +31,7 @@
   "hooks.receiver": "przez hook {form} Combwork",
   "hooks.refresh": "Odśwież",
   "hooks.response": "{response, select, none {Nic do powiedzenia} context {Wysłano kontekst} allowed {Zezwolono} warned {Zezwolono z ostrzeżeniem} asked {Zapytano Ciebie} blocked {Zablokowano} error {Błąd} other {Nieznana}}",
-  "hooks.source": "{source, select, hive {Combwork} managed {Ustawienia zarządzane} cli {Wiersz poleceń} project {Projekt} local {Projekt (lokalne)} user {Użytkownik} plugin {Wtyczka} other {Inne}}",
+  "hooks.source": "{source, select, combwork {Combwork} managed {Ustawienia zarządzane} cli {Wiersz poleceń} project {Projekt} local {Projekt (lokalne)} user {Użytkownik} plugin {Wtyczka} other {Inne}}",
   "hooks.stale": "Agent uruchomił się ponownie od tego odczytu: widać jego poprzednią sesję.",
   "hooks.status": "{status, select, passed {Przekazany przez Combwork} trusted {Zaufany} untrusted {Niezaufany: nie zostanie uruchomiony} modified {Zmieniony od zaufania: nie zostanie uruchomiony} unverified {Skonfigurowany · wczytanie niepotwierdzone} disabled {Wyłączony} notLoaded {Niewczytany} unsupported {Nieznana forma} other {Nieznany}}",
   "hooks.timeSpan": "{from}–{to}",

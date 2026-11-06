@@ -53,7 +53,7 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
   cfg.settings.providers['claude-code'].executablePath = path.join(__dirname, 'fake-claude', 'fake-claude.cmd')
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never', showTips: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: lib.port(47793), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' }, viewport: { width: 1500, height: 950 } })
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_API_PORT: lib.port(47793), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' }, viewport: { width: 1500, height: 950 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)
@@ -211,12 +211,12 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
     await page.locator('.template-editor .template-detail-actions button', { hasText: 'Save Template' }).click()
     check("the editor removes None's section, Git's kept", !!(await until(() => JSON.stringify(Object.keys(fileOf('team-a.json').workflow ?? {})) === '["git"]')), JSON.stringify(fileOf('team-a.json').workflow))
 
-    // --- HR5's round 1, 1: imported with a section Hive can't use: said, and no preset offered in its place.
+    // --- HR5's round 1, 1: imported with a section Combwork can't use: said, and no preset offered in its place.
     await page.locator('.activitybar [aria-label="Projects"]').click()
     await select('gitb')
     // gitb last showed Version Control: its Session tab, for + Add ▾.
     await page.locator('.tabs .tab', { hasText: 'Session' }).first().click()
-    const bad =path.join(lib.WORK, 'templateworkflow-bad.hive-template.json')
+    const bad =path.join(lib.WORK, 'templateworkflow-bad.combwork-template.json')
     fs.writeFileSync(bad, JSON.stringify({ version: 2, name: 'Bad none', savedAt: '', layout: 'auto', suggestedPreset: 'pair', agents: [{ name: 'BD-B1', role: 'builder', provider: 'claude-code' }], workflow: { none: { preset: null, options: { review: 'bogus' } } } }))
     const imported = await inv('templates:import', bad, { scope: 'workspace' })
     check('imported, its rejected section kept as rejected (never what it held)', !!imported?.imported && JSON.stringify(imported.imported.workflowDropped) === '["none"]' && !/bogus/.test(fs.readFileSync(path.join(ws, '.combwork', 'templates', imported.imported.file), 'utf8')), JSON.stringify(imported))
@@ -319,7 +319,7 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
     const confirmLate = page.locator('.dialog', { hasText: 'Save' }).last()
     await until(async () => (await confirmLate.getByRole('button', { name: 'Save', exact: true }).count()) === 1)
     await confirmLate.getByRole('button', { name: 'Save', exact: true }).click()
-    check("…saved as Team, with gitb's target and command, never Late's rounds", !!(await until(() => workflowOf(gitb)?.preset === 'team' && saved().finish === 'hiveMerges')) && saved().target === 'main' && saved().commands?.lint === 'pnpm lint' && saved().loopRounds !== 7, JSON.stringify(workflowOf(gitb)))
+    check("…saved as Team, with gitb's target and command, never Late's rounds", !!(await until(() => workflowOf(gitb)?.preset === 'team' && saved().finish === 'combworkMerges')) && saved().target === 'main' && saved().commands?.lint === 'pnpm lint' && saved().loopRounds !== 7, JSON.stringify(workflowOf(gitb)))
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {

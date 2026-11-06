@@ -13,7 +13,7 @@ describe("a card's lines", () => {
   it('keeps every line it started on, across a new cycle and a rename', () => {
     seq = 0
     const facts = [
-      started('slot-c', 'hive/AL/AL-3-x'),
+      started('slot-c', 'cw/AL/AL-3-x'),
       fact('Moved', { from: 'todo', to: 'active', cause: 'intent' } as never),
       fact('Moved', { from: 'active', to: 'done', cause: 'override' } as never),
       fact('Moved', { from: 'done', to: 'todo', cause: 'user' } as never),
@@ -22,16 +22,16 @@ describe("a card's lines", () => {
       fact('Moved', { from: 'todo', to: 'active', cause: 'override' } as never)
     ]
     const s = foldCard(facts)
-    expect([s.started?.line, s.lines]).toEqual(['main', ['hive/AL/AL-3-x', 'main']])
-    const renamed = foldCard([...facts, fact('LineRenamed', { from: 'hive/AL/AL-3-x', to: 'hive/AL/AL-3-y', why: 'repair' } as never)])
-    expect(renamed.lines).toEqual(['hive/AL/AL-3-y', 'main'])
+    expect([s.started?.line, s.lines]).toEqual(['main', ['cw/AL/AL-3-x', 'main']])
+    const renamed = foldCard([...facts, fact('LineRenamed', { from: 'cw/AL/AL-3-x', to: 'cw/AL/AL-3-y', why: 'repair' } as never)])
+    expect(renamed.lines).toEqual(['cw/AL/AL-3-y', 'main'])
   })
 
   it("is on the card's work view and badge, beside this cycle's line", () => {
     seq = 0
-    const facts = [started('slot-c', 'hive/AL/AL-3-x'), fact('Moved', { from: 'todo', to: 'active', cause: 'intent' } as never), started('project', 'main')]
+    const facts = [started('slot-c', 'cw/AL/AL-3-x'), fact('Moved', { from: 'todo', to: 'active', cause: 'intent' } as never), started('project', 'main')]
     const v = workView({ card: 3, column: 'doing', preWorkflow: false } as never, facts)
-    expect([v.line, v.lines]).toEqual(['main', ['hive/AL/AL-3-x', 'main']])
-    expect(workBadge(v).lines).toEqual(['hive/AL/AL-3-x', 'main'])
+    expect([v.line, v.lines]).toEqual(['main', ['cw/AL/AL-3-x', 'main']])
+    expect(workBadge(v).lines).toEqual(['cw/AL/AL-3-x', 'main'])
   })
 })

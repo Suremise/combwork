@@ -46,14 +46,14 @@ const check = (name, ok, extra = '') => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1400, height: 900 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     // Alpha: a reviewer agent, committed is done, everyone in the project folder. Beta (None) and gamma (Git): no review.
     await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'committed', folder: 'project' } })
@@ -69,7 +69,7 @@ const check = (name, ok, extra = '') => {
     for (const [p, a] of Object.values(agents)) await inv('session:start', p, { agentId: a.id })
     check('the agents start', !!(await lib.until(async () => (await Promise.all(Object.values(agents).map(live))).every((l) => l?.status === 'ready'), HUNG_MS)))
 
-    // Each agent's own token, from its launch, as its hive tools read it (intents.cjs).
+    // Each agent's own token, from its launch, as its Combwork tools read it (intents.cjs).
     const launchesFile = path.join(claudeHome, 'fake-launches.jsonl')
     const launches = () => {
       const text = fs.existsSync(launchesFile) ? fs.readFileSync(launchesFile, 'utf8') : ''
@@ -78,8 +78,8 @@ const check = (name, ok, extra = '') => {
     const tokenOf = async (agent) => {
       const sessionId = (await live(agent))?.sessionId
       const launch = await lib.until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
-      const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
-      return hive ? JSON.parse(fs.readFileSync(hive.env.CW_API_TOKEN_FILE, 'utf8')).token : null
+      const server = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
+      return server ? JSON.parse(fs.readFileSync(server.env.CW_API_TOKEN_FILE, 'utf8')).token : null
     }
     const tokens = Object.fromEntries(await Promise.all(Object.entries(agents).map(async ([k, a]) => [k, await tokenOf(a)])))
     check('each agent has its token', Object.values(tokens).every(Boolean))

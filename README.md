@@ -75,7 +75,7 @@ Combwork is a free, open-source Windows app for running coding agents. It looks 
 - **Transcript viewer** — read every session in full, including what came before each compaction, search across sessions, export as Markdown and resume.
 - **Files and Version Control** — a file browser with an editor and previews for Markdown, CSV, HTML, SVG, images and PDFs; changes, history, branches and remotes, with side-by-side diffs; `CLAUDE.md`, `AGENTS.md` and Claude Code's auto memory editable in place.
 - **Skills and MCP servers** — every Combwork skill reaches every agent, of any CLI, the bundled ones for card loops, merging and handovers among them; an MCP server runs only in the projects you add it to.
-- **Agent API** — every session gets Combwork's built-in `hive` MCP server (a tool for each step of a card's work, shared notes, handovers and notices for you), and scripts get the same through a local REST API.
+- **Agent API** — every session gets Combwork's built-in `combwork` MCP server (a tool for each step of a card's work, shared notes, handovers and notices for you), and scripts get the same through a local REST API.
 - **Nothing left running** — Combwork keeps track of what each agent starts, and offers to end what a stopped agent left running: a preview server, a watcher, a shell.
 - **Several windows** — one workspace per window, each with its own projects and agents.
 - **Keeps itself up to date** — updates download in the background and install when you quit or restart, never mid-session.
@@ -97,9 +97,9 @@ The seven languages besides English were translated by AI, and Combwork says so 
 
 ## Install
 
-Download `Combwork-Setup-<version>.exe` (`Hive-Setup-<version>.exe` for releases before the rename) from the [latest release](https://github.com/Suremise/combwork/releases/latest) and run it. The installer is not code-signed, so Windows SmartScreen may warn you; choose **More info → Run anyway**. After that Combwork keeps itself up to date.
+Download `Combwork-Setup-<version>.exe` from the [latest release](https://github.com/Suremise/combwork/releases/latest) and run it. The installer is not code-signed, so Windows SmartScreen may warn you; choose **More info → Run anyway**. After that Combwork keeps itself up to date.
 
-**Upgrading from 0.9.3?** The upgrade is one way: back up your workspace's `.hive` folder and your agents' worktrees first, and close every 0.9.3 Combwork on the workspace. Combwork asks before it upgrades a workspace's board; the [release notes](CHANGELOG.md) and [Upgrading to 1.0](docs/USER_GUIDE.md#upgrading-to-10) say what changes.
+**Upgrading from 0.9.3?** The upgrade is one way: back up your workspace's <!-- old-name: begin readme-09-folder -->`.hive`<!-- old-name: end readme-09-folder --> folder and your agents' worktrees first, and close every 0.9.3 on the workspace. Combwork asks before it upgrades a workspace's board; the [release notes](CHANGELOG.md) and [Upgrading to 1.0](docs/USER_GUIDE.md#upgrading-to-10) say what changes.
 
 To build the installer yourself, run `npm run dist`; it's written to `dist/`.
 
@@ -122,7 +122,7 @@ npm run release    # build and upload a draft GitHub release (see RELEASING.md)
 |---|---|
 | `src/main` | Electron main process: workspaces, sessions (node-pty), hooks, Agent API, tray |
 | `src/main/providers` | Provider adapters (Claude Code, Codex, GitHub Copilot): launch, hooks, transcripts, usage |
-| `src/main/mcp/hive-mcp.ts` | The built-in `hive` MCP server |
+| `src/main/mcp/cw-mcp.ts` | The built-in `combwork` MCP server |
 | `src/preload` | Typed bridge between the UI and the main process |
 | `src/renderer` | React UI |
 | `src/shared` | Types, defaults and provider descriptors shared by both sides |

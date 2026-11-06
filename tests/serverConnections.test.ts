@@ -11,13 +11,13 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-servers-')
+const base = tempDir('cw-servers-')
 const home = join(base, 'claude-home')
 const userHome = join(base, 'user-profile')
 const profile = join(base, 'profile')
-process.env.HIVE_USER_DATA = profile
+process.env.CW_USER_DATA = profile
 process.env.CLAUDE_CONFIG_DIR = home
-delete process.env.HIVE_TEST_CLI_HOME_CONNECTION
+delete process.env.CW_TEST_CLI_HOME_CONNECTION
 ;(electron.app as unknown as { getPath: (n: string) => string }).getPath = (n: string) => (n === 'home' ? userHome : profile)
 const safe = (electron as unknown as { safeStorage: { available: boolean } }).safeStorage
 // Set Up's terminal recorded, not started: its key and environment, and its end (HI-1772 round 1).
@@ -115,8 +115,8 @@ describe('a profile that never saved a key (round 2)', () => {
     }
   })
 
-  it("before ready, hive.log's first lines aren't masked; a config.json that can't be read keeps them strict (HI-1855)", async () => {
-    const line = "The install folder C:\\Program Files\\Hive has an app package's entry"
+  it("before ready, combwork.log's first lines aren't masked; a config.json that can't be read keeps them strict (HI-1855)", async () => {
+    const line = "The install folder C:\\Program Files\\Combwork has an app package's entry"
     resetMaskingForTests('pending')
     coverage.startCoverageEarly()
     expect(maskingState().state).toBe('none')

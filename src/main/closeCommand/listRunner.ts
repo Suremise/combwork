@@ -1,8 +1,8 @@
 // A list of the user's commands run by one runner (HI-1954, design HI-1954/s19 §2): the runner owns the sequence from
-// its start, each attempt of a step run by runner.ts' runJob in a folder of its own, and Hive only watches it and
+// its start, each attempt of a step run by runner.ts' runJob in a folder of its own, and Combwork only watches it and
 // steers it by control files. Its job.json is a snapshot: the steps' templates and the placeholders' values as the run
 // began, so editing a command meanwhile changes nothing in it; a Rerun may bring newer values (a project added since).
-// Node built-ins only: it runs outside the asar (hive-close-runner.js).
+// Node built-ins only: it runs outside the asar (cw-close-runner.js).
 import { existsSync, mkdirSync, readFileSync, renameSync, statSync } from 'fs'
 import { join } from 'path'
 import { CONTROL_MS, fillCommand, OBSERVER_STALE_MS, type CommandValues } from '../../shared/commands'
@@ -17,7 +17,7 @@ export interface ListStep {
   needed: boolean
 }
 
-/** What Hive asks the runner to run (job.json): the list, and what fills its placeholders. */
+/** What Combwork asks the runner to run (job.json): the list, and what fills its placeholders. */
 export interface ListJob {
   list: true
   steps: ListStep[]
@@ -50,7 +50,7 @@ export interface ListStatus {
   list: true
   runnerPid: number
   state: 'running' | 'exited'
-  /** Watched by Hive: a failure waits for its choice. False after Don't wait, or once Hive stopped watching. */
+  /** Watched by Combwork: a failure waits for its choice. False after Don't wait, or once Combwork stopped watching. */
   attended: boolean
   steps: StepState[]
   /** The failed step waiting for a choice, and its attempt. */
@@ -63,7 +63,7 @@ export interface ListStatus {
   endedAt?: string
 }
 
-/** A control Hive writes (control-<step>-<attempt>.json, or control-detach.json for Don't wait at any time). */
+/** A control Combwork writes (control-<step>-<attempt>.json, or control-detach.json for Don't wait at any time). */
 export interface ListControl {
   action: 'rerun' | 'skip' | 'stop' | 'detach'
   /** With rerun: the placeholders' values now (a project since added). */
@@ -139,7 +139,7 @@ function control(dir: string, deps: ListDeps, step: number, attempt: number): { 
 
 /**
  * Runs the list in `dir` to its end. Each step runs once it is its turn; one that fails waits, while watched, for Rerun,
- * Skip it and continue or Stop here (its control file); unwatched (Don't wait, or Hive gone), a needed step failing
+ * Skip it and continue or Stop here (its control file); unwatched (Don't wait, or Combwork gone), a needed step failing
  * stops the list and any other goes on. Resolves with the final status.
  */
 export async function runList(dir: string, job: ListJob, deps: ListDeps = nodeListDeps(), baseEnv: NodeJS.ProcessEnv = process.env): Promise<ListStatus> {
@@ -252,7 +252,7 @@ async function runAttempt(dir: string, i: number, step: ListStep, s: StepState, 
   } catch {
     // runJob's writes say so if it can't write there.
   }
-  // Its command and folder in the list's status as it starts: Hive's dialog shows them, and finds its output there.
+  // Its command and folder in the list's status as it starts: Combwork's dialog shows them, and finds its output there.
   save()
   const r: RunStatus = await runJob(sub, { command: command.text, cwd }, deps, baseEnv)
   if (r.state === 'spawnFailed') {

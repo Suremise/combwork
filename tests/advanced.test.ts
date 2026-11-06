@@ -1,11 +1,11 @@
-// Advanced settings (#367): Hive's overridable defaults, each CLI-facing one checked against what the CLI was recorded
+// Advanced settings (#367): Combwork's overridable defaults, each CLI-facing one checked against what the CLI was recorded
 // sending (tests/fixtures/advanced and the other recordings), what an override takes and how it falls back, advanced.json
 // (read, written, edited by hand, the CLI version an override was made for), the adapters using them, and the settings
 // catalog's entries for the Assistant.
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ADVANCED_DEFS, advancedDef, advancedFileText, advancedUnit, advancedRow, checkAdvanced, cliFacing, groupName, migrateAdvancedIds, parseAdvancedFile, RENAMED_ADVANCED, sampleMiss, shownText, type AdvancedDef } from '../src/shared/advanced'
+import { ADVANCED_DEFS, advancedDef, advancedFileText, advancedUnit, advancedRow, checkAdvanced, cliFacing, groupName, parseAdvancedFile, sampleMiss, shownText, type AdvancedDef } from '../src/shared/advanced'
 import { CLAUDE_FOOTER_MODES } from '../src/shared/claude'
 import { COPILOT_FOOTER_MODES } from '../src/shared/copilot'
 import { SETTINGS_CATALOG, checkSettingValue, settingDefault, settingEntry, settingPatch, settingValue, settingValueText } from '../src/shared/settingsCatalog'
@@ -57,7 +57,7 @@ describe('advanced defaults', () => {
       expect(d.title && d.desc, d.id).toBeTruthy()
       expect(checkAdvanced(d, d.default), d.id).toEqual({ value: d.default })
       if (d.kind === 'number') expect(d.min! <= (d.default as number) && (d.default as number) <= d.max!, d.id).toBe(true)
-      // Every value of a CLI's is CLI-facing (what Hive reads from it, and what it gives it); Hive's own aren't.
+      // Every value of a CLI's is CLI-facing (what Combwork reads from it, and what it gives it); Combwork's own aren't.
       expect(cliFacing(d), d.id).toBe(d.group !== 'cw')
     }
   })
@@ -160,7 +160,7 @@ describe('an override', () => {
     expect(sampleMiss(def('claude-code.trust.prompt'), 'I trust')).toBeNull()
     expect(sampleMiss(def('codex.rateLimits.field'), 'limits')).toMatch(/Codex 0\.159\.0 sent no field "limits" here \(it sent type, info, rate_limits\)/)
     expect(sampleMiss(def('codex.ready.placeholder'), 'Ask Codex anything')).toMatch(/doesn't find/)
-    // Hive's own have nothing recorded to try.
+    // Combwork's own have nothing recorded to try.
     expect(sampleMiss(def('cw.mcp.replySeconds'), 999)).toBeNull()
   })
 
@@ -196,73 +196,33 @@ describe('advanced.json', () => {
     const text = advancedFileText({ 'cw.mcp.replySeconds': 600, 'claude-code.trust.prompt': 'I trust' }, { 'claude-code.trust.prompt': { version: '2.1.296', value: 'I trust' } })
     expect(JSON.parse(text)).toEqual({ format: 1, values: { 'claude-code.trust.prompt': 'I trust', 'cw.mcp.replySeconds': 600 }, madeFor: { 'claude-code.trust.prompt': { version: '2.1.296', value: 'I trust' } } })
     expect(Object.keys(JSON.parse(text).values)).toEqual(['claude-code.trust.prompt', 'cw.mcp.replySeconds'])
-    expect(parseAdvancedFile(text)).toEqual({ values: { 'claude-code.trust.prompt': 'I trust', 'cw.mcp.replySeconds': 600 }, madeFor: { 'claude-code.trust.prompt': { version: '2.1.296', value: 'I trust' } }, unknown: [], renamed: [] })
+    expect(parseAdvancedFile(text)).toEqual({ values: { 'claude-code.trust.prompt': 'I trust', 'cw.mcp.replySeconds': 600 }, madeFor: { 'claude-code.trust.prompt': { version: '2.1.296', value: 'I trust' } }, unknown: [] })
     expect(parseAdvancedFile('{ "values": ')).toMatchObject({ error: expect.stringContaining("isn't valid JSON") })
     expect(parseAdvancedFile('[]')).toMatchObject({ error: expect.stringContaining('object') })
     expect(parseAdvancedFile('{"format":2,"values":{}}')).toMatchObject({ error: expect.stringContaining('newer Combwork') })
     expect(parseAdvancedFile('{"values":[]}')).toMatchObject({ error: expect.stringContaining('"values"') })
-    expect(parseAdvancedFile('{"values":{"hive.nope":1,"cw.mcp.replySeconds":400}}')).toMatchObject({ unknown: ['hive.nope'] })
+    expect(parseAdvancedFile('{"values":{"acme.nope":1,"cw.mcp.replySeconds":400}}')).toMatchObject({ unknown: ['acme.nope'] })
     // A record for a value no longer there is dropped.
     expect(parseAdvancedFile('{"values":{},"madeFor":{"claude-code.trust.prompt":{"version":"1","value":"x"}}}')).toMatchObject({ madeFor: {} })
   })
 
-  it("reads Combwork's own settings' hive.* ids as their cw.* ones, one way, the cw.* one winning by presence (HI-2518)", () => {
-    // Every setting of Combwork's own has a cw.* id, in group cw; no setting has a hive.* id now.
+  it("Combwork's own settings have cw.* ids; an old id from before 1.1 is no setting now, listed as unknown (HI-2518, HI-2598)", () => {
+    // old-name: begin old-advanced-ids-1
     expect(ADVANCED_DEFS.filter((d) => d.id.startsWith('hive.'))).toEqual([])
+    // old-name: end old-advanced-ids-1
     for (const d of ADVANCED_DEFS) expect(d.id.startsWith(`${d.group}.`), d.id).toBe(true)
-    expect(RENAMED_ADVANCED.size).toBe(ADVANCED_DEFS.filter((d) => d.group === 'cw').length)
-    expect(RENAMED_ADVANCED.get('hive.cards.attachmentFolders')).toBe('cw.cards.attachmentFolders')
-    expect(RENAMED_ADVANCED.get('hive.outage.checkUrl.codex')).toBe('cw.outage.checkUrl.codex')
-    // Old migrations' and retired keys keep their names: they are no settings now.
-    for (const k of ['hive.assistant.otherMcpServers', 'hive.agents.perProject', 'hive.accounts.preview']) expect(RENAMED_ADVANCED.has(k), k).toBe(false)
-    expect(migrateAdvancedIds({ 'hive.mcp.replySeconds': 600, 'claude-code.trust.prompt': 'x', 'hive.agents.perProject': 3, 'hive.nope': 1 })).toEqual({ record: { 'cw.mcp.replySeconds': 600, 'claude-code.trust.prompt': 'x', 'hive.agents.perProject': 3, 'hive.nope': 1 }, renamed: ['hive.mcp.replySeconds'] })
-    // Both there: the new one is kept, false, 0 and [] too, and the old one dropped.
-    expect(migrateAdvancedIds({ 'hive.restart.resumeAfterUpdate': true, 'cw.restart.resumeAfterUpdate': false }).record).toEqual({ 'cw.restart.resumeAfterUpdate': false })
-    expect(migrateAdvancedIds({ 'cw.progress.lanesShown': 0, 'hive.progress.lanesShown': 6 }).record).toEqual({ 'cw.progress.lanesShown': 0 })
-    expect(migrateAdvancedIds({ 'hive.cards.attachmentFolders': ['C:\\x'], 'cw.cards.attachmentFolders': [] }).record).toEqual({ 'cw.cards.attachmentFolders': [] })
-    const same = { 'cw.mcp.replySeconds': 1 }
-    expect(migrateAdvancedIds(same)).toEqual({ record: same, renamed: [] })
-    // advanced.json as read: values and the version records, the old ids gone; unknown keys listed as before.
-    const read = parseAdvancedFile(JSON.stringify({ format: 1, values: { 'hive.mcp.replySeconds': 600, 'hive.nope': 1, 'cw.progress.lanesShown': 0, 'hive.progress.lanesShown': 6 }, madeFor: { 'hive.mcp.replySeconds': { version: '1', value: 600 } } }))
-    expect(read).toEqual({ values: { 'cw.mcp.replySeconds': 600, 'hive.nope': 1, 'cw.progress.lanesShown': 0 }, madeFor: { 'cw.mcp.replySeconds': { version: '1', value: 600 } }, unknown: ['hive.nope'], renamed: ['hive.mcp.replySeconds', 'hive.progress.lanesShown'] })
-  })
-
-  it('the store writes an old file back under the new ids, in its queued write, and never over a file it could not read (HI-2518)', async () => {
-    const dir = tempDir('hive-advanced-renamed-')
-    const file = join(dir, 'advanced.json')
-    writeFileSync(file, JSON.stringify({ format: 1, values: { 'hive.mcp.replySeconds': 600, 'claude-code.trust.prompt': 'I trust' }, madeFor: { 'claude-code.trust.prompt': { version: '2.1.296', value: 'I trust' } } }))
-    const s = new AdvancedStore()
-    try {
-      s.load(dir)
-      expect(s.number('cw.mcp.replySeconds')).toBe(600)
-      await vi.waitFor(() => expect(JSON.parse(readFileSync(file, 'utf8')).values).toEqual({ 'claude-code.trust.prompt': 'I trust', 'cw.mcp.replySeconds': 600 }), { timeout: 10_000 })
-      expect(JSON.parse(readFileSync(file, 'utf8')).madeFor).toEqual({ 'claude-code.trust.prompt': { version: '2.1.296', value: 'I trust' } })
-      // A hand edit with an old id later is read the new way too, and written back.
-      writeFileSync(file, JSON.stringify({ format: 1, values: { 'hive.mcp.replySeconds': 900 } }))
-      await s.reload()
-      expect(s.number('cw.mcp.replySeconds')).toBe(900)
-      await vi.waitFor(() => expect(JSON.parse(readFileSync(file, 'utf8')).values).toEqual({ 'cw.mcp.replySeconds': 900 }), { timeout: 10_000 })
-    } finally {
-      s.stop()
-    }
-    const broken = tempDir('hive-advanced-renamed-')
-    const text = '{"values":{"hive.mcp.replySeconds":600}'
-    writeFileSync(join(broken, 'advanced.json'), text)
-    const b = new AdvancedStore()
-    try {
-      b.load(broken)
-      expect(b.state(null).fileError).toBeTruthy()
-      expect(readFileSync(join(broken, 'advanced.json'), 'utf8')).toBe(text)
-    } finally {
-      b.stop()
-    }
+    // The names upgrade renames them in the profile before advanced.json is read (storedNames.test.ts): nothing reads one after.
+    // old-name: begin old-advanced-ids-2
+    const read = parseAdvancedFile(JSON.stringify({ format: 1, values: { 'hive.mcp.replySeconds': 600, 'cw.progress.lanesShown': 0 } }))
+    expect(read).toEqual({ values: { 'hive.mcp.replySeconds': 600, 'cw.progress.lanesShown': 0 }, madeFor: {}, unknown: ['hive.mcp.replySeconds'] })
+    // old-name: end old-advanced-ids-2
   })
 })
 
 describe('the advanced store', () => {
   const stores: AdvancedStore[] = []
   const store = (): { s: AdvancedStore; dir: string; file: string } => {
-    const dir = tempDir('hive-advanced-')
+    const dir = tempDir('cw-advanced-')
     const s = new AdvancedStore()
     stores.push(s)
     return { s, dir, file: join(dir, 'advanced.json') }
@@ -283,21 +243,10 @@ describe('the advanced store', () => {
     expect(s.pattern('claude-code.trust.prompt').test('Yes, I trust the folder')).toBe(true)
     expect(s.number('cw.mcp.replySeconds')).toBe(600)
     await expect(s.set('cw.mcp.replySeconds', 5)).rejects.toThrow('30 to 3600')
-    await expect(s.set('hive.nope', 5)).rejects.toThrow('No advanced setting')
+    await expect(s.set('acme.nope', 5)).rejects.toThrow('No advanced setting')
     await s.set('cw.mcp.replySeconds', 300)
     await s.set('claude-code.trust.prompt', null)
     expect(read(file)).toEqual({ format: 1, values: {}, madeFor: {} })
-  })
-
-  it('a retired setting (the Connections preview, HI-1774) is dropped as read, never unknown, and gone at the next write; a real unknown one stays', async () => {
-    const { s, dir, file } = store()
-    writeFileSync(file, JSON.stringify({ format: 1, values: { 'hive.accounts.preview': true, 'hive.nope': 1, 'cw.mcp.replySeconds': 400 }, madeFor: { 'hive.accounts.preview': { version: null, value: true } } }))
-    expect(parseAdvancedFile(readFileSync(file, 'utf8'))).toEqual({ values: { 'hive.nope': 1, 'cw.mcp.replySeconds': 400 }, madeFor: {}, unknown: ['hive.nope'], renamed: [] })
-    s.load(dir)
-    expect(s.state(null).unknown).toEqual(['hive.nope'])
-    await s.set('cw.mcp.replySeconds', 600)
-    expect(read(file)).toEqual({ format: 1, values: { 'hive.nope': 1, 'cw.mcp.replySeconds': 600 }, madeFor: {} })
-    await expect(s.set('hive.accounts.preview', true)).rejects.toThrow('No advanced setting')
   })
 
   it('reads a file edited by hand: a changed CLI-facing value is made for the CLI installed now; an invalid one falls back', async () => {
@@ -308,7 +257,7 @@ describe('the advanced store', () => {
     expect(s.state(null).madeFor['codex.trust.prompt']).toEqual({ version: '0.162.1', value: 'trust it' })
     expect(s.number('codex.hooks.timeoutSeconds')).toBe(5)
     expect(s.pattern('codex.trust.prompt').source).toBe('trust it')
-    // Changed by hand while Hive runs: read again when the file changes.
+    // Changed by hand while Combwork runs: read again when the file changes.
     writeFileSync(file, JSON.stringify({ format: 1, values: { 'codex.trust.prompt': 'trust here' } }))
     await vi.waitFor(() => expect(s.pattern('codex.trust.prompt').source).toBe('trust here'), { timeout: 10_000 })
   })
@@ -321,7 +270,7 @@ describe('the advanced store', () => {
     s.load(dir)
     await vi.waitFor(() => expect(read(file).madeFor).toEqual({ 'codex.trust.prompt': { version: '0.162.1', value: 'trust it' }, 'codex.ready.placeholder': { version: '0.162.1', value: 'Ask Codex' } }), { timeout: 10_000 })
     s.stop()
-    // Hive starts again after Codex updated.
+    // Combwork starts again after Codex updated.
     const again = store().s
     again.noteCli('codex', '0.163.0')
     again.load(dir)
@@ -329,7 +278,7 @@ describe('the advanced store', () => {
     expect(again.diagnostics([null])).toContain('  - made for another CLI version than the installed one: codex.trust.prompt, codex.ready.placeholder')
   })
 
-  it("tracks the version for every value of a CLI's, those Hive gives it too (hooks, title, tool timeout)", async () => {
+  it("tracks the version for every value of a CLI's, those Combwork gives it too (hooks, title, tool timeout)", async () => {
     const { s, dir, file } = store()
     s.load(dir)
     s.noteCli('codex', '0.162.1')
@@ -341,12 +290,12 @@ describe('the advanced store', () => {
     expect(s.diagnostics([null])).toContain('  - made for another CLI version than the installed one: codex.hooks.timeoutSeconds')
   })
 
-  it("resets every override (keeping ids this Hive doesn't know), and refuses while the file can't be read", async () => {
+  it("resets every override (keeping ids this Combwork doesn't know), and refuses while the file can't be read", async () => {
     const { s, dir, file } = store()
-    writeFileSync(file, JSON.stringify({ values: { 'cw.mcp.replySeconds': 600, 'hive.someday': 1 } }))
+    writeFileSync(file, JSON.stringify({ values: { 'cw.mcp.replySeconds': 600, 'acme.someday': 1 } }))
     s.load(dir)
     await s.resetAll()
-    expect(read(file).values).toEqual({ 'hive.someday': 1 })
+    expect(read(file).values).toEqual({ 'acme.someday': 1 })
     expect(s.number('cw.mcp.replySeconds')).toBe(300)
     writeFileSync(file, '{')
     await vi.waitFor(() => expect(s.state(null).fileError).toBeTruthy(), { timeout: 10_000 })
@@ -382,7 +331,7 @@ describe('the advanced store', () => {
   const settled = (): Promise<void> => advanced.transact(async () => undefined)
 
   it("keeps the developer switch and advanced.json one value: the setting written to the file, a hand edit to the setting", async () => {
-    const dir = tempDir('hive-advanced-bound-')
+    const dir = tempDir('cw-advanced-bound-')
     const file = join(dir, 'advanced.json')
     const { cfg, change, reset, on } = boundSettings()
     try {
@@ -411,7 +360,7 @@ describe('the advanced store', () => {
   })
 
   it('keeps the developer switch and advanced.json one value whatever comes between their writes (HI-2418)', async () => {
-    const dir = tempDir('hive-advanced-bound-')
+    const dir = tempDir('cw-advanced-bound-')
     const file = join(dir, 'advanced.json')
     const { cfg, given, change, on } = boundSettings()
     const all = (): unknown[] => [existsSync(file) ? read(file).values : {}, advanced.get('cw.showDeveloperFeatures'), on()]
@@ -453,7 +402,7 @@ describe('the advanced store', () => {
   it('records each CLI found together: versions learnt at once both reach the file; changes at once all land', async () => {
     const { s, dir, file } = store()
     s.load(dir)
-    // Overrides made before Hive knew either CLI's version.
+    // Overrides made before Combwork knew either CLI's version.
     await s.set('claude-code.trust.prompt', 'trust (this|the) folder')
     await s.set('codex.trust.prompt', 'trust (this|the) folder')
     expect([read(file).madeFor['claude-code.trust.prompt'].version, read(file).madeFor['codex.trust.prompt'].version]).toEqual([null, null])
@@ -467,7 +416,7 @@ describe('the advanced store', () => {
   })
 
   it('changes the developer setting only once advanced.json has it: a refusal (an unreadable file, an edit meanwhile) changes neither', async () => {
-    const dir = tempDir('hive-advanced-checked-')
+    const dir = tempDir('cw-advanced-checked-')
     const file = join(dir, 'advanced.json')
     const updates: unknown[] = []
     const update = (patch: unknown) => (updates.push(patch), {} as AppSettings)
@@ -484,7 +433,7 @@ describe('the advanced store', () => {
       await expect(updateSettingsChecked({ advanced: { showDeveloperFeatures: false } }, update)).rejects.toThrow('Fix advanced.json')
       expect(updates).toHaveLength(2)
       expect(readFileSync(file, 'utf8')).toBe('{')
-      // An edit made since Hive read the file: refused, the edit read.
+      // An edit made since Combwork read the file: refused, the edit read.
       writeFileSync(file, JSON.stringify({ values: { 'cw.showDeveloperFeatures': true } }))
       await vi.waitFor(() => expect(advanced.state(null).fileError).toBeNull(), { timeout: 10_000 })
       advanced.stop()
@@ -506,7 +455,7 @@ describe('the advanced store', () => {
     expect(s.number('cw.mcp.replySeconds')).toBe(900)
     await expect(s.set('cw.mcp.replySeconds', 600)).rejects.toThrow('Fix advanced.json')
     // Through the Agent API (the Assistant's PATCH /v1/settings/:id reaches this set): a refusal by the file's state, 409
-    // with its words and the caller's error in metrics, never Hive's 500 (HI-1952 round 1); so is a reset of them all.
+    // with its words and the caller's error in metrics, never Combwork's 500 (HI-1952 round 1); so is a reset of them all.
     const { apiErrorReply } = await import('../src/main/servers')
     const { apiOutcome } = await import('../src/main/metrics')
     for (const refused of [await s.set('cw.mcp.replySeconds', 600).catch((e: unknown) => e), await s.resetAll().catch((e: unknown) => e)]) {
@@ -516,7 +465,7 @@ describe('the advanced store', () => {
       expect(apiOutcome({ finished: true, status: reply.status, waiting: false })).toBe('client-error')
     }
     // No setting by that id: 404.
-    expect(apiErrorReply(await s.set('hive.nope', 1).catch((e: unknown) => e)).status).toBe(404)
+    expect(apiErrorReply(await s.set('acme.nope', 1).catch((e: unknown) => e)).status).toBe(404)
     // The broken file is left for the user to fix.
     expect(readFileSync(file, 'utf8')).toBe('{ "values": { "cw.mcp.replySeconds": 9')
   })
@@ -532,7 +481,7 @@ describe('the advanced store', () => {
     expect(s.number('cw.mcp.replySeconds')).toBe(1200)
   })
 
-  it('records the CLI version once Hive learns it, keeps an override for a new version, and counts overrides for diagnostics (names only)', async () => {
+  it('records the CLI version once Combwork learns it, keeps an override for a new version, and counts overrides for diagnostics (names only)', async () => {
     const { s, dir, file } = store()
     s.load(dir)
     await s.set('copilot.trust.prompt', 'trust these files')
@@ -547,9 +496,9 @@ describe('the advanced store', () => {
     expect(read(file).madeFor['copilot.trust.prompt'].version).toBe('1.0.99')
     expect(advancedRow(def('copilot.trust.prompt'), s.state(null)).madeForOther).toBeNull()
     expect(s.diagnostics([{ 'cw.progress.lanesShown': 6 }])).toEqual(['- Advanced settings: 1 override (copilot.trust.prompt); 1 workspace value'])
-    writeFileSync(file, JSON.stringify({ values: { 'cw.mcp.replySeconds': 'x', 'hive.other': 1 } }))
+    writeFileSync(file, JSON.stringify({ values: { 'cw.mcp.replySeconds': 'x', 'acme.other': 1 } }))
     await s.reload()
-    expect(s.diagnostics([null])).toEqual(['- Advanced settings: 1 override (cw.mcp.replySeconds)', '  - not valid, so the default is used: cw.mcp.replySeconds', '  - unknown to this Hive: 1'])
+    expect(s.diagnostics([null])).toEqual(['- Advanced settings: 1 override (cw.mcp.replySeconds)', '  - not valid, so the default is used: cw.mcp.replySeconds', '  - unknown to this Combwork: 1'])
   })
 
   it("the developer console's show text is off by default; turned on, its listeners hear it and diagnostics name it (#699)", async () => {
@@ -568,7 +517,7 @@ describe('the advanced store', () => {
   })
 })
 
-describe('the adapters and the hive MCP server use them', () => {
+describe('the adapters and the combwork MCP server use them', () => {
   afterEach(async () => {
     await advanced.resetAll().catch(() => undefined)
     advanced.stop()
@@ -610,7 +559,7 @@ describe('the adapters and the hive MCP server use them', () => {
     expect(claudeCode.safeguardAsk!(ask, screen('advanced/safeguard-prompt-claude-2.1.296.txt'))).toBe(true)
     expect(claudeCode.safeguardAsk!(ask, screen('screen-claude-2.1.296-idle.txt'))).toBe(false)
     // #696: each mode's footer, from the screens recorded in it.
-    const claudeScreens = { manual: 'screen-claude-2.1.296-idle.txt', acceptEdits: 'advanced/footer-claude-2.1.296-acceptEdits.txt', plan: 'advanced/footer-claude-2.1.296-plan.txt', auto: 'screen-claude-2.1.296-hive-idle.txt', bypassPermissions: 'advanced/footer-claude-2.1.296-bypassPermissions.txt', dontAsk: 'advanced/footer-claude-2.1.296-dontAsk.txt' }
+    const claudeScreens = { manual: 'screen-claude-2.1.296-idle.txt', acceptEdits: 'advanced/footer-claude-2.1.296-acceptEdits.txt', plan: 'advanced/footer-claude-2.1.296-plan.txt', auto: 'screen-claude-2.1.296-auto-idle.txt', bypassPermissions: 'advanced/footer-claude-2.1.296-bypassPermissions.txt', dontAsk: 'advanced/footer-claude-2.1.296-dontAsk.txt' }
     for (const [mode, file] of Object.entries(claudeScreens)) expect(claudeCode.footerMode!(screen(file)), file).toBe(mode)
     const copilotScreens = { ask: 'advanced/ready-copilot-1.0.95.txt', 'allow-all': 'advanced/footer-copilot-1.0.95-allow-all.txt', plan: 'advanced/footer-copilot-1.0.95-plan.txt', autopilot: 'advanced/footer-copilot-1.0.95-autopilot.txt' }
     for (const [mode, file] of Object.entries(copilotScreens)) expect(copilot.footerMode!(screen(file), 'plan'), file).toBe(mode)
@@ -619,7 +568,7 @@ describe('the adapters and the hive MCP server use them', () => {
   })
 
   it("reads Codex's plan limits under renamed fields once the overrides name them (the recorded token_count, renamed)", async () => {
-    const dir = tempDir('hive-advanced-fields-')
+    const dir = tempDir('cw-advanced-fields-')
     advanced.load(dir)
     const { rolloutDetails } = await import('../src/main/providers/codex/rollout')
     const recorded = fixtureText('tests/fixtures/codex-0.159.jsonl')
@@ -638,7 +587,7 @@ describe('the adapters and the hive MCP server use them', () => {
   })
 
   it("reads Claude Code's plan limits from its recorded status line, and under renamed fields once the overrides name them", async () => {
-    const dir = tempDir('hive-advanced-claude-fields-')
+    const dir = tempDir('cw-advanced-claude-fields-')
     advanced.load(dir)
     const { parseClaudePlanUsage } = await import('../src/main/providers/claude/adapter')
     const recorded = fixtureText('tests/fixtures/advanced/statusline-claude-2.1.296.json')
@@ -657,7 +606,7 @@ describe('the adapters and the hive MCP server use them', () => {
   })
 
   it("counts Claude Code's recorded background subagents, and under a renamed status and fields once the overrides name them (#1584)", async () => {
-    const dir = tempDir('hive-advanced-subagents-')
+    const dir = tempDir('cw-advanced-subagents-')
     advanced.load(dir)
     const { claudeBackgroundTasks } = await import('../src/main/providers/claude/background')
     const recorded = fixtureText('tests/fixtures/advanced/subagent-launch-claude-2.1.310.jsonl') + fixtureText('tests/fixtures/advanced/subagent-resume-claude-2.1.309.jsonl')
@@ -675,7 +624,7 @@ describe('the adapters and the hive MCP server use them', () => {
   })
 
   it("counts Codex's recorded subagent, and under a renamed item, kind and fields once the overrides name them (#1584)", async () => {
-    const dir = tempDir('hive-advanced-codex-subagents-')
+    const dir = tempDir('cw-advanced-codex-subagents-')
     advanced.load(dir)
     const { codexBackgroundTasks } = await import('../src/main/providers/codex/background')
     const recorded = fixtureText('tests/fixtures/advanced/subagent-codex-0.164.0.jsonl')
@@ -692,7 +641,7 @@ describe('the adapters and the hive MCP server use them', () => {
   })
 
   it('takes an override at once (patterns, the placeholder, a sign-in error) and at the next launch (hooks, title, tool timeout)', async () => {
-    const dir = tempDir('hive-advanced-adapters-')
+    const dir = tempDir('cw-advanced-adapters-')
     advanced.load(dir)
     const { claudeCode } = await import('../src/main/providers/claude/adapter')
     const { codex, codexMcpServer, codexTurnScreen } = await import('../src/main/providers/codex/adapter')
@@ -743,11 +692,11 @@ describe('the adapters and the hive MCP server use them', () => {
     expect(codexMcpServer('combwork', { command: 'node' }).table?.tool_timeout_sec).toBe(1800)
     await advanced.set('codex.title.items', 'activity, spinner')
     await advanced.set('codex.hooks.timeoutSeconds', 8)
-    const home = tempDir('hive-advanced-codex-home-')
+    const home = tempDir('cw-advanced-codex-home-')
     const before = process.env.CODEX_HOME
     process.env.CODEX_HOME = home
     try {
-      const ctx = { projectPath: home, agentId: 'a-1', executable: 'C:\\bin\\codex.exe', cwd: home, workspacePath: home, runId: 'r', sessionId: '', resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: [], hookUrl: 'http://127.0.0.1:1/hook?run=r', hookAuthFile: 'C:/hive/hook-auth/r.txt', privateDir: 'C:/hive/launches/r', guidance: '', env: {}, allowBackgroundSessions: false, use200kContext: false }
+      const ctx = { projectPath: home, agentId: 'a-1', executable: 'C:\\bin\\codex.exe', cwd: home, workspacePath: home, runId: 'r', sessionId: '', resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: [], hookUrl: 'http://127.0.0.1:1/hook?run=r', hookAuthFile: 'C:/demo/hook-auth/r.txt', privateDir: 'C:/demo/launches/r', guidance: '', env: {}, allowBackgroundSessions: false, use200kContext: false }
       const { args } = codex.buildCommand(ctx.executable, ctx)
       expect(args.find((a) => a.startsWith('tui.terminal_title='))).toBe('tui.terminal_title=["activity","spinner"]')
       const stop = args.find((a) => a.startsWith('hooks.Stop='))!
@@ -759,16 +708,16 @@ describe('the adapters and the hive MCP server use them', () => {
       if (before === undefined) delete process.env.CODEX_HOME
       else process.env.CODEX_HOME = before
     }
-    // The hive MCP server's reply timeout and waits, kept a minute under Codex's tool timeout.
+    // The combwork MCP server's reply timeout and waits, kept a minute under Codex's tool timeout.
     await advanced.set('cw.mcp.replySeconds', 600)
     await advanced.set('cw.wait.cardMaxSeconds', 3000)
-    expect(mcpAdvancedEnv()).toEqual({ HIVE_REPLY_SECONDS: '600', HIVE_WAIT_MAX_SECONDS: '1740', HIVE_AGENT_WAIT_MAX_SECONDS: '600' })
+    expect(mcpAdvancedEnv()).toEqual({ CW_REPLY_SECONDS: '600', CW_WAIT_MAX_SECONDS: '1740', CW_AGENT_WAIT_MAX_SECONDS: '600' })
     await advanced.set('codex.mcp.toolTimeoutSeconds', null)
     expect(waitMaxSeconds('cards')).toBe(840)
   })
 
-  it('defaults to what Hive did before: 840 and 600 s waits, 300 s replies', () => {
-    expect(mcpAdvancedEnv()).toEqual({ HIVE_REPLY_SECONDS: '300', HIVE_WAIT_MAX_SECONDS: '840', HIVE_AGENT_WAIT_MAX_SECONDS: '600' })
+  it('defaults to what Combwork did before: 840 and 600 s waits, 300 s replies', () => {
+    expect(mcpAdvancedEnv()).toEqual({ CW_REPLY_SECONDS: '300', CW_WAIT_MAX_SECONDS: '840', CW_AGENT_WAIT_MAX_SECONDS: '600' })
   })
 })
 
@@ -803,9 +752,9 @@ describe("the Assistant's settings catalog", () => {
     expect(checkSettingValue(lanes, 'inherit')).toEqual({ value: null })
     expect(settingPatch(lanes, 6)).toEqual({ advanced: { id: 'cw.progress.lanesShown', scope: 'workspace', value: 6 } })
     // Agents per project (#562) is Maximum agents, a workflow option, since HI-2001 (agentLimit.test.ts).
-    expect(settingEntry('workspace.advanced.hive.agents.perProject')).toBeUndefined()
-    expect(settingEntry('advanced.hive.agents.perProject')).toBeUndefined()
-    // The developer features switch keeps its key and entry in Hive's settings, with its advanced value's text.
+    expect(settingEntry('workspace.advanced.cw.agents.perProject')).toBeUndefined()
+    expect(settingEntry('advanced.cw.agents.perProject')).toBeUndefined()
+    // The developer features switch keeps its key and entry in Combwork's settings, with its advanced value's text.
     expect(settingEntry('advanced.showDeveloperFeatures')).toMatchObject({ hidden: true, type: 'boolean', title: def('cw.showDeveloperFeatures').title, desc: def('cw.showDeveloperFeatures').desc })
     expect(settingEntry('advanced.cw.showDeveloperFeatures')).toBeUndefined()
   })

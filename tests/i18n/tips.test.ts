@@ -33,7 +33,7 @@ describe('the tips as messages', () => {
       }
   })
 
-  it('a shortcut is {key} with its command in `key`, a command Hive has; no old {key:…} is left', () => {
+  it('a shortcut is {key} with its command in `key`, a command Combwork has; no old {key:…} is left', () => {
     let keyed = 0
     for (const tip of TIPS) {
       const text = asMsg(tip.text).defaultMessage

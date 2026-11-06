@@ -10,7 +10,7 @@ import { DEFAULT_SETTINGS } from '../src/shared/defaults'
 import { tempDir } from './tempDir'
 
 describe("a workspace's card loops, as its workflow defaults (#412, HI-1766)", async () => {
-  const base = tempDir('hive-settings-ws-')
+  const base = tempDir('cw-settings-ws-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   const { createWorkspaceService: createService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
   const workspaces = new Set<ReturnType<typeof createService>>()
@@ -140,7 +140,7 @@ describe("a workspace's card loops, as its workflow defaults (#412, HI-1766)", a
         // A plain listing: the advanced ones at their defaults are one line.
         const plain = settingRows({})
         expect(plain.filter((r) => r.id.startsWith('advanced.') && r.id !== 'advanced.showDeveloperFeatures')).toEqual([expect.objectContaining({ id: 'advanced.*', value: expect.stringMatching(/^\d+ more$/), title: 'query "advanced" lists them' })])
-        // Every trust-related advanced setting: each CLI's trust prompt, Claude Code's accounts field (HI-1870), Codex's per-launch trust (HI-1871), Codex's hook listing (HI-982: Hive trusts its hooks by its own hashes without it).
+        // Every trust-related advanced setting: each CLI's trust prompt, Claude Code's accounts field (HI-1870), Codex's per-launch trust (HI-1871), Codex's hook listing (HI-982: Combwork trusts its hooks by its own hashes without it).
         expect(settingRows({ query: 'advanced trust' }).map((r) => r.id)).toEqual(['advanced.claude-code.trust.prompt', 'advanced.claude-code.accounts.trustField', 'advanced.codex.trust.perLaunch', 'advanced.codex.trust.prompt', 'advanced.codex.hooks.listMethod', 'advanced.copilot.trust.prompt'])
         const changed = await applySetting(entryOf('advanced.cw.mcp.replySeconds'), 600, null)
         expect([changed.old, changed.new]).toEqual([300, 600])
@@ -219,44 +219,4 @@ describe("a workspace's card loops, as its workflow defaults (#412, HI-1766)", a
     }
   })
 
-  it("an upgraded profile's and workspace's hive.* advanced values come back under cw.*, one way; a call naming an old id is refused with the new one (HI-2518)", async () => {
-    const { advanced } = await import('../src/main/advanced')
-    const profile = join(base, 'profile-renamed')
-    mkdirSync(profile, { recursive: true })
-    // As 1.1.0's RC and 1.0 saved them: Combwork's own under hive.*, a CLI's as it is, an old migration's key, one unknown.
-    const old = { 'hive.mcp.replySeconds': 600, 'hive.restart.resumeAfterUpdate': false, 'hive.progress.lanesShown': 0, 'claude-code.trust.prompt': 'I trust', 'hive.agents.perProject': 3, 'hive.nope': 1 }
-    writeFileSync(join(profile, 'advanced.json'), JSON.stringify({ format: 1, values: old, madeFor: { 'claude-code.trust.prompt': { version: '2.1.296', value: 'I trust' } } }))
-    const path = join(base, 'ws-renamed')
-    mkdirSync(join(path, 'alpha', '.combwork'), { recursive: true })
-    mkdirSync(join(path, '.combwork'), { recursive: true })
-    writeFileSync(join(path, 'alpha', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
-    writeFileSync(join(path, '.combwork', 'workspace.json'), JSON.stringify({ advanced: { 'hive.progress.lanesShown': 6, 'hive.restart.resumeAfterUpdate': false } }))
-    advanced.load(profile)
-    const now = { 'cw.mcp.replySeconds': 600, 'cw.restart.resumeAfterUpdate': false, 'cw.progress.lanesShown': 0, 'claude-code.trust.prompt': 'I trust', 'hive.agents.perProject': 3, 'hive.nope': 1 }
-    // In memory at once, and on disk in the store's queued write: nothing kept under the old ids.
-    expect(advanced.state(null).values).toEqual(now)
-    expect(advanced.legacy('hive.agents.perProject')).toBe(3)
-    expect(advanced.state(null).unknown).toEqual(['hive.nope'])
-    await vi.waitFor(() => expect(JSON.parse(readFileSync(join(profile, 'advanced.json'), 'utf8'))).toEqual({ format: 1, values: now, madeFor: { 'claude-code.trust.prompt': { version: '2.1.296', value: 'I trust' } } }), { timeout: 10_000 })
-    const w = createWorkspaceService()
-    await w.open(path)
-    try {
-      expect(w.config.advanced).toEqual({ 'cw.progress.lanesShown': 6, 'cw.restart.resumeAfterUpdate': false })
-      await inWorkspace(w, async () => {
-        expect(settingDetail(entryOf('workspace.advanced.cw.progress.lanesShown'), null)).toMatchObject({ value: '6 lanes' })
-        expect(settingDetail(entryOf('advanced.cw.mcp.replySeconds'), null)).toMatchObject({ value: '600 s' })
-        // No aliases: the old id is refused, naming the new one; one that never was a setting is just unknown.
-        expect(() => entryOf('advanced.hive.mcp.replySeconds')).toThrow('advanced.hive.mcp.replySeconds was renamed: use advanced.cw.mcp.replySeconds.')
-        expect(() => entryOf('workspace.advanced.hive.progress.lanesShown')).toThrow('use workspace.advanced.cw.progress.lanesShown.')
-        expect(() => entryOf('advanced.hive.showDeveloperFeatures')).toThrow('No setting "advanced.hive.showDeveloperFeatures"')
-        expect(() => entryOf('advanced.hive.nope')).toThrow('No setting')
-        // The workspace's file changes at its next save, under the new ids only.
-        await applySetting(entryOf('workspace.advanced.cw.progress.lanesShown'), 7, null)
-        expect(JSON.parse(readFileSync(join(path, '.combwork', 'workspace.json'), 'utf8')).advanced).toEqual({ 'cw.progress.lanesShown': 7, 'cw.restart.resumeAfterUpdate': false })
-      })
-    } finally {
-      advanced.stop()
-      await disposeWorkspaceService(w)
-    }
-  })
 })

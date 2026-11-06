@@ -151,7 +151,7 @@ function lane(e: Env, id: string, cards: number[], builder: string, reviewer: st
   state.lanes.push({ id, project: 'project', name: null, builder: { id: builder, name: builder }, reviewer: reviewer ? { id: reviewer, name: reviewer } : null, cards, rounds: 10, waitMinutes: 360, state: 'active', startedBy: 'the user', startedAt: t, updatedAt: t, endedAt: null, mergeCommit: null, ...(reviewer ? {} : { pool: true as const }) })
 }
 
-/** Runs SQL on the workspace's hive.db on a connection of its own, as another Hive (or the slots' own writes) would. */
+/** Runs SQL on the workspace's combwork.db on a connection of its own, as another Combwork (or the slots' own writes) would. */
 function onDb<T>(e: Env, fn: (db: DatabaseSync) => T): T {
   const db = new DatabaseSync(boardFile(e.home))
   try {
@@ -163,7 +163,7 @@ function onDb<T>(e: Env, fn: (db: DatabaseSync) => T): T {
 }
 
 let slotNo = 0
-/** An agent's dispatch lease of the project's slots (a lane's), taken or ended, in hive.db's slot tables as #1429 keeps them. */
+/** An agent's dispatch lease of the project's slots (a lane's), taken or ended, in combwork.db's slot tables as #1429 keeps them. */
 function lease(e: Env, agent: string, open: boolean): void {
   onDb(e, (db) => {
     const at = new Date().toISOString()
@@ -194,7 +194,7 @@ function withBoundary(e: Env, before: () => void | Promise<void>): unknown {
 async function submitted(e: Env, card: { id: number; key: string; title: string }, by = B1): Promise<void> {
   if (e.options.folder === 'slots') {
     const slot = join(tempDir('slot-'), 'slot')
-    sh(e.project, 'worktree', 'add', '-q', '-b', `hive/am/am-${card.id}`, slot, 'main')
+    sh(e.project, 'worktree', 'add', '-q', '-b', `cw/am/am-${card.id}`, slot, 'main')
     e.wf.cfg.slotFor = async () => ({ slot: 'slot', folder: slot, lease: `l-${card.id}`, fresh: true })
     moved(await e.wf.start(card.key, by))
     commit(slot, { [`${card.id}.txt`]: `${card.title}\n` }, card.title)
@@ -211,8 +211,8 @@ const pass = (e: Env, agents?: AgentDef[]): Promise<void> => settleReviewerPool(
 /** The wakes and pool asks a submission left to run (the harness doesn't run them: autoRun off). */
 const pending = (e: Env): { kind: string; agent?: unknown }[] => e.store.pendingActions().map((a) => ({ kind: a.kind, agent: a.payload.agent }))
 
-/** Pair's options with these, made to hold together: Hive merges in slots, Committed is done in the project folder. */
-const optionsFor = (reviewers: 1 | 2, reviewerMode: 'lane' | 'pool', folder: 'slots' | 'project'): WorkflowOptions => ({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [], target: 'main', reviewers, reviewerMode, folder, slotsUpToDate: folder === 'slots', finish: folder === 'slots' ? 'hiveMerges' : 'committed', identity: null, stopOwnRuns: false })
+/** Pair's options with these, made to hold together: Combwork merges in slots, Committed is done in the project folder. */
+const optionsFor = (reviewers: 1 | 2, reviewerMode: 'lane' | 'pool', folder: 'slots' | 'project'): WorkflowOptions => ({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [], target: 'main', reviewers, reviewerMode, folder, slotsUpToDate: folder === 'slots', finish: folder === 'slots' ? 'combworkMerges' : 'committed', identity: null, stopOwnRuns: false })
 
 describe('the option G17 (#1443)', () => {
   it('is reviewerMode, lane or pool: one per lane in every Git preset, none for None', () => {
@@ -709,7 +709,7 @@ describe('a card in Review outside a lane (HI-2046): given to a free reviewer by
 describe("a pool lane's design step (HI-2310): given out by the pool, its answerer preferred for the review", { timeout: 60_000 }, () => {
   const card = (n: number, at: string, o: Partial<PoolCard> = {}): PoolCard => ({ card: n, submission: 1, submittedAt: at, pool: true, builders: ['B1'], seen: [], reviewing: null, quorum: 1, passes: 0, ...o })
   const agent = (id: string, o: Partial<PoolAgent> = {}): PoolAgent => ({ id, role: 'reviewer', leased: false, idle: true, ...o })
-  const f = (seq: number, kind: string, data: Record<string, unknown>, actor = 'hive') => ({ seq, kind, at: `t${seq}`, actor, data })
+  const f = (seq: number, kind: string, data: Record<string, unknown>, actor = 'combwork') => ({ seq, kind, at: `t${seq}`, actor, data })
 
   it('in its turn, oldest first, a card takes its preferred reviewer if free and allowed; busy or not allowed, the next free one', () => {
     // R1 listed last: the younger card still gets it, the older one the first free.

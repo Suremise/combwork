@@ -1,7 +1,7 @@
 /**
- * The developer console's capture (#366, #636): what each CLI sends Hive, next to what Hive made of it, kept in a
+ * The developer console's capture (#366, #636): what each CLI sends Combwork, next to what Combwork made of it, kept in a
  * bounded ring per source while someone watches. Pure (no Node, no Electron), so the main process, the window and the
- * hive MCP server share it and it is unit tested.
+ * combwork MCP server share it and it is unit tested.
  *
  * Redacted at capture: a payload is copied field by field, never passed through. Strings stay only where they are
  * identifiers or paths (a hook's name, a session id, a tool's name, a file path); text (prompts, messages, replies,
@@ -12,22 +12,22 @@
 import type { ProviderId } from './types'
 import { maskSecrets, maskText } from './redact'
 
-/** Who sends the events: one agent's session (the Assistant's too), or Hive itself in a workspace. */
-export type ConsoleSourceKind = 'session' | 'assistant' | 'hive'
+/** Who sends the events: one agent's session (the Assistant's too), or Combwork itself in a workspace. */
+export type ConsoleSourceKind = 'session' | 'assistant' | 'combwork'
 
 /**
- * What an event is: a CLI's hook, status line, transcript records or terminal markers; a line Hive typed into it; its
- * launch and exit; Hive's own work (Agent API calls, the hook server, watches, the merge slot, Progress); or a trigger
+ * What an event is: a CLI's hook, status line, transcript records or terminal markers; a line Combwork typed into it; its
+ * launch and exit; Combwork's own work (Agent API calls, the hook server, watches, the merge slot, Progress); or a trigger
  * of the flight recorder firing (#698).
  */
 export const CONSOLE_KINDS = ['hook', 'statusline', 'transcript', 'terminal', 'input', 'launch', 'exit', 'api', 'hook-server', 'watch', 'merge-slot', 'progress', 'trigger'] as const
 export type ConsoleKind = (typeof CONSOLE_KINDS)[number]
 
 export interface ConsoleSource {
-  /** Stable for an agent across its launches: `session:<project path, lower case>#<agent id>`; `hive:<workspace path, lower case>`. */
+  /** Stable for an agent across its launches: `session:<project path, lower case>#<agent id>`; `combwork:<workspace path, lower case>`. */
   id: string
   kind: ConsoleSourceKind
-  /** "hive · HB6", "Assistant", "Combwork". */
+  /** "demo · B6", "Assistant", "Combwork". */
   label: string
   workspacePath: string
   projectPath?: string
@@ -40,7 +40,7 @@ export interface ConsoleSource {
   events: number
 }
 
-/** One captured event: the raw payload (redacted) and what Hive made of it, in Hive's own words and fields. */
+/** One captured event: the raw payload (redacted) and what Combwork made of it, in Combwork's own words and fields. */
 export interface ConsoleEvent {
   /** Increases across every source, so `since` works across sources and after a ring is dropped and made again. */
   seq: number
@@ -50,7 +50,7 @@ export interface ConsoleEvent {
   /** The event's own name: a hook's ("PreToolUse"), an API route ("GET /v1/tasks"), a terminal marker ("title"). */
   name: string
   provider?: ProviderId
-  /** One line: what came in and what Hive did ("PreToolUse (Edit) → toolStart; working"). Hive's words only. */
+  /** One line: what came in and what Combwork did ("PreToolUse (Edit) → toolStart; working"). Combwork's words only. */
   summary: string
   raw?: unknown
   made?: unknown
@@ -60,7 +60,7 @@ export interface ConsoleEvent {
   truncated?: true
 }
 
-/** A recording of one source to a file (#638): one going on in a window, or the newest in Hive's recordings folder. */
+/** A recording of one source to a file (#638): one going on in a window, or the newest in Combwork's recordings folder. */
 export interface ConsoleRecordingInfo {
   /** The file's name in the recordings folder ("console-20261012-091503-session.jsonl"). */
   name: string
@@ -115,11 +115,11 @@ export const RING_MAX_BYTES = 1024 * 1024
 export const EVENT_MAX_BYTES = 32 * 1024
 
 const sessionPrefix = 'session:'
-const hivePrefix = 'hive:'
+const combworkPrefix = 'combwork:'
 export const sessionSourceId = (projectPath: string, agentId: string): string => `${sessionPrefix}${projectPath.toLowerCase()}#${agentId}`
-export const hiveSourceId = (workspacePath: string): string => `${hivePrefix}${workspacePath.toLowerCase()}`
-export function parseSourceId(id: string): { kind: 'session'; projectPath: string; agentId: string } | { kind: 'hive'; workspacePath: string } | null {
-  if (id.startsWith(hivePrefix) && id.length > hivePrefix.length) return { kind: 'hive', workspacePath: id.slice(hivePrefix.length) }
+export const combworkSourceId = (workspacePath: string): string => `${combworkPrefix}${workspacePath.toLowerCase()}`
+export function parseSourceId(id: string): { kind: 'session'; projectPath: string; agentId: string } | { kind: 'combwork'; workspacePath: string } | null {
+  if (id.startsWith(combworkPrefix) && id.length > combworkPrefix.length) return { kind: 'combwork', workspacePath: id.slice(combworkPrefix.length) }
   if (!id.startsWith(sessionPrefix)) return null
   const at = id.lastIndexOf('#')
   if (at <= sessionPrefix.length || at === id.length - 1) return null
@@ -128,7 +128,7 @@ export function parseSourceId(id: string): { kind: 'session'; projectPath: strin
 
 /**
  * Who reads the console through the Agent API (#366 decision 6): a project agent its own sessions only (by its own
- * token, never what a request says); the Assistant its workspace's sessions (its own included) and Hive's events there;
+ * token, never what a request says); the Assistant its workspace's sessions (its own included) and Combwork's events there;
  * the workspace token and viewers any open workspace's. The window is the user's and reads every source of its own.
  */
 export type ConsoleReader = { kind: 'agent'; projectPath: string; agentId: string } | { kind: 'assistant'; workspace: string } | { kind: 'all' }
@@ -141,7 +141,7 @@ export function mayRead(reader: ConsoleReader, source: string, workspaceOfProjec
   if (!s) return false
   if (reader.kind === 'all') return true
   if (reader.kind === 'agent') return s.kind === 'session' && samePath(s.projectPath, reader.projectPath) && s.agentId === reader.agentId
-  if (s.kind === 'hive') return samePath(s.workspacePath, reader.workspace)
+  if (s.kind === 'combwork') return samePath(s.workspacePath, reader.workspace)
   const ws = workspaceOfProject(s.projectPath)
   return !!ws && samePath(ws, reader.workspace)
 }
@@ -293,8 +293,8 @@ export function safeWord(v: unknown, max = 64): string {
   return v.length <= max && IDENTIFIER.test(v) ? maskSecrets(v) : hidden(v)
 }
 
-/** A name of Hive's own (an agent's, a project's) for display: cut and on one line; secrets masked. */
-export const hiveName = (v: unknown, max = 40): string => (typeof v === 'string' ? maskSecrets(v.replace(/[\u0000-\u001f\u007f]+/g, ' ').slice(0, max)) : '')
+/** A name of Combwork's own (an agent's, a project's) for display: cut and on one line; secrets masked. */
+export const combworkName = (v: unknown, max = 40): string => (typeof v === 'string' ? maskSecrets(v.replace(/[\u0000-\u001f\u007f]+/g, ' ').slice(0, max)) : '')
 
 /** An event's name and summary at most (characters). */
 const NAME_MAX = 80
@@ -314,11 +314,11 @@ function maskAll(v: unknown): unknown {
 /**
  * An event as kept: its payloads redacted and bounded, its size counted, never over EVENT_MAX_BYTES. The last step
  * before its size is bounded (which only cuts) is secret masking over every string the console shows, records or gives
- * an agent: name, summary, every payload string and field name, text kept or not (#699). Its source is Hive's own key
+ * an agent: name, summary, every payload string and field name, text kept or not (#699). Its source is Combwork's own key
  * (a project's folder and an agent's id, never a CLI's), compared, never shown.
  */
 export function makeEvent(seq: number, at: string, source: string, c: CapturedEvent, opts: RedactOptions = {}): ConsoleEvent {
-  const e: ConsoleEvent = { seq, at, source: source.slice(0, 600), kind: c.kind, name: maskText(hiveName(c.name, NAME_MAX)), summary: maskText(hiveName(c.summary, SUMMARY_MAX)), bytes: 0 }
+  const e: ConsoleEvent = { seq, at, source: source.slice(0, 600), kind: c.kind, name: maskText(combworkName(c.name, NAME_MAX)), summary: maskText(combworkName(c.summary, SUMMARY_MAX)), bytes: 0 }
   if (c.provider) e.provider = c.provider
   if (c.raw !== undefined) e.raw = maskAll(redactPayload(c.raw, opts, c.safe?.raw))
   if (c.made !== undefined) e.made = maskAll(redactPayload(c.made, opts, c.safe?.made))
@@ -368,11 +368,11 @@ export const HOOK_FIELDS: SafeFields = {
   tool_name: true, toolName: true, tool_use_id: true, toolUseId: true, source: true, trigger: true, matcher: true, notification_type: true, model: true, agent_type: true, turn_id: true, timestamp: true,
   tool_input: { file_path: true, notebook_path: true, path: true }
 }
-/** What Hive made of a hook: the event's kind, the status, its actions, and a PreToolUse reply's decision. */
+/** What Combwork made of a hook: the event's kind, the status, its actions, and a PreToolUse reply's decision. */
 export const HOOK_MADE_FIELDS: SafeFields = { event: { kind: true, source: true, trigger: true, call: true }, status: true, actions: true, reply: { hookSpecificOutput: { hookEventName: true, permissionDecision: true } } }
 /** Claude Code's status line. */
 export const STATUSLINE_FIELDS: SafeFields = { session_id: true, transcript_path: true, cwd: true, version: true, model: { id: true, display_name: true }, workspace: { current_dir: true, project_dir: true }, output_style: { name: true }, rate_limits: { '*': { resets_at: true } } }
-/** The details Hive read from a status line or transcript (never the sign-in's message). */
+/** The details Combwork read from a status line or transcript (never the sign-in's message). */
 export const DETAILS_FIELDS: SafeFields = { modelName: true, modelId: true, effort: true, permissionMode: true, signInAt: true, interruptedAt: true, planUsage: { provider: true, plan: true, updatedAt: true, limits: { id: true, label: true, resetsAt: true } } }
 /** A transcript read: each record's envelope (Claude Code's and Codex's), never its content's text or a tool's input. */
 export const TRANSCRIPT_FIELDS: SafeFields = {

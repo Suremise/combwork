@@ -113,11 +113,11 @@
   },
   "queue.line.unenforced": {
     "text": "Combwork merges this card (its rules), but workflow rules aren't enforced: merge it yourself and report the merge (cw_report_merge).",
-    "note": "A card read under Hive merges while Settings → Advanced: workflow rules are enforced is off: nothing refuses, so the agent merges and reports as before 1.0."
+    "note": "A card read under Combwork merges while Settings → Advanced: workflow rules are enforced is off: nothing refuses, so the agent merges and reports as before 1.0."
   },
   "queue.line.who": {
     "text": "Combwork merges this card (its rules): don't merge it yourself.",
-    "note": "The first sentence of every queue line for a card Hive's merge queue merges (#1354): the agent never merges it itself."
+    "note": "The first sentence of every queue line for a card Combwork's merge queue merges (#1354): the agent never merges it itself."
   },
   "queue.next.conflict": {
     "text": "Merge {target} into your worktree, resolve the conflict, commit and submit again (cw_submit).",
@@ -165,7 +165,7 @@
   },
   "queue.paused.rules": {
     "text": "it paused while workflow rules were off; it moves on once they are enforced again (if they already are, once the user resumes it)",
-    "note": "What a queue paused while workflow rules weren't enforced waits for (#1406): Hive resumes it once they are."
+    "note": "What a queue paused while workflow rules weren't enforced waits for (#1406): Combwork resumes it once they are."
   },
   "queue.paused.stuck": {
     "text": "it moves on once the user settles its interrupted advance (their answer in For you, or Resume)",

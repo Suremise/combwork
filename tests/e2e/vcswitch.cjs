@@ -1,6 +1,6 @@
 // Switching a project's version control (#1419, SPEC §16.3.5, §16.6.5, S20, OP-29), the Assistant off, fake Claude Code
 // agents acting by their own tokens:
-// - alpha (queueFixture's "Hive merges" into `integration`): one card testing and one queued when its queue is paused,
+// - alpha (queueFixture's "Combwork merges" into `integration`): one card testing and one queued when its queue is paused,
 //   then switched to None (the warning lists both cards in flight and that the folder is still a Git repository; no
 //   switch back is offered afterwards). The Merge queue section stays, reached from the Progress panel's queue card;
 //   the queued card is removed there, a new card starts under None's rules meanwhile, and the testing one merges once
@@ -36,7 +36,7 @@ const check = (name, ok, extra = '') => {
 }
 const until = (fn, ms) => lib.until(fn, ms, 200)
 
-/** A project's .combwork/project.json, as Hive keeps it. */
+/** A project's .combwork/project.json, as Combwork keeps it. */
 function writeProject(dir, cfg) {
   fs.mkdirSync(path.join(dir, '.combwork'), { recursive: true })
   fs.writeFileSync(path.join(dir, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [], ...cfg }))
@@ -53,7 +53,7 @@ function writeProject(dir, cfg) {
   fs.writeFileSync(path.join(inner, 'index.js'), 'module.exports = 1\n')
   lib.gitProject(outer, { 'README.md': '# Outer\n' })
 
-  const h = await q.startHive(fx, { port: PORT })
+  const h = await q.startCombwork(fx, { port: PORT })
   const { page, inv, app } = h
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -90,7 +90,7 @@ function writeProject(dir, cfg) {
     const base = (await inv('app:info')).language
     const dir = path.join(lib.ROOT, 'locales', 'de')
     const german = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))))
-    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language })
+    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
     const confirmSwitch = async () => {
       await dialog.getByRole('button', { name: 'Switch', exact: true }).click()
       return !!(await until(async () => (await dialog.count()) === 0, HUNG_MS))
@@ -212,7 +212,7 @@ function writeProject(dir, cfg) {
     const initDialog = page.locator('.dialog').filter({ has: page.locator('[data-git-init-form]') })
     await until(async () => (await initDialog.count()) === 1, HUNG_MS)
     await initDialog.locator('#git-init-gitignore').selectOption('none').catch(() => undefined)
-    if (await initDialog.locator('#git-init-name').count()) await initDialog.locator('#git-init-name').fill('Hive Test')
+    if (await initDialog.locator('#git-init-name').count()) await initDialog.locator('#git-init-name').fill('Combwork Test')
     if (await initDialog.locator('#git-init-email').count()) await initDialog.locator('#git-init-email').fill('test@example.com')
     await initDialog.getByRole('button', { name: 'Initialise', exact: true }).click()
     check('initialised, the switch to Git warns first: the running lane and the card in flight keep their rules', !!(await until(async () => {
@@ -279,7 +279,7 @@ function writeProject(dir, cfg) {
     check('a subfolder project says actions affect the whole repository', !!(await until(async () => (await text(page.locator('[data-vc-fact]'))) === `This folder is inside a Git repository at ${outer}: branch and merge actions affect that whole repository.`, HUNG_MS)))
     const merging = q.queueOptions(fx, { target: '' })
     const op29 = await inv('workflow:setOptions', inner, { preset: null, options: merging }).then(() => 'saved', (e) => e.message)
-    check('Hive merges with no target of its own is refused (OP-29)', /This project is inside a larger repository: name the branch its work merges into\./.test(op29), op29)
+    check('Combwork merges with no target of its own is refused (OP-29)', /This project is inside a larger repository: name the branch its work merges into\./.test(op29), op29)
     const named = await inv('workflow:setOptions', inner, { preset: null, options: { ...merging, target: 'main' } }).then(() => 'saved', (e) => e.message)
     check('…and saved once it names one', named === 'saved', named)
   } catch (e) {

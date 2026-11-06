@@ -32,13 +32,13 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47897), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47897), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const until = async (fn, ms = 10000) => {
     const t = Date.now()
@@ -122,7 +122,7 @@ const check = (name, ok, extra = '') => {
   page2.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(again, page2, { width: 1400, height: 850 })
   await lib.appReady(page2)
-  const inv2 = (ch, ...a) => page2.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv2 = (ch, ...a) => page2.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv2, page2, ws)
   await page2.getByText('alpha', { exact: true }).first().click()
   const started = await inv2('session:start', alpha, { agentId: agent.id, prompt: 'Work on card #12' }).then(() => '', (e) => String(e?.message ?? e))

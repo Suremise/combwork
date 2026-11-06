@@ -311,7 +311,7 @@
       "hasProject": "select",
       "project": "plain",
       "at": "plain",
-      "byHive": "select",
+      "byCombwork": "select",
       "importance": "plain",
       "changed": "select",
       "updatedAt": "plain"
@@ -322,7 +322,7 @@
       "links": "plain"
     }
   },
-  "reply.journal.mark.byHive": {
+  "reply.journal.mark.byCombwork": {
     "placeholders": {}
   },
   "reply.journal.mark.detail": {
@@ -668,7 +668,7 @@
       "slot": "plain",
       "agent": "plain",
       "run": "plain",
-      "hive": "plain"
+      "combwork": "plain"
     }
   },
   "reply.release.none": {
@@ -749,6 +749,11 @@
     }
   },
   "reply.row.stalled": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "reply.row.waiting": {
     "placeholders": {
       "why": "plain"
     }
@@ -851,7 +856,7 @@
       "audience": "select"
     }
   },
-  "reply.skill.level.hive": {
+  "reply.skill.level.cw": {
     "placeholders": {}
   },
   "reply.skill.level.local": {
@@ -950,7 +955,7 @@
       "slots": "plain"
     }
   },
-  "reply.team.hive": {
+  "reply.team.cw": {
     "placeholders": {}
   },
   "reply.team.more": {

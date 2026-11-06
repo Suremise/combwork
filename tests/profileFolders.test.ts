@@ -1,154 +1,172 @@
-import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'fs'
+import { mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { chooseProfile, choiceLine } from '../src/main/profileFolders'
+import { chooseProfile, choiceLine, ProfileMoveRefused, type ProfileFs } from '../src/main/profileFolders'
 import { tempDir } from './tempDir'
 
-// HI-2461: the app only chooses its profile folders (the installer moves them, HI-2460): Combwork's when it is there,
-// Hive's as a fallback, never moving, locking or deleting; and after the installer's move, the sign-in check once.
+// old-name: begin profileFolders-inputs
+/** The profile folders' names before 1.1, the installed app's and a dev build's. */
+const OLD = 'Hive'
+const OLD_DEV = 'Hive-Dev'
+// old-name: end profileFolders-inputs
+
+// HI-2461, HI-2594: the app runs on Combwork's profile folders only. The old one from before, where the installer didn't
+// move it (HI-2460), is moved at start by the names upgrade, by the installer's rule (one rename, only while Combwork's is
+// confirmed absent, never a copy or a delete); a move it can't make refuses the start, nothing made in its place. After
+// a move (the installer's or the app's), the sign-in check once.
 
 const accounts = vi.hoisted(() => ({ list: [] as { id: string; name: string; kind?: string }[] }))
 const toasts = vi.hoisted(() => [] as { level: string; title: string; message?: string }[])
-vi.mock('../src/main/accounts', () => ({ hiveAccounts: () => accounts.list, isServer: (a: { kind?: string } | undefined) => a?.kind === 'server', checkAccount: async () => null }))
+vi.mock('../src/main/accounts', () => ({ combworkAccounts: () => accounts.list, isServer: (a: { kind?: string } | undefined) => a?.kind === 'server', checkAccount: async () => null }))
 vi.mock('../src/main/events', () => ({ toast: (level: string, title: string, message?: string) => void toasts.push({ level, title, message }) }))
 const { checkSignInsAfterMove, MOVE_RECORD } = await import('../src/main/profileNotices')
 
 const tree = (parent: string): string[] => readdirSync(parent).sort()
+const real: ProfileFs = { stat: statSync, rename: renameSync, write: (p, t) => writeFileSync(p, t), remove: (p) => rmSync(p, { force: true }) }
+const failing = (path: string, code: string) => (p: string) => {
+  if (p === path) throw Object.assign(new Error(code), { code })
+  return statSync(p)
+}
 
-describe('choosing the profile folder (HI-2461)', () => {
+describe('choosing the profile folder, and moving the old one (HI-2461, HI-2594)', () => {
   it('a new install: neither is there, Combwork\'s is used (made as usual), and nothing is made here', () => {
     const p = tempDir('pf-fresh-')
-    expect(chooseProfile(p, 'Hive', 'Combwork')).toEqual({ use: join(p, 'Combwork'), current: join(p, 'Combwork'), fallback: false })
+    expect(chooseProfile(p, OLD, 'Combwork')).toEqual({ use: join(p, 'Combwork') })
     expect(tree(p)).toEqual([])
   })
 
-  it("moved: Combwork's is used", () => {
+  it("moved by the installer: Combwork's is used, nothing moved", () => {
     const p = tempDir('pf-current-')
     mkdirSync(join(p, 'Combwork'))
-    expect(chooseProfile(p, 'Hive', 'Combwork')).toMatchObject({ use: join(p, 'Combwork'), fallback: false })
+    expect(chooseProfile(p, OLD, 'Combwork')).toEqual({ use: join(p, 'Combwork') })
   })
 
-  it("not moved yet: Hive's is used as the fallback, and left as it is", () => {
-    const p = tempDir('pf-fallback-')
-    mkdirSync(join(p, 'Hive'))
-    writeFileSync(join(p, 'Hive', 'config.json'), '{}')
-    const c = chooseProfile(p, 'Hive', 'Combwork')
-    expect(c).toEqual({ use: join(p, 'Hive'), current: join(p, 'Combwork'), fallback: true })
-    expect(choiceLine(c, (x) => x)).toContain("isn't there")
-    expect(tree(p)).toEqual(['Hive'])
-    expect(tree(join(p, 'Hive'))).toEqual(['config.json'])
-  })
-
-  it("both there: Combwork's is used, and Hive's is never touched", () => {
-    const p = tempDir('pf-both-')
-    mkdirSync(join(p, 'Combwork'))
-    mkdirSync(join(p, 'Hive'))
-    writeFileSync(join(p, 'Hive', 'kept.txt'), 'old')
-    expect(chooseProfile(p, 'Hive', 'Combwork')).toMatchObject({ use: join(p, 'Combwork'), fallback: false })
-    expect(readFileSync(join(p, 'Hive', 'kept.txt'), 'utf8')).toBe('old')
-  })
-
-  it("a file named like Combwork's folder: Hive's folder is used", () => {
-    const p = tempDir('pf-file-')
-    writeFileSync(join(p, 'Combwork'), 'not a folder')
-    mkdirSync(join(p, 'Hive'))
-    expect(chooseProfile(p, 'Hive', 'Combwork')).toMatchObject({ use: join(p, 'Hive'), fallback: true })
-  })
-
-  it("Combwork's folder that can't be looked at (no permission, an I/O error) is never taken for missing", () => {
-    const p = tempDir('pf-unreadable-')
-    mkdirSync(join(p, 'Hive'))
-    for (const code of ['EPERM', 'EACCES', 'EIO', 'EBUSY']) {
-      const stat = (path: string) => {
-        if (path === join(p, 'Combwork')) throw Object.assign(new Error(code), { code })
-        return statSync(path)
-      }
-      const c = chooseProfile(p, 'Hive', 'Combwork', stat)
-      expect(c, code).toEqual({ use: join(p, 'Combwork'), current: join(p, 'Combwork'), fallback: false, unreadable: code })
-      expect(choiceLine(c, (x) => x), code).toContain(code)
+  it("not moved yet: the old one is renamed to Combwork's, its files as they were; the local one carries the app's record of the move", () => {
+    for (const record of [false, true]) {
+      const p = tempDir('pf-move-')
+      mkdirSync(join(p, OLD))
+      writeFileSync(join(p, OLD, 'config.json'), '{"kept":true}')
+      const c = chooseProfile(p, OLD, 'Combwork', { record })
+      expect(c).toEqual({ use: join(p, 'Combwork'), movedFrom: join(p, OLD) })
+      expect(choiceLine(c, (x) => x)).toContain(`moved ${join(p, OLD)} to ${join(p, 'Combwork')}`)
+      expect(tree(p)).toEqual(['Combwork'])
+      expect(readFileSync(join(p, 'Combwork', 'config.json'), 'utf8')).toBe('{"kept":true}')
+      if (record) expect(JSON.parse(readFileSync(join(p, 'Combwork', MOVE_RECORD), 'utf8'))).toMatchObject({ v: 1, from: join(p, OLD), by: 'app' })
+      else expect(tree(join(p, 'Combwork'))).toEqual(['config.json'])
+      // The next start: Combwork's is there, nothing moves.
+      expect(chooseProfile(p, OLD, 'Combwork', { record })).toEqual({ use: join(p, 'Combwork') })
     }
   })
 
-  it("Hive's folder that can't be looked at, Combwork's missing: Hive's is used (never a blank Combwork in its place), for roaming and local alike", () => {
+  it("a record already in the old local folder (the installer's, its rename having failed) is kept as it is, and moves with it", () => {
+    const p = tempDir('pf-installer-record-')
+    mkdirSync(join(p, OLD))
+    const rec = JSON.stringify({ v: 1, from: join(p, OLD), movedAt: '2026-11-03T21:00:00.000Z', by: 'installer' })
+    writeFileSync(join(p, OLD, MOVE_RECORD), rec)
+    expect(chooseProfile(p, OLD, 'Combwork', { record: true })).toEqual({ use: join(p, 'Combwork'), movedFrom: join(p, OLD) })
+    expect(readFileSync(join(p, 'Combwork', MOVE_RECORD), 'utf8')).toBe(rec)
+  })
+
+  it("both there: Combwork's is used, and the old one is never touched", () => {
+    const p = tempDir('pf-both-')
+    mkdirSync(join(p, 'Combwork'))
+    mkdirSync(join(p, OLD))
+    writeFileSync(join(p, OLD, 'kept.txt'), 'old')
+    expect(chooseProfile(p, OLD, 'Combwork', { record: true })).toEqual({ use: join(p, 'Combwork') })
+    expect(tree(join(p, OLD))).toEqual(['kept.txt'])
+  })
+
+  it("a rename that fails (a 1.0 still running holds the folder): the start is refused, both as they were, the record taken back out", () => {
+    const p = tempDir('pf-held-')
+    mkdirSync(join(p, OLD))
+    writeFileSync(join(p, OLD, 'config.json'), '{}')
+    const fs: ProfileFs = { ...real, rename: () => { throw Object.assign(new Error('busy'), { code: 'EBUSY' }) } }
+    expect(() => chooseProfile(p, OLD, 'Combwork', { record: true, fs })).toThrow(ProfileMoveRefused)
+    try {
+      chooseProfile(p, OLD, 'Combwork', { record: true, fs })
+    } catch (e) {
+      expect(e).toMatchObject({ from: join(p, OLD), to: join(p, 'Combwork'), reason: "it couldn't be renamed (EBUSY)" })
+    }
+    expect(tree(p)).toEqual([OLD])
+    expect(tree(join(p, OLD))).toEqual(['config.json'])
+  })
+
+  it("a record that can't be put in Combwork's local folder: refused before anything moves", () => {
+    const p = tempDir('pf-norecord-')
+    mkdirSync(join(p, OLD))
+    const fs: ProfileFs = { ...real, write: () => { throw Object.assign(new Error('denied'), { code: 'EACCES' }) } }
+    expect(() => chooseProfile(p, OLD, 'Combwork', { record: true, fs })).toThrow(/record of the move couldn't be put in it \(EACCES\)/)
+    expect(tree(p)).toEqual([OLD])
+  })
+
+  it("a file named like Combwork's folder beside the old one: refused, never renamed over it", () => {
+    const p = tempDir('pf-file-')
+    writeFileSync(join(p, 'Combwork'), 'not a folder')
+    mkdirSync(join(p, OLD))
+    expect(() => chooseProfile(p, OLD, 'Combwork')).toThrow(/a file is there under Combwork's name/)
+    expect(readFileSync(join(p, 'Combwork'), 'utf8')).toBe('not a folder')
+    expect(tree(p)).toEqual(['Combwork', OLD])
+  })
+
+  it("Combwork's folder that can't be looked at (no permission, an I/O error) is never taken for missing: used, nothing moved", () => {
+    const p = tempDir('pf-unreadable-')
+    mkdirSync(join(p, OLD))
+    for (const code of ['EPERM', 'EACCES', 'EIO', 'EBUSY']) {
+      const c = chooseProfile(p, OLD, 'Combwork', { fs: { ...real, stat: failing(join(p, 'Combwork'), code) } })
+      expect(c, code).toEqual({ use: join(p, 'Combwork'), unreadable: code })
+      expect(choiceLine(c, (x) => x), code).toContain(code)
+    }
+    expect(tree(p)).toEqual([OLD])
+  })
+
+  it("the old folder that can't be looked at, Combwork's missing: refused (never a blank Combwork in its place), for roaming and local alike", () => {
     const p = tempDir('pf-legacy-unreadable-')
     for (const parent of [join(p, 'appdata'), join(p, 'localappdata')]) {
       mkdirSync(parent, { recursive: true })
       for (const code of ['EPERM', 'EACCES', 'EIO', 'EBUSY']) {
         const stat = (path: string) => {
           if (path === join(parent, 'Combwork')) throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
-          if (path === join(parent, 'Hive')) throw Object.assign(new Error(code), { code })
+          if (path === join(parent, OLD)) throw Object.assign(new Error(code), { code })
           return statSync(path)
         }
-        const c = chooseProfile(parent, 'Hive', 'Combwork', stat)
-        expect(c, `${parent} ${code}`).toEqual({ use: join(parent, 'Hive'), current: join(parent, 'Combwork'), fallback: true, unreadable: code })
-        expect(choiceLine(c, (x) => x), code).toContain(code)
+        expect(() => chooseProfile(parent, OLD, 'Combwork', { record: true, fs: { ...real, stat } }), `${parent} ${code}`).toThrow(`it couldn't be looked at (${code})`)
       }
       // Nothing was made in either place.
       expect(tree(parent)).toEqual([])
     }
   })
 
-  it("only ENOENT and ENOTDIR count as missing: Hive's folder is used then", () => {
-    const p = tempDir('pf-missing-')
-    mkdirSync(join(p, 'Hive'))
+  it("only ENOENT and ENOTDIR count as missing: Combwork's folder is moved then", () => {
     for (const code of ['ENOENT', 'ENOTDIR']) {
-      const stat = (path: string) => {
-        if (path === join(p, 'Combwork')) throw Object.assign(new Error(code), { code })
-        return statSync(path)
-      }
-      expect(chooseProfile(p, 'Hive', 'Combwork', stat), code).toMatchObject({ use: join(p, 'Hive'), fallback: true })
+      const p = tempDir('pf-missing-')
+      mkdirSync(join(p, OLD))
+      const c = chooseProfile(p, OLD, 'Combwork', { fs: { ...real, stat: failing(join(p, 'Combwork'), code) } })
+      expect(c, code).toEqual({ use: join(p, 'Combwork'), movedFrom: join(p, OLD) })
     }
   })
 })
 
-describe('the fallback notice (HI-2461)', () => {
-  it('names each old folder in use, and says nothing when Combwork\'s are used', async () => {
+describe('the start notices (HI-2594): no fallback is ever said', () => {
+  it("after the app's own move, the local folder's record runs the sign-in check once, as after the installer's", async () => {
     const { setProfileChoices } = await import('../src/main/profileFolders')
     const { startProfileNotices } = await import('../src/main/profileNotices')
     toasts.length = 0
     const p = tempDir('pf-notice-')
-    mkdirSync(join(p, 'appdata', 'Hive-Dev'), { recursive: true })
-    mkdirSync(join(p, 'localappdata', 'Combwork-Dev'), { recursive: true })
-    const roaming = chooseProfile(join(p, 'appdata'), 'Hive-Dev', 'Combwork-Dev')
-    const local = chooseProfile(join(p, 'localappdata'), 'Hive-Dev', 'Combwork-Dev')
+    mkdirSync(join(p, 'appdata', OLD_DEV), { recursive: true })
+    mkdirSync(join(p, 'localappdata', OLD_DEV), { recursive: true })
+    const roaming = chooseProfile(join(p, 'appdata'), OLD_DEV, 'Combwork-Dev')
+    const local = chooseProfile(join(p, 'localappdata'), OLD_DEV, 'Combwork-Dev', { record: true })
+    accounts.list = []
     setProfileChoices({ roaming, local })
     await startProfileNotices()
-    expect(toasts).toHaveLength(1)
-    expect(toasts[0].message).toContain(join(p, 'appdata', 'Hive-Dev'))
-    expect(toasts[0].message).not.toContain(join(p, 'localappdata'))
-    // The dev build's words: rename it by hand.
-    expect(toasts[0].message).toContain('rename it to Combwork-Dev')
-    toasts.length = 0
-    mkdirSync(join(p, 'appdata', 'Combwork-Dev'))
-    setProfileChoices({ roaming: chooseProfile(join(p, 'appdata'), 'Hive-Dev', 'Combwork-Dev'), local })
-    await startProfileNotices()
     expect(toasts).toHaveLength(0)
+    expect(JSON.parse(readFileSync(join(p, 'localappdata', 'Combwork-Dev', MOVE_RECORD), 'utf8'))).toMatchObject({ by: 'app', signInChecked: true })
     setProfileChoices({ roaming: null, local: null })
   })
 })
 
-describe("a start between the installer's record and its rename (HI-2460)", () => {
-  it("runs on Hive's folders, says so, and never checks sign-ins: the record waits in Hive's folder, untouched", async () => {
-    const { setProfileChoices } = await import('../src/main/profileFolders')
-    const { startProfileNotices } = await import('../src/main/profileNotices')
-    toasts.length = 0
-    const p = tempDir('pf-interval-')
-    mkdirSync(join(p, 'appdata', 'Hive-Dev'), { recursive: true })
-    const oldLocal = join(p, 'localappdata', 'Hive-Dev')
-    mkdirSync(oldLocal, { recursive: true })
-    const rec = JSON.stringify({ v: 1, from: oldLocal, movedAt: '2026-11-03T21:00:00.000Z', by: 'installer' })
-    writeFileSync(join(oldLocal, MOVE_RECORD), rec)
-    accounts.list = [{ id: 'a-out', name: 'Work' }]
-    setProfileChoices({ roaming: chooseProfile(join(p, 'appdata'), 'Hive-Dev', 'Combwork-Dev'), local: chooseProfile(join(p, 'localappdata'), 'Hive-Dev', 'Combwork-Dev') })
-    await startProfileNotices()
-    expect(toasts.map((t) => t.title)).toEqual(["Combwork is using Hive Desktop's data folders"])
-    expect(readFileSync(join(oldLocal, MOVE_RECORD), 'utf8')).toBe(rec)
-    setProfileChoices({ roaming: null, local: null })
-  })
-})
-
-describe('the sign-in check after the installer moved the folder (HI-2461, HI-2460)', () => {
-  const record = { v: 1, from: 'C:\\Users\\x\\AppData\\Local\\Hive', movedAt: '2026-11-03T21:00:00.000Z', by: 'installer', extra: { kept: true } }
+describe('the sign-in check after the installer (or the app) moved the folder (HI-2461, HI-2460, HI-2594)', () => {
+  const record = { v: 1, from: `C:\\Users\\x\\AppData\\Local\\${OLD}`, movedAt: '2026-11-03T21:00:00.000Z', by: 'installer', extra: { kept: true } }
   const answers: Record<string, { loggedIn: boolean | null } | null | 'throw'> = {}
   const check = async (id: string) => {
     const a = answers[id]

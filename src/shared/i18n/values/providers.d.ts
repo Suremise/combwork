@@ -1,6 +1,6 @@
 // Generated from locales/en/providers.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
-interface HiveMessageValues {
+interface CombworkMessageValues {
   'providers.action.install': undefined
   'providers.action.signIn': undefined
   'providers.action.update': undefined
@@ -39,7 +39,7 @@ interface HiveMessageValues {
   'providers.codex.hint.model': undefined
   'providers.codex.hint.settings': undefined
   'providers.codex.hint.signIn': undefined
-  'providers.codex.nativeHive': { file: string | number }
+  'providers.codex.nativeCombwork': { file: string | number }
   'providers.codex.sandbox.default': undefined
   'providers.codex.sandbox.needed': undefined
   'providers.codex.sandbox.nonAdmin': undefined

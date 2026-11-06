@@ -58,9 +58,9 @@ describe('sourceGroups', () => {
       src({ label: 'Assistant', kind: 'assistant' }),
       src({ label: 'beta · B2', project: 'beta', agent: 'B2' }),
       src({ label: 'alpha · B1', project: 'alpha', agent: 'B1' }),
-      src({ label: 'Combwork', kind: 'hive' })
+      src({ label: 'Combwork', kind: 'combwork' })
     ])
-    // The app's own group says its name (HI-2511), never Hive's.
+    // The app's own group says its name (HI-2511), never Combwork's.
     expect(groups.map((g) => [g.label, g.sources.map((s) => s.label)])).toEqual([
       ['Combwork', ['Combwork', 'Assistant']],
       ['alpha', ['alpha · B1']],
@@ -70,7 +70,7 @@ describe('sourceGroups', () => {
 
   it("names an agent's session by the agent, with its events when it has some", () => {
     expect(sourceOption(src({ label: 'alpha · B1', project: 'alpha', agent: 'B1' }))).toBe('B1')
-    expect(sourceOption(src({ label: 'Combwork', kind: 'hive', events: 12 }))).toBe('Combwork (12)')
+    expect(sourceOption(src({ label: 'Combwork', kind: 'combwork', events: 12 }))).toBe('Combwork (12)')
     expect(sourceOption(src({ label: 'Assistant', kind: 'assistant' }))).toBe('Assistant')
   })
 })

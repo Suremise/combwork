@@ -36,11 +36,11 @@ export interface ForYouItem {
   gate: string
   /** In English, as agents read it (an agent's question: its own words). */
   text: string
-  /** Hive's own request's message, for the window in its language (#1264); none for an agent's words. */
+  /** Combwork's own request's message, for the window in its language (#1264); none for an agent's words. */
   shown?: StoredText
   /** When it was asked. */
   since: string
-  /** The agent who asked; null: Hive. */
+  /** The agent who asked; null: Combwork. */
   asker: string | null
   /** Whom it waits on: the user (a person later, #439). */
   for: 'user'
@@ -93,7 +93,7 @@ export function askActionAvailable(kind: AskActionKind, card: { column: string; 
 
 /**
  * A card's requests for the user, oldest first: from its facts folded (its open requests). On a card in Done, a question
- * (an agent's or the Assistant's) is settled however the card got there (#1638): only Hive's own requests are listed (a
+ * (an agent's or the Assistant's) is settled however the card got there (#1638): only Combwork's own requests are listed (a
  * merge stopped part way, a decision after the merge).
  */
 export function forYouItems(card: { card: number; project: string; stage: StageId }, facts: readonly Fact[]): ForYouItem[] {
@@ -314,7 +314,7 @@ export interface WorkView {
 }
 
 /**
- * A request answered by a decision the user made (HI-1932): its words as asked (an agent's own, or Hive's request as data
+ * A request answered by a decision the user made (HI-1932): its words as asked (an agent's own, or Combwork's request as data
  * for the window, `shown`), the decision it names (the card's decision's id: its text is the card's, joined in the window),
  * who recorded it (the authenticated recorder: "You", "Assistant") and when.
  */

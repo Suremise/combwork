@@ -215,13 +215,13 @@
   "panes.table.worktree": "Worktree",
   "panes.table.worktreePrefix": "worktree {value}",
   "panes.template.detail": "{n, plural, one {# agent} many {# agents} other {# agents}} · {layout}",
-  "panes.template.heading": "{template} · {scope, select, hive {Combwork} workspace {espace de travail} other {ce projet}}",
+  "panes.template.heading": "{template} · {scope, select, combwork {Combwork} workspace {espace de travail} other {ce projet}}",
   "panes.template.layout": "{layout, select, auto {disposition automatique} single {un à la fois} columns2 {deux colonnes} columns3 {trois colonnes} grid {grille de quatre} grid6 {grille de six} other {{layout}}}",
   "panes.template.listFailed": "Impossible de lister les modèles",
   "panes.template.noneSaved": "Aucun modèle enregistré pour l’instant",
   "panes.template.noneYet": "Aucun modèle pour l’instant : + Ajouter ▾ → Modèles → Enregistrer le modèle… d’abord",
   "panes.template.save": "Enregistrer le modèle…",
-  "panes.template.scopeHeading": "{scope, select, hive {Modèles de Combwork} workspace {Modèles de l’espace de travail} other {Modèles de ce projet}}",
+  "panes.template.scopeHeading": "{scope, select, combwork {Modèles de Combwork} workspace {Modèles de l’espace de travail} other {Modèles de ce projet}}",
   "panes.terminal.exited": "le processus s’est terminé avec le code {code}",
   "panes.terminal.osc52.askCopy": "Copier",
   "panes.terminal.osc52.askDont": "Ne pas copier",
@@ -259,5 +259,6 @@
   "panes.watchCancel.failed": "Impossible d’annuler la surveillance",
   "panes.watchCell.agents": "Fin du tour : {agents}",
   "panes.watchCell.cardsInto": "{cards} → {column}",
-  "panes.worktree.toMerge": "À fusionner : {work}"
+  "panes.worktree.toMerge": "À fusionner : {work}",
+  "panes.footer.modelSwitched": "Lancé avec {launched}, le modèle de sa connexion ; {provider} utilise maintenant {running}. Redémarre l’agent pour revenir à {launched}."
 }

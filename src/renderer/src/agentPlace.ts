@@ -31,7 +31,7 @@ export const awayFromProject = (a: Pick<AgentInfo, 'place'>): boolean => a.place
 const PLACE = msg({
   id: 'agents.place.short',
   defaultMessage: '{is, select, slot {in {name}} carried {carried: {name}} home {home: {name}} other {0.9 worktree: {name}}}',
-  description: "Where an agent works, shown on its pane's header, in its hover and in the Agents table: in a slot it builds in ({name}: the slot's name, such as slot-b), its carried slot (its own worktree from before 1.0, kept for it), a reviewer's retired home, or its worktree from before 1.0 (Hive 0.9) not moved to a slot yet. Lower case."
+  description: "Where an agent works, shown on its pane's header, in its hover and in the Agents table: in a slot it builds in ({name}: the slot's name, such as slot-b), its carried slot (its own worktree from before 1.0, kept for it), a reviewer's retired home, or its worktree from before 1.0 (version 0.9) not moved to a slot yet. Lower case."
 })
 
 /** "in slot-b", "carried: hb2", "home: hr4", "0.9 worktree: hb1"; null in the project folder. */
@@ -39,7 +39,7 @@ export const placeText = (place: ShownPlace): string | null => (place.is === 'pr
 
 /** The hover's line, for an agent outside the project folder: where it works, with the folder's path. */
 export const placeTip = (place: ShownPlace): string =>
-  tr(msg({ id: 'agents.place.tip', defaultMessage: '{is, select, slot {Works in {name}: {path}} carried {Works in {name}, the slot kept for it: {path}} home {Works in its retired home {name}: {path}} other {Works in its 0.9 worktree {name}: {path}}}', description: "A line of an agent's hover: where it works and that folder's path ({path}): a slot it builds in ({name}: the slot's name, such as slot-b), its carried slot (its own worktree from before 1.0, kept for it as a slot), a reviewer's retired home, or its worktree from before 1.0 (Hive 0.9) not moved to a slot yet. Glossary: slot." }), { is: place.is, name: place.name ?? '', path: place.folder })
+  tr(msg({ id: 'agents.place.tip', defaultMessage: '{is, select, slot {Works in {name}: {path}} carried {Works in {name}, the slot kept for it: {path}} home {Works in its retired home {name}: {path}} other {Works in its 0.9 worktree {name}: {path}}}', description: "A line of an agent's hover: where it works and that folder's path ({path}): a slot it builds in ({name}: the slot's name, such as slot-b), its carried slot (its own worktree from before 1.0, kept for it as a slot), a reviewer's retired home, or its worktree from before 1.0 (version 0.9) not moved to a slot yet. Glossary: slot." }), { is: place.is, name: place.name ?? '', path: place.folder })
 
 /** A folder of the project's by name: a slot's, a retired home's, or null (the project folder, or one it doesn't know). */
 export const namedFolder = (project: Pick<ProjectInfo, 'folders'>, folder: string): NamedFolder | null => project.folders?.find((f) => samePath(f.path, folder)) ?? null

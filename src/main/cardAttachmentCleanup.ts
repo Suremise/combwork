@@ -24,7 +24,7 @@ import { boardRead, cardKeys } from './boardStore'
 import { cardFolder, cardHost, type CleanupFile } from './cardAttachments'
 import { fileIdentity, ownFolder } from './cardCleanupFs'
 import { createLogger, userText } from './logger'
-import { hiveError } from './hiveError'
+import { combworkError } from './combworkError'
 import { msg } from '../shared/i18n'
 import * as tasks from './tasks'
 import { openWorkspaces, workspace, type WorkspaceService } from './workspace'
@@ -48,15 +48,15 @@ const MAX_PLANS = 8
 
 const pause = (): Promise<void> => new Promise((r) => setTimeout(r, PAUSE_MS))
 
-/** A day's length: unpackaged test builds can shorten it (HIVE_TEST_DAY_MS), so a suite sees a card come due. */
+/** A day's length: unpackaged test builds can shorten it (CW_TEST_DAY_MS), so a suite sees a card come due. */
 function dayMs(): number {
-  const v = !app.isPackaged ? Number(process.env.HIVE_TEST_DAY_MS) : NaN
+  const v = !app.isPackaged ? Number(process.env.CW_TEST_DAY_MS) : NaN
   return Number.isFinite(v) && v > 0 ? v : DAY_MS
 }
 
-/** Whether the PC is idle now: no input for IDLE_SECONDS (unpackaged test builds: HIVE_TEST_IDLE, 1 idle, 0 busy). */
+/** Whether the PC is idle now: no input for IDLE_SECONDS (unpackaged test builds: CW_TEST_IDLE, 1 idle, 0 busy). */
 export function pcIdle(): boolean {
-  const own = !app.isPackaged ? process.env.HIVE_TEST_IDLE : undefined
+  const own = !app.isPackaged ? process.env.CW_TEST_IDLE : undefined
   if (own === '1' || own === '0') return own === '1'
   try {
     return powerMonitor.getSystemIdleTime() >= IDLE_SECONDS
@@ -345,7 +345,7 @@ const STALE = msg({ id: 'service.cardCleanup.stale', defaultMessage: 'This list 
 export async function applyCleanupPlan(projectPath: string, id: string, ws: WorkspaceService = workspace, now?: number): Promise<CardCleanupResult> {
   const p = plans.get(id)
   plans.delete(id)
-  if (!p || p.until < Date.now() || !alive(p.life) || p.life.ws !== ws || p.projectPath.toLowerCase() !== projectPath.toLowerCase()) throw hiveError(STALE, undefined, { kind: 'conflict' })
+  if (!p || p.until < Date.now() || !alive(p.life) || p.life.ws !== ws || p.projectPath.toLowerCase() !== projectPath.toLowerCase()) throw combworkError(STALE, undefined, { kind: 'conflict' })
   const out = noneDone()
   for (const c of p.cards) {
     if (!alive(p.life)) return { ...out, stopped: true }

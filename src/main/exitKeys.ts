@@ -4,7 +4,7 @@
  * beat (three Ctrl+C 400 ms apart) lost the exit under load: a turn's cancel took ~380 ms, the second key arrived 18 ms
  * after the turn ended and was lost as it wound down, and the third only armed it again, so Copilot was killed without
  * writing its token totals. Here each key waits for what it is for:
- * - A turn under way (or its dialog): the key cancels it, then its end is waited for, as Hive's own view of it says
+ * - A turn under way (or its dialog): the key cancels it, then its end is waited for, as Combwork's own view of it says
  *   (the turn ledger, read from the CLI's events about a second after it ended).
  * - At its prompt: the key arms the exit, and the hint is waited for. Not shown in `armMs`, the key was lost: the
  *   next arms it again (a key at its prompt only ever arms or exits it).
@@ -16,7 +16,7 @@
 export interface ExitKeysIO {
   /** Its CLI still runs (this session's, not a restart's). */
   alive(): boolean
-  /** A turn is under way, or its dialog asks something, as Hive's view of it says. */
+  /** A turn is under way, or its dialog asks something, as Combwork's view of it says. */
   inTurn(): boolean
   /** Its screen shows the exit armed (the adapter's `armed`). */
   armed(): boolean
@@ -48,7 +48,7 @@ export async function driveExitKeys(io: ExitKeysIO, armMs: number): Promise<void
     return true
   }
   while (io.alive()) {
-    // The hint showing wins over Hive's view of a turn, which lags the CLI's: it is at its prompt, armed.
+    // The hint showing wins over Combwork's view of a turn, which lags the CLI's: it is at its prompt, armed.
     if (io.inTurn() && !io.armed()) {
       if (!press()) return
       // Its end, however long the cancel takes; one that never ends is the kill's. The hint showing means it is over too.

@@ -1,10 +1,10 @@
-// Screenshot cases for the `assistant` area (#806): the Hive Assistant's panel (idle, its menus, its strip and its
+// Screenshot cases for the `assistant` area (#806): the Combwork Assistant's panel (idle, its menus, its strip and its
 // settings), the Assistant view and its modes (with New Mode), the Skills view (its failed load and refresh, a skill's
 // delete confirmation), Shared Notes and the MCP view (a server with a literal secret, whose warning main words), the
 // Projects sidebar (a project's menu, the compact rail), and templates: the Templates view (its failed load, a
 // template, its editor, Load into Project's plan, the delete confirmation) and a project's Templates tab. Reached for
 // the i18nshots route (#756's design, section 4) with locale-independent means only: IPC calls and failures
-// (HIVE_TEST_FAIL_IPC), command ids and structural hooks (classes, icons, data-path), never English text. See
+// (CW_TEST_FAIL_IPC), command ids and structural hooks (classes, icons, data-path), never English text. See
 // tests/e2e/i18nshots.cjs for ctx.
 const fs = require('fs')
 const path = require('path')
@@ -37,7 +37,7 @@ const menuShown = (ctx) => shown(ctx, ctx.page.locator('.menu[role="menu"]'), 't
 
 /** Makes calls on an IPC channel fail: the next one (`*1`), or all until failing(ctx, ''): tests/e2e/README.md. */
 const failing = (ctx, calls) => ctx.app.evaluate((_, c) => {
-  process.env.HIVE_TEST_FAIL_IPC = c
+  process.env.CW_TEST_FAIL_IPC = c
 }, calls)
 
 /** An icon button by its icon (its name is translated), within `scope`. */
@@ -87,7 +87,7 @@ async function rail(ctx) {
 
 // --- The Assistant view and its modes.
 
-/** The modes Hive ships, by their files (resources/modes): their names are the window's, their files Hive's. */
+/** The modes Combwork ships, by their files (resources/modes): their names are the window's, their files Combwork's. */
 const SHIPPED_MODES = ['coordinator', 'planner', 'qa-triager', 'release-manager']
 
 /** A mode's name as its row shows it (the badges after it aside). */
@@ -147,7 +147,7 @@ async function retrySkills(ctx) {
   await shown(ctx, ctx.page.locator('.sidebar .skill-row'), 'the skills')
 }
 
-/** The Skills view, a skill of Hive's own open. */
+/** The Skills view, a skill of Combwork's own open. */
 async function skills(ctx) {
   await showView(ctx, 'view.skills', '.sidebar .skill-row')
   await (await shown(ctx, ctx.page.locator('.sidebar .skill-row'), 'the skills')).first().click()
@@ -168,7 +168,7 @@ async function retrySkillsRefresh(ctx) {
   await gone(ctx, ctx.page.locator('.sidebar .load-stale'), "the failed refresh's note")
 }
 
-/** Deleting a Hive skill asks first, saying who loses it. */
+/** Deleting a Combwork skill asks first, saying who loses it. */
 async function skillDelete(ctx) {
   await iconButton(ctx, '.split .editor-toolbar', 'trash').click()
   return shown(ctx, ctx.page.locator('.dialog').last(), "the skill's delete confirmation")
@@ -257,15 +257,15 @@ async function retryTemplates(ctx) {
   await shown(ctx, ctx.page.locator('.sidebar .template-row'), 'the templates')
 }
 
-/** The Templates view, one of Hive's own selected (#1436): Team 3×3, its roles and pairs, read-only. */
-async function hiveTemplates(ctx) {
+/** The Templates view, one of Combwork's own selected (#1436): Team 3×3, its roles and pairs, read-only. */
+async function combworkTemplates(ctx) {
   await showView(ctx, 'view.templates', '.sidebar .template-row')
-  await (await shown(ctx, ctx.page.locator('.sidebar .template-row[data-scope="hive"]'), "Hive's templates")).nth(3).click()
-  await shown(ctx, ctx.page.locator('.template-detail[data-scope="hive"] .template-agents'), "one of Hive's templates")
+  await (await shown(ctx, ctx.page.locator('.sidebar .template-row[data-scope="combwork"]'), "Combwork's templates")).nth(3).click()
+  await shown(ctx, ctx.page.locator('.template-detail[data-scope="combwork"] .template-agents'), "one of Combwork's templates")
   return windowShot()
 }
 
-/** The Templates view, a template selected: what it holds (the workspace's: Hive's own are listed first). */
+/** The Templates view, a template selected: what it holds (the workspace's: Combwork's own are listed first). */
 async function templates(ctx) {
   await showView(ctx, 'view.templates', '.sidebar .template-row')
   await (await shown(ctx, ctx.page.locator('.sidebar .template-row[data-scope="workspace"]'), 'the templates')).first().click()
@@ -336,7 +336,7 @@ module.exports = {
     { name: 'project-menu', open: projectMenu, close: closeMenu },
     { name: 'projects-rail', open: projectsRail, close: expandRail },
     { name: 'templates-failed', open: templatesFailed, close: retryTemplates },
-    { name: 'templates-hive', open: hiveTemplates },
+    { name: 'templates-combwork', open: combworkTemplates },
     { name: 'templates', open: templates },
     { name: 'template-editor', open: templateEditor, close: closeEditor },
     { name: 'template-load', open: templateLoad, close: cancelDialog },

@@ -28,7 +28,7 @@ import { msg } from '@shared/i18n/msg'
 import { McpCatalogDetail } from '../components/McpCatalog'
 
 const M = {
-  tagline: msg({ id: 'workspace.welcome.tagline', defaultMessage: 'Run AI coding agents across your projects, side by side.', description: "The welcome page (no workspace open), under Hive's name." }),
+  tagline: msg({ id: 'workspace.welcome.tagline', defaultMessage: 'Run AI coding agents across your projects, side by side.', description: "The welcome page (no workspace open), under Combwork's name." }),
   start: msg({ id: 'workspace.welcome.start', defaultMessage: 'Start', description: 'The welcome page: a heading.' }),
   open: msg({ id: 'workspace.welcome.open', defaultMessage: 'Open Workspace…', description: 'The welcome page: a link.' }),
   create: msg({ id: 'workspace.welcome.create', defaultMessage: 'New Workspace…', description: 'The welcome page: a link.' }),
@@ -44,14 +44,14 @@ const M = {
   apiReference: msg({ id: 'workspace.welcome.apiReference', defaultMessage: 'Agent API reference', description: "The welcome page: a link to the Agent API's documentation." }),
   shortcuts: msg({ id: 'workspace.welcome.shortcuts', defaultMessage: 'Keyboard shortcuts', description: 'The welcome page: a link.' }),
   howItWorks: msg({ id: 'workspace.welcome.howItWorks', defaultMessage: 'How Combwork works', description: 'The welcome page: a heading.' }),
-  workspace: msg({ id: 'workspace.welcome.workspace', defaultMessage: 'Workspace', description: 'The welcome page, How Hive works: a heading.' }),
-  workspaceText: msg({ id: 'workspace.welcome.workspaceText', defaultMessage: 'A folder of projects. Combwork adds a <code>.combwork</code> folder for shared notes, skills and MCP servers — commit it to share with your team.', description: 'The welcome page, How Hive works. <code> is a folder name: keep .combwork as it is.' }),
-  projects: msg({ id: 'workspace.welcome.projects', defaultMessage: 'Projects', description: 'The welcome page, How Hive works: a heading.' }),
-  projectsText: msg({ id: 'workspace.welcome.projectsText', defaultMessage: "Each subfolder is a project. Toggle the ones you're working on; each gets its own coding agents, running side by side.", description: 'The welcome page, How Hive works.' }),
-  skills: msg({ id: 'workspace.welcome.skills', defaultMessage: 'Skills & MCP', description: 'The welcome page, How Hive works: a heading.' }),
-  skillsText: msg({ id: 'workspace.welcome.skillsText', defaultMessage: 'Combwork skills in the workspace reach the agents of every project (and the Assistant, for those written for it); each project also shows its own and your user skills. An MCP server is on only where you turn it on: in one project, or in all of them. Changes apply to new sessions.', description: 'The welcome page, How Hive works.' }),
-  flow: msg({ id: 'workspace.welcome.flow', defaultMessage: 'Stay in flow', description: 'The welcome page, How Hive works: a heading.' }),
-  flowText: msg({ id: 'workspace.welcome.flowText', defaultMessage: 'Combwork chimes and notifies you when an agent finishes or needs input — even from the system tray.', description: 'The welcome page, How Hive works.' }),
+  workspace: msg({ id: 'workspace.welcome.workspace', defaultMessage: 'Workspace', description: 'The welcome page, How Combwork works: a heading.' }),
+  workspaceText: msg({ id: 'workspace.welcome.workspaceText', defaultMessage: 'A folder of projects. Combwork adds a <code>.combwork</code> folder for shared notes, skills and MCP servers — commit it to share with your team.', description: 'The welcome page, How Combwork works. <code> is a folder name: keep .combwork as it is.' }),
+  projects: msg({ id: 'workspace.welcome.projects', defaultMessage: 'Projects', description: 'The welcome page, How Combwork works: a heading.' }),
+  projectsText: msg({ id: 'workspace.welcome.projectsText', defaultMessage: "Each subfolder is a project. Toggle the ones you're working on; each gets its own coding agents, running side by side.", description: 'The welcome page, How Combwork works.' }),
+  skills: msg({ id: 'workspace.welcome.skills', defaultMessage: 'Skills & MCP', description: 'The welcome page, How Combwork works: a heading.' }),
+  skillsText: msg({ id: 'workspace.welcome.skillsText', defaultMessage: 'Combwork skills in the workspace reach the agents of every project (and the Assistant, for those written for it); each project also shows its own and your user skills. An MCP server is on only where you turn it on: in one project, or in all of them. Changes apply to new sessions.', description: 'The welcome page, How Combwork works.' }),
+  flow: msg({ id: 'workspace.welcome.flow', defaultMessage: 'Stay in flow', description: 'The welcome page, How Combwork works: a heading.' }),
+  flowText: msg({ id: 'workspace.welcome.flowText', defaultMessage: 'Combwork chimes and notifies you when an agent finishes or needs input — even from the system tray.', description: 'The welcome page, How Combwork works.' }),
   selectNote: msg({ id: 'workspace.notes.select', defaultMessage: 'Select a note, or create one. Shared notes live in <code>.combwork/shared</code> and are available to every project and agent.', description: "The Shared Notes view with no note selected. <code> is a folder: keep .combwork/shared as it is." }),
   deleteNote: msg({ id: 'workspace.notes.delete', defaultMessage: 'Delete note', description: "A button over an open shared note." }),
   skillLoadTarget: msg({ id: 'workspace.skillView.loadTarget', defaultMessage: 'the skill', description: 'What could not be loaded: shown in "Could not load {what}: {error}", with Retry.' }),
@@ -89,12 +89,12 @@ const M = {
   docGuide: msg({ id: 'workspace.docs.guide', defaultMessage: 'User Guide', description: 'The Documentation view: a page.' }),
   docApi: msg({ id: 'workspace.docs.api', defaultMessage: 'Agent API', description: "The Documentation view: the Agent API's page." }),
   docChangelog: msg({ id: 'workspace.docs.changelog', defaultMessage: 'Release Notes', description: 'The Documentation view: a page.' }),
-  docLicense: msg({ id: 'workspace.docs.license', defaultMessage: 'License', description: "The Documentation view: Hive's licence page, and its heading." }),
-  docNotices: msg({ id: 'workspace.docs.notices', defaultMessage: 'Third-Party Notices', description: 'The Documentation view: a page (the licences of what Hive includes).' }),
-  seeAlso: msg({ id: 'workspace.docs.seeAlso', defaultMessage: 'See also the [third-party notices]({file}).', description: "Under Hive's licence (Markdown: a link, its words in the brackets; {file} is the page it opens)." }),
+  docLicense: msg({ id: 'workspace.docs.license', defaultMessage: 'License', description: "The Documentation view: Combwork's licence page, and its heading." }),
+  docNotices: msg({ id: 'workspace.docs.notices', defaultMessage: 'Third-Party Notices', description: 'The Documentation view: a page (the licences of what Combwork includes).' }),
+  seeAlso: msg({ id: 'workspace.docs.seeAlso', defaultMessage: 'See also the [third-party notices]({file}).', description: "Under Combwork's licence (Markdown: a link, its words in the brackets; {file} is the page it opens)." }),
   documentation: msg({ id: 'workspace.docs.title', defaultMessage: 'Documentation', description: "The Documentation view's heading." }),
   docShortcuts: msg({ id: 'workspace.docs.shortcuts', defaultMessage: 'Keyboard Shortcuts', description: 'The Documentation view: opens the keyboard shortcuts.' }),
-  about: msg({ id: 'workspace.docs.about', defaultMessage: 'About {app}', description: "The Documentation view: opens About ({app}: Hive's name)." })
+  about: msg({ id: 'workspace.docs.about', defaultMessage: 'About {app}', description: "The Documentation view: opens About ({app}: Combwork's name)." })
 }
 
 const code = (c: React.ReactNode[]): React.ReactNode => <code>{c}</code>
@@ -108,7 +108,7 @@ const rich = (m: Msg, values: Record<string, string> = {}): React.ReactNode[] =>
 export function WelcomeView() {
   const recent = useStore((s) => s.recent)
   const recentMenu = useContextMenu()
-  // Whether each folder is there now (#144): when shown, and when Hive comes back to the front (a folder deleted meanwhile).
+  // Whether each folder is there now (#144): when shown, and when Combwork comes back to the front (a folder deleted meanwhile).
   useEffect(() => {
     void actions.loadRecent()
     const again = (): void => void actions.loadRecent()
@@ -354,7 +354,7 @@ function McpServerView({ selected }: { selected: string | null }) {
 
   const [reload, setReload] = useState(0)
   useEffect(() => {
-    if (!selected || selected === '__hive') return
+    if (!selected || selected === '__cw') return
     // Another server selected before this one loaded: its text must not show (and be saved) under that one.
     let current = true
     void call('mcp:read', selected).then((t) => {
@@ -377,7 +377,7 @@ function McpServerView({ selected }: { selected: string | null }) {
   latest.current = text
   useEffect(() => onEditorDrafts(() => void (selected && dirtyNow.current && !editorDraft(`mcp:${selected}`) && setReload((n) => n + 1))), [selected])
   useEffect(() => {
-    if (!selected || selected === '__hive') return
+    if (!selected || selected === '__cw') return
     let current = true
     void call('mcp:list').then((l) => current && setInfo(l.find((m) => m.name === selected) ?? null))
     return () => {
@@ -393,7 +393,7 @@ function McpServerView({ selected }: { selected: string | null }) {
       </div>
     )
   }
-  if (selected === '__hive') {
+  if (selected === '__cw') {
     return (
       <div className="scroll-page">
         <div className="page-narrow">
@@ -401,7 +401,7 @@ function McpServerView({ selected }: { selected: string | null }) {
             <Icon name="hubot" /> {tr(M.builtIn)}
           </h2>
           <p className="hint">{rich(M.builtInText, { hasUrl: api?.url ? 'yes' : 'no', url: api?.url ?? '' })}</p>
-          <Markdown source={hiveToolsTable()} />
+          <Markdown source={combworkToolsTable()} />
         </div>
       </div>
     )
@@ -470,7 +470,7 @@ function McpServerView({ selected }: { selected: string | null }) {
             <>
               {!info.error && <span className="faint mcp-where">{actions.mcpWhereText(info, projects)}</span>}
               <button className="btn small" data-action="mcp-places" disabled={!!info.error} onClick={() => void actions.chooseMcpPlaces(info).then(() => call('mcp:list')).then((l) => setInfo((was) => l.find((m) => m.name === selected) ?? was))}>
-                <Icon name="add" /> {tr(msg({ id: 'mcp.view.addTo', defaultMessage: 'Add to…', description: "A button in an MCP server's view (HI-2059): chooses the projects, and the Hive Assistant, it is added to." }))}
+                <Icon name="add" /> {tr(msg({ id: 'mcp.view.addTo', defaultMessage: 'Add to…', description: "A button in an MCP server's view (HI-2059): chooses the projects, and the Combwork Assistant, it is added to." }))}
               </button>
             </>
           )}
@@ -517,8 +517,8 @@ function McpServerView({ selected }: { selected: string | null }) {
 // Docs
 // ---------------------------------------------------------------------------
 
-/** The built-in hive server's tools, as a table (the tools' names are theirs; what they do is window text). */
-function hiveToolsTable(): string {
+/** The built-in combwork server's tools, as a table (the tools' names are theirs; what they do is window text). */
+function combworkToolsTable(): string {
   const tools: [string, Msg][] = [
     ['cw_list_projects', M.toolListProjects],
     ['cw_project_status', M.toolProjectStatus],

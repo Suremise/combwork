@@ -50,7 +50,7 @@ import { Section } from './Sidebar'
 import { BusyButton, Icon, IconButton, LoadFailed, Modal, SearchInput, Switch, Tooltip, useBusy } from './ui'
 
 const M = {
-  title: msg({ id: 'dialects.title', defaultMessage: 'Dialects', description: 'Title of the Dialects view (HI-2444): the wording Hive gives agents, tuned per model and CLI. Glossary: dialect.' }),
+  title: msg({ id: 'dialects.title', defaultMessage: 'Dialects', description: 'Title of the Dialects view (HI-2444): the wording Combwork gives agents, tuned per model and CLI. Glossary: dialect.' }),
   tip: msg({ id: 'dialects.tip', defaultMessage: "The wording Combwork gives agents: its guidance, its tools' descriptions and replies, its wakes. A dialect file changes some of it, for a model, a CLI or the whole workspace; everything else stays Combwork's own. A change applies at each agent's next launch.", description: "Tooltip on the Dialects view's title (HI-2444). Glossary: dialect." }),
   import: msg({ id: 'dialects.import', defaultMessage: 'Import Dialect File…', description: 'A button in the Dialects view (HI-2444): adds a dialect file from a file. Glossary: dialect.' }),
   refresh: msg({ id: 'dialects.refresh', defaultMessage: 'Refresh', description: 'A button in the Dialects view: reads the dialect files again.' }),
@@ -67,23 +67,23 @@ const M = {
     workspace: msg({ id: 'dialects.kind.workspace', defaultMessage: 'Every agent in the workspace', description: "What the Workspace dialect file applies to, under its name in the Dialects view's list. Glossary: dialect." }),
     cli: msg({ id: 'dialects.kind.cli', defaultMessage: 'Every {cli} agent', description: "What a CLI's dialect file applies to, under its name in the Dialects view's list; {cli} is the CLI (\"Codex\"). Glossary: dialect." }),
     api: msg({ id: 'dialects.kind.api', defaultMessage: 'Callers with no session', description: "What the API dialect file applies to (scripts, curl), under its name in the Dialects view's list. Glossary: dialect." }),
-    model: msg({ id: 'dialects.kind.model', defaultMessage: 'Model {model}', description: "What a model file applies to, under its name in the Dialects view's list: agents running that model ID ({model}, as Hive matches it). Glossary: dialect." }),
+    model: msg({ id: 'dialects.kind.model', defaultMessage: 'Model {model}', description: "What a model file applies to, under its name in the Dialects view's list: agents running that model ID ({model}, as Combwork matches it). Glossary: dialect." }),
     copy: msg({ id: 'dialects.kind.copy', defaultMessage: 'Test copy: agents that pick it', description: "What a test copy (a dialect file with no model) applies to, under its name in the Dialects view's list: only agents whose Dialect setting names it. Glossary: dialect, test copy." })
   },
   state: {
-    shipped: msg({ id: 'dialects.state.shipped', defaultMessage: 'Shipped', description: 'A badge on a dialect file in the Dialects view: as Hive ships it. Glossary: dialect.' }),
-    edited: msg({ id: 'dialects.state.edited', defaultMessage: 'Edited', description: 'A badge on a dialect file in the Dialects view: shipped with Hive, and changed here (Revert puts it back). Glossary: dialect.' }),
-    yours: msg({ id: 'dialects.state.yours', defaultMessage: 'Yours', description: "A badge on a dialect file in the Dialects view: one the user made (a copy, an import), not Hive's. Glossary: dialect." })
+    shipped: msg({ id: 'dialects.state.shipped', defaultMessage: 'Shipped', description: 'A badge on a dialect file in the Dialects view: as Combwork ships it. Glossary: dialect.' }),
+    edited: msg({ id: 'dialects.state.edited', defaultMessage: 'Edited', description: 'A badge on a dialect file in the Dialects view: shipped with Combwork, and changed here (Revert puts it back). Glossary: dialect.' }),
+    yours: msg({ id: 'dialects.state.yours', defaultMessage: 'Yours', description: "A badge on a dialect file in the Dialects view: one the user made (a copy, an import), not Combwork's. Glossary: dialect." })
   },
-  outdatedBadge: msg({ id: 'dialects.outdatedBadge', defaultMessage: '{count, plural, one {# outdated} other {# outdated}}', description: "A warning badge on a dialect file in the Dialects view: how many of its texts no longer match this Hive's (they fall through to the layer below). Glossary: outdated." }),
+  outdatedBadge: msg({ id: 'dialects.outdatedBadge', defaultMessage: '{count, plural, one {# outdated} other {# outdated}}', description: "A warning badge on a dialect file in the Dialects view: how many of its texts no longer match this Combwork's (they fall through to the layer below). Glossary: outdated." }),
   brokenBadge: msg({ id: 'dialects.brokenBadge', defaultMessage: "Can't be read", description: "A warning badge on a dialect file in the Dialects view: it isn't JSON or a dialect file's shape, so it adds nothing. Glossary: dialect." }),
-  updateBadge: msg({ id: 'dialects.updateBadge', defaultMessage: 'Update available', description: 'A badge on an edited shipped dialect file: this Hive ships a newer version (Revert brings it in). Glossary: dialect.' }),
-  claimTaken: msg({ id: 'dialects.claimTaken', defaultMessage: 'Another file of this folder, {by}, claims model {model} first: Auto never picks this one.', description: "A warning on a dialect file whose model another file of the same CLI folder claims too (made outside Hive): {by} is that file, {model} the model ID. Glossary: dialect." }),
+  updateBadge: msg({ id: 'dialects.updateBadge', defaultMessage: 'Update available', description: 'A badge on an edited shipped dialect file: this Combwork ships a newer version (Revert brings it in). Glossary: dialect.' }),
+  claimTaken: msg({ id: 'dialects.claimTaken', defaultMessage: 'Another file of this folder, {by}, claims model {model} first: Auto never picks this one.', description: "A warning on a dialect file whose model another file of the same CLI folder claims too (made outside Combwork): {by} is that file, {model} the model ID. Glossary: dialect." }),
   usedBy: msg({ id: 'dialects.usedBy', defaultMessage: '{count, plural, one {Used by # running agent: {agents}} other {Used by # running agents: {agents}}}', description: 'Tooltip on the agents count of a dialect file in the Dialects view: the running agents whose dialect chain has it, by name. Glossary: dialect.' }),
   onSwitch: msg({ id: 'dialects.onSwitch', defaultMessage: '{name} on', description: "A dialect file's on/off switch in the Dialects view, for screen readers. {name} is the file's name. Glossary: dialect." }),
   onFailed: msg({ id: 'dialects.onFailed', defaultMessage: "Couldn't switch {name} on or off", description: 'A notice: switching a dialect file on or off failed. {name} is the file. Glossary: dialect.' }),
   // The file
-  save: msg({ id: 'dialects.save', defaultMessage: 'Save', description: "The Dialects view's Save button: writes the file's changes, checked against this Hive's texts first." }),
+  save: msg({ id: 'dialects.save', defaultMessage: 'Save', description: "The Dialects view's Save button: writes the file's changes, checked against this Combwork's texts first." }),
   saving: msg({ id: 'dialects.saving', defaultMessage: 'Saving…', description: "The Dialects view's Save button while it saves." }),
   discard: msg({ id: 'dialects.discard', defaultMessage: 'Discard Changes', description: "The Dialects view's button: drops the file's unsaved changes." }),
   saved: msg({ id: 'dialects.saved', defaultMessage: "{name} saved: it applies at each agent's next launch.", description: 'A notice after saving a dialect file. {name} is the file. Glossary: dialect.' }),
@@ -106,9 +106,9 @@ const M = {
   claimMoved: msg({ id: 'dialects.claimMoved', defaultMessage: '{name} has model {model} now: {from} became a test copy.', description: 'A notice after a dialect file took a model another file had (HI-2523). {name} is the file, {model} the model ID, {from} the file that had it. Glossary: test copy.' }),
   export: msg({ id: 'dialects.export', defaultMessage: 'Export…', description: 'A button of a dialect file in the Dialects view: writes it as it is to a file you choose.' }),
   exported: msg({ id: 'dialects.exported', defaultMessage: 'Exported to {path}', description: 'A notice after exporting a dialect file. {path} is where it was written.' }),
-  revert: msg({ id: 'dialects.revert', defaultMessage: 'Revert to Shipped', description: 'A button of an edited shipped dialect file: puts back the file as Hive ships it. Glossary: dialect.' }),
+  revert: msg({ id: 'dialects.revert', defaultMessage: 'Revert to Shipped', description: 'A button of an edited shipped dialect file: puts back the file as Combwork ships it. Glossary: dialect.' }),
   revertTitle: msg({ id: 'dialects.revertTitle', defaultMessage: 'Revert {name}?', description: 'Title of the confirmation before reverting a dialect file. {name} is the file.' }),
-  revertMessage: msg({ id: 'dialects.revertMessage', defaultMessage: "Your changes to it are lost, and it follows Combwork's updates again.", description: 'The confirmation before reverting a dialect file to the version Hive ships. Glossary: dialect.' }),
+  revertMessage: msg({ id: 'dialects.revertMessage', defaultMessage: "Your changes to it are lost, and it follows Combwork's updates again.", description: 'The confirmation before reverting a dialect file to the version Combwork ships. Glossary: dialect.' }),
   promote: msg({ id: 'dialects.promote', defaultMessage: 'Set Model…', description: "A button of the user's own dialect files (a test copy, a model file they made or imported) in the Dialects view (HI-2523): sets the model ID the file is for, which Auto picks it for (a file that had that model becomes a test copy). Glossary: dialect, test copy." }),
   promoteTitle: msg({ id: 'dialects.promoteTitle', defaultMessage: 'Set Model of {name}', description: 'Title of the Set Model dialog of a dialect file (HI-2523). {name} is the file. Glossary: dialect.' }),
   promoteMessage: msg({ id: 'dialects.promoteMessage', defaultMessage: "Agents on Auto running this model ID get this file from their next launch. A file that had the model keeps its texts, as a test copy.", description: 'The Set Model dialog of a dialect file (Dialects view). Glossary: dialect, test copy.' }),
@@ -119,8 +119,8 @@ const M = {
   deleteMessage: msg({ id: 'dialects.deleteMessage', defaultMessage: 'It goes to the Recycle Bin. Agents whose Dialect setting names it use Auto from their next launch.', description: 'The confirmation before deleting a dialect file. Glossary: dialect.' }),
   restart: msg({ id: 'dialects.restart', defaultMessage: '{count, plural, one {Restart to apply: {agents} runs on this file as it was.} other {Restart to apply: {agents} run on this file as it was.}}', description: 'A banner on a dialect file in the Dialects view: running agents whose dialect chain this file changed since their launch; they get the change when they restart. {agents} is their names. Glossary: dialect.' }),
   changedOutside: msg({ id: 'dialects.changedOutside', defaultMessage: 'This file changed outside Combwork while you were editing it.', description: 'A banner in the Dialects view: the dialect file changed on disk (an editor, git, another window) while it has unsaved changes here.' }),
-  reload: msg({ id: 'dialects.reload', defaultMessage: 'Reload (Lose My Changes)', description: "The Dialects view's button on a file changed outside Hive: reads it again, dropping the unsaved changes." }),
-  keepMine: msg({ id: 'dialects.keepMine', defaultMessage: 'Keep My Changes', description: "The Dialects view's button on a file changed outside Hive: keeps the unsaved changes; the next Save writes over the change made outside." }),
+  reload: msg({ id: 'dialects.reload', defaultMessage: 'Reload (Lose My Changes)', description: "The Dialects view's button on a file changed outside Combwork: reads it again, dropping the unsaved changes." }),
+  keepMine: msg({ id: 'dialects.keepMine', defaultMessage: 'Keep My Changes', description: "The Dialects view's button on a file changed outside Combwork: keeps the unsaved changes; the next Save writes over the change made outside." }),
   tabTexts: msg({ id: 'dialects.tab.texts', defaultMessage: 'Texts', description: "A tab of a dialect file in the Dialects view: every text, with the file's overrides." }),
   tabJson: msg({ id: 'dialects.tab.json', defaultMessage: 'JSON', description: "A tab of a dialect file in the Dialects view: the file's JSON text, to edit as text." }),
   tabs: msg({ id: 'dialects.tabs', defaultMessage: 'How to show {name}', description: "The Dialects view's tabs (Texts, JSON), for screen readers. {name} is the file." }),
@@ -135,7 +135,7 @@ const M = {
   showHere: msg({ id: 'dialects.show.here', defaultMessage: 'Changed in this file', description: "The Dialects view's filter: only the texts this file overrides." }),
   showAnywhere: msg({ id: 'dialects.show.anywhere', defaultMessage: 'Changed anywhere', description: "The Dialects view's filter: the texts this file or a layer beneath it overrides. Glossary: layer." }),
   counts: msg({ id: 'dialects.counts', defaultMessage: '{overrides, plural, one {# text changed here} other {# texts changed here}} of {total, number}', description: "The Dialects view's count over a file's texts: how many it overrides, of every agent text." }),
-  outdatedGroup: msg({ id: 'dialects.outdatedGroup', defaultMessage: 'Outdated', description: "The Dialects view's group of a file's overrides that no longer match this Hive's texts: they fall through to the layer below until edited or removed. Glossary: outdated." }),
+  outdatedGroup: msg({ id: 'dialects.outdatedGroup', defaultMessage: 'Outdated', description: "The Dialects view's group of a file's overrides that no longer match this Combwork's texts: they fall through to the layer below until edited or removed. Glossary: outdated." }),
   showMore: msg({ id: 'dialects.showMore', defaultMessage: 'Show {count, number} more', description: 'A button under a long group of texts in the Dialects view: shows more of them.' }),
   noMatch: msg({ id: 'dialects.noMatch', defaultMessage: 'No text matches.', description: "The Dialects view's texts with a search or filter that matches none." }),
   from: {
@@ -144,11 +144,11 @@ const M = {
     cli: msg({ id: 'dialects.from.cli', defaultMessage: 'from {cli} CLI', description: "Where an inherited text in the Dialects view comes from: the CLI's dialect file ({cli}: \"Codex\")." }),
     api: msg({ id: 'dialects.from.api', defaultMessage: 'from API', description: 'Where an inherited text in the Dialects view comes from: the API dialect file (callers with no session).' }),
     workspace: msg({ id: 'dialects.from.workspace', defaultMessage: 'from Workspace', description: "Where an inherited text in the Dialects view comes from: the workspace's dialect file." }),
-    default: msg({ id: 'dialects.from.default', defaultMessage: 'from Default', description: "Where an inherited text in the Dialects view comes from: Hive's own wording (the Default). Glossary: Default (dialects)." })
+    default: msg({ id: 'dialects.from.default', defaultMessage: 'from Default', description: "Where an inherited text in the Dialects view comes from: Combwork's own wording (the Default). Glossary: Default (dialects)." })
   },
   layerOff: msg({ id: 'dialects.layerOff', defaultMessage: '{layer} (off)', description: 'A layer in a text\'s expanded view in the Dialects view, switched off: its text doesn\'t apply. {layer} is its name ("from Workspace").' }),
   none: msg({ id: 'dialects.none', defaultMessage: '—', description: 'A layer with no text of its own in a text\'s expanded view (Dialects view). A dash: keep it short.' }),
-  note: msg({ id: 'dialects.note', defaultMessage: 'Note', description: "In a text's expanded view (Dialects view): the note beside the text in Hive's code, saying where it is used." }),
+  note: msg({ id: 'dialects.note', defaultMessage: 'Note', description: "In a text's expanded view (Dialects view): the note beside the text in Combwork's code, saying where it is used." }),
   placeholders: msg({ id: 'dialects.placeholders', defaultMessage: 'Placeholders: {names}', description: "In a text's expanded view (Dialects view): the placeholders its text must have, exactly ({names}: \"{project}, {count}\")." }),
   noPlaceholders: msg({ id: 'dialects.noPlaceholders', defaultMessage: 'No placeholders', description: "In a text's expanded view (Dialects view): its text has no placeholders." }),
   why: msg({ id: 'dialects.why', defaultMessage: 'Why', description: "The field for an override's reason in the Dialects view: why it is worded so (shown to whoever reads the file)." }),
@@ -156,10 +156,10 @@ const M = {
   text: msg({ id: 'dialects.text', defaultMessage: 'Text', description: "The field for an override's text in the Dialects view." }),
   override: msg({ id: 'dialects.override', defaultMessage: 'Change Here', description: "A button on an inherited text in the Dialects view: starts this file's own override of it, from the text it inherits." }),
   removeOverride: msg({ id: 'dialects.removeOverride', defaultMessage: 'Remove Override', description: "A button on a text this dialect file overrides: removes the override, so the text inherits again." }),
-  noDefault: msg({ id: 'dialects.noDefault', defaultMessage: 'No current Default: this text was removed or renamed in this Combwork.', description: "In the Dialects view, beside an outdated override whose id this Hive no longer has. Glossary: Default (dialects), outdated." }),
-  defaultNow: msg({ id: 'dialects.defaultNow', defaultMessage: 'The Default now: {text}', description: "In the Dialects view, beside an outdated override: Hive's current wording of the text. Glossary: Default (dialects), outdated." }),
+  noDefault: msg({ id: 'dialects.noDefault', defaultMessage: 'No current Default: this text was removed or renamed in this Combwork.', description: "In the Dialects view, beside an outdated override whose id this Combwork no longer has. Glossary: Default (dialects), outdated." }),
+  defaultNow: msg({ id: 'dialects.defaultNow', defaultMessage: 'The Default now: {text}', description: "In the Dialects view, beside an outdated override: Combwork's current wording of the text. Glossary: Default (dialects), outdated." }),
   problem: {
-    unknown: msg({ id: 'dialects.problem.unknown', defaultMessage: '{id}: no such text in this Combwork (removed or renamed).', description: 'Why a dialect override is outdated or refused: its id ({id}) isn\'t one of this Hive\'s texts.' }),
+    unknown: msg({ id: 'dialects.problem.unknown', defaultMessage: '{id}: no such text in this Combwork (removed or renamed).', description: 'Why a dialect override is outdated or refused: its id ({id}) isn\'t one of this Combwork\'s texts.' }),
     shape: msg({ id: 'dialects.problem.shape', defaultMessage: '{id}: not a "text" with an optional "why".', description: "Why a dialect override is outdated or refused: its entry ({id}) isn't an object with a text and an optional reason. \"text\" and \"why\" are the file's field names: keep them." }),
     unparsable: msg({ id: 'dialects.problem.unparsable', defaultMessage: "{id}: its text can't be read ({detail}).", description: "Why a dialect override is outdated or refused: its text ({id}) isn't valid message syntax; {detail} is the parser's English error." }),
     missing: msg({ id: 'dialects.problem.missing', defaultMessage: '{id}: missing {names}.', description: 'Why a dialect override is outdated or refused: its text ({id}) lacks placeholders it needs ({names}: "{project}, {count}").' }),
@@ -168,7 +168,7 @@ const M = {
   },
   refused: {
     title: msg({ id: 'dialects.refused.title', defaultMessage: 'Not saved', description: 'Heading of the reasons a dialect file was refused (Dialects view): nothing was written.' }),
-    path: msg({ id: 'dialects.refused.path', defaultMessage: "That isn't a dialect file's place.", description: "A dialect file's save, import or copy refused: its path isn't one Hive accepts." }),
+    path: msg({ id: 'dialects.refused.path', defaultMessage: "That isn't a dialect file's place.", description: "A dialect file's save, import or copy refused: its path isn't one Combwork accepts." }),
     file: msg({ id: 'dialects.refused.file', defaultMessage: "It isn't a dialect file: {why}", description: "A dialect file's save or import refused: the text isn't JSON or a dialect file's shape; {why} says what." }),
     modelHere: msg({ id: 'dialects.refused.modelHere', defaultMessage: 'Only a model file or test copy in a CLI folder can have a model: not the Workspace, CLI or API file.', description: "A dialect file's save refused: it names a model, where none may be. Glossary: dialect." }),
     modelClaimed: msg({ id: 'dialects.refused.modelClaimed', defaultMessage: '{by} already claims model {model}: a folder has one file per model.', description: "A dialect file's save refused: another file of the folder ({by}) claims the same model ID ({model}). Glossary: dialect." }),
@@ -202,7 +202,7 @@ const NO_ROWS: DialectRow[] = []
 const NO_USAGE: DialectUsage[] = []
 const ROWS_PER_PAGE = 200
 
-/** The catalogue, read once a run (it is this Hive's, the same for every workspace). */
+/** The catalogue, read once a run (it is this Combwork's, the same for every workspace). */
 let catalogueRead: Promise<DialectCatalogue> | null = null
 function useCatalogue(): DialectCatalogue | null {
   const [c, setC] = useState<DialectCatalogue | null>(null)
@@ -781,7 +781,7 @@ function DialectTexts({ view, file, catalogue, changeFile }: { view: DialectFile
     return t.id.toLowerCase().includes(q) || shown.toLowerCase().includes(q) || t.text.toLowerCase().includes(q)
   }
   const overrides = file ? Object.keys(file.texts).length : 0
-  // Outdated overrides first, whatever the filter: those of an id this Hive no longer has show only here.
+  // Outdated overrides first, whatever the filter: those of an id this Combwork no longer has show only here.
   const outdated = view.outdated.filter((p) => !q || p.id.toLowerCase().includes(q))
   const areas = catalogue.areas.map((area) => ({ area, texts: catalogue.texts.filter((t) => t.area === area && !outdatedIds.has(t.id) && matches(t)) })).filter((a) => a.texts.length)
   const searching = !!q || show !== 'all'

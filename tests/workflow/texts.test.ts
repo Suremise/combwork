@@ -1,6 +1,6 @@
 // The workflow core's text in every language (#1264, SPEC §16.8.3): each refusal's three sentences render in each locale
 // with sample values (no placeholder left, no English where a translation exists), the names in their values (a stage,
-// a move, a rule) and what a platform couldn't read shown through their own messages, and Hive's For you requests kept
+// a move, a rule) and what a platform couldn't read shown through their own messages, and Combwork's For you requests kept
 // as data beside their English.
 import { afterEach, describe, expect, it } from 'vitest'
 import { fmt, setLanguage, tr } from '../../src/shared/i18n'
@@ -60,7 +60,7 @@ const SAMPLE: RefusalValues = {
   rules: 'submit.checksPassed, approval.given',
   key: 'AM-12',
   earlier: 'AM-11',
-  line: 'hive/b1',
+  line: 'cw/b1',
   alias: '#1061',
   what: workflowText(UNREADABLE.head, { where: 'D:\\work\\am' }),
   rule: 'submit.checksPassed',
@@ -103,8 +103,8 @@ describe('the workflow text in every locale', () => {
 
   it("renders a submit.checksPassed refusal recorded before its text took the last run's reason, in every locale (HR1's #1654 round 1)", async () => {
     // A Refused fact's values as they were stored then: no why, files or copy.
-    const before = { card: 'AM-12', check: 'lint', revision: 'a3f2c1d', command: 'hive-progress --check lint --card AM-12' }
-    expect(refusal('submit.checksPassed', before)).toMatchObject({ message: "Review refused: lint hasn't passed on a3f2c1d.", next: 'Run hive-progress --check lint --card AM-12, then submit again.' })
+    const before = { card: 'AM-12', check: 'lint', revision: 'a3f2c1d', command: 'cw-progress --check lint --card AM-12' }
+    expect(refusal('submit.checksPassed', before)).toMatchObject({ message: "Review refused: lint hasn't passed on a3f2c1d.", next: 'Run cw-progress --check lint --card AM-12, then submit again.' })
     for (const code of LOCALES) {
       setLanguage(code, await loadCatalogue(code), code)
       const shown = refusalLines('submit.checksPassed', before, WINDOW)
@@ -112,7 +112,7 @@ describe('the workflow text in every locale', () => {
         expect(line, code).not.toMatch(/[{}]/)
         expect(line, code).toContain('lint')
       }
-      expect(shown.next, code).toContain('hive-progress --check lint --card AM-12')
+      expect(shown.next, code).toContain('cw-progress --check lint --card AM-12')
       // A value it has is kept: the new reason shows.
       expect(refusalLines('submit.checksPassed', { ...before, why: 'changed', files: 'src/a.ts', copy: 'yes' }, WINDOW).message, code).toContain('src/a.ts')
     }
@@ -257,7 +257,7 @@ describe("what a platform couldn't read", () => {
     expect(unreadWhy('revision', { unknown: { revision: 'cannot read repository HEAD' }, unknownText: {} }, format)).toEqual({ note: 'other', why: 'cannot read repository HEAD' })
   })
 
-  it("an id this Hive doesn't know (a newer Hive's record) shows as nothing rather than failing", () => {
+  it("an id this Combwork doesn't know (a newer Combwork's record) shows as nothing rather than failing", () => {
     expect(workflowLine({ id: 'workflow.unreadable.fromTheFuture' }, (m) => tr(m))).toBeNull()
     expect(workflowEnglish({ id: 'workflow.unreadable.fromTheFuture' })).toBe('workflow.unreadable.fromTheFuture')
   })

@@ -18,10 +18,10 @@ export const CARD_ATTACHMENTS_DIR = 'cards'
 /** Whether a folder in a host's attachments folder is a session's (any but the cards' folder). */
 export const isSessionFolder = (name: string): boolean => name.toLowerCase() !== CARD_ATTACHMENTS_DIR
 
-/** The folder's name before #387: Hive moves it to ATTACHMENTS_DIR, and old paths into it still lead to the moved files. */
+/** The folder's name before #387: Combwork moves it to ATTACHMENTS_DIR, and old paths into it still lead to the moved files. */
 export const OLD_ATTACHMENTS_DIR = 'images'
 
-/** Above this size Hive asks before attaching a file: a CLI may refuse it, or reading it may fill the agent's context. */
+/** Above this size Combwork asks before attaching a file: a CLI may refuse it, or reading it may fill the agent's context. */
 export const LARGE_ATTACHMENT_BYTES = 20 * 1024 * 1024
 
 export const IMAGE_FILE = /\.(png|jpe?g|gif|webp|bmp)$/i

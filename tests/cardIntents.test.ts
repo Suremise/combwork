@@ -12,7 +12,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-intents-')
+const base = tempDir('cw-intents-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -40,7 +40,7 @@ const toolReplies = await import('../src/shared/toolReplies')
 const { checksView, intentText } = toolReplies
 const { armIntentWatch } = await import('../src/main/intentWatch')
 const watches = await import('../src/main/watches')
-const { AGENT_ONLY_TOOLS, ASSISTANT_ONLY_TOOLS, HIVE_TOOLS, INTENT_TOOLS, assistantTools } = await import('../src/shared/assistantTools')
+const { AGENT_ONLY_TOOLS, ASSISTANT_ONLY_TOOLS, CW_TOOLS, INTENT_TOOLS, assistantTools } = await import('../src/shared/assistantTools')
 
 advanced.load(join(base, 'profile'))
 type WS = ReturnType<typeof createWorkspaceService>
@@ -352,7 +352,7 @@ describe('a card by intent (#1267)', () => {
     const { runCheck } = await import('../src/main/workflow/checks')
     const { sessions } = await import('../src/main/sessions')
     const deliveries = await import('../src/main/deliveries')
-    // Both agents watching and ready for a wake; each wake Hive makes is recorded.
+    // Both agents watching and ready for a wake; each wake Combwork makes is recorded.
     const liveFor = sessions.liveFor
     Object.assign(sessions, { liveFor: (p: string, id: string) => (id === 'a1' || id === 'a2' ? ({ projectPath: repo, agentId: id, status: 'watching', runId: `r-${id}` } as never) : liveFor.call(sessions, p, id)) })
     const made = vi.spyOn(deliveries, 'createDelivery')
@@ -474,7 +474,7 @@ describe('a card by intent (#1267)', () => {
     expect(watches.watchFor(repo, 'a1')).toBeNull()
   })
 
-  it("a lane's builder starting its lane's card itself is told what Hive's start would have: card-loop and the brief (HI-2092)", async () => {
+  it("a lane's builder starting its lane's card itself is told what Combwork's start would have: card-loop and the brief (HI-2092)", async () => {
     const { w } = await workspace()
     const [card, loose, others] = [await create(w), await create(w), await create(w)]
     await lanes.startLane(w, { project: 'p', builder: 'a1', reviewer: 'a2', cards: [card], by: 'Assistant', brief: 'Run the lanestages suite only.' })
@@ -583,7 +583,7 @@ describe('a card by intent (#1267)', () => {
     }
   })
 
-  it('a posted design keeps its name and deadline when Hive opens the workspace again (#1382, finding 1: restart)', async () => {
+  it('a posted design keeps its name and deadline when Combwork opens the workspace again (#1382, finding 1: restart)', async () => {
     const { w } = await workspace()
     const card = await inLane(w)
     const posted = await act(w, card, builder, design('Plan'))
@@ -631,7 +631,7 @@ describe('a card by intent (#1267)', () => {
   /** How long a condition here may take before the test has hung (a template's load under load takes seconds), never a wait. */
   const HUNG = { timeout: 15_000 }
   const agentIds = (w: WS) => inWorkspace(w, async () => (await w.projectConfig(join(w.path!, 'p'))).agents.map((a) => a.id))
-  /** The ways a2 leaves the project: Hive's removal, a template's load replacing every agent, a change of project.json. */
+  /** The ways a2 leaves the project: Combwork's removal, a template's load replacing every agent, a change of project.json. */
   const leaving: [string, (w: WS, p: string) => Promise<unknown>][] = [
     ['removeAgent', (w, p) => inWorkspace(w, () => projectAgents.removeAgent(p, 'a2', { deleteWorktree: false }))],
     [
@@ -731,7 +731,7 @@ describe('a card by intent (#1267)', () => {
     expect(await refused(act(w, card, builder, design('Plan v2')))).toBe('loop.noReviewer')
   })
 
-  it("Hive's removal of a lane's reviewer abandons its lane: the card's last reviewer is its reviewer again (#1382)", async () => {
+  it("Combwork's removal of a lane's reviewer abandons its lane: the card's last reviewer is its reviewer again (#1382)", async () => {
     const { w, card, p } = await reviewedByA2()
     await lanes.startLane(w, { project: 'p', builder: 'a1', reviewer: 'a3', cards: [card], by: 'Builder (p)' })
     await inWorkspace(w, () => projectAgents.removeAgent(p, 'a3', { deleteWorktree: false }))
@@ -953,7 +953,7 @@ describe("the intents' routes and tools (#1267)", () => {
     expect(intentText({ ok: true, card: '#3', from: '', to: '', warnings: ["b.ts is another agent's"] })).toBe("#3: done.\nWarning: b.ts is another agent's")
     // Start review's files (#1444): each as git's letter and its path, never [object Object].
     expect(intentText({ ok: true, card: '#3', from: 'review', to: 'review', data: { files: [{ path: 'greet.js', status: 'M' }, { path: 'test.js', status: 'A' }] } })).toBe('#3: still review. files: M greet.js, A test.js')
-    // What's next, as the hive tools (#1530).
+    // What's next, as the Combwork tools (#1530).
     expect(intentText({ ok: true, card: 'HI-12', from: 'review', to: 'review', next: { step: 'intents', intents: ['verdict'] } })).toBe('HI-12: still review. Next on it: cw_verdict.')
   })
 
@@ -967,9 +967,9 @@ describe("the intents' routes and tools (#1267)", () => {
     expect(checksView(names, 'AL-1', true)).toEqual({ checks: names, checksHint: hint(true) })
   })
 
-  it('every agent has the intent tools, Codex too (#913: enabled_tools is HIVE_TOOLS); the Assistant at Control agents, never start_card', () => {
+  it('every agent has the intent tools, Codex too (#913: enabled_tools is CW_TOOLS); the Assistant at Control agents, never start_card', () => {
     for (const t of [...INTENT_TOOLS, 'cw_start_card']) {
-      expect(HIVE_TOOLS).toContain(t)
+      expect(CW_TOOLS).toContain(t)
       expect(ASSISTANT_ONLY_TOOLS).not.toContain(t)
     }
     expect(AGENT_ONLY_TOOLS).toContain('cw_start_card')

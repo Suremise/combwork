@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import { join } from 'path'
 import { ASSISTANT_AGENT_ID, ASSISTANT_DIR } from '../shared/assistant'
-import { HIVE_DIR } from '../shared/defaults'
+import { CW_DIR } from '../shared/defaults'
 import { taskbarProgress } from '../shared/progress'
 import type { ProgressRun } from '../shared/types'
 import { config } from './config'
@@ -10,12 +10,12 @@ import { hashText, readJson, removePath, writeTextAtomic } from './fsutil'
 import { createLogger, userText } from './logger'
 import { ProgressStore } from './progress'
 import { sessions } from './sessions'
-import { hiveWindows, windowShowing } from './windows'
+import { combworkWindows, windowShowing } from './windows'
 import { WorkspaceService } from './workspace'
 
 const log = createLogger('progress')
 
-/** Where Recent's runs are kept between starts (#352): a file per workspace in Hive's profile. */
+/** Where Recent's runs are kept between starts (#352): a file per workspace in Combwork's profile. */
 const historyDir = (): string => join(app.getPath('userData'), 'progress-history')
 const historyFile = (workspacePath: string): string => join(historyDir(), `${hashText(workspacePath.toLowerCase())}.json`)
 
@@ -33,7 +33,7 @@ export const progress = new ProgressStore({
     showTaskbar(workspacePath, runs)
   },
   ownerRunning: (run) => {
-    const path = run.source === 'assistant' ? join(run.workspacePath, HIVE_DIR, ASSISTANT_DIR) : run.projectPath
+    const path = run.source === 'assistant' ? join(run.workspacePath, CW_DIR, ASSISTANT_DIR) : run.projectPath
     const agent = run.source === 'assistant' ? ASSISTANT_AGENT_ID : run.agentId
     return !!path && !!agent && sessions.liveFor(path, agent) !== null
   },
@@ -84,7 +84,7 @@ function showTaskbar(workspacePath: string, runs: ProgressRun[]): void {
   else w.setProgressBar(bar.mode === 'indeterminate' ? 1 : Math.max(0.02, bar.value), { mode: bar.mode })
 }
 
-/** Unpackaged test builds can watch the taskbar calls (HIVE_TEST_TASKBAR_LOG), which aren't visible from the page. */
+/** Unpackaged test builds can watch the taskbar calls (CW_TEST_TASKBAR_LOG), which aren't visible from the page. */
 let testHook: ((workspacePath: string, bar: ReturnType<typeof taskbarProgress>) => void) | null = null
 export function setTaskbarTestHook(fn: typeof testHook): void {
   testHook = fn
@@ -113,6 +113,6 @@ export function startProgress(): void {
     generation++
     if (!s.general.progressPanel) progress.clear()
     // The taskbar follows at once either way.
-    for (const e of hiveWindows()) if (e.ws.path) showTaskbar(e.ws.path, progress.list(e.ws.path))
+    for (const e of combworkWindows()) if (e.ws.path) showTaskbar(e.ws.path, progress.list(e.ws.path))
   })
 }

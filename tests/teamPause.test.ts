@@ -1,5 +1,5 @@
 // Pausing the team before an update (HI-2081, SPEC §16.10.9): each running agent told once a pause, the user's pause
-// holding a workspace opened while it lasts, kept for the running Hive only (HI-2156: a start is unpaused and removes
+// holding a workspace opened while it lasts, kept for the running Combwork only (HI-2156: a start is unpaused and removes
 // what earlier builds saved), one answer for status, resume and lane starts; and a paused workspace's running lanes
 // paused, so none is due a start.
 import { existsSync, mkdirSync, writeFileSync } from 'fs'
@@ -35,7 +35,7 @@ const tp = await import('../src/main/teamPause')
 const { refuseWhileTeamPaused } = await import('../src/main/lanes')
 const { scanWorkspace } = await import('../src/main/teamParked')
 
-const base = tempDir('hive-teampause-')
+const base = tempDir('cw-teampause-')
 let n = 0
 /** A workspace with a project of two agents (alpha: B1, R1), as the pause reads it. */
 function workspace(): { path: string; info: () => unknown } {
@@ -103,7 +103,7 @@ describe("a workspace's pause (HI-2081)", () => {
   })
 })
 
-describe('one answer, for this running Hive only (HI-2156)', () => {
+describe('one answer, for this running Combwork only (HI-2156)', () => {
   it('a start with pauses an earlier build saved: unpaused, and their files removed', async () => {
     const dir = profile()
     const w = workspace()

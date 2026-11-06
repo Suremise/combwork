@@ -1,4 +1,4 @@
-// The "Permission mode changed" offer (#1234): Hive offers to switch a running agent when its permission mode setting
+// The "Permission mode changed" offer (#1234): Combwork offers to switch a running agent when its permission mode setting
 // changes, never because it restarted. An agent given a task in a new conversation stops and starts again; a refresh
 // landing while the new launch reads its settings once saw a session with no mode yet and offered to switch it into
 // the mode it was already in.
@@ -8,7 +8,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-// The notices Hive raises, recorded (and still sent).
+// The notices Combwork raises, recorded (and still sent).
 const toasts = vi.hoisted(() => ({ titles: [] as string[] }))
 vi.mock('../src/main/events', async (original) => {
   const real = await original<typeof import('../src/main/events')>()
@@ -21,12 +21,12 @@ vi.mock('../src/main/events', async (original) => {
   }
 })
 
-const base = tempDir('hive-modeoffer-')
+const base = tempDir('cw-modeoffer-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 // A test copy on its CLI test home (tests/cliHomes.ts), as an e2e run is: its agents start with no connection (the
 // seam, HI-1755; connections are on for everyone since HI-1774).
-process.env.HIVE_USER_DATA = join(base, 'profile')
-process.env.HIVE_TEST_CLI_HOME_CONNECTION = '1'
+process.env.CW_USER_DATA = join(base, 'profile')
+process.env.CW_TEST_CLI_HOME_CONNECTION = '1'
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const { sessions } = await import('../src/main/sessions')

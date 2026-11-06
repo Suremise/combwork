@@ -1,21 +1,22 @@
-// A test run's own temp folder (#995, HI-2102), in the test area, %LOCALAPPDATA%\hive-test\tmp (#992), not %TEMP%:
-// Hive's Antivirus scanning setting covers the test area, and what tests make and remove in %TEMP% kept Defender busy.
+// A test run's own temp folder (#995, HI-2102), in the test area, %LOCALAPPDATA%\combwork-test\tmp (#992), not %TEMP%:
+// Combwork's Antivirus scanning setting covers the test area, and what tests make and remove in %TEMP% kept Defender busy.
 // Each run has its own folder there, run-<pid>-<random>, made as it starts and made its temp folder (TEMP, TMP and
 // TMPDIR), which what it starts inherits: the unit run (vitest.config.ts, before the workers start; tests/tempRun.ts
 // removes it once the run has ended) and the e2e and scenario runners (before their suites, removed as they exit), so
-// Vitest's module copies, Playwright's playwright-artifacts-* folders, and the temp files of Hive's code under test, the
-// test copies of Hive, git and the CLIs go there. A run's start removes the folders older than a day that stopped runs
+// Vitest's module copies, Playwright's playwright-artifacts-* folders, and the temp files of Combwork's code under test, the
+// test copies of Combwork, git and the CLIs go there. A run's start removes the folders older than a day that stopped runs
 // left, where the board's evidence rules let them go; npm run test:clean (tests/e2e/clean.mjs) sweeps the rest of tmp.
 // Where LOCALAPPDATA is unset (off Windows), it is in the temp folder. LOCALAPPDATA is read once, as this loads: a test
 // that changes it later doesn't move the folder.
 // The runners' as well as the unit tests' (tests/tempDir.ts gives its exports to the tests), so it is a .mts the
 // runners load as they do tests/progressReport.mts.
 import { mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, statSync } from 'fs'
+import { createRequire } from 'module'
 import { tmpdir } from 'os'
 import { basename, dirname, join } from 'path'
 
-/** The test area's temp folder, hive-test\tmp: the runs' folders are in it. */
-export const tempArea = join(process.env.LOCALAPPDATA || tmpdir(), 'hive-test', 'tmp')
+/** The test area's temp folder, combwork-test\tmp: the runs' folders are in it. */
+export const tempArea = join(process.env.LOCALAPPDATA || tmpdir(), 'combwork-test', 'tmp')
 /** A run's folder older than this whose run has ended was left by a stopped run: the next run's start removes it. */
 const STALE_MS = 24 * 60 * 60_000
 let root: string | undefined
@@ -34,11 +35,13 @@ export type Protects = (path: string) => string | null | undefined
  * process that made it removes it (endRunTemp).
  */
 export function startRunTemp(protects?: Protects): string {
-  if (!process.env.HIVE_TEST_RUN_TMP) {
+  if (!process.env.CW_TEST_RUN_TMP) {
+    // A run refuses while the test area's move (HI-2590) is still to do or unfinished (tests/testArea.cjs).
+    createRequire(import.meta.url)('./testArea.cjs').assertReady()
     mkdirSync(tempArea, { recursive: true })
     if (protects) pruneRunTemps(protects)
-    process.env.HIVE_TEST_RUN_TMP = realpathSync.native(mkdtempSync(join(tempArea, `run-${process.pid}-`)))
-    process.env.HIVE_TEST_RUN_TMP_OWNER = String(process.pid)
+    process.env.CW_TEST_RUN_TMP = realpathSync.native(mkdtempSync(join(tempArea, `run-${process.pid}-`)))
+    process.env.CW_TEST_RUN_TMP_OWNER = String(process.pid)
   }
   const dir = tempRoot()
   process.env.TEMP = process.env.TMP = process.env.TMPDIR = dir
@@ -86,8 +89,8 @@ export function pruneRunTemps(protects: Protects, { now = Date.now(), area = tem
 
 /** Removes this run's folder, if this process made it (tests/tempRun.ts, as the run ends). Replies with why it couldn't. */
 export function endRunTemp(): string | undefined {
-  const dir = process.env.HIVE_TEST_RUN_TMP
-  if (!dir || process.env.HIVE_TEST_RUN_TMP_OWNER !== String(process.pid)) return undefined
+  const dir = process.env.CW_TEST_RUN_TMP
+  if (!dir || process.env.CW_TEST_RUN_TMP_OWNER !== String(process.pid)) return undefined
   // Only ever a run's folder, directly in the test area.
   if (!basename(dir).startsWith('run-') || dirname(dir).toLowerCase() !== realpathSync.native(tempArea).toLowerCase()) return `not a run's folder: ${dir}`
   try {
@@ -98,10 +101,10 @@ export function endRunTemp(): string | undefined {
   }
 }
 
-/** The tests' temp folder by its real, long path, made if it isn't there: the run's own, or hive-test\tmp outside a run. */
+/** The tests' temp folder by its real, long path, made if it isn't there: the run's own, or combwork-test\tmp outside a run. */
 export function tempRoot(): string {
   if (root) return root
-  const dir = process.env.HIVE_TEST_RUN_TMP || tempArea
+  const dir = process.env.CW_TEST_RUN_TMP || tempArea
   mkdirSync(dir, { recursive: true })
   return (root = realpathSync.native(dir))
 }

@@ -52,7 +52,7 @@ const NOTES: { name: string; note: Note; values: string[] }[] = [
   { name: 'fresh, deferred', note: { started: [{ agentId: 'b', name: 'B1', role: 'builder', how: 'fresh' }, { agentId: 'r', name: 'R1', role: 'reviewer', how: 'deferred' }], running: [] } as Note, values: ['B1', 'R1'] },
   { name: 'failed one', note: { started: [{ agentId: 'b', name: 'B1', role: 'builder', how: 'failed', why: 'no CLI' }], running: [] } as Note, values: ['B1', 'no CLI'] },
   { name: 'failed two', note: { started: [{ agentId: 'b', name: 'B1', role: 'builder', how: 'failed' }, { agentId: 'r', name: 'R1', role: 'reviewer', how: 'failed', why: 'x' }], running: [] } as Note, values: ['B1', 'R1', 'x'] },
-  { name: 'by Hive, tell one', note: { started: [], running: ['B1', 'R1'], builder: 'B1', firstCardByHive: true } as Note, values: ['B1', 'R1'] },
+  { name: 'by Combwork, tell one', note: { started: [], running: ['B1', 'R1'], builder: 'B1', firstCardByCombwork: true } as Note, values: ['B1', 'R1'] },
   { name: 'tell two', note: { started: [], running: ['B1', 'R1'], builder: 'B1' } as Note, values: ['B1', 'R1'] },
   { name: 'no slot', note: { started: [], waitingForSlot: 'all 3 lent', running: ['R1'] } as Note, values: ['R1', 'all 3 lent'] }
 ]
@@ -120,7 +120,7 @@ describe('the canary dialect over them (card 5)', () => {
     check('builder failed', await resumeLaneBuilder('C:/ws/alpha', { id: 'lane-1', builder: { id: 'b', name: 'B1' } }), ['B1', 'no CLI'])
     // Said where their code runs, through the launch and the start pass (laneStart.test.ts, laneStarts.test.ts): each
     // a single sentence the descriptor holds whole.
-    const elsewhere = ['brief.start.notGiven', 'brief.start.firstCard', 'brief.start.nextCard', 'brief.record.cleared', 'brief.record.inSlot', 'brief.record.delivered']
+    const elsewhere = ['brief.start.notGiven', 'brief.start.firstCard', 'brief.start.firstWithBrief','brief.start.nextCard', 'brief.record.cleared', 'brief.record.inSlot', 'brief.record.delivered']
     // Stored for any reader: the Default's, whatever the scope (below).
     const stored = ['brief.start.byUser', 'brief.start.fromUser', 'brief.start.retryCancel', 'finish.journal.done', 'finish.cancel.cardDone', 'restart.closed.fact']
     expect(mine.filter((id) => !seen.has(id) && !elsewhere.includes(id) && !stored.includes(id))).toEqual([])

@@ -37,11 +37,11 @@ const picker = (lines: unknown[] | 'fail' | string): string =>
 /** A runner giving each test its result (passed unless named), writing what it was given to `seen`. */
 function runner(results: Record<string, 'passed' | 'failed' | 'skipped' | 'none'> = {}, seen = join(tempDir('focused-seen-'), 'seen.json')): { command: string; seen: string } {
   const body = `const fs = require('fs')
-const ids = JSON.parse(fs.readFileSync(process.env.HIVE_FOCUSED_TESTS, 'utf8'))
+const ids = JSON.parse(fs.readFileSync(process.env.CW_FOCUSED_TESTS, 'utf8'))
 const want = ${JSON.stringify(results)}
-fs.writeFileSync(${JSON.stringify(seen)}, JSON.stringify({ ids, jobs: process.env.HIVE_FOCUSED_JOBS }))
+fs.writeFileSync(${JSON.stringify(seen)}, JSON.stringify({ ids, jobs: process.env.CW_FOCUSED_JOBS }))
 const out = ids.filter((t) => want[t] !== 'none').map((t) => ({ test: t, result: want[t] || 'passed', ...(want[t] === 'skipped' ? { why: 'usage limit' } : {}) }))
-fs.writeFileSync(process.env.HIVE_FOCUSED_RESULTS, JSON.stringify(out))
+fs.writeFileSync(process.env.CW_FOCUSED_RESULTS, JSON.stringify(out))
 process.exit(out.some((r) => r.result === 'failed') || out.length !== ids.length ? 1 : 0)`
   return { command: script(body), seen }
 }
@@ -202,7 +202,7 @@ describe('chosen at submit, in the card folder at exactly the revision', () => {
   it('a picker that writes a tracked file in the folder proves nothing: unknown, refused', async () => {
     const e = team(script("const fs = require('fs'); const t = fs.readFileSync('README.md'); fs.writeFileSync('README.md', 'x'); fs.writeFileSync('README.md', t); process.stdout.write('')"), runner().command)
     const { card } = await built(e)
-    // Refused either way, nothing submitted: the bracket's (unknown, changed) or Hive's own evidence check, which may see it first.
+    // Refused either way, nothing submitted: the bracket's (unknown, changed) or Combwork's own evidence check, which may see it first.
     const r = await e.wf.submit(card.key, B1, { summary: 'x' })
     expect(isRefusal(r) && ['submit.focusedChosen', 'evidence.changed'].includes(r.rule)).toBe(true)
     expect(e.kinds(card.id)).not.toContain('Submitted')
@@ -317,9 +317,9 @@ function fixedRunner(results: (ids: string[]) => unknown, code: number): string 
   const f = join(tempDir('focused-fixed-'), 'results.cjs')
   writeFileSync(f, `module.exports = ${results.toString()}`)
   return script(`const fs = require('fs')
-const ids = JSON.parse(fs.readFileSync(process.env.HIVE_FOCUSED_TESTS, 'utf8'))
+const ids = JSON.parse(fs.readFileSync(process.env.CW_FOCUSED_TESTS, 'utf8'))
 const r = require(${JSON.stringify(f)})(ids)
-fs.writeFileSync(process.env.HIVE_FOCUSED_RESULTS, typeof r === 'string' ? r : JSON.stringify(r))
+fs.writeFileSync(process.env.CW_FOCUSED_RESULTS, typeof r === 'string' ? r : JSON.stringify(r))
 process.exit(${code})`)
 }
 
@@ -348,7 +348,7 @@ describe("HR4's round 1: what the merge takes as proof, decisions and results", 
     const [o] = await queue(e).drain('main')
     expect(o).toMatchObject({ outcome: 'paused', reason: 'focusedSkip' })
     const req = e.wf.state(card).requests.find((r) => r.gate === 'focusedSkip')!
-    for (const who of ['assistant', 'user', 'hive', B1] as const) expect(isRefusal(await e.wf.focusedSkip(card.key, who, req.request, true, 'not theirs')), who).toBe(true)
+    for (const who of ['assistant', 'user', 'combwork', B1] as const) expect(isRefusal(await e.wf.focusedSkip(card.key, who, req.request, true, 'not theirs')), who).toBe(true)
     expect(e.wf.state(card).approvals).toEqual([])
     expect(isRefusal(await e.wf.focusedSkip(card.key, R1, `${card.key}/r999`, true, 'no such request'))).toBe(true)
   })

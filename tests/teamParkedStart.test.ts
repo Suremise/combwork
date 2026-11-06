@@ -9,7 +9,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
 const HUNG_MS = 10000
-const base = tempDir('hive-teamparked-start-')
+const base = tempDir('cw-teamparked-start-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const h = vi.hoisted(() => ({ open: [] as unknown[], installed: 0 }))

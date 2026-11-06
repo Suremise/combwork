@@ -1,6 +1,6 @@
 // Agents finishing together: one chime, and one Windows notification naming them ("3 agents finished": alpha (2),
-// beta (1)); an agent asking for input is told at once, on its own. The test build runs quiet (HIVE_TEST_QUIET) and
-// records each notification it would show to HIVE_TEST_NOTIFY_LOG; the chimes are counted in the page. The agents are the fake
+// beta (1)); an agent asking for input is told at once, on its own. The test build runs quiet (CW_TEST_QUIET) and
+// records each notification it would show to CW_TEST_NOTIFY_LOG; the chimes are counted in the page. The agents are the fake
 // Claude Code. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -40,23 +40,23 @@ const until = async (fn, ms = 10000) => {
 
   const notifyLog = path.join(lib.WORK, 'bursts-notify.log')
   fs.rmSync(notifyLog, { force: true })
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47902), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_QUIET: '1', HIVE_TEST_NOTIFY_LOG: notifyLog })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47902), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_QUIET: '1', CW_TEST_NOTIFY_LOG: notifyLog })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1300, height: 800 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await app.evaluate(({ Notification }) => {
     Notification.isSupported = () => true
   })
-  // The notifications Hive would have shown, since the last clearNotes().
+  // The notifications Combwork would have shown, since the last clearNotes().
   const logged = () => (fs.existsSync(notifyLog) ? fs.readFileSync(notifyLog, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((e) => e.kind === 'notification')
   let notesFrom = 0
   const notes = async () => logged().slice(notesFrom)
   const clearNotes = () => (notesFrom = logged().length)
-  const chimes = () => page.evaluate(() => window.__hiveChimes?.() ?? -1)
+  const chimes = () => page.evaluate(() => window.__cwChimes?.() ?? -1)
 
   const one = await lib.addAgent(inv, alpha, { name: 'One' })
   const two = await lib.addAgent(inv, alpha, { name: 'Two' })
@@ -104,7 +104,7 @@ const until = async (fn, ms = 10000) => {
   fs.writeFileSync(path.join(claudeHome, 'bursts-one-go'), '')
   check('One finishes once released', !!(await until(async () => (await live(alpha, one))?.status === 'finished', 10000)))
 
-  // --- HI-2312: a finish whose agent starts its next turn before the group is told (as Hive's delivery typed at a turn's
+  // --- HI-2312: a finish whose agent starts its next turn before the group is told (as Combwork's delivery typed at a turn's
   // end starts one) isn't told: told then, it arrived as the agent worked again, with the last turn's message. Two
   // finishes and is given more at once; Three finishes a moment later, in the same group, which is told without Two's.
   await until(async () => (await notes()).some((n) => /One finished/.test(n.title)), HUNG_MS) // One's finish, told on its own

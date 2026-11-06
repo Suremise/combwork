@@ -1,5 +1,5 @@
 // For you on the board (#1269, SPEC §16.8.5, §16.11.4): what waits for the user (IPC `tasks:forYou`) and their answers
-// (IPC `tasks:answer`, only the user's), on the real board (a temp hive.db) and temp repositories. The user's review
+// (IPC `tasks:answer`, only the user's), on the real board (a temp combwork.db) and temp repositories. The user's review
 // asked when the card reaches Review, approved through the intent path (the card moves on in the same change); an
 // answer that doesn't fit its request, or to a request answered or retired, refused; a Decide answer's decision
 // recorded on the card (a new generation). At a lane's round limit a failed review given on the board asks the user,
@@ -11,7 +11,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-foryou-')
+const base = tempDir('cw-foryou-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -153,7 +153,7 @@ describe('For you on the board (#1269)', () => {
     expect(req).toMatchObject({ gate: 'okBefore', kind: 'approve', shown: { id: FOR_YOU.okBefore.id } })
     const approved = await answer(w, card, req.request, { outcome: 'approved', reply: 'Go ahead' })
     expect(forYou(w).count).toBe(0)
-    // HI-2286: a note on Hive's own gate is the user's comment only, never a decision.
+    // HI-2286: a note on Combwork's own gate is the user's comment only, never a decision.
     expect(approved.comments.at(-1)).toMatchObject({ by: 'You', text: 'Go ahead' })
     expect(approved.decisions ?? []).toEqual([])
     const told = await deliveredTo(w, 'a1')
@@ -300,7 +300,7 @@ describe('For you on the board (#1269)', () => {
       underWay()
       return real.apply(this, args)
     })
-    // What another connection (another window's Hive) sees of the card once the action has written its kind.
+    // What another connection (another window's Combwork) sees of the card once the action has written its kind.
     let seenOutside: string | null = null
     const written = FactStore.prototype.updateCard
     const kindSpy = vi.spyOn(FactStore.prototype, 'updateCard').mockImplementation(function (this: unknown, ...args: Parameters<typeof written>) {
@@ -584,7 +584,7 @@ describe("an answer that needs someone other than the card's agent (HI-1734)", a
   })
 
   it("HI-1449: a question with no actions on a card in Passed that its agent doesn't merge, answered with a reply: the Assistant is told its agent can't move it on", async () => {
-    const { w, wt } = await workspace({ ...REVIEWED, finish: 'hiveMerges', target: 'main', folder: 'slots' })
+    const { w, wt } = await workspace({ ...REVIEWED, finish: 'combworkMerges', target: 'main', folder: 'slots' })
     const card = await create(w)
     await update(w, card, { column: 'doing', agent: 'a1' })
     commitIn(wt, 'checks.txt')

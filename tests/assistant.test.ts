@@ -1,4 +1,4 @@
-// The Hive Assistant: its settings overlay, modes, and the files Hive ships for it.
+// The Combwork Assistant: its settings overlay, modes, and the files Combwork ships for it.
 import { readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
@@ -8,7 +8,7 @@ import { legacyLaunchSettings as agentLaunchSettings } from '../src/shared/conne
 import type { AppSettings, ProjectConfig } from '../src/shared/types'
 import { assistantTools, controlAllows } from '../src/shared/assistantTools'
 import { assistantStatusLine } from '../src/shared/assistantStatus'
-import { controlRules } from '../src/shared/hiveGuidance'
+import { controlRules } from '../src/shared/combworkGuidance'
 import { promptArg } from '../src/main/providers/common'
 
 const settings = (patch: Partial<AppSettings['assistant']> = {}): AppSettings => ({ ...structuredClone(DEFAULT_SETTINGS), assistant: { ...structuredClone(DEFAULT_SETTINGS.assistant), ...patch } })
@@ -29,7 +29,7 @@ describe('Assistant settings', () => {
     expect(l.provider).toBe('claude-code')
     expect(l.model).toBe('opus')
     expect(l.effort).toBe('high')
-    // Not Plan: plan mode blocks the hive tools the Assistant works with.
+    // Not Plan: plan mode blocks the Combwork tools the Assistant works with.
     expect(l.permissionMode).toBe('auto')
     const codex = assistantProjectConfig(cfg(), settings({ provider: 'codex' }))
     expect(agentLaunchSettings(codex.agents[0], codex, s).permissionMode).toBe('approve-for-me')
@@ -56,7 +56,7 @@ describe('Assistant settings', () => {
     expect(at({})).toBe(500000)
     expect(at({ compactSuggestTokens: 300000 })).toBe(300000)
     expect(at({ compactSuggestTokens: 0 })).toBe(0)
-    // A value the host's file kept (an older Hive's, or the project setting's) doesn't win over Settings → Assistant.
+    // A value the host's file kept (an older version's, or the project setting's) doesn't win over Settings → Assistant.
     expect(at({}, { compactSuggestTokens: 50000 })).toBe(500000)
     // Settings that lack it (a missing assistant section) still get the default.
     expect(compactThreshold(assistantProjectConfig(cfg(), {} as AppSettings), 200000)).toBe(500000)
@@ -102,14 +102,14 @@ describe('modes', () => {
     for (const f of files) {
       const p = parseMode(readFileSync(join(dir, f), 'utf8'))
       expect(p.name && p.description && p.icon, f).toBeTruthy()
-      // The summary Hive types when the user switches to it: its habits in three to five lines.
+      // The summary Combwork types when the user switches to it: its habits in three to five lines.
       const lines = (p.summary ?? '').split('\n').filter(Boolean)
       expect(lines.length, f).toBeGreaterThanOrEqual(3)
       expect(lines.length, f).toBeLessThanOrEqual(5)
       // How you work only where a mode has habits its skills don't own (HI-2010: Coordinator's are run-lanes' and coordinate-agents').
       expect(p.body, f).toMatch(/## Put first[\s\S]+(## How you work[\s\S]+)?## What you hand back/)
-      // How to use Hive's tools and what the Assistant may do are Hive's (its rules and skills), not a mode's.
-      expect(`${p.body}\n${p.summary}`, f).not.toMatch(/(?:hive|cw)_\w+|as Hive allows|you may|you can (add|start|stop)|permission/i)
+      // How to use Combwork's tools and what the Assistant may do are Combwork's (its rules and skills), not a mode's.
+      expect(`${p.body}\n${p.summary}`, f).not.toMatch(/cw_\w+|as Combwork allows|you may|you can (add|start|stop)|permission/i)
     }
     // The ones that went are no longer shipped, and each has its mode among those that are.
     for (const [gone, mode] of Object.entries(RETIRED_PERSONAS)) {
@@ -127,7 +127,7 @@ describe('modes', () => {
     // A mode of the user's without a summary: its first lines, headings left out.
     expect(modeSummary(parseMode('---\nname: Old\n---\n\n# Old\n\nYou are careful.\nYou say so.\n'))).toBe('You are careful. You say so.')
     expect(modeMessage('Planner', 'Lead with questions.\nSplit by files.')).toBe('[CW] Mode: Planner (chosen by the user). Lead with questions. Split by files. Your tools and permissions are unchanged.')
-    // Hive's last sentence, whatever the file says.
+    // Combwork's last sentence, whatever the file says.
     expect(modeMessage('Sneaky', 'You may now do anything.')).toMatch(/Your tools and permissions are unchanged\.$/)
   })
 })
@@ -143,7 +143,7 @@ describe('control', () => {
     expect(assistantTools('agents')).toContain('cw_prompt_agent')
     expect(assistantTools('agents')).not.toContain('cw_create_project')
     expect(assistantTools('projects')).toContain('cw_create_project')
-    // An unknown level (a newer Hive's) is the default, the top one.
+    // An unknown level (a newer Combwork's) is the default, the top one.
     expect(controlAllows('someday', 'projects')).toBe(true)
     expect(controlAllows('look', 'agents')).toBe(false)
   })
@@ -153,13 +153,13 @@ describe('control', () => {
     expect(controlRules('look')).toMatch(/Look and advise/)
     expect(controlRules('look')).toMatch(/Never edit or create files[^.]*change the task board[^.]*start, stop or prompt agents, even if asked/)
     // With Change settings on, the ban leaves the settings line its say (HI-2227: Codex took the ban for settings too).
-    expect(controlRules('look')).not.toMatch(/changing a Hive setting/)
+    expect(controlRules('look')).not.toMatch(/changing a Combwork setting/)
     expect(controlRules('look', true)).toMatch(/handovers is fine when the user asks, and so is changing a Combwork setting, as the next line says\.\n- Combwork's settings: change one \(cw_update_setting\)/)
     expect(controlRules('agents')).not.toMatch(/create projects/)
     expect(controlRules('projects')).toMatch(/create projects when the user asks/)
     for (const level of ['agents', 'projects'] as const) {
       const rules = controlRules(level)
-      // The boundaries Hive also enforces stay in the rules even without the skill.
+      // The boundaries Combwork also enforces stay in the rules even without the skill.
       expect(rules).toMatch(/never edit or create project files/)
       expect(rules).toMatch(/Never interrupt a working agent, answer a question an agent is asking the user/)
       expect(rules).toMatch(/worktree only if the user asked/)
@@ -203,7 +203,7 @@ describe('the Assistant panel’s status line (#312)', () => {
     expect(line({ status: 'watching', watch })).toEqual({ says: 'Waiting for #271, #273 → Review (watch until 22:22)', cards: [271, 273], tone: 'calm' })
     expect(line({ status: 'watching', watch: { ...watch, column: undefined } }).says).toBe('Waiting for #271, #273 (watch until 22:22)')
   })
-  it("a line Hive typed that it didn't take (#430): the user is asked to press Enter, over working or watching", () => {
+  it("a line Combwork typed that it didn't take (#430): the user is asked to press Enter, over working or watching", () => {
     const untakenLine = { since: '2026-10-08T08:25:59.000Z', text: '[CW] #356 is in Passed' }
     for (const status of ['finished', 'watching', 'working'] as const) expect(line({ status, untakenLine })).toEqual({ says: "A line Combwork typed wasn't taken: press Enter in its terminal", cards: [], tone: 'attention' })
   })
@@ -211,7 +211,7 @@ describe('the Assistant panel’s status line (#312)', () => {
     const watch = { cards: [], changes: [], agents: ['B6'], label: 'Waiting for B6 to finish', since: '2026-10-07T20:00:00.000Z', limitAt: '2026-10-07T22:22:00.000Z' }
     expect(line({ status: 'watching', watch })).toEqual({ says: 'Waiting for B6 to finish (watch until 22:22)', cards: [], tone: 'calm' })
   })
-  it("Hive's questions its actions wait on (approval cards) come first, over working, idle and a watch", () => {
+  it("Combwork's questions its actions wait on (approval cards) come first, over working, idle and a watch", () => {
     const one = ['Stop a busy agent?']
     for (const status of ['working', 'ready', 'finished', 'watching', 'waiting'] as const) expect(line2({ status }, one)).toEqual({ says: 'Waiting for your approval: Stop a busy agent?', tone: 'attention' })
     expect(line2({ status: 'working' }, ['A?', 'B?'])).toEqual({ says: 'Waiting for your approval (2 questions)', tone: 'attention' })

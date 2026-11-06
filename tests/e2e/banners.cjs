@@ -1,10 +1,10 @@
-// Pop-ups (#157, HI-2320: one pop-up system): while a Hive window is focused, an agent finishing or waiting is a pop-up
+// Pop-ups (#157, HI-2320: one pop-up system): while a Combwork window is focused, an agent finishing or waiting is a pop-up
 // in it, kept in its bell, not a Windows notification; a finished one closes after its seconds (kept while hovered or
 // focused), a waiting one stays until the agent moves on; clicking one shows its agent; × and Escape dismiss; the
 // position setting places them (bottom right by default); Show pop-ups about agents for This project and None (only in
-// the bell); with Hive in the background, a Windows notification and a quiet bell row, never a pop-up; and a profile from
+// the bell); with Combwork in the background, a Windows notification and a quiet bell row, never a pop-up; and a profile from
 // before (config 5) gets the 1.0 settings. The test copy runs quiet and records the
-// Windows notifications it would show (HIVE_TEST_NOTIFY_LOG); the window's focus is stubbed (Windows won't give a
+// Windows notifications it would show (CW_TEST_NOTIFY_LOG); the window's focus is stubbed (Windows won't give a
 // background app the focus). Fake Claude Code; throwaway profile and workspace.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -31,7 +31,7 @@ const check = (name, ok, extra = '') => {
   fs.rmSync(notifyLog, { force: true })
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase(), beta.toLowerCase()]))
   lib.enableProviders(userData)
-  // A profile from 0.3.x, with "Only when Hive is in the background" off.
+  // A profile from 0.3.x, with its notifications for the background only off.
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.version = 5
@@ -40,16 +40,16 @@ const check = (name, ok, extra = '') => {
   cfg.settings.notifications = { onlyWhenUnfocused: false, chimeEnabled: false, desktopNotifications: true, notifyOnFinished: true, notifyOnWaiting: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47927), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_QUIET: '1', HIVE_TEST_NOTIFY_LOG: notifyLog })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47927), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_QUIET: '1', CW_TEST_NOTIFY_LOG: notifyLog })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1300, height: 800 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
 
   const n0 = (await inv('settings:get')).notifications
-  check('a profile from before gets the one notification system: no While Hive is focused, pop-ups bottom right', !('whileFocused' in n0) && !('onlyWhenUnfocused' in n0) && n0.bannerPosition === 'bottom-right' && n0.bannerScope === 'all' && n0.bannerSeconds === 6 && n0.waitingBannerStays === true, JSON.stringify(n0))
+  check('a profile from before gets the one notification system: no While Combwork is focused, pop-ups bottom right', !('whileFocused' in n0) && !('onlyWhenUnfocused' in n0) && n0.bannerPosition === 'bottom-right' && n0.bannerScope === 'all' && n0.bannerSeconds === 6 && n0.waitingBannerStays === true, JSON.stringify(n0))
   // Shorter banners, so the suite doesn't wait 6 s for each.
   await inv('settings:update', { notifications: { bannerSeconds: 2 } })
 
@@ -66,7 +66,7 @@ const check = (name, ok, extra = '') => {
   }
   const turnEnds = (p, a) => lib.until(async () => (await live(p, a))?.status === 'finished', 20000)
 
-  // The window's focus, as the test says (and the events Hive listens for).
+  // The window's focus, as the test says (and the events Combwork listens for).
   const setFocus = (on) =>
     app.evaluate(({ BrowserWindow }, f) => {
       const w = BrowserWindow.getAllWindows()[0]
@@ -75,7 +75,7 @@ const check = (name, ok, extra = '') => {
     }, on)
   const osNotes = () => (fs.existsSync(notifyLog) ? fs.readFileSync(notifyLog, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((e) => e.kind === 'notification')
   const banners = () => page.locator('.popups .popup:not(.kind-tip)')
-  const bellTitles = () => page.evaluate(() => window.__hiveBell?.().map((t) => `${t.quiet ? 'quiet:' : ''}${t.title}`) ?? null)
+  const bellTitles = () => page.evaluate(() => window.__cwBell?.().map((t) => `${t.quiet ? 'quiet:' : ''}${t.title}`) ?? null)
   const bannerTitles = () => banners().allInnerTexts()
   const showProject = async (name) => {
     await page.locator('.project-row', { hasText: name }).first().click()
@@ -167,13 +167,13 @@ const check = (name, ok, extra = '') => {
   check('…that stays while it waits', (await page.locator('.popups .popup.kind-needsYou').count()) === 1)
   await turnEnds(alpha, one)
   check('…and closes once it is no longer waiting', !!(await lib.until(async () => (await page.locator('.popups .popup.kind-needsYou').count()) === 0, 8000)))
-  check('…its bell row says Answered', !!(await lib.until(() => page.evaluate(() => window.__hiveBell?.().some((t) => t.kind === 'needsYou' && t.resolved === 'Answered')), 5000)))
+  check('…its bell row says Answered', !!(await lib.until(() => page.evaluate(() => window.__cwBell?.().some((t) => t.kind === 'needsYou' && t.resolved === 'Answered')), 5000)))
   check('no Windows notification for any of them', osNotes().length === 0, JSON.stringify(osNotes()))
   await lib.until(async () => (await banners().count()) === 0, 6000)
 
   // --- More than fit: five waiting for you are all kept ("+1 more" shows the fifth), and finished ones never push
   // a waiting one out. Sent to the window as main sends them.
-  const sendEvent = (e) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), e)
+  const sendEvent = (e) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), e)
   const entry = (id, kind, title, message) => ({ type: 'toast', toast: { id, kind, level: kind === 'finished' ? 'success' : 'info', title, message, target: { kind: 'project', projectPath: alpha, project: 'alpha' }, timestamp: new Date().toISOString() } })
   const waitingNotice = (i) => entry(`w${i}`, 'needsYou', `Waiting ${i}`, 'Allow Bash?')
   const resolved = (ids) => sendEvent({ type: 'toast-resolved', ids, outcome: 'Answered' })
@@ -254,7 +254,7 @@ const check = (name, ok, extra = '') => {
   await lib.sleep(4500) // A fixed wait on purpose: the finish group (3 s), to show nothing pops up.
   check('None (only in the bell): no pop-up, no Windows notification while focused', (await banners().count()) === 0 && osNotes().length === before)
 
-  // --- Hive in the background: a Windows notification and a quiet bell row, never a pop-up, whatever the scope.
+  // --- Combwork in the background: a Windows notification and a quiet bell row, never a pop-up, whatever the scope.
   await setFocus(false)
   await send(alpha, one, 'go work 1')
   await turnEnds(alpha, one)

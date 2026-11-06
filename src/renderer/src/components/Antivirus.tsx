@@ -10,8 +10,8 @@ import { Icon, LoadFailed } from './ui'
 import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
 
 /**
- * Antivirus scanning of the workspace (#316; main/antivirus.ts): whether Microsoft Defender scans the folders Hive's work
- * goes through, the exclusions Hive can add (with consent, one UAC prompt) and remove, and Dev Drive. Settings →
+ * Antivirus scanning of the workspace (#316; main/antivirus.ts): whether Microsoft Defender scans the folders Combwork's work
+ * goes through, the exclusions Combwork can add (with consent, one UAC prompt) and remove, and Dev Drive. Settings →
  * Workspace shows it in full; Performance says when scanning likely slows the workspace; the window suggests it once
  * when it matters. Answers for a workspace the window no longer shows are dropped.
  */
@@ -21,7 +21,7 @@ export const AV_STATE: Record<AvPath['state'], { label: Msg; tone: string; tip: 
   excluded: { label: msg({ id: 'workspace.antivirus.stateExcluded', defaultMessage: 'Excluded', description: "A folder's scanning in Settings → Workspace's antivirus table: Defender skips it." }), tone: 'good-text', tip: msg({ id: 'workspace.antivirus.stateExcludedTip', defaultMessage: 'Defender doesn’t scan it.', description: 'Tooltip on Excluded.' }) },
   'not-excluded': { label: msg({ id: 'workspace.antivirus.stateScanned', defaultMessage: 'Scanned', description: "A folder's scanning: Defender scans it." }), tone: 'warn-text', tip: msg({ id: 'workspace.antivirus.stateScannedTip', defaultMessage: 'Defender scans every file Combwork’s work creates or opens here.', description: 'Tooltip on Scanned.' }) },
   unknown: { label: msg({ id: 'workspace.antivirus.stateUnknown', defaultMessage: 'Unknown', description: "A folder's scanning: Defender hides its exclusions without administrator rights." }), tone: 'faint', tip: msg({ id: 'workspace.antivirus.stateUnknownTip', defaultMessage: 'Defender shows its exclusions only to administrators: Check with administrator rights to see them.', description: 'Tooltip on Unknown. Check with administrator rights is a button below.' }) },
-  added: { label: msg({ id: 'workspace.antivirus.stateAdded', defaultMessage: 'Added by Combwork', description: "A folder's scanning: Hive added its exclusion (not confirmed)." }), tone: 'good-text', tip: msg({ id: 'workspace.antivirus.stateAddedTip', defaultMessage: 'Combwork added this exclusion; Defender hides its list without administrator rights, so it isn’t confirmed.', description: 'Tooltip on Added by Hive.' }) }
+  added: { label: msg({ id: 'workspace.antivirus.stateAdded', defaultMessage: 'Added by Combwork', description: "A folder's scanning: Combwork added its exclusion (not confirmed)." }), tone: 'good-text', tip: msg({ id: 'workspace.antivirus.stateAddedTip', defaultMessage: 'Combwork added this exclusion; Defender hides its list without administrator rights, so it isn’t confirmed.', description: 'Tooltip on Added by Combwork.' }) }
 }
 
 const DEV_DRIVE: Record<AvDevDrive, { label: Msg; tip: Msg }> = {
@@ -44,17 +44,17 @@ const M = {
   addMessage: msg({ id: 'workspace.antivirus.addMessage', defaultMessage: 'Combwork asks Defender to exclude:', description: 'Confirmation before Add Exclusions; the folders follow.' }),
   addDetail: msg({ id: 'workspace.antivirus.addDetail', defaultMessage: 'Defender won’t scan anything in them, including node_modules and whatever agents download there. Windows asks for administrator rights once. You can remove them again here.', description: 'Confirmation before Add Exclusions. Keep node_modules as it is.' }),
   addConfirm: msg({ id: 'workspace.antivirus.addConfirm', defaultMessage: 'Add Exclusions', description: "Add Exclusions' confirmation: its button." }),
-  removeTitle: msg({ id: 'workspace.antivirus.removeTitle', defaultMessage: 'Remove the exclusions Combwork added?', description: "Confirmation before Remove Hive's Exclusions." }),
-  removeMessage: msg({ id: 'workspace.antivirus.removeMessage', defaultMessage: 'Combwork asks Defender to scan again:', description: "Confirmation before Remove Hive's Exclusions; the folders follow." }),
-  removeDetail: msg({ id: 'workspace.antivirus.removeDetail', defaultMessage: 'Defender scans these folders again. Exclusions Combwork didn’t add stay. Windows asks for administrator rights once.', description: "Confirmation before Remove Hive's Exclusions." }),
-  removeConfirm: msg({ id: 'workspace.antivirus.removeConfirm', defaultMessage: 'Remove Exclusions', description: "Remove Hive's Exclusions' confirmation: its button." }),
+  removeTitle: msg({ id: 'workspace.antivirus.removeTitle', defaultMessage: 'Remove the exclusions Combwork added?', description: "Confirmation before Remove Combwork's Exclusions." }),
+  removeMessage: msg({ id: 'workspace.antivirus.removeMessage', defaultMessage: 'Combwork asks Defender to scan again:', description: "Confirmation before Remove Combwork's Exclusions; the folders follow." }),
+  removeDetail: msg({ id: 'workspace.antivirus.removeDetail', defaultMessage: 'Defender scans these folders again. Exclusions Combwork didn’t add stay. Windows asks for administrator rights once.', description: "Confirmation before Remove Combwork's Exclusions." }),
+  removeConfirm: msg({ id: 'workspace.antivirus.removeConfirm', defaultMessage: 'Remove Exclusions', description: "Remove Combwork's Exclusions' confirmation: its button." }),
   noWorkspace: msg({ id: 'workspace.antivirus.noWorkspace', defaultMessage: 'Open a workspace to check how Defender treats it.', description: "Settings → Workspace's antivirus with no workspace open." }),
   loadTarget: msg({ id: 'workspace.antivirus.loadTarget', defaultMessage: 'the antivirus status', description: 'What could not be loaded: shown in "Could not load {what}: {error}", with Retry.' }),
   checkingDefender: msg({ id: 'workspace.antivirus.checkingDefender', defaultMessage: 'Checking Defender…', description: "Settings → Workspace's antivirus while it checks." }),
   folder: msg({ id: 'workspace.antivirus.folder', defaultMessage: 'Folder', description: "Settings → Workspace's antivirus table: a column." }),
   scanning: msg({ id: 'workspace.antivirus.scanning', defaultMessage: 'Scanning', description: "Settings → Workspace's antivirus table: a column (whether Defender scans the folder)." }),
   devDrive: msg({ id: 'workspace.antivirus.devDrive', defaultMessage: 'Dev Drive', description: "Settings → Workspace's antivirus table: a column (whether the folder is on a Dev Drive). Keep Windows' name for Dev Drive." }),
-  notOffered: msg({ id: 'workspace.antivirus.notOffered', defaultMessage: 'Not offered: {why}.', description: "Under a folder Hive won't offer to exclude; {why} says why (lower case)." }),
+  notOffered: msg({ id: 'workspace.antivirus.notOffered', defaultMessage: 'Not offered: {why}.', description: "Under a folder Combwork won't offer to exclude; {why} says why (lower case)." }),
   live: msg({ id: 'workspace.antivirus.live', defaultMessage: 'As Defender lists its exclusions now.', description: "Settings → Workspace's antivirus: where the table's states come from." }),
   adminCheck: msg({ id: 'workspace.antivirus.adminCheck', defaultMessage: 'As Defender listed its exclusions with administrator rights, {when}.', description: "Settings → Workspace's antivirus: the states come from the last check with administrator rights ({when}: a date and time)." }),
   hidden: msg({ id: 'workspace.antivirus.hidden', defaultMessage: 'Defender shows its exclusions only to administrators, so Combwork can’t see them without asking.', description: "Settings → Workspace's antivirus: why the states are unknown." }),
@@ -63,14 +63,14 @@ const M = {
   checked: msg({ id: 'workspace.antivirus.checkedAt', defaultMessage: 'Checked {when}', description: 'When the antivirus status was checked ({when}: "4 minutes ago").' }),
   checkAgain: msg({ id: 'workspace.antivirus.checkAgain', defaultMessage: 'Check Again', description: "Settings → Workspace's antivirus: a button." }),
   checkAdmin: msg({ id: 'workspace.antivirus.checkAdmin', defaultMessage: 'Check with Administrator Rights…', description: "Settings → Workspace's antivirus: a button (Windows asks for administrator rights)." }),
-  goneTitle: msg({ id: 'workspace.antivirus.goneTitle', defaultMessage: 'Combwork’s exclusions of folders that are gone', description: "Settings → Workspace's antivirus: a heading over a list of exclusions Hive added for folders that no longer exist (moved or deleted)." }),
-  goneHint: msg({ id: 'workspace.antivirus.goneHint', defaultMessage: '{n, plural, one {Combwork excluded this folder, which no longer exists (moved or deleted). Remove Combwork’s Exclusions… takes it away too.} other {Combwork excluded these folders, which no longer exist (moved or deleted). Remove Combwork’s Exclusions… takes them away too.}}', description: "Settings → Workspace's antivirus, under the heading for exclusions of folders that are gone. {n}: how many. Remove Hive’s Exclusions… is the button below: use its name as shown." }),
-  removeHive: msg({ id: 'workspace.antivirus.removeHive', defaultMessage: 'Remove Combwork’s Exclusions…', description: "Settings → Workspace's antivirus: a button." }),
+  goneTitle: msg({ id: 'workspace.antivirus.goneTitle', defaultMessage: 'Combwork’s exclusions of folders that are gone', description: "Settings → Workspace's antivirus: a heading over a list of exclusions Combwork added for folders that no longer exist (moved or deleted)." }),
+  goneHint: msg({ id: 'workspace.antivirus.goneHint', defaultMessage: '{n, plural, one {Combwork excluded this folder, which no longer exists (moved or deleted). Remove Combwork’s Exclusions… takes it away too.} other {Combwork excluded these folders, which no longer exist (moved or deleted). Remove Combwork’s Exclusions… takes them away too.}}', description: "Settings → Workspace's antivirus, under the heading for exclusions of folders that are gone. {n}: how many. Remove Combwork’s Exclusions… is the button below: use its name as shown." }),
+  removeCombwork: msg({ id: 'workspace.antivirus.removeCombwork', defaultMessage: 'Remove Combwork’s Exclusions…', description: "Settings → Workspace's antivirus: a button." }),
   addExclusions: msg({ id: 'workspace.antivirus.addExclusions', defaultMessage: 'Add Exclusions…', description: "Settings → Workspace's antivirus: a button." }),
   aboutDevDrive: msg({ id: 'workspace.antivirus.aboutDevDrive', defaultMessage: 'About Dev Drive', description: "Settings → Workspace's antivirus: opens Microsoft's Dev Drive documentation." }),
   slowLine: msg({ id: 'workspace.antivirus.slowLine', defaultMessage: 'Microsoft Defender scans this workspace’s folders as Combwork’s work changes them, which slows builds, tests and git. <link>Antivirus scanning…</link>', description: "Performance, when Defender likely slows the workspace. <link> opens Settings → Workspace's antivirus." }),
-  whyAgents: msg({ id: 'workspace.antivirus.whyAgents', defaultMessage: 'several agents are running', description: 'Why Hive suggests exclusions now. Lower case: it goes in brackets in the suggestion.' }),
-  whySlow: msg({ id: 'workspace.antivirus.whySlow', defaultMessage: 'a long command just ran', description: 'Why Hive suggests exclusions now. Lower case: it goes in brackets in the suggestion.' }),
+  whyAgents: msg({ id: 'workspace.antivirus.whyAgents', defaultMessage: 'several agents are running', description: 'Why Combwork suggests exclusions now. Lower case: it goes in brackets in the suggestion.' }),
+  whySlow: msg({ id: 'workspace.antivirus.whySlow', defaultMessage: 'a long command just ran', description: 'Why Combwork suggests exclusions now. Lower case: it goes in brackets in the suggestion.' }),
   stillTitle: msg({ id: 'workspace.antivirus.stillTitle', defaultMessage: 'Defender is still scanning this workspace', description: "The suggestion's title, as a reminder." }),
   title: msg({ id: 'workspace.antivirus.title', defaultMessage: 'Defender is scanning this workspace', description: "The suggestion's title." }),
   reminder: msg({ id: 'workspace.antivirus.reminder', defaultMessage: 'A reminder: Microsoft Defender still scans every file Combwork’s work creates or opens ({why}). Excluding the workspace’s folders, or a Dev Drive, can make builds, tests and git much faster. Combwork reminds you at most once a day; Don’t Ask Again stops it for this workspace.', description: 'The suggestion, as a reminder ({why}: why now). Don’t Ask Again is its button.' }),
@@ -182,7 +182,7 @@ export function AntivirusPanel() {
   const defender = status.scan === 'defender'
   const offerable = status.paths.filter((p) => !p.unsafe)
   const toAdd = offerable.filter((p) => p.state !== 'excluded')
-  const hiveAdded = offerable.some((p) => p.addedByHive) || !!status.gone?.length
+  const combworkAdded = offerable.some((p) => p.addedByCombwork) || !!status.gone?.length
   return (
     <div className="antivirus">
       <p className={cx('antivirus-scan', status.slowed && 'warn-text')}>
@@ -265,9 +265,9 @@ export function AntivirusPanel() {
             <Icon name="shield" /> {tr(M.checkAdmin)}
           </button>
         )}
-        {defender && hiveAdded && (
+        {defender && combworkAdded && (
           <button className="btn subtle small" disabled={checking} onClick={() => void change('remove')}>
-            <Icon name="discard" /> {tr(M.removeHive)}
+            <Icon name="discard" /> {tr(M.removeCombwork)}
           </button>
         )}
         {defender && toAdd.length > 0 && (

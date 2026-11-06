@@ -1,6 +1,6 @@
 // The Progress panel in P7 (#1446) on fake Claude Code agents, the Assistant off: alpha with each card in its own folder
 // (the agent merges), the reviewer pool and one slot (Maximum agents: 1), the slots' setup a script:
-// 1. a lane from the window with the pool gets slot-a: its setup runs as "Hive (slot slot-a)", its own entry in the Runs
+// 1. a lane from the window with the pool gets slot-a: its setup runs as "Combwork (slot slot-a)", its own entry in the Runs
 //    tab's Agent filter; the lane's row reads "B1 / pool · slot-a", and its hover names slot-a, ready, and the card's line;
 // 2. the pool's reviewer R1 runs the card's check in its review copy: the run's row reads "AL-1 · <revision> · in copy-1";
 //    its details name the copy and the folder it ran in;
@@ -52,7 +52,7 @@ const lines = (file) => {
   // The identity its commits use, in its git config: G12 reads it from git each time (HI-2266, HI-2283).
   lib.git(alpha, ['config', 'user.name', identity.name])
   lib.git(alpha, ['config', 'user.email', identity.email])
-  // The slots' setup (its run is Hive's), and the check the reviewer runs: each records where it ran.
+  // The slots' setup (its run is Combwork's), and the check the reviewer runs: each records where it ran.
   const setupLog = path.join(tools, 'setup.log')
   const setup = path.join(tools, 'setup.js')
   fs.writeFileSync(setup, `require('fs').appendFileSync(${JSON.stringify(setupLog)}, process.env.CW_SLOT + '\\n')\n`)
@@ -67,7 +67,7 @@ const lines = (file) => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off' } })
+  const h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off' } })
   const { app, page, inv } = h
   // For the Japanese screenshots, taken in a second start of the same profile (tests run in English, #767).
   let laneId = null
@@ -90,8 +90,8 @@ const lines = (file) => {
     const tokenOf = async (id) => {
       const sessionId = await until(async () => (await live(id))?.sessionId, HUNG_MS)
       const launch = await until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
-      const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
-      return hive ? JSON.parse(fs.readFileSync(hive.env.CW_API_TOKEN_FILE, 'utf8')).token : null
+      const server = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
+      return server ? JSON.parse(fs.readFileSync(server.env.CW_API_TOKEN_FILE, 'utf8')).token : null
     }
     const intent = async (token, n, name, body = {}) => {
       const res = await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${encodeURIComponent(`#${n}`)}/${name}`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -104,11 +104,11 @@ const lines = (file) => {
     const c3 = await create('Second lane')
     const key1 = (await card(c1)).key
 
-    // --- 1. A lane with the pool, lent slot-a: its setup is Hive's run, "Hive (slot slot-a)".
+    // --- 1. A lane with the pool, lent slot-a: its setup is Combwork's run, "Combwork (slot slot-a)".
     const first = await inv('lanes:start', alpha, { builder: b1.id, reviewer: null, pool: true, cards: [c1] })
     check('the lane is lent slot-a', first.slot === 'slot-a', JSON.stringify(first))
     const warm = await until(async () => (await inv('progress:snapshot')).runs.find((r) => r.defaultName === 'slot' && r.slot === 'slot-a'), HUNG_MS)
-    check("slot-a's setup is a run of Combwork's for slot-a", !!warm && warm.source === 'hive', JSON.stringify(warm))
+    check("slot-a's setup is a run of Combwork's for slot-a", !!warm && warm.source === 'combwork', JSON.stringify(warm))
     await page.locator('.progress-rail').click().catch(() => undefined)
     const panel = page.locator('.progress-panel')
     await until(async () => (await panel.count()) === 1, HUNG_MS)
@@ -149,7 +149,7 @@ const lines = (file) => {
     check('the pool gives the card to R1', assigned === r1.id, String(assigned))
     const tr1 = await tokenOf(r1.id)
     let started = await intent(tr1, c1, 'start-review')
-    // Under load the copy's setup can outlast start review's first wait: it answers "Waiting for a review copy" and Hive
+    // Under load the copy's setup can outlast start review's first wait: it answers "Waiting for a review copy" and Combwork
     // tells R1 later (HI-1955). Once copy-1 is leased to R1 for the card, starting again answers with its folder.
     if ((started.body?.data?.reviewCopy ?? '').startsWith('Waiting for a review copy')) {
       await until(async () => (await inv('copies:list', alpha)).some((c) => c.name === 'copy-1' && c.state === 'leased' && c.lease?.kind === 'review' && c.lease.card === c1 && c.lease.agent === r1.id && !c.lease.returned), HUNG_MS)
@@ -158,13 +158,13 @@ const lines = (file) => {
     const copy = (started.body?.data?.reviewCopy ?? '').match(/Review in (.+?) at /)?.[1] ?? null
     check('R1 reviews in copy-1', started.status === 200 && !!copy && copy.endsWith('copy-1'), JSON.stringify(started.body))
     await until(async () => ['ready', 'finished'].includes((await live(r1.id))?.status), HUNG_MS)
-    // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
-    await lib.typeLine(inv, lib.ptyKey(alpha, r1.id), home, null, `shell: cd /d "${copy}" && hive-progress --check quick`, { live: () => live(r1.id) })
+    // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
+    await lib.typeLine(inv, lib.ptyKey(alpha, r1.id), home, null, `shell: cd /d "${copy}" && cw-progress --check quick`, { live: () => live(r1.id) })
     const checkRun = await until(async () => (await inv('progress:snapshot')).runs.find((r) => r.check === 'quick' && r.card === c1 && r.copy === 'copy-1' && r.state !== 'running'), HUNG_MS)
     check("the check ran in copy-1, linked to the card and its revision", !!checkRun && checkRun.revision === rev && same(lines(checkLog).at(-1), copy), JSON.stringify({ checkRun, ran: lines(checkLog) }))
     await tab('runs').click()
-    // HI-1710: copy-1's set-up run is R1's (its lease held the copy), never "Hive (copy copy-1)".
-    const copyWarm = (await inv('progress:snapshot')).runs.find((r) => r.source === 'hive' && r.copy === 'copy-1')
+    // HI-1710: copy-1's set-up run is R1's (its lease held the copy), never "Combwork (copy copy-1)".
+    const copyWarm = (await inv('progress:snapshot')).runs.find((r) => r.source === 'combwork' && r.copy === 'copy-1')
     check("copy-1's set-up run is credited to R1, in copy-1", !!copyWarm && copyWarm.agentId === r1.id && copyWarm.agentName === 'R1' && !copyWarm.defaultName, JSON.stringify(copyWarm))
     check('the Runs tab’s Agent filter has "Combwork (slot slot-a)" and R1 once, and no "Combwork (copy …)"', !!(await until(async () => {
         const choices = await agentChoices()
@@ -188,14 +188,14 @@ const lines = (file) => {
     runId = checkRun?.id ?? null
     await shoot('runs', panel)
 
-    // HI-1710: Branches & remotes lists copy-1 as Hive's, in its group, saying R1 reviews the card there; never unused.
+    // HI-1710: Branches & remotes lists copy-1 as Combwork's, in its group, saying R1 reviews the card there; never unused.
     await page.getByText('alpha', { exact: true }).first().click()
     await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
     await page.locator('[role="tab"][data-section="branches"]').click()
-    const copyRow = page.locator('.git-worktree[data-hive="copy"]')
+    const copyRow = page.locator('.git-worktree[data-cw="copy"]')
     const copyLine = `copy-1: R1 reviewing ${key1} at ${rev.slice(0, 7)}`
     check(`Branches & remotes lists copy-1 under "Review copies (Combwork’s)": "${copyLine}"`, !!(await until(async () => (await page.locator('[data-worktrees="copies"]').count()) === 1 && ((await copyRow.textContent().catch(() => '')) ?? '').includes(copyLine), HUNG_MS)), await copyRow.allInnerTexts().catch(() => []))
-    check('…with no button, and not among the worktrees', (await copyRow.locator('button').count()) === 0 && (await page.locator('.git-worktree:not([data-hive])', { hasText: 'copy-1' }).count()) === 0)
+    check('…with no button, and not among the worktrees', (await copyRow.locator('button').count()) === 0 && (await page.locator('.git-worktree:not([data-cw])', { hasText: 'copy-1' }).count()) === 0)
     await shoot('branches-copies', page.locator('.git-branches'))
 
     // --- 3. R1 fails it: the lane's hover names R1's verdict.
@@ -219,7 +219,7 @@ const lines = (file) => {
     const reread = page.locator('[data-action="reload-branches"]')
     await until(async () => !(await reread.locator('.spin, [class*="spin"]').count()), HUNG_MS)
     await reread.click()
-    check('…copy-1, read again, idle in the pool', !!(await until(async () => ((await page.locator('.git-worktree[data-hive="copy"]').textContent().catch(() => '')) ?? '').includes('copy-1: idle in the pool'), HUNG_MS)), await page.locator('.git-worktree[data-hive="copy"]').allInnerTexts().catch(() => []))
+    check('…copy-1, read again, idle in the pool', !!(await until(async () => ((await page.locator('.git-worktree[data-cw="copy"]').textContent().catch(() => '')) ?? '').includes('copy-1: idle in the pool'), HUNG_MS)), await page.locator('.git-worktree[data-cw="copy"]').allInnerTexts().catch(() => []))
     await shoot('branches-idle', page.locator('.git-branches'))
 
     /** Screenshots in both themes (English): `target` (null: the window, its hover made again by `show`). */
@@ -232,13 +232,13 @@ const lines = (file) => {
     await app.close().catch(() => undefined)
   }
 
-  // --- The same in Japanese: the profile started again with HIVE_LANG=ja; the lane's hover and the copy's run.
+  // --- The same in Japanese: the profile started again with CW_LANG=ja; the lane's hover and the copy's run.
   if (laneId && runId && !failed) {
     // B1 was in a running lane as the first start quit, so the quit recorded it to resume (restart.json in the profile)
     // and this start would offer it: that toast, shown or not depending on the reload, covered the lane row (HI-1955).
     // Resuming isn't this pass's subject: it starts with nothing to resume.
     fs.rmSync(path.join(userData, 'restart.json'), { force: true })
-    const ja = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off', HIVE_LANG: 'ja' } })
+    const ja = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off', CW_LANG: 'ja' } })
     try {
       ja.page.on('pageerror', (e) => check('no page errors (ja)', false, e.message))
       await lib.openWorkspace(ja.inv, ja.page, ws)

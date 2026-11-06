@@ -1,4 +1,4 @@
-// The canary dialect over hive-progress's text and its run links' refusals (dialects, HI-2438, card 5; design section 2,
+// The canary dialect over cw-progress's text and its run links' refusals (dialects, HI-2438, card 5; design section 2,
 // check 4): every word the wrapper prints, and every refusal of what a run names, comes through the catalogue.
 import { afterEach, describe, expect, it } from 'vitest'
 import { canaryProblems, canaryTexts } from '../src/shared/agentText/canary'
@@ -19,7 +19,7 @@ afterEach(() => setProcessChain(null))
 
 const seenIn = (texts: string[]): Set<string> => new Set(texts.flatMap((t) => [...t.matchAll(/⟦([^/⟧][^⟧]*)⟧/g)].map((m) => m[1])))
 
-describe('the canary dialect over hive-progress (card 5)', () => {
+describe('the canary dialect over cw-progress (card 5)', () => {
   it("finds every word of the wrapper's text in the catalogue, and each progress id in some line", () => {
     setProcessChain(chain(canaryTexts(catalogue)))
     const out: { text: string; values: string[] }[] = []
@@ -34,7 +34,7 @@ describe('the canary dialect over hive-progress (card 5)', () => {
     add(revisionProblem(process.cwd(), '-x', process.env))
     add(revisionProblem(process.cwd(), 'nosuchref123', process.env), [process.cwd(), 'nosuchref123'])
     add(revisionProblem(process.cwd(), 'HEAD~1', process.env), ['HEAD~1'])
-    const bare = tempDir('hive-progress-canary-')
+    const bare = tempDir('cw-progress-canary-')
     add(revisionProblem(bare, 'HEAD', process.env), [bare, 'HEAD'])
     for (const why of ['notCheck', 'notContained', 'dirty', 'moved', 'changed', 'revisionChanged'])
       for (const changes of [[], ['a.ts', ':reflog', ':edit']]) for (const isolated of [true, false]) add(uncountedLine({ check: { name: 'lint', counted: false, whyNot: why, changes, platform: 'git' } }, isolated), ['lint', 'a.ts'])
@@ -47,9 +47,9 @@ describe('the canary dialect over hive-progress (card 5)', () => {
         add(unansweredLine({ unreachable: true, why: 'failed', detail: 'boom' }, check, 1, 'u', asked), ['lint', 'boom'])
       }
     for (const { text, values } of out) expect(canaryProblems(text, ids, values), text).toEqual([])
-    // The lines runWrapped writes itself (the outside-Hive refusal, the wait, the isolated launcher's, a command not
+    // The lines runWrapped writes itself (the outside-Combwork refusal, the wait, the isolated launcher's, a command not
     // found, a failed run's stored detail) are said in its I/O: the e2e progressreport suite runs them. They are listed.
-    const inRun = ['progress.check.outsideHive', 'progress.check.waiting', 'progress.run.exitCode', 'progress.run.commandNotFound', 'progress.isolated.launcherDidntStart', 'progress.isolated.notRun', 'progress.isolated.notRunStatus', 'progress.isolated.notRunUnreachable']
+    const inRun = ['progress.check.outsideCombwork', 'progress.check.waiting', 'progress.run.exitCode', 'progress.run.commandNotFound', 'progress.isolated.launcherDidntStart', 'progress.isolated.notRun', 'progress.isolated.notRunStatus', 'progress.isolated.notRunUnreachable']
     const seen = seenIn(out.map((o) => o.text))
     expect([...ids].filter((id) => id.startsWith('progress.') && !seen.has(id) && !inRun.includes(id))).toEqual([])
     expect(inRun.filter((id) => !ids.has(id))).toEqual([])

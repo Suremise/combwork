@@ -1,6 +1,6 @@
 // The brief a lane started from the window gives its agents (#1280, SPEC §16.11.3): the cards in order, where the
 // builder works, the reviewer, what the project's options require, how to move cards and report, and the user's note;
-// every hive tool it names is one the hive MCP server has.
+// every Combwork tool it names is one the Combwork MCP server has.
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
@@ -12,7 +12,7 @@ const input = (over: Partial<LaneBriefInput> = {}): LaneBriefInput => ({
     { key: 'AL-1', title: 'Lane data' },
     { key: 'AL-2', title: 'Lane hover' }
   ],
-  builder: { name: 'B1', folder: 'D:\\ws.worktrees\\alpha\\b1', branch: 'hive/b1' },
+  builder: { name: 'B1', folder: 'D:\\ws.worktrees\\alpha\\b1', branch: 'cw/b1' },
   reviewer: { name: 'R1' },
   options: { review: 'agent', preChecks: ['typecheck', 'lint'], finish: 'agentMerges', okBefore: { mode: 'labels', labels: ['ui'] }, target: 'main' },
   rounds: 10,
@@ -41,7 +41,7 @@ describe("a lane's brief (#1280)", () => {
     const b = laneBrief(input(), 'builder')
     expect(b).toContain('use the card-loop skill as the builder, with R1 as the reviewer; rounds: 10.')
     expect(b).toContain('1. AL-1 Lane data\n2. AL-2 Lane hover')
-    expect(b).toContain('B1 works in D:\\ws.worktrees\\alpha\\b1 (branch hive/b1); work goes to main.')
+    expect(b).toContain('B1 works in D:\\ws.worktrees\\alpha\\b1 (branch cw/b1); work goes to main.')
     expect(b).toContain('- A reviewer agent reviews each card before it is merged.')
     expect(b).toContain('- Checks that pass before review: typecheck and lint. Run each as `cw-progress --check <name> --card "<key>"` before submitting.')
     expect(b).toContain('- The builder merges each approved card (merge-ready), then reports it with cw_report_merge; Combwork checks it is in.')
@@ -66,13 +66,13 @@ describe("a lane's brief (#1280)", () => {
 
   it("each option's line", () => {
     const o = input().options!
-    expect(laneRules({ ...o, review: 'none', preChecks: [], finish: 'hiveMerges', okBefore: { mode: 'never', labels: [] } })).toEqual(['No review is needed.', 'Combwork merges each approved card.'])
+    expect(laneRules({ ...o, review: 'none', preChecks: [], finish: 'combworkMerges', okBefore: { mode: 'never', labels: [] } })).toEqual(['No review is needed.', 'Combwork merges each approved card.'])
     expect(laneRules({ ...o, review: 'agentThenYou', preChecks: ['unit'], finish: 'committed', okBefore: { mode: 'every', labels: [] } })).toEqual(['A reviewer agent reviews each card, then the user does, before it is merged.', 'Checks that pass before review: unit. Run each as `cw-progress --check <name> --card "<key>"` before submitting.', 'A card is done once its work is committed.', "Every card waits for the user's OK before it is merged (Combwork asks them)."])
     expect(laneRules({ ...o, review: 'you', finish: 'accept', preChecks: [], okBefore: { mode: 'labels', labels: [] } })).toEqual(['The user reviews each card before it is merged.', 'An approved card is accepted where it is (no merge).'])
   })
 
-  it('every hive tool it names is one the hive MCP server has', () => {
-    const server = readFileSync(join(__dirname, '..', 'src', 'main', 'mcp', 'hive-mcp.ts'), 'utf8')
+  it('every Combwork tool it names is one the Combwork MCP server has', () => {
+    const server = readFileSync(join(__dirname, '..', 'src', 'main', 'mcp', 'cw-mcp.ts'), 'utf8')
     const text = ['builder', 'reviewer'].map((r) => laneBrief(input(), r as 'builder' | 'reviewer')).join('\n') + laneRules(null).join('\n')
     const named = [...new Set(text.match(/cw_[a-z_]+/g))]
     expect(named.length).toBeGreaterThan(5)

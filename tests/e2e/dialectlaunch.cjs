@@ -1,12 +1,12 @@
 // Dialects wired into sessions (HI-2443; plans/2026-11-03-dialects-design.md, sections 3 and 7, card 6b): each session's
 // chain is pinned at its launch, so an edit applies at its next launch and shows "restart to apply" meanwhile; an
 // agent's Dialect setting picks the file in its model slot (a test copy here, which Auto never picks); the launch record
-// shows the chain; hive-mcp.js gets the chain's texts through CW_DIALECT_FILE; the Agent API speaks each caller's
+// shows the chain; cw-mcp.js gets the chain's texts through CW_DIALECT_FILE; the Agent API speaks each caller's
 // chain (an agent's pinned one, the API chain for the workspace token, which follows the files), and with two windows
 // the workspace the request names, never the focused window's (HR1 on HI-2443); a launch with no dialect and a model
-// Hive can't name says "model unknown", and one it can name records nothing new. Runs the fake Claude Code (with no
+// Combwork can't name says "model unknown", and one it can name records nothing new. Runs the fake Claude Code (with no
 // model catalogue, FAKE_CLAUDE_MODELS=fail, so the CLI's default model is unknown) and the fake Codex (whose session
-// contract Hive says itself, as developer_instructions). Dev build, throwaway profile, workspaces, CLAUDE_CONFIG_DIR
+// contract Combwork says itself, as developer_instructions). Dev build, throwaway profile, workspaces, CLAUDE_CONFIG_DIR
 // and CODEX_HOME.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -39,7 +39,7 @@ const writeWorkspace = (hostMark, routeMark) => fs.writeFileSync(path.join(diale
 const TEST_COPY = 'claude-code/Mark v2.json'
 const writeTestCopy = (hostMark, routeMark) => fs.writeFileSync(path.join(dialects, ...TEST_COPY.split('/')), dialectFile('Mark v2', { 'contract.agent.host': host(hostMark), 'api.http.noRoute': noRoute(routeMark) }))
 
-/** The hive server of a launch's MCP config, started as its CLI would start it, asked to initialize: its result. */
+/** The Combwork MCP server of a launch's MCP config, started as its CLI would start it, asked to initialize: its result. */
 function initialize(def) {
   return new Promise((resolve) => {
     const p = spawn(def.command, def.args ?? [], { env: lib.childEnv(def.env ?? {}), windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'] })
@@ -78,7 +78,7 @@ function initialize(def) {
   lib.gitProject(proj)
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([proj.toLowerCase(), ws.toLowerCase()]))
   // The workspace's own dialect (every session's, and the API chain's), and a test copy for Claude Code beside the
-  // empty files Hive ships (synced in as the workspace opens).
+  // empty files Combwork ships (synced in as the workspace opens).
   fs.mkdirSync(path.join(dialects, 'claude-code'), { recursive: true })
   writeWorkspace('WS-HOST-1', 'WS-ROUTE-1')
   writeTestCopy('MODEL-HOST-1', 'MODEL-ROUTE-1')
@@ -92,13 +92,13 @@ function initialize(def) {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: PORT, CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, FAKE_CLAUDE_MODELS: 'fail' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: PORT, CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, FAKE_CLAUDE_MODELS: 'fail' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   const until = async (fn, ms = HUNG_MS) => {
     const t = Date.now()
     let v
@@ -129,10 +129,10 @@ function initialize(def) {
     }
   }, HUNG_MS)
   // What the API says: a route it doesn't have (api.http.noRoute), or with `body` a POST of a body that isn't JSON
-  // (api.http.bodyJson, refused before its route runs); `at` names the workspace by query, `header` by X-Hive-Workspace.
+  // (api.http.bodyJson, refused before its route runs); `at` names the workspace by query, `header` by X-Combwork-Workspace.
   const said = async (token, { at, header, body } = {}) => {
     const url = `http://127.0.0.1:${PORT}${body !== undefined ? '/v1/tasks' : '/v1/no-such-route'}${at ? `?workspace=${encodeURIComponent(at)}` : ''}`
-    const r = await fetch(url, { method: body !== undefined ? 'POST' : 'GET', headers: { Authorization: `Bearer ${token}`, ...(header ? { 'X-Hive-Workspace': encodeURIComponent(header) } : {}) }, ...(body !== undefined ? { body } : {}) })
+    const r = await fetch(url, { method: body !== undefined ? 'POST' : 'GET', headers: { Authorization: `Bearer ${token}`, ...(header ? { 'X-Combwork-Workspace': encodeURIComponent(header) } : {}) }, ...(body !== undefined ? { body } : {}) })
     return (await r.json().catch(() => ({}))).error ?? `(status ${r.status})`
   }
   const noRouteSaid = (token) => said(token)
@@ -164,14 +164,14 @@ function initialize(def) {
   check("Cody's (Auto) has no model file, the test copy never picked: its CLI's file and the Workspace file", !codyRecord?.pick && codyRecord?.layers?.[0]?.file === null && codyRecord?.layers?.[2]?.file === 'workspace.json' && /^[0-9a-f]{16}$/.test(codyRecord?.hash ?? ''), JSON.stringify(codyRecord))
   check('…and says why when it can\'t name the model ("model unknown"), else the real model ID it matched by', codyRecord?.modelUnknown === true || typeof codyRecord?.model === 'string', JSON.stringify(codyRecord))
 
-  // hive-mcp.js (Claude Code's contract comes from its instructions) and hive-progress get the chain's file.
+  // cw-mcp.js (Claude Code's contract comes from its instructions) and cw-progress get the chain's file.
   const launch = claudeLaunch()
   const mcp = launch?.opts?.['--mcp-config'] ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers?.combwork : null
   const file = mcp?.env?.CW_DIALECT_FILE
-  check("Clara's hive server is given its chain's file, and its shell too (for hive-progress)", !!file && fs.existsSync(file) && launch.env?.CW_DIALECT_FILE === file && mcp.env.CW_DIALECT === d1?.hash, JSON.stringify({ file, env: launch?.env }))
+  check("Clara's Combwork MCP server is given its chain's file, and its shell too (for cw-progress)", !!file && fs.existsSync(file) && launch.env?.CW_DIALECT_FILE === file && mcp.env.CW_DIALECT === d1?.hash, JSON.stringify({ file, env: launch?.env }))
   const instructions = (await initialize(mcp))?.instructions ?? ''
-  check('…which its hive server speaks: the contract opens with the test copy\'s line', instructions.startsWith('MODEL-HOST-1 alpha.'), instructions.slice(0, 160))
-  check("Cody's contract (Hive's own developer_instructions) opens with the Workspace file's line", codexTold().startsWith('WS-HOST-1 alpha.'), codexTold().slice(0, 160))
+  check('…which its Combwork MCP server speaks: the contract opens with the test copy\'s line', instructions.startsWith('MODEL-HOST-1 alpha.'), instructions.slice(0, 160))
+  check("Cody's contract (Combwork's own developer_instructions) opens with the Workspace file's line", codexTold().startsWith('WS-HOST-1 alpha.'), codexTold().slice(0, 160))
   // The Agent API answers an agent in its own chain.
   const claraToken = launch?.token
   check("Clara's own token is said the test copy's text", (await noRouteSaid(claraToken)).startsWith('MODEL-ROUTE-1 GET'), await noRouteSaid(claraToken))
@@ -190,7 +190,7 @@ function initialize(def) {
   const d2 = (await agentNow(clara.id))?.live?.launched?.dialect
   check('…on the edited chain: a new hash, and no restart needed', !!d2 && d2.hash !== d1.hash && !!(await until(async () => (await agentNow(clara.id))?.restartNeeded === false, HUNG_MS)), JSON.stringify(d2))
   const launch2 = claudeLaunch()
-  check('…and speaks it: its token, and its hive server\'s contract', (await noRouteSaid(launch2?.token)).startsWith('MODEL-ROUTE-2 GET') && ((await initialize(JSON.parse(fs.readFileSync(launch2.opts['--mcp-config'], 'utf8')).mcpServers.combwork))?.instructions ?? '').startsWith('MODEL-HOST-2 alpha.'))
+  check('…and speaks it: its token, and its Combwork MCP server\'s contract', (await noRouteSaid(launch2?.token)).startsWith('MODEL-ROUTE-2 GET') && ((await initialize(JSON.parse(fs.readFileSync(launch2.opts['--mcp-config'], 'utf8')).mcpServers.combwork))?.instructions ?? '').startsWith('MODEL-HOST-2 alpha.'))
 
   // --- Back to Auto: a change of the setting is a change of chain, applied at the next launch.
   await inv('agents:update', proj, clara.id, { dialect: null })
@@ -207,12 +207,12 @@ function initialize(def) {
   const plain = claudeLaunch()
   const plainMcp = JSON.parse(fs.readFileSync(plain.opts['--mcp-config'], 'utf8')).mcpServers.combwork
   const d4 = (await agentNow(clara.id))?.live?.launched
-  check('…gets no dialect file, in its hive server or its shell', !plainMcp.env.CW_DIALECT_FILE && !plain.env?.CW_DIALECT_FILE, JSON.stringify(plain.env))
+  check('…gets no dialect file, in its Combwork MCP server or its shell', !plainMcp.env.CW_DIALECT_FILE && !plain.env?.CW_DIALECT_FILE, JSON.stringify(plain.env))
   check('…and its launch record says only "model unknown" (Auto, no model chosen, none the CLI names: decision Q4)', JSON.stringify(d4?.dialect) === JSON.stringify({ modelUnknown: true }), JSON.stringify(d4))
-  check('…and Hive\'s own English', (await noRouteSaid(plain.token)).startsWith('No route for GET'), await noRouteSaid(plain.token))
-  // A model Hive can name: a launch with no dialect records nothing of one (as before dialects).
+  check('…and Combwork\'s own English', (await noRouteSaid(plain.token)).startsWith('No route for GET'), await noRouteSaid(plain.token))
+  // A model Combwork can name: a launch with no dialect records nothing of one (as before dialects).
   await lib.setLaunch(inv, proj, clara.id, { model: 'claude-opus-5-5' })
-  check('Clara restarts on a model Hive can name', !!(await restart(clara.id)))
+  check('Clara restarts on a model Combwork can name', !!(await restart(clara.id)))
   const d5 = (await agentNow(clara.id))?.live?.launched
   check('…and her launch record has no dialect in it (the Default, its model known)', !!d5 && !('dialect' in d5), JSON.stringify(d5))
   await page.screenshot({ path: path.join(lib.WORK, 'dialectlaunch.png') })
@@ -229,12 +229,12 @@ function initialize(def) {
   await inv('window:new')
   const second = await next
   await lib.appReady(second)
-  const inv2 = (ch, ...a) => second.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv2 = (ch, ...a) => second.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv2, second, wsB)
   // B's window opened last: a request naming no workspace would fall back to it by focus.
   check("?workspace= naming A is said A's text, with B's window opened last", (await said(wsToken, { at: ws })).startsWith('A-ROUTE GET'), await said(wsToken, { at: ws }))
   check("?workspace= naming B is said B's", (await said(wsToken, { at: wsB })).startsWith('B-ROUTE GET'), await said(wsToken, { at: wsB }))
-  check("X-Hive-Workspace naming A is said A's, and naming B, B's", (await said(wsToken, { header: ws })).startsWith('A-ROUTE GET') && (await said(wsToken, { header: wsB })).startsWith('B-ROUTE GET'), `${await said(wsToken, { header: ws })} | ${await said(wsToken, { header: wsB })}`)
+  check("X-Combwork-Workspace naming A is said A's, and naming B, B's", (await said(wsToken, { header: ws })).startsWith('A-ROUTE GET') && (await said(wsToken, { header: wsB })).startsWith('B-ROUTE GET'), `${await said(wsToken, { header: ws })} | ${await said(wsToken, { header: wsB })}`)
   check('naming neither of the two open: the Default', (await said(wsToken)).startsWith('No route for GET'), await said(wsToken))
   check("an error reply (a body that isn't JSON) is said in the named workspace's wording: B's, and A's Default", (await said(wsToken, { at: wsB, body: '{' })) === 'B-JSON' && (await said(wsToken, { at: ws, body: '{' })) === 'Body must be JSON', `${await said(wsToken, { at: wsB, body: '{' })} | ${await said(wsToken, { at: ws, body: '{' })}`)
   await app.close()

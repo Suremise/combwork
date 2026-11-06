@@ -4,14 +4,14 @@ import { randomUUID } from 'crypto'
 import { emitTo } from './events'
 import { createLogger, userText } from './logger'
 import { taskText, whereText, type LongTask, type WindowWhere } from '../shared/windowHealth'
-import type { HiveWindow } from './windows'
+import type { CombworkWindow } from './windows'
 import { APP_NAME } from '../shared/appName'
 
 const log = createLogger('window')
 
 /** A second crash within this long doesn't reload again: it asks, so a page that crashes on load can't loop. */
 export const CRASH_LOOP_MS = 60_000
-/** How long a window may hang before Hive offers to reload it. */
+/** How long a window may hang before Combwork offers to reload it. */
 const HANG_MS = 4000
 
 /** What to do about a window's renderer that has gone: reload it, or ask (it crashed again soon after a reload). */
@@ -22,11 +22,11 @@ export function crashResponse(lastCrashAt: number | null, now: number): 'reload'
 /** The note shown once a crashed window has reloaded. */
 export function reloadedMessage(unsaved: number): string {
   return unsaved
-    ? tr(msg({ id: 'main.window.reloadedLost', defaultMessage: '{n, plural, one {Your agents kept running. Unsaved changes to one file were lost.} other {Your agents kept running. Unsaved changes to # files were lost.}}', description: "The notice after Hive's window crashed and was reloaded, when files had unsaved edits. {n} is how many." }), { n: unsaved })
-    : tr(msg({ id: 'main.window.reloaded', defaultMessage: 'Your agents kept running.', description: "The notice after Hive's window crashed and was reloaded." }))
+    ? tr(msg({ id: 'main.window.reloadedLost', defaultMessage: '{n, plural, one {Your agents kept running. Unsaved changes to one file were lost.} other {Your agents kept running. Unsaved changes to # files were lost.}}', description: "The notice after Combwork's window crashed and was reloaded, when files had unsaved edits. {n} is how many." }), { n: unsaved })
+    : tr(msg({ id: 'main.window.reloaded', defaultMessage: 'Your agents kept running.', description: "The notice after Combwork's window crashed and was reloaded." }))
 }
 
-/** What hive.log needs of a window's page to say why it froze (HI-1775): where it is, its last input, its last long tasks. */
+/** What combwork.log needs of a window's page to say why it froze (HI-1775): where it is, its last input, its last long tasks. */
 interface Health {
   where: WindowWhere | null
   /** Its last input (a key, a click, a move): epoch ms. */
@@ -39,8 +39,8 @@ interface Health {
   /** When it stopped responding (Electron's `unresponsive`), while it hasn't responded since. */
   hungAt: number | null
 }
-const health = new WeakMap<HiveWindow, Health>()
-const healthOf = (entry: HiveWindow): Health => {
+const health = new WeakMap<CombworkWindow, Health>()
+const healthOf = (entry: CombworkWindow): Health => {
   let h = health.get(entry)
   if (!h) health.set(entry, (h = { where: null, inputAt: 0, recent: [], loggedAt: 0, heldBack: 0, hungAt: null }))
   return h
@@ -51,12 +51,12 @@ const LONG_TASK_LOG_MS = 10_000
 const RECENT_TASKS = 5
 
 /** The page says where it is now. */
-export function noteWhere(entry: HiveWindow, where: WindowWhere | null): void {
+export function noteWhere(entry: CombworkWindow, where: WindowWhere | null): void {
   if (where) healthOf(entry).where = where
 }
 
 /** The page's long tasks just ended: logged as one line (its longest, how many, where), at most every LONG_TASK_LOG_MS. */
-export function noteLongTasks(entry: HiveWindow, tasks: LongTask[], where: WindowWhere | null, now = Date.now()): void {
+export function noteLongTasks(entry: CombworkWindow, tasks: LongTask[], where: WindowWhere | null, now = Date.now()): void {
   if (!tasks.length) return
   const h = healthOf(entry)
   if (where) h.where = where
@@ -67,11 +67,11 @@ export function noteLongTasks(entry: HiveWindow, tasks: LongTask[], where: Windo
   }
   const longest = tasks.reduce((a, b) => (b.ms > a.ms ? b : a))
   const total = tasks.reduce((t, x) => t + x.ms, 0)
-  const more = h.heldBack ? `; ${h.heldBack} more since the last line, not logged` : '' // i18n-ignore: hive.log, in English
+  const more = h.heldBack ? `; ${h.heldBack} more since the last line, not logged` : '' // i18n-ignore: combwork.log, in English
   // Where the longest ran (its own place: the window may have moved on since), and each other place the burst's tasks ran.
   const at = longest.where ?? where ?? h.where
   const places = new Set(tasks.map((t) => whereText(t.where ?? null, userText)).filter((w) => w !== whereText(at, userText) && w !== 'where unknown'))
-  const elsewhere = places.size ? `; others in ${[...places].join(' | ')}` : '' // i18n-ignore: hive.log, in English
+  const elsewhere = places.size ? `; others in ${[...places].join(' | ')}` : '' // i18n-ignore: combwork.log, in English
   log.warn(`The window's page was busy for ${Math.round(longest.ms)} ms (${whereText(at, userText)}); ${tasks.length} long task(s), ${Math.round(total)} ms in all; the longest: ${taskText(longest)}${elsewhere}${more}`)
   h.loggedAt = now
   h.heldBack = 0
@@ -79,28 +79,28 @@ export function noteLongTasks(entry: HiveWindow, tasks: LongTask[], where: Windo
 
 /** What a hang's lines say of the window: where it was, its last input, its last long tasks. */
 function hangContext(h: Health, now: number): string {
-  const input = h.inputAt ? `its last input ${((now - h.inputAt) / 1000).toFixed(1)} s before` : 'no input seen' // i18n-ignore: hive.log, in English
+  const input = h.inputAt ? `its last input ${((now - h.inputAt) / 1000).toFixed(1)} s before` : 'no input seen' // i18n-ignore: combwork.log, in English
   // Each where it ran, when that isn't where the window is now.
   const here = whereText(h.where, userText)
   const placed = (t: LongTask): string => {
     const there = whereText(t.where ?? null, userText)
-    return there !== here && there !== 'where unknown' ? `${taskText(t)} in ${there}` : taskText(t) // i18n-ignore: hive.log, in English
+    return there !== here && there !== 'where unknown' ? `${taskText(t)} in ${there}` : taskText(t) // i18n-ignore: combwork.log, in English
   }
-  const tasks = h.recent.length ? `its last long tasks: ${h.recent.map(placed).join(', ')}` : 'no long task reported' // i18n-ignore: hive.log, in English
+  const tasks = h.recent.length ? `its last long tasks: ${h.recent.map(placed).join(', ')}` : 'no long task reported' // i18n-ignore: combwork.log, in English
   return `${whereText(h.where, userText)}; ${input}; ${tasks}`
 }
 
-const stillRunning = (): string => tr(msg({ id: 'main.window.stillRunning', defaultMessage: 'Your agents are still running: reloading the window reconnects to them.', description: "Hive's question when its window stopped or isn't responding." }))
+const stillRunning = (): string => tr(msg({ id: 'main.window.stillRunning', defaultMessage: 'Your agents are still running: reloading the window reconnects to them.', description: "Combwork's question when its window stopped or isn't responding." }))
 
 /**
  * Keeps a window usable when its page crashes or hangs. Agents run in the main process, so they're
  * unaffected; only the page is reloaded (its terminals reattach, as after View → Reload), and the window
  * keeps its workspace. Each window is watched on its own.
  */
-export function watchRenderer(entry: HiveWindow, opts: { quitting: () => boolean; openLogs: () => void; quit: () => void }): void {
+export function watchRenderer(entry: CombworkWindow, opts: { quitting: () => boolean; openLogs: () => void; quit: () => void }): void {
   const win = entry.win
   let lastCrashAt: number | null = null
-  // A reload Hive asked for after a hang crashes the page first: not a crash to report.
+  // A reload Combwork asked for after a hang crashes the page first: not a crash to report.
   let expectGone = false
   let hangTimer: NodeJS.Timeout | null = null
   let hangPrompt: AbortController | null = null
@@ -117,7 +117,7 @@ export function watchRenderer(entry: HiveWindow, opts: { quitting: () => boolean
         // Give the page a moment to subscribe to events.
         setTimeout(() => {
           if (win.isDestroyed()) return
-          emitTo(win, { type: 'toast', toast: { id: randomUUID(), level: 'warning', title: tr(msg({ id: 'main.window.reloadedTitle', defaultMessage: "Combwork's window stopped and was reloaded", description: "A notice's title after Hive's window crashed and was reloaded." })), message: reloadedMessage(unsaved), timestamp: new Date().toISOString() } })
+          emitTo(win, { type: 'toast', toast: { id: randomUUID(), level: 'warning', title: tr(msg({ id: 'main.window.reloadedTitle', defaultMessage: "Combwork's window stopped and was reloaded", description: "A notice's title after Combwork's window crashed and was reloaded." })), message: reloadedMessage(unsaved), timestamp: new Date().toISOString() } })
         }, 1500)
       })
     }
@@ -143,9 +143,9 @@ export function watchRenderer(entry: HiveWindow, opts: { quitting: () => boolean
         const choice = await ask({
           type: 'error',
           title: APP_NAME,
-          message: tr(msg({ id: 'main.window.stopped', defaultMessage: "Combwork's window stopped working.", description: "Hive's question when its window crashed again soon after a reload." })),
+          message: tr(msg({ id: 'main.window.stopped', defaultMessage: "Combwork's window stopped working.", description: "Combwork's question when its window crashed again soon after a reload." })),
           detail: stillRunning(),
-          buttons: [tr(msg({ id: 'main.window.reload', defaultMessage: 'Reload', description: "Button: reloads Hive's window." })), tr(msg({ id: 'main.window.openLogs', defaultMessage: 'Open Logs', description: "Button: opens the folder of Hive's log files." })), tr(msg({ id: 'main.window.quit', defaultMessage: 'Quit Combwork', description: 'Button: quits Hive.' }))],
+          buttons: [tr(msg({ id: 'main.window.reload', defaultMessage: 'Reload', description: "Button: reloads Combwork's window." })), tr(msg({ id: 'main.window.openLogs', defaultMessage: 'Open Logs', description: "Button: opens the folder of Combwork's log files." })), tr(msg({ id: 'main.window.quit', defaultMessage: 'Quit Combwork', description: 'Button: quits Combwork.' }))],
           defaultId: 0,
           cancelId: 0
         })
@@ -189,9 +189,9 @@ export function watchRenderer(entry: HiveWindow, opts: { quitting: () => boolean
         {
           type: 'warning',
           title: APP_NAME,
-          message: tr(msg({ id: 'main.window.unresponsive', defaultMessage: "Combwork's window isn't responding.", description: "Hive's question when its window has stopped responding." })),
-          detail: tr(msg({ id: 'main.window.unresponsiveDetail', defaultMessage: '{stillRunning} Wait for it, or reload it.', description: "Hive's question when its window isn't responding. {stillRunning} says the agents are still running." }), { stillRunning: stillRunning() }),
-          buttons: [tr(msg({ id: 'main.window.wait', defaultMessage: 'Wait', description: "Button: waits for Hive's window to respond." })), tr(msg({ id: 'main.window.reload', defaultMessage: 'Reload', description: "Button: reloads Hive's window." }))],
+          message: tr(msg({ id: 'main.window.unresponsive', defaultMessage: "Combwork's window isn't responding.", description: "Combwork's question when its window has stopped responding." })),
+          detail: tr(msg({ id: 'main.window.unresponsiveDetail', defaultMessage: '{stillRunning} Wait for it, or reload it.', description: "Combwork's question when its window isn't responding. {stillRunning} says the agents are still running." }), { stillRunning: stillRunning() }),
+          buttons: [tr(msg({ id: 'main.window.wait', defaultMessage: 'Wait', description: "Button: waits for Combwork's window to respond." })), tr(msg({ id: 'main.window.reload', defaultMessage: 'Reload', description: "Button: reloads Combwork's window." }))],
           defaultId: 0,
           cancelId: 0
         },

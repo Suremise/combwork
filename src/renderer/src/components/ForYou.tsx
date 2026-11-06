@@ -18,17 +18,17 @@ import { OPTION_TEXT, VALUE_TEXT } from '@shared/workflow/optionTexts'
 import type { CommitMessage, WorkflowOptions } from '@shared/workflow/options'
 
 // For you in the window (#1276, SPEC §16.8.5): a card's requests for the user, as a chip on its tile and a section in
-// its dialog where the user answers them (tasks:answer, #1269: only the user answers). Hive's own requests are shown
+// its dialog where the user answers them (tasks:answer, #1269: only the user answers). Combwork's own requests are shown
 // through their messages (in the window's language), an agent's question in its own words.
 
 const M = {
   chip: msg({ id: 'board.forYou.chip', defaultMessage: 'For you', description: "A chip on a board card: something on the card waits for the user (an approval, a decision, a question). Glossary: For you." }),
   chipTip: msg({ id: 'board.forYou.chipTip', defaultMessage: '{n, plural, one {Waits for you: {requests}} other {# requests wait for you: {requests}}}', description: "Accessible name of a card's For you chip: how many requests wait for the user ({n}) and each one, its kind and the start of what it asks ({requests}, separated by · ). Glossary: For you." }),
-  tipAsks: msg({ id: 'board.forYou.tipAsks', defaultMessage: '{kind, select, approve {{who} asks for your OK} decide {{who} asks you to decide} test {{who} asks you to test} signIn {{who} asks you to sign in} other {{who} asks you}}', description: "The first line of a request in the tooltip of a card's For you chip: who asks ({who}: an agent's name, or Hive) and what for (the request's kind: approve, decide, test, sign in, or anything else). The start of the request follows on the next line. Keep the select keys as they are. Glossary: For you." }),
+  tipAsks: msg({ id: 'board.forYou.tipAsks', defaultMessage: '{kind, select, approve {{who} asks for your OK} decide {{who} asks you to decide} test {{who} asks you to test} signIn {{who} asks you to sign in} other {{who} asks you}}', description: "The first line of a request in the tooltip of a card's For you chip: who asks ({who}: an agent's name, or Combwork) and what for (the request's kind: approve, decide, test, sign in, or anything else). The start of the request follows on the next line. Keep the select keys as they are. Glossary: For you." }),
   tipMore: msg({ id: 'board.forYou.tipMore', defaultMessage: '{n, plural, one {and # more request} other {and # more requests}}', description: "In the tooltip of a card's For you chip, after the first requests shown: how many more wait for the user ({n})." }),
   tipOpen: msg({ id: 'board.forYou.tipOpen', defaultMessage: 'Click to open the card and answer under For you.', description: "The last line of the tooltip of a card's For you chip: a click opens the card, whose For you section shows each request in full with its answers. Glossary: For you." }),
   heading: msg({ id: 'board.forYou.heading', defaultMessage: 'For you', description: "A heading in the card dialog, above what on the card waits for the user (approvals, decisions, questions). Glossary: For you." }),
-  asked: msg({ id: 'board.forYou.asked', defaultMessage: '{who, select, hive {Combwork asks} other {{who} asks}} · {when}', description: "Under a request for the user in the card dialog: who asks (Hive, or an agent: its name {who}) and when ({when}: \"5 min ago\"). Keep the select keys as they are." }),
+  asked: msg({ id: 'board.forYou.asked', defaultMessage: '{who, select, combwork {Combwork asks} other {{who} asks}} · {when}', description: "Under a request for the user in the card dialog: who asks (Combwork, or an agent: its name {who}) and when ({when}: \"5 min ago\"). Keep the select keys as they are." }),
   approve: msg({ id: 'board.forYou.approve', defaultMessage: 'Approve', description: "A button under a request for the user's approval (For you): approves it. Glossary: approve." }),
   decline: msg({ id: 'board.forYou.decline', defaultMessage: 'Decline…', description: "A button under a request for the user's approval (For you): declines it, asking why first (…). For the user's review, the card goes back to its builder as a round." }),
   declineTitle: msg({ id: 'board.forYou.declineTitle', defaultMessage: 'Decline: {request}', description: 'Title of the question when the user declines a request (For you); {request} is what it asks.' }),
@@ -41,7 +41,7 @@ const M = {
   asDecisionTip: msg({ id: 'board.forYou.asDecisionTip', defaultMessage: "Records your answer as one of the card's decisions, which its agents must follow from now on, and answers the question with it.", description: "Tooltip of the Record as Decision button under a question for the user (For you): what it does. Glossary: decision." }),
   offer: msg({ id: 'board.forYou.offer', defaultMessage: '{action, select, done {Move to Done} noCode {Make It No Code} skipReview {Skip Review} other {Unblock}}', description: "A button under an agent's question for the user (For you): an action the agent offers on its card, done with one click. Keep the select keys as they are; translate each choice." }),
   offerTip: msg({ id: 'board.forYou.offerTip', defaultMessage: "{action, select, done {Moves the card to Done as you, skipping its project's rules where needed (recorded as an override, with the reason beside it), and answers the question.} noCode {Makes the card no code as you (recorded as an override, with the reason beside it), and answers the question.} skipReview {Skips the card's review as you (with the reason beside it), and answers the question.} other {Unblocks the card (the reason beside it is added as your comment), and answers the question.}}", description: "Tooltip of a button under an agent's question for the user (For you): what the action the agent offers does. Keep the select keys as they are. Glossary: override, no-code card." }),
-  todayValue: msg({ id: 'board.forYou.todayValue', defaultMessage: '{today, select, yes {{value} (as until now)} other {{value}}}', description: "A choice in the merge queue's question before an upgraded project's first merge (HI-1697, For you): a value of a workflow option ({value}), marked when it is how Hive merged until now. Keep the select keys as they are." }),
+  todayValue: msg({ id: 'board.forYou.todayValue', defaultMessage: '{today, select, yes {{value} (as until now)} other {{value}}}', description: "A choice in the merge queue's question before an upgraded project's first merge (HI-1697, For you): a value of a workflow option ({value}), marked when it is how Combwork merged until now. Keep the select keys as they are." }),
   saveAndMerge: msg({ id: 'board.forYou.saveAndMerge', defaultMessage: 'Save and Carry On Merging', description: "A button under the merge queue's question before an upgraded project's first merge (HI-1697, For you): saves the merge style and commit message chosen above as the project's workflow options, and the merge queue carries on." }),
   agree: msg({ id: 'board.forYou.agree', defaultMessage: '{action, select, done {Move to Done With This Reply} noCode {Make It No Code With This Reply} skipReview {Skip Review With This Reply} other {Unblock With This Reply}}', description: "A button under an agent's question for the user (For you), beside Send, when the question offers one action: does that action as the user, with the reply typed in the box as its reason, and answers the question. Keep the select keys as they are; translate each choice." }),
   agreeTip: msg({ id: 'board.forYou.agreeTip', defaultMessage: 'Does what the agent asked as you, with your reply as the reason, and answers the question. Send only answers it: Combwork never reads a yes into a reply.', description: "Tooltip of the button under an agent's question (For you) that does the action the question offers with the user's reply as its reason. Send is the button that only sends the reply." }),
@@ -53,7 +53,7 @@ const M = {
   failed: msg({ id: 'board.forYou.failed', defaultMessage: "Your answer wasn't taken", description: "An error toast's title: the user's answer to a request (For you) was refused, perhaps answered or retired meanwhile (a new submission, the card moved on). Its text says why." })
 }
 
-/** A request's text in the window: Hive's own by its message (the window's language), an agent's in its own words. */
+/** A request's text in the window: Combwork's own by its message (the window's language), an agent's in its own words. */
 export const requestText = (i: Pick<ForYouItem, 'shown' | 'text'>): string => (i.shown ? (workflowLine(i.shown, (m, values) => tr(m, values)) ?? i.text) : i.text)
 
 /** A request's kind, as the window names it (Approve, Decide, Test, Sign in, Other). */
@@ -70,7 +70,7 @@ const TIP_REQUESTS = 2
 export function ForYouChip({ items }: { items: ForYouItem[] | undefined }) {
   const projects = useStore((s) => s.workspace?.projects)
   if (!items?.length) return null
-  const who = (i: ForYouItem): string => (i.asker ? (projects?.find((p) => p.name.toLowerCase() === i.project.toLowerCase())?.agents.find((a) => a.id === i.asker)?.name ?? i.asker) : 'Hive') // i18n-ignore: the app's name
+  const who = (i: ForYouItem): string => (i.asker ? (projects?.find((p) => p.name.toLowerCase() === i.project.toLowerCase())?.agents.find((a) => a.id === i.asker)?.name ?? i.asker) : 'Combwork') // i18n-ignore: the app's name
   const text = tr(M.chipTip, { n: items.length, requests: items.map((i) => `${kindText(i)}: ${gist(requestText(i), 100)}`).join(' · ') })
   const tip = (
     <div className="for-you-tip">
@@ -124,13 +124,13 @@ const R = {
   by: msg({
     id: 'board.forYou.resolvedBy',
     defaultMessage: '{gone, select, yes {By a decision since removed} other {By your decision: “{decision}”}}, {who, select, you {recorded by you} assistant {recorded by the Assistant} other {recorded by {name}}}',
-    description: "Under a request in the card dialog's For you section answered by a decision (HI-1932): the user's decision that answered it ({decision}: its words, cut short; gone yes: the user has removed that decision from the card since), and who wrote the decision down: the user, the Hive Assistant (recording the user's own words), or another ({name}). Keep the select keys."
+    description: "Under a request in the card dialog's For you section answered by a decision (HI-1932): the user's decision that answered it ({decision}: its words, cut short; gone yes: the user has removed that decision from the card since), and who wrote the decision down: the user, the Combwork Assistant (recording the user's own words), or another ({name}). Keep the select keys."
   })
 }
 
 /**
  * For you's resolved list (HI-1932): the card's requests a decision of the user's answered, newest first, each with its
- * question (Hive's own request in the window's language), the decision (its text is the card's, by its id), who recorded
+ * question (Combwork's own request in the window's language), the decision (its text is the card's, by its id), who recorded
  * it and when. Display only: nothing to answer.
  */
 function ResolvedList({ card, rows }: { card: TaskCard; rows: readonly WorkResolved[] }) {
@@ -207,7 +207,7 @@ function ForYouRequest({ card, kind, item, reply, setReply, setAnswering }: { ca
   const reasonOf = (x: { kind: AskActionKind; reason?: string }): string => reasons[x.kind] ?? x.reason ?? ''
   const action = useBusy()
   const text = requestText(item)
-  const who = item.asker ? (agents?.find((a) => a.id === item.asker)?.name ?? item.asker) : 'hive'
+  const who = item.asker ? (agents?.find((a) => a.id === item.asker)?.name ?? item.asker) : 'combwork'
   const answer = async (name: string, a: ForYouAnswer): Promise<void> => {
     let failed: string | null = null
     setAnswering(true)
@@ -236,7 +236,7 @@ function ForYouRequest({ card, kind, item, reply, setReply, setAnswering }: { ca
   const limit = item.gate === ROUND_LIMIT_GATE
   const projectPath = useStore((s) => s.workspace?.projects.find((p) => p.name.toLowerCase() === card.project.toLowerCase())?.path)
   const [style, setStyle] = useState<WorkflowOptions['style']>('merge')
-  // The branch's own first (HI-1997: every preset's), Hive's marked as how it merged until now.
+  // The branch's own first (HI-1997: every preset's), Combwork's marked as how it merged until now.
   const [message, setMessage] = useState<CommitMessage>('branch')
   // HI-1697: the merge queue's question before an upgraded project's first merge, answered with the two options.
   const chooseMerge = async (): Promise<void> => {
@@ -316,9 +316,9 @@ function ForYouRequest({ card, kind, item, reply, setReply, setAnswering }: { ca
             <label className="flex">
               {tr(OPTION_TEXT.commitMessage!.title)}
               <select className="select" data-option="commitMessage" value={message} onChange={(e) => setMessage(e.target.value as CommitMessage)}>
-                {(['hive', 'branch'] as const).map((v) => (
+                {(['combwork', 'branch'] as const).map((v) => (
                   <option key={v} value={v}>
-                    {tr(M.todayValue, { value: tr(VALUE_TEXT.commitMessage[v]), today: v === 'hive' ? 'yes' : 'no' })}
+                    {tr(M.todayValue, { value: tr(VALUE_TEXT.commitMessage[v]), today: v === 'combwork' ? 'yes' : 'no' })}
                   </option>
                 ))}
               </select>

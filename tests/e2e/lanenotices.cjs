@@ -1,8 +1,8 @@
 // Following a lane to its end without the Assistant (#1266, SPEC §16.11.4), on fake Claude Code agents (fake-claude/),
-// the Assistant never started: Hive notifies the user of a lane's failed review (one notice naming the lane and the
+// the Assistant never started: Combwork notifies the user of a lane's failed review (one notice naming the lane and the
 // card), a card of it blocked (with why), and every card passed so its merge is due; nothing for a plain move into
 // Review, and nothing when Settings → Notifications has notifications off. A quiet test copy records each notice in
-// HIVE_TEST_NOTIFY_LOG, which this reads. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+// CW_TEST_NOTIFY_LOG, which this reads. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 // Dev build only (#1578): it starts this checkout's Electron itself.
 const lib = require('./lib.cjs')
 const { showBoard, openByTitle } = require('./queueFixture.cjs')
@@ -39,14 +39,14 @@ const check = (name, ok, extra = '') => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_NOTIFY_LOG: notifyLog, HIVE_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_NOTIFY_LOG: notifyLog, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1500, height: 900 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
     const until = async (fn, ms) => {
@@ -56,7 +56,7 @@ const check = (name, ok, extra = '') => {
       return v
     }
     const say = async (id, text) => {
-      // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+      // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
       await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
     }
     const idle = async (id) => ['ready', 'finished', 'watching'].includes((await live(id))?.status)
@@ -79,7 +79,7 @@ const check = (name, ok, extra = '') => {
     const newCard = async (title) => (await inv('tasks:create', { title, project: 'alpha', agent: builder.id, column: 'doing' })).number
     const a = await newCard('Greeting says Hi')
     const b = await newCard('Greeting trims the name')
-    await say(builder.id, `hive cw_lane ${JSON.stringify({ action: 'start', cards: [a, b], reviewer: 'Reviewer', name: 'greetings' })}`)
+    await say(builder.id, `cw cw_lane ${JSON.stringify({ action: 'start', cards: [a, b], reviewer: 'Reviewer', name: 'greetings' })}`)
     check('the lane is running', !!(await until(async () => (await inv('lanes:list')).some((l) => l.state === 'active' && l.cards.length === 2), HUNG_MS)), JSON.stringify(await inv('lanes:list')))
 
     // A plain move into Review: no notice.
@@ -119,7 +119,7 @@ const check = (name, ok, extra = '') => {
     const dueNotice = () => notices().find((n) => n.body.includes('its merge is due'))
     check('every card passed: a notice that its merge is due', !!(await until(async () => !!dueNotice(), HUNG_MS)), JSON.stringify(notices()))
 
-    // With Hive focused (stubbed: a test window never takes the OS focus), a lane's notice is a banner in the window, as
+    // With Combwork focused (stubbed: a test window never takes the OS focus), a lane's notice is a banner in the window, as
     // the user's notification settings say: before and after, for the screenshots.
     await app.evaluate(({ BrowserWindow }) => {
       const w = BrowserWindow.getAllWindows()[0]
@@ -129,7 +129,7 @@ const check = (name, ok, extra = '') => {
     await page.screenshot({ path: path.join(lib.WORK, 'lanenotices-1-before.png') })
     await inv('tasks:update', a, { blocked: 'Release notes first?' })
     const banner = page.locator('.popups .popup', { hasText: 'Lane Builder / Reviewer (greetings)' })
-    check('with Hive focused, a lane notice is a pop-up in the window', !!(await until(async () => (await banner.count()) > 0, HUNG_MS)), JSON.stringify(await page.locator('.popups .popup').allInnerTexts()))
+    check('with Combwork focused, a lane notice is a pop-up in the window', !!(await until(async () => (await banner.count()) > 0, HUNG_MS)), JSON.stringify(await page.locator('.popups .popup').allInnerTexts()))
     check('…naming the card by its key and why it is blocked', (await banner.first().innerText()).includes(`${keyA} is blocked: Release notes first?`), await banner.first().innerText())
     await page.screenshot({ path: path.join(lib.WORK, 'lanenotices-2-banner.png') })
     await app.evaluate(({ BrowserWindow }) => {

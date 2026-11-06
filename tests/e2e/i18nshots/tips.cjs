@@ -33,7 +33,7 @@ async function showProject(ctx, name, what) {
 }
 
 /**
- * A quiet moment, as a tip waits for (HI-2320, SPEC §14 Tips; HI-2375): the window focused as Hive sees it (earlier
+ * A quiet moment, as a tip waits for (HI-2320, SPEC §14 Tips; HI-2375): the window focused as Combwork sees it (earlier
  * areas leave it unfocused, as a quiet test copy really is) and no pop-up left from them. No finishes pending and no
  * agent waiting: the route's agents are stopped by then. The 10 s with no key the tip also waits for fits in hungMs.
  */

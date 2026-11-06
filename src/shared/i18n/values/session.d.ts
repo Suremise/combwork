@@ -1,6 +1,6 @@
 // Generated from locales/en/session.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
-interface HiveMessageValues {
+interface CombworkMessageValues {
   'session.archive.notKept': undefined
   'session.autoCompact.body': { provider: string | number }
   'session.autoCompact.title': { agent: string | number }
@@ -106,6 +106,8 @@ interface HiveMessageValues {
   'session.modeOffer.one': { agent: string | number }
   'session.modeOffer.switch': undefined
   'session.modeOffer.title': { modes: string | number }
+  'session.model.switched': { cli: string | number; running: string | number; launched: string | number }
+  'session.model.switchedTitle': { agent: string | number }
   'session.movedFresh.body': { n: number }
   'session.newConversation.didntStop': undefined
   'session.newConversation.notRunning': undefined

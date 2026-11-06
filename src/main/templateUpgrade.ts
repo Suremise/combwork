@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from 'crypto'
 import { constants } from 'original-fs'
 import { copyFile, link, mkdir, readFile, readdir, unlink, writeFile } from 'original-fs/promises'
 import { join, resolve } from 'path'
-import { HIVE_DIR } from '../shared/defaults'
+import { CW_DIR } from '../shared/defaults'
 import { isTemplateFile, TEMPLATE_VERSION } from '../shared/templates'
 import { msg, tr } from '../shared/i18n'
 import { boardValue, boardWrite, setBoardValue, upgradeWaiting } from './boardStore'
@@ -13,7 +13,7 @@ import type { WorkspaceService } from './workspace'
  * 0.9's agent templates at the upgrade to 1.0 (#1436; Darren's 19 Oct decision on #1123: "existing templates are wiped",
  * a clean cut-over; the Assistant's scope call of 23 Oct: copy only). 1.0 doesn't use them: the lists skip a version-1
  * file and an import of one is refused (`readTemplate`). The user's saved ones, the workspace's and each project's, are
- * **copied** into the 0.9 board backup's folder (`.combwork/backups/templates-0.9`, beside the copy of hive.db the upgrade
+ * **copied** into the 0.9 board backup's folder (`.combwork/backups/templates-0.9`, beside the copy of combwork.db the upgrade
  * keeps, OP-37); the originals are never moved, deleted or rewritten. One quiet notice says so. The upgrade is one-way:
  * nothing puts them back.
  *
@@ -21,14 +21,14 @@ import type { WorkspaceService } from './workspace'
  * of its own to recover: a template whose bytes the backup already has is copied already; a copy is written under a
  * temporary name of its own (never a template's, removed by the copy that made it) and published at the first free name
  * by a link that never replaces a file (a copy that won't overwrite where links can't be made), so a rerun or two runs at
- * once (two Hives) never lose or change anything, never touch each other's temporary files, and copy each template once.
+ * once (two Combworks) never lose or change anything, never touch each other's temporary files, and copy each template once.
  * A temporary file left by a crash is harmless (no template's name, never listed or read) and left alone. A folder or
  * file that can't be read (other than gone) stops the run unmarked, for the next open.
  */
 
 const log = createLogger('templates')
 
-/** board_meta's mark: how many templates this Hive copied (`0`: none), once every folder was read and copied. */
+/** board_meta's mark: how many templates this Combwork copied (`0`: none), once every folder was read and copied. */
 const MARK = 'templates.v09'
 /** board_meta's notice to say once in the window: `due`, then `said`. */
 const NOTICE = 'templates.v09.notice'
@@ -37,17 +37,17 @@ export const V09_TEMPLATES = 'templates-0.9'
 /** Seams for unit tests: a failure where a run reads or writes, and the moment a copy is written but not yet published. */
 export const testHooks: { fail?: (op: 'scan' | 'read' | 'write', path: string) => void; beforePublish?: (part: string) => Promise<void> } = {}
 
-const backupDir = (workspacePath: string): string => join(workspacePath, HIVE_DIR, 'backups', V09_TEMPLATES)
+const backupDir = (workspacePath: string): string => join(workspacePath, CW_DIR, 'backups', V09_TEMPLATES)
 const code = (e: unknown): string | undefined => (e as NodeJS.ErrnoException)?.code
 
 /** The template folders to look in, each with where its copies go in the backup: the workspace's and each project's. */
 async function places(ws: WorkspaceService, workspacePath: string): Promise<{ from: string; to: string }[]> {
   const dir = backupDir(workspacePath)
-  const out = [{ from: join(workspacePath, HIVE_DIR, 'templates'), to: join(dir, 'workspace') }]
+  const out = [{ from: join(workspacePath, CW_DIR, 'templates'), to: join(dir, 'workspace') }]
   const ids = await ws.projectIds()
   for (const p of await ws.listProjectPaths()) {
     const id = ids.byPath.get(resolve(p).toLowerCase())
-    if (id) out.push({ from: join(p, HIVE_DIR, 'templates'), to: join(dir, 'projects', id) })
+    if (id) out.push({ from: join(p, CW_DIR, 'templates'), to: join(dir, 'projects', id) })
   }
   return out
 }
@@ -166,8 +166,8 @@ export async function sayV09TemplatesOnce(ws: WorkspaceService): Promise<void> {
   const life = ws.lifetime
   if (!path || upgradeWaiting(path) || boardValue(ws, NOTICE) !== 'due') return
   const n = (await backupFiles(path)).filter((f) => isTemplateFile(f.split('/').pop())).length
-  const title = tr(msg({ id: 'service.templates.v09Title', defaultMessage: 'Your 0.9 agent templates aren’t used in 1.0', description: "A quiet notice's title, once after the upgrade to Hive 1.0: the agent templates saved in 0.9 aren't listed or loaded any more (a copy is kept)." }))
-  const message = tr(msg({ id: 'service.templates.v09', defaultMessage: '1.0 templates don’t pin agents to worktrees, so the Combwork templates take their place. A copy of {n, plural, one {the template} other {the # templates}} is kept with the 0.9 board backup.', description: "A quiet notice once after the upgrade to Hive 1.0: the {n} agent templates saved in 0.9 aren't used; a copy of each was put in the folder of the board's 0.9 backup. \"The Hive templates\" are Hive's own templates (the Templates view's Hive group)." }), { n })
+  const title = tr(msg({ id: 'service.templates.v09Title', defaultMessage: 'Your 0.9 agent templates aren’t used in 1.0', description: "A quiet notice's title, once after the upgrade to 1.0: the agent templates saved in 0.9 aren't listed or loaded any more (a copy is kept)." }))
+  const message = tr(msg({ id: 'service.templates.v09', defaultMessage: '1.0 templates don’t pin agents to worktrees, so the Combwork templates take their place. A copy of {n, plural, one {the template} other {the # templates}} is kept with the 0.9 board backup.', description: "A quiet notice once after the upgrade to 1.0: the {n} agent templates saved in 0.9 aren't used; a copy of each was put in the folder of the board's 0.9 backup. \"The Combwork templates\" are Combwork's own templates (the Templates view's Combwork group)." }), { n })
   ws.emit({ type: 'toast', toast: { id: randomUUID(), level: 'info', title, message, timestamp: new Date().toISOString(), quiet: true } })
   void boardWrite(ws, async () => {
     if (!life.aborted && ws.path === path) setBoardValue(ws, NOTICE, 'said')

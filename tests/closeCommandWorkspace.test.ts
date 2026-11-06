@@ -1,7 +1,7 @@
 // HI-1368 with a real WorkspaceService (HR6's round 3, Darren's decision of 28 Oct ~15:30): a switch whose old workspace's
 // close is held by a closing task shows its saving step; Skip the command keeps the panel up and the close going, never
 // cancelled or begun again; once the close is released the panel goes, the switch opens the next workspace, intact, and
-// neither the workspace's command nor When Hive quits starts. The runner's start is stood in for (it would run a command).
+// neither the workspace's command nor When Combwork quits starts. The runner's start is stood in for (it would run a command).
 import { mkdirSync, rmSync } from 'fs'
 import { EventEmitter } from 'events'
 import { join } from 'path'
@@ -22,7 +22,7 @@ vi.mock('../src/main/closeCommand/runs', async (orig) => {
   }
 })
 
-const base = tempDir('hive-close-ws-')
+const base = tempDir('cw-close-ws-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 
@@ -78,7 +78,7 @@ describe("a switch whose old workspace's close is held", () => {
       // The switch opens the next workspace, once, with nothing of the old close left to run.
       await w.open(wsB)
       expect(w.path).toBe(wsB)
-      await expect(runQuitCommand({ list: [{ id: 'c-0000000f', name: 'Quit', command: 'backup all' }], onQuit: { run: [{ scope: 'hive', id: 'c-0000000f' }] } }, 'quit', null, 'left')).resolves.toBe('leftSaving')
+      await expect(runQuitCommand({ list: [{ id: 'c-0000000f', name: 'Quit', command: 'backup all' }], onQuit: { run: [{ scope: 'combwork', id: 'c-0000000f' }] } }, 'quit', null, 'left')).resolves.toBe('leftSaving')
       expect(started).toEqual([])
     } finally {
       WorkspaceService.closingTasks.delete(task)

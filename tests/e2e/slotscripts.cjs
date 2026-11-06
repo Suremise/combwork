@@ -1,5 +1,5 @@
 // The slots' copy patterns, idle removal switch and archive script acting in the app (#1563, tests/workflow/README.md's
-// P7 table), through a test Hive's `slots:test` channel as slotpool does, the options set with the Version Control tab's
+// P7 table), through a test Combwork's `slots:test` channel as slotpool does, the options set with the Version Control tab's
 // channel (slots:setSetting):
 // - Files copied into new slots `*.key`: a git-ignored api.key is copied into each new slot; an ignored notes.local and
 //   .env (the default's) are not;
@@ -33,12 +33,12 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(path.join(fx.alpha, '.env'), 'A=1\n')
   // The archive script: records the slot it ran for and whether its folder was still there, and exits with the code in
   // archive-exit.txt. It writes outside the slot (a slot it left files in would be kept for those).
-  const archiveLog = path.join(fx.tools, 'archive.log')
+  const archiveLog = path.join(fx.tools, 'arccombwork.log')
   const exitFile = path.join(fx.tools, 'archive-exit.txt')
   const archive = path.join(fx.tools, 'archive.js')
   fs.writeFileSync(archive, ["const fs = require('fs')", `fs.appendFileSync(${JSON.stringify(archiveLog)}, process.env.CW_SLOT + ' ' + fs.existsSync('.git') + '\\n')`, `process.exit(Number(fs.readFileSync(${JSON.stringify(exitFile)}, 'utf8')))`, ''].join('\n'))
   const archived = () => (fs.existsSync(archiveLog) ? fs.readFileSync(archiveLog, 'utf8').trim().split('\n').filter(Boolean) : [])
-  const h = await q.startHive(fx, { port: PORT, keepOptions: true })
+  const h = await q.startCombwork(fx, { port: PORT, keepOptions: true })
   try {
     const { page, inv } = h
     page.on('pageerror', (e) => check('no page errors', false, e.message))

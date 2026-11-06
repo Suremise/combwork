@@ -24,13 +24,13 @@ const check = (name, ok, extra = '') => {
   lib.gitProject(path.join(ws, 'alpha'))
   lib.enableProviders(userData)
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47923) })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47923) })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
 
   /** Hovers the element and measures its tooltip, its anchor (the tooltip's wrapper) and the window. */
@@ -115,7 +115,7 @@ const check = (name, ok, extra = '') => {
 
   // HI-2084: a hover tooltip whose anchor goes (its panel folded from the keyboard, the mouse still on it) lets go of
   // the hover slot as it unmounts, with no other tooltip shown after it: nothing keeps the detached anchor.
-  const held = () => page.evaluate(() => window.__hiveHoveredTip())
+  const held = () => page.evaluate(() => window.__cwHoveredTip())
   const button = page.locator('.assistant-header .tip-wrap > *:first-child').first()
   check('a hover tooltip: none holds the slot before', (await held()) === null, JSON.stringify(await held()))
   await page.mouse.move(700, 450)

@@ -1,5 +1,5 @@
 // Reading a Markdown document to outline it or read one section (#817): a project's file (in the folder the caller works
-// in) or a shared note (`shared:<path>`). Only Markdown, only inside its folder (through junctions too), never Hive's
+// in) or a shared note (`shared:<path>`). Only Markdown, only inside its folder (through junctions too), never Combwork's
 // own `.combwork` or git's `.git` folder, and up to DOC_MAX: a reply never carries more than the section asked for.
 import { readFile, stat } from 'original-fs/promises'
 import { isAbsolute, relative, resolve } from 'path'
@@ -7,7 +7,7 @@ import { insideReal, realPath } from './fsutil'
 import { parseDocRef } from '../shared/docRefs'
 import { docOutline, findHeading, sectionText } from '../shared/docSections'
 import type { ContextProblem } from '../shared/types'
-import { HIVE_DIR } from '../shared/defaults'
+import { CW_DIR } from '../shared/defaults'
 
 /** A shared note's reference starts with this: `shared:plans/i18n.md`. */
 export const SHARED_PREFIX = 'shared:'
@@ -20,8 +20,8 @@ export type DocRead = { ok: true; text: string } | { ok: false; code: 'outside' 
 
 const MARKDOWN = /\.(md|markdown|mdx)$/i
 
-/** Whether a path inside the folder goes into Hive's own `.combwork` or git's `.git`. */
-const hidden = (inside: string): boolean => inside.split(/[\\/]/).some((part) => part.toLowerCase() === HIVE_DIR || part.toLowerCase() === '.git')
+/** Whether a path inside the folder goes into Combwork's own `.combwork` or git's `.git`. */
+const hidden = (inside: string): boolean => inside.split(/[\\/]/).some((part) => part.toLowerCase() === CW_DIR || part.toLowerCase() === '.git')
 
 /**
  * Reads a document: `path` relative to `root` (a project's folder, or the shared notes' folder for `shared:` paths).

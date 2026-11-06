@@ -55,7 +55,7 @@ describe('agent pages follow the layout (#134)', () => {
     expect(pages(7)).toBe('a1a2a3a4a5a6|a7')
     expect(pages(0)).toBe('')
     expect(agentPageCount(0, 6)).toBe(1)
-    // A layout that isn't one Hive knows reads as automatic.
+    // A layout that isn't one Combwork knows reads as automatic.
     expect(projectLayout({ agents: agents(3), layout: 'mosaic' as SessionLayout })).toBe('columns3')
   })
 

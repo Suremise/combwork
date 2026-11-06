@@ -1,17 +1,17 @@
-// A --settings in a Claude Code agent's own arguments (#330): Claude Code reads only the last --settings, so Hive merges
-// the user's settings into its launch file (their hooks added to Hive's, Hive's status line kept) and passes that alone.
+// A --settings in a Claude Code agent's own arguments (#330): Claude Code reads only the last --settings, so Combwork merges
+// the user's settings into its launch file (their hooks added to Combwork's, Combwork's status line kept) and passes that alone.
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { mergeLaunchSettings, userSettings, withoutSettingsArgs } from '../src/main/providers/claude/launchSettings'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-launch-settings-')
+const base = tempDir('cw-launch-settings-')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 
-const hive = () => ({
-  hooks: { Stop: [{ hooks: [{ type: 'http', url: 'hive-stop' }] }], SessionStart: [{ hooks: [{ type: 'command', command: 'hive-start' }] }] },
-  statusLine: { type: 'command', command: 'hive-status', padding: 0 }
+const ours = () => ({
+  hooks: { Stop: [{ hooks: [{ type: 'http', url: 'cw-stop' }] }], SessionStart: [{ hooks: [{ type: 'command', command: 'cw-start' }] }] },
+  statusLine: { type: 'command', command: 'cw-status', padding: 0 }
 })
 const NEEDS = { url: 'http://127.0.0.1:9/hook?run=r', envVar: 'CW_HOOK_TOKEN' }
 
@@ -32,7 +32,7 @@ describe("a --settings in a Claude Code agent's arguments (#330)", () => {
     expect(await userSettings(['--settings', '{"model":"opus"}'], base)).toEqual({ model: 'opus' })
   })
 
-  it("refuses at launch, saying which argument, what Claude Code would refuse or Hive can't merge", async () => {
+  it("refuses at launch, saying which argument, what Claude Code would refuse or Combwork can't merge", async () => {
     writeFileSync(join(base, 'bad.json'), '{bad')
     writeFileSync(join(base, 'list.json'), '[1]')
     await expect(userSettings(['--settings', 'missing.json'], base)).rejects.toThrow("The settings file missing.json (--settings in Extra arguments) can't be read: there is no such file.")
@@ -64,60 +64,60 @@ describe("a --settings in a Claude Code agent's arguments (#330)", () => {
     expect(await userSettings(['--settings=', '--settings', 'ok.json'], base)).toEqual({ env: { A: '1' } })
   })
 
-  it("refuses settings that would turn Hive's hooks off where a merge can't undo it (Claude Code 2.1.292)", async () => {
-    // disableAllHooks turns off every hook and the status line, Hive's with the user's.
+  it("refuses settings that would turn Combwork's hooks off where a merge can't undo it (Claude Code 2.1.292)", async () => {
+    // disableAllHooks turns off every hook and the status line, Combwork's with the user's.
     await expect(userSettings(['--settings', '{"disableAllHooks":true}'], base)).rejects.toThrow('The --settings in Extra arguments turns off all hooks (disableAllHooks)')
     // Refused, never launched without them (#1285, Darren's decision): saying why, and what to change.
     await expect(userSettings(['--settings', '{"disableAllHooks":true}'], base)).rejects.toThrow(/how it knows what the agent is doing.*Take disableAllHooks out of those settings, or remove the --settings from Extra arguments/)
     expect(await userSettings(['--settings', '{"disableAllHooks":false}'], base)).toEqual({ disableAllHooks: false })
-    // An allowlist that isn't a list blocks Hive's HTTP hooks.
+    // An allowlist that isn't a list blocks Combwork's HTTP hooks.
     await expect(userSettings(['--settings', '{"allowedHttpHookUrls":"https://x.example/*"}'], base)).rejects.toThrow('sets allowedHttpHookUrls to something other than a list')
     await expect(userSettings(['--settings', '{"httpHookAllowedEnvVars":null}'], base)).rejects.toThrow('sets httpHookAllowedEnvVars to something other than a list')
     // A variable in the env block doesn't turn hooks off (2.1.292): left as it is.
     expect(await userSettings(['--settings', '{"env":{"CLAUDE_CODE_DISABLE_HOOKS":"1"}}'], base)).toEqual({ env: { CLAUDE_CODE_DISABLE_HOOKS: '1' } })
   })
 
-  it("adds what Hive's hooks need to the user's HTTP hook allowlists, which Claude Code takes whole from this file", () => {
-    // Restrictive lists: Hive's URL and token variable added, the user's entries kept.
-    expect(mergeLaunchSettings(hive(), { allowedHttpHookUrls: ['https://hooks.example/*'], httpHookAllowedEnvVars: ['MY_TOKEN'] }, NEEDS)).toMatchObject({ allowedHttpHookUrls: ['https://hooks.example/*', NEEDS.url], httpHookAllowedEnvVars: ['MY_TOKEN', 'CW_HOOK_TOKEN'] })
-    // Empty lists (nothing allowed): only Hive's.
-    expect(mergeLaunchSettings(hive(), { allowedHttpHookUrls: [], httpHookAllowedEnvVars: [] }, NEEDS)).toMatchObject({ allowedHttpHookUrls: [NEEDS.url], httpHookAllowedEnvVars: ['CW_HOOK_TOKEN'] })
+  it("adds what Combwork's hooks need to the user's HTTP hook allowlists, which Claude Code takes whole from this file", () => {
+    // Restrictive lists: Combwork's URL and token variable added, the user's entries kept.
+    expect(mergeLaunchSettings(ours(), { allowedHttpHookUrls: ['https://hooks.example/*'], httpHookAllowedEnvVars: ['MY_TOKEN'] }, NEEDS)).toMatchObject({ allowedHttpHookUrls: ['https://hooks.example/*', NEEDS.url], httpHookAllowedEnvVars: ['MY_TOKEN', 'CW_HOOK_TOKEN'] })
+    // Empty lists (nothing allowed): only Combwork's.
+    expect(mergeLaunchSettings(ours(), { allowedHttpHookUrls: [], httpHookAllowedEnvVars: [] }, NEEDS)).toMatchObject({ allowedHttpHookUrls: [NEEDS.url], httpHookAllowedEnvVars: ['CW_HOOK_TOKEN'] })
     // Already allowed: unchanged, not repeated.
-    expect(mergeLaunchSettings(hive(), { allowedHttpHookUrls: [NEEDS.url], httpHookAllowedEnvVars: ['CW_HOOK_TOKEN'] }, NEEDS)).toMatchObject({ allowedHttpHookUrls: [NEEDS.url], httpHookAllowedEnvVars: ['CW_HOOK_TOKEN'] })
+    expect(mergeLaunchSettings(ours(), { allowedHttpHookUrls: [NEEDS.url], httpHookAllowedEnvVars: ['CW_HOOK_TOKEN'] }, NEEDS)).toMatchObject({ allowedHttpHookUrls: [NEEDS.url], httpHookAllowedEnvVars: ['CW_HOOK_TOKEN'] })
     // Not set: not added (unset allows every URL and variable; setting one would block the user's other HTTP hooks).
-    const merged = mergeLaunchSettings(hive(), { env: {} }, NEEDS)
+    const merged = mergeLaunchSettings(ours(), { env: {} }, NEEDS)
     expect('allowedHttpHookUrls' in merged || 'httpHookAllowedEnvVars' in merged).toBe(false)
   })
 
-  it("merges: every setting of theirs, their hooks after Hive's for each event, Hive's status line", () => {
+  it("merges: every setting of theirs, their hooks after Combwork's for each event, Combwork's status line", () => {
     const theirs = {
       env: { B: '2' },
       autoCompactWindow: 250000,
       statusLine: { type: 'command', command: 'theirs-status' },
       hooks: { Stop: [{ hooks: [{ type: 'command', command: 'theirs-stop' }] }], PostToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'theirs-post' }] }], Bad: 'x' }
     }
-    expect(mergeLaunchSettings(hive(), theirs, NEEDS)).toEqual({
+    expect(mergeLaunchSettings(ours(), theirs, NEEDS)).toEqual({
       env: { B: '2' },
       autoCompactWindow: 250000,
-      statusLine: hive().statusLine,
+      statusLine: ours().statusLine,
       hooks: {
-        Stop: [...hive().hooks.Stop, ...theirs.hooks.Stop],
-        SessionStart: hive().hooks.SessionStart,
+        Stop: [...ours().hooks.Stop, ...theirs.hooks.Stop],
+        SessionStart: ours().hooks.SessionStart,
         PostToolUse: theirs.hooks.PostToolUse
       }
     })
-    // Hooks that aren't an object, or none: Hive's own.
-    expect(mergeLaunchSettings(hive(), { hooks: [1] }, NEEDS).hooks).toEqual(hive().hooks)
-    expect(mergeLaunchSettings(hive(), null, NEEDS)).toEqual(hive())
+    // Hooks that aren't an object, or none: Combwork's own.
+    expect(mergeLaunchSettings(ours(), { hooks: [1] }, NEEDS).hooks).toEqual(ours().hooks)
+    expect(mergeLaunchSettings(ours(), null, NEEDS)).toEqual(ours())
   })
 
-  it('a launch passes one --settings, Hive\'s file, holding Hive\'s hooks and status line with the user\'s settings', async () => {
+  it('a launch passes one --settings, Combwork\'s file, holding Combwork\'s hooks and status line with the user\'s settings', async () => {
     const { claudeCode } = await import('../src/main/providers/claude/adapter')
     const project = join(base, 'project')
     writeFileSync(join(base, 'mine.json'), JSON.stringify({ env: { B: '2' }, autoCompactWindow: 250000 }))
     const ctx = {
       projectPath: project, agentId: 'a1', executable: 'C:\\bin\\claude.exe', cwd: base, workspacePath: base, runId: 'r', sessionId: '00000000-0000-4000-8000-000000000000',
-      resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: ['--verbose', '--settings', 'mine.json'], hookUrl: 'http://127.0.0.1:9/hook?run=r', hookAuthFile: 'C:/hive/hook-auth/r.txt', privateDir: join(base, 'private-r'), guidance: '', env: {}, allowBackgroundSessions: true, use200kContext: false
+      resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: ['--verbose', '--settings', 'mine.json'], hookUrl: 'http://127.0.0.1:9/hook?run=r', hookAuthFile: 'C:/profile/hook-auth/r.txt', privateDir: join(base, 'private-r'), guidance: '', env: {}, allowBackgroundSessions: true, use200kContext: false
     }
     await claudeCode.prepareLaunch(ctx as never)
     const cmd = claudeCode.buildCommand(ctx.executable, ctx as never)
@@ -132,7 +132,7 @@ describe("a --settings in a Claude Code agent's arguments (#330)", () => {
     expect(merged).toMatchObject({ env: { B: '2' }, autoCompactWindow: 250000, statusLine: { type: 'command' } })
     expect(merged.hooks.Stop[0].hooks[0]).toMatchObject({ type: 'http', url: ctx.hookUrl })
     expect(Object.keys(merged.hooks)).toContain('SessionStart')
-    // One Hive can't read, or that would turn its hooks off, stops the launch before its folder changes.
+    // One Combwork can't read, or that would turn its hooks off, stops the launch before its folder changes.
     await expect(claudeCode.prepareLaunch({ ...ctx, extraArgs: ['--settings', 'missing.json'] } as never)).rejects.toThrow("can't be read")
     await expect(claudeCode.prepareLaunch({ ...ctx, extraArgs: ['--settings', '{"disableAllHooks":true}'] } as never)).rejects.toThrow('disableAllHooks')
     // So does a --settings with no value, even after a valid one (#361).

@@ -19,9 +19,9 @@ function spawnDetached(spawnFn: Spawn, file: string, args: string[], cwd: string
 }
 
 /**
- * Open External Terminal Here: Windows Terminal in `dir`, else cmd; elsewhere the system's terminal. It gets Hive's
- * environment with the folders of the CLIs Hive found (#1103), as sessions do, so `claude` found off PATH runs in it by
- * name; Hive's own PATH is left as it is. Which one started is returned (null: none could).
+ * Open External Terminal Here: Windows Terminal in `dir`, else cmd; elsewhere the system's terminal. It gets Combwork's
+ * environment with the folders of the CLIs Combwork found (#1103), as sessions do, so `claude` found off PATH runs in it by
+ * name; Combwork's own PATH is left as it is. Which one started is returned (null: none could).
  */
 export function openExternalTerminal(dir: string, spawnFn: Spawn = spawn, platform: NodeJS.Platform = process.platform): 'wt' | 'cmd' | 'x-terminal-emulator' | null {
   const env = envWithCliFolders({ ...process.env })

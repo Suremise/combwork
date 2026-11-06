@@ -1,7 +1,7 @@
 // Sessions and deliveries in their 1.0 tables (#1211, schema/sessionDeliveryTables.ts and sessionDeliveryCodec.ts): every record reads back
-// equal as JSON (odd ones too: a field Hive doesn't know, a null, a lone surrogate, one missing), a change writes only
-// the rows it changed, the 1.0 step moves store_rows' rows into the tables and keeps aside what isn't of Hive's form, and
-// the queries use their indexes. HIVE_STORE_ROUNDTRIP_DB=<a hive.db> runs the step over a copy of that board made in
+// equal as JSON (odd ones too: a field Combwork doesn't know, a null, a lone surrogate, one missing), a change writes only
+// the rows it changed, the 1.0 step moves store_rows' rows into the tables and keeps aside what isn't of Combwork's form, and
+// the queries use their indexes. CW_STORE_ROUNDTRIP_DB=<a combwork.db> runs the step over a copy of that board made in
 // tempDir() (the file itself is never opened): counts equal, every session and delivery equal as JSON.
 import { copyFileSync, existsSync } from 'fs'
 import { join } from 'path'
@@ -15,12 +15,12 @@ import { deliveryFromRow, deliveryToRow, keptUsageFromRow, keptUsageToRow, sessi
 import { addDeliveries, addSessionRecords, moveStoreRows, readAgentSessionRecords, readCardSessionRecords, readDeleted, readDeletedUsage, readDeliveries, readSessionRecord, readSessionRecords, writeDeliveries, writeSessionRecords } from '../src/main/schema/sessionDeliveryTables'
 import { QUERIES, V1_0_STEPS } from '../src/main/schema/v1_0'
 
-const base = tempDir('hive-store-tables-')
+const base = tempDir('cw-store-tables-')
 let n = 0
 type Rec = Record<string, unknown>
 
 /**
- * A database (in memory, or with `file` in that file, in WAL mode as Hive opens its own) with the sessions and deliveries
+ * A database (in memory, or with `file` in that file, in WAL mode as Combwork opens its own) with the sessions and deliveries
  * tables, and store_meta as 0.9's step 2 makes it.
  */
 function tables(file?: string): DatabaseSync {
@@ -38,7 +38,7 @@ const meta = (db: DatabaseSync, store: string, scope: string, key: string): unkn
 const json = (v: unknown): unknown => JSON.parse(JSON.stringify(v))
 
 const at = '2026-10-20T10:00:00.000Z'
-/** A session record with every field Hive writes. */
+/** A session record with every field Combwork writes. */
 const fullSession = (id: string, over: Rec = {}): Rec => ({
   id,
   agent: 'claude-code',
@@ -49,7 +49,7 @@ const fullSession = (id: string, over: Rec = {}): Rec => ({
   agentId: 'a1',
   agentName: 'Coder',
   cwd: 'D:\\w\\p',
-  branch: 'hive/a1',
+  branch: 'cw/a1',
   transcriptPath: 'C:\\t.jsonl',
   handedOverFrom: 'older',
   cards: [{ number: 5, title: 'Five' }, { number: 6, title: 'Six', review: true }],
@@ -104,7 +104,7 @@ describe('records through their rows (storeCodec.ts)', () => {
     expect(session(fullSession('s2', { sub: { parentId: 's1', kind: 'sub-agent' } }))).toEqual(fullSession('s2', { sub: { parentId: 's1', kind: 'sub-agent' } }))
   })
 
-  it('a minimal session, and odd ones, read back equal: fields Hive doesn\'t know, other types, a lone surrogate, one missing', () => {
+  it('a minimal session, and odd ones, read back equal: fields Combwork doesn\'t know, other types, a lone surrogate, one missing', () => {
     const min = { id: 'm', agent: 'codex', name: 'n', createdAt: at, lastActiveAt: at, archived: true }
     expect(session(min)).toEqual(min)
     const odd = { ...min, agentId: 42, extraField: { nested: [1, 2] }, name: 'lone \ud800 surrogate', cards: [{ number: 'x', title: 'bad' }], sub: { parentId: 1, kind: 'k' } }
@@ -112,7 +112,7 @@ describe('records through their rows (storeCodec.ts)', () => {
     // A record without a name (a hand edit): kept, read back without it.
     const { name: _n, ...noName } = min
     expect(session(noName)).toEqual(noName)
-    // Without an id it has no key: not of Hive's form.
+    // Without an id it has no key: not of Combwork's form.
     const { id: _i, ...noId } = min
     expect(sessionToRows('p1', 0, noId)).toBeNull()
   })
@@ -129,7 +129,7 @@ describe('records through their rows (storeCodec.ts)', () => {
     // Missing a field its row needs: kept (deliveries.ts's readDelivery sets it aside as it loads), read back as it was.
     const { state: _s, ...noState } = d
     expect(deliveryFromRow(deliveryToRow('p1', noState)!)).toEqual(noState)
-    // Without an id it has no key: not of Hive's form.
+    // Without an id it has no key: not of Combwork's form.
     const { id: _i, ...noId } = d
     expect(deliveryToRow('p1', noId)).toBeNull()
   })
@@ -149,7 +149,7 @@ describe('records through their rows (storeCodec.ts)', () => {
       expect(Object.getPrototypeOf(back)).toBe(Object.prototype)
     }
     // A delivery whose body has a lone surrogate: deliveries.ts reads it, so it keeps its row.
-    const lone = { id: 'm9', seq: 9, agentId: 'a1', conversation: null, kind: 'task', from: { kind: 'hive', name: 'Hive' }, body: 'half \ud83d of an emoji', state: 'queued', created: at, expires: at }
+    const lone = { id: 'm9', seq: 9, agentId: 'a1', conversation: null, kind: 'task', from: { kind: 'combwork', name: 'Combwork' }, body: 'half \ud83d of an emoji', state: 'queued', created: at, expires: at }
     expect(readDelivery(json(lone))).not.toBeNull()
     expect(deliveryFromRow(deliveryToRow('p1', lone)!)).toEqual(lone)
     const prot = own(fullDelivery('m8', 8), '__proto__', 1)
@@ -289,7 +289,7 @@ describe("a host's records in the tables (storeTables.ts)", () => {
     expect(readDeleted(db, 'p1')).toEqual(['gone', 'also'])
   })
 
-  it('a record without the fields Hive keeps, or two with one id, throw: nothing written', () => {
+  it('a record without the fields Combwork keeps, or two with one id, throw: nothing written', () => {
     const db = tables()
     db.exec('BEGIN')
     expect(() => writeSessionRecords(db, 'p1', { sessions: [fullSession('a'), fullSession('a')] })).toThrow('two session records with the id a')
@@ -319,7 +319,7 @@ describe("a host's records in the tables (storeTables.ts)", () => {
     expect(readDeliveries(db, 'p2')).toEqual([])
   })
 
-  it("deliveries moved in that aren't of Hive's form, or repeat an id, go with those kept aside", () => {
+  it("deliveries moved in that aren't of Combwork's form, or repeat an id, go with those kept aside", () => {
     const db = tables()
     db.exec('BEGIN')
     // One with an id but little else keeps its row (deliveries.ts's readDelivery sets it aside as it loads).
@@ -333,9 +333,9 @@ describe("a host's records in the tables (storeTables.ts)", () => {
 describe('the 1.0 step: store_rows into the tables', () => {
   /** A board file at 0.9's schema (and the group's steps before this one), with these store_rows rows. */
   function board09(rows: { store: string; scope: string; key: string; ord: number; doc: string }[], metas: [string, string, string, string][] = []): string {
-    const file = join(base, `b-${++n}`, 'hive.db')
+    const file = join(base, `b-${++n}`, 'combwork.db')
     const step = BOARD_MIGRATIONS.find((m) => m.name === 'sessions and deliveries in tables')!
-    const db = openDb(file, { migrations: BOARD_MIGRATIONS.filter((m) => m.version < step.version), hiveVersion: '0.9.3' })
+    const db = openDb(file, { migrations: BOARD_MIGRATIONS.filter((m) => m.version < step.version), appVersion: '0.9.3' })
     try {
       const put = db.writer.prepare('INSERT INTO store_rows (store, scope, key, ord, doc) VALUES (?, ?, ?, ?, ?)')
       for (const r of rows) put.run(r.store, r.scope, r.key, r.ord, r.doc)
@@ -375,7 +375,7 @@ describe('the 1.0 step: store_rows into the tables', () => {
         ['deliveries', 'p1', 'invalid', '[{"kept":"before"}]']
       ]
     )
-    const db = openDb(file, { migrations: BOARD_MIGRATIONS, hiveVersion: '1.0.0', approve: () => true })
+    const db = openDb(file, { migrations: BOARD_MIGRATIONS, appVersion: '1.0.0', approve: () => true })
     try {
       const w = db.writer
       expect(readSessionRecords(w, 'p1')).toEqual([json(fullSession('a')), json(fullSession('b', { cards: undefined }))])
@@ -399,7 +399,7 @@ describe('the 1.0 step: store_rows into the tables', () => {
 
   it("refuses while store_rows still has another store's rows (they would be lost): the whole group, the file left as it was", () => {
     const file = board09([{ store: 'lanes', scope: '', key: 'l1', ord: 0, doc: '{"id":"l1"}' }])
-    expect(() => openDb(file, { migrations: BOARD_MIGRATIONS, hiveVersion: '1.0.0', approve: () => true })).toThrow('store_rows still has rows of lanes (1)')
+    expect(() => openDb(file, { migrations: BOARD_MIGRATIONS, appVersion: '1.0.0', approve: () => true })).toThrow('store_rows still has rows of lanes (1)')
     const raw = new DatabaseSync(file, { readOnly: true })
     try {
       // As it was: every step before this one (board09 makes it so), none after.
@@ -410,8 +410,8 @@ describe('the 1.0 step: store_rows into the tables', () => {
   })
 
   it('a new file takes the step with nothing to move', () => {
-    const file = join(base, `b-${++n}`, 'hive.db')
-    const db = openDb(file, { migrations: BOARD_MIGRATIONS, hiveVersion: '1.0.0' })
+    const file = join(base, `b-${++n}`, 'combwork.db')
+    const db = openDb(file, { migrations: BOARD_MIGRATIONS, appVersion: '1.0.0' })
     try {
       expect(schemaVersion(db.writer)).toBe(Math.max(...BOARD_MIGRATIONS.map((m) => m.version)))
       expect(readSessionRecords(db.writer, 'p1')).toEqual([])
@@ -420,9 +420,9 @@ describe('the 1.0 step: store_rows into the tables', () => {
     }
   })
 
-  const live = process.env.HIVE_STORE_ROUNDTRIP_DB
+  const live = process.env.CW_STORE_ROUNDTRIP_DB
   it.skipIf(!live)("moves every session and delivery of a live board's copy: counts equal, each equal as JSON", () => {
-    const copy = join(tempDir('hive-store-roundtrip-'), 'hive.db')
+    const copy = join(tempDir('cw-store-roundtrip-'), 'combwork.db')
     copyFileSync(live!, copy)
     if (existsSync(`${live}-wal`)) copyFileSync(`${live}-wal`, `${copy}-wal`)
     const db = new DatabaseSync(copy)

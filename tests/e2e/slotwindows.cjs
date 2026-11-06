@@ -1,12 +1,12 @@
 // Slot writers with two workspaces open through a quit (HI-2299): after an update restart, a second workspace's slots
-// stayed held by the gone Hive's ended runs, its window closed first and their releases tried after its workspace had
+// stayed held by the gone Combwork's ended runs, its window closed first and their releases tried after its workspace had
 // closed ("No workspace is open"). Window 1 has workspace A (alpha: B1 in slot-a, S1 in slot-b), window 2 workspace B
 // (beta: C1 in slot-a), each lent through `slots:test`, as a card's start does:
 // 1. S1 leaves a process running (a real survivor) and is stopped; it's kept running.
 // 2. B is closed (Close Workspace, as Darren did) and reopened with no quit: C1's release was written while B was still
 //    open (no "wasn't released"), and its slot-a is free. C1 runs there again, and window 2 (not the last) is closed
 //    first: the same.
-// 3. Hive quits; the next start opens A: B1's slot-a comes back free, S1's slot-b stays held (its process still runs).
+// 3. Combwork quits; the next start opens A: B1's slot-a comes back free, S1's slot-b stays held (its process still runs).
 // 4. B is opened later, in a second window: C1's slot-a is free with no question (no writer, nothing to release).
 // A stopped run's release waits for its job to be seen empty (about 2 s), so a close that doesn't wait races it. The
 // agents run the fake Claude Code. Dev build only (slots:test). Throwaway profile, workspaces and CLAUDE_CONFIG_DIR.
@@ -32,10 +32,10 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase()
-const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
 const logText = () => {
   try {
-    return fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8')
+    return fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8')
   } catch {
     return ''
   }
@@ -53,7 +53,7 @@ const logText = () => {
 
   let h = null
   const start = async () => {
-    h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off' } })
+    h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off' } })
     h.page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.waitForProvider(h.inv)
     await lib.openWorkspace(h.inv, h.page, wsA)
@@ -108,7 +108,7 @@ const logText = () => {
     check('…stopped, its leftover listed', !!(await until(async () => !(await live(invA, alpha, s1.id)) && (await invA('session:leftovers')).some((l) => l.agentId === s1.id), HUNG_MS)))
     await invA('session:settleLeftovers', alpha, s1.id, 'keep')
 
-    // --- 2. B closed (Close Workspace, no card in flight) and reopened in the same Hive: C1's release was written while
+    // --- 2. B closed (Close Workspace, no card in flight) and reopened in the same Combwork: C1's release was written while
     // B was open, and its slot-a is free again.
     /** How the run's release went, once the log says: 'released', 'failed' (its workspace closed first), or null. */
     const releaseOf = (run) => {
@@ -136,7 +136,7 @@ const logText = () => {
     const windowRelease = await until(() => releaseOf(runC1b.runId), HUNG_MS)
     check("…C1's release written before its window's workspace closed", windowRelease === 'released', releaseLines(runC1b.runId))
 
-    // --- 3. Hive quits (B1 still running); the next start opens A.
+    // --- 3. Combwork quits (B1 still running); the next start opens A.
     await h.app.close()
     h = null
     await start()

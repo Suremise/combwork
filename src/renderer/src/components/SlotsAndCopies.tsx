@@ -18,24 +18,24 @@ import { OriginText } from './OriginText'
  * options: these aren't rules but the project's slot and copy settings (project.json `slots` and `copies`), each saved
  * as it is changed. With cards built in slots (G11): the setup and archive scripts and the files copied into a new slot,
  * each showing where its value comes from when unset (the setup command from before 1.0; the copied files as they
- * inherit, HI-1765: the workspace's, Hive's, the default), and the slots in use or ready. With any G11: the review and check copies' pool size and whether reviewers review
+ * inherit, HI-1765: the workspace's, Combwork's, the default), and the slots in use or ready. With any G11: the review and check copies' pool size and whether reviewers review
  * in them (Settings → Advanced's switch).
  */
 
 const T = {
-  heading: msg({ id: 'workflow.slots.heading', defaultMessage: 'Slots and copies', description: 'A heading of the Version Control tab’s Workflow section (Git): the project’s slots (worktrees Hive lends to cards and lanes) and its review and check copies (glossary 2.5: slot, review copy).' }),
+  heading: msg({ id: 'workflow.slots.heading', defaultMessage: 'Slots and copies', description: 'A heading of the Version Control tab’s Workflow section (Git): the project’s slots (worktrees Combwork lends to cards and lanes) and its review and check copies (glossary 2.5: slot, review copy).' }),
   desc: msg({ id: 'workflow.slots.desc', defaultMessage: 'These are saved as you change them, apart from the options above.', description: 'Under the heading “Slots and copies”: its settings save at once, unlike the workflow options, which are saved with Save….' }),
-  setup: msg({ id: 'workflow.slots.setup', defaultMessage: 'Setup script', description: 'A setting under “Slots and copies”: the command Hive runs in a new slot, and again when its lock files change (glossary 2.5: slot).' }),
+  setup: msg({ id: 'workflow.slots.setup', defaultMessage: 'Setup script', description: 'A setting under “Slots and copies”: the command Combwork runs in a new slot, and again when its lock files change (glossary 2.5: slot).' }),
   setupDesc: msg({ id: 'workflow.slots.setupDesc', defaultMessage: 'Runs in a new slot, and again in a slot whose lock files changed since its last install, e.g. npm ci. Review and check copies run it too.', description: 'What the setting “Setup script” does (glossary 2.5: slot, review copy; lock file).' }),
-  archive: msg({ id: 'workflow.slots.archive', defaultMessage: 'Archive script', description: 'A setting under “Slots and copies”: the command Hive runs in a slot before removing it.' }),
+  archive: msg({ id: 'workflow.slots.archive', defaultMessage: 'Archive script', description: 'A setting under “Slots and copies”: the command Combwork runs in a slot before removing it.' }),
   archiveDesc: msg({ id: 'workflow.slots.archiveDesc', defaultMessage: 'Runs in a slot before Combwork removes it. If it fails, the slot is kept.', description: 'What the setting “Archive script” does (glossary 2.5: slot).' }),
   copy: msg({ id: 'workflow.slots.copy', defaultMessage: 'Files copied into new slots', description: 'A setting under “Slots and copies”: the git-ignored files copied from the project folder into each new slot.' }),
   copyDesc: msg({ id: 'workflow.slots.copyDesc', defaultMessage: 'Git-ignored files copied from the project folder into each new slot, one pattern per line, such as .env files.', description: 'What the setting “Files copied into new slots” does (glossary 2.5: slot).' }),
-  fromSetup: msg({ id: 'workflow.slots.fromSetup', defaultMessage: 'From the project’s setup command before 1.0', description: 'Where the setting “Setup script” comes from while it isn’t set: the setup command the project had for agents’ worktrees before Hive 1.0.' }),
+  fromSetup: msg({ id: 'workflow.slots.fromSetup', defaultMessage: 'From the project’s setup command before 1.0', description: 'Where the setting “Setup script” comes from while it isn’t set: the setup command the project had for agents’ worktrees before 1.0.' }),
   none: msg({ id: 'workflow.slots.none', defaultMessage: 'None', description: 'A slot script that isn’t set: nothing runs.' }),
   setNone: msg({ id: 'workflow.slots.setNone', defaultMessage: 'Set for this project: none', description: 'Where a slot setting’s value comes from: this project sets it to nothing (no script runs, no files are copied), over the value it would inherit.' }),
-  toNone: msg({ id: 'workflow.slots.useNone', defaultMessage: 'Set to none', description: 'A button beside a slot setting this project inherits (from the workspace, Hive’s settings or before 1.0): set it to nothing for this project (no script runs, no files are copied).' }),
-  inherit: msg({ id: 'workflow.slots.inherit', defaultMessage: 'Inherit', description: 'A button beside a slot setting set for this project: stop setting it here, and use the inherited value again (the workspace’s, Hive’s or the default).' }),
+  toNone: msg({ id: 'workflow.slots.useNone', defaultMessage: 'Set to none', description: 'A button beside a slot setting this project inherits (from the workspace, Combwork’s settings or before 1.0): set it to nothing for this project (no script runs, no files are copied).' }),
+  inherit: msg({ id: 'workflow.slots.inherit', defaultMessage: 'Inherit', description: 'A button beside a slot setting set for this project: stop setting it here, and use the inherited value again (the workspace’s, Combwork’s or the default).' }),
   setHere: msg({ id: 'workflow.slots.setHere', defaultMessage: 'Set for this project', description: 'Where a slot setting’s value comes from: set in this project.' }),
   inUse: msg({ id: 'workflow.slots.inUse', defaultMessage: 'Slots in use and ready', description: 'A read-only list under “Slots and copies”: the project’s slots, what each is lent to, and those ready (glossary 2.5: slot).' }),
   noSlots: msg({ id: 'workflow.slots.noSlots', defaultMessage: 'No slots yet: one is made when a card starts.', description: 'Under “Slots in use and ready” when the project has no slot yet.' }),
@@ -45,7 +45,7 @@ const T = {
     ready: msg({ id: 'workflow.slots.state.ready', defaultMessage: 'Ready', description: 'A slot’s state in the list under “Slots and copies”: free, set up.' }),
     lent: msg({ id: 'workflow.slots.state.lent', defaultMessage: 'In use', description: 'A slot’s state in the list under “Slots and copies”: lent to a card or a lane.' }),
     dirty: msg({ id: 'workflow.slots.state.dirty', defaultMessage: 'Has changes left in it', description: 'A slot’s state in the list under “Slots and copies”: it has uncommitted or untracked files, so it isn’t lent until clean.' }),
-    gone: msg({ id: 'workflow.slots.state.gone', defaultMessage: 'Folder missing', description: 'A slot’s state in the list under “Slots and copies”: its folder is gone (Hive recreates it).' }),
+    gone: msg({ id: 'workflow.slots.state.gone', defaultMessage: 'Folder missing', description: 'A slot’s state in the list under “Slots and copies”: its folder is gone (Combwork recreates it).' }),
     removing: msg({ id: 'workflow.slots.state.removing', defaultMessage: 'Being removed', description: 'A slot’s state in the list under “Slots and copies”.' })
   } satisfies Record<SlotView['state'], ReturnType<typeof msg>>,
   lentCard: msg({ id: 'workflow.slots.lentCard', defaultMessage: '{agent}, for {card}', description: 'What a slot is lent to, in the list under “Slots and copies”: the builder agent {agent} (its name) for the card {card} (its key, HI-12).' }),
@@ -53,18 +53,18 @@ const T = {
   carried: msg({ id: 'workflow.slots.carried', defaultMessage: '{agent}’s old worktree, finishing its current work', description: 'What a slot holds, in the list under “Slots and copies”: an agent’s worktree from before 1.0, kept for it until its current card or lane ends (#1441). {agent} is its name.' }),
   copiesSize: msg({ id: 'workflow.slots.copiesSize', defaultMessage: 'Review and check copies', description: 'A setting under “Slots and copies”: how many review and check copies the project keeps (glossary 2.5: review copy).' }),
   copiesSizeDesc: msg({ id: 'workflow.slots.copiesSizeDesc', defaultMessage: 'How many copies the project keeps, each at exactly one revision, for reviewers and isolated checks. Empty keeps the larger of two and its reviewers plus one. They use the setup script.', description: 'What the setting “Review and check copies” does (glossary 2.5: review copy; isolated checks: cw-progress --check --isolated).' }),
-  copiesDefault: msg({ id: 'workflow.slots.copiesDefault', defaultMessage: '{n, number} (the default)', description: 'The placeholder of the setting “Review and check copies” while it isn’t set: the number Hive keeps.' }),
+  copiesDefault: msg({ id: 'workflow.slots.copiesDefault', defaultMessage: '{n, number} (the default)', description: 'The placeholder of the setting “Review and check copies” while it isn’t set: the number Combwork keeps.' }),
   copiesNow: msg({ id: 'workflow.slots.copiesNow', defaultMessage: '{n, plural, =0 {No copies yet.} one {# copy now, {leased, number} in use.} other {# copies now, {leased, number} in use.}}', description: 'Under the setting “Review and check copies”: how many copies the project has now, and how many are leased.' }),
   reviewCopies: msg({ id: 'workflow.slots.reviewCopies', defaultMessage: 'Reviewers review in review copies', description: 'A read-only row under “Slots and copies”: the setting of Settings → Advanced with this name (as translated there).' }),
   reviewCopiesDesc: msg({ id: 'workflow.slots.reviewCopiesDesc', defaultMessage: 'Set in Settings → Advanced, for every project.', description: 'Under the row “Reviewers review in review copies” of “Slots and copies”: where it is changed.' }),
   on: msg({ id: 'workflow.slots.on', defaultMessage: 'On', description: 'A setting’s value: on.' }),
   off: msg({ id: 'workflow.slots.off', defaultMessage: 'Off', description: 'A setting’s value: off.' }),
-  held: msg({ id: 'workflow.slots.held', defaultMessage: 'Held by an ended session of agent {agent}', description: "In the list of slots (Version Control → Slots and copies): the agent's ({agent}) last session there has ended, but Hive doesn't know that everything it started has, so nothing else uses the slot until it is released (#1506). A noun before the name (glossary §1 rule 4)." }),
+  held: msg({ id: 'workflow.slots.held', defaultMessage: 'Held by an ended session of agent {agent}', description: "In the list of slots (Version Control → Slots and copies): the agent's ({agent}) last session there has ended, but Combwork doesn't know that everything it started has, so nothing else uses the slot until it is released (#1506). A noun before the name (glossary §1 rule 4)." }),
   release: msg({ id: 'workflow.slots.release', defaultMessage: 'Release…', description: 'A button beside a held slot in the list of slots: asks, then frees it for other work (#1506).' }),
   openAdvanced: msg({ id: 'workflow.slots.openAdvanced', defaultMessage: 'Open Advanced', description: 'A button beside “Reviewers review in review copies”: opens Settings → Advanced.' }),
   saveFailed: msg({ id: 'workflow.slots.saveFailed', defaultMessage: 'Couldn’t save the slot settings', description: 'An error saving a setting under “Slots and copies”.' }),
   levelNone: msg({ id: 'workflow.slots.levelNone', defaultMessage: 'Set here: none', description: 'Where a slot default’s value comes from, in Settings → Workflow defaults or Settings → Workspace: this level sets it to nothing (no files are copied), over the value it would inherit.' }),
-  levelInherit: msg({ id: 'workflow.slots.levelInherit', defaultMessage: 'Inherit', description: 'A button beside a slot default set at this level (Settings → Workflow defaults or Settings → Workspace): stop setting it here, and use the inherited value (Hive’s, or the default).' })
+  levelInherit: msg({ id: 'workflow.slots.levelInherit', defaultMessage: 'Inherit', description: 'A button beside a slot default set at this level (Settings → Workflow defaults or Settings → Workspace): stop setting it here, and use the inherited value (Combwork’s, or the default).' })
 }
 
 /** Where an inherited slot option comes from (HI-1765), in the workflow options' words. */
@@ -94,7 +94,7 @@ export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots
     void call('copies:list', project.path).then(setCopies, () => setCopies([]))
     void call('slots:copyOf', project.path).then(setCopyNow, () => setCopyNow(null))
   }, [project.path])
-  // Hive's slot defaults are the settings' (a change there reaches every project's tab); the workspace's come with it.
+  // Combwork's slot defaults are the settings' (a change there reaches every project's tab); the workspace's come with it.
   const levels = useStore((s) => s.settings?.slotDefaults)
   const wsLevels = useStore((s) => s.workspace?.config.slotDefaults)
   useEffect(reload, [reload, project.config, levels, wsLevels])
@@ -265,15 +265,15 @@ export function SlotsAndCopies({ project, slots }: { project: ProjectInfo; slots
 }
 
 /**
- * A level's copied files (HI-1765), in Settings → Workflow defaults (Git: Hive's) and Settings → Workspace's workflow
- * defaults: its own patterns, none, or inherit (the workspace's: Hive's; Hive's: the default), saved as it is changed.
+ * A level's copied files (HI-1765), in Settings → Workflow defaults (Git: Combwork's) and Settings → Workspace's workflow
+ * defaults: its own patterns, none, or inherit (the workspace's: Combwork's; Combwork's: the default), saved as it is changed.
  * Its projects inherit it in Version Control → Slots and copies.
  */
 export function SlotCopyLevel({ level }: { level: WorkflowLevel }) {
   const workspacePath = useStore((s) => s.workspace?.path ?? '')
   const [form, setForm] = useState<SlotLevelForm | null>(null)
   const [shown, setShown] = useState(0)
-  // Read again when either level changes, from here or elsewhere (the settings tool, another window: HR5's round 1): Hive's
+  // Read again when either level changes, from here or elsewhere (the settings tool, another window: HR5's round 1): Combwork's
   // come with the settings, the workspace's with the workspace. Only the latest read or save counts.
   const levels = useStore((s) => s.settings?.slotDefaults)
   const wsLevels = useStore((s) => s.workspace?.config.slotDefaults)
@@ -296,7 +296,7 @@ export function SlotCopyLevel({ level }: { level: WorkflowLevel }) {
     const next = await actions.attempt(tr(T.saveFailed), () => call('slots:setLevelDefault', level, 'copy', value))
     if (next && n === latest.current) setForm(next)
     else if (!next) setShown((x) => x + 1)
-    // The projects' tabs read it again: Hive's comes with the settings, the workspace's with the workspace.
+    // The projects' tabs read it again: Combwork's comes with the settings, the workspace's with the workspace.
     if (level === 'workspace') await actions.refreshWorkspace()
   }
   if (!form) return null

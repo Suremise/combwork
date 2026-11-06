@@ -1,11 +1,11 @@
-// Project Settings → Storage: what Hive keeps per project (backups, archive, attachments, worktrees), measured in the
+// Project Settings → Storage: what Combwork keeps per project (backups, archive, attachments, worktrees), measured in the
 // background; Clean Up…, which moves what its preview listed to the Recycle Bin; and Purge… (#1138), which removes
-// everything Hive keeps per session, for a session, a project or the workspace, as its preview listed it.
+// everything Combwork keeps per session, for a session, a project or the workspace, as its preview listed it.
 import { randomUUID } from 'crypto'
 import { basename, dirname, join, resolve, sep } from 'path'
 import { lstat, opendir, readdir, rm, rmdir } from 'original-fs/promises'
 import { ASSISTANT_NAME } from '../shared/assistant'
-import { HIVE_DIR, assertSessionId, isSessionId, projectAgents } from '../shared/defaults'
+import { CW_DIR, assertSessionId, isSessionId, projectAgents } from '../shared/defaults'
 import { msg, tr, type Msg } from '../shared/i18n'
 import { planCleanup, planPurge, type CleanupFacts, type CleanupSession, type PurgeFacts, type PurgeFile, type PurgeSession } from '../shared/storage'
 import { utf8Bytes } from '../shared/metrics'
@@ -14,7 +14,7 @@ import { createLogger, userText } from './logger'
 import { sessions, type ListContext } from './sessions'
 import { workspace, workspaceOf } from './workspace'
 import { usageHistory } from './usageHistory'
-import { hiveError, shownError } from './hiveError'
+import { combworkError, shownError } from './combworkError'
 import { insideReal, placeKey } from './fsutil'
 import { folderFacts, legacyWorktree } from './agentFolders'
 import { unusedWorktreeFolders } from './unusedWorktrees'
@@ -111,7 +111,7 @@ const requests = new Map<string, Request>()
 const requestKey = (request: string, window: number | undefined): string => `${window ?? ''}:${request}`
 
 /**
- * What Hive keeps for a project or the Assistant. The last result comes back at once unless `refresh`; one
+ * What Combwork keeps for a project or the Assistant. The last result comes back at once unless `refresh`; one
  * measurement runs per project at a time. With `request`, the window (`window`, its web contents' id) can abandon the
  * call (abandonStorage), or abandons it by going: the measurement, which walks every file of every worktree, stops once
  * nothing waits for it.
@@ -199,14 +199,14 @@ function startMeasuring(projectPath: string, refresh: boolean): Measuring {
 
 async function measure(projectPath: string, refresh: boolean, signal: AbortSignal): Promise<ProjectStorage> {
   const assistant = workspace.isAssistantHome(projectPath)
-  const hive = join(projectPath, HIVE_DIR)
+  const combwork = join(projectPath, CW_DIR)
   const cache = refresh ? 'refresh' : 'use'
   // Backups grow in place, so they are always measured afresh (a few files).
-  const backups = await folderSize(join(hive, 'sessions'), 'none', signal)
-  const archive = await folderSize(join(hive, 'archive'), 'none', signal)
+  const backups = await folderSize(join(combwork, 'sessions'), 'none', signal)
+  const archive = await folderSize(join(combwork, 'archive'), 'none', signal)
   // What they hold before compression (#1110).
-  const sessionsRaw = await beforeCompression(join(hive, 'sessions'), backups)
-  const archiveRaw = await beforeCompression(join(hive, 'archive'), archive)
+  const sessionsRaw = await beforeCompression(join(combwork, 'sessions'), backups)
+  const archiveRaw = await beforeCompression(join(combwork, 'archive'), archive)
   const attachmentsRoot = await attachmentsDir(projectPath)
   // Cards' attachments (HI-1700) on a row of their own: the sessions' are the rest of the folder.
   const cardAttachments = await folderSize(join(attachmentsRoot, CARD_ATTACHMENTS_DIR), cache, signal)
@@ -388,7 +388,7 @@ export async function cleanup(projectPath: string, opts: CleanupOptions, listed:
 }
 
 /**
- * The files of .combwork/sessions and .combwork/archive that are Hive's per session: a backup (`<id>.jsonl`, compressed or not)
+ * The files of .combwork/sessions and .combwork/archive that are Combwork's per session: a backup (`<id>.jsonl`, compressed or not)
  * and what is left of one: a spare (`.spare`, trashAllOrNothing), a half-made copy (`.<pid>-<time>.tmp`, compressing)
  * and the names an archive sets aside (`.archiving`, `.previous`, `.archived`). Group 3 is empty for a backup.
  */
@@ -413,14 +413,14 @@ async function fileNow(path: string): Promise<PurgeFile | null> {
 /** A listed file is as the preview saw it. */
 const unchanged = (i: PurgeItem, now: PurgeFile | null): boolean => !!now && now.bytes === i.bytes && now.mtimeMs === i.mtimeMs
 
-/** What Purge… needs to know of a host (#1138): its sessions, Hive's files of them, and old kept usage. */
+/** What Purge… needs to know of a host (#1138): its sessions, Combwork's files of them, and old kept usage. */
 async function purgeFacts(host: string): Promise<PurgeFacts> {
   const file = await workspace.sessionsFile(host)
   const ctx: ListContext = { records: file.sessions, cfg: await workspace.projectConfig(host) }
   const liveNames = new Set(sessions.projectStates(host).flatMap((s) => [s.sessionId, `run-${s.runId}`]).filter(Boolean).map((n) => n.toLowerCase()))
   const files: PurgeFacts['files'] = []
   for (const folder of ['sessions', 'archive'] as const) {
-    const dir = join(host, HIVE_DIR, folder)
+    const dir = join(host, CW_DIR, folder)
     for (const e of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
       const m = e.isFile() ? BACKUP_FILE.exec(e.name) : null
       const now = m ? await fileNow(join(dir, e.name)) : null
@@ -438,7 +438,7 @@ async function purgeFacts(host: string): Promise<PurgeFacts> {
   const attachmentFolders: PurgeFacts['attachmentFolders'] = []
   const dir = await attachmentsDir(host)
   for (const e of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
-    // Only real folders named as Hive names them, and in them only plain files: anything else isn't Hive's.
+    // Only real folders named as Combwork names them, and in them only plain files: anything else isn't Combwork's.
     if (!e.isDirectory() || !isSessionId(e.name) || !isSessionFolder(e.name)) continue
     const path = join(dir, e.name)
     const inside: PurgeFile[] = []
@@ -466,7 +466,7 @@ function pruneExpiredPreviews(now: number): void {
   for (const [k, p] of previews) if (now - p.at > PREVIEW_MS) previews.delete(k)
 }
 
-/** What Purge… would remove (nothing is changed): every file and record of Hive's it covers, with its size. Kept for its apply. */
+/** What Purge… would remove (nothing is changed): every file and record of Combwork's it covers, with its size. Kept for its apply. */
 export async function purgePreview(target: PurgeTarget): Promise<PurgePreview> {
   const hosts = await purgeHosts(target)
   const only = target.kind === 'session' ? target.sessionId : undefined
@@ -487,7 +487,7 @@ export async function purgePreview(target: PurgeTarget): Promise<PurgePreview> {
 const M_PURGE = {
   notKept: msg({ id: 'main.storage.purgeNotKept', defaultMessage: "The folder isn't one Combwork keeps attachments in, so it is left alone.", description: "Purge skipped a session's attachments: their folder isn't a real folder in the project's attachments folder (a link, say)." }),
   changed: msg({ id: 'main.storage.purgeChanged', defaultMessage: 'It changed since the preview.', description: 'Purge skipped a file the preview listed: it was changed (written to) since.' }),
-  sessionChanged: msg({ id: 'main.storage.purgeSessionChanged', defaultMessage: "One of the session's backups changed since the preview, so nothing of it goes.", description: "Purge left a session alone: one of Hive's copies of its transcript changed since the preview (it was resumed, say)." }),
+  sessionChanged: msg({ id: 'main.storage.purgeSessionChanged', defaultMessage: "One of the session's backups changed since the preview, so nothing of it goes.", description: "Purge left a session alone: one of Combwork's copies of its transcript changed since the preview (it was resumed, say)." }),
   lastCopy: msg({ id: 'main.storage.purgeLastCopy', defaultMessage: "Whether Combwork's backup is the session's last copy changed since the preview.", description: "Purge left a session alone: its coding agent's own transcript went or came back since the preview, so what the purge would do to the session changed." }),
   noLonger: msg({ id: 'main.storage.purgeNoLonger', defaultMessage: 'It no longer qualifies (it changed since the preview).', description: 'Purge skipped an item the preview listed: it changed since (a session resumed, a file gone).' }),
   expired: msg({ id: 'main.storage.purgeExpired', defaultMessage: 'This preview is out of date. Open Purge again to see what goes now.', description: 'Purge refused: the preview it was asked to apply was already applied, or is too old.' })
@@ -502,7 +502,7 @@ const M_PURGE = {
 async function removeAttachments(host: string, dir: string, listed: PurgeItem[], permanent: boolean): Promise<PurgeItem[]> {
   const root = await attachmentsDir(host)
   const st = await lstat(dir).catch(() => null)
-  if (!st?.isDirectory() || st.isSymbolicLink() || resolve(dirname(dir)).toLowerCase() !== resolve(root).toLowerCase() || !insideReal(dir, [root])) throw hiveError(M_PURGE.notKept)
+  if (!st?.isDirectory() || st.isSymbolicLink() || resolve(dirname(dir)).toLowerCase() !== resolve(root).toLowerCase() || !insideReal(dir, [root])) throw combworkError(M_PURGE.notKept)
   const same: PurgeItem[] = []
   const changed: PurgeItem[] = []
   for (const i of listed) (resolve(dirname(i.path!)).toLowerCase() === resolve(dir).toLowerCase() && unchanged(i, await fileNow(i.path!)) ? same : changed).push(i)
@@ -522,7 +522,7 @@ async function removeAttachments(host: string, dir: string, listed: PurgeItem[],
  * session's last copy as the preview said; what changed is skipped and reported, and nothing it didn't list goes (an
  * attachment added since stays). A session's things go together, checked again with it reserved and its backups locked
  * (sessions.purge), what it used recorded first, and only with every listed backup unchanged; one whose last copy goes is
- * deleted from Hive, as Delete Session does. What is left of sessions Hive no longer has goes with that id reserved,
+ * deleted from Combwork, as Delete Session does. What is left of sessions Combwork no longer has goes with that id reserved,
  * once no session has it; old kept usage goes once the usage history has it. Running sessions, the usage history and the
  * CLIs' own files are never touched. A preview is applied once, and only within PREVIEW_MS of making it.
  */
@@ -530,7 +530,7 @@ export async function purge(previewId: string, listed: string[], permanent: bool
   if (typeof previewId !== 'string' || !Array.isArray(listed)) throw new Error('previewId and listed: a preview and its keys') // i18n-ignore: a refusal no person sees (the window sends these)
   pruneExpiredPreviews(Date.now())
   const preview = previews.get(previewId)
-  if (!preview) throw hiveError(M_PURGE.expired)
+  if (!preview) throw combworkError(M_PURGE.expired)
   previews.delete(previewId)
   const { target } = preview
   const only = target.kind === 'session' ? target.sessionId : undefined
@@ -593,11 +593,11 @@ export async function purge(previewId: string, listed: string[], permanent: bool
           },
           // With the session reserved and its backups locked, just before anything goes.
           async () => {
-            for (const i of backups) if (!unchanged(i, await fileNow(i.path!))) throw hiveError(M_PURGE.sessionChanged)
+            for (const i of backups) if (!unchanged(i, await fileNow(i.path!))) throw combworkError(M_PURGE.sessionChanged)
             // A leftover gone since is fine (sessions.purge passes over it); one written to isn't what was listed.
             for (const i of leftovers) {
               const now = await fileNow(i.path!)
-              if (now && !unchanged(i, now)) throw hiveError(M_PURGE.sessionChanged)
+              if (now && !unchanged(i, now)) throw combworkError(M_PURGE.sessionChanged)
             }
           }
         )
@@ -608,7 +608,7 @@ export async function purge(previewId: string, listed: string[], permanent: bool
         group.forEach((i) => skip(i, e))
       }
     }
-    // What is left of sessions Hive no longer has: a deleted session's old usage, its backups' files, its attachments (a folder at a time).
+    // What is left of sessions Combwork no longer has: a deleted session's old usage, its backups' files, its attachments (a folder at a time).
     const folders = new Map<string, PurgeItem[]>()
     for (const i of rest) {
       if (i.kind === 'orphan-attachments') {
@@ -618,7 +618,7 @@ export async function purge(previewId: string, listed: string[], permanent: bool
       try {
         if (i.kind === 'deleted-usage') await purgeDeletedUsage(host, i.sessionId!)
         else await whileUnclaimed(host, i.sessionId!, async () => {
-          if (!unchanged(i, await fileNow(i.path!))) throw hiveError(M_PURGE.changed)
+          if (!unchanged(i, await fileNow(i.path!))) throw combworkError(M_PURGE.changed)
           await remove(i.path!)
         })
         done(i)
@@ -645,15 +645,15 @@ export async function purge(previewId: string, listed: string[], permanent: bool
 }
 
 /**
- * Runs fn on what is left of a session Hive no longer has (`name`: its id, or run-<launch>), with that name reserved so
+ * Runs fn on what is left of a session Combwork no longer has (`name`: its id, or run-<launch>), with that name reserved so
  * no session starts under it meanwhile, once no record or launch has it now.
  */
 async function whileUnclaimed<T>(host: string, name: string, fn: () => Promise<T>): Promise<T> {
   return sessions.whileCleaning(host, name, async () => {
     const lower = name.toLowerCase()
-    if ((await workspace.sessionsFile(host)).sessions.some((s) => s.id.toLowerCase() === lower)) throw hiveError(msg({ id: 'main.storage.purgeClaimed', defaultMessage: 'It belongs to a session again.', description: 'Purge skipped a file or folder of a session Hive no longer had: it has one again.' }))
+    if ((await workspace.sessionsFile(host)).sessions.some((s) => s.id.toLowerCase() === lower)) throw combworkError(msg({ id: 'main.storage.purgeClaimed', defaultMessage: 'It belongs to a session again.', description: 'Purge skipped a file or folder of a session Combwork no longer had: it has one again.' }))
     // After the read above: nothing is awaited between this check and fn's first look at the files.
-    if (sessions.liveAnywhere(name) || sessions.projectStates(host).some((s) => `run-${s.runId}`.toLowerCase() === lower)) throw hiveError(msg({ id: 'main.storage.purgeRunning', defaultMessage: 'Its session is running.', description: 'Purge skipped a file or folder: its session is running now.' }))
+    if (sessions.liveAnywhere(name) || sessions.projectStates(host).some((s) => `run-${s.runId}`.toLowerCase() === lower)) throw combworkError(msg({ id: 'main.storage.purgeRunning', defaultMessage: 'Its session is running.', description: 'Purge skipped a file or folder: its session is running now.' }))
     return fn()
   })
 }
@@ -662,7 +662,7 @@ async function whileUnclaimed<T>(host: string, name: string, fn: () => Promise<T
 async function purgeDeletedUsage(host: string, id: string): Promise<void> {
   const k = (await workspace.sessionsFile(host)).deletedUsage?.find((x) => x.id === id)
   if (!k) return
-  if (!(await usageHistory.recordKept(host, k).catch(() => false))) throw hiveError(msg({ id: 'main.storage.purgeUnrecorded', defaultMessage: "Combwork couldn't record it in the usage history, so it is kept.", description: "Purge kept a deleted session's old usage: Hive couldn't save it in the usage history, which the totals keep." }))
+  if (!(await usageHistory.recordKept(host, k).catch(() => false))) throw combworkError(msg({ id: 'main.storage.purgeUnrecorded', defaultMessage: "Combwork couldn't record it in the usage history, so it is kept.", description: "Purge kept a deleted session's old usage: Combwork couldn't save it in the usage history, which the totals keep." }))
   await workspace.mutateSessions(host, (f) => {
     if (f.deletedUsage?.some((x) => x.id === id)) f.deletedUsage = f.deletedUsage.filter((x) => x.id !== id)
   })

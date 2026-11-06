@@ -37,13 +37,13 @@ import { Icon, IconButton, Modal, ReviewMark, statusText, Tooltip, useContextMen
 import { fmt, msg, tr, tRich } from '@shared/i18n'
 
 /**
- * The Hive Assistant's side panel: the workspace's overseer. Its header (mode, controls) and status line, what is
+ * The Combwork Assistant's side panel: the workspace's overseer. Its header (mode, controls) and status line, what is
  * happening in the workspace, its terminal, its footer (model, mode, context, cost) and what it has done. Everything about the
  * Assistant is here, apart from managing modes (their own view) and its defaults (Settings → Assistant).
  */
 
 const AGENT = ASSISTANT_AGENT_ID
-// i18n-ignore: the name Hive's own names for the Assistant's sessions start with (sessionLabel tells them apart), not text
+// i18n-ignore: the name Combwork's own names for the Assistant's sessions start with (sessionLabel tells them apart), not text
 const SESSION_NAMES = 'Assistant'
 
 const M = {
@@ -51,7 +51,7 @@ const M = {
   unreadCount: msg({ id: 'assistant.panel.unreadCount', defaultMessage: '{n, plural, one {# unread} other {# unread}}', description: "Read out with the Assistant's ⋯ button: how many items in its inbox it hasn't fetched or acked yet. Keep it short." }),
   inboxTip: msg({ id: 'assistant.panel.inboxTip', defaultMessage: "{n, plural, one {An item} other {# items}} in the Assistant's inbox that it hasn't fetched or acked yet: offered as its next line once it is idle, or read with cw_inbox.", description: "The heading of the Assistant's ⋯ menu's list of what it hasn't read in its inbox ({n}: how many). cw_inbox is a tool's name: keep it." }),
   inboxTipNoWakes: msg({ id: 'assistant.panel.inboxTipNoWakes', defaultMessage: "{n, plural, one {An item} other {# items}} in the Assistant's inbox that it hasn't fetched or acked yet", description: "The heading of the Assistant's ⋯ menu's list of what it hasn't read in its inbox, when the setting Wake an idle agent (Settings → Advanced) is off (a hint line under it says so; {n}: how many)." }),
-  noWakesHint: msg({ id: 'assistant.panel.noWakesHint', defaultMessage: 'Wake an idle agent is off, so nothing is typed by itself. Deliver Now types the line once.', description: "A hint line under the heading of the Assistant's ⋯ menu's list of its unread inbox, when the setting Wake an idle agent (Settings → Advanced) is off. Wake an idle agent names a setting and Deliver Now a menu item below: use their names as Hive shows them." }),
+  noWakesHint: msg({ id: 'assistant.panel.noWakesHint', defaultMessage: 'Wake an idle agent is off, so nothing is typed by itself. Deliver Now types the line once.', description: "A hint line under the heading of the Assistant's ⋯ menu's list of its unread inbox, when the setting Wake an idle agent (Settings → Advanced) is off. Wake an idle agent names a setting and Deliver Now a menu item below: use their names as Combwork shows them." }),
   inboxLine: msg({ id: 'assistant.panel.inboxLine', defaultMessage: '{id} · {from}: {text}', description: "An item of the Assistant's inbox in its ⋯ menu: its id, who it is from ({from}) and the start of its text ({text}). No preposition before the name (glossary §1 rule 4)." }),
   deliverNow: msg({ id: 'assistant.panel.deliverNow', defaultMessage: 'Deliver Now', description: "Menu item in the Assistant's ⋯ menu, shown while the setting Wake an idle agent is off: types the line telling it of what waits in its inbox into its terminal, once." }),
   deliverFailed: msg({ id: 'assistant.panel.deliverFailed', defaultMessage: "Could not deliver the Assistant's inbox", description: "An error's title: typing the line that tells the Assistant of what waits in its inbox (Deliver Now) failed." }),
@@ -76,7 +76,7 @@ const M = {
   showTip: msg({ id: 'assistant.panel.showTip', defaultMessage: '{hasKey, select, yes {Show the Assistant ({key})} other {Show the Assistant}}', description: 'Tooltip on the hidden Assistant panel\'s strip, with its shortcut ({key}: "Ctrl+Alt+I").' }),
   asking: msg({ id: 'assistant.panel.asking', defaultMessage: 'The Assistant is asking you something', description: "The hidden Assistant panel's bell: a question waits for you." }),
   statusTitle: msg({ id: 'assistant.panel.statusTitle', defaultMessage: '{running, select, yes {The Assistant: {status}} other {The Assistant is not running}}', description: "The Assistant's mark: what it is doing ({status}: Working, Waiting for you…)." }),
-  railLabel: msg({ id: 'assistant.panel.railLabel', defaultMessage: 'Assistant', description: "The hidden Assistant panel's strip, written down it. Hive's name stays as it is." }),
+  railLabel: msg({ id: 'assistant.panel.railLabel', defaultMessage: 'Assistant', description: "The hidden Assistant panel's strip, written down it. Combwork's name stays as it is." }),
   resumeTip: msg({ id: 'assistant.panel.resumeTip', defaultMessage: 'Resume "{name}", {when}', description: 'Tooltip on Resume: the conversation and when it was last active ({when}: "3 hours ago").' }),
   resume: msg({ id: 'assistant.panel.resume', defaultMessage: 'Resume', description: "A button: resumes the Assistant's last conversation." }),
   ended: msg({ id: 'assistant.panel.ended', defaultMessage: 'The conversation has ended.', description: "The Assistant's panel after its conversation ended." }),
@@ -141,7 +141,7 @@ const M = {
   inactive: msg({ id: 'assistant.panel.inactive', defaultMessage: '{count, plural, one {# inactive project} other {# inactive projects}}', description: "The Assistant's overview: a row that shows the inactive projects folded into it." }),
   restartQuestion: msg({ id: 'assistant.panel.restartQuestion', defaultMessage: 'Restart the Assistant?', description: "Confirmation before the Assistant's coding agent is changed." }),
   connectionRestart: msg({ id: 'assistant.panel.connectionRestart', defaultMessage: 'The Assistant restarts on the connection chosen and resumes this conversation.', description: "Confirmation before a running Assistant moves to another connection of the same coding agent CLI (HI-2108): it restarts in it and carries on the conversation." }),
-  cliOwnConnection: msg({ id: 'assistant.panel.cliOwnConnection', defaultMessage: "its mode is the CLI's own setting, and the Assistant needs to know its mode", description: "Why a connection is greyed out in Assistant Settings' choice of connection (HI-2108): its permission mode is \"The CLI's own setting\" (Hive passes none), and the Assistant's Control relies on knowing its mode. A clause, lower case." }),
+  cliOwnConnection: msg({ id: 'assistant.panel.cliOwnConnection', defaultMessage: "its mode is the CLI's own setting, and the Assistant needs to know its mode", description: "Why a connection is greyed out in Assistant Settings' choice of connection (HI-2108): its permission mode is \"The CLI's own setting\" (Combwork passes none), and the Assistant's Control relies on knowing its mode. A clause, lower case." }),
   switching: msg({ id: 'assistant.panel.switching', defaultMessage: "Switching to {to} stops this conversation ({from} conversations can't move to another provider) and starts a new one.", description: "Confirmation before the Assistant's coding agent is changed ({to}, {from}: Claude Code, Codex…)." }),
   tellFailed: msg({ id: 'assistant.panel.tellFailed', defaultMessage: 'Could not tell the Assistant its mode', description: "An error notice: the running Assistant couldn't be told its new mode; the reason follows." }),
   cancel: msg({ id: 'assistant.panel.cancel', defaultMessage: 'Cancel', description: "The Assistant Settings dialog's button that closes it without saving." }),
@@ -170,20 +170,20 @@ const settingsLink = (c: React.ReactNode[]): React.ReactNode => (
 )
 
 /**
- * A mode's name in the window: one Hive ships (SHIPPED_MODE_NAMES, #806), in the window's language while its file still
- * has Hive's name for it; any other (the user's own, or one they renamed) as its file has it.
+ * A mode's name in the window: one Combwork ships (SHIPPED_MODE_NAMES, #806), in the window's language while its file still
+ * has Combwork's name for it; any other (the user's own, or one they renamed) as its file has it.
  */
 export function modeName(p: Pick<ModeInfo, 'id' | 'name' | 'bundled'>): string {
   const shipped = p.bundled ? SHIPPED_MODE_NAMES[p.id] : undefined
   return shipped && p.name === shipped.defaultMessage ? tr(shipped) : p.name
 }
 
-/** What a mode is for, in the window: as modeName, one Hive ships in the window's language while its file still has Hive's words. */
+/** What a mode is for, in the window: as modeName, one Combwork ships in the window's language while its file still has Combwork's words. */
 export function modeDescription(p: Pick<ModeInfo, 'id' | 'description' | 'bundled'>): string {
   const shipped = p.bundled ? SHIPPED_MODE_DESCRIPTIONS[p.id] : undefined
   if (shipped && p.description === shipped.defaultMessage) return tr(shipped)
   // A new mode's description until the user writes one (#889).
-  if (p.description === NEW_MODE_DESCRIPTION) return tr(msg({ id: 'assistant.modes.newDescription', defaultMessage: 'What this mode is for, in one line.', description: "A new mode of the Hive Assistant's description, until the user writes one in its file: under its name in the mode menu and the Assistant view." }))
+  if (p.description === NEW_MODE_DESCRIPTION) return tr(msg({ id: 'assistant.modes.newDescription', defaultMessage: 'What this mode is for, in one line.', description: "A new mode of the Combwork Assistant's description, until the user writes one in its file: under its name in the mode menu and the Assistant view." }))
   return p.description
 }
 
@@ -488,7 +488,7 @@ function useConversationPicker() {
     const list = await actions.attempt(tr(M.listFailed), () => call('session:list', project.path))
     if (!list) return
     const open = project.agents[0]?.live?.sessionId
-    const all = list.filter((s) => s.source === 'hive' && !s.archived && !s.sub)
+    const all = list.filter((s) => s.source === 'combwork' && !s.archived && !s.sub)
     const items: MenuEntry[] = [{ header: true, label: tr(M.resumeOne) }]
     if (!all.length) items.push({ label: tr(M.noConversations), disabled: true })
     for (const s of all.slice(0, 12)) {
@@ -652,7 +652,7 @@ function AssistantHeader({ project, a }: { project: ProjectInfo; a: AgentInfo })
   )
 }
 
-/** A question's text as the window shows it (HI-2449): in the language Hive shows, or as Hive sent it with none. */
+/** A question's text as the window shows it (HI-2449): in the language Combwork shows, or as Combwork sent it with none. */
 const questionText = (q: AssistantQuestion, field: 'title' | 'message' | 'yes' | 'no'): string => (q.text ? shownText(q.text[field]) : q[field])
 
 /** Questions the Assistant's actions wait on (e.g. stopping a busy agent): the user answers on the card. */
@@ -695,7 +695,7 @@ const doneOpenKey = (ws: string): string => `assistant-done:${ws.toLowerCase()}`
 function AssistantStatus({ a }: { a: AgentInfo }) {
   useDateStyle()
   const live = a.live
-  // Hive's own questions its actions wait on (the cards under this line): the user is wanted first.
+  // Combwork's own questions its actions wait on (the cards under this line): the user is wanted first.
   const approvals = useStore((s) => s.assistantQuestions)
   const tasks = useStore((s) => s.tasks)
   const done = useDoneCount()
@@ -989,7 +989,7 @@ export function AssistantSettingsDialog() {
         <ConnectionChoice id="assistant-connection" value={connection} onChange={setConnection} unavailable={(c) => (cliOwn(c, cliOf(c.id)) ? tr(M.cliOwnConnection) : null)} />
         <label>{tr(M.mode)}</label>
         <select className="select" value={mode} onChange={(e) => setMode(e.target.value)}>
-          <option value="">{tr(M.defaultMode, { name: (defaultMode && modeName(defaultMode)) ?? settings?.assistant.mode ?? 'Overseer' /* i18n-ignore: the default mode's name, as Hive ships it */ })}</option>
+          <option value="">{tr(M.defaultMode, { name: (defaultMode && modeName(defaultMode)) ?? settings?.assistant.mode ?? 'Overseer' /* i18n-ignore: the default mode's name, as Combwork ships it */ })}</option>
           {modes
             .filter((p) => p.bundled !== 'missing')
             .map((p) => (

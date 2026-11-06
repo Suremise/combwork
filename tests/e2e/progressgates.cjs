@@ -47,14 +47,14 @@ const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1400, height: 850 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     await page.getByText('alpha', { exact: true }).first().click()
     // A reviewer agent who isn't the builder; the check "quick" before Review; each card in a folder of its own (in the
@@ -67,7 +67,7 @@ const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 
     for (const a of [builder, reviewer]) await inv('session:start', alpha, { agentId: a.id })
     check('the agents start', !!(await until(async () => (await live(builder.id))?.status === 'ready' && (await live(reviewer.id))?.status === 'ready', HUNG_MS)))
 
-    // Each agent's own token, from its launch, as its hive tools read it.
+    // Each agent's own token, from its launch, as its Combwork tools read it.
     const launchesFile = path.join(claudeHome, 'fake-launches.jsonl')
     const launches = () => {
       const text = fs.existsSync(launchesFile) ? fs.readFileSync(launchesFile, 'utf8') : ''
@@ -76,8 +76,8 @@ const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 
     const tokenOf = async (id) => {
       const sessionId = (await live(id))?.sessionId
       const launch = await until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
-      const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
-      return hive ? JSON.parse(fs.readFileSync(hive.env.CW_API_TOKEN_FILE, 'utf8')).token : null
+      const server = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
+      return server ? JSON.parse(fs.readFileSync(server.env.CW_API_TOKEN_FILE, 'utf8')).token : null
     }
     const tokens = { builder: await tokenOf(builder.id), reviewer: await tokenOf(reviewer.id) }
     check('each agent has its own token', !!tokens.builder && !!tokens.reviewer && tokens.builder !== tokens.reviewer)
@@ -87,12 +87,12 @@ const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 
     }
     const asBuilder = (p, body) => call(tokens.builder, p, body)
     const asReviewer = (p, body) => call(tokens.reviewer, p, body)
-    // The agent's shell (the fake's "shell:" step), as hive-progress runs in a session.
+    // The agent's shell (the fake's "shell:" step), as cw-progress runs in a session.
     const shells = () => {
       const f = path.join(claudeHome, 'fake-shell.jsonl')
       return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []
     }
-    // Typed again when a wake of Hive's (the lane's) disturbed it (typeLine).
+    // Typed again when a wake of Combwork's (the lane's) disturbed it (typeLine).
     const shell = async (id, cmd) => {
       const before = shells().length
       const name = id === builder.id ? 'B1' : 'R1'
@@ -162,7 +162,7 @@ const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 
     const first = gitIn(slot, 'rev-parse', 'HEAD')
 
     // --- Its check fails: the run says it blocks review for A.
-    const failedRun = await shell(builder.id, `cd /d "${slot}" && hive-progress --check quick`)
+    const failedRun = await shell(builder.id, `cd /d "${slot}" && cw-progress --check quick`)
     check('the check fails', failedRun?.code === 1, JSON.stringify(failedRun))
     const blocks = panel.locator('.progress-run-blocks')
     check('…and its row says it blocks review for the card', !!(await until(async () => ((await blocks.first().textContent().catch(() => '')) ?? '') === `Blocks review for ${keyA}`, HUNG_MS)), await blocks.first().textContent().catch(() => ''))
@@ -178,7 +178,7 @@ const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 
 
     // --- The check passes, the submit goes through: the notch clears with the move.
     fs.writeFileSync(path.join(slot, 'ok.txt'), 'yes\n')
-    const passedRun = await shell(builder.id, `cd /d "${slot}" && hive-progress --check quick`)
+    const passedRun = await shell(builder.id, `cd /d "${slot}" && cw-progress --check quick`)
     check('the check passes', passedRun?.code === 0, JSON.stringify(passedRun))
     await until(async () => (await inv('tasks:work', a))?.checks.some((c) => c.name === 'quick' && c.result === 'passed' && c.counted), HUNG_MS)
     const submitted = await asBuilder(`/v1/tasks/${encodeURIComponent(keyA)}/submit`, { summary: 'Round 1 ready' })
@@ -201,7 +201,7 @@ const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 
     fs.writeFileSync(path.join(slot, 'b.ts'), 'export const b = 3\n')
     gitIn(slot, 'commit', '-qam', 'Another change')
     const second = gitIn(slot, 'rev-parse', 'HEAD')
-    // Its Work section read once (as the card dialog does): Hive looks at its folder soon, once events settle. Asked
+    // Its Work section read once (as the card dialog does): Combwork looks at its folder soon, once events settle. Asked
     // again on every poll, that "soon" would keep moving.
     await inv('tasks:work', a)
     check('a new revision after the pass marks the folded segment stale', !!(await until(async () => (await fin.getAttribute('class'))?.includes('stale'), HUNG_MS)), await fin.getAttribute('class'))
@@ -235,20 +235,20 @@ const gitIn = (dir, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 
     await app.close().catch(() => undefined)
   }
 
-  // --- In another language: Hive started again in German, the same lane.
-  // The lane's agents were working: Hive offers to resume them (its restart record), in a notice over the lane's
+  // --- In another language: Combwork started again in German, the same lane.
+  // The lane's agents were working: Combwork offers to resume them (its restart record), in a notice over the lane's
   // segments (HI-1809: the hover timed out under it). Answered Don't Resume, below, until the record is gone (nothing
   // left to offer) and no offer shows.
   const restartRecord = path.join(userData, 'restart.json')
   const offered = fs.existsSync(restartRecord)
   console.log(`INFO restart record before the restart: ${offered ? 'yes' : 'no'}`)
-  const de = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off', HIVE_LANG: 'de' }) })
+  const de = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off', CW_LANG: 'de' }) })
   try {
     const page = await de.firstWindow()
     page.on('pageerror', (e) => check('no page errors in German', false, e.message))
     await lib.fitWindow(de, page, { width: 1400, height: 850 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     if (!(await page.evaluate((n) => document.title.includes(n), path.basename(ws)))) await lib.openWorkspace(inv, page, ws)
     if (offered) {
       const deMain = JSON.parse(fs.readFileSync(path.join(lib.ROOT, 'locales', 'de', 'main.json'), 'utf8'))

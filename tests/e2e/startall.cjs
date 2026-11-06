@@ -38,13 +38,13 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
   const PORT = lib.port(47884)
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: PORT, CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: PORT, CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   /** The open menu's rows, `label=keys` ('-' a separator), as keys.cjs reads them (HI-2551: ⋯'s entries show their keys). */
   const menuRows = () => page.locator('.menu').last().evaluate((m) => [...m.children].map((c) => (c.classList.contains('menu-sep') ? '-' : `${c.querySelector('.menu-label, :scope > span:not(.menu-key)')?.textContent.trim() ?? c.textContent.trim()}=${c.querySelector('.menu-key')?.textContent.trim() ?? ''}`)))
   await lib.openWorkspace(inv, page, ws)
@@ -56,7 +56,7 @@ const check = (name, ok, extra = '') => {
     return v
   }
   const type = async (id, text) => {
-    // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+    // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
     await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
   }
   // Starts an agent (trusting its folder) and has one exchange, so it has a conversation.
@@ -158,7 +158,7 @@ const check = (name, ok, extra = '') => {
   }, HUNG_MS)), JSON.stringify(await focusState()))
   await page.evaluate(() => document.activeElement?.blur())
   // Narrower: the actions turn to icons (named for screen readers and in their tooltips) and the title gives way; at the
-  // narrowest window Hive supports (900 px, sidebar and rails open), every action is inside the header, on screen and
+  // narrowest window Combwork supports (900 px, sidebar and rails open), every action is inside the header, on screen and
   // the thing under its own centre, in both themes. With the Assistant's panel open too, Agents ▾'s actions go into ⋯.
   // Every action found and read in one evaluation in the page, so a refold (the Assistant opening) can't leave a stale or
   // detached control between the two (a locator's evaluateAll queries first, then evaluates).
@@ -213,7 +213,7 @@ const check = (name, ok, extra = '') => {
   }
   const oneRow = () => page.locator('.project-header').evaluate((el) => el.getBoundingClientRect().height < 48)
   const statusText = () => page.locator('.project-header .badge-text').innerText().catch(() => '')
-  const toggleProgress = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', { type: 'menu-command', command: 'progress.toggle', args: [] }))
+  const toggleProgress = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', { type: 'menu-command', command: 'progress.toggle', args: [] }))
   // The Progress panel open at 900 px: the header about 265 px.
   await page.evaluate(() => document.activeElement?.blur())
   await toggleProgress()
@@ -399,10 +399,10 @@ const check = (name, ok, extra = '') => {
   const archiveDialog = page.locator('.dialog', { hasText: 'Archive and start new for all agents?' })
   await lib.agentsMenuRun(page, 'Archive and Start New (3)')
   await archiveDialog.waitFor({ timeout: 5000 })
-  const archiveText = await archiveDialog.innerText()
+  const arcappText = await archiveDialog.innerText()
   const archiveTable = await tableOf(archiveDialog)
   check('Archive lists them as a table too, saying each session is archived', archiveTable.rows.Worker?.[3]?.text === 'Stopped (will be interrupted), then its session archived, then a new one' && Object.keys(archiveTable.rows).length === 3, JSON.stringify(archiveTable.rows))
-  check('Archive asks once, listing the agents with sessions, the working one flagged', /Worker — Working.*\(will be interrupted\)/.test(archiveText) && /Idle — /.test(archiveText) && /Stopped — /.test(archiveText) && /\.combwork\/archive/.test(archiveText), archiveText)
+  check('Archive asks once, listing the agents with sessions, the working one flagged', /Worker — Working.*\(will be interrupted\)/.test(arcappText) && /Idle — /.test(arcappText) && /Stopped — /.test(arcappText) && /\.combwork\/archive/.test(arcappText), arcappText)
   await archiveDialog.getByRole('button', { name: 'Archive and start new' }).click()
   const renewed = await until(async () => {
     const l = await Promise.all([w, i, s].map((a) => live(a.id)))

@@ -1,4 +1,4 @@
-// The CLI versions a Hive release was tested with (#365): read from the real tier's run record (never typed by hand),
+// The CLI versions a Combwork release was tested with (#365): read from the real tier's run record (never typed by hand),
 // written into resources/tested-clis.json by `npm run tested-clis`, checked by `npm run release`, and compared with the
 // installed version for Provider Setup, Copy Diagnostics and the Agent API.
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
@@ -16,20 +16,20 @@ import { PROVIDERS } from '../src/shared/providers'
 import { testedComparison, testedNote, testedSummary } from '../src/shared/testedClis'
 import { tempDir } from './tempDir'
 
-type Suite = { name: string; needs?: string[]; noHive?: string }
+type Suite = { name: string; needs?: string[]; noCombwork?: string }
 type Cli = { provider: string; version: string; path: string | null; home?: string }
 const suites = SUITES as Suite[]
 const real = (need: string) => suites.filter((s) => s.needs?.includes(need)).map((s) => s.name)
 /** Those that need this CLI alone (HI-1742: one needing two, such as cliquit, is a run of both). */
 const alone = (need: string) => suites.filter((s) => s.needs?.length === 1 && s.needs[0] === need).map((s) => s.name)
-/** Those of them that start a test Hive, which says which version it selected (not noHive). */
-const hived = (need: string) => suites.filter((s) => s.needs?.includes(need) && !s.noHive).map((s) => s.name)
+/** Those of them that start a test Combwork, which says which version it selected (not noCombwork). */
+const withCombwork = (need: string) => suites.filter((s) => s.needs?.includes(need) && !s.noCombwork).map((s) => s.name)
 const CLAUDE: Cli = { provider: 'claude-code', version: '2.1.292', path: 'C:\\Users\\t\\.local\\bin\\claude.exe' }
 const CODEX: Cli = { provider: 'codex', version: '0.160.1', path: 'C:\\Users\\t\\AppData\\Local\\Programs\\OpenAI\\Codex\\bin\\codex.exe' }
-/** A passed suite whose test copies of Hive selected these CLIs (both, as Hive looks for both). */
+/** A passed suite whose test copies of Combwork selected these CLIs (both, as Combwork looks for both). */
 const pass = (name: string, clis: Cli[] = []) => ({ name, ok: true, seconds: 3, clis })
 const COPILOT: Cli = { provider: 'copilot', version: '1.0.93', path: 'C:\\Users\\t\\AppData\\Local\\Microsoft\\WinGet\\Links\\copilot.exe' }
-/** Each real suite once (#1521: reviewcopiesreal needs all three), its Hive having selected every CLI it needs. */
+/** Each real suite once (#1521: reviewcopiesreal needs all three), its Combwork having selected every CLI it needs. */
 const realResults = () => [pass('about'), ...suites.filter((s) => s.needs?.length).map((s) => pass(s.name, s.needs!.includes('copilot') ? [CLAUDE, CODEX, COPILOT] : [CLAUDE, CODEX]))]
 /** A run record of the whole real tier (and one fake suite), every suite passed, as run.mjs writes it. */
 const fullRecord = (over: Record<string, unknown> = {}) => {
@@ -38,15 +38,15 @@ const fullRecord = (over: Record<string, unknown> = {}) => {
 }
 type Result = ReturnType<typeof realResults>[number]
 
-describe('the run record says which real CLIs ran, as Hive selected them (#365)', () => {
-  it("reads the suite's log of what its Hive selected, once each, skipping lines it can't read", () => {
+describe('the run record says which real CLIs ran, as Combwork selected them (#365)', () => {
+  it("reads the suite's log of what its Combwork selected, once each, skipping lines it can't read", () => {
     const log = [JSON.stringify(CLAUDE), JSON.stringify(CODEX), JSON.stringify(CLAUDE), '{"provider":"codex"', JSON.stringify({ provider: 'codex' }), ''].join('\n')
     expect(readCliLog(log)).toEqual([CLAUDE, CODEX])
     expect(readCliLog('')).toEqual([])
   })
 
   it("takes each real CLI's versions from its own real suites only, and names them in the records", () => {
-    // A Codex suite's Hive also finds Claude Code: that isn't a run of Claude Code's suites.
+    // A Codex suite's Combwork also finds Claude Code: that isn't a run of Claude Code's suites.
     const results = [pass('about', [{ ...CLAUDE, version: '9.9.9' }]), pass(alone('claude')[0], [CLAUDE]), pass(alone('codex')[0], [{ ...CLAUDE, version: '2.1.1' }, CODEX])]
     expect(realCliVersions(results, suites)).toEqual({ claude: ['2.1.292'], codex: ['0.160.1'] })
     // A suite needing both (cliquit) is a run of each: its Claude Code counts.
@@ -54,7 +54,7 @@ describe('the run record says which real CLIs ran, as Hive selected them (#365)'
     expect(realCliVersions([...results, pass(both, [{ ...CLAUDE, version: '2.1.1' }, CODEX])], suites)).toEqual({ claude: ['2.1.1', '2.1.292'], codex: ['0.160.1'] })
     const clis = { claude: ['2.1.292'], codex: ['0.160.1', '0.161.0'] }
     const md = recordMarkdown({ code: 'abc', when: 'now', jobs: 4, results, logDir: 'x', summary: '3 passed', clis })
-    expect(md).toContain('Real CLIs (as Hive selected them): Claude Code 2.1.292, Codex 0.160.1 and 0.161.0.')
+    expect(md).toContain('Real CLIs (as Combwork selected them): Claude Code 2.1.292, Codex 0.160.1 and 0.161.0.')
     expect(recordMarkdown({ code: 'abc', when: 'now', jobs: 4, results: [pass('about')], logDir: 'x', summary: '1 passed' })).not.toContain('Real CLIs')
     const json = recordJson({ code: 'abc', when: 'now', results: [pass('a', [CLAUDE]), { name: 'b', ok: true, skipped: 'environment: usage limit', environment: true }], problems: ['code changed'], clis: { claude: ['2.1.292'] } })
     expect(json).toEqual({ code: 'abc', when: 'now', valid: false, problems: ['code changed'], clis: { claude: ['2.1.292'] }, results: [{ name: 'a', ok: true, skipped: null, environment: false, clis: [CLAUDE] }, { name: 'b', ok: true, skipped: 'environment: usage limit', environment: true, clis: [] }], notRun: [] })
@@ -63,15 +63,15 @@ describe('the run record says which real CLIs ran, as Hive selected them (#365)'
 
 describe("the run record names each real suite's CLI home, and none may be the user's own (#368)", () => {
   const profile = join('C:', 'Users', 't')
-  it("lists the home of each real suite's own CLI, not the other CLI its Hive found", () => {
-    const own = join(profile, 'AppData', 'Local', 'hive-test', 'e2e', 'lanes', '0', 'mode', 'mode-claude-home')
-    const codexHome = join(profile, 'AppData', 'Local', 'hive-test', 'codex')
+  it("lists the home of each real suite's own CLI, not the other CLI its Combwork found", () => {
+    const own = join(profile, 'AppData', 'Local', 'combwork-test', 'e2e', 'lanes', '0', 'mode', 'mode-claude-home')
+    const codexHome = join(profile, 'AppData', 'Local', 'combwork-test', 'codex')
     const claudeSuite = alone('claude')[0]
     const codexSuite = alone('codex')[0]
     const results = [pass('about', [{ ...CLAUDE, home: join(profile, '.claude') }] as Cli[]), pass(claudeSuite, [{ ...CLAUDE, home: own }, { ...CODEX, home: join(profile, '.codex') }] as Cli[]), pass(codexSuite, [{ ...CODEX, home: codexHome }] as Cli[])]
     const { homes, own: inUsers } = realCliHomes(results, suites, profile)
     expect(homes).toEqual([`${claudeSuite}: Claude Code in ${own}`, `${codexSuite}: Codex in ${codexHome}`])
-    // The fake suite's Hive and the Claude suite's Codex check aren't runs of those CLIs.
+    // The fake suite's Combwork and the Claude suite's Codex check aren't runs of those CLIs.
     expect(inUsers).toEqual([])
     expect(recordMarkdown({ code: 'abc', when: 'now', jobs: 4, results, logDir: 'x', summary: '3 passed', homes })).toContain(`Real CLIs' homes (#368): ${claudeSuite}: Claude Code in ${own}; ${codexSuite}: Codex in ${codexHome}.`)
   })
@@ -98,7 +98,7 @@ describe("the run record names each real suite's CLI home, and none may be the u
 })
 
 describe('npm run tested-clis: the manifest from a run record (#365)', () => {
-  it('takes each CLI whose real suites all ran and passed, with the version their Hive selected', () => {
+  it('takes each CLI whose real suites all ran and passed, with the version their Combwork selected', () => {
     const { manifest, updated, problems } = manifestFromRecord(fullRecord(), suites)
     expect(problems).toEqual([])
     expect(updated).toEqual(['claude-code', 'codex', 'copilot'])
@@ -125,28 +125,28 @@ describe('npm run tested-clis: the manifest from a run record (#365)', () => {
 
   it('takes the version only from what every suite of the CLI ran: none unsaid, all the same', () => {
     const changed = (name: string, clis: Cli[]) => fullRecord({ results: fullRecord().results.map((r: Result) => (r.name === name ? { ...r, clis } : r)) })
-    // A suite whose Hive didn't say (an older runner, or it never looked), or said only the other CLI.
-    expect(manifestFromRecord(changed(hived('codex')[1], []), suites).problems).toEqual([`Codex: the record doesn't say which version Hive used in ${hived('codex')[1]}`])
-    expect(manifestFromRecord(changed(hived('claude')[0], [CODEX]), suites).problems).toEqual([`Claude Code: the record doesn't say which version Hive used in ${hived('claude')[0]}`])
+    // A suite whose Combwork didn't say (an older runner, or it never looked), or said only the other CLI.
+    expect(manifestFromRecord(changed(withCombwork('codex')[1], []), suites).problems).toEqual([`Codex: the record doesn't say which version Combwork used in ${withCombwork('codex')[1]}`])
+    expect(manifestFromRecord(changed(withCombwork('claude')[0], [CODEX]), suites).problems).toEqual([`Claude Code: the record doesn't say which version Combwork used in ${withCombwork('claude')[0]}`])
     // One suite ran another version (updated mid-run, or another copy): refused, not one of them picked.
-    expect(manifestFromRecord(changed(hived('codex')[2], [CLAUDE, { ...CODEX, version: '0.161.0' }]), suites).problems).toEqual(['Codex: its real suites ran different versions (0.160.1, 0.161.0)'])
-    // The record's top-level summary is never the source: only what each suite's Hive selected.
+    expect(manifestFromRecord(changed(withCombwork('codex')[2], [CLAUDE, { ...CODEX, version: '0.161.0' }]), suites).problems).toEqual(['Codex: its real suites ran different versions (0.160.1, 0.161.0)'])
+    // The record's top-level summary is never the source: only what each suite's Combwork selected.
     expect(manifestFromRecord(fullRecord({ clis: { claude: ['1.0.0'], codex: ['0.1.0'] } }), suites).manifest.codex.version).toBe('0.160.1')
   })
 
-  it("doesn't ask a suite that runs its CLI without Hive (noHive) which version, but it must still pass (#921)", () => {
-    const own = [...suites, { name: 'codex-nohive', needs: ['codex'], noHive: 'runs codex itself' }]
-    const record = (r: object) => fullRecord({ results: [...fullRecord().results.filter((x: Result) => x.name !== 'codex-nohive'), { ...pass('codex-nohive'), ...r }] })
+  it("doesn't ask a suite that runs its CLI without Combwork (noCombwork) which version, but it must still pass (#921)", () => {
+    const own = [...suites, { name: 'codex-nocombwork', needs: ['codex'], noCombwork: 'runs codex itself' }]
+    const record = (r: object) => fullRecord({ results: [...fullRecord().results.filter((x: Result) => x.name !== 'codex-nocombwork'), { ...pass('codex-nocombwork'), ...r }] })
     expect(manifestFromRecord(record({}), own).problems).toEqual([])
     expect(manifestFromRecord(record({}), own).manifest.codex.version).toBe('0.160.1')
-    expect(manifestFromRecord(record({ ok: false }), own).problems).toEqual(['Codex: not all of its real suites passed (codex-nohive)'])
+    expect(manifestFromRecord(record({ ok: false }), own).problems).toEqual(['Codex: not all of its real suites passed (codex-nocombwork)'])
     // One that does name a version is held to it.
     expect(manifestFromRecord(record({ clis: [{ ...CODEX, version: '0.161.0' }] }), own).problems).toEqual(['Codex: its real suites ran different versions (0.160.1, 0.161.0)'])
-    // A CLI whose only suites start no Hive: nothing says its version.
-    const only = [{ name: 'codex-nohive', needs: ['codex'], noHive: 'runs codex itself' }]
-    expect(manifestFromRecord(fullRecord({ results: [pass('codex-nohive')] }), only).problems).toEqual(['Claude Code: none of its real suites ran', 'Codex: none of its real suites says which version Hive used', 'GitHub Copilot: none of its real suites ran'])
+    // A CLI whose only suites start no Combwork: nothing says its version.
+    const only = [{ name: 'codex-nocombwork', needs: ['codex'], noCombwork: 'runs codex itself' }]
+    expect(manifestFromRecord(fullRecord({ results: [pass('codex-nocombwork')] }), only).problems).toEqual(['Claude Code: none of its real suites ran', 'Codex: none of its real suites says which version Combwork used', 'GitHub Copilot: none of its real suites ran'])
     // Every suite marked so says why, and is a real suite.
-    for (const s of suites.filter((x) => x.noHive)) expect(s.needs?.some((n) => n !== 'packaged'), s.name).toBe(true)
+    for (const s of suites.filter((x) => x.noCombwork)) expect(s.needs?.some((n) => n !== 'packaged'), s.name).toBe(true)
   })
 
   it('refuses a record that is not valid, or not a record', () => {
@@ -223,7 +223,7 @@ describe('npm run tested-clis: the manifest from a run record (#365)', () => {
     })
   })
 
-  it('maps each real CLI of the suites to a provider Hive has', () => {
+  it('maps each real CLI of the suites to a provider Combwork has', () => {
     const needs = new Set(suites.flatMap((s) => s.needs ?? []).filter((n) => n !== 'packaged'))
     expect([...needs].sort()).toEqual(Object.keys(CLI_PROVIDERS).sort())
     for (const p of Object.values(CLI_PROVIDERS) as { id: string; name: string }[]) expect(PROVIDERS.find((x) => x.id === p.id)?.name).toBe(p.name)
@@ -248,7 +248,7 @@ describe('npm run release: the manifest must be of the code released (#365)', ()
 describe('the shipped manifest (#365)', () => {
   // Between releases it may lack a provider (Claude Code's real tier runs in the default home until #368, so its entry
   // is written by the release's run); npm run release refuses it until every provider has one (manifestStale).
-  it("names only Hive's providers, each entry as npm run tested-clis writes it from a run record of the real tier", () => {
+  it("names only Combwork's providers, each entry as npm run tested-clis writes it from a run record of the real tier", () => {
     const shipped = JSON.parse(readFileSync(MANIFEST, 'utf8'))
     expect(Object.keys(shipped).length).toBeGreaterThan(0)
     for (const id of Object.keys(shipped)) expect(PROVIDERS.map((p) => p.id), id).toContain(id)
@@ -284,8 +284,8 @@ describe('the installed version against the tested one (#365)', () => {
   })
 })
 
-describe('the run record\'s versions are what Hive selected, not the first copy on PATH (#365)', () => {
-  const dir = tempDir('hive-tested-clis-')
+describe('the run record\'s versions are what Combwork selected, not the first copy on PATH (#365)', () => {
+  const dir = tempDir('combwork-tested-clis-')
   afterAll(() => rmSync(dir, { recursive: true, force: true }))
   /** Puts an environment variable back as it was. */
   const restore = (k: string, v: string | undefined): void => {
@@ -300,7 +300,7 @@ describe('the run record\'s versions are what Hive selected, not the first copy 
     return file
   }
 
-  it("an editor extension's copy first on PATH, at another version: Hive selects the standalone CLI, and notes that one", async () => {
+  it("an editor extension's copy first on PATH, at another version: Combwork selects the standalone CLI, and notes that one", async () => {
     const extension = fake(join(dir, '.vscode', 'extensions', 'anthropic.claude-code-9.9.9', 'resources'), '9.9.9')
     const standalone = fake(join(dir, 'standalone'), '2.1.292')
     const { claudeCode } = await import('../src/main/providers/claude/adapter')
@@ -311,19 +311,19 @@ describe('the run record\'s versions are what Hive selected, not the first copy 
     try {
       const info = await claudeCode.locate()
       expect({ path: info.path, version: info.version, rejected: info.rejected }).toEqual({ path: standalone, version: '2.1.292', rejected: [extension] })
-      // A test copy of Hive notes what it selected for the run record.
-      const log = join(dir, 'hive-clis.jsonl')
-      const env = { user: process.env.HIVE_USER_DATA, log: process.env.HIVE_TEST_CLI_LOG }
-      process.env.HIVE_USER_DATA = join(dir, 'profile')
-      process.env.HIVE_TEST_CLI_LOG = log
+      // A test copy of Combwork notes what it selected for the run record.
+      const log = join(dir, 'cw-clis.jsonl')
+      const env = { user: process.env.CW_USER_DATA, log: process.env.CW_TEST_CLI_LOG }
+      process.env.CW_USER_DATA = join(dir, 'profile')
+      process.env.CW_TEST_CLI_LOG = log
       // With the home the adapter says its sessions get (#368): CLAUDE_CONFIG_DIR, here a test home.
       const configDir = process.env.CLAUDE_CONFIG_DIR
       process.env.CLAUDE_CONFIG_DIR = join(dir, 'claude-home')
       try {
         await noteSelectedCli(info, claudeCode.configHome?.() ?? null)
       } finally {
-        restore('HIVE_USER_DATA', env.user)
-        restore('HIVE_TEST_CLI_LOG', env.log)
+        restore('CW_USER_DATA', env.user)
+        restore('CW_TEST_CLI_LOG', env.log)
         restore('CLAUDE_CONFIG_DIR', configDir)
       }
       expect(readCliLog(readFileSync(log, 'utf8'))).toEqual([{ provider: 'claude-code', version: '2.1.292', path: standalone, home: join(dir, 'claude-home') }])
@@ -335,17 +335,17 @@ describe('the run record\'s versions are what Hive selected, not the first copy 
   it('notes nothing outside a test copy, or for a CLI not found', async () => {
     const log = join(dir, 'none.jsonl')
     const info = { provider: 'claude-code', found: true, path: 'x', version: '1.0.0' } as never
-    const was = process.env.HIVE_TEST_CLI_LOG
-    process.env.HIVE_TEST_CLI_LOG = log
-    const user = process.env.HIVE_USER_DATA
-    delete process.env.HIVE_USER_DATA
+    const was = process.env.CW_TEST_CLI_LOG
+    process.env.CW_TEST_CLI_LOG = log
+    const user = process.env.CW_USER_DATA
+    delete process.env.CW_USER_DATA
     try {
       await noteSelectedCli(info)
-      process.env.HIVE_USER_DATA = join(dir, 'profile')
+      process.env.CW_USER_DATA = join(dir, 'profile')
       await noteSelectedCli({ provider: 'claude-code', found: false, path: null, version: null } as never)
     } finally {
-      restore('HIVE_TEST_CLI_LOG', was)
-      restore('HIVE_USER_DATA', user)
+      restore('CW_TEST_CLI_LOG', was)
+      restore('CW_USER_DATA', user)
     }
     expect(() => readFileSync(log, 'utf8')).toThrow()
   })

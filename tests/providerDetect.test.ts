@@ -7,7 +7,7 @@ import * as electron from 'electron'
 import type { AgentInstallInfo, ProviderId } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-provider-detect-')
+const base = tempDir('cw-provider-detect-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { config } = await import('../src/main/config')
@@ -17,7 +17,7 @@ const { DEFAULT_PROJECT_CONFIG } = await import('../src/shared/defaults')
 
 const ALL: ProviderId[] = ['claude-code', 'codex', 'copilot']
 const svc = providerService as unknown as { set: (id: ProviderId, info: AgentInstallInfo) => void }
-/** Hive's answer for a CLI: found, missing, or still looking (null). */
+/** Combwork's answer for a CLI: found, missing, or still looking (null). */
 const hear = (id: ProviderId, found: boolean | null): void => svc.set(id, { ...providerService.info(id), found: !!found, path: found ? `C:\\fake\\${id}.exe` : null, checking: found === null })
 const waitMs = providerService.detectWaitMs
 

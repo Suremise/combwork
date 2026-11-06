@@ -3,7 +3,7 @@
 // no network, no credits. Checked with Copilot CLI 1.0.93 (the #403 spike). What the "model" does is the prompt's steps,
 // separated by " then ", as the fake Claude Code and fake Codex take them:
 //   skill NAME                 Copilot's skill tool (it reads the skill's SKILL.md)
-//   hive TOOL {json}           a tool of the hive MCP server (Copilot names it hive-TOOL), run by the real server
+//   cw TOOL {json}             a tool of the Combwork MCP server (Copilot names it combwork-TOOL), run by the real server
 //   boardmove N COLUMN, boardreview N ACTION [COLUMN], boardcomment N    cw_update_task, as the fakes do
 //   work N                     waits N seconds before its next step (a turn that takes a while)
 //   edit PATH OLD NEW          Copilot's edit tool (PATH relative to the session's folder)
@@ -13,22 +13,22 @@
 //   shell COMMAND…             its powershell tool
 //   question                   its ask_user tool (a question for the person)
 //   say TEXT…                  the turn's last reply (default: "Done.")
-//   checkpoint                 a view of README.md: a tool call after which Hive's notice may come (#650)
+//   checkpoint                 a view of README.md: a tool call after which Combwork's notice may come (#650)
 //   ratelimited                every request refused with a 429 (a request-rate limit, HI-1973): Copilot tries again
 //                              5 times, its error hook each time, then gives up (a rate_limit session error)
-// Hive's notices (#650: "[CW] New in your inbox…" added to a tool's result, "[CW] Before you finish…" as the prompt
+// Combwork's notices (#650: "[CW] New in your inbox…" added to a tool's result, "[CW] Before you finish…" as the prompt
 // its Stop carried the turn on with) and its doorbell (the prompt "[CW] New in your inbox…") are followed as a model does:
 // cw_inbox, then cw_inbox with ack for its ids; new work read so (a task, a handover) is then the prompt's steps.
 // One step a model call: each tool's result comes back in the next request, which gets the next step. Every request is
 // logged (`log`: one JSON line each, with the tools Copilot offered and the system prompt's length), so a suite can see
-// what Copilot sent. Usage is reported with each reply (tokens, as an API would), so Hive has some to count.
+// what Copilot sent. Usage is reported with each reply (tokens, as an API would), so Combwork has some to count.
 //
 // node fake-copilot-api.cjs [port] [log]   runs it on its own (port 0: any free one), for probes.
 const http = require('http')
 const fs = require('fs')
 const path = require('path')
 const { execFileSync, spawnSync } = require('child_process')
-const { parseHiveStep, isDoorbell, doorbellIsWork, inboxRows } = require('./fake-bridge.cjs')
+const { parseToolStep, isDoorbell, doorbellIsWork, inboxRows } = require('./fake-bridge.cjs')
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
@@ -62,14 +62,14 @@ function actionsOf(prompt) {
     if ((m = /\bboardmove\s+(\d+)\s+(\w+)/i.exec(step))) out.push({ tool: 'cw_update_task', args: { number: Number(m[1]), column: m[2].toLowerCase() } })
     if ((m = /\bboardreview\s+(\d+)\s+(\w+)(?:\s+(hold|todo|doing|review|passed|done)\b)?/i.exec(step))) out.push({ tool: 'cw_update_task', args: { number: Number(m[1]), review: m[2].toLowerCase(), ...(m[3] ? { column: m[3].toLowerCase(), comment: 'Fake review: passed.' } : {}) } })
     if ((m = /\bboardcomment\s+(\d+)/i.exec(step))) out.push({ tool: 'cw_update_task', args: { number: Number(m[1]), comment: 'Fake: done, see the files.' } })
-    const call = parseHiveStep(step)
+    const call = parseToolStep(step)
     if (call) out.push({ tool: call.tool, args: call.args })
     // Anywhere in the step, as the fake CLIs read it ("… (work 10)").
     if ((m = /\bwork\s+(\d+)/i.exec(step))) out.push({ wait: Number(m[1]) * 1000 })
     if ((m = /^edit\s+(\S+)\s+(\S+)\s+(\S+)$/i.exec(step))) out.push({ tool: 'edit', args: { path: m[1], old_str: m[2], new_str: m[3] } })
     if ((m = /^write\s+(\S+)\s+([\s\S]+)$/i.exec(step))) out.push({ tool: 'create', args: { path: m[1], file_text: `${m[2]}\n` } })
     if ((m = /^view\s+(\S+)$/i.exec(step))) out.push({ tool: 'view', args: { path: m[1] } })
-    // "checkpoint": a tool call of its own, after which Hive's notice may come (#650).
+    // "checkpoint": a tool call of its own, after which Combwork's notice may come (#650).
     if (/^checkpoint$/i.test(step)) out.push({ tool: 'view', args: { path: 'README.md' } })
     if ((m = /^shell:?\s+([\s\S]+)$/i.exec(step))) out.push({ tool: 'powershell', args: { command: m[1], description: 'Run a command', mode: 'sync', initial_wait: 30 } })
     if (/^question$/i.test(step)) out.push({ tool: 'ask_user', args: { message: 'Which one should I use?', requestedSchema: { type: 'object', properties: { choice: { type: 'string', enum: ['first', 'second'] } }, required: ['choice'] } } })
@@ -90,12 +90,12 @@ function inboxCall(m) {
 }
 
 /**
- * Hive's notice (#650: "[CW] New in your inbox…" after a tool's result, as Copilot adds a postToolUse hook's context,
+ * Combwork's notice (#650: "[CW] New in your inbox…" after a tool's result, as Copilot adds a postToolUse hook's context,
  * or "[CW] Before you finish…", the prompt its Stop carried the turn on with), followed as a model does: cw_inbox,
  * then cw_inbox with ack for the ids it listed. The call to make, or null (no notice, or followed already).
  */
 function followNotice(msgs, tools) {
-  // Where Copilot puts one, not a mention of one (Hive's guidance and skills quote them): after a tool's result, or the
+  // Where Copilot puts one, not a mention of one (Combwork's guidance and skills quote them): after a tool's result, or the
   // whole prompt.
   const isNotice = (m) => (m.role === 'tool' && /Additional guidance from postToolUse hooks:\s*\[CW\] New in your inbox/.test(textOf(m))) || (m.role === 'user' && /^\[CW\] (New in your inbox|Before you finish)/.test(promptOf(textOf(m))))
   const k = msgs.findLastIndex(isNotice)
@@ -125,7 +125,7 @@ function decide(body) {
   let prompt = promptOf(textOf(msgs[at]))
   const notice = followNotice(msgs, body.tools)
   if (notice) return { prompt: prompt.slice(0, 160), step: 'notice', wait: 0, ...notice }
-  // Hive's doorbell (#650), read (the notice above): new work it read (a task, a handover) is what it does; anything else
+  // Combwork's doorbell (#650), read (the notice above): new work it read (a task, a handover) is what it does; anything else
   // (a wake, a message) it has read, and its turn ends.
   if (isDoorbell(prompt)) {
     const listed = msgs.slice(at + 1).find((m) => m.role === 'tool' && /\bnew:/.test(textOf(m)))
@@ -243,7 +243,7 @@ function startFakeCopilotApi({ port = 0, log = null, systems = false } = {}) {
 }
 
 /**
- * The environment the real Copilot CLI needs to use the stand-in, for a test Hive's hiveEnv: offline, this API, a model
+ * The environment the real Copilot CLI needs to use the stand-in, for a test Combwork's combworkEnv: offline, this API, a model
  * id it knows. Its home (COPILOT_HOME) and the hidden GitHub CLI login (GH_CONFIG_DIR) come from the caller.
  */
 function offlineEnv(api) {
@@ -251,13 +251,13 @@ function offlineEnv(api) {
 }
 
 /**
- * A test Hive's environment for running the real Copilot CLI offline against `api`, in folders of the caller's (`dir`):
+ * A test Combwork's environment for running the real Copilot CLI offline against `api`, in folders of the caller's (`dir`):
  * its own COPILOT_HOME, a fake profile folder (Copilot also reads ~/.agents and the like), and the GitHub CLI's login
  * hidden (an empty GH_CONFIG_DIR, gh off PATH: with no stored login Copilot signs in with `gh auth token`). Never the
- * user's ~/.copilot, and no token variable (hiveEnv's allowlist passes none).
+ * user's ~/.copilot, and no token variable (combworkEnv's allowlist passes none).
  * `above`, the profile folder, is a folder above every folder this Copilot works in (its workspace, projects,
  * worktrees, the Assistant's home): outside a git repository Copilot takes skills from every folder above its working
- * folder up to its profile folder, so one under the user's profile (hive-test is) would otherwise reach the user's own
+ * folder up to its profile folder, so one under the user's profile (combwork-test is) would otherwise reach the user's own
  * ~\.claude\skills (#1308, tests/e2e/README.md).
  */
 function copilotTestEnv(api, dir, { above } = {}) {
@@ -326,7 +326,7 @@ function pathWithoutGh(value, { needed = ['git', 'node', 'copilot'], pathext = p
   return out.join(';')
 }
 
-/** Whether the standalone Copilot CLI is installed where Hive looks for it (PATH, WinGet's link, npm's launcher). */
+/** Whether the standalone Copilot CLI is installed where Combwork looks for it (PATH, WinGet's link, npm's launcher). */
 function copilotInstalled() {
   const { baseEnv } = require('./runContext.cjs')
   try {

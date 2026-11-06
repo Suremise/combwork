@@ -83,7 +83,7 @@ English, it says so.
 | agent | agente | Masculine: *el agente {agent}*. |
 | provider | proveedor | |
 | session | sesión | Starting an agent's session: *iniciar* / *empezar una sesión nueva*; *iniciar sesión* alone means signing in (below). |
-| the Assistant | el Asistente | Capitalised. Its only name: the full English name *Hive Assistant* went with the rename (HI-2458). |
+| the Assistant | el Asistente | Capitalised. Its only name: the full English name it had before went with the rename (HI-2458). |
 | persona (now: working mode) | modo (modo de trabajo) | The Assistant's personas became *modes*; the old *persona* is *personaje*. |
 | task board / board | tablero de tareas / tablero | The *Tasks* tab is *Tareas*. |
 | card | tarjeta | Never *tarea* in running text. |

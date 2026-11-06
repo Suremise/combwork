@@ -373,6 +373,22 @@
       "card": "plain"
     }
   },
+  "tasks.error.waitingNotActive": {
+    "placeholders": {
+      "card": "plain",
+      "active": "plain"
+    }
+  },
+  "tasks.error.waitingNotYours": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "tasks.error.waitingTooLong": {
+    "placeholders": {
+      "max": "number"
+    }
+  },
   "tasks.history.answerTold": {
     "placeholders": {
       "agent": "plain"
@@ -594,6 +610,9 @@
   "tasks.history.noDependencies": {
     "placeholders": {}
   },
+  "tasks.history.notWaiting": {
+    "placeholders": {}
+  },
   "tasks.history.notified": {
     "placeholders": {
       "event": "select",
@@ -743,6 +762,11 @@
   },
   "tasks.history.unblocked": {
     "placeholders": {}
+  },
+  "tasks.history.waiting": {
+    "placeholders": {
+      "reason": "plain"
+    }
   },
   "tasks.history.watchEnded": {
     "placeholders": {

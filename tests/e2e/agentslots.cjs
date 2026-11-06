@@ -47,7 +47,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
 
   let h = null
   try {
-    h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT) }, viewport: { width: 1500, height: 900 } })
+    h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT) }, viewport: { width: 1500, height: 900 } })
     h.page.on('pageerror', (e) => check('no page errors', false, e.message))
     const { inv, page } = h
     await lib.waitForProvider(inv)
@@ -81,7 +81,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     const b2 = await lib.addAgent(inv, alpha, { name: 'B2', workflowRole: 'builder' })
     // R1, a reviewer from before 1.0 in its own worktree (made as an upgraded project has one, #1451), whose worktree is a
     // retired home (#1441): it resumes there.
-    lib.git(alpha, ['worktree', 'add', '-q', '-b', 'hive/hr1', hr1])
+    lib.git(alpha, ['worktree', 'add', '-q', '-b', 'cw/hr1', hr1])
     const r1 = await lib.addAgent(inv, alpha, { name: 'R1', workflowRole: 'reviewer', location: 'existing-worktree', worktreePath: hr1 })
     check('three agents', !!b1?.id && !!b2?.id && !!r1?.id, JSON.stringify({ b1, b2, r1 }))
 
@@ -101,7 +101,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     await page.mouse.move(5, 5)
 
     // --- 3. B2's carried slot hb2.
-    lib.git(alpha, ['worktree', 'add', '-q', '-b', 'hive/hb2', hb2])
+    lib.git(alpha, ['worktree', 'add', '-q', '-b', 'cw/hb2', hb2])
     const carried = await op({ op: 'carry', agent: b2.id, slot: 'hb2', folder: hb2 })
     check("B2's own worktree hb2 is its carried slot", carried?.kind === 'carried' && carried.agent === b2.id, JSON.stringify(carried))
     // The test channel adopts it without the upgrade's refresh after (#1441): the window reads the project again.
@@ -153,17 +153,17 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     check("B2's stopped pane: works in hb2, the slot kept for it", !!b2Says && !/own worktree/.test(b2Says), (await placeholder('B2').innerText().catch(() => '')) || JSON.stringify((await agentInfo(b2.id))?.place))
     await inv('session:stop', alpha, r1.id)
     check('R1 stops', !!(await until(async () => !(await live(r1.id)), HUNG_MS)))
-    // A pane whose session ended here keeps its terminal (the ended bar); after an upgrade Hive opens with none: open
+    // A pane whose session ended here keeps its terminal (the ended bar); after an upgrade Combwork opens with none: open
     // it again, as then, and read R1's pane.
     await h.app.close()
-    h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT) }, viewport: { width: 1500, height: 900 } })
+    h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT) }, viewport: { width: 1500, height: 900 } })
     h.page.on('pageerror', (e) => check('no page errors', false, e.message))
     const again = { inv: h.inv, page: h.page }
     await lib.openWorkspace(again.inv, again.page, ws)
     await lib.fitWindow(h.app, again.page, { width: 1500, height: 900 })
     const placeholder2 = (name) => again.page.locator('.agent-pane', { has: lib.paneHeader(again.page, name) }).first().locator('.pane-placeholder')
     const r1Says = 'A new conversation starts in the project folder; Resume opens its last one in its old folder, hr1.'
-    check("R1, stopped, Hive opened again: its pane says a new conversation starts in the project folder, Resume in its old folder hr1", !!(await until(async () => (await placeholder2('R1').innerText().catch(() => '')).includes(r1Says), HUNG_MS)), await placeholder2('R1').innerText().catch(() => ''))
+    check("R1, stopped, Combwork opened again: its pane says a new conversation starts in the project folder, Resume in its old folder hr1", !!(await until(async () => (await placeholder2('R1').innerText().catch(() => '')).includes(r1Says), HUNG_MS)), await placeholder2('R1').innerText().catch(() => ''))
     check("…and not its 0.9 worktree", !/own worktree/.test(await placeholder2('R1').innerText().catch(() => '')))
     for (const theme of ['light', 'dark']) {
       await again.inv('settings:update', { appearance: { theme } })

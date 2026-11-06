@@ -21,7 +21,7 @@ const chain = (texts: Record<string, string>): DialectChain => ({ texts, files: 
 const canary = (): void => setProcessChain(chain(canaryTexts(catalogue)))
 const entry = (id: string) => settingEntry(id)!
 
-/** The permission modes a provider's "Enable the … option" names: the CLIs' own names for them, not Hive's wording. */
+/** The permission modes a provider's "Enable the … option" names: the CLIs' own names for them, not Combwork's wording. */
 const MODE_NAMES = ['agents.claude.bypass', 'agents.codex.fullAccess', 'agents.copilot.autopilot']
 
 /** The window's message ids in a text, nested ones too. */
@@ -57,7 +57,7 @@ describe('the settings catalogue in the Default', () => {
     for (const e of SETTINGS_CATALOG) if (!e.action) messageIds([e.text.title, e.text.desc, e.text.tip, e.text.off, (e.options ?? []).map((o) => o.text)], said)
     expect([...said].filter((id) => !ids.has(id))).toEqual(MODE_NAMES)
     expect(catalogue['settings.sessions.compactSuggestTokens.title']?.audience).toBe('both')
-    expect(catalogue['settings.advanced.hive.recorder.keep.desc']?.audience).toBe('both')
+    expect(catalogue['settings.advanced.cw.recorder.keep.desc']?.audience).toBe('both')
     expect(catalogue['settings.agent.helps.general.keepAwake']?.audience).toBeUndefined()
   })
 })
@@ -85,7 +85,7 @@ describe('a dialect over the settings', () => {
 })
 
 describe('the canary dialect over the settings tools', async () => {
-  const base = tempDir('hive-agenttext-settings-')
+  const base = tempDir('cw-agenttext-settings-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   afterAll(() => rmSync(base, { recursive: true, force: true }))
   const { createWorkspaceService, inWorkspace, workspace } = await import('../src/main/workspace')

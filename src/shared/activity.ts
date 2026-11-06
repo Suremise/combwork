@@ -1,10 +1,10 @@
 // The Activity tab (#1254, HI-1743): what runs now in a project, a tab per running agent, each its current work as a
 // list: its card in progress (a header) or its session, the turn now (its prompt, the tool call under way, or thinking
 // or writing), the subagents and background tasks, and the processes it started. Nothing past: "the card is the
-// history". From what Hive already has: the board, the session records, the agents' live state, a session's transcript
+// history". From what Combwork already has: the board, the session records, the agents' live state, a session's transcript
 // parse and Stop's tracking's processes.
 import type { AgentProcess } from './agentProcesses'
-import type { BackgroundTaskType, SessionListItem, SessionStatus, TranscriptItem, TranscriptTool } from './types'
+import type { BackgroundTaskType, ModelSwitch, ProviderId, SessionListItem, SessionStatus, TranscriptItem, TranscriptTool } from './types'
 import { maskText } from './redact'
 import type { ActivityHookBlock } from './hooks'
 
@@ -97,7 +97,7 @@ export interface ActivityDetail {
 export interface ActivityNow {
   launches: ActivityLaunch[]
   tasks: ActivityTask[]
-  /** Lock blocks standing now (HI-982): an agent's edit Hive's file lock blocked, while that decision stands. */
+  /** Lock blocks standing now (HI-982): an agent's edit Combwork's file lock blocked, while that decision stands. */
   blocks?: ActivityHookBlock[]
 }
 
@@ -189,7 +189,7 @@ export interface ActivityFilter {
 export interface ActivityAgent {
   id: string
   name: string
-  live: { sessionId: string; sessionName?: string; startedAt?: string; status: SessionStatus; text: string; working: boolean; waiting: boolean; failed: boolean } | null
+  live: { sessionId: string; sessionName?: string; startedAt?: string; status: SessionStatus; text: string; working: boolean; waiting: boolean; failed: boolean; /** It runs another model than it was launched with (HI-2609), and its CLI. */ modelSwitch?: ModelSwitch & { provider: ProviderId } } | null
 }
 
 /** A card as the tab needs it: its builder's and reviewer's agent ids, in this project. */
@@ -249,9 +249,9 @@ function stateOf(a: ActivityAgent): ActivityState {
 
 /**
  * Whether a process is the agent's own plumbing, not something it runs (HI-1743): its CLI and the terminal hosting it
- * (Stop's tracking marks them), and Combwork's tool server for it (cw-mcp.js; hive-mcp.js before HI-2463), always there and saying nothing.
+ * (Stop's tracking marks them), and Combwork's tool server for it (cw-mcp.js), always there and saying nothing.
  */
-export const ownProcess = (p: ActivityProcess, cli: ReadonlySet<number>): boolean => cli.has(p.pid) || /\b(?:cw|hive)-mcp\.js\b/i.test(p.command ?? p.label)
+export const ownProcess = (p: ActivityProcess, cli: ReadonlySet<number>): boolean => cli.has(p.pid) || /\bcw-mcp\.js\b/i.test(p.command ?? p.label)
 
 /** Whether something the agent started runs: a process of its launch that isn't its own plumbing, or a background task. */
 function running(id: string, now: ActivityNow): boolean {
@@ -293,9 +293,11 @@ export interface ActivityPart {
   doing: ActivityDoing
   subagents: ActivityNode[]
   processes: ActivityNode[]
-  /** Its edit Hive's file lock blocks now (HI-982), while that decision stands: none, or its latest. */
+  /** Its edit Combwork's file lock blocks now (HI-982), while that decision stands: none, or its latest. */
   blocks: ActivityHookBlock[]
-  /** Its own processes left out (the CLI, its terminal, hive-mcp.js): shown with `showOwn`. */
+  /** It runs another model than it was launched with (HI-2609): the launched and the running model's IDs; null when not. */
+  modelSwitch: (ModelSwitch & { provider: ProviderId }) | null
+  /** Its own processes left out (the CLI, its terminal, cw-mcp.js): shown with `showOwn`. */
   ownHidden: number
 }
 
@@ -329,11 +331,11 @@ export function buildActivityView(input: ActivityInput, agentId: string, opts: {
   for (const s of input.sessions) if (s.sub?.parentId) subs.set(s.sub.parentId, [...(subs.get(s.sub.parentId) ?? []), s])
 
   const part = (a: ActivityAgent, role: ActivityPart['role']): ActivityPart => {
-    const base: ActivityPart = { agentId: a.id, name: a.name, role, state: stateOf(a), line: a.live?.text ?? '', session: null, turn: null, doing: null, subagents: [], processes: [], blocks: (input.now.blocks ?? []).filter((b) => b.agentId === a.id), ownHidden: 0 }
+    const base: ActivityPart = { agentId: a.id, name: a.name, role, state: stateOf(a), line: a.live?.text ?? '', session: null, turn: null, doing: null, subagents: [], processes: [], blocks: (input.now.blocks ?? []).filter((b) => b.agentId === a.id), modelSwitch: a.live?.modelSwitch ? { launched: a.live.modelSwitch.launched, running: a.live.modelSwitch.running, provider: a.live.modelSwitch.provider } : null, ownHidden: 0 }
     const live = a.live
     if (!live) return base
     // Its session the list doesn't have yet (just started; the list is read again later): drawn from its live state.
-    const s = listed.get(live.sessionId) ?? ({ id: live.sessionId, agentId: a.id, agentName: a.name, name: live.sessionName ?? a.name, source: 'hive', lastActivity: live.startedAt ?? new Date(input.at).toISOString(), hasTranscript: true, hasBackup: false, title: null, usage: null, recache: null } as SessionListItem)
+    const s = listed.get(live.sessionId) ?? ({ id: live.sessionId, agentId: a.id, agentName: a.name, name: live.sessionName ?? a.name, source: 'combwork', lastActivity: live.startedAt ?? new Date(input.at).toISOString(), hasTranscript: true, hasBackup: false, title: null, usage: null, recache: null } as SessionListItem)
     const turns = input.turns.get(s.id)
     const last = turns?.turns.at(-1) ?? null
     const tasks = input.now.tasks.filter((x) => x.sessionId === s.id)

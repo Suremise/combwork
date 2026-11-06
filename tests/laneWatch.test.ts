@@ -74,11 +74,11 @@ describe('what a lane watch counts (#531)', () => {
     expect(laneHits({ ...was, cards: { 1: card({ c: 'passed' }) } }, now(news), LANE_DEFAULT_EVENTS)!.parts.map((p) => p.event)).toEqual(['blocked'])
     expect(laneHits({ ...was, cards: { 1: card({ c: 'passed', b: true }) } }, now(news), LANE_DEFAULT_EVENTS)).toBeNull()
     // The news: the reason last set, or the card's agent's latest comment, whichever is later; others' comments aren't news.
-    const history = [{ at: t1, by: 'HB2 (hive)', what: 'Blocked: Screenshots for your OK' }]
+    const history = [{ at: t1, by: 'HB2 (alpha)', what: 'Blocked: Screenshots for your OK' }]
     const base = { blocked: 'Screenshots for your OK', history, agentName: 'HB2', comments: [{ at: t2, by: 'Assistant', text: 'Looking' }] } as unknown as Parameters<typeof blockNewsAt>[0]
     expect(blockNewsAt(base)).toBe(t1)
-    expect(blockNewsAt({ ...base, comments: [{ at: t2, by: 'HB2 (hive)', text: 'Re-shot' }] } as typeof base)).toBe(t2)
-    expect(blockNewsAt({ ...base, history: [...history, { at: t2, by: 'HB2 (hive)', what: 'Blocked: Re-shot: your OK please' }] } as typeof base)).toBe(t2)
+    expect(blockNewsAt({ ...base, comments: [{ at: t2, by: 'HB2 (alpha)', text: 'Re-shot' }] } as typeof base)).toBe(t2)
+    expect(blockNewsAt({ ...base, history: [...history, { at: t2, by: 'HB2 (alpha)', what: 'Blocked: Re-shot: your OK please' }] } as typeof base)).toBe(t2)
     expect(blockNewsAt({ ...base, blocked: null } as typeof base)).toBe('')
     // Saved and read back with its news; one from before reads without.
     expect(readSavedLaneMark(JSON.parse(JSON.stringify(news)))).toEqual(news)
@@ -101,7 +101,7 @@ describe('what a lane watch counts (#531)', () => {
     const was: LaneMark = { state: 'active', mergeDue: false, cards: { 1: card({ q: '' }) } }
     const ask = { since: t1, by: 'HB6', text: 'Push the tag now?\nIt is v1.0.0.' }
     expect(laneHits(was, now(t1, ask), ['failed', 'paused-user'])!.parts).toEqual([{ n: 1, event: 'paused-user', text: '#1 waits for the user (HB6 asks)', detail: 'Push the tag now?' }])
-    // Hive's own request (no asker), a second question after the first, none new, one answered: told, told, quiet, quiet.
+    // Combwork's own request (no asker), a second question after the first, none new, one answered: told, told, quiet, quiet.
     expect(laneHits(was, now(t1, { since: t1, by: null, text: 'Approve the merge?' }), ['paused-user'])!.parts[0].text).toBe('#1 waits for the user (Combwork asks)')
     expect(laneHits(now(t1).mark, now(t2, { ...ask, since: t2 }), ['paused-user'])).not.toBeNull()
     expect(laneHits(now(t1).mark, now(t1, ask), ['paused-user'])).toBeNull()
@@ -211,8 +211,8 @@ describe('what a lane watch counts (#531)', () => {
   })
 
   it('the wake line names each lane and card, within the size: details give way, then labels, then each lane is counted', () => {
-    const hit = (i: number, detail = 'Which icon should the app use? A bee, a honeycomb or a hive cell.') => ({ id: `lane-${i}`, label: `Builder${i} / Reviewer${i} (lane ${i})`, parts: [{ n: 100 + i, event: 'blocked' as const, text: `#${100 + i} is blocked`, detail }, { n: 200 + i, event: 'failed' as const, text: `#${200 + i} failed review (Reviewer${i} (alpha))` }] })
-    expect(laneWakeLine([hit(1)])).toBe(`[CW] Lane Builder1 / Reviewer1 (lane 1): #101 is blocked: "Which icon should the app use? A bee, a honeycomb or a hive cell."; #201 failed review (Reviewer1 (alpha)). Your lane watch has ended: read the cards named (cw_read_task), act on them, then watch the lanes again (cw_wait_for_tasks with lanes).`)
+    const hit = (i: number, detail = 'Which icon should the app use? A bee, a honeycomb or a comb cell.') => ({ id: `lane-${i}`, label: `Builder${i} / Reviewer${i} (lane ${i})`, parts: [{ n: 100 + i, event: 'blocked' as const, text: `#${100 + i} is blocked`, detail }, { n: 200 + i, event: 'failed' as const, text: `#${200 + i} failed review (Reviewer${i} (alpha))` }] })
+    expect(laneWakeLine([hit(1)])).toBe(`[CW] Lane Builder1 / Reviewer1 (lane 1): #101 is blocked: "Which icon should the app use? A bee, a honeycomb or a comb cell."; #201 failed review (Reviewer1 (alpha)). Your lane watch has ended: read the cards named (cw_read_task), act on them, then watch the lanes again (cw_wait_for_tasks with lanes).`)
     for (const n of [3, 7, 20, 60]) {
       const line = laneWakeLine(Array.from({ length: n }, (_, i) => hit(i, '評'.repeat(300))))
       expect(Buffer.byteLength(JSON.stringify(line))).toBeLessThanOrEqual(WAKE_MAX_BYTES)
@@ -239,13 +239,13 @@ describe('what a lane watch counts (#531)', () => {
 
   it('one line tells the lanes, the cards beside them and the agents waiting for the user, within the size (#726)', () => {
     const lane = { id: 'lane-1', label: 'B1 / R1', parts: [{ n: 12, event: 'failed' as const, text: '#12 failed review (R1 (alpha))' }] }
-    const rel: CardChange = { number: 720, column: 'review', changes: ['comment'], by: 'HB6 (hive)', comment: { by: 'HB6 (hive)', firstLine: 'Draft release is up: push when ready' }, about: { owner: 'HB6', verdict: null } }
-    const wait = { name: 'HB6', project: 'hive', card: 720, what: 'Claude needs your permission to use Bash' }
+    const rel: CardChange = { number: 720, column: 'review', changes: ['comment'], by: 'HB6 (alpha)', comment: { by: 'HB6 (alpha)', firstLine: 'Draft release is up: push when ready' }, about: { owner: 'HB6', verdict: null } }
+    const wait = { name: 'HB6', project: 'alpha', card: 720, what: 'Claude needs your permission to use Bash' }
     expect(laneWakeLine([lane], { cards: [rel], waits: [wait], watching: true })).toBe(
-      `[CW] Lane B1 / R1: #12 failed review (R1 (alpha)) | #720 (HB6's card) is in Review (latest comment by HB6 (hive): "Draft release is up: push when ready") | HB6 (hive) is waiting for the user on #720: "Claude needs your permission to use Bash". Your lane watch has ended: read the cards named (cw_read_task), act on them, tell the user what an agent waits for (cw_notify) and never answer it for them, then watch the lanes again (cw_wait_for_tasks with lanes; your cards stay unless you pass cards).`
+      `[CW] Lane B1 / R1: #12 failed review (R1 (alpha)) | #720 (HB6's card) is in Review (latest comment by HB6 (alpha): "Draft release is up: push when ready") | HB6 (alpha) is waiting for the user on #720: "Claude needs your permission to use Bash". Your lane watch has ended: read the cards named (cw_read_task), act on them, tell the user what an agent waits for (cw_notify) and never answer it for them, then watch the lanes again (cw_wait_for_tasks with lanes; your cards stay unless you pass cards).`
     )
     // Only what happened: a wait alone, or a card alone.
-    expect(laneWakeLine([], { waits: [{ ...wait, card: null, what: null }] })).toMatch(/^\[CW\] HB6 \(hive\) is waiting for the user\. Your lane watch has ended/)
+    expect(laneWakeLine([], { waits: [{ ...wait, card: null, what: null }] })).toMatch(/^\[CW\] HB6 \(alpha\) is waiting for the user\. Your lane watch has ended/)
     expect(laneWakeLine([], { cards: [{ ...rel, changes: ['blocked'], blocked: 'Darren pushes the tag' }], watching: true })).toMatch(/^\[CW\] #720 \(HB6's card\) is in Review and blocked: "Darren pushes the tag" \(latest comment/)
     for (const n of [3, 10, 40]) {
       const many = laneWakeLine(
@@ -287,16 +287,16 @@ describe("a builder's reply waiting on an idle reviewer (HI-2428's replyWaitReas
     column: 'review' as const,
     archived: false,
     blocked: null,
-    project: 'hive',
+    project: 'alpha',
     review: { agent: 'a-r1', agentName: 'HR1', since: '2026-11-03T03:53:20.000Z' },
     history: [
-      { at: '2026-11-03T03:53:13.000Z', by: 'HB2 (hive)', what: 'Moved to Review' },
-      { at: asked, by: 'HR1 (hive)', what: 'Asked the builder: "Please post a full npm test record."' },
-      { at: replied, by: 'HB2 (hive)', what: 'Replied to the reviewer: "Full run: 8948 passed."' }
+      { at: '2026-11-03T03:53:13.000Z', by: 'HB2 (alpha)', what: 'Moved to Review' },
+      { at: asked, by: 'HR1 (alpha)', what: 'Asked the builder: "Please post a full npm test record."' },
+      { at: replied, by: 'HB2 (alpha)', what: 'Replied to the reviewer: "Full run: 8948 passed."' }
     ],
     comments: [
-      { at: asked, by: 'HR1 (hive)', text: 'Please post a full npm test record.' },
-      { at: replied, by: 'HB2 (hive)', text: 'Full run: 8948 passed.' }
+      { at: asked, by: 'HR1 (alpha)', text: 'Please post a full npm test record.' },
+      { at: replied, by: 'HB2 (alpha)', text: 'Full run: 8948 passed.' }
     ]
   }
   const idle = { name: 'HR1', status: 'finished' }
@@ -314,7 +314,7 @@ describe("a builder's reply waiting on an idle reviewer (HI-2428's replyWaitReas
     // A job that ended starts the clock again from its end.
     expect(replyWaitReason(c, idle, null, { running: false, endedAt: t + REVIEW_WAIT_STALL_MS }, t + REVIEW_WAIT_STALL_MS + 60_000)).toBeNull()
     const later = new Date(t + 60_000).toISOString()
-    expect(replyWaitReason({ ...c, comments: [...c.comments, { at: later, by: 'HR1 (hive)', text: 'Reading it.' }] }, idle, null, null, t + 3 * REVIEW_WAIT_STALL_MS)).toBeNull()
+    expect(replyWaitReason({ ...c, comments: [...c.comments, { at: later, by: 'HR1 (alpha)', text: 'Reading it.' }] }, idle, null, null, t + 3 * REVIEW_WAIT_STALL_MS)).toBeNull()
   })
   it('not before any reply, nor for a card out of Review, blocked, or with no review started', () => {
     expect(replyWaitReason({ ...c, history: c.history.slice(0, 2) }, idle, null, null, t + 3 * REVIEW_WAIT_STALL_MS)).toBeNull()
@@ -392,17 +392,17 @@ describe("a running lane's next card its builder hasn't started (HI-1741's laneN
 })
 
 describe('lane watches (main/watches.ts, #531)', async () => {
-  const base = tempDir('hive-lanewatch-')
+  const base = tempDir('cw-lanewatch-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   afterAll(() => rmSync(base, { recursive: true, force: true }))
   const { contextWorkspace, createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
   const tasks = await import('../src/main/tasks')
   const watches = await import('../src/main/watches')
   watches.testHooks.settleMs = 0
-  // A check reads what Hive did after `await watches.settled()`: deliveries run in the background (#570).
+  // A check reads what Combwork did after `await watches.settled()`: deliveries run in the background (#570).
   const lanes = await import('../src/main/lanes')
 
-  /** Workflow rules off for one test (#1270: Hive owns the lane while they are on), on again after it. */
+  /** Workflow rules off for one test (#1270: Combwork owns the lane while they are on), on again after it. */
   const { advanced } = await import('../src/main/advanced')
   const { ENFORCE } = await import('../src/main/workflow/service')
   const rulesOff = (): Promise<unknown> => advanced.set(ENFORCE, false)
@@ -422,7 +422,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     return { w, alpha, home: w.assistantHome }
   }
   /**
-   * The Assistant (watching, then working once typed into; #650: it follows Hive's doorbell with cw_inbox, and what it
+   * The Assistant (watching, then working once typed into; #650: it follows Combwork's doorbell with cw_inbox, and what it
    * read is `told`), and every agent of alpha running and working.
    */
   const fake = (alpha: string, home: string) => {
@@ -461,7 +461,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     st.status = 'watching'
     return watches.registerLaneWatch(w, home, 'assistant', { ids: 'all', events: [...LANE_DEFAULT_EVENTS] }, undefined, { ...(cards ? { cards } : {}), changes: [...LANE_CARD_CHANGES] })
   }
-  /** An alpha agent's status as Hive records it (#726: the session-status event). */
+  /** An alpha agent's status as Combwork records it (#726: the session-status event). */
   const status = (alpha: string, st: { agents: Record<string, string> }, id: string, s: string, statusMessage?: string) => {
     st.agents[id] = s
     watches.noteAgentStatus({ projectPath: alpha, agentId: id, agentName: id.toUpperCase(), status: s, runId: id, ...(statusMessage ? { statusMessage } : {}) } as never)
@@ -505,7 +505,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     expect(st.told[2]).toMatch(/^\[CW\] Lane B1 \/ R1 \(greetings\): all its cards passed: its merge is due\./)
     await watchAll(w, home, st)
     for (const n of [a, b]) await inWorkspace(w, () => tasks.updateTask(n, { column: 'done' }, user))
-    // Hive ends a lane whose cards are all Done as it follows the board (lanes.refresh).
+    // Combwork ends a lane whose cards are all Done as it follows the board (lanes.refresh).
     await lanes.refresh(w)
     await watches.evaluateWatches(w)
     await vi.waitFor(() => expect(st.told).toHaveLength(4), { timeout: HUNG_MS })
@@ -1015,10 +1015,10 @@ describe('lane watches (main/watches.ts, #531)', async () => {
       expect(st.told).toEqual([])
       expect(st.typed).toEqual([])
       // Its start fails: stalled, with the failure rather than "isn't running".
-      startEnded(alpha, 'b1', `#${a}`, { failed: "Hive couldn't get slot-g ready: git worktree add failed" })
+      startEnded(alpha, 'b1', `#${a}`, { failed: "Combwork couldn't get slot-g ready: git worktree add failed" })
       await watches.evaluateWatches(w)
       await vi.waitFor(() => expect(st.told).toHaveLength(1), { timeout: HUNG_MS })
-      expect(st.told[0]).toContain(`#${a} is stalled: "B1's start failed: Hive couldn't get slot-g ready: git worktree add failed"`)
+      expect(st.told[0]).toContain(`#${a} is stalled: "B1's start failed: Combwork couldn't get slot-g ready: git worktree add failed"`)
     } finally {
       Object.assign(sessions, { liveFor })
       resetAgentStartsForTests()
@@ -1040,7 +1040,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     await watches.evaluateWatches(w)
     await watches.settled()
     expect(st.typed).toEqual([])
-    // Its only-watching passes the limit: Hive's clock moves on (the lane tick looks again now and then).
+    // Its only-watching passes the limit: Combwork's clock moves on (the lane tick looks again now and then).
     vi.useFakeTimers({ toFake: ['Date'] })
     try {
       vi.setSystemTime(Date.parse(since) + REVIEW_WAIT_STALL_MS + 60_000)
@@ -1060,7 +1060,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a], by: 'B1 (alpha)' })
     await inWorkspace(w, () => tasks.updateTask(a, { column: 'review' }, agent('b1')))
     await inWorkspace(w, () => tasks.updateTask(a, { review: 'start' }, agent('r1')))
-    // R1 asked for a stress proof; B1 runs it through hive-progress for the card, then in a background shell.
+    // R1 asked for a stress proof; B1 runs it through cw-progress for the card, then in a background shell.
     const since = new Date().toISOString()
     const t0 = Date.parse(since)
     const run = { agentId: 'b1', projectPath: alpha, card: a, state: 'running', staleReason: null, startedAt: t0, finishedAt: null as number | null } as unknown as ProgressRun
@@ -1292,7 +1292,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     await watches.evaluateWatches(w)
     await watches.settled()
     expect(st.typed).toEqual([])
-    // Neither moves for the limit: Hive's clock moves on (the lane tick looks again now and then).
+    // Neither moves for the limit: Combwork's clock moves on (the lane tick looks again now and then).
     vi.useFakeTimers({ toFake: ['Date'] })
     try {
       vi.setSystemTime(Date.parse(since) + REVIEW_WAIT_STALL_MS + 60_000)
@@ -1323,7 +1323,7 @@ describe('lane watches (main/watches.ts, #531)', async () => {
     await watches.evaluateWatches(w)
     await watches.settled()
     expect(st.told).toHaveLength(1)
-    // The limit passes: Hive's clock moves on (the lane tick looks again now and then).
+    // The limit passes: Combwork's clock moves on (the lane tick looks again now and then).
     vi.useFakeTimers({ toFake: ['Date'] })
     try {
       vi.setSystemTime(Date.parse(idleSince) + MERGE_STALL_MS + 60_000)

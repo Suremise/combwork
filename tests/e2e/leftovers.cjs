@@ -45,7 +45,7 @@ const lingering = () => (fs.existsSync(lingerFile) ? fs.readFileSync(lingerFile,
 
   // Someone else's process with the project folder as its working folder: never the agent's. It runs until the suite
   // ends it (endExactly, below), not for a set time: one that lived 120 s had ended before a 213 s run under load checked
-  // that it outlives Hive (#708). It ends itself only once this suite's process is gone (or after an hour), so a suite
+  // that it outlives Combwork (#708). It ends itself only once this suite's process is gone (or after an hour), so a suite
   // killed part-way leaves nothing running.
   const strangerCode = `const suite = ${process.pid}; setInterval(() => { try { process.kill(suite, 0) } catch { process.exit(0) } }, 1000); setTimeout(() => process.exit(0), 3600000)`
   const stranger = spawn(process.execPath, ['-e', strangerCode], { cwd: proj, detached: true, stdio: 'ignore', windowsHide: true, env: lib.childEnv() })
@@ -53,7 +53,7 @@ const lingering = () => (fs.existsSync(lingerFile) ? fs.readFileSync(lingerFile,
   remember([stranger.pid])
   const strangerAt = Date.now()
 
-  const { app, page, inv } = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: lib.port(47882), HIVE_TEST_ASK_LEFTOVERS: '1' } })
+  const { app, page, inv } = await lib.launch({ userData, env: { ...env, CW_API_PORT: lib.port(47882), CW_TEST_ASK_LEFTOVERS: '1' } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   try {
     await lib.openWorkspace(inv, page, ws)
@@ -144,12 +144,12 @@ const lingering = () => (fs.existsSync(lingerFile) ? fs.readFileSync(lingerFile,
     check('with End them set, they are ended as the agent stops', await lib.until(() => auto.every((p) => !alive(p)), 15000), JSON.stringify(auto))
     check('and nothing is listed', !(await listed()))
 
-    // End them, but Windows refuses (HIVE_TEST_JOB_KILL_FAILS): still listed and offered, and End from the ⋯ works.
-    await app.evaluate(() => (process.env.HIVE_TEST_JOB_KILL_FAILS = '1'))
+    // End them, but Windows refuses (CW_TEST_JOB_KILL_FAILS): still listed and offered, and End from the ⋯ works.
+    await app.evaluate(() => (process.env.CW_TEST_JOB_KILL_FAILS = '1'))
     const refused = await leaveRunning(1)
     const offer = page.locator('.toast', { hasText: "couldn't end it by itself" })
     check("a refused End leaves it listed, offered, and says Combwork couldn't end it", (await lib.until(async () => (await listed())?.processes.length === 1, 15000)) && (await offer.first().waitFor({ timeout: 10000 }).then(() => true, () => false)) && refused.every(alive))
-    await app.evaluate(() => delete process.env.HIVE_TEST_JOB_KILL_FAILS)
+    await app.evaluate(() => delete process.env.CW_TEST_JOB_KILL_FAILS)
     await openLeftovers(1)
     await page.getByText('End It', { exact: true }).click()
     check('trying again from the ⋯ ends it', (await lib.until(() => refused.every((p) => !alive(p)), 10000)) && (await lib.until(async () => !(await listed()), 10000)))
@@ -175,9 +175,9 @@ const lingering = () => (fs.existsSync(lingerFile) ? fs.readFileSync(lingerFile,
     lib.endExactly([...ids.values()])
   }
 
-  // A PC where the process tracker never gets going (HIVE_TEST_PROCESS_TRACKER=silent: its helper starts but never says it is ready; given up on after HIVE_TEST_TRACKER_WAIT_MS): agents start
-  // all the same, untracked, and Hive says so once; Diagnostics says why.
-  const second = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: lib.port(47882), HIVE_TEST_PROCESS_TRACKER: 'silent', HIVE_TEST_TRACKER_WAIT_MS: '3000' } })
+  // A PC where the process tracker never gets going (CW_TEST_PROCESS_TRACKER=silent: its helper starts but never says it is ready; given up on after CW_TEST_TRACKER_WAIT_MS): agents start
+  // all the same, untracked, and Combwork says so once; Diagnostics says why.
+  const second = await lib.launch({ userData, env: { ...env, CW_API_PORT: lib.port(47882), CW_TEST_PROCESS_TRACKER: 'silent', CW_TEST_TRACKER_WAIT_MS: '3000' } })
   try {
     const { page: p2, inv: inv2 } = second
     await lib.openWorkspace(inv2, p2, ws)

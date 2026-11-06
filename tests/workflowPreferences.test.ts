@@ -1,4 +1,4 @@
-// Card loops and file locks as workflow options (HI-1766): how they resolve (each on its own, Hive's → the workspace's →
+// Card loops and file locks as workflow options (HI-1766): how they resolve (each on its own, Combwork's → the workspace's →
 // the project's, a value they don't take passed over), that they aren't rules (no ruleset or preset changes, never
 // Custom, kept through a preset's choice, no "How do you work?" answered by them), and how the old settings move in:
 // a new value wins (key presence, false and all), a default saved into every file is no choice, both platforms' options
@@ -126,7 +126,7 @@ describe("a project's settings from before HI-1766", () => {
   })
 })
 
-describe("the workspace's and Hive's settings from before HI-1766", () => {
+describe("the workspace's and Combwork's settings from before HI-1766", () => {
   it("the workspace's card loop rounds and wait become its defaults for None and Git, where they don't set them", () => {
     const out = migrateWorkspacePreferences({ loops: { rounds: 4, waitHours: 2 }, workflow: { git: { loopWaitHours: 5, review: 'agent' } } } as Record<string, unknown>)
     expect(out).toEqual({ workflow: { none: { loopRounds: 4, loopWaitHours: 2 }, git: { loopRounds: 4, loopWaitHours: 5, review: 'agent' } } })
@@ -135,7 +135,7 @@ describe("the workspace's and Hive's settings from before HI-1766", () => {
     expect(migrateWorkspacePreferences({ loops: { rounds: 0 }, advanced: {} } as Record<string, unknown>)).toEqual({ advanced: {} })
   })
 
-  it("Settings → Agents → File locks becomes Hive's default for None and Git; Block, saved into every config, is no choice", () => {
+  it("Settings → Agents → File locks becomes Combwork's default for None and Git; Block, saved into every config, is no choice", () => {
     const load = (raw: Record<string, unknown>) => migrateConfig(mergeDefaults(structuredClone(DEFAULT_APP_CONFIG), raw), raw)
     const warn = load({ settings: { agents: { fileLocks: 'warn' }, workflow: { git: { fileLocks: 'off' } } } })
     expect(warn.settings.workflow).toEqual({ none: { fileLocks: 'warn' }, git: { fileLocks: 'off' } })

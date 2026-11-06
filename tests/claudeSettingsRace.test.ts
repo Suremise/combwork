@@ -1,4 +1,4 @@
-// A settings file replaced or grown between Hive's stat and its read (#333): both readers (the compaction reader's and
+// A settings file replaced or grown between Combwork's stat and its read (#333): both readers (the compaction reader's and
 // the launch's read of a user's --settings) read the opened file to its end, never trusting the stat's size, and
 // never past a byte over Claude Code's 2 MiB limit. `afterStat` runs once, right after the next stat of that file.
 import { rmSync, writeFileSync } from 'fs'
@@ -40,7 +40,7 @@ vi.mock('fs/promises', async (importOriginal) => {
 const { SETTINGS_FILE_LIMIT, cliSettings } = await import('../src/main/providers/claude/autoCompact')
 const { userSettings } = await import('../src/main/providers/claude/launchSettings')
 
-const dir = tempDir('hive-settings-race-')
+const dir = tempDir('cw-settings-race-')
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
 const file = join(dir, 'mine.json')
 /** JSON of exactly `bytes` bytes. */

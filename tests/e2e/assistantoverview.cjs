@@ -35,14 +35,14 @@ const check = (name, ok, extra = '') => {
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47934), ...claude, HIVE_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47934), ...claude, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1500, height: 900 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     for (const p of [alpha, beta, long]) await inv('project:setActive', p, true)
     await lib.waitForProvider(inv)

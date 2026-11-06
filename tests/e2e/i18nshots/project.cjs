@@ -3,7 +3,7 @@
 // #1; the Git tab's Changes; Memory (with a new instructions file saved, checked to be the English starter agents
 // read), Skills and MCP (with their failed loads and refreshes); and Project Settings
 // (sections and the reset dialog). Reached for the i18nshots route (#756's design, section 4) with locale-independent
-// means only: git run on the project, IPC failures (HIVE_TEST_FAIL_IPC), events sent as main sends them, command ids
+// means only: git run on the project, IPC failures (CW_TEST_FAIL_IPC), events sent as main sends them, command ids
 // and structural hooks (data-action, data-section, data-stat, classes, icons), never English text. See
 // tests/e2e/i18nshots.cjs for ctx.
 const fs = require('fs')
@@ -30,11 +30,11 @@ async function cancelDialog(ctx) {
 
 /** Makes calls on an IPC channel fail: the next one (`*1`), or all until failing(ctx, ''): tests/e2e/README.md. */
 const failing = (ctx, calls) => ctx.app.evaluate((_, c) => {
-  process.env.HIVE_TEST_FAIL_IPC = c
+  process.env.CW_TEST_FAIL_IPC = c
 }, calls)
 
-/** Sends the window an event as main does (hive:event). */
-const sendEvent = (ctx, ev) => ctx.app.evaluate(({ BrowserWindow }, e) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', e), ev)
+/** Sends the window an event as main does (cw:event). */
+const sendEvent = (ctx, ev) => ctx.app.evaluate(({ BrowserWindow }, e) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', e), ev)
 
 /** git in the project, with an identity of its own for the commits made here (never the machine's config). */
 const git = (ctx, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...a], { cwd: ctx.project, env: ctx.lib.gitEnv(), stdio: 'pipe', encoding: 'utf8' })

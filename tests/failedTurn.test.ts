@@ -10,7 +10,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-failedturn-')
+const base = tempDir('cw-failedturn-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -42,7 +42,7 @@ const HANG = { timeout: 10_000 }
 const ROLLOUT = readFileSync(join(__dirname, 'fixtures', 'advanced', 'turn-failed-codex-0.164.0.jsonl'), 'utf8')
 const T = (JSON.parse(ROLLOUT.split('\n')[1]) as { payload: { turn_id: string } }).payload.turn_id
 const WORDS = 'stream disconnected before completion: Transport error: network error: error decoding response body'
-/** Copilot 1.0.105 launched by Hive with its model's API unreachable (HI-1960): the hooks Hive got and its session.error. */
+/** Copilot 1.0.105 launched by Combwork with its model's API unreachable (HI-1960): the hooks Combwork got and its session.error. */
 type CopilotRun = { hooks: Record<string, unknown>[]; sessionError: { timestamp: string; data: { message: string } } }
 const COPILOT = JSON.parse(readFileSync(join(__dirname, 'fixtures', 'advanced', 'errorhooks-copilot-1.0.105.json'), 'utf8')) as { refused: CopilotRun; notFound: CopilotRun }
 /** Its parser's whole output for the rollout, as the session reads it (the failure and the turn's end). */
@@ -180,10 +180,10 @@ describe('a turn that ended on an error (#1632, #1658)', () => {
     expect(needs(st)).toEqual([`error/${WORDS}`])
   })
 
-  it("HR5's continuation: a failure (and end) recorded before Hive continued the turn neither ends the continued work nor marks it; one after does", async () => {
+  it("HR5's continuation: a failure (and end) recorded before Combwork continued the turn neither ends the continued work nor marks it; one after does", async () => {
     const st = agent('k')
     await prompt(st, T)
-    // Hive continues its Stop (its reply blocks it, as the inbox's notice does): the same turn goes on.
+    // Combwork continues its Stop (its reply blocks it, as the inbox's notice does): the same turn goes on.
     await run(() => sessions.handleHook(st.runId, { session_id: 'x', cwd: p, hook_event_name: 'Stop', turn_id: T, last_assistant_message: 'work' }, { decision: 'block', reason: 'Continue with the requested work' }))
     expect(st.status).toBe('working')
     // The record of the work it went on from (the fixture's time, before the continuation): history.
@@ -214,7 +214,7 @@ describe('a turn that ended on an error (#1632, #1658)', () => {
     expect(needs(st)).toEqual([])
   })
 
-  it('a turn marked failed that Hive continues (its Stop answered with more work) needs the user no more', async () => {
+  it('a turn marked failed that Combwork continues (its Stop answered with more work) needs the user no more', async () => {
     const st = agent('m')
     await prompt(st, T)
     await stop(st, T)

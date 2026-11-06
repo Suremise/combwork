@@ -1,6 +1,6 @@
 // The card loop with wake-on-change (#128), on two fake Claude Code agents (fake-claude/): a builder and a reviewer work
 // through two cards in order, one passing first time and one failing once then passing, each waiting with
-// cw_wait_for_tasks wake (no polling): Hive types one line into the waiting agent when its card changes, and the
+// cw_wait_for_tasks wake (no polling): Combwork types one line into the waiting agent when its card changes, and the
 // fake answers it with the next line of its wake script. Checked: the order, the rounds, the final columns, one wake per
 // change; the watching status (header, Agent API), dispatch refused while watching, cw_wait_for_agents not waiting on
 // a watcher; no wake typed while the agent works or the user types; a watch surviving a stop and resume; Cancel. The
@@ -41,13 +41,13 @@ const check = (name, ok, extra = '') => {
   cfg.settings.assistant = { ...cfg.settings.assistant, typingPause: 4, enterEndsPause: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const apiToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
   const api = async (method, route, body) => {
@@ -73,7 +73,7 @@ const check = (name, ok, extra = '') => {
   }
   /**
    * Types a prompt into an agent (as the user does), Enter included, once its fake takes prompts (lib.fakePrompts: its
-   * session idle or watching, its last turn drawn over). Typed blind, a prompt that came as a turn ended on Hive's side
+   * session idle or watching, its last turn drawn over). Typed blind, a prompt that came as a turn ended on Combwork's side
    * but not yet on the fake's was dropped, and the suite then waited for a watch that never began (#1130).
    */
   const typers = new Map()
@@ -82,7 +82,7 @@ const check = (name, ok, extra = '') => {
     await typers.get(id).type(text)
   }
   // Cards as `#N`, their workspace numbers: a plain number reading as another card's key is refused (HI-2197).
-  const wait = (n, extra) => `hive cw_wait_for_tasks ${JSON.stringify({ cards: (Array.isArray(n) ? n : [n]).map((x) => `#${x}`), ...extra, wake: true })}`
+  const wait = (n, extra) => `cw cw_wait_for_tasks ${JSON.stringify({ cards: (Array.isArray(n) ? n : [n]).map((x) => `#${x}`), ...extra, wake: true })}`
 
   await page.getByText('alpha', { exact: true }).first().click()
   const builder = await lib.addAgent(inv, alpha, { name: 'Builder' })
@@ -102,15 +102,15 @@ const check = (name, ok, extra = '') => {
   await start(reviewer.id)
   await start(builder.id)
   // The builder busy on other work first (watching a card of its own): the lane the reviewer's join makes then waits to
-  // start c1, saying why, and the builder registers its lane and starts c1 itself (HI-2029: Hive starts a lane's first
+  // start c1, saying why, and the builder registers its lane and starts c1 itself (HI-2029: Combwork starts a lane's first
   // card on its builder once the builder is free).
   const elsewhere = (await inv('tasks:create', { title: 'Elsewhere', project: 'alpha' })).number
   await say(builder.id, wait(elsewhere, { column: 'done' }))
   await until(async () => (await live(builder.id))?.status === 'watching', HUNG_MS)
 
-  // The reviewer joins the builder's lane first (#483): Hive makes the lane, which the builder's own start then updates.
+  // The reviewer joins the builder's lane first (#483): Combwork makes the lane, which the builder's own start then updates.
   // Then it waits for c1 to arrive in Review: watching, never idle.
-  const lane = (body) => `hive cw_lane ${JSON.stringify(body)}`
+  const lane = (body) => `cw cw_lane ${JSON.stringify(body)}`
   // The project's own Card loops rounds and wait (workflow options since HI-1766): the lane the join makes takes them.
   await lib.setOwnOptions(inv, alpha, { loopRounds: 7, loopWaitHours: 5 })
   await say(reviewer.id, `${lane({ action: 'join', builder: 'Builder', cards: [c1, c2] })} then ${wait(c1, { column: 'review' })}`)
@@ -132,7 +132,7 @@ const check = (name, ok, extra = '') => {
     const r = await cancelHit(agentName).catch(() => null)
     return r?.clickable && r
   }, HUNG_MS)) || (await cancelHit(agentName).catch(() => ({ clickable: false })))
-  // Hive's narrowest window (900 px), two panes: ⋯ still fits, the label gives way.
+  // Combwork's narrowest window (900 px), two panes: ⋯ still fits, the label gives way.
   await lib.fitWindow(app, page, { width: 900, height: 750 })
   const narrow = await cancelHitWhenSettled('Reviewer')
   check('at 900 px in two panes, ⋯ is where a click lands on it', narrow.clickable, JSON.stringify(narrow))
@@ -389,13 +389,13 @@ const check = (name, ok, extra = '') => {
   check('a quit is pending, waiting on the watcher', !!pendingNow && (await inv('app:quitState')).working === 1, JSON.stringify(await inv('app:quitState')))
   const quitting = await lib.quitWatch(app)
   await inv('tasks:update', q1, { column: 'done' })
-  await lib.sleep(2500) // A fixed wait on purpose: this checks that Hive does NOT quit yet, which no condition can show.
+  await lib.sleep(2500) // A fixed wait on purpose: this checks that Combwork does NOT quit yet, which no condition can show.
   const still = await inv('app:quitState')
   check('…still waiting while the other card it watches is in Doing with the builder', still?.pending === true && still?.working === 1, JSON.stringify(still))
   const moved = Date.now()
   await inv('tasks:update', q2, { column: 'todo' })
-  // Hive decides to quit (#424): timed from the move; its process ending after that is Electron's, only waited for.
-  check('…and Hive quits once no watched card is being worked on', !!(await quitting.untilDecided(20000)) && (await quitting.gone(30000)), quitting.timings(moved))
+  // Combwork decides to quit (#424): timed from the move; its process ending after that is Electron's, only waited for.
+  check('…and Combwork quits once no watched card is being worked on', !!(await quitting.untilDecided(20000)) && (await quitting.gone(30000)), quitting.timings(moved))
   check('…without waking the watcher', wakes('Reviewer').length === reviewerWakes, JSON.stringify(wakes('Reviewer').slice(reviewerWakes)))
   console.log(failed ? `${failed} failed` : 'all passed')
   process.exit(failed ? 1 : 0)

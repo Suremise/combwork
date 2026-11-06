@@ -1,16 +1,16 @@
 import { join } from 'path'
 import { readFileSync } from 'original-fs'
 import { app } from 'electron'
-import { emit, onHiveEvent, toast } from './events'
+import { emit, onCombworkEvent, toast } from './events'
 import { resolveOffer } from './notify'
 import { readJson, writeJsonAtomic } from './fsutil'
 import { createLogger, userText } from './logger'
 import { JobHost, MAX_LISTED, MAX_WORKING_IN, type HostFailure, type JobList } from './processSupervisor'
 import { brokersOnly, brokersWorkingIn, folderInside, mayBeBroker, parseWorkingIn, SYSTEM_BROKERS } from './systemBrokers'
-import { hiveError } from './hiveError'
+import { combworkError } from './combworkError'
 import { processLabel, progressRunTitle, type AgentLeftovers, type AgentProcess } from '../shared/agentProcesses'
 import type { ActivityProcess } from '../shared/activity'
-import type { HiveEvent } from '../shared/types'
+import type { CombworkEvent } from '../shared/types'
 import { maskText } from '../shared/redact'
 import { englishText, shownText, withValues, type TextPart } from '../shared/advanced'
 import { msg, tr } from '../shared/i18n'
@@ -24,14 +24,14 @@ import { MAX_MARKER_LAUNCHES, MAX_MARKER_PROCESSES, type LaunchProcesses } from 
  * since. Ending a terminal ends only what is attached to its console, so a preview server or a `tail -f` the agent
  * started in the background outlives it, holding its folder and ports. When the CLI exits, what is left in its job is
  * what it left running: listed for the user to end or keep, or ended (Settings → Agents). Only the job's processes
- * are ever ended, so nothing Hive didn't start is touched: a process started before the CLI joined its job, or that
+ * are ever ended, so nothing Combwork didn't start is touched: a process started before the CLI joined its job, or that
  * broke away from it, is simply not tracked.
  *
- * Job objects need Win32 calls, which Node lacks: one hidden PowerShell per Hive holds the jobs (C# through Add-Type,
+ * Job objects need Win32 calls, which Node lacks: one hidden PowerShell per Combwork holds the jobs (C# through Add-Type,
  * no files), answering one line per request. Without it (PowerShell blocked) nothing is tracked, and agents stop as
- * before. Its jobs don't end processes when it closes: quitting Hive leaves running what the user chose to keep.
+ * before. Its jobs don't end processes when it closes: quitting Combwork leaves running what the user chose to keep.
  *
- * What is listed is also kept in Hive's profile (leftovers.json, #614), each process by its id and start time: a quit
+ * What is listed is also kept in Combwork's profile (leftovers.json, #614), each process by its id and start time: a quit
  * that doesn't ask (no window shown, or to install an update) or a crash leaves it there, and the next start lists again
  * those still running as the same processes (restoreLeftovers), to end by that identity (their jobs are gone by then).
  */
@@ -43,10 +43,10 @@ const log = createLogger('processes')
 const SETTLE_MS = 2000
 /**
  * How long the helper gets to say it is ready (Add-Type compiles its C#, which antivirus may scan), and then to answer
- * each request. Test copies (unpackaged) can shorten it: HIVE_TEST_TRACKER_WAIT_MS.
+ * each request. Test copies (unpackaged) can shorten it: CW_TEST_TRACKER_WAIT_MS.
  */
 const WAIT_MS = 60_000
-const waitMs = (): number => (!app.isPackaged && Number(process.env.HIVE_TEST_TRACKER_WAIT_MS) > 0 ? Number(process.env.HIVE_TEST_TRACKER_WAIT_MS) : WAIT_MS)
+const waitMs = (): number => (!app.isPackaged && Number(process.env.CW_TEST_TRACKER_WAIT_MS) > 0 ? Number(process.env.CW_TEST_TRACKER_WAIT_MS) : WAIT_MS)
 /** How often the leftovers are looked at again while there are any (they end by themselves too). */
 const POLL_MS = 10_000
 /** Launches whose leftovers are kept per agent (an agent restarted and stopped over and over), and in all. */
@@ -60,7 +60,7 @@ export { HOST_SOURCE } from './processSupervisor'
 function failureText(f: HostFailure): TextPart {
   switch (f.kind) {
     case 'test':
-      return 'PowerShell refused to run its helper (HIVE_TEST_PROCESS_TRACKER)' // i18n-ignore: test copies only
+      return 'PowerShell refused to run its helper (CW_TEST_PROCESS_TRACKER)' // i18n-ignore: test copies only
     case 'noPowerShell':
       return withValues(TRACKER.noPowerShell, { error: f.error })
     case 'slowHelper':
@@ -72,11 +72,11 @@ function failureText(f: HostFailure): TextPart {
   }
 }
 
-/** Hive's process supervisor (shared with the merge queue's runners, #1360): agents' launches' jobs. */
+/** Combwork's process supervisor (shared with the merge queue's runners, #1360): agents' launches' jobs. */
 const host = new JobHost({
   waitMs,
-  // Test copies (unpackaged): HIVE_TEST_PROCESS_TRACKER=fail, silent or mute.
-  testMode: () => (app.isPackaged ? '' : (process.env.HIVE_TEST_PROCESS_TRACKER ?? '')),
+  // Test copies (unpackaged): CW_TEST_PROCESS_TRACKER=fail, silent or mute.
+  testMode: () => (app.isPackaged ? '' : (process.env.CW_TEST_PROCESS_TRACKER ?? '')),
   log,
   onJoined: () => processJoined(),
   onLost: (why) => jobsLost(why),
@@ -86,7 +86,7 @@ const host = new JobHost({
   testRequests: !app.isPackaged
 })
 
-/** The process supervisor Hive's agents use, which the merge queue's runners share (#1360). */
+/** The process supervisor Combwork's agents use, which the merge queue's runners share (#1360). */
 export function processSupervisor(): JobHost {
   return host
 }
@@ -136,14 +136,14 @@ const running = new Map<string, Launch>()
 const lastListed = new Map<string, LaunchProcesses>()
 /**
  * Launches still running when the tracker was lost (jobsLost): no longer tracked, but their processes as last listed stay
- * in the running marker until each launch ends (launchEnded), so a Hive that then closes unexpectedly still lists them
+ * in the running marker until each launch ends (launchEnded), so a Combwork that then closes unexpectedly still lists them
  * at the next start (HI-2263). That start keeps only those still running by pid and start time (stillRunningOf).
  */
 const untrackedRunning = new Map<string, LaunchProcesses>()
 /** Launches whose CLI has exited, settling (findLeftovers): still in `running` for a moment, but never kept as running. */
 const endingRuns = new Set<string>()
 /**
- * What stopped launches left running, per launch, newest last. `restored`: kept from before Hive restarted (#614), with
+ * What stopped launches left running, per launch, newest last. `restored`: kept from before Combwork restarted (#614), with
  * no job: its processes are known by their ids and start times only.
  */
 const left = new Map<string, Launch & { processes: AgentProcess[]; more: number; since: string; restored?: boolean }>()
@@ -151,7 +151,7 @@ let poll: ReturnType<typeof setInterval> | null = null
 
 /**
  * How a launch's processes came to an end, as its job showed it (#1434: a slot's writer is released only on `ended`):
- * `ended`, its job seen empty (at its CLI's exit, or its leftovers since, or ended by Hive); `kept`, its leftovers kept
+ * `ended`, its job seen empty (at its CLI's exit, or its leftovers since, or ended by Combwork); `kept`, its leftovers kept
  * running by the user and no longer followed; `unknown`, it wasn't tracked, its job couldn't be listed, or the tracker
  * lost it. A run with none yet is still going (or has leftovers being followed). Bounded: the oldest are forgotten.
  */
@@ -181,7 +181,7 @@ export function onRunOutcome(fn: (runId: string, outcome: RunOutcome) => void): 
   return () => outcomeListeners.delete(fn)
 }
 /**
- * Ended launches whose leftovers Hive was asked to end (#1434): a kill is only asked, so their jobs are kept and looked
+ * Ended launches whose leftovers Combwork was asked to end (#1434): a kill is only asked, so their jobs are kept and looked
  * at again at each poll until seen empty (`ended`), or, after CONFIRM_POLLS polls still not, given up (`unknown`).
  */
 const confirming = new Map<string, number>()
@@ -260,15 +260,15 @@ export async function trackLaunch(launch: Launch, pid: number, cancelled?: Abort
 }
 
 /**
- * This Hive's identity as its slot writers name it, "pid:started" (HI-2055: agentFolders gives it), for the keeper's
- * receipts: a receipt frees only a writer of the Hive that started its helper.
+ * This Combwork's identity as its slot writers name it, "pid:started" (HI-2055: agentFolders gives it), for the keeper's
+ * receipts: a receipt frees only a writer of the Combwork that started its helper.
  */
-let hiveIdentity: (() => Promise<string>) | null = null
-export function setHiveIdentity(fn: (() => Promise<string>) | null): void {
-  hiveIdentity = fn
+let combworkIdentity: (() => Promise<string>) | null = null
+export function setCombworkIdentity(fn: (() => Promise<string>) | null): void {
+  combworkIdentity = fn
 }
 
-/** Where the keepers write their runs' states (HI-2055): Hive's profile. */
+/** Where the keepers write their runs' states (HI-2055): Combwork's profile. */
 export const keeperDir = (): string => join(app.getPath('userData'), 'keeper')
 
 /** The keeper configured on the helper running now (its instance), and that helper's identity. */
@@ -276,7 +276,7 @@ let keeperOf: { instance: number; helper: string } | null = null
 
 /**
  * The helper running now, configured as a keeper (HI-2055): its instance and identity, or null when it can't be (no
- * helper, no identity of this Hive yet, an answer that isn't one). A launch then goes on tracked, with no binding: its
+ * helper, no identity of this Combwork yet, an answer that isn't one). A launch then goes on tracked, with no binding: its
  * writer is never freed by a receipt.
  */
 async function keeperHelper(): Promise<{ instance: number; helper: string } | null> {
@@ -284,7 +284,7 @@ async function keeperHelper(): Promise<{ instance: number; helper: string } | nu
   const instance = host.instance
   if (instance === null) return null
   if (keeperOf?.instance === instance) return keeperOf
-  const who = await hiveIdentity?.().catch(() => null)
+  const who = await combworkIdentity?.().catch(() => null)
   if (!who || !/^\d+:\d+$/.test(who)) return null
   const r = await host.request('keeper', who, Buffer.from(keeperDir(), 'utf8').toString('base64url'))
   if (typeof r !== 'string' || !HELPER_ID.test(r) || host.instance !== instance) return null
@@ -300,7 +300,7 @@ let revocation: Promise<boolean> = Promise.resolve(true)
 
 /**
  * Revokes the helper that was lost (HI-2055): kept before any launch goes to its replacement, so a receipt it writes
- * later (it may still run: ended without our seeing it exit) frees nothing. Known at once in this Hive (the clear's guard
+ * later (it may still run: ended without our seeing it exit) frees nothing. Known at once in this Combwork (the clear's guard
  * reads it), durable once written.
  */
 function revokeHelper(helper: string): void {
@@ -333,7 +333,7 @@ export function keeperStillBound(run: string, helper: string): boolean {
   return runHelpers.get(run) === helper && !revokedHelpers.includes(helper)
 }
 
-/** A keeper's state of a run, as the next Hive reads it (HI-2055). */
+/** A keeper's state of a run, as the next Combwork reads it (HI-2055). */
 /** `more` (HI-2309, HR1's round 3): members its total counts beyond those it describes (none listed may be all of them). */
 export type KeeperState = { state: 'ended'; helper: string } | { state: 'live'; helper: string; members: AgentProcess[]; more: number }
 
@@ -342,11 +342,11 @@ const MAX_KEEPER_BYTES = 64 * 1024
 
 /**
  * A run's state as its keeper wrote it, taken only when whole and its own (HI-2055): the file named after the run, at
- * most MAX_KEEPER_BYTES, version 1, the run, its Hive (`hive`, the writer's "pid:started"), a helper this profile bound
+ * most MAX_KEEPER_BYTES, version 1, the run, its Combwork (`app`, the writer's "pid:started"), a helper this profile bound
  * that run to and hasn't revoked, `observed: complete`, and a state: "ended" with no member and total 0, or "live" with
  * its members by id, start time and name. Anything else, null: its writer stays held.
  */
-export async function keeperState(run: string, hive: string): Promise<KeeperState | null> {
+export async function keeperState(run: string, combwork: string): Promise<KeeperState | null> {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(run)) return null
   await readRecords()
   const file = join(keeperDir(), `keeper-${run}.json`)
@@ -358,7 +358,7 @@ export async function keeperState(run: string, hive: string): Promise<KeeperStat
   } catch {
     return null
   }
-  if (!s || typeof s !== 'object' || s.v !== 1 || s.run !== run || s.hive !== hive || s.observed !== 'complete') return null
+  if (!s || typeof s !== 'object' || s.v !== 1 || s.run !== run || s.app !== combwork || s.observed !== 'complete') return null
   const helper = s.helper
   if (typeof helper !== 'string' || !HELPER_ID.test(helper) || !keeperStillBound(run, helper)) return null
   const total = s.total
@@ -376,30 +376,30 @@ export async function keeperState(run: string, hive: string): Promise<KeeperStat
   return { state: 'live', helper, members: members.filter((p) => !/^(conhost|openconsole)(\.exe)?$/i.test(p.name)), more: total - members.length }
 }
 
-/** How long asking a gone Hive's keeper for its run now may take (HI-2313): a bound for one that doesn't answer. */
+/** How long asking a gone Combwork's keeper for its run now may take (HI-2313): a bound for one that doesn't answer. */
 const KEEPER_ASK_MS = 5000
 
 /** The pipe a keeper answers on while it keeps (HI-2313), named after its identity ("pid:created"). */
-export const keeperPipe = (helper: string): string => `\\\\.\\pipe\\hive-keeper-${helper.replace(':', '-')}`
+export const keeperPipe = (helper: string): string => `\\\\.\\pipe\\combwork-keeper-${helper.replace(':', '-')}`
 
 /** A keeper's answer of a run's job now (HI-2313): its members described (console hosts left out, counted), `more` beyond. */
 export type KeeperObservation = { helper: string; members: AgentProcess[]; more: number }
 
 /**
- * A gone Hive's run as its keeper observes it now (HI-2313): asked of the helper its run is bound to (unrevoked), over its
+ * A gone Combwork's run as its keeper observes it now (HI-2313): asked of the helper its run is bound to (unrevoked), over its
  * pipe, which it serves while it keeps; the keeper sweeps for the asking, never answering from a state written before.
- * Null unless the answer is whole and its own: one line, version 1, this run, that helper, the writer's Hive (`hive`,
+ * Null unless the answer is whole and its own: one line, version 1, this run, that helper, the writer's Combwork (`app`,
  * "pid:started"), `now` and `observed: complete`, every member by id, start time and name, its total at least those
  * described. Anything else (no binding, no pipe, no answer within KEEPER_ASK_MS, unsure, a job it doesn't hold): null,
  * and its writer stays held. It ends nothing; what it says is decided by the one rule (nothingHolds).
  */
-export async function keeperObservation(run: string, hive: string): Promise<KeeperObservation | null> {
+export async function keeperObservation(run: string, combwork: string): Promise<KeeperObservation | null> {
   if (process.platform !== 'win32' || !/^[A-Za-z0-9_-]{1,64}$/.test(run)) return null
   await readRecords()
   const helper = runHelpers.get(run)
   if (!helper || !HELPER_ID.test(helper) || !keeperStillBound(run, helper)) return null
   const line = await askKeeper(keeperPipe(helper), `observe ${run}\n`) // i18n-ignore: the keeper's request, a protocol word
-  return line === null ? null : parseObservation(line, run, helper, hive)
+  return line === null ? null : parseObservation(line, run, helper, combwork)
 }
 
 /** One line asked of a keeper's pipe, and its answer's one line; null when none came whole within KEEPER_ASK_MS. */
@@ -431,14 +431,14 @@ async function askKeeper(pipe: string, ask: string): Promise<string | null> {
 }
 
 /** A keeper's answer (HI-2313) taken only whole and its own (keeperObservation); exported for the unit tests. */
-export function parseObservation(line: string, run: string, helper: string, hive: string): KeeperObservation | null {
+export function parseObservation(line: string, run: string, helper: string, combwork: string): KeeperObservation | null {
   let s: Record<string, unknown>
   try {
     s = JSON.parse(line) as Record<string, unknown>
   } catch {
     return null
   }
-  if (!s || typeof s !== 'object' || Array.isArray(s) || s.v !== 1 || s.run !== run || s.helper !== helper || s.hive !== hive || s.state !== 'now' || s.observed !== 'complete') return null
+  if (!s || typeof s !== 'object' || Array.isArray(s) || s.v !== 1 || s.run !== run || s.helper !== helper || s.app !== combwork || s.state !== 'now' || s.observed !== 'complete') return null
   const total = s.total
   if (typeof total !== 'number' || !Number.isSafeInteger(total) || total < 0 || !Array.isArray(s.members) || s.members.length > MAX_LISTED || total < s.members.length) return null
   const members: AgentProcess[] = []
@@ -474,7 +474,7 @@ export async function pruneKeeperStates(now = Date.now()): Promise<void> {
 }
 
 /**
- * An earlier Hive's bindings that nothing can ever be read for (HI-2303): their helper has gone and wrote no state. Only
+ * An earlier Combwork's bindings that nothing can ever be read for (HI-2303): their helper has gone and wrote no state. Only
  * that helper writes a run's state, before it exits, so its absence once the helper is gone is final; a helper still
  * running (keeping), one whose state can't be told, or a state there (even a "live" one) keeps the binding. This lets
  * go what a slot removed while held, or a binding kept before bindings were kept by need, would otherwise keep forever.
@@ -494,7 +494,7 @@ async function settleOrphanBindings(): Promise<void> {
   let dropped = 0
   for (const [run, h] of [...runHelpers]) {
     if (helpersAlive.has(h)) continue
-    // This Hive's own helper is running: only an earlier one's bindings get here.
+    // This Combwork's own helper is running: only an earlier one's bindings get here.
     if (host.instance !== null && keeperOf?.helper === h) continue
     // A state there, or one that can't be told absent: kept. Settled or rebound meanwhile: left as it is now.
     if (await stat(join(keeperDir(), `keeper-${run}.json`)).then(() => true, (e: NodeJS.ErrnoException) => e?.code !== 'ENOENT')) continue
@@ -537,7 +537,7 @@ export async function agentsMemory(): Promise<{ agents: number; bytes: number } 
 /**
  * What running agents' launches have started, now (#987): each launch's job, its CLI and all it started, each process by
  * id and start time (one without can't be told from a later process with its id, so it is left out), within the
- * marker's bounds. For the running marker (lastRun.ts), so that after Hive is ended without quitting, the next start
+ * marker's bounds. For the running marker (lastRun.ts), so that after Combwork is ended without quitting, the next start
  * knows them. A launch whose job can't be listed (the tracker going meanwhile), or that was running when the tracker was
  * lost, gives its processes as last listed (HI-2263). Empty when no launch is tracked; never starts the host.
  */
@@ -659,7 +659,7 @@ export async function endAgentProcess(projectPath: string, agentId: string, pid:
   return 'notOwn'
 }
 
-/** Once every launch that has exited has been looked at (Hive quitting asks about all their leftovers at once). */
+/** Once every launch that has exited has been looked at (Combwork quitting asks about all their leftovers at once). */
 export async function leftoversSettled(): Promise<void> {
   while (settling.size) await Promise.allSettled([...settling])
 }
@@ -691,13 +691,13 @@ async function findLeftovers(runId: string): Promise<AgentLeftovers | null> {
   }
 }
 
-/** A launch being looked at as its CLI exits, its job listed: Hive quitting meanwhile keeps its record (HI-1886). */
+/** A launch being looked at as its CLI exits, its job listed: Combwork quitting meanwhile keeps its record (HI-1886). */
 const looking = new Map<string, Launch>()
 
 async function lookAt(runId: string, launch: Launch): Promise<AgentLeftovers | null> {
   let list = await listJob(runId)
   // The gate waits for its CLI, so a CLI still running once the gate has exited lost its terminal (HI-1819): started as
-  // the terminal was killed (Hive quitting just after a launch), after its console had ended what was attached to it.
+  // the terminal was killed (Combwork quitting just after a launch), after its console had ended what was attached to it.
   // It has no console and can't be used: ended, never listed as a leftover to keep.
   const orphans = launch.gated && launch.gate ? orphanedCli(list?.processes ?? [], launch.gate) : []
   if (orphans.length) {
@@ -817,18 +817,18 @@ async function runningNamed(names: readonly string[]): Promise<readonly string[]
   const r = await host.request('running', names.join(','))
   const now = Array.isArray(r) && r.every((x) => typeof x === 'string') ? (r as string[]) : null
   // A test copy's own names stand in only for a real answer (HR1's round 1): the request itself is always made.
-  const test = now && testBrokers() ? testLines(process.env.HIVE_TEST_SYSTEM_BROKER_ACTIVE).map((l) => l.toLowerCase()) : null
+  const test = now && testBrokers() ? testLines(process.env.CW_TEST_SYSTEM_BROKER_ACTIVE).map((l) => l.toLowerCase()) : null
   return test !== null ? names.filter((n) => test.includes(n)) : now
 }
 
 /**
- * Test copies (unpackaged): HIVE_TEST_SYSTEM_BROKER is a file of process ids, one per line, each taken as Windows
+ * Test copies (unpackaged): CW_TEST_SYSTEM_BROKER is a file of process ids, one per line, each taken as Windows
  * Sandbox's broker (no test can put one in WindowsApps), its path asked of the helper all the same; and
- * HIVE_TEST_SYSTEM_BROKER_ACTIVE a file of the executable names running now, one per line (while it is missing, none).
+ * CW_TEST_SYSTEM_BROKER_ACTIVE a file of the executable names running now, one per line (while it is missing, none).
  */
 function testBrokers(): Set<number> | null {
-  if (app.isPackaged || !process.env.HIVE_TEST_SYSTEM_BROKER) return null
-  return new Set(testLines(process.env.HIVE_TEST_SYSTEM_BROKER).map(Number).filter((n) => n > 0))
+  if (app.isPackaged || !process.env.CW_TEST_SYSTEM_BROKER) return null
+  return new Set(testLines(process.env.CW_TEST_SYSTEM_BROKER).map(Number).filter((n) => n > 0))
 }
 const testLines = (file: string | undefined): string[] => {
   try {
@@ -879,7 +879,7 @@ async function refresh(): Promise<void> {
     emit({ type: 'agent-leftovers', leftovers: first ? leftoversOf(first.projectPath, first.agentId) : { projectPath, agentId, agentName: '', processes: [], more: 0, since: '' } })
   }
   if (changed.size) persist()
-  // Jobs Hive asked to end: ended only once seen empty; still not after CONFIRM_POLLS looks, not known to have ended.
+  // Jobs Combwork asked to end: ended only once seen empty; still not after CONFIRM_POLLS looks, not known to have ended.
   for (const [runId, polls] of [...confirming]) {
     const list = await listJob(runId)
     if (!confirming.has(runId)) continue
@@ -956,7 +956,7 @@ export async function settleLeftovers(projectPath: string, agentId: string, how:
   emit({ type: 'agent-leftovers', leftovers: leftoversOf(mine[0].projectPath, agentId) })
   if (failed) {
     log.warn(`could not end ${failed} process(es) ${userText(name)} left running`)
-    throw hiveError(msg({ id: 'session.leftovers.notEnded', defaultMessage: "{n, plural, one {# process is still running: Windows didn't let Combwork end it. It stays listed in the ⋯ menu on the agent's pane, to try again or keep.} other {# processes are still running: Windows didn't let Combwork end them. They stay listed in the ⋯ menu on the agent's pane, to try again or keep.}}", description: "Ending the processes an agent left running failed. {n} is how many are still running; the ⋯ menu on the agent's pane lists them with End and Keep." }), { n: failed })
+    throw combworkError(msg({ id: 'session.leftovers.notEnded', defaultMessage: "{n, plural, one {# process is still running: Windows didn't let Combwork end it. It stays listed in the ⋯ menu on the agent's pane, to try again or keep.} other {# processes are still running: Windows didn't let Combwork end them. They stay listed in the ⋯ menu on the agent's pane, to try again or keep.}}", description: "Ending the processes an agent left running failed. {n} is how many are still running; the ⋯ menu on the agent's pane lists them with End and Keep." }), { n: failed })
   }
   return done
 }
@@ -990,8 +990,8 @@ const LO = {
   ended: msg({ id: 'main.leftovers.offerEnded', defaultMessage: '{n, plural, one {Ended # process} other {Ended # processes}}', description: "What the notice of processes an agent left running says once End Them ended them (HI-2320), in place of its buttons. {n} is how many." }),
   kept: msg({ id: 'main.leftovers.offerKept', defaultMessage: 'Kept running', description: "What the notice of processes an agent left running says once Keep Running was chosen (HI-2320), in place of its buttons." }),
   endedSome: msg({ id: 'main.leftovers.offerEndedSome', defaultMessage: "{n, plural, one {Ended the # process listed} other {Ended the # processes listed}}; {more, plural, one {# started since still runs: see the ⋯ menu on the agent's pane} other {# started since still run: see the ⋯ menu on the agent's pane}}", description: "What the notice of processes an agent left running says after End Them ended exactly the ones it listed while others started since still run (HI-2320), in place of its buttons. {n} and {more} are how many. The ⋯ menu on the agent's pane lists them with End and Keep." }),
-  incomplete: msg({ id: 'main.leftovers.offerIncomplete', defaultMessage: "Combwork couldn't list them all, so it can't end exactly these: see the ⋯ menu on the agent's pane", description: "What the notice of processes an agent left running says when End Them is pressed but the notice couldn't list every process (more than it shows, or one without a start time), so Hive won't end them from it (HI-2320). The ⋯ menu on the agent's pane lists them with End and Keep." }),
-  unchecked: msg({ id: 'main.leftovers.offerUnchecked', defaultMessage: "Combwork couldn't check what runs now, so it ended nothing. Try again.", description: "An error after End Them or Keep Running on the notice of processes an agent left running: Hive couldn't read what the agent's processes are now, so it did nothing (HI-2320)." }),
+  incomplete: msg({ id: 'main.leftovers.offerIncomplete', defaultMessage: "Combwork couldn't list them all, so it can't end exactly these: see the ⋯ menu on the agent's pane", description: "What the notice of processes an agent left running says when End Them is pressed but the notice couldn't list every process (more than it shows, or one without a start time), so Combwork won't end them from it (HI-2320). The ⋯ menu on the agent's pane lists them with End and Keep." }),
+  unchecked: msg({ id: 'main.leftovers.offerUnchecked', defaultMessage: "Combwork couldn't check what runs now, so it ended nothing. Try again.", description: "An error after End Them or Keep Running on the notice of processes an agent left running: Combwork couldn't read what the agent's processes are now, so it did nothing (HI-2320)." }),
   notEnded: msg({ id: 'main.leftovers.offerNotEnded', defaultMessage: "{n, plural, one {Windows didn't let Combwork end the process listed. Try again.} other {Windows didn't let Combwork end all # processes listed. Try again.}}", description: "An error after End Them on the notice of processes an agent left running: some of the processes it listed still run (HI-2320). {n} is how many it listed." }),
   gone: msg({ id: 'main.leftovers.offerGone', defaultMessage: 'They have ended', description: "What the notice of processes an agent left running says once they ended by themselves, or were ended or kept elsewhere (HI-2320), in place of its buttons." }),
   changed: msg({ id: 'main.leftovers.offerChanged', defaultMessage: "They changed since this notice: see them in the ⋯ menu on the agent's pane", description: "What the notice of processes an agent left running says once what runs is no longer exactly what it listed (HI-2320): its End Them would end processes it didn't show, so its buttons go. The ⋯ menu on the agent's pane lists them with End and Keep." })
@@ -1014,7 +1014,7 @@ export function leftoversOffer(projectPath: string, agentId: string): string {
 /** Offers whose End Them or Keep Running runs now: their own outcome says what happened, not the reconciler (HR2's round 1). */
 const offersSettling = new Set<string>()
 
-/** A launch's processes as they are now (the job's, or a restored launch's still running by id and start time): null if Hive can't tell. */
+/** A launch's processes as they are now (the job's, or a restored launch's still running by id and start time): null if Combwork can't tell. */
 async function listedNow(l: { runId: string; processes: AgentProcess[]; restored?: boolean }): Promise<{ processes: AgentProcess[]; more: number } | null> {
   return l.restored ? await stillRunning(l.processes) : await listJob(l.runId)
 }
@@ -1045,7 +1045,7 @@ export async function settleOffer(offer: string, how: 'end' | 'keep'): Promise<v
       const l = left.get(r.run)
       if (!l) return done(tr(LO.changed))
       const now = await listedNow(l)
-      if (!now) throw hiveError(LO.unchecked, undefined, { kind: 'conflict' })
+      if (!now) throw combworkError(LO.unchecked, undefined, { kind: 'conflict' })
       const seen = shownOf({ runId: r.run, processes: now.processes, more: now.more })
       if (seen.more !== r.more || seen.ids.join(',') !== r.ids.join(',')) return done(tr(LO.changed))
     }
@@ -1056,7 +1056,7 @@ export async function settleOffer(offer: string, how: 'end' | 'keep'): Promise<v
     // What the notice showed and the user authorised, frozen when it was made: never widened from the kept list, which a
     // poll may have changed during the awaits above (HR2's round 2).
     const shown = o.runs.flatMap((r) => r.frozen)
-    if (!(await endProcessesExactly(shown))) throw hiveError(LO.notEnded, { n: shown.length }, { kind: 'conflict' })
+    if (!(await endProcessesExactly(shown))) throw combworkError(LO.notEnded, { n: shown.length }, { kind: 'conflict' })
     // Each launch looked at again: one now empty is settled as ended; one with something started since stays listed.
     let left_ = 0
     for (const r of o.runs) {
@@ -1102,10 +1102,10 @@ let watchingOffers = false
 function watchLeftoverOffers(): void {
   if (watchingOffers) return
   watchingOffers = true
-  onHiveEvent(reconcileLeftoverOffers)
+  onCombworkEvent(reconcileLeftoverOffers)
 }
 
-function reconcileLeftoverOffers(e: HiveEvent): void {
+function reconcileLeftoverOffers(e: CombworkEvent): void {
   if (e.type !== 'agent-leftovers' || !offersShown.size) return
   const k = agentKey(e.leftovers.projectPath, e.leftovers.agentId)
   for (const [offer, o] of offersShown) {
@@ -1121,29 +1121,29 @@ function reconcileLeftoverOffers(e: HiveEvent): void {
   }
 }
 
-/** Ends or keeps every agent's leftovers (Hive quitting): those that can't be ended keep running. */
+/** Ends or keeps every agent's leftovers (Combwork quitting): those that can't be ended keep running. */
 export async function settleAllLeftovers(how: 'end' | 'keep'): Promise<number> {
   let n = 0
   for (const l of allLeftovers()) n += await settleLeftovers(l.projectPath, l.agentId, how).catch(() => 0)
   return n
 }
 
-/** Test copies (unpackaged): HIVE_TEST_JOB_KILL_FAILS=1 makes ending a launch's processes fail, as Windows refusing would. */
-const killFailsForTests = (): boolean => !app.isPackaged && process.env.HIVE_TEST_JOB_KILL_FAILS === '1'
+/** Test copies (unpackaged): CW_TEST_JOB_KILL_FAILS=1 makes ending a launch's processes fail, as Windows refusing would. */
+const killFailsForTests = (): boolean => !app.isPackaged && process.env.CW_TEST_JOB_KILL_FAILS === '1'
 
 /** Why launches can't be tracked (the host couldn't start), or why the latest one wasn't; null while all is well. */
 let problem: TextPart | null = null
 
 /** Why agents' processes aren't tracked, as the notice says it (Diagnostics has the English). */
 const TRACKER = {
-  noPowerShell: msg({ id: 'session.tracker.noPowerShell', defaultMessage: "PowerShell couldn't be started ({error})", description: "Why Hive can't track the processes agents start (a notice's first sentence, without its full stop). {error} is Windows' error, as it came." }),
-  slowHelper: msg({ id: 'session.tracker.slowHelper', defaultMessage: "The PowerShell helper of Combwork's process tracker didn't start within {seconds, plural, one {# second} other {# seconds}}", description: "Why Hive can't track the processes agents start (a notice's first sentence, without its full stop). {seconds} is how many seconds Hive waited." }),
-  refused: msg({ id: 'session.tracker.refused', defaultMessage: 'PowerShell refused to run its helper (Constrained Language Mode or a policy)', description: "Why Hive can't track the processes agents start (a notice's first sentence, without its full stop). Constrained Language Mode is PowerShell's term." }),
-  helperFailed: msg({ id: 'session.tracker.helperFailed', defaultMessage: "The PowerShell helper of Combwork's process tracker didn't start ({why})", description: "Why Hive can't track the processes agents start (a notice's first sentence, without its full stop). {why} is a technical detail, as it came (\"exit 1\")." }),
-  windowsOnly: msg({ id: 'session.tracker.windowsOnly', defaultMessage: 'Tracking processes needs Windows', description: "Why Hive can't track the processes agents start (a notice's first sentence, without its full stop)." }),
-  noAnswer: msg({ id: 'session.tracker.noAnswer', defaultMessage: "Combwork's process tracker didn't answer", description: "Why Hive couldn't track the processes an agent starts (a notice's first sentence, without its full stop)." }),
-  noStart: msg({ id: 'session.tracker.noStart', defaultMessage: "Combwork's process tracker couldn't start", description: "Why Hive can't track the processes agents start (a notice's first sentence, without its full stop)." }),
-  stopped: msg({ id: 'session.tracker.stopped', defaultMessage: "Combwork's process tracker stopped ({why})", description: "Why Hive no longer tracks the processes agents start (a notice's first sentence, without its full stop). {why} is a technical detail, as it came (\"exit 1\")." })
+  noPowerShell: msg({ id: 'session.tracker.noPowerShell', defaultMessage: "PowerShell couldn't be started ({error})", description: "Why Combwork can't track the processes agents start (a notice's first sentence, without its full stop). {error} is Windows' error, as it came." }),
+  slowHelper: msg({ id: 'session.tracker.slowHelper', defaultMessage: "The PowerShell helper of Combwork's process tracker didn't start within {seconds, plural, one {# second} other {# seconds}}", description: "Why Combwork can't track the processes agents start (a notice's first sentence, without its full stop). {seconds} is how many seconds Combwork waited." }),
+  refused: msg({ id: 'session.tracker.refused', defaultMessage: 'PowerShell refused to run its helper (Constrained Language Mode or a policy)', description: "Why Combwork can't track the processes agents start (a notice's first sentence, without its full stop). Constrained Language Mode is PowerShell's term." }),
+  helperFailed: msg({ id: 'session.tracker.helperFailed', defaultMessage: "The PowerShell helper of Combwork's process tracker didn't start ({why})", description: "Why Combwork can't track the processes agents start (a notice's first sentence, without its full stop). {why} is a technical detail, as it came (\"exit 1\")." }),
+  windowsOnly: msg({ id: 'session.tracker.windowsOnly', defaultMessage: 'Tracking processes needs Windows', description: "Why Combwork can't track the processes agents start (a notice's first sentence, without its full stop)." }),
+  noAnswer: msg({ id: 'session.tracker.noAnswer', defaultMessage: "Combwork's process tracker didn't answer", description: "Why Combwork couldn't track the processes an agent starts (a notice's first sentence, without its full stop)." }),
+  noStart: msg({ id: 'session.tracker.noStart', defaultMessage: "Combwork's process tracker couldn't start", description: "Why Combwork can't track the processes agents start (a notice's first sentence, without its full stop)." }),
+  stopped: msg({ id: 'session.tracker.stopped', defaultMessage: "Combwork's process tracker stopped ({why})", description: "Why Combwork no longer tracks the processes agents start (a notice's first sentence, without its full stop). {why} is a technical detail, as it came (\"exit 1\")." })
 }
 
 /**
@@ -1155,7 +1155,7 @@ export async function trackingReady(): Promise<boolean> {
 }
 
 /**
- * Starts the job host in the background (#1155: Hive reopening a workspace, or one opening with agents), so the first launch after Hive
+ * Starts the job host in the background (#1155: Combwork reopening a workspace, or one opening with agents), so the first launch after Combwork
  * starts doesn't wait the half second its PowerShell takes to get going; launches still start it themselves if it
  * isn't running (trackingReady). Says nothing: a host that can't start is said by the launch that finds it so.
  */
@@ -1175,7 +1175,7 @@ export function trackingProblemText(): TextPart | null {
   return process.platform !== 'win32' ? null : problem
 }
 
-/** Hive is quitting: the host closes, and its jobs with it, ending nothing. Resolves once its helper has exited (tests wait for it). */
+/** Combwork is quitting: the host closes, and its jobs with it, ending nothing. Resolves once its helper has exited (tests wait for it). */
 export function closeProcessTracking(): Promise<void> {
   if (poll) clearInterval(poll)
   poll = null
@@ -1234,8 +1234,8 @@ function jobsLost(why: string): void {
 }
 
 /** What the tracker stopping leaves untracked: what running agents start, until they restart; and what was listed. */
-const LOST = msg({ id: 'session.tracker.lost', defaultMessage: "{launches, plural, =0 {What agents start isn't tracked until they restart.} one {What the running agent starts isn't tracked until it restarts.} other {What the # running agents start isn't tracked until they restart.}}", description: "The notice after Hive's process tracker stopped: what is no longer tracked. {launches} is how many agents were running." })
-const LOST_LISTED = msg({ id: 'session.tracker.lostListed', defaultMessage: "{listed, plural, one {# process listed as left running is no longer tracked (it is still running).} other {# processes listed as left running are no longer tracked (they are still running).}} {launches, plural, =0 {Nor is what agents start until they restart.} one {Nor is what the running agent starts until it restarts.} other {Nor is what the # running agents start until they restart.}}", description: "The notice after Hive's process tracker stopped: what is no longer tracked. {listed} is how many processes agents left running were listed in their panes; {launches} how many agents were running." })
+const LOST = msg({ id: 'session.tracker.lost', defaultMessage: "{launches, plural, =0 {What agents start isn't tracked until they restart.} one {What the running agent starts isn't tracked until it restarts.} other {What the # running agents start isn't tracked until they restart.}}", description: "The notice after Combwork's process tracker stopped: what is no longer tracked. {launches} is how many agents were running." })
+const LOST_LISTED = msg({ id: 'session.tracker.lostListed', defaultMessage: "{listed, plural, one {# process listed as left running is no longer tracked (it is still running).} other {# processes listed as left running are no longer tracked (they are still running).}} {launches, plural, =0 {Nor is what agents start until they restart.} one {Nor is what the running agent starts until it restarts.} other {Nor is what the # running agents start until they restart.}}", description: "The notice after Combwork's process tracker stopped: what is no longer tracked. {listed} is how many processes agents left running were listed in their panes; {launches} how many agents were running." })
 
 /** Diagnostics: the tracker stopped earlier in this run, losing what it held; null if it never did. */
 let lost: string | null = null
@@ -1244,7 +1244,7 @@ let lost: string | null = null
 let told = false
 
 /**
- * Agents' processes can't be tracked, or some no longer are (#507): said once a Hive run, in a notification, and in
+ * Agents' processes can't be tracked, or some no longer are (#507): said once a Combwork run, in a notification, and in
  * Diagnostics (trackingProblem, trackingLost). Agents start and run all the same (decision B).
  */
 export function noteUntracked(reason: TextPart | null, detail?: TextPart): void {
@@ -1253,10 +1253,10 @@ export function noteUntracked(reason: TextPart | null, detail?: TextPart): void 
   log.warn(`agents' processes aren't tracked: ${userText(reason === null ? 'unknown' : englishText(reason))}`)
   toast(
     'warning',
-    tr(msg({ id: 'session.tracker.title', defaultMessage: "Combwork can't keep track of agents' processes", description: "A notice's title: Hive can't track the processes agents start, so those they leave running aren't listed." })),
-    tr(msg({ id: 'session.tracker.body', defaultMessage: '{reason}. {detail} Help → Copy Diagnostics says why.', description: "The notice that Hive can't track agents' processes. {reason} says why (a clause, without its full stop); {detail} is one or two sentences on what that means. Help → Copy Diagnostics is a menu command." }), {
-      reason: shownText(reason ?? msg({ id: 'session.tracker.unavailable', defaultMessage: "Its process tracker isn't available", description: "Why Hive can't track the processes agents start, when it doesn't know why (a notice's first sentence, without its full stop)." })),
-      detail: shownText(detail ?? msg({ id: 'session.tracker.detail', defaultMessage: "Agents start as usual, but processes they leave running when they stop aren't listed or offered to end.", description: "The notice that Hive can't track agents' processes: what that means." }))
+    tr(msg({ id: 'session.tracker.title', defaultMessage: "Combwork can't keep track of agents' processes", description: "A notice's title: Combwork can't track the processes agents start, so those they leave running aren't listed." })),
+    tr(msg({ id: 'session.tracker.body', defaultMessage: '{reason}. {detail} Help → Copy Diagnostics says why.', description: "The notice that Combwork can't track agents' processes. {reason} says why (a clause, without its full stop); {detail} is one or two sentences on what that means. Help → Copy Diagnostics is a menu command." }), {
+      reason: shownText(reason ?? msg({ id: 'session.tracker.unavailable', defaultMessage: "Its process tracker isn't available", description: "Why Combwork can't track the processes agents start, when it doesn't know why (a notice's first sentence, without its full stop)." })),
+      detail: shownText(detail ?? msg({ id: 'session.tracker.detail', defaultMessage: "Agents start as usual, but processes they leave running when they stop aren't listed or offered to end.", description: "The notice that Combwork can't track agents' processes: what that means." }))
     })
   )
 }
@@ -1266,7 +1266,7 @@ export function trackingLost(): string | null {
   return lost
 }
 
-/** Where what agents left running is kept for the next start (#614): Hive's profile. */
+/** Where what agents left running is kept for the next start (#614): Combwork's profile. */
 const savedFile = (): string => join(app.getPath('userData'), 'leftovers.json')
 
 /** A stopped launch's leftovers as kept (#614): its own record, so the bounds hold across restarts. */
@@ -1283,17 +1283,17 @@ interface SavedLeftovers {
   version: 1
   launches: SavedLaunch[]
   /**
-   * Runs whose processes Hive saw end, their jobs seen empty (HI-1886): what a slot's writer of that run, its Hive gone,
+   * Runs whose processes Combwork saw end, their jobs seen empty (HI-1886): what a slot's writer of that run, its Combwork gone,
    * is settled by at a later start (`endedEarlier`). Only a job seen empty proves it: a list of processes taken earlier
    * says nothing of those they started since.
    */
   ended?: string[]
   /**
    * Each tracked run's helper (HI-2055), "pid:created", as it was given its job: the only one whose keeper's "ended" frees
-   * that run's slot writer after this Hive has gone.
+   * that run's slot writer after this Combwork has gone.
    */
   helpers?: Record<string, string>
-  /** Helpers lost while this Hive ran (HI-2055): no receipt of theirs frees anything. */
+  /** Helpers lost while this Combwork ran (HI-2055): no receipt of theirs frees anything. */
   revoked?: string[]
 }
 
@@ -1385,7 +1385,7 @@ function persistChecked(): Promise<boolean> {
     .then(() => readRecords())
     .then(async () => {
       const any = launches.length > 0 || endedRuns.length > 0 || runHelpers.size > 0 || revokedHelpers.length > 0
-      // A Hive whose agents never left anything writes no file.
+      // A Combwork whose agents never left anything writes no file.
       if (!any && !keptAny) return true
       keptAny = any
       const data: SavedLeftovers = {
@@ -1410,11 +1410,11 @@ function persistChecked(): Promise<boolean> {
 export const testHooks: { write: ((path: string, data: unknown) => Promise<void>) | null } = { write: null }
 
 /**
- * A run whose processes Hive saw end but whose slot writer couldn't be released (HI-1886: its workspace closed first):
- * kept, so a later start settles that writer once this Hive has gone.
+ * A run whose processes Combwork saw end but whose slot writer couldn't be released (HI-1886: its workspace closed first):
+ * kept, so a later start settles that writer once this Combwork has gone.
  */
 /**
- * Runs that took a slot's writer in this Hive and haven't had its release written (HI-2299): only these are kept as
+ * Runs that took a slot's writer in this Combwork and haven't had its release written (HI-2299): only these are kept as
  * ended at a quit. Every ended run kept instead (130 in a day) went past MAX_RUN_RECORDS, and the oldest dropped were
  * those a later start needed: a closed workspace's unwritten releases (`keepRunEnded`), kept first.
  */
@@ -1440,13 +1440,13 @@ export function keepRunEnded(run: string): void {
   })
 }
 
-/** How long Hive's quit waits for the stopped launches' jobs to be seen empty (HI-1886), and how often it looks. */
+/** How long Combwork's quit waits for the stopped launches' jobs to be seen empty (HI-1886), and how often it looks. */
 const QUIT_LOOK_MS = 5000
 const QUIT_LOOK_EVERY_MS = 250
 
 /**
- * Hive quitting (HI-1886): the runs seen ended are kept for a later start, so their slot writers are settled if their
- * releases aren't written before Hive exits. Those already known (`ended`), and the launches whose CLI hasn't been seen
+ * Combwork quitting (HI-1886): the runs seen ended are kept for a later start, so their slot writers are settled if their
+ * releases aren't written before Combwork exits. Those already known (`ended`), and the launches whose CLI hasn't been seen
  * to exit yet, or whose job is being looked at: their jobs looked at until empty, for at most QUIT_LOOK_MS. A job seen
  * empty is the proof, as when a CLI exits (its whole membership: what its processes started joined it), and only from the
  * helper that held it as the look began; one not seen empty by then, or lost meanwhile, is kept for nothing, so its
@@ -1497,11 +1497,11 @@ export async function recordEndedLaunches(): Promise<void> {
   // records that were needed. A slot has one writer, so these are few.
   const keep = ended.filter((r) => writerRuns.has(r))
   endedRuns = [...new Set([...endedRuns, ...keep])].slice(-MAX_RUN_RECORDS)
-  if (keep.length || pending.size) log.info(`Kept ${keep.length} ended run(s) for their slot writers as Hive quits${pending.size ? `; ${pending.size} launch(es) not seen to end` : ''}`)
+  if (keep.length || pending.size) log.info(`Kept ${keep.length} ended run(s) for their slot writers as Combwork quits${pending.size ? `; ${pending.size} launch(es) not seen to end` : ''}`)
   persist()
 }
 
-/** Whether this profile kept that an earlier Hive's run was seen to end (HI-1886): its job seen empty. */
+/** Whether this profile kept that an earlier Combwork's run was seen to end (HI-1886): its job seen empty. */
 export async function endedEarlier(run: string): Promise<boolean> {
   await readRecords()
   return endedRuns.includes(run)
@@ -1516,7 +1516,7 @@ export function forgetEarlierRun(run: string): void {
   })
 }
 
-/** Once the kept list is written (Hive quitting). */
+/** Once the kept list is written (Combwork quitting). */
 export function leftoversSaved(): Promise<void> {
   return saving
 }
@@ -1545,7 +1545,7 @@ async function endExactly(processes: AgentProcess[]): Promise<boolean> {
   return !!r && typeof r === 'object' && r.failed === 0
 }
 
-/** The kept launches that can be read, within the bounds as Hive keeps them: the newest, and each list cut. */
+/** The kept launches that can be read, within the bounds as Combwork keeps them: the newest, and each list cut. */
 function boundedSaved(saved: Partial<SavedLeftovers> | null): SavedLaunch[] {
   const valid = (Array.isArray(saved?.launches) ? saved.launches : [])
     .filter((l) => l && typeof l.runId === 'string' && typeof l.projectPath === 'string' && typeof l.agentId === 'string' && Array.isArray(l.processes))
@@ -1573,9 +1573,9 @@ function boundedSaved(saved: Partial<SavedLeftovers> | null): SavedLaunch[] {
 let restoring: Promise<AgentLeftovers[]> | null = null
 
 /**
- * What agents left running before Hive last closed (#614): the kept launches' processes still running as the same ones,
+ * What agents left running before Combwork last closed (#614): the kept launches' processes still running as the same ones,
  * each launch listed again on its own (the agent's pane's ⋯, `session:leftovers`) within the usual bounds, and
- * returned (per agent) for Hive to offer as when an agent stops. Without the host, nothing is restored and the list
+ * returned (per agent) for Combwork to offer as when an agent stops. Without the host, nothing is restored and the list
  * stays kept for the next start. Once a start.
  */
 export function restoreLeftovers(): Promise<AgentLeftovers[]> {
@@ -1605,10 +1605,10 @@ export async function endProcessesExactly(processes: readonly AgentProcess[]): P
 }
 
 /**
- * Ends these processes with all they started that runs now (#1008: a hive-progress run's processes, so its whole test
- * run goes, what it started since Hive listed it too), each only while it is still the process it was checked to be
- * (EndTree). failed: those that still run after it, by id and start time (no label: Hive didn't list them), for the
- * caller to report and try again; unverified: the ids of the runs' children that still run and Hive could neither end
+ * Ends these processes with all they started that runs now (#1008: a cw-progress run's processes, so its whole test
+ * run goes, what it started since Combwork listed it too), each only while it is still the process it was checked to be
+ * (EndTree). failed: those that still run after it, by id and start time (no label: Combwork didn't list them), for the
+ * caller to report and try again; unverified: the ids of the runs' children that still run and Combwork could neither end
  * nor check (#1028: once their parent has ended, nothing tells them from a process that later gets the id, so they are
  * reported, never tried again). Null when the host can't say (none ended).
  */
@@ -1646,7 +1646,7 @@ async function restore(): Promise<AgentLeftovers[]> {
     left.set(runId, { ...launch, processes, more: 0, since: l.since, restored: true })
     bound(launch)
     agents.set(agentKey(l.projectPath, l.agentId), { projectPath: l.projectPath, agentId: l.agentId })
-    log.info(`${userText(l.agentName)} left ${processes.length} process(es) running before Hive restarted: ${userText(processes.map((p) => p.label).join('; '))}`)
+    log.info(`${userText(l.agentName)} left ${processes.length} process(es) running before Combwork restarted: ${userText(processes.map((p) => p.label).join('; '))}`)
   }
   persist()
   const found = [...agents.values()].map((a) => leftoversOf(a.projectPath, a.agentId)).filter((l) => l.processes.length)

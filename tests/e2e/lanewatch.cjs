@@ -39,13 +39,13 @@ const check = (name, ok, extra = '') => {
   cfg.settings.assistant = { ...cfg.settings.assistant, tellReplies: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const live = async (p, id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === p.toLowerCase() && s.agentId === id)
   const until = async (fn, ms = 30000) => {
@@ -54,7 +54,7 @@ const check = (name, ok, extra = '') => {
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
     return v
   }
-  /** The lines Hive typed into the Assistant (fake-wakes.jsonl; the project agents' loop wakes left out), as text. */
+  /** The lines Combwork typed into the Assistant (fake-wakes.jsonl; the project agents' loop wakes left out), as text. */
   const rawWakes = () => {
     const f = path.join(claudeHome, 'fake-wakes.jsonl')
     return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => !['Builder', 'Reviewer', 'Builder2'].includes(w.agent)).map((w) => w.text)
@@ -62,7 +62,7 @@ const check = (name, ok, extra = '') => {
   // The wakes as their checks read them: cards by number (they name them by key too, checked once below, #1219).
   const wakes = () => rawWakes().map(lib.unkey)
   const say = async (p, id, text) => {
-    // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+    // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
     await lib.typeLine(inv, lib.ptyKey(p, id), claudeHome, null, text, { live: () => live(p, id) })
   }
   const idle = async (p, id) => ['ready', 'finished'].includes((await live(p, id))?.status)
@@ -81,7 +81,7 @@ const check = (name, ok, extra = '') => {
   const newCard = async (title, agentId) => (await inv('tasks:create', { title, project: 'alpha', agent: agentId, column: 'doing' })).number
   const a = await newCard('Greeting says Hi', builder.id)
   const b = await newCard('Greeting trims the name', builder.id)
-  await say(alpha, builder.id, `hive cw_lane ${JSON.stringify({ action: 'start', cards: [a, b], reviewer: 'Reviewer', name: 'greetings' })}`)
+  await say(alpha, builder.id, `cw cw_lane ${JSON.stringify({ action: 'start', cards: [a, b], reviewer: 'Reviewer', name: 'greetings' })}`)
   await until(() => idle(alpha, builder.id), 15000)
 
   // A release card in no lane (#726), Builder2's.
@@ -90,11 +90,11 @@ const check = (name, ok, extra = '') => {
   const relKey = await lib.cardLabel(inv, rel)
   const watchAgain = async () => {
     await until(async () => ['ready', 'finished'].includes((await live(home, 'assistant'))?.status), 20000)
-    await say(home, 'assistant', 'hive cw_wait_for_tasks {"lanes":["all"],"wake":true,"limitMinutes":360}')
+    await say(home, 'assistant', 'cw cw_wait_for_tasks {"lanes":["all"],"wake":true,"limitMinutes":360}')
     return until(async () => (await live(home, 'assistant'))?.status === 'watching' && (await live(home, 'assistant'))?.watch, 15000)
   }
 
-  // HI-2069: a turn of the Assistant's ending with the lane running and no watch is carried on once by Hive's line,
+  // HI-2069: a turn of the Assistant's ending with the lane running and no watch is carried on once by Combwork's line,
   // naming the lane's builder (its Stop's context, fake-notices.jsonl); the turn that starts its watch gets none.
   const laneNotices = () => {
     const f = path.join(claudeHome, 'fake-notices.jsonl')
@@ -104,7 +104,7 @@ const check = (name, ok, extra = '') => {
   check('a turn of the Assistant ending with the lane unwatched gets the line once, naming its builder (HI-2069)', !!(await until(async () => laneNotices().length === 1 && (await idle(home, 'assistant')), 20000)) && laneNotices()[0].text === '[CW] Lanes are running (Builder) and nothing will wake you about them: watch the lanes (cw_wait_for_tasks with lanes ["all"], wake) before you finish.' && laneNotices().length === 1, JSON.stringify(laneNotices()))
 
   // The Assistant watches every running lane and the release card in one watch.
-  await say(home, 'assistant', `hive cw_wait_for_tasks {"lanes":["all"],"cards":[${rel}],"wake":true,"limitMinutes":360}`)
+  await say(home, 'assistant', `cw cw_wait_for_tasks {"lanes":["all"],"cards":[${rel}],"wake":true,"limitMinutes":360}`)
   check(`the Assistant watches the lanes and #${rel}: "Waiting on all running lanes and ${relKey}"`, !!(await until(async () => (await live(home, 'assistant'))?.status === 'watching' && (await live(home, 'assistant'))?.watch?.label === `Waiting on all running lanes and ${relKey}`, 15000)), JSON.stringify((await live(home, 'assistant'))?.watch))
   check('…and its turn ending on the lane watch gets no line (HI-2069)', laneNotices().length === 1, JSON.stringify(laneNotices()))
   const before = wakes().length
@@ -143,7 +143,7 @@ const check = (name, ok, extra = '') => {
   await say(alpha, builder2.id, 'work 8')
   await until(async () => (await live(alpha, builder2.id))?.status === 'working', 15000)
   const built = wakes().length
-  await say(home, 'assistant', 'hive cw_wait_for_tasks {"lanes":["all"],"agents":[{"project":"alpha","agent":"Builder2"}],"wake":true,"limitMinutes":360}')
+  await say(home, 'assistant', 'cw cw_wait_for_tasks {"lanes":["all"],"agents":[{"project":"alpha","agent":"Builder2"}],"wake":true,"limitMinutes":360}')
   check(`the lane watch takes an agent: "Waiting on all running lanes and ${relKey}, Builder2"`, !!(await until(async () => (await live(home, 'assistant'))?.watch?.label === `Waiting on all running lanes and ${relKey}, Builder2`, 15000)), JSON.stringify((await live(home, 'assistant'))?.watch))
   const builtLine = () => wakes().slice(built).find((t) => t.startsWith('[CW] Builder2 (alpha) finished'))
   check("an agent's turn ending wakes the lane watch", !!(await until(async () => !!builtLine(), 30000)) && builtLine().includes('Your lane watch has ended') && builtLine().includes('less the agents told here'), JSON.stringify(wakes().slice(built)))
@@ -151,7 +151,7 @@ const check = (name, ok, extra = '') => {
   // A lane started after its next watch began is followed too.
   await watchAgain()
   const c = await newCard('README usage', builder2.id)
-  await say(alpha, builder2.id, `hive cw_lane ${JSON.stringify({ action: 'start', cards: [c], reviewer: 'Reviewer' })}`)
+  await say(alpha, builder2.id, `cw cw_lane ${JSON.stringify({ action: 'start', cards: [c], reviewer: 'Reviewer' })}`)
   await until(() => idle(alpha, builder2.id), 15000)
   await inv('tasks:update', c, { blocked: 'Which example should the README show?' })
   const blockedLine = () => wakes().find((t) => t.startsWith('[CW] Lane Builder2 / Reviewer:'))

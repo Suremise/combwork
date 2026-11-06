@@ -9,7 +9,7 @@ import type { WorkspaceService } from './workspace'
 const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase()
 
 /**
- * A card's loop reviewer (#405, #1382): who Hive wakes for its handoffs (loopWakes.ts) and who may answer its builder's
+ * A card's loop reviewer (#405, #1382): who Combwork wakes for its handoffs (loopWakes.ts) and who may answer its builder's
  * design (cardIntents.ts, read inside the design's board change), one rule for both. The reviewer of a running (active or
  * paused: stored as active) lane with the card; else the agent of its latest review started or verdict (its facts, by the agent's id, so a
  * rename doesn't lose it); else, for a card with no such fact (from before 1.0), the agent whose board name last started

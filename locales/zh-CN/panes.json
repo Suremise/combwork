@@ -215,13 +215,13 @@
   "panes.table.worktree": "工作树",
   "panes.table.worktreePrefix": "工作树：{value}",
   "panes.template.detail": "{n, plural, other {# 个智能体}} · {layout}",
-  "panes.template.heading": "{template} · {scope, select, hive {Combwork} workspace {工作区} other {此项目}}",
+  "panes.template.heading": "{template} · {scope, select, combwork {Combwork} workspace {工作区} other {此项目}}",
   "panes.template.layout": "{layout, select, auto {自动布局} single {逐个显示} columns2 {两列} columns3 {三列} grid {2×2 网格} grid6 {3×2 网格} other {{layout}}}",
   "panes.template.listFailed": "无法列出模板",
   "panes.template.noneSaved": "尚未保存任何模板",
   "panes.template.noneYet": "还没有模板：请先使用“+ 添加 ▾”→“模板”→“保存模板…”",
   "panes.template.save": "保存模板…",
-  "panes.template.scopeHeading": "{scope, select, hive {Combwork 自带模板} workspace {工作区模板} other {此项目的模板}}",
+  "panes.template.scopeHeading": "{scope, select, combwork {Combwork 自带模板} workspace {工作区模板} other {此项目的模板}}",
   "panes.terminal.exited": "进程已退出，退出代码 {code}",
   "panes.terminal.osc52.askCopy": "复制",
   "panes.terminal.osc52.askDont": "不复制",
@@ -259,5 +259,6 @@
   "panes.watchCancel.failed": "无法取消监视",
   "panes.watchCell.agents": "{agents} 结束",
   "panes.watchCell.cardsInto": "{cards} → {column}",
-  "panes.worktree.toMerge": "待合并：{work}"
+  "panes.worktree.toMerge": "待合并：{work}",
+  "panes.footer.modelSwitched": "以其连接的模型 {launched} 启动；{provider} 现在使用 {running}。重启智能体即可回到 {launched}。"
 }

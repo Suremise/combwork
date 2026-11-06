@@ -1,5 +1,5 @@
 // A typed prompt's line breaks on the real Codex (HI-1327), in the signed-in Codex test home (lib.CODEX_HOME, its own
-// non-admin sandbox; never ~/.codex): a card the user starts on a running Codex agent without hive tools is typed into
+// non-admin sandbox; never ~/.codex): a card the user starts on a running Codex agent without Combwork tools is typed into
 // it with Send prompts as typed on, and Codex's own record of the prompt (its rollout's user message) is read back:
 // - Typed prompts: line breaks at Alt+Enter, then at Ctrl+J: the prompt as written (blank lines, indentation, a CRLF;
 //   a tab as a space), in one prompt, nothing sent early;
@@ -42,22 +42,22 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').split('\n').
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.providers['claude-code'].executablePath = path.join(__dirname, 'fake-claude', 'fake-claude.cmd')
-  // No hive tools, so a card the user starts on a running agent is typed into its CLI (#650).
-  cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true, port: PORT, provideHiveMcp: false, allowSessionInput: true }
+  // No Combwork tools, so a card the user starts on a running agent is typed into its CLI (#650).
+  cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true, port: PORT, provideCombworkMcp: false, allowSessionInput: true }
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   cfg.settings.notifications = { ...cfg.settings.notifications, desktopNotifications: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
   // Send prompts as typed on; a long wait for the line to be drawn (a model's turn may hold Codex busy a moment).
   fs.writeFileSync(path.join(userData, 'advanced.json'), JSON.stringify({ format: 1, values: { [AS_TYPED]: true, 'codex.prompt.drawnSeconds': 30 } }, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off', CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: lib.CODEX_HOME, PATH: lib.pathWithoutStoreAliases() })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off', CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: lib.CODEX_HOME, PATH: lib.pathWithoutStoreAliases() })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1400, height: 900 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     const def = await lib.addAgent(inv, proj, { name: 'Tester', provider: 'codex', location: 'project', model: 'gpt-6-luna', effort: 'low' })
     const key = lib.ptyKey(proj, def.id)

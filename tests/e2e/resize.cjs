@@ -14,17 +14,17 @@ const HUNG_MS = 15000
 let pass = 0, fail = 0
 const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.log(ok ? 'PASS' : 'FAIL', name, extra) }
 ;(async () => {
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await inv('workspace:open', ws); await sleep(800)
   // "How do you work?" answered (#1423), as a user does once: its step, shown once the form is read, moves what is dragged.
   await inv('workflow:presetNotNow', path.join(ws, 'demo'), 'git')
   // …and the window has the answer (the refresh it makes), before anything is measured.
-  await lib.until(async () => (await page.evaluate(() => window.hive.invoke('workspace:refresh')))?.projects.find((p) => p.name === 'demo')?.config.workflow?.presetAsked === 'notNow', 10000)
+  await lib.until(async () => (await page.evaluate(() => window.combwork.invoke('workspace:refresh')))?.projects.find((p) => p.name === 'demo')?.config.workflow?.presetAsked === 'notNow', 10000)
   await page.getByText('demo', { exact: true }).first().click(); await sleep(400)
 
   const drag = async (handle, dx) => {

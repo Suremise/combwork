@@ -4,7 +4,7 @@ import { join } from 'path'
 import { ADVANCED_DEFS } from '../src/shared/advanced'
 import { FLIGHT_PATTERN_OFF, knownIds, unknownIn } from '../src/shared/flightRecorder'
 import { parseRecording } from '../src/shared/consoleFixtures.mts'
-import { sessionSourceId, hiveSourceId } from '../src/shared/devConsole'
+import { sessionSourceId, combworkSourceId } from '../src/shared/devConsole'
 import { setLanguage } from '../src/shared/i18n'
 
 // The developer console's flight recorder (#698): the events and fields each CLI is known to send (advanced values; every
@@ -16,7 +16,7 @@ import { setLanguage } from '../src/shared/i18n'
 const profile = vi.hoisted(() => ({ dir: '' }))
 vi.mock('electron', async () => {
   const { tempDir } = await import('./tempDir')
-  profile.dir = tempDir('hive-flight-')
+  profile.dir = tempDir('cw-flight-')
   return { app: { getPath: () => profile.dir, getVersion: () => '0.9.0-test', isPackaged: false } }
 })
 // Settings → Advanced as the test sets them; anything else at its default.
@@ -109,7 +109,7 @@ describe('the events and fields each CLI is known to send', () => {
 describe("the console's flight mode", async () => {
   const { DevConsole, FLIGHT_MAX_SOURCES, FLIGHT_RING_EVENTS } = await import('../src/main/devConsole')
   const a = sessionSourceId('C:\\ws\\alpha', 'a1')
-  const hive = hiveSourceId('C:\\ws')
+  const own = combworkSourceId('C:\\ws')
   const ev = (n: number) => () => ({ kind: 'hook' as const, name: `Hook ${n}`, summary: `hook ${n}`, raw: { prompt: 'secret words', token: SECRET } })
 
   it('keeps the sources it is given whether watched or not, redacted, bounded, and nothing once off', () => {
@@ -118,8 +118,8 @@ describe("the console's flight mode", async () => {
     expect([c.capturing(a), c.flightEvents(a)]).toEqual([false, []])
     const kept: string[] = []
     c.setFlight((s) => s.startsWith('session:'), (e) => kept.push(e.name))
-    expect([c.capturing(a), c.capturing(hive)]).toEqual([true, false])
-    for (let i = 1; i <= FLIGHT_RING_EVENTS + 5; i++) c.capture([a, hive], ev(i))
+    expect([c.capturing(a), c.capturing(own)]).toEqual([true, false])
+    for (let i = 1; i <= FLIGHT_RING_EVENTS + 5; i++) c.capture([a, own], ev(i))
     const events = c.flightEvents(a)
     expect(events.length).toBe(FLIGHT_RING_EVENTS)
     expect(events.at(-1)!.name).toBe(`Hook ${FLIGHT_RING_EVENTS + 5}`)
@@ -127,7 +127,7 @@ describe("the console's flight mode", async () => {
     // Redacted as capture is: no text, no secret.
     expect(JSON.stringify(events)).not.toMatch(/secret words|sk-abc/)
     // The console's own rings and readers aren't touched: nobody watches.
-    expect([c.events(a), c.flightEvents(hive), c.stats().sources]).toEqual([[], [], 0])
+    expect([c.events(a), c.flightEvents(own), c.stats().sources]).toEqual([[], [], 0])
     // The least recently written sources go past the bound.
     for (let i = 0; i <= FLIGHT_MAX_SOURCES; i++) c.capture([sessionSourceId('C:\\ws\\p', `x${i}`)], ev(i))
     expect(c.stats().flightSources).toBe(FLIGHT_MAX_SOURCES)
@@ -147,7 +147,7 @@ describe("the console's flight mode", async () => {
 })
 
 describe('captures and triggers', async () => {
-  process.env.HIVE_TEST_FLIGHT_AFTER_MS = '1'
+  process.env.CW_TEST_FLIGHT_AFTER_MS = '1'
   const { devConsole } = await import('../src/main/devConsole')
   const { saveCapture, listCaptures, recordingsDir, latestRecording } = await import('../src/main/consoleRecorder')
   const { flightRecorder, FLIGHT_MAX_PENDING } = await import('../src/main/flightRecorder')
@@ -238,7 +238,7 @@ describe('captures and triggers', async () => {
     expect(whats.some((w) => /terminal title: found the needle/.test(w))).toBe(true)
   })
 
-  it("the notice and the list say what a capture saw in Hive's language; the file keeps its English beside it", async () => {
+  it("the notice and the list say what a capture saw in Combwork's language; the file keeps its English beside it", async () => {
     const PL = join(__dirname, '..', 'locales', 'pl')
     const polish = Object.assign({}, ...readdirSync(PL).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(readFileSync(join(PL, f), 'utf8'))))
     set({ 'cw.recorder.safeguard': true, 'cw.recorder.unknown': true })
@@ -318,7 +318,7 @@ describe('captures and triggers', async () => {
   })
 
   it('a trigger turned off stops at once: its capture waiting is dropped, another trigger still on saves its own', async () => {
-    process.env.HIVE_TEST_FLIGHT_AFTER_MS = '300'
+    process.env.CW_TEST_FLIGHT_AFTER_MS = '300'
     try {
       // Many kept, so this test's capture isn't pruned by the earlier ones.
       set({ 'cw.recorder.safeguard': true, 'cw.recorder.stalled': true, 'cw.recorder.keep': 200 })
@@ -337,7 +337,7 @@ describe('captures and triggers', async () => {
       expect(captures().length).toBe(before + 1)
       expect(toasts.list.length).toBe(1)
     } finally {
-      process.env.HIVE_TEST_FLIGHT_AFTER_MS = '1'
+      process.env.CW_TEST_FLIGHT_AFTER_MS = '1'
     }
   })
 

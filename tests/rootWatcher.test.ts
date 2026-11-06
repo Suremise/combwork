@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-root-watcher-')
+const base = tempDir('cw-root-watcher-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
@@ -47,7 +47,7 @@ describe("the workspace root's watch (#964)", () => {
   it('the workspace folder deleted ends the watch (Windows then sends events without end), and made again it is watched again', { timeout: 60_000 }, async () => {
     const internals = w as unknown as Internals
     expect(internals.rootWatcher).not.toBeNull()
-    // .combwork's own watcher holds its folders: closed, so the whole workspace folder can go, as when deleted with Hive's window showing another.
+    // .combwork's own watcher holds its folders: closed, so the whole workspace folder can go, as when deleted with Combwork's window showing another.
     await internals.watcher?.close()
     internals.watcher = null
     await vi.waitFor(() => rmSync(wsPath, { recursive: true, force: true }), { timeout: HUNG_MS })

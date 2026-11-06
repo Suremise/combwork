@@ -22,10 +22,10 @@ export const B3 = agentActor('B3')
 export const R1 = agentActor('R1')
 export const R2 = agentActor('R2')
 
-const ID = ['-c', 'user.name=Hive Test', '-c', 'user.email=test@hive.invalid']
+const ID = ['-c', 'user.name=Combwork Test', '-c', 'user.email=test@example.invalid']
 
 /**
- * HI-2025 (Darren's decision): the bound of a merge-queue test whose work is 65 to 110 git processes (Hive's own git per
+ * HI-2025 (Darren's decision): the bound of a merge-queue test whose work is 65 to 110 git processes (Combwork's own git per
  * queue step, about 95% of its time; nothing in it waits for time). Alone they take 2 to 11 s. 15 such tests passed 20 s
  * (the run's limit, vitest.config.ts) in HI-2025's runs of the workflow files under load: 5 in the baseline run, 13 in
  * the run beside three other lanes' full unit runs (CPU at 80%), after git was made cheaper, and 1 in the first final
@@ -51,7 +51,7 @@ export function commit(cwd: string, files: Record<string, string>, message: stri
   for (const [f, c] of Object.entries(files)) put(cwd, f, c)
   sh(cwd, 'add', '-A')
   const who = opts.email ? ['-c', `user.email=${opts.email}`] : []
-  execFileSync('git', [...ID, ...who, 'commit', '-q', '-m', message, ...(opts.trailer ? ['--trailer', `Hive-Card: ${opts.trailer}`] : [])], { cwd, stdio: 'pipe' })
+  execFileSync('git', [...ID, ...who, 'commit', '-q', '-m', message, ...(opts.trailer ? ['--trailer', `Combwork-Card: ${opts.trailer}`] : [])], { cwd, stdio: 'pipe' })
   return sh(cwd, 'rev-parse', 'HEAD')
 }
 
@@ -59,8 +59,8 @@ export function commit(cwd: string, files: Record<string, string>, message: stri
 export function freshGitRepo(dir: string): string {
   mkdirSync(dir, { recursive: true })
   execFileSync('git', ['init', '-q', '-b', 'main', dir])
-  sh(dir, 'config', 'user.name', 'Hive Test')
-  sh(dir, 'config', 'user.email', 'test@hive.invalid')
+  sh(dir, 'config', 'user.name', 'Combwork Test')
+  sh(dir, 'config', 'user.email', 'test@example.invalid')
   sh(dir, 'config', 'core.autocrlf', 'false')
   commit(dir, { 'README.md': 'hello\n', 'src/a.txt': 'one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten\n' }, 'initial')
   return dir
@@ -86,15 +86,15 @@ export interface Env {
   wf: Workflow
   store: FactStore
   project: string
-  /** The workspace folder: its hive.db holds the store (#1215); slots live here too, outside the repository. */
+  /** The workspace folder: its combwork.db holds the store (#1215); slots live here too, outside the repository. */
   home: string
   options: WorkflowOptions
   wakes: { agent: string; card: string; why: string }[]
   notes: { card: string; text: string; shown?: StoredText }[]
   queue: (cfg?: Partial<QueueConfig>) => MergeQueue
-  /** Another Hive on the same workspace: its own store connection and Workflow (§16.17). */
+  /** Another Combwork on the same workspace: its own store connection and Workflow (§16.17). */
   another: () => Workflow
-  /** A store on a connection of its own to the workspace's hive.db, as a restarted Hive opens it (closed with the rest). */
+  /** A store on a connection of its own to the workspace's combwork.db, as a restarted Combwork opens it (closed with the rest). */
   reopen: () => FactStore
   /** Facts of a card, by kind. */
   kinds: (card: number) => FactKind[]
@@ -109,8 +109,8 @@ export function setup(options: Partial<WorkflowOptions> & { platform: 'git' | 'n
   else mkdirSync(project, { recursive: true })
   if (extra.files) for (const [f, c] of Object.entries(extra.files)) put(project, f, c)
   const o: WorkflowOptions = { ...allOff(options.platform), ...options }
-  // The workspace's hive.db, made through the board's open path (#1215: the project's cards are the board's); the
-  // runtime, outside any board change, has a connection of its own to it, as another Hive would.
+  // The workspace's combwork.db, made through the board's open path (#1215: the project's cards are the board's); the
+  // runtime, outside any board change, has a connection of its own to it, as another Combwork would.
   const scope = { project: 'project', key: 'AM' }
   // Its window's, as a window opening it would admit it (#1395).
   const dismiss = admitted(home)

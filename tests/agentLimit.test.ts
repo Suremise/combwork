@@ -1,5 +1,5 @@
 // Maximum agents (HI-2001; #562 before it, Settings → Advanced → Agents per project): a workflow option, the user's team
-// size, set by the presets (Solo 1, Pair 2, Team and All off 12), resolved Hive's, the workspace's, then the project's.
+// size, set by the presets (Solo 1, Pair 2, Team and All off 12), resolved Combwork's, the workspace's, then the project's.
 // The Assistant and the Agent API add agents only up to it, checked again under the project's lock, and are told where
 // the user raises it; the user too (HI-2058, Darren's decision), told it in the window's words. A template's load
 // likewise: over it, the Assistant's is refused; the user's with its workflow saves the template's own maximum with its
@@ -22,7 +22,7 @@ import { settingEntry, settingReadOnly } from '../src/shared/settingsCatalog'
 import type { AgentDef } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-agentlimit-')
+const base = tempDir('cw-agentlimit-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -104,7 +104,7 @@ describe('the option', () => {
 
   it("the agent watch takes a whole project's agents at the most, and more (the Assistant's span projects)", () => {
     expect(AGENT_WATCH_MAX_AGENTS).toBeGreaterThan(AGENT_LIMIT_MAX)
-    const watched = (n: number) => ({ agents: Array.from({ length: n }, (_, i) => ({ projectPath: 'C:\\ws\\hive', agentId: `a${i}`, name: `A${i}`, project: 'hive' })), ignoreBackground: false })
+    const watched = (n: number) => ({ agents: Array.from({ length: n }, (_, i) => ({ projectPath: 'C:\\ws\\alpha', agentId: `a${i}`, name: `A${i}`, project: 'alpha' })), ignoreBackground: false })
     expect(readSavedAgentCondition(watched(AGENT_WATCH_MAX_AGENTS))?.agents).toHaveLength(AGENT_WATCH_MAX_AGENTS)
     expect(readSavedAgentCondition(watched(AGENT_WATCH_MAX_AGENTS + 1))).toBeNull()
   })
@@ -121,15 +121,15 @@ describe('the option', () => {
 
 describe('Agents per project becomes Maximum agents', () => {
   it("a workspace's own: its workflow defaults for None and Git, where they don't set it", () => {
-    expect(migrateWorkspacePreferences({ advanced: { [AGENTS_PER_PROJECT]: 16, 'hive.other': 1 } })).toEqual({ advanced: { 'hive.other': 1 }, workflow: { none: { maxAgents: 16 }, git: { maxAgents: 16 } } })
+    expect(migrateWorkspacePreferences({ advanced: { [AGENTS_PER_PROJECT]: 16, 'cw.other': 1 } })).toEqual({ advanced: { 'cw.other': 1 }, workflow: { none: { maxAgents: 16 }, git: { maxAgents: 16 } } })
     expect(migrateWorkspacePreferences({ advanced: { [AGENTS_PER_PROJECT]: 16 }, workflow: { git: { maxAgents: 4 } } })).toEqual({ advanced: {}, workflow: { none: { maxAgents: 16 }, git: { maxAgents: 4 } } })
     // One it doesn't take goes, moving nothing.
     expect(migrateWorkspacePreferences({ advanced: { [AGENTS_PER_PROJECT]: 99 } })).toEqual({ advanced: {} })
-    const untouched = { advanced: { 'hive.other': 1 } }
+    const untouched = { advanced: { 'cw.other': 1 } }
     expect(migrateWorkspacePreferences(untouched)).toBe(untouched)
   })
 
-  it("Hive's own: its workflow defaults, then dropped from advanced.json", async () => {
+  it("Combwork's own: its workflow defaults, then dropped from advanced.json", async () => {
     const profile = join(base, 'migrate')
     mkdirSync(profile, { recursive: true })
     writeFileSync(join(profile, 'advanced.json'), JSON.stringify({ format: 1, values: { [AGENTS_PER_PROJECT]: 18 } }))
@@ -176,7 +176,7 @@ describe('Agents per project becomes Maximum agents', () => {
   })
 })
 
-describe('Hive keeps to it', () => {
+describe('Combwork keeps to it', () => {
   const wsPath = join(base, 'ws')
   const alpha = join(wsPath, 'alpha')
   const beta = join(wsPath, 'beta')
@@ -227,7 +227,7 @@ describe('Hive keeps to it', () => {
     expect(count(alpha)).toBe(12)
   })
 
-  it("through the Agent API it is a refusal (409, its words), recorded as the caller's error, never Hive's (HI-1952)", async () => {
+  it("through the Agent API it is a refusal (409, its words), recorded as the caller's error, never Combwork's (HI-1952)", async () => {
     const { apiErrorReply } = await import('../src/main/servers')
     const { apiOutcome } = await import('../src/main/metrics')
     const refused = await add(alpha).then(
@@ -261,7 +261,7 @@ describe('Hive keeps to it', () => {
     await reset(beta, 3, 'b')
   })
 
-  it("the workspace's own over Hive's; lowered below what the project has, it keeps them all", async () => {
+  it("the workspace's own over Combwork's; lowered below what the project has, it keeps them all", async () => {
     await setOwn(13)
     expect(agentMax(alpha)).toBe(13)
     expect(await outcome(add(alpha))).toBe('ok')

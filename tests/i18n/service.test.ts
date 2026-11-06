@@ -1,5 +1,5 @@
 // #850 (E10f): the `service` area, the services behind the workspace, files, git, lanes, transcripts, metrics,
-// benchmarks, providers and advanced settings. Refusals are HiveErrors: the Agent API and every reader of `.message` get
+// benchmarks, providers and advanced settings. Refusals are CombworkErrors: the Agent API and every reader of `.message` get
 // the English exactly as before, with the status its English gave, and the window (IPC) its language. Text only agents
 // read stays English (a lane's refusals to cw_lane, a delivery's reasons, progress runs). Metrics keep their English
 // lists for agents with the window's text beside them, item for item; advanced.json's problem is text too.
@@ -10,7 +10,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from '../tempDir'
 
-const base = tempDir('hive-i18n-service-')
+const base = tempDir('cw-i18n-service-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { setLanguage } = await import('../../src/shared/i18n')
@@ -19,16 +19,16 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const files = await import('../../src/main/files')
 const { gitDiff } = await import('../../src/main/git')
 const gitRepo = await import('../../src/main/gitRepo')
-const { untrackHive } = await import('../../src/main/hiveVcs')
+const { untrackCombwork } = await import('../../src/main/combworkVcs')
 const { ownAttachmentsFolder } = await import('../../src/main/attachmentsFolder')
 const lanes = await import('../../src/main/lanes')
 const metrics = await import('../../src/main/metrics')
-const { HiveError, shownError, windowError } = await import('../../src/main/hiveError')
+const { CombworkError, shownError, windowError } = await import('../../src/main/combworkError')
 const { apiErrorReply } = await import('../../src/main/servers')
 
 const ROOT = resolve(__dirname, '../..')
 const EN = JSON.parse(readFileSync(join(ROOT, 'locales/en/service.json'), 'utf8')) as Record<string, { defaultMessage: string; description: string }>
-const FILES = ['advanced.ts', 'attachmentsFolder.ts', 'benchmarks.ts', 'files.ts', 'fsutil.ts', 'git.ts', 'gitRepo.ts', 'hiveVcs.ts', 'lanes.ts', 'lineWriter.ts', 'metrics.ts', 'progress.ts', 'providerService.ts', 'transcriptReads.ts', 'transcripts.ts', 'workspace.ts']
+const FILES = ['advanced.ts', 'attachmentsFolder.ts', 'benchmarks.ts', 'files.ts', 'fsutil.ts', 'git.ts', 'gitRepo.ts', 'combworkVcs.ts', 'lanes.ts', 'lineWriter.ts', 'metrics.ts', 'progress.ts', 'providerService.ts', 'transcriptReads.ts', 'transcripts.ts', 'workspace.ts']
 
 /** A German translation of some of the area's messages, as a language file gives them (the rest stays English). */
 const GERMAN: Record<string, string> = {
@@ -41,7 +41,7 @@ const GERMAN: Record<string, string> = {
   'git.validate.enterUrl': 'Gib eine URL ein',
   'git.validate.notEmail': 'Das ist keine E-Mail-Adresse',
   'service.gitRepo.badName': '{kind, select, tag {{hasName, select, yes {{name} ist kein gültiger Tag-Name.} other {Das ist kein gültiger Tag-Name.}}} other {{hasName, select, yes {{name} ist kein gültiger Branch-Name.} other {Das ist kein gültiger Branch-Name.}}}}',
-  'service.hiveVcs.noRepo': 'Kein Git-Repository enthält dieses Projekt.',
+  'service.combworkVcs.noRepo': 'Kein Git-Repository enthält dieses Projekt.',
   'service.attachments.badFolder': 'Kein Name eines Sitzungsordners.',
   'service.lanes.unknown': 'Unbekannte Lane {id}',
   'service.metrics.badRole': 'role muss agent, assistant, api oder viewer sein',
@@ -94,7 +94,7 @@ describe('the service area', () => {
 describe('refusals: English for agents and the log as before, the window in its language', () => {
   it('says each in English with the status it always had, and in German to the window', async () => {
     setLanguage('de', GERMAN)
-    const notRepo = tempDir('hive-not-a-repo-')
+    const notRepo = tempDir('cw-not-a-repo-')
     const nowhere = join(base, 'elsewhere')
     const cases: [Error, string, number, string][] = [
       [await caught(() => w.assertProject(nowhere)), `Not a project in the open workspace: ${nowhere}`, 404, `Kein Projekt im offenen Arbeitsbereich: ${nowhere}`],
@@ -103,11 +103,11 @@ describe('refusals: English for agents and the log as before, the window in its 
       [await caught(() => files.move(proj, ['sub/a.txt'], '')), '"a.txt" already exists in the project root', 500, '„a.txt“ gibt es im Projektordner schon'],
       [await caught(() => gitDiff(proj, '../x')), 'Path is outside the project', 500, 'Der Pfad liegt außerhalb des Projekts'],
       [await caught(() => gitRepo.createTag(proj, 'a..b', '')), "a..b isn't a valid tag name.", 500, 'a..b ist kein gültiger Tag-Name.'],
-      // The Git view's checks shared with its dialogs (#871): English in the message, whatever language Hive shows.
+      // The Git view's checks shared with its dialogs (#871): English in the message, whatever language Combwork shows.
       [await caught(() => gitRepo.addRemote(proj, '', 'https://example.com/r.git')), 'Enter a name', 500, 'Gib einen Namen ein'],
       [await caught(() => gitRepo.setRemoteUrl(proj, 'origin', ' ')), 'Enter a URL', 500, 'Gib eine URL ein'],
       [await caught(() => gitRepo.setIdentity(proj, 'A', 'nope')), "That isn't an email address", 500, 'Das ist keine E-Mail-Adresse'],
-      [await caught(() => untrackHive(notRepo, [])), 'No git repository holds this project.', 500, 'Kein Git-Repository enthält dieses Projekt.'],
+      [await caught(() => untrackCombwork(notRepo, [])), 'No git repository holds this project.', 500, 'Kein Git-Repository enthält dieses Projekt.'],
       [await caught(() => ownAttachmentsFolder(proj, '..')), 'Not a session folder name.', 400, 'Kein Name eines Sitzungsordners.'],
       [await caught(() => lanes.endLane(w, 'zzz', {})), 'Unknown lane zzz', 404, 'Unbekannte Lane zzz'],
       [await caught(() => metrics.queryMetrics(w, { scope: { kind: 'workspace' }, role: 'x' as never })), 'role must be agent, assistant, api or viewer', 400, 'role muss agent, assistant, api oder viewer sein']
@@ -121,10 +121,10 @@ describe('refusals: English for agents and the log as before, the window in its 
     }
   })
 
-  it("keeps a lane's refusals to agents English, with their status, whatever language Hive shows", () => {
+  it("keeps a lane's refusals to agents English, with their status, whatever language Combwork shows", () => {
     setLanguage('de', GERMAN)
     const e = new lanes.LaneError(400, "A lane's builder can't be its reviewer")
-    expect(e).toBeInstanceOf(HiveError)
+    expect(e).toBeInstanceOf(CombworkError)
     expect([e.message, e.status, e.kind, shownError(e)]).toEqual(["A lane's builder can't be its reviewer", 400, 'invalid', "A lane's builder can't be its reviewer"])
     expect(apiErrorReply(e).status).toBe(400)
   })

@@ -33,7 +33,7 @@ export function openModeMenu(projectPath: string, agentId: string, anchor?: Elem
 
 /**
  * Confirms choosing a provider's no-guardrails mode (Claude Code's Bypass, Codex's Full Access). `where`: what will run
- * in it, as the sentence's subject (an agent's name), or the whole question (`message`, "New sessions of hive will run
+ * in it, as the sentence's subject (an agent's name), or the whole question (`message`, "New sessions of demo will run
  * every command…"), in the window's language.
  */
 export async function confirmDangerousMode(provider: ProviderId, mode: PermissionMode, where: string | { message: string }): Promise<boolean> {
@@ -59,7 +59,7 @@ async function switchLive(project: ProjectInfo, a: AgentInfo, mode: PermissionMo
   if (canSwitchModeLive(desc, mode, live.permissionMode, null)) {
     const r = await actions.attempt(tr(msg({ id: 'agents.permission.switchFailed', defaultMessage: 'Could not switch the permission mode', description: "An error's title: switching a running agent's permission mode failed." })), () => call('session:setMode', project.path, a.id, mode))
     if (!r || r.ok) return
-    if (!r.restart) return notify('warning', tr(msg({ id: 'agents.permission.notSwitched', defaultMessage: 'Permission mode not switched', description: "A notification's title: Hive couldn't switch a running agent's permission mode (the message says why)." })), r.message)
+    if (!r.restart) return notify('warning', tr(msg({ id: 'agents.permission.notSwitched', defaultMessage: 'Permission mode not switched', description: "A notification's title: Combwork couldn't switch a running agent's permission mode (the message says why)." })), r.message)
   }
   const working = live.status === 'working'
   const label = permissionLabel(p, mode, tr)
@@ -95,7 +95,7 @@ function menuItems(project: ProjectInfo, a: AgentInfo, settings: AppSettings, vi
   if (live && !live.settingUp) {
     const cur = live.permissionMode
     const asking = live.status === 'waiting'
-    // Started in the CLI's own setting (#1284): Hive doesn't know its mode, so every choice restarts the session.
+    // Started in the CLI's own setting (#1284): Combwork doesn't know its mode, so every choice restarts the session.
     const cliOwn = !!modeOption(provider, cur)?.cliOwn
     return [
       { header: true, label: many ? tr(msg({ id: 'agents.permission.menuAgent', defaultMessage: 'Permission mode — {agent}', description: "The permission mode menu's heading, for one of several agents ({agent}: its name)." }), { agent: a.name }) : tr(msg({ id: 'agents.permission.menu', defaultMessage: 'Permission mode', description: "The permission mode menu's heading." })) },
@@ -103,8 +103,8 @@ function menuItems(project: ProjectInfo, a: AgentInfo, settings: AppSettings, vi
       ...(cliOwn
         ? [
             {
-              label: tr(msg({ id: 'agents.permission.cliOwnNoSwitchTitle', defaultMessage: "Combwork can't switch this session's mode", description: "In a running agent's permission mode menu, for a session started in \"The CLI's own setting\" (Hive passed no mode): a short line saying no mode switches live. Keep it short." })),
-              detail: tr(msg({ id: 'agents.permission.cliOwnNoSwitch', defaultMessage: "It started in the CLI's own setting, so Combwork doesn't know which mode it is in. A choice here restarts it.", description: "In a running agent's permission mode menu, under \"Hive can't switch this session's mode\" (a session started in \"The CLI's own setting\", Hive passed no mode): why, and what a choice does." })),
+              label: tr(msg({ id: 'agents.permission.cliOwnNoSwitchTitle', defaultMessage: "Combwork can't switch this session's mode", description: "In a running agent's permission mode menu, for a session started in \"The CLI's own setting\" (Combwork passed no mode): a short line saying no mode switches live. Keep it short." })),
+              detail: tr(msg({ id: 'agents.permission.cliOwnNoSwitch', defaultMessage: "It started in the CLI's own setting, so Combwork doesn't know which mode it is in. A choice here restarts it.", description: "In a running agent's permission mode menu, under \"Combwork can't switch this session's mode\" (a session started in \"The CLI's own setting\", Combwork passed no mode): why, and what a choice does." })),
               icon: 'info',
               disabled: true
             }
@@ -192,12 +192,12 @@ export function ModeBadge({ project, a, variant }: { project: ProjectInfo; a: Ag
   // Marked by the mode in effect: on the CLI's own setting, one without guardrails its CLI showed (#1284).
   const bypass = !!modeOption(provider, (a.live ? modeInEffect(a.live) : undefined) ?? mode)?.danger
   const label = a.live?.modeSwitching
-    ? tr(msg({ id: 'agents.permission.switching', defaultMessage: 'Switching to {mode}…', description: "The permission mode badge while Hive switches the running session to another mode ({mode}: its name)." }), { mode: permissionLabel(provider, a.live.modeSwitching, tr) })
+    ? tr(msg({ id: 'agents.permission.switching', defaultMessage: 'Switching to {mode}…', description: "The permission mode badge while Combwork switches the running session to another mode ({mode}: its name)." }), { mode: permissionLabel(provider, a.live.modeSwitching, tr) })
     : a.live?.planMode
       ? tr(msg({ id: 'agents.permission.withPlan', defaultMessage: '{mode} · Plan', description: "The permission mode badge of a running session with Plan mode on (Codex): its mode ({mode}: its name), then Plan. Keep it short." }), { mode: modeBadgeLabel(provider, mode, tr) })
       : modeBadgeLabel(provider, mode, tr)
   const kb = commandKeybinding('session.permissionMode')
-  // Shift+Tab still cycles the CLI's modes in one on its own setting, but Hive can't say where it starts (#1284).
+  // Shift+Tab still cycles the CLI's modes in one on its own setting, but Combwork can't say where it starts (#1284).
   const cycles = providerDescriptor(provider).capabilities.liveModeSwitch === 'cycle' && !option?.cliOwn
   const note = a.live && !a.live.modeSwitching && option?.cliNote ? shownText(option.cliNote, option.text?.cliNote, tr) : undefined
   const tip = tr(

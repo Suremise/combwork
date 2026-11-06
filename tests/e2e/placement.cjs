@@ -23,13 +23,13 @@ const check = (name, ok, extra = '') => {
 }
 
 const launch = async () => {
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47938) })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47938) })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   return { app, page, inv }
 }
 
@@ -104,12 +104,12 @@ const launch = async () => {
   check('a lone agent dragged onto an empty cell moves there', !!(await lib.until(async () => savedCells('grid6') === '. . . . . One' && (await shownCells()) === '. . . . . One', HUNG_MS)), `${savedCells('grid6')} / ${await shownCells()}`)
   await lib.showAgent(page, 'One')
   // Each save held back (#762 round 3): the moves are said at once, and each key waits for its save before the next.
-  await app.evaluate(() => void (process.env.HIVE_TEST_SLOW_IPC = 'agents:place=400'))
+  await app.evaluate(() => void (process.env.CW_TEST_SLOW_IPC = 'agents:place=400'))
   check('…Up from the keyboard: said, saved and shown', await key('ArrowUp', 'One: row 1, column 3', '. . One'), `${await said()} / ${savedCells('grid6')}`)
   check('…Left', await key('ArrowLeft', 'One: row 1, column 2', '. One'), `${await said()} / ${savedCells('grid6')}`)
   check('…Down', await key('ArrowDown', 'One: row 2, column 2', '. . . . One'), `${await said()} / ${savedCells('grid6')}`)
   check('…Right', await key('ArrowRight', 'One: row 2, column 3', '. . . . . One'), `${await said()} / ${savedCells('grid6')}`)
-  await app.evaluate(() => void (process.env.HIVE_TEST_SLOW_IPC = ''))
+  await app.evaluate(() => void (process.env.CW_TEST_SLOW_IPC = ''))
   check('…and at the edge it says so, moving nothing', await key('ArrowRight', "One can't move further right", '. . . . . One'), `${await said()} / ${savedCells('grid6')}`)
   await lib.agentMenu(page, 'One')
   // At the last cell: Move Left and Move Up go somewhere, Move Right and Move Down don't.
@@ -135,14 +135,14 @@ const launch = async () => {
 
   // --- A pane moved while its save is held (#1229): a refresh meanwhile reads the cells from before, and its report
   // reaches the window (seen by a listener after the window's own, then drawn); the panes stay where they were moved.
-  await app.evaluate(() => void (process.env.HIVE_TEST_SLOW_IPC = 'agents:place=20000*1'))
+  await app.evaluate(() => void (process.env.CW_TEST_SLOW_IPC = 'agents:place=20000*1'))
   await lib.showAgent(page, 'Two')
   await page.evaluate(() => document.activeElement?.blur())
   await page.keyboard.press('Control+Alt+Shift+ArrowLeft')
   check('Move Agent Left on Two, its save held: shown at once, not saved yet', !!(await lib.until(async () => (await shownCells()) === '. One . . Two .', HUNG_MS)) && savedCells('grid6') === '. One . . . Two', `${savedCells('grid6')} / ${await shownCells()}`)
   await page.evaluate(() => {
     window.__olderCells = null
-    window.hive.onEvent((e) => {
+    window.combwork.onEvent((e) => {
       const p = e.type === 'workspace-changed' && window.__olderCells === null ? e.workspace?.projects.find((x) => x.name === 'alpha') : null
       if (p) window.__olderCells = (p.config.placement?.grid6 ?? []).map((id) => p.agents.find((a) => a.id === id)?.name ?? '.').join(' ')
     })
@@ -152,7 +152,7 @@ const launch = async () => {
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
   check('…a refresh meanwhile reports the cells from before the move', older === '. One . . . Two', String(older))
   check('…and the panes stay where they were moved', (await shownCells()) === '. One . . Two .', await shownCells())
-  await app.evaluate(() => void (process.env.HIVE_TEST_SLOW_IPC = ''))
+  await app.evaluate(() => void (process.env.CW_TEST_SLOW_IPC = ''))
   // Bound: the save's hold left over, plus a hung run's.
   check('…saved once its save goes on, still shown', !!(await lib.until(async () => savedCells('grid6') === '. One . . Two' && (await shownCells()) === '. One . . Two .', 20000 + HUNG_MS)), `${savedCells('grid6')} / ${await shownCells()}`)
   await page.evaluate(() => document.activeElement?.blur())
@@ -161,17 +161,17 @@ const launch = async () => {
 
   // --- Two moves of a pane, the later refused while the earlier's save is held (#1229 round 3): the panes show the
   // earlier's cells, and once it is saved, what was saved, with no other refresh needed.
-  await app.evaluate(() => void (process.env.HIVE_TEST_SLOW_IPC = 'agents:place=20000*1'))
+  await app.evaluate(() => void (process.env.CW_TEST_SLOW_IPC = 'agents:place=20000*1'))
   await page.evaluate(() => document.activeElement?.blur())
   await page.keyboard.press('Control+Alt+Shift+ArrowLeft')
   check('Move Agent Left on Two, its save held', !!(await lib.until(async () => (await shownCells()) === '. One . . Two .', HUNG_MS)) && savedCells('grid6') === '. One . . . Two', `${savedCells('grid6')} / ${await shownCells()}`)
   // The next save fails at once (the held one has taken its delay already, and takes no failure once this one has).
-  await app.evaluate(() => void (process.env.HIVE_TEST_FAIL_IPC = 'agents:place*1'))
+  await app.evaluate(() => void (process.env.CW_TEST_FAIL_IPC = 'agents:place*1'))
   await page.evaluate(() => document.activeElement?.blur())
   await page.keyboard.press('Control+Alt+Shift+ArrowLeft')
   const refused = page.locator('.toast', { hasText: 'Could not move the agent' })
   check("…Move Agent Left again, refused: the panes show the first move's cells, not the refused one's", !!(await lib.until(async () => (await refused.count()) > 0 && (await shownCells()) === '. One . . Two .', HUNG_MS)), `${await refused.count()} toasts / ${await shownCells()}`)
-  await app.evaluate(() => void (process.env.HIVE_TEST_SLOW_IPC = process.env.HIVE_TEST_FAIL_IPC = ''))
+  await app.evaluate(() => void (process.env.CW_TEST_SLOW_IPC = process.env.CW_TEST_FAIL_IPC = ''))
   // Bound: the save's hold left over, plus a hung run's.
   check('…once the first is saved, the panes show what was saved', !!(await lib.until(async () => savedCells('grid6') === '. One . . Two' && (await shownCells()) === '. One . . Two .', 20000 + HUNG_MS)), `${savedCells('grid6')} / ${await shownCells()}`)
   await page.locator('.toast .icon-btn[aria-label="Dismiss"], .toast button[title="Dismiss"]').first().click().catch(() => undefined)

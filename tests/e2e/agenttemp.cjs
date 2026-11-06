@@ -2,7 +2,7 @@
 // TMP and TMPDIR in a folder of its own, <folder>\<project>-<hash>\<agent id> (the Assistant's apart), made at launch;
 // Claude Code also CLAUDE_CODE_TMPDIR, over one it inherited. Empty, a launch's variables are as before (an inherited
 // CLAUDE_CODE_TMPDIR kept). A folder inside a project stops the launch, and a launch held at its folder while its
-// workspace closes never starts its CLI (HIVE_TEST_HOLD_AGENT_TEMP: NOT RUN on a packaged build). Runs the fake Claude
+// workspace closes never starts its CLI (CW_TEST_HOLD_AGENT_TEMP: NOT RUN on a packaged build). Runs the fake Claude
 // Code and the fake Codex, which record their temp variables; the Assistant on the fake Claude Code. Dev build,
 // throwaway profile and folders.
 const lib = require('./lib.cjs')
@@ -20,7 +20,7 @@ const codexHome = path.join(lib.WORK, 'agenttemp-codex-home')
 const tempRoot = path.join(lib.WORK, 'agenttemp-root')
 const inherited = path.join(lib.WORK, 'agenttemp-inherited')
 const wsOther = path.join(lib.WORK, 'agenttemp-ws-other')
-// Each launch holds once its temp folder is made, while this file is missing (HIVE_TEST_HOLD_AGENT_TEMP): there from the start.
+// Each launch holds once its temp folder is made, while this file is missing (CW_TEST_HOLD_AGENT_TEMP): there from the start.
 const holdGo = path.join(lib.WORK, 'agenttemp-hold-go')
 const proj = path.join(ws, 'alpha')
 const PORT = lib.port(47800)
@@ -51,15 +51,15 @@ const allAt = (temp, dir) => ['TEMP', 'TMP', 'TMPDIR'].every((n) => Object.keys(
   cfg.settings.notifications = { ...cfg.settings.notifications, desktopNotifications: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  // Hive started with a CLAUDE_CODE_TMPDIR of the user's own: kept while the setting is empty, overridden when it is set.
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: PORT, CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, CLAUDE_CODE_TMPDIR: inherited, HIVE_TEST_HOLD_AGENT_TEMP: holdGo })
+  // Combwork started with a CLAUDE_CODE_TMPDIR of the user's own: kept while the setting is empty, overridden when it is set.
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: PORT, CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, CLAUDE_CODE_TMPDIR: inherited, CW_TEST_HOLD_AGENT_TEMP: holdGo })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1400, height: 850 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.waitForProvider(inv, 'codex')
     await lib.openWorkspace(inv, page, ws)
     const live = async (host, id) => (await inv('session:live')).find((s) => same(s.projectPath, host) && s.agentId === id)
@@ -80,14 +80,14 @@ const allAt = (temp, dir) => ['TEMP', 'TMP', 'TMPDIR'].every((n) => Object.keys(
     const clara = await lib.addAgent(inv, proj, { name: 'Clara' })
     const cody = await lib.addAgent(inv, proj, { name: 'Cody', provider: 'codex' })
 
-    // --- Empty (the default): the variables as Hive was given them.
+    // --- Empty (the default): the variables as Combwork was given them.
     await inv('session:start', proj, { agentId: clara.id })
     await inv('session:start', proj, { agentId: cody.id })
     check('both agents start with the setting empty', !!(await ready(proj, clara.id)) && !!(await ready(proj, cody.id)))
     const c0 = claudeLaunches(proj).at(-1)
     const x0 = codexLaunches().at(-1)
-    check("empty: Clara's TEMP and TMP are Hive's own, and its inherited CLAUDE_CODE_TMPDIR stays", same(c0?.temp?.TEMP, env.TEMP) && same(c0?.temp?.TMP, env.TMP) && same(c0?.env?.CLAUDE_CODE_TMPDIR, inherited), JSON.stringify({ temp: c0?.temp, tmpdir: c0?.env?.CLAUDE_CODE_TMPDIR, hive: [env.TEMP, env.TMP] }))
-    check("empty: Cody's TEMP and TMP are Hive's own", same(x0?.temp?.TEMP, env.TEMP) && same(x0?.temp?.TMP, env.TMP), JSON.stringify(x0?.temp))
+    check("empty: Clara's TEMP and TMP are Combwork's own, and its inherited CLAUDE_CODE_TMPDIR stays", same(c0?.temp?.TEMP, env.TEMP) && same(c0?.temp?.TMP, env.TMP) && same(c0?.env?.CLAUDE_CODE_TMPDIR, inherited), JSON.stringify({ temp: c0?.temp, tmpdir: c0?.env?.CLAUDE_CODE_TMPDIR, combwork: [env.TEMP, env.TMP] }))
+    check("empty: Cody's TEMP and TMP are Combwork's own", same(x0?.temp?.TEMP, env.TEMP) && same(x0?.temp?.TMP, env.TMP), JSON.stringify(x0?.temp))
     check('empty: no folder is made', !fs.existsSync(tempRoot))
 
     // --- Set: each launch in its own folder, made.

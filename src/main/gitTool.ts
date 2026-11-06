@@ -9,8 +9,8 @@ import { createLogger, userText } from './logger'
 const log = createLogger('git')
 
 /**
- * Whether git itself runs (#346), separate from whether a folder is a repository: `git --version` on Hive's own PATH
- * (a Start-menu launch can have a different PATH from a terminal), kept until checked again. Every git call Hive makes
+ * Whether git itself runs (#346), separate from whether a folder is a repository: `git --version` on Combwork's own PATH
+ * (a Start-menu launch can have a different PATH from a terminal), kept until checked again. Every git call Combwork makes
  * keeps it true: one that can't start git marks it missing at once, and one that runs while it says missing checks
  * again. Not in git.ts, which reports to it (and runs its check: the two import each other, used only in calls).
  */
@@ -18,10 +18,10 @@ let current: GitTool = { state: 'unknown' }
 let checking: Promise<GitTool> | null = null
 
 /**
- * HI-2137: the git Hive starts, and the environment it gets. PATH's `git`, unless that is exactly Git for Windows'
+ * HI-2137: the git Combwork starts, and the environment it gets. PATH's `git`, unless that is exactly Git for Windows'
  * launcher (`<root>\cmd\git.exe`), which starts the real git as a second process: then that real git, started directly
  * (one process start fewer per git, about 7.6 ms each, HI-2124), in the environment the launcher would have given it
- * (LauncherEnv), so hooks find the same tools first. Found by checkGit, used by every git Hive starts (the worker, the merge queue's git
+ * (LauncherEnv), so hooks find the same tools first. Found by checkGit, used by every git Combwork starts (the worker, the merge queue's git
  * host and launcher); one that can't be started any more falls back to PATH's (gitExeGone).
  */
 export interface GitExe {
@@ -32,7 +32,7 @@ export interface GitExe {
 export const PATH_GIT: GitExe = { exe: 'git' }
 let started: GitExe = PATH_GIT
 
-/** The git Hive starts (HI-2137). */
+/** The git Combwork starts (HI-2137). */
 export function gitExe(): GitExe {
   return started
 }
@@ -49,7 +49,7 @@ const LAUNCHER = /\\cmd\\git\.exe$/i
 /**
  * HI-2137: the real git behind Git for Windows' launcher, from where PATH's git is (`onPath`) and what it says its
  * exec-path is: only for the launcher itself (`<root>\cmd\git.exe`) whose exec-path is under the same root, and whose
- * real git is there. Null for anything else (a wrapper, git.com, another git), which Hive starts from PATH as before.
+ * real git is there. Null for anything else (a wrapper, git.com, another git), which Combwork starts from PATH as before.
  */
 export function realGitBehind(onPath: string | null, execPath: string): GitExe | null {
   if (!onPath || !LAUNCHER.test(onPath)) return null
@@ -79,7 +79,7 @@ function set(next: GitTool): void {
   current = next
   if (!changed) return
   if (next.state === 'ok') log.info(`Git ${next.version}`)
-  else log.warn(next.state === 'missing' ? "Git isn't on Hive's PATH" : next.state === 'old' ? `Git ${next.version} is older than Hive needs` : `Couldn't check git: ${next.error ?? 'unknown'}`)
+  else log.warn(next.state === 'missing' ? "Git isn't on Combwork's PATH" : next.state === 'old' ? `Git ${next.version} is older than Combwork needs` : `Couldn't check git: ${next.error ?? 'unknown'}`)
   emit({ type: 'git-tool', git: next })
 }
 
@@ -97,8 +97,8 @@ export function gitOnPath(env: NodeJS.ProcessEnv = process.env): string | null {
 }
 
 /**
- * Runs `git --version` through `git()`, like every git call Hive makes (SPEC §16.3.1), one check at a time, and records
- * what it found. HI-2137: PATH's git each time, and the git Hive starts found again with it.
+ * Runs `git --version` through `git()`, like every git call Combwork makes (SPEC §16.3.1), one check at a time, and records
+ * what it found. HI-2137: PATH's git each time, and the git Combwork starts found again with it.
  */
 export function checkGit(): Promise<GitTool> {
   checking ??= git(process.cwd(), ['--version'], undefined, undefined, { timeout: 10_000, exe: PATH_GIT.exe }).then(async (r) => {
@@ -136,7 +136,7 @@ export async function realGit(said: string, onPath: string | null, run: CheckRun
   if (!real) return PATH_GIT
   const same = (await run(real.exe, ['--version'])) ?? ''
   if (same.trim() !== said.trim()) {
-    log.warn(`Git for Windows' git.exe beside its launcher said ${JSON.stringify(same.trim().slice(0, 80))}, not ${JSON.stringify(said.trim())}: Hive starts git through the launcher`)
+    log.warn(`Git for Windows' git.exe beside its launcher said ${JSON.stringify(same.trim().slice(0, 80))}, not ${JSON.stringify(said.trim())}: Combwork starts git through the launcher`)
     return PATH_GIT
   }
   log.info(`Git: starting ${userText(real.exe)} directly, not through its launcher`)
@@ -145,7 +145,7 @@ export async function realGit(said: string, onPath: string | null, run: CheckRun
 
 /**
  * HI-2137: from a command that couldn't start the real git it was given, `tried` (git() and the merge queue, each of
- * which then runs that command once more with PATH's git): when Hive still starts that one (uninstalled, moved), it
+ * which then runs that command once more with PATH's git): when Combwork still starts that one (uninstalled, moved), it
  * starts PATH's from now on and checks git again. A command that found it gone after another did changes nothing here.
  */
 export function gitExeGone(tried: string): void {

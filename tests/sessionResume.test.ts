@@ -1,4 +1,4 @@
-// Sessions that can't be resumed (#239): each reason, from what Hive knows, shown on a disabled Resume.
+// Sessions that can't be resumed (#239): each reason, from what Combwork knows, shown on a disabled Resume.
 import { describe, expect, it } from 'vitest'
 import { removedAgentNote, resumeBlock, type ResumeContext } from '../src/shared/sessionResume'
 

@@ -52,6 +52,13 @@
       "waited": "plain"
     }
   },
+  "stall.laneNext.depsDone": {
+    "placeholders": {
+      "card": "plain",
+      "minutes": "plain",
+      "doing": "plain"
+    }
+  },
   "stall.loop.designWait": {
     "placeholders": {
       "builder": "plain",
@@ -76,6 +83,15 @@
     "placeholders": {
       "agent": "plain",
       "card": "plain"
+    }
+  },
+  "stall.review.given": {
+    "placeholders": {
+      "card": "plain",
+      "agent": "plain",
+      "given": "plain",
+      "state": "select",
+      "waited": "plain"
     }
   },
   "stall.review.noVerdict": {

@@ -48,7 +48,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
 
   let h = null
   const start = async () => {
-    h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT) }, viewport: { width: 1400, height: 850 } })
+    h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT) }, viewport: { width: 1400, height: 850 } })
     h.page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.waitForProvider(h.inv)
     await lib.openWorkspace(h.inv, h.page, ws)
@@ -156,7 +156,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     await leftNote.locator('button', { hasText: 'Show B1' }).click()
     check("…its Show opens the Sessions tab on B1's conversation", !!(await until(async () => (await h.page.locator('text=Ran in B1').count()) > 0, HUNG_MS)))
     // Back to the agents' panes.
-    await h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'menu-command', command: 'project.tab.session', args: [] })
+    await h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'menu-command', command: 'project.tab.session', args: [] })
     check('…slot-a still free', !(await slotList()).find((s) => s.name === 'slot-a')?.lease)
 
     // --- 3. A new card gets slot-a meanwhile: B1's conversation is refused with why; two launches for slot-a at once.
@@ -215,7 +215,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
 
     // --- 6. A builder with a dirty carried slot and a card in another: the card's slot wins, the old one waits.
     const hb1 = path.join(root, 'hb1')
-    lib.git(alpha, ['worktree', 'add', '-q', '-b', 'hive/hb1', hb1])
+    lib.git(alpha, ['worktree', 'add', '-q', '-b', 'cw/hb1', hb1])
     const carried = await op({ op: 'carry', agent: b1.id, slot: 'hb1', folder: hb1 })
     check("B1's own worktree hb1 is adopted as its carried slot", carried?.kind === 'carried' && carried.agent === b1.id, JSON.stringify(carried))
     await inv('session:start', alpha, { agentId: b1.id })

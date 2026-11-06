@@ -1,9 +1,9 @@
 // S55, P5's RC scenario end to end (#1358, SPEC §16.18, §16.19.1-2), as 1.0 builds it (#1573: §16.10's slots, no
-// worktree agents): "Pair (Hive merges)", the Assistant off, on fake Claude Code agents acting by their own tokens (their
-// hive tools' calls), B1 added in the project folder. The project's options are set through Version Control → Workflow
+// worktree agents): "Pair (Combwork merges)", the Assistant off, on fake Claude Code agents acting by their own tokens (their
+// Combwork tools' calls), B1 added in the project folder. The project's options are set through Version Control → Workflow
 // (#1355's form: Pair, with G8 strict on); lanes are started from the board, each lent a slot that B1 then works in.
 // The quick check is the project's `typecheck` script, steered from outside the repository (queueFixture.cjs's check),
-// run by the builder through hive-progress --check before each submit (counted) and by the queue on the merged result.
+// run by the builder through cw-progress --check before each submit (counted) and by the queue on the merged result.
 // Lane A (merge commits, strict):
 // - One: built on its line in the lane's slot (the next card's start refused meanwhile: one card at a time), submitted,
 //   passed; the queue merges its line at the approved revision (testing shown in the Merges tab): Done, and only then
@@ -56,7 +56,7 @@ const ancestor = (x, y) => {
   fs.writeFileSync(path.join(alpha, 'package.json'), JSON.stringify({ name: 'alpha', scripts: { typecheck: `node "${slash(path.join(fx.tools, 'check.js'))}"` } }, null, 2) + '\n')
   lib.git(alpha, ['-c', 'user.name=t', '-c', 'user.email=t@t', 'add', '-A'])
   lib.git(alpha, ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'scripts'])
-  const h = await q.startHive(fx, { port: PORT, keepOptions: true })
+  const h = await q.startCombwork(fx, { port: PORT, keepOptions: true })
   const { page, inv } = h
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -64,7 +64,7 @@ const ancestor = (x, y) => {
     await page.getByText('alpha', { exact: true }).first().click()
     const projectJson = () => JSON.parse(fs.readFileSync(path.join(alpha, '.combwork', 'project.json'), 'utf8'))
 
-    // --- Pair (Hive merges), strict on, through Version Control → Workflow (#1355, #1352).
+    // --- Pair (Combwork merges), strict on, through Version Control → Workflow (#1355, #1352).
     await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
     await page.locator('.git-sections [data-section="workflow"]').click()
     const form = page.locator('.workflow-form')
@@ -76,19 +76,19 @@ const ancestor = (x, y) => {
     await waitHung(async () => (await strictRow.count()) === 1)
     await strictRow.scrollIntoViewIfNeeded()
     await strictRow.locator('[role="switch"], input[type="checkbox"]').first().click()
-    // Hive's commit message chosen too (G19: Pair's is the branch's own since HI-1997): this lane's merges are checked by their trailers.
-    await form.locator('.workflow-option[data-option="commitMessage"] select').selectOption('hive')
+    // Combwork's commit message chosen too (G19: Pair's is the branch's own since HI-1997): this lane's merges are checked by their trailers.
+    await form.locator('.workflow-option[data-option="commitMessage"] select').selectOption('combwork')
     await form.getByRole('button', { name: 'Save…' }).click()
     const save = page.locator('.dialog', { hasText: 'Save Workflow Options' })
     await save.waitFor({ timeout: HUNG_MS })
     await save.getByRole('button', { name: 'Save', exact: true }).click()
     await save.waitFor({ state: 'detached', timeout: HUNG_MS })
-    const options = await waitHung(() => (projectJson().workflow?.options?.finish === 'hiveMerges' && projectJson().workflow.options.strict === true && projectJson().workflow.options.commitMessage === 'hive' ? projectJson().workflow.options : null))
-    check("Pair (Hive merges) saved from the form, strict on: Hive merges into main, cards on slots, typecheck before review and on the merged result, the repository's identity",!!options && options.target === 'main' && options.folder === 'slots' && JSON.stringify(options.preChecks) === '["typecheck"]' && JSON.stringify(options.mergeChecks) === '["typecheck"]' && options.identity?.email === fx.identity.email,JSON.stringify(projectJson().workflow))
+    const options = await waitHung(() => (projectJson().workflow?.options?.finish === 'combworkMerges' && projectJson().workflow.options.strict === true && projectJson().workflow.options.commitMessage === 'combwork' ? projectJson().workflow.options : null))
+    check("Pair (Combwork merges) saved from the form, strict on: Combwork merges into main, cards on slots, typecheck before review and on the merged result, the repository's identity",!!options && options.target === 'main' && options.folder === 'slots' && JSON.stringify(options.preChecks) === '["typecheck"]' && JSON.stringify(options.mergeChecks) === '["typecheck"]' && options.identity?.email === fx.identity.email,JSON.stringify(projectJson().workflow))
     await page.keyboard.press('Escape')
     const identity = options?.identity ?? fx.identity
     const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, '-c', `user.email=${identity.email}`, ...args]).trim()
-    /** git for a poll of a slot Hive may be changing: null while it can't be read (HEAD mid-checkout: HI-2103), polled again. */
+    /** git for a poll of a slot Combwork may be changing: null while it can't be read (HEAD mid-checkout: HI-2103), polled again. */
     const gitNow = (cwd, ...args) => { try { return git(cwd, ...args) } catch { return null } }
 
     const b1 = await q.agent(fx, h, 'B1')
@@ -136,8 +136,8 @@ const ancestor = (x, y) => {
     const tokenOf = async (id) => {
       const sessionId = await waitHung(async () => (await live(id))?.sessionId)
       const launch = await waitHung(() => q.launches(fx).filter((l) => l.sessionId === sessionId && l.opts['--mcp-config']).at(-1))
-      const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
-      return hive ? JSON.parse(fs.readFileSync(hive.env.CW_API_TOKEN_FILE, 'utf8')).token : null
+      const server = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
+      return server ? JSON.parse(fs.readFileSync(server.env.CW_API_TOKEN_FILE, 'utf8')).token : null
     }
     /** The agents' tokens after a lane start, once both run again. */
     const retoken = async () => {
@@ -154,7 +154,7 @@ const ancestor = (x, y) => {
     const untouched = (was) => git(wt, 'rev-parse', 'HEAD') === was.head && git(wt, 'status', '--porcelain') === was.status
     const worktreeNow = () => ({ head: git(wt, 'rev-parse', 'HEAD'), status: git(wt, 'status', '--porcelain') })
 
-    // The builder's shell (the fake's "shell:" step), as hive-progress runs in its session (p4lane's).
+    // The builder's shell (the fake's "shell:" step), as cw-progress runs in its session (p4lane's).
     const shells = () => {
       const file = path.join(fx.claudeHome, 'fake-shell.jsonl')
       return fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []
@@ -162,8 +162,8 @@ const ancestor = (x, y) => {
     const idle = async (id) => ['ready', 'finished'].includes((await live(id))?.status)
     const shell = async (cmd) => {
       const before = shells().length
-      // Hive may type a wake into B1 as the suite types (a verdict's, a card's task): each try waits for B1 idle with its
-      // inbox quiet (HI-1918: idle between Hive's own turns isn't enough), and typeLine types it again when a wake disturbed it.
+      // Combwork may type a wake into B1 as the suite types (a verdict's, a card's task): each try waits for B1 idle with its
+      // inbox quiet (HI-1918: idle between Combwork's own turns isn't enough), and typeLine types it again when a wake disturbed it.
       let seen = null
       const typed = await lib.typeLine(inv, lib.ptyKey(alpha, b1.id), fx.claudeHome, 'B1', `shell: ${cmd}`, {
         ready: async () => {
@@ -190,11 +190,11 @@ const ancestor = (x, y) => {
       if (!shells().slice(before).some((s) => s.cmd === cmd)) throw new Error(`B1 didn't run "${cmd}" (its line wasn't taken)`)
     }
     const counted = (x) => x.kind === 'CheckRan' && x.data?.counted === true
-    /** The quick check through hive-progress on the card's revision now (passing): a new counted CheckRan on it. */
+    /** The quick check through cw-progress on the card's revision now (passing): a new counted CheckRan on it. */
     const quickCheck = async (n) => {
       q.steer(fx, 'pass')
       const before = (await h.facts(n)).filter(counted).length
-      await shell(`hive-progress --check typecheck --card ${await keyOf(n)}`)
+      await shell(`cw-progress --check typecheck --card ${await keyOf(n)}`)
       return !!(await waitHung(async () => (await h.facts(n)).filter(counted).length > before))
     }
     const commit = (file, text = `${file}\n`) => {
@@ -217,7 +217,7 @@ const ancestor = (x, y) => {
      */
     const round = async (n, file, { text, meanwhile, merge = 'pass', commitIt = true, watched = false } = {}) => {
       const rev = commitIt ? commit(file, text) : git(wt, 'rev-parse', 'HEAD')
-      check(`${await keyOf(n)}'s quick check through hive-progress --check is counted`, await quickCheck(n))
+      check(`${await keyOf(n)}'s quick check through cw-progress --check is counted`, await quickCheck(n))
       // HI-2015: B1 watching its card before it submits (card-loop's order), its column moves too, isn't woken by its own
       // submission's move into Review (the checks gate on): its first wake is the reviewer's verdict.
       if (watched) {
@@ -241,10 +241,10 @@ const ancestor = (x, y) => {
     }
     const done = async (n) => !!(await waitHung(async () => (await card(n)).column === 'done'))
     const integrated = async (n) => (await factsOf(n, 'Integrated')).at(-1)
-    /** A card's start by B1: in the lane's slot (`wt` from then on), on its line once Hive has made it there. */
+    /** A card's start by B1: in the lane's slot (`wt` from then on), on its line once Combwork has made it there. */
     const start = async (n) => {
       // A lane started just as the one before it ends may wait for its slot (the earlier lane's lease ends just after
-      // it): the slot pass lends it and starts B1 in a new conversation with the brief, and Hive may then start the
+      // it): the slot pass lends it and starts B1 in a new conversation with the brief, and Combwork may then start the
       // card on B1 itself (HI-2029; B1's own start of it is that start). Refused for the slot meanwhile, tried again.
       const s = (await waitHung(async () => {
         const r = await intent('b1', n, 'start')
@@ -328,9 +328,9 @@ const ancestor = (x, y) => {
     const a = await startLane(laneA)
     check('lane A is started from the board: B1 / R1, its three cards in order', !!a, JSON.stringify(await inv('lanes:list')))
     await retoken()
-    // One in Todo, or already Active on B1: Hive starts a lane's card on its builder itself once its turn is over (HI-1990),
+    // One in Todo, or already Active on B1: Combwork starts a lane's card on its builder itself once its turn is over (HI-1990),
     // which a slow run can see before the window is shot (HI-2103).
-    const oneShown = async () => (await onBoard('Todo', c1)) || ((await onBoard('Active', c1)) && (await factsOf(c1, 'Started')).some((f) => f.actor === 'hive'))
+    const oneShown = async () => (await onBoard('Todo', c1)) || ((await onBoard('Active', c1)) && (await factsOf(c1, 'Started')).some((f) => f.actor === 'combwork'))
     await shoot('1-laneA-started', 'lanes', async () => (await oneShown()) && /B1 \/ R1/.test(await laneText(a?.id)))
 
     // --- One: merged by the queue at the approved revision; the next card waits for it.
@@ -354,16 +354,16 @@ const ancestor = (x, y) => {
     check('One is merged by the queue: Done', await done(c1), JSON.stringify(await kinds(c1)))
     const i1 = await integrated(c1)
     const msg1 = git(alpha, 'log', '-1', '--format=%B', 'main')
-    check("…Integrated by Hive at the approved revision: a merge commit of One's line, Hive's trailers", i1?.data?.by === 'hive' && i1.data.result === head() && git(alpha, 'rev-parse', 'main^2') === one.rev && msg1.includes(`Hive-Card: ${k1}`) && msg1.includes(`Hive-Revision: ${one.rev}`), JSON.stringify(i1))
+    check("…Integrated by Combwork at the approved revision: a merge commit of One's line, Combwork's trailers", i1?.data?.by === 'combwork' && i1.data.result === head() && git(alpha, 'rev-parse', 'main^2') === one.rev && msg1.includes(`Combwork-Card: ${k1}`) && msg1.includes(`Combwork-Revision: ${one.rev}`), JSON.stringify(i1))
     const main1 = head()
-    // HI-1990: nobody starts Two. Once One is Done and B1's turn is over, Hive starts it on B1 as the lane's next card, and
-    // B1 is given it in its slot; B1's own start then is that start (it raced Hive's), with the same folder and line.
-    const byHive = await waitHung(async () => (await factsOf(c2, 'Started')).find((f) => f.actor === 'hive') ?? null)
-    check('Hive starts Two on B1 itself once One is Done, with no prompt from the user or the Assistant', !!byHive && byHive.data?.builder === b1.id && (await card(c2))?.agent === b1.id, JSON.stringify({ byHive, card: await card(c2) }))
+    // HI-1990: nobody starts Two. Once One is Done and B1's turn is over, Combwork starts it on B1 as the lane's next card, and
+    // B1 is given it in its slot; B1's own start then is that start (it raced Combwork's), with the same folder and line.
+    const byCombwork = await waitHung(async () => (await factsOf(c2, 'Started')).find((f) => f.actor === 'combwork') ?? null)
+    check('Combwork starts Two on B1 itself once One is Done, with no prompt from the user or the Assistant', !!byCombwork && byCombwork.data?.builder === b1.id && (await card(c2))?.agent === b1.id, JSON.stringify({ byCombwork, card: await card(c2) }))
     check('…and gives it to B1 in its slot (placed there)', !!(await waitHung(async () => (await kinds(c2)).includes('BuilderPlaced'))), JSON.stringify(await kinds(c2)))
     const s2 = await start(c2)
     check("only then does Two start, in the lane's slot still, its line from main's head (One merged in)", s2.s.status === 200 && path.basename(wt ?? '') === lentA && s2.base === main1 && ancestor(one.rev, s2.base) && git(wt, 'rev-parse', 'HEAD') === s2.base, JSON.stringify(s2))
-    check("…B1's own start of it is Hive's, told so", (s2.s.body?.warnings ?? []).some((x) => /^Combwork started .* for you, as your lane's next card/.test(x)) && (await factsOf(c2, 'Started')).length === 1, JSON.stringify(s2.s.body))
+    check("…B1's own start of it is Combwork's, told so", (s2.s.body?.warnings ?? []).some((x) => /^Combwork started .* for you, as your lane's next card/.test(x)) && (await factsOf(c2, 'Started')).length === 1, JSON.stringify(s2.s.body))
     check("…One's line, merged, deleted once Two's is out (LineDeleted)", !!(await waitHung(async () => (await kinds(c1)).includes('LineDeleted'))) && !git(alpha, 'branch', '--list', line1), JSON.stringify(await kinds(c1)))
     await shoot('3-one-merged', 'lanes', async () => (await onBoard('Done', c1)) && (await onBoard('Active', c2)))
 
@@ -372,11 +372,11 @@ const ancestor = (x, y) => {
     check('Two merged: Done', await done(c2), JSON.stringify(await kinds(c2)))
     const [up] = await factsOf(c2, 'Updated')
     check('…brought up to date by the queue (strict): Updated, carried, from the reviewed revision', up?.data?.carried === true && up.data.from === two.rev, JSON.stringify(up))
-    check("…merged with the user's commit kept, naming both revisions", git(alpha, 'log', '-1', '--format=%B', 'main').includes(`Hive-Updated: ${up?.data?.to}`) && git(alpha, 'log', '-1', '--format=%B', 'main').includes(`Hive-Revision: ${two.rev}`) && ancestor(two.moved, 'main'))
-    // The queue's update and merge leave the slot alone. Hive starts Three about a second after Two is Done (HI-1990), its
+    check("…merged with the user's commit kept, naming both revisions", git(alpha, 'log', '-1', '--format=%B', 'main').includes(`Combwork-Updated: ${up?.data?.to}`) && git(alpha, 'log', '-1', '--format=%B', 'main').includes(`Combwork-Revision: ${two.rev}`) && ancestor(two.moved, 'main'))
+    // The queue's update and merge leave the slot alone. Combwork starts Three about a second after Two is Done (HI-1990), its
     // line made in the slot: the slot may be exactly as Three's start prepared it by now (HR1's round 2: its own
     // SlotPrepared, on the lease Three was started with: that line checked out at that revision, nothing changed), and
-    // nothing else. Hive checks Three's line out before it writes SlotPrepared (HI-2103): the slot read first, then the
+    // nothing else. Combwork checks Three's line out before it writes SlotPrepared (HI-2103): the slot read first, then the
     // facts, until they agree, so a read between the two waits for the fact rather than failing.
     let started3 = null
     let prep3 = null
@@ -386,7 +386,7 @@ const ancestor = (x, y) => {
       slot3 = { head: gitNow(wt, 'rev-parse', 'HEAD'), status: gitNow(wt, 'status', '--porcelain'), branch: gitNow(wt, 'branch', '--show-current') }
       if (slot3.head === null || slot3.status === null || slot3.branch === null) return null
       if (slot3.head === two.was.head && slot3.status === two.was.status) return 'untouched'
-      started3 = (await factsOf(c3, 'Started')).find((f) => f.actor === 'hive')?.data ?? null
+      started3 = (await factsOf(c3, 'Started')).find((f) => f.actor === 'combwork')?.data ?? null
       prep3 = (await factsOf(c3, 'SlotPrepared')).at(-1)?.data ?? null
       return asThree(slot3) ? 'asThree' : null
     })
@@ -429,7 +429,7 @@ const ancestor = (x, y) => {
 
     // --- Four: squash-merged by the queue; Five's line made from main with it.
     const four = await round(c4, 'four.txt')
-    check('Four squash-merged by the queue: Done, one commit on main with its trailers', (await done(c4)) && git(alpha, 'rev-list', '--parents', '-1', 'main').split(' ').length === 2 && git(alpha, 'log', '-1', '--format=%B', 'main').includes(`Hive-Revision: ${four.rev}`), JSON.stringify(await kinds(c4)))
+    check('Four squash-merged by the queue: Done, one commit on main with its trailers', (await done(c4)) && git(alpha, 'rev-list', '--parents', '-1', 'main').split(' ').length === 2 && git(alpha, 'log', '-1', '--format=%B', 'main').includes(`Combwork-Revision: ${four.rev}`), JSON.stringify(await kinds(c4)))
     const main4 = head()
     const s5 = await start(c5)
     check("Five starts on a line of its own from main (Four's squash in), no branch moved", s5.s.status === 200 && s5.base === main4 && git(wt, 'rev-parse', 'HEAD') === main4 && s5.line !== s4.line && !(await kinds(c4)).includes('LineMoved'), JSON.stringify(s5))
@@ -452,7 +452,7 @@ const ancestor = (x, y) => {
 
     // ===== Lane C (HI-1995): reordered now. Six is started and committed; B1's own reorder with applyNow puts it back
     // (its work kept on its line) and applies the new order; B1 starts Seven on a line of its own from main without Six's work. Once
-    // Seven is merged, Hive starts Six again, on its own line with its work.
+    // Seven is merged, Combwork starts Six again, on its own line with its work.
     const laneC = []
     for (const title of ['Six', 'Seven']) laneC.push((await inv('tasks:create', { title, project: 'alpha' })).number)
     const [c6, c7] = laneC
@@ -484,7 +484,7 @@ const ancestor = (x, y) => {
     await round(c7, 'seven.txt')
     check('Seven merged: Done, its change only its own', (await done(c7)) && (await submittedFiles(c7)) === JSON.stringify(['seven.txt']), await submittedFiles(c7))
     const again6 = await waitHung(async () => ((await factsOf(c6, 'Started')).length >= 2 ? (await factsOf(c6, 'Started')).at(-1) : null))
-    check('…then Hive starts Six again', !!again6 && again6.actor === 'hive', JSON.stringify(again6))
+    check('…then Combwork starts Six again', !!again6 && again6.actor === 'combwork', JSON.stringify(again6))
     const s6b = await start(c6)
     check('…on its own line, with its work', s6b.s.status === 200 && s6b.line === s6.line && ancestor(six, git(wt, 'rev-parse', 'HEAD')), JSON.stringify(s6b))
   } catch (e) {

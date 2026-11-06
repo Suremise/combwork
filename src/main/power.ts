@@ -1,7 +1,7 @@
 import { app, BrowserWindow, powerMonitor, powerSaveBlocker } from 'electron'
 import { agentsWorking, shouldKeepAwake } from '../shared/keepAwake'
 import { config } from './config'
-import { emit, onHiveEvent } from './events'
+import { emit, onCombworkEvent } from './events'
 import { createLogger } from './logger'
 import { sessions } from './sessions'
 import { openWorkspaces } from './workspace'
@@ -66,7 +66,7 @@ function watchWindow(win: BrowserWindow): void {
 }
 
 export function startPowerWatch(): void {
-  onHiveEvent((e) => {
+  onCombworkEvent((e) => {
     if (e.type === 'session-status' || e.type === 'session-exit') update()
   })
   config.onSettingsChanged((s, prev) => {

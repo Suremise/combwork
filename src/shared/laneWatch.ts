@@ -6,7 +6,7 @@ import { brief, cardPart, historyBlocked, historyVerdict, WAKE_MAX_BYTES, WATCH_
 import { cardRef } from './projectKeys'
 import { agentMsg, say } from './agentText'
 import { NOTICE_PREFIX } from './doorbell'
-// Types only: agentWatch loads the translations, which hive-mcp (toolReplies imports this) never does.
+// Types only: agentWatch loads the translations, which cw-mcp (toolReplies imports this) never does.
 import type { AgentEvent, WatchedAgent } from './agentWatch'
 
 const T = {
@@ -19,7 +19,7 @@ const T = {
   unblocked: agentMsg({ id: 'wake.lane.unblocked', text: '{card} is no longer blocked', note: 'A lane watch wake\'s event (#922): a lane\'s card\'s block lifted. card: "HI-12".' }),
   stalled: agentMsg({ id: 'wake.lane.stalled', text: '{card} is stalled', note: 'A lane watch wake\'s event: a lane\'s card stalled (why follows). card: "HI-12".' }),
   moved: agentMsg({ id: 'wake.lane.moved', text: '{card} is in {column}', note: 'A lane watch wake\'s event: a lane\'s card moved. card: "HI-12"; column: the board column\'s name ("Review").' }),
-  asked: agentMsg({ id: 'wake.lane.waitsForUser', text: '{card} waits for the user{who, select, agent { ({by} asks)} hive { (Combwork asks)} other {}}', note: 'A lane watch wake\'s event (HI-1991): a new request for the user on a lane\'s card (what it asks follows). card: "HI-12"; who: agent (by: the asking agent\'s name), hive (Hive asked), or none (not known).' }),
+  asked: agentMsg({ id: 'wake.lane.waitsForUser', text: '{card} waits for the user{who, select, agent { ({by} asks)} combwork { (Combwork asks)} other {}}', note: 'A lane watch wake\'s event (HI-1991): a new request for the user on a lane\'s card (what it asks follows). card: "HI-12"; who: agent (by: the asking agent\'s name), combwork (Combwork asked), or none (not known).' }),
   mergeDue: agentMsg({ id: 'wake.lane.mergeDue', text: 'all its cards passed: its merge is due', note: "A lane watch wake's event: every card of the lane passed, so its merge is due." }),
   mergeStalled: agentMsg({ id: 'wake.lane.mergeStalled', text: 'its merge is stalled', note: "A lane watch wake's event (#869): the lane's merge is due but nobody is doing it (why follows)." }),
   pausedMerge: agentMsg({ id: 'wake.lane.pausedMerge', text: 'paused for a merge: {status}', note: 'A lane watch wake\'s event (#1270): the lane waits for a card to merge. status: the lane\'s status ("waiting: HI-12 not merged").' }),
@@ -142,11 +142,11 @@ export interface LaneNow {
   mergeCommit?: string | null
 }
 
-/** A lane card's newest open request for the user (HI-1991): when it was made, who asked (null: Hive) and its text. */
+/** A lane card's newest open request for the user (HI-1991): when it was made, who asked (null: Combwork) and its text. */
 export interface LaneAsked {
   since: string
   by: string | null
-  /** Its English as stored; `shown`, Hive's own request as data, which a reader's chain says again (HI-2464). */
+  /** Its English as stored; `shown`, Combwork's own request as data, which a reader's chain says again (HI-2464). */
   text: string
   shown?: StoredText
 }
@@ -186,7 +186,7 @@ export function blockNewsAt(card: Pick<TaskCard, 'blocked' | 'history'> & Partia
   if (!card.blocked) return ''
   const set = card.history.findLast((h) => historyBlocked(h))?.at ?? ''
   const name = card.agentName
-  // A comment's author is its agent's name and project: "HB2 (hive)".
+  // A comment's author is its agent's name and project: "B2 (demo)".
   const said = name ? (card.comments?.findLast((c) => c.by === name || c.by.startsWith(`${name} (`))?.at ?? '') : ''
   return said > set ? said : set
 }
@@ -262,9 +262,9 @@ export function laneHits(before: LaneMark | null | undefined, now: LaneNow, even
     if (on.has('unblocked') && !is.b && was.b) parts.push({ n: c.number, event: 'unblocked', text: say(T.unblocked, { card }) })
     if (on.has('stalled') && is.s && !was.s) parts.push({ n: c.number, event: 'stalled', text: say(T.stalled, { card }), ...(c.stalled ? { detail: c.stalled } : {}) })
     if (on.has('moved') && is.c !== was.c) parts.push({ n: c.number, event: 'moved', text: say(T.moved, { card, column: columnLabel(is.c) }) })
-    // A new request for the user on it (HI-1991): an agent's question (cw_ask_user) or Hive's own, under For you. The
+    // A new request for the user on it (HI-1991): an agent's question (cw_ask_user) or Combwork's own, under For you. The
     // agent asking isn't waiting at a prompt, so `waiting` never tells it. A mark from before has no `q`.
-    if (on.has('paused-user') && was.q !== undefined && is.q !== undefined && is.q > was.q) parts.push({ n: c.number, event: 'paused-user', text: say(T.asked, { card, who: !c.asked ? 'none' : c.asked.by ? 'agent' : 'hive', by: c.asked?.by ?? '' }), ...(c.asked?.text ? { detail: firstLine(storedForAgents(c.asked.text, c.asked.shown)) } : {}) })
+    if (on.has('paused-user') && was.q !== undefined && is.q !== undefined && is.q > was.q) parts.push({ n: c.number, event: 'paused-user', text: say(T.asked, { card, who: !c.asked ? 'none' : c.asked.by ? 'agent' : 'combwork', by: c.asked?.by ?? '' }), ...(c.asked?.text ? { detail: firstLine(storedForAgents(c.asked.text, c.asked.shown)) } : {}) })
   }
   if (on.has('merge-due') && now.mark.mergeDue && !before.mergeDue && now.mark.state !== 'ended' && now.mark.state !== 'abandoned') parts.push({ n: null, event: 'merge-due', text: say(T.mergeDue) })
   if (on.has('stalled') && now.mark.ms && !before.ms) parts.push({ n: null, event: 'stalled', text: say(T.mergeStalled), ...(now.mergeStall ? { detail: now.mergeStall } : {}) })
@@ -463,7 +463,7 @@ export function readLaneCondition(args: { lanes?: unknown; events?: unknown }): 
   return { ids, events: withAlwaysEvents(ids, e as LaneEvent[]) }
 }
 
-/** A saved lane watch condition, checked (null: not one Hive would have made). */
+/** A saved lane watch condition, checked (null: not one Combwork would have made). */
 export function readSavedLaneCondition(v: unknown): LaneWatchCondition | null {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return null
   const r = readLaneCondition({ lanes: (v as { ids?: unknown }).ids === 'all' ? 'all' : (v as { ids?: unknown }).ids, events: (v as { events?: unknown }).events })

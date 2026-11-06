@@ -19,13 +19,13 @@ import { cliReadyOf, connectionCli, connectionOf, connectionSwitchDue, firstRead
 import type { Account, LiveSessionState } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-connections-')
+const base = tempDir('cw-connections-')
 const home = join(base, 'claude-home')
 const userHome = join(base, 'user-profile')
-process.env.HIVE_USER_DATA = join(base, 'profile')
+process.env.CW_USER_DATA = join(base, 'profile')
 process.env.CLAUDE_CONFIG_DIR = home
 // No test seam here: the real rule (a test copy's own run context sets it; this file decides per test).
-delete process.env.HIVE_TEST_CLI_HOME_CONNECTION
+delete process.env.CW_TEST_CLI_HOME_CONNECTION
 ;(electron.app as unknown as { getPath: (n: string) => string }).getPath = (n: string) => (n === 'home' ? userHome : join(base, 'profile'))
 
 const accounts = await import('../src/main/accounts')
@@ -191,13 +191,13 @@ describe('which connection a launch uses (resolveConnection)', () => {
 })
 
 describe('the test seam (testHomeSeam)', () => {
-  const env = (o: Record<string, string | undefined>) => ({ HIVE_USER_DATA: 'x', HIVE_TEST_CLI_HOME_CONNECTION: '1', CLAUDE_CONFIG_DIR: home, ...o })
+  const env = (o: Record<string, string | undefined>) => ({ CW_USER_DATA: 'x', CW_TEST_CLI_HOME_CONNECTION: '1', CLAUDE_CONFIG_DIR: home, ...o })
   const user = join(userHome, '.claude')
   it('only for an unpackaged test copy given it and an explicit CLI test home', () => {
     expect(seam.testHomeSeam('CLAUDE_CONFIG_DIR', env({}), false, user)).toBe(true)
     expect(seam.testHomeSeam('CLAUDE_CONFIG_DIR', env({}), true, user)).toBe(false)
-    expect(seam.testHomeSeam('CLAUDE_CONFIG_DIR', env({ HIVE_USER_DATA: undefined }), false, user)).toBe(false)
-    expect(seam.testHomeSeam('CLAUDE_CONFIG_DIR', env({ HIVE_TEST_CLI_HOME_CONNECTION: '0' }), false, user)).toBe(false)
+    expect(seam.testHomeSeam('CLAUDE_CONFIG_DIR', env({ CW_USER_DATA: undefined }), false, user)).toBe(false)
+    expect(seam.testHomeSeam('CLAUDE_CONFIG_DIR', env({ CW_TEST_CLI_HOME_CONNECTION: '0' }), false, user)).toBe(false)
     expect(seam.testHomeSeam('CLAUDE_CONFIG_DIR', env({ CLAUDE_CONFIG_DIR: undefined }), false, user)).toBe(false)
   })
   it('never on the user’s own home, however it is spelt (a junction to it too)', () => {
@@ -216,7 +216,7 @@ describe('a launch on a connection (connectionForLaunch)', () => {
   })
 
   it('with the seam on and none on here, the old launch (null: the CLI test home), and only then', async () => {
-    process.env.HIVE_TEST_CLI_HOME_CONNECTION = '1'
+    process.env.CW_TEST_CLI_HOME_CONNECTION = '1'
     try {
       expect(await launch()).toBeNull()
       const a = await signedInConnection('Personal', 'me@example.com')
@@ -224,7 +224,7 @@ describe('a launch on a connection (connectionForLaunch)', () => {
       expect(c?.id).toBe(a.id)
       c?.release()
     } finally {
-      delete process.env.HIVE_TEST_CLI_HOME_CONNECTION
+      delete process.env.CW_TEST_CLI_HOME_CONNECTION
     }
   })
 
@@ -330,7 +330,7 @@ describe('a launch on a connection (connectionForLaunch)', () => {
       c.release()
       await opened
       expect(JSON.parse(readFileSync(join(fresh, '.combwork', 'workspace.json'), 'utf8')).connections).toEqual({ 'claude-code': { on: [b.id] } })
-      expect(accounts.hiveAccounts().map((x) => x.id)).toEqual([b.id, a.id])
+      expect(accounts.combworkAccounts().map((x) => x.id)).toEqual([b.id, a.id])
     } finally {
       accounts.accountTestHooks.beforeOrderRead = undefined
       release()
@@ -382,7 +382,7 @@ describe('what is read from a connection’s home', () => {
   it('auto memory: every file the Memory tab lists opens and saves, by either path, and nothing else of the CLI’s home (HI-1999)', async () => {
     const a = await signedInConnection('Personal', 'me@example.com')
     const f = accounts.accountFolder(a.id)
-    // The connection's projects is Hive's junction to the CLI home's, where the list reads auto memory from.
+    // The connection's projects is Combwork's junction to the CLI home's, where the list reads auto memory from.
     expect(lstatSync(join(f, 'projects')).isSymbolicLink()).toBe(true)
     const project = join(wsPath, 'alpha')
     const key = encodeProjectPath(realpathSync(project))
@@ -1174,11 +1174,11 @@ describe('model, effort and context from the connection (HI-1770)', () => {
     expect(here(() => accounts.accountsView()).intro).toBeUndefined()
     // Not for a test copy on its CLI test home (the seam): nothing to set up there.
     config.update((c) => void delete c.ui.connectionsIntroShown)
-    process.env.HIVE_TEST_CLI_HOME_CONNECTION = '1'
+    process.env.CW_TEST_CLI_HOME_CONNECTION = '1'
     try {
       expect(here(() => accounts.accountsView()).intro).toBeUndefined()
     } finally {
-      delete process.env.HIVE_TEST_CLI_HOME_CONNECTION
+      delete process.env.CW_TEST_CLI_HOME_CONNECTION
     }
   })
 })
@@ -1393,7 +1393,7 @@ describe('connections as Settings → Accounts & Connections changes them (HI-21
       mkdirSync(join(p, '.combwork'), { recursive: true })
       writeFileSync(file, JSON.stringify(agentOn()))
       await w.refresh()
-      // As Hive's start sets it (initConnections).
+      // As Combwork's start sets it (initConnections).
       setConnectionGuard(accounts.connectionAssignable)
     })
     afterAll(() => writeFileSync(file, JSON.stringify({ version: 2, id, agents: [] })))

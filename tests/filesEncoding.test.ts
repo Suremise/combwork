@@ -9,7 +9,7 @@ import { tempDir } from './tempDir'
 const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
 const files = await import('../src/main/files')
 
-const base = tempDir('hive-encoding-')
+const base = tempDir('cw-encoding-')
 const ws = join(base, 'ws')
 const proj = join(ws, 'proj')
 mkdirSync(proj, { recursive: true })

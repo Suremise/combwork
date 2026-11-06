@@ -184,7 +184,7 @@ export function TitleBar() {
   const titleStyle = useTitleFit(barRef, menubarRef, actionsRef, titleRef, title)
 
   return (
-    <div className="titlebar" ref={barRef} onDoubleClick={(e) => e.target === e.currentTarget && void window.hive.invoke('window:toggleMaximize')}>
+    <div className="titlebar" ref={barRef} onDoubleClick={(e) => e.target === e.currentTarget && void window.combwork.invoke('window:toggleMaximize')}>
       <div className="titlebar-logo">
         <img src={iconUrl} alt="" />
       </div>
@@ -299,7 +299,7 @@ export function TitleBar() {
                     onMouseDown={(ev) => ev.preventDefault()}
                     onClick={() => {
                       setOpen(null)
-                      void window.hive.invoke('window:edit', e.role)
+                      void window.combwork.invoke('window:edit', e.role)
                     }}
                   >
                     <Icon name="blank" />

@@ -1,5 +1,5 @@
 // The task board (.combwork/tasks) and removing projects: who may change what, card numbers and order, and what Hide,
-// Remove from Hive and Delete do with a project's cards, handovers and folder (and what restoring brings back).
+// Remove from Combwork and Delete do with a project's cards, handovers and folder (and what restoring brings back).
 // The board's own rules, with the workflow rules off (Settings → Advanced): enforced, agents' moves are intents (#1268,
 // tests/agentMoves.test.ts) and the user's and the Assistant's go through the card's rules (#1265, tests/gates.test.ts).
 import { execFileSync } from 'child_process'
@@ -13,7 +13,7 @@ import { boardLockKey, editCard, readCard, removeCard, writeCard, writeCardOutsi
 import { boardTestHooks } from '../src/main/boardStore'
 import { follow } from './followDoorbell'
 
-const base = tempDir('hive-tasks-')
+const base = tempDir('cw-tasks-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 // The Recycle Bin, for tests: gone.
 ;(electron.shell as unknown as { trashItem: (p: string) => Promise<void> }).trashItem = (p) => rm(p, { recursive: true, force: true })
@@ -223,7 +223,7 @@ describe('task board', () => {
     })
   })
 
-  it('says what a change did, for the hive tools to confirm it', async () => {
+  it('says what a change did, for the Combwork tools to confirm it', async () => {
     const a = await run(() => tasks.createTask({ title: 'Said', project: 'alpha' }, agent))
     const b = await run(() => tasks.createTask({ title: 'Other', project: 'alpha' }, agent))
     const said: string[] = []
@@ -242,7 +242,7 @@ describe('task board', () => {
   it("refuses a project agent moving another agent's card in Doing on to Review or Done; its own, and everyone else, may", async () => {
     const projectJson = join(wsPath, 'alpha', '.combwork', 'project.json')
     const saved = readFileSync(projectJson, 'utf8')
-    // Its id kept (#508): Hive never drops it, and without it the project's cards would be no project's.
+    // Its id kept (#508): Combwork never drops it, and without it the project's cards would be no project's.
     writeFileSync(projectJson, JSON.stringify({ version: 2, id: JSON.parse(saved).id, agents: [{ id: 'a1', name: 'Agent 1' }, { id: 'a2', name: 'Agent 2' }] }))
     const a1 = { kind: 'agent', name: 'Agent 1 (alpha)', self: { project: 'alpha', agentId: 'a1' }, scope: 'alpha' } as const
     const a2 = { kind: 'agent', name: 'Agent 2 (alpha)', self: { project: 'alpha', agentId: 'a2' }, scope: 'alpha' } as const
@@ -316,7 +316,7 @@ describe('task board', () => {
     // Another agent's card, out of Doing (so nobody was working on it): taken, from each column, and said so.
     const projectJson = join(wsPath, 'alpha', '.combwork', 'project.json')
     const saved = readFileSync(projectJson, 'utf8')
-    // Its id kept (#508): Hive never drops it, and without it the project's cards would be no project's.
+    // Its id kept (#508): Combwork never drops it, and without it the project's cards would be no project's.
     writeFileSync(projectJson, JSON.stringify({ version: 2, id: JSON.parse(saved).id, agents: [{ id: 'a1', name: 'Agent 1' }, { id: 'a2', name: 'Agent 2' }] }))
     try {
       const other = { kind: 'agent', name: 'Agent 2 (alpha)', self: { project: 'alpha', agentId: 'a2' } } as const
@@ -375,7 +375,7 @@ describe('task board', () => {
   it('reads damaged card files safely', async () => {
     // Cards #1 to #3, so the reference to #3 is to a card that is there.
     for (const title of ['One', 'Two', 'Three']) await run(() => tasks.createTask({ title }, user))
-    // A card saved with fields of the wrong type (by an older Hive, a script, an export copied back).
+    // A card saved with fields of the wrong type (by an older Combwork, a script, an export copied back).
     await writeCard(w, 500, { title: 7, column: 'sideways', labels: 'x', blockedBy: ['a', 3] })
     const c = await run(() => tasks.getTask(500))
     expect(c.column).toBe('todo')
@@ -789,7 +789,7 @@ describe('card decisions', () => {
     for (const n of [mine, theirs]) await run(() => tasks.updateTask(n, { column: 'todo' }, user))
   })
 
-  it('tells an agent waiting for the user of new decisions once each: not while it works, the user types there or a line of Hive waits (#401)', async () => {
+  it('tells an agent waiting for the user of new decisions once each: not while it works, the user types there or a line of Combwork waits (#401)', async () => {
     const me = { projectPath: alpha, agentId: 'a1' }
     const n = (await run(() => tasks.createTask({ title: 'Waiting for the user', project: 'alpha', column: 'doing', agent: 'a1' }, user))).number
     await laterMs()
@@ -804,7 +804,7 @@ describe('card decisions', () => {
     let typing = false
     let waiting = false
     decisionWakes.testHooks.settleMs = 600_000
-    // What the agent read of each line Hive typed (#650: it follows the doorbell with cw_inbox).
+    // What the agent read of each line Combwork typed (#650: it follows the doorbell with cw_inbox).
     const sent: string[] = []
     const send = vi.spyOn(sessions, 'sendPrompt').mockImplementation(async (p, id, text, guard) => {
       guard?.()
@@ -821,7 +821,7 @@ describe('card decisions', () => {
     ]
     try {
       const tell = (): Promise<void> => decisionWakes.tellNow(w, alpha, 'a1')
-      // Working, the user typing there, a line of Hive's not taken: nothing typed.
+      // Working, the user typing there, a line of Combwork's not taken: nothing typed.
       await tell()
       status = 'finished'
       typing = true
@@ -1089,7 +1089,7 @@ describe('card decisions', () => {
     await run(() => tasks.updateTask(n, { decision: 'Blue.' }, assistant))
     let typing = false
     let refusedTyping = 0
-    // What happens as Hive types the line (before its guard's check), once.
+    // What happens as Combwork types the line (before its guard's check), once.
     let meanwhile: (() => Promise<void> | void) | null = null
     const sent: { to: string; text: string }[] = []
     decisionWakes.testHooks.settleMs = 30
@@ -1248,7 +1248,7 @@ describe('card decisions', () => {
   it('marks a decision recorded after work on the card started as new since start', () => {
     const card = { history: [{ at: '2026-10-07T10:00:00.000Z', by: 'You', what: 'Created in Todo' }] }
     expect(newSinceStart(card, { at: '2026-10-07T11:00:00.000Z' })).toBe(false)
-    const started = { history: [...card.history, { at: '2026-10-07T10:30:00.000Z', by: 'B5 (hive)', what: 'Moved to Doing' }] }
+    const started = { history: [...card.history, { at: '2026-10-07T10:30:00.000Z', by: 'B5 (alpha)', what: 'Moved to Doing' }] }
     expect(workStartedAt(started)).toBe(Date.parse('2026-10-07T10:30:00.000Z'))
     expect(newSinceStart(started, { at: '2026-10-07T10:20:00.000Z' })).toBe(false)
     expect(newSinceStart(started, { at: '2026-10-07T11:00:00.000Z' })).toBe(true)
@@ -1385,7 +1385,7 @@ describe("a project agent's board", () => {
   it('authorises every write on the card as it is under the board lock (a project change while a write waits)', async () => {
     const { fileLockDepth, withFileLock } = await import('../src/main/fsutil')
     const lock = boardLockKey(wsPath)
-    // Someone moves the card to beta while the agent's write waits for the board: another copy of Hive from before project
+    // Someone moves the card to beta while the agent's write waits for the board: another copy of Combwork from before project
     // ids (#508), without the id, which it doesn't keep.
     const toBeta = (x: number): void => {
       const { projectId: _id, ...c } = readCard(w, x)
@@ -1521,7 +1521,7 @@ describe('removing projects', () => {
     expect((await run(() => tasks.getTask(done.number))).archived).toBe(true)
   })
 
-  it('removes a project from Hive, packing its handovers and cards into its folder, and restores them', async () => {
+  it('removes a project from Combwork, packing its handovers and cards into its folder, and restores them', async () => {
     handover(wsPath, '2026-10-01-remove-me-plan.md', 'remove-me')
     handover(wsPath, '2026-10-01-remove-me-too-other.md', 'remove-me-too')
     handover(wsPath, '2026-10-01-keep-notes.md', 'keep')
@@ -1602,21 +1602,21 @@ describe('removing projects', () => {
     git(p, 'add', 'a.txt')
     git(p, 'commit', '-q', '-m', 'a')
     const tree = join(`${wsPath}.worktrees`, 'gitproj', 'agent-2')
-    git(p, 'worktree', 'add', '-q', '-b', 'hive/agent-2', tree, 'main')
+    git(p, 'worktree', 'add', '-q', '-b', 'cw/agent-2', tree, 'main')
     writeFileSync(join(tree, 'b.txt'), 'b')
     git(tree, 'add', 'b.txt')
     git(tree, 'commit', '-q', '-m', 'b')
-    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a2', name: 'Agent 2', worktree: { path: tree, branch: 'hive/agent-2', base: 'main' } }] }))
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a2', name: 'Agent 2', worktree: { path: tree, branch: 'cw/agent-2', base: 'main' } }] }))
     await w.refresh()
     const info = await run(() => removal.removalInfo(p))
     expect(info.worktrees).toEqual([expect.objectContaining({ agent: 'Agent 2', ahead: 1 })])
     await expect(run(() => removal.removeProject(p, 'remove'))).rejects.toThrow(/Merge or discard the work in Agent 2's worktree/)
     expect(await names()).toContain('gitproj')
     // Merged: then the worktree and its branch go, and the project leaves.
-    git(p, 'merge', '-q', 'hive/agent-2')
+    git(p, 'merge', '-q', 'cw/agent-2')
     await run(() => removal.removeProject(p, 'remove'))
     expect(existsSync(tree)).toBe(false)
-    expect(git(p, 'branch', '--list', 'hive/agent-2').trim()).toBe('')
+    expect(git(p, 'branch', '--list', 'cw/agent-2').trim()).toBe('')
     expect(await names()).not.toContain('gitproj')
   })
 })
@@ -1634,8 +1634,8 @@ describe('removal and board under faults', () => {
     git(p, 'add', 'a.txt')
     git(p, 'commit', '-q', '-m', 'a')
     const tree = join(`${wsPath}.worktrees`, name, 'agent-2')
-    git(p, 'worktree', 'add', '-q', '-b', 'hive/agent-2', tree, 'main')
-    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a2', name: 'Agent 2', worktree: { path: tree, branch: 'hive/agent-2', base: 'main' } }] }))
+    git(p, 'worktree', 'add', '-q', '-b', 'cw/agent-2', tree, 'main')
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a2', name: 'Agent 2', worktree: { path: tree, branch: 'cw/agent-2', base: 'main' } }] }))
     return { p, tree }
   }
   beforeEach(async () => {
@@ -2060,13 +2060,13 @@ describe('removal and board under faults', () => {
 describe('task prompt', () => {
   const card = { number: 7, title: 'Fix it', description: 'The details.', blockedBy: [], comments: [] } as unknown as import('../src/shared/types').TaskCard
   // A card's start in its own words (#1292, #966 row 30, Darren's choice: only the card's start has a raw variant).
-  it("in its own words: the card's title, the user's note and its description, nothing of Hive's", async () => {
+  it("in its own words: the card's title, the user's note and its description, nothing of Combwork's", async () => {
     const { rawTaskPrompt } = await import('../src/shared/tasks')
     expect(rawTaskPrompt(card)).toBe('Fix it\n\nThe details.')
     expect(rawTaskPrompt(card, '  Only the tests. ')).toBe('Fix it\n\nOnly the tests.\n\nThe details.')
     expect(rawTaskPrompt({ title: ' Fix it ', description: '' }, ' ')).toBe('Fix it')
     const raw = rawTaskPrompt({ ...card, blockedBy: [3], context: ['docs/A.md'], comments: [{ at: '2026-10-01T10:00:00Z', by: 'You', text: 'x' }] } as never)
-    expect(raw).not.toMatch(/Hive task board|work-on-card|depends on|Read these first|cw_read_task/)
+    expect(raw).not.toMatch(/Combwork task board|work-on-card|depends on|Read these first|cw_read_task/)
   })
 
   it('says when a card is back for more work, and puts the note before the card', async () => {
@@ -2076,7 +2076,7 @@ describe('task prompt', () => {
     expect(taskPrompt(card, false, { from: 'done', note: 'Only the tests.' })).toBe(
       'Work on task #7 from the Combwork task board: Fix it\n\nIt was in Done and is back in Doing for more work.\n\nOnly the tests.\n\nThe details.'
     )
-    // With Hive's tools: the work-on-card skill says how to carry it through, and the comments are a read away.
+    // With Combwork's tools: the work-on-card skill says how to carry it through, and the comments are a read away.
     expect(taskPrompt(card, true)).toBe('Work on task #7 from the Combwork task board: Fix it\n\nThe details.\n\nUse the work-on-card skill.')
     const commented = { ...card, comments: [{ at: '2026-10-01T10:00:00Z', by: 'You', text: 'First thoughts.' }, { at: '2026-10-02T10:00:00Z', by: 'Reviewer (alpha)', text: 'Failed: the redirect loops.' }] }
     expect(taskPrompt(commented, true)).toMatch(/The card has 2 comments: read them with cw_read_task\.$/)
@@ -2181,7 +2181,7 @@ describe("an agent's cards on its session", () => {
       { number: 1, title: 'Inbox' },
       { number: c.number, title: 'Third' }
     ])
-    // A session Hive hasn't recorded isn't created.
+    // A session Combwork hasn't recorded isn't created.
     await recordCards(w, alpha, 'a1', 'unknown')
     expect((await w.sessionsFile(alpha)).sessions.some((s) => s.id === 'unknown')).toBe(false)
   })

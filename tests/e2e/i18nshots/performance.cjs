@@ -40,7 +40,7 @@ module.exports = {
       close: (ctx) => views(ctx).first().click()
     },
     {
-      // Two views kept without a name, project agents' and scripts', compared: the names and descriptions Hive gives them,
+      // Two views kept without a name, project agents' and scripts', compared: the names and descriptions Combwork gives them,
       // and why they can't be compared (their Who filters), all in the language (#1104).
       name: 'compare-filters',
       open: async (ctx) => {

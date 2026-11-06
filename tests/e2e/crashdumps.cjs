@@ -1,4 +1,4 @@
-// Why Hive stopped (#985): a normal quit logs each step of its way out, with the caller; a crash of the window's page
+// Why Combwork stopped (#985): a normal quit logs each step of its way out, with the caller; a crash of the window's page
 // and of the main process each leave a crash dump in the profile (never uploaded) and the page's a log line; the next
 // start logs the dumps and Copy Diagnostics names the newest. Crashes only this test copy: its page by loading
 // chrome://crash, its main process by process.crash() in it, and anything left of it is ended by its own pid and start
@@ -14,7 +14,7 @@ const HUNG_MS = 20000
 
 const userData = path.join(lib.WORK, 'crashdumps-profile')
 const reports = path.join(userData, 'Crashpad', 'reports')
-const logFile = path.join(userData, 'logs', 'hive.log')
+const logFile = path.join(userData, 'logs', 'combwork.log')
 const heapDir = path.join(userData, 'heap')
 // The main process's heap in the out-of-memory test: small, so it fills (and its snapshot is written) in seconds.
 const SMALL_HEAP_MB = 256
@@ -31,7 +31,7 @@ const logText = () => (fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8')
 /** The log since the last start: this run's lines. */
 const thisRun = () => {
   const text = logText()
-  const at = text.lastIndexOf('] Hive ')
+  const at = Math.max(-1, ...[...text.matchAll(/\] Combwork \S+ starting \(/g)].map((m) => m.index))
   return at < 0 ? '' : text.slice(text.lastIndexOf('\n', at) + 1)
 }
 const has = (text, re) => re.test(text)
@@ -76,7 +76,7 @@ process.on('uncaughtException', (e) => {
       current = null
     }
 
-    // The window's page crashes: a dump and a line; Hive reloads it.
+    // The window's page crashes: a dump and a line; Combwork reloads it.
     {
       const { app } = await start()
       await app.evaluate(({ BrowserWindow }) => void BrowserWindow.getAllWindows()[0].webContents.loadURL('chrome://crash').catch(() => undefined))
@@ -98,7 +98,7 @@ process.on('uncaughtException', (e) => {
     // fills it; Node writes a heap snapshot into the profile's heap folder before the crash, which leaves a dump too.
     {
       fs.writeFileSync(path.join(userData, 'advanced.json'), JSON.stringify({ format: 1, values: { 'cw.heapSnapshotNearLimit': true } }))
-      const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [`--js-flags=--max-old-space-size=${SMALL_HEAP_MB}`, lib.ROOT], cwd: lib.ROOT, env: lib.hiveEnv({ HIVE_USER_DATA: userData }) })
+      const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [`--js-flags=--max-old-space-size=${SMALL_HEAP_MB}`, lib.ROOT], cwd: lib.ROOT, env: lib.combworkEnv({ CW_USER_DATA: userData }) })
       current = { app }
       identities.push(...lib.identify([app.process().pid]))
       await lib.appReady(await app.firstWindow())
@@ -127,9 +127,9 @@ process.on('uncaughtException', (e) => {
       check('and the snapshot', /\[memory\] 1 memory snapshot\(s\) in .*\\heap; the newest from \d{4}-/.test(thisRun()))
       const report = await inv('app:diagnostics')
       check('Copy Diagnostics names the newest dump', /### Crash dumps\n\n- 3 in `[^`]*Crashpad\\reports`; the newest from [^:]+:[^`]*`[\w-]+\.dmp`/.test(report), report.slice(report.indexOf('### Crash dumps'), report.indexOf('### Crash dumps') + 300))
-      check('and says they are never sent', /Hive never sends them/.test(report))
+      check('and says they are never sent', /Combwork never sends them/.test(report))
       const memory = report.slice(report.indexOf('### Memory'), report.indexOf('### Log'))
-      check('Copy Diagnostics has the memory now, the snapshots and the lines logged', /- Now: heap \d+ of \d+ MB used/.test(memory) && /- Memory snapshots: on; 1 in `[^`]*\\heap`, the newest from \d{4}-[^(]+\(\d+ MB\): they hold what Hive had in memory, so never attached/.test(memory) && /- Logged:\n {2}- \d{4}-\S+ Memory, at start: heap/.test(memory), memory)
+      check('Copy Diagnostics has the memory now, the snapshots and the lines logged', /- Now: heap \d+ of \d+ MB used/.test(memory) && /- Memory snapshots: on; 1 in `[^`]*\\heap`, the newest from \d{4}-[^(]+\(\d+ MB\): they hold what Combwork had in memory, so never attached/.test(memory) && /- Logged:\n {2}- \d{4}-\S+ Memory, at start: heap/.test(memory), memory)
       const quitting = await lib.quitWatch(app)
       await inv('app:quit').catch(() => undefined)
       check('the test copy quits again', !!(await quitting.gone(HUNG_MS)))

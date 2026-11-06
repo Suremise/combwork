@@ -1,8 +1,8 @@
 /**
- * Dates and times as the user chose them (Settings → General → Date format and Time): every date Hive shows goes
+ * Dates and times as the user chose them (Settings → General → Date format and Time): every date Combwork shows goes
  * through these, so one setting changes them all. Each process keeps the current choice (`setDateStyle`, from its
  * settings); a formatter given a style uses that instead. The numeric forms are the user's choice, whatever the language;
- * words (a weekday, a month, AM and PM) are in the language Hive shows (#851).
+ * words (a weekday, a month, AM and PM) are in the language Combwork shows (#851).
  */
 import { dateWords } from './i18n/locale'
 
@@ -34,8 +34,8 @@ export function dateStyle(): DateStyle {
 }
 
 /**
- * Windows' regional format (a BCP 47 tag, en-GB), which System dates follow (#767): not the language Hive shows, which
- * Chromium's default locale follows once Hive starts it in that language.
+ * Windows' regional format (a BCP 47 tag, en-GB), which System dates follow (#767): not the language Combwork shows, which
+ * Chromium's default locale follows once Combwork starts it in that language.
  */
 let regional: string | undefined
 export function setRegionalFormat(locale: string | undefined): void {
@@ -59,7 +59,7 @@ export function formatDate(d: Date | string | number, style: DateStyle = current
     case 'mdy':
       return `${m}/${day}/${y}`
     case 'system':
-      return x.toLocaleDateString(regional) // i18n-ignore: System is Windows' regional format by choice, not the language Hive shows
+      return x.toLocaleDateString(regional) // i18n-ignore: System is Windows' regional format by choice, not the language Combwork shows
     default:
       return `${y}-${m}-${day}`
   }

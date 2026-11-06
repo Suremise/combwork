@@ -1,5 +1,5 @@
 // Fresh starts at natural breaks (#1437, SPEC §16.10.4): on fake Claude Code agents, the Assistant never started, with
-// Hive "focused" (stubbed: a test window never takes the OS focus) so its notices are banners:
+// Combwork "focused" (stubbed: a test window never takes the OS focus) so its notices are banners:
 // 1. A lane ends (its card Done) with every agent idle: one "A good moment to start fresh" banner, with Start Fresh
 //    (Idle Agents).
 // 2. Its button opens Start Fresh (Idle Agents)' question: the two idle agents start fresh, a working one and a stopped
@@ -40,7 +40,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT) }, viewport: { width: 1400, height: 850 } })
+  const h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT) }, viewport: { width: 1400, height: 850 } })
   const { app, page, inv } = h
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -50,14 +50,14 @@ const check = (name, ok, extra = '') => {
     const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id) ?? null
     const idle = async (id) => ['ready', 'finished'].includes((await live(id))?.status)
     const say = async (id, text) => {
-      // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+      // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
       await lib.typeLine(inv, lib.ptyKey(alpha, id), home, null, text, { live: () => live(id) })
     }
-    const hiveLog = () => fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8')
-    /** The nudges Hive told, by what ended (its log line names it). */
-    const nudges = () => [...hiveLog().matchAll(/Suggested a fresh start in .*?\((.+?)\)/g)].map((m) => m[1])
+    const combworkLog = () => fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8')
+    /** The nudges Combwork told, by what ended (its log line names it). */
+    const nudges = () => [...combworkLog().matchAll(/Suggested a fresh start in .*?\((.+?)\)/g)].map((m) => m[1])
     /** The decisions not to suggest one, by what ended and why. */
-    const notNudged = () => [...hiveLog().matchAll(/No fresh-start suggestion in .*?\((.+?)\): (.+)/g)].map((m) => `${m[1]}: ${m[2].trim()}`)
+    const notNudged = () => [...combworkLog().matchAll(/No fresh-start suggestion in .*?\((.+?)\): (.+)/g)].map((m) => `${m[1]}: ${m[2].trim()}`)
     const banner = page.locator('.popups .popup', { hasText: 'A good moment to start fresh' })
     /** Closes the fresh-start banners shown (one at a time, each seen gone). */
     const closeBanners = async () => {
@@ -74,7 +74,7 @@ const check = (name, ok, extra = '') => {
       }
       await inv('settings:update', { appearance: { theme: 'light' } })
     }
-    // Hive focused: its notices are banners in the window, as the notification settings say.
+    // Combwork focused: its notices are banners in the window, as the notification settings say.
     await app.evaluate(({ BrowserWindow }) => {
       const w = BrowserWindow.getAllWindows()[0]
       w.isFocused = () => true
@@ -91,7 +91,7 @@ const check = (name, ok, extra = '') => {
 
     // --- 1. A lane ends with every agent idle: one nudge.
     const a = (await inv('tasks:create', { title: 'Greeting says Hi', project: 'alpha', agent: builder.id, column: 'doing' })).number
-    await say(builder.id, `hive cw_lane ${JSON.stringify({ action: 'start', cards: [a], reviewer: 'Reviewer', name: 'greetings' })}`)
+    await say(builder.id, `cw cw_lane ${JSON.stringify({ action: 'start', cards: [a], reviewer: 'Reviewer', name: 'greetings' })}`)
     const lane = await until(async () => (await inv('lanes:list')).find((l) => l.state === 'active' && l.cards.length === 1), HUNG_MS)
     check('the lane runs', !!lane, JSON.stringify(await inv('lanes:list')))
     await until(() => idle(builder.id), HUNG_MS)
@@ -152,7 +152,7 @@ const check = (name, ok, extra = '') => {
       return waited
     }
     const b = (await inv('tasks:create', { title: 'Greeting says Hello', project: 'alpha', agent: builder.id, column: 'doing' })).number
-    await say(builder.id, `hive cw_lane ${JSON.stringify({ action: 'start', cards: [b], reviewer: 'Reviewer', name: 'hellos' })}`)
+    await say(builder.id, `cw cw_lane ${JSON.stringify({ action: 'start', cards: [b], reviewer: 'Reviewer', name: 'hellos' })}`)
     const lane2 = await until(async () => (await inv('lanes:list')).find((l) => l.state === 'active' && l.cards.some((x) => x.number === b)), HUNG_MS)
     await until(() => idle(builder.id), HUNG_MS)
     const laneWaited = await finishing('lane-go', () => inv('tasks:update', b, { column: 'done' }), () => `lane:${lane2.id}`)

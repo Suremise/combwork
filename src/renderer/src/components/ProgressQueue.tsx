@@ -90,7 +90,7 @@ export function QueueCard({ view: v, runs, now, showProject }: { view: QueueView
           </Tooltip>
         )}
       </div>
-      {v.runBy && !v.runHere && <div className="progress-queue-line faint">{tr(msg({ id: 'board.queue.runBy', defaultMessage: 'Run by profile {profile}', description: "On a merge queue's card in the Progress panel: another Hive on this workspace runs the queue ({profile}: its profile's name, such as Hive-Dev). A noun before the name (glossary §1 rule 4)." }), { profile: v.runBy })}</div>}
+      {v.runBy && !v.runHere && <div className="progress-queue-line faint">{tr(msg({ id: 'board.queue.runBy', defaultMessage: 'Run by profile {profile}', description: "On a merge queue's card in the Progress panel: another Combwork on this workspace runs the queue ({profile}: its profile's name, such as Combwork-Dev). A noun before the name (glossary §1 rule 4)." }), { profile: v.runBy })}</div>}
       {v.paused && (
         <div className="progress-queue-paused" data-reason={v.paused.reason}>
           <Icon name="debug-pause" />
@@ -281,7 +281,7 @@ export function MergesList({ queues, slots, runs, now, projectName, showProject,
 const H = {
   recent: msg({ id: 'board.queue.recent.heading', defaultMessage: 'Recent merges', description: "A heading under a merge queue's card in the Progress panel's Merges tab (HI-1924): the queue's latest outcomes (merged, returned, taken out) and pauses follow, newest first." }),
   none: msg({ id: 'board.queue.recent.none', defaultMessage: 'No merges yet.', description: "Under Recent merges in the Progress panel's Merges tab, when the merge queue has merged, returned or paused nothing yet (or nothing of the agent the panel is filtered to)." }),
-  more: msg({ id: 'board.queue.recent.more', defaultMessage: 'More in Version Control', description: "A link after a merge queue's Recent merges in the Progress panel: its full history, in the project's Version Control tab (Merge queue section). Version Control is a place in Hive." }),
+  more: msg({ id: 'board.queue.recent.more', defaultMessage: 'More in Version Control', description: "A link after a merge queue's Recent merges in the Progress panel: its full history, in the project's Version Control tab (Merge queue section). Version Control is a place in Combwork." }),
   took: msg({ id: 'board.queue.recent.took', defaultMessage: 'took {duration}', description: "Beside an outcome in the Progress panel's Recent merges: how long the merge queue took over the card, its merge checks and merge ({duration}: “12 min”, “under a minute”). Lower case." }),
   lasted: msg({ id: 'board.queue.recent.lasted', defaultMessage: 'lasted {duration}', description: "Beside a pause in the Progress panel's Recent merges: how long the merge queue stayed paused ({duration}: “12 min”, “under a minute”). Lower case." }),
   still: msg({ id: 'board.queue.recent.stillPaused', defaultMessage: 'still paused', description: "Beside a pause in the Progress panel's Recent merges: the merge queue is paused now (the pause hasn't ended). Lower case." })

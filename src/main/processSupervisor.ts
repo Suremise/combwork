@@ -4,13 +4,13 @@ import { join } from 'path'
 import type { Writable } from 'stream'
 
 /**
- * Hive's process supervisor (#507, #543, #659, #678; shared since #1360): one hidden PowerShell per Hive (its C#
+ * Combwork's process supervisor (#507, #543, #659, #678; shared since #1360): one hidden PowerShell per Combwork (its C#
  * through Add-Type) holding Windows job objects, that both agents' launches (agentProcesses.ts) and the merge queue's
  * runners (workflow/queueRunner.ts) use, never a copy of it each.
  *
  * Each job owns the processes put in it and everything they start from then on; what escapes it (a packaged app's
  * process, such as the Store's PowerShell, starts its children outside every job) is adopted into it, or followed with
- * its handle held, by the sweeps. An agent's launch's job is unnamed and ends nothing when it closes (quitting Hive
+ * its handle held, by the sweeps. An agent's launch's job is unnamed and ends nothing when it closes (quitting Combwork
  * leaves running what the user chose to keep). A merge queue lease's job is named after its lease and kill on close
  * (no process of a queue outlives its job), and each process it follows is told ("followed <job> <pid>:<created>"),
  * for its runner to keep as a duty (a followed process isn't in the job, so closing it doesn't end one).
@@ -28,7 +28,7 @@ const POWERSHELL = join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'Wi
 /** Why the host couldn't start (its owner says it in its own words). */
 export type HostFailure = { kind: 'test' } | { kind: 'noPowerShell'; error: string } | { kind: 'slowHelper'; seconds: number } | { kind: 'refused' } | { kind: 'helperFailed'; why: string }
 
-/** The host's requests (HiveJobs.Answer). */
+/** The host's requests (CombworkJobs.Answer). */
 export type HostCommand = 'add' | 'list' | 'kill' | 'forget' | 'identify' | 'endexact' | 'endtree' | 'memory' | 'lineage' | 'open' | 'assign' | 'empty' | 'endnamed' | 'hasjob' | 'follow' | 'keeper' | 'running' | 'paths' | 'workingin'
 
 /** The most processes one `workingin` answer describes (HI-2467); more, and it says it isn't whole. */
@@ -37,7 +37,7 @@ export const MAX_WORKING_IN = 32
 export interface JobHostOptions {
   /** How long it gets to start, and then to answer each request. */
   waitMs: () => number
-  /** Test copies' modes (HIVE_TEST_PROCESS_TRACKER: fail, silent, mute); '' otherwise. */
+  /** Test copies' modes (CW_TEST_PROCESS_TRACKER: fail, silent, mute); '' otherwise. */
   testMode: () => string
   log: { warn: (msg: string, e?: unknown) => void }
   /** A process joined a job, or was taken into one ("new"). */
@@ -59,7 +59,7 @@ using System.Collections.Generic;
 using System.Management;
 using System.Runtime.InteropServices;
 using System.Text;
-public static class HiveJobs {
+public static class CombworkJobs {
   [DllImport("kernel32.dll", SetLastError=true)] static extern IntPtr CreateJobObject(IntPtr a, IntPtr name);
   [DllImport("kernel32.dll", SetLastError=true)] static extern bool AssignProcessToJobObject(IntPtr job, IntPtr proc);
   [DllImport("kernel32.dll", SetLastError=true)] static extern IntPtr OpenProcess(uint access, bool inherit, int pid);
@@ -93,13 +93,13 @@ public static class HiveJobs {
   [StructLayout(LayoutKind.Sequential)] struct ExtLimits { public BasicLimits basic; public IoCounters io; public UIntPtr procMem, jobMem, peakProc, peakJob; }
   /**
    * The kill-on-close jobs (the merge queue's), by id, each with its journal: the file each process it follows is
-   * written to, durably, before it is followed (Journal), so another Hive can end it after a crash (#1360).
+   * written to, durably, before it is followed (Journal), so another Combwork can end it after a crash (#1360).
    */
   static Dictionary<string, string> closing = new Dictionary<string, string>();
   /** A kill-on-close job's processes it couldn't journal, and so ended at once, not told yet: "unowned <job> <pid>". */
   static List<string> queueNotes = new List<string>();
   /** The name of a merge queue lease's job, in this Windows session. */
-  public static string QueueJobName(string id) { return "Local\\HiveQueue-" + id; }
+  public static string QueueJobName(string id) { return "Local\\CombworkQueue-" + id; }
   static Dictionary<string, IntPtr> jobs = new Dictionary<string, IntPtr>();
   /** Processes each job adopted (Sweep), for the log. */
   static Dictionary<string, int> adopted = new Dictionary<string, int>();
@@ -141,7 +141,7 @@ public static class HiveJobs {
   }
   /**
    * Before a kill-on-close job follows a process: its identity ("pid:created:check") written to the job's journal and flushed
-   * through to the disk, so it outlives a crash of this host or of Hive. False when it couldn't be (no journal, a write
+   * through to the disk, so it outlives a crash of this host or of Combwork. False when it couldn't be (no journal, a write
    * that failed): the caller ends the process at once instead (fail closed).
    */
   static bool Journal(string id, int pid, long created) {
@@ -384,7 +384,7 @@ public static class HiveJobs {
     return r;
   }
   /**
-   * Processes kept from before Hive restarted, by id and start time ("pid:created,…", #614): those still running as
+   * Processes kept from before Combwork restarted, by id and start time ("pid:created,…", #614): those still running as
    * the same process, as JSON ["pid:created", …]: an identity is the pair, never the id alone. An id that names
    * another process by now (another start time) is left out.
    */
@@ -522,7 +522,7 @@ public static class HiveJobs {
       // PROCESS_TERMINATE | SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION
       IntPtr p = OpenProcess(0x0001 | 0x100000 | 0x1000, false, e.Key);
       if (p == IntPtr.Zero) {
-        // ERROR_INVALID_PARAMETER: no process has the id. Anything else: one does, and Windows won't let Hive end it.
+        // ERROR_INVALID_PARAMETER: no process has the id. Anything else: one does, and Windows won't let Combwork end it.
         if (Marshal.GetLastWin32Error() == 87) ended++; else failed++;
         continue;
       }
@@ -541,7 +541,7 @@ public static class HiveJobs {
    * only while it is still that process, and below it, by the parent ids of a snapshot taken at "at", each child that is
    * still running, started after its parent and not after the snapshot. Each is checked through a handle opened on it
    * and held (open; close lets one go), so its id can't name another process before it is ended: a process an id names
-   * by now (started after the snapshot), and a root that has gone are never taken or followed. What Hive can't end is
+   * by now (started after the snapshot), and a root that has gone are never taken or followed. What Combwork can't end is
    * never passed over in silence: a root that runs but can't be opened or read is in failed ("pid:created"), and so is a
    * child that runs and can't be opened to end it but whose start time a query-only look (peek: its start time, 0 when
    * it has gone, -1 when it can't be read) shows to be one of the run's; a child that runs and can't be told either way
@@ -576,7 +576,7 @@ public static class HiveJobs {
         IntPtr h = open(k);
         if (h == IntPtr.Zero) {
           if (absent(k)) continue;
-          // It runs, and Hive can't end it: said if it is the run's (or might be), never passed over.
+          // It runs, and Combwork can't end it: said if it is the run's (or might be), never passed over.
           long pc = peek(k);
           if (pc == -1) unverified.Add(k);
           else if (pc > 0 && pc >= p.created && pc <= at) failed.Add(k + ":" + pc);
@@ -598,8 +598,8 @@ public static class HiveJobs {
   /**
    * Ends processes by id and start time ("pid:created,…") with all they started that runs now (#1008: a test run's
    * whole tree), as PickTree picks them, each through the handle it was checked with. JSON {"ended":n,"failed":n,
-   * "failedIds":["pid:created",…],"unverified":[pid,…]}: those failed still run (one Hive couldn't open among them), to
-   * try again; unverified, the ids of the run's children (as far as Hive can tell) that run and it could neither end nor check.
+   * "failedIds":["pid:created",…],"unverified":[pid,…]}: those failed still run (one Combwork couldn't open among them), to
+   * try again; unverified, the ids of the run's children (as far as Combwork can tell) that run and it could neither end nor check.
    */
   public static string EndTree(string list) {
     var children = new Dictionary<int, List<int>>();
@@ -626,7 +626,7 @@ public static class HiveJobs {
     Func<int, bool> absent = (pid) => error == 87;
     Func<IntPtr, long> createdOf = (h) => { long c, x, k, u; return GetProcessTimes(h, out c, out x, out k, out u) ? c : 0; };
     Func<IntPtr, bool> running = (h) => { uint code; return GetExitCodeProcess(h, out code) && code == 259; };
-    // PROCESS_QUERY_LIMITED_INFORMATION alone: what a process Hive can't end is, if it can tell.
+    // PROCESS_QUERY_LIMITED_INFORMATION alone: what a process Combwork can't end is, if it can tell.
     Func<int, long> peek = (pid) => {
       IntPtr q = OpenProcess(0x1000, false, pid);
       if (q == IntPtr.Zero) return Marshal.GetLastWin32Error() == 87 ? 0 : -1;
@@ -804,20 +804,20 @@ public static class HiveJobs {
   }
   [DllImport("kernel32.dll", SetLastError=true, CharSet=CharSet.Unicode)] static extern bool MoveFileExW(string from, string to, uint flags);
   /**
-   * The keeper (HI-2055): once its Hive has gone (its input ended: a quit, a crash), this helper stays while an agent's
+   * The keeper (HI-2055): once its Combwork has gone (its input ended: a quit, a crash), this helper stays while an agent's
    * launch job it holds still has a process, the only one that can tell those jobs complete, and writes each one's state
    * to keepDir as keeper-<job>.json: "live" with its members (by id, start time and name: no command line, which can
    * hold a secret) while it has any, "ended" once it is seen empty, then lets it go; it exits once it holds none. Nothing
-   * is ended by it. The next Hive frees a slot's writer only by an "ended" from the helper its run was bound to. Unset
+   * is ended by it. The next Combwork frees a slot's writer only by an "ended" from the helper its run was bound to. Unset
    * (keepDir null), it exits at the end of its input as before.
    */
   static string keepDir;
-  static string keepHive;
+  static string keepCombwork;
   static string keepSelf;
-  /** Configures the keeper: its Hive's identity ("pid:started", as its slot writers name it) and the folder. Its own identity, "pid:created". */
-  public static string Keeper(string hive, string dir) {
+  /** Configures the keeper: its Combwork's identity ("pid:started", as its slot writers name it) and the folder. Its own identity, "pid:created". */
+  public static string Keeper(string combwork, string dir) {
     int me = System.Diagnostics.Process.GetCurrentProcess().Id;
-    keepHive = hive;
+    keepCombwork = combwork;
     keepDir = dir;
     keepSelf = me + ":" + CreatedOf(me);
     return keepSelf;
@@ -872,7 +872,7 @@ public static class HiveJobs {
   }
   /** A job's state as JSON, its members (null: none said) by id, start time and name (never a command line). */
   static string StateJson(string id, string state, string observed, int[] members) {
-    var b = new StringBuilder("{\"v\":1,\"run\":" + Q(id) + ",\"helper\":" + Q(keepSelf) + ",\"hive\":" + Q(keepHive) + ",\"state\":" + Q(state) + ",\"observed\":" + Q(observed));
+    var b = new StringBuilder("{\"v\":1,\"run\":" + Q(id) + ",\"helper\":" + Q(keepSelf) + ",\"app\":" + Q(keepCombwork) + ",\"state\":" + Q(state) + ",\"observed\":" + Q(observed));
     if (members != null) {
       b.Append(",\"total\":").Append(members.Length).Append(",\"members\":[");
       for (int i = 0; i < members.Length && i < ${MAX_LISTED}; i++) {
@@ -885,7 +885,7 @@ public static class HiveJobs {
     return b.Append(",\"at\":").Append(DateTime.UtcNow.ToFileTimeUtc()).Append("}").ToString();
   }
   /**
-   * The answer to a later Hive asking for a run's job now (HI-2313): observed for the asking (Look), never a state written
+   * The answer to a later Combwork asking for a run's job now (HI-2313): observed for the asking (Look), never a state written
    * before. "now" with "complete" and its members (none: empty now); "now" with "unsure" when the observation wasn't sure
    * or its ancestry was let go unsure; "unknown" for a job it doesn't hold. Ends and changes nothing.
    */
@@ -909,7 +909,7 @@ public static class HiveJobs {
   [DllImport("kernel32.dll")] static extern bool CancelIoEx(IntPtr h, IntPtr ov);
   [DllImport("kernel32.dll", SetLastError=true)] static extern IntPtr CreateEventW(IntPtr sa, bool manual, bool initial, IntPtr name);
   /** The pipe a keeper answers on, named after its identity (its binding names it). */
-  public static string PipeName() { return @"\\.\pipe\hive-keeper-" + (keepSelf ?? "").Replace(':', '-'); }
+  public static string PipeName() { return @"\\.\pipe\combwork-keeper-" + (keepSelf ?? "").Replace(':', '-'); }
   /** How long one asking may take, from connecting to the answer read (a client that stops is let go). */
   const int ASK_MS = 2000;
   /**
@@ -938,7 +938,7 @@ public static class HiveJobs {
    * Its pipe, while it keeps (HI-2313): one client at a time, each asking one line ("observe <run>", at most 256 bytes)
    * and read its answer (Observation), all within ASK_MS from connecting, then let go. Only this user's processes, never
    * a remote client, may open it, and only the first instance by its name: one taken already, nothing is served (a later
-   * Hive asking it fails closed). Nothing a client sends ends or changes anything.
+   * Combwork asking it fails closed). Nothing a client sends ends or changes anything.
    */
   static void Serve() {
     IntPtr pipe = new IntPtr(-1), ev = IntPtr.Zero, ov = IntPtr.Zero, buf = IntPtr.Zero;
@@ -1017,7 +1017,7 @@ public static class HiveJobs {
    * Its input has ended (HI-2055): the merge queue's jobs close at once, ending what is in them as before (#1360), and,
    * configured, it keeps each agent launch's job it still holds, sweeping as it did, until each is seen empty (an
    * "ended" state, written once), then exits. A job it can't read is looked at again; one whose "ended" can't be
-   * written is let go with none (its slot stays held). It says "keeping" once, so a quitting Hive stops waiting for it.
+   * written is let go with none (its slot stays held). It says "keeping" once, so a quitting Combwork stops waiting for it.
    */
   public static void Keep() {
     List<string> mine;
@@ -1028,7 +1028,7 @@ public static class HiveJobs {
     if (mine.Count == 0) return;
     try { Console.Out.WriteLine("keeping"); Console.Out.Flush(); Console.Out.Close(); } catch { }
     Notices = null;
-    // Asked by a later Hive for its jobs as they are now (HI-2313).
+    // Asked by a later Combwork for its jobs as they are now (HI-2313).
     new System.Threading.Thread(Serve) { IsBackground = true }.Start();
     var last = new Dictionary<string, string>();
     while (mine.Count > 0) {
@@ -1295,7 +1295,7 @@ public static class HiveJobs {
         case "assign": r = Q(Assign(a[2], int.Parse(a[3]), long.Parse(a[4]), long.Parse(a[5]))); break;
         case "empty": r = Empty(a[2]) ? "true" : "false"; break;
         case "hasjob": r = Q(HasJob(a[2])); break;
-        // Its Hive's identity, and the folder in base64url (HI-2055): its own identity back.
+        // Its Combwork's identity, and the folder in base64url (HI-2055): its own identity back.
         case "keeper": r = Q(Keeper(a[2], a.Length > 3 ? Encoding.UTF8.GetString(Convert.FromBase64String(a[3].Replace('-', '+').Replace('_', '/').PadRight(a[3].Length + (4 - a[3].Length % 4) % 4, '='))) : null)); break;
         // Tests only (the host refuses to send it otherwise): follows a process, as Take does a packaged app's.
         case "follow": r = Follow(a[2], int.Parse(a[3]), 0x0001 | 0x100000) ? "true" : "false"; break;
@@ -1319,25 +1319,25 @@ const HOST_SCRIPT = `
 [Console]::Out.WriteLine('pid ' + $PID)
 $ErrorActionPreference = 'Stop'
 Add-Type -ReferencedAssemblies System.Management -TypeDefinition ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String([Console]::In.ReadLine())))
-[HiveJobs]::Notices = [Console]::Out
+[CombworkJobs]::Notices = [Console]::Out
 [Console]::Out.WriteLine('ready')
-while ($null -ne ($line = [Console]::In.ReadLine())) { [Console]::Out.WriteLine([HiveJobs]::Answer($line)); [HiveJobs]::TellQueue() }
-[HiveJobs]::Keep()
+while ($null -ne ($line = [Console]::In.ReadLine())) { [Console]::Out.WriteLine([CombworkJobs]::Answer($line)); [CombworkJobs]::TellQueue() }
+[CombworkJobs]::Keep()
 `
 const HOST_INPUT = Buffer.from(HOST_SOURCE, 'utf8').toString('base64') + '\n'
 
 /**
  * The helper's launcher (HI-2314): starts the command line given with only its own standard handles (its pipes to
- * Hive) to inherit, in a console of its own with no window, waits for it, and returns its exit code (-1: it couldn't
- * start it, said on its error output). Its fourth pipe from Hive (fd 3, the C runtime's handles in its startup info,
+ * Combwork) to inherit, in a console of its own with no window, waits for it, and returns its exit code (-1: it couldn't
+ * start it, said on its error output). Its fourth pipe from Combwork (fd 3, the C runtime's handles in its startup info,
  * never handed on) is its control: an "e" read there ends the helper through the handle it holds (under the lock its
- * closing takes, so never once that handle is closed); the pipe's end (Hive gone: a quit, a crash) ends nothing.
+ * closing takes, so never once that handle is closed); the pipe's end (Combwork gone: a quit, a crash) ends nothing.
  */
 const LAUNCH_SOURCE = String.raw`
 using System;
 using System.Runtime.InteropServices;
 using System.Text;
-public static class HiveLaunch {
+public static class CombworkLaunch {
   [StructLayout(LayoutKind.Sequential)] struct StartupInfoEx {
     public int cb; public IntPtr reserved, desktop, title;
     public int x, y, xSize, ySize, xChars, yChars, fill, flags;
@@ -1435,21 +1435,21 @@ const LINE_MAX = 32767
 const b64 = (s: string): string => Buffer.from(s, 'utf8').toString('base64')
 
 /**
- * How the helper is started (HI-2314), so that it outlives its Hive as the keeper (HI-2055): through a launcher, a
- * PowerShell of its own (LAUNCH_SOURCE). Node (libuv) puts each child it starts in one job that ends them all once Hive
+ * How the helper is started (HI-2314), so that it outlives its Combwork as the keeper (HI-2055): through a launcher, a
+ * PowerShell of its own (LAUNCH_SOURCE). Node (libuv) puts each child it starts in one job that ends them all once Combwork
  * ends, a quit or a crash alike, and lets their own children leave it silently: the launcher is in that job and ends
- * with Hive, the helper it starts is not. It hands the helper only its pipes to Hive: Electron's own standard handles
- * can be inherited (a test's pipes to it, say), and a helper outliving Hive would hold them. It waits for the helper and
+ * with Combwork, the helper it starts is not. It hands the helper only its pipes to Combwork: Electron's own standard handles
+ * can be inherited (a test's pipes to it, say), and a helper outliving Combwork would hold them. It waits for the helper and
  * exits with its exit code, so its owner's `exit` is the helper's; it ends the helper when told on its control pipe
  * (`stdio`'s fourth, endHelper), through the handle it holds, never by an id. Not Node's `detached`, which leaves that
  * job too: PowerShell 5.1 started without a console (DETACHED_PROCESS) exits at once, running nothing. Exported for the
- * unit tests, which start it as Hive does and then end the Hive.
+ * unit tests, which start it as Combwork does and then end the Combwork.
  */
 export function helperLaunch(script = HOST_SCRIPT): { file: string; args: string[]; input: string; stdio: ['pipe', 'pipe', 'pipe', 'pipe'] } {
   const line = `"${POWERSHELL}" ${psArgs(script).join(' ')}`
   const launcher = `$ErrorActionPreference = 'Stop'
 Add-Type -TypeDefinition ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${b64(LAUNCH_SOURCE)}')))
-exit [HiveLaunch]::Run([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${b64(line)}')))
+exit [CombworkLaunch]::Run([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${b64(line)}')))
 `
   const args = psArgs(launcher)
   if (line.length > LINE_MAX || [POWERSHELL, ...args].join(' ').length + 8 > LINE_MAX) throw new Error('the helper’s command line is too long') // i18n-ignore: a technical error, logged (it can't happen with the scripts as they are)
@@ -1459,11 +1459,11 @@ function psArgs(script: string): string[] {
   return ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')] // i18n-ignore: PowerShell's arguments
 }
 
-/** Test copies' helper that is ready but never answers (HIVE_TEST_PROCESS_TRACKER=mute): it notes each request it reads. */
+/** Test copies' helper that is ready but never answers (CW_TEST_PROCESS_TRACKER=mute): it notes each request it reads. */
 const MUTE_SCRIPT = `
 $null = [Console]::In.ReadLine()
 [Console]::Out.WriteLine('ready')
-while ($null -ne ($line = [Console]::In.ReadLine())) { if ($env:HIVE_TEST_TRACKER_HEARD) { [IO.File]::AppendAllText($env:HIVE_TEST_TRACKER_HEARD, $line + [Environment]::NewLine) } }
+while ($null -ne ($line = [Console]::In.ReadLine())) { if ($env:CW_TEST_TRACKER_HEARD) { [IO.File]::AppendAllText($env:CW_TEST_TRACKER_HEARD, $line + [Environment]::NewLine) } }
 `
 
 export interface JobList {
@@ -1485,11 +1485,11 @@ export class JobHost {
   private next = 1
   private waiting = new Map<number, (reply: unknown) => void>()
   private failed = false
-  /** Closed (Hive quitting): no helper starts again, not even for a request already on its way (a refresh's next look). */
+  /** Closed (Combwork quitting): no helper starts again, not even for a request already on its way (a refresh's next look). */
   private closed = false
   /**
    * Every helper started that hasn't exited yet (one being replaced too), with whether it said it was ready; `gone` also
-   * resolves once it says it is keeping its jobs past its Hive (HI-2055): closing waits for that, never for them to end.
+   * resolves once it says it is keeping its jobs past its Combwork (HI-2055): closing waits for that, never for them to end.
    * `pid`: the helper's own id once it has said it (its "pid" line), when it was started through its launcher (helperLaunch).
    */
   private alive = new Map<ChildProcessWithoutNullStreams, { up: boolean; gone: Promise<void>; pid?: number }>()
@@ -1521,7 +1521,7 @@ export class JobHost {
   private start(): Promise<boolean> {
     if (this.closed) return Promise.resolve(false)
     if (this.ready) return this.ready
-    // Test copies (unpackaged): HIVE_TEST_PROCESS_TRACKER=fail acts out a PC where PowerShell refuses the helper.
+    // Test copies (unpackaged): CW_TEST_PROCESS_TRACKER=fail acts out a PC where PowerShell refuses the helper.
     if (this.opts.testMode() === 'fail') {
       this.opts.onFailed({ kind: 'test' })
       this.failed = true
@@ -1532,14 +1532,14 @@ export class JobHost {
       let p: ChildProcessWithoutNullStreams
       let direct = false
       try {
-        // Test copies: HIVE_TEST_PROCESS_TRACKER=silent acts out a helper that starts but never says it is ready, =mute
-        // one that is ready but never answers (each request it reads noted in HIVE_TEST_TRACKER_HEARD), until its input closes.
-        // The test modes' PowerShell is Hive's own child (no keeper: ended with Hive, the silent one included); the
-        // helper is started through its launcher, to outlive Hive (helperLaunch).
+        // Test copies: CW_TEST_PROCESS_TRACKER=silent acts out a helper that starts but never says it is ready, =mute
+        // one that is ready but never answers (each request it reads noted in CW_TEST_TRACKER_HEARD), until its input closes.
+        // The test modes' PowerShell is Combwork's own child (no keeper: ended with Combwork, the silent one included); the
+        // helper is started through its launcher, to outlive Combwork (helperLaunch).
         const mode = this.opts.testMode()
         direct = mode === 'silent' || mode === 'mute'
         const { file, args, stdio } = direct ? { file: POWERSHELL, args: psArgs(mode === 'silent' ? '[System.Threading.Thread]::Sleep(-1)' : MUTE_SCRIPT), stdio: 'pipe' as const } : helperLaunch()
-        // In the temp folder: nothing it might write lands in whatever folder Hive was started from.
+        // In the temp folder: nothing it might write lands in whatever folder Combwork was started from.
         p = this.opts.launch ? this.opts.launch(file, args) : (spawn(file, args, { windowsHide: true, stdio, cwd: tmpdir() }) as ChildProcessWithoutNullStreams)
       } catch (e) {
         this.opts.log.warn('could not start the process job host: agents\u2019 leftover processes are not tracked', e)
@@ -1700,7 +1700,7 @@ export class JobHost {
   /**
    * Ends a helper (stuck, or not ready when closing), never by an id (#603): its launcher is told on its control pipe and
    * ends it through the handle it holds, then exits (its `exit`); its input is closed. One started without a launcher (a
-   * test mode), or with no control pipe, is ended as Hive's own child. A launcher that hasn't exited within the wait
+   * test mode), or with no control pipe, is ended as Combwork's own child. A launcher that hasn't exited within the wait
    * (stuck itself) is ended, and its helper then sees its input end.
    */
   private endHelper(p: ChildProcessWithoutNullStreams): void {
@@ -1730,7 +1730,7 @@ export class JobHost {
   }
 
   /**
-   * Closes the host (Hive quitting): its jobs close without ending anything. A helper that hasn't said it is ready holds
+   * Closes the host (Combwork quitting): its jobs close without ending anything. A helper that hasn't said it is ready holds
    * no jobs, and may never read its input: it is ended. No helper starts after this. Resolves once every helper started
    * has exited, so nothing of theirs (their working folder, the temp folder) is held any more (#1020).
    */

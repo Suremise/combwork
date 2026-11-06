@@ -1,6 +1,6 @@
 // Generated from locales/en/content.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
-interface HiveMessageValues {
+interface CombworkMessageValues {
   'content.mcp.badArgs': undefined
   'content.mcp.badCommand': undefined
   'content.mcp.badCwd': undefined
@@ -77,6 +77,7 @@ interface HiveMessageValues {
   'content.templates.changedSince': undefined
   'content.templates.changedWhile': undefined
   'content.templates.checkFailed': { agent: string | number; folder: string | number; error: string | number }
+  'content.templates.combworkOnly': undefined
   'content.templates.connectionAmbiguous': { ref: string | number; ids: string | number }
   'content.templates.connectionChoices': { keys: string | number }
   'content.templates.connectionUnknown': { ref: string | number }
@@ -85,7 +86,7 @@ interface HiveMessageValues {
   'content.templates.failed': { error: string | number }
   'content.templates.fenced': undefined
   'content.templates.gone': undefined
-  'content.templates.hiveOnly': undefined
+  'content.templates.importFrom10': undefined
   'content.templates.importNotJson': undefined
   'content.templates.importTooLarge': { kb: string | number }
   'content.templates.loading': undefined

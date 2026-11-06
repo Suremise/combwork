@@ -1,6 +1,6 @@
 /**
  * MCP catalogues (HI-545): catalog.json, schemaVersion 1, as the mcp project publishes it (its README's "The
- * catalogue", `scripts/catalog.mjs` `validate()` the reference this follows), and what Hive works out from one:
+ * catalogue", `scripts/catalog.mjs` `validate()` the reference this follows), and what Combwork works out from one:
  * whether this PC meets a server's requirements, whether one is installed or has an update, and which are shown for a
  * search and a filter. Pure: main reads the catalogues and probes the PC.
  */
@@ -9,15 +9,11 @@ import type { McpCatalogCheck, McpCatalogFilter, McpCatalogRequires, McpCatalogS
 export const CATALOG_SCHEMA_VERSION = 1
 /** Ours, first in every list and on unless turned off (11 and 14 Oct decisions). */
 export const OUR_CATALOG_URL = 'https://github.com/Suremise/combwork-mcp/releases/latest/download/catalog.json'
-/**
- * Ours at its earlier addresses (HI-2472: the mcp repo was Suremise/hive-mcp, which GitHub redirects): servers
- * installed from it there are still ours, and none is listed again as someone else's.
- */
-export const OUR_OLD_CATALOG_URLS: readonly string[] = ['https://github.com/Suremise/hive-mcp/releases/latest/download/catalog.json']
-/** Whether a catalogue address is ours, now or before. */
-export const isOurCatalogUrl = (url: string): boolean => url === OUR_CATALOG_URL || OUR_OLD_CATALOG_URLS.includes(url)
-/** Whether two addresses are the same catalogue: the same address, or ours by any of its addresses. */
-export const sameCatalogSource = (a: string, b: string): boolean => a === b || (isOurCatalogUrl(a) && isOurCatalogUrl(b))
+/** Whether a catalogue address is ours (HI-2594: only its current one; definitions stored with its address before 1.1
+ * are converted by the names upgrade, nameUpgradeFiles.ts). */
+export const isOurCatalogUrl = (url: string): boolean => url === OUR_CATALOG_URL
+/** Whether two addresses are the same catalogue. */
+export const sameCatalogSource = (a: string, b: string): boolean => a === b
 
 const OSES = ['windows', 'macos', 'linux']
 const EDITIONS = ['Home', 'Pro', 'Enterprise', 'Education'] // i18n-ignore: Windows' editions as catalogues name them (ids)
@@ -32,7 +28,7 @@ const isText = (v: unknown): v is string => typeof v === 'string' && v.trim() !=
 const isHttps = (v: unknown): v is string => typeof v === 'string' && /^https:\/\/[^\s/]+\/\S*$/.test(v)
 const isFileUrl = (v: unknown): v is string => typeof v === 'string' && /^file:\/\/\S+$/i.test(v)
 
-/** A catalogue's address Hive reads: https, or file:// (a share; Q2 of HI-545/s14). */
+/** A catalogue's address Combwork reads: https, or file:// (a share; Q2 of HI-545/s14). */
 export const catalogUrlAllowed = (url: string): boolean => isHttps(url) || isFileUrl(url)
 
 /** Whether a server's requires is valid. */
@@ -71,7 +67,7 @@ function serverValid(s: unknown, fileZips: boolean): s is McpCatalogServer {
   return Number.isInteger(s.zip.size) && (s.zip.size as number) > 0
 }
 
-/** A catalogue as Hive uses it: its name and the servers that are valid; those that aren't are counted, not listed. */
+/** A catalogue as Combwork uses it: its name and the servers that are valid; those that aren't are counted, not listed. */
 export interface ReadCatalog {
   name: string
   homepage?: string
@@ -87,7 +83,7 @@ export interface ReadCatalog {
 export function readCatalog(raw: unknown, url: string): ReadCatalog {
   // Its own fields named as the format names them, in English (inside mcp.catalog.notRead's {reason}).
   if (!isObject(raw)) throw new Error('catalog: an object') // i18n-ignore: catalog.json's format, in its own terms
-  if (raw.schemaVersion !== CATALOG_SCHEMA_VERSION) throw new Error(`schemaVersion: ${JSON.stringify(raw.schemaVersion)} (this Hive reads ${CATALOG_SCHEMA_VERSION})`) // i18n-ignore: catalog.json's format, in its own terms
+  if (raw.schemaVersion !== CATALOG_SCHEMA_VERSION) throw new Error(`schemaVersion: ${JSON.stringify(raw.schemaVersion)} (this Combwork reads ${CATALOG_SCHEMA_VERSION})`) // i18n-ignore: catalog.json's format, in its own terms
   if (!isText(raw.name)) throw new Error('name: one line') // i18n-ignore: catalog.json's format, in its own terms
   if (!Array.isArray(raw.servers)) throw new Error('servers: a list') // i18n-ignore: catalog.json's format, in its own terms
   const fileZips = isFileUrl(url)
@@ -111,13 +107,13 @@ export function compareVersions(a: string, b: string): number {
   return 0
 }
 
-/** What Hive found out about this PC for a catalogue's requirements; null where it couldn't (a probe failed or timed out). */
+/** What Combwork found out about this PC for a catalogue's requirements; null where it couldn't (a probe failed or timed out). */
 export interface PcFacts {
   os: 'windows' | 'macos' | 'linux' | 'other'
   /** Windows' edition as a catalogue names them (Home, Pro, Enterprise, Education), from its EditionID. */
   edition: string | null
   build: number | null
-  /** The Windows optional features Hive can check without elevation: name → present. */
+  /** The Windows optional features Combwork can check without elevation: name → present. */
   features: Record<string, boolean>
   /** Node's version on PATH ("22.4.0"), '' when there is none. */
   node: string | null
@@ -139,7 +135,7 @@ export function editionOf(editionId: string): string | null {
 export type CheckWords = (kind: McpCatalogCheck['kind'], value: string) => string
 
 /**
- * Each of a server's requirements checked against this PC: met, not met, or not something Hive can check (a feature
+ * Each of a server's requirements checked against this PC: met, not met, or not something Combwork can check (a feature
  * it can't see without elevation, a probe that failed, an app to read about). `words` gives each its label.
  */
 export function checkRequirements(r: McpCatalogRequires, pc: PcFacts, words: CheckWords): McpCatalogCheck[] {

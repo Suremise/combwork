@@ -32,7 +32,7 @@ const waitHung = (fn) => lib.until(fn, HUNG_MS, 200)
     fs.writeFileSync(path.join(dir, 'b.txt'), 'b\n')
     fs.writeFileSync(path.join(dir, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
   }
-  const h = await q.startHive(fx, { port: PORT })
+  const h = await q.startCombwork(fx, { port: PORT })
   const { page, inv } = h
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))

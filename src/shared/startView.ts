@@ -1,5 +1,5 @@
 /**
- * The Assistant's state view (#1032): what Hive gives the Assistant at each session start and after each compaction
+ * The Assistant's state view (#1032): what Combwork gives the Assistant at each session start and after each compaction
  * (Claude Code sends SessionStart then too), while its journal is on. The board, lanes and agents in brief, what waits
  * on the user, and the few journal entries relevant now, within a hard budget, so its context stays small (#989's
  * decision). Pure: main gathers the input (main/startView.ts). Agent-facing, so English.
@@ -121,7 +121,7 @@ const A = {
   head: agentMsg({
     id: 'startView.head',
     text: 'Where things stand, {source, select, compact {after a compaction} resume {on resuming} other {at session start}} ({when} UTC): a snapshot from the board, lanes, agents and your journal. Check the live state before acting on it.',
-    note: "The state view's first line, after the fixed \"[Hive] \" (#1032). source: compact, resume or start (Claude Code's SessionStart source; clear and startup are a start). when: the time, \"2026-10-18 12:00\"."
+    note: "The state view's first line, after the fixed \"[CW] \" (#1032). source: compact, resume or start (Claude Code's SessionStart source; clear and startup are a start). when: the time, \"2026-10-18 12:00\"."
   }),
   foot: agentMsg({
     id: 'startView.foot',

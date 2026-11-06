@@ -3,7 +3,7 @@ out/
 dist/
 *.log
 .DS_Store
-.hive/
+.combwork/
 
 # Reference material (not part of the app)
 reference/

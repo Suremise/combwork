@@ -1,6 +1,6 @@
 // Generated from locales/en/main.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
-interface HiveMessageValues {
+interface CombworkMessageValues {
   'main.accounts.badTarget': { target: string | number; cli: string | number }
   'main.accounts.checkHeld': { name: string | number; cli: string | number }
   'main.accounts.folderNotUsable': { name: string | number }
@@ -44,6 +44,15 @@ interface HiveMessageValues {
   'main.branchMerge.cardWork': { branch: string | number; card: string | number }
   'main.branchMerge.notBranch': { branch: string | number }
   'main.branchMerge.same': { branch: string | number }
+  'main.combworkMove.bothBody': undefined
+  'main.combworkMove.bothTitle': { folder: string | number }
+  'main.combworkMove.linkBody': undefined
+  'main.combworkMove.linkTitle': { folder: string | number }
+  'main.combworkMove.what.cards': undefined
+  'main.combworkMove.what.excludes': undefined
+  'main.combworkMove.what.folders': undefined
+  'main.combworkMove.what.notes': undefined
+  'main.combworkMove.what.worktrees': undefined
   'main.connections.badMode': { cli: string | number; mode: string | number }
   'main.connections.beingRemoved': { name: string | number }
   'main.connections.choice.missing': { agent: string | number }
@@ -107,15 +116,6 @@ interface HiveMessageValues {
   'main.gitInit.stopped': { what: string | number; why: string | number }
   'main.gitInit.stoppedAfter': { done: string | number; what: string | number; why: string | number }
   'main.gitInit.unreadable': { why: string | number }
-  'main.hiveMove.bothBody': undefined
-  'main.hiveMove.bothTitle': { folder: string | number }
-  'main.hiveMove.linkBody': undefined
-  'main.hiveMove.linkTitle': { folder: string | number }
-  'main.hiveMove.what.cards': undefined
-  'main.hiveMove.what.excludes': undefined
-  'main.hiveMove.what.folders': undefined
-  'main.hiveMove.what.notes': undefined
-  'main.hiveMove.what.worktrees': undefined
   'main.installDir.close': undefined
   'main.installDir.copied': undefined
   'main.installDir.copy': undefined
@@ -233,6 +233,14 @@ interface HiveMessageValues {
   'main.move.watches': { n: number }
   'main.move.workingMoved': { projects: string | number }
   'main.move.workingRenamed': { n: number; projects: string | number }
+  'main.nameUpgrade.boardBothBody': undefined
+  'main.nameUpgrade.boardBothTitle': { folder: string | number }
+  'main.nameUpgrade.boardLeftBody': undefined
+  'main.nameUpgrade.boardLeftTitle': { file: string | number }
+  'main.nameUpgrade.profileTitle': undefined
+  'main.nameUpgrade.what.board': undefined
+  'main.nameUpgrade.what.files': undefined
+  'main.nameUpgrade.what.projects': undefined
   'main.notify.answered': undefined
   'main.notify.sessionEnded': undefined
   'main.outage.gaveUpBody': { n: number }
@@ -266,9 +274,8 @@ interface HiveMessageValues {
   'main.plan.resetsOn': { when: string | number }
   'main.plan.used': { share: number; provider: string | number; window: string; hours: number; label: string | number }
   'main.plan.usedOn': { share: number; window: string; hours: number; label: string | number; connection: string | number }
-  'main.profileMove.fallbackBody': { n: number; folders: string | number }
-  'main.profileMove.fallbackBodyDev': { n: number; name: string | number; folders: string | number }
-  'main.profileMove.fallbackTitle': undefined
+  'main.profileMove.refused': { from: string | number; to: string | number; reason: string | number }
+  'main.profileMove.refusedTitle': undefined
   'main.profileMove.signInBody': { names: string | number; n: number }
   'main.profileMove.signInTitle': { n: number }
   'main.quit.closed': undefined
@@ -285,9 +292,9 @@ interface HiveMessageValues {
   'main.removal.folder.deleting': undefined
   'main.removal.folder.heldNow': undefined
   'main.removal.folder.home': undefined
+  'main.removal.folder.notCombwork': undefined
   'main.removal.folder.notForgotten': { why: string | number }
   'main.removal.folder.notHeld': { n: number }
-  'main.removal.folder.notHives': undefined
   'main.removal.folder.notTrashed': { path: string | number; why: string | number }
   'main.removal.folder.outsideDelete': undefined
   'main.removal.folderGone': { folder: string | number }

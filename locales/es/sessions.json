@@ -72,7 +72,7 @@
   "sessions.compaction.tokens": "{before} → {after}{next, select, none {} other { ({next} con instrucciones)}} · liberados {freed} · {when}",
   "sessions.delete.button": "Eliminar",
   "sessions.delete.detailExternal": "Combwork deja de mostrarla. {cli} conserva su transcripción, así que sigue en la lista de reanudación de {cli}.",
-  "sessions.delete.detailHive": "Las copias de Combwork de su transcripción van a la Papelera de reciclaje y deja de mostrarse aquí; lo que usó sigue en los totales. {cli} conserva su propia transcripción, así que sigue en la lista de reanudación de {cli}.",
+  "sessions.delete.detailCombwork": "Las copias de Combwork de su transcripción van a la Papelera de reciclaje y deja de mostrarse aquí; lo que usó sigue en los totales. {cli} conserva su propia transcripción, así que sigue en la lista de reanudación de {cli}.",
   "sessions.delete.failed": "{kind, select, conversation {No se pudo eliminar la conversación} other {No se pudo eliminar la sesión}}",
   "sessions.delete.message": "¿Eliminar “{name}” de Combwork?",
   "sessions.delete.title": "{kind, select, conversation {¿Eliminar la conversación?} other {¿Eliminar la sesión?}}",

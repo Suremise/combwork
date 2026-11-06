@@ -1,7 +1,7 @@
 // HI-1368's close command runner and runs: the output kept is bounded (the last 64 KB, however much the command writes),
 // written whole and at most every 250 ms; the command never blocks on its output; a real command writing megabytes is
-// followed to its end with the tail never over its bound; Hive reads only the end of the tail; what runs, with its
-// placeholders filled, and what doesn't (none, a test copy of Hive, an update restart without the tick); the runs kept,
+// followed to its end with the tail never over its bound; Combwork reads only the end of the tail; what runs, with its
+// placeholders filled, and what doesn't (none, a test copy of Combwork, an update restart without the tick); the runs kept,
 // never one still running.
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'fs'
 import { EventEmitter } from 'events'
@@ -12,7 +12,7 @@ import { runJob, TailRing, TAIL_BYTES, WRITE_MS, type RunnerDeps } from '../src/
 import { carryRuns, planRun, pruneRuns, runFolderName, runPrefix, runsCloseCommands, startRun, tailLines, READ_TAIL_BYTES, PANEL_LINES, LINE_CHARS } from '../src/main/closeCommand/runs'
 import { fillCloseCommand } from '../src/shared/closeCommand'
 
-const base = tempDir('hive-close-runner-')
+const base = tempDir('cw-close-runner-')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 let n = 0
 const folder = (): string => {
@@ -124,7 +124,7 @@ describe('the runner, with a real command', () => {
   }, 60_000)
 })
 
-describe('what Hive reads of a run', () => {
+describe('what Combwork reads of a run', () => {
   it('the last lines, from the end of the tail only, each cut short', async () => {
     const dir = folder()
     const file = join(dir, 'tail.txt')
@@ -143,7 +143,7 @@ describe('what Hive reads of a run', () => {
 
 describe('what runs', () => {
   it('fills the placeholders as written; an unknown one, or one with no value, stays', () => {
-    expect(fillCloseCommand('replica run hive --workspace "{workspace}" --name {name} --why {reason} {other}', { workspace: 'D:\\My Work', name: 'My Work', reason: 'switch' })).toBe('replica run hive --workspace "D:\\My Work" --name My Work --why switch {other}')
+    expect(fillCloseCommand('replica run demo --workspace "{workspace}" --name {name} --why {reason} {other}', { workspace: 'D:\\My Work', name: 'My Work', reason: 'switch' })).toBe('replica run demo --workspace "D:\\My Work" --name My Work --why switch {other}')
     expect(fillCloseCommand('backup {workspace} {reason}', { reason: 'quit' })).toBe('backup {workspace} quit')
   })
 
@@ -160,13 +160,13 @@ describe('what runs', () => {
   it("a test copy never runs them, shown or quiet; only an unpackaged build's seam does", () => {
     expect(runsCloseCommands({}, true)).toBe(true)
     expect(runsCloseCommands({}, false)).toBe(true)
-    // A test profile, quiet or shown (HIVE_TEST_QUIET=0 is still a test copy).
-    expect(runsCloseCommands({ HIVE_USER_DATA: 'x' }, false)).toBe(false)
-    expect(runsCloseCommands({ HIVE_USER_DATA: 'x', HIVE_TEST_QUIET: '0' }, false)).toBe(false)
-    expect(runsCloseCommands({ HIVE_TEST_QUIET: '1' }, true)).toBe(false)
+    // A test profile, quiet or shown (CW_TEST_QUIET=0 is still a test copy).
+    expect(runsCloseCommands({ CW_USER_DATA: 'x' }, false)).toBe(false)
+    expect(runsCloseCommands({ CW_USER_DATA: 'x', CW_TEST_QUIET: '0' }, false)).toBe(false)
+    expect(runsCloseCommands({ CW_TEST_QUIET: '1' }, true)).toBe(false)
     // The seam: an unpackaged build only.
-    expect(runsCloseCommands({ HIVE_USER_DATA: 'x', HIVE_TEST_RUN_ON_CLOSE: '1' }, false)).toBe(true)
-    expect(runsCloseCommands({ HIVE_TEST_QUIET: '1', HIVE_TEST_RUN_ON_CLOSE: '1' }, true)).toBe(false)
+    expect(runsCloseCommands({ CW_USER_DATA: 'x', CW_TEST_RUN_ON_CLOSE: '1' }, false)).toBe(true)
+    expect(runsCloseCommands({ CW_TEST_QUIET: '1', CW_TEST_RUN_ON_CLOSE: '1' }, true)).toBe(false)
   })
 })
 
@@ -244,7 +244,7 @@ describe('the runs kept', () => {
     const root = folder()
     const at = new Date(Date.UTC(2026, 9, 28, 12, 0, 0))
     const spawn = vi.fn(() => Object.assign(new EventEmitter(), { pid: 0, unref: () => undefined }) as never)
-    const deps = { exec: 'hive.exe', script: 'runner.js', env: {}, spawn }
+    const deps = { exec: 'combwork.exe', script: 'runner.js', env: {}, spawn }
     const one = startRun(root, runFolderName(runPrefix('workspace', A), at), 'backup one', 'D:/one/work', deps)
     const two = startRun(root, runFolderName(runPrefix('workspace', A), at), 'backup two', 'D:/one/work', deps)
     expect(one).not.toBe(two)

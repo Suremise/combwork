@@ -1,6 +1,6 @@
 /**
- * When what the Sandbox driver (drive.cjs) reads is ready: conditions Hive itself says are met, never a quiet spell
- * (tests/README.md: wait for Hive to settle, not for a quiet spell). Each wait is bounded and gives null when it expires,
+ * When what the Sandbox driver (drive.cjs) reads is ready: conditions Combwork itself says are met, never a quiet spell
+ * (tests/README.md: wait for Combwork to settle, not for a quiet spell). Each wait is bounded and gives null when it expires,
  * which the driver turns into a failed check, never a read of whatever is there. Node built-ins only: it runs inside the
  * Sandbox, and the unit tests (tests/sandboxChecks.test.ts) load it with stand-ins for the window and the Agent API.
  */
@@ -20,8 +20,8 @@ async function until(fn, ms, every = 250) {
 const sameFolder = (a, b) => typeof a === 'string' && typeof b === 'string' && a.replace(/[\\/]+$/, '').toLowerCase() === b.replace(/[\\/]+$/, '').toLowerCase()
 
 /**
- * The new workspace is set up: Hive's GET /v1/status names it as its workspace and lists its Hive skills, which it
- * replies with only once the open has brought the bundled skills and modes up to date (servers.ts hiveSkillsNow, which
+ * The new workspace is set up: Combwork's GET /v1/status names it as its workspace and lists its Combwork skills, which it
+ * replies with only once the open has brought the bundled skills and modes up to date (servers.ts combworkSkillsNow, which
  * awaits the workspace's itemsUpToDate: workspace.ts's work after an open). `status` reads /v1/status. Gives the reply.
  */
 function workspaceSetUp(status, folder, ms = 60_000, every = 250) {
@@ -48,8 +48,7 @@ const VIEWS = [
   { name: 'Skills', slug: 'skills', ready: ['.pane-body .row.skill-row'], loading: ['.pane-body .pane-empty .codicon-loading'] },
   // The servers list in the sidebar: "No MCP servers yet…" shows only once mcp:list has replied (none in a fresh one).
   { name: 'MCP Servers', slug: 'mcp-servers', ready: ['.pane-body .pane-empty:has-text("No MCP servers yet")'], loading: [] },
-  // The Assistant's conversations, once session:list has replied ("Loading…" meanwhile): the sessions tree. Its
-  // button is "Assistant" since HI-2458 ("Hive Assistant" before).
+  // The Assistant's conversations, once session:list has replied ("Loading…" meanwhile): the sessions tree.
   { name: 'Assistant', slug: 'assistant', ready: ['.sessions-list .sessions-tree'], loading: ['.main-area .empty-state .codicon-loading'] }
 ]
 /** The view is shown and loaded: `count(selector)` counts matches in the window. Gives true, or null when ms pass. */

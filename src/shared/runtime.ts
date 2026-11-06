@@ -6,11 +6,11 @@ import type { Tr } from './tasks'
 import type { LiveSessionState, RetryWait, RetryWaited, RuntimeFacts } from './types'
 
 /**
- * An agent's runtime as separate facts (#648), rather than one word standing for several. Each is stored where Hive
+ * An agent's runtime as separate facts (#648), rather than one word standing for several. Each is stored where Combwork
  * learns it (LiveSessionState.runtime, .turn and .backgroundTasks), never read back from the status word: the labels
- * are projected from them (runtimeLabel), with Hive's policy on top (a watch makes an idle agent "watching"; how its
+ * are projected from them (runtimeLabel), with Combwork's policy on top (a watch makes an idle agent "watching"; how its
  * last turn ended and assigned work are the board's and the status word's). Unknown is its own value, never idle: a
- * running turn Hive has heard nothing of for a while, with no sign of its end.
+ * running turn Combwork has heard nothing of for a while, with no sign of its end.
  */
 export interface AgentRuntime extends RuntimeFacts {
   /** Its latest turn: running, over, unknown, or none yet. */
@@ -48,7 +48,7 @@ export function agentRuntime(st: Pick<LiveSessionState, 'runtime' | 'turn' | 'ba
 export function unknownStateText(st: Pick<LiveSessionState, 'turn'> | null | undefined, now = Date.now(), tr?: Tr): string | null {
   if (st?.turn?.state !== 'unknown') return null
   const minutes = st.turn.silentSince ? minutesSince(st.turn.silentSince, now) : null
-  if (tr) return tr(msg({ id: 'panes.runtime.silent', defaultMessage: 'Silent {known, select, yes {{minutes, number}} other {?}} min · state unknown', description: "An agent's status (its pane, the agents table): Hive has heard nothing of its turn for {minutes} minutes (? when it can't tell: known is no) and can't tell what it is doing. Keep it short." }), { known: minutes === null ? 'no' : 'yes', minutes: minutes ?? 0 })
+  if (tr) return tr(msg({ id: 'panes.runtime.silent', defaultMessage: 'Silent {known, select, yes {{minutes, number}} other {?}} min · state unknown', description: "An agent's status (its pane, the agents table): Combwork has heard nothing of its turn for {minutes} minutes (? when it can't tell: known is no) and can't tell what it is doing. Keep it short." }), { known: minutes === null ? 'no' : 'yes', minutes: minutes ?? 0 })
   return `Silent ${minutes ?? '?'} min · state unknown` // i18n-ignore: agent-facing (the Agent API's agent state)
 }
 
@@ -57,7 +57,7 @@ export const RETRY_GRACE_MS = 30_000
 
 /**
  * Whether a retry wait (HI-1972) still stands at `now`: its retry time less than RETRY_GRACE_MS ago. One whose CLI
- * doesn't say when it tries again (HI-1973: Copilot's, retryAt null) has no deadline Hive could know: it stands until
+ * doesn't say when it tries again (HI-1973: Copilot's, retryAt null) has no deadline Combwork could know: it stands until
  * the CLI is heard from again, its turn ends or its launch does (HR6's round 1: a guessed 30 s lost long waits).
  */
 export function retryWaitCurrent(w: RetryWait, now = Date.now()): boolean {
@@ -67,7 +67,7 @@ export function retryWaitCurrent(w: RetryWait, now = Date.now()): boolean {
 }
 
 /**
- * When a retry wait ended (HI-1996): now, or its `retryAt` when that passed before Hive noticed (its loop looks every few
+ * When a retry wait ended (HI-1996): now, or its `retryAt` when that passed before Combwork noticed (its loop looks every few
  * seconds), never before the wait began.
  */
 export function retryWaitEnd(w: RetryWait, now = Date.now()): number {
@@ -107,19 +107,19 @@ export function retryWaitText(st: (Pick<LiveSessionState, 'retryWait' | 'turn'> 
 }
 
 /**
- * "Status unknown: no hooks from Claude Code" for an agent whose hooks aren't reaching Hive (#1336); null otherwise. In
+ * "Status unknown: no hooks from Claude Code" for an agent whose hooks aren't reaching Combwork (#1336); null otherwise. In
  * the window's language with tr, else English (the Agent API's).
  */
 export function hooksMissingText(st: Pick<LiveSessionState, 'hooksMissing' | 'provider'> | null | undefined, tr?: Tr): string | null {
   if (!st?.hooksMissing) return null
   const provider = providerDescriptor(st.provider).name
-  if (tr) return tr(msg({ id: 'panes.runtime.hooksMissing', defaultMessage: 'Status unknown: no hooks from {provider}', description: "An agent's status (its pane, the agents table): its coding agent ({provider}, a product name) has stopped sending Hive its hooks (the calls that tell Hive what it is doing), so Hive can't tell what it is doing. Keep it short." }), { provider })
+  if (tr) return tr(msg({ id: 'panes.runtime.hooksMissing', defaultMessage: 'Status unknown: no hooks from {provider}', description: "An agent's status (its pane, the agents table): its coding agent ({provider}, a product name) has stopped sending Combwork its hooks (the calls that tell Combwork what it is doing), so Combwork can't tell what it is doing. Keep it short." }), { provider })
   return `Status unknown: no hooks from ${provider}` // i18n-ignore: agent-facing (the Agent API's agent state)
 }
 
 /**
- * What the window says of an agent whose hooks aren't reaching Hive (#1336): that its status may be wrong, why when
- * Hive can tell, and what to do. Null otherwise.
+ * What the window says of an agent whose hooks aren't reaching Combwork (#1336): that its status may be wrong, why when
+ * Combwork can tell, and what to do. Null otherwise.
  */
 export function hooksMissingNote(st: Pick<LiveSessionState, 'hooksMissing' | 'provider'> | null | undefined, tr: Tr): string | null {
   const h = st?.hooksMissing
@@ -133,7 +133,7 @@ export const HOOKS_MISSING_NOTE = msg({
   defaultMessage:
     "Combwork isn't hearing from {provider}'s hooks, so its status may be wrong. {why, select, refused {Combwork refused its hooks: they didn't carry this session's token.} off {{where} turns hooks off (disableAllHooks).} newer {This {provider} is newer than the version Combwork was tested with, and an update may have changed its hooks.} other {{after, select, start {None came after it started.} other {None came after a prompt it went to work on.}}}} Until its hooks arrive, Combwork types nothing into it. Restart the session; if this happens again, update Combwork, or check {provider}'s settings for hooks turned off.",
   description:
-    "A notice on an agent's pane and in Notifications: its coding agent ({provider}, a product name) has stopped sending Hive its hooks (the calls that tell Hive what it is doing). why: Hive refused them (a security token didn't match); the settings file {where} (its name, such as \"managed settings\") turns hooks off (disableAllHooks is the setting's name: keep it); the coding agent is newer than the one Hive was tested with; else what showed it (after: no hook after its start, or after a prompt). Keep the select keys."
+    "A notice on an agent's pane and in Notifications: its coding agent ({provider}, a product name) has stopped sending Combwork its hooks (the calls that tell Combwork what it is doing). why: Combwork refused them (a security token didn't match); the settings file {where} (its name, such as \"managed settings\") turns hooks off (disableAllHooks is the setting's name: keep it); the coding agent is newer than the one Combwork was tested with; else what showed it (after: no hook after its start, or after a prompt). Keep the select keys."
 })
 
 /**
@@ -142,7 +142,7 @@ export const HOOKS_MISSING_NOTE = msg({
  */
 export const COMPACTING_TEXT = msg({ id: 'session.status.compacting', defaultMessage: 'Compacting the conversation…', description: "An agent's status while its CLI summarises the conversation to free up context space." })
 
-/** Hive's own status message in the window's language (`statusText`, #845), else the message as it came (the CLI's words). */
+/** Combwork's own status message in the window's language (`statusText`, #845), else the message as it came (the CLI's words). */
 export const shownStatusMessage = (st: Pick<LiveSessionState, 'statusMessage' | 'statusText'>): string | undefined => (st.statusText ? shownText(st.statusText) : st.statusMessage)
 
 /** The agent's place at the merge slot in the window's language (`mergeSlotText`, #845), else its English. */
@@ -151,14 +151,14 @@ export const shownMergeSlot = (st: Pick<LiveSessionState, 'mergeSlot' | 'mergeSl
 /**
  * What an agent is doing, in words, projected from its runtime facts: stopped, starting, signed out, asking, compacting,
  * silent with its state unknown, working; its status message where it has one (what it is asked, what it waits for).
- * Null when its facts say no turn runs: then Hive's policy words apply (watching, finished, ready, its background tasks:
+ * Null when its facts say no turn runs: then Combwork's policy words apply (watching, finished, ready, its background tasks:
  * ui.statusText).
  */
 export function runtimeLabel(st: Pick<LiveSessionState, 'runtime' | 'turn' | 'backgroundTasks' | 'statusMessage' | 'statusText' | 'mergeSlot' | 'mergeSlotText'> & Partial<Pick<LiveSessionState, 'hooksMissing' | 'provider' | 'retryWait'>>, now = Date.now()): string | null {
   const tr = trNow
   const rt = agentRuntime(st, now)
   if (rt.lifecycle === 'stopped') return tr(msg({ id: 'panes.runtime.stopped', defaultMessage: 'Stopped', description: "An agent's status: its session isn't running." }))
-  // Its hooks aren't arriving (#1336): what Hive has of it may be wrong, so it says so rather than guess.
+  // Its hooks aren't arriving (#1336): what Combwork has of it may be wrong, so it says so rather than guess.
   if (st.hooksMissing && st.provider) return hooksMissingText({ hooksMissing: st.hooksMissing, provider: st.provider }, tr)
   if (rt.attention === 'waiting') return shownStatusMessage(st) || tr(msg({ id: 'panes.runtime.needsInput', defaultMessage: 'Needs your input', description: "An agent's status: its CLI waits for the user's answer." }))
   if (rt.lifecycle === 'starting') return shownStatusMessage(st) || tr(msg({ id: 'panes.runtime.starting', defaultMessage: 'Starting…', description: "An agent's status: its CLI is starting." }))

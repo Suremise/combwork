@@ -37,13 +37,13 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
   const PORT = lib.port(47896)
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: PORT, CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: PORT, CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
   const until = async (fn, ms = 20000) => {
@@ -57,12 +57,12 @@ const check = (name, ok, extra = '') => {
   const coder = await lib.addAgent(inv, alpha, { name: 'Coder' })
   await lib.addAgent(inv, alpha, { name: 'Other' })
   await inv('project:updateConfig', alpha, { layout: 'columns2' })
-  // A running session with one exchange (so Hive keeps its record).
+  // A running session with one exchange (so Combwork keeps its record).
   await inv('session:start', alpha, { agentId: coder.id })
   await until(async () => ['waiting', 'ready'].includes((await live(coder.id))?.status), HUNG_MS)
   if ((await live(coder.id))?.status === 'waiting') await inv('pty:write', lib.ptyKey(alpha, coder.id), '\r')
   await until(async () => (await live(coder.id))?.status === 'ready', HUNG_MS)
-  // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+  // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
   await lib.typeLine(inv, lib.ptyKey(alpha, coder.id), claudeHome, null, 'hello', { live: () => live(coder.id) })
   check('Coder ran once', !!(await until(async () => (await live(coder.id))?.status === 'finished', HUNG_MS)))
   const sessionId = (await live(coder.id)).sessionId

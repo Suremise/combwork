@@ -1,7 +1,7 @@
 // Project removal on slots (#1447, SPEC §8): beta has a clean free slot, a free slot with unmerged commits, a review
 // copy and R1's retired home (its own worktree from before 1.0, adopted at the upgrade, #1441). Remove Project…'s dialog
-// lists them with what Remove from Hive does to each (the kept ones first, with why), screenshots in light and dark;
-// then Remove from Hive removes the clean slot and the copy through their pools' guarded clean-up, keeps the slot with
+// lists them with what Remove from Combwork does to each (the kept ones first, with why), screenshots in light and dark;
+// then Remove from Combwork removes the clean slot and the copy through their pools' guarded clean-up, keeps the slot with
 // unmerged work and the home, and says so in its result. With Delete chosen, the dialog sends every one to the Recycle Bin
 // with the project instead (#1447, HR1's round 1: the repository goes with it), screenshots too. Dev build, throwaway profile and workspace; no agent runs.
 // Dev build only (#1580): beta's slots, review copy and leases are made through slots:test, which a packaged build
@@ -24,14 +24,14 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const identity = ['-c', 'user.name=Hive Slot Test', '-c', 'user.email=slots@example.com']
+const identity = ['-c', 'user.name=Combwork Slot Test', '-c', 'user.email=slots@example.com']
 
 ;(async () => {
   for (const d of [userData, ws, `${ws}.worktrees`, shots]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(shots, { recursive: true })
   lib.gitProject(beta, { 'b.txt': 'b\n', '.gitignore': '.combwork/\n' })
   lib.git(beta, ['branch', '-M', 'main'])
-  lib.git(beta, ['worktree', 'add', '-q', '-b', 'hive/hr1', path.join(trees, 'hr1'), 'main'])
+  lib.git(beta, ['worktree', 'add', '-q', '-b', 'cw/hr1', path.join(trees, 'hr1'), 'main'])
   fs.mkdirSync(path.join(beta, '.combwork'), { recursive: true })
   fs.writeFileSync(
     path.join(beta, '.combwork', 'project.json'),
@@ -41,11 +41,11 @@ const identity = ['-c', 'user.name=Hive Slot Test', '-c', 'user.email=slots@exam
       agents: [
         { id: 'b1', name: 'B1', provider: 'claude-code', workflowRole: 'builder' },
         { id: 'b2', name: 'B2', provider: 'claude-code', workflowRole: 'builder' },
-        { id: 'r1', name: 'R1', provider: 'claude-code', workflowRole: 'reviewer', worktree: { path: path.join(trees, 'hr1'), branch: 'hive/hr1', base: 'main' } }
+        { id: 'r1', name: 'R1', provider: 'claude-code', workflowRole: 'reviewer', worktree: { path: path.join(trees, 'hr1'), branch: 'cw/hr1', base: 'main' } }
       ]
     }, null, 2)
   )
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_TEST_TIPS: 'off' }, viewport: { width: 1400, height: 900 } })
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_TEST_TIPS: 'off' }, viewport: { width: 1400, height: 900 } })
   const until = (fn, ms) => lib.until(fn, ms, 250)
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -65,7 +65,7 @@ const identity = ['-c', 'user.name=Hive Slot Test', '-c', 'user.email=slots@exam
     const copy = path.join(trees, 'copies', 'copy-1')
     lib.git(beta, ['worktree', 'add', '-q', '--detach', copy])
     const id = JSON.parse(fs.readFileSync(path.join(beta, '.combwork', 'project.json'), 'utf8')).id
-    const db = new DatabaseSync(path.join(ws, '.combwork', 'hive.db'), { timeout: 5000 })
+    const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })
     try {
       const now = new Date().toISOString()
       db.prepare("INSERT INTO copies (project, name, folder, state, created_at, used_at) VALUES (?, 'copy-1', ?, 'free', ?, ?)").run(id, copy, now, now)
@@ -73,7 +73,7 @@ const identity = ['-c', 'user.name=Hive Slot Test', '-c', 'user.email=slots@exam
       db.close()
     }
 
-    // The dialog: what Remove from Hive does to each.
+    // The dialog: what Remove from Combwork does to each.
     const info = await until(async () => {
       const i = await inv('project:removalInfo', beta)
       return i.folders?.length === 4 ? i : null
@@ -105,7 +105,7 @@ const identity = ['-c', 'user.name=Hive Slot Test', '-c', 'user.email=slots@exam
     await page.keyboard.press('Escape')
     await until(async () => (await rd.count()) === 0, HUNG_MS)
 
-    // Remove from Hive: the guarded clean-up, the rest kept and said.
+    // Remove from Combwork: the guarded clean-up, the rest kept and said.
     const done = await inv('project:remove', beta, 'remove')
     const said = done.warnings.join('\n')
     check('the result says what stayed, with why', /Left in place: slot-b( \([^)]*\))? at .* \(it has commits that aren't on main\)/.test(said) && /Left in place: R1.s old folder at .* \(left as it is/.test(said), said)

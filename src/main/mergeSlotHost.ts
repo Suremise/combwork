@@ -14,20 +14,19 @@ import { workspace, workspaceFor, workspaceOf, type WorkspaceService } from './w
 import { keepBeforeIds } from './beforeIds'
 import { rebase, samePath } from '../shared/movePaths'
 import { NO_PROJECT_IDS, type ProjectIdIndex } from '../shared/projectIds'
-import { devConsole, hiveSourceId, sessionSourceId } from './devConsole'
-import { hiveName, safeWord } from '../shared/devConsole'
+import { devConsole, combworkSourceId, sessionSourceId } from './devConsole'
+import { combworkName, safeWord } from '../shared/devConsole'
 import { addLeftMerge } from './lastRun'
 import { cardNamesOf } from './projectKeys'
 import { fmt, msg, tr } from '../shared/i18n'
 import { cardRef } from '../shared/projectKeys'
-import { HIVE_DIR } from '../shared/defaults'
-import { LEGACY_HIVE_DIR } from '../shared/hiveFolderMove'
+import { CW_DIR } from '../shared/defaults'
 import { movedPath } from './combworkMove'
 
 const M = {
-  leftTitle: msg({ id: 'main.mergeSlot.leftTitle', defaultMessage: '{agent} was merging when Combwork closed', description: "A notice's title as a workspace opens: the agent {agent} (its name) held the merge slot when Hive last closed, so its merge may be half done." }),
-  leftBody: msg({ id: 'main.mergeSlot.leftBody', defaultMessage: 'It held the merge slot for {branch}{hasCards, select, yes { ({cards})} other {}}. Check {folder} for a merge left half done (git status there) before the next merge.', description: "The notice that an agent was merging when Hive closed: {branch} is the branch it held the slot for, {cards} the cards it named (\"#7, #9\"; shown when {hasCards} is yes), {folder} where the merge was. 'git status' is a command: keep it." }),
-  leftBodyGone: msg({ id: 'main.mergeSlot.leftBodyGone', defaultMessage: "It held the merge slot for {branch}{hasCards, select, yes { ({cards})} other {}} in {project}, a project this workspace no longer has (its folder is another project's now, or gone). Check {folder} for a merge left half done (git status there) before the next merge.", description: "The notice that an agent was merging when Hive closed, in a project ({project}, its name) the workspace no longer has: {branch} is the branch it held the slot for, {cards} the cards it named (\"#7, #9\"; shown when {hasCards} is yes), {folder} where the merge was. 'git status' is a command: keep it." })
+  leftTitle: msg({ id: 'main.mergeSlot.leftTitle', defaultMessage: '{agent} was merging when Combwork closed', description: "A notice's title as a workspace opens: the agent {agent} (its name) held the merge slot when Combwork last closed, so its merge may be half done." }),
+  leftBody: msg({ id: 'main.mergeSlot.leftBody', defaultMessage: 'It held the merge slot for {branch}{hasCards, select, yes { ({cards})} other {}}. Check {folder} for a merge left half done (git status there) before the next merge.', description: "The notice that an agent was merging when Combwork closed: {branch} is the branch it held the slot for, {cards} the cards it named (\"#7, #9\"; shown when {hasCards} is yes), {folder} where the merge was. 'git status' is a command: keep it." }),
+  leftBodyGone: msg({ id: 'main.mergeSlot.leftBodyGone', defaultMessage: "It held the merge slot for {branch}{hasCards, select, yes { ({cards})} other {}} in {project}, a project this workspace no longer has (its folder is another project's now, or gone). Check {folder} for a merge left half done (git status there) before the next merge.", description: "The notice that an agent was merging when Combwork closed, in a project ({project}, its name) the workspace no longer has: {branch} is the branch it held the slot for, {cards} the cards it named (\"#7, #9\"; shown when {hasCards} is yes), {folder} where the merge was. 'git status' is a command: keep it." })
 }
 
 const log = createLogger('mergeSlots')
@@ -35,7 +34,7 @@ const log = createLogger('mergeSlots')
 /**
  * The app's merge slots (#350), wired to sessions (a launch's end releases its hold; status notes), Progress (a holder
  * still reporting keeps its hold), the windows (`merge-slots-changed`) and a small record per workspace in the app's
- * data (this machine's state, never the workspace's committed `.combwork`), so a hold Hive closed under is reported when
+ * data (this machine's state, never the workspace's committed `.combwork`), so a hold Combwork closed under is reported when
  * the workspace opens again.
  */
 export const mergeSlots = new MergeSlots({
@@ -45,8 +44,8 @@ export const mergeSlots = new MergeSlots({
   changed: (projectPath) => changed(projectPath),
   note: (a, text, about) => sessions.setMergeSlotNote(a.projectPath, a.agentId, a.runId, text, about),
   warn: (projectPath, title, message) => toast('warning', title, message, undefined, projectPath),
-  // Test builds can shorten a hold, to see one run out (HIVE_TEST_MERGE_HOLD_MS; never in an installed Hive).
-  ...(!app.isPackaged && Number(process.env.HIVE_TEST_MERGE_HOLD_MS) > 0 ? { holdMs: Number(process.env.HIVE_TEST_MERGE_HOLD_MS) } : {})
+  // Test builds can shorten a hold, to see one run out (CW_TEST_MERGE_HOLD_MS; never in an installed Combwork).
+  ...(!app.isPackaged && Number(process.env.CW_TEST_MERGE_HOLD_MS) > 0 ? { holdMs: Number(process.env.CW_TEST_MERGE_HOLD_MS) } : {})
 })
 
 /** A workspace's record of its agents' holds. */
@@ -73,16 +72,16 @@ function changed(projectPath: string): void {
   void save(ws).catch((e) => log.warn('saving the merge slots', e))
   testLog(ws)
   // The developer console (#636): who holds the project's slots and who waits, as they change.
-  devConsole.capture([hiveSourceId(ws)], () => {
+  devConsole.capture([combworkSourceId(ws)], () => {
     const slots = workspaceSlots(ws).filter((s) => s.project.toLowerCase() === basename(projectPath).toLowerCase())
     const made = slots.map((s) => ({ branch: s.branch, holder: s.holder && { agentId: s.holder.agentId ?? null, name: s.holder.name, cards: s.holder.cards }, waiting: s.waiting.map((w) => w.name) }))
-    const line = slots.slice(0, 5).map((s) => `${safeWord(s.branch)}: ${s.holder ? `held by ${hiveName(s.holder.name)}` : 'free'}${s.waiting.length ? `, ${s.waiting.length} waiting` : ''}`).join('; ') // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
-    return { kind: 'merge-slot', name: 'slots changed', raw: { project: basename(projectPath) }, made, safe: { raw: { project: true }, made: { branch: true, holder: { agentId: true, name: true }, waiting: true } }, summary: `merge slot ${hiveName(basename(projectPath))} → ${line || 'free'}` } // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
+    const line = slots.slice(0, 5).map((s) => `${safeWord(s.branch)}: ${s.holder ? `held by ${combworkName(s.holder.name)}` : 'free'}${s.waiting.length ? `, ${s.waiting.length} waiting` : ''}`).join('; ') // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
+    return { kind: 'merge-slot', name: 'slots changed', raw: { project: basename(projectPath) }, made, safe: { raw: { project: true }, made: { branch: true, holder: { agentId: true, name: true }, waiting: true } }, summary: `merge slot ${combworkName(basename(projectPath))} → ${line || 'free'}` } // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
   })
 }
 
 /**
- * Test builds only (HIVE_TEST_MERGE_SLOT_LOG, never in an installed Hive): each change to a workspace's slots, a JSON
+ * Test builds only (CW_TEST_MERGE_SLOT_LOG, never in an installed Combwork): each change to a workspace's slots, a JSON
  * line with its time, so a scenario sees who held a slot and who waited when, not only the claims made (#374).
  */
 function testLog(workspacePath: string): void {
@@ -100,12 +99,12 @@ export function slotTestEvent(agent: SlotAgent, projectPath: string, branch: str
   const outcome = 'held' in result ? (result.held ? 'held' : 'in line') : 'released' in result ? 'released' : 'left' in result ? 'left' : 'none' // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
   const ws = workspacePathOf(projectPath)
   const event = 'held' in result ? 'claim' : 'release'
-  devConsole.capture([ws && hiveSourceId(ws), sessionSourceId(projectPath, agent.agentId)], () => ({ kind: 'merge-slot', name: event, raw: { project: basename(projectPath), branch, agent: agent.agentName }, made: { outcome }, safe: { raw: { project: true, branch: true, agent: true }, made: { outcome: true } }, summary: `merge slot ${event} by ${hiveName(agent.agentName)} on ${safeWord(branch)} → ${outcome}` })) // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
+  devConsole.capture([ws && combworkSourceId(ws), sessionSourceId(projectPath, agent.agentId)], () => ({ kind: 'merge-slot', name: event, raw: { project: basename(projectPath), branch, agent: agent.agentName }, made: { outcome }, safe: { raw: { project: true, branch: true, agent: true }, made: { outcome: true } }, summary: `merge slot ${event} by ${combworkName(agent.agentName)} on ${safeWord(branch)} → ${outcome}` })) // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
   writeTestLog({ at: new Date().toISOString(), event: 'held' in result ? 'claim' : 'release', project: projectPath, branch, agentId: agent.agentId, agent: agent.agentName, outcome })
 }
 
 function writeTestLog(line: object): void {
-  const file = !app.isPackaged ? process.env.HIVE_TEST_MERGE_SLOT_LOG : undefined
+  const file = !app.isPackaged ? process.env.CW_TEST_MERGE_SLOT_LOG : undefined
   if (!file) return
   try {
     appendFileSync(file, JSON.stringify(line) + '\n')
@@ -140,7 +139,7 @@ function heldIn(workspacePath: string): SlotRecord[] {
 }
 
 /**
- * Where a hold Hive closed under belongs now (#508): its project's folder by its id (renamed or moved since, the whole
+ * Where a hold Combwork closed under belongs now (#508): its project's folder by its id (renamed or moved since, the whole
  * workspace too); one saved before ids, at its folder (under the workspace's folder now, if the workspace moved), or at
  * the project last opened there (project.json's lastPath, #146) when exactly one was. Null when it can't be known: its
  * project is gone, or another project has its folder (never told as that one's).
@@ -169,7 +168,7 @@ async function keepUnplaced(file: string, holds: SlotRecord[]): Promise<void> {
   await writeTextAtomic(kept, JSON.stringify({ version: 1, holds: [...had, ...holds].slice(-MAX_UNPLACED) }, null, 2) + '\n')
 }
 
-/** The record's holds that Hive no longer has, taken from it: kept as it was beside it first (once) when any is placed elsewhere. */
+/** The record's holds that Combwork no longer has, taken from it: kept as it was beside it first (once) when any is placed elsewhere. */
 async function orphansIn(file: string, workspacePath: string | null, place: (h: SlotRecord) => Promise<string | null>): Promise<{ hold: SlotRecord; at: string | null }[]> {
   return withFileLock(file, async () => {
     const raw = await readFile(file, 'utf8').catch(() => null)
@@ -186,18 +185,18 @@ async function orphansIn(file: string, workspacePath: string | null, place: (h: 
 }
 
 /**
- * Tests only (unpackaged builds): HIVE_TEST_HOLD_MERGE_RECOVERY=<file> holds the recovery until that file exists, so a
- * suite can show what waits for it (#984: the notice that Hive closed unexpectedly).
+ * Tests only (unpackaged builds): CW_TEST_HOLD_MERGE_RECOVERY=<file> holds the recovery until that file exists, so a
+ * suite can show what waits for it (#984: the notice that Combwork closed unexpectedly).
  */
 async function testHold(): Promise<void> {
-  const file = !app.isPackaged ? process.env.HIVE_TEST_HOLD_MERGE_RECOVERY : undefined
+  const file = !app.isPackaged ? process.env.CW_TEST_HOLD_MERGE_RECOVERY : undefined
   if (!file) return
   log.info('Merge slot recovery held until the test releases it')
   while (!existsSync(file)) await new Promise((r) => setTimeout(r, 100))
 }
 
 /**
- * A workspace opened: holds its record has that Hive no longer has (it closed or crashed while an agent held the slot)
+ * A workspace opened: holds its record has that Combwork no longer has (it closed or crashed while an agent held the slot)
  * are told to the user, since that merge may be half done, and dropped from the record. Each is told in its project
  * now (#508), and so are the holds recorded where the workspace was before it moved (its record is by its folder) when
  * nothing is there now; one whose project can't be known is told in the workspace, and kept beside the record.
@@ -207,15 +206,15 @@ export async function recoverMergeSlots(workspacePath: string): Promise<void> {
   const ws = workspaceFor(workspacePath)
   const ids = (await ws?.projectIds({ fresh: true })) ?? NO_PROJECT_IDS
   const last = ws?.movedFrom
-  const from = last && !existsSync(join(last, HIVE_DIR)) && !existsSync(join(last, LEGACY_HIVE_DIR)) && !workspaceFor(last) ? last : null
+  const from = last && !existsSync(join(last, CW_DIR)) && !workspaceFor(last) ? last : null
   const place = (h: SlotRecord): Promise<string | null> => (ws ? placeHold(ws, ids, from, h) : Promise.resolve(h.projectPath))
   const gone = [...(await orphansIn(recordFile(workspacePath), workspacePath, place)), ...(from ? await orphansIn(recordFile(from), null, place) : [])]
   // Each hold's cards as this workspace names them (HI-1661: by key); this runs outside any workspace's work.
   const named = ws ? cardNamesOf(ws) : cardRef
   for (const { hold: h, at } of gone) {
-    log.info(`Merge slot: Hive closed while ${userText(h.agentName)} held it for ${userText(h.branch)}`)
+    log.info(`Merge slot: Combwork closed while ${userText(h.agentName)} held it for ${userText(h.branch)}`)
     // The folder the merge was in (#984): the agent's own (its worktree), else the project's main checkout.
-    // A folder inside a .hive that moved to .combwork since (HI-2462) is named where it is now.
+    // A folder inside a pre-1.1 data folder that moved to .combwork since (HI-2462) is named where it is now.
     const folder = (h.cwd ? await movedPath(workspacePath, h.cwd) : null) ?? h.cwd ?? at ?? h.projectPath
     // After an unexpected close, told in that notice (lastRun.ts).
     if (at && addLeftMerge({ agentName: h.agentName, branch: h.branch, cards: h.cards, cardNames: h.cards.map(named), folder })) continue
@@ -236,7 +235,7 @@ export function startMergeSlots(): void {
   setUserMergeSlot((projectPath, branch, run) => mergeSlots.asUser(projectPath, branch, run))
 }
 
-/** The branch a project folder is on: what Hive's Merge dialog merges into, and the slot a claim names by default. */
+/** The branch a project folder is on: what Combwork's Merge dialog merges into, and the slot a claim names by default. */
 export async function currentBranch(projectPath: string): Promise<string | null> {
   return workspace.branch(projectPath)
 }

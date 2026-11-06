@@ -1,9 +1,9 @@
-// S28 (#1347, SPEC §16.9.3): two Hives merge into one repository at once, and one waits on the repository lock. Two
-// test Hives (their own profiles and ports) each have a project in the same repository: A's the main checkout, B's a
+// S28 (#1347, SPEC §16.9.3): two copies of Combwork merge into one repository at once, and one waits on the repository lock. Two
+// test copies (their own profiles and ports) each have a project in the same repository: A's the main checkout, B's a
 // linked worktree of it, so they share its common git dir and so its lock. A git hook holds A's merge (the lock taken)
-// until the test lets it go: B's merge waits, its window saying which Hive holds the repository, and merges once A's is
+// until the test lets it go: B's merge waits, its window saying which Combwork holds the repository, and merges once A's is
 // done. With B's wait (Settings → Advanced) cut to 1 s, B gives up, changing nothing and naming A. Dev build, fake tier.
-// Dev build only (#1580): each Hive's agent is a 0.9 worktree agent (agents:testLegacy, refused by a packaged build),
+// Dev build only (#1580): each Combwork's agent is a 0.9 worktree agent (agents:testLegacy, refused by a packaged build),
 // with a commit on its branch to merge (S28 isn't one of the packaged checks).
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -59,12 +59,12 @@ async function agentWithWork(inv, project, name) {
   fs.writeFileSync(path.join(alpha, '.git', 'hooks', 'pre-merge-commit'), `#!/bin/sh\necho started > "${slash(started)}"\nwhile [ -f "${slash(hold)}" ]; do sleep 0.1; done\nexit 0\n`)
   for (const p of [profileA, profileB]) lib.enableProviders(p)
 
-  const hives = []
+  const apps = []
   try {
-    const a = await lib.launch({ userData: profileA, env: { HIVE_API_PORT: lib.port(47844) } })
-    hives.push(a.app)
-    const b = await lib.launch({ userData: profileB, env: { HIVE_API_PORT: await freePort() } })
-    hives.push(b.app)
+    const a = await lib.launch({ userData: profileA, env: { CW_API_PORT: lib.port(47844) } })
+    apps.push(a.app)
+    const b = await lib.launch({ userData: profileB, env: { CW_API_PORT: await freePort() } })
+    apps.push(b.app)
     for (const [h, ws] of [[a, wsA], [b, wsB]]) {
       h.page.on('pageerror', (e) => check('no page errors', false, e.message))
       await lib.openWorkspace(h.inv, h.page, ws)
@@ -115,7 +115,7 @@ async function agentWithWork(inv, project, name) {
     check('suite ran', false, e?.stack ?? String(e))
   } finally {
     fs.rmSync(hold, { force: true })
-    for (const app of hives) await app.close().catch(() => undefined)
+    for (const app of apps) await app.close().catch(() => undefined)
   }
   console.log(failed ? `\n${failed} FAILED` : '\nALL PASS')
   process.exit(failed ? 1 : 0)

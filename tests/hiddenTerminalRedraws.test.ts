@@ -67,7 +67,7 @@ describe('deferHiddenSelectionRedraws', () => {
     expect(Object.keys(rs)).toEqual(['handleSelectionChanged'])
   })
 
-  // The internals it relies on, in the xterm Hive bundles: an xterm update that renames them fails here, not in a frozen window.
+  // The internals it relies on, in the xterm Combwork bundles: an xterm update that renames them fails here, not in a frozen window.
   it("finds what it relies on in the bundled xterm's renderer", () => {
     const require = createRequire(import.meta.url)
     const bundle = readFileSync(require.resolve('@xterm/xterm').replace(/xterm\.js$/, 'xterm.mjs'), 'utf8')

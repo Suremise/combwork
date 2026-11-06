@@ -32,7 +32,7 @@ async function queued(e: Env, title: string, file: string) {
   return card
 }
 
-/** Another Hive (a restart): its own store connection, Workflow and queue on the same files. */
+/** Another Combwork (a restart): its own store connection, Workflow and queue on the same files. */
 function restarted(e: Env): { wf: Workflow; q: MergeQueue } {
   const store = e.reopen()
   extra.push(store)
@@ -57,7 +57,7 @@ describe('the merge queue, round 1 claims', () => {
     expect(e.wf.state(b).stage).toBe('done')
   })
 
-  it('a swap that loses the race after IntegrationStarted fails as target moved, is queued again by Hive and merges', async () => {
+  it('a swap that loses the race after IntegrationStarted fails as target moved, is queued again by Combwork and merges', async () => {
     const e = team()
     sh(e.project, 'checkout', '-q', '--detach')
     const a = await queued(e, 'A', 'a.txt')

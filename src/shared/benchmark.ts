@@ -1,7 +1,7 @@
 /**
- * Comparing two measurements of Hive's own costs (#117): scenario benchmarks (tests/scenarios writes them,
- * "hive-benchmark/1": controlled runs, each sample with its correctness checks) and Performance exports
- * ("hive-metrics/1": real use over a range, kept as a summary). Pure, so the app and tests share it. Every file, imported
+ * Comparing two measurements of Combwork's own costs (#117): scenario benchmarks (tests/scenarios writes them,
+ * "combwork-benchmark/1": controlled runs, each sample with its correctness checks) and Performance exports
+ * ("combwork-metrics/1": real use over a range, kept as a summary). Pure, so the app and tests share it. Every file, imported
  * or kept, is read through the same normalisers as untrusted input (nothing is cast and returned as it was). A
  * comparison says whether the two can be compared at all (and why not), compares like with like (the same scenarios,
  * scope, filters), keeps what wasn't measured unknown (never zero), and never calls a smaller result better when the work
@@ -18,8 +18,15 @@ import { utf8Bytes, type MetricsRole, type MetricsScope } from './metrics'
 import { formatDate, formatDateTime } from './dates'
 import { moneyLabel } from './usageTotals'
 
-export const BENCHMARK_SCHEMA = 'hive-benchmark/1'
-export const METRICS_EXPORT_SCHEMA = 'hive-metrics/1'
+export const BENCHMARK_SCHEMA = 'combwork-benchmark/1'
+export const METRICS_EXPORT_SCHEMA = 'combwork-metrics/1'
+/**
+ * A Performance export's id as 1.0 wrote it: not imported (HI-2611, Darren's decision: no 1.0 export is kept), only
+ * recognised, so the refusal says what it is.
+ */
+// old-name: begin metrics-export-schema
+const OLD_METRICS_EXPORT_SCHEMA = 'hive-metrics/1'
+// old-name: end metrics-export-schema
 
 /** Bounds on what is read and kept: an artifact is checked as untrusted input. */
 // scenarios: 200 since #1444 took the set past 100 (the last ones were dropped from benchmarks).
@@ -50,20 +57,20 @@ const M = {
   fakeVsModel: msg({ id: 'performance.compare.reason.fakeVsModel', defaultMessage: 'A fake provider against a model trial: a fake proves routing and sizes, not a model’s behaviour.', description: 'Performance → Compare: why two scenario benchmarks cannot be compared. A fake provider is a stand-in for a coding agent CLI that runs no model; a model trial runs the real one.' }),
   differentProviders: msg({ id: 'performance.compare.reason.differentProviders', defaultMessage: 'Different providers ({base} and {run}).', description: "Performance → Compare: why two scenario benchmarks cannot be compared. {base} and {run} are providers' ids (claude-code, fake-codex)." }),
   differentSetups: msg({ id: 'performance.compare.reason.differentSetups', defaultMessage: 'Different model setups ({base} and {run}).', description: 'Performance → Compare: why two model trials cannot be compared. {base} and {run} are each a model, an effort and a mode, as the CLI names them ("opus, high, full-access").' }),
-  sourceChanged: msg({ id: 'performance.compare.reason.sourceChanged', defaultMessage: '{side, select, baseline {The baseline’s} other {The run’s}} source changed while it ran: its samples may mix two versions.', description: "Performance → Compare: why two scenario benchmarks cannot be compared: Hive's source code changed while one of them ran." }),
+  sourceChanged: msg({ id: 'performance.compare.reason.sourceChanged', defaultMessage: '{side, select, baseline {The baseline’s} other {The run’s}} source changed while it ran: its samples may mix two versions.', description: "Performance → Compare: why two scenario benchmarks cannot be compared: Combwork's source code changed while one of them ran." }),
   differentFilters: msg({ id: 'performance.compare.reason.differentFilters', defaultMessage: 'Different filters ({base} and {run}).', description: 'Performance → Compare: why two Performance exports cannot be compared. {base} and {run} are their filters ("everyone, all providers").' }),
   notRecording: msg({ id: 'performance.compare.reason.notRecording', defaultMessage: 'Combwork wasn’t recording in one of the ranges: there is nothing to compare.', description: 'Performance → Compare: why two Performance exports cannot be compared.' }),
   oneIncomplete: msg({ id: 'performance.compare.reason.oneIncomplete', defaultMessage: 'One of them is incomplete.', description: 'Performance → Compare: why a baseline and a run cannot be compared.' }),
   // What a reader should know.
   cliVersions: msg({ id: 'performance.compare.note.cliVersions', defaultMessage: 'CLI versions differ ({base} and {run}).', description: "Performance → Compare, a note on two model trials: the coding agent CLIs' versions differ. {base} and {run} are lists of versions, or ? when unknown." }),
-  sameGuidance: msg({ id: 'performance.compare.note.sameGuidance', defaultMessage: 'Both ran the same guidance revision: differences are in the tools, the API, the skills or the run itself.', description: "Performance → Compare, a note: both scenario benchmarks ran with the same revision of Hive's guidance for agents." }),
+  sameGuidance: msg({ id: 'performance.compare.note.sameGuidance', defaultMessage: 'Both ran the same guidance revision: differences are in the tools, the API, the skills or the run itself.', description: "Performance → Compare, a note: both scenario benchmarks ran with the same revision of Combwork's guidance for agents." }),
   fakeUsage: msg({ id: 'performance.compare.note.fakeUsage', defaultMessage: 'Provider usage isn’t compared: a fake’s tokens are simulated, not a provider’s.', description: "Performance → Compare, a note: a fake provider's token counts aren't real, so they aren't compared." }),
   partial: msg({ id: 'performance.compare.note.partial', defaultMessage: '{side, select, baseline {The baseline} other {The run}} is partial: {what}.', description: 'Performance → Compare, a note on Performance exports: what makes one partial. {what} is a list of reasons ("3 measurements dropped (a limit was full)").' }),
   rangesDiffer: msg({ id: 'performance.compare.note.rangesDiffer', defaultMessage: 'The ranges differ in length: compared per hour recorded.', description: 'Performance → Compare, a note on two Performance exports of time ranges of different lengths.' }),
   realUse: msg({ id: 'performance.compare.note.realUse', defaultMessage: 'Real use isn’t a controlled workload: a change here can be the work that was done, not Combwork.', description: 'Performance → Compare, a note on two Performance exports (measurements of real use, not of a fixed test).' }),
-  stale: msg({ id: 'performance.compare.note.stale', defaultMessage: '{n, plural, one {# sample} other {# samples}} left out: the session was given other guidance than the run started with (stale).', description: "Performance → Compare, a note on a scenario: samples left out because their session was given another revision of Hive's guidance." }),
+  stale: msg({ id: 'performance.compare.note.stale', defaultMessage: '{n, plural, one {# sample} other {# samples}} left out: the session was given other guidance than the run started with (stale).', description: "Performance → Compare, a note on a scenario: samples left out because their session was given another revision of Combwork's guidance." }),
   leftOut: msg({ id: 'performance.compare.note.leftOut', defaultMessage: '{n, plural, one {# sample} other {# samples}} left out: {why}.', description: "Performance → Compare, a note on a scenario: samples left out because they didn't complete or couldn't be read. {why} lists why (\"no check ran\", or the test harness's own words, in English)." }),
-  noSplit: msg({ id: 'performance.compare.note.noSplit', defaultMessage: '{side, select, baseline {The baseline has no per-agent figures} run {The run has no per-agent figures} other {Neither side has per-agent figures}}: totals of all agents shown.', description: "Performance → Compare, a note on a scenario (HI-2186): its measures can't be shown for the agent under test apart from the other agents, because a side was measured before Hive split them; the figures shown are every agent's together." }),
+  noSplit: msg({ id: 'performance.compare.note.noSplit', defaultMessage: '{side, select, baseline {The baseline has no per-agent figures} run {The run has no per-agent figures} other {Neither side has per-agent figures}}: totals of all agents shown.', description: "Performance → Compare, a note on a scenario (HI-2186): its measures can't be shown for the agent under test apart from the other agents, because a side was measured before Combwork split them; the figures shown are every agent's together." }),
   splitPartial: msg({ id: 'performance.compare.note.splitPartial', defaultMessage: 'Some per-agent figures weren’t measured (the coverage was partial): they are left out, not zero.', description: 'Performance → Compare, a note on a scenario (HI-2186): some of the figures of the agent under test or of the other agents are unknown.' }),
   fakePerCall: msg({ id: 'performance.compare.note.fakePerCall', defaultMessage: 'With the fake Claude Code or fake Codex, each Combwork tool call starts a combwork MCP server of its own: API requests and tool-list starts count per call, not per session.', description: "Performance → Compare, a note on a comparison of scenario runs on the scripted fake CLIs (HI-2186): what they do differs from a real CLI. Keep Combwork (the app's name), MCP, Claude Code and Codex." }),
   oneSample: msg({ id: 'performance.compare.note.oneSample', defaultMessage: 'One sample on a side: no spread to judge a change by.', description: 'Performance → Compare, a note on a scenario run only once on a side.' }),
@@ -86,14 +93,15 @@ const M = {
   didntComplete: msg({ id: 'performance.compare.sample.didntComplete', defaultMessage: 'didn’t complete', description: "Why a scenario's sample is left out of Performance → Compare, in \"{n} samples left out: {why}.\". Lower case." }),
   // What makes a Performance export partial.
   dropped: msg({ id: 'performance.compare.partial.dropped', defaultMessage: '{n, plural, one {# measurement dropped} other {# measurements dropped}} (a limit was full)', description: 'What makes a Performance export partial, in "The baseline is partial: {what}.". Lower case.' }),
-  unattributed: msg({ id: 'performance.compare.partial.unattributed', defaultMessage: 'some losses couldn’t be attributed to a project', description: 'What makes a Performance export partial, in "The baseline is partial: {what}.": measurements lost that Hive couldn\'t say were which project\'s. Lower case.' }),
+  unattributed: msg({ id: 'performance.compare.partial.unattributed', defaultMessage: 'some losses couldn’t be attributed to a project', description: 'What makes a Performance export partial, in "The baseline is partial: {what}.": measurements lost that Combwork couldn\'t say were which project\'s. Lower case.' }),
   evicted: msg({ id: 'performance.compare.partial.evicted', defaultMessage: 'history removed for space in the range', description: 'What makes a Performance export partial, in "The baseline is partial: {what}.": recorded history in its time range was removed to make room. Lower case.' }),
   projectPart: msg({ id: 'performance.compare.partial.projectPart', defaultMessage: 'one project’s part of a workspace export', description: 'What makes a Performance export partial, in "The baseline is partial: {what}.": only one project\'s part of an export of the whole workspace is compared. Lower case.' }),
   invalid: msg({ id: 'performance.compare.partial.invalid', defaultMessage: 'some of its measurements weren’t valid, so {keys} {n, plural, one {is} other {are}} unknown', description: "What makes a Performance export partial, in \"The baseline is partial: {what}.\". {keys} lists measures' field names (requests, responseBytes: keep them); {n} is how many. Lower case." }),
   // Why a file isn't imported.
   tooLarge: msg({ id: 'performance.compare.error.tooLarge', defaultMessage: 'It is over {mb, number} MB.', description: 'Why a file is not imported to Performance → Compare: it is larger than {mb} MB.' }),
   notJson: msg({ id: 'performance.compare.error.notJson', defaultMessage: 'It isn’t JSON.', description: 'Why a file is not imported to Performance → Compare.' }),
-  notHive: msg({ id: 'performance.compare.error.notHive', defaultMessage: 'It isn’t a Combwork benchmark or Performance export.', description: 'Why a file is not imported to Performance → Compare.' }),
+  from10: msg({ id: 'performance.compare.error.from10', defaultMessage: 'It is a Performance export from version 1.0, which Combwork doesn’t import. Export again from Combwork to compare.', description: 'Why a file is not imported to Performance → Compare (HI-2611): it was exported by version 1.0, from before the app was renamed Combwork.' }),
+  notCombwork: msg({ id: 'performance.compare.error.notCombwork', defaultMessage: 'It isn’t a Combwork benchmark or Performance export.', description: 'Why a file is not imported to Performance → Compare.' }),
   benchmarkOnProject: msg({ id: 'performance.compare.error.benchmarkOnProject', defaultMessage: 'A scenario benchmark is its own test workspace’s, not one of your projects: compare it in the Performance view (activity bar), with the whole workspace selected.', description: "Why a scenario benchmark (a test run's measurements) is not imported on a project's Performance page." }),
   benchmarkOnOwn: msg({ id: 'performance.compare.error.benchmarkOnOwn', defaultMessage: 'A scenario benchmark is its whole test workspace’s, not the workspace’s own work: compare it with the whole workspace selected.', description: 'Why a scenario benchmark is not imported to Performance → Compare with "Workspace\'s own work" selected.' }),
   invalidBenchmark: msg({ id: 'performance.compare.error.invalidBenchmark', defaultMessage: 'It isn’t a valid scenario benchmark (no run, fixtures version or scenarios).', description: 'Why a file is not imported to Performance → Compare.' }),
@@ -109,19 +117,19 @@ const M = {
   sanitizedPart: msg({ id: 'performance.compare.error.sanitizedPart', defaultMessage: 'It is sanitized (project names replaced), so this project’s part can’t be found.', description: "Why a workspace's Performance export is not imported on a project's Performance page." }),
   ownNoPart: msg({ id: 'performance.compare.error.ownNoPart', defaultMessage: 'It is the workspace’s own work: it has no project’s part.', description: "Why a Performance export is not imported on a project's Performance page." }),
   noPart: msg({ id: 'performance.compare.error.noPart', defaultMessage: 'It is a workspace export with no part for {project}.', description: "Why a workspace's Performance export is not imported on a project's Performance page. {project} is the project's name." }),
-  unknownSchema: msg({ id: 'performance.compare.error.unknownSchema', defaultMessage: 'It isn’t a Combwork benchmark (hive-benchmark/1) or Performance export (hive-metrics/1).', description: 'Why a file is not imported to Performance → Compare. Keep hive-benchmark/1 and hive-metrics/1 (file formats).' }),
-  // A kept comparison's name and description when Hive made them (#1104): the window says them from its facts.
-  aboutScenarios: msg({ id: 'performance.compare.about.scenarios', defaultMessage: '{real, select, yes {Model trial {provider} {model} ({effort}, {mode})} other {Fake {provider}}}, fixtures v{fixtures}, {scenarios, plural, one {# scenario} other {# scenarios}} × {repeats, number}, source {head}{real, select, yes {, spent {spent}{unpriced, plural, =0 {} other { + {unpriced, number} unpriced (total unknown)}}} other {}}', description: "What a kept scenario benchmark is, in a line under its name in Performance → Compare. A model trial ran a real model ({provider} the CLI, {model}, its {effort} and permission {mode}); Fake ran Hive's fake CLI. fixtures v{fixtures} is the version of the test fixtures (keep v); {head} is the git commit the run was made from; {spent} what the trial cost; unpriced trials are ones with no known cost." }),
+  unknownSchema: msg({ id: 'performance.compare.error.unknownSchema', defaultMessage: 'It isn’t a Combwork benchmark (combwork-benchmark/1) or Performance export (combwork-metrics/1).', description: 'Why a file is not imported to Performance → Compare. Keep combwork-benchmark/1 and combwork-metrics/1 (file formats).' }),
+  // A kept comparison's name and description when Combwork made them (#1104): the window says them from its facts.
+  aboutScenarios: msg({ id: 'performance.compare.about.scenarios', defaultMessage: '{real, select, yes {Model trial {provider} {model} ({effort}, {mode})} other {Fake {provider}}}, fixtures v{fixtures}, {scenarios, plural, one {# scenario} other {# scenarios}} × {repeats, number}, source {head}{real, select, yes {, spent {spent}{unpriced, plural, =0 {} other { + {unpriced, number} unpriced (total unknown)}}} other {}}', description: "What a kept scenario benchmark is, in a line under its name in Performance → Compare. A model trial ran a real model ({provider} the CLI, {model}, its {effort} and permission {mode}); Fake ran Combwork's fake CLI. fixtures v{fixtures} is the version of the test fixtures (keep v); {head} is the git commit the run was made from; {spent} what the trial cost; unpriced trials are ones with no known cost." }),
   aboutExport: msg({ id: 'performance.compare.about.export', defaultMessage: '{from} to {to}: {filters}', description: 'What a kept Performance export is, in a line under its name in Performance → Compare: its range ({from} and {to} are dates and times) and its filters (such as "project agents, all providers").' }),
   aboutExportPart: msg({ id: 'performance.compare.about.exportPart', defaultMessage: '{from} to {to}: {filters} ({part})', description: "What a kept Performance export is, in a line under its name in Performance → Compare, when it is one project's part of a workspace export: its range ({from} and {to} are dates and times), its filters, and {part}, which says it is that part." }),
-  labelBenchmark: msg({ id: 'performance.compare.label.benchmark', defaultMessage: '{provider} benchmark', description: "The name Hive gives a kept scenario benchmark that came without one, in Performance → Compare. {provider} is the CLI's name (Claude Code, Codex…)." }),
-  labelExport: msg({ id: 'performance.compare.label.export', defaultMessage: 'Export {from} to {to}{own, select, yes {, own work} other {}}', description: "The name Hive gives a kept Performance export, in Performance → Compare: the dates it covers; own work when it is the workspace's own work (no project's)." }),
-  labelExportPart: msg({ id: 'performance.compare.label.exportPart', defaultMessage: 'Export {from} to {to}, {project}’s part', description: "The name Hive gives one project's part of a workspace's Performance export, kept in Performance → Compare: the dates it covers, and the project's name." }),
-  labelKept: msg({ id: 'performance.compare.label.kept', defaultMessage: 'Kept {from} to {to}', description: "The name Hive gives a Performance view kept for comparison when you give it none (Keep current view), in Performance → Compare: the dates it covers." }),
+  labelBenchmark: msg({ id: 'performance.compare.label.benchmark', defaultMessage: '{provider} benchmark', description: "The name Combwork gives a kept scenario benchmark that came without one, in Performance → Compare. {provider} is the CLI's name (Claude Code, Codex…)." }),
+  labelExport: msg({ id: 'performance.compare.label.export', defaultMessage: 'Export {from} to {to}{own, select, yes {, own work} other {}}', description: "The name Combwork gives a kept Performance export, in Performance → Compare: the dates it covers; own work when it is the workspace's own work (no project's)." }),
+  labelExportPart: msg({ id: 'performance.compare.label.exportPart', defaultMessage: 'Export {from} to {to}, {project}’s part', description: "The name Combwork gives one project's part of a workspace's Performance export, kept in Performance → Compare: the dates it covers, and the project's name." }),
+  labelKept: msg({ id: 'performance.compare.label.kept', defaultMessage: 'Kept {from} to {to}', description: "The name Combwork gives a Performance view kept for comparison when you give it none (Keep current view), in Performance → Compare: the dates it covers." }),
   roleAgent: msg({ id: 'performance.compare.filters.role.agent', defaultMessage: 'project agents', description: "A Performance export's Who filter (as Performance's Who menu names it: Project agents), in a list of filters. Lower case." }),
   roleAssistant: msg({ id: 'performance.compare.filters.role.assistant', defaultMessage: 'the Assistant', description: "A Performance export's Who filter (as Performance's Who menu names it: The Assistant), in a list of filters." }),
   roleApi: msg({ id: 'performance.compare.filters.role.api', defaultMessage: 'scripts', description: "A Performance export's Who filter (as Performance's Who menu names it: Scripts), in a list of filters. Lower case." }),
-  sideMeasure: msg({ id: 'performance.compare.sideMeasure', defaultMessage: '{measure} · {side, select, builder {builders} reviewer {reviewers} either {either role} none {no workflow role} other {role not recorded}}', description: "A measure of Performance → Compare of exports for one workflow role's launches (HI-2049): {measure} is the measure's name (\"Guidance a launch\"); then whose launches: builders', reviewers', agents that take either role, those with no workflow role (generalists, the Assistant), or launches recorded before Hive recorded the role. Glossary: builder, reviewer, either, workflow role." }),
+  sideMeasure: msg({ id: 'performance.compare.sideMeasure', defaultMessage: '{measure} · {side, select, builder {builders} reviewer {reviewers} either {either role} none {no workflow role} other {role not recorded}}', description: "A measure of Performance → Compare of exports for one workflow role's launches (HI-2049): {measure} is the measure's name (\"Guidance a launch\"); then whose launches: builders', reviewers', agents that take either role, those with no workflow role (generalists, the Assistant), or launches recorded before Combwork recorded the role. Glossary: builder, reviewer, either, workflow role." }),
   roleViewer: msg({ id: 'performance.compare.filters.role.viewer', defaultMessage: 'viewer apps', description: "A Performance export's Who filter (as Performance's Who menu names it: Viewer apps), in a list of filters. Lower case." })
 }
 
@@ -147,36 +155,36 @@ export interface MeasureDef {
 }
 
 const AS_REPORTED = msg({ id: 'performance.compare.measureTip.asReported', defaultMessage: 'As the provider reported them.', description: "Tooltip of a token measure in Performance → Compare: the provider's own count." })
-const PER_HOUR = msg({ id: 'performance.compare.measureTip.perHour', defaultMessage: 'Per hour recorded.', description: 'Tooltip of a measure in Performance → Compare of exports: shown per hour Hive was recording.' })
+const PER_HOUR = msg({ id: 'performance.compare.measureTip.perHour', defaultMessage: 'Per hour recorded.', description: 'Tooltip of a measure in Performance → Compare of exports: shown per hour Combwork was recording.' })
 
 /** A scenario sample's measures (tests/scenarios/harness.cjs measuresOf), with what the comparison derives from them. */
 export const SCENARIO_MEASURES: MeasureDef[] = [
-  { key: 'contextBytes', label: msg({ id: 'performance.compare.measure.contextBytes', defaultMessage: 'Combwork context', description: "A measure in Performance → Compare: the size of what Hive put in an agent session's context." }), unit: 'bytes', group: 'context', tip: msg({ id: 'performance.compare.measureTip.contextBytes', defaultMessage: 'What Combwork put in the session’s context: launch guidance (core, project, the Assistant’s role and mode, skills’ catalog), the Combwork tools’ list and every tool reply. Exact UTF-8 bytes, not tokens. Unknown if any part wasn’t measured.', description: 'Tooltip of the Hive context measure in Performance → Compare. "Combwork tools" are Combwork\'s tools for agents (keep Combwork).' }) },
-  { key: 'guidanceBytes', label: msg({ id: 'performance.compare.measure.guidanceBytes', defaultMessage: 'Launch guidance', description: 'A measure in Performance → Compare: the size of the guidance Hive gave a session at launch.' }), unit: 'bytes', group: 'context', tip: msg({ id: 'performance.compare.measureTip.guidanceBytes', defaultMessage: 'Core contract, project additions, the Assistant’s role and mode, and the skills’ catalog, at launch.', description: 'Tooltip of the Launch guidance measure in Performance → Compare: its parts.' }) },
+  { key: 'contextBytes', label: msg({ id: 'performance.compare.measure.contextBytes', defaultMessage: 'Combwork context', description: "A measure in Performance → Compare: the size of what Combwork put in an agent session's context." }), unit: 'bytes', group: 'context', tip: msg({ id: 'performance.compare.measureTip.contextBytes', defaultMessage: 'What Combwork put in the session’s context: launch guidance (core, project, the Assistant’s role and mode, skills’ catalog), the Combwork tools’ list and every tool reply. Exact UTF-8 bytes, not tokens. Unknown if any part wasn’t measured.', description: 'Tooltip of the Combwork context measure in Performance → Compare. "Combwork tools" are Combwork\'s tools for agents (keep Combwork).' }) },
+  { key: 'guidanceBytes', label: msg({ id: 'performance.compare.measure.guidanceBytes', defaultMessage: 'Launch guidance', description: 'A measure in Performance → Compare: the size of the guidance Combwork gave a session at launch.' }), unit: 'bytes', group: 'context', tip: msg({ id: 'performance.compare.measureTip.guidanceBytes', defaultMessage: 'Core contract, project additions, the Assistant’s role and mode, and the skills’ catalog, at launch.', description: 'Tooltip of the Launch guidance measure in Performance → Compare: its parts.' }) },
   { key: 'guidanceChars', label: msg({ id: 'performance.compare.measure.guidanceChars', defaultMessage: 'Launch guidance (characters)', description: 'A measure in Performance → Compare: the launch guidance counted in characters.' }), unit: 'chars', group: 'context', tip: msg({ id: 'performance.compare.measureTip.guidanceChars', defaultMessage: 'The same parts in characters (UTF-16 code units); the catalog has bytes only.', description: 'Tooltip of the Launch guidance (characters) measure in Performance → Compare.' }) },
-  { key: 'toolListBytes', label: msg({ id: 'performance.compare.measure.toolListBytes', defaultMessage: 'Tool list', description: "A measure in Performance → Compare: the size of the list of Hive's tools a session was given." }), unit: 'bytes', group: 'context', tip: msg({ id: 'performance.compare.measureTip.toolListBytes', defaultMessage: 'The Combwork tools’ names, descriptions and schemas as the CLI got them.', description: 'Tooltip of the Tool list measure in Performance → Compare. Keep Combwork (the app\'s name).' }) },
-  { key: 'toolListChars', label: msg({ id: 'performance.compare.measure.toolListChars', defaultMessage: 'Tool list (characters)', description: "A measure in Performance → Compare: the size of the list of Hive's tools a session was given, in characters." }), unit: 'chars', group: 'context', tip: msg({ id: 'performance.compare.measureTip.toolListChars', defaultMessage: 'The same list in characters (UTF-16 code units). Unknown for a run from before Combwork counted them.', description: 'Tooltip of the Tool list (characters) measure in Performance → Compare.' }) },
-  { key: 'toolChars', label: msg({ id: 'performance.compare.measure.toolChars', defaultMessage: 'Tool replies', description: "A measure in Performance → Compare: the size of the replies of Hive's tools." }), unit: 'chars', group: 'context', tip: msg({ id: 'performance.compare.measureTip.toolChars', defaultMessage: 'Characters of the Combwork tools’ replies, as the model got them.', description: 'Tooltip of the Tool replies measure in Performance → Compare. Keep Combwork (the app\'s name).' }) },
-  { key: 'toolBytes', label: msg({ id: 'performance.compare.measure.toolBytes', defaultMessage: 'Tool replies (bytes)', description: "A measure in Performance → Compare: the size of the replies of Hive's tools, in bytes." }), unit: 'bytes', group: 'context', tip: msg({ id: 'performance.compare.measureTip.toolBytes', defaultMessage: 'UTF-8 bytes of the same replies.', description: 'Tooltip of the Tool replies (bytes) measure in Performance → Compare.' }) },
-  { key: 'toolCalls', label: msg({ id: 'performance.compare.measure.toolCalls', defaultMessage: 'Tool calls', description: "A measure in Performance → Compare: how many times agents called Hive's tools." }), unit: 'count', group: 'work', tip: msg({ id: 'performance.compare.measureTip.toolCalls', defaultMessage: 'Combwork tool calls measured by the bridge.', description: "Tooltip of the Tool calls measure in Performance → Compare. Keep Combwork (the app's name); the bridge is Combwork's MCP server between the CLI and Hive." }) },
-  { key: 'toolDetailCalls', label: msg({ id: 'performance.compare.measure.toolDetailCalls', defaultMessage: 'Detail calls', description: "A measure in Performance → Compare: calls of Hive's tools that asked for the full reply." }), unit: 'count', group: 'work', tip: msg({ id: 'performance.compare.measureTip.toolDetailCalls', defaultMessage: 'Calls that asked for the full form.', description: 'Tooltip of the Detail calls measure in Performance → Compare.' }) },
-  { key: 'hiveCalls', label: msg({ id: 'performance.compare.measure.hiveCalls', defaultMessage: 'Calls run', description: "A measure in Performance → Compare: calls of Hive's tools that Hive ran." }), unit: 'count', group: 'work', tip: msg({ id: 'performance.compare.measureTip.hiveCalls', defaultMessage: 'Combwork tool calls the server ran (its own log).', description: "Tooltip of the Calls run measure in Performance → Compare. Keep Combwork (the app's name)." }) },
+  { key: 'toolListBytes', label: msg({ id: 'performance.compare.measure.toolListBytes', defaultMessage: 'Tool list', description: "A measure in Performance → Compare: the size of the list of Combwork's tools a session was given." }), unit: 'bytes', group: 'context', tip: msg({ id: 'performance.compare.measureTip.toolListBytes', defaultMessage: 'The Combwork tools’ names, descriptions and schemas as the CLI got them.', description: 'Tooltip of the Tool list measure in Performance → Compare. Keep Combwork (the app\'s name).' }) },
+  { key: 'toolListChars', label: msg({ id: 'performance.compare.measure.toolListChars', defaultMessage: 'Tool list (characters)', description: "A measure in Performance → Compare: the size of the list of Combwork's tools a session was given, in characters." }), unit: 'chars', group: 'context', tip: msg({ id: 'performance.compare.measureTip.toolListChars', defaultMessage: 'The same list in characters (UTF-16 code units). Unknown for a run from before Combwork counted them.', description: 'Tooltip of the Tool list (characters) measure in Performance → Compare.' }) },
+  { key: 'toolChars', label: msg({ id: 'performance.compare.measure.toolChars', defaultMessage: 'Tool replies', description: "A measure in Performance → Compare: the size of the replies of Combwork's tools." }), unit: 'chars', group: 'context', tip: msg({ id: 'performance.compare.measureTip.toolChars', defaultMessage: 'Characters of the Combwork tools’ replies, as the model got them.', description: 'Tooltip of the Tool replies measure in Performance → Compare. Keep Combwork (the app\'s name).' }) },
+  { key: 'toolBytes', label: msg({ id: 'performance.compare.measure.toolBytes', defaultMessage: 'Tool replies (bytes)', description: "A measure in Performance → Compare: the size of the replies of Combwork's tools, in bytes." }), unit: 'bytes', group: 'context', tip: msg({ id: 'performance.compare.measureTip.toolBytes', defaultMessage: 'UTF-8 bytes of the same replies.', description: 'Tooltip of the Tool replies (bytes) measure in Performance → Compare.' }) },
+  { key: 'toolCalls', label: msg({ id: 'performance.compare.measure.toolCalls', defaultMessage: 'Tool calls', description: "A measure in Performance → Compare: how many times agents called Combwork's tools." }), unit: 'count', group: 'work', tip: msg({ id: 'performance.compare.measureTip.toolCalls', defaultMessage: 'Combwork tool calls measured by the bridge.', description: "Tooltip of the Tool calls measure in Performance → Compare. Keep Combwork (the app's name); the bridge is Combwork's MCP server between the CLI and Combwork." }) },
+  { key: 'toolDetailCalls', label: msg({ id: 'performance.compare.measure.toolDetailCalls', defaultMessage: 'Detail calls', description: "A measure in Performance → Compare: calls of Combwork's tools that asked for the full reply." }), unit: 'count', group: 'work', tip: msg({ id: 'performance.compare.measureTip.toolDetailCalls', defaultMessage: 'Calls that asked for the full form.', description: 'Tooltip of the Detail calls measure in Performance → Compare.' }) },
+  { key: 'combworkCalls', label: msg({ id: 'performance.compare.measure.combworkCalls', defaultMessage: 'Calls run', description: "A measure in Performance → Compare: calls of Combwork's tools that Combwork ran." }), unit: 'count', group: 'work', tip: msg({ id: 'performance.compare.measureTip.combworkCalls', defaultMessage: 'Combwork tool calls the server ran (its own log).', description: "Tooltip of the Calls run measure in Performance → Compare. Keep Combwork (the app's name)." }) },
   { key: 'repeatedCalls', label: msg({ id: 'performance.compare.measure.repeatedCalls', defaultMessage: 'Repeated calls', description: 'A measure in Performance → Compare: tool calls identical to an earlier one.' }), unit: 'count', group: 'work', tip: msg({ id: 'performance.compare.measureTip.repeatedCalls', defaultMessage: 'Calls identical to one already made: work done twice.', description: 'Tooltip of the Repeated calls measure in Performance → Compare.' }) },
-  { key: 'hiveCallErrors', label: msg({ id: 'performance.compare.measure.hiveCallErrors', defaultMessage: 'Failed calls', description: "A measure in Performance → Compare: calls of Hive's tools that failed." }), unit: 'count', group: 'failures', tip: msg({ id: 'performance.compare.measureTip.hiveCallErrors', defaultMessage: 'Combwork tool calls that failed.', description: "Tooltip of the Failed calls measure in Performance → Compare. Keep Combwork (the app's name)." }) },
-  { key: 'toolErrors', label: msg({ id: 'performance.compare.measure.toolErrors', defaultMessage: 'Tool errors', description: 'A measure in Performance → Compare: tool replies that were errors.' }), unit: 'count', group: 'failures', tip: msg({ id: 'performance.compare.measureTip.toolErrors', defaultMessage: 'Tool replies that were errors (the bridge’s count).', description: "Tooltip of the Tool errors measure in Performance → Compare. The bridge is Hive's MCP server between the CLI and Hive." }) },
-  { key: 'apiFailed', label: msg({ id: 'performance.compare.measure.apiFailed', defaultMessage: 'API failures', description: "A measure in Performance → Compare: requests to Hive's Agent API that failed." }), unit: 'count', group: 'failures', tip: msg({ id: 'performance.compare.measureTip.apiFailed', defaultMessage: 'Refused, failed or cancelled requests.', description: 'Tooltip of the API failures measure in Performance → Compare.' }) },
-  { key: 'apiCancelled', label: msg({ id: 'performance.compare.measure.apiCancelled', defaultMessage: 'API cancelled', description: "A measure in Performance → Compare: requests to Hive's Agent API that the caller cancelled." }), unit: 'count', group: 'failures', tip: msg({ id: 'performance.compare.measureTip.apiCancelled', defaultMessage: 'Requests the client gave up on.', description: 'Tooltip of the API cancelled measure in Performance → Compare.' }) },
-  { key: 'apiRequests', label: msg({ id: 'performance.compare.measure.apiRequests', defaultMessage: 'API requests', description: "A measure in Performance → Compare: requests to Hive's Agent API." }), unit: 'count', group: 'traffic', tip: msg({ id: 'performance.compare.measureTip.apiRequests', defaultMessage: 'Agent API requests by the session (and agents it started), not the harness’s own.', description: "Tooltip of the API requests measure in Performance → Compare. The harness is the test program that runs the scenarios." }) },
+  { key: 'combworkCallErrors', label: msg({ id: 'performance.compare.measure.combworkCallErrors', defaultMessage: 'Failed calls', description: "A measure in Performance → Compare: calls of Combwork's tools that failed." }), unit: 'count', group: 'failures', tip: msg({ id: 'performance.compare.measureTip.combworkCallErrors', defaultMessage: 'Combwork tool calls that failed.', description: "Tooltip of the Failed calls measure in Performance → Compare. Keep Combwork (the app's name)." }) },
+  { key: 'toolErrors', label: msg({ id: 'performance.compare.measure.toolErrors', defaultMessage: 'Tool errors', description: 'A measure in Performance → Compare: tool replies that were errors.' }), unit: 'count', group: 'failures', tip: msg({ id: 'performance.compare.measureTip.toolErrors', defaultMessage: 'Tool replies that were errors (the bridge’s count).', description: "Tooltip of the Tool errors measure in Performance → Compare. The bridge is Combwork's MCP server between the CLI and Combwork." }) },
+  { key: 'apiFailed', label: msg({ id: 'performance.compare.measure.apiFailed', defaultMessage: 'API failures', description: "A measure in Performance → Compare: requests to Combwork's Agent API that failed." }), unit: 'count', group: 'failures', tip: msg({ id: 'performance.compare.measureTip.apiFailed', defaultMessage: 'Refused, failed or cancelled requests.', description: 'Tooltip of the API failures measure in Performance → Compare.' }) },
+  { key: 'apiCancelled', label: msg({ id: 'performance.compare.measure.apiCancelled', defaultMessage: 'API cancelled', description: "A measure in Performance → Compare: requests to Combwork's Agent API that the caller cancelled." }), unit: 'count', group: 'failures', tip: msg({ id: 'performance.compare.measureTip.apiCancelled', defaultMessage: 'Requests the client gave up on.', description: 'Tooltip of the API cancelled measure in Performance → Compare.' }) },
+  { key: 'apiRequests', label: msg({ id: 'performance.compare.measure.apiRequests', defaultMessage: 'API requests', description: "A measure in Performance → Compare: requests to Combwork's Agent API." }), unit: 'count', group: 'traffic', tip: msg({ id: 'performance.compare.measureTip.apiRequests', defaultMessage: 'Agent API requests by the session (and agents it started), not the harness’s own.', description: "Tooltip of the API requests measure in Performance → Compare. The harness is the test program that runs the scenarios." }) },
   { key: 'apiResponseBytes', label: msg({ id: 'performance.compare.measure.apiResponseBytes', defaultMessage: 'API sent', description: "A measure in Performance → Compare: the size of the Agent API's replies." }), unit: 'bytes', group: 'traffic', tip: msg({ id: 'performance.compare.measureTip.apiResponseBytes', defaultMessage: 'Response bodies Combwork’s API sent.', description: 'Tooltip of the API sent measure in Performance → Compare.' }) },
   { key: 'apiRequestBytes', label: msg({ id: 'performance.compare.measure.apiRequestBytes', defaultMessage: 'API received', description: "A measure in Performance → Compare: the size of the requests the Agent API received." }), unit: 'bytes', group: 'traffic', tip: msg({ id: 'performance.compare.measureTip.apiRequestBytes', defaultMessage: 'Request bodies Combwork’s API received.', description: 'Tooltip of the API received measure in Performance → Compare.' }) },
-  { key: 'apiMs', label: msg({ id: 'performance.compare.measure.apiMs', defaultMessage: 'API time', description: "A measure in Performance → Compare: the time Hive's Agent API spent on requests." }), unit: 'ms', group: 'time', tip: msg({ id: 'performance.compare.measureTip.apiMs', defaultMessage: 'Time Combwork spent on the requests, in all.', description: 'Tooltip of the API time measure in Performance → Compare.' }) },
+  { key: 'apiMs', label: msg({ id: 'performance.compare.measure.apiMs', defaultMessage: 'API time', description: "A measure in Performance → Compare: the time Combwork's Agent API spent on requests." }), unit: 'ms', group: 'time', tip: msg({ id: 'performance.compare.measureTip.apiMs', defaultMessage: 'Time Combwork spent on the requests, in all.', description: 'Tooltip of the API time measure in Performance → Compare.' }) },
   { key: 'skillBytes', label: msg({ id: 'performance.compare.measure.skillBytes', defaultMessage: 'Skills on disk', description: 'A measure in Performance → Compare: the size of the skills delivered to a session.' }), unit: 'bytes', group: 'skills', tip: msg({ id: 'performance.compare.measureTip.skillBytes', defaultMessage: 'Delivered skills’ bytes: what was available, not what a model read.', description: 'Tooltip of the Skills on disk measure in Performance → Compare.' }) },
   { key: 'skillsNotDelivered', label: msg({ id: 'performance.compare.measure.skillsNotDelivered', defaultMessage: 'Skills not given', description: "A measure in Performance → Compare: skills a session should have had but didn't get." }), unit: 'count', group: 'skills', tip: msg({ id: 'performance.compare.measureTip.skillsNotDelivered', defaultMessage: 'Skills asked for that the session didn’t get.', description: 'Tooltip of the Skills not given measure in Performance → Compare.' }) },
-  { key: 'skillScans', label: msg({ id: 'performance.compare.measure.skillScans', defaultMessage: 'Skill scans', description: 'A measure in Performance → Compare: how often Hive looked through the skills.' }), unit: 'count', group: 'skills', tip: msg({ id: 'performance.compare.measureTip.skillScans', defaultMessage: 'The skill service’s scans during the scenario.', description: 'Tooltip of the Skill scans measure in Performance → Compare.' }) },
-  { key: 'skillHits', label: msg({ id: 'performance.compare.measure.skillHits', defaultMessage: 'Skill cache hits', description: 'A measure in Performance → Compare: skills Hive found unchanged in its cache.' }), unit: 'count', group: 'skills', tip: msg({ id: 'performance.compare.measureTip.skillHits', defaultMessage: 'Skills found unchanged (more is fine: shown for the cache scenarios).', description: 'Tooltip of the Skill cache hits measure in Performance → Compare.' }) },
-  { key: 'skillMisses', label: msg({ id: 'performance.compare.measure.skillMisses', defaultMessage: 'Skill cache misses', description: 'A measure in Performance → Compare: skills Hive had to read again.' }), unit: 'count', group: 'skills', tip: msg({ id: 'performance.compare.measureTip.skillMisses', defaultMessage: 'Skills read again (changed, or not cached).', description: 'Tooltip of the Skill cache misses measure in Performance → Compare.' }) },
-  { key: 'skillInvalidations', label: msg({ id: 'performance.compare.measure.skillInvalidations', defaultMessage: 'Skill changes seen', description: 'A measure in Performance → Compare: skills Hive found changed.' }), unit: 'count', group: 'skills', tip: msg({ id: 'performance.compare.measureTip.skillInvalidations', defaultMessage: 'Kept revisions found changed.', description: 'Tooltip of the Skill changes seen measure in Performance → Compare.' }) },
-  { key: 'skillBytesRead', label: msg({ id: 'performance.compare.measure.skillBytesRead', defaultMessage: 'Skill bytes read', description: 'A measure in Performance → Compare: how much of the skills Hive read from disk.' }), unit: 'bytes', group: 'skills', tip: msg({ id: 'performance.compare.measureTip.skillBytesRead', defaultMessage: 'Bytes the skill service read from disk.', description: 'Tooltip of the Skill bytes read measure in Performance → Compare.' }) },
+  { key: 'skillScans', label: msg({ id: 'performance.compare.measure.skillScans', defaultMessage: 'Skill scans', description: 'A measure in Performance → Compare: how often Combwork looked through the skills.' }), unit: 'count', group: 'skills', tip: msg({ id: 'performance.compare.measureTip.skillScans', defaultMessage: 'The skill service’s scans during the scenario.', description: 'Tooltip of the Skill scans measure in Performance → Compare.' }) },
+  { key: 'skillHits', label: msg({ id: 'performance.compare.measure.skillHits', defaultMessage: 'Skill cache hits', description: 'A measure in Performance → Compare: skills Combwork found unchanged in its cache.' }), unit: 'count', group: 'skills', tip: msg({ id: 'performance.compare.measureTip.skillHits', defaultMessage: 'Skills found unchanged (more is fine: shown for the cache scenarios).', description: 'Tooltip of the Skill cache hits measure in Performance → Compare.' }) },
+  { key: 'skillMisses', label: msg({ id: 'performance.compare.measure.skillMisses', defaultMessage: 'Skill cache misses', description: 'A measure in Performance → Compare: skills Combwork had to read again.' }), unit: 'count', group: 'skills', tip: msg({ id: 'performance.compare.measureTip.skillMisses', defaultMessage: 'Skills read again (changed, or not cached).', description: 'Tooltip of the Skill cache misses measure in Performance → Compare.' }) },
+  { key: 'skillInvalidations', label: msg({ id: 'performance.compare.measure.skillInvalidations', defaultMessage: 'Skill changes seen', description: 'A measure in Performance → Compare: skills Combwork found changed.' }), unit: 'count', group: 'skills', tip: msg({ id: 'performance.compare.measureTip.skillInvalidations', defaultMessage: 'Kept revisions found changed.', description: 'Tooltip of the Skill changes seen measure in Performance → Compare.' }) },
+  { key: 'skillBytesRead', label: msg({ id: 'performance.compare.measure.skillBytesRead', defaultMessage: 'Skill bytes read', description: 'A measure in Performance → Compare: how much of the skills Combwork read from disk.' }), unit: 'bytes', group: 'skills', tip: msg({ id: 'performance.compare.measureTip.skillBytesRead', defaultMessage: 'Bytes the skill service read from disk.', description: 'Tooltip of the Skill bytes read measure in Performance → Compare.' }) },
   { key: 'seconds', label: msg({ id: 'performance.compare.measure.seconds', defaultMessage: 'Duration', description: "A measure in Performance → Compare: how long a scenario's run took." }), unit: 's', group: 'time', tip: msg({ id: 'performance.compare.measureTip.seconds', defaultMessage: 'The scenario’s run, start to end (a model trial’s varies most).', description: 'Tooltip of the Duration measure in Performance → Compare.' }) }
 ]
 
@@ -191,17 +199,17 @@ export const USAGE_MEASURES: MeasureDef[] = [
   { key: 'costUsd', label: msg({ id: 'performance.compare.measure.costUsd', defaultMessage: 'Cost', description: 'A measure in Performance → Compare: what a session cost, in dollars.' }), unit: 'usd', group: 'provider', tip: msg({ id: 'performance.compare.measureTip.costUsd', defaultMessage: 'API-equivalent; only when every sample on both sides has a cost (≈ when Combwork estimated one).', description: 'Tooltip of the Cost measure in Performance → Compare. Keep ≈ (it marks an estimate).' }) }
 ]
 
-/** A Performance export's summary measures: per hour Hive was recording, so ranges of different lengths compare. */
+/** A Performance export's summary measures: per hour Combwork was recording, so ranges of different lengths compare. */
 export const EXPORT_MEASURES: MeasureDef[] = [
-  { key: 'requests', label: msg({ id: 'performance.compare.measure.exportRequests', defaultMessage: 'API requests', description: "A measure in Performance → Compare of exports: requests to Hive's Agent API." }), unit: 'count', group: 'traffic', tip: msg({ id: 'performance.compare.measureTip.exportRequests', defaultMessage: 'Agent API requests, per hour recorded.', description: 'Tooltip of the API requests measure in Performance → Compare of exports.' }) },
+  { key: 'requests', label: msg({ id: 'performance.compare.measure.exportRequests', defaultMessage: 'API requests', description: "A measure in Performance → Compare of exports: requests to Combwork's Agent API." }), unit: 'count', group: 'traffic', tip: msg({ id: 'performance.compare.measureTip.exportRequests', defaultMessage: 'Agent API requests, per hour recorded.', description: 'Tooltip of the API requests measure in Performance → Compare of exports.' }) },
   { key: 'failed', label: msg({ id: 'performance.compare.measure.exportFailed', defaultMessage: 'Failed or cancelled', description: "A measure in Performance → Compare of exports: Agent API requests that failed or were cancelled." }), unit: 'count', group: 'failures', tip: PER_HOUR },
   { key: 'responseBytes', label: msg({ id: 'performance.compare.measure.exportResponseBytes', defaultMessage: 'API sent', description: "A measure in Performance → Compare of exports: the size of the Agent API's replies." }), unit: 'bytes', group: 'traffic', tip: PER_HOUR },
-  { key: 'toolCalls', label: msg({ id: 'performance.compare.measure.exportToolCalls', defaultMessage: 'Tool calls', description: "A measure in Performance → Compare of exports: calls of Hive's tools." }), unit: 'count', group: 'work', tip: PER_HOUR },
-  { key: 'toolChars', label: msg({ id: 'performance.compare.measure.exportToolChars', defaultMessage: 'Tool replies', description: "A measure in Performance → Compare of exports: the size of the replies of Hive's tools." }), unit: 'chars', group: 'context', tip: msg({ id: 'performance.compare.measureTip.exportToolChars', defaultMessage: 'Characters, per hour recorded.', description: 'Tooltip of the Tool replies measure in Performance → Compare of exports.' }) },
-  { key: 'detailCalls', label: msg({ id: 'performance.compare.measure.exportDetailCalls', defaultMessage: 'Detail calls', description: "A measure in Performance → Compare of exports: calls of Hive's tools that asked for the full reply." }), unit: 'count', group: 'work', tip: PER_HOUR },
+  { key: 'toolCalls', label: msg({ id: 'performance.compare.measure.exportToolCalls', defaultMessage: 'Tool calls', description: "A measure in Performance → Compare of exports: calls of Combwork's tools." }), unit: 'count', group: 'work', tip: PER_HOUR },
+  { key: 'toolChars', label: msg({ id: 'performance.compare.measure.exportToolChars', defaultMessage: 'Tool replies', description: "A measure in Performance → Compare of exports: the size of the replies of Combwork's tools." }), unit: 'chars', group: 'context', tip: msg({ id: 'performance.compare.measureTip.exportToolChars', defaultMessage: 'Characters, per hour recorded.', description: 'Tooltip of the Tool replies measure in Performance → Compare of exports.' }) },
+  { key: 'detailCalls', label: msg({ id: 'performance.compare.measure.exportDetailCalls', defaultMessage: 'Detail calls', description: "A measure in Performance → Compare of exports: calls of Combwork's tools that asked for the full reply." }), unit: 'count', group: 'work', tip: PER_HOUR },
   { key: 'launches', label: msg({ id: 'performance.compare.measure.exportLaunches', defaultMessage: 'Launches', description: 'A measure in Performance → Compare of exports: agent sessions started.' }), unit: 'count', group: 'work', tip: PER_HOUR },
-  { key: 'guidancePerLaunch', label: msg({ id: 'performance.compare.measure.exportGuidancePerLaunch', defaultMessage: 'Guidance a launch', description: "A measure in Performance → Compare of exports: the size of Hive's guidance for each session started." }), unit: 'bytes', group: 'context', tip: msg({ id: 'performance.compare.measureTip.exportGuidancePerLaunch', defaultMessage: 'Core, project, the Assistant’s role and mode, and catalog, on average (not per hour).', description: 'Tooltip of the Guidance a launch measure in Performance → Compare of exports: its parts.' }) },
-  { key: 'toolListPerLaunch', label: msg({ id: 'performance.compare.measure.exportToolListPerLaunch', defaultMessage: 'Tool list a launch', description: "A measure in Performance → Compare of exports (HI-2049): the size of the list of Hive's tools each session was given." }), unit: 'chars', group: 'context', tip: msg({ id: 'performance.compare.measureTip.exportToolListPerLaunch', defaultMessage: 'The Combwork tools’ names, descriptions and schemas as each session’s CLI got them, in characters, on average (not per hour). Sessions from before Combwork counted characters are left out.', description: "Tooltip of the Tool list a launch measure in Performance → Compare of exports. Keep Combwork (the app's name)." }) }
+  { key: 'guidancePerLaunch', label: msg({ id: 'performance.compare.measure.exportGuidancePerLaunch', defaultMessage: 'Guidance a launch', description: "A measure in Performance → Compare of exports: the size of Combwork's guidance for each session started." }), unit: 'bytes', group: 'context', tip: msg({ id: 'performance.compare.measureTip.exportGuidancePerLaunch', defaultMessage: 'Core, project, the Assistant’s role and mode, and catalog, on average (not per hour).', description: 'Tooltip of the Guidance a launch measure in Performance → Compare of exports: its parts.' }) },
+  { key: 'toolListPerLaunch', label: msg({ id: 'performance.compare.measure.exportToolListPerLaunch', defaultMessage: 'Tool list a launch', description: "A measure in Performance → Compare of exports (HI-2049): the size of the list of Combwork's tools each session was given." }), unit: 'chars', group: 'context', tip: msg({ id: 'performance.compare.measureTip.exportToolListPerLaunch', defaultMessage: 'The Combwork tools’ names, descriptions and schemas as each session’s CLI got them, in characters, on average (not per hour). Sessions from before Combwork counted characters are left out.', description: "Tooltip of the Tool list a launch measure in Performance → Compare of exports. Keep Combwork (the app's name)." }) }
 ]
 
 /**
@@ -253,7 +261,7 @@ export interface Sample {
   skipped: number
   checks: Check[]
   failedChecks: string[]
-  /** The session was given other guidance than Hive had when the run started (a stale launch): left out. */
+  /** The session was given other guidance than Combwork had when the run started (a stale launch): left out. */
   stale: boolean
   /** A resumed session: its provider usage is the whole conversation's, so it isn't compared. */
   resumed: boolean
@@ -265,10 +273,10 @@ export interface Sample {
   split?: { subject: Measures; others: Measures }
   /** The harness couldn't split every measure (incomplete coverage): what it couldn't is left out of `split`. */
   splitPartial?: boolean
-  /** Each agent's hive calls in the measured window (HI-2186), the subject first. */
+  /** Each agent's Combwork calls in the measured window (HI-2186), the subject first. */
   agents?: AgentCalls[]
   usage: Measures | null
-  /** Whether the usage's cost was Hive's estimate. */
+  /** Whether the usage's cost was Combwork's estimate. */
   costEstimated: boolean
   /** How complete the measurement was: recording on, measurements dropped, what made it partial. */
   coverage: { recording: boolean | null; dropped: number; partial: string[] }
@@ -349,7 +357,7 @@ export interface Artifact {
   scope: CompareScope
   /** Derived from a workspace export: one project's part, explicitly chosen. */
   derived?: string
-  /** The name is one Hive gave it (it came with none): the window says it from its facts (#1104). */
+  /** The name is one Combwork gave it (it came with none): the window says it from its facts (#1104). */
   labelKind?: LabelKind
   run?: BenchmarkRun
   scenarios?: ScenarioResult[]
@@ -363,7 +371,7 @@ const MEASURE_KEYS = new Set([...SCENARIO_MEASURES.map((m) => m.key).filter((k) 
  * A part's measures (HI-2186: the subject's, the other agents'): the scenario's own, less what isn't any one agent's (the
  * skill service's work, drops) and what the harness counts for the subject alone (its calls, the skills it read).
  */
-const NOT_SPLIT = new Set(['hiveCalls', 'hiveCallErrors', 'repeatedCalls', 'skillsRead', 'skillRefsRead', 'skillScans', 'skillHits', 'skillMisses', 'skillInvalidations', 'skillBytesRead', 'skillTooLarge', 'dropped'])
+const NOT_SPLIT = new Set(['combworkCalls', 'combworkCallErrors', 'repeatedCalls', 'skillsRead', 'skillRefsRead', 'skillScans', 'skillHits', 'skillMisses', 'skillInvalidations', 'skillBytesRead', 'skillTooLarge', 'dropped'])
 const SPLIT_KEYS = new Set([...MEASURE_KEYS].filter((k) => !NOT_SPLIT.has(k)))
 const USAGE_KEYS = new Set([...USAGE_MEASURES.map((m) => m.key), 'contextTokens'])
 const EXPORT_KEYS = new Set(['requests', 'failed', 'responseBytes', 'requestBytes', 'toolCalls', 'toolChars', 'detailCalls', 'launches', 'guidanceBytes', 'toolListStarts', 'toolListChars', ...SIDE_TOTALS.flatMap(sided)])
@@ -386,7 +394,7 @@ function withModeNames(m: Record<string, unknown> | null): Record<string, unknow
 }
 
 /**
- * Measures with what adds up from them: the launch guidance and Hive's context, only when every part they add up is
+ * Measures with what adds up from them: the launch guidance and Combwork's context, only when every part they add up is
  * known (a missing part leaves them unknown).
  */
 function withDerived(m: Measures | null): Measures | null {
@@ -408,7 +416,7 @@ export interface AgentCalls {
   agent: string
   role: 'assistant' | 'builder' | 'reviewer' | 'agent'
   side: 'subject' | 'other'
-  hiveCalls: number
+  combworkCalls: number
   /** Unknown (absent) where the log can't say. */
   toolListStarts?: number
   /** An `overflow` row: how many agents it sums. */
@@ -423,11 +431,11 @@ function readAgents(v: unknown): AgentCalls[] | undefined {
   const out: AgentCalls[] = []
   for (const x of v.slice(0, BENCHMARK_LIMITS.agents)) {
     const o = obj(x)
-    const calls = num(o?.hiveCalls)
+    const calls = num(o?.combworkCalls)
     if (!o || typeof o.agent !== 'string' || !o.agent || calls === null || !(AGENT_ROLES as readonly string[]).includes(String(o.role)) || (o.side !== 'subject' && o.side !== 'other')) continue
     const starts = num(o.toolListStarts)
     const agents = num(o.agents)
-    out.push({ agent: text(o.agent, 64), role: o.role as AgentCalls['role'], side: o.side, hiveCalls: calls, ...(starts !== null ? { toolListStarts: starts } : {}), ...(agents !== null ? { agents } : {}) })
+    out.push({ agent: text(o.agent, 64), role: o.role as AgentCalls['role'], side: o.side, combworkCalls: calls, ...(starts !== null ? { toolListStarts: starts } : {}), ...(agents !== null ? { agents } : {}) })
   }
   return out
 }
@@ -597,7 +605,7 @@ function partTotals(p: unknown, t: Measures, unknown: Set<string>): void {
   }
   for (const kind of ['api', 'mcp', 'guidance', 'catalog'] as const) {
     const v = o[kind]
-    // A report with no tool lists at all (one written by hand, or by a Hive from before they were counted) has none.
+    // A report with no tool lists at all (one written by hand, or by a Combwork from before they were counted) has none.
     if (kind === 'catalog' && v === undefined) continue
     const mark = (...keys: string[]): void => keys.forEach((k) => unknown.add(k))
     if (!Array.isArray(v) || v.length > BENCHMARK_LIMITS.series) {
@@ -708,7 +716,7 @@ export function summaryOf(report: unknown, project?: string): ExportSummary {
   }
 }
 
-/** A kept summary, re-read (Hive wrote it, but the file is on disk). A total it doesn't have is unknown. */
+/** A kept summary, re-read (Combwork wrote it, but the file is on disk). A total it doesn't have is unknown. */
 function readSummary(v: unknown): ExportSummary | null {
   const s = obj(v)
   const totals = s ? readMeasures(s.totals, EXPORT_KEYS) : null
@@ -753,7 +761,7 @@ export function parseArtifact(textValue: string, scope: CompareScope, opts: { us
   } catch {
     return refuse(M.notJson)
   }
-  if (!data) return refuse(M.notHive)
+  if (!data) return refuse(M.notCombwork)
   const app = obj(data.app)
   if (data.schema === BENCHMARK_SCHEMA) {
     if (scope.kind === 'project') return refuse(M.benchmarkOnProject)
@@ -765,6 +773,7 @@ export function parseArtifact(textValue: string, scope: CompareScope, opts: { us
     // i18n-ignore: a kept comparison's default name, stored in its file and renamed by the user (#1104: stays as written)
     return { artifact: { schema: BENCHMARK_SCHEMA, kind: 'scenarios', label: text(data.label) || `${run.provider} benchmark`, ...(text(data.label) ? {} : { labelKind: 'benchmark' as const }), createdAt: iso(data.createdAt), appVersion: text(app?.version, 40), scope: { kind: 'workspace' }, run, scenarios } }
   }
+  if (data.schema === OLD_METRICS_EXPORT_SCHEMA) return refuse(M.from10)
   if (data.schema === METRICS_EXPORT_SCHEMA) {
     const report = obj(data.report)
     const fileScope = readScope(report?.scope)
@@ -805,7 +814,7 @@ export function parseArtifact(textValue: string, scope: CompareScope, opts: { us
 }
 
 /**
- * Re-reads a kept artifact through the same normalisers (Hive wrote it, but the file is on disk): a fresh, bounded
+ * Re-reads a kept artifact through the same normalisers (Combwork wrote it, but the file is on disk): a fresh, bounded
  * object, never the one read. Null if it isn't a valid one.
  */
 export function readKept(v: unknown): Artifact | null {
@@ -838,9 +847,9 @@ export interface KeptEntry {
   pinned: boolean
   /** One line saying what it is (provider and model, or the export's range and filters), in English. */
   about: string
-  /** What `about` (and a name Hive gave it) were made from, so the window says them in its language (#1104); none on entries kept before. */
+  /** What `about` (and a name Combwork gave it) were made from, so the window says them in its language (#1104); none on entries kept before. */
   facts?: KeptFacts
-  /** The name is one Hive gave it: the window says it from `facts` (#1104). */
+  /** The name is one Combwork gave it: the window says it from `facts` (#1104). */
   labelKind?: LabelKind
   /** A project's: that project's stable id (#514), so it stays its own whatever the project is called later. */
   owner?: string
@@ -873,11 +882,11 @@ export function aboutOf(a: Artifact): string {
   return `${s.from.slice(0, 16).replace('T', ' ')} to ${s.to.slice(0, 16).replace('T', ' ')}: ${f}${a.derived ? ` (${a.derived})` : ''}`
 }
 
-/** What Hive made a kept comparison's description from (#1104), kept in its index entry: the window says it in its language. */
+/** What Combwork made a kept comparison's description from (#1104), kept in its index entry: the window says it in its language. */
 export type KeptFacts =
   | { kind: 'scenarios'; real: boolean; provider: string; model: string; effort: string; mode: string | null; fixtures: number; scenarios: number; repeats: number; head: string; dirty: boolean; spentUsd: number; unpriced: number }
   | { kind: 'export'; from: string; to: string; filters: ExportSummary['filters']; part: boolean }
-/** The name Hive gave a kept comparison that came with none: a benchmark's, an export's, or a kept Performance view's. */
+/** The name Combwork gave a kept comparison that came with none: a benchmark's, an export's, or a kept Performance view's. */
 export type LabelKind = 'benchmark' | 'export' | 'kept'
 const isLabelKind = (v: unknown): v is LabelKind => v === 'benchmark' || v === 'export' || v === 'kept'
 
@@ -905,7 +914,7 @@ function factsAndLabel(e: Record<string, unknown>): { facts?: KeptFacts; labelKi
   return { ...(facts ? { facts } : {}), ...(facts && isLabelKind(e.labelKind) ? { labelKind: e.labelKind } : {}) }
 }
 
-/** A kept comparison's name as the window shows it: one Hive gave it, said from its facts in the window's language; the user's as written. */
+/** A kept comparison's name as the window shows it: one Combwork gave it, said from its facts in the window's language; the user's as written. */
 export function keptLabel(e: Pick<KeptEntry, 'label' | 'labelKind' | 'facts' | 'scope'>): TextPart {
   const f = e.facts
   if (!e.labelKind || !f) return e.label
@@ -982,7 +991,7 @@ export interface ScenarioComparison {
   subject: 'assistant' | 'agent'
   /** The subject's measures and the other agents' apart (HI-2186), when every usable sample on both sides has them. */
   split: { subject: MeasureDelta[]; others: MeasureDelta[] } | null
-  /** Each agent's hive calls in the measured window, on average a sample (null: unknown), when every sample has them. */
+  /** Each agent's Combwork calls in the measured window, on average a sample (null: unknown), when every sample has them. */
   agents: AgentCallsDelta[] | null
   usage: MeasureDelta[] | null
   /** In English (tests, code); `notesText` is the same for the window. */
@@ -990,7 +999,7 @@ export interface ScenarioComparison {
   notesText: Text[]
 }
 
-/** An agent's hive calls, baseline and run (HI-2186): null where a side can't say (its rows overflowed). */
+/** An agent's Combwork calls, baseline and run (HI-2186): null where a side can't say (its rows overflowed). */
 export interface AgentCallsDelta {
   agent: string
   role: AgentCalls['role']
@@ -1053,9 +1062,9 @@ function checkCounts(samples: Sample[]): Map<string, { passed: number; failed: n
 const avg = (xs: Sample[], f: (s: Sample) => number): number => (xs.length ? xs.reduce((n, s) => n + f(s), 0) / xs.length : 0)
 
 /** Measures that mean more failures or more work when they grow: a growth is a regression, whatever the size did. */
-const FAILURE_KEYS = ['hiveCallErrors', 'toolErrors', 'apiFailed', 'apiCancelled', 'repeatedCalls', 'hiveCalls']
+const FAILURE_KEYS = ['combworkCallErrors', 'toolErrors', 'apiFailed', 'apiCancelled', 'repeatedCalls', 'combworkCalls']
 
-/** Why a sample is left out: Hive's own reasons as messages, the harness's own words (or an older Hive's) as written. */
+/** Why a sample is left out: Combwork's own reasons as messages, the harness's own words (or an older version's) as written. */
 const SAMPLE_PROBLEMS = [M.tooManyChecks, M.invalidCheck, M.checkTwice, M.checksNotList, M.countsDiffer, M.failedNoCheck, M.noCheckRan, M.didntComplete]
 const sampleProblem = (reason: string): TextPart => SAMPLE_PROBLEMS.find((m) => m.defaultMessage === reason) ?? reason
 
@@ -1150,7 +1159,7 @@ function compareScenario(id: string, base: ScenarioResult | undefined, run: Scen
 const SPLIT_SHOWN = new Set(SCENARIO_MEASURES.map((m) => m.key).filter((k) => !NOT_SPLIT.has(k) && k !== 'seconds'))
 
 /**
- * Each agent's hive calls on average a sample, baseline and run (HI-2186), matched by its fixture identity (name and
+ * Each agent's Combwork calls on average a sample, baseline and run (HI-2186), matched by its fixture identity (name and
  * role), the subject first. An agent missing from a sample's rows made no call, unless that sample's rows overflowed:
  * then that side is unknown for it. Null unless every usable sample on both sides listed its agents.
  */
@@ -1165,7 +1174,7 @@ function agentDeltas(b: Sample[], r: Sample[]): AgentCallsDelta[] | null {
     for (const s of xs) {
       const row = s.agents!.find((a) => key(a) === k)
       if (row) {
-        n += row.hiveCalls
+        n += row.combworkCalls
         if (row.agents !== undefined) most = Math.max(most ?? 0, row.agents)
       } else if (s.agents!.some((a) => a.agent === 'overflow')) return { v: null }
     }
@@ -1215,7 +1224,7 @@ export function compareArtifacts(base: Artifact, run: Artifact): Comparison {
     if (a.guidance && b.guidance && a.guidance === b.guidance) notes.push(M.sameGuidance)
     const realUsage = a.real && b.real
     if (!realUsage) notes.push(M.fakeUsage)
-    // The scripted fakes start a hive server a call (fake-copilot runs the real Copilot CLI, which keeps one).
+    // The scripted fakes start a combwork server a call (fake-copilot runs the real Copilot CLI, which keeps one).
     if ([a, b].some((x) => x.provider === 'fake' || x.provider === 'fake-codex')) notes.push(M.fakePerCall)
     const ids = [...new Set([...base.scenarios.map((s) => s.id), ...run.scenarios.map((s) => s.id)])]
     const scenarios = ids.map((id) =>

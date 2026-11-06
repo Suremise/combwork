@@ -24,7 +24,7 @@ const list = (items: string[]): string => fmt.list(items, 'conjunction')
 const M = {
   region: msg({ id: 'git.queue.region', defaultMessage: 'Merge queues', description: "Accessible name of the Git tab's Merge queue section: the project's merge queues, a part per target branch. Glossary 2.5: merge queue." }),
   reading: msg({ id: 'git.queue.reading', defaultMessage: 'Reading the merge queues…', description: "The Version Control tab's Merge queue section while the project's queues are read. Glossary 2.5: merge queue." }),
-  none: msg({ id: 'git.queue.none', defaultMessage: "No merge queue. When the project's workflow has Combwork merge its cards (Version Control → Workflow: Who merges), each target branch's queue shows here, with its history.", description: "The Version Control tab's Merge queue section when the project has no queue. Version Control → Workflow and Who merges are Hive's names: keep them as Hive shows them. Glossary 2.5: merge queue." }),
+  none: msg({ id: 'git.queue.none', defaultMessage: "No merge queue. When the project's workflow has Combwork merge its cards (Version Control → Workflow: Who merges), each target branch's queue shows here, with its history.", description: "The Version Control tab's Merge queue section when the project has no queue. Version Control → Workflow and Who merges are Combwork's names: keep them as Combwork shows them. Glossary 2.5: merge queue." }),
   history: msg({ id: 'git.queue.history', defaultMessage: 'History of {target}', description: "A heading in the Git tab's Merge queue section: the latest outcomes of the queue for the branch {target} follow." }),
   noHistory: msg({ id: 'git.queue.noHistory', defaultMessage: 'Nothing merged or returned yet.', description: "The Git tab's Merge queue section, under a queue's history heading, when it has none yet." }),
   card: msg({ id: 'git.queue.card', defaultMessage: 'Card', description: "A column heading of the Git tab's merge queue history: the card." }),
@@ -110,7 +110,7 @@ export function GitQueueSection({ project }: { project: ProjectInfo }) {
  * with its detail (the merge commit, why it was returned or taken out) as its tooltip.
  */
 function historyColumns(v: QueueView, runs: readonly ProgressRun[], short: (id: string) => string): DataColumn<QueueRecent>[] {
-  // A red check named by its run, as the panel names it (when Hive still keeps the run).
+  // A red check named by its run, as the panel names it (when Combwork still keeps the run).
   const why = (r: QueueRecent): string => {
     const run = returnRun(v, r, runs)
     return returnWhy(r, returnCheck(r, run), v.target, tr, list)

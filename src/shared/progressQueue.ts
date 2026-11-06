@@ -109,12 +109,12 @@ export const justMerged = (v: QueueView, now: number): QueueRecent[] => v.recent
 /**
  * Whether a target's queue shows (#1356 item 0, round 2 of #1338): from its actual state, never the project's current
  * options alone. It shows while it has an entry testing or queued, a pause, a return not seen yet (or seen just now), a
- * merge of the last few seconds, a Hive running it (a lease), or a card in flight whose own ruleset has Hive merge into
- * it; and, empty, while the current options have Hive merge into it. So after a switch to "The agent merges" (or Git →
+ * merge of the last few seconds, a Combwork running it (a lease), or a card in flight whose own ruleset has Combwork merge into
+ * it; and, empty, while the current options have Combwork merge into it. So after a switch to "The agent merges" (or Git →
  * None with an old Git ruleset's cards in flight) the old queue stays, controllable, until its last outcome is seen.
  */
 export function queueShown(v: QueueView, now: number): boolean {
-  return !!v.testing || v.queued.length > 0 || !!v.paused || !!v.runBy || v.inFlight.length > 0 || v.hiveMerges || shownReturns(v, now).length > 0 || justMerged(v, now).length > 0
+  return !!v.testing || v.queued.length > 0 || !!v.paused || !!v.runBy || v.inFlight.length > 0 || v.combworkMerges || shownReturns(v, now).length > 0 || justMerged(v, now).length > 0
 }
 
 /** The queues that show, by project (its name) then target. */
@@ -127,7 +127,7 @@ export const BUSY_MERGE_MS = 60 * 60_000
 
 /**
  * Whether a queue is doing something now (HI-2165): an entry testing or queued, a pause, a return not seen yet (or seen
- * just now), or a merge in the last hour. An idle queue that only shows because Hive merges into it (or runs it) isn't.
+ * just now), or a merge in the last hour. An idle queue that only shows because Combwork merges into it (or runs it) isn't.
  */
 export function queueBusy(v: QueueView, now: number): boolean {
   return !!v.testing || v.queued.length > 0 || !!v.paused || shownReturns(v, now).length > 0 || v.recent.some((r) => r.outcome === 'merged' && now - at(r.at) < BUSY_MERGE_MS)
@@ -146,18 +146,18 @@ export const onPulseLine = (v: QueueView): boolean => !!v.testing || !!v.paused
 export const queuedCount = (views: readonly QueueView[]): number => views.reduce((n, v) => n + v.queued.length, 0)
 
 /**
- * The estimate for the entry testing now (#1356 item 1): the median time of this target's last merge checks, from Hive's
- * runs (#1349). A merge's checks are Hive's runs in the project on its result revision (the test merge's, which the
+ * The estimate for the entry testing now (#1356 item 1): the median time of this target's last merge checks, from Combwork's
+ * runs (#1349). A merge's checks are Combwork's runs in the project on its result revision (the test merge's, which the
  * checks ran on); only merges whose runs all passed count, the newest ESTIMATE_OF of them. Null when there are none.
  */
 export function queueEstimate(v: QueueView, runs: readonly ProgressRun[]): number | null {
   const results = new Map<string, number>()
-  for (const r of v.recent) if (r.outcome === 'merged' && r.by === 'hive' && r.result) results.set(r.result, at(r.at))
+  for (const r of v.recent) if (r.outcome === 'merged' && r.by === 'combwork' && r.result) results.set(r.result, at(r.at))
   if (!results.size) return null
   const project = v.projectPath.toLowerCase()
   const groups = new Map<string, ProgressRun[]>()
   for (const r of runs) {
-    if (r.source !== 'hive' || !r.revision || !results.has(r.revision) || r.projectPath?.toLowerCase() !== project) continue
+    if (r.source !== 'combwork' || !r.revision || !results.has(r.revision) || r.projectPath?.toLowerCase() !== project) continue
     groups.set(r.revision, [...(groups.get(r.revision) ?? []), r])
   }
   const spans = [...groups.entries()]
@@ -172,7 +172,7 @@ export function queueEstimate(v: QueueView, runs: readonly ProgressRun[]): numbe
 }
 
 /**
- * The Hive run of a returned entry's failed check (its log is Show log's, #1349): the card's Hive run in the project
+ * The Combwork run of a returned entry's failed check (its log is Show log's, #1349): the card's Combwork run in the project
  * whose log the outcome recorded, never another attempt's found by time (HI-1924, HR1's round 1). Null for a return no
  * check made (a conflict, a hook), an outcome that kept no log, or a run not kept.
  */
@@ -180,13 +180,13 @@ export function returnRun(v: QueueView, r: QueueRecent, runs: readonly ProgressR
   if (r.reason !== 'checks' || !r.logPath) return null
   const project = v.projectPath.toLowerCase()
   const log = r.logPath.toLowerCase()
-  return runs.find((x) => x.source === 'hive' && x.card === r.card && x.projectPath?.toLowerCase() === project && x.logPath?.toLowerCase() === log) ?? null
+  return runs.find((x) => x.source === 'combwork' && x.card === r.card && x.projectPath?.toLowerCase() === project && x.logPath?.toLowerCase() === log) ?? null
 }
 
 /** The check a return names: the one its outcome recorded, else its run's (null: none known). */
 export const returnCheck = (r: QueueRecent, run: ProgressRun | null): string | null => r.check ?? (run ? runCheckName(run) : null)
 
-/** A Hive run's check as its title names it ("HI-12 · unit · a3f2c1d": unit), or its counted check's name. */
+/** A Combwork run's check as its title names it ("HI-12 · unit · a3f2c1d": unit), or its counted check's name. */
 export function runCheckName(r: ProgressRun): string {
   if (r.counts?.name) return r.counts.name
   const parts = r.title.split(' · ')
@@ -234,14 +234,14 @@ export function returnWhy(r: QueueRecent, check: string | null, target: string, 
     msg({
       id: 'board.queue.returnWhy',
       defaultMessage: '{reason, select, conflict {{files, select, none {conflict} other {conflict in {files}}}} checks {{check, select, none {checks failed} other {checks failed: {check}}}} hook {a hook failed} folderBusy {the folder {target} is checked out in was busy} notUpToDate {not up to date with {target}} focused {its focused tests couldn’t be chosen or proved} other {{why}}}',
-      description: "Why the merge queue returned a card to its builder, in a few words after a colon: a conflict (in {files}: file names), its merge checks failed ({check}: the check, such as unit), a git hook failed, the folder the target ({target}: a branch) is checked out in was busy, or it wasn't up to date with the target, or its focused tests (G20: the tests its change needs) couldn't be chosen or proved by its review; else {why} as Hive recorded it. Lower case. Keep the select keys and the word none."
+      description: "Why the merge queue returned a card to its builder, in a few words after a colon: a conflict (in {files}: file names), its merge checks failed ({check}: the check, such as unit), a git hook failed, the folder the target ({target}: a branch) is checked out in was busy, or it wasn't up to date with the target, or its focused tests (G20: the tests its change needs) couldn't be chosen or proved by its review; else {why} as Combwork recorded it. Lower case. Keep the select keys and the word none."
     }),
     { reason, files: files.length ? (more > 0 ? list([...files, tr(msg({ id: 'board.queue.filesMore', defaultMessage: '{n, plural, one {# more} other {# more}}', description: 'The last item of a list of the files a merge conflict named, when there are more than shown: how many more ({n}). The list joins it to the first few as your language joins a list (HI-1585: no "and" written around a list).' }), { n: more })]) : list(files)) : 'none', check: check ?? 'none', target, why: r.reason ?? '' } // i18n-ignore: select keys, never shown
   )
   return r.transient ? tr(msg({ id: 'board.queue.transient', defaultMessage: '{why} (temporary)', description: "A merge queue return that was the environment's failure, not the work's (a check that couldn't start, a network error): its reason ({why}) and that it was temporary." }), { why }) : why
 }
 
-/** A return: "HI-108 returned to HB1: conflict in tasks.ts" (`builder` null: to no one Hive knows). */
+/** A return: "HI-108 returned to HB1: conflict in tasks.ts" (`builder` null: to no one Combwork knows). */
 export function returnedText(r: QueueRecent, why: string, builder: string | null, tr: Tr): string {
   if (!builder) return tr(msg({ id: 'board.queue.returned', defaultMessage: '{card} returned: {why}', description: "A merge queue's card in the Progress panel: a card ({card}: its key) the queue returned (glossary 2.4: returned), and why ({why}: conflict in tasks.ts, checks failed: unit…)." }), { card: r.key, why })
   return tr(msg({ id: 'board.queue.returnedTo', defaultMessage: '{card} returned to builder {builder}: {why}', description: "A merge queue's card in the Progress panel: a card ({card}: its key) the queue returned to its builder ({builder}: an agent's name; glossary 2.4: returned), and why ({why}: conflict in tasks.ts, checks failed: unit…). A noun before the name (glossary §1 rule 4)." }), { card: r.key, builder, why })
@@ -250,31 +250,31 @@ export function returnedText(r: QueueRecent, why: string, builder: string | null
 const PAUSES: Record<string, Msg> = {
   pushRejected: msg({ id: 'board.queue.pause.pushRejected', defaultMessage: '{card} is merged, but its remote refused the push of {target}: it has commits {target} hasn’t (Combwork never forces a push). Pull them into {target}, then resume; or turn off “Push the target branch after merging” and resume to keep merging locally.', description: "Why a merge queue is paused, on its card in the Progress panel (G18): after merging a card ({card}: its key), pushing the target ({target}: a branch) was refused because the remote has newer commits. “Push the target branch after merging” is a workflow option's name: use its words." }),
   pushFailed: msg({ id: 'board.queue.pause.pushFailed', defaultMessage: '{card} is merged, but pushing {target} failed (git’s message follows). Fix it, then resume; or turn off “Push the target branch after merging” and resume to keep merging locally.', description: "Why a merge queue is paused, on its card in the Progress panel (G18): after merging a card ({card}: its key), pushing the target ({target}: a branch) failed, for a sign-in, the network or a time limit; git's own message follows. “Push the target branch after merging” is a workflow option's name: use its words." }),
-  pushUnreadable: msg({ id: 'board.queue.pause.pushUnreadable', defaultMessage: '{card} is merged, and {target} still has to be pushed, but Combwork couldn’t read {target} to do it. Resume to try again; or turn off “Push the target branch after merging” and resume to keep merging locally.', description: "Why a merge queue is paused, on its card in the Progress panel (G18): after merging a card ({card}: its key), Hive couldn't read the target ({target}: a branch) to push it (git didn't answer), so the push still waits. “Push the target branch after merging” is a workflow option's name: use its words." }),
+  pushUnreadable: msg({ id: 'board.queue.pause.pushUnreadable', defaultMessage: '{card} is merged, and {target} still has to be pushed, but Combwork couldn’t read {target} to do it. Resume to try again; or turn off “Push the target branch after merging” and resume to keep merging locally.', description: "Why a merge queue is paused, on its card in the Progress panel (G18): after merging a card ({card}: its key), Combwork couldn't read the target ({target}: a branch) to push it (git didn't answer), so the push still waits. “Push the target branch after merging” is a workflow option's name: use its words." }),
   pushNoRemote: msg({ id: 'board.queue.pause.pushNoRemote', defaultMessage: '{card} is merged, but {target} has no remote to push to: it tracks none, and the repository has no origin or only remote. Add one or set what {target} tracks, then resume; or turn off “Push the target branch after merging” and resume.', description: "Why a merge queue is paused, on its card in the Progress panel (G18): after merging a card ({card}: its key), the target ({target}: a branch) had nowhere to be pushed. Origin is git's usual name for a remote: keep it. “Push the target branch after merging” is a workflow option's name: use its words." }),
   targetMovesFast: msg({ id: 'board.queue.pause.targetMovesFast', defaultMessage: '{target} kept moving during each test merge. Resume once it settles.', description: "Why a merge queue is paused, on its card in the Progress panel: the target ({target}: a branch) moved during every test merge. Glossary 2.5: test merge." }),
   folderBusy: msg({ id: 'board.queue.pause.folderBusy', defaultMessage: 'The folder {target} is checked out in was busy (an operation such as a merge or rebase was going on there).', description: "Why a merge queue is paused, on its card in the Progress panel: the folder where the target ({target}: a branch) is checked out was in the middle of a git operation." }),
   wrongBranch: msg({ id: 'board.queue.pause.wrongBranch', defaultMessage: 'The folder {target} was checked out in is on another branch now.', description: "Why a merge queue is paused, on its card in the Progress panel: the folder that had the target ({target}: a branch) checked out switched branch." }),
   staged: msg({ id: 'board.queue.pause.staged', defaultMessage: 'Changes are staged in the folder {target} is checked out in. Commit or unstage them, then resume.', description: "Why a merge queue is paused, on its card in the Progress panel: the folder where the target ({target}: a branch) is checked out has staged changes." }),
   unstagedChanges: msg({ id: 'board.queue.pause.unstagedChanges', defaultMessage: '{files, select, none {Files the merge changes} other {{files}}} have changes in the folder {target} is checked out in. Commit or undo them, then resume.', description: "Why a merge queue is paused, on its card in the Progress panel: files the merge would change ({files}: a list of names) have changes in the folder where the target ({target}: a branch) is checked out. Keep the select keys and the word none." }),
-  identity: msg({ id: 'board.queue.pause.identity', defaultMessage: "The repository has no commit identity, so Combwork can't make its merge commit. Set one in Version Control → Branches & remotes, then resume.", description: "Why a merge queue is paused, on its card in the Progress panel: git has no user name and email for the repository. Version Control → Branches & remotes is a place in Hive." }),
-  needsYou: msg({ id: 'board.queue.pause.needsYou', defaultMessage: 'Needs you: Combwork stopped part way and changes nothing more on its own. Open the card for its state and the commands that finish or undo it.', description: "Why a merge queue is paused, on its card in the Progress panel: something Hive couldn't settle by itself (a merge stopped part way, or what an earlier run left). Open the card: a button beside it." }),
+  identity: msg({ id: 'board.queue.pause.identity', defaultMessage: "The repository has no commit identity, so Combwork can't make its merge commit. Set one in Version Control → Branches & remotes, then resume.", description: "Why a merge queue is paused, on its card in the Progress panel: git has no user name and email for the repository. Version Control → Branches & remotes is a place in Combwork." }),
+  needsYou: msg({ id: 'board.queue.pause.needsYou', defaultMessage: 'Needs you: Combwork stopped part way and changes nothing more on its own. Open the card for its state and the commands that finish or undo it.', description: "Why a merge queue is paused, on its card in the Progress panel: something Combwork couldn't settle by itself (a merge stopped part way, or what an earlier run left). Open the card: a button beside it." }),
   uncounted: msg({ id: 'board.queue.pause.uncounted', defaultMessage: "The merge checks passed but didn't count for the merge, several times in a row. The card's Work section says why.", description: "Why a merge queue is paused, on its card in the Progress panel: its checks passed but didn't count (the folder changed during them, say). Glossary 2.3: merge checks; 2.4: work." }),
-  checkedOut: msg({ id: 'board.queue.pause.checkedOut', defaultMessage: '{target} is checked out in a folder. Combwork merges into it there now: resume to carry on.', description: "Why a merge queue is paused, on its card in the Progress panel: an older pause, from before Hive could merge into a checked-out branch ({target})." }),
+  checkedOut: msg({ id: 'board.queue.pause.checkedOut', defaultMessage: '{target} is checked out in a folder. Combwork merges into it there now: resume to carry on.', description: "Why a merge queue is paused, on its card in the Progress panel: an older pause, from before Combwork could merge into a checked-out branch ({target})." }),
   rulesOff: msg({ id: 'board.queue.pause.rulesOff', defaultMessage: "The workflow's rules are off (Settings → Advanced), so the queue doesn't merge.", description: "Why a merge queue is paused, on its card in the Progress panel: the workflow rules are turned off in Settings → Advanced." }),
-  signingWaits: msg({ id: 'board.queue.pause.signingWaits', defaultMessage: 'Signing the merge commit waits for you (a passphrase or a PIN). Unlock your signing key, then resume.', description: "Why a merge queue is paused, on its card in the Progress panel: git's commit signing asked for a passphrase or PIN, which Hive can't type." }),
+  signingWaits: msg({ id: 'board.queue.pause.signingWaits', defaultMessage: 'Signing the merge commit waits for you (a passphrase or a PIN). Unlock your signing key, then resume.', description: "Why a merge queue is paused, on its card in the Progress panel: git's commit signing asked for a passphrase or PIN, which Combwork can't type." }),
   signing: msg({ id: 'board.queue.pause.signing', defaultMessage: 'Signing the merge commit failed.', description: "Why a merge queue is paused, on its card in the Progress panel: git's commit signing failed (its message follows)." }),
   hookTimedOut: msg({ id: 'board.queue.pause.hookTimedOut', defaultMessage: "A hook of the merge commit was still running when signing's time ran out.", description: "Why a merge queue is paused, on its card in the Progress panel: a git hook kept running past the time limit." }),
-  subfolderTarget: msg({ id: 'board.queue.pause.subfolderTarget', defaultMessage: 'This project is inside a larger repository, so the queue merges only into a branch the card’s options name. Name it in Version Control → Workflow, apply it to {card} when you save, then resume; or remove {card} from the queue.', description: "Why a merge queue is paused, on its card in the Progress panel (OP-29): the project is a subfolder of a bigger Git repository and the card's options name no target branch. {card} is the card's key. Version Control → Workflow is a place in Hive (glossary 2.1); saving the options there can apply them to cards already started." }),
-  mergeChoice: msg({ id: 'board.queue.pause.mergeChoice', defaultMessage: '{card} is the first card to merge since the upgrade to Combwork 1.0: choose how Combwork merges this project (merge style and commit message) in For you, or in Version Control → Workflow.', description: "Why a merge queue is paused, on its card in the Progress panel (HI-1697): a project from before Hive 1.0 reached the merge queue for the first time ({card}: its key), and nobody chose its merge style and commit message (workflow options' names, glossary 2.6), so it waits for the user. For you is the list of what waits on the user (glossary 2.3); Version Control → Workflow is a place in Hive." }),
+  subfolderTarget: msg({ id: 'board.queue.pause.subfolderTarget', defaultMessage: 'This project is inside a larger repository, so the queue merges only into a branch the card’s options name. Name it in Version Control → Workflow, apply it to {card} when you save, then resume; or remove {card} from the queue.', description: "Why a merge queue is paused, on its card in the Progress panel (OP-29): the project is a subfolder of a bigger Git repository and the card's options name no target branch. {card} is the card's key. Version Control → Workflow is a place in Combwork (glossary 2.1); saving the options there can apply them to cards already started." }),
+  mergeChoice: msg({ id: 'board.queue.pause.mergeChoice', defaultMessage: '{card} is the first card to merge since the upgrade to Combwork 1.0: choose how Combwork merges this project (merge style and commit message) in For you, or in Version Control → Workflow.', description: "Why a merge queue is paused, on its card in the Progress panel (HI-1697): a project from before 1.0 reached the merge queue for the first time ({card}: its key), and nobody chose its merge style and commit message (workflow options' names, glossary 2.6), so it waits for the user. For you is the list of what waits on the user (glossary 2.3); Version Control → Workflow is a place in Combwork." }),
   approval: msg({ id: 'board.queue.pause.approval', defaultMessage: '{card} is ready to merge into {target}, which is checked out: it waits for your OK in For you.', description: "Why a merge queue is paused, on its card in the Progress panel: a card ({card}: its key) waits for the user's approval to update the checked-out target ({target}: a branch). For you is the list of what waits on the user (glossary 2.3)." })
 }
 
 /** Why a queue is paused, in a sentence (#1356 item 1): each pause reason a message, the user's and the Assistant's too. */
 export function pauseText(p: QueuePauseInfo, target: string, tr: Tr, list: (items: string[]) => string): string {
-  if (p.reason === 'user') return p.by === 'assistant' ? tr(msg({ id: 'board.queue.pause.byAssistant', defaultMessage: 'Paused by the Assistant. The queue merges nothing until it is resumed.', description: "Why a merge queue is paused, on its card in the Progress panel: the Hive Assistant paused it (Pause queue)." })) : tr(msg({ id: 'board.queue.pause.byYou', defaultMessage: 'Paused by you. The queue merges nothing until you resume it.', description: "Why a merge queue is paused, on its card in the Progress panel: the user paused it (Pause queue)." }))
+  if (p.reason === 'user') return p.by === 'assistant' ? tr(msg({ id: 'board.queue.pause.byAssistant', defaultMessage: 'Paused by the Assistant. The queue merges nothing until it is resumed.', description: "Why a merge queue is paused, on its card in the Progress panel: the Combwork Assistant paused it (Pause queue)." })) : tr(msg({ id: 'board.queue.pause.byYou', defaultMessage: 'Paused by you. The queue merges nothing until you resume it.', description: "Why a merge queue is paused, on its card in the Progress panel: the user paused it (Pause queue)." }))
   const m = PAUSES[p.reason]
-  if (!m) return tr(msg({ id: 'board.queue.pause.other', defaultMessage: 'Paused ({reason}).', description: "Why a merge queue is paused, on its card in the Progress panel, for a reason this window has no words for ({reason}: Hive's code for it)." }), { reason: p.reason })
+  if (!m) return tr(msg({ id: 'board.queue.pause.other', defaultMessage: 'Paused ({reason}).', description: "Why a merge queue is paused, on its card in the Progress panel, for a reason this window has no words for ({reason}: Combwork's code for it)." }), { reason: p.reason })
   const text = tr(m, { target, card: p.card ?? '', files: p.files.length ? list(p.files.slice(0, 5)) : 'none' }) // i18n-ignore: a select key, never shown
   return p.message ? `${text}\n${p.message}` : text // i18n-ignore: git's own message on the line after
 }
@@ -348,7 +348,7 @@ export function pauseWhyShort(p: Pick<QueuePauseLogged, 'reason' | 'by'>, tr: Tr
       id: 'board.queue.recent.paused',
       defaultMessage:
         'Paused: {reason, select, user {by you} assistant {by the Assistant} pushRejected {the remote refused the push} pushFailed {the push failed} pushNoRemote {no remote to push to} pushUnreadable {couldn’t read the branch to push it} targetMovesFast {the branch kept moving} folderBusy {its folder was busy} wrongBranch {its folder changed branch} staged {changes staged in its folder} unstagedChanges {changes in its folder} identity {no commit identity} needsYou {needs you} uncounted {the checks didn’t count} checkedOut {the branch was checked out} rulesOff {the rules were off} signingWaits {signing waited for you} signing {signing failed} hookTimedOut {a hook ran too long} subfolderTarget {no target branch named} mergeChoice {waiting for how to merge} approval {waiting for your OK} focusedSkip {waiting for your OK to skip focused tests} other {{code}}}',
-      description: "A pause in the Progress panel's Recent merges (Merges tab): the merge queue paused, and why in a few words (by the user or the Assistant; the push of the target branch refused, failed, with no remote or unreadable (G18); the branch moving, its checked-out folder busy, on another branch, with staged or other changes; no git identity; needs the user; checks that didn't count; rules off; commit signing; a git hook; no target branch for a project in a subfolder; the merge style choice after the upgrade; the user's approval; skipping focused tests). Else {code}, Hive's code for it. Lower case after the colon. Keep the select keys."
+      description: "A pause in the Progress panel's Recent merges (Merges tab): the merge queue paused, and why in a few words (by the user or the Assistant; the push of the target branch refused, failed, with no remote or unreadable (G18); the branch moving, its checked-out folder busy, on another branch, with staged or other changes; no git identity; needs the user; checks that didn't count; rules off; commit signing; a git hook; no target branch for a project in a subfolder; the merge style choice after the upgrade; the user's approval; skipping focused tests). Else {code}, Combwork's code for it. Lower case after the colon. Keep the select keys."
     }),
     { reason, code: p.reason }
   )
@@ -361,7 +361,7 @@ export function pushStateText(state: QueuePushState | undefined, tr: Tr): string
     msg({
       id: 'board.queue.recent.push',
       defaultMessage: '{state, select, pushed {Pushed} pending {Not pushed yet} off {Not pushed: pushing was turned off} reset {Not pushed: the branch no longer had it} other {Push not recorded}}',
-      description: "Beside a merge in the Progress panel's Recent merges (Merges tab), when the workflow pushes the target branch after merging (G18): pushed; not pushed yet; not pushed because the option was turned off, or because the branch was reset and no longer had the merge; or Hive has no record of its push (an older merge). Keep the select keys."
+      description: "Beside a merge in the Progress panel's Recent merges (Merges tab), when the workflow pushes the target branch after merging (G18): pushed; not pushed yet; not pushed because the option was turned off, or because the branch was reset and no longer had the merge; or Combwork has no record of its push (an older merge). Keep the select keys."
     }),
     { state }
   )

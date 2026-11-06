@@ -26,13 +26,13 @@ const check = (name, ok, extra = '') => {
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(proj, { recursive: true })
   lib.enableProviders(userData)
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47897) })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47897) })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1600, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('crowd', { exact: true }).first().click()
   await lib.sleep(500)
@@ -127,7 +127,7 @@ const check = (name, ok, extra = '') => {
     await lib.agentMenu(page, name)
     await page.locator('.menu-item', { hasText: 'Remove Agent…' }).click()
     await page.locator('.dialog-footer button', { hasText: /^Remove$/ }).click()
-    // Gone from Hive and from the panes (the dialog closes before the removal has finished).
+    // Gone from Combwork and from the panes (the dialog closes before the removal has finished).
     await lib.until(async () => !(await inv('workspace:refresh')).projects[0].agents.some((a) => a.name === name) && !(await page.locator('.pane-header-bar .agent-name').allInnerTexts()).some((t) => t.trim() === name), 10000)
   }
   await remove('Agent 9')

@@ -95,7 +95,7 @@ export interface DialectCatalogueText {
   placeholders: Record<string, string>
 }
 
-/** The catalogue of agent texts this Hive was built with: every text a dialect can override, by area. */
+/** The catalogue of agent texts this Combwork was built with: every text a dialect can override, by area. */
 export interface DialectCatalogue {
   areas: string[]
   texts: DialectCatalogueText[]
@@ -121,7 +121,7 @@ export interface DialectRow {
   /** Its overrides that apply, and those outdated (they fall through). */
   overrides: number
   outdated: number
-  /** Shipped with Hive and untouched, shipped and edited, or the user's own. */
+  /** Shipped with Combwork and untouched, shipped and edited, or the user's own. */
   state: 'shipped' | 'edited' | 'yours'
   /** An edited shipped file whose shipped version is newer than the one it was made from. */
   updateAvailable?: true
@@ -196,9 +196,9 @@ export function parseDialectFile(raw: string): { file: DialectFile } | { problem
 }
 
 /**
- * A dialect file as Hive writes it: its fields in order, ids sorted, two-space JSON with a final newline. An entry that
+ * A dialect file as Combwork writes it: its fields in order, ids sorted, two-space JSON with a final newline. An entry that
  * isn't `{ text, why? }` (an outdated one written by hand: `null`, a number) is kept as it is, never dropped or fatal:
- * Hive doesn't rewrite what the user wrote (HR1, HI-2439 r1).
+ * Combwork doesn't rewrite what the user wrote (HR1, HI-2439 r1).
  */
 export function dialectFileText(file: DialectFile): string {
   const texts: Record<string, unknown> = {}

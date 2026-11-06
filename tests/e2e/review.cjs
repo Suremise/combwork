@@ -1,9 +1,9 @@
-// Reviewing a card through an agent's own hive tools: the card stays in Review with the agent that did the work, the
+// Reviewing a card through an agent's own Combwork tools: the card stays in Review with the agent that did the work, the
 // board shows "Reviewing: <reviewer>" and the reviewer's strip tab shows the card (with an eye); a second reviewer is
 // refused; the reviewer's session ending stops the review; a verdict ends it (the card staying in Review, or going to
-// Done with it); the reviewer's session records the card as reviewed. Also what the agents' hive tools say about
+// Done with it); the reviewer's session records the card as reviewed. Also what the agents' Combwork tools say about
 // reviewing, from the MCP server as an agent's mcp.json starts it. The agents run the fake Claude Code (fake-claude/),
-// whose "boardreview N ACTION [COLUMN]" calls the hive tools' API with its own token. Dev build, throwaway profile,
+// whose "boardreview N ACTION [COLUMN]" calls the Combwork tools' API with its own token. Dev build, throwaway profile,
 // workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -24,7 +24,7 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 
-/** Starts the hive MCP server as an agent's mcp.json says, and returns its answers to `msgs`. */
+/** Starts the combwork MCP server as an agent's mcp.json says, and returns its answers to `msgs`. */
 function mcp(config, msgs) {
   return new Promise((resolve, reject) => {
     const p = spawn(config.command, config.args ?? [], { env: lib.childEnv(config.env) })
@@ -60,13 +60,13 @@ function mcp(config, msgs) {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47900), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47900), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
   const until = async (fn, ms = 20000) => {
@@ -88,7 +88,7 @@ function mcp(config, msgs) {
     }
     await until(async () => ['ready', 'finished'].includes((await live(id))?.status), HUNG_MS)
     const before = calls().length
-    // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+    // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
     await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
     await until(async () => calls().length > before && (await live(id))?.status === 'finished', HUNG_MS)
     return calls().at(-1)
@@ -105,9 +105,9 @@ function mcp(config, msgs) {
   const c = await inv('tasks:create', { title: 'Lean replies', project: 'alpha', agent: coder.id, column: 'review' })
   const n = c.number
 
-  // --- The reviewer starts its review with its own hive tools.
+  // --- The reviewer starts its review with its own Combwork tools.
   const started = await say(reviewer.id, `boardreview ${n} start`)
-  check('the hive tools take review start', started?.status === 200 && started.body?.changes?.includes('Started reviewing'), JSON.stringify(started))
+  check("Combwork's tools take review start", started?.status === 200 && started.body?.changes?.includes('Started reviewing'), JSON.stringify(started))
   const r1 = await card(n)
   check('the card stays in Review with the agent that did the work', r1.column === 'review' && r1.agent === coder.id, JSON.stringify({ column: r1.column, agent: r1.agent }))
   check('and is marked as reviewed by the reviewer', r1.review?.agent === reviewer.id && r1.review?.agentName === 'Reviewer', JSON.stringify(r1.review))
@@ -159,8 +159,8 @@ function mcp(config, msgs) {
   const rec = sessionsOf(alpha).sessions.find((s) => s.id === sid)
   check("the reviewer's session records the card as reviewed", !!rec?.cards?.some((x) => x.number === n && x.review === true), JSON.stringify(rec?.cards))
 
-  // --- What the agents' hive tools say, from the MCP server as the reviewer's mcp.json starts it.
-  // In the launch's private folder in Hive's user data, not the project (#345).
+  // --- What the agents' Combwork tools say, from the MCP server as the reviewer's mcp.json starts it.
+  // In the launch's private folder in Combwork's user data, not the project (#345).
   const mcpFile = path.join(lib.launchDir(userData, (await live(reviewer.id)).runId), 'mcp.json')
   const server = JSON.parse(fs.readFileSync(mcpFile, 'utf8')).mcpServers.combwork
   const [init, list] = await mcp(server, [

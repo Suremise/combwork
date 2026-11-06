@@ -1,8 +1,8 @@
-// A folder Hive runs from whose permissions have an entry for an AppContainer package but none for ALL APPLICATION
-// PACKAGES makes Electron refuse to start, with nothing on screen (#431). Hive checks at start (src/main/installDir.ts):
+// A folder Combwork runs from whose permissions have an entry for an AppContainer package but none for ALL APPLICATION
+// PACKAGES makes Electron refuse to start, with nothing on screen (#431). Combwork checks at start (src/main/installDir.ts):
 // it adds the entry when it can (to the folder, and to the file Electron checks if that doesn't inherit it), and when it
 // can't, says what to run and quits. Dev build, throwaway profile; the folders checked are test folders of the suite's
-// (HIVE_TEST_INSTALL_DIR), never Hive's own; the message is recorded (HIVE_TEST_NOTIFY_LOG) and drawn to a picture,
+// (CW_TEST_INSTALL_DIR), never Combwork's own; the message is recorded (CW_TEST_NOTIFY_LOG) and drawn to a picture,
 // never shown.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -38,7 +38,7 @@ const notifyLog = path.join(lib.WORK, 'installdir-notify.log')
 /** Starts Combwork on a test folder it can't fix and returns its exit code and the message it recorded. */
 async function cantStart(dir, vars = {}) {
   fs.rmSync(notifyLog, { force: true })
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47883), HIVE_TEST_INSTALL_DIR: dir, HIVE_TEST_NOTIFY_LOG: notifyLog, ...vars })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47883), CW_TEST_INSTALL_DIR: dir, CW_TEST_NOTIFY_LOG: notifyLog, ...vars })
   const child = spawn(lib.ELECTRON, [lib.ROOT], { cwd: lib.ROOT, env, stdio: 'ignore' })
   const code = await new Promise((resolve) => {
     const timer = setTimeout(() => {
@@ -79,7 +79,7 @@ function pasted(message) {
   for (const p of [fixable, locked, fileLocked]) fs.mkdirSync(p, { recursive: true })
 
   // A folder of the user's with its permissions made explicit and a package's entry added, holding the file Electron
-  // checks with permissions of its own (inheriting nothing): Hive adds the missing entry to the folder, and to the file,
+  // checks with permissions of its own (inheriting nothing): Combwork adds the missing entry to the folder, and to the file,
   // which the folder's entry doesn't reach.
   run(fixable, '/inheritance:d')
   run(fixable, '/grant', `*${PACKAGE}:(OI)(CI)(RX)`)
@@ -88,7 +88,7 @@ function pasted(message) {
   run(icu, '/inheritance:d')
   for (const p of [fixable, icu]) check(`${path.basename(p)} has a package entry and no ALL APPLICATION PACKAGES`, lacks(p), sddl(p))
   check('icudtl.dat inherits nothing', sddl(icu).startsWith('D:P'), sddl(icu))
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47883), HIVE_TEST_INSTALL_DIR: fixable, HIVE_TEST_NOTIFY_LOG: notifyLog })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47883), CW_TEST_INSTALL_DIR: fixable, CW_TEST_NOTIFY_LOG: notifyLog })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   await lib.appReady(page)
@@ -97,17 +97,17 @@ function pasted(message) {
   check('and to the file Electron checks, read', /\(A;;0x1200a9;;;AC\)/.test(sddl(icu)), sddl(icu))
   await app.close()
   // Its lines, written by the log's own thread (HI-1730), in words: a profile that never saved a key masks nothing (HI-1855).
-  const logFile = path.join(userData, 'logs', 'hive.log')
+  const logFile = path.join(userData, 'logs', 'combwork.log')
   const readLog = () => (fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8') : '')
   const said = await lib.until(() => readLog().includes("icudtl.dat doesn't inherit") && readLog().includes('Added ALL APPLICATION PACKAGES to the install folder'), HUNG_MS)
   check('its log says so', !!said, readLog().split('\n').filter((l) => l.includes('[installDir]')).join(' | '))
 
-  // A folder the user can't change the permissions of (the owner held to reading by OWNER RIGHTS): Hive can't add it,
+  // A folder the user can't change the permissions of (the owner held to reading by OWNER RIGHTS): Combwork can't add it,
   // so it says what to run and quits instead of starting.
   run(locked, '/grant:r', '*S-1-3-4:(OI)(CI)(RX)', `*${PACKAGE}:(OI)(CI)(RX)`, '/inheritance:r')
   run(locked, '/grant', FOLDER_ENTRY)
   check("the locked folder's permissions can't be changed", lacks(locked), sddl(locked))
-  const a = await cantStart(locked, { HIVE_TEST_DIALOG_SNAPSHOT: snapshot })
+  const a = await cantStart(locked, { CW_TEST_DIALOG_SNAPSHOT: snapshot })
   check('Combwork quit with an error instead of starting', a.code === 1, String(a.code))
   check("it told the user Combwork can't start", a.message?.title === "Combwork can't start", JSON.stringify(a.notes))
   check('naming the folder', !!a.message?.body.includes(`the folder Combwork is installed in:\n${locked}\n`), a.message?.body)
@@ -117,8 +117,8 @@ function pasted(message) {
   const drawn = fs.existsSync(snapshot) ? fs.statSync(snapshot).size : 0
   check('the message window draws, with its text and buttons (Windows Forms in PowerShell)', drawn > 8000, `${drawn} bytes`)
 
-  // A folder Hive can change, holding the file Electron checks inheriting nothing, with a package's entry, and its owner
-  // held to reading it: the folder gets the entry, the file can't, so Hive names the file and gives the command that
+  // A folder Combwork can change, holding the file Electron checks inheriting nothing, with a package's entry, and its owner
+  // held to reading it: the folder gets the entry, the file can't, so Combwork names the file and gives the command that
   // adds the entry to the folder and to the file (the folder's alone, which it just added, wouldn't reach it).
   run(fileLocked, '/inheritance:d')
   run(fileLocked, '/grant', `*${PACKAGE}:(OI)(CI)(RX)`)

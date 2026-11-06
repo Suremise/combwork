@@ -4,7 +4,7 @@ import { basename, dirname, join } from 'path'
 import { timedStep } from './stallWork'
 
 /**
- * Hive's SQLite layer (#990, #1017): every database Hive keeps (the workspace's board in `.combwork/hive.db`; later its metrics,
+ * Combwork's SQLite layer (#990, #1017): every database Combwork keeps (the workspace's board in `.combwork/combwork.db`; later its metrics,
  * and the Assistant's journal in a file of its own, #989) is opened, set up and migrated here, with Node's built-in
  * `node:sqlite` (no native module to rebuild for each Electron). Nothing else imports `node:sqlite`, so another library
  * would be a change to this file only. Its calls are synchronous: at these sizes a query or a commit takes well under a
@@ -31,7 +31,7 @@ export interface PendingGroup {
   to: number
 }
 
-/** Another connection (another Hive) has the file open, so a group's exclusive lock couldn't be had: nothing changed. */
+/** Another connection (another Combwork) has the file open, so a group's exclusive lock couldn't be had: nothing changed. */
 export class DbInUseError extends Error {
   constructor(file: string) {
     super(`${basename(file)} is open in another process`) // i18n-ignore: the board turns it into its message; this is for the log
@@ -42,8 +42,8 @@ export class DbInUseError extends Error {
 export interface OpenOptions {
   /** The schema's steps, in order. */
   migrations: Migration[]
-  /** This Hive's version, recorded with each step it runs. */
-  hiveVersion: string
+  /** This Combwork's version, recorded with each step it runs. */
+  appVersion: string
   /** Where a copy of the file is kept before a step runs on one that has data (the last 3 are kept). */
   backupDir?: string
   /** The name its copies start with there (default: the file's name without `.db`), so databases sharing a folder keep their own three. */
@@ -78,7 +78,7 @@ export interface OpenOptions {
 }
 
 /**
- * The waits before an open that failed with an I/O error is tried again (HI-2179): just after a Hive ended without
+ * The waits before an open that failed with an I/O error is tried again (HI-2179): just after a Combwork ended without
  * quitting, the next start's opens of the workspace's files failed so once, and the workspace didn't reopen. SQLite
  * tries a Windows sharing violation again itself (about 1.4 s), not this. Bounded: a disk that keeps failing still fails.
  */
@@ -87,7 +87,7 @@ export const OPEN_IO_RETRY_MS = [50, 100, 200, 400, 800]
 /** SQLite's I/O errors (SQLITE_IOERR, 10, and its extended codes): `errcode` on node:sqlite's errors. */
 export const isIoError = (e: unknown): boolean => ((e as { errcode?: unknown } | null)?.errcode as number) % 256 === 10
 
-/** How long a file left by a Hive that ended without quitting is waited for, before it is opened anyway (HI-2199). */
+/** How long a file left by a Combwork that ended without quitting is waited for, before it is opened anyway (HI-2199). */
 export const OPENABLE_WAIT_MS = 20_000
 const OPENABLE_POLL_MS = 100
 
@@ -116,7 +116,7 @@ function refusal(file: string): Error | null {
 export const openableNow = (file: string): boolean => refusal(file) === null
 
 /**
- * Waits, without holding main's thread, until a WAL database left as a Hive that ended without quitting left it can be opened
+ * Waits, without holding main's thread, until a WAL database left as a Combwork that ended without quitting left it can be opened
  * (HI-2199): its `-shm` still there, and another process still mapping it. The first connection to such a file truncates
  * the `-shm` (SQLite 3.53's winLockSharedMemory), which Windows refuses while any process has it mapped, so every open
  * fails with SQLITE_IOERR_TRUNCATE (1546) until that process lets go: seen for 10 s after an e2e kill, longer than
@@ -156,7 +156,7 @@ export interface Db {
   writer: DatabaseSync
   /** The connection queries use: it sees what was last committed, never a write still under way. */
   reader: DatabaseSync
-  /** The schema version of a file saved by a newer Hive (opened read-only), else null. */
+  /** The schema version of a file saved by a newer Combwork (opened read-only), else null. */
   newer: number | null
   /** A group of steps this file waits for, not approved (opened read-only), else null. */
   pending: PendingGroup | null
@@ -164,7 +164,7 @@ export interface Db {
 }
 
 /**
- * The settings every connection gets: WAL (readers never wait for the writer), `synchronous=NORMAL` (a crash of Hive loses
+ * The settings every connection gets: WAL (readers never wait for the writer), `synchronous=NORMAL` (a crash of Combwork loses
  * nothing committed; a power cut may lose the last commit or two, never the file), a wait for a lock held by another
  * process, and caches sized for a board of a few thousand cards.
  */
@@ -226,7 +226,7 @@ const backupName = (family: string, version: number, at: Date): string => `${fam
 /** What follows `<family>-v` in a copy's name: its version and time. */
 const BACKUP_REST = /^\d+-(\d{4}-\d\d-\d\dT\d\d-\d\d-\d\d-\d{3}Z)\.db$/
 
-/** The family a group's copy is kept under (`hive-before-1.0`): never pruned, and apart from the file's own three. */
+/** The family a group's copy is kept under (`combwork-before-1.0`): never pruned, and apart from the file's own three. */
 export const groupBackupFamily = (family: string, group: string): string => `${family}-before-${group}`
 
 /** The copies of a family in `dir`, oldest first: only names of the family's exact form, never another's or anything else. */
@@ -296,8 +296,8 @@ function migrate(db: DatabaseSync, file: string, opts: OpenOptions): PendingGrou
   const existing = from > 0 && hasData(db)
   const family = opts.backupFamily ?? basename(file).replace(/\.db$/i, '')
   let copied = false
-  transaction(db, () => db.exec('CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL, hive_version TEXT NOT NULL) STRICT'))
-  const record = db.prepare('INSERT INTO schema_version (version, name, applied_at, hive_version) VALUES (?, ?, ?, ?)')
+  transaction(db, () => db.exec('CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL, app_version TEXT NOT NULL) STRICT'))
+  const record = db.prepare('INSERT INTO schema_version (version, name, applied_at, app_version) VALUES (?, ?, ?, ?)')
   const timed: { version: number; name: string; ms: number }[] = []
   let copyMs: number | null = null
   const copy = (make: () => void): void => {
@@ -308,7 +308,7 @@ function migrate(db: DatabaseSync, file: string, opts: OpenOptions): PendingGrou
   const run = (m: Migration): void => {
     const t = performance.now()
     m.up(db)
-    record.run(m.version, m.name, new Date().toISOString(), opts.hiveVersion)
+    record.run(m.version, m.name, new Date().toISOString(), opts.appVersion)
     timed.push({ version: m.version, name: m.name, ms: performance.now() - t })
   }
   const told = (): void => {
@@ -428,7 +428,7 @@ export function soleCopy(file: string, dir: string, family: string, version: num
 }
 
 /**
- * Opens (or makes) a database file with its two connections, set up and migrated. A file saved by a newer Hive (a
+ * Opens (or makes) a database file with its two connections, set up and migrated. A file saved by a newer Combwork (a
  * schema version this build doesn't know) is opened read-only and migrated not at all: `newer` says its version, and
  * every write to it fails. So is one whose group of steps wasn't approved (`pending`). A group refused for another
  * connection on the file throws DbInUseError, the file as it was.
@@ -450,6 +450,17 @@ export function openDb(file: string, opts: OpenOptions): Db {
   })
 }
 
+/**
+ * `schema_version`'s column of the version that ran each step, named after the old name before 1.1, renamed `app_version` (HI-2587):
+ * in its own transaction, once (a file that has it already, or no table yet, needs nothing).
+ */
+export function renameVersionColumn(db: DatabaseSync): void {
+  const cols = (db.prepare("SELECT name FROM pragma_table_info('schema_version')").all() as { name: string }[]).map((c) => c.name) // i18n-ignore: SQL
+  // old-name: begin version-column
+  if (cols.includes('hive_version') && !cols.includes('app_version')) transaction(db, () => db.exec('ALTER TABLE schema_version RENAME COLUMN hive_version TO app_version'))
+  // old-name: end version-column
+}
+
 function openDbNow(file: string, opts: OpenOptions): Db {
   mkdirSync(dirname(file), { recursive: true })
   const writer = new DatabaseSync(file, { timeout: 5000 })
@@ -460,6 +471,8 @@ function openDbNow(file: string, opts: OpenOptions): Db {
     const known = Math.max(0, ...opts.migrations.map((m) => m.version))
     const found = schemaVersion(writer)
     const newer = found > known ? found : null
+    // The version column's old name (HI-2587, the names upgrade): renamed before anything reads or records a step.
+    if (newer === null) renameVersionColumn(writer)
     const pending = newer === null ? migrate(writer, file, opts) : null
     if (newer !== null || pending) writer.exec('PRAGMA query_only = ON')
     reader = new DatabaseSync(file, { timeout: 5000 })

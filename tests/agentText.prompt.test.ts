@@ -8,6 +8,7 @@ import { canaryProblems, canaryTexts } from '../src/shared/agentText/canary'
 import { laneBuilderSkill, laneOrderWaitReason, loopStepWaitReason, notWatchingReason, reviewStalled, reviewVerdictWaitReason, reviewWaitReason, stalledReason, startFailedReason, startWaitingReason, taskPrompt } from '../src/shared/tasks'
 import { laneBrief, laneRules, type LaneBriefInput } from '../src/shared/laneBrief'
 import type { TaskCard } from '../src/shared/types'
+import { laneNextWaitReason } from '../src/main/cardStall'
 // @ts-expect-error: a plain .mjs module without types
 import { readCatalogue } from '../scripts/agentTextExtract.mjs'
 
@@ -18,8 +19,8 @@ const chain = (texts: Record<string, string>): DialectChain => ({ texts, files: 
 
 afterEach(() => setProcessChain(null))
 
-/** What a test put in an output (names, keys, titles, paths, column names): not Hive's wording. */
-const VALUES = ['Fix it', 'The details', 'Only the tests', 'First thoughts', 'Failed', 'the redirect loops', 'Reviewer', 'alpha', 'You', 'Agent2', 'B1', 'R1', 'R2', 'R3', 'AL-1', 'AL-2', 'Lane data', 'Lane hover', 'Keep the API stable', 'typecheck', 'lint', 'ui', 'api', 'slot', 'hive', 'Done', 'Review', 'Passed', 'docs', 'md', 'intro', 'setup', 'install', 'att', 'png', 'x', 'k', 'Slot', 'held', 'no', 'CLI']
+/** What a test put in an output (names, keys, titles, paths, column names): not Combwork's wording. */
+const VALUES = ['Fix it', 'The details', 'Only the tests', 'First thoughts', 'Failed', 'the redirect loops', 'Reviewer', 'alpha', 'You', 'Agent2', 'B1', 'R1', 'R2', 'R3', 'AL-1', 'AL-2', 'Lane data', 'Lane hover', 'Keep the API stable', 'typecheck', 'lint', 'ui', 'api', 'slot', 'acme', 'Done', 'Review', 'Passed', 'docs', 'md', 'intro', 'setup', 'install', 'att', 'png', 'x', 'k', 'Slot', 'held', 'no', 'CLI']
 
 function prompts(): { name: string; text: string }[] {
   const out: { name: string; text: string }[] = []
@@ -71,6 +72,8 @@ function stalls(): { name: string; text: string | null }[] {
   for (const [minAgo, label] of [[40, 'minutes'], [120, 'hours'], [125, 'hours and minutes']] as const) {
     const r = { ...review, history: [{ at: at(minAgo), by: 'You', what: 'Moved to Review' }] }
     for (const w of [{}, { status: 'working' }, { silentMinutes: 25 }]) out.push({ name: `review wait ${label} ${JSON.stringify(w)}`, text: reviewWaitReason(r as never, [{ name: 'R1', project: 'alpha', agentId: 'r', cards: [9], ...w }], now) })
+    // HI-2636: given by the pool, idle or busy, its watch or none.
+    for (const status of ['finished', 'working']) out.push({ name: `review given ${label} ${status}`, text: reviewWaitReason(r as never, [], now, undefined, { agentId: 'r', name: 'R1', givenAt: at(minAgo - 1), status }) })
   }
   out.push({ name: 'no verdict', text: reviewVerdictWaitReason({ ...review, review: { agent: 'r', agentName: 'R1', since: at(60) } } as never, [{ name: 'R1', project: 'alpha', agentId: 'r', cards: [9], status: 'watching', watchSince: at(30) }], now) })
   out.push({
@@ -82,6 +85,16 @@ function stalls(): { name: string; text: string | null }[] {
         { name: 'R1', project: 'alpha', agentId: 'r', cards: [8], status: 'watching', watchSince: at(60) },
         { name: 'B1', project: 'alpha', agentId: 'b', cards: [9], status: 'watching', watchSince: at(60) }
       ],
+      now
+    )
+  })
+  // A lane's next card whose dependencies all went Done, not started since (HI-2618's DEPS_DONE; HI-2637).
+  out.push({
+    name: 'lane next, dependencies done',
+    text: laneNextWaitReason(
+      { number: 9, key: 'AL-2', column: 'todo', archived: false, blocked: null },
+      { builder: 'b', reviewer: 'r', state: 'active', startedAt: at(120), cards: [{ number: 8, key: 'AL-1', column: 'done', movedAt: at(90) }, { number: 9, key: 'AL-2', column: 'todo', movedAt: null }], due: { card: 9, open: [], readyAt: at(30) } } as never,
+      { name: 'B1', status: 'watching' },
       now
     )
   })
@@ -100,7 +113,7 @@ function briefs(): { name: string; text: string }[] {
       { key: 'AL-1', title: 'Lane data' },
       { key: 'AL-2', title: 'Lane hover' }
     ],
-    builder: { name: 'B1', folder: 'D:/hive/b1', branch: 'hive/b1' },
+    builder: { name: 'B1', folder: 'D:/acme/b1', branch: 'cw/b1' },
     reviewer: { name: 'R1' },
     options: { review: 'agent', preChecks: ['typecheck', 'lint'], finish: 'agentMerges', okBefore: { mode: 'labels', labels: ['ui', 'api'] }, target: 'main' },
     rounds: 10,
@@ -108,12 +121,12 @@ function briefs(): { name: string; text: string }[] {
     ...over
   })
   const out: { name: string; text: string }[] = []
-  const builders = [{ name: 'B1', folder: 'D:/hive/b1', branch: 'hive/b1' }, { name: 'B1', folder: 'D:/hive/b1', branch: null }, { name: 'B1', folder: null, branch: null }, { name: 'B1', folder: null, branch: null, slot: 'slot-b' }]
+  const builders = [{ name: 'B1', folder: 'D:/acme/b1', branch: 'cw/b1' }, { name: 'B1', folder: 'D:/acme/b1', branch: null }, { name: 'B1', folder: null, branch: null }, { name: 'B1', folder: null, branch: null, slot: 'slot-b' }]
   const reviewers: Partial<LaneBriefInput>[] = [{}, { reviewer: null }, { reviewer: null, pool: [] }, { reviewer: null, pool: ['R1', 'R2', 'R3'] }]
   for (const [i, builder] of builders.entries()) for (const [j, r] of reviewers.entries()) for (const role of ['builder', 'reviewer'] as const) out.push({ name: `brief ${i} ${j} ${role}`, text: laneBrief(input({ builder, ...r }), role) })
-  out.push({ name: 'brief no target, no note', text: laneBrief(input({ options: { review: 'none', preChecks: [], finish: 'hiveMerges', okBefore: { mode: 'none' } } as never, note: '' }), 'builder') })
+  out.push({ name: 'brief no target, no note', text: laneBrief(input({ options: { review: 'none', preChecks: [], finish: 'combworkMerges', okBefore: { mode: 'none' } } as never, note: '' }), 'builder') })
   for (const review of ['none', 'agent', 'agentThenYou', 'you'] as const)
-    for (const finish of ['hiveMerges', 'agentMerges', 'committed', 'notChecked', 'accept'] as const)
+    for (const finish of ['combworkMerges', 'agentMerges', 'committed', 'notChecked', 'accept'] as const)
       for (const okBefore of [{ mode: 'every' }, { mode: 'labels', labels: ['ui'] }])
         out.push({ name: `rules ${review} ${finish} ${okBefore.mode}`, text: laneRules({ review, finish, preChecks: ['lint'], okBefore, target: 'main' } as never).join('\n') })
   out.push({ name: 'rules off', text: laneRules(null).join('\n') })

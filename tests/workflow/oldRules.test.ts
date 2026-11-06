@@ -14,8 +14,8 @@ const pair = mustCompile(preset('git', 'pair')).id
 const team = mustCompile(preset('git', 'team')).id
 
 let seq = 0
-const fact = <K extends FactKind>(kind: K, data: FactData[K], ruleset?: string, actor: Actor = 'hive'): Fact => ({ seq: ++seq, card: 7, kind, at: `2026-10-22T10:00:${String(seq).padStart(2, '0')}.000Z`, actor, source: 'recorded', ...(ruleset ? { ruleset } : {}), data })
-const start = (over: Partial<StartedData> = {}): FactData['Started'] => ({ folder: 'project', line: 'hive/b1', base: 'base0000aaaa', target: 'main', builder: 'B1', cardKind: 'code', ...over })
+const fact = <K extends FactKind>(kind: K, data: FactData[K], ruleset?: string, actor: Actor = 'combwork'): Fact => ({ seq: ++seq, card: 7, kind, at: `2026-10-22T10:00:${String(seq).padStart(2, '0')}.000Z`, actor, source: 'recorded', ...(ruleset ? { ruleset } : {}), data })
+const start = (over: Partial<StartedData> = {}): FactData['Started'] => ({ folder: 'project', line: 'cw/b1', base: 'base0000aaaa', target: 'main', builder: 'B1', cardKind: 'code', ...over })
 const moved = (from: FactData['Moved']['from'], to: FactData['Moved']['to'], ruleset?: string): Fact => fact('Moved', { from, to, cause: 'intent' }, ruleset)
 
 /** A card started under `ruleset` and moved to Active. */

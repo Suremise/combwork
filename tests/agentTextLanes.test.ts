@@ -17,7 +17,7 @@ import { tempDir } from './tempDir'
 // @ts-expect-error: a plain .mjs module without types
 import { readCatalogue } from '../scripts/agentTextExtract.mjs'
 
-const base = tempDir('hive-agenttext-lanes-')
+const base = tempDir('cw-agenttext-lanes-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -60,7 +60,7 @@ const rec = (over: Partial<LaneRecord> = {}): LaneRecord => ({
 const card = (number: number, column: TaskCard['column'], over: Partial<TaskCard> = {}): TaskCard =>
   ({ number, title: `Card ${number}`, column, project: 'alpha', blocked: null, history: [], comments: [], archived: false, ...over }) as unknown as TaskCard
 
-/** The values the tests below pass: names, ids and titles are the caller's, not Hive's wording. */
+/** The values the tests below pass: names, ids and titles are the caller's, not Combwork's wording. */
 const VALUES = ['B1', 'R1', 'alpha', 'slot-b', 'lane-1', 'lane-0', 'Card 1', 'Card 2', 'Card 3', 'first', '3f2a', 'Asked the user', 'disk full', 'merging next', 'HI-9', 'rounds', 'waitMinutes']
 
 /** Every variant of what the lane builders say, each output named. */
@@ -278,7 +278,7 @@ describe('the canary dialect over the lanes service (main/lanes.ts)', () => {
       const h = join(base, 'journal-ws', '.combwork', 'assistant')
       const out = admitted(join(base, 'journal-ws'))
       try {
-        const id = journalStore.writeEntry(h, journalSettings({ enabled: true }), { kind: 'event', ...started, tags: ['hive', ...(started.tags ?? [])] }, 'hive')
+        const id = journalStore.writeEntry(h, journalSettings({ enabled: true }), { kind: 'event', ...started, tags: ['combwork', ...(started.tags ?? [])] }, 'combwork')
         journalStore.closeJournal(h)
         const raw = new DatabaseSync(journalStore.journalFile(h), { readOnly: true })
         try {

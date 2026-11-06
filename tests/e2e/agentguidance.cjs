@@ -1,9 +1,9 @@
-// Hive's guidance for agents (#1285, #966 row 13: cw.guidance, on by default), on a fake Claude Code session
-// (fake-claude/), so nothing signs in or spends tokens. The hive MCP server each launch was given (its --mcp-config, as
-// Hive wrote it) is started here as Claude Code would start it and asked to initialize:
-// - on: it answers with Hive's guidance as its instructions;
-// - off (Settings → Advanced, from the next session): the same server, Hive's tools still there, answers with none.
-// Then the new Advanced rows (this switch and Claude Code's "Hive's status line in place of yours", row 12) in both
+// Combwork's guidance for agents (#1285, #966 row 13: cw.guidance, on by default), on a fake Claude Code session
+// (fake-claude/), so nothing signs in or spends tokens. Combwork's MCP server each launch was given (its --mcp-config, as
+// Combwork wrote it) is started here as Claude Code would start it and asked to initialize:
+// - on: it answers with Combwork's guidance as its instructions;
+// - off (Settings → Advanced, from the next session): the same server, Combwork's tools still there, answers with none.
+// Then the new Advanced rows (this switch and Claude Code's "Combwork's status line in place of yours", row 12) in both
 // themes (agentguidance-*.png in the run's folder). Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -26,7 +26,7 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 
-/** The hive server of a launch's MCP config, started as its CLI would start it, asked to initialize: its result. */
+/** The combwork server of a launch's MCP config, started as its CLI would start it, asked to initialize: its result. */
 function initialize(def) {
   return requests(def, [{ method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'e2e', version: '1' } } }]).then(([r]) => r?.result ?? null)
 }
@@ -79,7 +79,7 @@ function descriptions(tools) {
 }
 
 /**
- * What a built script requires, through the chunks it loads: anything but Node's built-ins and Hive's own chunks. The
+ * What a built script requires, through the chunks it loads: anything but Node's built-ins and Combwork's own chunks. The
  * scripts run outside the asar, where nothing in node_modules can be found (a dev build would find this checkout's, so
  * only the built files can tell): agent text's formatter must be bundled in (HI-2433).
  */
@@ -110,18 +110,18 @@ function packagesRequired(entry) {
   const claudeEnv = lib.fakeClaude(userData, claudeHome, [alpha])
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
-  cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true, port: PORT, provideHiveMcp: true }
+  cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true, port: PORT, provideCombworkMcp: true }
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), ...claudeEnv })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), ...claudeEnv })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1400, height: 900 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     const def = await lib.addAgent(inv, alpha, { name: 'Tester' })
     const live = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === def.id)
@@ -129,8 +129,8 @@ function packagesRequired(entry) {
       const f = path.join(claudeHome, 'fake-launches.jsonl')
       return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []
     }
-    /** A launch's hive server: started, ready, its --mcp-config read while it runs (it holds the server's environment). */
-    const hiveServer = async () => {
+    /** A launch's combwork server: started, ready, its --mcp-config read while it runs (it holds the server's environment). */
+    const combworkServer = async () => {
       const before = launches().length
       await inv('session:start', alpha, { agentId: def.id })
       await lib.until(async () => launches().length > before && (await live())?.status === 'ready', HUNG_MS)
@@ -142,10 +142,10 @@ function packagesRequired(entry) {
     }
 
     // ---- On (the default): the guidance as the server's instructions.
-    const on = await hiveServer()
-    check('the launch has the hive server', !!on?.command, JSON.stringify(on))
+    const on = await combworkServer()
+    check("the launch has Combwork's server", !!on?.command, JSON.stringify(on))
     const withGuidance = await initialize(on)
-    check("on: the hive server answers with Hive's guidance as its instructions", typeof withGuidance?.instructions === 'string' && /cw_inbox|Hive/.test(withGuidance.instructions), JSON.stringify(withGuidance).slice(0, 300))
+    check("on: Combwork's server answers with Combwork's guidance as its instructions", typeof withGuidance?.instructions === 'string' && /cw_inbox|Combwork/.test(withGuidance.instructions), JSON.stringify(withGuidance).slice(0, 300))
 
     // ---- The canary dialect (HI-2065): the same server given a dialect file with every catalogue text in markers. Its
     // instructions must come through the catalogue whole: a word outside the markers bypassed it.
@@ -159,12 +159,12 @@ function packagesRequired(entry) {
     check("canary: the server reads the dialect file, and every word of its instructions is the catalogue's", problems.length === 0 && canary.instructions.includes('⟦contract.agent.host⟧'), `${problems.join('; ')} | ${String(canary?.instructions).slice(0, 300)}`)
 
     // Its tool lists (HI-2434), for each role, Control level and switch, and the errors its own code gives: every
-    // description and error word the catalogue's. Nothing here needs Hive: the lists and these errors come before any call.
+    // description and error word the catalogue's. Nothing here needs Combwork: the lists and these errors come before any call.
     const ids = new Set(Object.keys(catalogue))
     const canaryEnv = { ...on.env, CW_DIALECT_FILE: dialectFile, CW_DIALECT: 'canary' }
-    const assistant = (control) => ({ HIVE_ROLE: 'assistant', CW_PROJECT: '', HIVE_ASSISTANT_CONTROL: control, HIVE_ASSISTANT_SETTINGS: '1', HIVE_JOURNAL: '1', HIVE_DEV_CONSOLE: '1' })
+    const assistant = (control) => ({ CW_ROLE: 'assistant', CW_PROJECT: '', CW_ASSISTANT_CONTROL: control, CW_ASSISTANT_SETTINGS: '1', CW_JOURNAL: '1', CW_DEV_CONSOLE: '1' })
     const roles = [
-      ['agent', { HIVE_DEV_CONSOLE: '1' }, [['cw_lane', { action: 'nope' }], ['cw_merge_slot', { action: 'nope' }], ['cw_queue', { action: 'pause' }], ['cw_nope', {}]]],
+      ['agent', { CW_DEV_CONSOLE: '1' }, [['cw_lane', { action: 'nope' }], ['cw_merge_slot', { action: 'nope' }], ['cw_queue', { action: 'pause' }], ['cw_nope', {}]]],
       ['assistant at Look and advise', assistant('look'), []],
       ['assistant at Agents', assistant('agents'), []],
       ['assistant at Projects', assistant('projects'), [['cw_team', { action: 'nope' }], ['cw_connection', { action: 'nope' }], ['cw_release_slot', { action: 'nope', project: 'alpha' }], ['cw_template', { action: 'nope', project: 'alpha' }]]]
@@ -181,8 +181,8 @@ function packagesRequired(entry) {
 
     // ---- Off: the same server, its tools still there, no instructions.
     await inv('advanced:set', GUIDANCE, false)
-    const off = await hiveServer()
-    check('off: the launch still has the hive server (Hive\'s tools)', !!off?.command && off.env?.HIVE_GUIDANCE === '0', JSON.stringify(off?.env ?? {}).slice(0, 300))
+    const off = await combworkServer()
+    check("off: the launch still has Combwork's server (its tools)", !!off?.command && off.env?.CW_GUIDANCE === '0', JSON.stringify(off?.env ?? {}).slice(0, 300))
     const without = await initialize(off)
     check('…which answers with no instructions', !!without && !('instructions' in without), JSON.stringify(without).slice(0, 300))
     await inv('advanced:set', GUIDANCE, true)

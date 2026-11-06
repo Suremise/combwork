@@ -18,7 +18,7 @@
 // Screenshots in both themes, in English and German: the step, the board, Branches & remotes, the Pulse hovers, the
 // legend, the old rules mark, the save's warning, the offer, and each Version Control section of a Git and a None
 // project. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
-// The Merge queue section read slowly (HIVE_TEST_SLOW_IPC) is NOT RUN on a packaged build (HIVE_EXE), where the rest
+// The Merge queue section read slowly (CW_TEST_SLOW_IPC) is NOT RUN on a packaged build (CW_EXE), where the rest
 // runs (#1578).
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -52,7 +52,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
   fs.writeFileSync(path.join(alpha, 'package.json'), JSON.stringify({ name: 'alpha', scripts: { typecheck: `node "${slash(path.join(fx.tools, 'check.js'))}"` } }, null, 2) + '\n')
   lib.git(alpha, ['-c', 'user.name=t', '-c', 'user.email=t@t', 'add', '-A'])
   lib.git(alpha, ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'scripts'])
-  const h = await q.startHive(fx, { port: PORT, keepOptions: true })
+  const h = await q.startCombwork(fx, { port: PORT, keepOptions: true })
   const { page, inv, app } = h
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -65,8 +65,8 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     const dialog = page.locator('.dialog')
     const workflowLine = () => text(head.locator('[data-action="vc-workflow"]'))
     /**
-     * An agent's intent (`who`: its token), sent again while Hive answers evidence.changed, whose next step is "Try again:
-     * Hive reads it afresh" (what it read moved as it decided: a merge's reconcile, the folder's commits read), as an agent
+     * An agent's intent (`who`: its token), sent again while Combwork answers evidence.changed, whose next step is "Try again:
+     * Combwork reads it afresh" (what it read moved as it decided: a merge's reconcile, the folder's commits read), as an agent
      * does, a few times at most.
      */
     const send = async (who, n, name, body = {}) => {
@@ -84,7 +84,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     const base = (await inv('app:info')).language
     const dir = path.join(lib.ROOT, 'locales', 'de')
     const german = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))))
-    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language })
+    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
     const english = async () => (await page.getByRole('button', { name: 'Task Board', exact: true }).count()) > 0
     /**
      * Screenshots of `loc` (the window by default) in both themes, in English and then German; `show` brings back what
@@ -249,7 +249,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     await shoot('1-step-pair', { loc: page.locator('.vc-view') })
     check('Choose → Use Pair: the header reads "Workflow: Git · Pair"', await choose('Pair'), await workflowLine())
     const options = projectJson(alpha).workflow?.options ?? {}
-    check("…saved: Hive merges into main, cards on slots, typecheck before review and on the merged result, the repository's identity", projectJson(alpha).workflow?.preset === 'pair' && projectJson(alpha).workflow?.presetAsked === 'chosen' && options.finish === 'hiveMerges' && options.target === 'main' && options.folder === 'slots' && JSON.stringify(options.preChecks) === '["typecheck"]' && JSON.stringify(options.mergeChecks) === '["typecheck"]' && options.identity?.email === fx.identity.email, JSON.stringify(projectJson(alpha).workflow))
+    check("…saved: Combwork merges into main, cards on slots, typecheck before review and on the merged result, the repository's identity", projectJson(alpha).workflow?.preset === 'pair' && projectJson(alpha).workflow?.presetAsked === 'chosen' && options.finish === 'combworkMerges' && options.target === 'main' && options.folder === 'slots' && JSON.stringify(options.preChecks) === '["typecheck"]' && JSON.stringify(options.mergeChecks) === '["typecheck"]' && options.identity?.email === fx.identity.email, JSON.stringify(projectJson(alpha).workflow))
     const identity = options.identity ?? fx.identity
     const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, '-c', `user.email=${identity.email}`, ...args]).trim()
     // Pair, its Maximum agents raised to 3 as a user would (HI-2131, as HI-2091): G14's builder B2 below is alpha's third.
@@ -272,8 +272,8 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     const tokenOf = async (id) => {
       const sessionId = await waitHung(async () => (await live(id))?.sessionId)
       const launch = await waitHung(() => q.launches(fx).filter((l) => l.sessionId === sessionId && l.opts['--mcp-config']).at(-1))
-      const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
-      return hive ? JSON.parse(fs.readFileSync(hive.env.CW_API_TOKEN_FILE, 'utf8')).token : null
+      const server = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
+      return server ? JSON.parse(fs.readFileSync(server.env.CW_API_TOKEN_FILE, 'utf8')).token : null
     }
     /** An agent's intent by its own token; refused as unknown after a restart, its token read again and sent again (p5lane's). */
     const intent = async (who, n, name, body = {}) => {
@@ -298,14 +298,14 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
       check('…both agents run, with their tokens', !!ok, JSON.stringify(tokens))
     }
 
-    // The builder's shell (the fake's "shell:" step), as hive-progress runs in its session (p5lane's).
+    // The builder's shell (the fake's "shell:" step), as cw-progress runs in its session (p5lane's).
     const shells = () => {
       const file = path.join(fx.claudeHome, 'fake-shell.jsonl')
       return fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []
     }
     const shell = async (cmd) => {
       const before = shells().length
-      // Hive may type a wake into B1 as the suite types: each try waits for B1 idle with its inbox quiet (HI-1918), and
+      // Combwork may type a wake into B1 as the suite types: each try waits for B1 idle with its inbox quiet (HI-1918), and
       // typeLine types it again when the wake took or wiped it.
       await lib.typeLine(inv, lib.ptyKey(alpha, b1.id), fx.claudeHome, 'B1', `shell: ${cmd}`, { ready: async () => lib.agentQuiet(PORT, 'alpha', await live(b1.id), tokens.b1), strict: true, live: () => live(b1.id), hungMs: HUNG_MS })
       await waitHung(() => shells().length > before)
@@ -313,11 +313,11 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
       if (!shells().slice(before).some((s) => s.cmd === cmd)) throw new Error(`B1 didn't run "${cmd}" (its line wasn't taken)`)
     }
     const counted = (x) => x.kind === 'CheckRan' && x.data?.counted === true
-    /** The quick check through hive-progress on the card's revision now (passing): a new counted CheckRan on it. */
+    /** The quick check through cw-progress on the card's revision now (passing): a new counted CheckRan on it. */
     const quickCheck = async (n) => {
       q.steer(fx, 'pass')
       const before = (await h.facts(n)).filter(counted).length
-      await shell(`hive-progress --check typecheck --card ${await keyOf(n)}`)
+      await shell(`cw-progress --check typecheck --card ${await keyOf(n)}`)
       return !!(await waitHung(async () => (await h.facts(n)).filter(counted).length > before))
     }
     const commit = (file) => {
@@ -350,7 +350,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     // B1 is started again in the lane's slot (a new conversation, a launch with its own token, read by retoken).
     check("…B1 runs in the lane's slot", !!(await waitHung(async () => (await idle(b1.id)) && (await live(b1.id))?.cwd?.toLowerCase() === wt?.toLowerCase())), JSON.stringify(await live(b1.id)))
     await retoken()
-    /** Hive has made the card's line in the lane's slot (the start names the folder and the line). */
+    /** Combwork has made the card's line in the lane's slot (the start names the folder and the line). */
     const onLine = (s) => waitHung(() => s.body?.data?.folder?.toLowerCase() === wt?.toLowerCase() && git(wt, 'branch', '--show-current') === s.body?.data?.line)
 
     // --- One: start, a counted check, submit.
@@ -358,7 +358,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     const line = s1.body?.data?.line
     check("One starts in the lane's slot, on its line", s1.status === 200 && !!line && !!(await onLine(s1)), JSON.stringify(s1.body))
     const rev1 = commit('one.txt')
-    check("One's quick check through hive-progress --check is counted", await quickCheck(c1))
+    check("One's quick check through cw-progress --check is counted", await quickCheck(c1))
     const sub1 = await intent('b1', c1, 'submit', { summary: 'one ready' })
     check('One submitted: Review', sub1.status === 200 && (await card(c1)).column === 'review', JSON.stringify(sub1.body))
     const k1 = await keyOf(c1)
@@ -406,7 +406,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     fs.writeFileSync(fx.go, 'go')
     check('One is merged by the queue: Done', await done(c1), JSON.stringify(await kinds(c1)))
     const i1 = await integrated(c1)
-    check("…Integrated by Hive at the approved revision: a merge commit of B1's line", i1?.data?.by === 'hive' && git(alpha, 'rev-parse', 'main^2') === rev1, JSON.stringify(i1))
+    check("…Integrated by Combwork at the approved revision: a merge commit of B1's line", i1?.data?.by === 'combwork' && git(alpha, 'rev-parse', 'main^2') === rev1, JSON.stringify(i1))
     await toTab('alpha')
     await section('branches')
     const later = await send(b2, dep, 'start')
@@ -556,18 +556,18 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     const gcommit = (file, key) => {
       fs.writeFileSync(path.join(gamma, file), `${file}\n`)
       lib.git(gamma, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'add', file])
-      lib.git(gamma, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'commit', '-qm', file, '-m', `Hive-Card: ${key}`])
+      lib.git(gamma, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'commit', '-qm', file, '-m', `Combwork-Card: ${key}`])
     }
     gcommit('one.txt', gk1)
     gcommit('two.txt', gk2)
-    // Once Hive has read the folder's new commits (each attributed to its card by its trailer), as S11's core does before
+    // Once Combwork has read the folder's new commits (each attributed to its card by its trailer), as S11's core does before
     // its submits: a submit while they are read is refused to try again (evidence.changed).
     check("S11: each card's commit attributed to it by its trailer", !!(await waitHung(async () => (await kinds(gc1)).includes('CommitAttributed') && (await kinds(gc2)).includes('CommitAttributed'))), JSON.stringify({ one: await kinds(gc1), two: await kinds(gc2) }))
     const gsub2 = await send(g2, gc2, 'submit', { summary: 'two' })
     const gsub1 = await send(g1, gc1, 'submit', { summary: 'one' })
     check('S11: both submit in the shared folder: Done, nothing checked', gsub1.status === 200 && gsub2.status === 200 && (await done(gc1)) && (await done(gc2)), JSON.stringify({ gsub1: gsub1.body, gsub2: gsub2.body }))
     check("…two's submission is its own commit only",((await factsOf(gc2, 'Submitted')).at(-1)?.data?.files ?? []).map((x) => x.path).join() === 'two.txt', JSON.stringify((await factsOf(gc2, 'Submitted')).at(-1)?.data))
-    // G16 (#1481): G1 edits three.txt on its next card (its CLI's edit hook takes Hive's file lock); G2's commit sweeps it
+    // G16 (#1481): G1 edits three.txt on its next card (its CLI's edit hook takes Combwork's file lock); G2's commit sweeps it
     // in: G2's submit warns, naming G1's card, and goes through.
     const gc3 = (await inv('tasks:create', { title: 'Gamma three', project: 'gamma' })).number
     const gc4 = (await inv('tasks:create', { title: 'Gamma four', project: 'gamma' })).number
@@ -621,15 +621,15 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     const queueTab = page.locator('.git-sections [data-section="queue"]')
     check('None, a Git card still in flight: the Merge queue section stays', (await queueTab.count()) === 1, JSON.stringify(await page.locator('.git-sections [data-section]').evaluateAll((els) => els.map((e) => e.getAttribute('data-section')))))
     if ((await queueTab.count()) === 1) {
-      if (q.devSeam('the Merge queue section read slowly (HIVE_TEST_SLOW_IPC)')) {
+      if (q.devSeam('the Merge queue section read slowly (CW_TEST_SLOW_IPC)')) {
         // Read slowly (as under load): the section says it's reading, never nothing.
-        await app.evaluate(() => { process.env.HIVE_TEST_SLOW_IPC = 'queue:list=3000' })
+        await app.evaluate(() => { process.env.CW_TEST_SLOW_IPC = 'queue:list=3000' })
         await section('workflow')
         await section('queue')
         const reading = page.locator('.git-body [data-queue-reading]')
         check('the Merge queue section, while its queues are read, says so', !!(await waitHung(async () => (await reading.count()) === 1 && (await text(reading)) === 'Reading the merge queues…')), (await page.locator('.git-body').innerHTML().catch(() => '')).slice(0, 600))
         await page.locator('.vc-view').screenshot({ path: path.join(fx.shots, 'p6lane-vc-none-queue-reading-en-dark.png') })
-        await app.evaluate(() => { delete process.env.HIVE_TEST_SLOW_IPC })
+        await app.evaluate(() => { delete process.env.CW_TEST_SLOW_IPC })
       }
       // Then the old queue as the board has it, with its history: the repository gone takes none of it away.
       const body = page.locator('.git-body')

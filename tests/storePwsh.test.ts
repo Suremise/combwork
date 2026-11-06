@@ -1,6 +1,6 @@
 // The Microsoft Store's PowerShell 7 and Codex's sandbox (#585, Darren's decision: options 1 and 3). With Codex's Windows
 // sandbox set up and the Store's pwsh first on PATH, Provider Setup warns, names the symptom and suggests the installer's
-// PowerShell 7; Hive never changes the shell. Detection: the first pwsh.exe on PATH, by the Store's app execution alias
+// PowerShell 7; Combwork never changes the shell. Detection: the first pwsh.exe on PATH, by the Store's app execution alias
 // folder or its package folder. (On a machine with the Store's pwsh the alias is a reparse point only lstat can see:
 // checked against the real one, where there is one.)
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
@@ -10,7 +10,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { storePwshFirst, storePwshIssue } from '../src/main/providers/codex/storePwsh'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-store-pwsh-')
+const base = tempDir('cw-store-pwsh-')
 const folder = (...parts: string[]): string => {
   const d = join(base, ...parts)
   mkdirSync(d, { recursive: true })
@@ -54,7 +54,7 @@ describe('the Store PowerShell first on PATH (#585)', () => {
     if (process.platform === 'win32' && link) expect(storePwshFirst(real, process.env.LOCALAPPDATA, 'win32')).toBe(true)
   })
 
-  it('warns in Provider Setup: a short label, then the problem, the symptom and the fix, no button (Hive never changes the shell)', () => {
+  it('warns in Provider Setup: a short label, then the problem, the symptom and the fix, no button (Combwork never changes the shell)', () => {
     const issue = storePwshIssue()
     expect(issue).toMatchObject({ id: 'store-pwsh', level: 'warning', message: 'PowerShell 7 from the Microsoft Store is installed' })
     // The label is a badge and the window's banner (#1404): the explanation is the detail's first paragraph.

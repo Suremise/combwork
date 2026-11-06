@@ -1,9 +1,9 @@
 // A watch from a builder's previous conversation never holds off its next card (HI-2197, HB3's stall), on the fake
 // Claude Code, alpha's cards in slots:
-// 1. B1's first lane is lent slot-a; given its card there, B1 watches it by key. The lane ends: Hive types /exit, B1's
+// 1. B1's first lane is lent slot-a; given its card there, B1 watches it by key. The lane ends: Combwork types /exit, B1's
 //    CLI exits, and its watch outlives it (watches outlive a launch, for a resume).
 // 2. B1's next lane (slot-b) starts it in a new conversation: the old watch ends before it launches (no "waiting on
-//    cards"), and Hive gives B1 the lane's card.
+//    cards"), and Combwork gives B1 the lane's card.
 // 3. In that conversation B1 watches by a plain number that reads as another card's key (beta's cards made first, so
 //    alpha's numbers run ahead of its keys): refused, naming both; nothing is watched. A Done card by key answers at
 //    once (HI-2153).
@@ -23,7 +23,7 @@ const beta = path.join(ws, 'beta')
 const slotA = path.join(`${ws}.worktrees`, 'alpha', 'slot-a')
 const slotB = path.join(`${ws}.worktrees`, 'alpha', 'slot-b')
 const PORT = Number(lib.port(47707))
-const identity = { name: 'Hive Stale Watch Test', email: 'stalewatch@example.com' }
+const identity = { name: 'Combwork Stale Watch Test', email: 'stalewatch@example.com' }
 let failed = 0
 const check = (name, ok, extra = '') => {
   lib.checked(ok)
@@ -51,7 +51,7 @@ const transcripts = () => {
   lib.git(alpha, ['branch', '-M', 'main'])
   lib.gitProject(beta, { 'b.txt': 'b\n', '.gitignore': '.combwork/\n' })
   const env = lib.fakeClaude(userData, home, [alpha, beta, ws, slotA, slotB])
-  // B1 follows Hive's notices as a model does: cw_inbox, then the ack.
+  // B1 follows Combwork's notices as a model does: cw_inbox, then the ack.
   fs.writeFileSync(path.join(home, 'fake-follow-notices.txt'), '')
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
@@ -60,14 +60,14 @@ const transcripts = () => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off' } })
+  const h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off' } })
   const { page, inv } = h
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.waitForProvider(inv)
     await lib.openWorkspace(inv, page, ws)
     const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 250)
-    const log = () => lib.hiveLogLines(userData)
+    const log = () => lib.combworkLogLines(userData)
     await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'agentMerges', folder: 'slots', target: 'main', style: 'merge', preChecks: [], mergeChecks: [], identity, okBefore: { mode: 'never', labels: [] }, reviewerMode: 'pool', commands: {} } })
     const b1 = await lib.addAgent(inv, alpha, { name: 'B1', workflowRole: 'builder' })
     // A second builder: a pool of two slots, so the next lane needn't wait for the first card's.
@@ -94,11 +94,11 @@ const transcripts = () => {
     const first = await inv('lanes:start', alpha, { builder: b1.id, reviewer: null, pool: true, cards: [c1.n], name: 'First' })
     check('the first lane is lent slot-a', first.slot === 'slot-a', JSON.stringify(first))
     check(`B1 is given ${c1.key} in slot-a, and is idle`, !!(await until(async () => transcripts().includes(`Work on task ${c1.key}`) && (await idleIn(slotA)), HUNG_MS)), JSON.stringify(await live(b1.id)))
-    await say(`hive cw_wait_for_tasks ${JSON.stringify({ cards: [c1.key], changes: ['column'], wake: true })}`)
+    await say(`cw cw_wait_for_tasks ${JSON.stringify({ cards: [c1.key], changes: ['column'], wake: true })}`)
     check('B1 watches its card', !!(await until(async () => (await live(b1.id))?.status === 'watching', HUNG_MS)), JSON.stringify(await live(b1.id)))
     // Told the lane is finished (that wake ends its watch), B1 watches its card again, as HB3 did: that watch is the one
     // its next conversation would inherit.
-    fs.writeFileSync(path.join(home, 'fake-wakes-B1.txt'), `hive cw_wait_for_tasks ${JSON.stringify({ cards: [c1.key], changes: ['column'], wake: true })}\n`)
+    fs.writeFileSync(path.join(home, 'fake-wakes-B1.txt'), `cw cw_wait_for_tasks ${JSON.stringify({ cards: [c1.key], changes: ['column'], wake: true })}\n`)
     const ending = Math.max(0, log().length - 1)
     await inv('lanes:end', first.lane.id)
     check('…told the lane ended, B1 watches its card again', !!(await until(() => log().slice(ending).filter((l) => l.includes(' watches #')).length >= 1, HUNG_MS)), log().slice(ending).filter((l) => l.includes('[watches]')).join('\n'))
@@ -122,10 +122,10 @@ const transcripts = () => {
     const clash = cards.find((c) => cards.some((o) => o.key === `${c.key.split('-')[0]}-${c.n}`))
     check('a number of alpha reads as another of its keys', !!clash, JSON.stringify(cards))
     const other = `${clash.key.split('-')[0]}-${clash.n}`
-    await say(`hive cw_wait_for_tasks ${JSON.stringify({ cards: [clash.n], wake: true })}`)
+    await say(`cw cw_wait_for_tasks ${JSON.stringify({ cards: [clash.n], wake: true })}`)
     check(`watching ${clash.n} is refused, naming ${clash.key} and ${other}`, !!(await until(() => transcripts().includes(`${clash.n} is ${clash.key}'s number (#${clash.n}), not ${other}, which is another card. Name cards by key`), HUNG_MS)))
     check('…and nothing is watched', !(await live(b1.id))?.watch, JSON.stringify(await live(b1.id)))
-    await say(`hive cw_wait_for_tasks ${JSON.stringify({ cards: [cards[4].key], wake: true })}`)
+    await say(`cw cw_wait_for_tasks ${JSON.stringify({ cards: [cards[4].key], wake: true })}`)
     check(`a watch on ${cards[4].key}, in Done, answers at once`, !!(await until(() => transcripts().includes(`${cards[4].key} is in Done`), HUNG_MS)), transcripts().split('\n').filter((l) => l.includes(cards[4].key)).slice(-3).join('\n'))
     check('…and nothing is watched', !(await live(b1.id))?.watch, JSON.stringify(await live(b1.id)))
   } catch (err) {

@@ -215,13 +215,13 @@
   "panes.table.worktree": "ワークツリー",
   "panes.table.worktreePrefix": "ワークツリー：{value}",
   "panes.template.detail": "{n, plural, other {#個のエージェント}} · {layout}",
-  "panes.template.heading": "{template} · {scope, select, hive {Combwork} workspace {ワークスペース} other {このプロジェクト}}",
+  "panes.template.heading": "{template} · {scope, select, combwork {Combwork} workspace {ワークスペース} other {このプロジェクト}}",
   "panes.template.layout": "{layout, select, auto {自動レイアウト} single {1つずつ} columns2 {2列} columns3 {3列} grid {2×2グリッド} grid6 {3×2グリッド} other {{layout}}}",
   "panes.template.listFailed": "テンプレートの一覧を取得できませんでした",
   "panes.template.noneSaved": "保存されたテンプレートはまだありません",
   "panes.template.noneYet": "テンプレートはまだありません：先に「+ 追加 ▾」→「テンプレート」→「テンプレートを保存…」で保存してください",
   "panes.template.save": "テンプレートを保存…",
-  "panes.template.scopeHeading": "{scope, select, hive {Combworkのテンプレート} workspace {ワークスペースのテンプレート} other {このプロジェクトのテンプレート}}",
+  "panes.template.scopeHeading": "{scope, select, combwork {Combworkのテンプレート} workspace {ワークスペースのテンプレート} other {このプロジェクトのテンプレート}}",
   "panes.terminal.exited": "プロセスはコード{code}で終了しました",
   "panes.terminal.osc52.askCopy": "コピー",
   "panes.terminal.osc52.askDont": "コピーしない",
@@ -259,5 +259,6 @@
   "panes.watchCancel.failed": "監視をキャンセルできませんでした",
   "panes.watchCell.agents": "{agents}の完了",
   "panes.watchCell.cardsInto": "{cards} → {column}",
-  "panes.worktree.toMerge": "マージ対象：{work}"
+  "panes.worktree.toMerge": "マージ対象：{work}",
+  "panes.footer.modelSwitched": "接続のモデル{launched}で起動しましたが、{provider}は現在{running}で動いています。{launched}に戻すにはエージェントを再起動してください。"
 }

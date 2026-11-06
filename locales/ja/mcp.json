@@ -7,7 +7,7 @@
   "mcp.addFile.messageAdded": "{file}をワークスペース（.combwork/mcp）に追加します{files, plural, =0 {} other {（#件のファイルは専用のフォルダーに入ります）}}。まだどのプロジェクトにも追加されません。実行したい場所で追加してください：プロジェクトの「MCP」タブ、アシスタントのビュー、またはここの「追加先…」。実行するコマンド：",
   "mcp.addFile.replaceDetailAdded": "「置き換え」を選ぶと、既存のサーバー（.zipから追加したものはそのフォルダーも）をごみ箱に移し、このサーバーをどのプロジェクトにも追加しない状態で追加します。古いサーバーを追加していたプロジェクトとアシスタントでは使えなくなります。別の名前を選ぶこともできます。",
   "mcp.catalog.allSources": "すべてのソース",
-  "mcp.catalog.badName": "サーバー名には英字、数字、「-」、「_」を使えます（最大64文字）。「combwork」と「hive」は予約されています。",
+  "mcp.catalog.badName": "サーバー名には英字、数字、「-」、「_」を使えます（最大64文字）。「combwork」は予約されています。",
   "mcp.catalog.badgeInstalled": "インストール済み",
   "mcp.catalog.badgeNeeds": "このPCでは動きません",
   "mcp.catalog.badgeOther": "名前が使用中",

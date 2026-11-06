@@ -1,7 +1,7 @@
-// What a Codex launch says it delivered of each Hive skill when something fails (CodexAdapter.prepareLaunch): one
+// What a Codex launch says it delivered of each Combwork skill when something fails (CodexAdapter.prepareLaunch): one
 // skill's failure (its source gone, unreadable, removed mid-copy) is its own, the others are still delivered, and each
-// record is what Codex reads: Hive's copy from an earlier launch with its revision and why it wasn't refreshed, or
-// nothing. A folder of the user's with the name is never Hive's delivery and is never touched. When the skills folder
+// record is what Codex reads: Combwork's copy from an earlier launch with its revision and why it wasn't refreshed, or
+// nothing. A folder of the user's with the name is never Combwork's delivery and is never touched. When the skills folder
 // itself can't be set up, the records still say what's there. Faults are injected in fs/promises: reading files under
 // a folder named "unreadable" is denied, and so is creating .agents/skills while `folderFails` is set.
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
@@ -33,7 +33,7 @@ type Delivery = { revision: string | null; problem?: string; lasting?: true }
 // Hook trust is checked against the Codex executable; not what these tests are about.
 ;(codex as unknown as { checkHookHashes: () => Promise<void> }).checkHookHashes = async () => undefined
 
-const base = tempDir('hive-codex-delivery-')
+const base = tempDir('cw-codex-delivery-')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 beforeEach(() => {
   faults.folderFails = false
@@ -85,7 +85,7 @@ describe("one skill's source failing", () => {
     const was = source(src, 'was', 'v1')
     await launch(cwd, [{ name: 'was', sourcePath: was }])
     const kept = await contentHash(join(skills, 'cw-was'))
-    // Both now under a folder Hive may not read.
+    // Both now under a folder Combwork may not read.
     const locked = source(join(src, 'unreadable'), 'was', 'v2')
     const fresh = source(join(src, 'unreadable'), 'fresh', 'v1')
     const out = await launch(cwd, [{ name: 'was', sourcePath: locked }, { name: 'fresh', sourcePath: fresh }, { name: 'ok', sourcePath: ok }])
@@ -115,7 +115,7 @@ describe("one skill's source failing", () => {
 })
 
 describe('the skills folder failing', () => {
-  it("can't be set up: each skill is what is there, Hive's copies with their revisions, the user's folders as nothing", async () => {
+  it("can't be set up: each skill is what is there, Combwork's copies with their revisions, the user's folders as nothing", async () => {
     const { cwd, src, skills } = setup()
     const a = source(src, 'a', 'v1')
     await launch(cwd, [{ name: 'a', sourcePath: a }])

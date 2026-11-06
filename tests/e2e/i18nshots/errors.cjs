@@ -1,4 +1,4 @@
-// Screenshot cases for the `errors` area (#845): a call the main process refuses (ipc.ts's HiveErrors) as the window
+// Screenshot cases for the `errors` area (#845): a call the main process refuses (ipc.ts's CombworkErrors) as the window
 // shows it, in the run's language, reached for the i18nshots route (tests/e2e/i18nshots.cjs has the case format) with
 // locale-independent means only: IPC, command ids and structural hooks, never English text. Windows draws the native
 // dialogs' titles, so they can't be photographed here.
@@ -16,7 +16,7 @@ async function shown(ctx, locator, what) {
 const projectOf = (ctx) => path.join(ctx.workspace, 'errorsgit')
 
 /**
- * The .combwork notice's Exclude, refused: main says why (errors.hive.notIgnored), and the window shows it in a notice in
+ * The .combwork notice's Exclude, refused: main says why (errors.cw.notIgnored), and the window shows it in a notice in
  * its language.
  */
 async function excludeRefused(ctx) {
@@ -32,7 +32,7 @@ async function excludeRefused(ctx) {
   await ctx.command('project.focus', dir)
   await ctx.command('project.tab.settings')
   await page.mouse.move(5, 5)
-  const exclude = await shown(ctx, page.locator('.hive-vcs-notice button.primary'), "the .combwork notice's Exclude")
+  const exclude = await shown(ctx, page.locator('.cw-vcs-notice button.primary'), "the .combwork notice's Exclude")
   await exclude.click()
   return shown(ctx, page.locator('.toasts .toast.error'), 'the refusal')
 }

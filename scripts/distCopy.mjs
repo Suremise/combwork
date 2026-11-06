@@ -51,7 +51,7 @@ export function provenanceProblem(before, after) {
   return changed.length ? `the ${changed.join(', ')} changed while it was built (${changed.map((k) => `${before[k]} → ${after[k]}`).join('; ')})` : null
 }
 
-/** The installer's file name for a version: electron-builder.yml's artifactName (Combwork since HI-2458; Hive-Setup before). */
+/** The installer's file name for a version: electron-builder.yml's artifactName (Combwork-Setup since HI-2458). */
 export const installerName = (version) => `Combwork-Setup-${version}.exe`
 
 /** The files `npm run dist` makes for a version that belong with the installer; build-info.json last. */
@@ -197,7 +197,7 @@ export function copyToMain({ root, version, info, here = false, replace = false 
  * (copyToMain) without win-unpacked, so there it can describe another build than the win-unpacked it sits next to. This
  * one never moves: removed before packaging (dist.mjs), written by finishDist once the build's code is certain.
  */
-export const UNPACKED_INFO = join('win-unpacked', '.hive-build-info.json')
+export const UNPACKED_INFO = join('win-unpacked', '.cw-build-info.json')
 
 /** What dist/win-unpacked was built from (UNPACKED_INFO), or null: none (an older build, or one whose code changed). */
 export function readUnpackedInfo(dist) {
@@ -237,7 +237,7 @@ export function makeDist({ root, here = false, replace = false, run, buildStampe
     clear(dist)
     const { stamped } = buildStamped({ root, runBuild: () => run('npm run build') })
     if (!stamped) warn("\nThe source changed while it was building: out/ isn't stamped as this source's (npm run e2e -- --build rebuilds it).\n")
-    // A local build says so (#1647): the app's identity file and its installer's wait for another Hive installer.
+    // A local build says so (#1647): the app's identity file and its installer's wait for another Combwork installer.
     stampApp(root, { version: before.version, commit: before.head, local: true })
     run('npx electron-builder --win --publish never')
     return { lines: finish({ root, before, after: identity(root), here, replace }) }

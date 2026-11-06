@@ -1,4 +1,4 @@
-// The slot pool in the app (#1429, SPEC §16.10.1–16.10.2): a test Hive's main process lends a Git project's slots
+// The slot pool in the app (#1429, SPEC §16.10.1–16.10.2): a test Combwork's main process lends a Git project's slots
 // (through the test copies' `slots:test` channel, as #1438's card start will), with a setup command:
 // - two builders, two slots: slot-a and slot-b, each a worktree of the project's, their setup runs shown in the
 //   Progress panel as "Combwork (slot slot-a)" / "Combwork (slot slot-b)" (slot-a's while it runs, screenshot);
@@ -31,7 +31,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
   const setup = path.join(fx.tools, 'setup.js')
   // The setup: writes the slot's name and port block, then waits for the test's go-ahead (bounded against a hang).
   fs.writeFileSync(setup, ["const fs = require('fs')", "fs.mkdirSync('warm', { recursive: true })", "fs.writeFileSync('warm/env.txt', process.env.CW_SLOT + ' ' + process.env.CW_SLOT_PORT_BASE)", `const go = ${JSON.stringify(go)}, t = Date.now()`, 'const tick = () => (fs.existsSync(go) ? process.exit(0) : Date.now() - t > 120000 ? process.exit(3) : setTimeout(tick, 100))', 'tick()', ''].join('\n'))
-  const h = await q.startHive(fx, { port: PORT, keepOptions: true })
+  const h = await q.startCombwork(fx, { port: PORT, keepOptions: true })
   try {
     const { page, inv } = h
     page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -43,14 +43,14 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     const slot = async (name) => (await slots()).find((s) => s.name === name)
     const op = (o) => inv('slots:test', fx.alpha, o)
 
-    // --- slot-a: lent to B1 for card 101, its setup a run of Hive's while it runs.
+    // --- slot-a: lent to B1 for card 101, its setup a run of Combwork's while it runs.
     const panel = page.locator('.progress-panel')
     await page.locator('.progress-rail').click()
     check('the Progress panel opens', !!(await until(async () => (await panel.count()) === 1, HUNG_MS)))
     const lendA = op({ op: 'lend', agent: b1.id, card: 101 })
-    const runOf = async (name) => (await inv('progress:snapshot')).runs.find((r) => r.source === 'hive' && r.slot === name)
+    const runOf = async (name) => (await inv('progress:snapshot')).runs.find((r) => r.source === 'combwork' && r.slot === name)
     const runA = await until(() => runOf('slot-a'), HUNG_MS)
-    check("slot-a's setup is a run of Hive's, attributed to the slot", runA?.agentName === 'Combwork (slot slot-a)' && runA.defaultName === 'slot' && runA.state === 'running', JSON.stringify(runA))
+    check("slot-a's setup is a run of Combwork's, attributed to the slot", runA?.agentName === 'Combwork (slot slot-a)' && runA.defaultName === 'slot' && runA.state === 'running', JSON.stringify(runA))
     await panel.locator('.progress-tab[data-tab="runs"]').click()
     const rowA = panel.locator(`.progress-tab-runs [data-run="${runA?.id}"]`)
     check('…shown in Runs as "Combwork (slot slot-a)"', !!(await until(async () => (await rowA.count()) === 1 && (await rowA.innerText()).includes('Combwork (slot slot-a)'), HUNG_MS)), await panel.innerText().catch(() => ''))

@@ -1,12 +1,12 @@
-// The Progress panel: agents report long runs through the Agent API with their own tokens, and Hive shows each run with
+// The Progress panel: agents report long runs through the Agent API with their own tokens, and Combwork shows each run with
 // its agent in a panel on the right (folded: a strip with a bar per run) and on the taskbar button. A run is its
 // agent's: another agent can't touch it. Passed runs leave Pulse for the Runs tab (#1309); failed ones stay until seen,
 // then leave it marked red (or when dismissed), Pulse saying a run failed until a later run of it passes, and the Runs
 // tab keeping every run by day, retries folded, found by words and filtered; a row opens its details, its agent's name shows the agent (flashing its pane); an agent that
 // stops leaves its run "stopped reporting", and the setting turns it all off; another tells agents to run long commands
-// through hive-progress, which reaches a new session's guidance (#167). The agents are the fake Claude Code;
+// through cw-progress, which reaches a new session's guidance (#167). The agents are the fake Claude Code;
 // dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR. The taskbar calls are recorded through
-// HIVE_TEST_TASKBAR_LOG (the page can't see them).
+// CW_TEST_TASKBAR_LOG (the page can't see them).
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
@@ -75,13 +75,13 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   cfg.settings.notifications = { ...cfg.settings.notifications, desktopNotifications: false, chimeEnabled: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TASKBAR_LOG: taskbarLog })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TASKBAR_LOG: taskbarLog })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('alpha', { exact: true }).first().click()
   await lib.waitForProvider(inv)
@@ -259,7 +259,7 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   check('the strip shows the failed run', (await rail.locator('.progress-mini.failed').count()) === 1)
   await page.screenshot({ path: path.join(shots, 'dark-strip.png'), clip: { x: 1200, y: 30, width: 200, height: 300 } })
   // Focused as the test says (Windows won't give a background app the focus while another window has it): the window's
-  // focus is stubbed and the event Hive listens for sent with it.
+  // focus is stubbed and the event Combwork listens for sent with it.
   await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows()[0]
     w.isFocused = () => true
@@ -289,7 +289,7 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   check("…without showing its agent", (await shownProject()) === 'alpha', await shownProject())
   await showTab('runs')
   check('…and the Runs tab has it', !!(await until(async () => (await panel.locator(`.progress-recent-item[data-run="${run2b}"]`).count()) === 1, HUNG_MS)))
-  // A Recent run opens its details: what Hive has for it, its agent to show.
+  // A Recent run opens its details: what Combwork has for it, its agent to show.
   // Each row ends with a chevron after its time (#251), a button for the keyboard: down to show the details, up to hide them.
   const recent2 = panel.locator(`.progress-recent-item[data-run="${run2}"] button.progress-details-toggle`)
   check('a Recent run has a chevron button after its time, naming it, for its details', (await recent2.count()) === 1 && (await recent2.getAttribute('aria-label')) === 'Show details for npm run build' && (await recent2.getAttribute('aria-expanded')) === 'false' && (await recent2.locator('.codicon-chevron-down').count()) === 1, await recent2.getAttribute('aria-label').catch(() => ''))
@@ -379,7 +379,7 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   const copiedLog = (await page.evaluate(() => window.__copied)).at(-1) ?? ''
   check('Copy details includes the command, steps, exit code and log', copiedLog === [...(await shownLines(withLog.locator('.progress-details'))), 'Summary: 1 failed: taskbar'].join('\n') && copiedLog.includes('Command: npm run e2e -- --all --build --record') && copiedLog.includes(`Log: ${logFile}`) && copiedLog.includes('Exit code: 1'), copiedLog)
   await page.screenshot({ path: path.join(shots, 'dark-log-details.png') })
-  // A log that has gone, and one Hive won't run: an error says why, never silence.
+  // A log that has gone, and one Combwork won't run: an error says why, never silence.
   const gone = await runWithLog('e2e: log deleted since', path.join(logDir, 'gone.md'))
   const before = (await shellCalls()).length
   await gone.locator('button', { hasText: 'Open log' }).click()
@@ -720,7 +720,7 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   check('…Recent included, kept runs too (#352)', (await inv('progress:list')).length === 0 && !!(await until(async () => !fs.existsSync(path.join(userData, 'progress-history')), 5000)))
 
   // --- Agents show long commands (#167): on by default, in Settings under the Progress panel and greyed out while the
-  // panel is off; a session started afterwards gets the matching rule (its hive MCP server's instructions).
+  // panel is off; a session started afterwards gets the matching rule (its combwork MCP server's instructions).
   const instructionsOf = async (dir) => {
     const launch = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).filter((l) => l.cwd.toLowerCase() === dir.toLowerCase()).at(-1)
     const server = JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork
@@ -789,7 +789,7 @@ const near = (a, b) => Math.abs(a - b) < 0.001
   const page2 = await app2.firstWindow()
   page2.on('pageerror', (e) => check('no page errors after the restart', false, e.message))
   await lib.appReady(page2)
-  const inv2 = (ch, ...a) => page2.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv2 = (ch, ...a) => page2.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   if ((await inv2('workspace:get'))?.path?.toLowerCase() !== ws.toLowerCase()) await lib.openWorkspace(inv2, page2, ws)
   const kept = (await inv2('progress:list')).find((x) => x.id === run5)
   check('after a restart, the ended run is kept with its summary', kept?.state === 'failed' && kept?.summary === 'kept' && kept?.seenAt !== null, JSON.stringify(kept))

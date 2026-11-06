@@ -1,7 +1,7 @@
 /**
  * OSC 52 (#736): a terminal program asking the terminal to set (`ESC ] 52 ; c ; <base64> BEL`) or read (`… ; ? BEL`)
  * the clipboard. Copilot's own mouse selection copies this way (Ctrl+C or right-click on it), and Claude Code sends one
- * alongside its native copy. Hive takes writes from a terminal the user is using and never answers a read: a program
+ * alongside its native copy. Combwork takes writes from a terminal the user is using and never answers a read: a program
  * must not read the user's clipboard.
  */
 
@@ -16,7 +16,7 @@ export const OSC52_INPUT_MS = 10_000
 
 export type Osc52Refusal = 'read' | 'not-in-use' | 'too-large' | 'invalid' | 'blocked' | 'declined'
 
-/** What Hive does with a write it would take (#1292, Settings → Advanced): take it, ask the user first, or take none. */
+/** What Combwork does with a write it would take (#1292, Settings → Advanced): take it, ask the user first, or take none. */
 export type Osc52Policy = 'allow' | 'ask' | 'block'
 
 /** A write osc52() takes, by the policy: written, asked about first, or refused ('blocked'). Reads and the rest are refused either way. */

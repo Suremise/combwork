@@ -1,8 +1,8 @@
 /**
- * Hive's performance metrics (#115): what the Agent API, the hive MCP bridge, Hive's launch guidance and its skill
- * service cost, counted locally per workspace. Units are exact where Hive can measure them (UTF-8 bytes, characters as
+ * Combwork's performance metrics (#115): what the Agent API, the combwork MCP bridge, Combwork's launch guidance and its skill
+ * service cost, counted locally per workspace. Units are exact where Combwork can measure them (UTF-8 bytes, characters as
  * UTF-16 code units, i.e. JavaScript string length, milliseconds on a monotonic clock); provider token usage is what the
- * provider reported. Hive estimates no tokens. Nothing here holds a prompt, a body, a token, a URL or a path.
+ * provider reported. Combwork estimates no tokens. Nothing here holds a prompt, a body, a token, a URL or a path.
  */
 import type { Text } from './advanced'
 import type { LaunchWorkflow } from './workflow/roles'
@@ -36,7 +36,7 @@ export interface ApiSeries extends Timed {
   responseBytes: number
 }
 
-/** Hive tool calls as the MCP bridge answered them: the final text the model gets. */
+/** Combwork tool calls as the MCP bridge answered them: the final text the model gets. */
 export interface McpSeries extends Timed {
   tool: string
   role: 'agent' | 'assistant'
@@ -48,20 +48,20 @@ export interface McpSeries extends Timed {
   bytes: number
 }
 
-/** What a launch gave a session from Hive (by provider and role), exact sizes of each part. */
+/** What a launch gave a session from Combwork (by provider and role), exact sizes of each part. */
 export interface GuidanceSeries {
   provider: string
   role: 'agent' | 'assistant'
-  /** The launch's side of the workflow (HI-2049); `unknown`: recorded before Hive counted it. */
+  /** The launch's side of the workflow (HI-2049); `unknown`: recorded before Combwork counted it. */
   workflow: LaunchWorkflow | 'unknown'
   /** The hash of the dialect chain its launches spoke (HI-2443), where one overrides text; absent: the Default. */
   dialect?: string
   launches: number
   /**
-   * Each part of what Hive tells the session at launch, counted once a launch whichever way the provider gets it (the
-   * hive MCP server's instructions, Codex's developer_instructions, the Assistant's prompt):
-   * - core: Hive's session contract, the same text for every session of a role;
-   * - custom: what Hive adds for this project or workspace (the latest handover's pointer);
+   * Each part of what Combwork tells the session at launch, counted once a launch whichever way the provider gets it (the
+   * combwork MCP server's instructions, Codex's developer_instructions, the Assistant's prompt):
+   * - core: Combwork's session contract, the same text for every session of a role;
+   * - custom: what Combwork adds for this project or workspace (the latest handover's pointer);
    * - role: the Assistant's role (who it is, the workspace, what Control lets it do), none for project agents;
    * - mode: the Assistant's mode, as the workspace has it, none for project agents.
    */
@@ -84,19 +84,19 @@ export interface GuidanceSeries {
   /** Skills asked for that the session didn't get (too big, a link that can't be made, a failed copy, a broken header). */
   skillsNotDelivered: number
   /**
-   * Skills the session got whose copy couldn't be measured (gone or unreadable when Hive looked): counted in `skills`,
+   * Skills the session got whose copy couldn't be measured (gone or unreadable when Combwork looked): counted in `skills`,
    * left out of `skillCatalogBytes` and `skillBytes`, which are the measured skills' only. Unknown, not zero.
    */
   skillsUnmeasured: number
 }
 
 /**
- * The hive MCP bridge's tool list as one session start sent it to its CLI (tools/list: names, descriptions, schemas).
- * Its instructions aren't counted here: they are Hive's session contract, counted once per launch in GuidanceSeries.
+ * The combwork MCP bridge's tool list as one session start sent it to its CLI (tools/list: names, descriptions, schemas).
+ * Its instructions aren't counted here: they are Combwork's session contract, counted once per launch in GuidanceSeries.
  */
 export interface CatalogSeries {
   role: 'agent' | 'assistant'
-  /** The side of the workflow of the launch whose bridge sent it (HI-2049); `unknown`: recorded before Hive counted it. */
+  /** The side of the workflow of the launch whose bridge sent it (HI-2049); `unknown`: recorded before Combwork counted it. */
   workflow: LaunchWorkflow | 'unknown'
   starts: number
   tools: number
@@ -175,9 +175,9 @@ export interface ProviderUsageSummary {
   /** Provider requests, and compactions, the sessions reported. */
   requests: number
   compactions: number
-  /** Responses the CLIs' safety classifiers stopped (#606), where Hive can detect them (not Copilot). */
+  /** Responses the CLIs' safety classifiers stopped (#606), where Combwork can detect them (not Copilot). */
   safeguardStops: number
-  /** API-equivalent cost (USD) of the sessions with one: reported by the provider, or Hive's estimate (`costEstimated` of them). Not a bill: a subscription isn't charged per request. */
+  /** API-equivalent cost (USD) of the sessions with one: reported by the provider, or Combwork's estimate (`costEstimated` of them). Not a bill: a subscription isn't charged per request. */
   costUsd: number
   costEstimated: number
   /** Sessions whose cost isn't known (no price for the model, or no usage reported). */
@@ -199,7 +199,7 @@ export interface TrendPoint {
   /** Where the hour or day starts (ISO). */
   start: string
   /**
-   * How much of the slot Hive was recording for this workspace (open, recording on, not since reset), ms. Zero: not
+   * How much of the slot Combwork was recording for this workspace (open, recording on, not since reset), ms. Zero: not
    * observed, so its zeros mean nothing was seen, not that nothing happened.
    */
   observedMs: number
@@ -258,7 +258,7 @@ export interface MetricsFilters {
 }
 
 /**
- * When Hive was recording for this workspace in the range: open in Hive, recording on, since the last reset (to within
+ * When Combwork was recording for this workspace in the range: open in Combwork, recording on, since the last reset (to within
  * a few minutes). Outside it, nothing was seen: no data is not the same as zero.
  */
 export interface MetricsCoverage {
@@ -269,7 +269,7 @@ export interface MetricsCoverage {
   /** Separate stretches of observation in the range (more than one: there were gaps). */
   stretches: number
   /**
-   * History removed to keep the metrics file under its size limit (not by age), through this time (ISO), when that is in
+   * History removed to keep the metrics under their size limit (not by age), through this time (ISO), when that is in
    * the range: nothing before it is available, so it isn't counted as observed either.
    */
   evictedThrough?: string
@@ -285,13 +285,13 @@ export interface MetricsReport {
   coverage: MetricsCoverage
   /**
    * The parts. A project scope has only that project's; a workspace scope has each project's and `workspace` (work not
-   * of any project: the Assistant, scripts, Hive's own). The totals are their sum, each counted once.
+   * of any project: the Assistant, scripts, Combwork's own). The totals are their sum, each counted once.
    */
   projects: Record<string, MetricsPart>
   workspace?: MetricsPart
   /** Skill service health (workspace scope only: it is shared, not any project's). */
   skills?: SkillServiceSeries
-  /** Process-wide, not this workspace's: requests refused before Hive knew whose they were, and event streams. */
+  /** Process-wide, not this workspace's: requests refused before Combwork knew whose they were, and event streams. */
   app?: { unauthenticated: number; streams: StreamSeries; inFlight: number }
   providers: ProviderUsageSummary[]
   /** Why provider usage is empty or partial for these filters, when it is (e.g. scripts have no sessions). */

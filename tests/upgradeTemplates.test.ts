@@ -12,9 +12,9 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { as09 } from './boardDb'
 import { TEMPLATE_VERSION } from '../src/shared/templates'
-import type { HiveEvent } from '../src/shared/types'
+import type { CombworkEvent } from '../src/shared/types'
 
-const base = tempDir('hive-upgrade-templates-')
+const base = tempDir('cw-upgrade-templates-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -84,7 +84,7 @@ async function workspace09(): Promise<{ ws: string; wsTemplates: string; pTempla
 function notices(w: WS): { title: string; message: string }[] {
   const seen: { title: string; message: string }[] = []
   const emit = w.emit.bind(w)
-  w.emit = ((e: HiveEvent) => {
+  w.emit = ((e: CombworkEvent) => {
     if (e.type === 'toast') seen.push({ title: e.toast.title, message: e.toast.message ?? '' })
     return emit(e)
   }) as typeof w.emit
@@ -118,7 +118,7 @@ describe("0.9's agent templates at the upgrade to 1.0 (#1436)", () => {
     expect(readFileSync(join(ws, '.combwork', 'backups', step.V09_TEMPLATES, 'workspace', 'pair.json'), 'utf8')).toBe(v1('Pair'))
     // 1.0 lists only its own: the 0.9 files aren't listed, loaded, added from or deleted.
     const listed = await inWorkspace(w, () => templates.listTemplates(join(ws, 'p')))
-    expect(listed.filter((t) => t.scope !== 'hive').map((t) => t.file).sort()).toEqual(['damaged.json', 'new.json'])
+    expect(listed.filter((t) => t.scope !== 'combwork').map((t) => t.file).sort()).toEqual(['damaged.json', 'new.json'])
     await expect(inWorkspace(w, () => templates.templatePlan(join(ws, 'p'), 'workspace', 'pair.json'))).rejects.toThrow(/no longer there/)
     await expect(inWorkspace(w, () => templates.addAgentFromTemplate(join(ws, 'p'), 'project', 'mine.json', 0))).rejects.toThrow(/no longer there/)
     await expect(inWorkspace(w, () => templates.deleteTemplate({ scope: 'workspace', file: 'team.json' }))).rejects.toThrow(/no longer there/)

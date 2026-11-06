@@ -1,4 +1,4 @@
-// Saving where the panes are (#762), as Hive's main process does: placePanes under the project file's lock (the cells,
+// Saving where the panes are (#762), as Combwork's main process does: placePanes under the project file's lock (the cells,
 // and the order as they read), refusing an agent in two cells, and every placement settling as agents are added or
 // removed, so each agent keeps its cell, across a restart too. Each case has a workspace of its own.
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-placement-')
+const base = tempDir('cw-placement-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -26,7 +26,7 @@ describe('saving pane placements', () => {
     await w.open(wsPath)
   }
   beforeEach(() => {
-    wsPath = tempDir('hive-placement-ws-')
+    wsPath = tempDir('cw-placement-ws-')
     alpha = join(wsPath, 'alpha')
     file = join(alpha, '.combwork', 'project.json')
     mkdirSync(join(alpha, '.combwork'), { recursive: true })

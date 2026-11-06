@@ -6,7 +6,7 @@ import { Icon, Tooltip } from './ui'
 
 /**
  * Tabs (HI-1837): a row of tabs switching between separate pages or forms of one view, such as Settings → Version
- * Control's Hive and workspace defaults or a project's Version Control sections. A segmented control picks a value or a
+ * Control's Combwork and workspace defaults or a project's Version Control sections. A segmented control picks a value or a
  * filter for the same view (None · Git, Files | Commits, Today / 7 days…) and stays one: the two look different on
  * purpose. Each tab can carry an icon, a count and an unsaved mark; the keyboard moves along them (arrows, Home, End,
  * roving focus), and with `fold` the tabs not selected fold to their icons when the row is short of room.
@@ -36,13 +36,13 @@ export interface TabItem<T extends string = string> {
 }
 
 const T = {
-  unsaved: msg({ id: 'tabs.unsaved', defaultMessage: 'Unsaved changes', description: "Tooltip of the dot on a tab whose page has changes not saved yet (Settings → Version Control's Hive defaults, say), and read out with the tab's name." }),
+  unsaved: msg({ id: 'tabs.unsaved', defaultMessage: 'Unsaved changes', description: "Tooltip of the dot on a tab whose page has changes not saved yet (Settings → Version Control's Combwork defaults, say), and read out with the tab's name." }),
   named: msg({ id: 'tabs.unsavedNamed', defaultMessage: '{tab} (unsaved changes)', description: "A tab's accessible name while its page has changes not saved yet; {tab} is its name." }),
   withNote: msg({ id: 'tabs.withNote', defaultMessage: '{tab} ({note})', description: "A dimmed tab's accessible name: {tab} is its name, {note} why it is dimmed (a CLI turned off, say)." })
 }
 
 /** A tab's icon: a codicon by name, or the node given, hidden from screen readers (the tab's name says it: a CLI's icon names it again). */
-const tabIcon = (icon: TabItem['icon']): React.ReactNode => (typeof icon === 'string' ? <Icon name={icon} /> : icon ? <span className="hive-tab-icon" aria-hidden="true">{icon}</span> : null)
+const tabIcon = (icon: TabItem['icon']): React.ReactNode => (typeof icon === 'string' ? <Icon name={icon} /> : icon ? <span className="cw-tab-icon" aria-hidden="true">{icon}</span> : null)
 
 /** The ids a tab and its panel take: unique per row of tabs, so two on one page never share one. */
 export const tabIds = (base: string, id: string): { tab: string; panel: string } => ({ tab: `${base}-tab-${id}`, panel: `${base}-panel-${id}` })
@@ -87,8 +87,8 @@ export function Tabs<T extends string>({ items, value, onChange, label, fold, re
     listRef.current?.querySelector<HTMLElement>(`[data-tab="${CSS.escape(next)}"]`)?.focus()
   }
   return (
-    <div ref={rowRef} className="hive-tabs-row">
-      <div ref={listRef} className={cx('hive-tabs', icons && 'icons', className)} role="tablist" aria-label={label} onKeyDown={onKeyDown}>
+    <div ref={rowRef} className="cw-tabs-row">
+      <div ref={listRef} className={cx('cw-tabs', icons && 'icons', className)} role="tablist" aria-label={label} onKeyDown={onKeyDown}>
         {items.map((x) => {
           const selected = x.id === value
           const folded = icons && !selected && !!x.icon
@@ -96,14 +96,14 @@ export function Tabs<T extends string>({ items, value, onChange, label, fold, re
           const name = x.muted ? tr(T.withNote, { tab: named, note: x.muted }) : named
           return (
             <Tooltip key={x.id} content={x.tip ?? (folded ? name : (x.muted ?? null))}>
-              <button type="button" role="tab" id={tabIds(base, x.id).tab} aria-controls={tabIds(base, x.id).panel} aria-selected={selected} {...(x.unsaved || x.muted ? { 'aria-label': name } : {})} tabIndex={selected ? 0 : -1} data-tab={x.id} {...(x.muted ? { 'data-muted': '' } : {})} {...x.attrs} className={cx('hive-tab', selected && 'active', folded && 'icon-only', x.muted && 'muted')} onClick={() => onChange(x.id)}>
+              <button type="button" role="tab" id={tabIds(base, x.id).tab} aria-controls={tabIds(base, x.id).panel} aria-selected={selected} {...(x.unsaved || x.muted ? { 'aria-label': name } : {})} tabIndex={selected ? 0 : -1} data-tab={x.id} {...(x.muted ? { 'data-muted': '' } : {})} {...x.attrs} className={cx('cw-tab', selected && 'active', folded && 'icon-only', x.muted && 'muted')} onClick={() => onChange(x.id)}>
                 {tabIcon(x.icon)}
-                <span className="hive-tab-label">{x.label}</span>
-                {x.tag && <span className="hive-tab-tag">{x.tag}</span>}
-                {x.count !== undefined && <span className="hive-tab-count">{fmt.number(x.count)}</span>}
+                <span className="cw-tab-label">{x.label}</span>
+                {x.tag && <span className="cw-tab-tag">{x.tag}</span>}
+                {x.count !== undefined && <span className="cw-tab-count">{fmt.number(x.count)}</span>}
                 {x.unsaved && (
                   <Tooltip content={tr(T.unsaved)}>
-                    <span className="hive-tab-unsaved" data-unsaved="" />
+                    <span className="cw-tab-unsaved" data-unsaved="" />
                   </Tooltip>
                 )}
               </button>
@@ -113,13 +113,13 @@ export function Tabs<T extends string>({ items, value, onChange, label, fold, re
       </div>
       {fold && (
         // The tabs with every name, for measuring; the names are CSS content, so no text here repeats a tab's.
-        <div ref={measureRef} className="hive-tabs hive-tabs-measure" aria-hidden inert>
+        <div ref={measureRef} className="cw-tabs cw-tabs-measure" aria-hidden inert>
           {items.map((x) => (
-            <span key={x.id} className="hive-tab" data-label={x.label}>
+            <span key={x.id} className="cw-tab" data-label={x.label}>
               {tabIcon(x.icon)}
-              {x.tag && <span className="hive-tab-tag">{x.tag}</span>}
-              {x.count !== undefined && <span className="hive-tab-count">{fmt.number(x.count)}</span>}
-              {x.unsaved && <span className="hive-tab-unsaved" />}
+              {x.tag && <span className="cw-tab-tag">{x.tag}</span>}
+              {x.count !== undefined && <span className="cw-tab-count">{fmt.number(x.count)}</span>}
+              {x.unsaved && <span className="cw-tab-unsaved" />}
             </span>
           ))}
         </div>

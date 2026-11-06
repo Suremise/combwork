@@ -1,5 +1,5 @@
 // Windows' broker seen working in a held slot (HI-2467, systemBrokers.ts): an idle Windows Sandbox broker keeps the
-// folder it was started in as its current folder, so Windows refuses to rename the slot and Hive can't lend it. Hive
+// folder it was started in as its current folder, so Windows refuses to rename the slot and Combwork can't lend it. Combwork
 // names it only on evidence read in one answer: a trusted broker path and a current folder in the slot. Anything else
 // (a folder elsewhere, a path not a broker's, an unread folder, a process gone, a malformed answer) names nothing, and
 // the caller says only that a process holds it. Idleness is asked afresh each time, unknown when it can't be told.
@@ -11,7 +11,7 @@ import { brokersWorkingIn, folderInside, parseWorkingIn, type WorkingIn } from '
 
 const ROOT = join(process.env.ProgramW6432 || process.env.ProgramFiles || 'C:\\Program Files', 'WindowsApps')
 const BROKER = join(ROOT, 'MicrosoftWindows.WindowsSandbox_0.5.3.0_x64__cw5n1h2txyewy', 'WindowsSandboxServer.exe')
-const dir = tempDir('hive-brokers-working-in-')
+const dir = tempDir('cw-brokers-working-in-')
 const SLOT = join(dir, 'slot-a')
 const SIBLING = join(dir, 'slot-ab')
 for (const d of [SLOT, join(SLOT, 'src'), SIBLING]) mkdirSync(d, { recursive: true })

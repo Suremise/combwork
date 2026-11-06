@@ -1,7 +1,7 @@
 /**
- * Builds recorded as facts (#1534, #1062): `npm run dist` and `npm run release` (scripts/buildFact.mjs) tell Hive of each
- * successful build, through the Agent API (`POST /v1/builds`) while Hive is running, else by a marker file in the
- * workspace's `.combwork/builds` that Hive picks up when the workspace next opens. Hive writes it into the journal as its own
+ * Builds recorded as facts (#1534, #1062): `npm run dist` and `npm run release` (scripts/buildFact.mjs) tell Combwork of each
+ * successful build, through the Agent API (`POST /v1/builds`) while Combwork is running, else by a marker file in the
+ * workspace's `.combwork/builds` that Combwork picks up when the workspace next opens. Combwork writes it into the journal as its own
  * fact. Agent-facing English (the journal is the Assistant's).
  */
 
@@ -9,7 +9,7 @@
 export const BUILD_KINDS = ['beta', 'baseline', 'rc', 'release'] as const
 export type BuildKind = (typeof BUILD_KINDS)[number]
 
-/** Where a build's marker waits for Hive, under the workspace's `.combwork` folder. */
+/** Where a build's marker waits for Combwork, under the workspace's `.combwork` folder. */
 export const BUILD_MARKERS_DIR = 'builds'
 
 /** A successful build, as the scripts send it. */
@@ -45,21 +45,21 @@ export function buildFactOf(v: unknown): BuildFact | { error: string } {
 
 const KIND_WORDS: Record<BuildKind, string> = { beta: 'beta', baseline: 'baseline', rc: 'release candidate', release: 'release' }
 
-/** The journal entry's one line: "Built Hive 1.0.0-rc.1 (baseline) from 1fef5341 on 1.0.0". */
+/** The journal entry's one line: "Built Combwork 1.1.0-rc.1 (baseline) from 1fef5341 on 1.1.0". */
 export function buildFactSummary(f: BuildFact): string {
   const what = f.by === 'release' ? 'Uploaded a draft of' : 'Built'
-  return `${what} Hive ${f.version} (${KIND_WORDS[f.kind]}) from ${f.commit.slice(0, 8)}${f.branch ? ` on ${f.branch}` : ''}`
+  return `${what} Combwork ${f.version} (${KIND_WORDS[f.kind]}) from ${f.commit.slice(0, 8)}${f.branch ? ` on ${f.branch}` : ''}`
 }
 
 /** A build fact's one line read back (the window shows it in the user's language, #1534 round 1), or null for another line. */
 export function parseBuildSummary(summary: string): { by: BuildFact['by']; version: string; kind: BuildKind; commit: string; branch: string | null } | null {
-  const m = /^(Built|Uploaded a draft of) Hive (\S+) \((beta|baseline|release candidate|release)\) from ([0-9a-f]{7,64})(?: on (.+))?$/.exec(summary)
+  const m = /^(Built|Uploaded a draft of) Combwork (\S+) \((beta|baseline|release candidate|release)\) from ([0-9a-f]{7,64})(?: on (.+))?$/.exec(summary)
   if (!m) return null
   const kind = (Object.keys(KIND_WORDS) as BuildKind[]).find((k) => KIND_WORDS[k] === m[3])!
   return { by: m[1] === 'Built' ? 'dist' : 'release', version: m[2], kind, commit: m[4], branch: m[5] ?? null }
 }
 
-/** The detail Hive writes for a build fact. */
+/** The detail Combwork writes for a build fact. */
 export function buildFactDetail(f: Pick<BuildFact, 'installer' | 'builtAt' | 'by'>): string {
   return `Installer: ${f.installer}\nBuilt: ${f.builtAt}${f.by === 'release' ? '\nUploaded to a draft GitHub release (npm run release).' : ''}`
 }

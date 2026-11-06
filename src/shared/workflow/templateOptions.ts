@@ -188,7 +188,7 @@ export function overlayTemplateWorkflow(section: TemplateWorkflow, base: Workflo
     .map((k) => ({ key: k as OptionKey, now: shown(k, base.options[k]), next: shown(k, options[k]) }))
   const named = [...new Set([...options.preChecks, ...(base.platform === 'git' ? options.mergeChecks : [])])]
   const missingCommands = named.filter((n) => !options.commands[n]?.trim())
-  // G20 on where Hive merges needs this project's runner (HI-1949): flagged as a check's command is; saving still refuses it.
-  if (base.platform === 'git' && options.focusedTests && options.finish === 'hiveMerges' && !options.commands[FOCUSED_RUN]?.trim()) missingCommands.push(FOCUSED_RUN)
+  // G20 on where Combwork merges needs this project's runner (HI-1949): flagged as a check's command is; saving still refuses it.
+  if (base.platform === 'git' && options.focusedTests && options.finish === 'combworkMerges' && !options.commands[FOCUSED_RUN]?.trim()) missingCommands.push(FOCUSED_RUN)
   return { preset: section.preset, own, options, changes, missingCommands, identityOff }
 }

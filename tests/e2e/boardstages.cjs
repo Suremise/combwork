@@ -1,4 +1,4 @@
-// The board shows stages (#1420, SPEC §16.5.2): a Pair project (Hive merges, queueFixture.cjs) beside a No review Git
+// The board shows stages (#1420, SPEC §16.5.2): a Pair project (Combwork merges, queueFixture.cjs) beside a No review Git
 // project (beta) and a None one (notes), with fake Claude Code agents acting by their own tokens and the Assistant off.
 // - a card in the merge queue sits in Merging, a column of its own under Approved's heading, and moves to Done merged;
 // - Merging collapses to a strip in the Approved group and stays collapsed after a reload; both columns fold the group;
@@ -44,7 +44,7 @@ const nothingToArchive = (dialog) => {
   fs.mkdirSync(path.join(notes, '.combwork'), { recursive: true })
   fs.writeFileSync(path.join(notes, 'plan.md'), '# Plan\n')
   fs.writeFileSync(path.join(notes, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [], workflow: { platform: 'none', preset: null, options: {} } }))
-  const h = await q.startHive(fx, { port: PORT })
+  const h = await q.startCombwork(fx, { port: PORT })
   try {
     const { page, inv } = h
     page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -87,7 +87,7 @@ const nothingToArchive = (dialog) => {
 
     // --- The stages each project's options produce.
     const ids = async (p) => (await inv('workflow:stages', p))?.stages.map((s) => s.id).join(' ')
-    check('alpha (Hive merges) has every stage', (await ids(fx.alpha)) === 'hold todo active review approved merging done', await ids(fx.alpha))
+    check('alpha (Combwork merges) has every stage', (await ids(fx.alpha)) === 'hold todo active review approved merging done', await ids(fx.alpha))
     check('beta (No review) has On Hold, Todo, Active and Done', (await ids(beta)) === 'hold todo active done', await ids(beta))
     check('notes (None) has On Hold, Todo, Active and Done', (await ids(notes)) === 'hold todo active done', await ids(notes))
 
@@ -268,7 +268,7 @@ const nothingToArchive = (dialog) => {
     // The OK'd card follows it through the queue.
     await until(async () => (await h.card(okCard))?.column === 'done', HUNG_MS)
 
-    // --- Archive All in Approved while Merging isn't shown (HR2's round 2): a card waiting for your OK under Hive merges,
+    // --- Archive All in Approved while Merging isn't shown (HR2's round 2): a card waiting for your OK under Combwork merges,
     // the project switched to The agent merges for later cards (no Merging now); your OK while the dialog is open sends the
     // old card into Merging under its own rules, and Approved's archive leaves it there.
     await inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { okBefore: { mode: 'every', labels: [] } }) })
@@ -373,7 +373,7 @@ const nothingToArchive = (dialog) => {
     const base = (await inv('app:info')).language
     const dir = path.join(lib.ROOT, 'locales', 'pl')
     const messages = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))))
-    await h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language: { ...base, code: 'pl', locale: 'pl', messages } })
+    await h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language: { ...base, code: 'pl', locale: 'pl', messages } })
     await showBoard('Wszystkie projekty', 'Tablica zadań')
     check('Polish: Merging reads Scalanie under Zatwierdzone', !!(await until(async () => (await labelText('merging')) === 'Scalanie' && (await inColumn(second.n, 'merging')), HUNG_MS)), await labelText('merging'))
     // Seven columns at this width: every name readable, wrapped rather than cut (the Assistant's OK on round 3).
@@ -399,7 +399,7 @@ const nothingToArchive = (dialog) => {
     check('a 24-letter name with no space stays inside its column', !!(await until(async () => (await labelText('doing')) === 'W'.repeat(24) && (await outside()).length === 0, HUNG_MS)), JSON.stringify(await outside()))
     await shoot('longname-pl')
     await inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx) })
-    await h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language: base })
+    await h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language: base })
     fs.writeFileSync(fx.go, 'go')
     await until(async () => (await h.card(second.n))?.column === 'done', HUNG_MS)
 
@@ -407,7 +407,7 @@ const nothingToArchive = (dialog) => {
     // cards (`board:stages`, in the board's read), and Approved's heading sits on its line in the gap above the columns,
     // so a grouped board's columns start where a board's with no group do. main's reads of the stages and of the
     // toolbar's workflow link are held, to see the board meanwhile; each layout the board takes is recorded as it is
-    // made. main's answers for alpha with its options now (Hive merges) and with no Merging (No review, committed) are
+    // made. main's answers for alpha with its options now (Combwork merges) and with no Merging (No review, committed) are
     // read before the reads are replaced; the test says which alpha's answer (`answer`) as its options change.
     const read = async () => ({ stages: await inv('board:stages'), form: await inv('workflow:form', fx.alpha) })
     const plain = { review: 'none', finish: 'committed', folder: 'project' }

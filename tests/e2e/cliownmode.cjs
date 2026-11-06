@@ -1,7 +1,7 @@
 // "The CLI's own setting" (#1284, #966 row 1), and the Assistant's other MCP servers' switch (row 7) gone, on a fake Claude
 // Code session (fake-claude/), so nothing signs in or spends tokens.
 // 1. A project's agents on the CLI's own setting: the stopped agent's badge says "CLI's own" and its menu marks the
-//    choice; launched, the CLI gets no --permission-mode; its hooks report the mode it runs in, which Hive records as
+//    choice; launched, the CLI gets no --permission-mode; its hooks report the mode it runs in, which Combwork records as
 //    seen while the badge keeps saying "CLI's own"; a conversation of its own, stopped and resumed, resumes with no flag
 //    and the same state; the running agent's menu says why nothing switches live, and a switch restarts it in the mode
 //    chosen (then passed again).
@@ -36,14 +36,14 @@ const check = (name, ok, extra = '') => {
   cfg.settings.appearance = { ...cfg.settings.appearance, theme: 'dark' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, ...claudeEnv })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, ...claudeEnv })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1400, height: 850 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     /** Both themes' screenshots of what is on screen now, each once the window shows that theme. */
     const shots = async (name) => {
@@ -143,7 +143,7 @@ const check = (name, ok, extra = '') => {
     await page.keyboard.press('Control+,')
     await page.locator('.settings-nav .row', { hasText: 'Advanced' }).click()
     await page.locator('.advanced-list').waitFor({ timeout: HUNG_MS })
-    check("Advanced no longer lists the Assistant's servers' switch", (await page.locator('.advanced-row[data-advanced="hive.assistant.otherMcpServers"]').count()) === 0)
+    check("Advanced no longer lists the Assistant's servers' switch", (await page.locator('.advanced-row[data-advanced="cw.assistant.otherMcpServers"]').count()) === 0)
   } catch (e) {
     check('the suite ran to its end', false, e?.stack ?? String(e))
   } finally {

@@ -114,11 +114,11 @@ const M = {
   noRemotes: msg({ id: 'git.remotes.none', defaultMessage: "No remotes: this repository is only on this computer. Add one (a GitHub repository's URL, say) to push to it.", description: 'Git → Branches & remotes of a repository with no remote.' }),
   pushesTo: msg({ id: 'git.remotes.pushesTo', defaultMessage: '(pushes to {url})', description: "After a remote's URL, when it pushes to another URL." }),
   worktrees: msg({ id: 'git.worktrees.heading', defaultMessage: 'Worktrees', description: 'Heading in Git → Branches & remotes, followed by how many there are.' }),
-  copiesHeading: msg({ id: 'git.worktrees.copiesHeading', defaultMessage: 'Review copies (Combwork’s)', description: "A heading in Git → Branches & remotes, followed by how many: the worktrees Hive keeps for reviews (review copies: clean checkouts at the revision a reviewer checks). Hive's own, not the user's." }),
-  copiesHint: msg({ id: 'git.worktrees.copiesHint', defaultMessage: 'Clean checkouts Combwork keeps for reviewers, each at the revision being checked. Combwork manages them: there is nothing to remove here.', description: "Under the Review copies (Hive's) heading in Git → Branches & remotes." }),
-  copyRow: msg({ id: 'git.worktrees.copyRow', defaultMessage: '{use, select, review {{copy}: {agent} reviewing {card} at {revision}} check {{copy}: {agent} checking {card} at {revision}} other {{copy}: idle in the pool}}', description: "A review copy's row in Git → Branches & remotes: its name ({copy}, such as copy-1, keep it as it is) and who uses it: a reviewer ({agent}) reviewing a card ({card}: its key) at a revision ({revision}: a short commit id), an agent running a check on it, or no one (idle in Hive's pool of copies). Keep the select keys." }),
-  queueHeading: msg({ id: 'git.worktrees.queueHeading', defaultMessage: 'Merge queue (Combwork’s)', description: "A heading in Git → Branches & remotes, followed by how many: the folder Hive's merge queue tests merges in (glossary: merge queue). Hive's own, not the user's." }),
-  queueHint: msg({ id: 'git.worktrees.queueHint', defaultMessage: 'Where Combwork’s merge queue tests a card’s merge before it goes in. Combwork manages it: there is nothing to remove here.', description: "Under the Merge queue (Hive's) heading in Git → Branches & remotes." }),
+  copiesHeading: msg({ id: 'git.worktrees.copiesHeading', defaultMessage: 'Review copies (Combwork’s)', description: "A heading in Git → Branches & remotes, followed by how many: the worktrees Combwork keeps for reviews (review copies: clean checkouts at the revision a reviewer checks). Combwork's own, not the user's." }),
+  copiesHint: msg({ id: 'git.worktrees.copiesHint', defaultMessage: 'Clean checkouts Combwork keeps for reviewers, each at the revision being checked. Combwork manages them: there is nothing to remove here.', description: "Under the Review copies (Combwork's) heading in Git → Branches & remotes." }),
+  copyRow: msg({ id: 'git.worktrees.copyRow', defaultMessage: '{use, select, review {{copy}: {agent} reviewing {card} at {revision}} check {{copy}: {agent} checking {card} at {revision}} other {{copy}: idle in the pool}}', description: "A review copy's row in Git → Branches & remotes: its name ({copy}, such as copy-1, keep it as it is) and who uses it: a reviewer ({agent}) reviewing a card ({card}: its key) at a revision ({revision}: a short commit id), an agent running a check on it, or no one (idle in Combwork's pool of copies). Keep the select keys." }),
+  queueHeading: msg({ id: 'git.worktrees.queueHeading', defaultMessage: 'Merge queue (Combwork’s)', description: "A heading in Git → Branches & remotes, followed by how many: the folder Combwork's merge queue tests merges in (glossary: merge queue). Combwork's own, not the user's." }),
+  queueHint: msg({ id: 'git.worktrees.queueHint', defaultMessage: 'Where Combwork’s merge queue tests a card’s merge before it goes in. Combwork manages it: there is nothing to remove here.', description: "Under the Merge queue (Combwork's) heading in Git → Branches & remotes." }),
   queueRow: msg({ id: 'git.worktrees.queueRow', defaultMessage: 'The merge queue’s folder', description: "The merge queue's folder's row in Git → Branches & remotes (glossary: merge queue)." }),
   readOnly: msg({ id: 'git.worktrees.readOnly', defaultMessage: "Read-only here: an agent's work comes into the project folder through Merge.", description: 'Under the Worktrees heading. Merge is the name of the action that brings an agent\'s branch in.' }),
   changes: msg({ id: 'git.worktrees.changes', defaultMessage: 'Changes', description: "Button on a worktree's row: shows its changes in Git → Changes." }),
@@ -408,10 +408,10 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
           const lane = l?.lane ? (lanes.find((x) => x.id === l.lane)?.name ?? l.lane) : ''
           return tr(M.slotLease, { kind: l ? (l.kind === 'carried' ? 'carried' : l.card !== null ? 'card' : 'lane') : 'none', slot: v.name, agent, card, lane })
         }
-        // The worktrees as the user's (agents', slots', unused ones) and Hive's own (HI-1710).
-        const theirs = info.worktrees.filter((w) => !w.hive)
-        const hiveCopies = info.worktrees.filter((w) => w.hive === 'copy')
-        const hiveQueue = info.worktrees.filter((w) => w.hive === 'queue')
+        // The worktrees as the user's (agents', slots', unused ones) and Combwork's own (HI-1710).
+        const theirs = info.worktrees.filter((w) => !w.combwork)
+        const combworkCopies = info.worktrees.filter((w) => w.combwork === 'copy')
+        const combworkQueue = info.worktrees.filter((w) => w.combwork === 'queue')
         const copyText = (path: string): string => {
           const c = copies.find((x) => samePath(x.folder, path))
           const l = c?.lease && !c.lease.returned ? c.lease : null
@@ -700,16 +700,16 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                 </div>
               </>
             )}
-            {/* Hive's own worktrees (HI-1710): its review copies and the merge queue's folder, each its group, nothing to remove. */}
-            {hiveCopies.length > 0 && (
+            {/* Combwork's own worktrees (HI-1710): its review copies and the merge queue's folder, each its group, nothing to remove. */}
+            {combworkCopies.length > 0 && (
               <>
                 <h2 className="section" data-worktrees="copies">
-                  {tr(M.copiesHeading)} <span className="badge">{hiveCopies.length}</span>
+                  {tr(M.copiesHeading)} <span className="badge">{combworkCopies.length}</span>
                 </h2>
                 <p className="hint">{tr(M.copiesHint)}</p>
                 <div className="git-rows">
-                  {hiveCopies.map((w) => (
-                    <div key={w.path} className="git-row git-worktree" data-worktree-row={w.path} data-hive="copy">
+                  {combworkCopies.map((w) => (
+                    <div key={w.path} className="git-row git-worktree" data-worktree-row={w.path} data-cw="copy">
                       <Icon name="shield" />
                       <span className="git-name">{copyText(w.path)}</span>
                       <span className="faint">{w.branch ?? (w.head ? headText({ branch: null, head: w.head }) : '')}</span>
@@ -719,15 +719,15 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
                 </div>
               </>
             )}
-            {hiveQueue.length > 0 && (
+            {combworkQueue.length > 0 && (
               <>
                 <h2 className="section" data-worktrees="queue">
-                  {tr(M.queueHeading)} <span className="badge">{hiveQueue.length}</span>
+                  {tr(M.queueHeading)} <span className="badge">{combworkQueue.length}</span>
                 </h2>
                 <p className="hint">{tr(M.queueHint)}</p>
                 <div className="git-rows">
-                  {hiveQueue.map((w) => (
-                    <div key={w.path} className="git-row git-worktree" data-worktree-row={w.path} data-hive="queue">
+                  {combworkQueue.map((w) => (
+                    <div key={w.path} className="git-row git-worktree" data-worktree-row={w.path} data-cw="queue">
                       <Icon name="git-merge" />
                       <span className="git-name">{tr(M.queueRow)}</span>
                       <span className="faint">{w.branch ?? (w.head ? headText({ branch: null, head: w.head }) : '')}</span>
@@ -871,16 +871,16 @@ const U = {
   planFailed: msg({ id: 'git.update.planFailed', defaultMessage: "Couldn't read what updating {branch} would do", description: "An error notification's title (HI-1180): reading what Update from <target> would do to the branch {branch} failed." }),
   title: msg({ id: 'git.update.title', defaultMessage: 'Update {branch} from {target}', description: 'Title of the Update from <target> dialog (HI-1180): bring the branch {branch} up to date with the target branch {target}.' }),
   counts: msg({ id: 'git.update.counts', defaultMessage: "{target} has {behind, plural, one {# commit} other {# commits}} {branch} hasn't; {branch} has {ahead, plural, one {# commit} other {# commits}} of its own.", description: "The Update from <target> dialog's first sentence: how many commits of the target {target} the branch {branch} lacks ({behind}), and how many it has that the target hasn't ({ahead})." }),
-  where: msg({ id: 'git.update.where', defaultMessage: '{where, select, project {It runs in the project folder, where {branch} is checked out.} slot {It runs in {slot}, the slot {branch} is checked out in.} worktree {It runs in {folder}, where {branch} is checked out.} other {{branch} is checked out nowhere: Combwork updates it in a temporary folder, removed after.}}', description: "The Update from <target> dialog: where the update runs (select: translate each): the project folder, a slot ({slot}: its name, such as slot-a), another worktree ({folder}: its path), or a temporary folder Hive makes when the branch isn't checked out anywhere." }),
+  where: msg({ id: 'git.update.where', defaultMessage: '{where, select, project {It runs in the project folder, where {branch} is checked out.} slot {It runs in {slot}, the slot {branch} is checked out in.} worktree {It runs in {folder}, where {branch} is checked out.} other {{branch} is checked out nowhere: Combwork updates it in a temporary folder, removed after.}}', description: "The Update from <target> dialog: where the update runs (select: translate each): the project folder, a slot ({slot}: its name, such as slot-a), another worktree ({folder}: its path), or a temporary folder Combwork makes when the branch isn't checked out anywhere." }),
   card: msg({ id: 'git.update.card', defaultMessage: "It is {card}'s work.", description: "The Update from <target> dialog: the branch is the line of a card ({card}: its key, such as HI-12) that isn't Done." }),
   agents: msg({ id: 'git.update.agents', defaultMessage: '{agents} {n, plural, one {works} other {work}} there: {n, plural, one {its} other {their}} next turn starts from the updated branch.', description: 'The Update from <target> dialog: agents ({agents}: their names, joined) work in the folder the update runs in, none in a turn now; what they do next starts from the updated branch.' }),
   approval: msg({ id: 'git.update.approval', defaultMessage: '{approval, select, carries {{card} has passed review: its pass carries over when the update is the same change, as a clean merge or rebase is.} other {{card} has passed review: once updated, it goes back for review (the project keeps a pass only for the exact commit).}}', description: "The Update from <target> dialog, for a card that passed review ({card}: its key): whether the pass survives the update (carries: the project's \"A pass survives a clean rebase\" is on; other: the card is reviewed again). Select: translate each." }),
-  undone: msg({ id: 'git.update.undone', defaultMessage: 'A conflict is undone at once, leaving {branch} as it was.', description: 'The Update from <target> dialog: if git stops at a conflict, Hive aborts the merge or rebase, so the branch {branch} is never left half updated.' }),
+  undone: msg({ id: 'git.update.undone', defaultMessage: 'A conflict is undone at once, leaving {branch} as it was.', description: 'The Update from <target> dialog: if git stops at a conflict, Combwork aborts the merge or rebase, so the branch {branch} is never left half updated.' }),
   how: msg({ id: 'git.update.how', defaultMessage: 'How', description: 'A label in the Update from <target> dialog: the choice of Merge or Rebase.' }),
   merge: msg({ id: 'git.update.merge', defaultMessage: 'Merge {target} in', description: 'An option in the Update from <target> dialog (the default): merge the target branch {target} into the branch, as one merge commit.' }),
   rebase: msg({ id: 'git.update.rebase', defaultMessage: 'Rebase onto {target}', description: "An option in the Update from <target> dialog: replay the branch's own commits on top of the target branch {target}." }),
   mergeNote: msg({ id: 'git.update.mergeNote', defaultMessage: "One merge commit joins {target}'s commits to {branch}'s, which stay as they are.", description: 'What Merge does, under the choice in the Update from <target> dialog: one merge commit; the branch {branch} keeps its own commits as they are.' }),
-  rebaseNote: msg({ id: 'git.update.rebaseNote', defaultMessage: "{branch}'s {n, plural, one {commit is} other {# commits are}} replayed on top of {target}, as new commits.{pushed, select, yes { What was pushed of {branch} then differs from it, and Combwork never forces a push.} other {}}", description: "What Rebase does, under the choice in the Update from <target> dialog: the branch's {n} commits are rewritten on top of {target}; with pushed yes, it tracks a remote branch, which then no longer matches (pushing it would need a force, which Hive never does)." }),
+  rebaseNote: msg({ id: 'git.update.rebaseNote', defaultMessage: "{branch}'s {n, plural, one {commit is} other {# commits are}} replayed on top of {target}, as new commits.{pushed, select, yes { What was pushed of {branch} then differs from it, and Combwork never forces a push.} other {}}", description: "What Rebase does, under the choice in the Update from <target> dialog: the branch's {n} commits are rewritten on top of {target}; with pushed yes, it tracks a remote branch, which then no longer matches (pushing it would need a force, which Combwork never does)." }),
   forward: msg({ id: 'git.update.forward', defaultMessage: 'Fast-forward to {target}', description: 'The one choice in the Update from <target> dialog for a branch with no commits of its own (HI-1180): it is moved forward to the target branch {target}.' }),
   forwardNote: msg({ id: 'git.update.forwardNote', defaultMessage: '{branch} has no commits of its own, so it simply moves forward to {target}: no merge commit, nothing rewritten.', description: 'What Fast-forward does, under the choice in the Update from <target> dialog: the branch {branch} has nothing the target {target} lacks, so it moves to the target.' }),
   confirm: msg({ id: 'git.update.confirm', defaultMessage: 'Update', description: 'The Update from <target> dialog\'s button: updates the branch.' }),

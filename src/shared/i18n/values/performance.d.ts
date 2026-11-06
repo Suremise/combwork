@@ -1,6 +1,6 @@
 // Generated from locales/en/performance.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
-interface HiveMessageValues {
+interface CombworkMessageValues {
   'performance.appWide': { inFlight: number; refused: number; connections: number; events: number; size: string | number }
   'performance.card.data': undefined
   'performance.card.dataSub': { size: string | number }
@@ -71,12 +71,13 @@ interface HiveMessageValues {
   'performance.compare.error.benchmarkOnProject': undefined
   'performance.compare.error.exportIsOwn': undefined
   'performance.compare.error.exportIsWhole': undefined
+  'performance.compare.error.from10': undefined
   'performance.compare.error.holdsOther': { project: string | number; other: string }
   'performance.compare.error.invalidBenchmark': undefined
   'performance.compare.error.invalidExport': undefined
   'performance.compare.error.noPart': { project: string | number }
   'performance.compare.error.noScenarios': undefined
-  'performance.compare.error.notHive': undefined
+  'performance.compare.error.notCombwork': undefined
   'performance.compare.error.notJson': undefined
   'performance.compare.error.otherProject': { project: string | number; here: string | number }
   'performance.compare.error.ownHoldsProjects': undefined
@@ -122,6 +123,8 @@ interface HiveMessageValues {
   'performance.compare.measure.apiResponseBytes': undefined
   'performance.compare.measure.cacheReadTokens': undefined
   'performance.compare.measure.cacheWriteTokens': undefined
+  'performance.compare.measure.combworkCallErrors': undefined
+  'performance.compare.measure.combworkCalls': undefined
   'performance.compare.measure.contextBytes': undefined
   'performance.compare.measure.costUsd': undefined
   'performance.compare.measure.exportDetailCalls': undefined
@@ -135,8 +138,6 @@ interface HiveMessageValues {
   'performance.compare.measure.exportToolListPerLaunch': undefined
   'performance.compare.measure.guidanceBytes': undefined
   'performance.compare.measure.guidanceChars': undefined
-  'performance.compare.measure.hiveCallErrors': undefined
-  'performance.compare.measure.hiveCalls': undefined
   'performance.compare.measure.inputTokens': undefined
   'performance.compare.measure.outputTokens': undefined
   'performance.compare.measure.providerRequests': undefined
@@ -164,6 +165,8 @@ interface HiveMessageValues {
   'performance.compare.measureTip.apiRequests': undefined
   'performance.compare.measureTip.apiResponseBytes': undefined
   'performance.compare.measureTip.asReported': undefined
+  'performance.compare.measureTip.combworkCallErrors': undefined
+  'performance.compare.measureTip.combworkCalls': undefined
   'performance.compare.measureTip.contextBytes': undefined
   'performance.compare.measureTip.costUsd': undefined
   'performance.compare.measureTip.exportGuidancePerLaunch': undefined
@@ -172,8 +175,6 @@ interface HiveMessageValues {
   'performance.compare.measureTip.exportToolListPerLaunch': undefined
   'performance.compare.measureTip.guidanceBytes': undefined
   'performance.compare.measureTip.guidanceChars': undefined
-  'performance.compare.measureTip.hiveCallErrors': undefined
-  'performance.compare.measureTip.hiveCalls': undefined
   'performance.compare.measureTip.outputTokens': undefined
   'performance.compare.measureTip.perHour': undefined
   'performance.compare.measureTip.providerRequests': undefined

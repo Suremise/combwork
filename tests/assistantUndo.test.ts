@@ -1,4 +1,4 @@
-// Undo for the Hive Assistant's changes (#1282, SPEC §16.14): each change it makes is recorded, as it is made, with what
+// Undo for the Combwork Assistant's changes (#1282, SPEC §16.14): each change it makes is recorded, as it is made, with what
 // it replaced, grouped by the user's message, kept 7 days across restarts; undo puts back what is still as it left it and
 // says what someone changed since, never overwriting it. Through the same code the Agent API runs: assistantBatch for a
 // batch (as POST /v1/tasks/batch), recordingChanges around a single change (as assistantChange), and the routes' own
@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-assistant-undo-')
+const base = tempDir('cw-assistant-undo-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 mkdirSync(join(base, 'profile'), { recursive: true })
 
@@ -144,6 +144,52 @@ describe("the Assistant's changes, recorded and undone (#1282)", () => {
     expect(await card(c.number)).toMatchObject({ title: 'Mine', description: '', blocked: null, links: [], agent: null, column: 'todo' })
   })
 
+  it("a card's waiting mark (HI-2618, HR1's round 1): set, changed or cleared by the Assistant, put back whole; a move out of Doing that cleared it, put back with the move", async () => {
+    const c = await make('Held for a window')
+    await run(() => tasks.updateTask(c.number, { column: 'doing', agent: 'a1' }, user))
+    // Set: undone, the card is no longer waiting.
+    let group = newMessage()
+    await asAssistant(`hold #${c.number}`, () => tasks.updateTask(c.number, { waitingFor: 'Waiting for the quiet window' }, assistant))
+    let [change] = groupOf(group)!.changes
+    expect(change.fields).toEqual(['waitingFor'])
+    let [r] = await userUndo(w, { change: change.id })
+    expect(r.undone).toEqual(['waitingFor'])
+    expect((await card(c.number)).waitingFor).toBeUndefined()
+    // The user's own mark, changed by the Assistant and then cleared: each undone puts back the mark as it was, who and when.
+    await run(() => tasks.updateTask(c.number, { waitingFor: 'Darren holds it' }, user))
+    const mine = (await card(c.number)).waitingFor!
+    group = newMessage()
+    await asAssistant(`reword #${c.number}'s hold`, () => tasks.updateTask(c.number, { waitingFor: 'The Assistant holds it' }, assistant))
+    ;[change] = groupOf(group)!.changes
+    ;[r] = await userUndo(w, { change: change.id })
+    expect(r.undone).toEqual(['waitingFor'])
+    expect((await card(c.number)).waitingFor).toEqual(mine)
+    group = newMessage()
+    await asAssistant(`release #${c.number}`, () => tasks.updateTask(c.number, { waitingFor: null }, assistant))
+    ;[change] = groupOf(group)!.changes
+    ;[r] = await userUndo(w, { change: change.id })
+    expect((await card(c.number)).waitingFor).toEqual(mine)
+    // Moved to Todo by the Assistant, which clears it: undone, back in Doing and waiting as it was.
+    group = newMessage()
+    await asAssistant(`put #${c.number} back`, () => tasks.updateTask(c.number, { column: 'todo' }, assistant))
+    ;[change] = groupOf(group)!.changes
+    expect(change.fields).toEqual(expect.arrayContaining(['column', 'waitingFor']))
+    expect((await card(c.number)).waitingFor).toBeUndefined()
+    ;[r] = await userUndo(w, { change: change.id })
+    expect(r.undone).toEqual(expect.arrayContaining(['column', 'waitingFor']))
+    const back = await card(c.number)
+    expect(back.column).toBe('doing')
+    expect(back.waitingFor).toEqual(mine)
+    // Changed since by the user: undo leaves it, and says so.
+    group = newMessage()
+    await asAssistant(`release #${c.number} again`, () => tasks.updateTask(c.number, { waitingFor: '' }, assistant))
+    ;[change] = groupOf(group)!.changes
+    await run(() => tasks.updateTask(c.number, { waitingFor: 'Mine again' }, user))
+    ;[r] = await userUndo(w, { change: change.id })
+    expect(r.skipped).toEqual([{ field: 'waitingFor', why: 'changed' }])
+    expect((await card(c.number)).waitingFor?.reason).toBe('Mine again')
+  })
+
   it('a card it made is archived; one someone else has changed since is left, and said', async () => {
     const group = newMessage()
     const made = await asAssistant('add the task "Its own" to the board', () => tasks.createTask({ title: 'Its own', project: 'alpha' }, assistant), 'create-task')
@@ -210,7 +256,7 @@ describe("the Assistant's changes, recorded and undone (#1282)", () => {
     expect(projectAgents(await w.projectConfig(alpha)).find((x) => x.id === 'a1')!.name).toBe('A1')
   })
 
-  it('a Hive setting: set back while still as it set it; changed since, left', async () => {
+  it('a Combwork setting: set back while still as it set it; changed since, left', async () => {
     const e = entryOf('sessions.confirmStop')
     const record = async () => {
       const group = newMessage()

@@ -6,13 +6,13 @@ import { openLockDb } from './db'
 
 /**
  * The repository lock's core (#1347, SPEC §16.9.3): one lock per repository, across processes (the dev and the installed
- * Hive, a test Hive), so two can't merge into or move the refs of one repository at once. It depends on nothing of
+ * Combwork, a test Combwork), so two can't merge into or move the refs of one repository at once. It depends on nothing of
  * Electron's, so tests run it in plain Node children too; repoLock.ts is what the app calls.
  *
  * The lock is a row, not a file's existence: renaming or unlinking a lock file can't be made safe, since two contenders
  * can both judge it stale and a late release can unlink a successor's. The row lives in a small SQLite database in the
- * repository's common git dir (`hive-merge.lock`, shared by its worktrees), one row (`id` 1) naming its holder by a
- * random token, pid, the process's start time (a reused pid is another process) and Hive's profile.
+ * repository's common git dir (`cw-merge.lock`, shared by its worktrees), one row (`id` 1) naming its holder by a
+ * random token, pid, the process's start time (a reused pid is another process) and Combwork's profile.
  * - Take: with no row, write ours (`BEGIN IMMEDIATE`, SQLite's own cross-process lock, so one writer at a time). With a
  *   row whose holder is dead (its pid gone, or running with another start time), judged outside the transaction, the
  *   row is replaced only if it is still that row (its token): compare and swap, so of two contenders on one dead holder
@@ -22,7 +22,7 @@ import { openLockDb } from './db'
  */
 
 /** The lock's file, in the repository's common git dir. */
-export const REPO_LOCK_FILE = 'hive-merge.lock'
+export const REPO_LOCK_FILE = 'cw-merge.lock'
 
 // i18n-ignore: SQL, not text
 const SCHEMA = `CREATE TABLE IF NOT EXISTS repo_lock (
@@ -57,7 +57,7 @@ export interface LockProcesses {
 }
 
 export interface TakeOptions {
-  /** This Hive's profile (its folder's name), shown to a Hive that waits. */
+  /** This Combwork's profile (its folder's name), shown to a Combwork that waits. */
   profile: string
   /** How long to wait for a live holder before giving up (the lock stays the holder's). */
   waitMs: number
@@ -98,7 +98,7 @@ export type TakeResult = { held: HeldRepoLock } | { timedOut: RepoLockHolder }
 
 const POWERSHELL = join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
 
-/** A process's start time from Windows (the same source and rounding for every Hive, so they compare equal). */
+/** A process's start time from Windows (the same source and rounding for every Combwork, so they compare equal). */
 function windowsStartOf(pid: number): Promise<number | null> {
   if (process.platform !== 'win32' || !Number.isInteger(pid) || pid <= 0) return Promise.resolve(null)
   const script = `$p = Get-CimInstance Win32_Process -Filter "ProcessId=${pid}"; if ($p) { ([DateTimeOffset]$p.CreationDate).ToUnixTimeMilliseconds() }`

@@ -36,13 +36,13 @@ describe("import.meta.glob's users and Vitest's module cache", () => {
     expect(globCacheKey({ sourceCode: 'export const x = 1 // import.meta.env' })).toBeUndefined()
   })
 
-  it("covers each of Hive's glob users", () => {
+  it("covers each of Combwork's glob users", () => {
     for (const file of ['src/main/dialects/schema.ts', 'src/main/installDir.ts', 'src/shared/i18n/catalogues.ts'])
       expect(usesImportGlob(readFileSync(join(ROOT, file), 'utf8')), file).toBe(true)
   })
 
   it('HI-2478: the next cached run sees added and removed matches without changing the glob module', async () => {
-    const dir = tempDir('hive-glob-cache-')
+    const dir = tempDir('cw-glob-cache-')
     const areas = join(dir, 'areas')
     const cache = join(dir, 'module-cache')
     mkdirSync(areas)

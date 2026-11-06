@@ -1,5 +1,5 @@
-// A Hive's copies store in a process of its own, for tests/copies.test.ts (#1435): two of these on one hive.db copy are
-// two Hives leasing at once. Bundled by the test (esbuild, Electron stubbed) and run by Node; it says `ready`, then takes
+// A Combwork's copies store in a process of its own, for tests/copies.test.ts (#1435): two of these on one combwork.db copy are
+// two Combworks leasing at once. Bundled by the test (esbuild, Electron stubbed) and run by Node; it says `ready`, then takes
 // a copy for the request on its first line of input and answers with one line: REPLY and JSON.
 import { createInterface } from 'readline'
 import { CopyStore } from '../src/main/copies'

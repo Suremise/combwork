@@ -42,12 +42,12 @@ const identity = (stat) => `${stat.dev}:${stat.ino}`
   let h = null
   let fd = null
   try {
-    h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT) } })
+    h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT) } })
     const { inv, page } = h
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.waitForProvider(inv)
     await lib.openWorkspace(inv, page, ws)
-    await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'hiveMerges', folder: 'slots', target: 'main', style: 'merge', preChecks: [], mergeChecks: [], identity: { name: 'Slot Writer Test', email: 'slotwriter@example.com' }, okBefore: { mode: 'never', labels: [] } } })
+    await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'combworkMerges', folder: 'slots', target: 'main', style: 'merge', preChecks: [], mergeChecks: [], identity: { name: 'Slot Writer Test', email: 'slotwriter@example.com' }, okBefore: { mode: 'never', labels: [] } } })
     const b1 = await lib.addAgent(inv, alpha, { name: 'B1', workflowRole: 'builder' })
     const r1 = await lib.addAgent(inv, alpha, { name: 'R1', workflowRole: 'reviewer' })
     await lib.setMaxAgents(inv, 1)

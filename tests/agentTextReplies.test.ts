@@ -1,4 +1,4 @@
-// Agent text (dialects, HI-2065; HI-2435): the canary dialect over Hive's tool replies (src/shared/toolReplies.ts, the
+// Agent text (dialects, HI-2065; HI-2435): the canary dialect over Combwork's tool replies (src/shared/toolReplies.ts, the
 // `reply` area). Every word a reply builder says comes through the catalogue: run with every id's text wrapped in
 // markers, no letter is left outside them but the values the test passed in, and every `reply.*` id shows in some
 // reply. With no dialect, the replies read as they always did.
@@ -23,7 +23,7 @@ const chain = (texts: Record<string, string>): DialectChain => ({ texts, files: 
 
 afterEach(() => setProcessChain(null))
 
-/** Values the samples pass: names, keys, paths and the like, which are the caller's words, not Hive's. */
+/** Values the samples pass: names, keys, paths and the like, which are the caller's words, not Combwork's. */
 const VALUES = ['alpha', 'Coder', 'Codex', 'Lean replies', 'HI-12', 'main', 'feature/x', 'claude-code', 'builder', 'reviewer', 'lane-3f2a', 'notes/plan.md', 'm41', 'work-on-card', 'Carry a card', 'broken header', 'Commented', 'Moved to Review', 'cw_start_card', 'cw_submit', 'folder', 'files', 'base', 'greet.js', 'column', 'comment', 'Waiting for HI-12 → Review', 'waiting for HI-12 → Review', 'decision', 'sessions.compactAbove', 'Suggest compacting above', 'Settings → Sessions → Suggest compacting above', 'Einstellungen', 'on or off', 'Suggests compacting.', 'A tip.', 'when long', 'at the next launch', 'the user decides', 'User guide section', 'summary text', 'why text', 'detail text', 'abc1234', 'it was taken', 'B1', 'a-1', 'log', 'hello', 'conflict', 'paused for a conflict', 'src/a.ts', 'ours', 'merge', 'git merge --abort', 'git status', 'abort', 'check', 'checks', 'a step', 'timeout', 'Opus', 'opus', 'high', 'plan', 'acc', 'Work', 'Codex work', 'weekly', 'fiveHour', 'any', 'Sonnet', 'tpl', 'workspace', 'team.json', 'mergeMethod', 'squash', 'rebase', 'Review checks', 'pnpm build', 'Coder2', 'HB4', 'working', 'refused text', 'move.needsOverride', 'Do this next.', 'Change it there.', 'a warning', 'Watching HI-12', '5h', 'e2e', 'Watching lanes', 'HI-12 has a new decision', 'Coder: finished', 'pending reason', 'active', 'review', 'start', 'submit', 'beta', 'HI-13', 'HI-60', 'Other', 'Git', 'None', 'title', 'labels', 'Plan', 'lane line', 'failed', 'passed', 'Waiting for agents', 'ttl', 'slot-a', 'r1', 'h1', 'x', 'y']
 
 /** Text other modules give the replies as values (shared/tasks.ts's column names, mergeSlot.ts, idleWatch.ts, unsubmitted.ts, progress.ts): not this area's. */
@@ -91,7 +91,9 @@ function replies(): { name: string; text: string }[] {
   const rows = [
     ...['ready', 'finished', 'background', 'waiting', 'watching', 'signin', 'working'].map((status) => row({ agent: { name: 'Coder', status, backgroundTasks: 2 } })),
     row({ agent: { name: 'Coder', status: 'working', backgroundTasks: 1 }, labels: ['decision'], blocked: 'pending reason', blockedBy: [13, 60], elsewhere: [60], stalled: 'x', reviewing: { name: 'Codex', stalled: 'x' }, comments: 1 }),
-    row({ column: 'review', reviewing: { name: 'Codex' }, comments: 3 })
+    row({ column: 'review', reviewing: { name: 'Codex' }, comments: 3 }),
+    // A card in Doing waiting on purpose (HI-2618's reply.row.waiting; HI-2637).
+    row({ column: 'doing', agent: { name: 'Coder', status: 'watching', backgroundTasks: 0 }, waitingFor: 'x' })
   ]
   add('list', R.taskListText(rows))
   add('list page', R.taskListText(Array.from({ length: 250 }, () => row({})), { offset: 10 }))
@@ -119,7 +121,7 @@ function replies(): { name: string; text: string }[] {
   for (const kind of ['image', 'pdf', 'binary'] as const) add(`attachment ${kind}`, R.attachmentText({ name: 'greet.js', file: 'x', size: 2048, kind, path: 'notes/plan.md' }))
   add('attachment text', R.attachmentText({ name: 'greet.js', file: 'x', size: 2048, kind: 'text', offset: 0, content: 'x', next: 1024 }))
   add('attachment whole', R.attachmentText({ name: 'greet.js', file: 'x', size: 2048, kind: 'text', offset: 0, content: 'x' }))
-  const skill = (o: Partial<R.SkillRow>): R.SkillRow => ({ name: 'work-on-card', description: 'Carry a card', level: 'hive', ...o })
+  const skill = (o: Partial<R.SkillRow>): R.SkillRow => ({ name: 'work-on-card', description: 'Carry a card', level: 'combwork', ...o })
   add('skills', R.skillListText([skill({ audience: 'agents' }), skill({ audience: 'assistant', level: 'machine' }), skill({ audience: 'all', level: 'plugin', plugin: 'x' }), skill({ problem: 'broken header', level: 'local', description: '' })]))
   add('skills none', R.skillListText([]))
   const wc = (o: Partial<R.WaitChange>): R.WaitChange => ({ number: 12, column: 'review', changes: ['column', 'comment'], by: 'Coder', comment: { by: 'Coder', firstLine: 'hello' }, ...o })
@@ -147,7 +149,7 @@ function replies(): { name: string; text: string }[] {
   add('setting changed', R.settingChangedText({ title: 'x', id: 'sessions.compactAbove', path: 'Settings → Sessions → Suggest compacting above', project: 'alpha', old: 'on', new: 'off', restart: 'at the next launch' }))
   add('setting changed now', R.settingChangedText({ title: 'x', id: 'sessions.compactAbove', path: 'Settings → Sessions → Suggest compacting above', old: 'on', new: 'off' }))
   add('setting same', R.settingChangedText({ title: 'x', id: 'sessions.compactAbove', path: 'Settings → Sessions → Suggest compacting above', project: 'alpha', old: 'on', new: 'on' }))
-  const entry = (o: Partial<R.JournalEntryDetail>): R.JournalEntryDetail => ({ id: 12, at: '2026-10-18T00:00:00Z', kind: 'decision', project: 'alpha', summary: 'summary text', importance: 3, source: 'hive', supersededBy: 13, hasDetail: true, detail: 'detail text', why: 'why text', digestOf: 'x', updatedAt: 'x', links: [{ type: 'card', ref: '12' }], tags: ['lane'], supersedes: [1], ...o })
+  const entry = (o: Partial<R.JournalEntryDetail>): R.JournalEntryDetail => ({ id: 12, at: '2026-10-18T00:00:00Z', kind: 'decision', project: 'alpha', summary: 'summary text', importance: 3, source: 'combwork', supersededBy: 13, hasDetail: true, detail: 'detail text', why: 'why text', digestOf: 'x', updatedAt: 'x', links: [{ type: 'card', ref: '12' }], tags: ['lane'], supersedes: [1], ...o })
   add('recall', R.journalRecallText([entry({}), entry({ importance: 2, source: 'agent', hasDetail: false, supersededBy: null, project: null })]))
   add('recall none', R.journalRecallText([]))
   add('recall no match', R.journalRecallText([], 'x'))
@@ -189,8 +191,8 @@ function replies(): { name: string; text: string }[] {
   add('team', R.teamText(team))
   add('team parked', R.teamText({ ...team, parked: true, safeToInstall: true, running: Array.from({ length: 201 }, () => team.running[1]) }))
   add('team not paused', R.teamText({ ...team, paused: false, running: [] }))
-  add('releasable', R.releasableText({ project: 'alpha', carried: [{ slot: 'slot-a', agent: 'Coder' }], held: [{ slot: 'slot-a', agent: 'Coder', run: 'x', hive: 'y', processes: { list: Array.from({ length: 6 }, () => ({ pid: 1, label: 'e2e' })), more: 1 } }, { slot: 'slot-a', agent: 'Coder', run: 'x', hive: 'y', processes: null }] }))
-  add('releasable few', R.releasableText({ project: 'alpha', carried: [], held: [{ slot: 'slot-a', agent: 'Coder', run: 'x', hive: 'y', processes: { list: [{ pid: 1, label: 'e2e' }], more: 0 } }] }))
+  add('releasable', R.releasableText({ project: 'alpha', carried: [{ slot: 'slot-a', agent: 'Coder' }], held: [{ slot: 'slot-a', agent: 'Coder', run: 'x', combwork: 'y', processes: { list: Array.from({ length: 6 }, () => ({ pid: 1, label: 'e2e' })), more: 1 } }, { slot: 'slot-a', agent: 'Coder', run: 'x', combwork: 'y', processes: null }] }))
+  add('releasable few', R.releasableText({ project: 'alpha', carried: [], held: [{ slot: 'slot-a', agent: 'Coder', run: 'x', combwork: 'y', processes: { list: [{ pid: 1, label: 'e2e' }], more: 0 } }] }))
   add('releasable none', R.releasableText({ project: 'alpha', carried: [], held: [] }))
   add('released carried', R.slotReleasedText({ project: 'alpha', kind: 'carried', slot: 'slot-a', agent: 'Coder' }))
   add('released writer', R.slotReleasedText({ project: 'alpha', kind: 'writer', slot: 'slot-a', agent: 'Coder', ended: true }))
@@ -240,7 +242,7 @@ describe('the canary dialect over the tool replies (HI-2435)', () => {
     expect(R.reorderText({ column: 'todo', top: [12], count: 3 })).toBe('Todo now starts #12; its other 2 cards keep their order below.')
     expect(R.noteWrittenText('notes/plan.md', 12345, false, 'abc')).toBe('Wrote notes/plan.md (12,345 characters, revision abc).')
     expect(R.undoText([{ change: 'a-1', what: 'title', undone: ['title'], skipped: [] }])).toBe('Undid 1 of 1 change in full.')
-    expect(R.releasableText({ project: 'alpha', carried: [], held: [{ slot: 'slot-a', agent: 'Coder', run: 'r1', hive: 'h1', processes: null }] })).toBe('slot-a: held by Coder\'s ended run r1, its Combwork h1 (kind writer, confirm {"slot":"slot-a","run":"r1"}). Combwork doesn\'t know which of its processes still run.')
+    expect(R.releasableText({ project: 'alpha', carried: [], held: [{ slot: 'slot-a', agent: 'Coder', run: 'r1', combwork: 'h1', processes: null }] })).toBe('slot-a: held by Coder\'s ended run r1, its Combwork h1 (kind writer, confirm {"slot":"slot-a","run":"r1"}). Combwork doesn\'t know which of its processes still run.')
     expect(R.checksView(['typecheck'], 'HI-12', true)?.checksHint).toBe('before review: run one with cw-progress --check <name> --card "HI-12" (--isolated: in a check copy at the card\'s revision; work-on-card)')
   })
 })

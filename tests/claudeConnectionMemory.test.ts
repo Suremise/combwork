@@ -1,5 +1,5 @@
 // Auto memory on a connection (HI-1899): a connection's home links `projects` to the CLI's own by a junction, so Claude
-// Code saw each memory file's resolved path outside its memory folder and asked before every memory write. Hive gives
+// Code saw each memory file's resolved path outside its memory folder and asked before every memory write. Combwork gives
 // the launch that folder by its resolved path (autoMemoryDirectory), only on such a home and only where nothing else
 // names the folder.
 import { execFileSync } from 'child_process'
@@ -12,7 +12,7 @@ import { advanced } from '../src/main/advanced'
 import { junction } from './pathAliases'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-connection-memory-')
+const base = tempDir('cw-connection-memory-')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 
 const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
@@ -30,7 +30,7 @@ function connectionHome(name: string): { home: string; cliProjects: string } {
 
 describe("a project's memory folder name, as Claude Code makes it (2.1.312)", () => {
   it('turns every character but letters and digits into -', () => {
-    expect(memoryKey('D:\\Development\\HIVE\\hive')).toBe('D--Development-HIVE-hive')
+    expect(memoryKey('D:\\Projects\\ACME\\acme')).toBe('D--Projects-ACME-acme')
     expect(memoryKey('C:/work/my project.v2')).toBe('C--work-my-project-v2')
   })
 
@@ -125,7 +125,7 @@ describe("a Claude Code launch's settings on a connection (HI-1899)", () => {
     mkdirSync(cwd, { recursive: true })
     const ctx = {
       projectPath: cwd, agentId: 'a1', executable: 'C:\\bin\\claude.exe', cwd, workspacePath: cwd, runId: 'r', sessionId: '00000000-0000-4000-8000-000000000000',
-      resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: over.extraArgs ?? [], hookUrl: 'http://127.0.0.1:9/hook?run=r', hookAuthFile: 'C:/hive/hook-auth/r.txt', privateDir: join(base, `${name}-private`), guidance: '', env: over.env ?? {}, allowBackgroundSessions: true, use200kContext: false
+      resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: over.extraArgs ?? [], hookUrl: 'http://127.0.0.1:9/hook?run=r', hookAuthFile: 'C:/cw/hook-auth/r.txt', privateDir: join(base, `${name}-private`), guidance: '', env: over.env ?? {}, allowBackgroundSessions: true, use200kContext: false
     }
     await claudeCode.prepareLaunch(ctx as never)
     return { cwd, settings: JSON.parse(readFileSync(join(ctx.privateDir, 'settings.json'), 'utf8')) }
@@ -164,7 +164,7 @@ describe("a Claude Code launch's settings on a connection (HI-1899)", () => {
     writeFileSync(join(own.home, 'settings.json'), JSON.stringify({ env: { CLAUDE_CODE_PROJECT_DIR_NAME: 'user-chosen-memory' } }))
     expect((await launch('userenv', { env: { CLAUDE_CONFIG_DIR: own.home } })).settings.autoMemoryDirectory).toBeUndefined()
     expect((await launch('otherhome', { env: { CLAUDE_CONFIG_DIR: home }, extraArgs: ['--settings', JSON.stringify({ env: { CLAUDE_CONFIG_DIR: 'C:\\elsewhere' } })] })).settings.autoMemoryDirectory).toBeUndefined()
-    // Settings Hive can't be sure of (--bare may stop Claude Code reading some): none.
+    // Settings Combwork can't be sure of (--bare may stop Claude Code reading some): none.
     expect((await launch('bare', { env: { CLAUDE_CONFIG_DIR: home }, extraArgs: ['--bare'] })).settings.autoMemoryDirectory).toBeUndefined()
     // The project's own settings.
     const project = join(base, 'project-project')

@@ -1,5 +1,5 @@
 name: Feature request
-description: An idea for something Hive could do, or do better.
+description: An idea for something Combwork could do, or do better.
 labels: [enhancement]
 body:
   - type: markdown
@@ -18,7 +18,7 @@ body:
     id: idea
     attributes:
       label: Your idea
-      description: What you would like Hive to do about it.
+      description: What you would like Combwork to do about it.
     validations:
       required: true
   - type: textarea

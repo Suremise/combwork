@@ -15,7 +15,7 @@ import { installSourceText } from '../../src/shared/providers'
 import type { AppSettings } from '../../src/shared/types'
 
 // #806: the `assistant` area (the Assistant's panel and view, its modes, the Skills, Templates, Shared Notes, MCP and
-// Projects sidebars, the template dialogs, and the template and MCP secret texts Hive works out). Its messages are read
+// Projects sidebars, the template dialogs, and the template and MCP secret texts Combwork works out). Its messages are read
 // from the English catalogue (tests/i18nCatalogues.test.ts checks it is current); the sentences once built by hand read
 // as before in English; the Load template plan marks the defaults from the values, never from a label's words (labels
 // are in the window's language); and what the Assistant itself reads stays English.
@@ -93,7 +93,7 @@ describe('the assistant area', () => {
   })
 })
 
-describe('what Hive works out in shared code is in the language when it is worked out', () => {
+describe('what Combwork works out in shared code is in the language when it is worked out', () => {
   it("a template file's problems: text, in the language shown when shown, English for the log (#870)", () => {
     const problem = (raw: unknown): Text => {
       const t = readTemplate(raw)
@@ -129,12 +129,12 @@ describe('what Hive works out in shared code is in the language when it is worke
 
   it("the Load template plan, as before in English", () => {
     const plan = {
-      remove: [{ id: 'a', name: 'Dev', running: false, dirty: 0, worktree: { path: 'D:/x/site/dev', branch: 'hive/dev' } }],
+      remove: [{ id: 'a', name: 'Dev', running: false, dirty: 0, worktree: { path: 'D:/x/site/dev', branch: 'cw/dev' } }],
       create: [{ name: 'Dev', role: 'builder' as const, provider: 'claude-code' as const }]
     }
     const high: ConnectionOption = { id: 'c-1', name: 'Claude · High', account: 'a-1', accountName: 'Personal', cli: 'claude-code', model: 'opus', effort: 'high' }
     const text = templateLoadDetail(plan, () => high, settings)
-    expect(text).toContain('Removed:\n• Dev (its worktree and branch hive/dev stay): replaced by a new agent with the same name\n')
+    expect(text).toContain('Removed:\n• Dev (its worktree and branch cw/dev stay): replaced by a new agent with the same name\n')
     expect(text).toContain('• Dev — Builder (new): Claude · High (opus · High)')
     expect(text).toMatch(/\n\nTheir conversations stay in the Sessions tab, and their open cards go back \(Active ones to Todo\)\. The layout becomes the template's\.$/)
   })
@@ -162,7 +162,7 @@ describe('the sentences once built by hand read as before, in English', () => {
   it("who gets a skill, and where it goes", () => {
     expect(tr(m('assistant.skills.copiedDetail'), { audience: 'assistant' })).toBe('The Assistant now gets it as a Combwork skill, from their next session.')
     expect(tr(m('assistant.skills.copiedDetail'), { audience: 'agents' })).toBe('The project agents now get it as a Combwork skill, from their next session.')
-    expect(tr(m('assistant.skills.deleteHive'), { audience: 'all' })).toMatch(/^It's removed from the workspace, so new sessions of the project agents and the Assistant no longer get it\./)
+    expect(tr(m('assistant.skills.deleteCombwork'), { audience: 'all' })).toMatch(/^It's removed from the workspace, so new sessions of the project agents and the Assistant no longer get it\./)
     expect(tr(m('assistant.skills.deleteLocal'), { known: 'yes', provider: 'Codex' })).toBe('Codex agents in this project no longer load it in new sessions.')
     expect(tr(m('assistant.skills.deleteLocal'), { known: 'no', provider: '' })).toBe('The agents in this project no longer load it in new sessions.')
     expect(tr(m('assistant.modes.deleteMessage'), { file: 'advisor.md', bundled: 'yes' })).toBe('advisor.md goes to the Recycle Bin. It ships with Combwork, so you can restore it later.')

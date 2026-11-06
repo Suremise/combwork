@@ -60,7 +60,7 @@ describe('settling a slot command job (#1429)', () => {
         probe: p,
         root: j.root,
         dir: j.dir,
-        // A supervisor that outlived its Hive tries to write down another process after the seal: it can't (it ends it).
+        // A supervisor that outlived its Combwork tries to write down another process after the seal: it can't (it ends it).
         afterSeal: () => {
           try {
             appendFileSync(j.main, record(456, T))

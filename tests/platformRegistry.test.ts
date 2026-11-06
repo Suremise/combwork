@@ -1,4 +1,4 @@
-// Each project's platform (SPEC §16.3, #1213): detected per case of §16.3.5's table, recorded in project.json when Hive
+// Each project's platform (SPEC §16.3, #1213): detected per case of §16.3.5's table, recorded in project.json when Combwork
 // makes it and never switched silently after (a different detection is offered and said once), the
 // descriptor's capabilities in ProjectInfo, and the two git calls that bypassed `git()` now going through it.
 import { execFileSync } from 'child_process'
@@ -6,16 +6,16 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import type { HiveEvent, ProjectConfig } from '../src/shared/types'
+import type { CombworkEvent, ProjectConfig } from '../src/shared/types'
 import { PLATFORMS, revisionShort } from '../src/shared/platform/descriptors'
 import { detect, projectPlatform } from '../src/main/platform/registry'
 import { git, gitTestHooks } from '../src/main/git'
 import { checkGit } from '../src/main/gitTool'
 import { excludeCopies } from '../src/main/providers/common'
-import { onHiveEvent } from '../src/main/events'
+import { onCombworkEvent } from '../src/main/events'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-platform-')
+const base = tempDir('cw-platform-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -28,17 +28,17 @@ const HUNG_MS = 10000
 
 describe('detection, per case of §16.3.5', () => {
   it('a Git repository is Git, at its root', () => {
-    const p = tempDir('hive-platform-git-')
+    const p = tempDir('cw-platform-git-')
     gitInit(p)
     expect(detect(p)).toEqual({ platform: 'git', root: p })
   })
 
   it('a folder with no version control is None', () => {
-    expect(detect(tempDir('hive-platform-none-'))).toEqual({ platform: 'none' })
+    expect(detect(tempDir('cw-platform-none-'))).toEqual({ platform: 'none' })
   })
 
   it('a subfolder of a larger repository is Git, showing the repository root', () => {
-    const root = tempDir('hive-platform-sub-')
+    const root = tempDir('cw-platform-sub-')
     gitInit(root)
     const p = join(root, 'project')
     mkdirSync(p)
@@ -47,14 +47,14 @@ describe('detection, per case of §16.3.5', () => {
 
   it('Mercurial and Jujutsu are None, naming what was found', () => {
     for (const [marker, name] of [['.hg', 'Mercurial'], ['.jj', 'Jujutsu']]) {
-      const p = tempDir('hive-platform-other-')
+      const p = tempDir('cw-platform-other-')
       mkdirSync(join(p, marker))
       expect(detect(p)).toEqual({ platform: 'none', other: name })
     }
   })
 
   it('a colocated jj+git repository is Jujutsu, so None', () => {
-    const p = tempDir('hive-platform-jjgit-')
+    const p = tempDir('cw-platform-jjgit-')
     gitInit(p)
     mkdirSync(join(p, '.jj'))
     expect(detect(p)).toEqual({ platform: 'none', other: 'Jujutsu' })
@@ -63,14 +63,14 @@ describe('detection, per case of §16.3.5', () => {
 
 describe("a project's platform", () => {
   it('takes what detection finds until one is recorded, with its descriptor\'s capabilities', () => {
-    const p = tempDir('hive-platform-first-')
+    const p = tempDir('cw-platform-first-')
     expect(projectPlatform(p, undefined)).toEqual({ id: 'none', capabilities: PLATFORMS.none.capabilities, detected: { platform: 'none' } })
     gitInit(p)
     expect(projectPlatform(p, undefined)).toEqual({ id: 'git', capabilities: PLATFORMS.git.capabilities, detected: { platform: 'git', root: p } })
   })
 
   it('keeps the recorded one when detection differs, and offers the switch', () => {
-    const p = tempDir('hive-platform-kept-')
+    const p = tempDir('cw-platform-kept-')
     gitInit(p)
     expect(projectPlatform(p, 'none')).toMatchObject({ id: 'none', capabilities: PLATFORMS.none.capabilities, offer: { offer: 'git', why: 'gitFound' } })
     renameSync(join(p, '.git'), join(p, 'moved.git'))
@@ -82,7 +82,7 @@ describe("a project's platform", () => {
   })
 
   it('a recorded value that is no platform uses detection, offers nothing, and says what it holds', () => {
-    const p = tempDir('hive-platform-invalid-')
+    const p = tempDir('cw-platform-invalid-')
     gitInit(p)
     for (const [value, said] of [['mercurial', 'mercurial'], ['Git', 'Git'], ['toString', 'toString'], ['__proto__', '__proto__'], [42, '42'], [true, 'true'], [{ id: 'git' }, '{"id":"git"}'], [['git'], '["git"]']] as const) {
       expect(projectPlatform(p, value)).toEqual({ id: 'git', capabilities: PLATFORMS.git.capabilities, detected: { platform: 'git', root: p }, invalid: said })
@@ -102,10 +102,10 @@ describe("a project's platform", () => {
 describe('in ProjectInfo', () => {
   let ws: string
   let w: ReturnType<typeof createWorkspaceService>
-  const events: HiveEvent[] = []
+  const events: CombworkEvent[] = []
   let off: () => void = () => undefined
   /**
-   * A project Hive sets up (its project.json made by ensureProject, as adding one does): as the workspace opens with it,
+   * A project Combwork sets up (its project.json made by ensureProject, as adding one does): as the workspace opens with it,
    * then with the refresh the open scheduled run. A folder made in an open workspace is a root-watch event, whose refresh
    * reads the project (its `.git` too) while the test renames or reads it (#1375: EPERM renaming `.git`, its notice said
    * by that refresh): now only the test reads it.
@@ -123,9 +123,9 @@ describe('in ProjectInfo', () => {
   const info = (p: string) => inWorkspace(w, () => w.projectInfo(p))
 
   beforeEach(async () => {
-    ws = tempDir('hive-platform-ws-')
+    ws = tempDir('cw-platform-ws-')
     events.length = 0
-    off = onHiveEvent((e) => events.push(e))
+    off = onCombworkEvent((e) => events.push(e))
     w = createWorkspaceService()
     await w.open(ws)
   })
@@ -179,7 +179,7 @@ describe('in ProjectInfo', () => {
     expect(notices(p).map((t) => t.message)).toEqual(["beta's Git repository is gone. Git's rules hold, so its cards can't move on until the repository is back or you switch the project to None in its Version Control tab."])
   })
 
-  it("one notice per project: a newer detection replaces the earlier one, in Hive's language (#1419)", async () => {
+  it("one notice per project: a newer detection replaces the earlier one, in Combwork's language (#1419)", async () => {
     const p = await project('gamma', gitInit)
     renameSync(join(p, '.git'), join(p, 'moved.git'))
     await info(p)
@@ -235,7 +235,7 @@ describe('in ProjectInfo', () => {
     try {
       const old = info(p)
       await vi.waitFor(() => expect(held).toBe(true), { timeout: HUNG_MS })
-      const next = tempDir('hive-platform-ws2-')
+      const next = tempDir('cw-platform-ws2-')
       await w.open(next)
       release()
       expect((await old).platform?.offer?.why).toBe('repositoryGone')
@@ -278,13 +278,13 @@ describe('every git call goes through git()', () => {
   })
 
   it("excludeCopies' rev-parse --git-common-dir", async () => {
-    const p = tempDir('hive-platform-exclude-')
+    const p = tempDir('cw-platform-exclude-')
     gitInit(p)
     await excludeCopies(p)
     expect(started).toContainEqual(['rev-parse', '--git-common-dir'])
-    expect(readFileSync(join(p, '.git', 'info', 'exclude'), 'utf8')).toContain('/.agents/skills/hive-*/')
+    expect(readFileSync(join(p, '.git', 'info', 'exclude'), 'utf8')).toContain('/.agents/skills/cw-*/')
     // Outside a repository: nothing written, nothing thrown.
-    await excludeCopies(tempDir('hive-platform-norepo-'))
+    await excludeCopies(tempDir('cw-platform-norepo-'))
     expect((await git(p, ['status', '--short'])).ok).toBe(true)
   })
 })

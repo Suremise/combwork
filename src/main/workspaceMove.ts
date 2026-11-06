@@ -2,7 +2,7 @@ import { existsSync } from 'original-fs'
 import { mkdir, readFile, stat } from 'original-fs/promises'
 import { basename, dirname, join, resolve } from 'path'
 import type { MoveBranch, MoveCards, MoveHostPlan, MoveOptions, MoveOwner, MovePlan, MoveReport, MoveReportRow, MoveWorktree, PathDataCopy, ProfileMove, ProjectConfig, WorkspaceMoved } from '../shared/types'
-import { HIVE_DIR, projectAgents } from '../shared/defaults'
+import { CW_DIR, projectAgents } from '../shared/defaults'
 import { fmt, msg, tr } from '../shared/i18n'
 import { moveHasWork, rebase, rebaseAny, samePath, worktreeCandidates, type PathMove } from '../shared/movePaths'
 import { moveCardFolders, PruneBlocked, recreateWorktree } from './agentWorktree'
@@ -22,7 +22,7 @@ import type { SlotRenamer } from './slots'
 import { workflowFor } from './workflow/service'
 import { reconcilersIdle } from './workflow/reconciler'
 import { moveExclusions } from './antivirus'
-import { branchHere, chooseSpace, refPart, type BranchHome } from '../shared/hiveBranches'
+import { branchHere, chooseSpace, refPart, type BranchHome } from '../shared/agentBranches'
 import { orphanNames } from '../shared/projectIds'
 import { shortPath } from '../shared/shortPath'
 import { legacyCards, moveOrphanCards, stampCardProjects } from './tasks'
@@ -37,7 +37,7 @@ import { carryWorkspaceRuns } from './closeCommand/closeCommands'
 import { emitTo } from './events'
 
 /**
- * A workspace (or project) moved to another folder (#146). Hive records where each was last opened (`lastPath` in
+ * A workspace (or project) moved to another folder (#146). Combwork records where each was last opened (`lastPath` in
  * workspace.json and project.json); when that differs, what is stored by absolute path is out of date: agents'
  * worktrees (and git's links both ways), session folders, Claude Code's per-path transcripts and memory, the recent
  * list. The plan says what Repair would do; repair does it, refusing while agents run. Every step can run again
@@ -46,8 +46,8 @@ import { emitTo } from './events'
 
 const log = createLogger('move')
 
-const assistantName = (): string => tr(msg({ id: 'main.move.assistant', defaultMessage: 'Assistant', description: "The Hive Assistant's name, where Repair (after a workspace moved) lists what it repairs and the agents still running." }))
-const PROJECT_FILE = join(HIVE_DIR, 'project.json')
+const assistantName = (): string => tr(msg({ id: 'main.move.assistant', defaultMessage: 'Assistant', description: "The Combwork Assistant's name, where Repair (after a workspace moved) lists what it repairs and the agents still running." }))
+const PROJECT_FILE = join(CW_DIR, 'project.json')
 
 /** Whether p is inside root (or is it). */
 const under = (p: string, root: string): boolean => rebase(p, root, root) !== null
@@ -93,7 +93,7 @@ async function recordNew(ws: WorkspaceService, projects: string[]): Promise<void
   for (const p of projects) if (!(await ws.projectConfig(p)).lastPath) await ws.mutateProjectConfig(p, (c) => (c.lastPath ? {} : { lastPath: p }))
 }
 
-/** The workspace's project folders that have Hive's files (hidden ones too). */
+/** The workspace's project folders that have Combwork's files (hidden ones too). */
 async function projectFolders(ws: WorkspaceService): Promise<string[]> {
   const all = [...(await ws.listProjectPaths()), ...(await ws.listProjectPaths({ hidden: true }))]
   return all.filter((p) => existsSync(join(p, PROJECT_FILE)))
@@ -251,7 +251,7 @@ async function renameCardLines(ws: WorkspaceService, project: string, from: stri
   for (const card of wf.store.cards()) {
     if (!on(wf.state(card).started?.line)) continue
     // Checked again under the write's lock: a card another observer has already renamed gets no second fact.
-    await wf.write(card, null, 'hive', (w) => {
+    await wf.write(card, null, 'combwork', (w) => {
       if (on(w.state().started?.line)) w.fact('LineRenamed', { from, to, why: 'repair' }) // i18n-ignore: a fact's kind and codes, not text
     })
   }
@@ -308,7 +308,7 @@ const R = {
   taken: msg({ id: 'main.move.result.taken', defaultMessage: 'kept: the new name is a branch already', description: "Repair's report, the Result column: an agent's branch isn't renamed, because a branch with the new name exists." }),
   renameFailed: msg({ id: 'main.move.result.renameFailed', defaultMessage: "couldn't be renamed: {why}", description: "Repair's report, the Result column: an agent's branch couldn't be renamed ({why}: git's or the system's message)." }),
   gone: msg({ id: 'main.move.result.gone', defaultMessage: "gone, so it isn't renamed", description: "Repair's report, the Result column: an agent's branch to rename no longer exists." }),
-  unrecorded: msg({ id: 'main.move.result.unrecorded', defaultMessage: "renamed, but not recorded yet ({why}): Repair finishes it", description: "Repair's report, the Result column: git renamed an agent's branch, but Hive couldn't record it yet ({why}: the system's message)." }),
+  unrecorded: msg({ id: 'main.move.result.unrecorded', defaultMessage: "renamed, but not recorded yet ({why}): Repair finishes it", description: "Repair's report, the Result column: git renamed an agent's branch, but Combwork couldn't record it yet ({why}: the system's message)." }),
   sessions: msg({ id: 'main.move.result.sessions', defaultMessage: '{n, plural, one {# session points here now} other {# sessions point here now}}', description: "Repair's report, the Result column: session records pointed to the new folder ({n}: how many)." }),
   failedWhy: msg({ id: 'main.move.result.failed', defaultMessage: "couldn't be updated: {why}", description: "Repair's report, the Result column: a step failed ({why}: the system's message); the next Repair tries again." }),
   copied: msg({ id: 'main.move.result.copied', defaultMessage: '{n, plural, one {# file copied} other {# files copied}}', description: "Repair's report, the Result column: a coding agent's conversation and memory files copied to the new folder ({n}: how many)." }),
@@ -329,12 +329,12 @@ const R = {
 const F = {
   relinked: msg({ id: 'main.move.folder.relinked', defaultMessage: '{host}: {what} at {path} is linked to the project again.', description: "A line of Repair's report, after a workspace or project moved: one of the project's slots, review copies or old reviewer folders ({what}: its name, such as \"slot-b (HI-B1, AM-12)\") is linked to the project again. {host} is the project, {path} the folder." }),
   movedTo: msg({ id: 'main.move.folder.movedTo', defaultMessage: '{host}: {what} is now at {path}.', description: "A line of Repair's report, after a workspace or project moved: one of the project's slots, copies or old reviewer folders ({what}: its name) is now at {path}. {host} is the project." }),
-  failed: msg({ id: 'main.move.folder.failed', defaultMessage: "{host}: {what} at {path} couldn't be recorded ({why}). Repair tries again.", description: "A line of Repair's report, after a workspace or project moved: one of the project's slots, copies or old reviewer folders ({what}: its name) was found at {path}, but Hive's record of it couldn't be updated ({why}). {host} is the project." }),
-  busy: msg({ id: 'main.move.folder.busy', defaultMessage: 'Combwork is using it now', description: "Why Repair couldn't update its record of a slot or copy (in main.move.folder.failed's {why}): one of Hive's own steps (setting it up, removing it) holds it now. A clause." }),
+  failed: msg({ id: 'main.move.folder.failed', defaultMessage: "{host}: {what} at {path} couldn't be recorded ({why}). Repair tries again.", description: "A line of Repair's report, after a workspace or project moved: one of the project's slots, copies or old reviewer folders ({what}: its name) was found at {path}, but Combwork's record of it couldn't be updated ({why}). {host} is the project." }),
+  busy: msg({ id: 'main.move.folder.busy', defaultMessage: 'Combwork is using it now', description: "Why Repair couldn't update its record of a slot or copy (in main.move.folder.failed's {why}): one of Combwork's own steps (setting it up, removing it) holds it now. A clause." }),
   recreated: msg({ id: 'main.move.folder.recreated', defaultMessage: '{host}: {what} was made again on {branch}, at {path}.', description: "A line of Repair's report: a slot lent to an agent, whose folder was gone, was made again on its branch ({branch}) at {path}; the agent keeps it. {what} is its name, {host} the project." }),
   recreateFailed: msg({ id: 'main.move.folder.recreateFailed', defaultMessage: "{host}: {what} couldn't be made again: {why}", description: "A line of Repair's report: a lent slot whose folder was gone couldn't be made again ({why}: the reason, often in English from git). {what} is its name, {host} the project." }),
-  released: msg({ id: 'main.move.folder.released', defaultMessage: "{host}: {what} was released; it's made again where it belongs when it is next lent.", description: "A line of Repair's report: a lent slot whose folder was gone was released (its agent no longer has it); Hive makes it again at its next use. {what} is its name, {host} the project." }),
-  later: msg({ id: 'main.move.folder.later', defaultMessage: "{host}: {what} wasn't found; it's made again at {path} when it is next used.", description: "A line of Repair's report: a free slot or a review copy ({what}: its name) whose folder wasn't found; Hive makes it again at {path} the next time it lends it. {host} is the project." }),
+  released: msg({ id: 'main.move.folder.released', defaultMessage: "{host}: {what} was released; it's made again where it belongs when it is next lent.", description: "A line of Repair's report: a lent slot whose folder was gone was released (its agent no longer has it); Combwork makes it again at its next use. {what} is its name, {host} the project." }),
+  later: msg({ id: 'main.move.folder.later', defaultMessage: "{host}: {what} wasn't found; it's made again at {path} when it is next used.", description: "A line of Repair's report: a free slot or a review copy ({what}: its name) whose folder wasn't found; Combwork makes it again at {path} the next time it lends it. {host} is the project." }),
   forgotten: msg({ id: 'main.move.folder.forgotten', defaultMessage: "{host}: {what} is no longer kept (it was at {path}); its conversations can't be resumed there.", description: "A line of Repair's report: an old reviewer folder ({what}) that wasn't found is forgotten, as the user chose; the conversations that ran there can be read, not resumed there. {host} is the project, {path} where it was." }),
   slotMissing: msg({ id: 'main.move.folder.slotMissing', defaultMessage: "{hasBranch, select, yes {{host}: {what} wasn't found (it was at {path}). Recreate it on {branch}, locate it, or release it.} other {{host}: {what} wasn't found (it was at {path}), and its branch is gone too. Locate it, or release it.}}", description: "A line of Repair's report: a lent slot ({what}: its name) wasn't found; Repair waits for the user's choice: make it again on its branch ({branch}), pick its folder, or release it. {host} is the project, {path} where it was." }),
   homeMissing: msg({ id: 'main.move.folder.homeMissing', defaultMessage: "{host}: {what} wasn't found (it was at {path}). Locate it, or forget it.", description: "A line of Repair's report: an old reviewer folder ({what}), where its conversations resume, wasn't found; Repair waits for the user's choice. {host} is the project, {path} where it was." }),
@@ -343,7 +343,7 @@ const F = {
 
 /**
  * The worktrees git's prune would forget (a recreate's refusal, `PruneBlocked`), as Repair's report names them: an
- * agent's by its name, any other (made outside Hive, or whose agent is gone) by its folder's name. Exported for tests.
+ * agent's by its name, any other (made outside Combwork, or whose agent is gone) by its folder's name. Exported for tests.
  */
 export function blockerNames(blockers: readonly string[], worktrees: readonly Pick<MoveWorktree, 'agentName' | 'from' | 'to'>[]): string[] {
   return blockers.map((p) => {
@@ -634,7 +634,7 @@ export async function movePlan(ws: WorkspaceService, opts: MoveOptions = {}): Pr
     planned.push({ path: h.path, name: h.name, from: h.from, folder: h.folder, worktrees, sessions: await sessionCwds(ws, h.path, moves, false), folders: await pathData(moves, false), ...(branches.length ? { branches } : {}) })
   }
   // Branches still named after an old place in projects that didn't move (#1305): a move repaired before, or one made
-  // outside Hive. Each such project is listed for its branches alone.
+  // outside Combwork. Each such project is listed for its branches alone.
   for (const p of await projectFolders(ws)) {
     if (hosts.some((h) => samePath(h.path, p))) continue
     const branches = await branchesOf(ws, p, [])
@@ -664,7 +664,7 @@ export const movedSummary = (plan: MovePlan | null): WorkspaceMoved | null =>
   plan && moveHasWork(plan) ? { from: plan.from, projects: plan.projects, pending: plan.pending, ...(plan.cards?.length ? { cards: plan.cards } : {}), ...(plan.branches ? { branches: plan.branches } : {}), ...(plan.profile?.length ? { profile: plan.profile } : {}) } : null
 
 /**
- * What Hive's profile keeps by a workspace's folder follows it when it moves (HI-2007): its window's pin and its close
+ * What Combwork's profile keeps by a workspace's folder follows it when it moves (HI-2007): its window's pin and its close
  * command's runs, and its view preferences, each project's and its panes' (HI-2008, viewPrefs.ts). The Assistant's old token file is left: it is written again at each launch, and deleting it could take
  * a workspace's back there (HR2's round 2). Design HI-2007/s40 and s42:
  * - A move is recorded as the moved workspace opens (config.json's `profileMoves`, one per old folder) only when the
@@ -685,7 +685,7 @@ async function carryProfile(ws: WorkspaceService, report?: MoveReport): Promise<
   const life = ws.lifetime
   if (!here) return
   const current = (): boolean => !life.aborted && ws.path === here
-  const gone = (p: string): boolean => !existsSync(join(p, HIVE_DIR)) && !workspaceFor(p)
+  const gone = (p: string): boolean => !existsSync(join(p, CW_DIR)) && !workspaceFor(p)
   const ofFrom = (from: string) => (m: ProfileMove): boolean => samePath(m.from, from)
   // Where it was last opened (lastPath, as Repair goes by), and where its records were last brought (profileAt): moved
   // again before a Repair, lastPath is still the first old folder while the records went on with it (HR2's round 3).
@@ -741,7 +741,7 @@ async function carryProfile(ws: WorkspaceService, report?: MoveReport): Promise<
     if (r.going.length) log.info(`${r.going.length} close-command run(s) still going at ${userText(m.from)}: they follow once ended`)
     for (const s of r.stuck) {
       const why = s.why
-      if (report) say(report, 'failed', tr(msg({ id: 'main.move.closeRunsFailed', defaultMessage: "Combwork's records of the workspace's close command couldn't all follow it from the old folder ({why}). Combwork tries again.", description: "A line of Repair's report, after a workspace moved to another folder: the output Hive keeps of the workspace's close command couldn't all be moved from the old folder's records. {why} is the system's message." }), { why }), { what: { kind: 'closeRuns' }, result: tr(R.failedWhy, { why }) })
+      if (report) say(report, 'failed', tr(msg({ id: 'main.move.closeRunsFailed', defaultMessage: "Combwork's records of the workspace's close command couldn't all follow it from the old folder ({why}). Combwork tries again.", description: "A line of Repair's report, after a workspace moved to another folder: the output Combwork keeps of the workspace's close command couldn't all be moved from the old folder's records. {why} is the system's message." }), { why }), { what: { kind: 'closeRuns' }, result: tr(R.failedWhy, { why }) })
       else log.warn(`carrying a close-command run from ${userText(m.from)}: ${userText(why)}`)
     }
     if (!pinKeptAt(m.from) && !viewPrefsKeptAt(m.from) && !r.going.length && !r.stuck.length && !r.stopped) end()
@@ -811,7 +811,7 @@ async function recordDone(ws: WorkspaceService, hosts: string[], all: boolean): 
 
 const trimList = (list: string[], max = 5): string =>
   list.length > max
-    ? fmt.list([...list.slice(0, max), tr(msg({ id: 'main.move.more', defaultMessage: '{n, plural, one {# more} other {# more}}', description: "The last item of a long list in Repair's report (after a workspace moved), after the first few: how many more there are (folders, files or names). Hive joins it to the list (\"A, B, C and 3 more\")." }), { n: list.length - max })])
+    ? fmt.list([...list.slice(0, max), tr(msg({ id: 'main.move.more', defaultMessage: '{n, plural, one {# more} other {# more}}', description: "The last item of a long list in Repair's report (after a workspace moved), after the first few: how many more there are (folders, files or names). Combwork joins it to the list (\"A, B, C and 3 more\")." }), { n: list.length - max })])
     : fmt.list(list, 'unit')
 
 /**
@@ -1088,7 +1088,7 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
           ...(space && space.toLowerCase() !== refPart(basename(ws.path ?? ''), 'workspace').toLowerCase() && !(cfg.branchSpaces ?? []).some((s) => s.toLowerCase() === space.toLowerCase()) ? { branchSpaces: [...(cfg.branchSpaces ?? []), space] } : {})
         }))
       } catch (e) {
-        say(report, 'failed', tr(msg({ id: 'main.move.branchUnrecorded', defaultMessage: "{host}: the branch of agent {agent} is now {to}, but Combwork couldn't record it yet ({why}). Repair finishes it.", description: "A line of Repair's report, after a workspace or project moved to another folder: git renamed an agent's branch, and Hive's record of it (or of the cards on it) couldn't be written; the next Repair finishes it. {host} is the project; {agent} an agent; {to} the branch's new name; {why} the system's message. A noun before the name (glossary §1 rule 4)." }), { host: h.name, agent: b.agentName, to: b.to, why: whyOf(e) }), { ...branchRow, now: b.to, result: tr(R.unrecorded, { why: whyOf(e) }) })
+        say(report, 'failed', tr(msg({ id: 'main.move.branchUnrecorded', defaultMessage: "{host}: the branch of agent {agent} is now {to}, but Combwork couldn't record it yet ({why}). Repair finishes it.", description: "A line of Repair's report, after a workspace or project moved to another folder: git renamed an agent's branch, and Combwork's record of it (or of the cards on it) couldn't be written; the next Repair finishes it. {host} is the project; {agent} an agent; {to} the branch's new name; {why} the system's message. A noun before the name (glossary §1 rule 4)." }), { host: h.name, agent: b.agentName, to: b.to, why: whyOf(e) }), { ...branchRow, now: b.to, result: tr(R.unrecorded, { why: whyOf(e) }) })
         continue
       }
       say(
@@ -1096,7 +1096,7 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
         'done',
         b.remote
           ? tr(msg({ id: 'main.move.branchRenamedRemote', defaultMessage: "{host}: branch {from} of agent {agent} is now {to}; it still tracks {from} on remote {remote}, so push it under the new name when you're ready.", description: "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place was renamed, and it tracks a remote, which keeps the old name. {host} is the project; {agent} an agent; {from} and {to} are branch names; {remote} the remote (origin). A noun before each name (glossary §1 rule 4)." }), { host: h.name, agent: b.agentName, from: b.from, to: b.to, remote: b.remote })
-          : tr(msg({ id: 'main.move.branchRenamed', defaultMessage: '{host}: branch {from} of agent {agent} is now {to}.', description: "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place was renamed, with Hive's record of it. {host} is the project; {agent} an agent; {from} and {to} are branch names. A noun before the name (glossary §1 rule 4)." }), { host: h.name, agent: b.agentName, from: b.from, to: b.to }),
+          : tr(msg({ id: 'main.move.branchRenamed', defaultMessage: '{host}: branch {from} of agent {agent} is now {to}.', description: "A line of Repair's report, after a workspace or project moved to another folder: an agent's branch named after the old place was renamed, with Combwork's record of it. {host} is the project; {agent} an agent; {from} and {to} are branch names. A noun before the name (glossary §1 rule 4)." }), { host: h.name, agent: b.agentName, from: b.from, to: b.to }),
         { ...branchRow, now: b.to, result: tr(R.renamed, { remote: b.remote ?? 'none' }) }
       )
     }
@@ -1135,7 +1135,7 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
   for (const m of plan.cards ?? []) {
     try {
       // First, in the record of names, that the project had that name (#514): what was saved under it (handovers, kept
-      // comparisons) is then given to it, by this Repair or, if that fails, by the next (or when Hive next follows the
+      // comparisons) is then given to it, by this Repair or, if that fails, by the next (or when Combwork next follows the
       // projects' names, after a restart too), once the cards that told it are moved.
       const id = ws.projectIdsNow().byPath.get(join(ws.path!, m.to).toLowerCase())
       if (id) await noteFormerName(ws, id, m.from)
@@ -1195,7 +1195,7 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
     })
     say(report, 'done', tr(msg({ id: 'main.move.workingMoved', defaultMessage: 'Working on: {projects}, as before the move.', description: "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner): the projects stay Working on. Working on is how the sidebar marks projects: use its name as shown. {projects} lists them." }), { projects: trimList(plan.working) }), { what: { kind: 'working' }, result: tr(R.working, { projects: trimList(plan.working) }) })
   }
-  // Hive's Defender exclusions follow the workspace (#1302): last, so the administrator prompt comes once everything else
+  // Combwork's Defender exclusions follow the workspace (#1302): last, so the administrator prompt comes once everything else
   // is done; only when the dialog's box asked for it. A declined prompt changes nothing and is said; a refusal too.
   if (opts.defender && plan.from) {
     try {
@@ -1203,7 +1203,7 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
       if (r) say(report, r.outcome === 'done' ? 'done' : r.outcome === 'refused' ? 'skipped' : 'failed', r.message, { what: { kind: 'defender' }, result: r.message })
     } catch (e) {
       const why = e instanceof Error ? e.message : String(e)
-      say(report, 'failed', tr(msg({ id: 'main.move.defenderFailed', defaultMessage: "Combwork's Defender exclusions couldn't be moved to the new folders ({why}).", description: "A line of Repair's report, after a workspace moved to another folder: moving Hive's Microsoft Defender exclusions from the old folders to the new ones failed. {why} is the system's message." }), { why }), { what: { kind: 'defender' }, result: tr(R.failedWhy, { why }) })
+      say(report, 'failed', tr(msg({ id: 'main.move.defenderFailed', defaultMessage: "Combwork's Defender exclusions couldn't be moved to the new folders ({why}).", description: "A line of Repair's report, after a workspace moved to another folder: moving Combwork's Microsoft Defender exclusions from the old folders to the new ones failed. {why} is the system's message." }), { why }), { what: { kind: 'defender' }, result: tr(R.failedWhy, { why }) })
     }
   }
   await recordDone(ws, repaired, repaired.length === plan.hosts.length)

@@ -53,14 +53,14 @@ function sizes(home) {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47924), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47924), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   // Low, so a few turns scroll the terminals.
   await lib.fitWindow(app, page, { width: 1300, height: 560 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.waitForProvider(inv, 'codex')
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('alpha', { exact: true }).first().click()
@@ -75,7 +75,7 @@ function sizes(home) {
     { name: 'Claude Code', a: claude, home: claudeHome, key: lib.ptyKey(alpha, claude.id) },
     { name: 'Codex', a: codex, home: codexHome, key: lib.ptyKey(alpha, codex.id) }
   ]
-  const state = (key) => page.evaluate((k) => window.__hiveTerminalState(k), key)
+  const state = (key) => page.evaluate((k) => window.__cwTerminalState(k), key)
   // Turns until each terminal has scrolled.
   for (const g of agents) {
     for (let i = 1; i <= 12 && !((await state(g.key))?.baseY > 0); i++) {
@@ -106,7 +106,7 @@ function sizes(home) {
     await show()
     // Shown again: one new size after a font change; otherwise none, which only time can tell (on purpose).
     if (sizeChanges) await lib.until(() => agents.every((g, i) => sizes(g.home).length > before[i].n), 5000)
-    // No further size may follow, and past the time Hive holds a terminal at the bottom, it must stay there.
+    // No further size may follow, and past the time Combwork holds a terminal at the bottom, it must stay there.
     await lib.sleep(1600) // on purpose
     for (const [i, b] of before.entries()) {
       const g = b.g
@@ -132,13 +132,13 @@ function sizes(home) {
     sizeChanges: true
   })
   await page.screenshot({ path: path.join(lib.WORK, 'termsize-after-settings.png') })
-  // Shown again, xterm can move the view itself a moment later (its scroll position synced from a stale one): Hive puts
+  // Shown again, xterm can move the view itself a moment later (its scroll position synced from a stale one): Combwork puts
   // a terminal that follows its output back at the bottom. The same move, made just after coming back from Settings.
   await settingsBtn.click()
   await lib.sleep(500)
   await projectsBtn.click()
   await lib.sleep(200)
-  for (const g of agents) await page.evaluate((k) => window.__hiveTerminalScrollLines(k, -3), g.key)
+  for (const g of agents) await page.evaluate((k) => window.__cwTerminalScrollLines(k, -3), g.key)
   await lib.sleep(1600) // on purpose: past the hold, it must still be at the bottom
   for (const g of agents) check(`late scroll after Settings: ${g.name} is put back at the bottom`, atBottom(await state(g.key)), JSON.stringify(await state(g.key)))
   await roundTrip('Files tab', () => page.locator('.tabs .tab', { hasText: 'Files' }).first().click(), () => page.locator('.tabs .tab', { hasText: 'Session' }).first().click())
@@ -188,26 +188,26 @@ function sizes(home) {
   await roundTrip('Settings after scrolling back down', () => settingsBtn.click(), () => projectsBtn.click())
   await page.screenshot({ path: path.join(lib.WORK, 'termsize-end.png') })
 
-  // Narrowed, what the terminal shows re-wraps instead of being cut at its edge (#896): Hive's exit line, and a line as
+  // Narrowed, what the terminal shows re-wraps instead of being cut at its edge (#896): Combwork's exit line, and a line as
   // wide as the terminal was, written in a wide window. xterm keeps a line's cells past a narrower terminal's edge
   // without drawing them, so only what is drawn counts.
-  const fitted = () => page.evaluate(() => window.__hiveTerminalsFitted())
+  const fitted = () => page.evaluate(() => window.__cwTerminalsFitted())
   const drawn = async () => {
     const cols = (await state(writer.key)).cols
-    return ((await page.evaluate((k) => window.__hiveTerminalLines(k), writer.key)) ?? []).map((l) => l.slice(0, cols)).join('')
+    return ((await page.evaluate((k) => window.__cwTerminalLines(k), writer.key)) ?? []).map((l) => l.slice(0, cols)).join('')
   }
-  // One pane: two columns at the narrowest window with the panel open are narrower than Hive fits a terminal to.
+  // One pane: two columns at the narrowest window with the panel open are narrower than Combwork fits a terminal to.
   await page.locator('.layout-switch button[aria-label="One at a time"]').click()
   await lib.fitWindow(app, page, { width: 1400, height: 650 })
   await inv('session:stop', alpha, claude.id)
-  check('reflow: Hive writes its exit line', !!(await lib.until(async () => (await drawn()).includes('[process exited with code'), HUNG_MS)), await drawn())
+  check('reflow: Combwork writes its exit line', !!(await lib.until(async () => (await drawn()).includes('[process exited with code'), HUNG_MS)), await drawn())
   check('reflow: the terminal is fitted to the wide window', !!(await lib.until(fitted, HUNG_MS)), JSON.stringify(await state(writer.key)))
   const wide = (await state(writer.key)).cols
   const marker = Array.from({ length: wide }, (_, i) => String.fromCharCode(65 + (i % 26))).join('')
-  await page.evaluate(([k, d]) => window.__hiveTerminalOutput(k, d), [writer.key, `${marker}\r\n`])
+  await page.evaluate(([k, d]) => window.__cwTerminalOutput(k, d), [writer.key, `${marker}\r\n`])
   // The narrowest window, with the Progress panel open.
   await lib.fitWindow(app, page, { width: 900, height: 650 })
-  if (!(await page.locator('.progress-panel').count())) await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', { type: 'menu-command', command: 'progress.toggle', args: [] }))
+  if (!(await page.locator('.progress-panel').count())) await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', { type: 'menu-command', command: 'progress.toggle', args: [] }))
   check('reflow: the Progress panel opens', !!(await lib.until(async () => (await page.locator('.progress-panel').count()) > 0, HUNG_MS)))
   check('reflow: the terminal narrows', !!(await lib.until(async () => (await state(writer.key)).cols < wide && (await fitted()), HUNG_MS)), JSON.stringify({ wide, now: await state(writer.key) }))
   check('reflow: the wide line and the exit line are whole after narrowing', !!(await lib.until(async () => { const t = await drawn(); return t.includes(marker) && t.includes('[process exited with code') }, HUNG_MS)), JSON.stringify({ wide, cols: (await state(writer.key)).cols, drawn: await drawn() }))
@@ -219,9 +219,9 @@ function sizes(home) {
   const panes = () => page.locator('.agent-pane').count()
   const layoutButton = () => page.evaluate(() => [...document.querySelectorAll('.layout-switch button.active, .layout-switch button.layout-menu')].map((b) => b.getAttribute('aria-label')).join())
   // Fitted, and drawn inside its pane: one too small to fit counts as fitted, so its screen is measured too.
-  const inside = () => page.evaluate(() => window.__hiveTerminalsInside())
+  const inside = () => page.evaluate(() => window.__cwTerminalsInside())
   const fewer = (n) => lib.until(async () => (await panes()) === n && (await fitted()) && (await inside()), HUNG_MS)
-  const toggleProgress = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', { type: 'menu-command', command: 'progress.toggle', args: [] }))
+  const toggleProgress = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', { type: 'menu-command', command: 'progress.toggle', args: [] }))
   // At this width the toolbar folds the layouts into one button with a menu (#886).
   await page.locator('.layout-switch button.layout-menu').click()
   await page.getByRole('menuitem', { name: 'Two columns' }).click()
@@ -259,7 +259,7 @@ function sizes(home) {
   const share = () => page.evaluate(() => {
     const strip = document.querySelector('.tile-strip')
     const tab = strip?.closest('.tab-body')
-    return strip && tab ? { strip: Math.round(strip.getBoundingClientRect().width), tab: Math.round(tab.getBoundingClientRect().width), pane: Math.round(document.querySelector('.agents-area.tile-focus').getBoundingClientRect().width), min: window.__hiveTerminalMinWidth() } : null
+    return strip && tab ? { strip: Math.round(strip.getBoundingClientRect().width), tab: Math.round(tab.getBoundingClientRect().width), pane: Math.round(document.querySelector('.agents-area.tile-focus').getBoundingClientRect().width), min: window.__cwTerminalMinWidth() } : null
   })
   const shared = (w) => !!w && w.strip <= Math.min(made, Math.max(170, Math.floor(w.tab * 0.4))) + 1 && w.pane >= w.min - 1 && (w.strip <= 170 || w.pane >= w.min + 23)
   check('focus, 900 px: the strip at most 40% of the tab, the terminal wider than it', !!(await lib.until(async () => { const w = await share(); return shared(w) && w.pane > w.strip }, HUNG_MS)), JSON.stringify({ ...(await share()), made }))

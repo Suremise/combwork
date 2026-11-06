@@ -1,4 +1,4 @@
-// Which update Hive takes, and when it installs one (#1647, src/shared/updates.ts, src/main/buildIdentity.ts): versions
+// Which update Combwork takes, and when it installs one (#1647, src/shared/updates.ts, src/main/buildIdentity.ts): versions
 // by semver with prereleases, a local build offered (never given) a release of its own version, and a downloaded update
 // installed only over an older copy read from disk, never one that can't be read.
 import { mkdirSync, writeFileSync } from 'fs'
@@ -10,7 +10,7 @@ import { asarPackageVersion, installedCopy, runningIdentity } from '../src/main/
 // oxlint-disable-next-line typescript/no-require-imports -- the e2e suites' CommonJS helper, shared with them
 const { fakeInstall } = require('./e2e/fakeInstall.cjs') as { fakeInstall: (dir: string, o?: { version?: string; identity?: unknown }) => string }
 
-const base = tempDir('hive-updates-')
+const base = tempDir('cw-updates-')
 let n = 0
 const dir = () => join(base, `r${++n}`)
 const release = (version: string): BuildIdentity => ({ version, commit: null, local: false })
@@ -65,7 +65,7 @@ describe('the copy installed on disk (#1647)', () => {
     const src = dir()
     mkdirSync(join(src, 'out'), { recursive: true })
     writeFileSync(join(src, 'out', 'main.js'), 'x'.repeat(5000))
-    writeFileSync(join(src, 'package.json'), JSON.stringify({ name: 'hive', version: '1.0.0-rc.2' }))
+    writeFileSync(join(src, 'package.json'), JSON.stringify({ name: 'combwork', version: '1.0.0-rc.2' }))
     // oxlint-disable-next-line typescript/no-require-imports -- a dev-only dependency of electron-builder's
     const asar = require('@electron/asar') as { createPackage: (src: string, dest: string) => Promise<void> }
     const real = join(dir(), 'app.asar')

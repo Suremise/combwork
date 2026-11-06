@@ -8,7 +8,7 @@ import { encodeProjectPath } from './usage'
  * form of the path, the resolved one included, is inside the memory folder it computed, `<config dir>/projects/<key>/
  * memory/`; the protected-path check (`.claude`) comes first. A connection's home links `projects` to the CLI's own home
  * by a junction (HI-1755), so the resolved form of each memory file is outside that folder, under `~/.claude`, and every
- * memory write asks (read in 2.1.312). Hive names the same folder by its resolved path in the launch's settings
+ * memory write asks (read in 2.1.312). Combwork names the same folder by its resolved path in the launch's settings
  * (`autoMemoryDirectory`), so both forms are one path: nothing moves and nothing more is allowed.
  */
 
@@ -20,7 +20,7 @@ const GIT_MS = 5_000
 
 /**
  * Variables that give Claude Code its memory folder, or the folder's name, some other way (2.1.312; the last is
- * CLAUDE_CODE_PROJECT_DIR_NAME, a name in place of the one from Git): Hive then sets none.
+ * CLAUDE_CODE_PROJECT_DIR_NAME, a name in place of the one from Git): Combwork then sets none.
  */
 export const MEMORY_ENV_OVERRIDES = ['CLAUDE_COWORK_MEMORY_PATH_OVERRIDE', 'CLAUDE_CODE_REMOTE_MEMORY_DIR', 'CLAUDE_CODE_PROJECT_DIR_NAME'] as const
 

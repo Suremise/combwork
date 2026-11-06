@@ -22,7 +22,7 @@ interface Cell {
 const cells: Cell[] = []
 for (const platform of ['git', 'none'] as const)
   for (const review of ['none', 'agent', 'agentThenYou', 'you'] as ReviewBy[])
-    for (const finish of (platform === 'git' ? ['hiveMerges', 'agentMerges', 'committed', 'notChecked'] : ['accept']) as Finisher[])
+    for (const finish of (platform === 'git' ? ['combworkMerges', 'agentMerges', 'committed', 'notChecked'] : ['accept']) as Finisher[])
       for (const kind of ['code', 'no-code'] as const)
         for (const ok of ['never', 'every'] as const) cells.push({ platform, review, finish, folder: platform === 'git' && finish !== 'committed' ? 'slots' : 'project', kind, ok })
 
@@ -92,7 +92,7 @@ describe('what comes next on a card (#1530)', () => {
     }
     expect(e.wf.state(card).stage, `${name(c)}: ${steps.join(' → ')}`).toBe('done')
     expect(next).toEqual({ step: 'done' })
-    // An OK before every merge is asked whoever merges, Hive not checking it too (#1592): the user is a step.
+    // An OK before every merge is asked whoever merges, Combwork not checking it too (#1592): the user is a step.
     if (c.platform === 'git' && c.kind === 'code' && c.ok === 'every' && c.finish !== 'committed') expect(steps, `${name(c)}: ${steps.join(' → ')}`).toContain('user')
   })
 

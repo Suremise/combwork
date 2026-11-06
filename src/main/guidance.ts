@@ -1,23 +1,23 @@
 import { agentMsg, currentChain, say, type AgentMsg, type AgentValues } from '../shared/agentText'
 import { inDefaultDialect } from '../shared/agentText/asyncScope'
-import { assistantSkillsLine, controlRules, hiveInstructions, journalRule, sessionContract } from '../shared/hiveGuidance'
+import { assistantSkillsLine, controlRules, combworkInstructions, journalRule, sessionContract } from '../shared/combworkGuidance'
 import { taskPrompt } from '../shared/tasks'
 import type { SkillInfo } from '../shared/types'
 import { ContentTooLarge, hashText } from './fsutil'
 import { coalesced, revisionOf } from './revisions'
 import { clock as metricsClock, metricsHandle, recordSkills } from './metrics'
-import { hiveSkills } from './skills'
+import { combworkSkills } from './skills'
 import type { SkillDelivery } from './providers/types'
 import { utf8Bytes } from '../shared/metrics'
 import { currentWorkspace, inWorkspace, type WorkspaceService } from './workspace'
 
 /**
  * Where the guidance a session got came from, so a reviewer can tell what actually ran (an older build, an older
- * copy of a skill) without prompts, tokens or paths: a revision of Hive's own guidance text, and each Hive skill's.
+ * copy of a skill) without prompts, tokens or paths: a revision of Combwork's own guidance text, and each Combwork skill's.
  */
 
 /**
- * A hash of Hive's guidance text (the session contracts, the control rules, a card's prompt): changes when its wording
+ * A hash of Combwork's guidance text (the session contracts, the control rules, a card's prompt): changes when its wording
  * does. The Default's: a dialect's own revision is its chain's hash.
  */
 export const GUIDANCE_REVISION = inDefaultDialect(guidanceHash)
@@ -26,9 +26,9 @@ export const GUIDANCE_REVISION = inDefaultDialect(guidanceHash)
 function guidanceHash(): string {
   return hashText(
     [
-      hiveInstructions('{project}', 'agent'),
-      hiveInstructions('{project}', 'agent', false),
-      hiveInstructions('', 'assistant'),
+      combworkInstructions('{project}', 'agent'),
+      combworkInstructions('{project}', 'agent', false),
+      combworkInstructions('', 'assistant'),
       controlRules('look'),
       controlRules('agents'),
       controlRules('projects'),
@@ -44,7 +44,7 @@ function guidanceHash(): string {
 const chainRevisions = new Map<string, string>()
 
 /**
- * Hive's guidance revision as said in the current chain (dialects, HI-2443): a session's, in its launch record. The
+ * Combwork's guidance revision as said in the current chain (dialects, HI-2443): a session's, in its launch record. The
  * Default's (`GUIDANCE_REVISION`) where no chain is in force or it overrides none of the guidance's texts; otherwise the
  * hash of the guidance as that chain says it, so two launches on the same chain have the same revision.
  */
@@ -62,8 +62,8 @@ export function chainGuidanceRevision(): string {
 
 const S = {
   notDelivered: agentMsg({ id: 'contract.skill.notDelivered', text: 'it was not delivered', note: "Why a skill a launch asked for isn't as asked: its launch didn't deliver it (the launch record, the Agent API's status)." }),
-  nobody: agentMsg({ id: 'contract.skill.nobody', text: 'nobody gets it: {why}', note: "A Hive skill whose header can't be read or names an unknown audience (the Agent API's status). why: the problem." }),
-  tooBig: agentMsg({ id: 'contract.skill.tooBig', text: 'too big to check: {why}', note: "A Hive skill too big to hash (the Agent API's status). why: its size and the limit." })
+  nobody: agentMsg({ id: 'contract.skill.nobody', text: 'nobody gets it: {why}', note: "A Combwork skill whose header can't be read or names an unknown audience (the Agent API's status). why: the problem." }),
+  tooBig: agentMsg({ id: 'contract.skill.tooBig', text: 'too big to check: {why}', note: "A Combwork skill too big to hash (the Agent API's status). why: its size and the limit." })
 }
 
 /**
@@ -89,7 +89,7 @@ export function launchRecord(requested: Record<string, string>, delivered: Recor
   return Object.keys(problems).length ? { skills, problems, settled } : { skills, settled }
 }
 
-/** A Hive skill as the Agent API's status shows it. */
+/** A Combwork skill as the Agent API's status shows it. */
 export interface SkillRevision {
   name: string
   /** Who gets it; 'none' when its header can't be read (`problem` says why). */
@@ -97,7 +97,7 @@ export interface SkillRevision {
   /** Its content's hash (line endings ignored); empty when it couldn't be read (`problem` says why if it's too big). */
   revision: string
   problem?: string
-  /** For a skill that ships with Hive: whether this copy is Hive's ('same') or was edited ('changed'). */
+  /** For a skill that ships with Combwork: whether this copy is Combwork's ('same') or was edited ('changed'). */
   bundled?: 'same' | 'changed'
   updateAvailable?: true
 }
@@ -108,7 +108,7 @@ type ScannedRevision = Omit<SkillRevision, 'problem'> & { problems: [AgentMsg, A
 const scans = new WeakMap<WorkspaceService, { lifetime: AbortSignal; scan: () => Promise<ScannedRevision[]> }>()
 
 /**
- * The workspace's Hive skills with their revisions (the Agent API's status). Revisions are kept between calls
+ * The workspace's Combwork skills with their revisions (the Agent API's status). Revisions are kept between calls
  * (revisions.ts); callers asking at the same time share one scan, which holds no text: each caller says its problems in
  * its own dialect once the scan is done (HI-2433).
  */
@@ -144,7 +144,7 @@ function scannedRevisions(): Promise<ScannedRevision[]> {
 
 async function scanRevisions(): Promise<ScannedRevision[]> {
   const out: ScannedRevision[] = []
-  for (const s of await hiveSkills()) {
+  for (const s of await combworkSkills()) {
     const r: ScannedRevision = { name: s.name, audience: s.audience ?? 'agents', revision: '', problems: [] }
     // Nobody gets it (its header is broken or its audience unknown): its audience is none, and why.
     if (s.problem) {
@@ -165,7 +165,7 @@ async function scanRevisions(): Promise<ScannedRevision[]> {
 
 /**
  * The parts of what a launch tells a session, for the performance metrics (exact sizes): the core session contract
- * (hiveInstructions, the same for every session of a role), what Hive adds for the project (the rest of `guidance`: the
+ * (combworkInstructions, the same for every session of a role), what Combwork adds for the project (the rest of `guidance`: the
  * latest handover's pointer, and the Workspace notes note given as `notes`, #1433), and for the Assistant its role and
  * its mode (which ends its text). Text that doesn't start or end as expected is counted whole as core or role, never
  * split by guesswork.

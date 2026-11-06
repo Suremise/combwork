@@ -25,7 +25,7 @@ const { config } = await import('../src/main/config')
 const { connectionLoginChanged, forgetConnectionUsage, mergePlanUsage, nextWarning, planNotice, reportPlanUsage, usageLogin, warningKey } = await import('../src/main/planUsage')
 const { parseClaudePlanUsage } = await import('../src/main/providers/claude/adapter')
 const { rolloutPlanUsage } = await import('../src/main/providers/codex/rollout')
-const { onHiveEvent } = await import('../src/main/events')
+const { onCombworkEvent } = await import('../src/main/events')
 const { setNotifyHost } = await import('../src/main/notify')
 const { DEFAULT_SETTINGS } = await import('../src/shared/defaults')
 
@@ -71,7 +71,7 @@ describe('reportPlanUsage', () => {
 })
 
 // A warning is told once (HI-2320): a pop-up in the window you are using (kept in its bell), or a Windows notification
-// with Hive in the background (its bell row kept quietly), never both, never a second copy.
+// with Combwork in the background (its bell row kept quietly), never both, never a second copy.
 describe('a plan usage warning', () => {
   const g = globalThis as { __osSupported?: boolean; __osShown?: string[] }
   const seen: { type: string; toast?: { quiet?: boolean; title: string; kind?: string }; notice?: { title: string }; windows?: true }[] = []
@@ -83,7 +83,7 @@ describe('a plan usage warning', () => {
     g.__osShown = []
     seen.length = 0
     focused = false
-    off = onHiveEvent((e) => void seen.push(e as never))
+    off = onCombworkEvent((e) => void seen.push(e as never))
     vi.spyOn(config, 'update').mockImplementation((fn: (c: ReturnType<typeof config.get>) => void) => fn(config.get()))
     config.get().planWarnings = {}
     setNotifyHost({ focused: () => (focused ? { win: win as never, workspacePath: 'C:\\Work\\A', projectPath: 'C:\\Work\\A\\alpha' } : null), fallback: () => win as never, workspaceOf: () => null })
@@ -108,10 +108,10 @@ describe('a plan usage warning', () => {
     }
   }
 
-  it('Hive in the background: a Windows notification, its row kept in the bell, no pop-up', () => {
+  it('Combwork in the background: a Windows notification, its row kept in the bell, no pop-up', () => {
     expect(warn()).toEqual({ entries: 1, popups: 0, windows: 1, told: 1 })
   })
-  it('a Hive window focused: a pop-up in it, no Windows notification', () => {
+  it('a Combwork window focused: a pop-up in it, no Windows notification', () => {
     focused = true
     expect(warn()).toEqual({ entries: 1, popups: 1, windows: 0, told: 0 })
   })
@@ -137,14 +137,14 @@ describe('plan usage per connection (HI-1756)', () => {
   const MAX2 = { id: 'a-22222222', name: 'Max 2', login: usageLogin(TWO)! }
   const events: { type: string; provider?: string; connection?: string; toast?: { title: string } }[] = []
   let off: () => void
-  /** The connections Hive keeps, each accepted as (and now signed in as) its login. */
+  /** The connections Combwork keeps, each accepted as (and now signed in as) its login. */
   const signedIn = (id: string, who: { email: string; orgId: string }, observed: { email: string; orgId: string } = who) => {
     const all = (config.get().accounts ?? []).filter((c) => c.id !== id)
     config.get().accounts = [...all, { id, provider: 'claude-code', name: id, createdAt: '2026-10-27T00:00:00Z', accepted: who, observed: { at: '2026-10-27T00:00:00Z', loggedIn: true, ...observed } }]
   }
   beforeEach(() => {
     events.length = 0
-    off = onHiveEvent((e) => void events.push(e as never))
+    off = onCombworkEvent((e) => void events.push(e as never))
     // A window owns the warnings (HI-2320: told once, to one window), whose events the listeners hear.
     setNotifyHost({ focused: () => null, fallback: () => ({ isDestroyed: () => false, webContents: { id: 8, send: () => undefined } }) as never, workspaceOf: () => null })
     vi.spyOn(config, 'update').mockImplementation((fn: (c: ReturnType<typeof config.get>) => void) => fn(config.get()))
@@ -274,14 +274,14 @@ describe('plan usage per connection (HI-1756)', () => {
 
 // #383: what the CLIs really send (tests/fixtures/planusage-2026-10-19.json, recorded through the developer console):
 // each session relays the reading of its own latest API call, so reports come out of order, and a resumed Codex
-// session reports the last reading in its rollout, however old. Hive keeps the truth: usage never goes down within a
+// session reports the last reading in its rollout, however old. Combwork keeps the truth: usage never goes down within a
 // reset period.
-describe('the plan usage Hive keeps from its sessions (#383)', () => {
+describe('the plan usage Combwork keeps from its sessions (#383)', () => {
   const recorded = JSON.parse(readFileSync(join(__dirname, 'fixtures', 'planusage-2026-10-19.json'), 'utf8'))
   const statusLines: { at: string; agent: string; rate_limits: Record<string, { used_percentage: number; resets_at: number }> | null }[] = recorded.claude.statusLines
   const reading = statusLines.find((s) => s.rate_limits)!
   const at = Date.parse(reading.at)
-  /** A Claude Code status line as recorded, with the weekly figure changed, parsed as Hive does. */
+  /** A Claude Code status line as recorded, with the weekly figure changed, parsed as Combwork does. */
   const claude = (weekly: number, when = at, resets = reading.rate_limits!.seven_day.resets_at) =>
     parseClaudePlanUsage({ rate_limits: { ...reading.rate_limits, seven_day: { used_percentage: weekly, resets_at: resets } } }, new Date(when))!
   const weekly = (u: { limits: { id: string; usedPercent: number }[] }) => u.limits.find((l) => l.id === 'seven_day')?.usedPercent
@@ -359,7 +359,7 @@ describe('the plan usage Hive keeps from its sessions (#383)', () => {
 
   it('tells the windows of a raw change across a warning threshold, though it rounds the same (round 4, finding 1)', () => {
     const told: number[] = []
-    const off = onHiveEvent((e) => {
+    const off = onCombworkEvent((e) => {
       if (e.type === 'plan-usage') told.push((e as { usage: { limits: { id: string; usedPercent: number }[] } }).usage.limits.find((l) => l.id === 'seven_day')!.usedPercent)
     })
     const update = vi.spyOn(config, 'update').mockImplementation((fn: (c: ReturnType<typeof config.get>) => void) => fn(config.get()))

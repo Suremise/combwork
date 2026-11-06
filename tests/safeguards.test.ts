@@ -13,7 +13,7 @@ const lines = (...o: unknown[]): string => o.map((x) => JSON.stringify(x)).join(
 const at = (iso: string): number => Date.parse(iso)
 /** Runs `fn` with Settings → Advanced's store in a folder of its own, its overrides removed after. */
 async function withAdvanced(fn: () => Promise<void>): Promise<void> {
-  advanced.load(tempDir('hive-safeguards-advanced-'))
+  advanced.load(tempDir('cw-safeguards-advanced-'))
   try {
     await fn()
   } finally {
@@ -301,7 +301,7 @@ describe('usage', () => {
     const { parseTranscript } = await import('../src/main/providers/claude/usage')
     const prompt = (ts: string, uuid: string, text: string): object => ({ type: 'user', timestamp: ts, uuid, message: { role: 'user', content: text } })
     // Turn p1: the prompt seen on screen (no entry), then its record when answered "Switch automatically". Turn p2 began
-    // before Hive read either (the next prompt), and turn p3 had a stop its screen showed and nothing recorded (HB3's).
+    // before Combwork read either (the next prompt), and turn p3 had a stop its screen showed and nothing recorded (HB3's).
     const text = lines(prompt(T0, 'p1', 'fix it'), assistant(T0, 'claude-opus-5-5', [toolUse('Bash')]), fallback(T1, 'req_1', 'session'), assistant(T1, 'claude-opus-4-8', []), prompt(T2, 'p2', 'carry on'), assistant(T2, 'claude-opus-4-8', []), prompt(T3, 'p3', 'and this'))
     const usage = parseTranscript(text, 's1')
     expect([usage.safeguards, usage.safeguardsAsked]).toEqual([{ 'claude-opus-5-5': 1 }, { p1: 1 }])
@@ -358,7 +358,7 @@ describe('usage', () => {
       ['a tagged text block', [{ type: 'text', text: '<task>Continue with this task</task>' }]],
       ['images alone', [image]],
       ['a command', '<command-name>/review</command-name>\n<command-args></command-args>'],
-      ["Hive's typed line", '[CW] #12 is in Review: HR5 failed it']
+      ["Combwork's typed line", '[CW] #12 is in Review: HR5 failed it']
     ]
     for (const [what, content] of prompts) {
       // Turn p1: a stop Claude Code recorded by itself (no prompt shown). Turn p2: the person's next prompt, then a stop
@@ -419,7 +419,7 @@ describe("Claude Code's prompt about a stop, told by its screen", () => {
 
   it('is never told by the words alone: task text, an old stop note, another dialog naming no tool, or an answered prompt', () => {
     // The agent's own work about safeguards, over another prompt naming no tool (the folder trust question).
-    const trust = ['Working on safeguards notices for Hive.', 'A safety classifier stopped a response: see #606.', 'Do you trust the files in this folder?', '❯ 1. Yes', '  2. No']
+    const trust = ['Working on safeguards notices for Combwork.', 'A safety classifier stopped a response: see #606.', 'Do you trust the files in this folder?', '❯ 1. Yes', '  2. No']
     expect(claudeCode.safeguardAsk!(generic, screen(...trust))).toBe(false)
     // An earlier stop's note still on screen, under an ordinary question.
     const old = ["  ⎿  Opus 5.5's safeguards stopped the response above · continuing once with that noted", '', 'Which branch should I use?', '❯ 1. main', '  2. dev']

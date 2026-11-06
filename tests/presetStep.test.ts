@@ -10,7 +10,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { as09 } from './boardDb'
 
-const base = tempDir('hive-presetstep-')
+const base = tempDir('cw-presetstep-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 

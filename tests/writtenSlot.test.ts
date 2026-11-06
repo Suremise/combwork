@@ -54,7 +54,7 @@ async function setup(name: string, builders = ['b1', 'b2']) {
   write(projectId)
   await ws.refresh()
   const store = new SlotStore(fileSlotConn(boardFile(wsPath)), projectId)
-  // B1's run: live (this Hive's), in a turn until the test ends it; every stop and quit recorded, never done.
+  // B1's run: live (this Combwork's), in a turn until the test ends it; every stop and quit recorded, never done.
   const RUN = 'run-b1'
   let busy = true
   const stops: string[] = []
@@ -187,7 +187,7 @@ describe("B1's next start takes over the slot its own run still writes in (HI-17
     expect(r && 'lease' in r ? r.lease : r).toBe(pre.lease.id)
     expect(slotOf().target).toBe('1.0.0')
     // Its card's line from 1.0.0, then the lane's lease released: the pool's settle detaches it at 1.0.0's head.
-    sh(pre.slot.folder, 'switch', '-q', '-c', 'hive/AM-1-lane-card', '1.0.0')
+    sh(pre.slot.folder, 'switch', '-q', '-c', 'cw/AM-1-lane-card', '1.0.0')
     commit(pre.slot.folder, { 'work.txt': 'work\n' }, 'work')
     running.delete('lane-w')
     expect(await t.pool.release(pre.lease.id, 'laneEnded')).toBe(true)
@@ -228,7 +228,7 @@ describe("B1's next start takes over the slot its own run still writes in (HI-17
     expect(await t.lane('lane-next')).toEqual({ slot: b1.slot })
   })
 
-  it("another agent's writer is not B1's: B1 is lent another slot; B1's own run held by another Hive: it waits, never a second slot", async () => {
+  it("another agent's writer is not B1's: B1 is lent another slot; B1's own run held by another Combwork: it waits, never a second slot", async () => {
     const t = await setup('other')
     const first = await t.lane('lane-old')
     if (!('slot' in first)) throw new Error(JSON.stringify(first))
@@ -239,7 +239,7 @@ describe("B1's next start takes over the slot its own run still writes in (HI-17
     const next = await t.lane('lane-next')
     expect('slot' in next && next.slot).not.toBe(first.slot)
 
-    const u = await setup('otherhive')
+    const u = await setup('second')
     const a = await u.lane('lane-old')
     if (!('slot' in a)) throw new Error(JSON.stringify(a))
     const l = u.leases('b1')[0]

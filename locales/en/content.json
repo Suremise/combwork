@@ -12,8 +12,8 @@
     "description": "An error adding an MCP server from a file: its definition's \"cwd\" field (keep it as it is) isn't text."
   },
   "content.mcp.badName": {
-    "defaultMessage": "Server names may contain letters, numbers, \"-\" and \"_\" (max 64 characters). \"combwork\" and \"hive\" are reserved.",
-    "description": "An error adding an MCP server: its name has a character a server name can't have, is too long, or is combwork or hive (Combwork's own server and its name before HI-2463: keep them)."
+    "defaultMessage": "Server names may contain letters, numbers, \"-\" and \"_\" (max 64 characters). \"combwork\" is reserved.",
+    "description": "An error adding an MCP server: its name has a character a server name can't have, is too long, or is combwork (Combwork's own server: keep it as it is)."
   },
   "content.mcp.badRecord": {
     "defaultMessage": "\"{field}\" must be an object of strings.",
@@ -25,7 +25,7 @@
   },
   "content.mcp.changedAdd": {
     "defaultMessage": "{name} has changed since it was shown to you. Check what it runs and add it again.",
-    "description": "An error adding an MCP server to a project or the Hive Assistant: its definition ({name} is the server) changed after Hive showed what it runs, so it is not added until checked again."
+    "description": "An error adding an MCP server to a project or the Combwork Assistant: its definition ({name} is the server) changed after Combwork showed what it runs, so it is not added until checked again."
   },
   "content.mcp.chooseFile": {
     "defaultMessage": "Choose a .json definition or a .zip of a server folder.",
@@ -105,7 +105,7 @@
   },
   "content.mcp.zipNoDefinition": {
     "defaultMessage": "No {files} found. A server .zip has its definition at its top level, or inside one folder.",
-    "description": "An error adding an MCP server from a .zip without a definition where Hive looks. {files} are the file names it looks for, joined with \"or\"."
+    "description": "An error adding an MCP server from a .zip without a definition where Combwork looks. {files} are the file names it looks for, joined with \"or\"."
   },
   "content.mcp.zipTooMany": {
     "defaultMessage": "The .zip has too many files for an MCP server (over {max, number}).",
@@ -121,27 +121,27 @@
   },
   "content.mode.badName": {
     "defaultMessage": "Give the mode a name with letters or numbers.",
-    "description": "An error making a new mode for the Hive Assistant: its name has no letters or numbers to name its file after."
+    "description": "An error making a new mode for the Combwork Assistant: its name has no letters or numbers to name its file after."
   },
   "content.mode.exists": {
     "defaultMessage": "There is already a mode called \"{mode}\".",
-    "description": "An error making a new mode for the Hive Assistant: the workspace already has one called {mode}."
+    "description": "An error making a new mode for the Combwork Assistant: the workspace already has one called {mode}."
   },
   "content.mode.invalid": {
     "defaultMessage": "Invalid mode",
-    "description": "An error deleting a mode of the Hive Assistant: its id isn't one Hive could have made."
+    "description": "An error deleting a mode of the Combwork Assistant: its id isn't one Combwork could have made."
   },
   "content.mode.noAssistant": {
     "defaultMessage": "The Assistant has no settings in this workspace.",
-    "description": "An error switching the Hive Assistant's mode: the workspace's Assistant settings are missing."
+    "description": "An error switching the Combwork Assistant's mode: the workspace's Assistant settings are missing."
   },
   "content.mode.notBundled": {
     "defaultMessage": "\"{mode}\" isn't one of Combwork's modes.",
-    "description": "An error restoring a mode Hive ships: Hive ships no mode called {mode}."
+    "description": "An error restoring a mode Combwork ships: Combwork ships no mode called {mode}."
   },
   "content.mode.unknown": {
     "defaultMessage": "There is no mode \"{mode}\" in this workspace.",
-    "description": "An error switching the Hive Assistant's mode: the workspace has no mode (a file in .combwork/modes) called {mode}."
+    "description": "An error switching the Combwork Assistant's mode: the workspace has no mode (a file in .combwork/modes) called {mode}."
   },
   "content.notes.badName": {
     "defaultMessage": "Invalid name",
@@ -177,7 +177,7 @@
   },
   "content.skill.audience": {
     "defaultMessage": "{kind, select, text {its audience is \"{audience}\", not agents, assistant or all} empty {its audience is empty, not agents, assistant or all} list {its audience is a list, not agents, assistant or all} other {its audience is a {type}, not agents, assistant or all}}",
-    "description": "Why nobody gets a Hive skill: its header's metadata.audience isn't agents, assistant or all (keep those three words, which the header must say). {kind} is what it is instead: text ({audience} is the text), empty, a list, or another YAML value ({type}: number, boolean or object, as YAML names them). It starts in lower case (it follows a colon)."
+    "description": "Why nobody gets a Combwork skill: its header's metadata.audience isn't agents, assistant or all (keep those three words, which the header must say). {kind} is what it is instead: text ({audience} is the text), empty, a list, or another YAML value ({type}: number, boolean or object, as YAML names them). It starts in lower case (it follows a colon)."
   },
   "content.skill.badName": {
     "defaultMessage": "Skill names may contain letters, numbers, \"-\" and \"_\" (max 64 characters).",
@@ -185,11 +185,11 @@
   },
   "content.skill.cantCopyName": {
     "defaultMessage": "\"{name}\" can't be a Combwork skill name: use letters, numbers, \"-\" and \"_\" (rename the folder first).",
-    "description": "An error copying a skill into the workspace: its folder's name {name} can't be a Hive skill's name."
+    "description": "An error copying a skill into the workspace: its folder's name {name} can't be a Combwork skill's name."
   },
   "content.skill.cantDelete": {
     "defaultMessage": "Only Combwork skills and a project's local skills can be deleted in Combwork.",
-    "description": "An error deleting a skill Hive doesn't manage (a CLI's own, from the user's profile or a plugin)."
+    "description": "An error deleting a skill Combwork doesn't manage (a CLI's own, from the user's profile or a plugin)."
   },
   "content.skill.chooseFile": {
     "defaultMessage": "Choose a .md file or a .zip.",
@@ -209,11 +209,11 @@
   },
   "content.skill.isCopy": {
     "defaultMessage": "That's Combwork's own copy of a workspace skill; delete the skill in the workspace instead.",
-    "description": "An error deleting a skill in a project's folder that is Hive's copy of a workspace skill (Hive puts it there for a coding agent)."
+    "description": "An error deleting a skill in a project's folder that is Combwork's copy of a workspace skill (Combwork puts it there for a coding agent)."
   },
   "content.skill.metadata": {
     "defaultMessage": "its metadata isn't a set of fields (`metadata:`, then `audience: …` indented under it)",
-    "description": "Why nobody gets a Hive skill: the metadata field of its SKILL.md header isn't a set of fields. Keep what is between backticks (`metadata:`, `audience: …`) as it is, backticks included: they mark YAML. It starts in lower case (it follows a colon)."
+    "description": "Why nobody gets a Combwork skill: the metadata field of its SKILL.md header isn't a set of fields. Keep what is between backticks (`metadata:`, `audience: …`) as it is, backticks included: they mark YAML. It starts in lower case (it follows a colon)."
   },
   "content.skill.noLocalFolder": {
     "defaultMessage": "{cli} has no project skills folder.",
@@ -225,23 +225,23 @@
   },
   "content.skill.notBundled": {
     "defaultMessage": "\"{name}\" isn't one of Combwork's bundled skills.",
-    "description": "An error restoring a skill Hive ships: Hive ships no skill called {name}."
+    "description": "An error restoring a skill Combwork ships: Combwork ships no skill called {name}."
   },
   "content.skill.notClosed": {
     "defaultMessage": "its header isn't closed (no line with --- after it)",
-    "description": "Why nobody gets a Hive skill: its SKILL.md header (front matter) starts with a --- line but no --- line ends it. Keep ---. It starts in lower case (it follows a colon)."
+    "description": "Why nobody gets a Combwork skill: its SKILL.md header (front matter) starts with a --- line but no --- line ends it. Keep ---. It starts in lower case (it follows a colon)."
   },
   "content.skill.notClosedWithin": {
     "defaultMessage": "its header isn't closed within its first {kb} KB",
-    "description": "Why nobody gets a Hive skill: its SKILL.md header (front matter, between --- lines) doesn't end within its first {kb} KB. It follows \"Nobody gets this skill until its header is fixed:\", so it starts in lower case."
+    "description": "Why nobody gets a Combwork skill: its SKILL.md header (front matter, between --- lines) doesn't end within its first {kb} KB. It follows \"Nobody gets this skill until its header is fixed:\", so it starts in lower case."
   },
   "content.skill.notFields": {
     "defaultMessage": "its header isn't a list of fields (`name: …`, `description: …`)",
-    "description": "Why nobody gets a Hive skill: its SKILL.md header is YAML but not a set of fields. Keep what is between backticks (`name: …`, `description: …`) as it is, backticks included: they mark YAML. It starts in lower case (it follows a colon)."
+    "description": "Why nobody gets a Combwork skill: its SKILL.md header is YAML but not a set of fields. Keep what is between backticks (`name: …`, `description: …`) as it is, backticks included: they mark YAML. It starts in lower case (it follows a colon)."
   },
   "content.skill.notListed": {
     "defaultMessage": "That folder isn't a skill Combwork lists.",
-    "description": "An error listing a skill's files for its page: the folder asked for isn't one of the skills Hive shows (the workspace's skills or a project's)."
+    "description": "An error listing a skill's files for its page: the folder asked for isn't one of the skills Combwork shows (the workspace's skills or a project's)."
   },
   "content.skill.notSkill": {
     "defaultMessage": "Not a skill folder (no SKILL.md)",
@@ -249,15 +249,15 @@
   },
   "content.skill.yaml": {
     "defaultMessage": "its header isn't valid YAML ({reason})",
-    "description": "Why nobody gets a Hive skill: its SKILL.md header can't be read as YAML. {reason} is the YAML reader's own words (English). It starts in lower case (it follows a colon)."
+    "description": "Why nobody gets a Combwork skill: its SKILL.md header can't be read as YAML. {reason} is the YAML reader's own words (English). It starts in lower case (it follows a colon)."
   },
   "content.skill.yamlAt": {
     "defaultMessage": "its header isn't valid YAML (line {line}: {reason})",
-    "description": "Why nobody gets a Hive skill: its SKILL.md header can't be read as YAML. {line} is the line of the file, {reason} the YAML reader's own words (English). It starts in lower case (it follows a colon)."
+    "description": "Why nobody gets a Combwork skill: its SKILL.md header can't be read as YAML. {line} is the line of the file, {reason} the YAML reader's own words (English). It starts in lower case (it follows a colon)."
   },
   "content.skill.zipNoSkill": {
     "defaultMessage": "No SKILL.md found. A skill .zip has SKILL.md at its top level, or inside one folder.",
-    "description": "An error adding a skill from a .zip that has no SKILL.md where Hive looks. Keep SKILL.md as it is: it is a file name."
+    "description": "An error adding a skill from a .zip that has no SKILL.md where Combwork looks. Keep SKILL.md as it is: it is a file name."
   },
   "content.skill.zipTooLarge": {
     "defaultMessage": "The .zip is too large for a skill (over {mb} MB unpacked).",
@@ -303,6 +303,10 @@
     "defaultMessage": "Combwork couldn't check {agent}'s worktree ({folder}): {error}",
     "description": "Why a template can't be loaded: git couldn't tell whether the worktree {folder} of the agent {agent} it would remove has uncommitted work; {error} is why (often git's own words)."
   },
+  "content.templates.combworkOnly": {
+    "defaultMessage": "Combwork's own templates can't be changed: duplicate one into the workspace or a project to change it.",
+    "description": "An error: saving, renaming, editing, importing into or deleting one of Combwork's own templates (the Combwork scope, read-only). Duplicate is a button: as Combwork names it."
+  },
   "content.templates.connectionAmbiguous": {
     "defaultMessage": "Several connections are called \"{ref}\": name one by its id ({ids}).",
     "description": "An error loading a template or choosing connections (HI-2109): the name given ({ref}) is several connections' names; {ids} lists their ids."
@@ -335,9 +339,9 @@
     "defaultMessage": "That template is no longer there.",
     "description": "An error: the template was deleted or renamed meanwhile."
   },
-  "content.templates.hiveOnly": {
-    "defaultMessage": "Combwork's own templates can't be changed: duplicate one into the workspace or a project to change it.",
-    "description": "An error: saving, renaming, editing, importing into or deleting one of Hive's own templates (the Hive scope, read-only). Duplicate is a button: as Hive names it."
+  "content.templates.importFrom10": {
+    "defaultMessage": "It is an agent template exported from version 1.0, whose workflow settings Combwork doesn't import. Make the template again in Combwork.",
+    "description": "An error importing a template (HI-2611): the file was exported by version 1.0, from before the app was renamed Combwork, and holds workflow settings under their old names."
   },
   "content.templates.importNotJson": {
     "defaultMessage": "It isn't a Combwork agent template (not JSON).",
@@ -401,15 +405,15 @@
   },
   "content.templates.restoring": {
     "defaultMessage": "Undo is putting this project's agents back as they were before a template was loaded",
-    "description": "Why an agent can't start (followed by \", so its agents can't start now.\"): the Hive Assistant's undo is putting back the agents a template's load replaced (HI-1502). A sentence without its full stop."
+    "description": "Why an agent can't start (followed by \", so its agents can't start now.\"): the Combwork Assistant's undo is putting back the agents a template's load replaced (HI-1502). A sentence without its full stop."
   },
   "content.templates.running": {
     "defaultMessage": "{agent} is running or starting: stop it first.",
     "description": "Why a template can't be loaded: the agent {agent} it would replace is running."
   },
   "content.templates.scope": {
-    "defaultMessage": "Unknown scope \"{scope}\": hive, workspace or project.",
-    "description": "An error: where a template is kept must be hive, workspace or project (keep those three words: they are the values to use)."
+    "defaultMessage": "Unknown scope \"{scope}\": combwork, workspace or project.",
+    "description": "An error: where a template is kept must be combwork, workspace or project (keep those three words: they are the values to use)."
   },
   "content.templates.started": {
     "defaultMessage": "An agent started meanwhile: nothing was changed. Stop it first.",

@@ -1,11 +1,11 @@
-// What an agent left running stays listed across Hive's restart (#614). The fake Claude Code's "devapp" leaves a dev
-// copy of an Electron app running, as an agent's dev launch of Hive or a suite's Playwright copy that was never closed
+// What an agent left running stays listed across Combwork's restart (#614). The fake Claude Code's "devapp" leaves a dev
+// copy of an Electron app running, as an agent's dev launch of Combwork or a suite's Playwright copy that was never closed
 // did (Electron's own executable with --inspect=0 --remote-debugging-port=0 and the app's folder, started through a
-// detached node that has exited by then), and "linger 1" a node. Hive lists them as the agent stops, then closes without
+// detached node that has exited by then), and "linger 1" a node. Combwork lists them as the agent stops, then closes without
 // asking (a quiet test copy, as a quit to install an update does): they keep running, and the next start lists them
 // again, each checked to be the same process (its id and start time), and offers to end them; End Them ends them. A kept
 // record whose pid names another process by then (a stranger's, with another start time) isn't listed, and the stranger
-// is never ended. And a test Hive's own command line names its profile (lib.cjs), so the runner stops one whose suite
+// is never ended. And a test Combwork's own command line names its profile (lib.cjs), so the runner stops one whose suite
 // died before closing it (HB1's, 10 Oct). Fake Claude Code; dev build, throwaway profile and workspace, quiet.
 const lib = require('./lib.cjs')
 const { namesFolder, processes } = require('./folderProcesses.cjs')
@@ -47,12 +47,12 @@ const readKept = () => (fs.existsSync(kept) ? JSON.parse(fs.readFileSync(kept, '
 
   let app = null
   try {
-    const first = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: lib.port(47870) } })
+    const first = await lib.launch({ userData, env: { ...env, CW_API_PORT: lib.port(47870) } })
     app = first.app
     const { page, inv } = first
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)
-    // A test Hive's own command line names its profile (lib.cjs): a suite killed before closing it can't leave it
+    // A test Combwork's own command line names its profile (lib.cjs): a suite killed before closing it can't leave it
     // running unseen, as HB1's run did, since the runner stops what names the suite's folder once it ends.
     const own = processes().find((p) => p.pid === app.process().pid)
     check("the test copy's own command line names its profile, in the suite's folder", !!own && namesFolder(own.commandLine, userData) && namesFolder(own.commandLine, base), own?.commandLine)
@@ -86,19 +86,19 @@ const readKept = () => (fs.existsSync(kept) ? JSON.parse(fs.readFileSync(kept, '
       const a = k?.launches?.find((x) => x.agentId === agent.id)
       return a && all.every((pid) => a.processes.some((p) => p.pid === pid && /^\d+$/.test(p.created))) && k
     }, 10000)
-    check("Hive keeps the list in its profile, each process with its start time", !!saved, JSON.stringify(readKept()))
+    check("Combwork keeps the list in its profile, each process with its start time", !!saved, JSON.stringify(readKept()))
 
     // Closed without asking (a quiet test copy, as a quit to install an update): left running, still listed.
     await app.close()
     app = null
-    check('closing Hive without asking leaves them running', lib.processRunning(dev) && lib.processRunning(node))
+    check('closing Combwork without asking leaves them running', lib.processRunning(dev) && lib.processRunning(node))
     const k = readKept()
     check('and keeps them listed for the next start', !!k?.launches?.some((a) => a.agentId === agent.id && a.processes.some((p) => p.pid === dev)), JSON.stringify(k))
     // A kept record whose pid names another process now: the stranger's, with another start time.
     k.launches[0].processes.push({ pid: stranger.pid, name: 'node.exe', label: 'node old-server.js', created: '116444736000000000' })
     fs.writeFileSync(kept, JSON.stringify(k, null, 2))
 
-    const second = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: lib.port(47870) } })
+    const second = await lib.launch({ userData, env: { ...env, CW_API_PORT: lib.port(47870) } })
     app = second.app
     second.page.on('pageerror', (e) => check('no page errors (after the restart)', false, e.message))
     await lib.openWorkspace(second.inv, second.page, ws)

@@ -1,6 +1,6 @@
 // sessions.quit (HI-1706): a lane's builder ended as a person ends its CLI, typing its exit command (Claude Code's /exit,
 // Codex's /quit) and Enter, then killed only if it is still running after the grace. Never typed over the user's draft
-// or while they type, nor over a line of Hive's not taken; fenced to that run and the caller's lease before each key
+// or while they type, nor over a line of Combwork's not taken; fenced to that run and the caller's lease before each key
 // and before the kill; Stop and restarts don't use it.
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -10,7 +10,7 @@ import { tempDir } from './tempDir'
 
 const writes: { key: string; data: string }[] = []
 const kills: string[] = []
-/** Called at each write (a test's input or turn arriving while Hive types). */
+/** Called at each write (a test's input or turn arriving while Combwork types). */
 let onWrite: ((key: string, data: string) => void) | null = null
 vi.mock('../src/main/ptyHost', async (orig) => ({
   ...(await orig<typeof import('../src/main/ptyHost')>()),
@@ -21,7 +21,7 @@ vi.mock('../src/main/ptyHost', async (orig) => ({
   killPty: (key: string) => void kills.push(key)
 }))
 
-const base = tempDir('hive-quit-')
+const base = tempDir('cw-quit-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 const { sessions } = await import('../src/main/sessions')
 const { advanced } = await import('../src/main/advanced')
@@ -39,7 +39,7 @@ let n = 0
 function live(adapter: unknown = claudeCode) {
   const agentId = `b${++n}`
   const state = { provider: 'claude-code', runId: `run-${n}`, projectPath: P, agentId, agentName: `B${n}`, cwd: P, status: 'ready', startedAt: new Date().toISOString() }
-  // Its input box (claudeInputStandIn, fed what is typed into this agent: HI-1979, Hive types into it only once a key
+  // Its input box (claudeInputStandIn, fed what is typed into this agent: HI-1979, Combwork types into it only once a key
   // of its own shows it empty), bracketed paste off.
   const input = claudeInput({ paste: false })
   input.from(() => writes.filter((w) => w.key === `session:${P.toLowerCase()}#${agentId}`).map((w) => w.data))
@@ -140,7 +140,7 @@ describe("a lane's builder ended by its CLI's own exit", () => {
     try {
       const a = live()
       expect(sessions.userMayBeTyping(P, a.agentId)).toBe(false)
-      // At Hive's first write, the user begins a sentence of their own there.
+      // At Combwork's first write, the user begins a sentence of their own there.
       onWrite = (key) => {
         if (key !== a.key) return
         onWrite = null

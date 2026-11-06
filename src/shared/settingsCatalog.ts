@@ -1,6 +1,6 @@
 /**
- * Hive's settings catalog (#186): every setting described once, for Settings and Project Settings (which render these
- * rows) and for the Hive Assistant's tools (cw_list_settings, cw_read_setting, cw_update_setting), so what the
+ * Combwork's settings catalog (#186): every setting described once, for Settings and Project Settings (which render these
+ * rows) and for the Combwork Assistant's tools (cw_list_settings, cw_read_setting, cw_update_setting), so what the
  * user reads and what the Assistant explains never drift apart. Each entry says where the setting is, what it does,
  * when it helps, the values it takes and its default, whether it needs a restart, and whether the Assistant may change
  * it: sensitive settings (permission modes, the Agent API, what runs, the Assistant's own Control) are read-only to it.
@@ -32,9 +32,9 @@ import { LANGUAGE_TEXT } from './i18n/languageText'
 import { LANGUAGES, SOURCE_LANGUAGE } from './i18n/languages'
 import { PROVIDERS, dangerModes, defaultProviderSettings, permissionLabel, providerDescriptor, providerSettings, type ModeOption, type ProviderDescriptor } from './providers'
 import { LEGACY_CONSUMED, ownOrLegacy } from './workflow/preferences'
-import { EMPTY_HIVE, EMPTY_WORKSPACE, resolvePoint } from './commands'
+import { EMPTY_CW, EMPTY_WORKSPACE, resolvePoint } from './commands'
 
-/** Where a setting lives: Hive's own (Settings), a provider's page in Settings, the open workspace, or one project (Project Settings). */
+/** Where a setting lives: Combwork's own (Settings), a provider's page in Settings, the open workspace, or one project (Project Settings). */
 export type SettingScope = 'app' | 'provider' | 'workspace' | 'project'
 
 /** The control Settings shows for it; custom ones are drawn by the view (by id). */
@@ -86,9 +86,9 @@ interface Row {
   advanced?: { id: string; scope: 'app' | 'workspace' }
   /** A workflow option of the project's (#1278): project.json's `workflow.options[<this>]`, checked with the others in main. */
   workflow?: OptionKey
-  /** A workflow option's default at a level (#1422): Hive's (`global`) or the workspace's, for a platform. */
+  /** A workflow option's default at a level (#1422): Combwork's (`global`) or the workspace's, for a platform. */
   workflowLevel?: { level: WorkflowLevel; platform: PlatformId }
-  /** A slot default (HI-1765): the copied files at Hive's level, the workspace's, or the project's own (`slots.copy`). */
+  /** A slot default (HI-1765): the copied files at Combwork's level, the workspace's, or the project's own (`slots.copy`). */
   slotLevel?: WorkflowLevel | 'project'
 }
 
@@ -99,7 +99,7 @@ function modeLabel(m: Pick<ModeOption, 'label' | 'text'>): TextPart {
 
 /** Advanced's values (#367) as catalog rows, drawn by Settings → Advanced's list: one each, and a workspace's own where it takes one. */
 function advancedRows(): Row[] {
-  // One of Hive's settings (Show developer features) keeps its own entry, under its settings key.
+  // One of Combwork's settings (Show developer features) keeps its own entry, under its settings key.
   return ADVANCED_DEFS.filter((d) => !d.setting).flatMap((d): Row[] => {
     const title = withValues(msg({ id: 'settings.advancedRow.title', defaultMessage: '{group}: {title}', description: "An advanced setting's title where it is named alone: {group} is Combwork or the CLI it belongs to, {title} the setting's own title." }), { group: groupName(d.group), title: d.text.title })
     const tip = withValues(
@@ -107,7 +107,7 @@ function advancedRows(): Row[] {
         id: 'settings.advancedRow.tip',
         defaultMessage:
           "{takes} null (or Reset) goes back to Combwork's default.{cli, select, yes { It is {group}'s: an override records the version it was made for, and is flagged when another version is installed.{tried, select, yes { Combwork tries it on what the CLI was recorded sending, and says when it doesn't find that.} other {}}} other {}}",
-        description: "More on an advanced setting: {takes} says what it takes; null is the value that resets it (keep it). {cli} is yes for a CLI's value, {group} that CLI's name; {tried} is yes when Hive tries the value on what the CLI sent."
+        description: "More on an advanced setting: {takes} says what it takes; null is the value that resets it (keep it). {cli} is yes for a CLI's value, {group} that CLI's name; {tried} is yes when Combwork tries the value on what the CLI sent."
       }),
       { takes: advancedTakesText(d), cli: cliFacing(d) ? 'yes' : 'no', group: groupName(d.group), tried: d.kind === 'number' || d.kind === 'list' ? 'no' : 'yes' }
     )
@@ -135,7 +135,7 @@ export interface SettingOption {
 }
 
 export interface SettingEntry extends Omit<Row, 'title' | 'desc' | 'tip' | 'options' | 'off' | 'confirmOn'> {
-  /** Stable: "<section>.<key>" for Hive's settings, "<provider>.<key>" for a provider's page, "project.<key>" (and "project.<provider>.<key>") for a project's. */
+  /** Stable: "<section>.<key>" for Combwork's settings, "<provider>.<key>" for a provider's page, "project.<key>" (and "project.<provider>.<key>") for a project's. */
   id: string
   scope: SettingScope
   /** Its title, description and tip in English: the Assistant's tools, and searching in English. `text` has them as Settings shows them. */
@@ -155,15 +155,15 @@ export interface SettingEntry extends Omit<Row, 'title' | 'desc' | 'tip' | 'opti
   action?: boolean
   /** What the tools take for a custom control (a model is any text); without it, a custom setting is read-only to them. */
   value?: 'text' | 'boolean' | 'select' | 'effort' | 'table'
-  /** Read-only to the Hive Assistant, and why (it can still read and explain it): settingReadOnly() says it, with its {path}. */
+  /** Read-only to the Combwork Assistant, and why (it can still read and explain it): settingReadOnly() says it, with its {path}. */
   readOnly?: AgentMsg
   /** Sensitive: permissions, what runs, the Agent API, the Assistant's own settings (readOnly says which). */
   sensitive?: boolean
-  /** Who takes a change only when restarted: running agents' sessions, the Assistant, or Hive itself (#676). */
-  restart?: 'sessions' | 'assistant' | 'hive'
+  /** Who takes a change only when restarted: running agents' sessions, the Assistant, or Combwork itself (#676). */
+  restart?: 'sessions' | 'assistant' | 'combwork'
   /** The id of the user guide's heading about it (Help → User Guide; #1535). */
   docs: string
-  /** A project setting that can inherit Hive's (null, or the 'inherit' option). */
+  /** A project setting that can inherit Combwork's (null, or the 'inherit' option). */
   inherits?: boolean
 }
 
@@ -209,13 +209,13 @@ export const SETTINGS_SECTIONS: SettingsSectionInfo<SettingsSection>[] = [
     )
   ),
   // Accounts & Connections (HI-2107, HI-2105's design): the accounts, and the connections agents choose on them.
-  sectionInfo('accounts', msg({ id: 'settings.section.accounts.label', defaultMessage: 'Accounts & Connections', description: "A section of Settings, in its list on the left (HI-2107): accounts, the sign-ins and servers Hive's agents reach their models through, and connections, the named setups on them (model, effort, mode) that agents choose." }), msg({ id: 'settings.section.accounts.desc', defaultMessage: "An account is a sign-in Combwork keeps (signed in through the CLI's own sign-in) or a server such as DeepSeek or Ollama, reached by its base URL and key. A connection is a setup on an account: its model, effort, context, permission mode and extra arguments. Agents and the Assistant each choose a connection, and every account shares your conversations. Drag accounts into your order: a new agent gets the first connection of the first account that's on here.", description: 'Under the heading of the section "Accounts & Connections" of Settings (HI-2107): what it holds, and what the order of accounts decides.' })),
+  sectionInfo('accounts', msg({ id: 'settings.section.accounts.label', defaultMessage: 'Accounts & Connections', description: "A section of Settings, in its list on the left (HI-2107): accounts, the sign-ins and servers Combwork's agents reach their models through, and connections, the named setups on them (model, effort, mode) that agents choose." }), msg({ id: 'settings.section.accounts.desc', defaultMessage: "An account is a sign-in Combwork keeps (signed in through the CLI's own sign-in) or a server such as DeepSeek or Ollama, reached by its base URL and key. A connection is a setup on an account: its model, effort, context, permission mode and extra arguments. Agents and the Assistant each choose a connection, and every account shares your conversations. Drag accounts into your order: a new agent gets the first connection of the first account that's on here.", description: 'Under the heading of the section "Accounts & Connections" of Settings (HI-2107): what it holds, and what the order of accounts decides.' })),
   sectionInfo('notifications', msg({ id: 'settings.section.notifications.label', defaultMessage: 'Notifications', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.notifications.desc', defaultMessage: 'Chimes and desktop notifications when agents finish or need you.', description: 'Under the heading of the section "Notifications" of Settings: what it holds.' })),
   sectionInfo('sessions', msg({ id: 'settings.section.sessions.label', defaultMessage: 'Sessions', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.sessions.desc', defaultMessage: 'Transcript backups, cache estimates and session behaviour.', description: 'Under the heading of the section "Sessions" of Settings: what it holds.' })),
   sectionInfo('assistant', msg({ id: 'settings.section.assistant.label', defaultMessage: 'Assistant', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.assistant.desc', defaultMessage: "The Assistant's defaults: the side panel's overseer of each workspace (Ctrl+Alt+I). Each workspace can change them in the panel's Assistant Settings.", description: 'Under the heading of the section "Assistant" of Settings: what it holds.' })),
   sectionInfo('workspace', msg({ id: 'settings.section.workspace.label', defaultMessage: 'Workspace', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.workspace.desc', defaultMessage: "The open workspace's own: its projects that Combwork leaves out (hidden, or removed from Combwork with their handovers and cards packed into the folder), how much Combwork keeps for each project, and antivirus scanning. Its workflow defaults are in Version Control.", description: 'Under the heading of the section "Workspace" of Settings: what it holds.' })),
   sectionInfo('board', msg({ id: 'settings.section.board.label', defaultMessage: 'Board', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.board.desc', defaultMessage: "The task board's colours and housekeeping, the same in every workspace.", description: 'Under the heading of the section "Board" of Settings: what it holds.' })),
-  sectionInfo('workflow', msg({ id: 'settings.section.workflow.label', defaultMessage: 'Version Control', description: 'A section of Settings, in its list on the left: the workflow options projects start from, Hive’s and the open workspace’s (HI-1768). Named as a project’s Version Control tab (glossary 2.1).' }), msg({ id: 'settings.section.workflow.desc', defaultMessage: 'The workflow options projects start from: Combwork defaults, for every workspace, and the open workspace’s over them. A project’s own options, in its Version Control tab, win over both.', description: 'Under the heading of the section "Version Control" of Settings: what it holds. Hive defaults and the Version Control tab: names as Hive shows them (glossary 2.1).' })),
+  sectionInfo('workflow', msg({ id: 'settings.section.workflow.label', defaultMessage: 'Version Control', description: 'A section of Settings, in its list on the left: the workflow options projects start from, Combwork’s and the open workspace’s (HI-1768). Named as a project’s Version Control tab (glossary 2.1).' }), msg({ id: 'settings.section.workflow.desc', defaultMessage: 'The workflow options projects start from: Combwork defaults, for every workspace, and the open workspace’s over them. A project’s own options, in its Version Control tab, win over both.', description: 'Under the heading of the section "Version Control" of Settings: what it holds. Combwork defaults and the Version Control tab: names as Combwork shows them (glossary 2.1).' })),
   sectionInfo('agents', msg({ id: 'settings.section.agents.label', defaultMessage: 'Agents', description: 'A section of Settings, in its list on the left: defaults for every project’s agents.' }), msg({ id: 'settings.section.agents.desc', defaultMessage: 'Defaults for every project’s agents: how long background tasks count, and processes agents leave running.', description: 'Under the heading of the section "Agents" of Settings: what it holds.' })),
   sectionInfo('keybindings', msg({ id: 'settings.section.keybindings.label', defaultMessage: 'Keyboard Shortcuts', description: 'A section of Settings, in its list on the left.' }), msg({ id: 'settings.section.keybindings.desc', defaultMessage: 'Change, remove or add shortcuts for any command. Projects can set their own for project and session commands (Project Settings → Keyboard Shortcuts).', description: 'Under the heading of the section "Keyboard Shortcuts" of Settings: what it holds.' })),
   sectionInfo('mcpCatalogs', msg({ id: 'settings.section.mcpCatalogs.label', defaultMessage: 'MCP Catalogues', description: 'A section of Settings, in its list on the left (HI-545): the lists of MCP servers to install. MCP is a protocol’s name: keep it.' }), msg({ id: 'settings.section.mcpCatalogs.desc', defaultMessage: "Where the MCP view's Catalogue finds servers to install. Combwork's own comes first; add a company's or a community's list by its address.", description: 'Under the heading of the section "MCP Catalogues" of Settings (HI-545): what it holds.' })),
@@ -234,8 +234,8 @@ const APP_ROWS: Row[] = [
   {
     section: 'general',
     key: 'commands',
-    title: msg({ id: 'settings.general.commands.title', defaultMessage: 'Commands', description: "A setting's title (Settings → General): the user's own named commands for Hive as a whole (HI-1954)." }),
-    desc: msg({ id: 'settings.general.commands.desc', defaultMessage: "Your own commands for Combwork as a whole: run one by hand (here, or Run Command in the command palette), or pick them for When Combwork quits, run, or for any workspace's open and close.", description: 'What the setting "Commands" does, under its title (Settings → General, HI-1954). When Hive quits, run is another setting\'s title: use its translation.' }),
+    title: msg({ id: 'settings.general.commands.title', defaultMessage: 'Commands', description: "A setting's title (Settings → General): the user's own named commands for Combwork as a whole (HI-1954)." }),
+    desc: msg({ id: 'settings.general.commands.desc', defaultMessage: "Your own commands for Combwork as a whole: run one by hand (here, or Run Command in the command palette), or pick them for When Combwork quits, run, or for any workspace's open and close.", description: 'What the setting "Commands" does, under its title (Settings → General, HI-1954). When Combwork quits, run is another setting\'s title: use its translation.' }),
     tip: msg({
       id: 'settings.general.commands.tip',
       defaultMessage: "Saved in Combwork's own settings, never in a workspace, so a repository you clone brings none that run by themselves. Only you can set them: the Assistant can't change them.",
@@ -247,12 +247,12 @@ const APP_ROWS: Row[] = [
   {
     section: 'general',
     key: 'onQuit',
-    title: msg({ id: 'settings.general.onQuit.title', defaultMessage: 'When Combwork quits, run', description: "A setting's title (Settings → General): a command of the user's that Hive runs as it quits." }),
-    desc: msg({ id: 'settings.general.onQuit.desc', defaultMessage: "The commands Combwork runs, in order, as it quits, once every window's workspace has closed. Combwork waits for them, showing them running.", description: 'What the setting "When Hive quits, run" does, under its title (Settings → General; HI-1954: a list of the user\'s commands).' }),
+    title: msg({ id: 'settings.general.onQuit.title', defaultMessage: 'When Combwork quits, run', description: "A setting's title (Settings → General): a command of the user's that Combwork runs as it quits." }),
+    desc: msg({ id: 'settings.general.onQuit.desc', defaultMessage: "The commands Combwork runs, in order, as it quits, once every window's workspace has closed. Combwork waits for them, showing them running.", description: 'What the setting "When Combwork quits, run" does, under its title (Settings → General; HI-1954: a list of the user\'s commands).' }),
     tip: msg({
       id: 'settings.general.onQuit.tip',
       defaultMessage: "Pick them from Commands above. '{reason}' becomes quit, or update when Combwork restarts to install an update (only with that box ticked). Don't wait, in the dialog Combwork shows, lets Combwork go on while the rest run by themselves. Only you can set them: the Assistant can't change them.",
-      description: "The info tip of the setting \"When Hive quits, run\" (Settings → General; HI-1954). '{reason}' is a placeholder the user writes in a command, and quit and update are the values it becomes: keep all three as they are (the quotes around {reason} keep it from being read as a placeholder of this text). Commands is the title of the setting above; Don't wait is the name of a button of the dialog."
+      description: "The info tip of the setting \"When Combwork quits, run\" (Settings → General; HI-1954). '{reason}' is a placeholder the user writes in a command, and quit and update are the values it becomes: keep all three as they are (the quotes around {reason} keep it from being read as a placeholder of this text). Commands is the title of the setting above; Don't wait is the name of a button of the dialog."
     }),
     type: 'custom',
     wide: true
@@ -272,9 +272,9 @@ const APP_ROWS: Row[] = [
   { section: 'general', key: 'dateFormat', title: msg({ id: 'settings.general.dateFormat.title', defaultMessage: 'Date format', description: "A setting's title (Settings → General)." }), desc: msg({ id: 'settings.general.dateFormat.desc', defaultMessage: 'How dates show in Combwork: sessions named by when they started, the session lists and their tooltips, exports.', description: 'What the setting "Date format" does, under its title (Settings → General).' }), tip: msg({ id: 'settings.general.dateFormat.tip', defaultMessage: 'System uses your Windows language\'s short date. Names you give sessions stay as you typed them: only the automatic ones (when a session started) follow this. How long ago something happened ("2 hours ago") stays, with the date on hover.', description: 'The info tip of the setting "Date format" (Settings → General): more on what it does and when it applies.' }), type: 'select', options: [{ value: 'ymd', label: msg({ id: 'settings.general.dateFormat.option.ymd', defaultMessage: 'yyyy-mm-dd (2026-10-04)', description: 'A choice of the setting "Date format" (Settings → General).' }) }, { value: 'dmy', label: msg({ id: 'settings.general.dateFormat.option.dmy', defaultMessage: 'dd/mm/yyyy (04/10/2026)', description: 'A choice of the setting "Date format" (Settings → General).' }) }, { value: 'mdy', label: msg({ id: 'settings.general.dateFormat.option.mdy', defaultMessage: 'mm/dd/yyyy (10/04/2026)', description: 'A choice of the setting "Date format" (Settings → General).' }) }, { value: 'system', label: msg({ id: 'settings.general.dateFormat.option.system', defaultMessage: 'System', description: 'A choice of the setting "Date format" (Settings → General).' }) }] },
   { section: 'general', key: 'timeFormat', title: msg({ id: 'settings.general.timeFormat.title', defaultMessage: 'Time format', description: "A setting's title (Settings → General)." }), desc: msg({ id: 'settings.general.timeFormat.desc', defaultMessage: 'How times show with the dates.', description: 'What the setting "Time format" does, under its title (Settings → General).' }), tip: msg({ id: 'settings.general.timeFormat.tip', defaultMessage: 'Applies wherever Combwork shows a time, such as a session that started today or the time a screenshot was pasted.', description: 'The info tip of the setting "Time format" (Settings → General): more on what it does and when it applies.' }), type: 'select', options: [{ value: '24h', label: msg({ id: 'settings.general.timeFormat.option.24h', defaultMessage: '24-hour (14:05)', description: 'A choice of the setting "Time format" (Settings → General).' }) }, { value: '12h', label: msg({ id: 'settings.general.timeFormat.option.12h', defaultMessage: '12-hour (2:05 PM)', description: 'A choice of the setting "Time format" (Settings → General).' }) }] },
   { section: 'general', key: 'userName', title: msg({ id: 'settings.general.userName.title', defaultMessage: 'Your name', description: "A setting's title (Settings → General)." }), desc: msg({ id: 'settings.general.userName.desc', defaultMessage: 'How Combwork names you to the Assistant when it tells it you replied to an agent ("Darren replied to B1 on #399").', description: 'What the setting "Your name" does, under its title (Settings → General).' }), tip: msg({ id: 'settings.general.userName.tip', defaultMessage: 'It goes into the Assistant\'s conversation, so use whatever form you like it to see. Empty uses "User".', description: 'The info tip of the setting "Your name" (Settings → General): more on what it does and when it applies.' }), type: 'text', placeholder: msg({ id: 'settings.general.userName.placeholder', defaultMessage: 'User', description: 'The empty box\'s placeholder of the setting "Your name" (Settings → General).' }) },
-  { section: 'general', key: 'showTips', title: msg({ id: 'settings.general.showTips.title', defaultMessage: 'Show a tip when Combwork starts', description: "A setting's title (Settings → General)." }), desc: msg({ id: 'settings.general.showTips.desc', defaultMessage: 'One tip a day about something Combwork can do, and a tip at the moments one helps.', description: 'What the setting "Show a tip when Hive starts" does, under its title (Settings → General).' }), tip: msg({ id: 'settings.general.showTips.tip', defaultMessage: 'Tips show in a small card in the bottom corner and never get in the way. Help → Tips… lists them all, whether this is on or off.', description: 'The info tip of the setting "Show a tip when Hive starts" (Settings → General): more on what it does and when it applies.' }), type: 'boolean' },
+  { section: 'general', key: 'showTips', title: msg({ id: 'settings.general.showTips.title', defaultMessage: 'Show a tip when Combwork starts', description: "A setting's title (Settings → General)." }), desc: msg({ id: 'settings.general.showTips.desc', defaultMessage: 'One tip a day about something Combwork can do, and a tip at the moments one helps.', description: 'What the setting "Show a tip when Combwork starts" does, under its title (Settings → General).' }), tip: msg({ id: 'settings.general.showTips.tip', defaultMessage: 'Tips show in a small card in the bottom corner and never get in the way. Help → Tips… lists them all, whether this is on or off.', description: 'The info tip of the setting "Show a tip when Combwork starts" (Settings → General): more on what it does and when it applies.' }), type: 'boolean' },
   // Updates
-  { section: 'updates', key: 'status', title: msg({ id: 'settings.updates.status.title', defaultMessage: 'Combwork version', description: "A setting's title (Settings → Updates)." }), tip: msg({ id: 'settings.updates.status.tip', defaultMessage: 'The version you are running and the result of the last check.', description: 'The info tip of the setting "Hive Desktop version" (Settings → Updates): more on what it does and when it applies.' }), type: 'custom' },
+  { section: 'updates', key: 'status', title: msg({ id: 'settings.updates.status.title', defaultMessage: 'Combwork version', description: "A setting's title (Settings → Updates)." }), tip: msg({ id: 'settings.updates.status.tip', defaultMessage: 'The version you are running and the result of the last check.', description: 'The info tip of the setting "Combwork version" (Settings → Updates): more on what it does and when it applies.' }), type: 'custom' },
   { section: 'updates', key: 'checkAutomatically', title: msg({ id: 'settings.updates.checkAutomatically.title', defaultMessage: 'Check for updates automatically', description: "A setting's title (Settings → Updates)." }), desc: msg({ id: 'settings.updates.checkAutomatically.desc', defaultMessage: 'Look for a new version of Combwork shortly after it starts and every 6 hours.', description: 'What the setting "Check for updates automatically" does, under its title (Settings → Updates).' }), tip: msg({ id: 'settings.updates.checkAutomatically.tip', defaultMessage: 'When off, Combwork only checks when you choose Help → Check for Updates…; development builds never update.', description: 'The info tip of the setting "Check for updates automatically" (Settings → Updates): more on what it does and when it applies.' }), type: 'boolean' },
   { section: 'updates', key: 'downloadAutomatically', title: msg({ id: 'settings.updates.downloadAutomatically.title', defaultMessage: 'Download updates automatically', description: "A setting's title (Settings → Updates)." }), desc: msg({ id: 'settings.updates.downloadAutomatically.desc', defaultMessage: 'Download a new version in the background as soon as it is found.', description: 'What the setting "Download updates automatically" does, under its title (Settings → Updates).' }), tip: msg({ id: 'settings.updates.downloadAutomatically.tip', defaultMessage: 'When off, the status bar says a new version is available and you choose when to download it. Downloads are checked against the release checksum.', description: 'The info tip of the setting "Download updates automatically" (Settings → Updates): more on what it does and when it applies.' }), type: 'boolean' },
   { section: 'updates', key: 'install', title: msg({ id: 'settings.updates.install.title', defaultMessage: 'Install updates', description: "A setting's title (Settings → Updates)." }), desc: msg({ id: 'settings.updates.install.desc', defaultMessage: 'When a downloaded update is installed.', description: 'What the setting "Install updates" does, under its title (Settings → Updates).' }), tip: msg({ id: 'settings.updates.install.tip', defaultMessage: 'Automatically: the update installs when you next quit Combwork (never while it is running, so your sessions are not interrupted); Restart and Update installs it straight away. Manually: it installs only when you choose Restart and Update. Either way, Combwork asks before stopping agents that are working.', description: 'The info tip of the setting "Install updates" (Settings → Updates): more on what it does and when it applies.' }), type: 'select', options: [{ value: 'auto', label: msg({ id: 'settings.updates.install.option.auto', defaultMessage: 'Automatically, when Combwork quits', description: 'A choice of the setting "Install updates" (Settings → Updates).' }) }, { value: 'manual', label: msg({ id: 'settings.updates.install.option.manual', defaultMessage: 'Manually, with Restart and Update', description: 'A choice of the setting "Install updates" (Settings → Updates).' }) }] },
@@ -300,7 +300,7 @@ const APP_ROWS: Row[] = [
   { section: 'notifications', key: 'notifyOnWaiting', title: msg({ id: 'settings.notifications.notifyOnWaiting.title', defaultMessage: 'Notify when input is needed', description: "A setting's title (Settings → Notifications)." }), desc: msg({ id: 'settings.notifications.notifyOnWaiting.desc', defaultMessage: 'Notify when a session is waiting for permission or input.', description: 'What the setting "Notify when input is needed" does, under its title (Settings → Notifications).' }), tip: msg({ id: 'settings.notifications.notifyOnWaiting.tip', defaultMessage: "Triggered by the agent's permission prompts and questions.", description: 'The info tip of the setting "Notify when input is needed" (Settings → Notifications): more on what it does and when it applies.' }), type: 'boolean' },
   { section: 'notifications', key: 'taskbarCount', title: msg({ id: 'settings.notifications.taskbarCount.title', defaultMessage: 'Show a count on the taskbar button', description: "A setting's title (Settings → Notifications)." }), desc: msg({ id: 'settings.notifications.taskbarCount.desc', defaultMessage: "A badge on Combwork's taskbar button, and the window title, show how many agents need you.", description: 'What the setting "Show a count on the taskbar button" does, under its title (Settings → Notifications).' }), tip: msg({ id: 'settings.notifications.taskbarCount.tip', defaultMessage: 'The same count as the status bar: agents waiting for your input, and those that finished while you were not looking. Each window shows its own workspace.', description: 'The info tip of the setting "Show a count on the taskbar button" (Settings → Notifications): more on what it does and when it applies.' }), type: 'boolean' },
   { section: 'notifications', key: 'flashOnWaiting', title: msg({ id: 'settings.notifications.flashOnWaiting.title', defaultMessage: 'Flash the taskbar button when an agent needs input', description: "A setting's title (Settings → Notifications)." }), desc: msg({ id: 'settings.notifications.flashOnWaiting.desc', defaultMessage: 'When an agent starts waiting for your answer while Combwork is in the background.', description: 'What the setting "Flash the taskbar button when an agent needs input" does, under its title (Settings → Notifications).' }), tip: msg({ id: 'settings.notifications.flashOnWaiting.tip', defaultMessage: 'It stops when you switch to the window. Finishing agents never flash it.', description: 'The info tip of the setting "Flash the taskbar button when an agent needs input" (Settings → Notifications): more on what it does and when it applies.' }), type: 'boolean' },
-  { section: 'notifications', key: 'suggestFreshStart', title: msg({ id: 'settings.notifications.suggestFreshStart.title', defaultMessage: 'Suggest a fresh start', description: "A setting's title (Settings → Notifications, #1437)." }), desc: msg({ id: 'settings.notifications.suggestFreshStart.desc', defaultMessage: "A notice when a project's last lane ends, or a card is done with no lane running, and none of its agents is busy: a good moment for Start Fresh (Idle Agents).", description: 'What the setting "Suggest a fresh start" does, under its title (Settings → Notifications). Start Fresh (Idle Agents) is a command: keep its name as Hive shows it.' }), tip: msg({ id: 'settings.notifications.suggestFreshStart.tip', defaultMessage: 'Once each time the work finishes. Fresh conversations cost less than long ones; the old ones stay in the Sessions tab. A project can set its own in Project Settings → Sessions.', description: 'The info tip of the setting "Suggest a fresh start" (Settings → Notifications).' }), type: 'boolean' },
+  { section: 'notifications', key: 'suggestFreshStart', title: msg({ id: 'settings.notifications.suggestFreshStart.title', defaultMessage: 'Suggest a fresh start', description: "A setting's title (Settings → Notifications, #1437)." }), desc: msg({ id: 'settings.notifications.suggestFreshStart.desc', defaultMessage: "A notice when a project's last lane ends, or a card is done with no lane running, and none of its agents is busy: a good moment for Start Fresh (Idle Agents).", description: 'What the setting "Suggest a fresh start" does, under its title (Settings → Notifications). Start Fresh (Idle Agents) is a command: keep its name as Combwork shows it.' }), tip: msg({ id: 'settings.notifications.suggestFreshStart.tip', defaultMessage: 'Once each time the work finishes. Fresh conversations cost less than long ones; the old ones stay in the Sessions tab. A project can set its own in Project Settings → Sessions.', description: 'The info tip of the setting "Suggest a fresh start" (Settings → Notifications).' }), type: 'boolean' },
   { section: 'notifications', key: 'bannerScope', title: msg({ id: 'settings.notifications.bannerScope.title', defaultMessage: 'Show pop-ups about agents for', description: "A setting's title (Settings → Notifications, HI-2320)." }), desc: msg({ id: 'settings.notifications.bannerScope.desc', defaultMessage: 'Which agents, lanes and cards the window you are using pops up a notification about.', description: 'What the setting "Show pop-ups about agents for" does, under its title (Settings → Notifications).' }), tip: msg({ id: 'settings.notifications.bannerScope.tip', defaultMessage: "One left out is kept under the bell without popping up. With Combwork in the background, Windows notifications come whatever this says. Clicking one about another window's project brings that window up.", description: 'The info tip of the setting "Show pop-ups about agents for" (Settings → Notifications): more on what it does and when it applies.' }), type: 'select', options: [{ value: 'all', label: msg({ id: 'settings.notifications.bannerScope.option.all', defaultMessage: 'All workspaces', description: 'A choice of the setting "Show pop-ups about agents for" (Settings → Notifications).' }) }, { value: 'workspace', label: msg({ id: 'settings.notifications.bannerScope.option.workspace', defaultMessage: 'This workspace', description: 'A choice of the setting "Show pop-ups about agents for" (Settings → Notifications).' }) }, { value: 'project', label: msg({ id: 'settings.notifications.bannerScope.option.project', defaultMessage: 'This project', description: 'A choice of the setting "Show pop-ups about agents for" (Settings → Notifications).' }) }, { value: 'none', label: msg({ id: 'settings.notifications.bannerScope.option.none', defaultMessage: 'None (only in the bell)', description: 'A choice of the setting "Show pop-ups about agents for" (Settings → Notifications, HI-2320): no pop-ups about agents; they are kept under the bell (the Notifications panel).' }) }] },
   { section: 'notifications', key: 'bannerPosition', title: msg({ id: 'settings.notifications.bannerPosition.title', defaultMessage: 'Pop-up position', description: "A setting's title (Settings → Notifications, HI-2320)." }), desc: msg({ id: 'settings.notifications.bannerPosition.desc', defaultMessage: 'Where notifications and tips pop up in the window.', description: 'What the setting "Pop-up position" does, under its title (Settings → Notifications).' }), tip: msg({ id: 'settings.notifications.bannerPosition.tip', defaultMessage: "Several stack, the newest nearest the edge. Bottom right stays left of the Assistant's panel.", description: 'The info tip of the setting "Pop-up position" (Settings → Notifications): more on what it does and when it applies.' }), type: 'select', options: [{ value: 'top-left', label: msg({ id: 'settings.notifications.bannerPosition.option.topLeft', defaultMessage: 'Top left', description: 'A choice of the setting "Pop-up position" (Settings → Notifications).' }) }, { value: 'top-center', label: msg({ id: 'settings.notifications.bannerPosition.option.topCenter', defaultMessage: 'Top centre', description: 'A choice of the setting "Pop-up position" (Settings → Notifications).' }) }, { value: 'top-right', label: msg({ id: 'settings.notifications.bannerPosition.option.topRight', defaultMessage: 'Top right', description: 'A choice of the setting "Pop-up position" (Settings → Notifications).' }) }, { value: 'bottom-left', label: msg({ id: 'settings.notifications.bannerPosition.option.bottomLeft', defaultMessage: 'Bottom left', description: 'A choice of the setting "Pop-up position" (Settings → Notifications).' }) }, { value: 'bottom-center', label: msg({ id: 'settings.notifications.bannerPosition.option.bottomCenter', defaultMessage: 'Bottom centre', description: 'A choice of the setting "Pop-up position" (Settings → Notifications).' }) }, { value: 'bottom-right', label: msg({ id: 'settings.notifications.bannerPosition.option.bottomRight', defaultMessage: 'Bottom right', description: 'A choice of the setting "Pop-up position" (Settings → Notifications).' }) }] },
   { section: 'notifications', key: 'bannerSeconds', title: msg({ id: 'settings.notifications.bannerSeconds.title', defaultMessage: 'Pop-ups close after (seconds)', description: "A setting's title (Settings → Notifications, HI-2320)." }), desc: msg({ id: 'settings.notifications.bannerSeconds.desc', defaultMessage: 'How long a pop-up stays, unless it waits for you.', description: 'What the setting "Pop-ups close after (seconds)" does, under its title (Settings → Notifications).' }), tip: msg({ id: 'settings.notifications.bannerSeconds.tip', defaultMessage: 'One with buttons, or an error, stays at least 15 seconds. It stays while the pointer or the keyboard is on it, and while the window is in the background.', description: 'The info tip of the setting "Pop-ups close after (seconds)" (Settings → Notifications): more on what it does and when it applies.' }), type: 'number', min: 2, max: 60 },
@@ -372,8 +372,8 @@ const APP_ROWS: Row[] = [
   {
     section: 'workspace',
     key: 'onOpen',
-    title: msg({ id: 'settings.workspace.onOpen.title', defaultMessage: 'When this workspace opens, run', description: "A setting's title (Settings → Workspace): the user's commands Hive runs as the workspace opens (HI-1954)." }),
-    desc: msg({ id: 'settings.workspace.onOpen.desc', defaultMessage: "The commands Combwork runs, in order, as this workspace opens: a local server or a database its agents need, say. Its agents start once they're done, or once you choose Don't wait.", description: 'What the setting "When this workspace opens, run" does, under its title (Settings → Workspace, HI-1954). Don\'t wait is the name of a button of the dialog Hive shows.' }),
+    title: msg({ id: 'settings.workspace.onOpen.title', defaultMessage: 'When this workspace opens, run', description: "A setting's title (Settings → Workspace): the user's commands Combwork runs as the workspace opens (HI-1954)." }),
+    desc: msg({ id: 'settings.workspace.onOpen.desc', defaultMessage: "The commands Combwork runs, in order, as this workspace opens: a local server or a database its agents need, say. Its agents start once they're done, or once you choose Don't wait.", description: 'What the setting "When this workspace opens, run" does, under its title (Settings → Workspace, HI-1954). Don\'t wait is the name of a button of the dialog Combwork shows.' }),
     tip: msg({
       id: 'settings.workspace.onOpen.tip',
       defaultMessage: "Pick them from Commands above. '{reason}' becomes open. If one fails, Combwork asks: Rerun, Skip it and continue, or Stop here; a command ticked \"The commands after this need it\" leads with Stop here. Only you can set them: the Assistant can't change them.",
@@ -385,7 +385,7 @@ const APP_ROWS: Row[] = [
   {
     section: 'workspace',
     key: 'onClose',
-    title: msg({ id: 'settings.workspace.onClose.title', defaultMessage: 'When this workspace closes, run', description: "A setting's title (Settings → Workspace): a command of the user's that Hive runs as the open workspace closes." }),
+    title: msg({ id: 'settings.workspace.onClose.title', defaultMessage: 'When this workspace closes, run', description: "A setting's title (Settings → Workspace): a command of the user's that Combwork runs as the open workspace closes." }),
     desc: msg({ id: 'settings.workspace.onClose.desc', defaultMessage: 'The commands Combwork runs, in order, as this workspace closes: its window closes, another workspace opens in it, or Combwork quits. Combwork waits for them, showing them running.', description: 'What the setting "When this workspace closes, run" does, under its title (Settings → Workspace; HI-1954: a list of the user\'s commands).' }),
     tip: msg({
       id: 'settings.workspace.onClose.tip',
@@ -398,17 +398,17 @@ const APP_ROWS: Row[] = [
   {
     section: 'workflow',
     key: 'defaults',
-    title: msg({ id: 'settings.workflow.hiveDefaults.title', defaultMessage: 'Combwork defaults', description: "A setting's title (Settings → Version Control): the workflow options every project of every workspace starts from (Darren's words, HI-1768)." }),
-    desc: msg({ id: 'settings.workflow.hiveDefaults.desc', defaultMessage: 'For every workspace: what each project starts from unless its workspace or the project sets its own. Pick a preset, or set each option, for None or for Git.', description: 'What the setting "Hive defaults" is, under its title (Settings → Version Control). None and Git: glossary 2.1.' }),
-    tip: msg({ id: 'settings.workflow.hiveDefaults.tip', defaultMessage: 'Until 1.0’s settings tidy, Settings → Workflow defaults: nothing set there changed.', description: 'The info tip of "Hive defaults" (Settings → Version Control): its old place, so a search for its old name finds it. Workflow defaults was the old section’s name: translate it as that section was.' }),
+    title: msg({ id: 'settings.workflow.combworkDefaults.title', defaultMessage: 'Combwork defaults', description: "A setting's title (Settings → Version Control): the workflow options every project of every workspace starts from (Darren's words, HI-1768)." }),
+    desc: msg({ id: 'settings.workflow.combworkDefaults.desc', defaultMessage: 'For every workspace: what each project starts from unless its workspace or the project sets its own. Pick a preset, or set each option, for None or for Git.', description: 'What the setting "Combwork defaults" is, under its title (Settings → Version Control). None and Git: glossary 2.1.' }),
+    tip: msg({ id: 'settings.workflow.combworkDefaults.tip', defaultMessage: 'Until 1.0’s settings tidy, Settings → Workflow defaults: nothing set there changed.', description: 'The info tip of "Combwork defaults" (Settings → Version Control): its old place, so a search for its old name finds it. Workflow defaults was the old section’s name: translate it as that section was.' }),
     type: 'custom',
     wide: true
   },
   {
     section: 'workflow',
     key: 'workspaceDefaults',
-    title: msg({ id: 'settings.workflow.workspaceDefaults.title', defaultMessage: 'Workspace defaults', description: "A setting's title (Settings → Version Control): the workflow options the open workspace's projects start from, over Hive defaults (HI-1768). The window shows the workspace's name beside it." }),
-    desc: msg({ id: 'settings.workflow.workspaceDefaults.desc', defaultMessage: 'For this workspace’s projects, over Combwork defaults; a project sets its own in its Version Control tab.', description: 'What the setting "Workspace defaults" is, under its title (Settings → Version Control). Hive defaults and the Version Control tab: names as Hive shows them.' }),
+    title: msg({ id: 'settings.workflow.workspaceDefaults.title', defaultMessage: 'Workspace defaults', description: "A setting's title (Settings → Version Control): the workflow options the open workspace's projects start from, over Combwork defaults (HI-1768). The window shows the workspace's name beside it." }),
+    desc: msg({ id: 'settings.workflow.workspaceDefaults.desc', defaultMessage: 'For this workspace’s projects, over Combwork defaults; a project sets its own in its Version Control tab.', description: 'What the setting "Workspace defaults" is, under its title (Settings → Version Control). Combwork defaults and the Version Control tab: names as Combwork shows them.' }),
     tip: msg({ id: 'settings.workflow.workspaceDefaults.tip', defaultMessage: 'Until 1.0’s settings tidy, the workflow defaults in Settings → Workspace: nothing set there changed.', description: 'The info tip of "Workspace defaults" (Settings → Version Control): its old place, so a search for it finds it.' }),
     type: 'custom',
     wide: true
@@ -435,7 +435,7 @@ const APP_ROWS: Row[] = [
     section: 'assistant',
     key: 'mcp',
     title: msg({ id: 'settings.assistant.mcp.title', defaultMessage: 'MCP servers (this workspace)', description: "A setting's title (Settings → Assistant): which of the open workspace's MCP servers the Assistant gets. MCP is a protocol's name: keep it." }),
-    desc: msg({ id: 'settings.assistant.mcp.descAdded', defaultMessage: "The workspace's MCP servers added for the Assistant are chosen in its own view (the Assistant on the activity bar), as a project's are in its MCP tab.", description: 'What the setting "MCP servers (this workspace)" says, under its title (Settings → Assistant, HI-2059): the servers are added in the Hive Assistant’s view now. "MCP tab" is a place in Hive: keep it as Hive shows it.' }),
+    desc: msg({ id: 'settings.assistant.mcp.descAdded', defaultMessage: "The workspace's MCP servers added for the Assistant are chosen in its own view (the Assistant on the activity bar), as a project's are in its MCP tab.", description: 'What the setting "MCP servers (this workspace)" says, under its title (Settings → Assistant, HI-2059): the servers are added in the Combwork Assistant’s view now. "MCP tab" is a place in Combwork: keep it as Combwork shows it.' }),
     type: 'custom'
   },
   {
@@ -451,13 +451,13 @@ const APP_ROWS: Row[] = [
       msg({
         id: 'settings.assistant.control.tip',
         defaultMessage: 'It never removes agents, discards worktrees or deletes projects, and never types into an agent that is working, asking you something or that you just typed in (see Pause after you type). What it does is listed in its panel, where you can undo its changes. A running Assistant takes a change after a restart.',
-        description: 'The info tip of the setting "Control" (Settings → Assistant): its last paragraph. Pause after you type is another setting: keep its name as Hive shows it.'
+        description: 'The info tip of the setting "Control" (Settings → Assistant): its last paragraph. Pause after you type is another setting: keep its name as Combwork shows it.'
       }),
       '',
       msg({
         id: 'settings.assistant.control.tip.inbox',
         defaultMessage: "How the Assistant hears of its inbox follows Settings → Advanced's three inbox switches (Tell a working agent at the end of a tool, Keep an agent going when it stops with unread items, Wake an idle agent), Settings' own values: a project's don't apply to it.",
-        description: 'The info tip of the setting "Control" (Settings → Assistant): a paragraph on which inbox switches the Assistant follows. The three names in brackets are settings of Settings → Advanced: use their names as Hive shows them.'
+        description: 'The info tip of the setting "Control" (Settings → Assistant): a paragraph on which inbox switches the Assistant follows. The three names in brackets are settings of Settings → Advanced: use their names as Combwork shows them.'
       })
     ]),
     type: 'select',
@@ -487,7 +487,7 @@ const APP_ROWS: Row[] = [
   { section: 'agentApi', key: 'status', title: msg({ id: 'settings.agentApi.status.title', defaultMessage: 'Status', description: "A setting's title (Settings → Agent API)." }), tip: msg({ id: 'settings.agentApi.status.tip', defaultMessage: 'Whether the Agent API is listening.', description: 'The info tip of the setting "Status" (Settings → Agent API): more on what it does and when it applies.' }), type: 'custom' },
   { section: 'agentApi', key: 'enabled', title: msg({ id: 'settings.agentApi.enabled.title', defaultMessage: 'Enable Agent API', description: "A setting's title (Settings → Agent API)." }), desc: msg({ id: 'settings.agentApi.enabled.desc', defaultMessage: 'Run a local HTTP API that agents and scripts can use to talk to Combwork.', description: 'What the setting "Enable Agent API" does, under its title (Settings → Agent API).' }), tip: msg({ id: 'settings.agentApi.enabled.tip', defaultMessage: 'Listens on 127.0.0.1 only and requires the bearer token below. See Help → Agent API Reference. Turned off, the port still answers the Assistant alone (it has its own token, and Settings → Assistant → Control decides what it may do).', description: 'The info tip of the setting "Enable Agent API" (Settings → Agent API): more on what it does and when it applies.' }), type: 'boolean' },
   { section: 'agentApi', key: 'port', title: msg({ id: 'settings.agentApi.port.title', defaultMessage: 'Port', description: "A setting's title (Settings → Agent API)." }), desc: msg({ id: 'settings.agentApi.port.desc', defaultMessage: 'Local port for the Agent API.', description: 'What the setting "Port" does, under its title (Settings → Agent API).' }), tip: msg({ id: 'settings.agentApi.port.tip', defaultMessage: 'Change this if the port is used by another program.', description: 'The info tip of the setting "Port" (Settings → Agent API): more on what it does and when it applies.' }), type: 'number', min: 1024, max: 65535 },
-  { section: 'agentApi', key: 'provideHiveMcp', title: msg({ id: 'settings.agentApi.provideHiveMcp.title', defaultMessage: 'Provide Combwork tools to sessions', description: "A setting's title (Settings → Agent API)." }), desc: msg({ id: 'settings.agentApi.provideHiveMcp.desc', defaultMessage: 'Add the built-in "combwork" MCP server to every session.', description: 'What the setting "Provide Combwork tools to sessions" does, under its title (Settings → Agent API).' }), tip: msg({ id: 'settings.agentApi.provideHiveMcp.tip', defaultMessage: 'Gives agents tools for shared notes, handovers, project status and notifications.', description: 'The info tip of the setting "Provide Combwork tools to sessions" (Settings → Agent API): more on what it does and when it applies.' }), type: 'boolean' },
+  { section: 'agentApi', key: 'provideCombworkMcp', title: msg({ id: 'settings.agentApi.provideCombworkMcp.title', defaultMessage: 'Provide Combwork tools to sessions', description: "A setting's title (Settings → Agent API)." }), desc: msg({ id: 'settings.agentApi.provideCombworkMcp.desc', defaultMessage: 'Add the built-in "combwork" MCP server to every session.', description: 'What the setting "Provide Combwork tools to sessions" does, under its title (Settings → Agent API).' }), tip: msg({ id: 'settings.agentApi.provideCombworkMcp.tip', defaultMessage: 'Gives agents tools for shared notes, handovers, project status and notifications.', description: 'The info tip of the setting "Provide Combwork tools to sessions" (Settings → Agent API): more on what it does and when it applies.' }), type: 'boolean' },
   {
     section: 'agentApi',
     key: 'allowSessionInput',
@@ -525,7 +525,7 @@ const APP_ROWS: Row[] = [
     desc: advancedDef('cw.showDeveloperFeatures')!.text.desc,
     tip: msg({ id: 'settings.advanced.showDeveloperFeatures.tip', defaultMessage: 'For power users and for developing Combwork. The console opens in a window of its own; Combwork captures a source only while it is open on it, redacted. Turning this off closes it.', description: 'The info tip of the setting this (Settings → Advanced): more on what it does and when it applies.' }),
     type: 'boolean',
-    // Drawn in the list below, first among Hive's own (#367): kept in Hive's settings under this key, and in
+    // Drawn in the list below, first among Combwork's own (#367): kept in Combwork's settings under this key, and in
     // advanced.json as cw.showDeveloperFeatures (the two are one value).
     hidden: true
   },
@@ -679,7 +679,7 @@ export const PROJECT_SETTINGS_SECTIONS: SettingsSectionInfo[] = [
   sectionInfo('advanced', msg({ id: 'settings.projectSection.advanced.label', defaultMessage: 'Advanced', description: 'A section of Project Settings, in its list on the left.' }), msg({ id: 'settings.projectSection.advanced.desc', defaultMessage: 'Where the settings are stored, and resetting them.', description: 'Under the heading of the section "Advanced" of Project Settings: what it holds.' }))
 ]
 
-const INHERIT: RowOption = { value: 'inherit', label: msg({ id: 'settings.option.inherit', defaultMessage: 'Inherit', description: "A choice of a project's setting: use Hive's own setting (Settings) instead of one of its own." }) }
+const INHERIT: RowOption = { value: 'inherit', label: msg({ id: 'settings.option.inherit', defaultMessage: 'Inherit', description: "A choice of a project's setting: use Combwork's own setting (Settings) instead of one of its own." }) }
 const ON_OFF: RowOption[] = [INHERIT, { value: 'on', label: msg({ id: 'settings.option.on', defaultMessage: 'On', description: 'A choice of a setting that is on or off, beside Inherit or Default.' }) }, { value: 'off', label: msg({ id: 'settings.option.off', defaultMessage: 'Off', description: 'A choice of a setting that is on or off, beside Inherit or Default.' }) }]
 
 /** What Project Settings → Project key does (#1221): Project Settings gives its example in the project's own key. */
@@ -699,7 +699,7 @@ function optionRows(at: (key: OptionKey) => Pick<Row, 'section' | 'key'> & Parti
     option('preChecks', 'custom'),
     option('commands', 'custom'),
     option('sameness', 'select', [['change', V.sameness.change], ['exact', V.sameness.exact]]),
-    option('finish', 'select', [['hiveMerges', V.finish.hiveMerges], ['agentMerges', V.finish.agentMerges], ['committed', V.finish.committed], ['notChecked', V.finish.notChecked]]),
+    option('finish', 'select', [['combworkMerges', V.finish.combworkMerges], ['agentMerges', V.finish.agentMerges], ['committed', V.finish.committed], ['notChecked', V.finish.notChecked]]),
     option('style', 'select', [['merge', V.style.merge], ['squash', V.style.squash], ['rebase', V.style.rebase]]),
     option('target', 'text'),
     option('mergeChecks', 'custom'),
@@ -707,7 +707,7 @@ function optionRows(at: (key: OptionKey) => Pick<Row, 'section' | 'key'> & Parti
     option('mergeInstall', 'select', [['onManifestChange', V.mergeInstall.onManifestChange], ['always', V.mergeInstall.always]]),
     option('strict', 'boolean'),
     option('pushTarget', 'boolean'),
-    option('commitMessage', 'select', [['hive', V.commitMessage.hive], ['branch', V.commitMessage.branch]]),
+    option('commitMessage', 'select', [['combwork', V.commitMessage.combwork], ['branch', V.commitMessage.branch]]),
     option('okBefore', 'custom'),
     option('folder', 'select', [['slots', V.folder.slots], ['project', V.folder.project]]),
     option('slotsUpToDate', 'boolean'),
@@ -732,7 +732,7 @@ function optionRows(at: (key: OptionKey) => Pick<Row, 'section' | 'key'> & Parti
 }
 
 /**
- * Hive's and the workspace's workflow defaults (#1422): each option for each platform a hidden row of the Assistant's
+ * Combwork's and the workspace's workflow defaults (#1422): each option for each platform a hidden row of the Assistant's
  * settings tool, `workflow.<platform>.<option>` (Settings → Workflow defaults) and `workspace.workflow.<platform>.<option>`
  * (Settings → Workspace), set as the editor saves them: checked against the level and the projects inheriting it.
  */
@@ -773,37 +773,37 @@ const PROJECT_ROWS: Row[] = [
   { section: 'sessions', key: 'compactSuggestTokens', title: msg({ id: 'settings.project.compactSuggestTokens.title', defaultMessage: 'Suggest compacting above', description: "A setting's title (Project Settings → Sessions)." }), desc: msg({ id: 'settings.project.compactSuggestTokens.desc', defaultMessage: 'Context size (tokens) at which Compact is highlighted for this project. Empty inherits Settings → Sessions → Suggest compacting above.', description: 'What the setting "Suggest compacting above" does, under its title (Project Settings → Sessions).' }), tip: msg({ id: 'settings.project.compactSuggestTokens.tip', defaultMessage: 'Only changes when the Compact button turns orange; compacting is always available once the agent has finished.', description: 'The info tip of the setting "Suggest compacting above" (Project Settings → Sessions): more on what it does and when it applies.' }), type: 'number', min: 1000, max: 2000000, step: 10000, off: msg({ id: 'settings.project.compactSuggestTokens.off', defaultMessage: 'Never', description: 'The Off box of the number setting "Suggest compacting above" (Project Settings → Sessions): ticked, the setting is off (0).' }) },
   { section: 'sessions', key: 'transcriptWarnMB', title: msg({ id: 'settings.project.transcriptWarnMB.title', defaultMessage: 'Warn when a transcript is over', description: "A setting's title (Project Settings → Sessions)." }), desc: msg({ id: 'settings.project.transcriptWarnMB.desc', defaultMessage: "Size, in MB, at which a running conversation's transcript is flagged for this project. Empty inherits Settings → Sessions → Warn when a transcript is over.", description: 'What the setting "Warn when a transcript is over" does, under its title (Project Settings → Sessions).' }), tip: msg({ id: 'settings.project.transcriptWarnMB.tip', defaultMessage: 'A long conversation slows down the CLI and Combwork; handing the work over to a new conversation makes it short again.', description: 'The info tip of the setting "Warn when a transcript is over" (Project Settings → Sessions): more on what it does and when it applies.' }), type: 'number', min: 1, max: 2000, step: 10, off: msg({ id: 'settings.project.transcriptWarnMB.off', defaultMessage: 'Never', description: 'The Off box of the number setting "Warn when a transcript is over" (Project Settings → Sessions): ticked, the setting is off (0).' }) },
   { section: 'sessions', key: 'chime', title: msg({ id: 'settings.project.chime.title', defaultMessage: 'Completion chime', description: "A setting's title (Project Settings → Sessions)." }), desc: msg({ id: 'settings.project.chime.desc', defaultMessage: 'Play a sound when an agent in this project finishes or needs input.', description: 'What the setting "Completion chime" does, under its title (Project Settings → Sessions).' }), tip: msg({ id: 'settings.project.chime.tip', defaultMessage: 'Inherit follows Settings → Notifications.', description: 'The info tip of the setting "Completion chime" (Project Settings → Sessions): more on what it does and when it applies.' }), type: 'select', options: ON_OFF },
-  { section: 'sessions', key: 'suggestFreshStart', title: msg({ id: 'settings.project.suggestFreshStart.title', defaultMessage: 'Suggest a fresh start', description: "A setting's title (Project Settings → Sessions, #1437)." }), desc: msg({ id: 'settings.project.suggestFreshStart.desc', defaultMessage: "A notice when this project's work has finished, with Start Fresh (Idle Agents).", description: 'What the setting "Suggest a fresh start" does, under its title (Project Settings → Sessions). Start Fresh (Idle Agents) is a command: keep its name as Hive shows it.' }), tip: msg({ id: 'settings.project.suggestFreshStart.tip', defaultMessage: 'Inherit follows Settings → Notifications.', description: 'The info tip of the setting "Suggest a fresh start" (Project Settings → Sessions).' }), type: 'select', options: ON_OFF },
+  { section: 'sessions', key: 'suggestFreshStart', title: msg({ id: 'settings.project.suggestFreshStart.title', defaultMessage: 'Suggest a fresh start', description: "A setting's title (Project Settings → Sessions, #1437)." }), desc: msg({ id: 'settings.project.suggestFreshStart.desc', defaultMessage: "A notice when this project's work has finished, with Start Fresh (Idle Agents).", description: 'What the setting "Suggest a fresh start" does, under its title (Project Settings → Sessions). Start Fresh (Idle Agents) is a command: keep its name as Combwork shows it.' }), tip: msg({ id: 'settings.project.suggestFreshStart.tip', defaultMessage: 'Inherit follows Settings → Notifications.', description: 'The info tip of the setting "Suggest a fresh start" (Project Settings → Sessions).' }), type: 'select', options: ON_OFF },
   // Carrying on (#1432, shared/inboxSwitches.ts): this project's own of Settings → Advanced's inbox switches.
   {
     section: 'sessions',
     key: 'inboxCheckpoints',
-    title: msg({ id: 'settings.project.inboxCheckpoints.title', defaultMessage: 'Tell a working agent at the end of a tool', description: "A setting's title (Project Settings → Sessions): Hive tells a busy agent what has arrived in its inbox each time one of its tool calls ends." }),
+    title: msg({ id: 'settings.project.inboxCheckpoints.title', defaultMessage: 'Tell a working agent at the end of a tool', description: "A setting's title (Project Settings → Sessions): Combwork tells a busy agent what has arrived in its inbox each time one of its tool calls ends." }),
     desc: msg({ id: 'settings.project.inboxCheckpoints.desc', defaultMessage: "Combwork tells a working agent of what arrives in its inbox at the end of its next tool call. Off: it isn't told until its turn ends or it is idle; nothing is lost.", description: 'What the setting "Tell a working agent at the end of a tool" does, under its title (Project Settings → Sessions).' }),
-    tip: msg({ id: 'settings.project.inboxCheckpoints.tip', defaultMessage: 'Inherit follows Settings → Advanced → Tell a working agent at the end of a tool.', description: 'The info tip of the setting "Tell a working agent at the end of a tool" (Project Settings → Sessions). Settings → Advanced names Hive\'s settings: use its names as Hive shows them.' }),
+    tip: msg({ id: 'settings.project.inboxCheckpoints.tip', defaultMessage: 'Inherit follows Settings → Advanced → Tell a working agent at the end of a tool.', description: 'The info tip of the setting "Tell a working agent at the end of a tool" (Project Settings → Sessions). Settings → Advanced names Combwork\'s settings: use its names as Combwork shows them.' }),
     type: 'select',
     options: ON_OFF
   },
   {
     section: 'sessions',
     key: 'inboxStopContinuation',
-    title: msg({ id: 'settings.project.inboxStopContinuation.title', defaultMessage: 'Keep an agent going when it stops with unread items', description: "A setting's title (Project Settings → Sessions): when an agent is about to end its turn with items in its inbox it hasn't read, Hive makes it carry on and read them." }),
+    title: msg({ id: 'settings.project.inboxStopContinuation.title', defaultMessage: 'Keep an agent going when it stops with unread items', description: "A setting's title (Project Settings → Sessions): when an agent is about to end its turn with items in its inbox it hasn't read, Combwork makes it carry on and read them." }),
     desc: msg({ id: 'settings.project.inboxStopContinuation.desc', defaultMessage: "Combwork keeps an agent ending its turn with unread items going to read them, once a turn. Off: the turn ends, and they wait in the inbox for an idle wake.", description: 'What the setting "Keep an agent going when it stops with unread items" does, under its title (Project Settings → Sessions).' }),
-    tip: msg({ id: 'settings.project.inboxStopContinuation.tip', defaultMessage: 'Codex and Copilot have their stop held back, Claude Code a line added to it. Inherit follows Settings → Advanced → Keep an agent going when it stops with unread items.', description: 'The info tip of the setting "Keep an agent going when it stops with unread items" (Project Settings → Sessions). Codex, Copilot and Claude Code are CLIs\' names: keep them. Settings → Advanced names Hive\'s settings: use its names as Hive shows them.' }),
+    tip: msg({ id: 'settings.project.inboxStopContinuation.tip', defaultMessage: 'Codex and Copilot have their stop held back, Claude Code a line added to it. Inherit follows Settings → Advanced → Keep an agent going when it stops with unread items.', description: 'The info tip of the setting "Keep an agent going when it stops with unread items" (Project Settings → Sessions). Codex, Copilot and Claude Code are CLIs\' names: keep them. Settings → Advanced names Combwork\'s settings: use its names as Combwork shows them.' }),
     type: 'select',
     options: ON_OFF
   },
   {
     section: 'sessions',
     key: 'inboxIdleWakes',
-    title: msg({ id: 'settings.project.inboxIdleWakes.title', defaultMessage: 'Wake an idle agent', description: "A setting's title (Project Settings → Sessions): Hive types a short line into an idle agent's terminal to tell it something has arrived in its inbox." }),
-    desc: msg({ id: 'settings.project.inboxIdleWakes.desc', defaultMessage: "Combwork types a short line into an idle agent's terminal when something arrives in its inbox, card loops' wakes included. Off: nothing is typed for what waits; the agent's pane shows how many, and Deliver Now types the line once.", description: 'What the setting "Wake an idle agent" does, under its title (Project Settings → Sessions). Deliver Now is a menu item of the agent\'s pane: use its name as Hive shows it.' }),
-    tip: msg({ id: 'settings.project.inboxIdleWakes.tip', defaultMessage: 'A card started on an agent, or a task given to it now, is still typed. Inherit follows Settings → Advanced → Wake an idle agent.', description: 'The info tip of the setting "Wake an idle agent" (Project Settings → Sessions). Settings → Advanced names Hive\'s settings: use its names as Hive shows them.' }),
+    title: msg({ id: 'settings.project.inboxIdleWakes.title', defaultMessage: 'Wake an idle agent', description: "A setting's title (Project Settings → Sessions): Combwork types a short line into an idle agent's terminal to tell it something has arrived in its inbox." }),
+    desc: msg({ id: 'settings.project.inboxIdleWakes.desc', defaultMessage: "Combwork types a short line into an idle agent's terminal when something arrives in its inbox, card loops' wakes included. Off: nothing is typed for what waits; the agent's pane shows how many, and Deliver Now types the line once.", description: 'What the setting "Wake an idle agent" does, under its title (Project Settings → Sessions). Deliver Now is a menu item of the agent\'s pane: use its name as Combwork shows it.' }),
+    tip: msg({ id: 'settings.project.inboxIdleWakes.tip', defaultMessage: 'A card started on an agent, or a task given to it now, is still typed. Inherit follows Settings → Advanced → Wake an idle agent.', description: 'The info tip of the setting "Wake an idle agent" (Project Settings → Sessions). Settings → Advanced names Combwork\'s settings: use its names as Combwork shows them.' }),
     type: 'select',
     options: ON_OFF
   },
   ...workflowRows(),
-  { section: 'storage', key: 'storage', title: msg({ id: 'settings.project.storage.title', defaultMessage: 'What Combwork keeps', description: "A setting's title (Project Settings → Storage)." }), desc: msg({ id: 'settings.project.storage.desc', defaultMessage: 'Measured in the background; Refresh measures again. The coding agents’ own transcripts (in ~/.claude, ~/.codex and ~/.copilot) aren’t counted, and Clean Up… and Purge… never touch them.', description: 'What the setting "What Hive keeps" does, under its title (Project Settings → Storage). Clean Up… and Purge… are buttons: use their names as translated there.' }), type: 'custom', wide: true },
+  { section: 'storage', key: 'storage', title: msg({ id: 'settings.project.storage.title', defaultMessage: 'What Combwork keeps', description: "A setting's title (Project Settings → Storage)." }), desc: msg({ id: 'settings.project.storage.desc', defaultMessage: 'Measured in the background; Refresh measures again. The coding agents’ own transcripts (in ~/.claude, ~/.codex and ~/.copilot) aren’t counted, and Clean Up… and Purge… never touch them.', description: 'What the setting "What Combwork keeps" does, under its title (Project Settings → Storage). Clean Up… and Purge… are buttons: use their names as translated there.' }), type: 'custom', wide: true },
   // Archived cards' attachments, removed some days after archiving (HI-1842, shared/cardCleanup.ts).
   {
     section: 'storage',
@@ -904,7 +904,7 @@ const READ_ONLY: [RegExp, AgentMsg][] = [[/^keybindings\./, agentMsg({ id: 'sett
 
 const RESTART: [RegExp, NonNullable<SettingEntry['restart']>][] = [
   [/^(project\.)?[\w-]+\.(executablePath|defaultModel|defaultEffort|model|effort|extraArgs|use200kContext|allowBackgroundSessions|defaultPermissionMode|permissionMode)$/, 'sessions'],
-  [/^general\.progressCommands$|^agentApi\.(provideHiveMcp|devConsole)$/, 'sessions'],
+  [/^general\.progressCommands$|^agentApi\.(provideCombworkMcp|devConsole)$/, 'sessions'],
   [/^assistant\.(control|changeSettings|provider|mode)$|^assistant\.provider:|^assistant\.[\w-]+\.\w+$/, 'assistant']
 ]
 
@@ -948,7 +948,7 @@ const HELPS: Record<string, AgentMsg> = {
 /** The id of the user guide's heading for each section (Help → User Guide). */
 const DOCS: Record<string, string> = {
   general: 'getting-started', // i18n-ignore: a user guide heading's id (#1535)
-  updates: 'updating-hive', // i18n-ignore: a user guide heading's id (#1535)
+  updates: 'updating-combwork', // i18n-ignore: a user guide heading's id (#1535)
   appearance: 'getting-started', // i18n-ignore: a user guide heading's id (#1535)
   providers: 'coding-agents-claude-code-codex-and-github-copilot', // i18n-ignore: a user guide heading's id (#1535)
   notifications: 'notifications', // i18n-ignore: a user guide heading's id (#1535)
@@ -959,7 +959,7 @@ const DOCS: Record<string, string> = {
   agents: 'several-agents-in-one-project', // i18n-ignore: a user guide heading's id (#1535)
   keybindings: 'keyboard-shortcuts', // i18n-ignore: a user guide heading's id (#1535)
   mcpCatalogs: 'installing-servers-from-a-catalogue', // i18n-ignore: a user guide heading's id (#1535)
-  agentApi: 'the-built-in-hive-server', // i18n-ignore: a user guide heading's id (#1535)
+  agentApi: 'the-built-in-combwork-server', // i18n-ignore: a user guide heading's id (#1535)
   advanced: 'troubleshooting' // i18n-ignore: a user guide heading's id (#1535)
 }
 const DOCS_BY_ID: Record<string, string> = {
@@ -987,7 +987,7 @@ const DOCS_BY_ID: Record<string, string> = {
   'sessions.backupTranscripts': 'archiving-and-backups', // i18n-ignore: a user guide heading's id (#1535)
   'sessions.backupRetention': 'archiving-and-backups', // i18n-ignore: a user guide heading's id (#1535)
   'sessions.recordPerformance': 'performance-metrics', // i18n-ignore: a user guide heading's id (#1535)
-  'sessions.resumeAfterUnexpectedClose': 'when-hive-closed-unexpectedly', // i18n-ignore: a user guide heading's id (#1535)
+  'sessions.resumeAfterUnexpectedClose': 'when-combwork-closed-unexpectedly', // i18n-ignore: a user guide heading's id (#1535)
   'agents.backgroundTaskMinutes': 'sessions', // i18n-ignore: a user guide heading's id (#1535)
   'agents.leftoverProcesses': 'processes-agents-leave-running' // i18n-ignore: a user guide heading's id (#1535)
 }
@@ -1001,7 +1001,7 @@ function settingPathOf(e: Pick<SettingEntry, 'section' | 'text' | 'workflowLevel
   const title = format(e.text.title)
   // A project's workflow options are its Version Control tab's (HI-1766), not a section of Project Settings.
   if (scope === 'project' && e.section === 'workflow') return format(withValues(PATHS.versionControl, { title }))
-  // A level's default (HI-1768): Settings → Version Control, its part (Hive defaults or Workspace defaults).
+  // A level's default (HI-1768): Settings → Version Control, its part (Combwork defaults or Workspace defaults).
   const level = e.workflowLevel?.level ?? (e.slotLevel === 'global' || e.slotLevel === 'workspace' ? e.slotLevel : null)
   if (level) return format(withValues(PATHS.level, { section: format(SETTINGS_SECTIONS.find((x) => x.id === 'workflow')!.text.label), part: format(level === 'global' ? LEVEL_PART.global : LEVEL_PART.workspace), title }))
   if (scope === 'project') return format(withValues(PATHS.project, { section: where(PROJECT_SETTINGS_SECTIONS), title }))
@@ -1010,15 +1010,15 @@ function settingPathOf(e: Pick<SettingEntry, 'section' | 'text' | 'workflowLevel
 
 /** Settings → Version Control's two parts (HI-1768), as a level default's path names them. */
 const LEVEL_PART = {
-  global: msg({ id: 'settings.workflow.hiveDefaults.title', defaultMessage: 'Combwork defaults', description: "A setting's title (Settings → Version Control): the workflow options every project of every workspace starts from (Darren's words, HI-1768)." }),
-  workspace: msg({ id: 'settings.workflow.workspaceDefaults.title', defaultMessage: 'Workspace defaults', description: "A setting's title (Settings → Version Control): the workflow options the open workspace's projects start from, over Hive defaults (HI-1768). The window shows the workspace's name beside it." })
+  global: msg({ id: 'settings.workflow.combworkDefaults.title', defaultMessage: 'Combwork defaults', description: "A setting's title (Settings → Version Control): the workflow options every project of every workspace starts from (Darren's words, HI-1768)." }),
+  workspace: msg({ id: 'settings.workflow.workspaceDefaults.title', defaultMessage: 'Workspace defaults', description: "A setting's title (Settings → Version Control): the workflow options the open workspace's projects start from, over Combwork defaults (HI-1768). The window shows the workspace's name beside it." })
 }
 
 /** A setting's path, by its parts. */
 const PATHS = {
   settings: msg({ id: 'settings.path.settings', defaultMessage: 'Settings → {section} → {title}', description: 'Where a setting is: Settings, its section and its title. Settings is the name of the Settings view.' }),
   project: msg({ id: 'settings.path.project', defaultMessage: 'Project Settings → {section} → {title}', description: "Where a project's setting is: Project Settings, its section and its title." }),
-  level: msg({ id: 'settings.path.level', defaultMessage: 'Settings → {section} → {part} → {title}', description: 'Where a workflow default is: Settings, its section (Version Control), its part (Hive defaults or Workspace defaults) and its title.' }),
+  level: msg({ id: 'settings.path.level', defaultMessage: 'Settings → {section} → {part} → {title}', description: 'Where a workflow default is: Settings, its section (Version Control), its part (Combwork defaults or Workspace defaults) and its title.' }),
   versionControl: msg({ id: 'settings.path.versionControl', defaultMessage: 'Version Control → Workflow → {title}', description: "Where a project's workflow option is: the project's Version Control tab, its Workflow section, and the option's title (glossary 2.1)." }),
 }
 
@@ -1030,7 +1030,7 @@ function entry(row: Row, id: string, scope: SettingScope, docs: string): Setting
   const action = ACTIONS.has(id)
   const value = row.type === 'custom' ? CUSTOM_VALUES[id] : undefined
   const applies = row.advanced ? advancedDef(row.advanced.id)?.applies : undefined
-  const restart = row.advanced ? (applies === 'sessions' ? 'sessions' : applies === 'restart' ? 'hive' : undefined) : RESTART.find(([re]) => re.test(id))?.[1]
+  const restart = row.advanced ? (applies === 'sessions' ? 'sessions' : applies === 'restart' ? 'combwork' : undefined) : RESTART.find(([re]) => re.test(id))?.[1]
   const { title, desc, tip, options, off, confirmOn, englishTitle, ...rest } = row
   const text: SettingEntry['text'] = { title, desc: desc ?? null, tip: tip ?? null, ...(off ? { off } : {}), ...(confirmOn ? { confirmOn } : {}), ...(englishTitle ? { englishTitle } : {}) }
   return {
@@ -1081,10 +1081,10 @@ export const settingReadOnly = (e: SettingEntry): string | undefined => (e.readO
 /** When it is worth suggesting (undefined: no signal recorded). */
 export const settingHelps = (e: SettingEntry): string | undefined => (e.helps ? say(e.helps) : undefined)
 
-/** Where the user finds it, as the user sees it, in the language Hive shows: "Ustawienia → Sesje → …". */
+/** Where the user finds it, as the user sees it, in the language Combwork shows: "Ustawienia → Sesje → …". */
 export const shownSettingPath = (e: SettingEntry): string => settingPathOf(e, e.scope, shownText)
 
-/** Settings' entries (Hive's and the providers' pages), in their order. */
+/** Settings' entries (Combwork's and the providers' pages), in their order. */
 export const APP_SETTINGS_CATALOG: readonly SettingEntry[] = [...APP_ROWS, ...levelRows()].map((r) =>
   r.provider ? entry(r, `${r.provider}.${r.key}`, 'provider', 'coding-agents-claude-code-codex-and-github-copilot') : entry(r, `${r.section}.${r.key}`, r.section === 'workspace' ? 'workspace' : 'app', DOCS[r.section] ?? 'getting-started') // i18n-ignore: a user guide heading's id (#1535)
 )
@@ -1104,7 +1104,7 @@ export function settingEntry(id: string): SettingEntry | undefined {
 // ---------------------------------------------------------------------------
 
 /**
- * A setting's value now: in Hive's settings, or in a project's config ('inherit' or null for one that inherits). An
+ * A setting's value now: in Combwork's settings, or in a project's config ('inherit' or null for one that inherits). An
  * advanced value (#367) is advanced.json's override (`advanced`: its values) or the default, or the workspace's own (null:
  * Settings → Advanced's).
  */
@@ -1122,7 +1122,7 @@ export function settingValue(e: SettingEntry, settings: AppSettings, project?: P
   if (e.slotLevel === 'project') return project ? (project.slots?.copy ?? project.worktreeCopy ?? 'inherit') : undefined
   if (e.scope === 'project') {
     if (!project) return undefined
-    // The project's own value of a workflow option, or inherit (#1278: the workspace's, then Hive's, then all-off).
+    // The project's own value of a workflow option, or inherit (#1278: the workspace's, then Combwork's, then all-off).
     // With no options yet, its card loops and file locks from before HI-1766, as the form and the runtime read them.
     if (e.workflow) return ownOrLegacy(project as ProjectConfig & Record<string, unknown>)[e.workflow] ?? 'inherit'
     if (e.key === PLATFORM_SETTING_KEY) return project.platform ?? project.workflow?.platform ?? null
@@ -1130,7 +1130,7 @@ export function settingValue(e: SettingEntry, settings: AppSettings, project?: P
   }
   if (e.provider) {
     const v = (providerSettings(settings, e.provider) as unknown as Record<string, unknown>)[e.key]
-    // A fallback list nobody edited is Hive's own (an empty list).
+    // A fallback list nobody edited is Combwork's own (an empty list).
     return (e.key === 'modelFallback' || e.key === 'effortFallback') && v === undefined ? [] : e.key === 'prices' ? (v ?? {}) : v
   }
   return (settings[e.section as keyof AppSettings] as unknown as Record<string, unknown> | undefined)?.[e.key]
@@ -1138,18 +1138,18 @@ export function settingValue(e: SettingEntry, settings: AppSettings, project?: P
 
 /** The user's commands as the settings tools read them (HI-1954): the lists' names, each point's names in order. */
 function commandsSettingValue(id: string, settings: AppSettings, ws?: Pick<WorkspaceConfig, 'commands'> | null): string[] | undefined {
-  const hive = settings.commands ?? EMPTY_HIVE
+  const combwork = settings.commands ?? EMPTY_CW
   const own = ws?.commands ?? EMPTY_WORKSPACE
-  const names = (point: CommandPoint, workspace?: CustomCommand[]): string[] => resolvePoint(point, { hive: hive.list, workspace }).map((r) => r.command?.name ?? '(deleted)') // i18n-ignore: the tools' text
-  if (id === 'general.commands') return hive.list.map((c) => c.name)
-  if (id === 'general.onQuit') return names(hive.onQuit)
+  const names = (point: CommandPoint, workspace?: CustomCommand[]): string[] => resolvePoint(point, { combwork: combwork.list, workspace }).map((r) => r.command?.name ?? '(deleted)') // i18n-ignore: the tools' text
+  if (id === 'general.commands') return combwork.list.map((c) => c.name)
+  if (id === 'general.onQuit') return names(combwork.onQuit)
   if (id === 'workspace.commands') return own.list.map((c) => c.name)
   if (id === 'workspace.onOpen') return names(own.onOpen, own.list)
   if (id === 'workspace.onClose') return names(own.onClose, own.list)
   return undefined
 }
 
-/** A setting's default: Hive's, or for a project's, Inherit. */
+/** A setting's default: Combwork's, or for a project's, Inherit. */
 export function settingDefault(e: SettingEntry): unknown {
   if (e.action) return undefined
   if (/^workspace\.(onClose|onOpen|commands)$|^general\.(onQuit|commands)$/.test(e.id)) return []
@@ -1177,9 +1177,9 @@ const AGENT = {
   notSettable: agentMsg({ id: 'settings.agent.error.notSettable', text: "{title} isn't a value that can be set this way ({why}): change it in {path}.", note: "cw_update_setting on a setting with no value the tools set. {why} is settings.agent.error.isAction or why it is read-only; {path} where the user changes it." }),
   isAction: agentMsg({ id: 'settings.agent.error.isAction', text: 'it is a button, a status or a list', note: "Why a setting has no value to set: it is a button, a status or a list (inside settings.agent.error.notSettable's brackets)." }),
   notSettableHere: agentMsg({ id: 'settings.agent.error.notSettableHere', text: "{title} isn't a value the settings tools set: change it in {path}.", note: "cw_update_setting on a setting Settings edits with a control of its own that the tools don't set (Accounts & Connections, MCP catalogues, check commands…), neither an action nor read-only (HI-2470). {path} is where the user changes it." }),
-  unknownAdvanced: agentMsg({ id: 'settings.agent.error.unknownAdvanced', text: "{title} isn't known.", note: 'An advanced setting this version of Hive has no definition of.' }),
+  unknownAdvanced: agentMsg({ id: 'settings.agent.error.unknownAdvanced', text: "{title} isn't known.", note: 'An advanced setting this version of Combwork has no definition of.' }),
   boolean: agentMsg({ id: 'settings.agent.error.boolean', text: '{title} takes true or false.', note: 'A value that is not a boolean. true and false are the values as written: keep them.' }),
-  notNumber: agentMsg({ id: 'settings.agent.error.notNumber', text: '{title} takes a number{hasOff, select, yes { (0 for {off})} other {}}{inherit, select, yes {, or null to inherit} other {}}.', note: "A value that isn't a number. {off} is the label 0 stands for (Never); inherit is yes where null inherits Hive's value." }),
+  notNumber: agentMsg({ id: 'settings.agent.error.notNumber', text: '{title} takes a number{hasOff, select, yes { (0 for {off})} other {}}{inherit, select, yes {, or null to inherit} other {}}.', note: "A value that isn't a number. {off} is the label 0 stands for (Never); inherit is yes where null inherits Combwork's value." }),
   range: agentMsg({ id: 'settings.agent.error.range', text: '{title} takes {min} to {max}{hasOff, select, yes {, or 0 for {off}} other {}}.', note: 'A number out of range. {min} and {max} are numbers as written; {off} is the label 0 stands for (Never).' }),
   choice: agentMsg({ id: 'settings.agent.error.choice', text: '{title} takes one of: {choices}.', note: 'A value that is none of a select setting\'s choices. {choices} lists the values as written.' }),
   effortType: agentMsg({ id: 'settings.agent.error.effortType', text: '{title} takes an effort level: {levels}.', note: 'An effort setting given something other than text. {levels} is settings.agent.takes.effort*.' }),
@@ -1214,10 +1214,10 @@ const AGENT = {
   offValue: agentMsg({ id: 'settings.agent.value.off', text: '0 ({off})', note: 'A number setting at 0, which turns it off. {off} is what 0 stands for (Never).' }),
   empty: agentMsg({ id: 'settings.agent.value.empty', text: '(empty)', note: 'A text setting with no text.' }),
   size: agentMsg({ id: 'settings.agent.value.size', text: '({n} {kind, select, list {entries} other {keys}})', note: "A table's size in a listing: {n} is a number as written (the word stays plural, as the tools always said it); kind is list or object." }),
-  hiveList: agentMsg({ id: 'settings.agent.value.hiveList', text: "(Combwork's list)", note: "A fallback list left empty: Hive's own list applies." }),
+  combworkList: agentMsg({ id: 'settings.agent.value.combworkList', text: "(Combwork's list)", note: "A fallback list left empty: Combwork's own list applies." }),
   none: agentMsg({ id: 'settings.agent.value.none', text: '(none)', note: 'A table with nothing in it, or an entry one side of a change has not got.' }),
   removed: agentMsg({ id: 'settings.agent.value.removed', text: 'removed', note: "A change to a provider's prices: a shipped model removed from its table." }),
-  hivePrice: agentMsg({ id: 'settings.agent.value.hivePrice', text: "Combwork's price", note: "A change to a provider's prices: a shipped model at Hive's own price (not removed)." }),
+  combworkPrice: agentMsg({ id: 'settings.agent.value.combworkPrice', text: "Combwork's price", note: "A change to a provider's prices: a shipped model at Combwork's own price (not removed)." }),
   older: agentMsg({ id: 'settings.agent.value.older', text: '{label} (older)', note: "A model fallback list's entry marked older, in a change: {label} is its label." })
 }
 
@@ -1253,7 +1253,7 @@ const COLUMNS = ['hold', 'todo', 'doing', 'review', 'passed', 'done']
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const price = (n: unknown): boolean => typeof n === 'number' && Number.isFinite(n) && n >= 0
 
-/** A table's value checked: column colours, a provider's prices, or one of its fallback lists; null puts back Hive's. */
+/** A table's value checked: column colours, a provider's prices, or one of its fallback lists; null puts back Combwork's. */
 function checkTable(e: SettingEntry, raw: unknown): { value: unknown } | { error: string } {
   if (e.id === 'board.colors') {
     if (raw === null) return { value: { ...DEFAULT_SETTINGS.board.colors } }
@@ -1270,7 +1270,7 @@ function checkTable(e: SettingEntry, raw: unknown): { value: unknown } | { error
     }
     return { value: Object.fromEntries(Object.entries(raw).map(([m, p]) => [m.trim(), { input: (p as Record<string, number>).input, cachedInput: (p as Record<string, number>).cachedInput, output: (p as Record<string, number>).output, ...((p as Record<string, number>).cacheWrite !== undefined ? { cacheWrite: (p as Record<string, number>).cacheWrite } : {}) }])) }
   }
-  // A fallback list: [{ value, label, older? }]; [] or null puts back Hive's own.
+  // A fallback list: [{ value, label, older? }]; [] or null puts back Combwork's own.
   if (raw === null) return { value: [] }
   if (!Array.isArray(raw)) return { error: say(AGENT.fallbackShape, { title: agentTitle(e), shape: `{value, label${e.key === 'modelFallback' ? ', older?' : ''}}` }) } // agent-protocol: an entry's JSON fields
   const seen = new Set<string>()
@@ -1288,7 +1288,7 @@ function checkTable(e: SettingEntry, raw: unknown): { value: unknown } | { error
 /**
  * A value as the setting takes it, or why not: the type, the range (0 where Never turns it off), the options, an effort
  * level the pickers offer, plain text of a sensible length, a table's shape. A project's number or list takes null (or
- * "inherit") to inherit Hive's.
+ * "inherit") to inherit Combwork's.
  */
 export function checkSettingValue(e: SettingEntry, raw: unknown, ctx: SettingContext = {}): { value: unknown } | { error: string } {
   const kind = settingKind(e)
@@ -1407,7 +1407,7 @@ export function effortTakes(e: SettingEntry, levels: { value: string }[]): strin
 }
 
 /**
- * The change that sets a checked value: a patch for Hive's settings, one for a project's config (from its current one),
+ * The change that sets a checked value: a patch for Combwork's settings, one for a project's config (from its current one),
  * or a table replaced whole (a provider's prices or fallback list: a deep merge can't remove an entry).
  */
 export function settingPatch(
@@ -1465,7 +1465,7 @@ export function settingValueText(e: SettingEntry, v: unknown, full = false): str
   if (typeof v === 'string') return v === '' ? say(AGENT.empty) : v
   if (!full) {
     const n = Array.isArray(v) ? v.length : Object.keys(v as object).length
-    return n ? say(AGENT.size, { n: String(n), kind: Array.isArray(v) ? 'list' : 'object' }) : Array.isArray(v) ? say(AGENT.hiveList) : say(AGENT.none)
+    return n ? say(AGENT.size, { n: String(n), kind: Array.isArray(v) ? 'list' : 'object' }) : Array.isArray(v) ? say(AGENT.combworkList) : say(AGENT.none)
   }
   const json = JSON.stringify(v)
   return json.length > 3000 ? `${json.slice(0, 2999)}…` : json
@@ -1476,14 +1476,14 @@ export function settingValueText(e: SettingEntry, v: unknown, full = false): str
  * a table by what changed in it (the entries of an object whose values differ, "doing: #3b82f6"; a list's values), each
  * side cut at 200 characters, so changing one colour reads as that colour, not as "(6 keys) → (6 keys)". A provider's
  * prices with `removed` (the shipped models removed from its table, before and after) show those too: "m: removed" on
- * the side that removed it, "m: Hive's price" on the other.
+ * the side that removed it, "m: Combwork's price" on the other.
  */
 export function settingChangeTexts(e: SettingEntry, old: unknown, now: unknown, removed?: { old: string[]; new: string[] }): { oldText: string; newText: string } {
   if (removed) {
     const shown = (prices: unknown, gone: string[], other: string[]): Record<string, unknown> => {
       const own = isObject(prices) ? prices : {}
       const out: Record<string, unknown> = { ...own }
-      for (const m of other) if (!(m in own) && !gone.includes(m)) out[m] = say(AGENT.hivePrice)
+      for (const m of other) if (!(m in own) && !gone.includes(m)) out[m] = say(AGENT.combworkPrice)
       for (const m of gone) if (!(m in own)) out[m] = say(AGENT.removed)
       return out
     }
@@ -1492,10 +1492,10 @@ export function settingChangeTexts(e: SettingEntry, old: unknown, now: unknown, 
   const cut = (s: string): string => (s.length > 200 ? `${s.slice(0, 199)}…` : s)
   if (Array.isArray(old) || Array.isArray(now)) {
     const valueOf = (x: unknown): string => (isObject(x) && typeof x.value === 'string' ? x.value : JSON.stringify(x))
-    const values = (v: unknown): string => (Array.isArray(v) && v.length ? v.map(valueOf).join(', ') : say(AGENT.hiveList))
+    const values = (v: unknown): string => (Array.isArray(v) && v.length ? v.map(valueOf).join(', ') : say(AGENT.combworkList))
     const a = Array.isArray(old) ? old : []
     const b = Array.isArray(now) ? now : []
-    // From or back to Hive's list: the whole list. Otherwise the entries that changed, by value, as an object's are
+    // From or back to Combwork's list: the whole list. Otherwise the entries that changed, by value, as an object's are
     // ("gpt-7: GPT 7 (older)", "(none)" where one side hasn't it), so a label or older flag that changed shows.
     if (a.length && b.length) {
       const byValue = (l: unknown[]): Map<string, unknown> => new Map(l.map((x) => [valueOf(x), x]))

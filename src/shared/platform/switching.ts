@@ -1,4 +1,4 @@
-// Switching a project's version control (#1419, SPEC §16.6.5): which switch can be made from what Hive detects now, and
+// Switching a project's version control (#1419, SPEC §16.6.5): which switch can be made from what Combwork detects now, and
 // its reasons, the same in the window (the choice atop the Version Control tab) and in main (the switch, under the
 // project's lock, and the Assistant's settings tool). Choosing None is never refused for what is detected (#1122: you
 // pick the version control): Git only where a Git repository is found and no other version control is.
@@ -6,7 +6,7 @@
 import { msg, type Msg } from '../i18n/msg'
 import type { Detection, PlatformId } from './descriptors'
 
-/** A platform's name as Hive shows it (glossary 2.1). */
+/** A platform's name as Combwork shows it (glossary 2.1). */
 export const PLATFORM_NAME: Record<PlatformId, Msg> = {
   none: msg({ id: 'git.vc.none', defaultMessage: 'None', description: 'The version control of a project without any, in the choice atop the Version Control tab and in "Workflow: None · Solo" (glossary 2.1: None).' }),
   git: msg({ id: 'git.vc.git', defaultMessage: 'Git', description: 'A version control system’s name, in the choice atop the Version Control tab (glossary 2.1: keep).' })

@@ -223,7 +223,7 @@ describe('the full upgrade of an rc.12-shaped profile (HI-2106)', () => {
   ]
   const wsFile = { version: 1, mcp: { enabled: [] }, connections: { 'claude-code': { on: ['a-personal', 'a-work', 'a-deepseek'], default: 'a-personal' }, codex: { on: ['a-codex'], default: 'a-codex' } }, assistantConnection: { 'claude-code': 'a-work', codex: 'a-codex' } } as unknown as WorkspaceConfig
   const projects: Record<string, ProjectConfig> = {
-    hive: projectOf({
+    alpha: projectOf({
       version: 2,
       // A project's mode and extra arguments over the global ones; its own model moved onto agents by HI-1770 already.
       providers: { 'claude-code': { model: 'inherit', effort: 'inherit', permissionMode: 'plan', extraArgs: '--project', use200kContext: 'inherit' } },
@@ -283,15 +283,15 @@ describe('the full upgrade of an rc.12-shaped profile (HI-2106)', () => {
 
   it('the cases the card names, as they launched', () => {
     // A global 200K on with an account with no context default: 1M; its project's mode and arguments over the global ones.
-    expect(was.agents['hive/W1']).toMatchObject({ context: false, mode: 'plan', args: ['--verbose', '--project'], folder: 'a-work' })
+    expect(was.agents['alpha/W1']).toMatchObject({ context: false, mode: 'plan', args: ['--verbose', '--project'], folder: 'a-work' })
     // The agent's own model, effort and mode.
-    expect(was.agents['hive/HB2']).toMatchObject({ model: 'sonnet', effort: 'high', mode: 'manual' })
+    expect(was.agents['alpha/HB2']).toMatchObject({ model: 'sonnet', effort: 'high', mode: 'manual' })
     // A server account: no effort or context.
-    expect(was.agents['hive/S1']).toMatchObject({ model: 'deepseek-v4', effort: null, context: false, folder: 'a-deepseek' })
+    expect(was.agents['alpha/S1']).toMatchObject({ model: 'deepseek-v4', effort: null, context: false, folder: 'a-deepseek' })
     // Off here: the workspace's first on.
-    expect(was.agents['hive/X2'].folder).toBe('a-codex')
+    expect(was.agents['alpha/X2'].folder).toBe('a-codex')
     // Copilot: the legacy layer, on its own home.
-    expect(was.agents['hive/G2']).toMatchObject({ model: 'gpt-5', mode: 'plan', args: ['--banner'], folder: null })
+    expect(was.agents['alpha/G2']).toMatchObject({ model: 'gpt-5', mode: 'plan', args: ['--banner'], folder: null })
     // HI-1770's move made as the launch would have: the project's model and context.
     expect(was.agents['other/O1']).toMatchObject({ model: 'haiku', context: true })
     expect(was.agents['other/O2']).toMatchObject({ model: 'opus', context: false })
@@ -299,21 +299,21 @@ describe('the full upgrade of an rc.12-shaped profile (HI-2106)', () => {
   })
 
   it('agents hold only their connection; matching setups share one; the project keeps no launch settings', () => {
-    const hive = migrated.hive.agents
-    for (const a of [...hive, ...migrated.other.agents]) expect(Object.keys(a).filter((k) => ['model', 'effort', 'permissionMode', 'use200kContext'].includes(k))).toEqual([])
-    const by = (name: string): AgentDef => hive.find((a) => a.name === name)!
+    const alpha = migrated.alpha.agents
+    for (const a of [...alpha, ...migrated.other.agents]) expect(Object.keys(a).filter((k) => ['model', 'effort', 'permissionMode', 'use200kContext'].includes(k))).toEqual([])
+    const by = (name: string): AgentDef => alpha.find((a) => a.name === name)!
     expect(by('HB3').connection).toBe(by('HB4').connection)
     expect(by('HB1').connection).toBe(by('HB5').connection)
     expect(by('HB1').connection).not.toBe(by('HB3').connection)
     expect(by('X2').connection).toBe(store.connections.find((c) => c.account === 'a-codex' && c.effort === undefined)?.id)
-    expect('providers' in migrated.hive || 'defaultProvider' in migrated.hive).toBe(false)
-    expect(migrated.hive.migrations?.accounts1).toEqual({ at: AT })
+    expect('providers' in migrated.alpha || 'defaultProvider' in migrated.alpha).toBe(false)
+    expect(migrated.alpha.migrations?.accounts1).toEqual({ at: AT })
     // HI-1770's record is kept, for its notice.
     expect(migrated.other.migrations?.connections1?.['claude-code']?.moved.map((m) => m.id)).toEqual(['claude-code:o1:model', 'claude-code:o1:use200kContext'])
   })
 
   it('names what it made after what differs from the base, on the account', () => {
-    const named = (agent: string): string => store.connections.find((c) => c.id === migrated.hive.agents.find((a) => a.name === agent)!.connection)!.name
+    const named = (agent: string): string => store.connections.find((c) => c.id === migrated.alpha.agents.find((a) => a.name === agent)!.connection)!.name
     expect(named('HB1')).toBe('Personal · Plan · --verbose --project')
     expect(named('HB3')).toMatch(/^Personal · High/)
   })
@@ -330,7 +330,7 @@ describe('the full upgrade of an rc.12-shaped profile (HI-2106)', () => {
 
   it('runs once: a second run changes nothing', () => {
     const count = store.connections.length
-    expect(migrateProject(migrated.hive, inp, store, AT)).toBeNull()
+    expect(migrateProject(migrated.alpha, inp, store, AT)).toBeNull()
     expect(migrateAssistant(assistant, inp, store, AT)).toBeNull()
     expect(store.connections.length).toBe(count)
   })
@@ -354,7 +354,7 @@ describe("0.9's providers' order, read by the migration only (HI-2139)", () => {
     expect(project.agents[0].provider).toBe('codex')
   })
 
-  it("isn't today's: Automatic's fallback picks in Hive's order", () => {
+  it("isn't today's: Automatic's fallback picks in Combwork's order", () => {
     expect(autoProvider(loaded.settings)).toBe('claude-code')
   })
 })

@@ -1,11 +1,11 @@
 import { AsyncLocalStorage } from 'async_hooks'
 import { createHash } from 'crypto'
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'original-fs'
+import { copyFileSync, existsSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'original-fs'
 import { mkdir, writeFile } from 'original-fs/promises'
 import { basename, join } from 'path'
 import type { StatementSync } from 'node:sqlite'
 import { app } from 'electron'
-import { HIVE_DIR } from '../shared/defaults'
+import { CW_DIR } from '../shared/defaults'
 import { msg } from '../shared/i18n'
 import type { ArchiveBatch, BoardState } from '../shared/types'
 import { cardField, composeCard, decomposeCard, readCardRows, writeCardChanges, writeCardRows, type CardPart, type CardRow, type CardRows } from './schema/cardRows'
@@ -13,6 +13,8 @@ import { moveCardsIntoTables } from './schema/cardsStep'
 import { addKey, cardKeys as keysOfCards, cardOfKey, cardPlace, changeKey, currentKeys, keysHeld, KEYS_STEP, moveKeys, movedCardNames, numberCard } from './schema/keysStep'
 import { LANE_RECORD_STEP, moveLaneRecords } from './schema/laneRecordStep'
 import { ACTIONS_DELIVERED_STEP, ASSISTANT_CHANGES_STEP, CARD_ATTACHMENTS_STEP, CARD_REVS_STEP, CARD_SEARCH_STEP, CARDS_STEP, FACTS_STEP, QUERIES, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_RUNNERS_STEP, COPIES_STEP, QUEUE_SEEN_STEP, SESSION_LEASES_STEP, SKILL_COPIES_STEP, SLOTS_STEP, UNDO_OUTCOMES_STEP } from './schema/v1_0'
+import { NAMES_STEP } from './schema/namesStep'
+import { VALUES_STEP } from './schema/valuesStep'
 import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, isIoError, openDb, OPENABLE_WAIT_MS, schemaVersion, soleCopy, untilOpenable, type Db, type Migration, type PendingGroup } from './db'
 import { checkpointsReleased, checkpointWhenIdle, timedCommit } from './walCheckpoint'
 import { beginWrite, countedWrite } from './dbWrites'
@@ -21,7 +23,7 @@ import { moveStores, STORES_STEP } from './schema/storeCodec'
 import { emit } from './events'
 import { placeKey, realPath, withFileLock } from './fsutil'
 import { trash } from './trash'
-import { hiveError } from './hiveError'
+import { combworkError } from './combworkError'
 import { createLogger, userText } from './logger'
 import { assertAdmitted, assertPlaceAdmitted, isAdmitted, isRefusal } from './openingFence'
 import { HEARTBEAT_MS, othersPresent, profileId, removePresence, writePresence } from './presence'
@@ -32,7 +34,7 @@ import { CATEGORY_STAGE, type Category, type StageId } from '../shared/workflow/
 const log = createLogger('board')
 
 /**
- * The workspace's task board in SQLite (#1017, design on the card): `.combwork/hive.db`. Since 1.0's cards step (#1209) a
+ * The workspace's task board in SQLite (#1017, design on the card): `.combwork/combwork.db`. Since 1.0's cards step (#1209) a
  * card is a row of typed columns in `cards` with its lists in child tables (labels, links, context, comments, history,
  * decisions, holds; schema/v1_0.ts), and every reader is given the card's JSON document composed from them, byte for
  * byte the document it was saved as (schema/cardRows.ts), so the Agent API's JSON is unchanged. Before the upgrade (a
@@ -40,8 +42,8 @@ const log = createLogger('board')
  * transaction, and one `tasks-changed` after it commits. Only this module reads or writes cards' rows.
  */
 
-export const DB_FILE = 'hive.db'
-/** The folder the cards' files were in before (#1017), and what an older Hive still looks at. */
+export const DB_FILE = 'combwork.db'
+/** The folder the cards' files were in before (#1017), and what an older version still looks at. */
 const TASKS = 'tasks'
 
 /** The group of the 1.0 upgrade's steps (#1207): every P3 step that changes the schema is in it. */
@@ -109,7 +111,7 @@ export const BOARD_MIGRATIONS: Migration[] = [
   },
   {
     // #1207: the first step of the 1.0 upgrade (SPEC §16.17). The group's steps run as one, asked first, with the file
-    // locked to this Hive and a copy of the 0.9 board kept; P3's tables follow it, each the next version, in the group.
+    // locked to this Combwork and a copy of the 0.9 board kept; P3's tables follow it, each the next version, in the group.
     version: 3,
     name: '1.0 upgrade',
     group: UPGRADE_GROUP_ID,
@@ -210,7 +212,7 @@ export const BOARD_MIGRATIONS: Migration[] = [
     }
   },
   {
-    // #1360: the merge queue's runner, one per project and target across Hives, its processes and its worktrees
+    // #1360: the merge queue's runner, one per project and target across Combworks, its processes and its worktrees
     // (workflow/queueRunner.ts), and a queue pause's process.
     version: 14,
     name: QUEUE_RUNNERS_STEP.name,
@@ -229,7 +231,7 @@ export const BOARD_MIGRATIONS: Migration[] = [
     }
   },
   {
-    // #1353: who paused a merge queue (the user, the Assistant; none: Hive's own pause) and when.
+    // #1353: who paused a merge queue (the user, the Assistant; none: Combwork's own pause) and when.
     version: 16,
     name: QUEUE_PAUSE_BY_STEP.name,
     group: UPGRADE_GROUP_ID,
@@ -275,7 +277,7 @@ export const BOARD_MIGRATIONS: Migration[] = [
     }
   },
   {
-    // #1431: which skill copies Hive made in which folder (skillCopies.ts), so a clean-up removes only its own.
+    // #1431: which skill copies Combwork made in which folder (skillCopies.ts), so a clean-up removes only its own.
     version: 21,
     name: SKILL_COPIES_STEP.name,
     group: UPGRADE_GROUP_ID,
@@ -309,6 +311,34 @@ export const BOARD_MIGRATIONS: Migration[] = [
     up: (db) => {
       for (const sql of CARD_REVS_STEP.ddl) db.exec(sql)
     }
+  },
+  {
+    // HI-2587, the names upgrade: what the board kept under the old names takes Combwork's (comments' old text column,
+    // the 0.9 import's record's old version key). In the 1.0 group, near its end: a board 1.0 or an RC upgraded takes it
+    // unasked (as HI-1718's later steps), a 0.9 board with its upgrade.
+    version: 25,
+    name: NAMES_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: (db) => {
+      // Only with 1.0's tables (a board made before them, its group not run, has no comments' column to rename).
+      const cols = (db.prepare("SELECT name FROM pragma_table_info('card_comments')").all() as { name: string }[]).map((c) => c.name) // i18n-ignore: SQL
+      // old-name: begin board-names-step
+      if (cols.includes('hive_text')) for (const sql of NAMES_STEP.ddl) db.exec(sql)
+      db.exec("UPDATE board_meta SET value = json_remove(json_set(value, '$.appVersion', json_extract(value, '$.hiveVersion')), '$.hiveVersion') WHERE key = 'imported' AND json_valid(value) AND json_type(value, '$.hiveVersion') IS NOT NULL") // i18n-ignore: SQL
+      // old-name: end board-names-step
+    }
+  },
+  {
+    // HI-2598, the names upgrade's stored values (its design HI-2598/s9 §2): what 1.0 and the release candidates stored
+    // under the old names (a fact's actor, who merges, the rulesets compiled from it, a lane's builder, Combwork's own
+    // deliveries…) takes Combwork's, once (schema/valuesStep.ts). The 1.0 group's last step: taken unasked as 25 is.
+    version: 26,
+    name: VALUES_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: (db) => {
+      const changed = VALUES_STEP.up(db)
+      if (Object.keys(changed).length) log.info(`names: values converted ${JSON.stringify(changed)}`)
+    }
   }
 ]
 
@@ -317,7 +347,7 @@ interface Imported {
   at: string
   cards: number
   damaged: string[]
-  hiveVersion: string
+  appVersion: string
   /** The folder the files were moved to, as a backup. */
   folder: string
   /** The files' folder couldn't be renamed yet (held open): tried again at the next open. */
@@ -333,7 +363,7 @@ interface Board {
    * Its `.combwork` at that real location, as it opened: every write and removal on disk for it (the heartbeat, the stub, the
    * presence marker's removal) goes there, never through a spelling that may point elsewhere by then (#1402).
    */
-  hive: string
+  combwork: string
   db: Db
   /** Its cards are still JSON documents, a row each (a 0.9 board waiting for its upgrade to 1.0, read-only), not 1.0's tables. */
   legacy: boolean
@@ -367,7 +397,7 @@ const boards = new Map<string, Board>()
 export const boardTestHooks: {
   failPut: ((n: number) => boolean) | null
   refuseRename: ((from: string) => boolean) | null
-  /** The 1.0 upgrade's question answered before it is asked (as HIVE_TEST_BOARD_UPGRADE does for a test copy). */
+  /** The 1.0 upgrade's question answered before it is asked (as CW_TEST_BOARD_UPGRADE does for a test copy). */
   upgradeAnswer: 'yes' | 'no' | null
   /** Runs while the upgrade holds the file's exclusive lock, its steps committed. */
   whileUpgrading: (() => void) | null
@@ -385,47 +415,16 @@ export function onBoardNotice(fn: (path: string, n: BoardNotice) => void): void 
 
 const M = {
   noWorkspace: msg({ id: 'board.error.noWorkspace', defaultMessage: 'No workspace is open', description: 'An error: the task board needs an open workspace, and there is none.' }),
-  newer: msg({ id: 'board.error.newer', defaultMessage: 'This board was saved by a newer version of Combwork. It is shown read-only: update Combwork to change it.', description: "An error: the workspace's task board was saved by a newer Hive, whose format this version doesn't know; cards can be read but not changed." }),
-  upgradeFirst: msg({ id: 'board.error.upgradeFirst', defaultMessage: "This board is from Combwork 0.9: it is read-only until it is upgraded to 1.0 (Upgrade… on the board's banner).", description: "An error: the workspace's task board hasn't been upgraded to Hive 1.0's format yet (the user was asked and said not now), so cards can be read but not changed. Upgrade… is the button on the banner above the board." }),
-  upgradeFirstStart: msg({ id: 'board.error.upgradeFirstStart', defaultMessage: 'This workspace is from Combwork 0.9: upgrade it to 1.0 before starting agents (Upgrade… on the banner at the top of the window).', description: "An error: an agent (or the Assistant) can't start while the workspace's data waits for its upgrade to Hive 1.0's format (the user said Not Now): Hive couldn't record its session. Upgrade… is the button on the banner at the top of the window." }),
-  stopAgentsFirst: msg({ id: 'board.error.stopAgentsFirst', defaultMessage: "Stop this workspace's agents and its Assistant first: once the 0.9 board is back, Combwork can't record them.", description: "An error from Help → Restore the 0.9 Board Backup…: agents of the workspace are running or starting; the board put back is read-only in this Hive, so their sessions couldn't be recorded. Nothing was changed." }),
-  inUse: msg({ id: 'board.error.inUse', defaultMessage: 'Another Combwork has this workspace open: close it first.', description: "An error: the board can't be upgraded to 1.0 (or its 0.9 backup put back) while another copy of Hive (an older version, or another profile) has the workspace open. Nothing was changed." }),
-  noBackup: msg({ id: 'board.error.noBackup', defaultMessage: 'There is no 0.9 board backup to put back: this board was never upgraded to 1.0 here.', description: "An error from Help → Restore the 0.9 Board Backup…: no copy of the board from before its upgrade to Hive 1.0 is kept in the workspace." }),
+  newer: msg({ id: 'board.error.newer', defaultMessage: 'This board was saved by a newer version of Combwork. It is shown read-only: update Combwork to change it.', description: "An error: the workspace's task board was saved by a newer Combwork, whose format this version doesn't know; cards can be read but not changed." }),
+  upgradeFirst: msg({ id: 'board.error.upgradeFirst', defaultMessage: "This board is from version 0.9: it is read-only until it is upgraded to 1.0 (Upgrade… on the board's banner).", description: "An error: the workspace's task board hasn't been upgraded to 1.0's format yet (the user was asked and said not now), so cards can be read but not changed. Upgrade… is the button on the banner above the board." }),
+  upgradeFirstStart: msg({ id: 'board.error.upgradeFirstStart', defaultMessage: 'This workspace is from version 0.9: upgrade it to 1.0 before starting agents (Upgrade… on the banner at the top of the window).', description: "An error: an agent (or the Assistant) can't start while the workspace's data waits for its upgrade to 1.0's format (the user said Not Now): Combwork couldn't record its session. Upgrade… is the button on the banner at the top of the window." }),
+  stopAgentsFirst: msg({ id: 'board.error.stopAgentsFirst', defaultMessage: "Stop this workspace's agents and its Assistant first: once the 0.9 board is back, Combwork can't record them.", description: "An error from Help → Restore the 0.9 Board Backup…: agents of the workspace are running or starting; the board put back is read-only in this Combwork, so their sessions couldn't be recorded. Nothing was changed." }),
+  inUse: msg({ id: 'board.error.inUse', defaultMessage: 'Another Combwork has this workspace open: close it first.', description: "An error: the board can't be upgraded to 1.0 (or its 0.9 backup put back) while another copy of Combwork (an older version, or another profile) has the workspace open. Nothing was changed." }),
+  noBackup: msg({ id: 'board.error.noBackup', defaultMessage: 'There is no 0.9 board backup to put back: this board was never upgraded to 1.0 here.', description: "An error from Help → Restore the 0.9 Board Backup…: no copy of the board from before its upgrade to 1.0 is kept in the workspace." }),
   unavailable: msg({ id: 'board.error.unavailable', defaultMessage: "The board couldn't be opened: {error}", description: "An error: the workspace's task board database couldn't be opened or its cards couldn't be moved into it; {error} says why (from the system, often in English). Nothing was lost: the cards are still where they were." })
 }
 
 const stamp = (): string => new Date().toISOString().replace(/[:.]/g, '-')
-
-/** The README left in the cards' old folder for anyone (or any older Hive) looking there. */
-const README = [
-  'The task board moved to .combwork/hive.db in Hive 0.9 (#1017).', // i18n-ignore: a file left for people and older Hive versions, in English
-  'An older Hive opening this workspace shows an empty board; cards it adds here are set aside in .combwork/tasks.set-aside when Hive 0.9 or later opens again, for you to review.', // i18n-ignore: as above
-  'To use the board in an older Hive, use Export Board to JSON in Hive 0.9 and copy the exported files into this folder, with Hive closed.', // i18n-ignore: as above
-  ''
-].join('\r\n')
-
-/** The stub of the old folder: the next number (so an older Hive never reuses one) and the README. */
-function writeStub(hive: string, next: number): void {
-  const dir = join(hive, TASKS)
-  try {
-    mkdirSync(dir, { recursive: true })
-    writeFileSync(join(dir, 'board.json'), JSON.stringify({ version: 1, next }, null, 2) + '\n')
-    if (!existsSync(join(dir, 'README.txt'))) writeFileSync(join(dir, 'README.txt'), README)
-  } catch (e) {
-    log.warn('writing the board folder for older versions', e)
-  }
-}
-
-/** Moves the stub's next number on (an older Hive never takes one this board has used), if the stub is there. */
-function writeStubNext(hive: string, next: number): void {
-  const file = join(hive, TASKS, 'board.json')
-  if (!existsSync(join(hive, TASKS))) return
-  try {
-    writeFileSync(file, JSON.stringify({ version: 1, next }, null, 2) + '\n')
-  } catch (e) {
-    log.warn('moving on the next number older versions read', e)
-  }
-}
 
 /** The highest card number among card files' names, damaged files' too: none of them is ever given to another card. */
 const highestName = (names: string[]): number => names.reduce((m, f) => Math.max(m, Number(f.slice(0, -5)) || 0), 0)
@@ -485,12 +484,11 @@ function renameNow(from: string, to: string): boolean {
  * Moves the cards' files into a new database (#1017), once, in one transaction: every `<n>.json` (never .bak, .tmp or
  * anything else) as its text was, board.json's next number and the archive batches. Checked before it commits: as many
  * rows as card files read, each with its file's number, column and archived. A file that isn't a card is left where it
- * is (in the backup folder after the move) and named. Then the folder becomes `tasks.imported-<time>`, kept as a backup,
- * and a stub takes its place for older versions.
+ * is (in the backup folder after the move) and named. Then the folder becomes `tasks.imported-<time>`, kept as a backup.
  */
-function importFiles(b: Board, hive: string, hiveVersion: string): void {
+function importFiles(b: Board, combwork: string, appVersion: string): void {
   const db = b.db.writer
-  const dir = join(hive, TASKS)
+  const dir = join(combwork, TASKS)
   const names = cardFiles(dir)
   const cards: { n: number; doc: Record<string, unknown> }[] = []
   const damaged: string[] = []
@@ -503,7 +501,7 @@ function importFiles(b: Board, hive: string, hiveVersion: string): void {
   const batches = readJsonFile<{ batches?: unknown }>(join(dir, 'archive-batches.json'), {})
   const folder = `${TASKS}.imported-${stamp()}`
   const t0 = performance.now()
-  const record: Imported = { at: new Date().toISOString(), cards: cards.length, damaged, hiveVersion, folder, pendingRename: names.length > 0 || existsSync(join(dir, 'board.json')) || existsSync(join(dir, 'archive-batches.json')) }
+  const record: Imported = { at: new Date().toISOString(), cards: cards.length, damaged, appVersion, folder, pendingRename: names.length > 0 || existsSync(join(dir, 'board.json')) || existsSync(join(dir, 'archive-batches.json')) }
   timedStep(`db begin ${DB_FILE}`, () => db.exec('BEGIN IMMEDIATE'))
   try {
     for (const c of cards) writeCardRows(db, decomposeCard(c.n, c.doc))
@@ -531,75 +529,49 @@ function importFiles(b: Board, hive: string, hiveVersion: string): void {
   }
   log.info(`moved ${cards.length} card(s) from ${userText(dir)} into ${DB_FILE} in ${Math.round(performance.now() - t0)} ms${damaged.length ? `; ${damaged.length} file(s) that aren't cards left in the folder: ${damaged.join(', ')}` : ''}`)
   if (cards.length || damaged.length) notify(b.path, { kind: 'imported', cards: cards.length, damaged, folder })
-  finishMove(b, hive, record)
+  finishMove(b, combwork, record)
 }
 
-/** Renames the old folder to its backup name and leaves the stub (or, refused, tries again at the next open). */
-function finishMove(b: Board, hive: string, record: Imported): void {
-  const dir = join(hive, TASKS)
+/** Renames the old folder to its backup name (or, refused, tries again at the next open). */
+function finishMove(b: Board, combwork: string, record: Imported): void {
+  const dir = join(combwork, TASKS)
   if (record.pendingRename && existsSync(dir)) {
-    if (!renameNow(dir, join(hive, record.folder))) {
+    if (!renameNow(dir, join(combwork, record.folder))) {
       log.warn(`couldn't rename ${userText(dir)} to ${record.folder} (held open): tried again at the next open`)
       return
     }
-    log.info(`the card files are kept in ${userText(join(hive, record.folder))}`)
+    log.info(`the card files are kept in ${userText(join(combwork, record.folder))}`)
   }
   if (record.pendingRename) setMeta(b.db.writer, 'imported', JSON.stringify({ ...record, pendingRename: false }))
-  writeStub(hive, nextOf(b.db.writer))
 }
 
-/** Where cards an older Hive saved in the stub are set aside, intact, for the user to review (Darren, 17 Oct). */
+/** Where cards an older version saved in the stub are set aside, intact, for the user to review (Darren, 17 Oct). */
 export const SET_ASIDE = `${TASKS}.set-aside`
 
 /**
- * Card files an older Hive saved in the stub folder (#1017's downgrade; Darren's decision, 17 Oct): after the move to the
- * database nothing is taken back on its own. Every `<n>.json` found there is set aside, intact, in `.combwork/tasks.set-aside`,
- * free number or not, and the user is told once ("n cards made by an older Hive were found: review them"; the review to
- * add or discard them is #1044). Each file goes once: one whose very content is set aside already isn't kept twice, and
- * another file of the same name is kept beside it under a name of its own. A copy is made before the file leaves the
- * stub, so a file Windows won't let go of (or Hive ending part way) is only removed at a later open. Their numbers are
- * never given to new cards.
+ * The numbers of the cards set aside for the user to review (#1044; those an older version saved in the stub 0.9 to 1.0
+ * left, which the names upgrade sets aside: nameUpgradeFiles.ts moveOldStub, HI-2594) are never given to new cards: the
+ * next number is moved past them at each open, in the board's own write. Reads only the set-aside folder.
  */
-function setAsideStub(b: Board, hive: string): void {
-  const dir = join(hive, TASKS)
-  const names = cardFiles(dir)
-  if (!names.length) return
+function keepSetAsideNumbers(b: Board, combwork: string): void {
+  let names: string[]
+  try {
+    names = readdirSync(join(combwork, SET_ASIDE)).filter((f) => SET_ASIDE_NAME.test(f))
+  } catch {
+    return
+  }
+  const highest = names.reduce((m, f) => Math.max(m, Number(SET_ASIDE_NAME.exec(f)![1])), 0)
   const db = b.db.writer
-  // Numbers given from here are past every file's in the stub, and the older Hive's own next number.
-  const board = readJsonFile<{ next?: unknown }>(join(dir, 'board.json'), {})
-  setMeta(db, 'next', String(Math.max(nextOf(db), Number(board.next) || 1, highestName(names) + 1)))
-  const aside = join(hive, SET_ASIDE)
-  mkdirSync(aside, { recursive: true })
-  const kept = new Set(readdirSync(aside).map((f) => readFileSync(join(aside, f), 'utf8')))
-  let found = 0
-  for (const f of names) {
-    let text: string
-    try {
-      text = readFileSync(join(dir, f), 'utf8')
-    } catch (e) {
-      log.warn(`couldn't read ${f} in ${userText(dir)}: tried again at the next open`, e)
-      continue
-    }
-    if (!kept.has(text)) {
-      const to = existsSync(join(aside, f)) ? `${f.slice(0, -5)}.${stamp()}-${found}.json` : f
-      writeFileSync(join(aside, to), text)
-      kept.add(text)
-      found++
-    }
-    try {
-      rmSync(join(dir, f))
-    } catch (e) {
-      log.warn(`couldn't remove ${f} from ${userText(dir)} (its copy is in ${SET_ASIDE}): tried again at the next open`, e)
-    }
-  }
-  if (found) {
-    log.info(`${found} card file(s) an older Hive saved in ${userText(dir)} set aside in ${SET_ASIDE}`)
-    notify(b.path, { kind: 'setAside', cards: found, folder: SET_ASIDE })
-  }
-  writeStub(hive, nextOf(db))
+  if (highest >= nextOf(db)) setMeta(db, 'next', String(highest + 1))
 }
 
-/** A set-aside file's name as setAsideStub gives it: `<n>.json`, or `<n>.<time>-<i>.json` beside one of that name. */
+/** Tells the user cards an older version saved were set aside (the names upgrade, HI-2594): the board's notice. */
+export function tellSetAside(path: string, cards: number): void {
+  log.info(`${cards} card file(s) an older version saved set aside in ${SET_ASIDE}`)
+  notify(path, { kind: 'setAside', cards, folder: SET_ASIDE })
+}
+
+/** A set-aside file's name as it is given (moveOldStub): `<n>.json`, or `<n>.<time>-<i>.json` beside one of that name. */
 const SET_ASIDE_NAME = /^(\d+)(?:\.[0-9TZ-]+)?\.json$/
 const textHash = (text: string): string => createHash('sha256').update(text).digest('hex')
 
@@ -610,7 +582,7 @@ const textHash = (text: string): string => createHash('sha256').update(text).dig
  */
 export function setAsideFiles(ws: WorkspaceService): { file: string; number: number; text: string | null }[] {
   if (!ws.path) return []
-  const dir = join(ws.path, HIVE_DIR, SET_ASIDE)
+  const dir = join(ws.path, CW_DIR, SET_ASIDE)
   let names: string[]
   try {
     names = readdirSync(dir).filter((f) => SET_ASIDE_NAME.test(f))
@@ -639,7 +611,7 @@ export function setAsideFiles(ws: WorkspaceService): { file: string; number: num
 /** The path of a set-aside file named by the window: only a name of the folder's own form, never a path out of it. */
 export function setAsideFile(ws: WorkspaceService, file: string): string | null {
   if (!ws.path || !SET_ASIDE_NAME.test(file)) return null
-  const p = join(ws.path, HIVE_DIR, SET_ASIDE, file)
+  const p = join(ws.path, CW_DIR, SET_ASIDE, file)
   return existsSync(p) ? p : null
 }
 
@@ -655,11 +627,11 @@ export function setAsideAdded(ws: WorkspaceService, file: string, text: string):
     added.add(textHash(text))
     setMeta(db, 'setAsideAdded', JSON.stringify([...added]))
   })
-  const dir = join(ws.path!, HIVE_DIR, SET_ASIDE)
+  const dir = join(ws.path!, CW_DIR, SET_ASIDE)
   afterBoardWrite(ws, () => removeAdded(dir, file))
 }
 
-/** A set-aside file whose card is on the board goes to the Recycle Bin (#1044 round 1): the older Hive's copy stays recoverable. */
+/** A set-aside file whose card is on the board goes to the Recycle Bin (#1044 round 1): the older version's copy stays recoverable. */
 function removeAdded(dir: string, file: string): void {
   const p = join(dir, file)
   // Once: a listing while its move is under way leaves it to that move.
@@ -671,7 +643,7 @@ function removeAdded(dir: string, file: string): void {
 }
 const removing = new Set<string>()
 
-const hiveVersion = (): string => {
+const appVersion = (): string => {
   try {
     return app.getVersion()
   } catch {
@@ -699,9 +671,9 @@ function boardOf(path: string, transient = false): Board {
     if (!transient) assertPlaceAdmitted(open.place)
     return open
   }
-  if (!transient) assertAdmitted(join(path, HIVE_DIR, DB_FILE))
+  if (!transient) assertAdmitted(join(path, CW_DIR, DB_FILE))
   const failed = failures.get(key)?.error
-  if (failed) throw hiveError(M.unavailable, { error: failed.message }, { kind: 'conflict' })
+  if (failed) throw combworkError(M.unavailable, { error: failed.message }, { kind: 'conflict' })
   try {
     const b = openBoard(path, false)
     b.transient = transient
@@ -710,12 +682,12 @@ function boardOf(path: string, transient = false): Board {
     const err = e instanceof Error ? e : new Error(String(e))
     failures.set(key, { error: err, place: placeKey(path) })
     log.error(`opening the board of ${userText(path)}${isIoError(e) ? ` (SQLite code ${(e as { errcode?: number }).errcode})` : ''}`, e)
-    throw hiveError(M.unavailable, { error: err.message }, { kind: 'conflict' })
+    throw combworkError(M.unavailable, { error: err.message }, { kind: 'conflict' })
   }
 }
 
 /**
- * Before a workspace's open first uses its board (HI-2199): while its file, as a Hive that ended without quitting left
+ * Before a workspace's open first uses its board (HI-2199): while its file, as a Combwork that ended without quitting left
  * it, can't be opened yet (another process still maps its `-shm`), waits for that, bounded (untilOpenable), so the board
  * opens once it can instead of failing for the rest of the session. At once for a board open already or a file closed
  * cleanly; ended when `signal` (the open's lifetime) aborts.
@@ -726,32 +698,32 @@ export async function untilBoardOpenable(path: string, signal: AbortSignal): Pro
   const onWait = (e: Error): void => {
     waiting = true
     boardTestHooks.openableWait?.(path)
-    log.warn(`the board of ${userText(path)} can't be opened yet: ${userText(e.message)} (SQLite code ${(e as { errcode?: number }).errcode}; another process still maps its ${DB_FILE}-shm, as just after a Hive ended without quitting): waiting up to ${OPENABLE_WAIT_MS / 1000} s`)
+    log.warn(`the board of ${userText(path)} can't be opened yet: ${userText(e.message)} (SQLite code ${(e as { errcode?: number }).errcode}; another process still maps its ${DB_FILE}-shm, as just after a Combwork ended without quitting): waiting up to ${OPENABLE_WAIT_MS / 1000} s`)
   }
-  const waited = await untilOpenable(join(path, HIVE_DIR, DB_FILE), { onWait, signal })
+  const waited = await untilOpenable(join(path, CW_DIR, DB_FILE), { onWait, signal })
   if (waiting) log.info(`the board of ${userText(path)}: ${signal.aborted ? 'its wait ended with its open' : 'openable'} after ${Math.round(waited)} ms`)
 }
 
 /**
  * Opens a workspace's board, its file migrated: the 1.0 group (#1207) only when `upgrade` (the user said yes) or a test
  * copy's pre-answer, else the board opens read-only until it is upgraded. Throws as openDb does (DbInUseError: another
- * Hive has the file open), and when another profile's presence marker is fresh, nothing changed either way.
+ * Combwork has the file open), and when another profile's presence marker is fresh, nothing changed either way.
  */
 function openBoard(path: string, upgrade: boolean): Board {
   const key = keyOf(path)
   // The folder's `.combwork` where it really is, now: what every later write and removal for this board uses (#1402), the
   // file itself opened by its spelling (the same file at this instant; db.ts knows it by that).
   const real = realPath(path)
-  const hive = join(real, HIVE_DIR)
+  const combwork = join(real, CW_DIR)
   let db: Db | null = null
   try {
-    db = openDb(join(path, HIVE_DIR, DB_FILE), {
+    db = openDb(join(path, CW_DIR, DB_FILE), {
       migrations: BOARD_MIGRATIONS,
-      hiveVersion: hiveVersion(),
-      backupDir: join(path, HIVE_DIR, BACKUPS),
+      appVersion: appVersion(),
+      backupDir: join(path, CW_DIR, BACKUPS),
       approve: (p) => upgrade || upgradeAnswer(p) === 'yes',
       beforeGroup: () => {
-        if (othersPresent(hive, presenceId()).length) throw new OtherHiveError()
+        if (othersPresent(combwork, presenceId()).length) throw new OtherCombworkError()
       },
       whileGroupLocked: boardTestHooks.whileUpgrading ?? holdForTest,
       checkpointer: checkpointWhenIdle,
@@ -769,7 +741,7 @@ function openBoard(path: string, upgrade: boolean): Board {
     const b: Board = {
       path,
       place: real.toLowerCase(),
-      hive,
+      combwork,
       db,
       legacy: db.reader.prepare("SELECT 1 FROM pragma_table_info('cards') WHERE name = 'doc'").get() !== undefined, // i18n-ignore: SQL
       version: w.prepare('PRAGMA data_version'), // i18n-ignore: SQL
@@ -781,19 +753,19 @@ function openBoard(path: string, upgrade: boolean): Board {
       generation: ++openings,
       commits: 0,
       poll: setInterval(() => pollOther(key), POLL_MS),
-      presence: setInterval(() => markPresent(hive), HEARTBEAT_MS)
+      presence: setInterval(() => markPresent(combwork), HEARTBEAT_MS)
     }
     b.poll.unref?.()
     b.presence.unref?.()
     if (writable(db)) {
       const raw = meta(w, 'imported')
       const imported = raw ? (JSON.parse(raw) as Imported) : null
-      if (!imported) importFiles(b, hive, hiveVersion())
-      else if (imported.pendingRename) finishMove(b, hive, imported)
-      else setAsideStub(b, hive)
+      if (!imported) importFiles(b, combwork, appVersion())
+      else if (imported.pendingRename) finishMove(b, combwork, imported)
+      else keepSetAsideNumbers(b, combwork)
     }
     b.dataVersion = (b.version.get() as { data_version: number }).data_version
-    markPresent(hive)
+    markPresent(combwork)
     boards.set(key, b)
     return b
   } catch (e) {
@@ -802,42 +774,42 @@ function openBoard(path: string, upgrade: boolean): Board {
   }
 }
 
-/** Whether a board's file takes writes: not saved by a newer Hive, nor waiting for its upgrade. */
+/** Whether a board's file takes writes: not saved by a newer Combwork, nor waiting for its upgrade. */
 const writable = (db: Db): boolean => db.newer === null && !db.pending
 
 /** The folder of the board's copies (db.ts keeps the newest three, and the 1.0 group's copy for good). */
 const BACKUPS = 'backups'
-/** The family of the board's copies; the copy before the 1.0 upgrade is `hive-before-1.0-v<n>-<time>.db`. */
+/** The family of the board's copies; the copy before the 1.0 upgrade is `combwork-before-1.0-v<n>-<time>.db`. */
 const FAMILY = DB_FILE.replace(/\.db$/, '')
 /** Where Restore the 0.9 Board Backup keeps the 1.0 file it replaces: never pruned either. */
 const RESTORE_FAMILY = `${FAMILY}-before-restore`
 
-/** Another profile's Hive has the workspace open, by its presence marker (a 1.0 Hive; a 0.9 one shows by SQLite's lock). */
-class OtherHiveError extends Error {
+/** Another profile's Combwork has the workspace open, by its presence marker (1.0's; a 0.9 build shows by SQLite's lock). */
+class OtherCombworkError extends Error {
   constructor() {
-    super('another Hive has the workspace open (its presence marker is fresh)') // i18n-ignore: for the log; the user sees M.inUse
+    super('another Combwork has the workspace open (its presence marker is fresh)') // i18n-ignore: for the log; the user sees M.inUse
   }
 }
 
 /**
- * A test copy's answer to the upgrade's question, given before it is asked (HIVE_TEST_BOARD_UPGRADE=yes|no, unpackaged
+ * A test copy's answer to the upgrade's question, given before it is asked (CW_TEST_BOARD_UPGRADE=yes|no, unpackaged
  * builds only; the e2e suites' boards made by 0.9), or a unit test's hook. Anything else: the user is asked.
  */
 function upgradeAnswer(p: PendingGroup): 'yes' | 'no' | null {
   if (p.group !== UPGRADE_GROUP_ID) return null
   if (boardTestHooks.upgradeAnswer) return boardTestHooks.upgradeAnswer
-  const env = process.env.HIVE_TEST_BOARD_UPGRADE
+  const env = process.env.CW_TEST_BOARD_UPGRADE
   if (packaged() || (env !== 'yes' && env !== 'no')) return null
   return env
 }
 
 /**
- * For the S60 suite (unpackaged builds only): HIVE_TEST_UPGRADE_HOLD=<ms>;<file> keeps the upgrade's exclusive lock that
- * long once its steps are committed, after writing <file>, so the suite can start a 0.9 Hive during the upgrade. Main's
+ * For the S60 suite (unpackaged builds only): CW_TEST_UPGRADE_HOLD=<ms>;<file> keeps the upgrade's exclusive lock that
+ * long once its steps are committed, after writing <file>, so the suite can start a 0.9 build during the upgrade. Main's
  * thread waits meanwhile, as it would on a slow disk.
  */
 function holdForTest(): void {
-  const hold = packaged() ? undefined : process.env.HIVE_TEST_UPGRADE_HOLD
+  const hold = packaged() ? undefined : process.env.CW_TEST_UPGRADE_HOLD
   if (!hold) return
   const [ms, file] = hold.split(';')
   if (file) writeFileSync(file, new Date().toISOString(), 'utf8')
@@ -856,10 +828,10 @@ const packaged = (): boolean => {
 let ownPresence: string | null = null
 const presenceId = (): string => (ownPresence ??= profileId(userDataOf()))
 
-/** Writes this Hive's presence marker in a workspace's .combwork (its heartbeat); a failure only means one heartbeat fewer. */
-function markPresent(hive: string): void {
+/** Writes this Combwork's presence marker in a workspace's .combwork (its heartbeat); a failure only means one heartbeat fewer. */
+function markPresent(combwork: string): void {
   try {
-    writePresence(hive, presenceId(), { pid: process.pid, profile: basename(userDataOf()), hiveVersion: hiveVersion(), startedAt })
+    writePresence(combwork, presenceId(), { pid: process.pid, profile: basename(userDataOf()), appVersion: appVersion(), startedAt })
   } catch (e) {
     log.warn('writing the workspace presence marker', e)
   }
@@ -874,10 +846,10 @@ const userDataOf = (): string => {
   }
 }
 
-/** How often each open board looks for another process's changes (a dev Hive, a script on the same workspace). */
+/** How often each open board looks for another process's changes (a dev Combwork, a script on the same workspace). */
 export const POLL_MS = 1000
 
-/** Another connection (another process) committed: the board is told, once. Hive's own writes don't change the writer's data_version. */
+/** Another connection (another process) committed: the board is told, once. Combwork's own writes don't change the writer's data_version. */
 function pollOther(key: string): void {
   const b = boards.get(key)
   if (!b) return
@@ -929,7 +901,7 @@ export function noteLanesSaved(path: string): void {
 /**
  * Closes a workspace's board (it closed, or its file is replaced): the stub's next number brought up to date for older
  * versions. Every board of that folder, however it was spelt as it opened (#1402: one opened through a junction or an
- * 8.3 name, by deliveries say, would otherwise hold the folder until Hive quits). The folder is `place`, its real
+ * 8.3 name, by deliveries say, would otherwise hold the folder until Combwork quits). The folder is `place`, its real
  * location as its window opened it, else as this spelling's board opened: never what the spelling resolves to now, so a
  * junction removed or pointed at another workspace since neither keeps this one's boards open nor closes another's.
  */
@@ -941,7 +913,7 @@ export function closeBoard(path: string, place?: string): void {
   for (const [k, b] of [...boards]) if (k === key || (others && b.place === at)) closeOne(k, b)
 }
 
-/** Closes the board under that spelling only (a lease's own, Hive quitting). */
+/** Closes the board under that spelling only (a lease's own, Combwork quitting). */
 function closeOne(key: string, b: Board): void {
   if (boards.get(key) !== b) return
   boards.delete(key)
@@ -949,21 +921,16 @@ function closeOne(key: string, b: Board): void {
   clearInterval(b.presence)
   // The profile's marker at the place is every open board's of it here (another spelling's too): it goes with the last.
   try {
-    if (![...boards.values()].some((o) => o.place === b.place)) removePresence(b.hive, presenceId())
+    if (![...boards.values()].some((o) => o.place === b.place)) removePresence(b.combwork, presenceId())
   } catch (e) {
     log.warn('removing the workspace presence marker', e)
-  }
-  try {
-    if (writable(b.db) && existsSync(join(b.hive, TASKS))) writeStub(b.hive, nextOf(b.db.writer))
-  } catch (e) {
-    log.warn('bringing the board folder up to date', e)
   }
   // A save holding a lease on it goes on with this connection (#1383): closed as the save's lease ends.
   if (b.leases > 0) b.detached = true
   else b.db.close()
 }
 
-/** Closes every board (Hive quits). */
+/** Closes every board (Combwork quits). */
 export function closeAllBoards(): void {
   for (const [k, b] of [...boards]) closeOne(k, b)
 }
@@ -993,7 +960,7 @@ const lostChange = (cause?: unknown): Error =>
 
 /** The workspace folder, or the error a board change gives without one. */
 function pathOf(ws: WorkspaceService): string {
-  if (!ws.path) throw hiveError(M.noWorkspace, undefined, { kind: 'conflict' })
+  if (!ws.path) throw combworkError(M.noWorkspace, undefined, { kind: 'conflict' })
   return ws.path
 }
 
@@ -1022,17 +989,17 @@ function boardWriteLocked<T>(ws: WorkspaceService, path: string, key: string, fn
   return withFileLock(boardLock(path), async () => {
     // `alive`: the caller's workspace, as it was when it asked, is still open (a background run's, #1215 round 1): a
     // change that waited for the lock while it closed or switched is refused, and the board isn't opened again for it.
-    if (opts.alive && !opts.alive()) throw hiveError(M.noWorkspace, undefined, { kind: 'conflict' })
+    if (opts.alive && !opts.alive()) throw combworkError(M.noWorkspace, undefined, { kind: 'conflict' })
     const b = boardOf(path)
-    if (b.db.newer !== null) throw hiveError(M.newer, undefined, { kind: 'conflict' })
-    if (b.db.pending) throw hiveError(M.upgradeFirst, undefined, { kind: 'conflict' })
+    if (b.db.newer !== null) throw combworkError(M.newer, undefined, { kind: 'conflict' })
+    if (b.db.pending) throw combworkError(M.upgradeFirst, undefined, { kind: 'conflict' })
     const state: WriteState = { key, open: true, changed: false, after: [], undone: [], lost: null }
     const db = b.db.writer
     let committed = false
     timedStep(`db begin ${DB_FILE}`, () => db.exec('BEGIN IMMEDIATE'))
     try {
       const out = await writing.run(state, fn)
-      if (!boards.has(key)) throw hiveError(M.noWorkspace, undefined, { kind: 'conflict' })
+      if (!boards.has(key)) throw combworkError(M.noWorkspace, undefined, { kind: 'conflict' })
       // Undone part way, whatever the change made of the error meanwhile (a batch skips a card that fails): it fails whole.
       if (state.lost) throw state.lost
       if (!db.isTransaction) throw lostChange()
@@ -1139,7 +1106,7 @@ function readConn(ws: WorkspaceService): { b: Board; db: Db['reader'] } {
 
 /**
  * A read of several statements on one snapshot of the board (#1209 round 1, HR4's finding): a card is its row and its
- * child rows, read by separate statements, and another process (another Hive, a script) committing between them must
+ * child rows, read by separate statements, and another process (another Combwork, a script) committing between them must
  * never give a card neither of them saved, nor a child query that picks other cards than its parent's. Inside a change
  * (or a read already holding one) it runs on that transaction; else it opens a read transaction on the reader, whose
  * snapshot every statement of `fn` sees, and ends it after. `fn` is synchronous: nothing else uses the reader meanwhile.
@@ -1182,7 +1149,7 @@ export function adoptionCardNow(ws: WorkspaceService, n: number): AdoptionCard |
 
 /**
  * Marks cards as from before 1.0 (#1218, SPEC §16.4.1: no facts), inside boardWrite: each only while it is as the
- * adoption classified it (its project, column and archived state), has no facts and isn't marked yet, so a card a Hive
+ * adoption classified it (its project, column and archived state), has no facts and isn't marked yet, so a card a Combwork
  * has meanwhile started, adopted or moved is left alone. `marked`: how many it marked; `changed`: those it left that are
  * still neither marked nor started (classified again from fresh data by the adoption's next run).
  */
@@ -1308,7 +1275,7 @@ function readSnapshot<T>(ws: WorkspaceService, fn: (b: Board, db: Db['reader']) 
 function writeOp<T>(ws: WorkspaceService, op: (b: Board) => T): T {
   const path = pathOf(ws)
   const state = writing.getStore()
-  if (!state || !state.open || state.key !== keyOf(path)) throw new Error('A board write outside boardWrite') // i18n-ignore: a mistake in Hive's code, never shown
+  if (!state || !state.open || state.key !== keyOf(path)) throw new Error('A board write outside boardWrite') // i18n-ignore: a mistake in Combwork's code, never shown
   const b = boardOf(path)
   if (state.lost) throw state.lost
   if (!b.db.writer.isTransaction) throw (state.lost = lostChange())
@@ -1463,7 +1430,7 @@ function cardFields(db: Db['reader'], keys: string[], sel: { where?: string; arg
 }
 
 /**
- * The fields a card's cost needs (cardCosts.ts): its holds, and for a card from before Hive kept them its history with
+ * The fields a card's cost needs (cardCosts.ts): its holds, and for a card from before Combwork kept them its history with
  * the agent and reviewer it has now (holdsFromHistory names them by those: HR1's #1210 round 1 finding).
  */
 const COST_FIELDS = ['title', 'project', 'projectId', 'column', 'archived', 'held', 'history', 'agent', 'agentName', 'review']
@@ -1807,17 +1774,9 @@ export function deleteCard(ws: WorkspaceService, n: number): boolean {
   return writeOp(ws, (b) => Number(b.db.writer.prepare('DELETE FROM cards WHERE number = ?').run(n).changes) > 0) // i18n-ignore: SQL
 }
 
-/**
- * The next card number, taken (inside boardWrite): never one a card has or had. The stub an older Hive reads is moved past
- * it at once (#1017 round 1): after Hive is ended without closing, an older Hive still never gives a card a number this
- * board has used (a change undone leaves only a number unused, as the old allocator could).
- */
+/** The next card number, taken (inside boardWrite): never one a card has or had. */
 export function takeNumber(ws: WorkspaceService): number {
-  return writeOp(ws, (b) => {
-    const n = takeNumberIn(b.db.writer)
-    writeStubNext(b.hive, n + 1)
-    return n
-  })
+  return writeOp(ws, (b) => takeNumberIn(b.db.writer))
 }
 
 /** The next card number, taken on a connection inside its transaction (the fact store's cards, #1215): as takeNumber, but for the stub. */
@@ -1909,13 +1868,13 @@ export const boardOpen = (workspacePath: string): boolean => boards.has(keyOf(wo
 export const inBoardWrite = (workspacePath: string): boolean => inWrite(keyOf(workspacePath))
 
 /** The board's file (for the log, diagnostics and tests). */
-export const boardFile = (workspacePath: string): string => join(workspacePath, HIVE_DIR, DB_FILE)
+export const boardFile = (workspacePath: string): string => join(workspacePath, CW_DIR, DB_FILE)
 
-/** Whether the board is shown read-only: saved by a newer Hive, or waiting for its upgrade to 1.0. */
+/** Whether the board is shown read-only: saved by a newer Combwork, or waiting for its upgrade to 1.0. */
 export const boardReadOnly = (ws: WorkspaceService): boolean => (ws.path ? !writable(boardOf(ws.path).db) : false)
 
 // ---------------------------------------------------------------------------
-// The 1.0 upgrade (#1207, SPEC §16.17): asked first, the file locked to this Hive, the 0.9 copy kept, and a way back.
+// The 1.0 upgrade (#1207, SPEC §16.17): asked first, the file locked to this Combwork, the 0.9 copy kept, and a way back.
 // ---------------------------------------------------------------------------
 
 /** The board's state for the window: why it is read-only, and the copy kept from before its upgrade to 1.0. */
@@ -1935,7 +1894,7 @@ const FIRST_10 = Math.min(...BOARD_MIGRATIONS.filter((m) => m.group === UPGRADE_
  * db.ts keeps those with the ordinary copies anyway.
  */
 const copy09 = (path: string): { file: string; version: number; at: string } | undefined =>
-  backupsOf(join(path, HIVE_DIR, BACKUPS), groupBackupFamily(FAMILY, UPGRADE_GROUP_ID))
+  backupsOf(join(path, CW_DIR, BACKUPS), groupBackupFamily(FAMILY, UPGRADE_GROUP_ID))
     .filter((c) => c.version < FIRST_10)
     .at(-1)
 
@@ -1943,7 +1902,7 @@ const copy09 = (path: string): { file: string; version: number; at: string } | u
  * The workspace database's generation (#1207 round 2): a number that changes each time its file is replaced under the
  * services (the upgrade to 1.0, Restore the 0.9 Board Backup), whose caches were read from the file before. What a
  * service read in an older generation is stale: it reads again, and a save made from it is refused (`saveStore`'s guard),
- * so nothing written meanwhile (by a 0.9 Hive while the upgrade waited) is overwritten from an old snapshot.
+ * so nothing written meanwhile (by a 0.9 build while the upgrade waited) is overwritten from an old snapshot.
  */
 /** By the workspace's place (#1395: a store loaded through another spelling of its folder is the same database's). */
 const generations = new Map<string, number>()
@@ -1977,7 +1936,7 @@ function replaced(path: string): void {
 }
 
 /**
- * Whether a workspace's data waits for its upgrade to 1.0 (the user said Not Now): hive.db then takes no writes, so
+ * Whether a workspace's data waits for its upgrade to 1.0 (the user said Not Now): combwork.db then takes no writes, so
  * nothing that must be recorded may start (an agent's session, #1207 round 1). False when the board can't be opened at
  * all: that is told where it is used. Throws the refusal for a workspace no window holds (#1395).
  */
@@ -2005,16 +1964,16 @@ export function boardWaits(ws: WorkspaceService): boolean {
   }
 }
 
-/** Throws the user's reason when the workspace's upgrade to 1.0 waits: for what can't run without hive.db (an agent's start). */
+/** Throws the user's reason when the workspace's upgrade to 1.0 waits: for what can't run without combwork.db (an agent's start). */
 export function assertUpgraded(workspacePath: string): void {
-  if (upgradeWaiting(workspacePath)) throw hiveError(M.upgradeFirstStart, undefined, { kind: 'conflict' })
+  if (upgradeWaiting(workspacePath)) throw combworkError(M.upgradeFirstStart, undefined, { kind: 'conflict' })
 }
 
 /** A copy's time as its name has it (`2026-10-20T14-06-21-256Z`), as ISO. */
 const isoOf = (at: string): string => at.replace(/T(\d\d)-(\d\d)-(\d\d)-(\d{3})Z$/, 'T$1:$2:$3.$4Z')
 
-/** The user's errors for another Hive on the file (SQLite's lock or a fresh presence marker). */
-const inUse = (e: unknown): boolean => e instanceof DbInUseError || e instanceof OtherHiveError
+/** The user's errors for another Combwork on the file (SQLite's lock or a fresh presence marker). */
+const inUse = (e: unknown): boolean => e instanceof DbInUseError || e instanceof OtherCombworkError
 
 const upgradedListeners = new Set<(ws: WorkspaceService) => void>()
 /**
@@ -2029,8 +1988,8 @@ export function onBoardUpgraded(fn: (ws: WorkspaceService) => void): () => void 
 
 /**
  * Upgrades the board to 1.0, the user having said yes: under the board's lock (no change of it under way), the board
- * closed and opened again with the 1.0 group approved, which db.ts runs with the file locked to this Hive, after a copy
- * kept for good, in one transaction. Another Hive with the workspace open: refused, nothing changed, and the board opens
+ * closed and opened again with the 1.0 group approved, which db.ts runs with the file locked to this Combwork, after a copy
+ * kept for good, in one transaction. Another Combwork with the workspace open: refused, nothing changed, and the board opens
  * read-only again. Replies with the kept copy's file.
  */
 export async function upgradeBoard(ws: WorkspaceService): Promise<{ backup: string | null }> {
@@ -2045,9 +2004,9 @@ export async function upgradeBoard(ws: WorkspaceService): Promise<{ backup: stri
     const from09 = pending.from < FIRST_10
     // The group runs with the file locked to one connection: the checkpoints' worker lets go of it first (HI-1691),
     // awaited before the close, so nothing opens it again between the close and the upgrade's open.
-    await checkpointsReleased(join(path, HIVE_DIR, DB_FILE))
+    await checkpointsReleased(join(path, CW_DIR, DB_FILE))
     // Opened for keeps: only while a window holds it (#1395), checked after that wait, nothing awaited since.
-    assertAdmitted(join(path, HIVE_DIR, DB_FILE))
+    assertAdmitted(join(path, CW_DIR, DB_FILE))
     closeBoard(path)
     try {
       openBoard(path, true)
@@ -2055,13 +2014,13 @@ export async function upgradeBoard(ws: WorkspaceService): Promise<{ backup: stri
       // Opened again as it was (read-only, its upgrade waiting); a failure there is the board's to tell.
       failures.delete(key)
       if (inUse(e)) {
-        log.info(`the board of ${userText(path)} wasn't upgraded: another Hive has it open`)
+        log.info(`the board of ${userText(path)} wasn't upgraded: another Combwork has it open`)
         boardOf(path)
-        throw hiveError(M.inUse, undefined, { kind: 'conflict' })
+        throw combworkError(M.inUse, undefined, { kind: 'conflict' })
       }
       log.error(`upgrading the board of ${userText(path)}`, e)
       boardOf(path)
-      throw hiveError(M.unavailable, { error: e instanceof Error ? e.message : String(e) }, { kind: 'conflict' })
+      throw combworkError(M.unavailable, { error: e instanceof Error ? e.message : String(e) }, { kind: 'conflict' })
     }
     // A 0.9 board's copy is the one kept for good; a 1.0 board taking a later step of the group gets an ordinary one.
     const kept = from09 ? copy09(path) : undefined
@@ -2083,47 +2042,47 @@ export async function upgradeBoard(ws: WorkspaceService): Promise<{ backup: stri
 
 /**
  * Help → Restore the 0.9 Board Backup… (SPEC §16.17): the board as it is now copied aside first (kept for good), then the
- * copy made before its upgrade to 1.0 put back in its place, and the board opened again: read-only in this Hive (its
- * upgrade waiting again), writable for a 0.9 Hive. Nothing is deleted. Refused while another Hive has the workspace open:
+ * copy made before its upgrade to 1.0 put back in its place, and the board opened again: read-only in this Combwork (its
+ * upgrade waiting again), writable for a 0.9 build. Nothing is deleted. Refused while another Combwork has the workspace open:
  * it would go on with the 1.0 file under the copy put back. Replies with the copy of the 1.0 board.
  */
 export async function restoreBoardBackup(ws: WorkspaceService, agentsRunning: () => number): Promise<{ saved: string; restored: string }> {
   const path = pathOf(ws)
-  const hive = join(path, HIVE_DIR)
-  const file = join(hive, DB_FILE)
+  const combwork = join(path, CW_DIR)
+  const file = join(combwork, DB_FILE)
   // Counted as a write (HI-1368): a close command waits for it.
   const out = await countedWrite(path, () => withFileLock(boardLock(path), async () => {
     // Opened first: an open is what upgrades it (a test copy's answer), and so makes its copy.
     const version = schemaVersion(boardOf(path).db.reader)
     const kept = copy09(path)
-    // The file itself, not only its name: a 0.9 board, which a 0.9 Hive can change again.
-    if (!kept || !(fileSchemaVersion(kept.file) < FIRST_10)) throw hiveError(M.noBackup, undefined, { kind: 'conflict' })
+    // The file itself, not only its name: a 0.9 board, which a 0.9 build can change again.
+    if (!kept || !(fileSchemaVersion(kept.file) < FIRST_10)) throw combworkError(M.noBackup, undefined, { kind: 'conflict' })
     // The board put back takes no writes here: an agent running on would go unrecorded. Starts are refused from then on.
-    if (agentsRunning() > 0) throw hiveError(M.stopAgentsFirst, undefined, { kind: 'conflict' })
-    if (othersPresent(hive, presenceId()).length) throw hiveError(M.inUse, undefined, { kind: 'conflict' })
+    if (agentsRunning() > 0) throw combworkError(M.stopAgentsFirst, undefined, { kind: 'conflict' })
+    if (othersPresent(combwork, presenceId()).length) throw combworkError(M.inUse, undefined, { kind: 'conflict' })
     // Copied as its only connection, then replaced: the checkpoints' worker lets go of it first (HI-1691), awaited
     // before the close, so nothing opens it again between the close and the copy.
     await checkpointsReleased(file)
     // As they are after that wait: still a window's (#1395, HR6's round 3: closed meanwhile, nothing is changed), and no
-    // agent or other Hive on it.
+    // agent or other Combwork on it.
     assertAdmitted(file)
-    if (agentsRunning() > 0) throw hiveError(M.stopAgentsFirst, undefined, { kind: 'conflict' })
-    if (othersPresent(hive, presenceId()).length) throw hiveError(M.inUse, undefined, { kind: 'conflict' })
+    if (agentsRunning() > 0) throw combworkError(M.stopAgentsFirst, undefined, { kind: 'conflict' })
+    if (othersPresent(combwork, presenceId()).length) throw combworkError(M.inUse, undefined, { kind: 'conflict' })
     closeBoard(path)
     let saved: string
     try {
-      saved = soleCopy(file, join(hive, BACKUPS), RESTORE_FAMILY, version)
+      saved = soleCopy(file, join(combwork, BACKUPS), RESTORE_FAMILY, version)
     } catch (e) {
       failures.delete(keyOf(path))
       boardOf(path)
-      if (e instanceof DbInUseError) throw hiveError(M.inUse, undefined, { kind: 'conflict' })
+      if (e instanceof DbInUseError) throw combworkError(M.inUse, undefined, { kind: 'conflict' })
       throw e
     }
     // Closed by its only connection, SQLite has folded its log back in and removed it: what is left of one is another
     // process's, which opened the file meanwhile.
     if (existsSync(`${file}-wal`)) {
       boardOf(path)
-      throw hiveError(M.inUse, undefined, { kind: 'conflict' })
+      throw combworkError(M.inUse, undefined, { kind: 'conflict' })
     }
     const next = `${file}.restoring`
     copyFileSync(kept.file, next)
@@ -2141,7 +2100,7 @@ export async function restoreBoardBackup(ws: WorkspaceService, agentsRunning: ()
 
 /**
  * Exports the board to plain files (Export Board to JSON): a folder with `<n>.json` for each card, exactly as the cards'
- * files were before 0.9 (so an older Hive can read them), with board.json and archive-batches.json. Returns how many cards.
+ * files were before 0.9 (so an older version can read them), with board.json and archive-batches.json. Returns how many cards.
  */
 export async function exportBoard(ws: WorkspaceService, dir: string, mask: <T>(v: T) => T = (v) => v): Promise<number> {
   // Its cards, next number and batches as one snapshot of the board.

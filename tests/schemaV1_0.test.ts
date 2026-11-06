@@ -1,6 +1,6 @@
-// hive.db's 1.0 schema (#1208): every step's tables made on an empty file, each module's real query using its index
+// combwork.db's 1.0 schema (#1208): every step's tables made on an empty file, each module's real query using its index
 // (EXPLAIN QUERY PLAN), and the card JSON contract: a card's document split into rows, through SQLite and back, is the
-// same bytes. HIVE_CARD_ROUNDTRIP_DB=<a hive.db> runs the round trip over every card of that board, on a copy made in
+// same bytes. CW_CARD_ROUNDTRIP_DB=<a combwork.db> runs the round trip over every card of that board, on a copy made in
 // tempDir() (the file itself is never opened).
 import { copyFileSync, existsSync } from 'fs'
 import { join } from 'path'
@@ -27,12 +27,12 @@ function roundTrip(db: DatabaseSync, n: number, doc: Record<string, unknown>): s
   return JSON.stringify(composeCard(rows))
 }
 
-/** A card as Hive 0.9.3 saves it (saveCard's order). */
+/** A card as 0.9.3 saves it (saveCard's order). */
 const card = (n: number, more: Record<string, unknown> = {}): Record<string, unknown> => ({
   number: n,
   title: `Card ${n}`,
   description: 'What to do',
-  project: 'hive',
+  project: 'alpha',
   projectId: 'p-1',
   agent: 'a-1',
   agentName: 'B1',
@@ -119,8 +119,8 @@ describe('the card JSON contract', () => {
     ['being reviewed, with decisions, holds and context', card(3, { review: { agent: 'a-2', agentName: 'R1', since: '2026-10-20T11:00:00.000Z' }, context: ['docs/SPEC.md#164-facts'], contextProblems: [{ ref: 'docs/SPEC.md#x', problem: 'noHeading', closest: ['y'] }], decisions: [{ id: 'd1', text: 'Do it', decidedBy: 'user', recordedBy: 'Assistant', at: '2026-10-20T12:00:00.000Z', editedAt: '2026-10-20T12:30:00.000Z' }], held: [{ agent: 'a-1', name: 'B1', role: 'build', from: 'x', to: 'y' }, { name: 'R1', role: 'review', from: 'z' }] })],
     ['archived, its fields after updatedAt (an older order)', { ...card(4, { archived: true }), archivedFor: 'done', archivedBatch: 'b1' }],
     ['an order of its own and a field missing', { title: 'Odd', number: 5, description: '', project: '', agent: null, column: 'todo', order: 1, labels: [], blocked: null, blockedBy: [], links: [], comments: [], history: [], archived: false, createdAt: 'a', createdBy: 'b', updatedAt: 'c' }],
-    ['fields Hive does not know, and known ones of another type', card(6, { worktree: 'old', archived: 1, order: '2', labels: ['a', 7], blockedBy: [1.5], agent: '', review: { agent: 'a', since: 's' }, title: 42 })],
-    ['entries not of Hive\'s form', card(7, { comments: [{ by: 'You', at: 'x', text: 'order' }, null, 'text', { at: 'x', by: 'y', text: 'z', extra: true }, { at: 'x', by: 'y', text: 5 }], history: [{ at: 'x', by: 'y', what: 'z', whatText: null }], held: [] })],
+    ['fields Combwork does not know, and known ones of another type', card(6, { worktree: 'old', archived: 1, order: '2', labels: ['a', 7], blockedBy: [1.5], agent: '', review: { agent: 'a', since: 's' }, title: 42 })],
+    ['entries not of Combwork\'s form', card(7, { comments: [{ by: 'You', at: 'x', text: 'order' }, null, 'text', { at: 'x', by: 'y', text: 'z', extra: true }, { at: 'x', by: 'y', text: 5 }], history: [{ at: 'x', by: 'y', what: 'z', whatText: null }], held: [] })],
     ['an empty optional list kept', card(8, { decisions: [] })],
     ['a lone surrogate in text', card(9, { title: 'bad \ud800 title', comments: [{ at: 'x', by: 'y', text: 'half \udc00' }] })],
     ['the wrong number inside', card(10, { number: 11 })],
@@ -136,7 +136,7 @@ describe('the card JSON contract', () => {
     expect(roundTrip(db, n, doc)).toBe(want)
   })
 
-  it('keeps the columns readers query, and no layout for a card of Hive\'s form', () => {
+  it('keeps the columns readers query, and no layout for a card of Combwork\'s form', () => {
     const r = decomposeCard(1, card(1))
     expect(r.card).toMatchObject({ col: 'doing', ord: 3.5, agent: 'a-1', archived: 0, extra: null, layout: null })
     const odd = decomposeCard(6, card(6, { title: 42, order: '2' }))
@@ -144,9 +144,9 @@ describe('the card JSON contract', () => {
     expect(JSON.parse(odd.card.extra!)).toEqual({ title: 42, order: '2' })
   })
 
-  const live = process.env.HIVE_CARD_ROUNDTRIP_DB
+  const live = process.env.CW_CARD_ROUNDTRIP_DB
   it.skipIf(!live)("round-trips every card of a live board's copy", () => {
-    const copy = join(tempDir('hive-roundtrip-'), 'hive.db')
+    const copy = join(tempDir('cw-roundtrip-'), 'combwork.db')
     copyFileSync(live!, copy)
     if (existsSync(`${live}-wal`)) copyFileSync(`${live}-wal`, `${copy}-wal`)
     const old = new DatabaseSync(copy)

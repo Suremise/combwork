@@ -2,10 +2,10 @@
  * A switch to another connection at an agent's next safe point (HI-1755): once its turn is over, its CLI is ended with
  * its own exit (HI-1706's quit, never mid-turn), and once that exact run has exited, its last session is resumed, once,
  * on the connection it would launch on then. One per agent: asking again while one waits changes nothing (the resume
- * reads the choice as it is then). A manual stop or start, its workspace closing or Hive quitting cancels it; it is never
+ * reads the choice as it is then). A manual stop or start, its workspace closing or Combwork quitting cancels it; it is never
  * kept across a restart (not the install-restart's record).
  *
- * The steps are given (SwitchDeps), so unit tests drive each boundary: Hive's are in sessions.ts.
+ * The steps are given (SwitchDeps), so unit tests drive each boundary: Combwork's are in sessions.ts.
  */
 
 export interface SwitchDeps {
@@ -21,7 +21,7 @@ export interface SwitchDeps {
   commit?: () => Promise<boolean>
   /** sessions.quit for the run: 'held' means nothing was typed (a draft, a prompt): asked again at the next change. */
   quit: () => Promise<'sent' | 'held' | 'gone'>
-  /** Resumes its last session on its connection as chosen now; refused (its workspace closing, Hive quitting) it throws. */
+  /** Resumes its last session on its connection as chosen now; refused (its workspace closing, Combwork quitting) it throws. */
   resume: () => Promise<void>
   /**
    * A resume refused only for now (HI-2304: its slot held by what a run left running there): why, in English; null for a

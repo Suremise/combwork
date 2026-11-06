@@ -1,7 +1,7 @@
-// Hive's own test runners show in the Progress panel of the Hive that launched the agent running them (#137): the e2e
+// Combwork's own test runners show in the Progress panel of the Combwork that launched the agent running them (#137): the e2e
 // runner (tests/e2e/run.mjs) one step per suite, the scenarios runner (tests/scenarios/run.mjs) one per trial, the unit tests (a Vitest reporter, vitest.config.ts) one per file, each
-// with an estimate from how long they took before (kept under %LOCALAPPDATA%\hive-test, never in the repo). Only when the
-// Hive variables are set and Hive answers; never changes a result. Run under hive-progress, they print step lines for its
+// with an estimate from how long they took before (kept under %LOCALAPPDATA%\combwork-test, never in the repo). Only when the
+// Combwork variables are set and Combwork answers; never changes a result. Run under cw-progress, they print step lines for its
 // run instead of reporting their own (one row). Off with --no-progress (e2e) or CW_PROGRESS=0. To remove it: delete this
 // file and its two hooks.
 import { tmpdir } from 'node:os'
@@ -18,10 +18,10 @@ interface TestSpecification {
   moduleId: string
 }
 
-// Where the runners' timings are kept (HIVE_TEST_PROGRESS_TIMINGS: another file, for this module's own tests).
-const timings = (): string => process.env.HIVE_TEST_PROGRESS_TIMINGS || join(process.env.LOCALAPPDATA || tmpdir(), 'hive-test', 'progress-timings.json')
+// Where the runners' timings are kept (CW_TEST_PROGRESS_TIMINGS: another file, for this module's own tests).
+const timings = (): string => process.env.CW_TEST_PROGRESS_TIMINGS || join(process.env.LOCALAPPDATA || tmpdir(), 'combwork-test', 'progress-timings.json')
 
-/** Whether to report: the Hive variables are set (or it runs under hive-progress), and it isn't turned off. */
+/** Whether to report: the Combwork variables are set (or it runs under cw-progress), and it isn't turned off. */
 export function progressWanted(argv: string[] = process.argv): boolean {
   return !argv.includes('--no-progress') && (progressTarget() !== null || wrappedLines() !== undefined)
 }
@@ -59,7 +59,7 @@ export function e2eProgress(names: string[], argv: string[] = process.argv): { s
   }
 }
 
-/** What a scenarios run reports to: the Hive's Agent API, or step lines for the hive-progress it runs under. */
+/** What a scenarios run reports to: the Combwork's Agent API, or step lines for the cw-progress it runs under. */
 export interface ProgressIo {
   target: ProgressTarget | null
   lines?: (line: string) => void
@@ -103,7 +103,7 @@ export function scenariosProgress(names: string[], provider: string, argv: strin
 /**
  * A heavy run waiting for a test slot (tests/e2e/slots.mjs): a row of its own in the Progress panel ("e2e: waiting for
  * a test slot", naming who holds the slots) from the first time it has to wait until it gets one, so it shows as
- * waiting, not hung. Under hive-progress, the wrapper's row names the wait instead (wait lines). Either way the run is
+ * waiting, not hung. Under cw-progress, the wrapper's row names the wait instead (wait lines). Either way the run is
  * waiting (#549): no time left, a waiting bar, and the wait not counted against the wrapper's estimate. Nothing until
  * waiting(), and nothing with --no-progress.
  */
@@ -119,7 +119,7 @@ export function slotWaitProgress(kind: string, command: string, argv: string[] =
     // The whole line, as the test slots word it (slots.mjs waitSummary, HI-2070: what is ahead, by whose run).
     waitingAs: show,
     finish: async (summary: string) => {
-      // Under hive-progress the wrapper's run goes on: it waits no more.
+      // Under cw-progress the wrapper's run goes on: it waits no more.
       run?.update({ waiting: '' })
       await run?.finish(true, summary)
     }

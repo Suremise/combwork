@@ -1,7 +1,7 @@
 // Skills: the bundled skills in a new workspace, and in an existing one only those it was never given (the ones it
 // had before are its own to keep or delete), restore, revert and "update available", adding from
 // a .md or a .zip, local skills per provider (and for both at once), the project's Skills tab, "Edit in
-// workspace", the notice for a skill that no longer exists, and the warning over the Skills view and over a Hive skill
+// workspace", the notice for a skill that no longer exists, and the warning over the Skills view and over a Combwork skill
 // being edited (not in preview, not in the project tab). Deleting moves folders to the Recycle Bin.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -29,7 +29,7 @@ const check = (name, ok, extra = '') => {
 }
 
 ;(async () => {
-  // The lists above are every skill Hive ships: a new one in resources/skills goes in NEWER.
+  // The lists above are every skill Combwork ships: a new one in resources/skills goes in NEWER.
   const shipped = fs.readdirSync(path.join(lib.ROOT, 'resources', 'skills')).filter((n) => fs.existsSync(path.join(lib.ROOT, 'resources', 'skills', n, 'SKILL.md'))).sort()
   check('the bundled skills are EARLIER and NEWER', JSON.stringify(shipped) === JSON.stringify([...BUNDLED].sort()), `resources/skills: ${shipped.join(',')}`)
   for (const d of [userData, ws, oldWs, dump]) fs.rmSync(d, { recursive: true, force: true })
@@ -42,11 +42,11 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(path.join(dump, 'unrelated.txt'), 'not part of any skill')
   fs.writeFileSync(path.join(dump, 'photo.png'), lib.samplePng())
   fs.writeFileSync(path.join(dump, 'deploy.zip'), zipSync({ 'deploy/SKILL.md': strToU8('---\nname: deploy\ndescription: Deploy the app.\n---\n\nRun scripts/deploy.ps1.\n'), 'deploy/scripts/deploy.ps1': strToU8('Write-Host deploy') }))
-  // A Hive copy for Codex in the project's .agents/skills: never a local skill.
+  // A Combwork copy for Codex in the project's .agents/skills: never a local skill.
   const copy = path.join(proj, '.agents', 'skills', 'cw-handover')
   fs.mkdirSync(copy, { recursive: true })
   fs.writeFileSync(path.join(copy, 'SKILL.md'), '---\nname: handover\ndescription: copy\n---\n')
-  fs.writeFileSync(path.join(copy, '.hive-copy'), '{"hash":"x"}')
+  fs.writeFileSync(path.join(copy, '.combwork-copy'), '{"hash":"x"}')
 
   lib.enableProviders(userData, ['claude-code', 'codex'])
   const { app, page, inv } = await lib.launch({ userData, env: { CODEX_HOME: lib.CODEX_HOME }, viewport: { width: 1500, height: 950 } })
@@ -71,7 +71,7 @@ const check = (name, ok, extra = '') => {
   list = await inv('skills:workspace')
   check('new workspace: all match this version', BUNDLED.every((n) => list.find((s) => s.name === n)?.bundled === 'same'))
 
-  // Skills view: Hive skills only.
+  // Skills view: Combwork skills only.
   await page.keyboard.press('Control+Shift+K')
   check('Skills view lists them', await becomes(async () => (await page.locator('.skill-row').count()) === BUNDLED.length), String(await page.locator('.skill-row').count()))
   const viewWarning = await page.locator('.sidebar .skills-warning').allInnerTexts()
@@ -92,11 +92,11 @@ const check = (name, ok, extra = '') => {
   list = await inv('skills:workspace')
   check('reverted: "same" again, edit gone', list.find((s) => s.name === 'pick-up')?.bundled === 'same' && !fs.readFileSync(pickUp, 'utf8').includes('My own step'))
 
-  // An edited copy made from an older version: Hive leaves it, and says an update is there to take.
+  // An edited copy made from an older version: Combwork leaves it, and says an update is there to take.
   fs.appendFileSync(pickUp, '\nMy own step.\n')
   const manifestFile = path.join(ws, '.combwork', 'bundled.json')
   const manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8'))
-  // A version Hive shipped before this one (a made-up one wouldn't count: it could be a newer Hive's).
+  // A version Combwork shipped before this one (a made-up one wouldn't count: it could be a newer Combwork's).
   manifest.skills['pick-up'].from = require('../../src/main/bundledHistory.json').skills['pick-up'][0]
   fs.writeFileSync(manifestFile, JSON.stringify(manifest))
   list = await inv('skills:workspace')
@@ -173,17 +173,17 @@ const check = (name, ok, extra = '') => {
   check('Revert to default puts back the whole folder: builder.md as shipped', await becomes(async () => (await inv('skills:workspace')).find((s) => s.name === 'card-loop')?.bundled === 'same' && !fs.readFileSync(builderFile, 'utf8').includes('My builder note.')))
 
   // Adding from a .md (only that file) and a .zip (its folder, with the script).
-  const fromMd = await inv('skills:addFromFile', path.join(dump, 'release-notes.md'), 'release-notes', [{ kind: 'hive' }])
+  const fromMd = await inv('skills:addFromFile', path.join(dump, 'release-notes.md'), 'release-notes', [{ kind: 'combwork' }])
   const mdDir = path.join(skillsDir, 'release-notes')
   check('from .md: only SKILL.md, nothing else from its folder', JSON.stringify(fs.readdirSync(mdDir)) === '["SKILL.md"]', fs.readdirSync(mdDir).join(','))
   check('from .md: frontmatter added, described by its heading', fromMd.description === 'Write release notes', fromMd.description)
-  await inv('skills:addFromFile', path.join(dump, 'deploy.zip'), 'deploy', [{ kind: 'hive' }])
+  await inv('skills:addFromFile', path.join(dump, 'deploy.zip'), 'deploy', [{ kind: 'combwork' }])
   check('from .zip: unpacked with its script', fs.existsSync(path.join(skillsDir, 'deploy', 'SKILL.md')) && fs.existsSync(path.join(skillsDir, 'deploy', 'scripts', 'deploy.ps1')))
   let err = ''
-  await inv('skills:addFromFile', path.join(dump, 'deploy.zip'), 'deploy', [{ kind: 'hive' }]).catch((e) => (err = String(e)))
+  await inv('skills:addFromFile', path.join(dump, 'deploy.zip'), 'deploy', [{ kind: 'combwork' }]).catch((e) => (err = String(e)))
   check('adding a name twice is refused', /already exists/.test(err), err)
 
-  // The notice for a skill that no longer exists (deleted outside Hive while shown).
+  // The notice for a skill that no longer exists (deleted outside Combwork while shown).
   await page.locator('.skill-row', { hasText: 'deploy' }).first().click()
   // Shown first, then deleted: the notice is for a skill that goes while it's on screen.
   await lib.until(async () => (await page.locator('.skill-row.selected', { hasText: 'deploy' }).count()) === 1, HUNG_MS)
@@ -191,7 +191,7 @@ const check = (name, ok, extra = '') => {
   await lib.until(async () => (await page.getByText('no longer exists in this workspace').count()) === 1, 10000)
   check('a skill deleted meanwhile: "no longer exists"', (await page.getByText('no longer exists in this workspace').count()) === 1)
 
-  // Project Skills tab (#118): Hive's skills open at the top, then one provider's skills, folded, picked from a dropdown
+  // Project Skills tab (#118): Combwork's skills open at the top, then one provider's skills, folded, picked from a dropdown
   // that starts on the project's default provider; the choice and what is open are remembered for the project; local
   // skills added for both at once.
   await page.keyboard.press('Control+Shift+E')
@@ -203,9 +203,9 @@ const check = (name, ok, extra = '') => {
   await lib.until(async () => (await pick.count()) === 1, 10000)
   const pickOptions = await pick.locator('option').allInnerTexts()
   check('project tab: a dropdown of the providers, starting on the default one', pickOptions.length === 2 && pickOptions[0].startsWith('Claude Code') && pickOptions[1].startsWith('Codex') && (await pick.inputValue()) === 'claude-code', JSON.stringify({ pickOptions, value: await pick.inputValue() }))
-  const hiveToggle = page.locator('.skill-group-toggle', { hasText: 'Combwork' }).first()
+  const combworkToggle = page.locator('.skill-group-toggle', { hasText: 'Combwork' }).first()
   const providerToggle = page.locator('.skill-provider-toggle')
-  check('project tab: Combwork skills at the top, open', (await hiveToggle.getAttribute('aria-expanded')) === 'true' && (await page.locator('.split-list .skill-row', { hasText: 'workspace-note' }).count()) === 1)
+  check('project tab: Combwork skills at the top, open', (await combworkToggle.getAttribute('aria-expanded')) === 'true' && (await page.locator('.split-list .skill-row', { hasText: 'workspace-note' }).count()) === 1)
   check('…then that provider’s skills only, folded', (await page.locator('.skill-provider').count()) === 1 && /claude code skills/i.test(await providerToggle.innerText()) && (await providerToggle.getAttribute('aria-expanded')) === 'false' && (await page.locator('.skill-provider .skill-group', { hasText: 'Local' }).count()) === 0)
   await page.screenshot({ path: path.join(lib.WORK, 'skills-project-folded.png') })
   await providerToggle.click()
@@ -228,9 +228,9 @@ const check = (name, ok, extra = '') => {
   await page.screenshot({ path: path.join(lib.WORK, 'skills-project.png') })
 
   // The dropdown's choice and what is open are kept for the project: away from the tab and back, and in the saved
-  // preferences (here: Codex, its skills open, Hive's folded).
+  // preferences (here: Codex, its skills open, Combwork's folded).
   await pick.selectOption('codex')
-  await hiveToggle.click()
+  await combworkToggle.click()
   await page.keyboard.press('Alt+1')
   await sleep(300)
   await lib.openMoreTab(page, 'Skills')
@@ -238,7 +238,7 @@ const check = (name, ok, extra = '') => {
   const saved = await inv('ui:get')
   const savedPick = saved.skillsProvider ?? {}
   check('the provider shown is remembered for the project', (await pick.inputValue()) === 'codex' && savedPick[proj.toLowerCase()] === 'codex', JSON.stringify({ value: await pick.inputValue(), savedPick }))
-  check('…and which groups are open', (await hiveToggle.getAttribute('aria-expanded')) === 'false' && (await providerToggle.getAttribute('aria-expanded')) === 'true' && JSON.stringify(saved.skillsFold?.[proj.toLowerCase()]) === JSON.stringify({ hive: false, provider: true }), JSON.stringify(saved.skillsFold))
+  check('…and which groups are open', (await combworkToggle.getAttribute('aria-expanded')) === 'false' && (await providerToggle.getAttribute('aria-expanded')) === 'true' && JSON.stringify(saved.skillsFold?.[proj.toLowerCase()]) === JSON.stringify({ combwork: false, provider: true }), JSON.stringify(saved.skillsFold))
 
   // A local skill is edited in place (not preview) and can be deleted there.
   const localRow = page.locator('.skill-provider').first().locator('.skill-row', { hasText: 'lint-rules' })
@@ -248,15 +248,15 @@ const check = (name, ok, extra = '') => {
   await lib.until(async () => !fs.existsSync(path.join(proj, '.agents', 'skills', 'lint-rules')), 10000)
   check('local skill deleted in the project tab', !fs.existsSync(path.join(proj, '.agents', 'skills', 'lint-rules')) && fs.existsSync(path.join(proj, '.claude', 'skills', 'lint-rules')))
 
-  // "Edit in workspace" on a Hive skill opens it in the Skills view, in the editor. Hive's group unfolded first.
-  await hiveToggle.click()
-  check('the Combwork group unfolds', (await hiveToggle.getAttribute('aria-expanded')) === 'true' && !!(await lib.until(async () => (await page.locator('.split-list .skill-row', { hasText: 'workspace-note' }).count()) === 1, HUNG_MS)))
-  const hiveRow = page.locator('.skill-row', { hasText: 'workspace-note' }).first()
-  await hiveRow.click()
+  // "Edit in workspace" on a Combwork skill opens it in the Skills view, in the editor. Combwork's group unfolded first.
+  await combworkToggle.click()
+  check('the Combwork group unfolds', (await combworkToggle.getAttribute('aria-expanded')) === 'true' && !!(await lib.until(async () => (await page.locator('.split-list .skill-row', { hasText: 'workspace-note' }).count()) === 1, HUNG_MS)))
+  const combworkRow = page.locator('.skill-row', { hasText: 'workspace-note' }).first()
+  await combworkRow.click()
   await lib.until(async () => (await page.locator('.split .editor-toolbar', { hasText: 'workspace-note' }).count()) === 1, 5000)
   check('project tab: a Combwork skill (view only) has no warning', (await page.locator('.skills-warning').count()) === 0)
-  await hiveRow.hover()
-  await hiveRow.locator('button[aria-label^="Edit in the workspace"]').click()
+  await combworkRow.hover()
+  await combworkRow.locator('button[aria-label^="Edit in the workspace"]').click()
   // The project tab's row for the same skill stays in the DOM, hidden and selected, and the Skills view draws its own row
   // once its list is read (#717). Counting both, the old check passed at once on the hidden row and then read once: 1
   // while the Skills view's list wasn't drawn yet, 2 (a failure) once it was, which under load it was by the read. Only a

@@ -1,7 +1,7 @@
 // Git missing (#346): a test copy whose PATH has no git (through the run context's environment, never the machine's)
 // says so wherever git matters, never "not a git repository": Provider Setup's Git row (Git not found, with the fix and
 // Git for Windows), the status bar, the Changes tab, the Merge dialog. Remove All's opt-in deletion keeps the worktree, with the reason. A repository with a worktree agent, made
-// with the suite's own git before Hive starts. Throwaway profile and workspace, quiet; no agent is started.
+// with the suite's own git before Combwork starts. Throwaway profile and workspace, quiet; no agent is started.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -21,7 +21,7 @@ const check = (name, ok, extra = '') => {
 
 /** The run context's PATH for a test copy without the folders that hold git (node stays, for the CLIs' launchers). */
 function pathWithoutGit() {
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData })
   const key = Object.keys(env).find((k) => k.toUpperCase() === 'PATH')
   return (env[key] ?? '')
     .split(path.delimiter)
@@ -34,10 +34,10 @@ function pathWithoutGit() {
   lib.gitProject(repo)
   const main = lib.git(repo, ['rev-parse', '--abbrev-ref', 'HEAD']).trim()
   fs.mkdirSync(path.dirname(tree), { recursive: true })
-  lib.git(repo, ['worktree', 'add', '-q', '-b', 'hive/wt', tree, main])
+  lib.git(repo, ['worktree', 'add', '-q', '-b', 'cw/wt', tree, main])
   // A worktree agent, as Add Agent would have saved it: merged and clean, so Remove All's box would delete it with git.
   fs.mkdirSync(path.join(repo, '.combwork'), { recursive: true })
-  fs.writeFileSync(path.join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-wt', name: 'Treeling', provider: 'claude-code', worktree: { path: tree, branch: 'hive/wt', base: main } }] }))
+  fs.writeFileSync(path.join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-wt', name: 'Treeling', provider: 'claude-code', worktree: { path: tree, branch: 'cw/wt', base: main } }] }))
   lib.enableProviders(userData)
   const hidden = pathWithoutGit()
   check('the test copy gets a PATH without git', !hidden.toLowerCase().includes('\\git\\cmd'))
@@ -56,7 +56,7 @@ function pathWithoutGit() {
     const t = await inv('git:tool', true)
     return t.state === 'missing' ? t : null
   }, 15000)
-  check('Hive finds git missing', !!tool, JSON.stringify(await inv('git:tool')))
+  check('Combwork finds git missing', !!tool, JSON.stringify(await inv('git:tool')))
   const item = page.locator('.statusbar .status-item.warn', { hasText: 'Git' })
   check('the status bar shows it', !!(await lib.until(async () => (await item.count()) === 1, 10000)))
 
@@ -117,7 +117,7 @@ function pathWithoutGit() {
   check('worktree checks: not removable, because git is missing', checks.length === 1 && checks[0].removable === false && checks[0].reason === MISSING, JSON.stringify(checks))
   const removed = await inv('agents:remove', repo, 'a-wt', { deleteWorktree: 'merged-clean' })
   check('removing with "merged and clean" keeps the worktree, saying why', removed.worktree?.deleted === false && removed.worktree.reason === MISSING && fs.existsSync(tree), JSON.stringify(removed))
-  check('…and its branch', lib.git(repo, ['branch', '--format=%(refname:short)']).includes('hive/wt'))
+  check('…and its branch', lib.git(repo, ['branch', '--format=%(refname:short)']).includes('cw/wt'))
 
   await app.close()
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')

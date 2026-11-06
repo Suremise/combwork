@@ -1,5 +1,5 @@
-// Hive's one way to the Recycle Bin (#414): every deletion goes through trash() in src/main/trash.ts, and a test copy of
-// Hive moves what it deletes into its own trash folder instead of the user's Recycle Bin.
+// Combwork's one way to the Recycle Bin (#414): every deletion goes through trash() in src/main/trash.ts, and a test copy of
+// Combwork moves what it deletes into its own trash folder instead of the user's Recycle Bin.
 import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join, relative } from 'path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
@@ -28,11 +28,11 @@ vi.mock('fs/promises', async (original) => {
 const { testTrashDir, trash } = await import('../src/main/trash')
 const { trashAllOrNothing } = await import('../src/main/fsutil')
 
-const base = tempDir('hive-trash-')
+const base = tempDir('cw-trash-')
 const shell = electron.shell as unknown as { trashItem?: (p: string) => Promise<void> }
-const saved = { dir: process.env.HIVE_TEST_TRASH_DIR, profile: process.env.HIVE_USER_DATA }
+const saved = { dir: process.env.CW_TEST_TRASH_DIR, profile: process.env.CW_USER_DATA }
 afterEach(() => {
-  for (const [k, v] of [['HIVE_TEST_TRASH_DIR', saved.dir], ['HIVE_USER_DATA', saved.profile]] as const) {
+  for (const [k, v] of [['CW_TEST_TRASH_DIR', saved.dir], ['CW_USER_DATA', saved.profile]] as const) {
     if (v === undefined) delete process.env[k]
     else process.env[k] = v
   }
@@ -55,22 +55,22 @@ describe('trash (src/main/trash.ts)', () => {
   })
 
   it('picks the test trash folder only in a test copy: unpackaged, or packaged and quiet (#1599)', () => {
-    expect(testTrashDir({ HIVE_TEST_TRASH_DIR: 'C:\\t\\trash', HIVE_USER_DATA: 'C:\\p' }, false)).toBe('C:\\t\\trash')
-    expect(testTrashDir({ HIVE_USER_DATA: 'C:\\p' }, false)).toBe(join('C:\\p', 'test-trash'))
+    expect(testTrashDir({ CW_TEST_TRASH_DIR: 'C:\\t\\trash', CW_USER_DATA: 'C:\\p' }, false)).toBe('C:\\t\\trash')
+    expect(testTrashDir({ CW_USER_DATA: 'C:\\p' }, false)).toBe(join('C:\\p', 'test-trash'))
     // npm run dev: no test profile, the Recycle Bin.
     expect(testTrashDir({}, false)).toBeNull()
     // The installed app (never quiet): always the Recycle Bin, whatever else its environment says.
-    expect(testTrashDir({ HIVE_TEST_TRASH_DIR: 'C:\\t\\trash', HIVE_USER_DATA: 'C:\\p' }, true)).toBeNull()
-    expect(testTrashDir({ HIVE_TEST_TRASH_DIR: 'C:\\t\\trash', HIVE_USER_DATA: 'C:\\p', HIVE_TEST_QUIET: '0' }, true)).toBeNull()
-    // A packaged copy a test started (HIVE_TEST_QUIET=1, lib.hiveEnv): its suite's trash folder, or its profile's.
-    expect(testTrashDir({ HIVE_TEST_TRASH_DIR: 'C:\\t\\trash', HIVE_USER_DATA: 'C:\\p', HIVE_TEST_QUIET: '1' }, true)).toBe('C:\\t\\trash')
-    expect(testTrashDir({ HIVE_USER_DATA: 'C:\\p', HIVE_TEST_QUIET: '1' }, true)).toBe(join('C:\\p', 'test-trash'))
-    expect(testTrashDir({ HIVE_TEST_QUIET: '1' }, true)).toBeNull()
+    expect(testTrashDir({ CW_TEST_TRASH_DIR: 'C:\\t\\trash', CW_USER_DATA: 'C:\\p' }, true)).toBeNull()
+    expect(testTrashDir({ CW_TEST_TRASH_DIR: 'C:\\t\\trash', CW_USER_DATA: 'C:\\p', CW_TEST_QUIET: '0' }, true)).toBeNull()
+    // A packaged copy a test started (CW_TEST_QUIET=1, lib.combworkEnv): its suite's trash folder, or its profile's.
+    expect(testTrashDir({ CW_TEST_TRASH_DIR: 'C:\\t\\trash', CW_USER_DATA: 'C:\\p', CW_TEST_QUIET: '1' }, true)).toBe('C:\\t\\trash')
+    expect(testTrashDir({ CW_USER_DATA: 'C:\\p', CW_TEST_QUIET: '1' }, true)).toBe(join('C:\\p', 'test-trash'))
+    expect(testTrashDir({ CW_TEST_QUIET: '1' }, true)).toBeNull()
   })
 
   it('in a test copy, moves files and folders into its trash folder and notes each one', async () => {
     const dir = join(base, 'run-trash')
-    process.env.HIVE_TEST_TRASH_DIR = dir
+    process.env.CW_TEST_TRASH_DIR = dir
     shell.trashItem = async () => {
       throw new Error('the real Recycle Bin was used')
     }
@@ -95,8 +95,8 @@ describe('trash (src/main/trash.ts)', () => {
 
   it('falls back to <profile>/test-trash with only a test profile', async () => {
     const profile = join(base, 'profile')
-    process.env.HIVE_USER_DATA = profile
-    delete process.env.HIVE_TEST_TRASH_DIR
+    process.env.CW_USER_DATA = profile
+    delete process.env.CW_TEST_TRASH_DIR
     const file = join(base, 'card.json')
     writeFileSync(file, '{}')
     await trash(file)
@@ -108,7 +108,7 @@ describe('trash (src/main/trash.ts)', () => {
     const dir = join(base, 'note-fails')
     // Its log can't be appended to: a folder of that name.
     mkdirSync(join(dir, 'trash.jsonl'), { recursive: true })
-    process.env.HIVE_TEST_TRASH_DIR = dir
+    process.env.CW_TEST_TRASH_DIR = dir
     const file = join(base, 'gone.md')
     writeFileSync(file, 'gone')
     await expect(trash(file)).resolves.toBeUndefined()
@@ -124,7 +124,7 @@ describe('trash (src/main/trash.ts)', () => {
 
   it('an item on another drive is refused before anything moves: whole, in place, nothing in the trash (#414 round 1)', async () => {
     const dir = join(base, 'other-drive')
-    process.env.HIVE_TEST_TRASH_DIR = dir
+    process.env.CW_TEST_TRASH_DIR = dir
     const folder = join(base, 'project')
     mkdirSync(join(folder, 'src'), { recursive: true })
     writeFileSync(join(folder, 'a.txt'), 'a')
@@ -145,14 +145,14 @@ describe('trash (src/main/trash.ts)', () => {
 
   it('rejects for something that is not there, noting nothing', async () => {
     const dir = join(base, 'missing-trash')
-    process.env.HIVE_TEST_TRASH_DIR = dir
+    process.env.CW_TEST_TRASH_DIR = dir
     await expect(trash(join(base, 'not-there.txt'))).rejects.toThrow()
     expect(existsSync(join(dir, 'trash.jsonl'))).toBe(false)
   })
 
   it('a folder something has open for a moment is moved once it is let go, not refused (#668)', async () => {
     const dir = join(base, 'held-trash')
-    process.env.HIVE_TEST_TRASH_DIR = dir
+    process.env.CW_TEST_TRASH_DIR = dir
     const folder = join(base, 'held-project')
     mkdirSync(join(folder, '.combwork'), { recursive: true })
     const file = join(folder, '.combwork', 'project.json')
@@ -182,7 +182,7 @@ describe('trash (src/main/trash.ts)', () => {
 
   it('a folder kept open is refused after a few tries, whole and in place, nothing in the trash (#668)', async () => {
     const dir = join(base, 'kept-open-trash')
-    process.env.HIVE_TEST_TRASH_DIR = dir
+    process.env.CW_TEST_TRASH_DIR = dir
     const folder = join(base, 'kept-open')
     mkdirSync(folder, { recursive: true })
     const file = join(folder, 'a.txt')
@@ -200,8 +200,8 @@ describe('trash (src/main/trash.ts)', () => {
   })
 
   it('outside a test copy, tries the Recycle Bin again while the item is still there (#668)', async () => {
-    delete process.env.HIVE_TEST_TRASH_DIR
-    delete process.env.HIVE_USER_DATA
+    delete process.env.CW_TEST_TRASH_DIR
+    delete process.env.CW_USER_DATA
     const file = join(base, 'busy.txt')
     writeFileSync(file, 'busy')
     let tries = 0
@@ -215,8 +215,8 @@ describe('trash (src/main/trash.ts)', () => {
   })
 
   it('outside a test copy, uses the Recycle Bin (shell.trashItem), and passes on its failure', async () => {
-    delete process.env.HIVE_TEST_TRASH_DIR
-    delete process.env.HIVE_USER_DATA
+    delete process.env.CW_TEST_TRASH_DIR
+    delete process.env.CW_USER_DATA
     const asked: string[] = []
     shell.trashItem = async (p) => {
       asked.push(p)

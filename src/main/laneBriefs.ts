@@ -12,7 +12,7 @@ import { join } from 'path'
 import { agentMsg, inDefaultDialect, say } from '../shared/agentText'
 import type { LaneRecord } from '../shared/lanes'
 import { cancelDeliveries, createDelivery, deliveriesOf, registerSource, type DeliverySource } from './deliveries'
-import { onHiveEvent } from './events'
+import { onCombworkEvent } from './events'
 import { mutateLanes, onLanesWritten, rawLanes } from './lanes'
 import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
@@ -101,8 +101,8 @@ async function settleOnce(ws: WorkspaceService): Promise<void> {
     if (text) {
       const made = (await deliveriesOf(projectPath, lane.builder.id)).some((r) => r.source === LANE_BRIEF_SOURCE && r.ref === current)
       if (!made) {
-        // agent-protocol: the sender is the product's name, Hive
-        await createDelivery(projectPath, { agentId: lane.builder.id, agentName: lane.builder.name, kind: 'rebrief', from: { kind: 'hive', name: 'Combwork' }, body: inDefaultDialect(() => briefText(lane, text)), source: LANE_BRIEF_SOURCE, ref: current, meta: { lane: lane.id, rev: b.rev, ...(b.notIn ? { notIn: b.notIn } : {}) } }) // i18n-ignore: who a delivery is from, as agents read it
+        // agent-protocol: the sender is the product's name, Combwork
+        await createDelivery(projectPath, { agentId: lane.builder.id, agentName: lane.builder.name, kind: 'rebrief', from: { kind: 'combwork', name: 'Combwork' }, body: inDefaultDialect(() => briefText(lane, text)), source: LANE_BRIEF_SOURCE, ref: current, meta: { lane: lane.id, rev: b.rev, ...(b.notIn ? { notIn: b.notIn } : {}) } }) // i18n-ignore: who a delivery is from, as agents read it
         log.info(`Lane ${lane.id}'s brief (rev ${b.rev}) delivered to ${userText(lane.builder.name)}`)
       }
     }
@@ -149,7 +149,7 @@ export function startLaneBriefs(): void {
     for (const ws of openWorkspaces()) void settleLaneBriefs(ws)
   }
   const offLanes = onLanesWritten(all)
-  const offOpen = onHiveEvent((e) => {
+  const offOpen = onCombworkEvent((e) => {
     if (e.type === 'workspace-changed') all()
   })
   stop = () => {

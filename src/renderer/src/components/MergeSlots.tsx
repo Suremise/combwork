@@ -31,7 +31,7 @@ export function useMergeSlots(): MergeSlotInfo[] {
 type Holder = NonNullable<MergeSlotInfo['holder']>
 
 /**
- * The merge slot in the window's words (#798): shared/mergeSlot words it in English for agents and the hive tools, and
+ * The merge slot in the window's words (#798): shared/mergeSlot words it in English for agents and the Combwork tools, and
  * these are the window's, in the user's language.
  */
 
@@ -104,7 +104,7 @@ export async function releaseSlot(s: MergeSlotInfo, projectName: string): Promis
     confirmLabel: releaseLabel(),
     danger: true
   })
-  // Releases the hold this question named: if it has changed hands meanwhile, Hive refuses and says so.
+  // Releases the hold this question named: if it has changed hands meanwhile, Combwork refuses and says so.
   if (ok) await attempt(tr(msg({ id: 'board.slots.releaseFailed', defaultMessage: "Couldn't release the merge slot", description: "An error's title: freeing a merge slot failed." })), () => call('mergeSlots:release', s.project, s.branch, h.id))
 }
 

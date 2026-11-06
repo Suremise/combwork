@@ -44,7 +44,7 @@ export function parseList(out: string): Listed[] {
 
 /**
  * `root` and what it started, from `list`, children before their parents. A parent id is only a number: a process that
- * started before the one its parent id names isn't its child but an older orphan, and is left alone (as hive-progress's
+ * started before the one its parent id names isn't its child but an older orphan, and is left alone (as cw-progress's
  * treeToEnd, #655).
  */
 export function treeOf(list: Listed[], root: Listed): Listed[] {
@@ -90,7 +90,7 @@ export const windowsProbe: ProcessProbe = {
   }
 }
 
-/** Elsewhere (Hive is Windows-only; a fallback for completeness): a pid alone, nothing listed or ended. */
+/** Elsewhere (Combwork is Windows-only; a fallback for completeness): a pid alone, nothing listed or ended. */
 const otherProbe: ProcessProbe = {
   self: async () => ({ pid: process.pid, started: Math.round(Date.now() - process.uptime() * 1000) }),
   alive: async (pid) => {

@@ -26,7 +26,7 @@ const card = (number: number, column: TaskColumn, history: string[] = [], extra:
   number,
   title: `Card ${number}`,
   description: '',
-  project: 'hive',
+  project: 'alpha',
   agent: null,
   column,
   order: 0,
@@ -423,7 +423,7 @@ describe("a segment's hover: what the card's facts say (#1225)", () => {
     const o = { by: 'user' as const, move: 'active→done', rules: ['integrate.approved', 'done.contained'], reason: ' Merged by hand ', at: '' }
     expect(workNotes(badge({ revision: null, override: o }), 'done', null, short, tr, names)).toEqual(['You moved it past its rules: Review and approval before merging + done.contained. Reason: Merged by hand'])
     expect(workNotes(badge({ revision: null, override: { ...o, by: 'assistant', reason: '' } }), 'done', null, short, tr, names)).toEqual(['The Assistant moved it past its rules: Review and approval before merging + done.contained. No reason given.'])
-    // Without the window's names (hive-mcp): no line.
+    // Without the window's names (cw-mcp): no line.
     expect(workNotes(badge({ revision: null, override: o }), 'done', null, short, tr)).toEqual([])
   })
 
@@ -548,7 +548,7 @@ describe("a segment's hover: what the card's facts say (#1225)", () => {
 })
 
 describe('stages in a lane (#1421): names over the categories, the divider, the legend, Solo, old rules', () => {
-  // A Pair project where Hive merges: Review, Approved and Merging (Merging inside Approved).
+  // A Pair project where Combwork merges: Review, Approved and Merging (Merging inside Approved).
   const pairStages = { stages: mustCompile(preset('git', 'pair')).stages, names: {} }
   const solo = { stages: mustCompile(preset('git', 'solo')).stages, names: {} }
   const withBadge = (stage: WorkBadge['stage']) => ({ stage })
@@ -651,7 +651,7 @@ describe('stages in a lane (#1421): names over the categories, the divider, the 
 })
 
 describe("old rules keep their stages (HR4's #1421 round 1): the options now produce others", () => {
-  // The project switched to Solo (no review, nothing merging); a lane and its cards still under Pair (Hive merges).
+  // The project switched to Solo (no review, nothing merging); a lane and its cards still under Pair (Combwork merges).
   const pair = mustCompile(preset('git', 'pair')).stages.map((s) => s.id)
   const soloNow = { stages: mustCompile(preset('git', 'solo')).stages, names: { approved: 'Ready' } }
 
@@ -698,8 +698,8 @@ describe('refusals name the user as you in the window, as the user to agents (HI
     expect(r.next).toBe("Move it anyway only with the user's reason. One they gave with their request is enough (\"I merged it by hand\", say): move it again with override and that reason, in their words. With none, tell them which rules this skips and ask for theirs.")
     expect(r.change).toBe('These rules are set in Version Control, where the user can change them.')
     expect(refusal('loop.followUpChecked', { card: 'AL-1' }).next).toBe("Wait for the reviewer's ok or gaps; if none comes, ask the user.")
-    expect(refusal('lane.lineBehind', { card: 'AL-2', line: 'hive/AL-2', target: 'main', earlier: 'AL-1' }).next).toBe('Leave it as it is: Combwork brings hive/AL-2 up to date with main once you are idle, or asks the user, and tells you when AL-2 can start.')
-    expect(refusal('merge.hiveMerges', { card: 'AL-1', target: 'main', queue: 'paused', waits: 'answer' }).next).toBe('It is in the merge queue for main, which is paused until the user answers in For you: wait for Done, or for it to come back.')
+    expect(refusal('lane.lineBehind', { card: 'AL-2', line: 'cw/AL-2', target: 'main', earlier: 'AL-1' }).next).toBe('Leave it as it is: Combwork brings cw/AL-2 up to date with main once you are idle, or asks the user, and tells you when AL-2 can start.')
+    expect(refusal('merge.combworkMerges', { card: 'AL-1', target: 'main', queue: 'paused', waits: 'answer' }).next).toBe('It is in the merge queue for main, which is paused until the user answers in For you: wait for Done, or for it to come back.')
     expect(refusal('platform.unknown', { card: 'AL-1', offer: 'repositoryGone' }).next).toMatch(/^The project's Git repository is gone: ask the user to restore it/)
   })
 
@@ -710,7 +710,7 @@ describe('refusals name the user as you in the window, as the user to agents (HI
       expect(l.change).toBe('These rules are set in Version Control, where you can change them.')
     }
     expect(refusalLines('loop.followUpChecked', { card: 'AL-1' }, inCard).next).toBe("The agent waits for the reviewer's ok or gaps; if none comes, it asks you.")
-    expect(refusalLines('merge.hiveMerges', { card: 'AL-1', target: 'main', queue: 'paused', waits: 'fix' }, inCard).next).toBe('It is in the merge queue for main, which is paused until you fix what stopped it and resume it; it moves to Done once merged, or comes back.')
+    expect(refusalLines('merge.combworkMerges', { card: 'AL-1', target: 'main', queue: 'paused', waits: 'fix' }, inCard).next).toBe('It is in the merge queue for main, which is paused until you fix what stopped it and resume it; it moves to Done once merged, or comes back.')
     expect(refusalLines('platform.unknown', { card: 'AL-1', offer: 'repositoryGone' }, inCard).next).toMatch(/^The project's Git repository is gone: restore it, or switch the project to None/)
   })
 
@@ -742,7 +742,7 @@ describe("a lane's wait and its cards' times (HI-1926)", () => {
     // No longer waiting: none; a wait with no card (a slot) is stamped too.
     expect(stampWait(a, null, T + MIN, true)).toBeUndefined()
     expect(stampWait(undefined, { reason: 'slot', card: null }, T, true)).toMatchObject({ since: T, observed: true })
-    // The first listing (Hive just started, or the workspace opened): not seen to begin, so at least that long.
+    // The first listing (Combwork just started, or the workspace opened): not seen to begin, so at least that long.
     expect(stampWait(undefined, reviewer, T, false)).toMatchObject({ since: T, observed: false })
   })
 

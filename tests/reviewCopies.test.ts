@@ -3,7 +3,7 @@
 // with --add-dir; Codex's -c override would replace the user's own writable roots: the recorded fixture); start review
 // leasing a copy at the submission's revision, the verdict returning it to returning, a stale pass's confirming review
 // leasing one again, a resubmission's new revision, and a review waiting while every copy is in use, then told once it
-// has one. A real CopyPool on a real hive.db and git repository; conditions, never time.
+// has one. A real CopyPool on a real combwork.db and git repository; conditions, never time.
 import { spawn as nodeSpawn } from 'child_process'
 import { mkdirSync, readFileSync } from 'fs'
 import { createRequire } from 'module'
@@ -26,7 +26,7 @@ vi.mock('../src/main/agentMessages', () => ({ leaveMessage: async (_p: string, a
 const req = createRequire(import.meta.url)
 const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
 
-const base = tempDir('hive-review-copies-')
+const base = tempDir('cw-review-copies-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 const homes = { CODEX_HOME: process.env.CODEX_HOME, COPILOT_HOME: process.env.COPILOT_HOME }
 
@@ -63,7 +63,7 @@ function context(over: Partial<LaunchContext> = {}): LaunchContext {
   return {
     projectPath: cwd, agentId: 'a-1', executable: 'C:\\bin\\cli.exe', cwd, workspacePath: base, runId: `r-${Math.random()}`, sessionId: '0cb916db-26aa-40f2-86b5-1ba81b225fd2',
     resume: false, name: '', skills: [], mcpServers: { combwork: { command: 'node', args: ['cw-mcp.js'] } }, model: null, effort: null, permissionMode: null, extraArgs: [],
-    hookUrl: 'http://127.0.0.1:5000/hook?run=r1', hookAuthFile: join(base, 'auth.txt'), privateDir: join(base, `private-${Math.random()}`), guidance: 'Hive guidance', allowBackgroundSessions: false, use200kContext: false,
+    hookUrl: 'http://127.0.0.1:5000/hook?run=r1', hookAuthFile: join(base, 'auth.txt'), privateDir: join(base, `private-${Math.random()}`), guidance: 'Combwork guidance', allowBackgroundSessions: false, use200kContext: false,
     env: { PATH: 'C:\\Windows' },
     ...over
   }
@@ -91,7 +91,7 @@ describe("the grant of the project's copies folder (extraDirs)", () => {
     expect(copiesDirOf('D:\\Work\\ws.worktrees', 'D:\\Work\\ws\\proj')).toBe(join('D:\\Work\\ws.worktrees', 'proj', COPIES_DIR))
   })
 
-  it('every provider Hive has can be given folders', () => {
+  it('every provider Combwork has can be given folders', () => {
     for (const p of PROVIDERS) expect(p.capabilities.extraDirs, p.id).toBe(true)
   })
 
@@ -197,7 +197,7 @@ function world(size = 2, tell?: ConstructorParameters<typeof ReviewCopies>[0]['t
     },
     settle: async () => true,
     holder: { self: async () => ({ pid: 1, started: 1001 }), alive: async () => true, live: new Set() },
-    profile: 'hive-1',
+    profile: 'profile-1',
     runIn: () => null,
     holderBusy: (agent) => busy.get(agent) ?? null,
     leaseOver: () => null,
@@ -339,7 +339,7 @@ describe('waiting when none is free', () => {
     expect(reviewCopyText(waiting)).toMatch(/^Waiting for a review copy \(/)
     expect(w.notes.filter((n) => n.id === 'tasks.history.reviewCopyWaiting')).toEqual([{ card: 13, id: 'tasks.history.reviewCopyWaiting', values: { agent: 'R2' } }])
     expect(w.rc.waits()).toEqual([expect.objectContaining({ card: 13, agent: R2.id, name: 'R2', since: expect.any(Number) })])
-    // It says what holds each copy, and when Hive tries again (HI-1764: it was told only "pending").
+    // It says what holds each copy, and when Combwork tries again (HI-1764: it was told only "pending").
     expect(w.rc.waits()[0].why).toMatch(/^the pool's 1 copy is in use; the longest lent, copy-1, for \d+ min \(a review of \S*12\)$/)
     // Asked again meanwhile: still waiting, said on the card once.
     expect((await w.rc.start(13, R2)).is).toBe('waiting')
@@ -418,7 +418,7 @@ describe('waiting when none is free', () => {
   })
 })
 
-// HR5's round 1: off means off. With workflow rules not enforced (or review copies off), Hive records facts and leases
+// HR5's round 1: off means off. With workflow rules not enforced (or review copies off), Combwork records facts and leases
 // nothing; a copy already out is still returned and freed.
 const NOT_ENFORCED = "workflow rules aren't enforced (Settings → Advanced, Workflow rules are enforced)"
 

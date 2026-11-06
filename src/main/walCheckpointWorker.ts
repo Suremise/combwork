@@ -5,7 +5,7 @@ import { DatabaseSync } from 'node:sqlite'
 /**
  * The WAL checkpoints' worker (HI-1691): a thread of its own that checkpoints a database's WAL (PASSIVE) on a connection
  * of its own, opened for the checkpoint and closed after it, so the copy into the file and its fsync (100 ms to most of a
- * second on a loaded disk) never hold up Hive's main process, and with it the keystrokes typed into a pane. When to
+ * second on a loaded disk) never hold up Combwork's main process, and with it the keystrokes typed into a pane. When to
  * checkpoint, and the fallback to SQLite's own, stay main's (walCheckpoint.ts). A PASSIVE checkpoint can run on any
  * connection to the file: it never waits for readers or writers, and copies what no reader still needs.
  *

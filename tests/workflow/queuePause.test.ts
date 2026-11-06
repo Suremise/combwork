@@ -37,7 +37,7 @@ const head = (e: Env) => sh(e.project, 'rev-parse', 'main')
 const pause = (e: Env): void => void e.store.setQueuePause('main', { reason: 'user', card: '', by: 'user' })
 
 describe('Pause queue and Resume (#1353)', () => {
-  it('paused: the queue takes no entry, and the pause is kept for a restarted Hive; resumed, it merges', async () => {
+  it('paused: the queue takes no entry, and the pause is kept for a restarted Combwork; resumed, it merges', async () => {
     const e = team()
     const card = await queued(e)
     pause(e)
@@ -99,7 +99,7 @@ describe('Remove from queue (#1353, S33a)', () => {
     const override = e.store.facts(card.id).find((f) => f.kind === 'Override')
     expect(override?.data).toMatchObject({ move: 'remove from queue', by: 'assistant', reason: 'not now' })
     expect(e.wakes.some((w) => w.agent === 'B1' && w.why.includes('taken out of the merge queue'))).toBe(true)
-    // A restarted Hive's queue (its own connection and runtime) finds nothing to merge.
+    // A restarted Combwork's queue (its own connection and runtime) finds nothing to merge.
     const again = new MergeQueue(e.another(), { folder: `${e.home}/queue`, runCheck: async () => ({ ok: true, output: '' }) })
     expect(await again.drain('main')).toEqual([])
     expect(head(e)).toBe(before)

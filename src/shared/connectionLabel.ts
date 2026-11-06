@@ -19,7 +19,7 @@ export interface ConnectionShown {
   other: boolean
 }
 
-/** Every account in the one order (decision A): Hive's folders and the CLI's own homes alike. */
+/** Every account in the one order (decision A): Combwork's folders and the CLI's own homes alike. */
 export function orderedAccounts(view: Pick<ConnectionsView, 'connections' | 'homes' | 'order'>): Account[] {
   const all: Account[] = [...view.connections, ...(view.homes ?? [])]
   const order = view.order ?? all.map((a) => a.id)
@@ -67,7 +67,7 @@ export function offeredConnections(view: ConnectionsView | null, settings: Param
 }
 
 /**
- * Whether a CLI can run a new agent now, as Hive's detection says (decision A: on and installed): `yes`, installed;
+ * Whether a CLI can run a new agent now, as Combwork's detection says (decision A: on and installed): `yes`, installed;
  * `no`, not found; `checking`, not known yet (detection under way).
  */
 export type CliReady = (cli: ProviderId) => 'yes' | 'no' | 'checking'

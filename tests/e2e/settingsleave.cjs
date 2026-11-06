@@ -15,12 +15,12 @@ const HUNG_MS = 10000
 const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
 ;(async () => {
   lib.enableProviders(userData)
-  const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.hiveEnv({ HIVE_USER_DATA: userData }) })
+  const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.combworkEnv({ CW_USER_DATA: userData }) })
   try {
     const page = await app.firstWindow()
     await lib.fitWindow(app, page, { width: 1300, height: 800 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     await lib.until(async () => (await page.locator('.project-row').count()) === 2, HUNG_MS)
 

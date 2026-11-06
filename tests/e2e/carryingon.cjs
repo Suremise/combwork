@@ -1,6 +1,6 @@
-// Carrying on (#1432, #966 row 16): Hive's three ways of getting an agent to read its inbox, each with its own switch
+// Carrying on (#1432, #966 row 16): Combwork's three ways of getting an agent to read its inbox, each with its own switch
 // (Settings → Advanced, a project's own in Project Settings → Sessions), on a fake Claude Code and a fake Codex agent
-// that both follow Hive's notices (fake-claude/, fake-codex/: a tool's PostToolUse reply and a Stop's reach "the
+// that both follow Combwork's notices (fake-claude/, fake-codex/: a tool's PostToolUse reply and a Stop's reach "the
 // model"; a doorbell they read is logged in fake-wakes.jsonl). For each CLI:
 // 1. checkpoints on: a message left during a tool is told at that tool's end, read and acked in the same turn;
 // 2. checkpoints and Stop continuation off: nothing at the tool's end nor at the Stop, the turn ends as the CLI ends it,
@@ -51,18 +51,18 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
   // The Assistant's fake runs in the workspace's folder: trusted too, so a line typed into it isn't taken as the answer.
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase(), ws.toLowerCase()]))
-  // Both follow Hive's notices, as a model does: they read their inbox and ack what they listed.
+  // Both follow Combwork's notices, as a model does: they read their inbox and ack what they listed.
   fs.writeFileSync(path.join(claudeHome, 'fake-follow-notices.txt'), '')
   fs.writeFileSync(path.join(codexHome, 'fake-follow-notices.txt'), '')
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, HIVE_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1500, height: 900 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.waitForProvider(inv, 'codex')
     await lib.openWorkspace(inv, page, ws)
     const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
@@ -70,7 +70,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const status = async (id) => (await live(id))?.status
     const idle = async (id) => ['ready', 'finished'].includes(await status(id))
     const say = async (id, text) => {
-      // Into Claude Code typed again if a wake of Hive's disturbed it (lib.typeLine, #1560). The fake Codex keeps no input
+      // Into Claude Code typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560). The fake Codex keeps no input
       // log: typed, then a pause before its Enter on purpose (it reads a typed line before its Enter, as a CLI does).
       if (id !== codex.id) return lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
       await inv('pty:write', lib.ptyKey(alpha, id), text)
@@ -81,7 +81,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const notices = (a) => lines(path.join(homeOf(a), 'fake-notices.jsonl')).filter((n) => n.agent === a.name)
     const wakes = (a) => lines(path.join(homeOf(a), 'fake-wakes.jsonl')).filter((w) => w.agent === a.name).map((w) => w.text)
     const setSwitch = (which, value) => inv('advanced:set', `cw.inbox.${which}`, value)
-    const command = (id) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'menu-command', command: id, args: [] })
+    const command = (id) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'menu-command', command: id, args: [] })
     const ownNow = async (key) => (await inv('workspace:refresh')).projects.find((x) => x.path.toLowerCase() === alpha.toLowerCase())?.config[key]
     /** The project's own value, chosen in Project Settings → Sessions (inherit, on, off), then back to the Session tab. */
     const setOwn = async (key, value) => {
@@ -108,7 +108,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const tool = (name, args) => {
       const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
         input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) + '\n',
-        env: lib.childEnv({ CW_API_URL: API, CW_WORKSPACE: ws, HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'projects', CW_API_TOKEN_FILE: asTokenFile, HIVE_API_TOKEN: '', CW_PROJECT: '' }),
+        env: lib.childEnv({ CW_API_URL: API, CW_WORKSPACE: ws, CW_ROLE: 'assistant', CW_ASSISTANT_CONTROL: 'projects', CW_API_TOKEN_FILE: asTokenFile, CW_API_TOKEN: '', CW_PROJECT: '' }),
         timeout: 60000
       }).toString()
       const r = JSON.parse(out.split('\n')[0]).result
@@ -192,7 +192,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     await setSwitch('idleWakes', false)
     const n = (await inv('tasks:create', { title: 'Carry on', project: 'alpha', agent: codex.id })).number
     await inv('tasks:update', n, { column: 'doing', agent: codex.id })
-    await say(codex.id, `hive cw_lane ${JSON.stringify({ action: 'start', cards: [n], reviewer: 'Claude' })}`)
+    await say(codex.id, `cw cw_lane ${JSON.stringify({ action: 'start', cards: [n], reviewer: 'Claude' })}`)
     check('the lane is registered', !!(await until(async () => (await inv('lanes:list')).some((l) => l.reviewer?.id === claude.id), HUNG_MS)))
     await until(() => idle(codex.id), HUNG_MS)
     const before = wakes(claude).length
@@ -207,8 +207,8 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     // --- 5. The Assistant follows Settings' switch (it has no project): its watch's wake waits in its inbox, its panel's ⋯
     // shows it unread, and Deliver Now there types its line once.
     const asst = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === home.toLowerCase())
-    // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
-    await lib.typeLine(inv, lib.ptyKey(home, 'assistant'), claudeHome, null, `hive cw_wait_for_tasks ${JSON.stringify({ cards: [n], changes: ['comment'], wake: true })}`, { live: asst })
+    // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
+    await lib.typeLine(inv, lib.ptyKey(home, 'assistant'), claudeHome, null, `cw cw_wait_for_tasks ${JSON.stringify({ cards: [n], changes: ['comment'], wake: true })}`, { live: asst })
     check('the Assistant watches the card', !!(await until(async () => (await asst())?.status === 'watching', HUNG_MS)), (await asst())?.status)
     await inv('tasks:comment', n, 'A note for the watch.')
     const asstUnread = async () => (await asst())?.inbox?.unread ?? []

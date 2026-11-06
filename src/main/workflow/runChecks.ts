@@ -1,5 +1,5 @@
 // Runs as checks (#1222, SPEC §16.13): a progress run that names a card (and, on Git, what was checked out) brackets its
-// command: what Hive reads when it starts (before hive-progress runs the command) and when it finishes. Its end writes
+// command: what Combwork reads when it starts (before cw-progress runs the command) and when it finishes. Its end writes
 // `CheckRan` in the card's facts, counted only if every rule holds, else with why not:
 // - it was started as a check (`--check`) and reported the command configured for it when it was resolved, or its
 //   command is exactly a configured one (`notCheck`);
@@ -36,7 +36,7 @@ import type { PlatformId } from '../../shared/platform/descriptors'
 import { agentActor, CHANGES_KEPT, foldCard, type Actor, type CheckRanData, type Fact } from '../../shared/workflow/facts'
 import { allOff } from '../../shared/workflow/options'
 
-/** What a run is for, as Hive knows it when the run starts. */
+/** What a run is for, as Combwork knows it when the run starts. */
 export interface CheckRunFor {
   card: number
   /** The folder it runs in (Git), or the project's (None). */
@@ -44,7 +44,7 @@ export interface CheckRunFor {
   /** The card's project's folder (its repository, for ancestry). */
   project: string
   platform: PlatformId
-  /** Git: what was checked out when it started, read by Hive (runLink), and the revision it names (the same). */
+  /** Git: what was checked out when it started, read by Combwork (runLink), and the revision it names (the same). */
   tested: string | null
   /** The check it was started as (`--check`), or null. */
   check: string | null
@@ -285,7 +285,7 @@ export type Recorded = CheckRanData & { platform: PlatformId; blocks?: 'review' 
 
 /**
  * Each project's check records still being written, by workspace and project folder (#1651): a submit right after
- * hive-progress exits waits for them (`checksSettled`), since a run's end reads the folder (the watcher settling, git)
+ * cw-progress exits waits for them (`checksSettled`), since a run's end reads the folder (the watcher settling, git)
  * before its `CheckRan` is written, and a passed check counts for its commit as soon as its run has finished.
  */
 const recording = new WeakMap<WorkspaceService, Map<string, Set<Promise<unknown>>>>()
@@ -323,7 +323,7 @@ export function bracketFinished(run: ProgressRun): Promise<Recorded | null> {
 async function record(run: ProgressRun, b: Bracket): Promise<Recorded | null> {
   if (run.finishedAt === null || (run.state !== 'passed' && run.state !== 'failed' && run.state !== 'stopped')) return null
   if (b.ws.path !== b.workspacePath || !cardOf(b)) return null
-  // Its command as its reporter said (hive-progress: the check's command, or its command line); None's declared paths
+  // Its command as its reporter said (cw-progress: the check's command, or its command line); None's declared paths
   // as they are now: a list changed during the run is a new revision.
   const endPaths = b.for.platform === 'none' ? declaredPaths(b.ws, b.project, b.for.card) : undefined
   const ended = await checkEnd({ ...b.for, command: run.command }, b.start, { at: run.finishedAt, result: run.state, run: run.id, by: run.agentName, title: run.title, endPaths })
@@ -346,7 +346,7 @@ async function record(run: ProgressRun, b: Bracket): Promise<Recorded | null> {
   return { ...data, platform: b.for.platform, ...(gate ? { blocks: gate } : {}) }
 }
 
-/** Brackets read at resolve (before hive-progress starts the command), by the link it gave out, until their start. */
+/** Brackets read at resolve (before cw-progress starts the command), by the link it gave out, until their start. */
 const resolved = new Map<string, { b: Bracket; at: number }>()
 
 /** A bracket read when resolve gave out `linkId`: its start takes it (`takeResolved`) within LINK_TTL_MS. */

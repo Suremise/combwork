@@ -59,7 +59,7 @@ export function parseBaseUrl(raw: string): BaseUrl {
   return { ok: true, url: `${u.origin}${path}`, origin: u.origin, local }
 }
 
-/** The origin a base URL's key is bound to; null when it isn't a base URL Hive takes. */
+/** The origin a base URL's key is bound to; null when it isn't a base URL Combwork takes. */
 export function originOf(baseUrl: string): string | null {
   const b = parseBaseUrl(baseUrl)
   return b.ok ? b.origin : null

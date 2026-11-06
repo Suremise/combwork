@@ -6,13 +6,13 @@ import { agentDoingCards, agentReviewCards } from '../shared/tasks'
 import type { LiveSessionState, StoredText, TaskCard } from '../shared/types'
 import { coalesced } from './coalesce'
 import { createLogger } from './logger'
-import { allTasks, commentAsHive, liveCardHeads } from './tasks'
+import { allTasks, commentAsCombwork, liveCardHeads } from './tasks'
 import { workspaceFor, type WorkspaceService } from './workspace'
 
 const log = createLogger('cards')
 
 /**
- * Adds the agent's Doing cards, and those it reviews, to its session's record (only one Hive has recorded). `still`, asked
+ * Adds the agent's Doing cards, and those it reviews, to its session's record (only one Combwork has recorded). `still`, asked
  * under the file's lock as the record is written: whether that session is still the agent's (a launch's own, #650).
  * `board`: the board as just read, when the caller has it.
  */
@@ -61,12 +61,12 @@ export function recordLiveCardsSoon(workspacePath: string, live: () => LiveSessi
   return coalesced(`live-cards:${workspacePath.toLowerCase()}`, () => recordLiveCards(workspacePath, live()).catch((e) => log.warn('Could not record the cards of running sessions', e)))
 }
 
-/** A comment from Hive on each card an agent of a project has in Doing (#606: its model changed after a safeguard stop). */
+/** A comment from Combwork on each card an agent of a project has in Doing (#606: its model changed after a safeguard stop). */
 export async function commentOnDoingCards(ws: WorkspaceService, projectPath: string, agentId: string, said: string | StoredText): Promise<number[]> {
   if (ws.isAssistantHome(projectPath)) return []
   const project = basename(projectPath)
   const out: number[] = []
   // Each checked again under its lock: moved, reassigned or taken to another project meanwhile, it isn't the agent's now.
-  for (const c of agentDoingCards(await allTasks(ws, { archived: false }), project, agentId)) if (await commentAsHive(c.number, said, ws, (card) => agentDoingCards([card], project, agentId).length === 1)) out.push(c.number)
+  for (const c of agentDoingCards(await allTasks(ws, { archived: false }), project, agentId)) if (await commentAsCombwork(c.number, said, ws, (card) => agentDoingCards([card], project, agentId).length === 1)) out.push(c.number)
   return out
 }

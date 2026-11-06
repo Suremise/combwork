@@ -17,7 +17,7 @@
   },
   "stall.doing.startFailed": {
     "text": "{agent}'s start failed: {why}",
-    "note": "HI-1976: the card's agent couldn't be started. why: the failure, in Hive's or the CLI's own words."
+    "note": "HI-1976: the card's agent couldn't be started. why: the failure, in Combwork's or the CLI's own words."
   },
   "stall.doing.startWaiting": {
     "text": "{agent} waits to start: {why}",
@@ -39,6 +39,10 @@
     "text": "{reviewer} is waiting for {other}, before {card} in the lane, while {builder} waits on the review of {card}: each has waited on the other for {waited}.",
     "note": "A lane deadlocked: its reviewer waits for a card before this one in the lane, while its builder waits for this card's verdict. waited: a duration (stall.duration.*)."
   },
+  "stall.laneNext.depsDone": {
+    "text": "{card} is the lane's next card: the last of the cards it depends on went Done {minutes} min ago, and {doing}",
+    "note": "The Agent API's and lane watches' stalled (HI-2618): a lane's next card whose dependencies are all Done, not started since. card: its key; minutes: how long since the last of them went Done; doing: what its builder does, a sentence (\"B1 is only watching without starting it.\")."
+  },
   "stall.loop.designWait": {
     "text": "{builder} posted a design on {card} for its reviewer to check and has waited {waited}: nobody has answered it, and it hasn't gone ahead as posted (cw_loop_step proceed).",
     "note": "#1382: the builder posted a design for its reviewer to check before building; nobody answered, and it didn't go ahead once its wait was over. waited: a duration (stall.duration.*)."
@@ -54,6 +58,10 @@
   "stall.loop.wakeUntaken": {
     "text": "{agent} hasn't taken the wake Combwork typed for {card}: it waits in its prompt.",
     "note": "#777: the agent watched the card, and its wake waits untaken in its prompt (its CLI didn't take the line)."
+  },
+  "stall.review.given": {
+    "text": "{card} was given to {agent} to review {given} ago, and it hasn't started reviewing it{state, select, busy { (it is working on something else)} other {}}: in Review for {waited}.",
+    "note": "HI-2636: a card waiting in Review that Combwork's reviewer pool gave to a reviewer, which hasn't started its review (watching it or not). given: how long ago it was given; waited: how long it has been in Review (both durations, stall.duration.*). state: busy (working on something else) or none."
   },
   "stall.review.noVerdict": {
     "text": "{agent} started reviewing {card} but has given no verdict, and has only been watching it for {waited}.",

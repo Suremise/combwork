@@ -55,7 +55,7 @@ import { gitProblem, gitTool } from './gitTool'
 import { gitProblemData } from '../shared/gitTool'
 import { linesOf, listOf, shownText, withValues, type Text, type TextPart, type TextValues } from '../shared/advanced'
 import { fmt, msg, tr, type Msg } from '../shared/i18n'
-import { errorText, HiveError } from './hiveError'
+import { errorText, CombworkError } from './combworkError'
 import { changingFolder } from './folderFence'
 import { createLogger, userText } from './logger'
 import { mergeSlots } from './mergeSlotHost'
@@ -86,7 +86,7 @@ const net = (cwd: string, args: string[]): Promise<GitResult> => git(cwd, args, 
 
 /**
  * The Git view's words (#850): what an action did, why it was refused or failed. Only the window reads them, so what an
- * action did is said in its language at once (`tr`), and a refusal is a HiveError (English to the log, the window's
+ * action did is said in its language at once (`tr`), and a refusal is a CombworkError (English to the log, the window's
  * language through IPC). Git's own words stay as git said them.
  */
 const M = {
@@ -107,12 +107,12 @@ const M = {
   pushAllRefused: msg({ id: 'service.gitRepo.pushAllRefused', defaultMessage: "{remote} refused {n, plural, one {# branch or tag} other {# branches and tags}} (Combwork never forces a push): it has commits they haven't, so pull or merge them first. What happened to each:", description: "An error after Push to… with all branches and tags in the Git view: the first line, the remote {remote} refused {n} of them; a line for each outcome follows (service.gitRepo.pushOutcome)." }),
   pushOutcome: msg({ id: 'service.gitRepo.pushOutcome', defaultMessage: '{result, select, pushed {Pushed: {refs}.} upToDate {Already up to date: {refs}.} refused {Refused: {refs}.} other {Tags pushed: {refs}.}}', description: "A line after Push to… with all branches and tags in the Git view: the branches pushed, already up to date, refused (branches or tags), or the tags pushed. {refs} lists them all by name." }),
   remoteTrackingChanged: msg({ id: 'service.gitRepo.remoteTrackingChanged', defaultMessage: "The branches tracking {remote} changed since you were asked, so nothing was removed: look at them again.", description: 'An error removing a remote in the Git view: the local branches tracking it are not the ones the confirmation listed (one started or stopped tracking it meanwhile).' }),
-  notOnRemote: msg({ id: 'service.gitRepo.notOnRemote', defaultMessage: '{remote} has no {branch} (as of the last fetch): push it there first, or fetch.', description: 'An error choosing what a branch tracks in the Git view: the remote {remote} has no branch {branch} that Hive knows of.' }),
+  notOnRemote: msg({ id: 'service.gitRepo.notOnRemote', defaultMessage: '{remote} has no {branch} (as of the last fetch): push it there first, or fetch.', description: 'An error choosing what a branch tracks in the Git view: the remote {remote} has no branch {branch} that Combwork knows of.' }),
   badName: msg({ id: 'service.gitRepo.badName', defaultMessage: "{kind, select, tag {{hasName, select, yes {{name} isn't a valid tag name.} other {That isn't a valid tag name.}}} other {{hasName, select, yes {{name} isn't a valid branch name.} other {That isn't a valid branch name.}}}}", description: "An error creating a branch or a tag ({kind}): its name {name} is one git refuses. {hasName} is no when no name was given (then it says That)." })
 }
 
 /** A refusal or failure from a message and its values. */
-const refusal = (m: Msg, values?: TextValues): HiveError => new HiveError(values ? withValues(m, values) : m)
+const refusal = (m: Msg, values?: TextValues): CombworkError => new CombworkError(values ? withValues(m, values) : m)
 
 /**
  * Git's own words for a failure, a few lines of them (a switch lists the files in the way), without its hints, and with
@@ -122,7 +122,7 @@ export function gitSays(r: GitResult): string {
   return shownText(gitSaid(r))
 }
 
-/** gitSays as text: git's own lines as they came, Hive's words (it gave up, an exit code alone) as a message. */
+/** gitSays as text: git's own lines as they came, Combwork's words (it gave up, an exit code alone) as a message. */
 export function gitSaid(r: GitResult): TextPart {
   if (r.timedOut) return withValues(M.gaveUp, { minutes: NETWORK_MS / 60_000 })
   const lines = `${r.err}\n${r.out}`
@@ -194,7 +194,7 @@ const summaries = new Map<string, KeptSummary>()
 
 /**
  * HI-2135: how many folders' summaries are kept: the most recently read, the oldest dropped first, so the folders of a
- * long session (projects removed, slots and review copies gone, other workspaces) aren't kept for as long as Hive runs.
+ * long session (projects removed, slots and review copies gone, other workspaces) aren't kept for as long as Combwork runs.
  * A folder dropped is read with git again the next time, as one never read is.
  */
 const SUMMARIES_MAX = 200
@@ -212,7 +212,7 @@ export function forgetSummaries(): void {
   summaries.clear()
 }
 
-/** Tests: how many folders' summaries are kept at most (null: as Hive keeps them), and how many are kept now. */
+/** Tests: how many folders' summaries are kept at most (null: as Combwork keeps them), and how many are kept now. */
 export function summariesForTests(max?: number | null): number {
   if (max !== undefined) summariesMax = max ?? SUMMARIES_MAX
   return summaries.size
@@ -229,7 +229,7 @@ interface KeyBasis {
  * upstream's commits, the packed refs, and every config file git reads there (remotes and upstreams can come from any):
  * those its last read named, the repository's own, and the global ones whether they exist yet or not. The status bar
  * reads the summary again at each usage change of the project's agents (several a second while lanes build): the same
- * key is git's same answer. Only for a plain repository (plainRepo, the one rule of Hive's git caches), every one of
+ * key is git's same answer. Only for a plain repository (plainRepo, the one rule of Combwork's git caches), every one of
  * those config files free of includes: null otherwise, as where the files can't say (no `.git` of its own, a branch or
  * an upstream whose commit isn't read from them) or config is given in the environment.
  */
@@ -280,7 +280,7 @@ async function fileParts(gitDir: string): Promise<Pick<GitRepoSummary, 'state' |
 /**
  * The config files `git config --list --show-origin -z` read in `root` (each entry its origin, then its key and value),
  * as absolute paths; null when an entry came from elsewhere than a file or the command line (a blob, standard input),
- * which no file's change would show. The command line's are Hive's own (GIT_PREFIX), the same at every read; config
+ * which no file's change would show. The command line's are Combwork's own (GIT_PREFIX), the same at every read; config
  * given in the environment (also said as the command line's) isn't kept at all (summaryKey).
  */
 export function configOrigins(out: string, root: string): string[] | null {
@@ -535,7 +535,7 @@ export async function repoHistory(root: string, opts: { ref?: string | null; pag
     if (r.startsWith('refs/heads/')) branches.push(r.slice('refs/heads/'.length))
     else if (r.startsWith('refs/remotes/') && !r.endsWith('/HEAD')) remoteBranches.push(r.slice('refs/remotes/'.length))
   }
-  // By default the project's target (where its work goes: 1.0.0 for hive, not main), else the folder's branch.
+  // By default the project's target (where its work goes: an integration branch such as 1.0.0, not main), else the folder's branch.
   const target = opts.workTarget && branches.includes(opts.workTarget) ? opts.workTarget : null
   // Named whole (round 1): a local branch called origin/main never hides the remote's of that name.
   const defaultRef = target ? `refs/heads/${target}` : summary.branch ? `refs/heads/${summary.branch}` : null
@@ -604,11 +604,11 @@ async function scrubbed(projectPath: string, e: unknown, urls: string[]): Promis
   const r = await git(projectPath, ['config', '--get-regexp', String.raw`^remote\..*\.(push)?url$`])
   const configured = r.ok ? r.out.split(/\r?\n/).filter(Boolean).map((l) => l.slice(l.indexOf(' ') + 1)) : []
   const secrets = [...new Set([...configured, ...urls].flatMap(urlSecrets))].sort((a, b) => b.length - a.length)
-  // A HiveError's text is cleaned part by part (git's words are values), so the window's language never brings one back.
-  if (e instanceof HiveError) {
+  // A CombworkError's text is cleaned part by part (git's words are values), so the window's language never brings one back.
+  if (e instanceof CombworkError) {
     const text = scrubText(e.text, secrets) as Text
     // agent-protocol: the same error's text with its secrets cleaned out: its messages are found where it was thrown
-    return JSON.stringify(text) === JSON.stringify(e.text) ? e : new HiveError(text, e.kind ? { kind: e.kind } : undefined)
+    return JSON.stringify(text) === JSON.stringify(e.text) ? e : new CombworkError(text, e.kind ? { kind: e.kind } : undefined)
   }
   const message = scrubSecrets(e.message, secrets)
   return message === e.message ? e : new Error(message)
@@ -629,7 +629,7 @@ function scrubText(t: TextPart, secrets: string[]): TextPart {
 
 /**
  * The project's agents working in its folder now (#1451: their current folder, `currentFolder`: a running session's, else
- * where a new conversation would start), with their sessions' status. One with input of Hive's still on its way (#646
+ * where a new conversation would start), with their sessions' status. One with input of Combwork's still on its way (#646
  * round 1: a prompt or launch task given and not taken yet, or a line typed and not taken) counts as working: its CLI may
  * start that turn any moment, and the folder's fence can't take back what is in its input.
  */
@@ -659,23 +659,23 @@ function folderSlots(projectPath: string): FolderSlot[] {
 /**
  * Switching branch or pulling moves the ground under the agents working in the folder and under a merge into its
  * branch: refused while one works there or the merge slot is held or waited for, saying why. The change itself runs
- * holding the slot of the branch it leaves and the repository lock (repoLock.ts, across Hives), so a merge can't start in the middle. An agent may
+ * holding the slot of the branch it leaves and the repository lock (repoLock.ts, across Combworks), so a merge can't start in the middle. An agent may
  * start working while it waits for them, so it is checked again once they are held, right before git runs (nothing is
  * awaited between that check and starting git).
  */
 async function changeFolder<T>(projectPath: string, action: GitFolderAction, branch: string | null, fn: () => Promise<T>): Promise<T> {
   const why = folderBusyData(await folderAgents(projectPath), folderSlots(projectPath), action)
-  if (why) throw new HiveError(why)
+  if (why) throw new CombworkError(why)
   const locked = (): Promise<T> =>
     withRepoLock(projectPath, () =>
-      // The folder is fenced from here to git's end (#646): no line of Hive's is typed into its agents and none starts
-      // there meanwhile, so no turn of Hive's begins between this last check and git changing the files.
+      // The folder is fenced from here to git's end (#646): no line of Combwork's is typed into its agents and none starts
+      // there meanwhile, so no turn of Combwork's begins between this last check and git changing the files.
       // i18n-ignore: what changes the folder, for the log and an agent's reply (agent-facing, English)
       changingFolder(projectPath, `a Git ${action}`, async () => {
         // The slot is this action's own now (asUser refuses when anyone else holds or waits for it); without a branch to
         // hold it for (a detached HEAD), the slots are checked again too.
         const now = folderBusyData(await folderAgents(projectPath), branch ? [] : folderSlots(projectPath), action)
-        if (now) throw new HiveError(now)
+        if (now) throw new CombworkError(now)
         return fn()
       }), { project: projectPath }
     )
@@ -692,10 +692,10 @@ async function summaryOf(projectPath: string): Promise<GitRepoSummary> {
   const s = await repoSummary(projectPath)
   // Git's problem as data; else (it changed meanwhile) the summary's English as it is.
   // agent-text: gitProblemData
-  if (s.gitProblem) throw new HiveError(gitProblemData(gitTool()) ?? linesOf([s.gitProblem]))
+  if (s.gitProblem) throw new CombworkError(gitProblemData(gitTool()) ?? linesOf([s.gitProblem]))
   if (!s.isRepo) throw refusal(msg({ id: 'service.gitRepo.notRepo', defaultMessage: "{folder} isn't a git repository.", description: 'An error in the Git view: the project folder {folder} is not in a git repository.' }), { folder: projectPath })
   const parent = parentRepoData(s)
-  if (parent) throw new HiveError(parent)
+  if (parent) throw new CombworkError(parent)
   return s
 }
 
@@ -751,7 +751,7 @@ export async function addRemote(projectPath: string, name: string, url: string):
   name = name.trim()
   url = url.trim()
   const problem = remoteNameProblemData(name) ?? remoteUrlProblemData(url)
-  if (problem) throw new HiveError(problem)
+  if (problem) throw new CombworkError(problem)
   return oneAtATime(projectPath, async () => {
     await summaryOf(projectPath)
     const r = await git(projectPath, ['remote', 'add', '--', name, url])
@@ -766,7 +766,7 @@ export async function setRemoteUrl(projectPath: string, name: string, url: strin
   projectPath = workspace.assertProject(projectPath)
   url = url.trim()
   const problem = remoteUrlProblemData(url)
-  if (problem) throw new HiveError(problem)
+  if (problem) throw new CombworkError(problem)
   return oneAtATime(projectPath, async () => {
     await summaryOf(projectPath)
     const r = await git(projectPath, ['remote', 'set-url', '--', name, url])
@@ -776,7 +776,7 @@ export async function setRemoteUrl(projectPath: string, name: string, url: strin
   }, [url])
 }
 
-/** Fetches every remote: the only way ahead/behind changes (Hive never fetches by itself). */
+/** Fetches every remote: the only way ahead/behind changes (Combwork never fetches by itself). */
 export async function fetchAll(projectPath: string): Promise<string> {
   projectPath = workspace.assertProject(projectPath)
   return oneAtATime(projectPath, async () => {
@@ -803,7 +803,7 @@ export async function pull(projectPath: string): Promise<string> {
     if (s.state) throw refusal(msg({ id: 'service.gitRepo.midOperation', defaultMessage: 'Git is in the middle of a {state}: finish or abort it first.', description: "An error pulling in the Git view: a git operation is under way in the project folder; {state} is git's word for it (merge, rebase, cherry-pick, revert or bisect: keep it as it is)." }), { state: s.state })
     // Refused before the fetch too, so a pull that can't go ahead doesn't wait on the network first.
     const why = folderBusyData(await folderAgents(projectPath), folderSlots(projectPath), 'pull')
-    if (why) throw new HiveError(why)
+    if (why) throw new CombworkError(why)
     if (s.upstream.remote) {
       const f = await net(projectPath, ['fetch', '--', s.upstream.remote])
       if (!f.ok) throw failed(M.fetchFailed, {}, f)
@@ -812,7 +812,7 @@ export async function pull(projectPath: string): Promise<string> {
     const u = now.upstream
     if (!u || u.gone) throw refusal(msg({ id: 'service.gitRepo.upstreamGone', defaultMessage: '{upstream} is gone from the remote.', description: 'An error pulling in the Git view: the remote branch {upstream} the branch follows was deleted there.' }), { upstream: s.upstream.name })
     if (u.behind === 0) return tr(msg({ id: 'service.gitRepo.upToDate', defaultMessage: '{branch} is up to date with {upstream}.', description: 'After pulling in the Git view: the branch {branch} has every commit of the remote branch {upstream} already.' }), { branch: now.branch ?? '', upstream: u.name })
-    if (u.ahead > 0) throw refusal(msg({ id: 'service.gitRepo.diverged', defaultMessage: '{branch} and {upstream} have diverged ({ahead, plural, one {# commit} other {# commits}} here, {behind, number} there), so pulling needs a merge or rebase. Do that in a terminal, or ask an agent to.', description: 'An error pulling in the Git view: the branch {branch} has {ahead} commits the remote branch {upstream} hasn\'t, and it has {behind} the branch hasn\'t; Hive pulls only when no merge is needed.' }), { branch: now.branch ?? '', upstream: u.name, ahead: u.ahead, behind: u.behind })
+    if (u.ahead > 0) throw refusal(msg({ id: 'service.gitRepo.diverged', defaultMessage: '{branch} and {upstream} have diverged ({ahead, plural, one {# commit} other {# commits}} here, {behind, number} there), so pulling needs a merge or rebase. Do that in a terminal, or ask an agent to.', description: 'An error pulling in the Git view: the branch {branch} has {ahead} commits the remote branch {upstream} hasn\'t, and it has {behind} the branch hasn\'t; Combwork pulls only when no merge is needed.' }), { branch: now.branch ?? '', upstream: u.name, ahead: u.ahead, behind: u.behind })
     const r = await changeFolder(projectPath, 'pull', now.branch, () => git(projectPath, ['merge', '--ff-only', '@{upstream}']))
     if (!r.ok) throw failed(msg({ id: 'service.gitRepo.pullFailed', defaultMessage: "Couldn't pull: {why}", description: "An error pulling in the Git view; {why} is git's own words." }), {}, r)
     log.info(`Pulled ${userText(projectPath)}`)
@@ -821,8 +821,8 @@ export async function pull(projectPath: string): Promise<string> {
   })
 }
 
-/** A push's refusal, naming the branch: Hive never forces, so the user pulls or merges first. */
-const rejected = (to: string, branch: string): HiveError => refusal(msg({ id: 'service.gitRepo.rejected', defaultMessage: "{to} has commits {branch} hasn't, so the push was refused (Combwork never forces a push). Pull first, or merge them in a terminal.", description: "An error pushing the branch {branch} in the Git view: the remote branch {to} has commits it hasn't, so the remote refused." }), { to, branch })
+/** A push's refusal, naming the branch: Combwork never forces, so the user pulls or merges first. */
+const rejected = (to: string, branch: string): CombworkError => refusal(msg({ id: 'service.gitRepo.rejected', defaultMessage: "{to} has commits {branch} hasn't, so the push was refused (Combwork never forces a push). Pull first, or merge them in a terminal.", description: "An error pushing the branch {branch} in the Git view: the remote branch {to} has commits it hasn't, so the remote refused." }), { to, branch })
 
 /** Pushes the branch to its upstream, or to `remote` (setting it as the upstream) when it has none. Never forced. */
 export async function push(projectPath: string, remote?: string): Promise<string> {
@@ -893,7 +893,7 @@ export async function pushToRemote(projectPath: string, remote: string, scope: P
     void checkProject(projectPath)
     const refused = refs.filter((x) => x.result === 'refused')
     const lines = [withValues(refused.length ? M.pushAllRefused : M.pushedAll, { remote, n: refused.length }), ...pushOutcomes(refs)]
-    if (refused.length) throw new HiveError(linesOf(lines))
+    if (refused.length) throw new CombworkError(linesOf(lines))
     return shownText(linesOf(lines))
   })
 }
@@ -959,7 +959,7 @@ export async function renameRemote(projectPath: string, from: string, to: string
   projectPath = workspace.assertProject(projectPath)
   to = to.trim()
   const problem = remoteNameProblemData(to)
-  if (problem) throw new HiveError(problem)
+  if (problem) throw new CombworkError(problem)
   return oneAtATime(projectPath, async () => {
     const s = await summaryOf(projectPath)
     if (!s.remotes.includes(from)) throw refusal(M.noRemote, { remote: from })
@@ -1046,7 +1046,7 @@ export async function setIdentity(projectPath: string, name: string, email: stri
   name = name.trim()
   email = email.trim()
   const problem = identityProblemData(name, email)
-  if (problem) throw new HiveError(problem)
+  if (problem) throw new CombworkError(problem)
   return oneAtATime(projectPath, async () => {
     await summaryOf(projectPath)
     for (const [key, value] of [['user.name', name], ['user.email', email]] as const) {
@@ -1066,12 +1066,12 @@ export async function setIdentity(projectPath: string, name: string, email: stri
 // ---------------------------------------------------------------------------
 
 const B = {
-  noTarget: msg({ id: 'service.gitRepo.noTarget', defaultMessage: "There's no branch {target} here to check the branches against.", description: "An error deleting branches in Version Control → Branches & remotes: the branch the project's work merges into ({target}; the default branch when none is set) isn't in the repository, so Hive can't tell which branches are merged." }),
+  noTarget: msg({ id: 'service.gitRepo.noTarget', defaultMessage: "There's no branch {target} here to check the branches against.", description: "An error deleting branches in Version Control → Branches & remotes: the branch the project's work merges into ({target}; the default branch when none is set) isn't in the repository, so Combwork can't tell which branches are merged." }),
   kept: msg({ id: 'service.gitRepo.branchKept', defaultMessage: "{why, select, target {{branch} is the branch work merges into: kept.} default {{branch} is the default branch: kept.} current {{branch} is checked out in the project folder: kept.} worktree {{branch} is checked out in a worktree or slot: kept.} card {An open card works on {branch}: kept.} remoteHead {{branch} is the remote's default branch: kept.} moved {{branch} has moved since you were shown it: kept. Look at it again.} unmerged {{branch} has commits that aren't in {target}: kept.} gone {There's no branch {branch}.} other {{branch} isn't a valid branch name.}}", description: "Why a branch wasn't deleted (Clean Up Merged Branches, Delete branch…, in Version Control → Branches & remotes). {branch} is its name, {target} the branch the project's work merges into. Keep the select keys." }),
   deleteFailed: msg({ id: 'service.gitRepo.deleteBranchFailed', defaultMessage: "Couldn't delete {branch}: {why}", description: "An error deleting the branch {branch} in Version Control → Branches & remotes; {why} is git's own words." }),
   deleted: msg({ id: 'service.gitRepo.branchesDeleted', defaultMessage: '{n, plural, one {Deleted {branches}.} other {Deleted # branches: {branches}.}}', description: 'After deleting branches in Version Control → Branches & remotes: {branches} lists them ({n}).' }),
   remoteDeleted: msg({ id: 'service.gitRepo.remoteBranchesDeleted', defaultMessage: '{n, plural, one {Deleted {branches} on {remote}.} other {Deleted # branches on {remote}: {branches}.}}', description: 'After deleting branches on the remote {remote} (Clean Up Merged Branches): {branches} lists them ({n}).' }),
-  remoteRefused: msg({ id: 'service.gitRepo.remoteDeleteRefused', defaultMessage: "{remote} refused to delete {branches}: it has commits there you haven't fetched, or it doesn't allow deleting them.", description: 'After deleting branches on the remote {remote}: it refused those listed in {branches} (Hive deletes a remote branch only at the commit you were shown).' })
+  remoteRefused: msg({ id: 'service.gitRepo.remoteDeleteRefused', defaultMessage: "{remote} refused to delete {branches}: it has commits there you haven't fetched, or it doesn't allow deleting them.", description: 'After deleting branches on the remote {remote}: it refused those listed in {branches} (Combwork deletes a remote branch only at the commit you were shown).' })
 }
 
 /** The branches of open cards (any but Done) on the board, any project's (#1642): never deleted. */
@@ -1099,7 +1099,7 @@ const branchNameOk = async (projectPath: string, name: string): Promise<boolean>
  */
 export async function deleteBranches(projectPath: string, items: BranchAt[], unmerged = false): Promise<string> {
   projectPath = workspace.assertProject(projectPath)
-  if (!Array.isArray(items) || !items.length || (unmerged && items.length !== 1)) throw new HiveError({ lines: ['git:deleteBranches takes branches, and one when unmerged'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
+  if (!Array.isArray(items) || !items.length || (unmerged && items.length !== 1)) throw new CombworkError({ lines: ['git:deleteBranches takes branches, and one when unmerged'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
   return oneAtATime(projectPath, () =>
     guarded(projectPath, async () => {
         await summaryOf(projectPath)
@@ -1136,7 +1136,7 @@ export async function deleteBranches(projectPath: string, items: BranchAt[], unm
             notes.push(kept('unmerged', branch, now.target))
             continue
           }
-          // Removed only at the commit checked (round 4): a git outside Hive's lock that moved it meanwhile makes git
+          // Removed only at the commit checked (round 4): a git outside Combwork's lock that moved it meanwhile makes git
           // refuse, and its new commits stay. Then checked out anywhere after all (taken around the lock): put back at
           // that commit, kept. Its config goes only once it is gone for good.
           const r = await git(projectPath, ['update-ref', '-d', `refs/heads/${branch}`, sha])
@@ -1155,7 +1155,7 @@ export async function deleteBranches(projectPath: string, items: BranchAt[], unm
           deleted.push(branch)
         }
         if (deleted.length) log.info(`Deleted ${deleted.length} branch(es) of ${userText(projectPath)}: ${userText(deleted.join(', '))}${unmerged ? ' (unmerged, confirmed)' : ''}`)
-        if (!deleted.length) throw new HiveError(linesOf(notes))
+        if (!deleted.length) throw new CombworkError(linesOf(notes))
         void checkProject(projectPath)
         return shownText(linesOf([withValues(B.deleted, { n: deleted.length, branches: listOf(deleted, 'unit') }), ...notes]))
     })
@@ -1164,14 +1164,14 @@ export async function deleteBranches(projectPath: string, items: BranchAt[], unm
 
 /**
  * Deletes branches on a remote (#1642, `git push --delete`, outward-facing: the window asks for each with its own tick):
- * each named as the window has it (nas/hive/hb1), only merged into the project's target, never the remote's default
+ * each named as the window has it (nas/cw/hb1), only merged into the project's target, never the remote's default
  * branch, the target or the default branch, nor one whose local branch is in use, and only at the commit the user was
  * shown (`--force-with-lease`: a branch that moved on the remote is refused there). The checks and the push are one hold
  * of the repository's lock (round 3), bounded by the network timeout: a slot, worktree or target change waits for it.
  */
 export async function deleteRemoteBranches(projectPath: string, remote: string, items: BranchAt[]): Promise<string> {
   projectPath = workspace.assertProject(projectPath)
-  if (!Array.isArray(items) || !items.length) throw new HiveError({ lines: ['git:deleteRemoteBranches takes branches'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
+  if (!Array.isArray(items) || !items.length) throw new CombworkError({ lines: ['git:deleteRemoteBranches takes branches'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
   return oneAtATime(projectPath, async () => {
     return guarded(projectPath, async () => {
         const s = await summaryOf(projectPath)
@@ -1217,7 +1217,7 @@ export async function deleteRemoteBranches(projectPath: string, remote: string, 
           }
           ready.push({ name: full, branch, sha })
         }
-        if (!ready.length) throw new HiveError(linesOf(said))
+        if (!ready.length) throw new CombworkError(linesOf(said))
         // The push under the lock too (round 3): no slot, worktree or target change lands between the checks and it.
         const r = await net(projectPath, ['push', '--porcelain', ...ready.map((g) => `--force-with-lease=refs/heads/${g.branch}:${g.sha}`), '--', remote, ...ready.map((g) => `:refs/heads/${g.branch}`)])
         const got = parsePushPorcelain(r.out)
@@ -1227,7 +1227,7 @@ export async function deleteRemoteBranches(projectPath: string, remote: string, 
         if (done.length) log.info(`Deleted ${done.length} branch(es) on ${userText(remote)} of ${userText(projectPath)}: ${userText(done.map((g) => g.branch).join(', '))}`)
         void checkProject(projectPath)
         const lines = [...(done.length ? [withValues(B.remoteDeleted, { n: done.length, remote, branches: listOf(done.map((g) => g.branch), 'unit') })] : []), ...(refused.length ? [withValues(B.remoteRefused, { remote, branches: listOf(refused.map((g) => g.branch), 'unit') })] : []), ...said]
-        if (!done.length) throw new HiveError(linesOf(lines))
+        if (!done.length) throw new CombworkError(linesOf(lines))
         return shownText(linesOf(lines))
     })
   })
@@ -1235,9 +1235,9 @@ export async function deleteRemoteBranches(projectPath: string, remote: string, 
 
 /**
  * A clean-up's one hold (#1642 rounds 3 and 5), from each branch's last check through its deletion (a remote's push
- * included): the repository's lock, across Hives, which slot preparation, merges, branch switches and every workflow
+ * included): the repository's lock, across Combworks, which slot preparation, merges, branch switches and every workflow
  * options write that can move the project's target take (`withRepoLocks`: the project's, a level's, a setting's tool,
- * a platform switch), then this Hive's turn of workflow writes. In that order everywhere, so none waits on another.
+ * a platform switch), then this Combwork's turn of workflow writes. In that order everywhere, so none waits on another.
  */
 function guarded<T>(projectPath: string, fn: () => Promise<T>): Promise<T> {
   return withRepoLock(projectPath, () => workflowWrite(fn), { project: projectPath })
@@ -1299,17 +1299,17 @@ const UPDATE = {
   }),
   dirty: msg({ id: 'service.gitRepo.update.dirty', defaultMessage: '{folder} has uncommitted changes: commit them, or set them aside, before updating {branch}.', description: "Why updating a branch from its target is refused: the folder it is checked out in ({folder}: a slot's name, a folder's name or a path) has changes not committed. {branch} is the branch." }),
   midOperation: msg({ id: 'service.gitRepo.update.midOperation', defaultMessage: 'Git is in the middle of a {state} in {folder}: finish or abort it first.', description: "Why updating a branch from its target is refused: a git operation ({state}: merge, rebase…, as git names it) is under way in the folder the branch is checked out in ({folder}: a slot's name, a folder's name or a path)." }),
-  queued: msg({ id: 'service.gitRepo.update.queued', defaultMessage: '{card} is in the merge queue, which brings it up to date itself: take it out of the queue first to update {branch} here.', description: "Why updating a branch from its target is refused: the branch is the line of a card ({card}: its key, such as HI-12) that Hive's merge queue is merging now. {branch} is the branch." }),
+  queued: msg({ id: 'service.gitRepo.update.queued', defaultMessage: '{card} is in the merge queue, which brings it up to date itself: take it out of the queue first to update {branch} here.', description: "Why updating a branch from its target is refused: the branch is the line of a card ({card}: its key, such as HI-12) that Combwork's merge queue is merging now. {branch} is the branch." }),
   upToDate: msg({ id: 'service.gitRepo.update.upToDate', defaultMessage: '{branch} already has everything in {target}.', description: 'After Update from <target> (HI-1180): the branch {branch} already contains every commit of the target {target}; nothing was done.' }),
-  conflict: msg({ id: 'service.gitRepo.update.conflict', defaultMessage: '{how, select, rebase {Rebasing} other {Merging}} {branch} with {target} stopped at a conflict in {files}, so it was undone: {branch} is as it was. Update it by hand, or ask its builder to.', description: 'An error updating a branch from its target: git stopped at a conflict, and Hive aborted it, leaving the branch and its folder as they were. {how}: merge or rebase (select: translate each); {branch} the branch, {target} the target; {files} the files in conflict, joined (src/a.ts and src/b.ts).' }),
-  failed: msg({ id: 'service.gitRepo.update.failed', defaultMessage: "Couldn't update {branch} from {target}, so it is as it was: {why}", description: "An error updating a branch from its target that isn't a conflict (a hook refused the commit, signing failed…); Hive undid what git started. {why} is git's own words." }),
-  moved: msg({ id: 'service.gitRepo.update.moved', defaultMessage: '{branch} changed while it was being updated, so nothing was changed: try again.', description: 'An error updating a branch from its target: the branch moved to another commit meanwhile (a commit, a push), so Hive left it as it is.' }),
+  conflict: msg({ id: 'service.gitRepo.update.conflict', defaultMessage: '{how, select, rebase {Rebasing} other {Merging}} {branch} with {target} stopped at a conflict in {files}, so it was undone: {branch} is as it was. Update it by hand, or ask its builder to.', description: 'An error updating a branch from its target: git stopped at a conflict, and Combwork aborted it, leaving the branch and its folder as they were. {how}: merge or rebase (select: translate each); {branch} the branch, {target} the target; {files} the files in conflict, joined (src/a.ts and src/b.ts).' }),
+  failed: msg({ id: 'service.gitRepo.update.failed', defaultMessage: "Couldn't update {branch} from {target}, so it is as it was: {why}", description: "An error updating a branch from its target that isn't a conflict (a hook refused the commit, signing failed…); Combwork undid what git started. {why} is git's own words." }),
+  moved: msg({ id: 'service.gitRepo.update.moved', defaultMessage: '{branch} changed while it was being updated, so nothing was changed: try again.', description: 'An error updating a branch from its target: the branch moved to another commit meanwhile (a commit, a push), so Combwork left it as it is.' }),
   merged: msg({ id: 'service.gitRepo.update.merged', defaultMessage: 'Merged {target} into {branch} ({commit}).', description: 'After Update from <target> with Merge (HI-1180): the target {target} was merged into the branch {branch}, as the commit {commit} (a short id: keep it as it is).' }),
   rebased: msg({ id: 'service.gitRepo.update.rebased', defaultMessage: "Rebased {branch}'s {n, plural, one {# commit} other {# commits}} onto {target} ({commit}).", description: 'After Update from <target> with Rebase (HI-1180): the branch {branch} has its {n} commits replayed onto the target {target}; {commit} is its new head (a short id: keep it as it is).' }),
   forwarded: msg({ id: 'service.gitRepo.update.forwarded', defaultMessage: 'Fast-forwarded {branch} to {target} ({commit}).', description: 'After Update from <target> on a branch with no commits of its own (HI-1180): it was moved forward to the target {target}; {commit} is its new head (a short id: keep it as it is).' }),
-  notUndone: msg({ id: 'service.gitRepo.update.notUndone', defaultMessage: "Updating {branch} from {target} stopped, and Combwork couldn't undo it: {folder} is {state, select, none {left changed} merge {still in the middle of a merge} rebase {still in the middle of a rebase} other {still in the middle of a git operation}}. Finish or abort it there yourself (git status says how), then check {branch}. Git said: {why}", description: "An error updating a branch from its target (HI-1180): git stopped, and Hive's own abort failed, so the folder ({folder}: a slot's name, a folder's name or a path) is left as git left it ({state}: none, merge, rebase or another operation; select: translate each). {why} is git's own words." }),
-  notUndoneTemporary: msg({ id: 'service.gitRepo.update.notUndoneTemporary', defaultMessage: "Updating {branch} from {target} stopped, and Combwork couldn't undo it in its temporary folder {folder}, kept as git left it: {branch} itself is as it was. Remove that folder in Unused worktrees once you have looked. Git said: {why}", description: "An error updating a branch from its target (HI-1180) that was checked out nowhere: git stopped in the temporary folder Hive made ({folder}: its path), and Hive's abort failed, so the folder is kept; the branch itself wasn't moved. {state} is unused here. {why} is git's own words." }),
-  temporaryLeft: msg({ id: 'service.gitRepo.update.temporaryLeft', defaultMessage: "Combwork couldn't remove its temporary folder {folder}: remove it in Unused worktrees.", description: 'A second line after Update from <target> on a branch checked out nowhere (HI-1180): the temporary folder Hive made for it ({folder}: its path) could not be removed.' }),
+  notUndone: msg({ id: 'service.gitRepo.update.notUndone', defaultMessage: "Updating {branch} from {target} stopped, and Combwork couldn't undo it: {folder} is {state, select, none {left changed} merge {still in the middle of a merge} rebase {still in the middle of a rebase} other {still in the middle of a git operation}}. Finish or abort it there yourself (git status says how), then check {branch}. Git said: {why}", description: "An error updating a branch from its target (HI-1180): git stopped, and Combwork's own abort failed, so the folder ({folder}: a slot's name, a folder's name or a path) is left as git left it ({state}: none, merge, rebase or another operation; select: translate each). {why} is git's own words." }),
+  notUndoneTemporary: msg({ id: 'service.gitRepo.update.notUndoneTemporary', defaultMessage: "Updating {branch} from {target} stopped, and Combwork couldn't undo it in its temporary folder {folder}, kept as git left it: {branch} itself is as it was. Remove that folder in Unused worktrees once you have looked. Git said: {why}", description: "An error updating a branch from its target (HI-1180) that was checked out nowhere: git stopped in the temporary folder Combwork made ({folder}: its path), and Combwork's abort failed, so the folder is kept; the branch itself wasn't moved. {state} is unused here. {why} is git's own words." }),
+  temporaryLeft: msg({ id: 'service.gitRepo.update.temporaryLeft', defaultMessage: "Combwork couldn't remove its temporary folder {folder}: remove it in Unused worktrees.", description: 'A second line after Update from <target> on a branch checked out nowhere (HI-1180): the temporary folder Combwork made for it ({folder}: its path) could not be removed.' }),
   missed: msg({ id: 'service.gitRepo.update.missed', defaultMessage: '{branch} was changed, but it still lacks commits of {target}: check it in History before going on.', description: "An error after Update from <target> (HI-1180): git said it succeeded, but the branch {branch} still doesn't contain the target {target}'s head." })
 }
 
@@ -1394,14 +1394,14 @@ export async function updateBranch(projectPath: string, branch: string, how: Bra
 
 async function updateLocked(projectPath: string, branch: string, how: BranchUpdateHow): Promise<string> {
   const place = await branchFolder(projectPath, branch)
-  // The folder fenced from the last check to git's end (#646): no Hive line typed into its agents, none started there.
+  // The folder fenced from the last check to git's end (#646): no Combwork line typed into its agents, none started there.
   // i18n-ignore: what changes the folder, for the log and an agent's reply (agent-facing, English)
   const fenced = <T>(fn: () => Promise<T>): Promise<T> => (place.folder ? changingFolder(place.folder, 'a Git update from the target', fn) : fn())
   return fenced(async () => {
     // Checked again under the locks: nothing changes between this and git starting.
     const plan = await branchUpdatePlan(projectPath, branch)
     // agent-text: branchUpdatePlan
-    if (plan.blocked) throw new HiveError(linesOf([plan.blocked]))
+    if (plan.blocked) throw new CombworkError(linesOf([plan.blocked]))
     if (plan.behind === 0) return tr(UPDATE.upToDate, { branch, target: plan.target })
     // The target branch's commit, read now (HR4's round 1, finding 2): git is given it, never the name, which a tag of the
     // same name would take.
@@ -1410,7 +1410,7 @@ async function updateLocked(projectPath: string, branch: string, how: BranchUpda
     const target = at.out.trim()
     const card = (await lineCard(projectPath, branch))?.key
     // i18n-ignore: a commit message, in English
-    const message = ['-m', `Merge ${plan.target} into ${branch}`, ...(card ? ['-m', `Hive-Card: ${card}`] : [])]
+    const message = ['-m', `Merge ${plan.target} into ${branch}`, ...(card ? ['-m', `Combwork-Card: ${card}`] : [])]
     // Nothing of its own (behind only): brought up by a fast-forward, whichever was asked; a merge commit would hold nothing.
     const forward = plan.ahead === 0
     // A rebase moves only the branch it rebases (HR4's #1352 round 1: never another ref with `rebase.updateRefs` on).
@@ -1462,13 +1462,13 @@ async function updateLocked(projectPath: string, branch: string, how: BranchUpda
         const { error, undone } = await undo(tmp, was, r, true)
         // Not undone: kept as git left it, as the error says. Undone: removed, and said if it couldn't be.
         const left = undone ? await removed() : null
-        throw left ? new HiveError(linesOf([errorText(error), withValues(UPDATE.temporaryLeft, { folder: tmp })])) : error
+        throw left ? new CombworkError(linesOf([errorText(error), withValues(UPDATE.temporaryLeft, { folder: tmp })])) : error
       }
       head = (await git(tmp, ['rev-parse', 'HEAD'])).out.trim()
       // Moved only from the commit it was updated from: a branch that moved meanwhile is left as it is.
       const moved = (await git(projectPath, ['update-ref', `refs/heads/${branch}`, head, was])).ok
       note = await removed()
-      if (!moved) throw note ? new HiveError(linesOf([withValues(UPDATE.moved, { branch }), withValues(UPDATE.temporaryLeft, { folder: tmp })])) : refusal(UPDATE.moved, { branch })
+      if (!moved) throw note ? new CombworkError(linesOf([withValues(UPDATE.moved, { branch }), withValues(UPDATE.temporaryLeft, { folder: tmp })])) : refusal(UPDATE.moved, { branch })
     }
     // What it was asked to do, done: the target's commit is in the branch now.
     if (!(await git(projectPath, ['merge-base', '--is-ancestor', target, head])).ok) throw refusal(UPDATE.missed, { branch, target: plan.target })

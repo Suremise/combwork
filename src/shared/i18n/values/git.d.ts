@@ -1,6 +1,6 @@
 // Generated from locales/en/git.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
-interface HiveMessageValues {
+interface CombworkMessageValues {
   'git.branch.delete': undefined
   'git.branch.deleteMergedMessage': { target: string | number }
   'git.branch.deleteMergedTitle': { branch: string | number }
@@ -47,6 +47,32 @@ interface HiveMessageValues {
   'git.cleanUp.remoteWarn': undefined
   'git.cleanUp.title': undefined
   'git.cleanUp.withLocal': undefined
+  'git.combworkVcs.checking': undefined
+  'git.combworkVcs.dismiss': undefined
+  'git.combworkVcs.exclude': undefined
+  'git.combworkVcs.excludeFailed': undefined
+  'git.combworkVcs.excludedDone': { project: string | number }
+  'git.combworkVcs.excluding': undefined
+  'git.combworkVcs.ignoredBut': { synced: string | number; why: string | number }
+  'git.combworkVcs.more': { count: number }
+  'git.combworkVcs.noVcs': undefined
+  'git.combworkVcs.notExcluded': undefined
+  'git.combworkVcs.notExcludedTitle': undefined
+  'git.combworkVcs.otherVcs': { vcs: string | number }
+  'git.combworkVcs.synced': { service: string | number }
+  'git.combworkVcs.syncedTitle': { service: string | number }
+  'git.combworkVcs.titleSentence': { title: string | number }
+  'git.combworkVcs.trackedDetail': { count: number; notExcluded: string }
+  'git.combworkVcs.trackedTitle': { count: number }
+  'git.combworkVcs.untrack': undefined
+  'git.combworkVcs.untrackButton': undefined
+  'git.combworkVcs.untrackFailed': undefined
+  'git.combworkVcs.untrackMessage': { count: number; project: string | number }
+  'git.combworkVcs.untrackTitle': { count: number }
+  'git.combworkVcs.untracked': { project: string | number }
+  'git.combworkVcs.untrackedDetail': undefined
+  'git.combworkVcs.untracking': undefined
+  'git.combworkVcs.why': undefined
   'git.fetch.at': { when: string | number }
   'git.fetch.button': undefined
   'git.fetch.failed': undefined
@@ -64,32 +90,6 @@ interface HiveMessageValues {
   'git.history.option': { kind: string; branch: string | number }
   'git.history.reload': undefined
   'git.history.remote': undefined
-  'git.hiveVcs.checking': undefined
-  'git.hiveVcs.dismiss': undefined
-  'git.hiveVcs.exclude': undefined
-  'git.hiveVcs.excludeFailed': undefined
-  'git.hiveVcs.excludedDone': { project: string | number }
-  'git.hiveVcs.excluding': undefined
-  'git.hiveVcs.ignoredBut': { synced: string | number; why: string | number }
-  'git.hiveVcs.more': { count: number }
-  'git.hiveVcs.noVcs': undefined
-  'git.hiveVcs.notExcluded': undefined
-  'git.hiveVcs.notExcludedTitle': undefined
-  'git.hiveVcs.otherVcs': { vcs: string | number }
-  'git.hiveVcs.synced': { service: string | number }
-  'git.hiveVcs.syncedTitle': { service: string | number }
-  'git.hiveVcs.titleSentence': { title: string | number }
-  'git.hiveVcs.trackedDetail': { count: number; notExcluded: string }
-  'git.hiveVcs.trackedTitle': { count: number }
-  'git.hiveVcs.untrack': undefined
-  'git.hiveVcs.untrackButton': undefined
-  'git.hiveVcs.untrackFailed': undefined
-  'git.hiveVcs.untrackMessage': { count: number; project: string | number }
-  'git.hiveVcs.untrackTitle': { count: number }
-  'git.hiveVcs.untracked': { project: string | number }
-  'git.hiveVcs.untrackedDetail': undefined
-  'git.hiveVcs.untracking': undefined
-  'git.hiveVcs.why': undefined
   'git.identity.about': { hasGlobal: string; project: string | number; global: string | number }
   'git.identity.email': undefined
   'git.identity.global': undefined

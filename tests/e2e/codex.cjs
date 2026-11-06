@@ -1,5 +1,5 @@
-// Hive running a Codex agent end to end, against the permanent test CODEX_HOME (codex-home.cjs, signed in).
-// One short prompt on gpt-6-luna at low effort. Nothing touches the real ~/.codex or Hive profile.
+// Combwork running a Codex agent end to end, against the permanent test CODEX_HOME (codex-home.cjs, signed in).
+// One short prompt on gpt-6-luna at low effort. Nothing touches the real ~/.codex or Combwork profile.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
@@ -7,8 +7,8 @@ const path = require('path')
 const { execFileSync } = require('child_process')
 const { sessionsOf } = require('./storeDocs.cjs')
 const scratch = lib.WORK
-const userData = path.join(scratch, 'cxhive-profile')
-const ws = path.join(scratch, 'cxhive-ws')
+const userData = path.join(scratch, 'cxcw-profile')
+const ws = path.join(scratch, 'cxcw-ws')
 const proj = path.join(ws, 'demo')
 const codexHome = lib.CODEX_HOME
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -32,13 +32,13 @@ function prepare() {
 
 ;(async () => {
   prepare()
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47892), CODEX_HOME: codexHome, PATH: lib.pathWithoutStoreAliases() })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47892), CODEX_HOME: codexHome, PATH: lib.pathWithoutStoreAliases() })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => results.push(`PAGEERROR ${e.message}`))
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   const waitFor = async (fn, ms) => { const t = Date.now(); while (Date.now() - t < ms) { const v = await fn(); if (v) return v; await sleep(500) } return null }
 
   const info = await waitFor(async () => { const i = (await inv('provider:info')).codex; return i && !i.checking ? i : null }, 30000)
@@ -61,7 +61,7 @@ function prepare() {
   await page.screenshot({ path: path.join(scratch, 'cxh-1-ready.png') })
 
   // One prompt: an edit with apply_patch. Codex answering it is the CLI's part (a usage limit or the network there is
-  // the environment's, lib.cliStep), what Hive makes of the turn is checked after it.
+  // the environment's, lib.cliStep), what Combwork makes of the turn is checked after it.
   const key = `session:${proj.toLowerCase()}#${def.id}`
   await lib.cliStep('the prompt’s turn', { session: key }, async () => {
     // Sent until Codex takes it (lib.sendPrompt): under the full set's load, an Enter right after the prompt can become a
@@ -104,7 +104,7 @@ function prepare() {
   check('switches preset with the /permissions menu', r.ok && !!(await waitFor(async () => (await live())?.permissionMode === 'ask', 20000)), JSON.stringify(r))
   await page.screenshot({ path: path.join(scratch, 'cxh-3-menu.png') })
 
-  // Full Access live (#1014), as the menu does it after Hive's own confirmation: Codex shows its own warning after the
+  // Full Access live (#1014), as the menu does it after Combwork's own confirmation: Codex shows its own warning after the
   // pick, which the user answers in its terminal, and the switch waits for that answer. Answered "1. Yes, continue
   // anyway" (0.162.1 offers that and Cancel, neither of which changes the test home), the session switches in place: the
   // same Codex process and conversation, no restart. Its screens are kept for the advanced setting's recorded sample.
@@ -132,12 +132,12 @@ function prepare() {
   const fullText = await fullItem.innerText().catch(() => '')
   check("the mode menu: Full access with its own description, not 'Restarts the session'", /No sandbox and no approvals/.test(fullText) && !/Restarts the session/.test(fullText), fullText)
   await fullItem.click()
-  // Hive's own confirmation first, unchanged; no restart question after it.
+  // Combwork's own confirmation first, unchanged; no restart question after it.
   const useFull = page.getByRole('button', { name: 'Use Full access', exact: true })
-  check("Hive's confirmation comes first", !!(await waitFor(async () => (await useFull.count()) === 1, 10000)))
+  check("Combwork's confirmation comes first", !!(await waitFor(async () => (await useFull.count()) === 1, 10000)))
   await useFull.click()
   const warned = await waitFor(async () => /Enable full access\?/i.test(await screenNow('warning')), 20000)
-  check("Codex shows its own Full Access warning, and Hive's switch waits for the answer", !!warned && (await live())?.modeSwitching === 'full-access', JSON.stringify(await live().then((l) => l && { mode: l.permissionMode, switching: l.modeSwitching, status: l.status })))
+  check("Codex shows its own Full Access warning, and Combwork's switch waits for the answer", !!warned && (await live())?.modeSwitching === 'full-access', JSON.stringify(await live().then((l) => l && { mode: l.permissionMode, switching: l.modeSwitching, status: l.status })))
   await page.screenshot({ path: path.join(scratch, 'cxh-5-fullaccess-warning.png') })
   // What Codex printed so far (before the answer), for whether it says the selection before or after it.
   fs.writeFileSync(path.join(scratch, 'cxh-fullaccess-before-answer.txt'), lib.plainText(await inv('pty:buffer', key)).slice(-4000))
@@ -153,7 +153,7 @@ function prepare() {
   await inv('session:stop', proj, def.id)
   const stopped = await waitFor(async () => (!(await live()) ? true : null), 20000)
   check('stops', !!stopped)
-  await sleep(1500) // A fixed wait on purpose: no condition Hive exposes says Codex's process has fully exited before the same thread is resumed.
+  await sleep(1500) // A fixed wait on purpose: no condition Combwork exposes says Codex's process has fully exited before the same thread is resumed.
   await inv('session:start', proj, { agentId: def.id, resumeId: sessionId })
   const resumed = await waitFor(async () => { const l = await live(); return l?.status === 'ready' ? l : null }, 60000)
   check('resumes the same conversation', resumed?.sessionId === sessionId, JSON.stringify(resumed && { s: resumed.sessionId, st: resumed.status }))

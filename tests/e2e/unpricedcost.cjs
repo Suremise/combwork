@@ -1,4 +1,4 @@
-// A session whose model Hive has no price for has an unknown cost, never $0: the agent's footer shows "$?", the
+// A session whose model Combwork has no price for has an unknown cost, never $0: the agent's footer shows "$?", the
 // Overview's running agent and its cost cards "Unknown" (the summary, the provider's, the session's),
 // each naming the model on hover; with a price of the user's they show the estimate. The agent is the fake Claude
 // Code, whose transcript reports the model "claude-fake" and no cost. Dev build, throwaway profile, workspace and
@@ -35,13 +35,13 @@ const until = async (fn, ms = 10000) => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47928), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47928), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('alpha', { exact: true }).first().click()
   const agent = await lib.addAgent(inv, alpha, { name: 'Counter' })

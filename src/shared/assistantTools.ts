@@ -1,7 +1,7 @@
 /**
- * The hive tools the Hive Assistant gets, by how far it may act (Settings → Assistant → Control). The hive MCP
- * server offers these and Claude Code runs them without asking (they're Hive's own, already limited by the
- * control level and checked again by the Agent API). No imports: hive-mcp.js runs outside the app bundle.
+ * The Combwork tools the Combwork Assistant gets, by how far it may act (Settings → Assistant → Control). The combwork MCP
+ * server offers these and Claude Code runs them without asking (they're Combwork's own, already limited by the
+ * control level and checked again by the Agent API). No imports: cw-mcp.js runs outside the app bundle.
  */
 
 export type AssistantControlLevel = 'look' | 'agents' | 'projects'
@@ -38,7 +38,7 @@ export const ASSISTANT_AGENT_TOOLS = ['cw_activate_project', 'cw_add_agent', 'cw
 export const TASK_TOOLS = ['cw_create_task', 'cw_update_task', 'cw_update_tasks', 'cw_reorder_tasks']
 
 /**
- * A card's intents (#1267, SPEC §16.8.1), Hive moving the card: every agent has these, the Assistant at the control level
+ * A card's intents (#1267, SPEC §16.8.1), Combwork moving the card: every agent has these, the Assistant at the control level
  * that runs agents. Starting a card oneself is an agent's (the Assistant starts cards on agents: cw_start_task).
  */
 export const INTENT_TOOLS = ['cw_put_back', 'cw_submit', 'cw_declare_paths', 'cw_start_review', 'cw_verdict', 'cw_report_merge', 'cw_ask_user', 'cw_cannot_within_rules', 'cw_request_builder', 'cw_loop_step']
@@ -90,7 +90,7 @@ export const ASSISTANT_CONNECTION_TOOLS = ['cw_connection']
 /** Creating projects. */
 export const ASSISTANT_PROJECT_TOOLS = ['cw_create_project']
 
-/** Changing Hive's settings: only with Settings → Assistant → Control → Change settings on, whatever the level. */
+/** Changing Combwork's settings: only with Settings → Assistant → Control → Change settings on, whatever the level. */
 export const ASSISTANT_SETTINGS_TOOLS = ['cw_update_setting']
 
 /** The Assistant's journal (#1031): offered only while Settings → Assistant → Journal is on (at its start). */
@@ -123,23 +123,11 @@ export function assistantTools(level: AssistantControlLevel | string | undefined
  */
 export const TOOLS_SERVER = 'combwork'
 
-/**
- * Its name before HI-2463, still reserved: a workspace server named hive is never given, and a user's own native
- * `[mcp_servers.hive]` (Codex) is turned off for Combwork's sessions, so no agent gets the old hive_* tools beside cw_*.
- */
-export const LEGACY_TOOLS_SERVER = 'hive'
+/** Whether a name is the reserved server name, Combwork's own (case-insensitive, as servers' names are compared). */
+export const isReservedServerName = (name: string): boolean => name.trim().toLowerCase() === TOOLS_SERVER
 
-/** Whether a name is one of the reserved server names (case-insensitive, as servers' names are compared). */
-export const isReservedServerName = (name: string): boolean => [TOOLS_SERVER, LEGACY_TOOLS_SERVER].includes(name.trim().toLowerCase())
-
-/**
- * A tool's current name for a name read back from stored data (HI-2463): metrics and ledgers written before the rename
- * recorded `hive_<tool>`. A read-time projection only: what is stored stays as it was written.
- */
-export const currentToolName = (name: string): string => (name.startsWith('hive_') && HIVE_TOOLS.includes(`cw_${name.slice(5)}`) ? `cw_${name.slice(5)}` : name)
-
-/** Every tool the combwork MCP server has (a test checks it against hive-mcp.ts): the only tool names metrics record. */
-export const HIVE_TOOLS: readonly string[] = [
+/** Every tool the combwork MCP server has (a test checks it against cw-mcp.ts): the only tool names metrics record. */
+export const CW_TOOLS: readonly string[] = [
   'cw_list_projects', 'cw_project_status', 'cw_session_usage', 'cw_list_shared_notes', 'cw_read_shared_note', 'cw_write_shared_note', 'cw_doc_outline', 'cw_read_section',
   'cw_read_latest_handover', 'cw_create_handover', 'cw_notify', 'cw_list_providers', 'cw_agent_activity', 'cw_wait_for_agents',
   'cw_create_project', 'cw_activate_project', 'cw_add_agent', 'cw_update_agent', 'cw_start_agent', 'cw_stop_agent', 'cw_prompt_agent',

@@ -27,9 +27,9 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 
-/** Writes to the workspace's board from outside Hive, as the upgrade would have (its marks). */
+/** Writes to the workspace's board from outside Combwork, as the upgrade would have (its marks). */
 function board(sql, ...args) {
-  const db = new DatabaseSync(path.join(ws, '.combwork', 'hive.db'), { timeout: 5000 })
+  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })
   try {
     db.prepare(sql).run(...args)
   } finally {
@@ -53,7 +53,7 @@ function board(sql, ...args) {
   const { app, page } = await lib.launch({ userData, viewport: { width: 1400, height: 900 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     const text = (loc) => loc.innerText().catch(() => '')
     await lib.openWorkspace(inv, page, ws)
     const vcTab = page.locator('.tabs .tab', { hasText: 'Version Control' })
@@ -151,7 +151,7 @@ function board(sql, ...args) {
     const base = (await inv('app:info')).language
     const dir = path.join(lib.ROOT, 'locales', 'de')
     const messages = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))))
-    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language })
+    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
     await speak({ ...base, code: 'de', locale: 'de', messages })
     check('the tab and the fact line in German', !!(await lib.until(async () => (await page.locator('.tabs .tab', { hasText: 'Versionsverwaltung' }).count()) === 1 && (await text(fact)) === 'Dieser Ordner hat keine Versionsverwaltung.', HUNG_MS)), await text(fact))
     await shots('none-de', page.locator('.vc-view'))
@@ -176,7 +176,7 @@ function board(sql, ...args) {
     // --- The queues, from models main gives in place of its own (#1416's round 1): alpha's queue paused; plain's (None)
     // as each step sets it. A read of plain's can be held, to see what shows meanwhile.
     await app.evaluate(({ ipcMain }, d) => {
-      const view = (p, over = {}) => ({ project: p === d.alpha ? 'alpha' : 'plain', projectPath: p, target: 'main', paused: null, runBy: null, runHere: false, testing: null, queued: [], recent: [], returns: [], returnsMore: 0, pauses: [], hiveMerges: false, inFlight: [], ...over })
+      const view = (p, over = {}) => ({ project: p === d.alpha ? 'alpha' : 'plain', projectPath: p, target: 'main', paused: null, runBy: null, runHere: false, testing: null, queued: [], recent: [], returns: [], returnsMore: 0, pauses: [], combworkMerges: false, inFlight: [], ...over })
       globalThis.__vc = { hold: false, held: [], asked: 0, plain: [] }
       ipcMain.removeHandler('queue:list')
       ipcMain.handle('queue:list', (_e, p) => {
@@ -192,7 +192,7 @@ function board(sql, ...args) {
       ipcMain.removeHandler('queue:history')
       ipcMain.handle('queue:history', () => [])
     }, { alpha, plain })
-    const said = (projectPath) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'queue-changed', workspacePath: ws, projectPath })
+    const said = (projectPath) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'queue-changed', workspacePath: ws, projectPath })
     const plainQueue = (models) => app.evaluate((_, m) => (globalThis.__vc.plain = m), models)
     const queueTab = page.locator('.git-sections [data-section="queue"]')
     const pick = async (name) => {
@@ -259,7 +259,7 @@ function board(sql, ...args) {
         const v = list.closest('.vc-view').getBoundingClientRect()
         const sel = list.querySelector('[aria-selected="true"]')
         const s = sel?.getBoundingClientRect()
-        const name = sel?.querySelector('.hive-tab-label')?.getBoundingClientRect()
+        const name = sel?.querySelector('.cw-tab-label')?.getBoundingClientRect()
         const others = [...list.querySelectorAll('[role="tab"]:not([aria-selected="true"])')]
         return {
           view: Math.round(v.width),

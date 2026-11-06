@@ -11,7 +11,7 @@ import type { UsageSummary } from '../shared/usageLedger'
 import { advanced } from './advanced'
 import { resolvedValues } from './advancedValues'
 import { config } from './config'
-import { emit, onHiveEvent } from './events'
+import { emit, onCombworkEvent } from './events'
 import { createLogger, userText } from './logger'
 import { recordProvider, sessions, type ListContext } from './sessions'
 import { boardHolds, cardHolds, type CardHolds } from './tasks'
@@ -31,7 +31,7 @@ const QUERIES: ReadonlySet<Body['type']> = new Set(['sessions', 'cards', 'timeli
  * The usage history's side in main (#1106): the usage worker (usageWorker.ts) and the work it is given. Main keeps the
  * queue, one job in the worker at a time, most urgent first: a session about to be deleted (its use recorded before its
  * transcript goes), then running sessions (a tick about every minute, and as each ends), then the one-time import of a
- * workspace's existing sessions (the backfill) and the sweeps that find what changed while Hive wasn't looking (every
+ * workspace's existing sessions (the backfill) and the sweeps that find what changed while Combwork wasn't looking (every
  * ten minutes). A job is made when its turn comes, so it has the board and the records as they are then. Queries go to
  * the worker too (it alone opens usage.db); main prices what they return with its settings.
  */
@@ -140,14 +140,14 @@ class UsageHistory {
   /** Each workspace's cards' holds, read again after a board change or half a minute, and each project's worked out from them once (holdIndex, HI-1748). */
   private cards = new Map<string, BoardCards>()
 
-  /** Starts the tick (Hive is ready). */
+  /** Starts the tick (Combwork is ready). */
   start(): void {
     if (this.timer) return
     this.stopped = false
     this.timer = setInterval(() => this.tick(), TICK_MS)
     this.timer.unref?.()
     const status = new Map<string, string>()
-    onHiveEvent((e) => {
+    onCombworkEvent((e) => {
       // The board changed: its holds are read again, and running sessions' cards shared out again if they changed.
       if (e.type === 'tasks-changed') {
         const c = this.cards.get(wsKey(e.workspacePath))
@@ -220,7 +220,7 @@ class UsageHistory {
     await Promise.all(waits.map((p) => p.catch(() => undefined)))
   }
 
-  /** Hive quits: what is queued is dropped and the worker ends (each write is a transaction: nothing is left half done). */
+  /** Combwork quits: what is queued is dropped and the worker ends (each write is a transaction: nothing is left half done). */
   async stop(): Promise<void> {
     this.stopped = true
     if (this.timer) clearInterval(this.timer)
@@ -315,7 +315,7 @@ class UsageHistory {
     body = admitted(body)
     const send = await this.transport()
     body = admitted(body)
-    const cfg = JSON.stringify({ advanced: resolvedValues(advanced), providers: config.settings.providers, hiveVersion: appVersion(), cacheSize: usageCacheSize() })
+    const cfg = JSON.stringify({ advanced: resolvedValues(advanced), providers: config.settings.providers, appVersion: appVersion(), cacheSize: usageCacheSize() })
     if (cfg !== this.sentConfig) {
       this.sentConfig = cfg
       this.post(send, { type: 'config', ...(JSON.parse(cfg) as Omit<Extract<Body, { type: 'config' }>, 'type'>) }).catch((e) => log.warn('sending the usage worker its settings', e))
@@ -334,7 +334,7 @@ class UsageHistory {
   /**
    * The usage.db files the worker was sent (where each really was as its request entered: the worker keeps a file open
    * by the name it is sent), by their workspace's place then (#1456): the workspace's close closes every one, so none
-   * holds the folder until Hive quits. Only admitted workspaces' (a request for another is refused), forgotten as each
+   * holds the folder until Combwork quits. Only admitted workspaces' (a request for another is refused), forgotten as each
    * closes: bounded by the windows open.
    */
   private sent = new Map<string, Map<string, string>>()
@@ -426,7 +426,7 @@ class UsageHistory {
   // -------------------------------------------------------------------------
 
   /**
-   * Records what a session of a host used (its record's: none, nothing), from its transcript or Hive's backup of it, as
+   * Records what a session of a host used (its record's: none, nothing), from its transcript or Combwork's backup of it, as
    * far as it is written. `priority` 0 for one about to be deleted (it waits for nothing else), 1 for a running one;
    * `keepState` keeps the parser's state ('running': at most every few minutes). `path`: where it was read last, when
    * the caller has it (a sweep), else found as the session list finds it.
@@ -462,7 +462,7 @@ class UsageHistory {
   }
 
   /**
-   * Records a session started outside Hive (no record: the Sessions list shows it), so its usage is read from the history
+   * Records a session started outside Combwork (no record: the Sessions list shows it), so its usage is read from the history
    * next time rather than its transcript; it never counts in totals.
    */
   ingestExternal(projectPath: string, ext: { id: string; provider: ProviderId; transcriptPath: string }): Promise<IngestResult | null> {
@@ -642,7 +642,7 @@ class UsageHistory {
   }
 
   /**
-   * Records what a session used before Hive lets its copies or record go (Delete, Clean Up), waiting for nothing else
+   * Records what a session used before Combwork lets its copies or record go (Delete, Clean Up), waiting for nothing else
    * queued: its file, and its kept usage from before the history when it has one (whichever counted more is kept).
    * Resolves whether that's done: true also for a session with nothing to keep (no file, no kept usage); false when its
    * use couldn't be recorded (the delete then keeps it).
@@ -679,15 +679,15 @@ class UsageHistory {
   /**
    * Whether work begun for a workspace may go on: it is still the one open, in the same opening. `ws.lifetime` read later
    * is the next opening's (close starts a new one), so the run's own is checked (#1379: a backfill that went on after a
-   * switch read the closed workspace's sessions and opened its hive.db again, holding its folder).
+   * switch read the closed workspace's sessions and opened its combwork.db again, holding its folder).
    */
   private live(ws: WorkspaceService, run: WorkspaceRun): boolean {
     return !run.signal.aborted && ws.path === run.path && !this.stopped
   }
 
   /**
-   * What changed while Hive wasn't reading it: each record the history doesn't have yet (a session adopted, started
-   * before this tick), and each whose file grew (a session continued outside Hive); parser states of sessions unused for
+   * What changed while Combwork wasn't reading it: each record the history doesn't have yet (a session adopted, started
+   * before this tick), and each whose file grew (a session continued outside Combwork); parser states of sessions unused for
    * two weeks let go.
    */
   private async sweep(ws: WorkspaceService, run = runOf(ws)): Promise<void> {
@@ -799,8 +799,8 @@ class UsageHistory {
     let run = this.backfills.get(key)
     if (!run) {
       run = this.backfill(ws, opening)
-        // Then what changed since it was last open (a session continued outside Hive, one that ended as Hive quit; a card
-        // moved meanwhile, by another Hive or a script). Only while this opening lasts: not the next workspace's.
+        // Then what changed since it was last open (a session continued outside Combwork, one that ended as Combwork quit; a card
+        // moved meanwhile, by another Combwork or a script). Only while this opening lasts: not the next workspace's.
         .then(() => this.sweep(ws, opening))
         .then(() => this.attribute(ws, opening))
         .then(() => this.housekeep(ws, opening))
@@ -812,14 +812,14 @@ class UsageHistory {
   }
 
   /**
-   * The one-time import of a workspace's sessions (Darren's decision 3): each record's transcript (or Hive's backup of
+   * The one-time import of a workspace's sessions (Darren's decision 3): each record's transcript (or Combwork's backup of
    * it) read in the worker, newest first, so recent periods fill first; a record's kept usage (a backup can lag what was
    * kept: whichever counted more stays); each deleted session's kept usage. Nothing already counted is lost: what
    * keptUsage and deletedUsage held is imported, and stays where it was. Only when every session was imported is it
    * recorded as done (usage_meta) and usage-cache.json retired (decision 6): one that failed (the worker ended, a file
-   * that can't be read, a write another Hive held) leaves it not done, and it runs again (what was imported is skipped)
+   * that can't be read, a write another Combwork held) leaves it not done, and it runs again (what was imported is skipped)
    * at the next open or ten-minute tick, the Overview saying meanwhile that its figures are partial; so does an
-   * interruption (Hive quit, the workspace closed).
+   * interruption (Combwork quit, the workspace closed).
    */
   private async backfill(ws: WorkspaceService, opening: WorkspaceRun): Promise<void> {
     const { path } = opening
@@ -875,7 +875,7 @@ class UsageHistory {
       this.setProgress(path, { importing: true, done: n - failed, total })
       return
     }
-    await this.call({ type: 'meta', file, scope: '', key: 'backfill', value: JSON.stringify({ at: new Date().toISOString(), sessions: total, hiveVersion: appVersion() }) })
+    await this.call({ type: 'meta', file, scope: '', key: 'backfill', value: JSON.stringify({ at: new Date().toISOString(), sessions: total, appVersion: appVersion() }) })
     log.info(`imported the usage history of ${userText(path)}: ${total} session(s) in ${Date.now() - t0} ms`)
     this.setProgress(path, { importing: false, done: total, total })
     await sessions.retireUsageCacheFile().catch((e) => log.warn('removing usage-cache.json', e))
@@ -902,7 +902,7 @@ class UsageHistory {
    * gauge, its cost, the Agent API's), or one the history doesn't have yet. Not queued: the worker reads it at once, from
    * where its last read of the file stopped, or from the session's saved state when it hasn't read it in this run (a
    * resume after a restart reads only what was added since). `projectPath`: the session's host, whose history has that
-   * state. Null when it can't be read, or once Hive is quitting.
+   * state. Null when it can't be read, or once Combwork is quitting.
    */
   async read(projectPath: string, path: string, sessionId: string, provider: ProviderId, o: { noWait?: boolean; reportsIgnored?: boolean } = {}): Promise<ReadResult | null> {
     if (this.stopped) return null

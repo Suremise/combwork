@@ -16,13 +16,13 @@ import { tempDir } from './tempDir'
 // As on GitHub's runner (#447): the temp folder by its 8.3 short name where it has one (git lists worktrees by their long
 // names; a junction makes another name on any machine, #448), and no global git config (tests/noGlobalGit.ts), so no
 // user identity but the repository's own.
-const made = tempDir('hive-unusedwt-')
+const made = tempDir('cw-unusedwt-')
 const base = shortPath(made) ?? made
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 ;(electron.shell as unknown as { trashItem: (p: string) => Promise<void> }).trashItem = async (p) => rmSync(p, { recursive: true, force: true })
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
-/** Makes a git command fail as git would (exit 128) while set: what Hive can't check it never offers to remove. */
+/** Makes a git command fail as git would (exit 128) while set: what Combwork can't check it never offers to remove. */
 let failing: ((args: string[]) => boolean) | null = null
 vi.mock('../src/main/git', async (importOriginal) => {
   const real = await importOriginal<typeof import('../src/main/git')>()
@@ -30,12 +30,12 @@ vi.mock('../src/main/git', async (importOriginal) => {
   return { ...real, git: ((cwd, args, ...rest) => (failing?.(args) ? failed() : real.git(cwd, args, ...rest))) as typeof real.git }
 })
 
-const { PREVIEW_MS, hiveWorktreeOf, mergeUnused, removalPreview, removeUnusedWorktree, setQueueNeed, unusedBranchStatus, unusedWorktreeCounts, unusedWorktrees } = await import('../src/main/unusedWorktrees')
+const { PREVIEW_MS, combworkWorktreeOf, mergeUnused, removalPreview, removeUnusedWorktree, setQueueNeed, unusedBranchStatus, unusedWorktreeCounts, unusedWorktrees } = await import('../src/main/unusedWorktrees')
 const { createWorktree } = await import('../src/main/worktrees')
 const { addAgent, reserveForRemoval, worktreeChecks } = await import('../src/main/projectAgents')
 const { gitTestHooks } = await import('../src/main/git')
 const { gitOnPath, setGitToolForTests } = await import('../src/main/gitTool')
-// Paths compared as places: git lists the long names of folders Hive may know by short (8.3) ones, as on CI (#389).
+// Paths compared as places: git lists the long names of folders Combwork may know by short (8.3) ones, as on CI (#389).
 const { fileLockDepth, placeKey, withFileLock } = await import('../src/main/fsutil')
 const { commonGitDir } = await import('../src/main/repoLock')
 const { REPO_LOCK_FILE } = await import('../src/main/repoLockCore')
@@ -62,9 +62,9 @@ let w: ReturnType<typeof createWorkspaceService>
 const run = <T,>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
 let n = 0
 
-/** A new worktree hive/<name> in the workspace's worktree folder, off main. */
+/** A new worktree cw/<name> in the workspace's worktree folder, off main. */
 async function tree(name: string): Promise<{ path: string; branch: string }> {
-  const t = { path: join(root, name), branch: `hive/${name}` }
+  const t = { path: join(root, name), branch: `cw/${name}` }
   await createWorktree(proj, t.path, t.branch, 'main')
   return t
 }
@@ -77,7 +77,7 @@ const branches = (): string[] => git(proj, 'branch', '--format=%(refname:short)'
 const listOf = async (): Promise<UnusedWorktree[]> => (await run(() => unusedWorktrees(proj))).worktrees
 const find = async (path: string): Promise<UnusedWorktree | undefined> => (await listOf()).find((x) => placeKey(x.path) === placeKey(path))
 /**
- * Agents of the project, with these worktrees. The project keeps its id (#1149): written without it, Hive gives it a new
+ * Agents of the project, with these worktrees. The project keeps its id (#1149): written without it, Combwork gives it a new
  * one at its next read of the ids (a second later or more, as under load), and its session records are under the old one.
  */
 const agents = (trees: { path: string; branch: string }[]): void => {
@@ -159,9 +159,9 @@ describe('listing', () => {
     agents([])
   })
 
-  it("says who made each (#476): the Hive agent whose session last ran there, else Hive's folder, else not Hive", async () => {
+  it("says who made each (#476): the Combwork agent whose session last ran there, else Combwork's folder, else not Combwork", async () => {
     const ran = await tree(`ran${++n}`)
-    const hive = await tree(`hive${n}`)
+    const ours = await tree(`ours${n}`)
     const other = { path: join(base, 'elsewhere', `other${n}`), branch: `feature/other${n}` }
     await createWorktree(proj, other.path, other.branch, 'main')
     const at = (m: number): string => new Date(Date.UTC(2026, 9, 9, 10, m)).toISOString()
@@ -173,11 +173,11 @@ describe('listing', () => {
       // One listing (it reads git for every worktree): each is looked up in it.
       const list = await listOf()
       const of = (path: string): UnusedWorktree => list.find((x) => placeKey(x.path) === placeKey(path))!
-      expect(of(ran.path).origin).toEqual({ madeBy: 'hive', agentName: 'B4' })
-      expect(of(hive.path).origin).toEqual({ madeBy: 'hive' })
+      expect(of(ran.path).origin).toEqual({ madeBy: 'combwork', agentName: 'B4' })
+      expect(of(ours.path).origin).toEqual({ madeBy: 'combwork' })
       expect(of(other.path).origin).toEqual({ madeBy: 'other' })
       expect(originLabel(of(ran.path))).toBe('was B4')
-      expect(originLabel(of(hive.path))).toBe('made by Combwork')
+      expect(originLabel(of(ours.path))).toBe('made by Combwork')
       expect(originLabel(of(other.path))).toBe('not made by Combwork')
       expect(unusedPickerLabel(of(other.path))).toBe(`feature/other${n} · not made by Combwork · merged, clean`)
     } finally {
@@ -209,13 +209,13 @@ describe('listing', () => {
       return need
     })
     try {
-      const held = { target: 'main', lease, token: 't1', profile: 'Hive-Dev', pid: process.pid, started: 1, takenAt: '2026-10-21T00:00:00.000Z', renewedAt: '2026-10-21T00:00:00.000Z' }
+      const held = { target: 'main', lease, token: 't1', profile: 'Combwork-Dev', pid: process.pid, started: 1, takenAt: '2026-10-21T00:00:00.000Z', renewedAt: '2026-10-21T00:00:00.000Z' }
       await run(() => boardWrite(w, async () => store.takeQueueLease(held, null) && store.setQueueFolder({ folder: t, target: 'main', lease })))
       // Its runner merging in it: not listed, not removable, even though nothing else needs it.
       expect(await find(t)).toBeUndefined()
       await expect(run(() => removalPreview(proj, t))).rejects.toThrow(/Combwork doesn't remove it/)
       expect(existsSync(t)).toBe(true)
-      // Its Hive crashed (the lease names a process that has ended): the queue's, while the queue needs it.
+      // Its Combwork crashed (the lease names a process that has ended): the queue's, while the queue needs it.
       const ended = execFileSync(process.execPath, ['-e', 'process.stdout.write(String(process.pid))'], { encoding: 'utf8', env: { SystemRoot: process.env.SystemRoot ?? '' } })
       await run(() => boardWrite(w, async () => store.takeQueueLease({ ...held, token: 't2', pid: Number(ended) }, 't1')))
       need = true
@@ -250,7 +250,7 @@ describe('listing', () => {
     const lease = `ac${++n}`
     const t = join(root, `queue-0123456789ab-${lease}`)
     git(proj, 'worktree', 'add', '-q', '--detach', t)
-    const runner = (token: string): Parameters<typeof store.takeQueueLease>[0] => ({ target: 'main', lease, token, profile: 'Hive-Dev', pid: process.pid, started: 1, takenAt: '2026-10-25T00:00:00.000Z', renewedAt: '2026-10-25T00:00:00.000Z' })
+    const runner = (token: string): Parameters<typeof store.takeQueueLease>[0] => ({ target: 'main', lease, token, profile: 'Combwork-Dev', pid: process.pid, started: 1, takenAt: '2026-10-25T00:00:00.000Z', renewedAt: '2026-10-25T00:00:00.000Z' })
     const takes = (token: string): void => {
       store.takeQueueLease(runner(token), null)
       store.setQueueFolder({ folder: t, target: 'main', lease })
@@ -310,18 +310,18 @@ describe('listing', () => {
     expect(await find(q)).toMatchObject({ kind: 'queue' })
   })
 
-  it("Branches & remotes' groups (HI-1710): a review copy is Hive's 'copy', a queue folder its 'queue', anything else no one of Hive's", async () => {
+  it("Branches & remotes' groups (HI-1710): a review copy is Combwork's 'copy', a queue folder its 'queue', anything else no one of Combwork's", async () => {
     const copy = join(root, 'copies', `copy-${++n}`)
     const q = join(root, `queue-0123456789ab-ef${n}`)
     const plain = await tree(`plain${n}`)
-    const of = (path: string): Promise<'copy' | 'queue' | null> => run(async () => hiveWorktreeOf(proj, path))
+    const of = (path: string): Promise<'copy' | 'queue' | null> => run(async () => combworkWorktreeOf(proj, path))
     expect(await of(copy)).toBe('copy')
     // As git may list it: another case, the other slash.
     expect(await of(copy.toUpperCase().replace(/\\/g, '/'))).toBe('copy')
     expect(await of(q)).toBe('queue')
     expect(await of(plain.path)).toBeNull()
     expect(await of(proj)).toBeNull()
-    // Named like one, but not in the project's own folder of Hive's worktrees: not Hive's.
+    // Named like one, but not in the project's own folder of Combwork's worktrees: not Combwork's.
     expect(await of(join(base, 'elsewhere', 'copies', 'copy-1'))).toBeNull()
     expect(await of(join(base, 'elsewhere', 'queue-0123456789ab-ef1'))).toBeNull()
     expect(await of(join(root, 'copies-old', 'copy-1'))).toBeNull()
@@ -519,9 +519,9 @@ describe('Remove anyway', () => {
     commit(t.path, 'w.txt')
     const p = await preview(t.path)
     expect(p.branch).toBe(t.branch)
-    git(t.path, 'checkout', '-q', '-b', `hive/different${n}`)
+    git(t.path, 'checkout', '-q', '-b', `cw/different${n}`)
     expect(await anyway(t.path, p.token)).toMatchObject({ deleted: false, reason: expect.stringMatching(/its branch/) })
-    expect(branches()).toEqual(expect.arrayContaining([t.branch, `hive/different${n}`]))
+    expect(branches()).toEqual(expect.arrayContaining([t.branch, `cw/different${n}`]))
     expect(existsSync(t.path)).toBe(true)
   })
 
@@ -606,7 +606,7 @@ describe('in the Changes tab (#400)', () => {
     // machine (the 8.3 temp folder only where the volume makes short names, #448). Git lists it by its real name.
     mkdirSync(root, { recursive: true })
     const via = junction(root, join(base, `via-root${++n}`))
-    const t = { path: join(via, `changes${n}`), branch: `hive/changes${n}` }
+    const t = { path: join(via, `changes${n}`), branch: `cw/changes${n}` }
     await createWorktree(proj, t.path, t.branch, 'main')
     commit(t.path, 'c.txt')
     const outside = join(base, 'elsewhere')
@@ -724,10 +724,10 @@ describe('without git (#346)', () => {
 })
 
 describe('what the window says', () => {
-  const wt = (check: UnusedWorktree['check'], extra: Partial<UnusedWorktree> = {}): UnusedWorktree => ({ path: 'C:\\w\\x', branch: 'hive/x', check, ...extra })
+  const wt = (check: UnusedWorktree['check'], extra: Partial<UnusedWorktree> = {}): UnusedWorktree => ({ path: 'C:\\w\\x', branch: 'cw/x', check, ...extra })
   it("the Overview's line counts them and the merged ones (#400)", () => {
-    const merged = { path: 'C:\\t\\a', branch: 'hive/a', check: { removable: true, into: 'main' } } as UnusedWorktree
-    const work = { path: 'C:\\t\\b', branch: 'hive/b', check: { removable: false, into: 'main', ahead: 1, dirty: 0 } } as UnusedWorktree
+    const merged = { path: 'C:\\t\\a', branch: 'cw/a', check: { removable: true, into: 'main' } } as UnusedWorktree
+    const work = { path: 'C:\\t\\b', branch: 'cw/b', check: { removable: false, into: 'main', ahead: 1, dirty: 0 } } as UnusedWorktree
     expect(unusedSummary([])).toBeNull()
     expect(unusedSummary([merged, work])).toBe('2 unused worktrees (1 merged)')
     expect(unusedSummary([merged])).toBe('1 unused worktree (1 merged)')
@@ -738,7 +738,7 @@ describe('what the window says', () => {
     expect(unusedWorkNotice([wt({ removable: false, into: 'main', ahead: 2, dirty: 0 }), wt({ removable: false, into: 'main', ahead: 0, dirty: 3 })])).toBe("2 unused worktrees have work that isn't on main")
   })
   it('nothing to remove anyway when git could not count it', () => {
-    expect(lostByRemoving(wt({ removable: false, into: 'main', reason: "git couldn't check hive/x" }))).toBeNull()
-    expect(unusedState(wt({ removable: false, into: 'main', reason: "git couldn't check hive/x" }))).toBe("git couldn't check hive/x")
+    expect(lostByRemoving(wt({ removable: false, into: 'main', reason: "git couldn't check cw/x" }))).toBeNull()
+    expect(unusedState(wt({ removable: false, into: 'main', reason: "git couldn't check cw/x" }))).toBe("git couldn't check cw/x")
   })
 })

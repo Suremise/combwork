@@ -17,7 +17,7 @@ const { CLOSING, runCheckpoint } = await import('../src/main/walCheckpointWorker
 
 /** A bound for a hung run (the waits are for conditions). */
 const HUNG_MS = 15_000
-const base = tempDir('hive-wal-checkpoint-worker-')
+const base = tempDir('cw-wal-checkpoint-worker-')
 const bundle = join(base, 'wal-checkpoint-worker.cjs')
 let n = 0
 const DEFAULTS = { ...wal.checkpointLimits }
@@ -32,7 +32,7 @@ afterAll(() => {
 })
 
 const MIGRATIONS = [{ version: 1, name: 'rows', up: (db: DatabaseSync) => db.exec('CREATE TABLE t (id INTEGER PRIMARY KEY, doc BLOB) STRICT') }]
-const open = () => openDb(join(base, `db-${++n}.db`), { migrations: MIGRATIONS, hiveVersion: 'test', checkpointer: wal.checkpointWhenIdle })
+const open = () => openDb(join(base, `db-${++n}.db`), { migrations: MIGRATIONS, appVersion: 'test', checkpointer: wal.checkpointWhenIdle })
 const write = (db: DatabaseSync, commits: number): void => {
   const ins = db.prepare('INSERT INTO t (doc) VALUES (?)')
   for (let i = 0; i < commits; i++) transaction(db, () => ins.run(Buffer.alloc(6000, i % 251)))

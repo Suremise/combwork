@@ -3,7 +3,7 @@
 // active tab in view, when even that doesn't fit. No tab is ever cut off unless the strip scrolls, at the window's
 // minimum width too; icon-only tabs keep their name (tooltip and accessible label) and order, and dragging files over
 // the Session tab still switches to it. Light and dark screenshots. The agent runs the fake Claude Code (fake-claude/).
-// Opened in a narrow window, the tabs fit at once, with no resize (#812): on Hive's start with the project restored, on
+// Opened in a narrow window, the tabs fit at once, with no resize (#812): on Combwork's start with the project restored, on
 // switching to another project, and on showing the project again after another view.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -23,7 +23,7 @@ const LABELS = ['Session', 'Overview', 'Performance', 'Tasks', 'Sessions', 'File
 const MORE = ['Memory', 'Skills', 'Templates', 'MCP']
 const SPARE = 12
 let failed = 0
-const inv2 = (page, ch, ...a) => page.evaluate(([c, args]) => window.hive.invoke(c, ...args), [ch, a])
+const inv2 = (page, ch, ...a) => page.evaluate(([c, args]) => window.combwork.invoke(c, ...args), [ch, a])
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
@@ -44,7 +44,7 @@ const check = (name, ok, extra = '') => {
 
   const HEIGHT = 800
   let viewport = 1700 // wide enough for every label (the 12 tabs need about 1000 px of strip, and 12 more to go back to them)
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: lib.port(47914), CLAUDE_CONFIG_DIR: claudeHome }, viewport: { width: viewport, height: HEIGHT } })
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_API_PORT: lib.port(47914), CLAUDE_CONFIG_DIR: claudeHome }, viewport: { width: viewport, height: HEIGHT } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('alpha', { exact: true }).first().click()
@@ -203,16 +203,16 @@ const check = (name, ok, extra = '') => {
 
   await inv('session:stop', alpha).catch(() => undefined)
 
-  // --- Opened narrow (#812): the fit is right on first show, with no resize to set it. Hive starts from saved bounds as
+  // --- Opened narrow (#812): the fit is right on first show, with no resize to set it. Combwork starts from saved bounds as
   // narrow as it allows (sidebar shown: room for the icons but not the labels, as above), and nothing sizes the window or
-  // the page after that (lib.launch would: fitWindow), so only Hive's own first layout can get the fit right.
+  // the page after that (lib.launch would: fitWindow), so only Combwork's own first layout can get the fit right.
   await app.close()
   const narrowBounds = { width: minW, height: HEIGHT, maximized: false }
   const saved = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   saved.window = narrowBounds
   saved.windows = (saved.windows ?? []).map((w) => ({ workspace: w.workspace, ...narrowBounds }))
   fs.writeFileSync(cfgFile, JSON.stringify(saved, null, 2))
-  const again = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47914), CLAUDE_CONFIG_DIR: claudeHome }) })
+  const again = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47914), CLAUDE_CONFIG_DIR: claudeHome }) })
   try {
     const p = await again.firstWindow()
     p.on('pageerror', (e) => check('no page errors (narrow start)', false, e.message))
@@ -228,7 +228,7 @@ const check = (name, ok, extra = '') => {
       check(`${what}: ${fit}, no scrolling`, !!ok, JSON.stringify(await fitOf()))
     }
     const narrowShot = (file) => p.screenshot({ path: path.join(lib.WORK, file), clip: { x: 0, y: 0, width: sizes[0] ?? minW, height: 140 } })
-    await fitsAs('Hive started narrow with alpha restored', 'icons')
+    await fitsAs('Combwork started narrow with alpha restored', 'icons')
     await narrowShot('tabstrip-6-start-narrow-dark.png')
     await p.getByText('beta', { exact: true }).first().click()
     await lib.until(async () => (await p.locator('.project-header h1').textContent().catch(() => '')) === 'beta', HUNG_MS)

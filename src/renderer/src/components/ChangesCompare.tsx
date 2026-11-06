@@ -38,7 +38,7 @@ const M = {
   commits: msg({ id: 'project.compare.commits', defaultMessage: 'Commits', description: "A switch in the Changes tab's comparison: each side's commits." }),
   noFiles: msg({ id: 'project.compare.noFiles', defaultMessage: '{head} changes no files since it left {base}.', description: "The Changes tab's comparison when the branch changes nothing." }),
   moreFiles: msg({ id: 'project.compare.moreFiles', defaultMessage: 'Show more ({shown, number} of {total, number})', description: "A button under the Changes tab's comparison's files: lists more of them." }),
-  cut: msg({ id: 'project.compare.cut', defaultMessage: 'Only the first {shown, number} of {total, number} files are listed.', description: "Under the Changes tab's comparison's files when there are more than Hive lists." }),
+  cut: msg({ id: 'project.compare.cut', defaultMessage: 'Only the first {shown, number} of {total, number} files are listed.', description: "Under the Changes tab's comparison's files when there are more than Combwork lists." }),
   onlyHead: msg({ id: 'project.compare.onlyHead', defaultMessage: 'On {head}, not on {base}', description: "A heading in the Changes tab's comparison: the commits the branch {head} has that {base} hasn't." }),
   none: msg({ id: 'project.compare.none', defaultMessage: 'None.', description: "Under a heading of the Changes tab's comparison's commits: there are none." }),
   load: msg({ id: 'project.compare.load', defaultMessage: 'the comparison', description: "What couldn't be read, in an error in the Changes tab: the comparison of two branches." }),

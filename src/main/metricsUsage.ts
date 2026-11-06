@@ -10,8 +10,8 @@ import { msg } from '../shared/i18n'
 
 /** Why a report has no provider usage: the window's text; the Agent API's report and its export get the English (#1104). */
 const NOTE = {
-  scripts: msg({ id: 'performance.providersNote.scripts', defaultMessage: 'Scripts start no sessions, so they have no provider usage.', description: "Performance, under Provider usage with Scripts chosen as whose work: why the table is empty (scripts call Hive's API and run no coding agents)." }),
-  assistant: msg({ id: 'performance.providersNote.assistant', defaultMessage: 'The Assistant’s sessions are the workspace’s, not a project’s.', description: "Performance, under Provider usage for a project with the Hive Assistant chosen as whose work: why the table is empty (the Assistant isn't any project's)." })
+  scripts: msg({ id: 'performance.providersNote.scripts', defaultMessage: 'Scripts start no sessions, so they have no provider usage.', description: "Performance, under Provider usage with Scripts chosen as whose work: why the table is empty (scripts call Combwork's API and run no coding agents)." }),
+  assistant: msg({ id: 'performance.providersNote.assistant', defaultMessage: 'The Assistant’s sessions are the workspace’s, not a project’s.', description: "Performance, under Provider usage for a project with the Combwork Assistant chosen as whose work: why the table is empty (the Assistant isn't any project's)." })
 }
 
 /** Which sessions' usage a report is about: a project's, or the workspace's (all, or its own only), and whose. */
@@ -137,8 +137,8 @@ export { METRICS_EXPORT_SCHEMA }
 
 /**
  * A report as an export file (Performance → Export): the report itself, made with the page's filters, with what a
- * reader needs to read it: schema, Hive's version, units, and (also in the report) the filters, what they couldn't
- * narrow, the coverage (when Hive was recording) and what isn't measured. `sanitize`: project names become project-1,
+ * reader needs to read it: schema, Combwork's version, units, and (also in the report) the filters, what they couldn't
+ * narrow, the coverage (when Combwork was recording) and what isn't measured. `sanitize`: project names become project-1,
  * project-2… (the same name the same number) and the workspace's path is left out.
  */
 export function metricsExport(r: MetricsReport, appVersion: string, sanitize: boolean): Record<string, unknown> {

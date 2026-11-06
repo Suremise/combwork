@@ -1,5 +1,5 @@
 // The team pause's admission gate in the delivery service (HI-2081; HR1's s10 and s12 checks): apart from a delivery's
-// own validity, one of Hive's own wakes (a loop card event, a watch wake) for a project agent of a paused workspace is
+// own validity, one of Combwork's own wakes (a loop card event, a watch wake) for a project agent of a paused workspace is
 // held as it is, unread: not offered, not typed (a pause landing between the offer and its Enter stops it before Enter,
 // and it is put back), not read by cw_inbox, not counted for a notice, and not expired while held; a message or the
 // user's answer still goes. Once the team resumes its time is moved on by how long it was held and it is offered once.
@@ -18,7 +18,7 @@ const pause = vi.hoisted(() => ({ on: false }))
 vi.mock('../src/main/teamPause', async (orig) => ({ ...(await orig<object>()), pausedFor: () => (pause.on ? { pauseId: 'p1', since: new Date().toISOString(), by: 'user' } : null) }))
 
 describe("the team pause's hold on deliveries (HI-2081)", async () => {
-  const base = tempDir('hive-deliveries-pause-')
+  const base = tempDir('cw-deliveries-pause-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   const dismiss = admitted(base)
   afterAll(async () => {
@@ -46,8 +46,8 @@ describe("the team pause's hold on deliveries (HI-2081)", async () => {
     }
   })
   deliveries.setSenderCheckForTests(() => null)
-  const hive: DeliverySender = { kind: 'hive', name: 'Hive' }
-  const wake = (o: Record<string, unknown> = {}) => deliveries.createDelivery(alpha, { agentId: 'b1', agentName: 'B1', kind: 'card-event', from: hive, card: 7, body: 'is in Review', source: 'loop', ref: '#7', ...o })
+  const combwork: DeliverySender = { kind: 'combwork', name: 'Combwork' }
+  const wake = (o: Record<string, unknown> = {}) => deliveries.createDelivery(alpha, { agentId: 'b1', agentName: 'B1', kind: 'card-event', from: combwork, card: 7, body: 'is in Review', source: 'loop', ref: '#7', ...o })
   const states = async () => (await deliveries.deliveriesOf(alpha, 'b1')).map((r) => `${r.id} ${r.state}`)
   beforeEach(() => {
     alpha = join(base, `alpha${++n}`)
@@ -59,7 +59,7 @@ describe("the team pause's hold on deliveries (HI-2081)", async () => {
   it("held while paused: not offered, not read, not counted; a message and the user's answer still go", async () => {
     pause.on = true
     const w = await wake()
-    const msg = await deliveries.createDelivery(alpha, { agentId: 'b1', agentName: 'B1', kind: 'rebrief', from: hive, body: 'Rebase first.' })
+    const msg = await deliveries.createDelivery(alpha, { agentId: 'b1', agentName: 'B1', kind: 'rebrief', from: combwork, body: 'Rebase first.' })
     const answer = await wake({ kind: 'answer', from: { kind: 'user', name: 'Darren' }, body: 'Yes', ref: '#7/answer' })
     expect(await deliveries.countable(alpha, 'b1')).toEqual([expect.objectContaining({ id: msg.id }), expect.objectContaining({ id: answer.id })].sort((a, b) => (a.id < b.id ? -1 : 1)))
     const read = await deliveries.readInbox(alpha, 'b1')

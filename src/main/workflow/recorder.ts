@@ -93,14 +93,13 @@ export function recordingByRuntime<T>(fn: () => Promise<T>, moved: number | null
 /** The reads made for a card not made yet (tasks.ts' createTask), before its number is taken. */
 const NEW_CARD = 0
 
-/** A fact's actor (§16.4.1): the user, the Assistant, an agent by its id, or Hive itself. */
+/** A fact's actor (§16.4.1): the user, the Assistant, an agent by its id, or Combwork itself. */
 export function actorOf(a: ChangeActor | undefined): Actor {
-  if (!a) return 'hive'
+  if (!a) return 'combwork'
   if (a.kind === 'user') return 'user'
   if (a.kind === 'assistant') return 'assistant'
   if (a.self) return agentActor(a.self.agentId)
-  // Combwork's own name (HI-2463), and Hive, which history written before it holds.
-  return a.name === 'Combwork' || a.name === 'Hive' || a.name === 'Repair' ? 'hive' : agentActor(a.name)
+  return a.name === 'Combwork' || a.name === 'Repair' ? 'combwork' : agentActor(a.name)
 }
 
 /** The stage a column stands for (P3: a move is to the column's stage). */
@@ -164,7 +163,7 @@ async function readsFor(ws: WorkspaceService, p: Planned): Promise<Reads> {
   const laneRuleset = p.why === 'start' ? laneRulesetOf(ws, p) : null
   if (laneRuleset) r.ruleset = laneRuleset
   else if (p.why === 'start') {
-    // Resolved over the workspace's and Hive's (#1278: a project may set only some), as the runtime has them.
+    // Resolved over the workspace's and Combwork's (#1278: a project may set only some), as the runtime has them.
     const resolved = cfg.workflow ? resolvedOf(ws, projectPath, cfg.workflow.platform, cfg) : null
     try {
       const c = resolved && !resolved.invalid ? compile(resolved.options) : null
@@ -429,7 +428,7 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
 export const rulesEnforced = (): boolean => advanced.get<boolean>('cw.workflow.enforce')
 
 /**
- * A failed review recorded at the card's round limit (§16.11.4, #1269): Hive asks the user (For you, Decide) as the
+ * A failed review recorded at the card's round limit (§16.11.4, #1269): Combwork asks the user (For you, Decide) as the
  * runtime does (`askAtLimit`), so a loop's verdicts given on the board (before #1268 moves them to the runtime) pause it
  * too. Only for a card in a running lane, while the rules are enforced.
  */
@@ -442,7 +441,7 @@ function roundLimit(tx: Tx, n: number, key: string, ruleset: { ruleset?: string 
   const shown = workflowText(FOR_YOU.roundLimit, { card: key, rounds: s.rounds })
   // agent-stored: storedForAgents says a request again for each reader (its forYou rows, a lane wake's detail; HI-2464)
   const text = workflowEnglish(shown)
-  const asked = tx.append(n, { kind: 'ApprovalRequested', actor: 'hive', source: 'recorded', ...ruleset, data: { request: `${key}/r${s.lastSeq + 1}`, kind: 'decide', gate: ROUND_LIMIT_GATE, text, requestText: shown, for: 'user', stage: s.stage, generation: s.generation } })
+  const asked = tx.append(n, { kind: 'ApprovalRequested', actor: 'combwork', source: 'recorded', ...ruleset, data: { request: `${key}/r${s.lastSeq + 1}`, kind: 'decide', gate: ROUND_LIMIT_GATE, text, requestText: shown, for: 'user', stage: s.stage, generation: s.generation } })
   tx.action(n, 'notify', { text, shown }, asked.seq)
 }
 
@@ -480,11 +479,11 @@ function loopWakes(tx: Tx, n: number, by: Actor, after: TaskCard, f: { submitted
   }
 }
 
-/** A move's cause (§16.4.2): the user's from the window, an agent's or the Assistant's by its tools or the API, Hive's derived. */
+/** A move's cause (§16.4.2): the user's from the window, an agent's or the Assistant's by its tools or the API, Combwork's derived. */
 function causeOf(a: ChangeActor | undefined): 'intent' | 'user' | 'derived' {
   if (!a) return 'derived'
   if (a.kind === 'user') return 'user'
-  return actorOf(a) === 'hive' ? 'derived' : 'intent'
+  return actorOf(a) === 'combwork' ? 'derived' : 'intent'
 }
 
 /**

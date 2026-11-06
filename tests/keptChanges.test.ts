@@ -1,4 +1,4 @@
-// Kept files changed by Hive while something else is saving them (#1600): a read-modify-write (project.json, the
+// Kept files changed by Combwork while something else is saving them (#1600): a read-modify-write (project.json, the
 // record of project names, the record of handovers' owners) never writes back the .bak's value read from a file still
 // being saved; it reads again a few times, then refuses, the file left as the other program saves it.
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'fs'
@@ -8,7 +8,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { closeAllBoards } from '../src/main/boardStore'
 
-const base = tempDir('hive-keptchanges-')
+const base = tempDir('cw-keptchanges-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 afterAll(() => {
   closeAllBoards()
@@ -51,7 +51,7 @@ function untouched(file: string, bak: string): void {
 }
 
 describe('a kept file read for a change (#1600)', () => {
-  const dir = tempDir('hive-keptbusy-')
+  const dir = tempDir('cw-keptbusy-')
 
   it('throws KeptFileBusy while it is still being saved; other reads keep its last good copy', async () => {
     const f = join(dir, 'busy.json')

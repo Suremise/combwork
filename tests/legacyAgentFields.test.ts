@@ -8,7 +8,7 @@ import * as electron from 'electron'
 import { carryLegacyAgentFields, legacySetupPending, legacyWorktree } from '../src/shared/agentFolders'
 import { tempDir } from './tempDir'
 
-const TREE = { path: 'C:\\ws.worktrees\\alpha\\hb1', branch: 'hive/hb1', base: 'main' }
+const TREE = { path: 'C:\\ws.worktrees\\alpha\\hb1', branch: 'cw/hb1', base: 'main' }
 
 describe("0.9.3's agent fields, carried through (pure)", () => {
   it('an agent written without them keeps the stored ones; one that writes the key, as undefined, drops them', () => {
@@ -27,7 +27,7 @@ describe("0.9.3's agent fields, carried through (pure)", () => {
 })
 
 describe("0.9.3's agent fields survive the workspace's saves", async () => {
-  const base = tempDir('hive-legacyfields-')
+  const base = tempDir('cw-legacyfields-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   const { createWorkspaceService, disposeWorkspaceService, inWorkspace, workspace } = await import('../src/main/workspace')
 

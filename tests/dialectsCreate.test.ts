@@ -136,7 +136,7 @@ describe('a launch’s model ID (dialectModelId, HI-2523)', () => {
 })
 
 describe('New Model File, Duplicate and Set Model (HI-2523)', () => {
-  const base = tempDir('hive-dialects-create-')
+  const base = tempDir('cw-dialects-create-')
   afterAll(() => rmSync(base, { recursive: true, force: true }))
   let n = 0
   const folder = (): string => {

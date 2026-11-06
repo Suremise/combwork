@@ -1,7 +1,7 @@
 // Codex connections (HI-1757; the test seam off so the real rule
 // applies), on the fake Codex (no browser, no real sign-in): with none on, a Codex agent is refused; two connections
 // signed in with Codex's own login in each one's folder; two agents on them at once, each launch's CODEX_HOME its own
-// folder, its login kept there (the file store) and a token in Hive's environment never passed on; a conversation
+// folder, its login kept there (the file store) and a token in Combwork's environment never passed on; a conversation
 // carried from one connection to the other (its rollout in the shared sessions folder, resumed), its plan usage then
 // the connection's own, in the status bar (HI-1882); a login changed in a
 // connection's folder warned of; Advanced's non-admin sandbox on connections passed to each Codex there (HI-1893), and
@@ -46,14 +46,14 @@ const rollouts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive:
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  // A token in Hive's own environment, as one set on the PC would be: a connection's Codex must never get it.
-  // Each app server the fake runs (Hive's sign-in checks, its hook checks) notes its pid there.
+  // A token in Combwork's own environment, as one set on the PC would be: a connection's Codex must never get it.
+  // Each app server the fake runs (Combwork's sign-in checks, its hook checks) notes its pid there.
   const appServers = path.join(userData, 'fake-appservers.txt')
-  const env = { CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, CODEX_ACCESS_TOKEN: 'made-up-not-a-token', HIVE_TEST_CLI_HOME_CONNECTION: '0', FAKE_CODEX_APPSERVER_LOG: appServers }
+  const env = { CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, CODEX_ACCESS_TOKEN: 'made-up-not-a-token', CW_TEST_CLI_HOME_CONNECTION: '0', FAKE_CODEX_APPSERVER_LOG: appServers }
   const { app, page } = await lib.launch({ userData, env, viewport: { width: 1400, height: 900 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     const failure = (p) => p.then(() => null, (e) => String(e?.message ?? e))
     await lib.waitForProvider(inv, 'codex')
     await lib.openWorkspace(inv, page, ws)
@@ -86,12 +86,12 @@ const rollouts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive:
     await inv('connections:setOn', home.id, true)
     check('the first turned on is the default', (await inv('connections:list')).workspace.codex?.default === work.id)
 
-    // --- Set up for this workspace. Hive's per-launch trust (HI-1871, Darren: on by default) gives each launch its own
+    // --- Set up for this workspace. Combwork's per-launch trust (HI-1871, Darren: on by default) gives each launch its own
     // folder trusted, so nothing is pending; with it off (Advanced), Codex's trust of the project's repository root is
-    // read from the connection's config.toml (Hive writes none) and Set Up opens there (HI-1870).
+    // read from the connection's config.toml (Combwork writes none) and Set Up opens there (HI-1870).
     const root = fs.realpathSync.native(alpha)
     const trustOf = async (id) => (await view(id))?.trust ?? null
-    check("with Hive's per-launch trust on (the default), a Codex connection on here needs no trust answer", !!(await lib.until(async () => JSON.stringify(await trustOf(work.id)) === JSON.stringify({ pending: [], unknown: false }), HUNG_MS)))
+    check("with Combwork's per-launch trust on (the default), a Codex connection on here needs no trust answer", !!(await lib.until(async () => JSON.stringify(await trustOf(work.id)) === JSON.stringify({ pending: [], unknown: false }), HUNG_MS)))
     await inv('advanced:set', 'codex.trust.perLaunch', false)
     check("off, it needs its trust of the project's repository root", !!(await lib.until(async () => JSON.stringify((await trustOf(work.id))?.pending) === JSON.stringify([{ project: 'alpha', folder: root, git: true }]), HUNG_MS)) && (await view(work.id))?.setUp === true, JSON.stringify(await trustOf(work.id)))
     const { key, in: opened } = await inv('connections:setUp', work.id)
@@ -116,11 +116,11 @@ const rollouts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive:
     const all = [...launchedIn(work.id), ...launchedIn(home.id)]
     check("…each with its connection's folder as CODEX_HOME", launchedIn(work.id).every((l) => l.home === path.join(accountsRoot, work.id)) && launchedIn(home.id).every((l) => l.home === path.join(accountsRoot, home.id)))
     check('…its login kept in that folder (the file store)', all.every((l) => l.args.join(' ').includes('cli_auth_credentials_store="file"')))
-    check("…each with its own folder trusted for that launch (Hive's per-launch trust, HI-1871), written nowhere", all.every((l) => l.args.some((a) => a.startsWith('projects=') && a.includes('trust_level="trusted"'))) && !(fs.existsSync(path.join(accountsRoot, home.id, 'config.toml')) && fs.readFileSync(path.join(accountsRoot, home.id, 'config.toml'), 'utf8').includes('[projects.')))
+    check("…each with its own folder trusted for that launch (Combwork's per-launch trust, HI-1871), written nowhere", all.every((l) => l.args.some((a) => a.startsWith('projects=') && a.includes('trust_level="trusted"'))) && !(fs.existsSync(path.join(accountsRoot, home.id, 'config.toml')) && fs.readFileSync(path.join(accountsRoot, home.id, 'config.toml'), 'utf8').includes('[projects.')))
     // Neither has one of its own (Work's Set Up was given the PC's, so it chose none), so the PC's is passed on, and with
     // Advanced's non-admin sandbox off (HI-1893) never "unelevated".
     check("…the PC's Windows sandbox passed on where the connection has none of its own, and not the non-admin one", all.every((l) => l.args.includes('windows.sandbox="elevated"') && !l.args.includes('windows.sandbox="unelevated"')), JSON.stringify(all.map((l) => l.args.filter((x) => x.startsWith('windows.')))))
-    check("…and never the token in Hive's environment", all.every((l) => l.loginVars.length === 0), JSON.stringify(all.map((l) => l.loginVars)))
+    check("…and never the token in Combwork's environment", all.every((l) => l.loginVars.length === 0), JSON.stringify(all.map((l) => l.loginVars)))
     check('…and its run says so', (await live('a-one'))?.launchedConnection?.id === work.id && (await live('a-two'))?.launchedConnection?.id === home.id)
 
     // --- A conversation carried over: Two's first turn on Home, then resumed on Work, through the shared rollouts.
@@ -221,7 +221,7 @@ const rollouts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive:
     check("Home's folder is gone", !fs.existsSync(path.join(accountsRoot, home.id)))
     check("…and Codex's own sessions are untouched", JSON.stringify(rollouts(path.join(codexHome, 'sessions'))) === JSON.stringify(before) && before.length > 0, JSON.stringify(before))
 
-    // --- Every app server Hive ran for its checks was ended before its answer was taken: none is left running.
+    // --- Every app server Combwork ran for its checks was ended before its answer was taken: none is left running.
     const ran = fs.existsSync(appServers) ? fs.readFileSync(appServers, 'utf8').split(/\r?\n/).map(Number).filter((n) => n > 0) : []
     const alive = (pid) => {
       try {
@@ -231,7 +231,7 @@ const rollouts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { recursive:
         return false
       }
     }
-    check("Hive's checks ran Codex's app server, and none of them is left running", ran.length > 0 && ran.every((pid) => !alive(pid)), JSON.stringify({ ran: ran.length, left: ran.filter(alive) }))
+    check("Combwork's checks ran Codex's app server, and none of them is left running", ran.length > 0 && ran.every((pid) => !alive(pid)), JSON.stringify({ ran: ran.length, left: ran.filter(alive) }))
   } catch (e) {
     check('the suite ran to its end', false, e.stack)
   } finally {

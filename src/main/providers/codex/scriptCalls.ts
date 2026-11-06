@@ -4,12 +4,12 @@ import { firstLine, shortPath, toolLabel } from '../conversation'
 
 /**
  * The calls a Codex code-mode script made (HI-2240). In code mode (Codex 0.166) the model runs every tool from a script
- * (its `exec` tool): `tools.mcp__combwork__cw_read_task(…)`, `tools.exec_command({cmd})`, `tools.apply_patch(…)`. Hive
+ * (its `exec` tool): `tools.mcp__combwork__cw_read_task(…)`, `tools.exec_command({cmd})`, `tools.apply_patch(…)`. Combwork
  * shows the script as one tool, Script; Codex's rollout records each call the script made as it ends, an
  * `item_completed` event whose item is the call: McpToolCall (server, tool, arguments, status, result.content),
  * CommandExecution (command, aggregated_output, exit_code, status), FileChange (changes), ImageView (path), WebSearch
- * (query) or another kind (Extension…). Each becomes a transcript tool named as Hive names the same call made directly
- * (`hive · cw_read_task`, Shell, Edit, view_image), the Script's `calls`. The format belongs to Codex: the scenario
+ * (query) or another kind (Extension…). Each becomes a transcript tool named as Combwork names the same call made directly
+ * (`combwork · cw_read_task`, Shell, Edit, view_image), the Script's `calls`. The format belongs to Codex: the scenario
  * harness reads it the same way (tests/scenarios/codexScripts.cjs).
  */
 

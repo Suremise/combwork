@@ -24,7 +24,7 @@ function fresh() {
 
 async function launch() {
   lib.enableProviders(userData)
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47897) })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47897) })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => results.push(`PAGEERROR ${e.message}`))
@@ -32,7 +32,7 @@ async function launch() {
   app.process().on('exit', (c) => console.log('DEBUG exit', c, new Date().toISOString()))
   app.process().stderr.on('data', (d) => /error|quit/i.test(String(d)) && console.log('DEBUG stderr', String(d).slice(0, 300)))
   await lib.appReady(page)
-  await page.evaluate((folder) => window.hive.invoke('workspace:open', folder), ws)
+  await page.evaluate((folder) => window.combwork.invoke('workspace:open', folder), ws)
   await lib.until(async () => page.evaluate((n) => document.title.includes(n), path.basename(ws)), 20000)
   await page.getByText('demo', { exact: true }).first().click()
   await page.locator('.tab', { hasText: 'Files' }).click()
@@ -41,7 +41,7 @@ async function launch() {
 }
 
 /**
- * Hive quits (#424): it decides to within ms of the watch's quit (its own quit work: saving, stopping), then its process
+ * Combwork quits (#424): it decides to within ms of the watch's quit (its own quit work: saving, stopping), then its process
  * ends. The process's part is Electron's, which a loaded machine stretches to seconds, so it is only waited for.
  */
 const quits = async (q, ms = 8000) => {
@@ -113,7 +113,7 @@ const quits = async (q, ms = 8000) => {
   check('delete: file gone, and its unsaved changes with it', !!(await lib.until(async () => !exists('gone.ts') && (await pane.locator('.editor-toolbar .dirty-dot').count()) === 0, 10000)))
 
   // Quit: the dialog lists the two unsaved files (not the deleted one), Save and quit saves them.
-  await page.evaluate(() => window.hive.invoke('app:quit'))
+  await page.evaluate(() => window.combwork.invoke('app:quit'))
   await sleep(800)
   const quitText = await page.locator('.dialog').last().innerText().catch(() => '')
   check('quit: asks with no sessions running', /unsaved changes/.test(quitText))
@@ -121,31 +121,31 @@ const quits = async (q, ms = 8000) => {
   await page.screenshot({ path: path.join(scratch, 'us-1-quit.png') })
   const q1 = await lib.quitWatch(app)
   await page.getByRole('button', { name: 'Save and quit' }).click()
-  check('quit/save: Hive quit', await quits(q1))
+  check('quit/save: Combwork quit', await quits(q1))
   check('quit/save: b.ts saved', read('b.ts').includes('edited'))
   check('quit/save: notes/c.ts saved', read('notes/c.ts').includes('inFolder'))
 
   // ---- Run 2: discard.
   ;({ app, page } = await launch())
   await edit('keep.ts', 'export const discardMe = true\n')
-  await page.evaluate(() => window.hive.invoke('app:quit'))
+  await page.evaluate(() => window.combwork.invoke('app:quit'))
   await sleep(800)
   await page.getByRole('button', { name: 'Discard the changes' }).click()
   const q2 = await lib.quitWatch(app)
   await page.locator('.dialog-footer button.danger').last().click()
-  check('quit/discard: Hive quit', await quits(q2))
+  check('quit/discard: Combwork quit', await quits(q2))
   check('quit/discard: keep.ts unchanged', !read('keep.ts').includes('discardMe'))
 
-  // ---- Run 3: a file changed on disk can't be saved over; Hive stays open.
+  // ---- Run 3: a file changed on disk can't be saved over; Combwork stays open.
   ;({ app, page } = await launch())
   await edit('keep.ts', 'export const mine = true\n')
   fs.writeFileSync(path.join(proj, 'keep.ts'), 'export const theirs = true\n')
   await sleep(300)
-  await page.evaluate(() => window.hive.invoke('app:quit'))
+  await page.evaluate(() => window.combwork.invoke('app:quit'))
   await sleep(800)
   await page.getByRole('button', { name: 'Save and quit' }).click()
-  await lib.sleep(1500) // A fixed wait on purpose: this checks that Hive does NOT quit, which no condition can show.
-  check('conflict: Hive still open', !app.process().killed && app.process().exitCode === null)
+  await lib.sleep(1500) // A fixed wait on purpose: this checks that Combwork does NOT quit, which no condition can show.
+  check('conflict: Combwork still open', !app.process().killed && app.process().exitCode === null)
   check('conflict: disk version kept', read('keep.ts').includes('theirs') && !read('keep.ts').includes('mine'))
   check('conflict: dialog still lists keep.ts', /keep\.ts/.test(await page.locator('.dialog').last().innerText().catch(() => '')))
   await page.getByRole('button', { name: 'Cancel' }).click()
@@ -157,7 +157,7 @@ const quits = async (q, ms = 8000) => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'P', code: 'KeyP', ctrlKey: true, shiftKey: true }))
   })
   await page.keyboard.press('Escape')
-  await page.evaluate(() => window.hive.invoke('app:quit'))
+  await page.evaluate(() => window.combwork.invoke('app:quit'))
   await sleep(600)
   await page.getByRole('button', { name: 'Discard the changes' }).click()
   const q3 = await lib.quitWatch(app)

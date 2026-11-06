@@ -206,7 +206,7 @@ describe('main process stalls (#1109)', () => {
     expect(s.warnings[0]).toMatch(/during it: api GET \/v1\/tasks \(1\.5 s, still running\)$/)
   })
 
-  it("names hooks and requests only by names Hive knows, never by what a client sent", () => {
+  it("names hooks and requests only by names Combwork knows, never by what a client sent", () => {
     expect(hookLabel(false, { hook_event_name: 'PreToolUse' })).toBe('hook PreToolUse')
     expect(hookLabel(false, { hook_event_name: 'PrivateCustomerName' })).toBe('hook (other event)')
     expect(hookLabel(false, null)).toBe('hook (other event)')
@@ -288,14 +288,14 @@ describe("the Performance view's stalls (HI-1135)", () => {
     const call = beginWork('ipc tasks:list')
     let route = 'api POST /v1/tasks'
     const request = beginWork(() => route)
-    timedStep('db commit hive.db', () => s.stall(900, 40))
+    timedStep('db commit combwork.db', () => s.stall(900, 40))
     call()
     s.settle()
     expect(s.recorded).toHaveLength(1)
     const { stall, end } = s.recorded[0]
     expect(end).toBe(now)
     expect(stall).toMatchObject({ ms: 900, cpuMs: 40, stepsMore: 0, workMore: 0 })
-    expect(stall.steps).toEqual([{ label: 'db commit hive.db', count: 1, ms: 900, running: false }])
+    expect(stall.steps).toEqual([{ label: 'db commit combwork.db', count: 1, ms: 900, running: false }])
     expect(stall.work).toEqual(expect.arrayContaining([{ label: 'ipc tasks:list', count: 1, ms: 900, running: false }, { label: 'api POST /v1/tasks', count: 1, ms: 900, running: true }]))
     // Copied as it was: a label made later, or the work ending later, doesn't change it.
     route = 'api POST /v1/changed'
@@ -328,11 +328,11 @@ describe("the Performance view's stalls (HI-1135)", () => {
     const t = watcher()
     t.tick()
     noteStep('db transaction a database', now - 100)
-    for (let i = 0; i < 4; i++) noteStep('db open hive.db', now - 30)
+    for (let i = 0; i < 4; i++) noteStep('db open combwork.db', now - 30)
     t.stall(900, 0)
     t.settle()
     expect(t.recorded[0].stall.steps).toEqual([
-      { label: 'db open hive.db', count: 4, ms: 120, running: false },
+      { label: 'db open combwork.db', count: 4, ms: 120, running: false },
       { label: 'db transaction a database', count: 1, ms: 100, running: false }
     ])
   })
@@ -390,20 +390,20 @@ describe('the steps that can wait, and a whole-process pause (HI-1692)', () => {
     const s = watcher()
     s.tick()
     // The step blocks the thread: the clock moves on inside it, and the next tick finds the loop held as long.
-    timedStep('db begin hive.db', () => s.stall(5200, 3))
+    timedStep('db begin combwork.db', () => s.stall(5200, 3))
     s.settle()
-    expect(s.warnings).toEqual(['The main process was busy for 5200 ms (main thread CPU 3 ms); during it: db begin hive.db (5.2 s)'])
+    expect(s.warnings).toEqual(['The main process was busy for 5200 ms (main thread CPU 3 ms); during it: db begin combwork.db (5.2 s)'])
   })
 
   it('names the step over the IPC call that only waited behind it: the most overlap first', () => {
     const s = watcher()
     s.tick()
     const call = beginWork('ipc tasks:list')
-    timedStep('db commit hive.db', () => s.stall(900, 0))
+    timedStep('db commit combwork.db', () => s.stall(900, 0))
     call()
     s.settle()
-    expect(s.warnings[0]).toMatch(/during it: (db commit hive\.db \(0\.9 s\), ipc tasks:list|ipc tasks:list \(0\.9 s\), db commit hive\.db)/)
-    expect(s.warnings[0]).toContain('db commit hive.db (0.9 s)')
+    expect(s.warnings[0]).toMatch(/during it: (db commit combwork.db \(0\.9 s\), ipc tasks:list|ipc tasks:list \(0\.9 s\), db commit combwork.db)/)
+    expect(s.warnings[0]).toContain('db commit combwork.db (0.9 s)')
   })
 
   it("names the step first when five calls waited behind it, beyond the five named (HR6's round 1)", () => {
@@ -414,7 +414,7 @@ describe('the steps that can wait, and a whole-process pause (HI-1692)', () => {
       now += 1
       return beginWork(`ipc waiting-${i}`)
     })
-    timedStep('db begin hive.db', () => {
+    timedStep('db begin combwork.db', () => {
       now += 4000
     })
     now += 10
@@ -423,7 +423,7 @@ describe('the steps that can wait, and a whole-process pause (HI-1692)', () => {
     // The loop's delay as the tick measured it: the step's whole block.
     s.settle()
     const line = s.warnings[0] ?? ''
-    expect(line).toMatch(/during it: db begin hive\.db \(4\.0 s\), ipc waiting-/)
+    expect(line).toMatch(/during it: db begin combwork.db \(4\.0 s\), ipc waiting-/)
     expect(line).toMatch(/ and 1 more$/)
   })
 
@@ -447,7 +447,7 @@ describe('the steps that can wait, and a whole-process pause (HI-1692)', () => {
     s.stall(7957, 0)
     s.settle()
     expect(s.warnings).toEqual([])
-    expect(s.infos).toEqual(["The main process was paused for 7957 ms with the rest of Hive's process (its watchdog thread stopped too: the PC or the process was paused): not counted as busy"])
+    expect(s.infos).toEqual(["The main process was paused for 7957 ms with the rest of Combwork's process (its watchdog thread stopped too: the PC or the process was paused): not counted as busy"])
     // Asked about the stall's own span.
     expect(s.watchdog.asked.at(-1)).toEqual([now - 7957, now])
     // One it ticked through is main's own: warned.

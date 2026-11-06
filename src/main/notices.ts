@@ -1,13 +1,13 @@
 import { englishText, type Text } from '../shared/advanced'
 import { msg, tr } from '../shared/i18n'
 import { asksYou } from '../shared/inbox'
-import { emit, onHiveEvent } from './events'
+import { emit, onCombworkEvent } from './events'
 import { resolveAsks } from './notify'
 
-const CLOSED = msg({ id: 'main.quit.closed', defaultMessage: 'Combwork has closed', description: 'A notice after Hive quit without asking, its sessions stopped.' })
-const CLOSED_BODY = msg({ id: 'main.quit.closedBody', defaultMessage: '{n, plural, one {# session was stopped. Resume it from Combwork next time; nothing was lost.} other {# sessions were stopped. Resume them from Combwork next time; nothing was lost.}}', description: 'The notice after Hive quit: how many sessions it stopped.' })
+const CLOSED = msg({ id: 'main.quit.closed', defaultMessage: 'Combwork has closed', description: 'A notice after Combwork quit without asking, its sessions stopped.' })
+const CLOSED_BODY = msg({ id: 'main.quit.closedBody', defaultMessage: '{n, plural, one {# session was stopped. Resume it from Combwork next time; nothing was lost.} other {# sessions were stopped. Resume them from Combwork next time; nothing was lost.}}', description: 'The notice after Combwork quit: how many sessions it stopped.' })
 
-/** The notice after Hive quit without asking: in the language shown, its title in English for the Agent API too. */
+/** The notice after Combwork quit without asking: in the language shown, its title in English for the Agent API too. */
 export function closedNotice(stopped: number): { title: string; body: string; apiTitle: string; apiTitleText: Text } {
   // agent-stored: agentField says the events stream's title again in each caller's dialect, from apiTitleText (apiEvents.ts, HI-2465)
   return { title: tr(CLOSED), body: tr(CLOSED_BODY, { n: stopped }), apiTitle: englishText(CLOSED), apiTitleText: CLOSED }
@@ -24,7 +24,7 @@ const ENDED = msg({ id: 'main.notify.sessionEnded', defaultMessage: 'Its session
 export function startNoticeResolver(): () => void {
   const asking = new Set<string>()
   const key = (projectPath: string, agentId: string): string => `${projectPath.toLowerCase()}#${agentId}`
-  return onHiveEvent((e) => {
+  return onCombworkEvent((e) => {
     if (e.type === 'session-status') {
       const k = key(e.state.projectPath, e.state.agentId)
       if (asksYou(e.state)) asking.add(k)

@@ -13,7 +13,7 @@ const M = {
   week: msg({ id: 'project.period.week', defaultMessage: '{days, plural, one {# day} other {# days}}', description: 'A period of the usage figures: the last seven days ({days} is 7), today included.' }),
   month: msg({ id: 'project.period.month', defaultMessage: '{days, plural, one {# day} other {# days}}', description: 'A period of the usage figures: the last thirty days ({days} is 30), today included.' }),
   all: msg({ id: 'project.period.all', defaultMessage: 'All time', description: 'A period of the usage figures: everything recorded.' }),
-  unknown: msg({ id: 'project.cost.unknown', defaultMessage: 'Unknown', description: 'A cost Hive cannot work out: no price is known for the model.' }),
+  unknown: msg({ id: 'project.cost.unknown', defaultMessage: 'Unknown', description: 'A cost Combwork cannot work out: no price is known for the model.' }),
   belowCent: msg({ id: 'project.cost.belowCent', defaultMessage: '< {cent}', description: 'A cost under one cent. {cent} is one cent in dollars, such as "$0.01".' }),
   other: msg({ id: 'project.chart.other', defaultMessage: 'Other ({count})', description: 'In the usage chart by project: the projects not shown on their own. {count} is how many.' }),
   withFree: msg({ id: 'project.cost.withFree', defaultMessage: '{cost} + free (local)', description: 'A total cost ("$1.20") that also covers sessions run only on a model server on this PC (Ollama, for example), which cost nothing (HI-1772).' })
@@ -54,7 +54,7 @@ export interface Totals {
   cacheWrite: number
   output: number
   cost: number
-  /** Some of the cost is Hive's estimate. */
+  /** Some of the cost is Combwork's estimate. */
   estimated: boolean
   /** Sessions with a cost (reported or estimated). */
   priced: number
@@ -66,7 +66,7 @@ export interface Totals {
 
 /**
  * A total cost as the window shows it: "≈ $1.20" when every session in it has a cost, "≈ $1.20 + ?" when some have none (a known
- * subtotal, incomplete), "Unknown" when none has: sessions Hive couldn't price never count as $0.
+ * subtotal, incomplete), "Unknown" when none has: sessions Combwork couldn't price never count as $0.
  */
 export function costText(t: { cost: number; estimated: boolean; priced: number; unpriced: number; free?: number }, label: (n: number) => string = moneyLabel): string {
   // Only free sessions (HI-1772): free (local); free ones beside others: said after the others' cost.

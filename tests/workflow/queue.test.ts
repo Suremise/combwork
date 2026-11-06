@@ -19,7 +19,7 @@ afterEach(() => {
 })
 
 const team = (over: Partial<ReturnType<typeof preset>> = {}, extra: Parameters<typeof setup>[1] = {}) =>
-  (env = setup({ ...preset('git', 'team', { quick: ['quick'], tests: [] }), preChecks: [], okBefore: { mode: 'never', labels: [] }, commands: { quick: 'npm run quick' }, commitMessage: 'hive', ...over }, extra))
+  (env = setup({ ...preset('git', 'team', { quick: ['quick'], tests: [] }), preChecks: [], okBefore: { mode: 'never', labels: [] }, commands: { quick: 'npm run quick' }, commitMessage: 'combwork', ...over }, extra))
 
 /** A card approved and queued: started by B1, committed, submitted, passed by R1. */
 async function queued(e: Env, title = 'Change', files: Record<string, string> = { 'src/c.txt': 'c\n' }, labels: string[] = []) {
@@ -39,7 +39,7 @@ async function queued(e: Env, title = 'Change', files: Record<string, string> = 
 const mainHead = (e: Env) => sh(e.project, 'rev-parse', 'main')
 
 describe('the merge queue', () => {
-  it('merges an approved card with Hive\'s trailers, and the lane ends verified with the result revision', async () => {
+  it('merges an approved card with Combwork\'s trailers, and the lane ends verified with the result revision', async () => {
     const e = team()
     const { card } = await queued(e)
     e.wf.startLane('L1', [card.id], 'R1')
@@ -48,13 +48,13 @@ describe('the merge queue', () => {
     expect(o).toMatchObject({ outcome: 'integrated' })
     const s = e.wf.state(card)
     expect(s.stage).toBe('done')
-    expect(s.integrated).toMatchObject({ by: 'hive', method: 'merge', result: mainHead(e) })
+    expect(s.integrated).toMatchObject({ by: 'combwork', method: 'merge', result: mainHead(e) })
     const msg = sh(e.project, 'log', '-1', '--format=%B', 'main')
-    expect(msg).toContain(`Hive-Card: ${card.key}`)
-    expect(msg).toContain(`Hive-Revision: ${s.latest!.revision}`)
-    expect(msg).toContain('Hive-Reviewed-By: R1')
+    expect(msg).toContain(`Combwork-Card: ${card.key}`)
+    expect(msg).toContain(`Combwork-Revision: ${s.latest!.revision}`)
+    expect(msg).toContain('Combwork-Reviewed-By: R1')
     // The submitted revision is pinned.
-    expect(sh(e.project, 'rev-parse', `refs/hive/cards/${card.key.toLowerCase()}/1`)).toBe(s.latest!.revision)
+    expect(sh(e.project, 'rev-parse', `refs/cw/cards/${card.key.toLowerCase()}/1`)).toBe(s.latest!.revision)
   })
 
   it("HI-1181: a conflict in the test merge records its hunks, the target's side first, and the builder's wake says where", async () => {
@@ -66,7 +66,7 @@ describe('the merge queue', () => {
     const f = e.wf.state(card).entries.at(-1)?.failure
     expect(f?.conflicts).toEqual({ oursIs: 'target', files: [{ file: 'src/x.txt', hunks: [{ line: 1, before: [], ours: ['target'], theirs: ['card'], after: [] }] }] })
     expect(e.wakes.some((w) => w.agent === 'B1' && w.why.includes('src/x.txt (1 conflict, line 1)'))).toBe(true)
-    // HI-2087: and a comment of Hive's on the card, its English what the wake says, its message the window's.
+    // HI-2087: and a comment of Combwork's on the card, its English what the wake says, its message the window's.
     const comments = e.store.deliveries().filter((d) => d.kind === 'comment')
     expect(comments).toHaveLength(1)
     expect(String(comments[0].payload.text)).toMatch(new RegExp(`^${card.key} came back from the merge queue: a conflict with main in src/x.txt \\(1 conflict, line 1\\)\\..* Merge main into your worktree`))
@@ -101,6 +101,17 @@ describe('the merge queue', () => {
     expect(s.stage).toBe('active')
     expect(s.entries.at(-1)?.failure).toMatchObject({ reason: 'checks', log: '3 failing tests' })
     expect(e.wakes.some((w) => w.agent === 'B1' && w.why.includes('merge queue'))).toBe(true)
+  })
+
+  it("HI-2617: each merge check is given the target's head as CW_CHECK_BASE, so it can look at what the card adds", async () => {
+    const e = team()
+    await queued(e)
+    const before = mainHead(e)
+    const seen: (Record<string, string> | undefined)[] = []
+    const [o] = await e.queue({ runCheck: async (_n, _c, _f, ctx) => (seen.push(ctx.env), { ok: true, output: '' }) }).drain('main')
+    expect(o).toMatchObject({ outcome: 'integrated' })
+    expect(seen.length).toBeGreaterThan(0)
+    for (const given of seen) expect(given).toEqual({ CW_CHECK_BASE: before })
   })
 
   it('S7: a hand merge of an approved card is observed → Done (outside); the queue drops the entry; the lane counts it', async () => {
@@ -199,7 +210,7 @@ describe('the merge queue', () => {
 
   // GIT_HEAVY_MS: a card tested MAX_RETESTS + 1 times as the target moves after each test, 108 git processes; past 20 s in
   // HI-2025's run beside three other full runs.
-  it('S52: the target moves during every test → after MAX_RETESTS retests the entry pauses (targetMovesFast), nothing advanced by Hive', { timeout: GIT_HEAVY_MS }, async () => {
+  it('S52: the target moves during every test → after MAX_RETESTS retests the entry pauses (targetMovesFast), nothing advanced by Combwork', { timeout: GIT_HEAVY_MS }, async () => {
     const e = team()
     sh(e.project, 'checkout', '-q', '--detach')
     const { card } = await queued(e)
@@ -210,13 +221,13 @@ describe('the merge queue', () => {
     expect(o).toMatchObject({ outcome: 'paused', reason: 'targetMovesFast' })
     expect(n).toBe(MAX_RETESTS + 1)
     expect(e.store.queuePause('main')).toMatchObject({ reason: 'targetMovesFast', card: card.key })
-    // main is where the last push left it: no merge of Hive's on it.
+    // main is where the last push left it: no merge of Combwork's on it.
     expect(sh(e.project, 'log', '-1', '--format=%s', 'main')).toBe(`race ${n}`)
     expect(e.kinds(card.id)).not.toContain('Integrated')
     expect(e.wf.state(card).stage).toBe('merging')
   })
 
-  it('S52: a hand merge of the change during its test → observed (Integrated outside), no empty merge commit of Hive\'s', async () => {
+  it('S52: a hand merge of the change during its test → observed (Integrated outside), no empty merge commit of Combwork\'s', async () => {
     const e = team()
     sh(e.project, 'checkout', '-q', '--detach')
     const { card } = await queued(e)
@@ -410,7 +421,7 @@ describe('the merge queue', () => {
     const s = e.wf.state(card)
     expect(s.stage).toBe('done')
     expect(s.integrated).toMatchObject({ method: 'squash', by: 'outside' })
-    expect(sh(e.project, 'rev-parse', `refs/hive/cards/${card.key.toLowerCase()}/1`)).toBe(rev)
+    expect(sh(e.project, 'rev-parse', `refs/cw/cards/${card.key.toLowerCase()}/1`)).toBe(rev)
     const n = e.store.facts(card.id).length
     await reconcile(e.wf, card)
     expect(e.store.facts(card.id).length).toBe(n)

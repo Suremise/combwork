@@ -6,7 +6,7 @@ import { readdir } from 'original-fs/promises'
 import { join } from 'path'
 import { msg } from '../shared/i18n'
 import { withValues } from '../shared/advanced'
-import { HiveError } from './hiveError'
+import { CombworkError } from './combworkError'
 import { createLogger, userText } from './logger'
 import { timedStep } from './stallWork'
 import { placeKey, realPath, relativeInside } from './places'
@@ -18,7 +18,7 @@ import { agentMsg, inDefaultDialect, say, type AgentMsg, type AgentValues } from
  * records are said when read).
  */
 const A = {
-  fileWent: agentMsg({ id: 'skillCopy.source.fileWent', text: 'a file in it went while it was being copied', note: "A skill delivery's problem: a file of the skill's folder in the workspace went while Hive copied it." }),
+  fileWent: agentMsg({ id: 'skillCopy.source.fileWent', text: 'a file in it went while it was being copied', note: "A skill delivery's problem: a file of the skill's folder in the workspace went while Combwork copied it." }),
   folderGone: agentMsg({ id: 'skillCopy.source.folderGone', text: 'its folder in the workspace is gone', note: "A skill delivery's problem: the skill's folder in the workspace is gone." }),
   denied: agentMsg({ id: 'skillCopy.source.denied', text: 'its folder in the workspace could not be read (access denied)', note: "A skill delivery's problem: Windows refused to read the skill's folder in the workspace." }),
   notCopied: agentMsg({
@@ -26,19 +26,19 @@ const A = {
     text: 'it could not be copied{hasCode, select, yes { ({code})} other {}}',
     note: "A skill delivery's problem: making its copy failed (a disk full, a write that failed). hasCode: yes with the error's code (code: ENOSPC…)."
   }),
-  changedBeforeReplaced: agentMsg({ id: 'skillCopy.swap.changedBeforeReplaced', text: '{name} changed before it could be replaced', note: "Why a swap was abandoned (a skill's or mode's copy; name: its folder or file name): it was edited before Hive replaced it. Nothing was replaced." }),
-  changedWhileReplaced: agentMsg({ id: 'skillCopy.swap.changedWhileReplaced', text: '{name} changed while it was being replaced', note: 'Why a swap was abandoned: it was edited while Hive replaced it, and was put back as it was.' }),
-  putBackWhileReplaced: agentMsg({ id: 'skillCopy.swap.putBackWhileReplaced', text: '{name} was put back while it was being replaced', note: 'Why a swap was abandoned: something new took its place while Hive replaced it.' }),
+  changedBeforeReplaced: agentMsg({ id: 'skillCopy.swap.changedBeforeReplaced', text: '{name} changed before it could be replaced', note: "Why a swap was abandoned (a skill's or mode's copy; name: its folder or file name): it was edited before Combwork replaced it. Nothing was replaced." }),
+  changedWhileReplaced: agentMsg({ id: 'skillCopy.swap.changedWhileReplaced', text: '{name} changed while it was being replaced', note: 'Why a swap was abandoned: it was edited while Combwork replaced it, and was put back as it was.' }),
+  putBackWhileReplaced: agentMsg({ id: 'skillCopy.swap.putBackWhileReplaced', text: '{name} was put back while it was being replaced', note: 'Why a swap was abandoned: something new took its place while Combwork replaced it.' }),
   changedKeptBeside: agentMsg({
     id: 'skillCopy.swap.changedKeptBeside',
     text: '{name} changed while it was being replaced; the edited copy is kept beside it',
-    note: 'Why a swap was abandoned: it was edited while Hive replaced it; the edited copy is kept beside it as a -conflict- copy.'
+    note: 'Why a swap was abandoned: it was edited while Combwork replaced it; the edited copy is kept beside it as a -conflict- copy.'
   }),
-  changedBeforeRemoved: agentMsg({ id: 'skillCopy.swap.changedBeforeRemoved', text: '{name} changed before it could be removed', note: 'Why a removal was abandoned: it was edited before Hive removed it. Nothing was removed.' }),
-  changedWhileRemoved: agentMsg({ id: 'skillCopy.swap.changedWhileRemoved', text: '{name} changed while it was being removed', note: 'Why a removal was abandoned: it was edited while Hive removed it, and was put back (or kept as a -conflict- copy).' }),
-  overBytes: agentMsg({ id: 'skillCopy.tooBig.bytes', text: 'it is over {mb} MB', note: "Why a skill or mode is too big for Hive to check (HASH_LIMITS): mb is the limit in MB, a whole number. A delivery's problem and a kept revision's reason." }),
-  tooDeep: agentMsg({ id: 'skillCopy.tooBig.depth', text: 'it has folders more than {depth} deep', note: 'Why a skill or mode is too big for Hive to check (HASH_LIMITS): depth is the most folder levels.' }),
-  tooMany: agentMsg({ id: 'skillCopy.tooBig.entries', text: 'it has more than {entries} files and folders', note: 'Why a skill or mode is too big for Hive to check (HASH_LIMITS): entries is the most files and folders.' }),
+  changedBeforeRemoved: agentMsg({ id: 'skillCopy.swap.changedBeforeRemoved', text: '{name} changed before it could be removed', note: 'Why a removal was abandoned: it was edited before Combwork removed it. Nothing was removed.' }),
+  changedWhileRemoved: agentMsg({ id: 'skillCopy.swap.changedWhileRemoved', text: '{name} changed while it was being removed', note: 'Why a removal was abandoned: it was edited while Combwork removed it, and was put back (or kept as a -conflict- copy).' }),
+  overBytes: agentMsg({ id: 'skillCopy.tooBig.bytes', text: 'it is over {mb} MB', note: "Why a skill or mode is too big for Combwork to check (HASH_LIMITS): mb is the limit in MB, a whole number. A delivery's problem and a kept revision's reason." }),
+  tooDeep: agentMsg({ id: 'skillCopy.tooBig.depth', text: 'it has folders more than {depth} deep', note: 'Why a skill or mode is too big for Combwork to check (HASH_LIMITS): depth is the most folder levels.' }),
+  tooMany: agentMsg({ id: 'skillCopy.tooBig.entries', text: 'it has more than {entries} files and folders', note: 'Why a skill or mode is too big for Combwork to check (HASH_LIMITS): entries is the most files and folders.' }),
   tooBigToDeliver: agentMsg({ id: 'skillCopy.tooBig.deliver', text: 'it is too big for Combwork to check ({why})', note: "A launch's problem for a skill over HASH_LIMITS: why is one of skillCopy.tooBig.*." }),
   linksNotCopied: agentMsg({
     id: 'skillCopy.links.notCopied',
@@ -66,7 +66,7 @@ export async function readJson<T>(path: string, fallback: T): Promise<T> {
 }
 
 // ---------------------------------------------------------------------------
-// Kept files: Hive's own settings and records (config.json, workspace.json, project.json, sessions.json).
+// Kept files: Combwork's own settings and records (config.json, workspace.json, project.json, sessions.json).
 // Each save also writes <file>.bak, the last good version. A file that can't be read as JSON (once it has stopped
 // changing: below) is set aside as <file>.corrupt-<time> and the .bak restored, so one bad file never turns into
 // lost settings or records.
@@ -101,7 +101,7 @@ function recoverText(path: string, bak: string | null): { value: unknown; restor
   return { value: null, restored: false, aside }
 }
 
-// A file that doesn't parse may be mid-save by something outside Hive: an editor or `fs.writeFileSync` saving in
+// A file that doesn't parse may be mid-save by something outside Combwork: an editor or `fs.writeFileSync` saving in
 // place truncates it, then writes (#1598). Before calling it damaged, it is read again after short pauses (about
 // 1 s in all, only when it doesn't parse) until it parses, or two reads in a row see the same text, size and mtime
 // and that mtime is at least DAMAGED_AGE_MS old. A writer stalled mid-save on a busy machine leaves a half-written
@@ -201,9 +201,9 @@ function unsettled<T>(path: string, bak: string | null, fallback: T): T {
  * A kept file still being saved by something else, read for a change (#1600): its value can't be known yet, so the change
  * isn't made. `retryWhileSaving` runs the change again a few times first.
  */
-export class KeptFileBusy extends HiveError {
+export class KeptFileBusy extends CombworkError {
   constructor(path: string) {
-    super(withValues(msg({ id: 'service.fsutil.keptBusy', defaultMessage: '{file} is being saved by something else: nothing was changed. Try again in a moment.', description: "An error: one of Hive's settings or records files ({file}: its path) was still being written by another program (an editor, a script), so Hive's change to it wasn't made." }), { file: path }), { kind: 'conflict' })
+    super(withValues(msg({ id: 'service.fsutil.keptBusy', defaultMessage: '{file} is being saved by something else: nothing was changed. Try again in a moment.', description: "An error: one of Combwork's settings or records files ({file}: its path) was still being written by another program (an editor, a script), so Combwork's change to it wasn't made." }), { file: path }), { kind: 'conflict' })
   }
 }
 
@@ -211,9 +211,9 @@ export class KeptFileBusy extends HiveError {
  * A kept file that is there but can't be read (HI-2414: locked by another program, access refused, a disk error), even
  * after the pauses: its value isn't known, so a change to it isn't made, and nothing is written over it or its .bak.
  */
-export class KeptFileUnreadable extends HiveError {
+export class KeptFileUnreadable extends CombworkError {
   constructor(path: string) {
-    super(withValues(msg({ id: 'service.fsutil.keptUnreadable', defaultMessage: "{file} couldn't be read: nothing was changed. Try again in a moment.", description: "An error: one of Hive's settings or records files ({file}: its path) is there but couldn't be read (another program had it locked, or a disk error), so Hive's change to it wasn't made and the file was left as it is." }), { file: path }), { kind: 'conflict' })
+    super(withValues(msg({ id: 'service.fsutil.keptUnreadable', defaultMessage: "{file} couldn't be read: nothing was changed. Try again in a moment.", description: "An error: one of Combwork's settings or records files ({file}: its path) is there but couldn't be read (another program had it locked, or a disk error), so Combwork's change to it wasn't made and the file was left as it is." }), { file: path }), { kind: 'conflict' })
   }
 }
 
@@ -379,7 +379,7 @@ const keptByStat = new Map<string, { mtimeMs: number; size: number; ino: number;
 /** The most files kept by their stat (HR1's round 1): one more lets go of the least recently read. */
 export const KEPT_BY_STAT_MAX = 64
 
-/** Forgets what readKeptJsonByStat kept of a file: Hive is writing it. */
+/** Forgets what readKeptJsonByStat kept of a file: Combwork is writing it. */
 const forgetKeptStat = (path: string): boolean => keptByStat.delete(path.toLowerCase())
 
 /**
@@ -497,8 +497,8 @@ export function placeRelative(from: string, to: string): string {
 
 /**
  * Whether a path is inside an .asar archive (`…\app.asar\icon.png`). Such a path isn't a file on disk, and Electron's
- * readers that take a path (nativeImage, its file: loader) open the archive for it and keep it open until Hive quits,
- * so a build can't replace it (#246). Hive's file routes refuse them; the .asar itself is fine. Only an archive counts:
+ * readers that take a path (nativeImage, its file: loader) open the archive for it and keep it open until Combwork quits,
+ * so a build can't replace it (#246). Combwork's file routes refuse them; the .asar itself is fine. Only an archive counts:
  * a folder of the path named *.asar is one when it is a file on disk (asked of original-fs, which never opens one as
  * an archive); a real folder of that name (`art.asar\icon.png`) is just a folder (#261).
  */
@@ -573,7 +573,7 @@ async function saveKept(path: string, data: unknown, opts: { compact?: boolean; 
   const k = path.toLowerCase()
   if (opts.holder && staleHolders.get(k)?.has(opts.holder)) {
     if (!(await keptGone(path))) {
-      log.warn(`${userText(path)} wasn't saved: what this save holds came from its last good copy or a default, not the file, so it could replace settings Hive never saw`)
+      log.warn(`${userText(path)} wasn't saved: what this save holds came from its last good copy or a default, not the file, so it could replace settings Combwork never saw`)
       throw new KeptFileUnreadable(path)
     }
     staleHolders.delete(k)
@@ -689,9 +689,9 @@ export const holderLookupsRunning = (): number => lookingUp.size
 
 /**
  * A replace that kept failing because the file was held (HI-1749: a view switch's "EPERM … rename" reached the window and
- * nothing of it hive.log): said with the file, the code and how long it was tried, then which processes have it open, as
+ * nothing of it combwork.log): said with the file, the code and how long it was tried, then which processes have it open, as
  * far as Windows can say (it may have let go by then). A lookup already under way for the file says it for this one too;
- * with `max` under way, none is started (never queued: failures while Hive's I/O struggles mustn't pile up processes).
+ * with `max` under way, none is started (never queued: failures while Combwork's I/O struggles mustn't pile up processes).
  */
 function renameGaveUp(to: string, code: string, tries: number, ms: number): void {
   log.warn(`replacing ${userText(to)} failed with ${code} after ${tries} tries over ${ms} ms: another process had it open`)
@@ -1044,8 +1044,15 @@ let swapCounter = 0
 /** A swap that found its destination no longer as expected: nothing was replaced, and the destination is as it was. */
 export class SwapAbandoned extends Error {}
 
+/**
+ * A swapIn or swapOut abandoned because what it checks couldn't be read (access denied, held, a failed read: `cause`), not because
+ * it differs (HI-2612): put back as any abandoned swap is, but a step that must not pass on an I/O failure (the names
+ * upgrade's retirement of old copies) fails on it rather than take it for the user's change.
+ */
+export class SwapUnreadable extends SwapAbandoned {}
+
 /** A swap whose copy couldn't be made (its source gone, unreadable or changing): nothing was replaced. `cause` is why. Restore (Skills, modes) shows it in the window's language (#850). */
-export class CopyFailed extends HiveError {}
+export class CopyFailed extends CombworkError {}
 
 /**
  * Why a skill's source couldn't be copied, without its path (the user's): gone, a file in it gone, not allowed, or
@@ -1059,18 +1066,38 @@ export function sourceProblem(e: unknown, source: string): string {
   return stored(A.notCopied, { hasCode: code ? 'yes' : 'no', code: code ?? '' })
 }
 
-/** What a path holds, to compare with what a swap expects: its contentHash, null if nothing is there. */
-async function hashOrNone(path: string): Promise<string | null> {
-  const there = await lstat(path).then(
-    () => true,
-    (e: NodeJS.ErrnoException) => (e.code === 'ENOENT' ? false : Promise.reject(e))
-  )
-  return there ? contentHash(path).catch(() => '\0unreadable') : null
+/** A hash that couldn't be read, with what it failed with (hashChecked). */
+class Unreadable {
+  constructor(readonly error: unknown) {}
+}
+
+/**
+ * What a path holds: its contentHash, null if nothing is there, or Unreadable when a look at it failed, its own entry's
+ * included (HR2's round 2 on HI-2612: so a check after a rename puts the item back, never throws past it). Too large, or
+ * a file of it gone as it was read, is a difference (a hash no expected one matches), not a failure.
+ */
+async function hashChecked(path: string): Promise<string | null | Unreadable> {
+  try {
+    await lstat(path)
+  } catch (e) {
+    return (e as NodeJS.ErrnoException | null)?.code === 'ENOENT' ? null : new Unreadable(e)
+  }
+  return contentHash(path).catch((e: unknown) => (e instanceof ContentTooLarge || (e as NodeJS.ErrnoException | null)?.code === 'ENOENT' ? '\0changed' : new Unreadable(e)))
+}
+
+/**
+ * Null while `p` is still exactly `expected` (a contentHash, or null for nothing there); else the abandonment a swap
+ * throws: SwapUnreadable when it couldn't be read (HI-2620), SwapAbandoned (`why`) when it differs.
+ */
+async function unlikeHash(p: string, expected: string | null, why: string): Promise<SwapAbandoned | null> {
+  const h = await hashChecked(p)
+  if (h instanceof Unreadable) return new SwapUnreadable(why, { cause: h.error })
+  return h === expected ? null : new SwapAbandoned(why)
 }
 
 const exists = (path: string): Promise<boolean> => lstat(path).then(() => true, () => false)
 
-/** Runs fn holding Hive's own write lock (withFileLock, as its editors use) on each of `paths`, taken in order. */
+/** Runs fn holding Combwork's own write lock (withFileLock, as its editors use) on each of `paths`, taken in order. */
 function withFileLocks<T>(paths: string[], fn: () => Promise<T>): Promise<T> {
   const [first, ...rest] = [...new Set(paths)].sort()
   return first === undefined ? fn() : withFileLock(first, () => withFileLocks(rest, fn))
@@ -1093,19 +1120,20 @@ async function filesIn(path: string): Promise<string[]> {
  * is open), the old one stays as it was and this throws. `cleanSwaps` tidies what a crash between the steps leaves.
  *
  * With `expected` (a contentHash, or null for nothing there), the swap is only for that destination: an automatic
- * update, never a user's newer version. It is checked after the copy is made (under Hive's own editors' file locks), on
+ * update, never a user's newer version. It is checked after the copy is made (under Combwork's own editors' file locks), on
  * the old one once it has been moved aside, and again before the old one is removed (a write through a file already
  * open); any difference puts the user's version back and throws SwapAbandoned, leaving the destination as the user has
- * it. What a rollback moves aside is removed only if it is still exactly what was staged, and anything a refused
+ * it. A check that can't read it does the same but throws SwapUnreadable (HI-2620): a failure to retry, not the user's
+ * change. What a rollback moves aside is removed only if it is still exactly what was staged, and anything a refused
  * rename leaves out of place is kept as a `-conflict-` copy: nothing that may hold the user's work is removed unchecked.
- * Without `expected` (Restore, Revert, Hive's own copies) it replaces whatever is there.
+ * Without `expected` (Restore, Revert, Combwork's own copies) it replaces whatever is there.
  */
 export async function swapIn(src: string, dest: string, o: { prepare?: (copy: string, revision: string) => Promise<void>; expected?: string | null } = {}): Promise<string> {
   const tag = `${process.pid}-${++swapCounter}`
   const parent = dirname(dest)
   const name = dest.slice(parent.length + 1)
-  const fresh = join(parent, `.${name}.hive-new-${tag}`)
-  const old = join(parent, `.${name}.hive-old-${tag}`)
+  const fresh = join(parent, `.${name}.cw-new-${tag}`)
+  const old = join(parent, `.${name}.cw-old-${tag}`)
   const check = o.expected !== undefined
   await mkdir(parent, { recursive: true })
   // The copy, made within the limits as the source is read (it may change meanwhile), and checked before anything is
@@ -1122,29 +1150,43 @@ export async function swapIn(src: string, dest: string, o: { prepare?: (copy: st
       revision = await contentHash(fresh)
     } catch (e) {
       if (e instanceof ContentTooLarge || e instanceof LinkNotCopied) throw e
-      throw new CopyFailed(withValues(msg({ id: 'service.fsutil.notCopied', defaultMessage: '{name} could not be copied', description: "An error putting back one of Hive's skills or modes: its copy couldn't be made ({name}: its folder or file name); nothing was replaced." }), { name }), { cause: e })
+      throw new CopyFailed(withValues(msg({ id: 'service.fsutil.notCopied', defaultMessage: '{name} could not be copied', description: "An error putting back one of Combwork's skills or modes: its copy couldn't be made ({name}: its folder or file name); nothing was replaced." }), { name }), { cause: e })
     }
     await o.prepare?.(fresh, revision)
   } catch (e) {
     await rm(fresh, { recursive: true, force: true }).catch(() => undefined)
     throw e
   }
-  // What was staged: a rollback's backup of the destination is Hive's only while it is this (prepare adds only files
+  // What was staged: a rollback's backup of the destination is Combwork's only while it is this (prepare adds only files
   // contentHash leaves out, such as a copy's marker).
   const staged = check ? revision : null
-  /** Removes `p` if it is still `ok` (Hive's: nothing of the user's in it), else keeps it as a visible conflict copy. */
+  const expected = o.expected ?? null
+  /**
+   * Removes `p` if it is still `ok` (Combwork's: nothing of the user's in it), else keeps it as a visible conflict copy.
+   * One that can't be read stays where it is (HI-2620), a name cleanSwaps looks at again: never a conflict copy on a guess.
+   */
   const dispose = async (p: string, ok: string | null): Promise<void> => {
-    if (ok !== null && (await hashOrNone(p)) === ok) await rm(p, { recursive: true, force: true }).catch(() => undefined)
+    const h = await hashChecked(p)
+    if (h instanceof Unreadable) return
+    if (ok !== null && h === ok) await rm(p, { recursive: true, force: true }).catch(() => undefined)
     else await keepAsConflict(p, parent, name)
   }
+  /**
+   * Keeps the old one where it can't be put back: as a conflict copy when it differs; when it couldn't be read, where it
+   * is, for cleanSwaps to settle once it can (HI-2620).
+   */
+  const keepOld = (why: SwapAbandoned): Promise<void> => (why instanceof SwapUnreadable ? Promise.resolve() : keepAsConflict(old, parent, name))
   const publish = async (): Promise<void> => {
-    if (check && (await hashOrNone(dest)) !== o.expected) throw new SwapAbandoned(stored(A.changedBeforeReplaced, { name }))
+    const before = check ? await unlikeHash(dest, expected, stored(A.changedBeforeReplaced, { name })) : null
+    if (before) throw before
     const had = await exists(dest)
     // A file in the old one held open by a running session keeps it from moving: a few tries, then it stays.
     if (had) await renameRetrying(dest, old, 5)
-    if (had && check && (await hashOrNone(old)) !== o.expected) {
-      await renameRetrying(old, dest).catch(() => keepAsConflict(old, parent, name))
-      throw new SwapAbandoned(stored(A.changedWhileReplaced, { name }))
+    // Checked again once moved aside: a difference, or a look that fails (HI-2620: never thrown past this), puts it back.
+    const moved = had && check ? await unlikeHash(old, expected, stored(A.changedWhileReplaced, { name })) : null
+    if (moved) {
+      await renameRetrying(old, dest).catch(() => keepOld(moved))
+      throw moved
     }
     try {
       // Something new in its place meanwhile (the user's): it stays. On Windows the rename would fail anyway.
@@ -1155,31 +1197,35 @@ export async function swapIn(src: string, dest: string, o: { prepare?: (copy: st
       // The old one back in its place if that is empty. If the user made a new one, theirs stays, and the old one goes
       // only if it is still the version this swap expected (else it is kept as a conflict copy).
       if (had && !(await exists(dest))) await renameRetrying(old, dest).catch(() => (check ? keepAsConflict(old, parent, name) : undefined))
-      else if (had && check) await dispose(old, o.expected ?? null)
+      else if (had && check) await dispose(old, expected)
       throw e
     }
     if (!had) return
     // Written to through a file left open before the move: the user's version goes back in its place. What is in the
     // place now is moved aside first, and removed only if it is still exactly what was staged; if it was edited too, it
-    // is kept as a conflict copy. Nothing that could hold the user's work is removed unchecked.
-    if (check && (await hashOrNone(old)) !== o.expected) {
-      const back = join(parent, `.${name}.hive-back-${tag}`)
+    // is kept as a conflict copy. Nothing that could hold the user's work is removed unchecked. One that can't be read
+    // now goes back the same way (HI-2620), and the swap fails as unreadable: tried again later, never taken as done.
+    const last = check ? await unlikeHash(old, expected, stored(A.changedWhileReplaced, { name })) : null
+    if (last) {
+      const back = join(parent, `.${name}.cw-back-${tag}`)
+      // Where the old one can't go back: kept beside the new version (as a conflict copy, or aside when unreadable).
+      const keptBeside = (): SwapAbandoned => (last instanceof SwapUnreadable ? last : new SwapAbandoned(stored(A.changedKeptBeside, { name })))
       try {
         await renameRetrying(dest, back)
       } catch {
         // The new version can't move: it stays, and the user's edited old one is kept beside it.
-        await keepAsConflict(old, parent, name)
-        throw new SwapAbandoned(stored(A.changedKeptBeside, { name }))
+        await keepOld(last)
+        throw keptBeside()
       }
       try {
         await renameRetrying(old, dest)
       } catch {
         await renameRetrying(back, dest).catch(() => keepAsConflict(back, parent, name))
-        await keepAsConflict(old, parent, name)
-        throw new SwapAbandoned(stored(A.changedKeptBeside, { name }))
+        await keepOld(last)
+        throw keptBeside()
       }
       await dispose(back, staged)
-      throw new SwapAbandoned(stored(A.changedWhileReplaced, { name }))
+      throw last
     }
     await rm(old, { recursive: true, force: true }).catch(() => undefined)
   }
@@ -1193,8 +1239,8 @@ export async function swapIn(src: string, dest: string, o: { prepare?: (copy: st
 }
 
 /**
- * Removes `dest` (a file or a folder) only while it is exactly `expected` (a contentHash): a retired item of Hive's that
- * the user never changed (#259). As swapIn guards a replacement: checked under Hive's own editors' file locks, again once
+ * Removes `dest` (a file or a folder) only while it is exactly `expected` (a contentHash): a retired item of Combwork's that
+ * the user never changed (#259). As swapIn guards a replacement: checked under Combwork's own editors' file locks, again once
  * it has been moved aside (a dot-name, which scans skip), and again just before it goes (a write through a file left
  * open). Any difference puts it back in its place, or keeps it beside it as a `-conflict-` copy when something new has
  * taken that place, and throws SwapAbandoned: nothing that may hold the user's work is removed. `cleanSwaps` tidies what
@@ -1204,19 +1250,30 @@ export async function swapOut(dest: string, expected: string): Promise<void> {
   const tag = `${process.pid}-${++swapCounter}`
   const parent = dirname(dest)
   const name = dest.slice(parent.length + 1)
-  const old = join(parent, `.${name}.hive-old-${tag}`)
+  const old = join(parent, `.${name}.cw-old-${tag}`)
+  const unlike = (p: string, why: string): Promise<SwapAbandoned | null> => unlikeHash(p, expected, why)
   const remove = async (): Promise<void> => {
-    if ((await hashOrNone(dest)) !== expected) throw new SwapAbandoned(stored(A.changedBeforeRemoved, { name }))
+    const before = await unlike(dest, stored(A.changedBeforeRemoved, { name }))
+    if (before) throw before
     await renameRetrying(dest, old, 5)
-    const putBack = async (why: string): Promise<never> => {
-      if (!(await exists(dest))) await renameRetrying(old, dest).catch(() => keepAsConflict(old, parent, name))
+    const putBack = async (why: SwapAbandoned): Promise<never> => {
+      // Whether its place is still empty: only an absence says so (HI-2611). A look that fails leaves it aside, where
+      // cleanSwaps finds it again, never made a conflict copy on a guess: an I/O failure, so SwapUnreadable.
+      const filled = await lstat(dest).then(
+        () => true,
+        (e: NodeJS.ErrnoException) => (e.code === 'ENOENT' || e.code === 'ENOTDIR' ? false : e)
+      )
+      if (filled instanceof Error) throw new SwapUnreadable(why.message, { cause: filled })
+      if (!filled) await renameRetrying(old, dest).catch(() => keepAsConflict(old, parent, name))
       else await keepAsConflict(old, parent, name)
-      throw new SwapAbandoned(why)
+      throw why
     }
-    if ((await hashOrNone(old)) !== expected) await putBack(stored(A.changedWhileRemoved, { name }))
+    const moved = await unlike(old, stored(A.changedWhileRemoved, { name }))
+    if (moved) await putBack(moved)
     // Something new in its place meanwhile is the user's: it stays, and so does what was moved aside (as a conflict copy
-    // if it was changed: it is removed only while it is still exactly Hive's).
-    if ((await hashOrNone(old)) !== expected) await putBack(stored(A.changedWhileRemoved, { name }))
+    // if it was changed: it is removed only while it is still exactly Combwork's).
+    const last = await unlike(old, stored(A.changedWhileRemoved, { name }))
+    if (last) await putBack(last)
     await rm(old, { recursive: true, force: true })
   }
   await withFileLocks(await filesIn(dest), remove)
@@ -1243,35 +1300,57 @@ async function keepAsConflict(p: string, parent: string, name: string): Promise<
  * After a crash during swapIn in `parent`: a staged copy never put in place goes; an old one (the destination moved
  * aside) whose place is empty comes back. An old one whose place has been filled, and a rollback's backup (what was in
  * the place when the user's version was being put back), are removed only if `disposable` says they hold nothing of the
- * user's (Hive's own copies; a version Hive shipped); otherwise they are kept beside it as `<name>-conflict-<time>`, so
+ * user's (Combwork's own copies; a version Combwork shipped); otherwise they are kept beside it as `<name>-conflict-<time>`, so
  * they can be found and recovered. Old ones are handled first, so the user's original takes its place before a backup.
+ *
+ * Only a confirmed answer moves anything (HI-2611, after HR2's round 4): `disposable` false is "not ours", but one that
+ * throws (access denied, a file held, a failed read), or a look at the place that fails other than by its absence, is
+ * unresolved, and the leftover stays where it is, as a name the next clean looks at again, never renamed into a conflict
+ * copy no retry would see. Says the leftovers still there, each by its name in `parent`: those unresolved, and those it
+ * couldn't move or remove now. A step that must not pass on an I/O failure (the names upgrade) fails on any.
  */
-export async function cleanSwaps(parent: string, disposable: (old: string, name: string) => Promise<boolean> = async () => true): Promise<void> {
+export async function cleanSwaps(parent: string, disposable: (old: string, name: string) => Promise<boolean> = async () => true): Promise<string[]> {
   let names: string[] = []
   try {
     names = await readdir(parent)
   } catch {
-    return
+    return []
   }
   const found = names.flatMap((n) => {
-    const m = /^\.(.+)\.hive-(new|old|back)-\d+-\d+$/.exec(n)
+    const m = /^\.(.+)\.cw-(new|old|back)-\d+-\d+$/.exec(n)
     return m ? [{ n, name: m[1], kind: m[2] }] : []
   })
+  const left: string[] = []
   const order = { old: 0, back: 1, new: 2 } as Record<string, number>
   for (const { n, name, kind } of found.sort((a, b) => order[a.kind] - order[b.kind])) {
     const p = join(parent, n)
-    if (kind === 'new') await rm(p, { recursive: true, force: true }).catch(() => undefined)
-    else if (!(await exists(join(parent, name)))) await renameRetrying(p, join(parent, name)).catch(() => undefined)
-    else if (await disposable(p, name).catch(() => false)) await rm(p, { recursive: true, force: true }).catch(() => undefined)
-    else await keepAsConflict(p, parent, name)
+    const stays = (): void => void left.push(n)
+    if (kind === 'new') {
+      await rm(p, { recursive: true, force: true }).catch(stays)
+      continue
+    }
+    // Whether its place is empty: only an absence says so.
+    const filled = await lstat(join(parent, name)).then(
+      () => true,
+      (e: NodeJS.ErrnoException) => (e.code === 'ENOENT' || e.code === 'ENOTDIR' ? false : null)
+    )
+    if (filled === null) stays()
+    else if (!filled) await renameRetrying(p, join(parent, name)).catch(stays)
+    else {
+      const ours = await disposable(p, name).catch(() => null)
+      if (ours === null) stays()
+      else if (ours) await rm(p, { recursive: true, force: true }).catch(stays)
+      else await keepAsConflict(p, parent, name)
+    }
   }
+  return left
 }
 
-/** The marker file in a copy Hive made of a skill (Codex's .agents/skills copies): not part of the skill's content. */
-export const COPY_MARKER = '.hive-copy'
+/** The marker file in a copy Combwork made of a skill (Codex's .agents/skills copies): not part of the skill's content. */
+export const COPY_MARKER = '.combwork-copy'
 
 /**
- * What Hive has read to know its skills, since it started (for measurements and tests): files and bytes hashed
+ * What Combwork has read to know its skills, since it started (for measurements and tests): files and bytes hashed
  * (contentHash), directory entries listed (readDirBounded), and bytes of skills' headers read (SKILL.md frontmatter).
  */
 export const readStats = { files: 0, bytes: 0, entries: 0, metaBytes: 0 }
@@ -1338,8 +1417,8 @@ async function treeEntries(path: string, o: HashOptions): Promise<TreeEntry[]> {
   const walk = async (rel: string, depth: number): Promise<void> => {
     o.signal?.throwIfAborted()
     if (depth > lim.depth) throw new ContentTooLarge(stored(A.tooDeep, { depth: String(lim.depth) }))
-    // The limit is on the skill's own entries: Hive's copy marker (one a folder at most) comes on top, so a skill at the
-    // limit is still within it once Hive has marked its copy. The listing stays bounded: at most one more than allowed.
+    // The limit is on the skill's own entries: Combwork's copy marker (one a folder at most) comes on top, so a skill at the
+    // limit is still within it once Combwork has marked its copy. The listing stays bounded: at most one more than allowed.
     const list = await readDirBounded(rel ? join(path, rel) : path, lim.entries - seen + 1, o.signal, o.count)
     const own = list.entries.length - (list.entries.some((e) => e.name === COPY_MARKER) ? 1 : 0)
     if (list.more || seen + own > lim.entries) throw new ContentTooLarge(stored(A.tooMany, { entries: String(lim.entries) }))
@@ -1359,9 +1438,9 @@ async function treeEntries(path: string, o: HashOptions): Promise<TreeEntry[]> {
 
 /**
  * A hash of a file's or folder's content that ignores line endings (a git checkout's CRLF is the same skill), for
- * telling Hive's shipped versions of a skill or mode apart. Paths are compared as written, in code-point order.
+ * telling Combwork's shipped versions of a skill or mode apart. Paths are compared as written, in code-point order.
  * A link (symlink or junction) is never followed: it counts by its name and where it points, so a copy with a link
- * the user added never hashes the same as a version Hive shipped (Hive ships none). Files are read in chunks, and
+ * the user added never hashes the same as a version Combwork shipped (Combwork ships none). Files are read in chunks, and
  * no more than HASH_LIMITS allow (ContentTooLarge): what it read, not what a stat said, counts.
  */
 export async function contentHash(path: string, o: HashOptions = {}): Promise<string> {
@@ -1449,7 +1528,7 @@ export async function readCapped(path: string, max: number): Promise<{ data: Buf
 
 /**
  * Where a link points, as one absolute path whatever form it was written in (relative, a junction's \\?\ prefix, a
- * trailing separator; case on Windows), so a link and Hive's copy of it (copySkillTree) are the same content.
+ * trailing separator; case on Windows), so a link and Combwork's copy of it (copySkillTree) are the same content.
  */
 export async function linkTarget(abs: string): Promise<string> {
   const raw = (await readlink(abs)).replace(/^\\\\\?\\/, '')
@@ -1529,7 +1608,7 @@ async function copyBounded(from: string, to: string, budget: { bytes: number }, 
 /** What a skill's links that couldn't be copied mean for the session that gets it. */
 export const linksNotCopied = (paths: string[]): string => stored(A.linksNotCopied, { n: paths.length, paths: paths.join(', ') })
 
-/** Files that aren't part of a skill's content: Hive's own copy marker and the operating systems' folder files. */
+/** Files that aren't part of a skill's content: Combwork's own copy marker and the operating systems' folder files. */
 const CONTENT_HASH_SKIP = new Set([COPY_MARKER, '.DS_Store', 'Thumbs.db', 'desktop.ini'])
 
 export async function removePath(path: string): Promise<void> {
@@ -1541,7 +1620,7 @@ export function hashText(text: string): string {
 }
 
 /**
- * In Claude Code's config folder, only what Hive shows: the user CLAUDE.md and auto memory (editable),
+ * In Claude Code's config folder, only what Combwork shows: the user CLAUDE.md and auto memory (editable),
  * and skills (read-only). Never credentials or settings.
  */
 export function claudeFileAllowed(path: string, write: boolean, home: string): boolean {
@@ -1568,7 +1647,7 @@ export function isInUse(e: unknown): boolean {
   return ['EBUSY', 'EPERM', 'EACCES'].includes((e as NodeJS.ErrnoException)?.code ?? '')
 }
 
-/** Checks one of Hive's files can be moved (renamed aside and back), before any of a set goes. Throws if it can't. */
+/** Checks one of Combwork's files can be moved (renamed aside and back), before any of a set goes. Throws if it can't. */
 export async function movable(file: string): Promise<void> {
   const aside = `${file}.moving`
   await rename(file, aside)
@@ -1593,7 +1672,7 @@ export async function heldOpen(file: string): Promise<boolean> {
 const SPARE = '.spare'
 
 /**
- * Sends Hive's own files to the Recycle Bin all or nothing: each is first checked movable and given a spare name (a
+ * Sends Combwork's own files to the Recycle Bin all or nothing: each is first checked movable and given a spare name (a
  * hard link, else a copy); then each goes (`trash`), then `then` runs (e.g. the record's change). If any of it
  * fails, the files already gone are put back from their spares (a copy of each stays in the Recycle Bin) and the error
  * is thrown (isInUse tells one another program caused). The spares go in the end.

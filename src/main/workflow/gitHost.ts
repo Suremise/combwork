@@ -45,7 +45,7 @@ export function frameOf(kind: string, id: number, payload: Buffer | string = '')
  * more: it exits once what runs has ended (before the gate: at once, having run nothing). Anything else ends it (65).
  */
 export const HOST = `
-// A process of its own, not Hive's: its exit isn't one of Hive's ways out (exitBy).
+// A process of its own, not Combwork's: its exit isn't one of Combwork's ways out (exitBy).
 const end = process.exit.bind(process)
 const cp = require('child_process')
 const QUIET = ${EXITED_QUIET_MS}, CHUNK = ${OUT_CHUNK}
@@ -251,8 +251,8 @@ export class FrameDecoder {
 }
 
 /**
- * Starts a host, waiting for its gate: detached (outside Hive's own job), hidden, as a launcher is (startLauncher), in
- * `base` (tests: their own) with Hive's executable run as Node. Its commands get each request's own environment.
+ * Starts a host, waiting for its gate: detached (outside Combwork's own job), hidden, as a launcher is (startLauncher), in
+ * `base` (tests: their own) with Combwork's executable run as Node. Its commands get each request's own environment.
  */
 export function startGitHost(base: NodeJS.ProcessEnv = process.env): { child: ChildProcess; after: number; before: number } {
   const env: NodeJS.ProcessEnv = { ...base, ELECTRON_RUN_AS_NODE: '1' }

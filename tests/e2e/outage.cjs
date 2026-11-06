@@ -51,14 +51,14 @@ function standIn() {
   const values = { 'cw.outage.resume': true, 'cw.outage.checkFirstSeconds': 1, 'cw.outage.checkMostSeconds': 2, 'cw.outage.checkUrl.claude-code': `http://127.0.0.1:${host.port}/` }
   fs.writeFileSync(path.join(userData, 'advanced.json'), JSON.stringify({ format: 1, values }, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47921), ...claude })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47921), ...claude })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1300, height: 800 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     const ada = await lib.addAgent(inv, alpha, { name: 'Ada' })
     const key = lib.ptyKey(alpha, ada.id)
@@ -74,7 +74,7 @@ function standIn() {
       await lib.sendPrompt(inv, key, `netdown ${n}`, { submitted: async () => !!(await live())?.failedTurn && (await live()).failedTurn.since !== before })
     }
 
-    // --- On: the turn ends on ECONNREFUSED, and Hive waits while the stand-in drops each check.
+    // --- On: the turn ends on ECONNREFUSED, and Combwork waits while the stand-in drops each check.
     await failTurn(1)
     const waiting = await lib.until(async () => ((await live())?.statusMessage === 'Waiting for the connection…' ? await live() : null), HUNG_MS)
     check('the agent shows "Waiting for the connection…"', !!waiting, JSON.stringify(await live()))

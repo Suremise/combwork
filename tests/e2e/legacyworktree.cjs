@@ -37,13 +37,13 @@ const legacyBytes = () => Object.fromEntries(stored().map((a) => [a.id, JSON.str
   for (const d of [userData, ws, `${ws}.worktrees`]) fs.rmSync(d, { recursive: true, force: true })
   lib.gitProject(alpha, { 'a.txt': 'a\n', '.gitignore': '.combwork/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
-  lib.git(alpha, ['worktree', 'add', '-q', '-b', 'hive/hb1', hb1, 'main'])
-  lib.git(alpha, ['worktree', 'add', '-q', '-b', 'hive/hb2', hb2, 'main'])
+  lib.git(alpha, ['worktree', 'add', '-q', '-b', 'cw/hb1', hb1, 'main'])
+  lib.git(alpha, ['worktree', 'add', '-q', '-b', 'cw/hb2', hb2, 'main'])
   fs.mkdirSync(path.join(alpha, '.combwork'), { recursive: true })
   // As 0.9.3 wrote it (its field order too).
   const agents = [
-    { id: 'b1', name: 'B1', provider: 'claude-code', worktree: { path: hb1, branch: 'hive/hb1', base: 'main' }, workflowRole: 'builder' },
-    { id: 'b2', name: 'B2', provider: 'claude-code', worktree: { path: hb2, branch: 'hive/hb2', base: 'main' }, needsSetup: true, workflowRole: 'builder' },
+    { id: 'b1', name: 'B1', provider: 'claude-code', worktree: { path: hb1, branch: 'cw/hb1', base: 'main' }, workflowRole: 'builder' },
+    { id: 'b2', name: 'B2', provider: 'claude-code', worktree: { path: hb2, branch: 'cw/hb2', base: 'main' }, needsSetup: true, workflowRole: 'builder' },
     { id: 'r1', name: 'R1', provider: 'claude-code', workflowRole: 'reviewer' }
   ]
   fs.writeFileSync(file, JSON.stringify({ version: 2, platform: 'git', agents }, null, 2))
@@ -58,7 +58,7 @@ const legacyBytes = () => Object.fromEntries(stored().map((a) => [a.id, JSON.str
 
   let h = null
   try {
-    h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off' }, viewport: { width: 1400, height: 850 } })
+    h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off' }, viewport: { width: 1400, height: 850 } })
     h.page.on('pageerror', (e) => check('no page errors', false, e.message))
     const { inv, page } = h
     const until = (fn, ms) => lib.until(fn, ms, 250)

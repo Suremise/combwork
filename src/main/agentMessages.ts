@@ -7,7 +7,7 @@ const T = {
   notRunning: agentMsg({ id: 'inbox.message.notRunning', text: '{agent} isn\'t running.', note: '#530: a message left for an agent (cw_message_agent) refused: the agent isn\'t running. agent: its name.' }),
   noText: agentMsg({ id: 'inbox.message.noText', text: 'text is required', note: 'A message left for an agent refused: its text (the tool\'s argument, text) is empty.' }),
   tooLong: agentMsg({ id: 'inbox.message.tooLong', text: 'A message is at most {max} characters (this one has {n}).', note: 'A message left for an agent refused: too long. max: the most; n: its length.' }),
-  tooMany: agentMsg({ id: 'inbox.message.tooMany', text: '{agent} already has {max} messages waiting, the most Combwork keeps for an agent: wait until they are delivered (cw_agent_activity), or cancel them.', note: 'A message left for an agent refused: as many as Hive keeps for it already wait. agent: its name; max: how many.' })
+  tooMany: agentMsg({ id: 'inbox.message.tooMany', text: '{agent} already has {max} messages waiting, the most Combwork keeps for an agent: wait until they are delivered (cw_agent_activity), or cancel them.', note: 'A message left for an agent refused: as many as Combwork keeps for it already wait. agent: its name; max: how many.' })
 }
 
 /**
@@ -20,7 +20,7 @@ const T = {
  * cw_prompt_agent refused every agent of a running card loop; a message goes in whatever the agent is doing.
  *
  * Its sender's permission is worked out again at every step, until the agent reads it: one no longer allowed is refused.
- * At most MAX_QUEUED waiting per agent, each at most MESSAGE_MAX_CHARS. They survive the agent's stops and Hive's
+ * At most MAX_QUEUED waiting per agent, each at most MESSAGE_MAX_CHARS. They survive the agent's stops and Combwork's
  * restarts; the Assistant's are refused once the launch that left them has ended (#645). One tied to a card's round
  * (`card`, #652) is stale, never given, once that card has moved on: passed, out of Doing and Review, or in a new round.
  */

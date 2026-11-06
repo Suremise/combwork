@@ -6,7 +6,7 @@ import type { ProviderId } from '../shared/types'
 import { createLogger, userText } from './logger'
 
 /**
- * The wait for a dropped connection (HI-1612), without Hive's services (outageResume.ts gives it them): which failed
+ * The wait for a dropped connection (HI-1612), without Combwork's services (outageResume.ts gives it them): which failed
  * turns it is for, the checks backing off, the resume, and when it gives up.
  */
 const log = createLogger('outage')
@@ -17,7 +17,7 @@ const T = {
 }
 
 /**
- * Whether a failed turn's words are a dropped connection of its CLI's: its CLI's pattern finds them, and Hive's for
+ * Whether a failed turn's words are a dropped connection of its CLI's: its CLI's pattern finds them, and Combwork's for
  * what is never one (a usage limit, a sign-in, "overloaded") doesn't. `pattern` gives an advanced pattern by its id.
  */
 export function connectionDropped(provider: ProviderId, words: string, pattern: (id: string) => RegExp): boolean {
@@ -43,7 +43,7 @@ export interface OutageAgent {
 /** How a wait ended. */
 export type OutageEnd = { kind: 'resumed'; droppedAt: number; backAt: number } | { kind: 'gaveUp'; resumes: number } | { kind: 'timedOut'; minutes: number } | { kind: 'cancelled' }
 
-/** What the wait needs of Hive: the settings, the network, the agent's status, its note and the notices. */
+/** What the wait needs of Combwork: the settings, the network, the agent's status, its note and the notices. */
 export interface OutageHost {
   on(): boolean
   /** Whether this failed turn's words are a connection error of its CLI's. */
@@ -109,7 +109,7 @@ export class OutageResume {
     this.resumes.set(a.key, recent)
     if (recent.length >= this.host.resumesPerHour()) {
       // The resumes are kept: until the hour since them has passed, another drop gives up again, never a fourth resume.
-      log.warn(`${userText(a.projectPath)} · ${a.agentId}: its connection dropped again after ${recent.length} resumes in an hour; Hive stops resuming it`)
+      log.warn(`${userText(a.projectPath)} · ${a.agentId}: its connection dropped again after ${recent.length} resumes in an hour; Combwork stops resuming it`)
       this.host.ended(a, { kind: 'gaveUp', resumes: recent.length })
       return
     }
@@ -158,7 +158,7 @@ export class OutageResume {
 
   private timedOut(w: Waiting): void {
     this.stop(w)
-    log.warn(`${userText(w.agent.projectPath)} · ${w.agent.agentId}: the connection didn't come back within the wait; Hive stops waiting`)
+    log.warn(`${userText(w.agent.projectPath)} · ${w.agent.agentId}: the connection didn't come back within the wait; Combwork stops waiting`)
     this.host.ended(w.agent, { kind: 'timedOut', minutes: Math.round(this.host.waitMs() / 60_000) })
   }
 

@@ -1,5 +1,5 @@
-// A CLI installed while Hive runs (#472): Hive adds the registry PATH's new folders to its own before it looks for the
-// CLIs, so the install is found without a restart. The registry is stubbed (HIVE_TEST_REGISTRY_PATH): this test
+// A CLI installed while Combwork runs (#472): Combwork adds the registry PATH's new folders to its own before it looks for the
+// CLIs, so the install is found without a restart. The registry is stubbed (CW_TEST_REGISTRY_PATH): this test
 // never reads the machine's.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { expandVars, noteCliFolder, withCliFolders, mergePath, parseRegQuery, pathFolders, refreshPath, refreshPathBeforeStart, testRegistryPath } from '../src/main/freshPath'
@@ -23,7 +23,7 @@ afterEach(() => {
 })
 
 describe('mergePath', () => {
-  it("adds only the folders Hive's PATH doesn't have, after its own, in order", () => {
+  it("adds only the folders Combwork's PATH doesn't have, after its own, in order", () => {
     const r = mergePath('C:\\Windows;C:\\Tools', ['C:\\Windows', 'C:\\Users\\u\\AppData\\Local\\Microsoft\\WinGet\\Links', 'C:\\New'], ';')
     expect(r.value).toBe('C:\\Windows;C:\\Tools;C:\\Users\\u\\AppData\\Local\\Microsoft\\WinGet\\Links;C:\\New')
     expect(r.added).toEqual(['C:\\Users\\u\\AppData\\Local\\Microsoft\\WinGet\\Links', 'C:\\New'])
@@ -65,19 +65,19 @@ describe('reading the registry', () => {
 
 describe('test copies', () => {
   it("never read the machine's registry: the suite's stand-in, else none with a test profile", () => {
-    expect(testRegistryPath({ HIVE_TEST_REGISTRY_PATH: 'C:\\X' }, false)).toBe('C:\\X')
-    expect(testRegistryPath({ HIVE_USER_DATA: 'C:\\p' }, false)).toBe('')
+    expect(testRegistryPath({ CW_TEST_REGISTRY_PATH: 'C:\\X' }, false)).toBe('C:\\X')
+    expect(testRegistryPath({ CW_USER_DATA: 'C:\\p' }, false)).toBe('')
     expect(testRegistryPath({}, false)).toBeUndefined()
-    expect(testRegistryPath({ HIVE_TEST_REGISTRY_PATH: 'C:\\X', HIVE_USER_DATA: 'C:\\p' }, true)).toBeUndefined()
+    expect(testRegistryPath({ CW_TEST_REGISTRY_PATH: 'C:\\X', CW_USER_DATA: 'C:\\p' }, true)).toBeUndefined()
   })
 })
 
 describe.runIf(process.platform === 'win32')('refreshPath', () => {
-  it("adds what an installer put in the registry to Hive's PATH, so where.exe and new sessions find the CLI", async () => {
+  it("adds what an installer put in the registry to Combwork's PATH, so where.exe and new sessions find the CLI", async () => {
     const key = Object.keys(process.env).find((k) => k.toUpperCase() === 'PATH') ?? 'PATH'
     process.env[key] = 'C:\\Windows'
     process.env.LOCALAPPDATA = 'C:\\Users\\u\\AppData\\Local'
-    process.env.HIVE_TEST_REGISTRY_PATH = 'C:\\Windows;%LOCALAPPDATA%\\Microsoft\\WinGet\\Links'
+    process.env.CW_TEST_REGISTRY_PATH = 'C:\\Windows;%LOCALAPPDATA%\\Microsoft\\WinGet\\Links'
     expect(await refreshPath()).toEqual(['C:\\Users\\u\\AppData\\Local\\Microsoft\\WinGet\\Links'])
     expect(process.env[key]).toBe('C:\\Windows;C:\\Users\\u\\AppData\\Local\\Microsoft\\WinGet\\Links')
     // Nothing new the next time.
@@ -88,7 +88,7 @@ describe.runIf(process.platform === 'win32')('refreshPath', () => {
   it('shares one read between calls at the same time', async () => {
     const key = Object.keys(process.env).find((k) => k.toUpperCase() === 'PATH') ?? 'PATH'
     process.env[key] = 'C:\\Windows'
-    process.env.HIVE_TEST_REGISTRY_PATH = 'C:\\New'
+    process.env.CW_TEST_REGISTRY_PATH = 'C:\\New'
     const [a, b] = await Promise.all([refreshPath(), refreshPath()])
     expect(a).toEqual(['C:\\New'])
     expect(b).toEqual(['C:\\New'])
@@ -96,46 +96,46 @@ describe.runIf(process.platform === 'win32')('refreshPath', () => {
   })
 })
 
-// Before Hive starts an agent or a terminal (#821): the PATH a new process gets, with what was installed since Hive
+// Before Combwork starts an agent or a terminal (#821): the PATH a new process gets, with what was installed since Combwork
 // started, and never a long wait for it.
 describe.runIf(process.platform === 'win32')('refreshPathBeforeStart', () => {
-  it('gives the next process the folders added to the registry since Hive started', async () => {
+  it('gives the next process the folders added to the registry since Combwork started', async () => {
     const key = Object.keys(process.env).find((k) => k.toUpperCase() === 'PATH') ?? 'PATH'
     process.env[key] = 'C:\\Windows'
-    process.env.HIVE_TEST_REGISTRY_PATH = 'C:\\Windows'
+    process.env.CW_TEST_REGISTRY_PATH = 'C:\\Windows'
     await refreshPathBeforeStart()
     expect(process.env[key]).toBe('C:\\Windows')
-    // An installer adds a folder while Hive runs.
-    process.env.HIVE_TEST_REGISTRY_PATH = 'C:\\Windows;C:\\Installed'
+    // An installer adds a folder while Combwork runs.
+    process.env.CW_TEST_REGISTRY_PATH = 'C:\\Windows;C:\\Installed'
     await refreshPathBeforeStart()
     expect(process.env[key]).toBe('C:\\Windows;C:\\Installed')
   })
 
-  it("goes on with Hive's PATH when the registry is slow, and the read still counts once it ends", async () => {
+  it("goes on with Combwork's PATH when the registry is slow, and the read still counts once it ends", async () => {
     const key = Object.keys(process.env).find((k) => k.toUpperCase() === 'PATH') ?? 'PATH'
     process.env[key] = 'C:\\Windows'
-    delete process.env.HIVE_TEST_REGISTRY_PATH
-    delete process.env.HIVE_USER_DATA
+    delete process.env.CW_TEST_REGISTRY_PATH
+    delete process.env.CW_USER_DATA
     held.length = 0
     // The registry isn't answering: the start goes on after its wait, with the PATH as it was.
     await refreshPathBeforeStart(20)
     expect(process.env[key]).toBe('C:\\Windows')
     expect(held).toHaveLength(1)
-    // PowerShell answers late: its folders are on Hive's PATH for the next start.
+    // PowerShell answers late: its folders are on Combwork's PATH for the next start.
     held[0](null, 'M=C:\\Windows\r\nU=C:\\Late\r\n')
     await vi.waitFor(() => expect(process.env[key]).toBe('C:\\Windows;C:\\Late'), { timeout: HUNG_MS })
   })
 })
 
 // #1103: Claude Code's native installer can leave ~\.local\bin off every PATH (the registry's too), so Provider Setup
-// found the CLI where it installs it while the sessions and terminals Hive starts couldn't run it by name.
-describe("a found CLI's folder on the PATH of what Hive starts (#1103)", () => {
+// found the CLI where it installs it while the sessions and terminals Combwork starts couldn't run it by name.
+describe("a found CLI's folder on the PATH of what Combwork starts (#1103)", () => {
   const sep = process.platform === 'win32' ? ';' : ':'
   const exe = process.platform === 'win32' ? String.raw`C:\Users\someone\.local\bin\claude.exe` : '/home/someone/.local/bin/claude'
   const folder = process.platform === 'win32' ? String.raw`C:\Users\someone\.local\bin` : '/home/someone/.local/bin'
   afterEach(() => noteCliFolder('test-cli', null))
 
-  it("adds its folder at the end of a child's PATH, once, keeping the rest in its order; Hive's own PATH stays as it is", () => {
+  it("adds its folder at the end of a child's PATH, once, keeping the rest in its order; Combwork's own PATH stays as it is", () => {
     const own = process.env.PATH
     noteCliFolder('test-cli', exe)
     expect(withCliFolders(['A', 'B'].join(sep))).toBe(['A', 'B', folder].join(sep))

@@ -1,23 +1,24 @@
-import { existsSync } from 'original-fs'
-import { lstat, mkdir, readFile, readdir, realpath, rename, writeFile } from 'original-fs/promises'
+import { mkdir, readFile, readdir, realpath, rename, writeFile } from 'original-fs/promises'
 import { createHash, randomUUID } from 'crypto'
 import { join, resolve } from 'path'
 import { Worker } from 'worker_threads'
-import { HIVE_DIR } from '../shared/defaults'
+import { CW_DIR } from '../shared/defaults'
 import { ASSISTANT_DIR } from '../shared/assistant'
-import { LEGACY_HIVE_DIR, movedExcludeText, movedPathOf, rewriteMovedPaths, type FolderMove } from '../shared/hiveFolderMove'
+import { LEGACY_HIVE_DIR, movedExcludeText, movedPathOf, rewriteMovedPaths, type FolderMove } from '../shared/combworkFolderMove'
 import { msg, tr, type Msg } from '../shared/i18n'
 import { toast } from './events'
 import { readKeptJson, realPath, writeKeptJson, writeTextAtomic } from './fsutil'
+import { ifAbsent, lstatOrNullAsync, present } from './fsPresence'
 import { git } from './git'
-import { HiveError, errorText, hiveError } from './hiveError'
-import { excludeLine, gitDirOf, vcsOf } from './hiveVcs'
+import { CombworkError, errorText, combworkError } from './combworkError'
+import { excludeLine, gitDirOf, vcsOf } from './combworkVcs'
 import { createLogger, userText } from './logger'
 import { othersPresentByProcess } from './presence'
-import { dataFolder, ours, type HostKind } from './hiveFolder'
+import { ours, type HostKind } from './combworkFolder'
 import { withNamedLock } from './repoLock'
+import { projectNamesDone, record as recordNames, upgradeWorkspace, workspaceNeeds } from './nameUpgrade'
 import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
-import type { CardsAnswer, CardsRewrite } from './hiveMoveWorker'
+import type { CardsAnswer, CardsRewrite, Checkpoint, CheckpointAnswer, CopyFolders, CopyFoldersAnswer } from './combworkMoveWorker'
 
 /**
  * The move of a workspace's `.hive` folders to `.combwork` (HI-2462, SPEC §4.1.1; the design is the card's: HI-2462/s21,
@@ -28,7 +29,7 @@ import type { CardsAnswer, CardsRewrite } from './hiveMoveWorker'
  *
  * - **Ownership**: the move holds a lock across processes (repoLockCore's row, by token, pid and process start, in
  *   `<workspace>\.combwork-move.lock`, outside every folder that moves, kept for good), and refuses while another
- *   process's presence marker is fresh. The workspace's folder is renamed first: a Hive holding its board open makes
+ *   process's presence marker is fresh. The workspace's folder is renamed first: a 1.0 app holding its board open makes
  *   that fail before any project is touched.
  * - **State is on disk, never recorded beside it** (s65): before a host's `.hive` is renamed, a marker
  *   (`combwork-move-id`) is written in it, so it moves with the folder. A host has moved exactly when its `.combwork`
@@ -38,10 +39,10 @@ import type { CardsAnswer, CardsRewrite } from './hiveMoveWorker'
  *   runs again over all of it (each is idempotent), and the hash is written once the last has worked.
  * - **Never moved**: another tool's `.hive`, a `.hive` beside a `.combwork` with no marker (both: `.combwork` is used,
  *   `.hive` left as it is, a warning), a linked `.hive`, a host whose real place is outside the workspace. Stored paths,
- *   links and a conversation's folder are translated through the map alone (shared/hiveFolderMove.ts).
+ *   links and a conversation's folder are translated through the map alone (shared/combworkFolderMove.ts).
  */
 
-const log = createLogger('hiveMove')
+const log = createLogger('combworkMove')
 
 /** The lock's file, in the workspace folder itself: the one place that doesn't move. */
 export const MOVE_LOCK_FILE = '.combwork-move.lock'
@@ -71,26 +72,26 @@ interface MovedFile {
 }
 
 const M = {
-  locked: msg({ id: 'service.hiveMove.locked', defaultMessage: "Combwork couldn't move {folder} to .combwork: a program has a file in it open. Close that program (or the other Combwork or Hive using this workspace), then open the workspace again. Nothing was lost.", description: "An error opening a workspace (HI-2462): its .hive folder, renamed .combwork in this version, couldn't be renamed because a file in it is open. {folder} is the folder. Keep .hive and .combwork as they are (folder names)." }),
-  otherOpen: msg({ id: 'service.hiveMove.otherOpen', defaultMessage: 'This workspace is open in another Combwork or Hive ({profile}). Close it there, then open it here: Combwork moves its .hive folders to .combwork first.', description: "An error opening a workspace (HI-2462): another copy of the app ({profile}: its profile folder's name) has it open, so its .hive folders can't be renamed .combwork now. Keep .hive and .combwork as they are." }),
-  busy: msg({ id: 'service.hiveMove.busy', defaultMessage: "Another Combwork is moving this workspace's .hive folders to .combwork ({profile}). Open it again once it has finished.", description: "An error opening a workspace (HI-2462): another copy of the app ({profile}: its profile folder's name) is renaming the workspace's .hive folders to .combwork now. Keep .hive and .combwork as they are." }),
-  phase: msg({ id: 'service.hiveMove.phaseFailed', defaultMessage: "Combwork moved this workspace's .hive folders to .combwork, but couldn't finish updating {what}: {error} Open the workspace again to finish.", description: "An error opening a workspace (HI-2462): its .hive folders were renamed .combwork, but a step after that failed; the next open finishes it. {what} is what it was updating (main.hiveMove.what.*); {error} says why, a sentence. Keep .hive and .combwork as they are." }),
-  closed: msg({ id: 'service.hiveMove.closed', defaultMessage: "The workspace was closed while Combwork was moving its .hive folders to .combwork. Open it again to finish.", description: 'An error opening a workspace (HI-2462): it was closed, or another was opened in its window, during the rename of its .hive folders to .combwork. Keep .hive and .combwork as they are.' }),
-  bothTitle: msg({ id: 'main.hiveMove.bothTitle', defaultMessage: '{folder} has both a .hive and a .combwork folder', description: "A warning's title as a workspace opens (HI-2462): the folder {folder} has Combwork's folder under both its old name (.hive) and its new one (.combwork). Keep .hive and .combwork as they are." }),
-  bothBody: msg({ id: 'main.hiveMove.bothBody', defaultMessage: 'Combwork uses .combwork and leaves .hive as it is. Move anything you still need out of .hive yourself.', description: "The warning's text (HI-2462): which of the two folders Combwork uses, and that it never changes the other. Keep .hive and .combwork as they are." }),
-  linkTitle: msg({ id: 'main.hiveMove.linkTitle', defaultMessage: "{folder}'s .hive folder wasn't moved", description: "A warning's title as a workspace opens (HI-2462): the folder {folder}'s .hive wasn't renamed .combwork. Keep .hive and .combwork as they are." }),
-  linkBody: msg({ id: 'main.hiveMove.linkBody', defaultMessage: "It is a link to another folder, or the project is a link to a folder outside the workspace, so Combwork leaves it as it is. To use it, rename it .combwork yourself with Combwork closed.", description: "The warning's text (HI-2462): why the .hive folder wasn't renamed, and how the user can do it. Keep .hive and .combwork as they are." }),
+  locked: msg({ id: 'service.combworkMove.locked', defaultMessage: "Combwork couldn't move {folder} to .combwork: a program has a file in it open. Close that program (or another Combwork, or a 1.0 copy, using this workspace), then open the workspace again. Nothing was lost.", description: "An error opening a workspace (HI-2462): its old data folder, renamed .combwork in this version, couldn't be renamed because a file in it is open. {folder} is the folder. A 1.0 copy: the app's version 1.0, from before it was renamed. Keep .combwork as it is (a folder name)." }),
+  otherOpen: msg({ id: 'service.combworkMove.otherOpen', defaultMessage: 'This workspace is open in another Combwork or a 1.0 copy ({profile}). Close it there, then open it here: Combwork moves its old data folders to .combwork first.', description: "An error opening a workspace (HI-2462): another copy of the app ({profile}: its profile folder's name; a 1.0 copy: the app's version 1.0, from before it was renamed) has it open, so its old data folders can't be renamed .combwork now. Keep .combwork as it is." }),
+  busy: msg({ id: 'service.combworkMove.busy', defaultMessage: "Another Combwork is moving this workspace's old data folders to .combwork ({profile}). Open it again once it has finished.", description: "An error opening a workspace (HI-2462): another copy of the app ({profile}: its profile folder's name) is renaming the workspace's old data folders to .combwork now. Keep .combwork as it is." }),
+  phase: msg({ id: 'service.combworkMove.phaseFailed', defaultMessage: "Combwork moved this workspace's old data folders to .combwork, but couldn't finish updating {what}: {error} Open the workspace again to finish.", description: "An error opening a workspace (HI-2462): its old data folders were renamed .combwork, but a step after that failed; the next open finishes it. {what} is what it was updating (main.combworkMove.what.*); {error} says why, a sentence. Keep .combwork as it is." }),
+  closed: msg({ id: 'service.combworkMove.closed', defaultMessage: "The workspace was closed while Combwork was moving its old data folders to .combwork. Open it again to finish.", description: 'An error opening a workspace (HI-2462): it was closed, or another was opened in its window, during the rename of its old data folders to .combwork. Keep .combwork as it is.' }),
+  bothTitle: msg({ id: 'main.combworkMove.bothTitle', defaultMessage: '{folder} has both an old data folder and a .combwork folder', description: "A warning's title as a workspace opens (HI-2462): the folder {folder} has Combwork's folder under both its name from before 1.1 and its new one (.combwork). Keep .combwork as it is." }),
+  bothBody: msg({ id: 'main.combworkMove.bothBody', defaultMessage: 'Combwork uses .combwork and leaves the old data folder as it is. Move anything you still need out of it yourself.', description: "The warning's text (HI-2462): which of the two folders Combwork uses, and that it never changes the other (the old one, from before 1.1). Keep .combwork as it is." }),
+  linkTitle: msg({ id: 'main.combworkMove.linkTitle', defaultMessage: "{folder}'s old data folder wasn't moved", description: "A warning's title as a workspace opens (HI-2462): the folder {folder}'s data folder from before 1.1 wasn't renamed .combwork. Keep .combwork as it is." }),
+  linkBody: msg({ id: 'main.combworkMove.linkBody', defaultMessage: "It is a link to another folder, or the project is a link to a folder outside the workspace, so Combwork leaves it as it is. To use it, rename it .combwork yourself with Combwork closed.", description: "The warning's text (HI-2462): why the old data folder wasn't renamed, and how the user can do it. Keep .combwork as it is." }),
   what: {
-    excludes: msg({ id: 'main.hiveMove.what.excludes', defaultMessage: "git's exclude lines", description: 'What the folder move was updating when it failed (service.hiveMove.phaseFailed): the lines that keep the folder out of git.' }),
-    worktrees: msg({ id: 'main.hiveMove.what.worktrees', defaultMessage: 'the worktrees inside it', description: 'What the folder move was updating when it failed (service.hiveMove.phaseFailed): git worktrees kept inside the moved folder.' }),
-    notes: msg({ id: 'main.hiveMove.what.notes', defaultMessage: 'the paths in shared notes and handovers', description: 'What the folder move was updating when it failed (service.hiveMove.phaseFailed).' }),
-    cards: msg({ id: 'main.hiveMove.what.cards', defaultMessage: 'the paths in cards', description: 'What the folder move was updating when it failed (service.hiveMove.phaseFailed): links and paths in cards\' descriptions and comments.' }),
-    folders: msg({ id: 'main.hiveMove.what.folders', defaultMessage: "the agents' folders inside it", description: "What the folder move was updating when it failed (service.hiveMove.phaseFailed): slots and other agents' folders kept inside the moved folder." })
+    excludes: msg({ id: 'main.combworkMove.what.excludes', defaultMessage: "git's exclude lines", description: 'What the folder move was updating when it failed (service.combworkMove.phaseFailed): the lines that keep the folder out of git.' }),
+    worktrees: msg({ id: 'main.combworkMove.what.worktrees', defaultMessage: 'the worktrees inside it', description: 'What the folder move was updating when it failed (service.combworkMove.phaseFailed): git worktrees kept inside the moved folder.' }),
+    notes: msg({ id: 'main.combworkMove.what.notes', defaultMessage: 'the paths in shared notes and handovers', description: 'What the folder move was updating when it failed (service.combworkMove.phaseFailed).' }),
+    cards: msg({ id: 'main.combworkMove.what.cards', defaultMessage: 'the paths in cards', description: 'What the folder move was updating when it failed (service.combworkMove.phaseFailed): links and paths in cards\' descriptions and comments.' }),
+    folders: msg({ id: 'main.combworkMove.what.folders', defaultMessage: "the agents' folders inside it", description: "What the folder move was updating when it failed (service.combworkMove.phaseFailed): slots and other agents' folders kept inside the moved folder." })
   } satisfies Record<Phase, Msg<string>>
 }
 
 const legacy = (host: string): string => join(host, LEGACY_HIVE_DIR)
-const current = (host: string): string => join(host, HIVE_DIR)
+const current = (host: string): string => join(host, CW_DIR)
 const lower = (p: string): string => resolve(p).toLowerCase()
 const under = (p: string, root: string): boolean => {
   const a = lower(p)
@@ -100,7 +101,7 @@ const under = (p: string, root: string): boolean => {
 
 /** A host's own folder, not a link (a symlink or junction) to somewhere else: its real place is inside the host's. */
 async function plainFolder(host: string, dir: string): Promise<boolean> {
-  const st = await lstat(dir).catch(() => null)
+  const st = await lstatOrNullAsync(dir)
   if (!st || st.isSymbolicLink() || !st.isDirectory()) return false
   return realPath(dir).toLowerCase() === join(realPath(host), LEGACY_HIVE_DIR).toLowerCase()
 }
@@ -118,16 +119,20 @@ const markText = (id: string): string => JSON.stringify({ kind: MARK_KIND, versi
  */
 async function movedHost(host: string): Promise<boolean> {
   const dir = current(host)
+  // No marker, or one that isn't Combwork's: not moved. One that can't be read now fails the step (presence.ts).
+  const text = await readFile(join(dir, MARK_FILE), 'utf8').catch(ifAbsent(null))
+  if (text === null) return false
+  let m: { kind?: unknown; version?: unknown; id?: unknown } | null
   try {
-    const m = JSON.parse(await readFile(join(dir, MARK_FILE), 'utf8')) as { kind?: unknown; version?: unknown; id?: unknown }
-    if (!(m.kind === MARK_KIND && m.version === 1 && typeof m.id === 'string' && m.id.length > 0)) return false
-    const st = await lstat(dir)
-    if (st.isSymbolicLink() || !st.isDirectory()) return false
-    const [realDir, realHost] = await Promise.all([realpath(dir), realpath(host)])
-    return realDir.toLowerCase() === join(realHost, HIVE_DIR).toLowerCase()
+    m = JSON.parse(text) as typeof m
   } catch {
     return false
   }
+  if (!(m && m.kind === MARK_KIND && m.version === 1 && typeof m.id === 'string' && m.id.length > 0)) return false
+  const st = await lstatOrNullAsync(dir)
+  if (!st || st.isSymbolicLink() || !st.isDirectory()) return false
+  const [realDir, realHost] = await Promise.all([realpath(dir), realpath(host)])
+  return realDir.toLowerCase() === join(realHost, CW_DIR).toLowerCase()
 }
 
 /** A host as one look at it saw it (HI-2510): whether its `.combwork` was Combwork's move, looked at once per step. */
@@ -145,7 +150,7 @@ async function lookAt(hosts: { host: string; kind: HostKind }[]): Promise<Looked
   const out: Looked[] = []
   let next = 0
   const lane = async (): Promise<void> => {
-    for (let i = next++; i < hosts.length; i = next++) out[i] = { ...hosts[i], marked: existsSync(current(hosts[i].host)) && (await movedHost(hosts[i].host)) }
+    for (let i = next++; i < hosts.length; i = next++) out[i] = { ...hosts[i], marked: present(current(hosts[i].host)) && (await movedHost(hosts[i].host)) }
   }
   await Promise.all(Array.from({ length: Math.min(LOOK_AT_ONCE, hosts.length) }, lane))
   return out
@@ -155,8 +160,8 @@ async function lookAt(hosts: { host: string; kind: HostKind }[]): Promise<Looked
 export async function classify(ws: string, host: string, kind: HostKind, marked?: boolean): Promise<HostState> {
   const oldDir = legacy(host)
   const newDir = current(host)
-  const hasOld = existsSync(oldDir)
-  const hasNew = existsSync(newDir)
+  const hasOld = present(oldDir)
+  const hasNew = present(newDir)
   if (hasNew && (marked ?? (await movedHost(host)))) return 'moved'
   if (!hasOld) return 'current'
   // The workspace's own folder is the workspace; a project or the Assistant's home must really be inside it.
@@ -169,13 +174,21 @@ export async function classify(ws: string, host: string, kind: HostKind, marked?
 /** The hosts the workspace has: itself, its Assistant's home (in its tree in use), and every folder it lists as a project (hidden ones too). */
 export async function hostsOf(ws: string): Promise<{ host: string; kind: HostKind }[]> {
   const out: { host: string; kind: HostKind }[] = [{ host: ws, kind: 'workspace' }, { host: join(treeOf(ws), ASSISTANT_DIR), kind: 'assistant' }]
-  const entries = await readdir(ws, { withFileTypes: true }).catch(() => null)
+  const entries = await readdir(ws, { withFileTypes: true }).catch(ifAbsent(null))
   for (const e of entries ?? []) if (e.isDirectory() && !e.name.startsWith('.') && !e.name.startsWith('$')) out.push({ host: join(ws, e.name), kind: 'project' })
   return out
 }
 
-/** The workspace's tree in use: `.combwork` once there, else its own `.hive`, else `.combwork` (to be made). */
-export const treeOf = (ws: string): string => dataFolder(ws, 'workspace')
+/**
+ * The workspace's tree as the move finds it: `.combwork` once there, else its own `.hive` (the move's input, and a 0.9
+ * profile's connection order's, accounts.ts), else `.combwork` (to be made). Never makes either.
+ */
+export function treeOf(ws: string): string {
+  const now = join(ws, CW_DIR)
+  if (present(now)) return now
+  const old = join(ws, LEGACY_HIVE_DIR)
+  return present(old) && ours(old, 'workspace') ? old : now
+}
 
 /**
  * The moves a workspace's folders show now (s65): each host whose `.combwork` holds the marker. The Assistant's home's
@@ -327,17 +340,27 @@ function warn(host: string, state: HostState): void {
   }
 }
 
-/** A `.hive` made again beside a moved `.combwork` (an older Hive opened it since): said once, left as it is. */
+/**
+ * A `.hive` made again beside a moved `.combwork` (an older release opened it since): said once, left as it is. Only a
+ * warning, never a step (HI-2612): one that can't be looked at now is logged, not warned of, and nothing is recorded by it.
+ */
 async function warnRecreated(hosts: Looked[]): Promise<void> {
-  for (const h of hosts) if (h.marked && existsSync(legacy(h.host)) && (await plainFolder(h.host, legacy(h.host)).catch(() => false)) && ours(legacy(h.host), h.kind)) warn(h.host, 'both')
+  for (const h of hosts) {
+    if (!h.marked) continue
+    try {
+      if ((await plainFolder(h.host, legacy(h.host))) && ours(legacy(h.host), h.kind)) warn(h.host, 'both')
+    } catch (e) {
+      log.warn(`couldn't look at ${userText(legacy(h.host))} beside its moved .combwork`, e)
+    }
+  }
 }
 
-const lockBusy = (h: { profile: string }): HiveError => hiveError(M.busy, { profile: h.profile }, { kind: 'conflict' })
+const lockBusy = (h: { profile: string }): CombworkError => combworkError(M.busy, { profile: h.profile }, { kind: 'conflict' })
 
 /**
  * Moves a workspace's folders, before anything reads them (WorkspaceService's open, inside its claim): every host with
  * our `.hive` alone, then the early phases when the map isn't the one they last finished for. `only`: a single host (a
- * project that came into the open workspace later, ensureProject). Throws a HiveError (translated, naming the folder)
+ * project that came into the open workspace later, ensureProject). Throws a CombworkError (translated, naming the folder)
  * when it can't, nothing of that host changed.
  */
 export function moveFolders(ws: string, o: MoveOptions & { only?: string } = {}): Promise<MoveOutcome> {
@@ -359,8 +382,16 @@ async function moveNow(ws: string, o: MoveOptions & { only?: string }): Promise<
     if (s === 'planned') planned++
   }
   await warnRecreated(hosts)
-  // Nothing to rename, and the rewrites finished for the map as it is: no lock, nothing written.
-  if (!planned) {
+  // Nothing to rename, nothing under an old name (HI-2587), and the rewrites finished for the map as it is: no lock,
+  // nothing written.
+  // A single project (one that came later): its own steps by its own record, whatever the workspace's (HR2's round 1).
+  // Only read here (HR2's rounds 2 and 3): whether anything is due. Every write, the names upgrade's records included, is
+  // under the lock, after the other processes' refusal.
+  const namesDue = o.only ? !(await projectNamesDone(o.only)) : await workspaceNeeds(ws)
+  const stop = (): void => {
+    if (o.signal?.aborted || (o.stillOurs && !o.stillOurs())) throw combworkError(M.closed, undefined, { kind: 'conflict' })
+  }
+  if (!planned && !namesDue) {
     const moves = await movesOf(ws, all)
     if (!moves.length || (await doneHash(ws)) === mapHash(moves)) {
       publish(ws, moves)
@@ -368,10 +399,26 @@ async function moveNow(ws: string, o: MoveOptions & { only?: string }): Promise<
     }
   }
   await moveTestHooks.looked?.()
-  const stop = (): void => {
-    if (o.signal?.aborted || (o.stillOurs && !o.stillOurs())) throw hiveError(M.closed, undefined, { kind: 'conflict' })
-  }
   return withNamedLock(ws, MOVE_LOCK_FILE, () => movedUnderLock(ws, o, stop), { waitMs: 0, busy: lockBusy })
+}
+
+/**
+ * A workspace just made (its `.combwork` new, nothing of 1.0's in it): its names upgrade recorded done, under the move's
+ * lock and only with no other process present, as every write of the upgrade is (HR2's round 3). Not recorded (another
+ * process there, the lock held): its next open looks again, under the lock. Never throws.
+ */
+export function recordNewWorkspace(ws: string): Promise<void> {
+  return inTurn(ws, () =>
+    withNamedLock(
+      ws,
+      MOVE_LOCK_FILE,
+      async () => {
+        for (const dir of [legacy(ws), current(ws)]) if (othersPresentByProcess(dir).length) return
+        await recordNames(ws)
+      },
+      { waitMs: 0, busy: lockBusy }
+    )
+  ).catch((e) => log.warn("recording a new workspace's names upgrade done", e))
 }
 
 /**
@@ -387,7 +434,7 @@ export async function excludeMoveLock(ws: string): Promise<void> {
     if (!gd) return
     const f = join(gd, 'info', 'exclude')
     const line = excludeLine(found.root, ws).replace(/\/\.combwork\/$/, `/${MOVE_LOCK_FILE}`)
-    const text = await readFile(f, 'utf8').catch(() => '')
+    const text = await readFile(f, 'utf8').catch(ifAbsent(''))
     if (text.split(/\r?\n/).some((l) => l.trim() === line)) return
     await mkdir(join(gd, 'info'), { recursive: true })
     await writeTextAtomic(f, `${text}${text && !text.endsWith('\n') ? '\n' : ''}# Combwork's folder move lock (added by Combwork)\n${line}\n`) // i18n-ignore: a line in git's exclude file, which stays English
@@ -398,14 +445,15 @@ export async function excludeMoveLock(ws: string): Promise<void> {
 
 async function movedUnderLock(ws: string, o: MoveOptions & { only?: string }, stop: () => void): Promise<MoveOutcome> {
   stop()
-  await excludeMoveLock(ws)
-  // Inside the lock, everything is looked at again: another process may have moved it meanwhile.
+  // Inside the lock, everything is looked at again: another process may have moved it meanwhile. Another process's
+  // presence refuses it before anything is written (HR2's round 3: the lock file's exclude line too).
   for (const dir of [legacy(ws), current(ws)]) {
     const others = othersPresentByProcess(dir)
-    if (others.length) throw hiveError(M.otherOpen, { profile: others[0].profile }, { kind: 'conflict' })
+    if (others.length) throw combworkError(M.otherOpen, { profile: others[0].profile }, { kind: 'conflict' })
   }
+  await excludeMoveLock(ws)
   const id = randomUUID()
-  // The workspace first: a Hive with its board open fails it here, before any project is touched; then its Assistant's
+  // The workspace first: a Combwork with its board open fails it here, before any project is touched; then its Assistant's
   // home (inside the workspace's folder, so looked at after it moved), then the projects.
   let moved = 0
   for (const kind of ['workspace', 'assistant', 'project'] as const) {
@@ -418,7 +466,7 @@ async function movedUnderLock(ws: string, o: MoveOptions & { only?: string }, st
       try {
         await renameFolder(legacy(h.host), current(h.host))
       } catch (e) {
-        if (isLocked(e)) throw hiveError(M.locked, { folder: legacy(h.host) }, { kind: 'conflict' })
+        if (isLocked(e)) throw combworkError(M.locked, { folder: legacy(h.host) }, { kind: 'conflict' })
         throw e
       }
       moved++
@@ -426,6 +474,11 @@ async function movedUnderLock(ws: string, o: MoveOptions & { only?: string }, st
       await moveTestHooks.after?.(`renamed:${kind}`)
     }
   }
+  // Then what is kept inside under the old names (HI-2587, nameUpgrade.ts), still under the lock and before anything of
+  // the workspace is admitted.
+  const projects = (await hostsOf(ws)).filter((h) => h.kind === 'project').map((h) => h.host)
+  const setAside = async (cards: number): Promise<void> => (await import('./boardStore')).tellSetAside(ws, cards)
+  await upgradeWorkspace(ws, { stop, checkpoint: checkpointOffMain, copyFolders: copyFoldersOffMain, projects, only: o.only, setAside })
   const moves = await deriveMoves(ws)
   publish(ws, moves)
   if (!moves.length || (await doneHash(ws)) === mapHash(moves)) return { late: false, moved }
@@ -435,7 +488,7 @@ async function movedUnderLock(ws: string, o: MoveOptions & { only?: string }, st
       await runEarly(ws, moves, phase)
     } catch (e) {
       log.warn(`the folder move's ${phase}`, e)
-      throw hiveError(M.phase, { what: M.what[phase], error: errorText(e) }, { kind: 'conflict' })
+      throw combworkError(M.phase, { what: M.what[phase], error: errorText(e) }, { kind: 'conflict' })
     }
     await moveTestHooks.after?.(`phase:${phase}`)
   }
@@ -455,18 +508,18 @@ async function runEarly(ws: string, moves: FolderMove[], phase: Phase): Promise<
   else if (phase === 'notes') await rewriteNotes(join(current(ws), 'shared'), moves)
 }
 
-/** Hive's exclude line for a moved project's old folder, in its repository's info/exclude, for the new one. */
+/** Combwork's exclude line for a moved project's old folder, in its repository's info/exclude, for the new one. */
 export async function moveExcludeLine(host: string): Promise<boolean> {
   const found = vcsOf(host)
   if (found?.kind !== 'git') return false
   const gd = await gitDirOf(found.root)
   if (!gd) return false
   const f = join(gd, 'info', 'exclude')
-  const text = await readFile(f, 'utf8').catch(() => null)
+  const text = await readFile(f, 'utf8').catch(ifAbsent(null))
   if (text === null) return false
   const newLine = excludeLine(found.root, host)
   const oldLine = newLine.replace(/\/\.combwork\/$/, `/${LEGACY_HIVE_DIR}/`)
-  const next = movedExcludeText(text, oldLine, newLine, !existsSync(legacy(host)))
+  const next = movedExcludeText(text, oldLine, newLine, !present(legacy(host)))
   if (next === text) return false
   await writeTextAtomic(f, next)
   return true
@@ -484,7 +537,7 @@ export async function repairWorktrees(host: string, moves: FolderMove[]): Promis
   const fixed: string[] = []
   for (const p of paths) {
     const to = movedPathOf(p, moves)
-    if (to && existsSync(to)) fixed.push(to)
+    if (to && present(to)) fixed.push(to)
   }
   if (!fixed.length) return 0
   const rep = await git(host, ['worktree', 'repair', ...fixed])
@@ -494,11 +547,11 @@ export async function repairWorktrees(host: string, moves: FolderMove[]): Promis
 
 /** The shared notes and handovers' paths into moved folders, each file written whole, only those that change. */
 export async function rewriteNotes(dir: string, moves: FolderMove[]): Promise<number> {
-  if (!moves.length || !existsSync(dir)) return 0
+  if (!moves.length || !present(dir)) return 0
   let n = 0
   const walk = async (d: string, depth: number): Promise<void> => {
     if (depth > 8) return
-    const entries = await readdir(d, { withFileTypes: true }).catch(() => null)
+    const entries = await readdir(d, { withFileTypes: true }).catch(ifAbsent(null))
     for (const e of entries ?? []) {
       const p = join(d, e.name)
       if (e.isDirectory() && !e.isSymbolicLink()) await walk(p, depth + 1)
@@ -517,30 +570,48 @@ export async function rewriteNotes(dir: string, moves: FolderMove[]): Promise<nu
 }
 
 /** The worker's script, beside main's; in unit tests (no build) its code runs here. */
-const workerScript = (): string => join(__dirname, 'hive-move-worker.js')
+const workerScript = (): string => join(__dirname, 'cw-move-worker.js')
 
-/** Rewrites the board's cards in the worker (hiveMoveWorker.ts). */
-export async function rewriteCardsOffMain(job: CardsRewrite): Promise<CardsAnswer> {
+/** Rewrites the board's cards in the worker (combworkMoveWorker.ts). */
+export function rewriteCardsOffMain(job: CardsRewrite): Promise<CardsAnswer> {
+  return inMoveWorker<CardsAnswer>(job, async () => (await import('./combworkMoveWorker')).rewriteCards(job))
+}
+
+/** Checkpoints and closes the board's old file in the worker (combworkMoveWorker.ts), before its rename (HI-2587). */
+export function checkpointOffMain(file: string): Promise<CheckpointAnswer> {
+  const job: Checkpoint = { kind: 'checkpoint', file }
+  return inMoveWorker<CheckpointAnswer>(job, async () => (await import('./combworkMoveWorker')).checkpointFile(job))
+}
+
+/** The folders the board's skill copies records name, read in the worker (HI-2587's marker step); none without a board. */
+export async function copyFoldersOffMain(file: string): Promise<string[]> {
+  if (!present(file)) return []
+  const job: CopyFolders = { kind: 'copyFolders', file }
+  const a = await inMoveWorker<CopyFoldersAnswer>(job, async () => (await import('./combworkMoveWorker')).copyFolders(job))
+  if (!a.ok) throw new Error(a.error)
+  return a.folders
+}
+
+async function inMoveWorker<A extends { ok: boolean }>(job: CardsRewrite | Checkpoint | CopyFolders, here: () => Promise<A>): Promise<A> {
   if (!bundledScriptExists(workerScript())) {
     workerHere('folder move', "its script isn't there") // i18n-ignore: Copy Diagnostics' report, in English
-    const { rewriteCards } = await import('./hiveMoveWorker')
-    return rewriteCards(job)
+    return here()
   }
   return new Promise((res) => {
     const w = new Worker(workerScript(), { workerData: job })
     workerStarted('folder move', w) // i18n-ignore: a worker's name, for Copy Diagnostics' report (English)
     let done = false
-    w.once('message', (a: CardsAnswer) => {
+    w.once('message', (a: A) => {
       done = true
       res(a)
       void w.terminate()
     })
     w.once('error', (e: Error) => {
-      if (!done) res({ ok: false, error: e.message })
+      if (!done) res({ ok: false, error: e.message } as unknown as A)
       done = true
     })
     w.once('exit', (code) => {
-      if (!done) res({ ok: false, error: `the worker ended (exit code ${code})` }) // i18n-ignore: for the error's detail
+      if (!done) res({ ok: false, error: `the worker ended (exit code ${code})` } as unknown as A) // i18n-ignore: for the error's detail
       done = true
     })
   })
@@ -562,7 +633,7 @@ export interface LateServices {
 export function finishMove(ws: string, svc: LateServices, o: MoveOptions = {}): Promise<void> {
   return inTurn(ws, () => {
     const stop = (): void => {
-      if (o.signal?.aborted || (o.stillOurs && !o.stillOurs())) throw hiveError(M.closed, undefined, { kind: 'conflict' })
+      if (o.signal?.aborted || (o.stillOurs && !o.stillOurs())) throw combworkError(M.closed, undefined, { kind: 'conflict' })
     }
     return withNamedLock(ws, MOVE_LOCK_FILE, () => finishUnderLock(resolve(ws), svc, stop), { waitMs: 0, busy: lockBusy })
   })
@@ -588,7 +659,7 @@ async function finishUnderLock(ws: string, svc: LateServices, stop: () => void):
       }
     } catch (e) {
       log.warn(`the folder move's ${phase}`, e)
-      throw e instanceof HiveError ? e : hiveError(M.phase, { what: M.what[phase], error: errorText(e) }, { kind: 'conflict' })
+      throw e instanceof CombworkError ? e : combworkError(M.phase, { what: M.what[phase], error: errorText(e) }, { kind: 'conflict' })
     }
     await moveTestHooks.after?.(`phase:${phase}`)
   }
@@ -606,7 +677,7 @@ export async function followMovedLink(p: string, workspaces: readonly string[], 
   let q: string | null = null
   for (const ws of workspaces) if ((q = await movedPath(ws, p))) break
   const at = q ?? p
-  if (q && existsSync(q)) return q
+  if (q && present(q)) return q
   return (await movedAttachment(at)) ?? q
 }
 

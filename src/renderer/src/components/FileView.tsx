@@ -38,7 +38,7 @@ const M = {
   discardMessage: msg({ id: 'files.view.discardMessage', defaultMessage: 'Reload {name} from disk and discard your unsaved changes?', description: 'Confirmation before reloading a file. {name} is the file name.' }),
   reload: msg({ id: 'files.view.reload', defaultMessage: 'Reload', description: 'Button: reads the file from disk again, dropping unsaved edits.' }),
   saveTip: msg({ id: 'files.view.saveTip', defaultMessage: 'Save (Ctrl+S)', description: 'Tooltip on the Save button. Keep Ctrl+S as it is.' }),
-  binary: msg({ id: 'files.view.binary', defaultMessage: 'This is a binary file.', description: 'Shown in place of a file Hive cannot show as text.' }),
+  binary: msg({ id: 'files.view.binary', defaultMessage: 'This is a binary file.', description: 'Shown in place of a file Combwork cannot show as text.' }),
   tooLarge: msg({ id: 'files.view.tooLarge', defaultMessage: 'This file is too large to open here ({size}).', description: 'Shown in place of a file too large for the editor. {size} is its size, such as "12.4 MB".' }),
   notUtf8: msg({ id: 'files.view.notUtf8', defaultMessage: "This file isn't UTF-8 text, so Combwork can't edit it without changing its characters.", description: 'Shown in place of a text file in another encoding (such as Windows-1252), which the editor would corrupt on save. UTF-8 is the encoding\'s name: keep it as it is.' }),
   openInApp: msg({ id: 'files.view.openInApp', defaultMessage: 'Open it in its default app instead.', description: 'Under "This is a binary file." or "This file is too large to open here", above an Open button.' }),
@@ -108,7 +108,7 @@ export function ReadOnlyPreview({ root, abs, name, text }: { root: string; abs: 
 
 type Mode = 'edit' | 'preview' | 'split'
 
-// Unsaved edits survive switching files, tabs and projects while Hive is open.
+// Unsaved edits survive switching files, tabs and projects while Combwork is open.
 interface Draft {
   text: string
   base: FileContent
@@ -558,7 +558,7 @@ function MarkdownPreview({ text, root, rel, onOpenRel }: PreviewProps) {
     if (!el) return
     for (const img of el.querySelectorAll('img')) {
       const src = img.getAttribute('src') ?? ''
-      if (!src || /^(https?:|data:|hive-img:)/i.test(src)) continue
+      if (!src || /^(https?:|data:|combwork-img:)/i.test(src)) continue
       const target = joinRel(dir, safeDecode(src.split(/[?#]/)[0]))
       img.setAttribute('src', imageUrl(`${root}\\${target.replace(/\//g, '\\')}`))
     }
@@ -566,7 +566,7 @@ function MarkdownPreview({ text, root, rel, onOpenRel }: PreviewProps) {
     if (!blocks.length) return
     void import('../monaco').then(({ monaco }) => {
       // Token colours are only registered once a theme is set, which may not have happened yet.
-      monaco.editor.setTheme(document.documentElement.dataset.theme === 'light' ? 'hive-light' : 'hive-dark')
+      monaco.editor.setTheme(document.documentElement.dataset.theme === 'light' ? 'cw-light' : 'cw-dark')
       for (const code of blocks) {
         const lang = /language-([\w+#-]+)/.exec(code.className)?.[1]
         if (!lang || code.dataset.colorized) continue
@@ -702,7 +702,7 @@ function ImagePreview({ abs }: PreviewProps) {
 }
 
 function PdfPreview({ abs }: PreviewProps) {
-  // Chromium's PDF viewer doesn't run in a sandboxed frame; the source is hive-img:, which only serves images and PDFs from the workspace.
+  // Chromium's PDF viewer doesn't run in a sandboxed frame; the source is combwork-img:, which only serves images and PDFs from the workspace.
   // eslint-disable-next-line react/iframe-missing-sandbox
   return <iframe className="pdf-preview" src={imageUrl(abs)} title={tr(M.pdfPreview)} />
 }

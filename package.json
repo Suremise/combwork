@@ -1,5 +1,5 @@
 {
-  "name": "hive",
+  "name": "combwork",
   "productName": "Combwork",
   "version": "1.0.0",
   "description": "Combwork — a streamlined, agent-first desktop workspace for AI-assisted coding.",
@@ -22,7 +22,8 @@
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "vitest run",
-    "check:repo": "node scripts/i18nGuard.mjs && node scripts/agentTextGuard.mjs && node scripts/agentTextExtract.mjs --check && vitest run tests/agentsmd.test.ts tests/checkRepo.test.ts tests/controlCharacters.test.ts tests/dbWrites.test.ts tests/exitLog.test.ts tests/fakeCopilotApi.test.ts tests/focusedPick.test.ts tests/guidance.test.ts tests/i18n.test.ts tests/i18nFormatting.test.ts tests/legacyWorktreeGate.test.ts tests/licenses.test.ts tests/lineEndings.test.ts tests/modeDescriptions.test.ts tests/networkDecoding.test.ts tests/searchBoxes.test.ts tests/skillDescriptions.test.ts tests/skills.test.ts tests/tempDir.test.ts tests/testQuiet.test.ts tests/tips.test.ts tests/trash.test.ts tests/userGuide.test.ts tests/windowsExits.test.ts && vitest run tests/admission.test.ts tests/bundled.test.ts tests/e2esuites.test.ts tests/folderProcesses.test.ts tests/i18nCatalogues.test.ts -t \"^(the (e2e suite list|suites a change needs|run context|rule's owner)|test tooling ends processes by identity)|bundled skill and mode that ships now|(up to date with|message in) Hive's source|Hive's translations pass\"",
+    "check:names": "node tests/oldNames.mjs",
+    "check:repo": "node scripts/i18nGuard.mjs && node scripts/agentTextGuard.mjs && node scripts/agentTextExtract.mjs --check && node tests/oldNames.mjs --diff && vitest run tests/agentsmd.test.ts tests/checkRepo.test.ts tests/controlCharacters.test.ts tests/dbWrites.test.ts tests/exitLog.test.ts tests/fakeCopilotApi.test.ts tests/focusedPick.test.ts tests/guidance.test.ts tests/i18n.test.ts tests/i18nFormatting.test.ts tests/legacyWorktreeGate.test.ts tests/licenses.test.ts tests/lineEndings.test.ts tests/modeDescriptions.test.ts tests/networkDecoding.test.ts tests/presenceChecks.test.ts tests/searchBoxes.test.ts tests/skillDescriptions.test.ts tests/skills.test.ts tests/tempDir.test.ts tests/testArea.test.ts tests/testQuiet.test.ts tests/tips.test.ts tests/trash.test.ts tests/userGuide.test.ts tests/windowsExits.test.ts && vitest run tests/admission.test.ts tests/bundled.test.ts tests/e2esuites.test.ts tests/folderProcesses.test.ts tests/i18nCatalogues.test.ts -t \"^(the (e2e suite list|suites a change needs|run context|rule's owner)|test tooling ends processes by identity)|bundled skill and mode that ships now|(up to date with|message in) Combwork's source|Combwork's translations pass\"",
     "icons": "node scripts/build-icons.mjs",
     "dist": "node scripts/dist.mjs",
     "dist:dir": "npm run build && electron-builder --win --dir --publish never",
@@ -32,6 +33,7 @@
     "e2e": "node tests/e2e/run.mjs",
     "e2e:concurrency": "node tests/e2e/concurrency.mjs",
     "test:clean": "node tests/e2e/clean.mjs",
+    "test:move-area": "node tests/moveTestArea.mjs",
     "test:waits": "node scripts/testWaits.mjs",
     "sandbox-checks": "node tests/sandbox/checks.cjs",
     "agent-text:extract": "node scripts/agentTextExtract.mjs",
@@ -90,7 +92,7 @@
     "esbuild@0.28.2": true,
     "electron-winstaller@5.4.0": true
   },
-  "//overrides": "#1141: monaco-editor 0.57.0 pins dompurify 3.4.15 (two IN_PLACE advisories). The override fixes npm's copy; the renderer build's hive-monaco-dompurify plugin (electron.vite.config.ts) makes Monaco's own bundled copy Hive's dompurify too. Remove both once Monaco pins 3.4.17 or later (HI-2421: 3.4.16 has advisories too): tests/monacoDompurify.test.ts fails then.",
+  "//overrides": "#1141: monaco-editor 0.57.0 pins dompurify 3.4.15 (two IN_PLACE advisories). The override fixes npm's copy; the renderer build's cw-monaco-dompurify plugin (electron.vite.config.ts) makes Monaco's own bundled copy Combwork's dompurify too. Remove both once Monaco pins 3.4.17 or later (HI-2421: 3.4.16 has advisories too): tests/monacoDompurify.test.ts fails then.",
   "overrides": {
     "monaco-editor": {
       "dompurify": "3.4.17"

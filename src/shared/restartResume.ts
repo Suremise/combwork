@@ -1,12 +1,12 @@
 /**
- * Restarts announced and resumed (HI-1707): what Hive records of its agents as it closes, the record's states, the
+ * Restarts announced and resumed (HI-1707): what Combwork records of its agents as it closes, the record's states, the
  * installer's request to close for an install, and the lines agents are given. Pure: main/restartResume.ts keeps the
  * record and runs the queue.
  */
 import { agentMsg, say } from './agentText'
 import { NOTICE_PREFIX } from './doorbell'
 
-/** Why Hive closed: an installer asked (install), an update installing (update), Restart Hive (restart), or a quit. */
+/** Why Combwork closed: an installer asked (install), an update installing (update), Restart Combwork (restart), or a quit. */
 export type RestartReason = 'install' | 'update' | 'restart' | 'quit'
 
 /**
@@ -20,7 +20,7 @@ export const FINAL_STATES: readonly RestartState[] = ['resumed', 'failed', 'dism
 /** The states the user still has to see: held (its slot), and offered. */
 const OPEN_STATES: readonly RestartState[] = ['pending', 'offered', 'queued', 'starting', 'held']
 
-/** An agent Hive closed under, and where its resume stands: who is resumed (how is the record's `reason`). */
+/** An agent Combwork closed under, and where its resume stands: who is resumed (how is the record's `reason`). */
 export interface RestartEntry {
   workspace: string
   projectPath: string
@@ -30,15 +30,15 @@ export interface RestartEntry {
   provider: string
   sessionId: string
   sessionName?: string
-  /** How it was as Hive closed: working, watching (a card loop), waiting, background, or idle in a running lane. */
+  /** How it was as Combwork closed: working, watching (a card loop), waiting, background, or idle in a running lane. */
   status: string
   /** The card it was on (its key, else #n), and the card's round then. */
   card?: { label: string; round?: number }
   /** The running lane it was the builder or reviewer of. */
   lane?: { id: string; name: string | null; role: 'builder' | 'reviewer' }
-  /** Hive's version as it closed. */
+  /** Combwork's version as it closed. */
   from: string
-  /** When Hive closed. */
+  /** When Combwork closed. */
   at: string
   state: RestartState
   /** Why it was skipped, held or failed, for the notice. */
@@ -72,7 +72,7 @@ export const isFinal = (s: RestartState): boolean => FINAL_STATES.includes(s)
 export const isOpen = (s: RestartState): boolean => OPEN_STATES.includes(s)
 
 /**
- * A new snapshot (Hive closing again) added to the record, with that close's reason: each agent in it replaces its
+ * A new snapshot (Combwork closing again) added to the record, with that close's reason: each agent in it replaces its
  * earlier entry (it ran in this run, so that entry is out of date), and entries of agents not in it are kept as they
  * are, so an offer the user hasn't answered isn't lost. Final entries are dropped.
  */
@@ -107,7 +107,7 @@ export function parseRecord(text: string): RestartRecord | null {
     const v = JSON.parse(text) as Partial<RestartRecord>
     if (v?.version !== 1 || !Array.isArray(v.entries)) return null
     const ok = (e: Partial<RestartEntry>): e is RestartEntry => typeof e?.projectPath === 'string' && typeof e.agentId === 'string' && typeof e.sessionId === 'string' && typeof e.state === 'string' && typeof e.at === 'string'
-    // A record with no reason we know offers (a quit's): Hive never resumes by itself on a guess.
+    // A record with no reason we know offers (a quit's): Combwork never resumes by itself on a guess.
     const reason = REASONS.includes(v.reason as RestartReason) ? (v.reason as RestartReason) : 'quit'
     return { version: 1, reason, entries: v.entries.filter(ok) }
   } catch {
@@ -119,14 +119,14 @@ export function parseRecord(text: string): RestartRecord | null {
 // The installer's request (installer.nsh): close for an install, bound to this process and this copy.
 // ---------------------------------------------------------------------------
 
-/** The request's file in Hive's profile, the acknowledgement's, and what a request taken is renamed to. */
+/** The request's file in Combwork's profile, the acknowledgement's, and what a request taken is renamed to. */
 export const REQUEST_FILE = 'restart-request.json'
 export const ackFile = (nonce: string): string => `restart-ack-${nonce}.json`
 export const takenFile = (nonce: string): string => `restart-request.${nonce}.taken`
 /** A request is at most this big, and this old. */
 export const REQUEST_MAX_BYTES = 4096
 export const REQUEST_MAX_AGE_MS = 60_000
-/** How far apart this process's start and the request's may be (the installer reads it from Windows, Hive from its uptime). */
+/** How far apart this process's start and the request's may be (the installer reads it from Windows, Combwork from its uptime). */
 export const START_TOLERANCE_MS = 5_000
 
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -137,7 +137,7 @@ export interface RestartRequest {
   pid: number
   /** When that process started (UTC, ISO). */
   pidCreated: string
-  /** The Hive.exe it was started from. */
+  /** The Combwork.exe it was started from. */
   exe: string
   reason: 'install'
   /** When the installer wrote it (UTC, ISO). */
@@ -190,24 +190,24 @@ export function checkRequest(text: string, t: RequestTarget, samePath: (a: strin
 // ---------------------------------------------------------------------------
 
 const T = {
-  restarting: agentMsg({ id: 'notice.restart.restarting', text: "Combwork is restarting for an update. Your work is saved; you'll be resumed.", note: 'HI-1707: the notice an agent finds in its inbox as Hive closes for an update, an install or a restart.' }),
+  restarting: agentMsg({ id: 'notice.restart.restarting', text: "Combwork is restarting for an update. Your work is saved; you'll be resumed.", note: 'HI-1707: the notice an agent finds in its inbox as Combwork closes for an update, an install or a restart.' }),
   resumed: agentMsg({
     id: 'notice.restart.resumed',
     text: '{reason, select, quit {Combwork was quit and started again} restart {Combwork restarted} other {Combwork restarted for an update}}{versions} at {time} UTC; your session was stopped and is resumed now.{where}{watch, select, yes { Carry on: re-arm your card watch if you were waiting.} other { Carry on where you were.}}',
-    note: 'HI-1707: the first prompt a resumed agent is given. reason: quit, restart or update (an install too); versions: " (1.0.0 → 1.0.1)" when the version changed, or nothing; time: when Hive closed ("10:00"); where: what it was on (notice.restart.where), after a space, or nothing; watch: yes when it was watching or in a lane.'
+    note: 'HI-1707: the first prompt a resumed agent is given. reason: quit, restart or update (an install too); versions: " (1.0.0 → 1.0.1)" when the version changed, or nothing; time: when Combwork closed ("10:00"); where: what it was on (notice.restart.where), after a space, or nothing; watch: yes when it was watching or in a lane.'
   }),
   where: agentMsg({
     id: 'notice.restart.where',
     text: "{onCard, select, yes {You were on {card}{hasRound, select, yes {, round {round}} other {}}{inLane, select, yes {, in lane ''{lane}'' (its {role, select, builder {builder} other {reviewer}})} other {}}} other {You were in lane ''{lane}'' (its {role, select, builder {builder} other {reviewer}})}}.",
-    note: 'HI-1707: what a resumed agent was on as Hive closed. onCard: yes with its card (card: "HI-12"; round: its round when hasRound is yes); inLane: yes with its lane (lane: its name or id; role: builder or reviewer). One of the two at least.'
+    note: 'HI-1707: what a resumed agent was on as Combwork closed. onCard: yes with its card (card: "HI-12"; round: its round when hasRound is yes); inLane: yes with its lane (lane: its name or id; role: builder or reviewer). One of the two at least.'
   })
 }
 
-/** The line an agent finds in its inbox as Hive closes for an update (said per agent, in its dialect). */
+/** The line an agent finds in its inbox as Combwork closes for an update (said per agent, in its dialect). */
 export const restartingLine = (): string => say(T.restarting)
 
 /**
- * The first line a resumed agent is given: why Hive restarted, from which version to which and when, what it was on,
+ * The first line a resumed agent is given: why Combwork restarted, from which version to which and when, what it was on,
  * and to re-arm its watch if it was waiting.
  */
 export function resumeNote(e: Pick<RestartEntry, 'from' | 'at' | 'status' | 'card' | 'lane'>, to: string, reason: RestartReason): string {

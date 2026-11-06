@@ -9,7 +9,7 @@ import { tempDir } from './tempDir'
 const require = createRequire(import.meta.url)
 const { pathWithoutGh, actionsOf, decide } = require('./e2e/fake-copilot-api.cjs')
 
-const base = tempDir('hive-fake-copilot-')
+const base = tempDir('cw-fake-copilot-')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 const PATHEXT = '.COM;.EXE;.BAT;.CMD'
 /** A folder with these files in it (empty files: only their names count). */
@@ -51,7 +51,7 @@ describe("gh off a test Copilot's PATH, whatever its folder is called", () => {
     expect(() => pathWithoutGh([sys, linked].join(';'), { pathext: PATHEXT, realpath: () => join(both, 'node.exe') })).toThrow(/losing node/)
   })
 
-  it("a test Hive's environment: no gh where Windows looks, the login and token variables hidden, the profile faked", () => {
+  it("a test Combwork's environment: no gh where Windows looks, the login and token variables hidden, the profile faked", () => {
     const { copilotTestEnv } = require('./e2e/fake-copilot-api.cjs')
     const portable = folder('portable-tools-2', ['gh.cmd'])
     const was = process.env.PATH
@@ -94,7 +94,7 @@ describe("the stand-in model's steps", () => {
       { say: 'Done here.' }
     ])
     expect(actionsOf('shell: git status && node check.js')).toEqual([{ tool: 'powershell', args: { command: 'git status && node check.js', description: 'Run a command', mode: 'sync', initial_wait: 30 } }])
-    expect(actionsOf('hive cw_list_tasks {"column":"todo"}')).toEqual([{ tool: 'cw_list_tasks', args: { column: 'todo' } }])
+    expect(actionsOf('cw cw_list_tasks {"column":"todo"}')).toEqual([{ tool: 'cw_list_tasks', args: { column: 'todo' } }])
     // "work N" anywhere in a step, as in a task's own words.
     expect(actionsOf('Run this, then reply "built" (work 10)')).toEqual([{ wait: 10000 }])
   })

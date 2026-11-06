@@ -5,7 +5,9 @@ import { gitProblemText } from '@shared/gitTool'
 import { agentRuntime, hooksMissingText } from '@shared/runtime'
 import { LOOP_STEP_WAIT_MINUTES } from '@shared/lanes'
 import { projectInfoPreferences } from '@shared/workflow/preferences'
-import { COLUMN_TEXT, REVIEW_WAIT_STALL_MS, TASK_COLUMNS, applyBoardFold, archiveBatchLabel, archiveBatchText, backgroundTaskMinutes, builderJobOf, cardMatches, newSinceStart, archivedAt, columnColor, columnName, laneOrderWaitReason, loopStepWait, loopStepWaitReason, notWatchingAgent, notWatchingReason, reviewStalled, reviewVerdictWaitReason, reviewWaitReason, stallAgentOf, stalledReason, startFailedReason, startWaitingReason, taskOverview, type BoardFoldChange, type LaneOrderView } from '@shared/tasks'
+import { COLUMN_TEXT, REVIEW_WAIT_STALL_MS, TASK_COLUMNS, applyBoardFold, archiveBatchLabel, archiveBatchText, backgroundTaskMinutes, builderJobOf, cardMatches, newSinceStart, archivedAt, columnColor, columnName, laneOrderWaitReason, loopStepWait, loopStepWaitReason, notWatchingAgent, notWatchingReason, reviewStalled, reviewVerdictWaitReason, reviewWaitReason, reviewWaiter, laneReviewOwed, stallAgentOf, stalledReason, startFailedReason, startWaitingReason, taskOverview, type BoardFoldChange, type LaneOrderView, type ReviewOwed } from '@shared/tasks'
+import { agentWorkflowRole, reviewsWork } from '@shared/workflow/roles'
+import { WORKFLOW_ENFORCE, advancedDef, advancedRow } from '@shared/advanced'
 import { isProviderEnabled, providerMessage, providerName } from '@shared/providers'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { call, errorMessage } from '../api'
@@ -61,7 +63,7 @@ function useBoardFold(): BoardFold {
 }
 
 /**
- * Changes this workspace's board fold (a view preference in Hive's own settings, never in the cards' files): shown at
+ * Changes this workspace's board fold (a view preference in Combwork's own settings, never in the cards' files): shown at
  * once, and saved by main as a change to what is saved now, so another window's folds (of its workspace) are never
  * written over with what this window read earlier. Folded cards no longer on the board, archived ones included, are
  * dropped (once the board has been read).
@@ -135,6 +137,8 @@ function cardStall(projects: ProjectInfo[], c: TaskCard, lane?: LaneOrderView | 
   // The team paused (HI-2081): its agents parking is what was asked of them, never a stall; once it resumes, each timed
   // stall needs its own wait since then too, as main's check has it.
   if (workspacePaused(get().workspace?.path)) return null
+  // Waiting on purpose (HI-2618), as main's check has it: never a stall while it is marked.
+  if (c.waitingFor && c.column === 'doing') return null
   const resumed = useTeamPause.getState().resumedAt
   const waited = (ms: number): boolean => Date.now() - resumed >= ms
   const { agent } = cardAgent(projects, c)
@@ -145,7 +149,10 @@ function cardStall(projects: ProjectInfo[], c: TaskCard, lane?: LaneOrderView | 
   const { loopers, watchers } = stallAgentsNow(projects)
   const looping = notWatchingReason(c, loopers, tr)
   if (looping) return { text: looping, kind: notWatchingAgent(c, loopers)?.untaken ? 'wake-untaken' : 'not-watching' }
-  const waiting = waited(REVIEW_WAIT_STALL_MS) ? reviewWaitReason(c, watchers, Date.now(), tr) : null
+  // Only the agent owing the review (HI-2636), never another agent only watching it.
+  const owed = reviewOwedOnBoard(projects, c, lane)
+  const reviews = (id: string): boolean => mayReview(projects, c, id)
+  const waiting = waited(REVIEW_WAIT_STALL_MS) ? reviewWaitReason(c, watchers, Date.now(), tr, owed, reviews) : null
   if (!waiting) {
     if (!waited(REVIEW_WAIT_STALL_MS)) return null
     const verdict = reviewVerdictWaitReason(c, watchers, Date.now(), tr, reviewJob(c, agent))
@@ -156,15 +163,28 @@ function cardStall(projects: ProjectInfo[], c: TaskCard, lane?: LaneOrderView | 
     // loopStepWait's own first tests, before the project's options are worked out for it (HI-1806: for every card).
     if (c.archived || c.blocked || !c.agent || (c.column !== 'doing' && c.column !== 'review' && c.column !== 'passed')) return null
     const project = cardAgent(projects, c).project
-    // The project's Design check wait (its workflow option, HI-1766), over Hive's and the workspace's.
+    // The project's Design check wait (its workflow option, HI-1766), over Combwork's and the workspace's.
     const st = get()
     const bound = (project ? projectInfoPreferences(project, st.settings?.workflow, st.workspace?.config.workflow).loopStepWaitMinutes : LOOP_STEP_WAIT_MINUTES) * 60_000
     const step = loopStepWaitReason(c, watchers, bound, Date.now(), tr)
     return step ? { text: step, kind: loopStepWait(c, watchers, bound)?.step === 'followUp' ? 'follow-up' : 'loop-step' } : null
   }
   // The watcher reviewWaitReason names: its state unknown (silent) or not.
-  const w = watchers.find((x) => x.project.toLowerCase() === c.project.toLowerCase() && x.agentId !== c.agent && x.cards.includes(c.number))
+  const w = reviewWaiter(c, watchers, owed, reviews)
   return { text: waiting, kind: w?.silentMinutes !== undefined ? 'review-silent' : 'review-wait' }
+}
+
+/** The card's project's agent, as the window knows it. */
+const projectAgentOf = (projects: ProjectInfo[], c: Pick<TaskCard, 'project'>, id: string): AgentInfo | undefined => projects.find((p) => p.name.toLowerCase() === c.project.toLowerCase())?.agents.find((a) => a.id === id)
+
+/** Who owes a card's review as the window knows it (HI-2636, laneReviewOwed), with the workflow rules as they are now. */
+const reviewOwedOnBoard = (projects: ProjectInfo[], c: Pick<TaskCard, 'number' | 'project'>, lane: LaneOrderView | null | undefined): ReviewOwed | null | undefined =>
+  laneReviewOwed(c, lane, projects.find((p) => p.name.toLowerCase() === c.project.toLowerCase())?.agents ?? [], advancedRow(advancedDef(WORKFLOW_ENFORCE)!, get().advanced).value === true)
+
+/** Whether an agent of the card's project may review (its workflow role, HI-2636). */
+function mayReview(projects: ProjectInfo[], c: Pick<TaskCard, 'project'>, id: string): boolean {
+  const a = projectAgentOf(projects, c, id)
+  return !!a && reviewsWork(agentWorkflowRole(a))
 }
 
 /**
@@ -179,9 +199,9 @@ function reviewJob(c: TaskCard, builder: AgentInfo | null | undefined): ReturnTy
 
 /** A stalled card's hover: what to do about it. */
 function stallHint(kind: StallKind): string {
-  if (kind === 'wake-untaken') return tr(msg({ id: 'board.stall.hintWakeUntaken', defaultMessage: "Combwork typed this card's wake into that agent, but its CLI didn't send it. Show the agent, click its terminal and press Enter.", description: "Tooltip on a stalled card: Hive typed the line that wakes the agent into its terminal, and the agent's CLI never sent it (it waits in the agent's prompt)." }))
+  if (kind === 'wake-untaken') return tr(msg({ id: 'board.stall.hintWakeUntaken', defaultMessage: "Combwork typed this card's wake into that agent, but its CLI didn't send it. Show the agent, click its terminal and press Enter.", description: "Tooltip on a stalled card: Combwork typed the line that wakes the agent into its terminal, and the agent's CLI never sent it (it waits in the agent's prompt)." }))
   if (kind === 'not-watching') return tr(msg({ id: 'board.stall.hintNotWatching', defaultMessage: 'Nothing will wake that agent when this card changes. Show it and ask it to carry on its card loop.', description: "Tooltip on a stalled card: an agent in a card loop stopped without a card watch (what wakes it when the card changes)." }))
-  if (kind === 'review-silent') return tr(msg({ id: 'board.stall.hintReviewSilent', defaultMessage: 'Its reviewer may have finished its turn without Combwork seeing it end. Show the reviewer: if its terminal waits at its prompt, Mark idle, and the watch wakes it.', description: 'Tooltip on a card stalled in Review whose reviewer Hive has heard nothing from. "Mark idle" is a command in the agent\'s menu: keep its wording as that command is translated.' }))
+  if (kind === 'review-silent') return tr(msg({ id: 'board.stall.hintReviewSilent', defaultMessage: 'Its reviewer may have finished its turn without Combwork seeing it end. Show the reviewer: if its terminal waits at its prompt, Mark idle, and the watch wakes it.', description: 'Tooltip on a card stalled in Review whose reviewer Combwork has heard nothing from. "Mark idle" is a command in the agent\'s menu: keep its wording as that command is translated.' }))
   if (kind === 'review-verdict') return tr(msg({ id: 'board.stall.hintReviewVerdict', defaultMessage: 'Its reviewer stopped without a verdict and waits on the card. Read its latest comment (it may have a question for you), then show the reviewer and ask it to finish its review.', description: 'Tooltip on a card stalled in Review: its reviewer started reviewing, then went back to waiting on the card without passing or failing it.' }))
   if (kind === 'lane-order') return tr(msg({ id: 'board.stall.hintLaneOrder', defaultMessage: "Its builder and its lane's reviewer are each waiting for the other. Ask the builder to send the card its reviewer waits for, or ask the reviewer to review this one.", description: "Tooltip on a card stalled in Review by its card loop's deadlock: the builder sent this card to Review and waits for its verdict, while the loop's reviewer waits for another card of the loop to arrive." }))
   if (kind === 'loop-step') return tr(msg({ id: 'board.stall.hintLoopStep', defaultMessage: 'Its builder waits for its reviewer to check the design it posted. Ask the reviewer to answer it, or tell the builder to go ahead as posted.', description: 'Tooltip on a card stalled in Doing (#1382): in a card loop, the builder posted a design for its reviewer to check before building, and nobody answered.' }))
@@ -202,7 +222,7 @@ function cardBusy(c: TaskCard, projects: ProjectInfo[], assistant: ProjectInfo |
     if (agent?.live) return tr(BUSY.working, { agent: agent.name })
   }
   if (c.review) return tr(BUSY.reviewing, { agent: c.review.agentName })
-  // HI-2153: a watch on a card in Done waits for nothing more (Hive ends it): nobody is on it for that.
+  // HI-2153: a watch on a card in Done waits for nothing more (Combwork ends it): nobody is on it for that.
   if (c.column === 'done') return null
   for (const p of assistant ? [...projects, assistant] : projects) {
     const a = p.agents.find((x) => x.live?.watch?.cards.includes(c.number))
@@ -254,7 +274,7 @@ const MOVE = {
   detail: msg({ id: 'board.move.askDetail', defaultMessage: 'Moving it anyway records an override on the card, with your reason.', description: "Under the rules a move would skip, in the question before it: making the move records it on the card as an exception to the rules (glossary: override), with the reason the user gives below." }),
   reason: msg({ id: 'board.move.reason', defaultMessage: 'Reason (optional)', description: "The label of the field in the question before a move that skips rules: why the user makes the exception, kept with it on the card. Optional." }),
   anyway: msg({ id: 'board.move.anyway', defaultMessage: 'Move Anyway', description: 'The button of the question before a move that skips rules: makes the move, recording it as an override (glossary: override).' }),
-  refused: msg({ id: 'board.move.refused', defaultMessage: "{card} can't move to {column}", description: "A toast's title: a card's move was refused for something no exception to the rules can make true (nothing to submit, something Hive couldn't read). {card} is the card's name, {column} a board column. The toast's text says why and what to do." }),
+  refused: msg({ id: 'board.move.refused', defaultMessage: "{card} can't move to {column}", description: "A toast's title: a card's move was refused for something no exception to the rules can make true (nothing to submit, something Combwork couldn't read). {card} is the card's name, {column} a board column. The toast's text says why and what to do." }),
   notMoved: msg({ id: 'board.move.notMoved', defaultMessage: 'Your other changes are saved; the card stays in {column}.', description: "In the card dialog, after Save: the user changed the card's Column, but its move was cancelled or refused (a toast says why); everything else was saved. {column} is the board column it is in." }),
   stopped: msg({ id: 'board.move.stopped', defaultMessage: '{card} stopped in {column}', description: "A toast's title: a drag went part of the way (the card's work started) and stopped in {column} (a board column), for something no exception to the rules can make true. {card} is the card's name. The toast's text says why and what to do." })
 }
@@ -397,6 +417,14 @@ function cardMenu(c: TaskCard, readOnly: string | null): MenuEntry[] {
           ...(c.column === 'todo' && c.project ? [{ label: tr(msg({ id: 'board.menu.startLane', defaultMessage: 'Start Lane with It…', description: "Menu item on a Todo card (right-click): opens Start Lane with this card first in the lane's list (a lane: a builder and a reviewer working through cards in turn). Glossary: lane." })), icon: 'list-ordered', disabled: !!readOnly, onClick: () => openLaneStart(c.project, [c.number]) }] : []),
           // What runs on it now (HI-1743), for a card in progress.
           ...(cardHasActivity(c) ? [{ label: tr(ACTIVITY), icon: 'type-hierarchy', onClick: () => void openCardActivity(c) }] : []),
+          // Waiting on purpose (HI-2618): marked with why in the card dialog's Waiting box, or cleared at once.
+          ...(c.column === 'doing'
+            ? [
+                c.waitingFor
+                  ? { label: tr(msg({ id: 'board.menu.clearWaiting', defaultMessage: 'Clear Waiting', description: "Menu item on a card in Active that waits on purpose (right-click, HI-2618): clears that mark, so Combwork reports it as stalled again if nobody gets on with it." })), icon: 'watch', disabled: !!readOnly, onClick: () => void change(c.number, { waitingFor: null }) }
+                  : { label: tr(msg({ id: 'board.menu.markWaiting', defaultMessage: 'Mark as Waiting…', description: "Menu item on a card in Active (right-click, HI-2618): opens the card's dialog to say why it waits on purpose (held for a quiet window, say), so Combwork doesn't report it as stalled meanwhile." })), icon: 'watch', disabled: !!readOnly, onClick: () => set({ taskOpen: c.number }) }
+              ]
+            : []),
           { separator: true },
           { header: true, label: tr(msg({ id: 'board.menu.moveTo', defaultMessage: 'Move to', description: "A heading in a card's right-click menu, above the board columns it can move to." })) },
           ...TASK_COLUMNS.filter((x) => x.id !== c.column).map((x) => ({ label: tr(COLUMN_TEXT[x.id].label), icon: 'arrow-right', disabled: !!readOnly, onClick: () => (x.id === 'doing' ? moveToDoing({ n: c.number, project: c.project, agent: c.agent }) : void moveCard(c, x.id)) })),
@@ -444,6 +472,8 @@ const ARCHIVE = msg({ id: 'board.card.archive', defaultMessage: 'Archive', descr
 const NEEDS_PROJECT = msg({ id: 'board.dialog.needsProject', defaultMessage: 'Give it a project first: its agent works there.', description: "Why a card with no project can't be started (a tooltip, and the Start dialog)." })
 /** The card dialog's Blocked field (its label and the box's name). */
 const BLOCKED_FIELD = msg({ id: 'board.dialog.blocked', defaultMessage: 'Blocked', description: "A field label in the card dialog: why the card can't go on (empty: it isn't blocked)." })
+/** The card dialog's Waiting field (HI-2618): its label and the box's name. */
+const WAITING_FIELD = msg({ id: 'board.dialog.waiting', defaultMessage: 'Waiting', description: "A field label in the card dialog, for a card in Active (HI-2618): why it waits on purpose (empty: it isn't). Not the same as Blocked." })
 /** No agent has the card. */
 const NOBODY_YET = msg({ id: 'board.dialog.nobodyYet', defaultMessage: 'Nobody yet', description: "No agent has the card: the card dialog's agent choice, and a choice of the Move to Doing dialog." })
 /** Start the card (the Start and Move to Doing dialogs' button). */
@@ -637,6 +667,7 @@ const CardTile = memo(function CardTile({
   )
   const blockedTip = c.blocked ? tr(msg({ id: 'board.card.blockedTip', defaultMessage: 'Blocked: {reason}', description: "Tooltip on a blocked card: why it can't go on ({reason}, in the user's or an agent's own words)." }), { reason: c.blocked }) : ''
   const blockedLabel = tr(msg({ id: 'board.card.blocked', defaultMessage: 'Blocked', description: "Accessible name of a folded card's blocked mark (a card that can't go on)." }))
+  const waitingTip = c.waitingFor ? tr(msg({ id: 'board.card.waitingTip', defaultMessage: 'Waiting: {reason} (marked by {by}). Combwork doesn’t report it as stalled meanwhile.', description: "Tooltip on a card in Active that waits on purpose (HI-2618): why ({reason}, in the user's or an agent's own words) and who marked it ({by}: the user (\"You\"), the Assistant or an agent's name)." }), { reason: c.waitingFor.reason, by: c.waitingFor.by }) : ''
   const stalledText = stalled ? tr(msg({ id: 'board.card.stalled', defaultMessage: 'Stalled: {why}', description: 'On a stalled card (and its tooltip when folded): nobody is getting on with it, and why ({why}, a sentence).' }), { why: stalled }) : ''
   const props = {
     className: cx('task-card', folded && 'folded', c.blocked && 'blocked', finished && 'finished', stalled && !c.blocked && 'stalled'),
@@ -663,6 +694,13 @@ const CardTile = memo(function CardTile({
               <Tooltip content={blockedTip}>
                 <span className="task-flag blocked" aria-label={blockedLabel}>
                   <Icon name="circle-slash" />
+                </span>
+              </Tooltip>
+            )}
+            {c.waitingFor && c.column === 'doing' && (
+              <Tooltip content={waitingTip}>
+                <span className="task-flag waiting" aria-label={tr(msg({ id: 'board.card.waitingMark', defaultMessage: 'Waiting', description: "Accessible name of a folded card's waiting mark (HI-2618: it waits on purpose)." }))}>
+                  <Icon name="watch" />
                 </span>
               </Tooltip>
             )}
@@ -707,6 +745,15 @@ const CardTile = memo(function CardTile({
             <div className="task-blocked">
               <Icon name="circle-slash" />
               <span className="task-note-text">{c.blocked}</span>
+            </div>
+          </Tooltip>
+        )}
+        {/* Waiting on purpose (HI-2618): quiet, not red; why on hover too. */}
+        {c.waitingFor && c.column === 'doing' && (
+          <Tooltip block content={waitingTip}>
+            <div className="task-waiting">
+              <Icon name="watch" />
+              <span className="task-note-text">{c.waitingFor.reason}</span>
             </div>
           </Tooltip>
         )}
@@ -1312,7 +1359,7 @@ export function BoardToolbar({
   useLanguage()
   const readOnly = readOnlyReason(useStore((s) => s.boardState?.readOnly))
   const count = useStore((s) => (s.tasks ?? NO_TASKS).filter((c) => c.archived && (project === null || c.project.toLowerCase() === project.toLowerCase())).length)
-  // How many cards an older Hive saved are set aside (#1044): the ⋯ menu offers them while any are. Read again as the board
+  // How many cards an older version saved are set aside (#1044): the ⋯ menu offers them while any are. Read again as the board
   // changes, and as their dialog closes: a discard there changes no card, so the board alone wouldn't say (HI-1860).
   const tasks = useStore((s) => s.tasks)
   const asideOpen = useStore((s) => s.setAsideOpen)
@@ -1598,7 +1645,7 @@ function Decisions({
     <div className="task-decisions">
       <div className="task-section-h">
         {tr(msg({ id: 'board.decision.heading', defaultMessage: 'Decisions ({n})', description: "A heading in the card dialog: the decisions the user recorded about the card, and how many ({n})." }), { n: list.length })}
-        <InfoTip text={tr(msg({ id: 'board.decision.info', defaultMessage: 'What you decided about this card: scope, wording, a default. Agents read them when they start and again before Review, and follow them where the description says otherwise; reviewers check the work against them. An agent or the Assistant can write down a decision you made; only you change or remove one.', description: "The (i) beside the card dialog's Decisions heading. Review is the board column; the Assistant is the Hive Assistant." }))} />
+        <InfoTip text={tr(msg({ id: 'board.decision.info', defaultMessage: 'What you decided about this card: scope, wording, a default. Agents read them when they start and again before Review, and follow them where the description says otherwise; reviewers check the work against them. An agent or the Assistant can write down a decision you made; only you change or remove one.', description: "The (i) beside the card dialog's Decisions heading. Review is the board column; the Assistant is the Combwork Assistant." }))} />
       </div>
       {list.map((d) => (
         <div key={d.id} className={cx('task-decision', newSinceStart(card, d) && 'new')}>
@@ -1767,9 +1814,9 @@ export function BoardPanel() {
 
 // ---------------------------------------------------------------------------
 /**
- * A line of a card's history, or a comment Hive wrote, as the window shows it (#846): from its message and values, in the
+ * A line of a card's history, or a comment Combwork wrote, as the window shows it (#846): from its message and values, in the
  * window's language (a batch's name worded as the archive's picker words it); its English for an entry from before, or
- * one whose message this Hive doesn't know.
+ * one whose message this Combwork doesn't know.
  */
 function storedLine(english: string, stored: StoredText | undefined): string {
   if (!stored) return english
@@ -1778,7 +1825,7 @@ function storedLine(english: string, stored: StoredText | undefined): string {
   return storedLineText(shown, (m, values) => tr(m, values), (id) => providerMessage(id) ?? workflowMessage(id)) ?? english
 }
 
-/** Who wrote a history line or a comment, as stored (English: "You", "Assistant", "Repair"), in the window's language; Hive and agents' names as they are. */
+/** Who wrote a history line or a comment, as stored (English: "You", "Assistant", "Repair"), in the window's language; Combwork and agents' names as they are. */
 const byText = (by: string): string => (Object.hasOwn(BY_TEXT, by) ? tr(BY_TEXT[by]) : by)
 /** Who added a card, as board.dialog.added selects it: the user, the Assistant, Repair, or an agent (other, by name). */
 const ADDED_BY: Record<string, string> = { You: 'you', Assistant: 'assistant', Repair: 'repair' }
@@ -1811,7 +1858,7 @@ export function TaskDialog() {
   // A new card's Review: Skip (#1625), and the user's optional note on why.
   const [skipReview, setSkipReview] = useState(false)
   const [skipNote, setSkipNote] = useState('')
-  // Why the board takes no changes (#1230): its 1.0 upgrade waits, or a newer Hive saved it. The card can be read, not changed.
+  // Why the board takes no changes (#1230): its 1.0 upgrade waits, or a newer Combwork saved it. The card can be read, not changed.
   const readOnly = readOnlyReason(useStore((s) => s.boardState?.readOnly))
   const ro = !!readOnly
   const isNew = open !== null && typeof open === 'object'
@@ -1827,6 +1874,7 @@ export function TaskDialog() {
   const [column, setColumn] = useState<TaskColumn>('todo')
   const [labels, setLabels] = useState('')
   const [blocked, setBlocked] = useState('')
+  const [waiting, setWaiting] = useState('')
   const [blockedBy, setBlockedBy] = useState('')
   const [links, setLinks] = useState('')
   // Its doc sections to read first (#818), one reference a line.
@@ -1888,6 +1936,7 @@ export function TaskDialog() {
     setColumn(c?.column ?? 'todo')
     setLabels(c?.labels.join(', ') ?? '')
     setBlocked(c?.blocked ?? '')
+    setWaiting(c?.waitingFor?.reason ?? '')
     setBlockedBy(c ? refsText(c.blockedBy) : '')
     setLinks(c ? refsText(c.links) : '')
     setContext(c?.context?.join('\n') ?? '')
@@ -1899,6 +1948,7 @@ export function TaskDialog() {
       column: c?.column ?? 'todo',
       labels: c?.labels.join(', ') ?? '',
       blocked: c?.blocked ?? '',
+      waiting: c?.waitingFor?.reason ?? '',
       blockedBy: c ? refsText(c.blockedBy) : '',
       links: c ? refsText(c.links) : '',
       context: c?.context?.join('\n') ?? ''
@@ -1987,6 +2037,7 @@ export function TaskDialog() {
       if (column !== was.column && !hold) patch.column = column
       if (labels !== was.labels) patch.labels = labelList
       if (blocked !== was.blocked) patch.blocked = blocked.trim() || null
+      if (waiting !== was.waiting) patch.waitingFor = waiting.trim() || null
       if (blockedBy !== was.blockedBy) patch.blockedBy = refs(blockedBy)
       if (links !== was.links) patch.links = refs(links)
       if (context !== was.context) patch.context = splitDocRefs(context)
@@ -2272,6 +2323,24 @@ export function TaskDialog() {
               if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) e.preventDefault()
             }}
           />
+          {/* Waiting on purpose (HI-2618), a card in Active only. */}
+          {card && card.column === 'doing' && (
+            <>
+              <label>{tr(WAITING_FIELD)}</label>
+              <textarea
+                className="input task-blocked-input"
+                rows={1}
+                aria-label={tr(WAITING_FIELD)}
+                placeholder={tr(msg({ id: 'board.dialog.waitingPlaceholder', defaultMessage: 'Why it waits on purpose (empty: not waiting). It isn’t reported as stalled; its agent keeps running.', description: "Placeholder of the card dialog's Waiting box (HI-2618), for a card in Active: why it waits on purpose (held for a quiet window, an answer from someone). Combwork then doesn't report it as stalled, and nothing is stopped. Empty means it isn't waiting." }))}
+                value={waiting}
+                readOnly={ro}
+                onChange={(e) => setWaiting(e.target.value.replace(/\s*[\r\n]+\s*/g, ' '))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) e.preventDefault()
+                }}
+              />
+            </>
+          )}
           <label>{tr(msg({ id: 'board.dialog.dependsOn', defaultMessage: 'Depends on', description: 'A field label in the card dialog: the cards to finish before this one.' }))}</label>
           <input className="input" placeholder={tr(msg({ id: 'board.dialog.dependsOnPlaceholder', defaultMessage: 'Cards to finish first, e.g. AM-3 AM-5', description: "Placeholder of the card dialog's Depends on box: cards by name (AM-3 AM-5 are examples: a project key, a hyphen and a number; #3 works too)." }))} value={blockedBy} readOnly={ro} onChange={(e) => setBlockedBy(e.target.value)} />
           <label>{tr(msg({ id: 'board.dialog.related', defaultMessage: 'Related', description: 'A field label in the card dialog: related cards.' }))}</label>
@@ -2286,7 +2355,7 @@ export function TaskDialog() {
               readOnly={ro}
               onChange={(e) => setContext(e.target.value)}
             />
-            {/* Each reference opens its section in Hive's viewer (#818). */}
+            {/* Each reference opens its section in Combwork's viewer (#818). */}
             {splitDocRefs(context).some((r) => parseDocRef(r)) && (
               <div className="task-context-links">
                 {splitDocRefs(context)
@@ -2339,7 +2408,7 @@ export function TaskDialog() {
                 <div className="task-comment-by">
                   <strong>{byText(c.by)}</strong> <span className="faint">{timeAgo(c.at)}</span>
                 </div>
-                <Markdown source={withAttachmentUrls(storedLine(c.text, c.hiveText), lookup)} cards={MARKDOWN_CARDS} onLink={onAttachmentLink} images={attachmentImages} />
+                <Markdown source={withAttachmentUrls(storedLine(c.text, c.appText), lookup)} cards={MARKDOWN_CARDS} onLink={onAttachmentLink} images={attachmentImages} />
               </div>
             ))}
             {!card.archived && (
@@ -2371,7 +2440,7 @@ export function TaskDialog() {
             <CardCostLine card={card} />
             <div className="faint task-created">
               {card.createdBy
-                ? tr(msg({ id: 'board.dialog.added', defaultMessage: '{who, select, you {Added by you} assistant {Added by the Assistant} repair {Added by Repair} other {Added by {by}}} {added} · changed {changed}', description: "At the foot of the card dialog: who added the card ({who}: you, the user; assistant, the Hive Assistant; repair, Hive's Repair, which gives cards back to a moved project; other: an agent, {by} its name), when ({added}: \"3 days ago\"), and when it last changed ({changed})." }), { who: addedBy(card.createdBy), by: card.createdBy, added: timeAgo(card.createdAt), changed: timeAgo(card.updatedAt) })
+                ? tr(msg({ id: 'board.dialog.added', defaultMessage: '{who, select, you {Added by you} assistant {Added by the Assistant} repair {Added by Repair} other {Added by {by}}} {added} · changed {changed}', description: "At the foot of the card dialog: who added the card ({who}: you, the user; assistant, the Combwork Assistant; repair, Combwork's Repair, which gives cards back to a moved project; other: an agent, {by} its name), when ({added}: \"3 days ago\"), and when it last changed ({changed})." }), { who: addedBy(card.createdBy), by: card.createdBy, added: timeAgo(card.createdAt), changed: timeAgo(card.updatedAt) })
                 : tr(msg({ id: 'board.dialog.addedUnknown', defaultMessage: 'Added by unknown {added} · changed {changed}', description: "At the foot of the card dialog when who added the card isn't known: when it was added ({added}: \"3 days ago\") and last changed ({changed})." }), { added: timeAgo(card.createdAt), changed: timeAgo(card.updatedAt) })}
             </div>
           </>
@@ -2495,7 +2564,7 @@ function StartChoices({ project, pick }: { project: ProjectInfo; pick: StartPick
           <ConnectionChoice id="start-agent-connection" value={connection} onChange={chooseConnection} />
           {checking && (
             <div className="hint span2" data-connection-checking>
-              <Icon name="loading" spin /> {tr(msg({ id: 'board.start.checkingConnection', defaultMessage: 'Finding out which coding agents are installed, to choose the first connection that can run…', description: "Under the new agent's choice of connection in the Start dialog (HI-2121) while Hive still looks for the installed coding agent CLIs: the first usable connection is chosen once it knows; Start waits until then." }))}
+              <Icon name="loading" spin /> {tr(msg({ id: 'board.start.checkingConnection', defaultMessage: 'Finding out which coding agents are installed, to choose the first connection that can run…', description: "Under the new agent's choice of connection in the Start dialog (HI-2121) while Combwork still looks for the installed coding agent CLIs: the first usable connection is chosen once it knows; Start waits until then." }))}
             </div>
           )}
         </div>

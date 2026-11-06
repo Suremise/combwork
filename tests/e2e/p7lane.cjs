@@ -1,8 +1,8 @@
 // P7's acceptance in the app (#1448, SPEC §16.18, §16.19.1's P7 row: "a 6×6 setup runs a full lane on slots, Resume All
 // and resume after restart work"), the Assistant off, fake Claude Code builders and fake Codex reviewers acting by their
 // own tokens, temp Git projects:
-// A. alpha, Hive's Team 6×6 loaded (its agents named from the project's key), Team chosen in the Version Control tab (G15
-//    On, G17 One per lane), Hive merging into main, checked out in the project folder:
+// A. alpha, Combwork's Team 6×6 loaded (its agents named from the project's key), Team chosen in the Version Control tab (G15
+//    On, G17 One per lane), Combwork merging into main, checked out in the project folder:
 //    - two lanes started from the window at once: each is lent a slot (slot-a, slot-b), its builder started there in a new
 //      conversation, and each card gets a line of its own from main's head;
 //    - lane 1's first card: counted checks, submitted; its reviewer, whose session stays in the project folder, is
@@ -13,8 +13,8 @@
 //    - S42: the user's uncommitted edit in a file the next merge changes pauses the queue, the file named; put back, it
 //      merges;
 //    - the Progress panel: "AL-B1 / AL-R1 · slot-a", the review copy's run a check of the revision, the slots' warming
-//      runs as Hive's;
-//    - lane 1 ends; a third lane is lent slot-a again; Hive quits mid-lane and opens again: Resume All resumes the open
+//      runs as Combwork's;
+//    - lane 1 ends; a third lane is lent slot-a again; Combwork quits mid-lane and opens again: Resume All resumes the open
 //      leases' sessions in their slots and lists AL-B1's, whose slot was lent again, as reused (S35's window side).
 // Screenshots in both themes. Dev build, throwaway profile, workspace, CLAUDE_CONFIG_DIR and CODEX_HOME.
 const lib = require('./lib.cjs')
@@ -61,7 +61,7 @@ const jsonl = (file) => lines(file).map((l) => JSON.parse(l))
 const commitIn = (dir, files, message, trailer) => {
   for (const [f, text] of Object.entries(files)) fs.writeFileSync(path.join(dir, f), text)
   lib.git(dir, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'add', '-A'])
-  lib.git(dir, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'commit', '-qm', message, ...(trailer ? ['-m', `Hive-Card: ${trailer}`] : [])])
+  lib.git(dir, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'commit', '-qm', message, ...(trailer ? ['-m', `Combwork-Card: ${trailer}`] : [])])
   return git(dir, 'rev-parse', 'HEAD')
 }
 const isIn = (dir, rev, ref) => {
@@ -112,8 +112,8 @@ function prepare() {
   fs.writeFileSync(path.join(fx.claudeHome, 'fake-trusted.json'), JSON.stringify([fx.ws, alpha, beta, gamma, ...slotFolders(alpha), ...slotFolders(beta)].map((f) => f.toLowerCase())))
 }
 
-async function startHive(env = {}) {
-  const { app, page, inv } = await lib.launch({ userData: fx.userData, viewport: { width: 1500, height: 950 }, env: { HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: fx.claudeHome, CODEX_HOME: codexHome, HIVE_TEST_TIPS: 'off', ...env } })
+async function startCombwork(env = {}) {
+  const { app, page, inv } = await lib.launch({ userData: fx.userData, viewport: { width: 1500, height: 950 }, env: { CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: fx.claudeHome, CODEX_HOME: codexHome, CW_TEST_TIPS: 'off', ...env } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.waitForProvider(inv)
   await lib.waitForProvider(inv, 'codex')
@@ -121,7 +121,7 @@ async function startHive(env = {}) {
   return { app, page, inv }
 }
 
-/** The page's helpers for one start of Hive: sessions, tokens, intents, shells, the board and the Progress panel. */
+/** The page's helpers for one start of Combwork: sessions, tokens, intents, shells, the board and the Progress panel. */
 function helpers(h) {
   const { page, inv } = h
   const live = async (p, id) => (await inv('session:live')).find((s) => same(s.projectPath, p) && s.agentId === id) ?? null
@@ -134,19 +134,19 @@ function helpers(h) {
     if (!s) return null
     if (a.provider === 'codex') {
       const l = await until(() => codexLaunches().findLast((x) => x.args.some((y) => y.includes(s.runId))), HUNG_MS)
-      const hive = l ? fromCodexTable(l.args.find((x) => x.startsWith('mcp_servers.combwork=')).slice('mcp_servers.combwork='.length)) : null
-      return hive ? JSON.parse(fs.readFileSync(hive.env.CW_API_TOKEN_FILE, 'utf8')).token : null
+      const server = l ? fromCodexTable(l.args.find((x) => x.startsWith('mcp_servers.combwork=')).slice('mcp_servers.combwork='.length)) : null
+      return server ? JSON.parse(fs.readFileSync(server.env.CW_API_TOKEN_FILE, 'utf8')).token : null
     }
     // The newest: a resumed conversation keeps its id, and an earlier launch's files are gone.
     const l = await until(() => claudeLaunches().findLast((x) => x.sessionId === s.sessionId && x.opts['--mcp-config'] && fs.existsSync(x.opts['--mcp-config'])), HUNG_MS)
-    const hive = l ? JSON.parse(fs.readFileSync(l.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
-    return hive ? JSON.parse(fs.readFileSync(hive.env.CW_API_TOKEN_FILE, 'utf8')).token : null
+    const server = l ? JSON.parse(fs.readFileSync(l.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
+    return server ? JSON.parse(fs.readFileSync(server.env.CW_API_TOKEN_FILE, 'utf8')).token : null
   }
   /** An agent's intent on a card, its token read afresh each time (a restarted session has a new one). */
   const intent = async (p, a, n, name, body = {}) => {
     const token = await tokenOf(p, a)
     let res = null
-    // "Try again: Hive reads it afresh" (what it read moved as it decided), as an agent does, a few times at most.
+    // "Try again: Combwork reads it afresh" (what it read moved as it decided), as an agent does, a few times at most.
     for (let tries = 0; tries < 5; tries++) {
       const r = await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${encodeURIComponent(`#${n}`)}/${name}`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       res = { status: r.status, body: await r.json().catch(() => null) }
@@ -257,26 +257,26 @@ function helpers(h) {
     }, HUNG_MS)
     await listed.click()
   }
-  const command = (id) => h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'menu-command', command: id, args: [] })
+  const command = (id) => h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'menu-command', command: id, args: [] })
   return { live, idle, tokenOf, intent, startReview, shell, card, facts, kinds, fact, done, lane, slots, slotOfLane, create, runs, shoot, showBoard, startLane, panel, showTab, laneTop, text, toProject, command }
 }
 
 ;(async () => {
   prepare()
-  let h = await startHive()
+  let h = await startCombwork()
   // What the restart needs of the first start: the agents, the lanes, the cards.
   const kept = {}
   try {
     const { page, inv } = h
     const x = helpers(h)
 
-    // --- A. alpha: Team 6×6 from Hive's template, its agents named from the project's key.
+    // --- A. alpha: Team 6×6 from Combwork's template, its agents named from the project's key.
     // Loaded from the Templates view: Team 6×6 → Load into Project… → alpha; its load dialog names each agent.
     await page.locator('.activitybar [aria-label="Templates"]').click()
-    const tplRow = page.locator('.sidebar .template-row[data-scope="hive"][aria-label="Team 6×6"]')
+    const tplRow = page.locator('.sidebar .template-row[data-scope="combwork"][aria-label="Team 6×6"]')
     await tplRow.waitFor({ timeout: HUNG_MS })
     await tplRow.click()
-    const detail = page.locator('.main-area > .tab-body .template-detail[data-scope="hive"]')
+    const detail = page.locator('.main-area > .tab-body .template-detail[data-scope="combwork"]')
     await detail.waitFor({ timeout: HUNG_MS })
     await detail.getByRole('button', { name: 'Load into Project…' }).click()
     const pick = page.locator('.dialog').last()
@@ -296,7 +296,7 @@ function helpers(h) {
     check('…six Claude Code builders and six Codex reviewers, none in a worktree', agents.length === 12 && agents.filter((a) => a.workflowRole === 'builder' && a.provider === 'claude-code').length === 6 && agents.filter((a) => a.workflowRole === 'reviewer' && a.provider === 'codex').length === 6 && agents.every((a) => !a.worktree), JSON.stringify(agents.map((a) => [a.name, a.workflowRole, a.provider, !!a.worktree])))
     Object.assign(kept, { b1, b2, b3, r1, r2, r3 })
 
-    // Team chosen in the Version Control tab: G15 On, G17 One per lane, Hive merging into main (the default branch).
+    // Team chosen in the Version Control tab: G15 On, G17 One per lane, Combwork merging into main (the default branch).
     await x.toProject('alpha')
     await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
     await page.locator('.git-sections [data-section="workflow"]').click()
@@ -316,7 +316,7 @@ function helpers(h) {
       const f = await inv('workflow:form', alpha)
       return f?.preset === 'team' ? f.options : null
     }, HUNG_MS)
-    must('Team saved from the tab: Hive merges into main, slots, G15 On, G17 One per lane, quick and tests before review and merge', opts?.finish === 'hiveMerges' && opts.target === 'main' && !!opts.commands?.typecheck && !!opts.commands?.test && opts.folder === 'slots' && opts.slotsUpToDate === true && opts.reviewerMode === 'lane' && opts.preChecks?.length === 2 && opts.mergeChecks?.length === 2, JSON.stringify(opts))
+    must('Team saved from the tab: Combwork merges into main, slots, G15 On, G17 One per lane, quick and tests before review and merge', opts?.finish === 'combworkMerges' && opts.target === 'main' && !!opts.commands?.typecheck && !!opts.commands?.test && opts.folder === 'slots' && opts.slotsUpToDate === true && opts.reviewerMode === 'lane' && opts.preChecks?.length === 2 && opts.mergeChecks?.length === 2, JSON.stringify(opts))
     await inv('project:updateConfig', alpha, { slots: { setup: `node "${path.join(fx.tools, 'setup.js')}"` } })
 
     // --- Two lanes from the window at once, each lent a slot, its builder started there in a new conversation.
@@ -339,7 +339,7 @@ function helpers(h) {
       }, HUNG_MS)
       check(`${b.name} runs in ${s.name}`, !!there && there.slot === s.name, JSON.stringify(await x.live(alpha, b.id)))
     }
-    check("the slots' warming ran as Hive's, for each slot", !!(await until(async () => ['slot-a', 'slot-b'].every((n) => lines(setupLog).includes(n)), HUNG_MS)) && (await x.runs()).some((r) => r.source === 'hive' && r.slot === 'slot-a'), JSON.stringify({ log: lines(setupLog), runs: (await x.runs()).filter((r) => r.slot).map((r) => [r.slot, r.source, r.defaultName]) }))
+    check("the slots' warming ran as Combwork's, for each slot", !!(await until(async () => ['slot-a', 'slot-b'].every((n) => lines(setupLog).includes(n)), HUNG_MS)) && (await x.runs()).some((r) => r.source === 'combwork' && r.slot === 'slot-a'), JSON.stringify({ log: lines(setupLog), runs: (await x.runs()).filter((r) => r.slot).map((r) => [r.slot, r.source, r.defaultName]) }))
 
     // Each card its own line from main's head.
     const startIn = async (b, n, slot) => {
@@ -360,7 +360,7 @@ function helpers(h) {
     const checksIn = async (b, n) => {
       q.steer(fx, 'pass')
       const k = (await x.card(n)).key
-      for (const name of ['typecheck', 'test']) await x.shell(alpha, b, `hive-progress --check ${name} --card ${k}`)
+      for (const name of ['typecheck', 'test']) await x.shell(alpha, b, `cw-progress --check ${name} --card ${k}`)
       return until(async () => ((await counted(n)).length >= 2 ? counted(n) : null), HUNG_MS)
     }
     const rev1 = commitIn(slotA.folder, { 'one.txt': 'one\n' }, 'Lane one: first')
@@ -375,7 +375,7 @@ function helpers(h) {
     must(`…start review leases it a review copy at the revision (${rev1.slice(0, 7)})`, review.status === 200 && !!copy && fs.existsSync(copy) && git(copy, 'rev-parse', 'HEAD') === rev1, JSON.stringify(review.body))
     check("…its session stays in the project folder", same((await x.live(alpha, r1.id))?.cwd, alpha))
     q.steer(fx, 'pass')
-    const ran = await x.shell(alpha, r1, `cd /d "${copy}" && hive-progress --check typecheck`)
+    const ran = await x.shell(alpha, r1, `cd /d "${copy}" && cw-progress --check typecheck`)
     const copyRun = await until(async () => (await x.runs()).find((r) => r.card === a1 && r.copy === path.basename(copy) && r.state !== 'running'), HUNG_MS)
     check('…its check in the copy is a check of the card at the revision', !!ran && !!copyRun && copyRun.revision === rev1, JSON.stringify({ ran, copyRun }))
     Object.assign(kept, { copyRun: copyRun?.id })
@@ -404,13 +404,13 @@ function helpers(h) {
     }, HUNG_MS)), await tip())
     await h.page.mouse.move(5, 5)
     const agentChoices = () => x.panel.locator('select[aria-label="Agent"] option').allInnerTexts().catch(() => [])
-    // HI-1710: the copy's set-up run is its reviewer's (no "Hive (copy …)" entry), and no entry is listed twice.
-    const hives = ['Combwork (slot slot-a)', 'Combwork (slot slot-b)']
-    const hivesNamed = async () => {
+    // HI-1710: the copy's set-up run is its reviewer's (no "Combwork (copy …)" entry), and no entry is listed twice.
+    const slots = ['Combwork (slot slot-a)', 'Combwork (slot slot-b)']
+    const combworkNamed = async () => {
       const now = await agentChoices()
-      return hives.every((c) => now.includes(c)) && !now.some((c) => c.startsWith('Combwork (copy')) && new Set(now).size === now.length
+      return slots.every((c) => now.includes(c)) && !now.some((c) => c.startsWith('Combwork (copy')) && new Set(now).size === now.length
     }
-    check("the Runs tab's Agent filter names the slots' runs as Hive's, and the copy's as its reviewer's", !!(await until(hivesNamed, HUNG_MS)), JSON.stringify(await agentChoices()))
+    check("the Runs tab's Agent filter names the slots' runs as Combwork's, and the copy's as its reviewer's", !!(await until(combworkNamed, HUNG_MS)), JSON.stringify(await agentChoices()))
     await x.shoot('runs', x.panel)
 
     // --- Passed: the queue merges it into main, checked out in the project folder, while the reviewer is idle there (S42).
@@ -469,7 +469,7 @@ function helpers(h) {
     check('…put back and resumed: merged, Done', (await inv('queue:resume', alpha, 'main')).resumed === true && (await x.done(a2)), JSON.stringify(await x.kinds(a2)))
     check('lane 1 ends with its cards Done; its builder is stopped', !!(await until(async () => !!(await x.lane(l1.id))?.endedAt && !(await x.live(alpha, b1.id)), HUNG_MS)))
 
-    // --- A third lane is lent slot-a again (AL-B1's conversation there is now another's); Hive quits mid-lane.
+    // --- A third lane is lent slot-a again (AL-B1's conversation there is now another's); Combwork quits mid-lane.
     // slot-a free again: no lease, its writer (AL-B1's session) gone, ready.
     check('slot-a is free and ready once lane 1 has ended', !!(await until(async () => (await x.slots(alpha)).some((s) => s.name === 'slot-a' && !s.lease && !s.writer && s.state === 'ready'), HUNG_MS)), JSON.stringify(await x.slots(alpha)))
     const d1 = await x.create(alpha, 'Lane three: only')
@@ -486,7 +486,7 @@ function helpers(h) {
   }
 
   // --- The second start: the restart's Resume All (S35), then the pool (beta) and everyone in the project folder (gamma).
-  h = await startHive()
+  h = await startCombwork()
   try {
     if (kept.ok) {
       const { page, inv } = h
@@ -509,7 +509,7 @@ function helpers(h) {
       commitIn(slotB, { 'two.txt': 'two\n' }, 'Lane two: only')
       q.steer(fx, 'pass')
       const k = (await x.card(kept.c1)).key
-      for (const name of ['typecheck', 'test']) await x.shell(alpha, b2, `hive-progress --check ${name} --card ${k}`)
+      for (const name of ['typecheck', 'test']) await x.shell(alpha, b2, `cw-progress --check ${name} --card ${k}`)
       await inv('session:start', alpha, { agentId: kept.r2.id }).catch(() => undefined)
       check('lane 2 carries on after the restart: submitted, reviewed, passed', (await x.intent(alpha, b2, kept.c1, 'submit', { summary: 'two: ready' })).status === 200 && (await x.intent(alpha, kept.r2, kept.c1, 'start-review')).status === 200 && (await x.intent(alpha, kept.r2, kept.c1, 'verdict', { pass: true, comment: 'two: passed' })).status === 200)
       check('…merged: Done, the lane ended', (await x.done(kept.c1)) && !!(await until(async () => !!(await x.lane(kept.l2))?.endedAt, HUNG_MS)))
@@ -543,18 +543,18 @@ function helpers(h) {
 const assignedOf = async (x, n) => (await x.facts(n)).filter((f) => f.kind === 'ReviewerAssigned').map((f) => f.data.reviewer)
 
 /**
- * B. beta, Hive's Team 6 + pool trimmed to two builders and its two pooled reviewers, an either agent E1 beside them, two
- * reviewers per card (G1b = 2), Hive merging: two lanes on the pool ("<KEY>-B1 / pool"); a card reviewed by both pooled
+ * B. beta, Combwork's Team 6 + pool trimmed to two builders and its two pooled reviewers, an either agent E1 beside them, two
+ * reviewers per card (G1b = 2), Combwork merging: two lanes on the pool ("<KEY>-B1 / pool"); a card reviewed by both pooled
  * reviewers, each in a review copy at its revision; E1 builds a card in a slot and isn't given a review meanwhile, then,
  * its card Done, reviews from the pool in the project folder (its launch granted the copies folder).
  */
 async function pool(h) {
   const { inv } = h
   const x = helpers(h)
-  await inv('workflow:setOptions', beta, { preset: null, options: { review: 'agent', noSelfReview: true, reviewers: 2, finish: 'hiveMerges', folder: 'slots', target: 'main', style: 'merge', preChecks: [], mergeChecks: [], identity: fx.identity, okBefore: { mode: 'never', labels: [] }, reviewerMode: 'pool' } })
-  const plan = await inv('templates:plan', beta, 'hive', 'team-6-pool.json')
+  await inv('workflow:setOptions', beta, { preset: null, options: { review: 'agent', noSelfReview: true, reviewers: 2, finish: 'combworkMerges', folder: 'slots', target: 'main', style: 'merge', preChecks: [], mergeChecks: [], identity: fx.identity, okBefore: { mode: 'never', labels: [] }, reviewerMode: 'pool' } })
+  const plan = await inv('templates:plan', beta, 'combwork', 'team-6-pool.json')
   check('Team 6 + pool suggests the reviewer pool', plan.reviewerMode === 'pool', JSON.stringify(plan.reviewerMode))
-  await inv('templates:load', beta, 'hive', 'team-6-pool.json', plan.remove.map((a) => a.id))
+  await inv('templates:load', beta, 'combwork', 'team-6-pool.json', plan.remove.map((a) => a.id))
   const agentsOf = async () => (await inv('workspace:refresh'))?.projects.find((p) => same(p.path, beta))?.agents ?? []
   for (const extra of (await agentsOf()).filter((a) => /-B[3-6]$/.test(a.name))) await inv('agents:remove', beta, extra.id, { deleteWorktree: false })
   await lib.addAgent(inv, beta, { name: 'E1', workflowRole: 'either' })
@@ -699,7 +699,7 @@ async function gallery(h, kept) {
   const base = (await inv('app:info')).language
   const dir = path.join(lib.ROOT, 'locales', 'de')
   const german = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))))
-  const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language })
+  const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
   const english = async () => (await page.getByRole('button', { name: 'Task Board', exact: true }).count()) > 0
   /** `loc` (or what `open(lang)` opens in each language) shot in both themes, English then German; `close` after. */
   const shoot = async (name, { loc = page, open, close } = {}) => {
@@ -787,8 +787,8 @@ async function gallery(h, kept) {
 
   // A template's load dialog, its names table from the project's key (delta's, loaded nowhere).
   await page.locator('.activitybar [aria-label="Templates"]').click()
-  await page.locator('.sidebar .template-row[data-scope="hive"][aria-label="Team 6×6"]').click()
-  const detail = page.locator('.main-area > .tab-body .template-detail[data-scope="hive"]')
+  await page.locator('.sidebar .template-row[data-scope="combwork"][aria-label="Team 6×6"]').click()
+  const detail = page.locator('.main-area > .tab-body .template-detail[data-scope="combwork"]')
   await detail.waitFor({ timeout: HUNG_MS })
   await shoot('template-names', {
     open: async (lang) => {

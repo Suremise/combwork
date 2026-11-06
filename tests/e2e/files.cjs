@@ -24,8 +24,8 @@ w('dist/out.js', 'x')
 execSync('git init -q && git add -A && git -c user.email=t@t -c user.name=t commit -qm init', { cwd: proj, env: lib.gitEnv() })
 w('src/app.ts', 'export const a = 2\n') // modified
 w('src/new.ts', 'new\n') // untracked
-// Fake session attachments: one live-ish group, one archived. Written where Hive kept them before #387, .combwork/images,
-// which Hive moves to .combwork/attachments; the first group also has a log and a PDF.
+// Fake session attachments: one live-ish group, one archived. Written where Combwork kept them before #387, .combwork/images,
+// which Combwork moves to .combwork/attachments; the first group also has a log and a PDF.
 const png = lib.samplePng(400, 200)
 const ids = ['11111111-aaaa-bbbb-cccc-000000000001', '22222222-aaaa-bbbb-cccc-000000000002']
 for (const [i, id] of ids.entries()) {
@@ -57,12 +57,12 @@ const check = (name, ok, extra = '') => {
 }
 
 ;(async () => {
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => results.push(`PAGEERROR ${e.message}`))
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('demo', { exact: true }).first().click()
   await page.locator('.tab', { hasText: 'Files' }).click()
@@ -138,7 +138,7 @@ const check = (name, ok, extra = '') => {
   await page.getByRole('button', { name: 'Move to Recycle Bin' }).click()
   await lib.until(async () => !exists('.gitignore copy'), 10000)
   check('delete moves ".gitignore copy" to the Recycle Bin', !exists('.gitignore copy'))
-  // A test copy's Recycle Bin is the suite's own trash folder (#414). Hive notes the move in trash.jsonl just after it,
+  // A test copy's Recycle Bin is the suite's own trash folder (#414). Combwork notes the move in trash.jsonl just after it,
   // so the file leaving the project doesn't mean the note is there yet (#441): wait for it.
   check("…the suite's trash folder in a test copy, not the user's", !!(await lib.until(() => lib.trashed('.gitignore copy').some((e) => fs.existsSync(e.to)), 5000)), JSON.stringify(lib.trashed()))
 
@@ -178,7 +178,7 @@ const check = (name, ok, extra = '') => {
   // once the copy's row is in the tree the paste has done what it does after that reload.
   await page.keyboard.press('Control+C')
   await row('dist').click()
-  await app.evaluate(() => { process.env.HIVE_TEST_SLOW_IPC = 'files:list=5000' })
+  await app.evaluate(() => { process.env.CW_TEST_SLOW_IPC = 'files:list=5000' })
   await page.keyboard.press('Control+V')
   await lib.until(() => exists('dist/from explorer.txt'), HUNG_MS)
   // Checked and clicked in one go in the window: was the paste still reloading dist at the click?
@@ -191,12 +191,12 @@ const check = (name, ok, extra = '') => {
   const pastedRow = await lib.until(async () => (await row('dist/from explorer.txt').count()) === 1, HUNG_MS)
   const kept = await page.locator('.file-row.selected').evaluateAll((els) => els.map((e) => e.getAttribute('data-rel')))
   check('…and the clicked row keeps the selection once the paste ends', !!pastedRow && JSON.stringify(kept) === JSON.stringify(['.gitignore']), JSON.stringify({ pastedRow: !!pastedRow, kept }))
-  await app.evaluate(() => { process.env.HIVE_TEST_SLOW_IPC = '' })
+  await app.evaluate(() => { process.env.CW_TEST_SLOW_IPC = '' })
 
-  // Live update from outside Hive.
+  // Live update from outside Combwork.
   w('made-outside.txt', 'hi')
   await lib.until(async () => (await row('made-outside.txt').count()) === 1, 10000)
-  check('file created outside Hive appears live', (await row('made-outside.txt').count()) === 1)
+  check('file created outside Combwork appears live', (await row('made-outside.txt').count()) === 1)
 
   // Filter.
   await page.locator('.files-filter input').fill('util')

@@ -22,7 +22,7 @@ const load = async () => {
 /** The log file's lines that carry this text. */
 const inFile = (text: string): string[] => {
   try {
-    return readFileSync(join(app.getPath('userData'), 'logs', 'hive.log'), 'utf8').split('\n').filter((l) => l.includes(text))
+    return readFileSync(join(app.getPath('userData'), 'logs', 'combwork.log'), 'utf8').split('\n').filter((l) => l.includes(text))
   } catch {
     return []
   }

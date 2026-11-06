@@ -1,15 +1,16 @@
-// The fake CLIs' way to call Hive's tools: through the real hive MCP server, started as the launch configured it (its
+// The fake CLIs' way to call Combwork's tools: through the launch's real Combwork MCP server, started as the launch configured it (its
 // command, arguments and environment), so a scripted call is what a model's call would be. The server runs the call
-// against the Agent API, logs it (HIVE_TEST_MCP_LOG) and reports its reply's size to Hive's performance metrics, as
-// it does for a real CLI. Used by fake-claude and fake-codex for their "hive", "boardmove", "boardreview" and
+// against the Agent API, logs it (CW_TEST_MCP_LOG) and reports its reply's size to Combwork's performance metrics, as
+// it does for a real CLI. Used by fake-claude and fake-codex for their "cw", "boardmove", "boardreview" and
 // "boardcomment" steps.
 const { spawn } = require('child_process')
+const { toolName } = require('./fake-claude/oldRelease.cjs')
 
 /**
- * Calls `tool` with `args` on the hive MCP server `server` ({ command, args, env }): initialize, tools/list, the call,
+ * Calls `tool` with `args` on the Combwork MCP server `server` ({ command, args, env }): initialize, tools/list, the call,
  * then end of input (the server sends its metrics report and exits). Resolves { text, isError }.
  */
-function callHiveTool(server, tool, args, timeoutMs = 30000) {
+function callOwnTool(server, tool, args, timeoutMs = 30000) {
   return new Promise((resolve) => {
     const env = { ...process.env, ...server.env }
     const p = spawn(server.command, server.args ?? [], { env, stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true })
@@ -23,10 +24,10 @@ function callHiveTool(server, tool, args, timeoutMs = 30000) {
       p.stdin.end()
     }
     const timer = setTimeout(() => {
-      done({ text: 'The hive server did not answer', isError: true })
+      done({ text: 'The Combwork MCP server did not answer', isError: true })
       p.kill()
     }, timeoutMs)
-    p.on('exit', () => resolve(result ?? { text: 'The hive server exited', isError: true }))
+    p.on('exit', () => resolve(result ?? { text: 'The Combwork MCP server exited', isError: true }))
     p.on('error', (e) => {
       done({ text: String(e), isError: true })
       resolve(result)
@@ -53,12 +54,12 @@ function callHiveTool(server, tool, args, timeoutMs = 30000) {
 }
 
 /**
- * Connects the launch's hive MCP server as a CLI does when it starts (#865): initialize and notifications/initialized,
- * which the server tells Hive of (POST /v1/launch/connected), then end of input (it exits once that is sent). `held`:
+ * Connects the launch's Combwork MCP server as a CLI does when it starts (#865): initialize and notifications/initialized,
+ * which the server tells Combwork of (POST /v1/launch/connected), then end of input (it exits once that is sent). `held`:
  * a promise to wait for first (a test holding the connection back, as a resumed Claude Code connects after its
  * SessionStart). Resolves once the server has exited; never fails.
  */
-async function connectHive(server, held) {
+async function connectOwnServer(server, held) {
   if (!server) return
   if (held) await held
   await new Promise((resolve) => {
@@ -80,7 +81,7 @@ async function connectHive(server, held) {
 }
 
 /**
- * A Codex inline table as Hive writes it (`-c mcp_servers.combwork={command="…",args=["…"],env={K="…"}}`: strings are JSON
+ * A Codex inline table as Combwork writes it (`-c mcp_servers.combwork={command="…",args=["…"],env={K="…"}}`: strings are JSON
  * strings, keys bare or JSON strings) as an object.
  */
 function fromCodexTable(text) {
@@ -106,12 +107,13 @@ function fromCodexTable(text) {
 }
 
 /**
- * Parses a scripted "hive TOOL {json}" step's arguments: the JSON object after the tool's name (no " then " in it), or
- * none. A tool by its 1.1 name (cw_*, HI-2463), or by an older Hive's (hive_*: upgradelane's 0.9 Hive, HI-2506).
+ * Parses a scripted "cw TOOL {json}" step's arguments: the JSON object after the tool's name (no " then " in it), or
+ * none. A tool by its current name (cw_*); an old release's only in old-release mode, refused otherwise (oldRelease.cjs
+ * toolName, HI-2614).
  */
-function parseHiveStep(step) {
-  const m = /\bhive\s+((?:cw|hive)_[a-z_]+)(?:\s+(\{.*\}))?/i.exec(step)
-  if (!m) return null
+function parseToolStep(step) {
+  const m = /\bcw\s+([a-z]+_[a-z_]+)(?:\s+(\{.*\}))?/i.exec(step)
+  if (!m || !toolName(m[1])) return null
   let args = {}
   try {
     args = m[2] ? JSON.parse(m[2]) : {}
@@ -121,7 +123,7 @@ function parseHiveStep(step) {
   return { tool: m[1], args }
 }
 
-/** Whether a prompt is Hive's doorbell (#650): its fixed words naming what waits in the agent's inbox by id. */
+/** Whether a prompt is Combwork's doorbell (#650): its fixed words naming what waits in the agent's inbox by id. */
 const isDoorbell = (text) => String(text).startsWith('[CW] New in your inbox: ')
 
 /**
@@ -133,7 +135,7 @@ const doorbellIsWork = (text) => /^\[CW\] New in your inbox: (\d+ (task|tasks|ha
 /**
  * cw_inbox's reply (shared/deliveries.ts inboxText) as its items: { ids, from, card, text }, oldest first. An item's
  * text may run over several lines (a task's); the reply's own lines (its count, what was received before, the ack note,
- * and what Hive adds to a tool's reply, such as #357's "[CW] #12 has 1 new decision…") aren't items.
+ * and what Combwork adds to a tool's reply, such as #357's "[CW] #12 has 1 new decision…") aren't items.
  */
 function inboxRows(reply) {
   const rows = []
@@ -149,4 +151,4 @@ function inboxRows(reply) {
   return rows
 }
 
-module.exports = { callHiveTool, connectHive, fromCodexTable, parseHiveStep, isDoorbell, doorbellIsWork, inboxRows }
+module.exports = { callOwnTool, connectOwnServer, fromCodexTable, parseToolStep, isDoorbell, doorbellIsWork, inboxRows }

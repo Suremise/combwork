@@ -117,7 +117,7 @@
   },
   "lane.line.text": {
     "text": "{pair}: {state}; {cards}; rounds {rounds}, wait {wait}. {id}",
-    "note": "A lane in one line, for the hive tools: \"B1 / R1 (hive): active, on #405; #483 Passed, #405 Review r2; rounds 10, wait 6 h. lane-3fa2\". {cards}: its cards, each \"key column\"; {id}: the lane's id."
+    "note": "A lane in one line, for the Combwork tools: \"B1 / R1 (demo): active, on #405; #483 Passed, #405 Review r2; rounds 10, wait 6 h. lane-3fa2\". {cards}: its cards, each \"key column\"; {id}: the lane's id."
   },
   "lane.list.none": {
     "text": "No lanes.",
@@ -153,7 +153,7 @@
   },
   "lane.next.startIn": {
     "text": "Next: {card}. Start it: it is built in {slot}, on a new branch Combwork makes there.",
-    "note": "cw_lane next: the card to start next, built in the lane's slot (#1438), where Hive makes its line as it starts."
+    "note": "cw_lane next: the card to start next, built in the lane's slot (#1438), where Combwork makes its line as it starts."
   },
   "lane.next.waits": {
     "text": "The lane waits: {why}. Start nothing new meanwhile.",
@@ -361,11 +361,11 @@
   },
   "lane.status.fresh.uncertain": {
     "text": "{agent}'s new conversation didn't start (Combwork closed as it started): retry it from the lane's row, or end the lane",
-    "note": "An agent owed a new conversation (HI-2034) was being launched when Hive closed: never launched again by itself."
+    "note": "An agent owed a new conversation (HI-2034) was being launched when Combwork closed: never launched again by itself."
   },
   "lane.status.fresh.waits": {
     "text": "waiting: {agent} starts in a new conversation once it is free",
-    "note": "An agent is owed a new conversation for its lane (HI-2034): Hive launches it once the agent is free."
+    "note": "An agent is owed a new conversation for its lane (HI-2034): Combwork launches it once the agent is free."
   },
   "lane.status.hold": {
     "text": "{card} is On Hold",
@@ -421,7 +421,7 @@
   },
   "lane.status.slotHeld": {
     "text": "waiting for {slot}: {held, select, session {{agent}'s session is still in it} broker {a process still has a file or folder in it open: Windows Sandbox's broker ({broker}) is working in it{idle, select, yes {, with no Sandbox running} no {, with a Sandbox running} other {}}} other {a process still has a file or folder in it open}}",
-    "note": "HI-2466: a lane waiting for a slot, the only free one ({slot}) held: a session of the agent {agent} still runs in it, or (other) a process holds it. broker (HI-2467): a process holds it, and Windows Sandbox's broker ({broker}: its process name, such as WindowsSandboxServer) has the slot as its current folder; idle: yes, no Sandbox runs; no, one does; other, not known. Hive tries again until it is free."
+    "note": "HI-2466: a lane waiting for a slot, the only free one ({slot}) held: a session of the agent {agent} still runs in it, or (other) a process holds it. broker (HI-2467): a process holds it, and Windows Sandbox's broker ({broker}: its process name, such as WindowsSandboxServer) has the slot as its current folder; idle: yes, no Sandbox runs; no, one does; other, not known. Combwork tries again until it is free."
   },
   "lane.status.stale": {
     "text": "stale: {card} must be submitted again",
@@ -433,23 +433,23 @@
   },
   "lane.status.start.dependencies": {
     "text": "{card} waits to start: it waits for {waitsFor} to merge",
-    "note": "A lane's next card waits for a card it depends on to be merged (HI-2129); {waitsFor} is that card's key."
+    "note": "A lane's next card waits for the cards it depends on to be merged (HI-2129, HI-2618); {waitsFor} is their keys, comma-separated."
   },
   "lane.status.start.failed": {
     "text": "{card} waits to start: {agent}'s last start failed",
-    "note": "A lane's next card isn't started yet (HI-2029): Hive's last start of it on the builder failed."
+    "note": "A lane's next card isn't started yet (HI-2029): Combwork's last start of it on the builder failed."
   },
   "lane.status.start.queued": {
     "text": "{card} waits to start: a line of Combwork's is on its way to {agent}",
-    "note": "A lane's next card isn't started yet (HI-2029): a line Hive types is on its way to the builder."
+    "note": "A lane's next card isn't started yet (HI-2029): a line Combwork types is on its way to the builder."
   },
   "lane.status.start.refused": {
     "text": "{card} waits to start: its start was refused for now; Combwork tries again",
-    "note": "A lane's next card isn't started yet (HI-2029): Hive's start of it was refused for now, and is tried again."
+    "note": "A lane's next card isn't started yet (HI-2029): Combwork's start of it was refused for now, and is tried again."
   },
   "lane.status.start.refusedHeld": {
     "text": "{card} waits to start: its start was refused for now, {slot} still in use ({held, select, session {{heldBy}'s session is still in it} left {{heldBy}'s last run left {program}{more, plural, =0 {} other { and # more}} running in it} lastRun {{heldBy}'s last run there isn't known to have ended} broker {a process still has a file or folder in it open: Windows Sandbox's broker ({broker}) is working in it{idle, select, yes {, with no Sandbox running} no {, with a Sandbox running} other {}}} other {a process still has a file or folder in it open}}); Combwork tries again",
-    "note": "A lane's next card isn't started yet (HI-2468): Hive's start of it was refused because its slot {slot} is still in use: a session of the agent {heldBy} still runs in it; left, the agent {heldBy}'s last run left programs running in it ({program}: the first one's name, such as node; {more}: how many more); lastRun, that run isn't known to have ended; or (broker) a process holds it, and Windows Sandbox's broker ({broker}: its process name) has the slot as its current folder, idle: yes, no Sandbox runs; no, one does; other, not known; or (other) a process holds it. Hive tries the start again."
+    "note": "A lane's next card isn't started yet (HI-2468): Combwork's start of it was refused because its slot {slot} is still in use: a session of the agent {heldBy} still runs in it; left, the agent {heldBy}'s last run left programs running in it ({program}: the first one's name, such as node; {more}: how many more); lastRun, that run isn't known to have ended; or (broker) a process holds it, and Windows Sandbox's broker ({broker}: its process name) has the slot as its current folder, idle: yes, no Sandbox runs; no, one does; other, not known; or (other) a process holds it. Combwork tries the start again."
   },
   "lane.status.start.watching": {
     "text": "{card} waits to start: {agent} is waiting on other work",

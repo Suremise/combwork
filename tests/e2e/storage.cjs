@@ -18,7 +18,7 @@ const userData = path.join(lib.WORK, 'storage-profile')
 const ws = path.join(lib.WORK, 'storage-ws')
 const claudeHome = path.join(lib.WORK, 'storage-claude-home')
 const alpha = path.join(ws, 'alpha')
-const hive = path.join(alpha, '.combwork')
+const dataDir = path.join(alpha, '.combwork')
 const cliDir = path.join(claudeHome, 'projects', alpha.replace(/[^a-zA-Z0-9]/g, '-'))
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -67,7 +67,7 @@ const write = (file, text) => {
   for (let i = 1; i <= 11; i++) fs.mkdirSync(path.join(ws, `p${String(i).padStart(2, '0')}`), { recursive: true })
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase()]))
 
-  // The fixtures: Hive's backups (archive, sessions), the CLI's copies, and attachments.
+  // The fixtures: Combwork's backups (archive, sessions), the CLI's copies, and attachments.
   const sessions = [
     { id: OLD_CLI, name: 'Old with CLI copy', archived: true, days: 200, cli: true, n: 1 },
     { id: OLD_GONE, name: 'Old, CLI lost it', archived: true, days: 200, cli: false, n: 2 },
@@ -75,15 +75,15 @@ const write = (file, text) => {
     { id: OPEN, name: 'Not archived', archived: false, days: 200, cli: true, n: 4 }
   ]
   for (const s of sessions) {
-    // Hive's backups of ended sessions are kept compressed (#1110).
-    write(path.join(hive, s.archived ? 'archive' : 'sessions', `${s.id}.jsonl.gz`), zlib.gzipSync(transcript(s.id, s.n)))
+    // Combwork's backups of ended sessions are kept compressed (#1110).
+    write(path.join(dataDir, s.archived ? 'archive' : 'sessions', `${s.id}.jsonl.gz`), zlib.gzipSync(transcript(s.id, s.n)))
     if (s.cli) write(path.join(cliDir, `${s.id}.jsonl`), transcript(s.id, s.n))
-    write(path.join(hive, 'attachments', s.id, 'shot.png'), lib.samplePng(40 + s.n * 10, 30))
+    write(path.join(dataDir, 'attachments', s.id, 'shot.png'), lib.samplePng(40 + s.n * 10, 30))
   }
-  write(path.join(hive, 'attachments', DELETED, 'shot.png'), lib.samplePng(90, 60))
-  write(path.join(hive, 'attachments', 'run-deadbeef', 'early.png'), lib.samplePng(70, 50))
+  write(path.join(dataDir, 'attachments', DELETED, 'shot.png'), lib.samplePng(90, 60))
+  write(path.join(dataDir, 'attachments', 'run-deadbeef', 'early.png'), lib.samplePng(70, 50))
   write(
-    path.join(hive, 'sessions.json'),
+    path.join(dataDir, 'sessions.json'),
     JSON.stringify({
       version: 1,
       sessions: sessions.map((s) => ({ id: s.id, agent: 'claude-code', name: s.name, createdAt: ago(s.days + 1), lastActiveAt: ago(s.days), archived: s.archived })),
@@ -99,18 +99,18 @@ const write = (file, text) => {
   cfg.settings.notifications = { ...cfg.settings.notifications, desktopNotifications: false, chimeEnabled: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47908), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47908), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 950 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   // The open's background work ended first (its "after opening" line): its pass adopting agents' 0.9 worktrees as slots
   // (#1441) among it. Tree's worktree, made while that pass ran, was adopted as slot "tree" instead of staying Tree's
   // worktree as this suite counts it (HI-2209). Bounded as a hung run, never how long it takes: it includes the bundled skills.
-  const logFile = path.join(userData, 'logs', 'hive.log')
+  const logFile = path.join(userData, 'logs', 'combwork.log')
   const opened = await until(() => (fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8') : '').match(/after opening ⁨?storage-ws⁩?: .*adoption, slots/)?.[0], 30000)
   check("the open's background work has ended, its worktree adoption with it", !!opened)
 
@@ -120,9 +120,9 @@ const write = (file, text) => {
   await inv('session:start', alpha, { agentId: live.id })
   const state = await until(async () => (await inv('session:live')).find((s) => s.agentId === live.id && s.status === 'ready'), 20000)
   check('the live agent is running', !!state)
-  const runDir = path.join(hive, 'attachments', `run-${state?.runId}`)
+  const runDir = path.join(dataDir, 'attachments', `run-${state?.runId}`)
   write(path.join(runDir, 'pending.png'), lib.samplePng(30, 30))
-  const liveImages = state?.sessionId ? path.join(hive, 'attachments', state.sessionId) : null
+  const liveImages = state?.sessionId ? path.join(dataDir, 'attachments', state.sessionId) : null
   if (liveImages) write(path.join(liveImages, 'now.png'), lib.samplePng(20, 20))
 
   const totals = async () => {
@@ -137,9 +137,9 @@ const write = (file, text) => {
 
   // Storage: the sizes.
   const st = await inv('storage:project', alpha, true)
-  check('Storage: transcript backups', st.sessions === sizeOf(path.join(hive, 'sessions')), `${st.sessions} vs ${sizeOf(path.join(hive, 'sessions'))}`)
-  check('Storage: archive', st.archive === sizeOf(path.join(hive, 'archive')) && st.archive > 0, `${st.archive}`)
-  check('Storage: attachments', st.attachments === sizeOf(path.join(hive, 'attachments')), `${st.attachments} vs ${sizeOf(path.join(hive, 'attachments'))}`)
+  check('Storage: transcript backups', st.sessions === sizeOf(path.join(dataDir, 'sessions')), `${st.sessions} vs ${sizeOf(path.join(dataDir, 'sessions'))}`)
+  check('Storage: archive', st.archive === sizeOf(path.join(dataDir, 'archive')) && st.archive > 0, `${st.archive}`)
+  check('Storage: attachments', st.attachments === sizeOf(path.join(dataDir, 'attachments')), `${st.attachments} vs ${sizeOf(path.join(dataDir, 'attachments'))}`)
   check('Storage: the worktree', st.worktrees.length === 1 && st.worktrees[0].agent === 'Tree' && st.worktrees[0].bytes === sizeOf(st.worktrees[0].path) && st.worktrees[0].bytes > 0, JSON.stringify(st.worktrees))
   check('Storage: the total', st.total === st.sessions + st.archive + st.attachments + st.worktrees[0]?.bytes)
   // What the compressed backups hold (#1110).
@@ -186,7 +186,7 @@ const write = (file, text) => {
   await group.getByRole('button', { name: 'Clean Up…' }).click()
   const dialog = page.getByRole('dialog', { name: 'Clean Up alpha' })
   const rows = () => dialog.locator('.cleanup-preview tbody [title]').evaluateAll((els) => els.map((e) => e.getAttribute('title')))
-  const norm = (list) => list.map((p) => path.relative(hive, p).replace(/\\/g, '/')).sort()
+  const norm = (list) => list.map((p) => path.relative(dataDir, p).replace(/\\/g, '/')).sort()
   const want = (list) => JSON.stringify([...list].sort())
   const previewIs = async (list) => (await until(async () => want(norm(await rows())) === want(list), 5000)) || norm(await rows())
   let got = await previewIs([`attachments/${OLD_CLI}`, `attachments/${OLD_GONE}`])
@@ -212,20 +212,20 @@ const write = (file, text) => {
   check('the button says how much goes', /Move 6 items \(.+\) to the Recycle Bin/.test((await button.textContent()) ?? ''), await button.textContent())
   await page.screenshot({ path: path.join(lib.WORK, 'storage-cleanup.png') })
   const everything = (dir) => fs.readdirSync(dir, { recursive: true }).map((f) => path.join(dir, String(f)))
-  const keptBefore = everything(hive).filter((p) => !listed.some((l) => p.toLowerCase().startsWith(path.join(hive, l).toLowerCase())))
+  const keptBefore = everything(dataDir).filter((p) => !listed.some((l) => p.toLowerCase().startsWith(path.join(dataDir, l).toLowerCase())))
   await button.click()
   check('the dialog closes', !!(await until(async () => (await dialog.count()) === 0, 15000)))
 
   // Exactly what was listed went; everything else stayed.
-  check('the listed files are gone', listed.every((l) => !fs.existsSync(path.join(hive, l))), listed.filter((l) => fs.existsSync(path.join(hive, l))).join(', '))
+  check('the listed files are gone', listed.every((l) => !fs.existsSync(path.join(dataDir, l))), listed.filter((l) => fs.existsSync(path.join(dataDir, l))).join(', '))
   // …to the Recycle Bin, which for a test copy is the suite's own trash folder (#414): each one arrived there.
-  const binned = lib.trashed(hive)
-  const arrived = (l) => binned.some((e) => e.from.toLowerCase() === path.join(hive, l).toLowerCase() || path.join(hive, l).toLowerCase().startsWith(`${e.from.toLowerCase()}${path.sep}`))
+  const binned = lib.trashed(dataDir)
+  const arrived = (l) => binned.some((e) => e.from.toLowerCase() === path.join(dataDir, l).toLowerCase() || path.join(dataDir, l).toLowerCase().startsWith(`${e.from.toLowerCase()}${path.sep}`))
   check("…into the suite's trash folder, not the user's Recycle Bin", listed.every(arrived), JSON.stringify({ missing: listed.filter((l) => !arrived(l)), binned }))
   const missing = keptBefore.filter((p) => !p.endsWith('.bak') && !fs.existsSync(p))
   check('nothing else went', missing.length === 0, missing.join(', '))
   check("the running launch's attachments stayed", fs.existsSync(path.join(runDir, 'pending.png')))
-  check('the recent and not-archived sessions kept their backups', fs.existsSync(path.join(hive, 'archive', `${RECENT}.jsonl.gz`)) && fs.existsSync(path.join(hive, 'sessions', `${OPEN}.jsonl.gz`)))
+  check('the recent and not-archived sessions kept their backups', fs.existsSync(path.join(dataDir, 'archive', `${RECENT}.jsonl.gz`)) && fs.existsSync(path.join(dataDir, 'sessions', `${OPEN}.jsonl.gz`)))
   check("the CLI's transcripts are untouched", [OLD_CLI, RECENT, OPEN].every((s) => fs.existsSync(path.join(cliDir, `${s}.jsonl`))))
   check('the worktree is untouched', fs.existsSync(st.worktrees[0].path) && sizeOf(st.worktrees[0].path) === st.worktrees[0].bytes)
 
@@ -244,10 +244,10 @@ const write = (file, text) => {
 
   // Storage shows the smaller sizes.
   const after = await inv('storage:project', alpha, true)
-  check('Storage measures again after Clean Up', after.archive === sizeOf(path.join(hive, 'archive')) && after.attachments === sizeOf(path.join(hive, 'attachments')) && after.total < st.total)
+  check('Storage measures again after Clean Up', after.archive === sizeOf(path.join(dataDir, 'archive')) && after.attachments === sizeOf(path.join(dataDir, 'attachments')) && after.total < st.total)
 
   // A dozen leftover attachments (no session has them): Clean Up…'s preview pages, filters and sorts them (#250).
-  for (let i = 1; i <= 12; i++) write(path.join(hive, 'attachments', `0rphan${String(i).padStart(2, '0')}-0000-4000-8000-000000000000`, 'x.png'), lib.samplePng(20 + i * 10, 20 + i * 10))
+  for (let i = 1; i <= 12; i++) write(path.join(dataDir, 'attachments', `0rphan${String(i).padStart(2, '0')}-0000-4000-8000-000000000000`, 'x.png'), lib.samplePng(20 + i * 10, 20 + i * 10))
   await page.locator('.activity-btn[aria-label="Settings"]').click()
   await page.locator('.settings-nav .row', { hasText: 'Workspace' }).click()
   // The project's page stays mounted (hidden) once shown: the visible table is Settings → Workspace's.

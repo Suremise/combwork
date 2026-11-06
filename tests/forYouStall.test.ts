@@ -27,7 +27,7 @@ vi.mock('../src/renderer/src/scopedLoad', async () => {
   }
 })
 vi.stubGlobal('window', {
-  hive: {
+  combwork: {
     invoke: () => {
       let resolve!: (x: unknown) => void
       const promise = new Promise((r) => (resolve = r))

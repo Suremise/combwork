@@ -1,5 +1,5 @@
 // The Assistant's change boundary in a dialect (HI-2450): what a change is called is data, said in the Assistant's chain
-// in the refusal it reads, and in the Default in the activity line Hive keeps (its panel, hive.log, the event stream).
+// in the refusal it reads, and in the Default in the activity line Combwork keeps (its panel, combwork.log, the event stream).
 // With no chain, both read exactly as before.
 import { join } from 'path'
 import { mkdirSync } from 'fs'
@@ -9,7 +9,7 @@ import { tempDir } from './tempDir'
 import { agentMsg, setChainResolver, type DialectChain } from '../src/shared/agentText'
 import { inRequestScope } from '../src/shared/agentText/asyncScope'
 
-const base = tempDir('hive-control-dialect-')
+const base = tempDir('cw-control-dialect-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 

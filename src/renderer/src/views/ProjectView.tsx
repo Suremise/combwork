@@ -295,11 +295,11 @@ function SessionEmpty({ project, framed }: { project: ProjectInfo; framed: boole
   const settings = useStore((s) => s.settings)
   const view = useConnections()
   const offered = !focused && view ? offeredConnections(view, settings) : []
-  // With no agent, the connection a new one gets (decision A: the first usable, its CLI installed); none while Hive is
+  // With no agent, the connection a new one gets (decision A: the first usable, its CLI installed); none while Combwork is
   // still looking for a CLI before it.
   const ready = offered.length ? firstReadyConnection(view, settings, cliReadyOf(providers)) : null
   // The focused agent's provider, else the new agent's (its connection's CLI; Automatic's pick where none is usable),
-  // and what Hive found of its CLI.
+  // and what Combwork found of its CLI.
   const provider = (!focused && connectionCli(view, ready?.id)) || agentProviderOf(focused)
   const info = providers[provider]
   const on = isProviderEnabled(settings, provider)
@@ -604,7 +604,7 @@ export function ProjectView({ visible }: { visible: boolean }) {
         </div>
       </div>
 
-      {/* Its hooks aren't reaching Hive (#1336): its status may be wrong; a restart with working hooks clears it. */}
+      {/* Its hooks aren't reaching Combwork (#1336): its status may be wrong; a restart with working hooks clears it. */}
       {live?.hooksMissing && (
         <div className="banner warn hooks-missing">
           <Icon name="warning" /> {hooksMissingNote(live, tr)}

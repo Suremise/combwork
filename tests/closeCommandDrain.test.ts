@@ -1,4 +1,4 @@
-// HI-1368's drain: a closed workspace's close command runs only once Hive has finished writing it. A store's last save,
+// HI-1368's drain: a closed workspace's close command runs only once Combwork has finished writing it. A store's last save,
 // asked for before the close and waiting meanwhile, keeps the drain waiting until it has committed (its row in the file
 // when the drain ends); a lease held past the bound, or a quit's outer bound, ends it undrained (no command runs); the
 // checkpoints are waited for before it ends. Real stores on a workspace folder; the rest with stand-ins.
@@ -10,7 +10,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
 import { admitted } from './admitted'
 
-const base = tempDir('hive-close-drain-')
+const base = tempDir('cw-close-drain-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 
@@ -38,7 +38,7 @@ const close = (ws: string): void => {
   dismissPlace(placeKey(ws))
   board.closeBoard(ws)
 }
-const lane = (id: string): Record<string, unknown> => ({ id, project: 'hive', name: id, builder: { id: 'a-b', name: 'B' }, reviewer: null, cards: [1], rounds: 10, waitMinutes: 360, state: 'active', startedBy: 'B', startedAt: '2026-10-28T12:00:00.000Z', updatedAt: '2026-10-28T12:00:00.000Z' })
+const lane = (id: string): Record<string, unknown> => ({ id, project: 'alpha', name: id, builder: { id: 'a-b', name: 'B' }, reviewer: null, cards: [1], rounds: 10, waitMinutes: 360, state: 'active', startedBy: 'B', startedAt: '2026-10-28T12:00:00.000Z', updatedAt: '2026-10-28T12:00:00.000Z' })
 /** A gate a test opens: what waits on it goes on then. */
 const gate = (): { wait: Promise<void>; open: () => void } => {
   let open!: () => void

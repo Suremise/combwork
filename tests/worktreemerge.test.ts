@@ -20,7 +20,7 @@ afterEach(() => {
 })
 
 async function twoBranches(): Promise<{ project: string; a: { path: string; branch: string; base: string }; b: { path: string; branch: string; base: string } }> {
-  root = tempDir('hive-merge-')
+  root = tempDir('cw-merge-')
   const project = join(root, 'project')
   run(root, 'init', '-q', '-b', 'main', project)
   // core.eol: the repo's `* text=auto` (#149) checks text out with the native ending (CRLF on Windows) otherwise.
@@ -29,8 +29,8 @@ async function twoBranches(): Promise<{ project: string; a: { path: string; bran
   writeFileSync(join(project, 'CHANGELOG.md'), CHANGELOG)
   run(project, 'add', '-A')
   run(project, 'commit', '-qm', 'base')
-  const a = { path: join(root, 'wt', 'a'), branch: 'hive/a', base: 'main' }
-  const b = { path: join(root, 'wt', 'b'), branch: 'hive/b', base: 'main' }
+  const a = { path: join(root, 'wt', 'a'), branch: 'cw/a', base: 'main' }
+  const b = { path: join(root, 'wt', 'b'), branch: 'cw/b', base: 'main' }
   for (const [wt, entry] of [[a, '- Entry from A.'], [b, '- Entry from B.']] as const) {
     await createWorktree(project, wt.path, wt.branch, 'main')
     writeFileSync(join(wt.path, 'CHANGELOG.md'), CHANGELOG.replace('- Earlier entry.', `${entry}\n- Earlier entry.`))
@@ -108,7 +108,7 @@ describe('mergeWorktree (#1347)', () => {
   })
 
   // HI-2422: a tag of the branch's name, at a commit the target already has, made git say "Already up to date" (a
-  // warning, exit 0) and Hive report the merge done, with the branch's work never merged.
+  // warning, exit 0) and Combwork report the merge done, with the branch's work never merged.
   for (const squash of [false, true]) {
     it(`merges the branch, not a same-named tag, into the checked-out target (${squash ? 'squash' : 'merge commit'})`, async () => {
       const { project, a } = await twoBranches()

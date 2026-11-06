@@ -1,6 +1,6 @@
 // Generated from locales/en/project.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
-interface HiveMessageValues {
+interface CombworkMessageValues {
   'project.agents.add': undefined
   'project.agents.chooseConnections': undefined
   'project.agents.merge': undefined
@@ -242,13 +242,13 @@ interface HiveMessageValues {
   'project.loading': undefined
   'project.mcp.addServer': undefined
   'project.mcp.builtIn': undefined
+  'project.mcp.combworkDesc': undefined
   'project.mcp.copy': undefined
   'project.mcp.definedByProject': undefined
   'project.mcp.givenAll': undefined
   'project.mcp.givenNone': undefined
   'project.mcp.givenTo': { agents: string | number }
   'project.mcp.headingAdded': undefined
-  'project.mcp.hiveDesc': undefined
   'project.mcp.invalid': undefined
   'project.mcp.manage': undefined
   'project.mcp.noneAdded': undefined
@@ -334,7 +334,7 @@ interface HiveMessageValues {
   'project.settings.offLower': undefined
   'project.settings.on': undefined
   'project.settings.onLower': undefined
-  'project.settings.openHive': undefined
+  'project.settings.openCombwork': undefined
   'project.settings.overrides': undefined
   'project.settings.reset': undefined
   'project.settings.resetButton': undefined
@@ -345,14 +345,14 @@ interface HiveMessageValues {
   'project.settings.warnOver': undefined
   'project.skills.addLocal': { provider: string | number }
   'project.skills.assistantOnly': { count: number }
+  'project.skills.cw': undefined
   'project.skills.delete': undefined
   'project.skills.deliveredNote': undefined
   'project.skills.editInWorkspace': undefined
   'project.skills.heading': undefined
-  'project.skills.hive': undefined
   'project.skills.local': undefined
   'project.skills.newLocal': { provider: string | number }
-  'project.skills.noHive': undefined
+  'project.skills.noCombwork': undefined
   'project.skills.noneLocal': undefined
   'project.skills.noneUser': undefined
   'project.skills.plugins': undefined

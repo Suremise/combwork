@@ -86,7 +86,7 @@ describe('the merge queue in the app (#1348)', () => {
     sh(e.project, 'branch', 'release', 'main')
     const a = await queued(e, 'For main', undefined, 'src/a.txt')
     const b = await queued(e, 'For release', 'release', 'src/b.txt')
-    // Both advances begin and Hive crashes before either target moves.
+    // Both advances begin and Combwork crashes before either target moves.
     const crash = { afterStarted: () => Promise.reject(new Error('crash')) }
     await expect(e.queue({ hooks: crash }).drain('main')).rejects.toThrow('crash')
     await expect(e.queue({ hooks: crash }).drain('release')).rejects.toThrow('crash')

@@ -1,5 +1,5 @@
 // Project keys (#704, SPEC §16.12): a project's short identity, as in `AM-12`. 2–4 letters A–Z, unique in the workspace,
-// none a prefix of another; Hive suggests 2 letters (on a clash, other 2-letter pairs first). A key belongs to one project
+// none a prefix of another; Combwork suggests 2 letters (on a clash, other 2-letter pairs first). A key belongs to one project
 // for good: a project's old keys stay its aliases, so no other project can take them.
 
 /** A key's form: 2–4 letters A–Z (compared case-insensitively, kept upper case). */
@@ -41,7 +41,7 @@ function lettersOf(name: string): string[] {
 }
 
 /**
- * The key Hive suggests for a project named `name`, given the keys others hold: its first two letters (hive is HI,
+ * The key Combwork suggests for a project named `name`, given the keys others hold: its first two letters (demo is DE,
  * ambrosia AM, website WE); on a clash other 2-letter pairs of its letters, the first letter kept first; then 3 and 4
  * letters of its name; then any free pair. Always one that keyProblem accepts.
  */
@@ -89,7 +89,7 @@ let scoped: CardNames | null = null
 
 /**
  * Where the texts agents read get their card names (#1219): main sets it once (the namer of the request, wake or
- * delivery being made, for its own workspace); elsewhere (the window, the hive MCP server) there is none, and a text
+ * delivery being made, for its own workspace); elsewhere (the window, the combwork MCP server) there is none, and a text
  * names a card `#N` unless it runs in namedBy.
  */
 export function setCardNaming(get: () => CardNames | null): void {
@@ -111,7 +111,7 @@ export function namedBy<T>(names: CardNames | null | undefined, fn: () => T): T 
 /** A card as a text names it, by its number (see CardNames). */
 export const cardRef = (n: number): string => (scoped ?? naming() ?? plain)(n)
 
-/** Names for some cards, by number, as a text's JSON carries them (`names`): what the hive MCP server words a reply with. */
+/** Names for some cards, by number, as a text's JSON carries them (`names`): what the combwork MCP server words a reply with. */
 export function namesOf(numbers: Iterable<number>): Record<string, string> | undefined {
   const out: Record<string, string> = {}
   let any = false

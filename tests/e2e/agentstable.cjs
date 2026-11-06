@@ -41,13 +41,13 @@ const LONG = 'Coordinator out of the box: fold the coordinator playbook into the
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), ...cenv, HIVE_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), ...cenv, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   for (const p of [alpha, solo]) await inv('project:setActive', p, true)
   await lib.waitForProvider(inv)
@@ -83,7 +83,7 @@ const LONG = 'Coordinator out of the box: fold the coordinator playbook into the
   const cs = await make('Solo card', one.id, 'solo')
   // Lanes: B1 with R1, B2 with R2 (started with the workspace's token, naming the builder). Idle builders outside slots,
   // B1 and B2 get their lanes in new conversations (HI-2232), each taking the lane's brief as its first turn: quiet first
-  // (idle, nothing of Hive's being typed into them or waiting to be), so each is renewed at once, never left as it is
+  // (idle, nothing of Combwork's being typed into them or waiting to be), so each is renewed at once, never left as it is
   // mid-turn nor owed; then done with their briefs in the new conversations before the suite types into them (HI-2247;
   // quiet alone isn't the brief's turn over, and a line typed during it is dropped: HI-2357, lib.laneBriefDone).
   const quiet = async (n) => lib.agentQuiet(PORT, 'alpha', await live(a[n].id), apiToken)
@@ -98,7 +98,7 @@ const LONG = 'Coordinator out of the box: fold the coordinator playbook into the
 
   check('B1 works', (await say('B1', 'work 600', 'working')) > 0)
   check('B2 waits on a background task', (await say('B2', 'background 600', 'background')) > 0)
-  check('R1 watches B1’s card', (await say('R1', `hive cw_wait_for_tasks ${JSON.stringify({ cards: [c1], column: 'review', wake: true, limitMinutes: 60 })}`, 'watching')) > 0)
+  check('R1 watches B1’s card', (await say('R1', `cw cw_wait_for_tasks ${JSON.stringify({ cards: [c1], column: 'review', wake: true, limitMinutes: 60 })}`, 'watching')) > 0)
   check('R2 is idle', (await status('R2')) === 'ready')
 
   const shoot = async (name, clip) => {

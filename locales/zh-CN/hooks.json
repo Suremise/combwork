@@ -31,7 +31,7 @@
   "hooks.receiver": "通过 Combwork 的 {form} 钩子",
   "hooks.refresh": "刷新",
   "hooks.response": "{response, select, none {无需回复} context {已发送上下文} allowed {已允许} warned {已允许，附带警告} asked {已询问你} blocked {已阻止} error {错误} other {未知}}",
-  "hooks.source": "{source, select, hive {Combwork} managed {托管设置} cli {命令行} project {项目} local {项目（本地）} user {用户} plugin {插件} other {其他}}",
+  "hooks.source": "{source, select, combwork {Combwork} managed {托管设置} cli {命令行} project {项目} local {项目（本地）} user {用户} plugin {插件} other {其他}}",
   "hooks.stale": "读取之后该智能体已重启：这里显示的是它之前的会话。",
   "hooks.status": "{status, select, passed {由 Combwork 传入} trusted {已信任} untrusted {未信任：不会运行} modified {信任后已更改：不会运行} unverified {已配置 · 加载未确认} disabled {已关闭} notLoaded {未加载} unsupported {未知形式} other {未知}}",
   "hooks.timeSpan": "{from}–{to}",

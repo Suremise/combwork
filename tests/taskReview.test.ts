@@ -8,7 +8,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { readCard, writeCard } from './boardDb'
 
-const base = tempDir('hive-review-')
+const base = tempDir('cw-review-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')

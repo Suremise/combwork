@@ -5,8 +5,8 @@
 //   chatty:<file>   print about 200 KB of output at a time until <file> exists, then check and write the marker
 //   fail            print two lines and exit 3 (no marker)
 //   flag:<file>     as fail until <file> exists, then as quick (the onopen suite's Rerun, HI-1954)
-// The check: hive.db copied, the copy opened with node:sqlite, its integrity_check and its cards' titles read, and
-// whether a -wal with anything in it was left beside the original (it shouldn't be, once Hive has closed the board).
+// The check: combwork.db copied, the copy opened with node:sqlite, its integrity_check and its cards' titles read, and
+// whether a -wal with anything in it was left beside the original (it shouldn't be, once Combwork has closed the board).
 const fs = require('fs')
 const path = require('path')
 
@@ -15,7 +15,7 @@ const [marker, label, reason, workspace, mode = 'quick'] = process.argv.slice(2)
 function check() {
   const out = { label, reason, at: Date.now() }
   if (workspace && workspace !== '-') {
-    const db = path.join(workspace, '.combwork', 'hive.db')
+    const db = path.join(workspace, '.combwork', 'combwork.db')
     const wal = `${db}-wal`
     out.walLeft = fs.existsSync(wal) ? fs.statSync(wal).size : 0
     const copy = `${marker}.combwork.db`

@@ -1,6 +1,6 @@
 /**
  * The Assistant's journal (#989, #1031): what an entry is, what may be stored, and the settings, shared by main (the
- * store, `main/journal.ts`), the hive MCP server (its tools) and the window (Settings → Assistant). Agent-facing words
+ * store, `main/journal.ts`), the combwork MCP server (its tools) and the window (Settings → Assistant). Agent-facing words
  * here stay English; the window's words are its own messages.
  */
 
@@ -19,8 +19,8 @@ export const DEFAULT_SCOPE: ScopeKind[] = ['decision', 'plan', 'event', 'inciden
 export const LINK_TYPES = ['card', 'commit', 'note', 'artifact', 'session', 'agent', 'project', 'entry'] as const
 export type LinkType = (typeof LINK_TYPES)[number]
 
-/** Who wrote an entry: Hive's own facts, or the Assistant. */
-export type JournalSource = 'hive' | 'assistant'
+/** Who wrote an entry: Combwork's own facts, or the Assistant. */
+export type JournalSource = 'combwork' | 'assistant'
 
 /** The journal's settings, per workspace (Settings → Assistant → Journal). */
 export interface JournalSettings {

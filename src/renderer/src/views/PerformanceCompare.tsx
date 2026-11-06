@@ -21,7 +21,7 @@ import { cx, formatBytes, formatTokens } from '../util'
  */
 
 const M = {
-  better: msg({ id: 'performance.compare.status.better', defaultMessage: 'Smaller, still correct', description: "A scenario's result in Performance → Compare: Hive gave it less context and it still passes every check." }),
+  better: msg({ id: 'performance.compare.status.better', defaultMessage: 'Smaller, still correct', description: "A scenario's result in Performance → Compare: Combwork gave it less context and it still passes every check." }),
   betterTip: msg({ id: 'performance.compare.status.betterTip', defaultMessage: 'Less Combwork context; every check that passed still passes and still runs; no more calls, failures or retries.', description: 'Tooltip of the "Smaller, still correct" result in Performance → Compare.' }),
   same: msg({ id: 'performance.compare.status.same', defaultMessage: 'No change', description: "A scenario's result in Performance → Compare." }),
   sameTip: msg({ id: 'performance.compare.status.sameTip', defaultMessage: 'Within 1% of the baseline, with the same correctness.', description: 'Tooltip of the "No change" result in Performance → Compare.' }),
@@ -77,17 +77,17 @@ const M = {
   result: msg({ id: 'performance.compare.col.result', defaultMessage: 'Result', description: 'Column header in Performance → Compare.' }),
   checks: msg({ id: 'performance.compare.col.checks', defaultMessage: 'Checks', description: 'Column header in Performance → Compare.' }),
   checksTip: msg({ id: 'performance.compare.col.checksTip', defaultMessage: 'On average a sample: checks passed ✓, failed ✗ and skipped – (a check only a model’s own work can meet is skipped for a fake), baseline → run.', description: 'Tooltip of the Checks column in Performance → Compare. Keep ✓, ✗ and – (they mark the counts).' }),
-  context: msg({ id: 'performance.compare.col.context', defaultMessage: 'Combwork context', description: "Column header in Performance → Compare: the size of what Hive put in a session's context." }),
-  toolReplies: msg({ id: 'performance.compare.col.toolReplies', defaultMessage: 'Tool replies', description: "Column header in Performance → Compare: the size of the replies of Hive's tools." }),
-  calls: msg({ id: 'performance.compare.col.calls', defaultMessage: 'Calls (repeated)', description: "Column header in Performance → Compare: calls of Hive's tools, and how many repeated an earlier one." }),
-  allAgentsTip: msg({ id: 'performance.compare.col.allAgentsTip', defaultMessage: 'Every agent’s in the scenario together, as the result judges them; a scenario’s details show the session under test apart.', description: "Tooltip of the Tool replies column in Performance → Compare (HI-2186): the figure is all agents' together (the session the scenario tests, and any agents it or Hive started), which is what the Result column judges." }),
+  context: msg({ id: 'performance.compare.col.context', defaultMessage: 'Combwork context', description: "Column header in Performance → Compare: the size of what Combwork put in a session's context." }),
+  toolReplies: msg({ id: 'performance.compare.col.toolReplies', defaultMessage: 'Tool replies', description: "Column header in Performance → Compare: the size of the replies of Combwork's tools." }),
+  calls: msg({ id: 'performance.compare.col.calls', defaultMessage: 'Calls (repeated)', description: "Column header in Performance → Compare: calls of Combwork's tools, and how many repeated an earlier one." }),
+  allAgentsTip: msg({ id: 'performance.compare.col.allAgentsTip', defaultMessage: 'Every agent’s in the scenario together, as the result judges them; a scenario’s details show the session under test apart.', description: "Tooltip of the Tool replies column in Performance → Compare (HI-2186): the figure is all agents' together (the session the scenario tests, and any agents it or Combwork started), which is what the Result column judges." }),
   callsTip: msg({ id: 'performance.compare.col.callsTip', defaultMessage: 'The Combwork tool calls of the session under test (the Assistant, or the agent the scenario tests), and how many repeated an earlier one.', description: "Tooltip of the Calls (repeated) column in Performance → Compare (HI-2186). Keep Combwork (the app's name)." }),
   splitMeasure: msg({ id: 'performance.compare.splitMeasure', defaultMessage: '{measure} · {part, select, subject {{assistant, select, yes {the Assistant} other {the agent under test}}} others {other agents} other {all agents (judged)}}', description: "A row of a scenario's measures in Performance → Compare (HI-2186): {measure} is the measure's name (\"Tool calls\"); then whose: the session the scenario tests (the Assistant, or the agent under test), the other agents, or all of them together, which is what the result judges." }),
   callsByAgent: msg({ id: 'performance.compare.callsByAgent', defaultMessage: 'Combwork calls by agent in the measured window, baseline → run: {agents}', description: "A line under a scenario's measures in Performance → Compare (HI-2186): each agent's Combwork tool calls, on average a sample. {agents} is a list of entries like \"Coder (builder): 1 → 4\"." }),
-  agentCalls: msg({ id: 'performance.compare.agentCalls', defaultMessage: '{agent}{role, select, builder { (builder)} reviewer { (reviewer)} other {}}: {base} → {run}', description: "An entry of the Hive calls by agent line in Performance → Compare (HI-2186): an agent's name (a test fixture's, such as Coder, or the Assistant), its role in a lane, and its calls in the baseline and in the run ({base} and {run} are numbers already formatted, or – when unknown). Glossary: builder, reviewer." }),
-  agentAssistant: msg({ id: 'performance.compare.agent.assistant', defaultMessage: 'the Assistant', description: 'An agent in the Hive calls by agent line of Performance → Compare (HI-2186): the Hive Assistant.' }),
-  agentUnattributed: msg({ id: 'performance.compare.agent.unattributed', defaultMessage: 'an agent not in the fixture', description: "An agent in the Hive calls by agent line of Performance → Compare (HI-2186): calls of an agent the scenario's fixture didn't make." }),
-  agentOverflow: msg({ id: 'performance.compare.agent.overflow', defaultMessage: '{n, plural, one {# other agent} other {# other agents}}', description: 'An entry in the Hive calls by agent line of Performance → Compare (HI-2186): the agents past the list’s limit, their calls summed.' }),
+  agentCalls: msg({ id: 'performance.compare.agentCalls', defaultMessage: '{agent}{role, select, builder { (builder)} reviewer { (reviewer)} other {}}: {base} → {run}', description: "An entry of the Combwork calls by agent line in Performance → Compare (HI-2186): an agent's name (a test fixture's, such as Coder, or the Assistant), its role in a lane, and its calls in the baseline and in the run ({base} and {run} are numbers already formatted, or – when unknown). Glossary: builder, reviewer." }),
+  agentAssistant: msg({ id: 'performance.compare.agent.assistant', defaultMessage: 'the Assistant', description: 'An agent in the Combwork calls by agent line of Performance → Compare (HI-2186): the Combwork Assistant.' }),
+  agentUnattributed: msg({ id: 'performance.compare.agent.unattributed', defaultMessage: 'an agent not in the fixture', description: "An agent in the Combwork calls by agent line of Performance → Compare (HI-2186): calls of an agent the scenario's fixture didn't make." }),
+  agentOverflow: msg({ id: 'performance.compare.agent.overflow', defaultMessage: '{n, plural, one {# other agent} other {# other agents}}', description: 'An entry in the Combwork calls by agent line of Performance → Compare (HI-2186): the agents past the list’s limit, their calls summed.' }),
   measure: msg({ id: 'performance.compare.col.measure', defaultMessage: 'Measure', description: 'Column header in Performance → Compare.' }),
   change: msg({ id: 'performance.compare.col.change', defaultMessage: 'Change', description: 'Column header in Performance → Compare: from the baseline to the run.' }),
   samples: msg({ id: 'performance.compare.samples', defaultMessage: '<b>{title}</b> · samples {base, number} → {run, number}', description: "The head of a scenario's details in Performance → Compare: its title, and how many samples the baseline and the run have." }),
@@ -460,7 +460,7 @@ function scenarioColumns(open: string | null): DataColumn<ScenarioComparison>[] 
       num: true,
       descFirst: true,
       cell: (s) => {
-        const calls = measureOf(s, 'hiveCalls')
+        const calls = measureOf(s, 'combworkCalls')
         const rep = measureOf(s, 'repeatedCalls')
         return (
           <>
@@ -468,7 +468,7 @@ function scenarioColumns(open: string | null): DataColumn<ScenarioComparison>[] 
           </>
         )
       },
-      sortValue: (s) => measureOf(s, 'hiveCalls')?.run?.mean ?? null
+      sortValue: (s) => measureOf(s, 'combworkCalls')?.run?.mean ?? null
     }
   ]
 }

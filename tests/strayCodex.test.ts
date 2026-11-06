@@ -7,7 +7,7 @@ import { tempDir } from './tempDir'
 
 describe('a stray .codex folder (#509)', () => {
   it('is nothing without a .codex folder, or with only Codex’s config in it', () => {
-    const p = tempDir('hive-stray-codex-')
+    const p = tempDir('cw-stray-codex-')
     expect(strayCodexEntries(p)).toBeNull()
     mkdirSync(join(p, '.codex'))
     expect(strayCodexEntries(p)).toBeNull()
@@ -16,7 +16,7 @@ describe('a stray .codex folder (#509)', () => {
   })
 
   it('is nothing for Codex’s own configuration: custom agents, rules, and files its TOML names', () => {
-    const p = tempDir('hive-stray-codex-')
+    const p = tempDir('cw-stray-codex-')
     mkdirSync(join(p, '.codex', 'agents'), { recursive: true })
     mkdirSync(join(p, '.codex', 'rules'))
     // OpenAI's subagents docs: .codex/config.toml with .codex/agents/reviewer.toml.
@@ -34,7 +34,7 @@ describe('a stray .codex folder (#509)', () => {
   })
 
   it('is nothing for files named in nested folders, at any depth', () => {
-    const p = tempDir('hive-stray-codex-')
+    const p = tempDir('cw-stray-codex-')
     mkdirSync(join(p, '.codex', 'instructions'), { recursive: true })
     mkdirSync(join(p, '.codex', 'team', 'shared', 'deep'), { recursive: true })
     mkdirSync(join(p, '.codex', 'agents', 'notes'), { recursive: true })
@@ -47,7 +47,7 @@ describe('a stray .codex folder (#509)', () => {
   })
 
   it('takes only path fields as references: a profile, model or description named like a stray folder hides nothing', () => {
-    const p = tempDir('hive-stray-codex-')
+    const p = tempDir('cw-stray-codex-')
     mkdirSync(join(p, '.codex', 'scratch'), { recursive: true })
     mkdirSync(join(p, '.codex', 'agents'))
     writeFileSync(join(p, '.codex', 'scratch', 'probe.cjs'), '')
@@ -58,7 +58,7 @@ describe('a stray .codex folder (#509)', () => {
   })
 
   it('is warned of when it holds anything else, naming the folder and what it holds', () => {
-    const p = tempDir('hive-stray-codex-')
+    const p = tempDir('cw-stray-codex-')
     mkdirSync(join(p, '.codex', 'scratch', 'r2-484'), { recursive: true })
     writeFileSync(join(p, '.codex', 'config.toml'), '')
     expect(strayCodexEntries(p)).toEqual(['scratch'])
@@ -70,7 +70,7 @@ describe('a stray .codex folder (#509)', () => {
   })
 
   it('is nothing when .codex is a file', () => {
-    const p = tempDir('hive-stray-codex-')
+    const p = tempDir('cw-stray-codex-')
     writeFileSync(join(p, '.codex'), '')
     expect(strayCodexEntries(p)).toBeNull()
   })

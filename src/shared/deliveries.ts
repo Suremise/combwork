@@ -1,13 +1,13 @@
 /**
- * Deliveries (#647, plans/2026-10-12-messaging-redesign.md §3.1): everything Hive has for an agent to read is a record
+ * Deliveries (#647, plans/2026-10-12-messaging-redesign.md §3.1): everything Combwork has for an agent to read is a record
  * with an id, its target, kind, sender, card, body and state, saved in its workspace's database (#1018: under its project) and offered
  * by one scheduler (main/deliveries.ts): every way into an agent makes one (#649). The agent collects them with
  * cw_inbox (received) and acknowledges them once it has acted on them (acked). This file is the pure part: the states and their moves, coalescing, the typed line and the
- * inbox's reply. No imports beyond shared files with none of their own: hive-mcp.js runs outside the app bundle.
+ * inbox's reply. No imports beyond shared files with none of their own: cw-mcp.js runs outside the app bundle.
  */
 import type { InboxBrief, InboxSummary } from './types'
 import { agentMsg, say } from './agentText'
-import { inboxNotice, withCurrentNames } from './doorbell'
+import { inboxNotice } from './doorbell'
 import { cardRef } from './projectKeys'
 
 /** What a delivery is: a task, a re-brief (a message for the work it is on), a card event, the user's answer, a handover, a control notice. */
@@ -29,13 +29,13 @@ export const goesAlone = (kind: DeliveryKind): boolean => kind === 'task' || kin
 export type DeliveryNeed = 'idle' | 'free' | 'stalled'
 
 /**
- * queued: waiting to be offered; offered: Hive has told the agent of it (#650: the doorbell typed into its terminal, which
+ * queued: waiting to be offered; offered: Combwork has told the agent of it (#650: the doorbell typed into its terminal, which
  * names it by id; never its text); received: the agent fetched it with cw_inbox (#645: received is automatic on fetch;
  * #650: the only receipt. Before #650 a line that carried its whole text also made it received once its CLI took it,
  * receivedVia 'typed', which saved records may still say); acked: the agent says it has acted on it. Ended without that: cancelled (by
  * whom), refused (its sender may no longer send it), expired (too old, or its agent is in another conversation now),
  * stale (#652: tied to a card's round, and that card has moved on: passed, out of Doing and Review, or in a new round).
- * uncertain: offered when Hive stopped or its agent's launch ended, before it was received: it may not have reached the
+ * uncertain: offered when Combwork stopped or its agent's launch ended, before it was received: it may not have reached the
  * agent, so it is offered once more, saying it may repeat (`again`), and stays uncertain if that one isn't received.
  */
 export const DELIVERY_STATES = ['queued', 'offered', 'received', 'acked', 'cancelled', 'refused', 'expired', 'uncertain', 'stale'] as const
@@ -44,10 +44,10 @@ export type DeliveryState = (typeof DELIVERY_STATES)[number]
 /**
  * Who a delivery is from. The Assistant's names its workspace and the launch that sent it: its permission is worked out
  * again from those and the settings at every step (never a token or a closure, which can't be saved), and a launch that
- * has ended sends nothing more (#645). Hive's own (board events) and the user's need no more. An agent's (HI-1866: its
+ * has ended sends nothing more (#645). Combwork's own (board events) and the user's need no more. An agent's (HI-1866: its
  * request for the Assistant on a card) names its project and id, so whoever reads it knows which agent asked.
  */
-export type DeliverySender = { kind: 'assistant'; name: string; workspace: string; launch: string } | { kind: 'hive'; name: string } | { kind: 'user'; name: string } | { kind: 'agent'; name: string; project: string; agentId: string }
+export type DeliverySender = { kind: 'assistant'; name: string; workspace: string; launch: string } | { kind: 'combwork'; name: string } | { kind: 'user'; name: string } | { kind: 'agent'; name: string; project: string; agentId: string }
 
 export interface DeliveryRecord {
   /** Short and unique in its project ("m12"): what the agent acks. */
@@ -72,7 +72,7 @@ export interface DeliveryRecord {
   created: string
   expires: string
   offered?: string
-  /** How many times it was offered (again after Hive stopped while offering it). */
+  /** How many times it was offered (again after Combwork stopped while offering it). */
   offers?: number
   received?: string
   /** How it was received: fetched with cw_inbox ('typed': its line taken by its CLI, before #650 made the inbox the only receipt). */
@@ -84,7 +84,7 @@ export interface DeliveryRecord {
   ended?: string
   /** Why it ended, or why it is uncertain. */
   detail?: string
-  /** Why it may repeat (#649: it was offered when Hive stopped or its launch ended): said when it is offered once more. */
+  /** Why it may repeat (#649: it was offered when Combwork stopped or its launch ended): said when it is offered once more. */
   again?: string
   /**
    * HI-2463: received, not acked, in the conversation named here, which its agent left for a fresh one (a conversation
@@ -108,7 +108,7 @@ export interface DeliveryRecord {
   forRun?: string
   /**
    * The durable action that made it (`card_actions.id`, SPEC §16.4.5): one delivery per action, never two (the unique
-   * `deliveries.action`), so an action run again (a restart, another Hive) finds it and makes nothing.
+   * `deliveries.action`), so an action run again (a restart, another Combwork) finds it and makes nothing.
    */
   action?: number
 }
@@ -187,8 +187,7 @@ export interface InboxItem {
 /**
  * The unread deliveries as the inbox lists them, oldest first: a card's events in one item, where its first one was;
  * with them, those received in a conversation its agent left for a fresh one (`carriedFrom`, HI-2463), shown again.
- * Combwork's own text keeps every word as written (it may quote a person's or an agent's): one from before HI-2463 that
- * names an old tool or command gets a note on how the names map (withCurrentNames).
+ * Every text is handed out as stored (the names upgrade made Combwork's own from before HI-2463 current, HI-2598).
  */
 export function inboxItems(records: readonly DeliveryRecord[]): InboxItem[] {
   const out: InboxItem[] = []
@@ -208,10 +207,10 @@ export function inboxItems(records: readonly DeliveryRecord[]): InboxItem[] {
       out.push(item)
       continue
     }
-    out.push({ ids: [r.id], kind: r.kind, from: r.from.name, ...(r.card ? { card: r.card } : {}), text: r.from.kind === 'hive' ? withCurrentNames(r.body) : r.body, at: r.created })
+    out.push({ ids: [r.id], kind: r.kind, from: r.from.name, ...(r.card ? { card: r.card } : {}), text: r.body, at: r.created })
   }
   // A card's events quote people's and agents' comments, kept as written.
-  for (const { item, events } of byCard.values()) item.text = withCurrentNames(coalesced(events))
+  for (const { item, events } of byCard.values()) item.text = coalesced(events)
   return out
 }
 
@@ -248,7 +247,7 @@ const T = {
 
 /**
  * The line that offers deliveries by typing, one line: the CLI's prompt. The doorbell (#650, plans/2026-10-12-messaging-
- * redesign.md §3.4): Hive's fixed words with counts by kind, cards and ids (shared/doorbell.ts), never what they say,
+ * redesign.md §3.4): Combwork's fixed words with counts by kind, cards and ids (shared/doorbell.ts), never what they say,
  * which the agent reads with cw_inbox, labelled with its sender; ids that may repeat say so; and the watch that carries
  * on if the agent is watching.
  */
@@ -337,7 +336,7 @@ function readSender(v: unknown): DeliverySender | null {
   if (!str(s.name, 200) || !s.name) return null
   if (s.kind === 'assistant') return str(s.workspace, 1024) && s.workspace && str(s.launch, 200) ? { kind: 'assistant', name: s.name, workspace: s.workspace, launch: s.launch } : null
   if (s.kind === 'agent') return str(s.project, 300) && s.project && str(s.agentId, 128) && s.agentId ? { kind: 'agent', name: s.name, project: s.project, agentId: s.agentId } : null
-  if (s.kind === 'hive' || s.kind === 'user') return { kind: s.kind, name: s.name }
+  if (s.kind === 'combwork' || s.kind === 'user') return { kind: s.kind, name: s.name }
   return null
 }
 

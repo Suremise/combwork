@@ -38,7 +38,7 @@ vi.mock('original-fs', async (orig) => {
   }
 })
 
-const base = tempDir('hive-keptunreadable-')
+const base = tempDir('cw-keptunreadable-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 afterAll(() => {
   closeAllBoards()
@@ -74,7 +74,7 @@ function bytes(f: string): { file: string; bak: string } {
 }
 
 describe('a kept file that is there but unreadable (HI-2414)', () => {
-  const dir = tempDir('hive-keptlocked-')
+  const dir = tempDir('cw-keptlocked-')
   let n = 0
   const saved = async (value: unknown): Promise<string> => {
     const f = join(dir, `kept-${++n}.json`)
@@ -99,7 +99,7 @@ describe('a kept file that is there but unreadable (HI-2414)', () => {
   it("a plain read gives its .bak's value; a holder's saves are refused until its own read succeeds again", async () => {
     const f = await saved({ agents: ['a'], id: 'p1' })
     const before = bytes(f)
-    // The .bak older than the file (written separately, or an edit outside Hive): what a stale holder would save.
+    // The .bak older than the file (written separately, or an edit outside Combwork): what a stale holder would save.
     writeFileSync(`${f}.bak`, JSON.stringify({ agents: [] }))
     const older = bytes(f)
     const holder = {}

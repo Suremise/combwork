@@ -1,6 +1,6 @@
 // The 1.0 upgrade's run (#1207, SPEC §16.17): a group of schema steps run as one (asked first, the file locked to one
 // connection, a copy kept for good, one transaction), and the board's side of it: read-only until the user says yes,
-// refused while another Hive has the workspace open (SQLite's lock, or a fresh presence marker), and Restore the 0.9
+// refused while another Combwork has the workspace open (SQLite's lock, or a fresh presence marker), and Restore the 0.9
 // Board Backup putting the copy back.
 import { existsSync, mkdirSync, readdirSync, unlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -25,7 +25,7 @@ vi.mock('../src/main/walCheckpoint', async (original) => {
   }
 })
 
-const base = tempDir('hive-board-upgrade-')
+const base = tempDir('cw-board-upgrade-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace, workspace } = await import('../src/main/workspace')
@@ -85,21 +85,21 @@ const group = (third: (d: DatabaseSync) => void = (d) => d.exec('CREATE TABLE d 
 /** A file at v2 with data, as 0.9 left it. */
 function at09(): { file: string; backups: string } {
   const f = fileIn()
-  openDb(f.file, { migrations: plain, hiveVersion: '0.9.3' }).close()
+  openDb(f.file, { migrations: plain, appVersion: '0.9.3' }).close()
   return f
 }
 
 describe('a group of steps (db.ts)', () => {
   it('runs every pending step of the group in one transaction: a throwing step leaves the file before the group', () => {
     const f = at09()
-    expect(() => openDb(f.file, { migrations: [...plain, ...group(() => { throw new Error('step four broke') })], hiveVersion: '1.0.0', backupDir: f.backups, approve: () => true })).toThrow('step four broke')
+    expect(() => openDb(f.file, { migrations: [...plain, ...group(() => { throw new Error('step four broke') })], appVersion: '1.0.0', backupDir: f.backups, approve: () => true })).toThrow('step four broke')
     // Neither of the group's steps: not c, not a recorded version 3.
     expect(tables(f.file)).toEqual(['a', 'b', 'schema_version'])
     const raw = new DatabaseSync(f.file)
     expect(schemaVersion(raw)).toBe(2)
     raw.close()
     // And the lock went back: the file opens again, and the group runs once it works.
-    const db = openDb(f.file, { migrations: [...plain, ...group()], hiveVersion: '1.0.0', backupDir: f.backups, approve: () => true })
+    const db = openDb(f.file, { migrations: [...plain, ...group()], appVersion: '1.0.0', backupDir: f.backups, approve: () => true })
     try {
       expect(schemaVersion(db.writer)).toBe(4)
       expect(db.pending).toBeNull()
@@ -111,9 +111,9 @@ describe('a group of steps (db.ts)', () => {
 
   it('asks once for the whole group; refused, the steps before it run and the file opens read-only, waiting', () => {
     const f = fileIn()
-    openDb(f.file, { migrations: plain.slice(0, 1), hiveVersion: '0.9.0' }).close()
+    openDb(f.file, { migrations: plain.slice(0, 1), appVersion: '0.9.0' }).close()
     const asked: unknown[] = []
-    const db = openDb(f.file, { migrations: [...plain, ...group()], hiveVersion: '1.0.0', backupDir: f.backups, approve: (p) => (asked.push(p), false) })
+    const db = openDb(f.file, { migrations: [...plain, ...group()], appVersion: '1.0.0', backupDir: f.backups, approve: (p) => (asked.push(p), false) })
     try {
       expect(asked).toEqual([{ group: '1.0', from: 2, to: 4 }])
       expect(db.pending).toEqual({ group: '1.0', from: 2, to: 4 })
@@ -129,7 +129,7 @@ describe('a group of steps (db.ts)', () => {
 
   it('a new file takes every step, the group too, unasked', () => {
     const f = fileIn()
-    const db = openDb(f.file, { migrations: [...plain, ...group()], hiveVersion: '1.0.0', backupDir: f.backups, approve: () => { throw new Error('asked') } })
+    const db = openDb(f.file, { migrations: [...plain, ...group()], appVersion: '1.0.0', backupDir: f.backups, approve: () => { throw new Error('asked') } })
     try {
       expect(schemaVersion(db.writer)).toBe(4)
     } finally {
@@ -140,7 +140,7 @@ describe('a group of steps (db.ts)', () => {
 
   it('keeps its copy of the file before the group for good: later copies never prune it', () => {
     const f = at09()
-    openDb(f.file, { migrations: [...plain, ...group()], hiveVersion: '1.0.0', backupDir: f.backups, approve: () => true }).close()
+    openDb(f.file, { migrations: [...plain, ...group()], appVersion: '1.0.0', backupDir: f.backups, approve: () => true }).close()
     const kept = readdirSync(f.backups).filter((x) => x.startsWith('x-before-1.0-v2-'))
     expect(kept).toHaveLength(1)
     // It is the file at v2, whole.
@@ -149,7 +149,7 @@ describe('a group of steps (db.ts)', () => {
     let steps: Step[] = [...plain, ...group()]
     for (let v = 5; v < 5 + BACKUPS_KEPT + 2; v++) {
       steps = [...steps, { version: v, name: `v${v}`, up: (d) => d.exec(`CREATE TABLE t${v} (q)`) }]
-      openDb(f.file, { migrations: steps, hiveVersion: '1.0.0', backupDir: f.backups }).close()
+      openDb(f.file, { migrations: steps, appVersion: '1.0.0', backupDir: f.backups }).close()
     }
     const after = readdirSync(f.backups)
     expect(after.filter((x) => x.startsWith('x-v'))).toHaveLength(BACKUPS_KEPT)
@@ -158,10 +158,10 @@ describe('a group of steps (db.ts)', () => {
 
   it("a later step of the group on a file in it already: an ordinary copy, never another 'before the group' one (#1207 round 1)", () => {
     const f = at09()
-    openDb(f.file, { migrations: [...plain, ...group()], hiveVersion: '1.0.0', backupDir: f.backups, approve: () => true }).close()
+    openDb(f.file, { migrations: [...plain, ...group()], appVersion: '1.0.0', backupDir: f.backups, approve: () => true }).close()
     const five: Step = { version: 5, name: 'five', group: '1.0', up: (d) => d.exec('CREATE TABLE e (v)') }
     const asked: unknown[] = []
-    const db = openDb(f.file, { migrations: [...plain, ...group(), five], hiveVersion: '1.0.1', backupDir: f.backups, approve: (p) => (asked.push(p), true) })
+    const db = openDb(f.file, { migrations: [...plain, ...group(), five], appVersion: '1.0.1', backupDir: f.backups, approve: (p) => (asked.push(p), true) })
     try {
       // Not asked again (HI-1718): it was when the file joined the group.
       expect(asked).toEqual([])
@@ -176,9 +176,9 @@ describe('a group of steps (db.ts)', () => {
 
   it('a later step of the group on a file in it already runs even where the group would be refused: the file opens writable, waiting for nothing (HI-1718)', () => {
     const f = at09()
-    openDb(f.file, { migrations: [...plain, ...group()], hiveVersion: '1.0.0', backupDir: f.backups, approve: () => true }).close()
+    openDb(f.file, { migrations: [...plain, ...group()], appVersion: '1.0.0', backupDir: f.backups, approve: () => true }).close()
     const five: Step = { version: 5, name: 'five', group: '1.0', up: (d) => d.exec('CREATE TABLE e (v)') }
-    const db = openDb(f.file, { migrations: [...plain, ...group(), five], hiveVersion: '1.0.1', backupDir: f.backups, approve: () => false })
+    const db = openDb(f.file, { migrations: [...plain, ...group(), five], appVersion: '1.0.1', backupDir: f.backups, approve: () => false })
     try {
       expect(db.pending).toBeNull()
       expect(schemaVersion(db.writer)).toBe(5)
@@ -188,7 +188,7 @@ describe('a group of steps (db.ts)', () => {
     }
     // A file before the group is still asked, and refused waits.
     const g = at09()
-    const before = openDb(g.file, { migrations: [...plain, ...group(), five], hiveVersion: '1.0.1', backupDir: g.backups, approve: () => false })
+    const before = openDb(g.file, { migrations: [...plain, ...group(), five], appVersion: '1.0.1', backupDir: g.backups, approve: () => false })
     try {
       expect(before.pending).toEqual({ group: '1.0', from: 2, to: 5 })
     } finally {
@@ -198,12 +198,12 @@ describe('a group of steps (db.ts)', () => {
 
   it('a file made in 1.0 (every step unasked) gets no copy kept for good when a later step of the group comes', () => {
     const f = fileIn()
-    openDb(f.file, { migrations: [...plain, ...group()], hiveVersion: '1.0.0', backupDir: f.backups }).close()
+    openDb(f.file, { migrations: [...plain, ...group()], appVersion: '1.0.0', backupDir: f.backups }).close()
     const raw = new DatabaseSync(f.file)
     raw.exec('INSERT INTO a VALUES (2)')
     raw.close()
     const five: Step = { version: 5, name: 'five', group: '1.0', up: (d) => d.exec('CREATE TABLE e (v)') }
-    openDb(f.file, { migrations: [...plain, ...group(), five], hiveVersion: '1.0.1', backupDir: f.backups, approve: () => true }).close()
+    openDb(f.file, { migrations: [...plain, ...group(), five], appVersion: '1.0.1', backupDir: f.backups, approve: () => true }).close()
     expect(readdirSync(f.backups).filter((x) => x.includes('before-1.0'))).toEqual([])
   })
 
@@ -212,7 +212,7 @@ describe('a group of steps (db.ts)', () => {
     const other = new DatabaseSync(f.file)
     other.prepare('SELECT count(*) FROM a').get()
     try {
-      expect(() => openDb(f.file, { migrations: [...plain, ...group()], hiveVersion: '1.0.0', backupDir: f.backups, approve: () => true })).toThrow(DbInUseError)
+      expect(() => openDb(f.file, { migrations: [...plain, ...group()], appVersion: '1.0.0', backupDir: f.backups, approve: () => true })).toThrow(DbInUseError)
       expect(schemaVersion(other)).toBe(2)
       expect(existsSync(f.backups)).toBe(false)
       // The other connection still writes: nothing was left locked.
@@ -220,7 +220,7 @@ describe('a group of steps (db.ts)', () => {
     } finally {
       other.close()
     }
-    const db = openDb(f.file, { migrations: [...plain, ...group()], hiveVersion: '1.0.0', backupDir: f.backups, approve: () => true })
+    const db = openDb(f.file, { migrations: [...plain, ...group()], appVersion: '1.0.0', backupDir: f.backups, approve: () => true })
     try {
       expect(schemaVersion(db.writer)).toBe(4)
       expect(db.reader.prepare('SELECT count(*) AS n FROM a').get()).toEqual({ n: 2 })
@@ -234,7 +234,7 @@ describe('a group of steps (db.ts)', () => {
     let during: string | null = null
     const db = openDb(f.file, {
       migrations: [...plain, ...group()],
-      hiveVersion: '1.0.0',
+      appVersion: '1.0.0',
       backupDir: f.backups,
       approve: () => true,
       whileGroupLocked: () => {
@@ -253,9 +253,9 @@ describe('a group of steps (db.ts)', () => {
     expect(during).toMatch(/locked/)
   })
 
-  it("a refusal before the copy (another Hive's marker) changes nothing and lets go of the file", () => {
+  it("a refusal before the copy (another Combwork's marker) changes nothing and lets go of the file", () => {
     const f = at09()
-    expect(() => openDb(f.file, { migrations: [...plain, ...group()], hiveVersion: '1.0.0', backupDir: f.backups, approve: () => true, beforeGroup: () => { throw new Error('another Hive') } })).toThrow('another Hive')
+    expect(() => openDb(f.file, { migrations: [...plain, ...group()], appVersion: '1.0.0', backupDir: f.backups, approve: () => true, beforeGroup: () => { throw new Error('another Combwork') } })).toThrow('another Combwork')
     expect(existsSync(f.backups)).toBe(false)
     const other = new DatabaseSync(f.file, { timeout: 100 })
     try {
@@ -283,7 +283,7 @@ async function close(w: WS): Promise<void> {
   await disposeWorkspaceService(w)
   store.closeBoard(path)
 }
-const hiveOf = (ws: string): string => join(ws, '.combwork')
+const combworkOf = (ws: string): string => join(ws, '.combwork')
 const upgradeSteps = store.BOARD_MIGRATIONS.filter((m) => m.group === '1.0')
 
 /** A workspace whose board 0.9 left (its file before the 1.0 group), with card #1 on it. */
@@ -315,7 +315,7 @@ describe("the board's upgrade to 1.0 (#1207)", () => {
     expect(await titles(w)).toEqual(['From 0.9'])
     await expect(inWorkspace(w, () => tasks.createTask({ title: 'Too soon', project: 'p' }, user))).rejects.toThrow(/read-only until it is upgraded/)
     const { backup } = await inWorkspace(w, () => store.upgradeBoard(w))
-    expect(backup).toMatch(/hive-before-1\.0-v2-.*\.db$/)
+    expect(backup).toMatch(/combwork-before-1.0-v2-.*\.db$/)
     expect(tables(backup!)).toContain('cards')
     const state = inWorkspace(w, () => store.boardState(w))
     expect(state.readOnly).toBeNull()
@@ -327,17 +327,17 @@ describe("the board's upgrade to 1.0 (#1207)", () => {
     await close(w)
   })
 
-  it('is refused while another Hive has the file open, the board still read-only; goes ahead once it has closed', async () => {
+  it('is refused while another Combwork has the file open, the board still read-only; goes ahead once it has closed', async () => {
     const ws = await board09()
     const w = await open(ws)
-    // A 0.9 Hive: a connection to the file, as every open workspace holds one.
+    // A 0.9 build: a connection to the file, as every open workspace holds one.
     const other = new DatabaseSync(store.boardFile(ws))
     other.prepare('SELECT count(*) FROM cards').get()
     try {
       await expect(inWorkspace(w, () => store.upgradeBoard(w))).rejects.toThrow('Another Combwork has this workspace open: close it first.')
       expect(inWorkspace(w, () => store.boardState(w)).readOnly).toBe('upgrade')
       expect(await titles(w)).toEqual(['From 0.9'])
-      expect(existsSync(join(hiveOf(ws), 'backups')) ? readdirSync(join(hiveOf(ws), 'backups')).filter((x) => x.includes('before-1.0')) : []).toEqual([])
+      expect(existsSync(join(combworkOf(ws), 'backups')) ? readdirSync(join(combworkOf(ws), 'backups')).filter((x) => x.includes('before-1.0')) : []).toEqual([])
     } finally {
       other.close()
     }
@@ -349,22 +349,22 @@ describe("the board's upgrade to 1.0 (#1207)", () => {
   it("keeps a presence marker while open; another profile's fresh one refuses the upgrade, a stale one doesn't", async () => {
     const ws = await board09()
     const w = await open(ws)
-    const dir = join(hiveOf(ws), PRESENCE_DIR)
+    const dir = join(combworkOf(ws), PRESENCE_DIR)
     inWorkspace(w, () => store.boardState(w))
     const own = readdirSync(dir)
     expect(own).toHaveLength(1)
-    const other = join(dir, 'Hive-Dev-12345678.json')
-    // Running (this process's pid) and recent: another Hive.
-    writeFileSync(other, JSON.stringify({ pid: process.pid, profile: 'Hive-Dev', hiveVersion: '1.0.0', startedAt: new Date().toISOString(), heartbeat: new Date().toISOString() }))
+    const other = join(dir, 'Combwork-Dev-12345678.json')
+    // Running (this process's pid) and recent: another Combwork.
+    writeFileSync(other, JSON.stringify({ pid: process.pid, profile: 'Combwork-Dev', appVersion: '1.0.0', startedAt: new Date().toISOString(), heartbeat: new Date().toISOString() }))
     await expect(inWorkspace(w, () => store.upgradeBoard(w))).rejects.toThrow('close it first')
     expect(inWorkspace(w, () => store.boardState(w)).readOnly).toBe('upgrade')
-    // Its heartbeat missed: a Hive that stopped without removing it.
-    writeFileSync(other, JSON.stringify({ pid: process.pid, profile: 'Hive-Dev', hiveVersion: '1.0.0', startedAt: new Date().toISOString(), heartbeat: new Date(Date.now() - STALE_MS - 1000).toISOString() }))
+    // Its heartbeat missed: a Combwork that stopped without removing it.
+    writeFileSync(other, JSON.stringify({ pid: process.pid, profile: 'Combwork-Dev', appVersion: '1.0.0', startedAt: new Date().toISOString(), heartbeat: new Date(Date.now() - STALE_MS - 1000).toISOString() }))
     await inWorkspace(w, () => store.upgradeBoard(w))
     expect(inWorkspace(w, () => store.boardState(w)).readOnly).toBeNull()
     await close(w)
     // Removed as the workspace closed; the other's left alone.
-    expect(readdirSync(dir)).toEqual(['Hive-Dev-12345678.json'])
+    expect(readdirSync(dir)).toEqual(['Combwork-Dev-12345678.json'])
   })
 
   it('a board an earlier 1.0 upgraded takes the group\'s later steps unasked: writable, its cards kept (HI-1718: rc.1–rc.4 boards at v22)', async () => {
@@ -385,7 +385,7 @@ describe("the board's upgrade to 1.0 (#1207)", () => {
     // No answer given: had it been asked, the board would wait read-only for the user.
     const w = await open(ws)
     expect(inWorkspace(w, () => store.boardState(w)).readOnly).toBeNull()
-    expect(fileSchemaVersion(store.boardFile(ws))).toBe(last)
+    expect(fileSchemaVersion(store.boardFile(ws))).toBe(Math.max(last, ...store.BOARD_MIGRATIONS.map((m) => m.version)))
     expect(tables(store.boardFile(ws))).toContain('card_attachments')
     expect(tables(store.boardFile(ws))).toContain('board_rev')
     await inWorkspace(w, () => tasks.createTask({ title: 'After', project: 'p' }, user))
@@ -430,7 +430,7 @@ describe("the board's upgrade to 1.0 (#1207)", () => {
     const ws = await board09()
     const w = await open(ws)
     await inWorkspace(w, () => store.upgradeBoard(w))
-    const backups = join(hiveOf(ws), 'backups')
+    const backups = join(combworkOf(ws), 'backups')
     const copies = readdirSync(backups).sort()
     const version = fileSchemaVersion(store.boardFile(ws))
     let hold = holdRelease()
@@ -455,7 +455,7 @@ describe("the board's upgrade to 1.0 (#1207)", () => {
     expect(fileSchemaVersion(store.boardFile(ws2))).toBe(2)
   })
 
-  it('Restore is refused while another Hive has the file open, the 1.0 board left as it was', async () => {
+  it('Restore is refused while another Combwork has the file open, the 1.0 board left as it was', async () => {
     const ws = await board09()
     store.boardTestHooks.upgradeAnswer = 'yes'
     const w = await open(ws)
@@ -473,12 +473,12 @@ describe("the board's upgrade to 1.0 (#1207)", () => {
   })
 })
 
-describe('while the upgrade waits, nothing needing hive.db starts or writes (#1207 round 1)', () => {
+describe('while the upgrade waits, nothing needing combwork.db starts or writes (#1207 round 1)', () => {
   it('an agent is refused before anything starts, saying why; it starts once upgraded', async () => {
     const ws = await board09()
     const w = await open(ws)
     expect(inWorkspace(w, () => store.upgradeWaiting(ws))).toBe(true)
-    await expect(inWorkspace(w, () => sessions.start(join(ws, 'p'), { agentId: 'a1' }))).rejects.toThrow('This workspace is from Combwork 0.9: upgrade it to 1.0 before starting agents')
+    await expect(inWorkspace(w, () => sessions.start(join(ws, 'p'), { agentId: 'a1' }))).rejects.toThrow('This workspace is from version 0.9: upgrade it to 1.0 before starting agents')
     expect(sessions.agentsIn(ws)).toBe(0)
     // The Assistant's home is in the workspace: refused the same way.
     await expect(inWorkspace(w, () => sessions.start(join(ws, '.combwork', 'assistant'), { agentId: 'assistant' }))).rejects.toThrow('upgrade it to 1.0 before starting agents')
@@ -542,12 +542,12 @@ describe('while the upgrade waits, nothing needing hive.db starts or writes (#12
     const told: string[] = []
     const off = store.onBoardUpgraded((x) => told.push(x.path!))
     try {
-      // Nothing written, nothing thrown ("This board is from Hive 0.9…" was logged for each).
+      // Nothing written, nothing thrown (a warning that the board was from 0.9 was logged for each).
       expect(await inWorkspace(w, () => tasks.stampCardProjects(w))).toBe(0)
       expect(await inWorkspace(w, () => keyProjects(w))).toEqual([])
       expect(await inWorkspace(w, () => tasks.archiveOldDone(w))).toEqual([])
       expect(await inWorkspace(w, () => tasks.endReviewsWithoutSession(w, () => false))).toEqual([])
-      // Refused (another Hive has the file open): not upgraded, nobody told.
+      // Refused (another Combwork has the file open): not upgraded, nobody told.
       const other = new DatabaseSync(store.boardFile(ws))
       other.prepare('SELECT count(*) FROM cards').get()
       await expect(inWorkspace(w, () => store.upgradeBoard(w))).rejects.toThrow('close it first')
@@ -576,7 +576,7 @@ describe('while the upgrade waits, nothing needing hive.db starts or writes (#12
     const { readTable } = await import('../src/main/storeTables')
     const ws = await board09()
     const w = await open(ws)
-    // What Hive logs meanwhile (to the console in an unpackaged build, as the tests are).
+    // What Combwork logs meanwhile (to the console in an unpackaged build, as the tests are).
     const lines: string[] = []
     const keep = (...a: unknown[]): void => void lines.push(a.map(String).join(' '))
     const spies = [vi.spyOn(console, 'log').mockImplementation(keep), vi.spyOn(console, 'error').mockImplementation(keep)]
@@ -584,11 +584,11 @@ describe('while the upgrade waits, nothing needing hive.db starts or writes (#12
       expect(store.boardWaits(w)).toBe(true)
       // The line updater (a pass came with every agent's change in another window) and a metrics save, on the 0.9 board.
       await inWorkspace(w, () => updateLines(w))
-      // The stage repair (HI-1674), which warned "This board is from Hive 0.9" at each open (HI-1714): it leaves the board alone.
+      // The stage repair (HI-1674), which warned that the board was from 0.9 at each open (HI-1714): it leaves the board alone.
       expect(await inWorkspace(w, () => repairStages(w))).toEqual({ unmarked: 0, repaired: [], failed: 0 })
       metrics.recordApi(metrics.metricsHandle(w), null, { route: '/v1/tasks', method: 'GET', role: 'agent', outcome: 'ok', requestBytes: 1, responseBytes: 1, ms: 1 })
       await metrics.metricsHandle(w)!.store.save()
-      expect(lines.filter((l) => /no such table|readonly database|Could not save the performance metrics|bringing builders|from Hive 0\.9|repairing the stages/i.test(l))).toEqual([])
+      expect(lines.filter((l) => /no such table|readonly database|Could not save the performance metrics|bringing builders|from version 0\.9|repairing the stages/i.test(l))).toEqual([])
       expect(readTable(ws, 'metrics').docs).toEqual([])
       await inWorkspace(w, () => store.upgradeBoard(w))
       expect(store.boardWaits(w)).toBe(false)
@@ -619,13 +619,13 @@ describe('while the upgrade waits, nothing needing hive.db starts or writes (#12
     const ws = await board09()
     const w = await open(ws)
     await inWorkspace(w, () => store.upgradeBoard(w))
-    const dir = join(hiveOf(ws), 'backups')
-    const [v2] = readdirSync(dir).filter((x) => x.startsWith('hive-before-1.0-v2-'))
+    const dir = join(combworkOf(ws), 'backups')
+    const [v2] = readdirSync(dir).filter((x) => x.startsWith('combwork-before-1.0-v2-'))
     // A later copy of the family, of a 1.0 board (as round 1 made one before a later step of the group), named newer.
     const raw = new DatabaseSync(store.boardFile(ws))
-    raw.prepare('VACUUM INTO ?').run(join(dir, 'hive-before-1.0-v3-2099-01-01T00-00-00-000Z.db'))
+    raw.prepare('VACUUM INTO ?').run(join(dir, 'combwork-before-1.0-v3-2099-01-01T00-00-00-000Z.db'))
     raw.close()
-    const at = v2.replace(/^hive-before-1\.0-v2-(.*)\.db$/, '$1').replace(/T(\d\d)-(\d\d)-(\d\d)-(\d{3})Z$/, 'T$1:$2:$3.$4Z')
+    const at = v2.replace(/^combwork-before-1.0-v2-(.*)\.db$/, '$1').replace(/T(\d\d)-(\d\d)-(\d\d)-(\d{3})Z$/, 'T$1:$2:$3.$4Z')
     expect(inWorkspace(w, () => store.boardState(w)).backup09?.at).toBe(at)
     const { restored } = await inWorkspace(w, () => store.restoreBoardBackup(w, () => 0))
     expect(restored.endsWith(v2)).toBe(true)
@@ -637,9 +637,9 @@ describe('while the upgrade waits, nothing needing hive.db starts or writes (#12
     const ws = await board09()
     const w = await open(ws)
     await inWorkspace(w, () => store.upgradeBoard(w))
-    const dir = join(hiveOf(ws), 'backups')
+    const dir = join(combworkOf(ws), 'backups')
     const raw = new DatabaseSync(store.boardFile(ws))
-    raw.prepare('VACUUM INTO ?').run(join(dir, 'hive-before-1.0-v2-2099-01-01T00-00-00-000Z.db'))
+    raw.prepare('VACUUM INTO ?').run(join(dir, 'combwork-before-1.0-v2-2099-01-01T00-00-00-000Z.db'))
     raw.close()
     await expect(inWorkspace(w, () => store.restoreBoardBackup(w, () => 0))).rejects.toThrow('There is no 0.9 board backup')
     expect(fileSchemaVersion(store.boardFile(ws))).toBeGreaterThan(2)
@@ -648,11 +648,11 @@ describe('while the upgrade waits, nothing needing hive.db starts or writes (#12
 })
 
 describe("what services read before the database was replaced is read again (#1207 round 2)", () => {
-  /** A delivery as a 0.9 Hive saves it, straight into the database (another process), with the host's next id. */
+  /** A delivery as a 0.9 build saves it, straight into the database (another process), with the host's next id. */
   function writtenBy09(ws: string, scope: string, id: string, next: number, body: string): void {
     const raw = new DatabaseSync(store.boardFile(ws), { timeout: 5000 })
     try {
-      const rec = { id, seq: Number(id.slice(1)), agentId: 'a1', conversation: null, kind: 'task', from: { kind: 'hive', name: 'Hive' }, body, state: 'queued', created: new Date().toISOString(), expires: new Date(Date.now() + 86_400_000).toISOString() }
+      const rec = { id, seq: Number(id.slice(1)), agentId: 'a1', conversation: null, kind: 'task', from: { kind: 'combwork', name: 'Combwork' }, body, state: 'queued', created: new Date().toISOString(), expires: new Date(Date.now() + 86_400_000).toISOString() }
       raw.prepare('INSERT INTO store_rows (store, scope, key, ord, doc) VALUES (?, ?, ?, ?, ?) ON CONFLICT(store, scope, key) DO UPDATE SET doc = excluded.doc').run('deliveries', scope, id, 0, JSON.stringify(rec))
       raw.prepare('INSERT INTO store_meta (store, scope, key, value) VALUES (?, ?, ?, ?) ON CONFLICT(store, scope, key) DO UPDATE SET value = excluded.value').run('deliveries', scope, 'next', String(next))
       raw.prepare('INSERT INTO store_meta (store, scope, key, value) VALUES (?, ?, ?, ?) ON CONFLICT(store, scope, key) DO NOTHING').run('deliveries', scope, 'imported', JSON.stringify({ at: new Date().toISOString(), rows: 1, file: null }))
@@ -675,7 +675,7 @@ describe("what services read before the database was replaced is read again (#12
       writtenBy09(ws, scope, 'm1', 2, 'Written by 0.9 while the upgrade waited')
       await inWorkspace(w, () => store.upgradeBoard(w))
       expect(bodies(await inWorkspace(w, () => delivery.deliveriesOf(host, 'a1')))).toEqual(['m1 Written by 0.9 while the upgrade waited'])
-      const made = await inWorkspace(w, () => delivery.createDelivery(host, { agentId: 'a1', kind: 'task', from: { kind: 'hive', name: 'Hive' }, body: 'The first in 1.0' }))
+      const made = await inWorkspace(w, () => delivery.createDelivery(host, { agentId: 'a1', kind: 'task', from: { kind: 'combwork', name: 'Combwork' }, body: 'The first in 1.0' }))
       expect(made.id).toBe('m2')
       const saved = await inWorkspace(w, () => delivery.savedForTests(host))
       expect(bodies(saved.deliveries)).toEqual(['m1 Written by 0.9 while the upgrade waited', 'm2 The first in 1.0'])
@@ -744,7 +744,7 @@ describe("what services read before the database was replaced is read again (#12
       const { scope } = await inWorkspace(w, () => w.sessionScope(host))
       writtenBy09(ws, scope, 'm1', 2, 'From 0.9')
       await inWorkspace(w, () => store.upgradeBoard(w))
-      await inWorkspace(w, () => delivery.createDelivery(host, { agentId: 'a1', kind: 'task', from: { kind: 'hive', name: 'Hive' }, body: 'Only in 1.0' }))
+      await inWorkspace(w, () => delivery.createDelivery(host, { agentId: 'a1', kind: 'task', from: { kind: 'combwork', name: 'Combwork' }, body: 'Only in 1.0' }))
       expect(bodies(await inWorkspace(w, () => delivery.deliveriesOf(host, 'a1')))).toEqual(['m1 From 0.9', 'm2 Only in 1.0'])
       // Back to the 0.9 board: what it has, not the 1.0 board's cache.
       await inWorkspace(w, () => store.restoreBoardBackup(w, () => 0))
@@ -752,7 +752,7 @@ describe("what services read before the database was replaced is read again (#12
       // 0.9 adds one, then it is upgraded again: that one is kept, and the next id follows it.
       writtenBy09(ws, scope, 'm2', 3, 'From 0.9 after the restore')
       await inWorkspace(w, () => store.upgradeBoard(w))
-      const made = await inWorkspace(w, () => delivery.createDelivery(host, { agentId: 'a1', kind: 'task', from: { kind: 'hive', name: 'Hive' }, body: 'In 1.0 again' }))
+      const made = await inWorkspace(w, () => delivery.createDelivery(host, { agentId: 'a1', kind: 'task', from: { kind: 'combwork', name: 'Combwork' }, body: 'In 1.0 again' }))
       expect(made.id).toBe('m3')
       expect(bodies((await inWorkspace(w, () => delivery.savedForTests(host))).deliveries)).toEqual(['m1 From 0.9', 'm2 From 0.9 after the restore', 'm3 In 1.0 again'])
     } finally {
@@ -789,7 +789,7 @@ describe("what services read before the database was replaced is read again (#12
 })
 
 describe('a workspace closed right after its database was replaced stays closed (#1207 round 3)', () => {
-  const markers = (ws: string): string[] => (existsSync(join(hiveOf(ws), PRESENCE_DIR)) ? readdirSync(join(hiveOf(ws), PRESENCE_DIR)) : [])
+  const markers = (ws: string): string[] => (existsSync(join(combworkOf(ws), PRESENCE_DIR)) ? readdirSync(join(combworkOf(ws), PRESENCE_DIR)) : [])
 
   /**
    * Replaces the database and closes the workspace with setImmediate held (only it: Node's I/O runs as usual), so what
@@ -854,7 +854,7 @@ describe('a workspace closed right after its database was replaced stays closed 
     try {
       await inWorkspace(w, () => delivery.deliveriesOf(host, 'a1'))
       await inWorkspace(w, () => store.upgradeBoard(w))
-      const made = await inWorkspace(w, () => delivery.createDelivery(host, { agentId: 'a1', kind: 'task', from: { kind: 'hive', name: 'Hive' }, body: 'After the upgrade' }))
+      const made = await inWorkspace(w, () => delivery.createDelivery(host, { agentId: 'a1', kind: 'task', from: { kind: 'combwork', name: 'Combwork' }, body: 'After the upgrade' }))
       expect((await inWorkspace(w, () => delivery.savedForTests(host))).deliveries.map((r) => r.id)).toEqual([made.id])
     } finally {
       await delivery.forgetDeliveriesForTests()

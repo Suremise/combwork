@@ -1,10 +1,10 @@
-// The Hive Assistant view (#243): its sections are Modes, Conversations and Attachments; Attachments shows what was
+// The Combwork Assistant view (#243): its sections are Modes, Conversations and Attachments; Attachments shows what was
 // pasted into its conversations (its home's .combwork/attachments), grouped by conversation, in the project Attachments tab's grid
 // and viewer; a group's name opens that conversation's transcript in the conversations tree (#239's), and a group can
 // be moved to the Recycle Bin at once. Its tiles (#900): a file that isn't an image shows its type's icon, every tile its
 // size, and the group's heading the span of days, with a divider where each day starts. "Show Assistant Attachments" is a command. Modes' New Mode… (a prompt opened from a
 // button) takes Enter once: the mode is made, or the error shown, and no dialog is left open (#355). Fixtures only
-// (nothing runs): a conversation record, its transcript (Hive's copy) and two images. Dev build, throwaway profile and
+// (nothing runs): a conversation record, its transcript (Combwork's copy) and two images. Dev build, throwaway profile and
 // workspace, quiet.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -25,7 +25,7 @@ const check = (name, ok, extra = '') => {
 }
 const conv = '0f5c2a8e-3333-4444-8555-666677770001'
 const at = (h) => new Date(Date.UTC(2026, 9, 5, h, 0, 0)).toISOString()
-/** Local noon `n` days ago, and an attachment's name for a time (Hive puts it in front: 2026-10-12_09-30-00_x.log). */
+/** Local noon `n` days ago, and an attachment's name for a time (Combwork puts it in front: 2026-10-12_09-30-00_x.log). */
 const daysBack = (n) => {
   const d = new Date()
   return new Date(d.getFullYear(), d.getMonth(), d.getDate() - n, 12, 0, 0)
@@ -36,13 +36,13 @@ const stamp = (d, name) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.
 ;(async () => {
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(path.join(ws, 'api'), { recursive: true })
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47927), CLAUDE_CONFIG_DIR: path.join(lib.WORK, 'assistantimages-claude-home') })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47927), CLAUDE_CONFIG_DIR: path.join(lib.WORK, 'assistantimages-claude-home') })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
 
   // A past conversation of the Assistant, with two pasted images.
@@ -92,7 +92,7 @@ const stamp = (d, name) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.
   await newMode('Enter Test')
   check('Enter with a name already used shows why', !!(await lib.until(async () => (await page.getByText('There is already a mode called').count()) > 0, 5000)))
   check('…and leaves no dialog open either', (await page.locator('.dialog').count()) === 0, String(await page.locator('.dialog').count()))
-  // The confirming Enter released in another window (Hive loses the focus, its keyup never comes here): the next
+  // The confirming Enter released in another window (Combwork loses the focus, its keyup never comes here): the next
   // Enters here aren't held back. A field of the test's own, typed into with real key presses.
   await page.locator('button[aria-label="New Mode…"]').click()
   await lib.until(async () => (await page.locator('.dialog input.input').count()) === 1 && (await page.locator('.dialog input.input').evaluate((el) => el === document.activeElement)), 5000)
@@ -162,7 +162,7 @@ const stamp = (d, name) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.
   await lib.until(async () => (await page.locator('.images-page').count()) === 0, 8000)
   check('the group goes, and the view says there are none', /No attachments yet/.test(await page.locator('.empty-state').first().innerText().catch(() => '')))
   check('its images are gone from its home', !fs.existsSync(imgDir) || fs.readdirSync(imgDir).length === 0)
-  // Hive's copy of its transcript, whole: plain, or compressed by the backups' housekeeping (#1110), which may run
+  // Combwork's copy of its transcript, whole: plain, or compressed by the backups' housekeeping (#1110), which may run
   // meanwhile (#1298). The .gz is in place before the plain file goes, so reading the plain one first misses neither.
   const backup = path.join(home, '.combwork', 'sessions', `${conv}.jsonl`)
   const kept = (() => {

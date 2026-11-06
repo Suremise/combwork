@@ -1,7 +1,7 @@
-// The restart queue's lifecycle (HI-1707, HR3's round 1), with Hive's services stood in for so each race is driven
-// exactly: Hive closing while a resume waits on its slot check; a workspace not ready (not read, or its merge slots not
+// The restart queue's lifecycle (HI-1707, HR3's round 1), with Combwork's services stood in for so each race is driven
+// exactly: Combwork closing while a resume waits on its slot check; a workspace not ready (not read, or its merge slots not
 // recovered); a launch that doesn't stop holding the next back; each workspace's own Resume agents after an update;
-// and the agents recorded as Hive closes even when reading their cards and lanes hangs.
+// and the agents recorded as Combwork closes even when reading their cards and lanes hangs.
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -158,7 +158,7 @@ async function queueSettles(step: () => unknown): Promise<void> {
   )
 }
 /**
- * Hive started again on the record the last run saved: a new run (no launches yet), the workspace opening. Its
+ * Combwork started again on the record the last run saved: a new run (no launches yet), the workspace opening. Its
  * entries are then decided: queued (and the first started), or offered.
  */
 async function relaunch(ws: { path: string }, o: { readyMs?: number } = {}): Promise<void> {
@@ -179,7 +179,7 @@ function takesNote(agentId: string): void {
 }
 
 beforeEach(() => {
-  dir = tempDir('hive-restart-recovery-')
+  dir = tempDir('cw-restart-recovery-')
   Object.assign(h, { lives: [], workspaces: [], hold: null, holdAsked: 0, starts: [], pending: [], tasks: null, stopEnds: true, paused: false, run: 0, toasts: [], openOffers: new Set(), resolved: [], dropped: [], saveHold: null, savesHeld: 0 })
 })
 afterEach(() => {
@@ -193,7 +193,7 @@ afterAll(() => {
 })
 
 describe('the restart queue (HI-1707)', () => {
-  it("Hive closing while a resume waits on its slot check: nothing starts, and the entry stays pending for the next start", async () => {
+  it("Combwork closing while a resume waits on its slot check: nothing starts, and the entry stays pending for the next start", async () => {
     const ws = workspace(join(dir, 'ws'), ['a1'])
     h.workspaces = [ws]
     let release!: () => void
@@ -299,7 +299,7 @@ describe('the restart queue (HI-1707)', () => {
     await m.startRestartRecovery()
     await vi.waitFor(() => expect(m.restartRecord()?.entries[0].state).toBe('offered'), { timeout: HUNG_MS })
     expect(h.starts).toEqual([])
-    // Hive closes for an update with the offer unanswered: the latest close decides how.
+    // Combwork closes for an update with the offer unanswered: the latest close decides how.
     await m.recordClosing('update', { snapshotMs: 1000, tellMs: 50 })
     await m.restartRecordSaved()
     expect(saved()).toMatchObject({ reason: 'update', entries: [expect.objectContaining({ agentId: 'a1', state: 'pending', card: { label: 'HI-1', round: 3 } })] })
@@ -327,7 +327,7 @@ describe('the restart queue (HI-1707)', () => {
     await vi.waitFor(() => expect(h.starts).toEqual(['a1']), { timeout: HUNG_MS })
     takesNote('a1')
     await vi.waitFor(() => expect(m.restartRecord()?.entries[0]?.state ?? 'gone').toMatch(/resumed|gone/), { timeout: HUNG_MS })
-    // Its session ended afterwards: nothing running is recorded as Hive closes, and the resumed entry leaves.
+    // Its session ended afterwards: nothing running is recorded as Combwork closes, and the resumed entry leaves.
     h.lives = []
     await m.recordClosing('update', { snapshotMs: 1000, tellMs: 50 })
     await m.restartRecordSaved()
@@ -443,7 +443,7 @@ describe('the restart queue (HI-1707)', () => {
     })
   })
 
-  it("Hive closing while reading the agents' cards and lanes hangs: every running conversation is still recorded", async () => {
+  it("Combwork closing while reading the agents' cards and lanes hangs: every running conversation is still recorded", async () => {
     const ws = workspace(join(dir, 'ws'), ['a1', 'idle'])
     h.workspaces = [ws]
     await startWith([])

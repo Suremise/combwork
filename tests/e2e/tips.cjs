@@ -1,4 +1,4 @@
-// Tips: the day's tip in a card when Hive starts (once a day), Next tip, Learn more (the user guide at its
+// Tips: the day's tip in a card when Combwork starts (once a day), Next tip, Learn more (the user guide at its
 // heading), closing it, a moment's tip once (a second agent), Help → Tips… (grouped, searchable, Try it runs the
 // command, Learn more closes it), and Don't show tips. No agents run. Dev build, throwaway profile and workspace with tips turned on.
 const lib = require('./lib.cjs')
@@ -27,13 +27,13 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, showTips: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 860 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('alpha', { exact: true }).first().click()
   const until = async (fn, ms = 10000) => {
@@ -47,7 +47,7 @@ const check = (name, ok, extra = '') => {
   const saved = () => JSON.parse(fs.readFileSync(cfgFile, 'utf8')).ui?.tips ?? {}
 
   // --- The day's tip.
-  check('a tip shows when Hive starts', !!(await until(async () => (await card.count()) === 1, 10000)))
+  check('a tip shows when Combwork starts', !!(await until(async () => (await card.count()) === 1, 10000)))
   check('the first tip, numbered', (await title()) === 'Compact with a focus' && /Tip · 1 of \d+/.test(await card.locator('.tip-head').innerText()), await title())
   check('its shortcut is shown', (await card.locator('.tip-text kbd').count()) === 1)
   check('it is not a dialog: the window works around it', (await page.locator('[role="dialog"]').count()) === 0)
@@ -126,7 +126,7 @@ const check = (name, ok, extra = '') => {
   // it. Its startup is held on a slowed call, and the change comes meanwhile (as R5's probe for #266 did).
   await inv('ui:changeTips', { shownOn: '2000-01-01' })
   await app.evaluate(() => {
-    process.env.HIVE_TEST_SLOW_IPC = 'provider:info=2500*1'
+    process.env.CW_TEST_SLOW_IPC = 'provider:info=2500*1'
   })
   await page.reload()
   await page.waitForLoadState('domcontentloaded')

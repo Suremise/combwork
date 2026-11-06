@@ -1,6 +1,6 @@
-// A window's health in hive.log (HI-1775): its page's long tasks and where it was, so a freeze names itself. The page
+// A window's health in combwork.log (HI-1775): its page's long tasks and where it was, so a freeze names itself. The page
 // reports where it is as that changes, and its long tasks a moment after they end; main logs them, and a hang's start
-// and end with them. Log lines are English (hive.log is read in English, as main's own stall warnings are).
+// and end with them. Log lines are English (combwork.log is read in English, as main's own stall warnings are).
 
 /** Where a window is: what a long-task or hang line names. */
 export interface WindowWhere {

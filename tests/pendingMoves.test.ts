@@ -9,7 +9,7 @@ import type { WorkspaceInfo } from '../src/shared/types'
 const alpha = 'C:\\ws\\alpha'
 const beta = 'C:\\ws\\beta'
 type Cells = (string | null)[]
-/** A workspace as Hive reports it: alpha's agents in this order (each with a status), beta's two. */
+/** A workspace as Combwork reports it: alpha's agents in this order (each with a status), beta's two. */
 const report = (order: string, opts: { status?: string; cells?: Cells } = {}): WorkspaceInfo =>
   ({
     path: 'C:\\ws',

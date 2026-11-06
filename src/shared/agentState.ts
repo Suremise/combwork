@@ -3,8 +3,8 @@ import { msg, tr, type Msg } from './i18n'
 import type { AgentInfo, LiveSessionState, ProjectInfo, TaskCard } from './types'
 
 /**
- * An agent's state as the session page marks it (#973, Hive 0.9.0): four states, each drawn with its own shape as well
- * as its colour (StateMark), so they read apart without colour. Projected from what Hive already knows (the status
+ * An agent's state as the session page marks it (#973, 0.9.0): four states, each drawn with its own shape as well
+ * as its colour (StateMark), so they read apart without colour. Projected from what Combwork already knows (the status
  * word, a question, a stall, a card blocked on the user); it detects nothing of its own.
  * - waiting: waiting for you (a permission prompt, a question, a sign-in, a card blocked on you): a diamond;
  * - stalled: nothing will move it on (its CLI failed, or failed to start, its turn has been silent with its state

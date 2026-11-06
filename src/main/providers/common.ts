@@ -8,7 +8,7 @@ import type { AgentInstallInfo, ReadinessIssue, RecacheEstimate, SessionUsage } 
 import { readFirstLineOf } from '../transcriptFiles'
 import { cleanSwaps, contentHash, ContentTooLarge, COPY_MARKER, CopyFailed, LinkNotCopied, sourceProblem, swapIn, swapOut, tooBigToDeliver, withFileLock } from '../fsutil'
 import { createLogger, userText } from '../logger'
-import { hiveError } from '../hiveError'
+import { combworkError } from '../combworkError'
 import { git } from '../git'
 import type { HookIds, LaunchContext, SkillCopyBook, SkillCopyRecord, SkillDelivery } from './types'
 
@@ -45,7 +45,7 @@ export function compareVersions(a: string, b: string): number {
   return 0
 }
 
-/** Copies of a CLI that belong to an editor extension (VS Code, Cursor…), which Hive never uses. */
+/** Copies of a CLI that belong to an editor extension (VS Code, Cursor…), which Combwork never uses. */
 export const EDITOR_EXTENSION_PATH = /[\\/]\.(vscode|vscode-insiders|cursor|windsurf)[\\/]extensions[\\/]/i
 
 export const EDITOR_ROOTS = ['.vscode', '.vscode-insiders', '.cursor', '.windsurf']
@@ -79,8 +79,8 @@ const NPM_SHIM_RUN = /^endLocal & goto #_undefined_# 2>NUL \|\| title %COMSPEC% 
 const ONE_LINE_RUN = /^@node "%~dp0\\?([^"%*?<>|&^]+\.[cm]?js)" %\*$/
 
 /**
- * The node and script a Node CLI's .cmd launcher runs, so Hive can start them directly instead of through cmd.exe (and
- * its 8,191-character command line, which the Hive Assistant's Codex launch is longer than). Only launchers that do
+ * The node and script a Node CLI's .cmd launcher runs, so Combwork can start them directly instead of through cmd.exe (and
+ * its 8,191-character command line, which the Combwork Assistant's Codex launch is longer than). Only launchers that do
  * nothing else are taken, matched whole: npm's (NPM_SHIM_LINES) and the bare one-line `@node "%~dp0cli.cjs" %*`. One
  * that sets anything, passes its own arguments or Node flags, or runs another interpreter gives null and still goes
  * through cmd.exe, since starting its script directly would leave that out.
@@ -121,7 +121,7 @@ function onPath(exe: string, env: NodeJS.ProcessEnv): string | null {
   return null
 }
 
-/** Whether Hive starts this executable through cmd.exe (a .cmd/.bat it can't start directly). */
+/** Whether Combwork starts this executable through cmd.exe (a .cmd/.bat it can't start directly). */
 export function runsThroughCmd(file: string): boolean {
   return process.platform === 'win32' && /\.(cmd|bat)$/i.test(file) && !shimTarget(file)
 }
@@ -137,7 +137,7 @@ export function toSpawnable(file: string, args: string[]): { file: string; args:
     const out = { file: process.env.ComSpec || 'cmd.exe', args: ['/d', '/s', '/c', file, ...args] }
     const length = commandLineLength(out.file, out.args)
     if (length > CMD_MAX_CHARS) {
-      throw hiveError(CMD_TOO_LONG, { file: basename(file), max: CMD_MAX_CHARS, length })
+      throw combworkError(CMD_TOO_LONG, { file: basename(file), max: CMD_MAX_CHARS, length })
     }
     return out
   }
@@ -151,7 +151,7 @@ export function commandLineLength(file: string, args: string[]): number {
 }
 
 /**
- * A first task as the CLI's last argument. A .cmd/.bat Hive can't start directly runs through cmd.exe, which can't pass
+ * A first task as the CLI's last argument. A .cmd/.bat Combwork can't start directly runs through cmd.exe, which can't pass
  * newlines or its special characters safely, so there it becomes one plain line (a Node CLI's launcher is started as
  * node and its script, which take it as it is). A leading dash would read as an option.
  */
@@ -163,7 +163,7 @@ export function promptArg(executable: string, text: string): string {
 
 /**
  * A first task after the user's extra arguments, for a CLI that takes it as its last positional argument (Claude Code,
- * Codex): behind a "--" of Hive's own, so an option that takes a list ("--allowedTools a b", Codex's "--image a.png")
+ * Codex): behind a "--" of Combwork's own, so an option that takes a list ("--allowedTools a b", Codex's "--image a.png")
  * ending the extra arguments can't read the task as another of its values (#523). Extra arguments never hold a bare
  * "--" of their own: Settings refuses one, and so does a launch (extraArgsProblem).
  */
@@ -172,9 +172,9 @@ export function taskArgs(executable: string, text: string): string[] {
 }
 
 /**
- * A shell command that forwards a hook's JSON (stdin) to Hive's hook server with curl (on PATH in Windows 10+, and in
+ * A shell command that forwards a hook's JSON (stdin) to Combwork's hook server with curl (on PATH in Windows 10+, and in
  * Git Bash), for hooks a CLI can only run as commands. The Authorization header comes from the launch's auth file
- * (`-H @<file>`, in Hive's user data), so neither the command nor any file it is written to holds a token (#345). The
+ * (`-H @<file>`, in Combwork's user data), so neither the command nor any file it is written to holds a token (#345). The
  * form works in Git Bash, PowerShell and cmd alike: `curl.exe` unquoted (a quoted path is an expression in PowerShell),
  * `"@-"` quoted (a bare @- is splatting there), forward slashes (bash would eat backslashes). Codex's hook trust hash
  * covers this text (codex/adapter.ts hookHash). `seconds`: how long curl tries, the hook's own timeout (#367).
@@ -215,28 +215,21 @@ export function recacheEstimate(usage: SessionUsage, ttlOverride: 'auto' | '5m' 
 }
 
 // ---------------------------------------------------------------------------
-// Hive's skill copies in a project's .agents/skills (Codex, Copilot)
+// Combwork's skill copies in a project's .agents/skills (Codex, Copilot)
 // ---------------------------------------------------------------------------
 
-/** The folder, relative to an agent's working folder, where CLIs without a per-launch skills folder read Hive's copies. */
+/** The folder, relative to an agent's working folder, where CLIs without a per-launch skills folder read Combwork's copies. */
 export const AGENTS_SKILLS = join('.agents', 'skills')
 
 /** The prefix of Combwork's copies' folders in .agents/skills (HI-2463: the name agents see their skills by). */
 export const COPY_PREFIX = 'cw-'
 
-/**
- * The prefix of its copies before HI-2463. A copy still there under it is retired when it is provably Combwork's own
- * (ownCopies: marker, record and unchanged content), so a CLI never reads one skill under both names; a user's own
- * folder with this prefix is never touched.
- */
-export const LEGACY_COPY_PREFIX = 'hive-'
-
-/** Where a launch's CLI reads Combwork's copy of a skill in .agents/skills (`prefix`: a copy from before, to retire it). */
-export function agentsSkillCopyPath(cwd: string, skill: string, prefix = COPY_PREFIX): string {
-  return join(cwd, AGENTS_SKILLS, `${prefix}${skill}`)
+/** Where a launch's CLI reads Combwork's copy of a skill in .agents/skills. */
+export function agentsSkillCopyPath(cwd: string, skill: string): string {
+  return join(cwd, AGENTS_SKILLS, `${COPY_PREFIX}${skill}`)
 }
 
-/** The hash in a Hive copy's marker ('' for one from before hashes), or null: not Hive's copy (or no folder). */
+/** The hash in a Combwork copy's marker ('' for one from before hashes), or null: not Combwork's copy (or no folder). */
 async function skillMarker(folder: string): Promise<string | null> {
   try {
     return (JSON.parse(await readFile(join(folder, COPY_MARKER), 'utf8')) as { hash?: string }).hash ?? ''
@@ -246,8 +239,8 @@ async function skillMarker(folder: string): Promise<string | null> {
 }
 
 /**
- * A skill not delivered this time, for `problem`: what the CLI reads of it is Hive's copy from an earlier launch, if one
- * is there (its revision, and the problem says it kept it); a folder of the user's with its name is never Hive's delivery.
+ * A skill not delivered this time, for `problem`: what the CLI reads of it is Combwork's copy from an earlier launch, if one
+ * is there (its revision, and the problem says it kept it); a folder of the user's with its name is never Combwork's delivery.
  */
 async function keptCopy(dest: string, problem: string): Promise<SkillDelivery> {
   const kept = existsSync(dest) && (await skillMarker(dest)) !== null ? await contentHash(dest).catch(() => null) : null
@@ -255,9 +248,9 @@ async function keptCopy(dest: string, problem: string): Promise<SkillDelivery> {
 }
 
 /**
- * Copies the session's Hive skills into <cwd>/.agents/skills/hive-<name> (for CLIs with no per-launch skills folder:
- * Codex and Copilot, which share the copies), removes Hive's copies of skills it no longer gets, and keeps them out of
- * git. Hive's copies carry a marker file (with the source's hash): folders without one are the user's and are never
+ * Copies the session's Combwork skills into <cwd>/.agents/skills/cw-<name> (for CLIs with no per-launch skills folder:
+ * Codex and Copilot, which share the copies), removes Combwork's copies of skills it no longer gets, and keeps them out of
+ * git. Combwork's copies carry a marker file (with the source's hash): folders without one are the user's and are never
  * touched. An unchanged skill isn't copied again, and a changed one is swapped in whole (swapIn), so another agent
  * sharing the folder never reads one half-copied; it does read the new version from then on (the CLIs read a skill's
  * files when they use it). What a swap interrupted by a crash left there is tidied first. Says what each skill's copy
@@ -269,7 +262,7 @@ export async function syncAgentsSkills(ctx: LaunchContext, cli: string): Promise
     return await withFileLock(join(ctx.cwd, AGENTS_SKILLS), () => syncAgentsSkillsNow(ctx, cli))
   } catch (e) {
     // The folder couldn't be set up or locked: nothing was copied, and each skill is what was there before (a copy
-    // Hive made at an earlier launch, read without the lock: another launch may be changing it).
+    // Combwork made at an earlier launch, read without the lock: another launch may be changing it).
     log.warn(`Could not copy skills for ${cli}`, e)
     const out: Record<string, SkillDelivery> = {}
     for (const s of ctx.skills) out[s.name] = await keptCopy(agentsSkillCopyPath(ctx.cwd, s.name), 'the skills could not be copied') // i18n-ignore: the skills' launch record, which agents read (the Agent API's status): guidance.ts
@@ -283,21 +276,18 @@ async function syncAgentsSkillsNow(ctx: LaunchContext, cli: string): Promise<Rec
   const wanted = new Map(ctx.skills.map((s) => [`${COPY_PREFIX}${s.name}`, s]))
   if (!ctx.skills.length && !existsSync(dir)) return out
   await mkdir(dir, { recursive: true })
-  // Under the same lock as the swaps: Hive's own leftovers only (dot-folders named for a swap).
+  // Under the same lock as the swaps: Combwork's own leftovers only (dot-folders named for a swap).
   await cleanSwaps(dir, unchangedCopy)
   const own = await ownCopies(ctx.cwd, ctx.projectPath, ctx.copies)
-  // Copies under the old prefix first (HI-2463), while their records still describe them: each is retired as any copy
-  // no longer given is, so the new cw- copy delivered below is the only one the CLI reads.
-  const entries = await readdir(dir).catch(() => [] as string[])
-  for (const [prefix, f] of [...entries.filter((e) => e.startsWith(LEGACY_COPY_PREFIX)).map((e) => [LEGACY_COPY_PREFIX, e] as const), ...entries.filter((e) => e.startsWith(COPY_PREFIX)).map((e) => [COPY_PREFIX, e] as const)]) {
-    // A copy Hive no longer gives (switched off, deleted or renamed) goes only when it is Hive's own, unchanged (#1431),
-    // and no other session of Hive's works in the folder (it may be reading it): asked for each copy, inside the lock.
-    // One kept now (a reader there, or a file in it open) goes at a later launch with the folder to itself, or when the
-    // last session there ends (as Settings → Advanced says).
+  for (const f of (await readdir(dir).catch(() => [] as string[])).filter((e) => e.startsWith(COPY_PREFIX))) {
+    // A copy Combwork no longer gives (switched off, deleted or renamed) goes only when it is Combwork's own, unchanged
+    // (#1431), and no other session of Combwork's works in the folder (it may be reading it): asked for each copy, inside
+    // the lock. One kept now (a reader there, or a file in it open) goes at a later launch with the folder to itself, or
+    // when the last session there ends (as Settings → Advanced says).
     if (wanted.has(f) || ctx.othersHere?.()) continue
-    const skill = f.slice(prefix.length)
-    const revision = await own(skill, prefix)
-    if (revision) await retireCopy(ctx.cwd, skill, revision, ctx.copies, prefix).catch((e) => log.warn(`Could not remove ${userText(f)} for ${cli}; trying again next time`, e))
+    const skill = f.slice(COPY_PREFIX.length)
+    const revision = await own(skill)
+    if (revision) await retireCopy(ctx.cwd, skill, revision, ctx.copies).catch((e) => log.warn(`Could not remove ${userText(f)} for ${cli}; trying again next time`, e))
   }
   for (const [folder, s] of wanted) {
     // One skill's failure is its own: the others are still delivered, and each record says what the CLI reads.
@@ -307,29 +297,29 @@ async function syncAgentsSkillsNow(ctx: LaunchContext, cli: string): Promise<Rec
       log.warn(`Could not copy skill ${userText(s.name)} for ${cli}`, e)
       out[s.name] = await keptCopy(join(dir, folder), 'it could not be copied') // i18n-ignore: the skills' launch record, which agents read (the Agent API's status): guidance.ts
     }
-    // Hive's record of the copy (#1431): only one that is exactly what Hive wrote (its content its marker's hash), so a
-    // copy edited since keeps its old record and is never taken for Hive's own.
+    // Combwork's record of the copy (#1431): only one that is exactly what Combwork wrote (its content its marker's hash), so a
+    // copy edited since keeps its old record and is never taken for Combwork's own.
     const revision = out[s.name].revision
-    if (ctx.copies && revision && (await skillMarker(join(dir, folder))) === revision) await ctx.copies.record(ctx.cwd, ctx.projectPath, s.name, revision).catch((e) => log.warn(`Could not record Hive's copy of ${userText(s.name)} for ${cli}`, e))
+    if (ctx.copies && revision && (await skillMarker(join(dir, folder))) === revision) await ctx.copies.record(ctx.cwd, ctx.projectPath, s.name, revision).catch((e) => log.warn(`Could not record Combwork's copy of ${userText(s.name)} for ${cli}`, e))
   }
   // Keeping the copies out of git: a failure here changes nothing about what was delivered.
-  await excludeCopies(ctx.cwd).catch((e) => log.warn(`Could not add Hive's ${cli} skill copies to git's exclude file`, e))
+  await excludeCopies(ctx.cwd).catch((e) => log.warn(`Could not add Combwork's ${cli} skill copies to git's exclude file`, e))
   return out
 }
 
 /**
- * Which copies in a folder's .agents/skills are Hive's own to remove (#1431): the copy's marker says Hive made it, Hive's
+ * Which copies in a folder's .agents/skills are Combwork's own to remove (#1431): the copy's marker says Combwork made it, Combwork's
  * record says so too, and its content is still the revision recorded (unchanged since delivery), so neither a user's
  * skill nor a copy edited since is ever removed. A marked copy without a record (made before records) whose content is
- * still its marker's hash is provably Hive's and unchanged: it is recorded then. Records that can't be read: none is.
+ * still its marker's hash is provably Combwork's and unchanged: it is recorded then. Records that can't be read: none is.
  * Without a book (tests), the marker and content alone decide. Each answer is the revision the copy may be removed at
  * (null: it stays), which retireCopy checks again as it goes: an edit made meanwhile keeps it.
  */
-async function ownCopies(folder: string, project: string, book: SkillCopyBook | undefined): Promise<(skill: string, prefix?: string) => Promise<string | null>> {
-  const records = book ? await book.of(folder).catch((e) => (log.warn("Could not read Hive's record of its skill copies", e), null)) : undefined
-  return async (skill, prefix = COPY_PREFIX) => {
+async function ownCopies(folder: string, project: string, book: SkillCopyBook | undefined): Promise<(skill: string) => Promise<string | null>> {
+  const records = book ? await book.of(folder).catch((e) => (log.warn("Could not read Combwork's record of its skill copies", e), null)) : undefined
+  return async (skill) => {
     if (records === null) return null
-    const dest = agentsSkillCopyPath(folder, skill, prefix)
+    const dest = agentsSkillCopyPath(folder, skill)
     const marker = await skillMarker(dest)
     // No marker: the user's. An empty one, from before hashes: whether it was changed can't be told.
     if (!marker) return null
@@ -345,19 +335,19 @@ async function ownCopies(folder: string, project: string, book: SkillCopyBook | 
 }
 
 /**
- * Removes Hive's copy of a skill in a folder only while it is still `revision` (swapOut: checked under Hive's editors'
+ * Removes Combwork's copy of a skill in a folder only while it is still `revision` (swapOut: checked under Combwork's editors'
  * file locks, again once moved aside and just before it goes, so an edit made since ownCopies looked keeps it, put back
  * or kept beside it as a conflict copy), then its record. One already gone just loses its record; one edited meanwhile
- * keeps its record, whose revision no longer matches, so it is never taken for Hive's own again.
+ * keeps its record, whose revision no longer matches, so it is never taken for Combwork's own again.
  */
-async function retireCopy(folder: string, skill: string, revision: string, book: SkillCopyBook | undefined, prefix = COPY_PREFIX): Promise<void> {
-  const dest = agentsSkillCopyPath(folder, skill, prefix)
+async function retireCopy(folder: string, skill: string, revision: string, book: SkillCopyBook | undefined): Promise<void> {
+  const dest = agentsSkillCopyPath(folder, skill)
   if (existsSync(dest)) await swapOut(dest, revision)
   await book?.forget(folder, skill)
 }
 
 /**
- * cleanSwaps' test in .agents/skills: what a crash left aside is removed only while it is a Hive copy whose content is
+ * cleanSwaps' test in .agents/skills: what a crash left aside is removed only while it is a Combwork copy whose content is
  * still its marker's hash; anything else is kept beside it as a conflict copy.
  */
 async function unchangedCopy(aside: string): Promise<boolean> {
@@ -366,13 +356,13 @@ async function unchangedCopy(aside: string): Promise<boolean> {
 }
 
 /**
- * Removes Hive's own skill copies from a folder's .agents/skills (#1431: the last of Hive's sessions there ended, a lease
+ * Removes Combwork's own skill copies from a folder's .agents/skills (#1431: the last of Combwork's sessions there ended, a lease
  * ended, a slot is about to go, or at start for folders whose sessions are gone), under syncAgentsSkills' lock, so a
- * launch meanwhile wins: `busy` is asked inside the lock, and a folder a session of Hive's is in keeps every copy. Only
- * Hive's own copies go (ownCopies); a user's skill, a copy edited since, and anything else in the folder stay. Records of
+ * launch meanwhile wins: `busy` is asked inside the lock, and a folder a session of Combwork's is in keeps every copy. Only
+ * Combwork's own copies go (ownCopies); a user's skill, a copy edited since, and anything else in the folder stay. Records of
  * copies no longer there are dropped. Says which skills' copies were removed.
  */
-export async function removeHiveCopies(folder: string, project: string, book: SkillCopyBook | undefined, busy: () => boolean): Promise<string[]> {
+export async function removeCombworkCopies(folder: string, project: string, book: SkillCopyBook | undefined, busy: () => boolean): Promise<string[]> {
   const dir = join(folder, AGENTS_SKILLS)
   return withFileLock(dir, async () => {
     if (busy()) return []
@@ -383,24 +373,23 @@ export async function removeHiveCopies(folder: string, project: string, book: Sk
     }
     await cleanSwaps(dir, unchangedCopy)
     const own = await ownCopies(folder, project, book)
-    // Both prefixes (HI-2463): copies from before the rename go the same way, under the same test.
-    const names = new Map<string, Set<string>>([[COPY_PREFIX, new Set([...recorded.values()].map((r) => r.skill))], [LEGACY_COPY_PREFIX, new Set()]])
-    for (const f of await readdir(dir).catch(() => [] as string[])) for (const [prefix, set] of names) if (f.startsWith(prefix)) set.add(f.slice(prefix.length))
+    const names = new Set([...recorded.values()].map((r) => r.skill))
+    for (const f of await readdir(dir).catch(() => [] as string[])) if (f.startsWith(COPY_PREFIX)) names.add(f.slice(COPY_PREFIX.length))
     const removed: string[] = []
-    for (const [prefix, skill] of [...names].flatMap(([p, set]) => [...set].map((s) => [p, s] as const))) {
+    for (const skill of names) {
       try {
-        if (!existsSync(agentsSkillCopyPath(folder, skill, prefix))) {
-          // A record with no copy under either name is dropped.
-          if (prefix === COPY_PREFIX && !existsSync(agentsSkillCopyPath(folder, skill, LEGACY_COPY_PREFIX))) await book?.forget(folder, skill)
+        if (!existsSync(agentsSkillCopyPath(folder, skill))) {
+          // A record with no copy is dropped.
+          await book?.forget(folder, skill)
         } else {
-          const revision = await own(skill, prefix)
+          const revision = await own(skill)
           if (!revision) continue
-          await retireCopy(folder, skill, revision, book, prefix)
+          await retireCopy(folder, skill, revision, book)
           if (!removed.includes(skill)) removed.push(skill)
         }
       } catch (e) {
         // In use (a CLI run on its own there has a file open): it stays, and goes at a later clean-up.
-        log.warn(`Could not remove Hive's copy of ${userText(skill)} from ${userText(folder)}; trying again later`, e)
+        log.warn(`Could not remove Combwork's copy of ${userText(skill)} from ${userText(folder)}; trying again later`, e)
       }
     }
     return removed
@@ -409,14 +398,14 @@ export async function removeHiveCopies(folder: string, project: string, book: Sk
 
 /** One skill into its folder in .agents/skills (under syncAgentsSkills' lock): what the CLI reads of it afterwards. */
 async function deliverSkill(s: LaunchContext['skills'][number], dest: string, folder: string, cli: string): Promise<SkillDelivery> {
-  // One identity for the source, Hive's copies and their markers: contentHash, which counts links (never following
+  // One identity for the source, Combwork's copies and their markers: contentHash, which counts links (never following
   // them) and leaves the marker out. A marker from before (another hash) just means one more copy.
   // The launch's settings' read of the source where they had one (HI-2268: hashed again only when its files changed).
   let hash: string
   try {
     hash = s.revision || (await contentHash(s.sourcePath))
   } catch (e) {
-    // Not copied. Hive's copy from an earlier launch stays, and is what the CLI reads: its revision is what reached the
+    // Not copied. Combwork's copy from an earlier launch stays, and is what the CLI reads: its revision is what reached the
     // session. A folder of the user's with the name is theirs, not a delivery. Too big lasts until the skill is
     // smaller; a source that couldn't be read (gone, or being edited) may work at the next launch.
     if (e instanceof ContentTooLarge) return { ...(await keptCopy(dest, tooBigToDeliver(e))), lasting: true }
@@ -437,7 +426,7 @@ async function deliverSkill(s: LaunchContext['skills'][number], dest: string, fo
   if (had === null) {
     // Not marked: the user's own folder, unless it is an unchanged copy from before markers.
     if ((await revision()) !== hash) {
-      log.warn(`Not copying skill ${userText(s.name)} for ${cli}: ${userText(dest)} is not Hive's copy.`)
+      log.warn(`Not copying skill ${userText(s.name)} for ${cli}: ${userText(dest)} is not Combwork's copy.`)
       return { revision: null, problem: `a folder of the user's in .agents/skills is named ${folder}`, lasting: true } // i18n-ignore: the skills' launch record, which agents read (the Agent API's status): guidance.ts
     }
     await writeFile(join(dest, COPY_MARKER), JSON.stringify({ source: s.sourcePath, hash }) + '\n')
@@ -465,7 +454,12 @@ async function deliverSkill(s: LaunchContext['skills'][number], dest: string, fo
   }
 }
 
-/** Keeps Hive's copies (and a swap's dot-folders) out of git, in the repository's info/exclude. */
+/** The comment above Combwork's copies' lines in a repository's info/exclude (HI-2580). */
+export const COPIES_EXCLUDE_COMMENT = "# Combwork's copies of workspace skills for Codex and Copilot (added by Combwork)" // i18n-ignore: a line in git's exclude file, which stays English
+/** How that comment starts: Combwork's own (one from before 1.1 says Combwork's by then: the names upgrade, HI-2587). */
+const COPIES_COMMENT_HEAD = "# Combwork's copies of workspace skills" // i18n-ignore: a line in git's exclude file, which stays English
+
+/** Keeps Combwork's copies (and a swap's dot-folders) out of git, in the repository's info/exclude. */
 export async function excludeCopies(cwd: string): Promise<void> {
   const common = await git(cwd, ['rev-parse', '--git-common-dir'], undefined, undefined, { timeout: 5000 })
   const gitDir = common.ok ? common.out.trim() : ''
@@ -473,18 +467,17 @@ export async function excludeCopies(cwd: string): Promise<void> {
   const exclude = join(isAbsolute(gitDir) ? gitDir : resolvePath(cwd, gitDir), 'info', 'exclude')
   const text = await readFile(exclude, 'utf8').catch(() => '')
   const lines = text.split(/\r?\n/)
-  // Hive's copies, and the dot-folders a swap uses for a moment (left behind only by a crash, until the next launch).
-  // The cw- names (HI-2463), and the hive- ones copies had before, which may still be there until they are retired.
-  const missing = ['/.agents/skills/cw-*/', '/.agents/skills/.cw-*/', '/.agents/skills/hive-*/', '/.agents/skills/.hive-*/'].filter((l) => !lines.includes(l))
+  // Combwork's copies, and the dot-folders a swap uses for a moment (left behind only by a crash, until the next launch).
+  const missing = ['/.agents/skills/cw-*/', '/.agents/skills/.cw-*/'].filter((l) => !lines.includes(l))
   if (missing.length) {
     await mkdir(join(exclude, '..'), { recursive: true })
-    await appendFile(exclude, `${text && !text.endsWith('\n') ? '\n' : ''}${lines.some((l) => l.startsWith("# Hive's copies of workspace skills")) ? '' : "# Hive's copies of workspace skills for Codex and Copilot (added by Hive)\n"}${missing.join('\n')}\n`)
+    await appendFile(exclude, `${text && !text.endsWith('\n') ? '\n' : ''}${lines.some((l) => l.startsWith(COPIES_COMMENT_HEAD)) ? '' : `${COPIES_EXCLUDE_COMMENT}\n`}${missing.join('\n')}\n`)
   }
 }
 
 /**
  * The English text a provider's install info holds (its readiness, its notes), each with the same as data (#797):
- * Hive's own code and the Agent API (GET /v1/status, /v1/providers) read the English, and the window is sent it in the
+ * Combwork's own code and the Agent API (GET /v1/status, /v1/providers) read the English, and the window is sent it in the
  * language it shows (shownInstallInfo).
  */
 const INSTALL_TEXT = new Map<string, TextPart>()
@@ -505,7 +498,7 @@ export function shownInstallInfo(info: AgentInstallInfo): AgentInstallInfo {
   })
 }
 
-/** A provider's install info as an agent reads it (the Agent API's status): Hive's own words in its dialect (dialects, HI-2440). */
+/** A provider's install info as an agent reads it (the Agent API's status): Combwork's own words in its dialect (dialects, HI-2440). */
 export const agentInstallInfo = (info: AgentInstallInfo): AgentInstallInfo => installInfoIn(info, (s) => agentField(s, INSTALL_TEXT.get(s)))
 
 function installInfoIn(info: AgentInstallInfo, shown: (s: string) => string): AgentInstallInfo {
@@ -518,7 +511,7 @@ function installInfoIn(info: AgentInstallInfo, shown: (s: string) => string): Ag
 }
 
 const READINESS = {
-  notInstalled: msg({ id: 'providers.readiness.notInstalled', defaultMessage: '{provider} is not installed.', description: "Provider Setup and Settings → Providers: Hive didn't find the coding agent's CLI. {provider} is its name (Claude Code)." }),
+  notInstalled: msg({ id: 'providers.readiness.notInstalled', defaultMessage: '{provider} is not installed.', description: "Provider Setup and Settings → Providers: Combwork didn't find the coding agent's CLI. {provider} is its name (Claude Code)." }),
   signedOut: msg({ id: 'providers.readiness.signedOut', defaultMessage: '{provider} is not signed in.', description: "Provider Setup and Settings → Providers: the coding agent's CLI has no sign-in. {provider} is its name." }),
   update: msg({ id: 'providers.readiness.update', defaultMessage: '{provider} {version} is available.', description: 'Provider Setup and Settings → Providers: a newer version of the coding agent is out. {provider} is its name, {version} the version.' }),
   install: msg({ id: 'providers.action.install', defaultMessage: 'Install', description: "Provider Setup's button: installs the coding agent's CLI in a terminal." }),
@@ -538,7 +531,7 @@ export const signedOutIssue = (provider: string, detail?: TextPart[]): Readiness
   ...(detail ? { detail: detail.map(installText) } : {})
 })
 
-/** A newer version is out: Update, or (`detail`) how to update it where Hive can't. */
+/** A newer version is out: Update, or (`detail`) how to update it where Combwork can't. */
 export const updateIssue = (provider: string, version: string | null, detail?: TextPart[]): ReadinessIssue => ({
   id: 'update',
   level: 'info',

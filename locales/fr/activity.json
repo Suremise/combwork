@@ -30,6 +30,8 @@
   "activity.liveTip": "Passer en direct : montrer ce qui s’exécute à mesure que cela change. L’onglet s’ouvre figé, un instantané du moment où tu l’as ouvert.",
   "activity.loadFailed": "Impossible de charger l’activité : {error}",
   "activity.loading": "Chargement…",
+  "activity.modelSwitch": "Modèle changé : {launched} → {running}",
+  "activity.modelSwitch.tip": "Son agent de code a changé de modèle de lui-même ou à une question à lui. Affiché tant qu’il utilise l’autre modèle ; redémarre l’agent pour revenir à celui de sa connexion.",
   "activity.noPrompt": "(prompt sans texte)",
   "activity.notEnded": "{why, select, notOwn {{label} n’est plus un des processus de cet agent : rien n’a été arrêté.} cli {{label} est la CLI de l’agent : utilise Arrêter pour l’arrêter.} other {Impossible d’arrêter {label} : le processus tourne peut-être encore.}}",
   "activity.notRunning": "Pas en cours",

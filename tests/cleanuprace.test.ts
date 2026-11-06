@@ -9,7 +9,7 @@ import { DEFAULT_CLEANUP } from '../src/shared/storage'
 import type { CleanupOptions } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-cleanup-')
+const base = tempDir('cw-cleanup-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 // The Recycle Bin, as deleting the file.
 ;(electron.shell as unknown as { trashItem: (p: string) => Promise<void> }).trashItem = async (p) => rmSync(p, { recursive: true, force: true })
@@ -149,7 +149,7 @@ describe('Clean Up while sessions change', () => {
     expect(await totalTokens(id)).toBe(before)
   })
 
-  it('a session whose only copy is Hive’s is not deleted when its usage read throws', async () => {
+  it('a session whose only copy is Combwork’s is not deleted when its usage read throws', async () => {
     const id = await oldSession(false)
     const usage = failUsage(id, async () => {
       throw new Error('EBUSY')

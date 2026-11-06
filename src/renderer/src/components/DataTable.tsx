@@ -8,7 +8,7 @@ import { Icon, IconButton, InfoTip, SearchInput, Tooltip } from './ui'
 
 /**
  * A table that can grow: sorting by a header, quick filters under the headers, and pages under it (with rows per page,
- * remembered per table). The same look as Hive's other tables (.table in .table-wrap, as Performance's): real table
+ * remembered per table). The same look as Combwork's other tables (.table in .table-wrap, as Performance's): real table
  * markup, aria-sort on the sorted header, labelled filters and paging buttons. Only the current page is rendered. Its
  * rows per page and its sort are remembered per table (`id`).
  */

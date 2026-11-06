@@ -5,7 +5,7 @@
  * leave them behind.
  */
 
-/** Whether a value is a project id Hive could have made (anything else in project.json is given a new one). */
+/** Whether a value is a project id Combwork could have made (anything else in project.json is given a new one). */
 export const isProjectId = (v: unknown): v is string => typeof v === 'string' && /^p-[0-9a-f]{8,32}$/.test(v)
 
 export interface ProjectIdEntry {
@@ -80,7 +80,7 @@ export interface LegacyRecord {
  * Names that records saved before ids (#508) are left under, which no project of the workspace has (their project renamed
  * or moved since), and the project each belongs to now: the project Repair is moving from that name, else the one project
  * whose agents (or their sessions) worked on them. A name whose agents are known to no project, or to more than one, is
- * left alone: Hive can't tell whose its records are. `taken`: the names that are the workspace's (its projects, hidden and
+ * left alone: Combwork can't tell whose its records are. `taken`: the names that are the workspace's (its projects, hidden and
  * removed ones too), which are never left behind. Records with an id never come here: their id says whose they are.
  */
 export function orphanNames(records: readonly LegacyRecord[], taken: readonly string[], projects: { name: string; agents: ReadonlySet<string> }[], renamed: { from: string; to: string }[] = []): { from: string; to: string }[] {

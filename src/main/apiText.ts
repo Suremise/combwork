@@ -113,7 +113,7 @@ export const API = {
     unknownView: agentMsg({ id: 'api.card.unknownView', text: 'Unknown view "{view}": short or full.' })
   },
   change: {
-    activateProject: agentMsg({ id: 'api.change.activateProject', text: 'activate the project {project}', note: 'What an Assistant\'s change is called: in its refusals ("Only the Hive Assistant can …", "don\'t let you …") and, capitalised, in its activity.' }),
+    activateProject: agentMsg({ id: 'api.change.activateProject', text: 'activate the project {project}', note: 'What an Assistant\'s change is called: in its refusals ("Only the Combwork Assistant can …", "don\'t let you …") and, capitalised, in its activity.' }),
     addAgent: agentMsg({ id: 'api.change.addAgent', text: 'add an agent to {project}' }),
     addConnection: agentMsg({ id: 'api.change.addConnection', text: 'make a connection' }),
     cancelMessages: agentMsg({ id: 'api.change.cancelMessages', text: 'cancel the messages waiting for {agent} in {project}' }),
@@ -191,8 +191,8 @@ export const API = {
     notReadable: agentMsg({ id: 'api.console.notReadable', text: 'Not a developer console source you can read' }),
     off: agentMsg({ id: 'api.console.off', text: 'Reading the developer console is off: the user can turn it on in Settings → Agent API → Let agents read the developer console' }),
     projectWithAgent: agentMsg({ id: 'api.console.projectWithAgent', text: 'project is required with agent' }),
-    saySource: agentMsg({ id: 'api.console.saySource', text: 'Say which source: agent (and project), source=assistant or source=hive' }),
-    sourceArg: agentMsg({ id: 'api.console.sourceArg', text: 'source is hive or assistant; name an agent with agent (and project)' }),
+    saySource: agentMsg({ id: 'api.console.saySource', text: 'Say which source: agent (and project), source=assistant or source=combwork' }),
+    sourceArg: agentMsg({ id: 'api.console.sourceArg', text: 'source is combwork or assistant; name an agent with agent (and project)' }),
     unknownKinds: agentMsg({ id: 'api.console.unknownKinds', text: 'Unknown event kinds: {kinds} (kinds are {known})' })
   },
   delivery: {
@@ -216,7 +216,7 @@ export const API = {
   done: {
     activated: agentMsg({ id: 'api.done.activated', text: 'Activated {project}', note: 'What an Assistant\'s change did, in its activity (stored, said in the Default).' }),
     addedAgent: agentMsg({ id: 'api.done.addedAgent', text: 'Added {agent} to {project}{started, select, yes { and started it} no { (it didn\'t start: {error})} other {}}' }),
-    addedAgentBrief: agentMsg({ id: 'api.done.addedAgentBrief', text: 'Added {agent} to {project}{started, select, yes { and started it} no {; it didn\'t start} other {}}', note: 'The event stream\'s line, in Hive\'s own words: never why it didn\'t start (#763).' }),
+    addedAgentBrief: agentMsg({ id: 'api.done.addedAgentBrief', text: 'Added {agent} to {project}{started, select, yes { and started it} no {; it didn\'t start} other {}}', note: 'The event stream\'s line, in Combwork\'s own words: never why it didn\'t start (#763).' }),
     addedConnection: agentMsg({ id: 'api.done.addedConnection', text: 'Made the connection {connection} on {account}' }),
     alreadyStopped: agentMsg({ id: 'api.done.alreadyStopped', text: '{agent} in {project} had already stopped' }),
     cancelledMessages: agentMsg({ id: 'api.done.cancelledMessages', text: '{n, plural, =0 {No message was waiting for {agent} in {project}} one {Cancelled the message waiting for {agent} in {project}} other {Cancelled {total} messages waiting for {agent} in {project}}}' }),
@@ -240,7 +240,7 @@ export const API = {
     queueResumed: agentMsg({ id: 'api.done.queueResumed', text: '{resumed, select, yes {Resumed the merge queue for {target} in {project}} other {The merge queue for {target} in {project} is still paused ({hasReason, select, yes {{reason}} other {paused}})}}' }),
     reordered: agentMsg({ id: 'api.done.reordered', text: 'Put {cards} at the top of {column}' }),
     slotReleased: agentMsg({ id: 'api.done.slotReleased', text: 'Released {slot} in {project}{kind, select, carried {: no longer kept for {agent}} other { from {agent}\'s ended run{ended, select, yes {, its listed processes ended first} other {}}}}' }),
-    startedAgent: agentMsg({ id: 'api.done.startedAgent', text: "{resumed, select, yes {Resumed} other {Started}} {agent} in {project}{fresh, select, renamed { in a new conversation: its last one is from before Combwork renamed the tools agents use, so it can't continue (it stays in Sessions to read)} moved { in a new conversation: its last one ran in a folder that moved with .hive to .combwork, so it can't continue (it stays in Sessions to read)} other {}}", note: 'fresh (HI-2540): a resume asked for started a new conversation instead, and why (renamed, moved); none: it resumed or started as asked.' }),
+    startedAgent: agentMsg({ id: 'api.done.startedAgent', text: "{resumed, select, yes {Resumed} other {Started}} {agent} in {project}{fresh, select, renamed { in a new conversation: its last one is from before Combwork renamed the tools agents use, so it can't continue (it stays in Sessions to read)} moved { in a new conversation: its last one ran in a folder that moved to .combwork with its old data folder, so it can't continue (it stays in Sessions to read)} other {}}", note: 'fresh (HI-2540): a resume asked for started a new conversation instead, and why (renamed, moved); none: it resumed or started as asked.' }),
     stoppedAgent: agentMsg({ id: 'api.done.stoppedAgent', text: 'Stopped {agent} in {project}' }),
     teamPaused: agentMsg({ id: 'api.done.teamPaused', text: 'Paused the team ({pause})' }),
     teamResumed: agentMsg({ id: 'api.done.teamResumed', text: '{was, select, yes {Resumed the team} other {The team was not paused}}' }),
@@ -325,7 +325,7 @@ export const API = {
     reportOnlyBridge: agentMsg({ id: 'api.mcp.reportOnlyBridge', text: 'Only the combwork MCP bridge reports its calls, with an agent\'s or the Assistant\'s token' })
   },
   mergeSlot: {
-    moveName: agentMsg({ id: 'api.mergeSlot.moveName', text: 'merge slot', note: 'The refused move\'s name, in the workflow\'s refusal of a Hive-merged card\'s merge slot.' }),
+    moveName: agentMsg({ id: 'api.mergeSlot.moveName', text: 'merge slot', note: 'The refused move\'s name, in the workflow\'s refusal of a Combwork-merged card\'s merge slot.' }),
     noBranch: agentMsg({ id: 'api.mergeSlot.noBranch', text: 'The project folder isn\'t on a branch: name the branch to merge into.' }),
     onlyAgents: agentMsg({ id: 'api.mergeSlot.onlyAgents', text: 'Only a project\'s own agents hold its merge slot (with their own token). Scripts and the Assistant can read it.' }),
     onlyRunning: agentMsg({ id: 'api.mergeSlot.onlyRunning', text: 'Only a running agent can hold the merge slot.' })
@@ -406,7 +406,7 @@ export const API = {
   },
   slot: {
     heldGone: agentMsg({ id: 'api.slot.heldGone', text: 'gone (process {pid})' }),
-    heldThisHive: agentMsg({ id: 'api.slot.heldThisHive', text: 'this Combwork' }),
+    heldThisCombwork: agentMsg({ id: 'api.slot.heldThisCombwork', text: 'this Combwork' }),
     kindArg: agentMsg({ id: 'api.slot.kindArg', text: 'kind is carried or writer' }),
     notAgents: agentMsg({ id: 'api.slot.notAgents', text: 'Project agents can\'t release a slot: that is the user\'s, and the Assistant\'s within Settings → Assistant → Control once the user agrees. Tell the user if a slot is stuck.' })
   },
@@ -464,8 +464,8 @@ export const API = {
     closed: agentMsg({ id: 'api.workspace.closed', text: 'The workspace was closed' }),
     noneOpen: agentMsg({ id: 'api.workspace.noneOpen', text: 'No workspace is open' }),
     projectInSeveral: agentMsg({ id: 'api.workspace.projectInSeveral', text: '"{project}" is a project in several open workspaces: name it as <workspace>/<project>, e.g. {workspace}/{project}' }),
-    sayWhich: agentMsg({ id: 'api.workspace.sayWhich', text: 'Several workspaces are open in Combwork: say which with ?workspace=<name> or the X-Hive-Workspace header' }),
-    severalNamed: agentMsg({ id: 'api.workspace.severalNamed', text: 'Several open workspaces are named "{name}" ({paths}): say which by its full path in the X-Hive-Workspace header or ?workspace=' }),
+    sayWhich: agentMsg({ id: 'api.workspace.sayWhich', text: 'Several workspaces are open in Combwork: say which with ?workspace=<name> or the X-Combwork-Workspace header' }),
+    severalNamed: agentMsg({ id: 'api.workspace.severalNamed', text: 'Several open workspaces are named "{name}" ({paths}): say which by its full path in the X-Combwork-Workspace header or ?workspace=' }),
     unknown: agentMsg({ id: 'api.workspace.unknown', text: 'Unknown workspace "{name}": it isn\'t open in Combwork' }),
     unknownProject: agentMsg({ id: 'api.workspace.unknownProject', text: 'Unknown project "{name}"' })
   }

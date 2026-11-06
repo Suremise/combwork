@@ -1,8 +1,8 @@
-import type { CloseReason, CommandPoint, CommandRef, CommandsHive, CommandsWorkspace, CustomCommand } from './types'
+import type { CloseReason, CommandPoint, CommandRef, CommandsCombwork, CommandsWorkspace, CustomCommand } from './types'
 import { msg } from './i18n'
 
-// HI-1954: custom commands (JetBrains' External Tools), named once at Hive's level or a workspace's and picked for the
-// points Hive runs them at: a workspace opening or closing, Hive quitting, or by hand. Design HI-1954/s15, s19, s21.
+// HI-1954: custom commands (JetBrains' External Tools), named once at Combwork's level or a workspace's and picked for the
+// points Combwork runs them at: a workspace opening or closing, Combwork quitting, or by hand. Design HI-1954/s15, s19, s21.
 // Pure: main runs them (main/commands/), Settings edits them, both through these.
 
 /** Why a list runs: its `{reason}`. */
@@ -12,12 +12,12 @@ export type CommandReason = CloseReason | 'open' | 'manual'
 export type PointName = 'onOpen' | 'onClose' | 'onQuit'
 
 /** The names HI-1368's single commands get as they become commands of the list (the user can rename them). */
-export const MIGRATED_CLOSE = msg({ id: 'commands.migrated.close', defaultMessage: 'Close command', description: "The name Hive gives the command the user had in Settings → Workspace → When this workspace closes, run, as it becomes one of the workspace's named commands (HI-1954). The user can rename it." })
-export const MIGRATED_QUIT = msg({ id: 'commands.migrated.quit', defaultMessage: 'Quit command', description: "The name Hive gives the command the user had in Settings → General → When Hive quits, run, as it becomes one of Hive's named commands (HI-1954). The user can rename it." })
+export const MIGRATED_CLOSE = msg({ id: 'commands.migrated.close', defaultMessage: 'Close command', description: "The name Combwork gives the command the user had in Settings → Workspace → When this workspace closes, run, as it becomes one of the workspace's named commands (HI-1954). The user can rename it." })
+export const MIGRATED_QUIT = msg({ id: 'commands.migrated.quit', defaultMessage: 'Quit command', description: "The name Combwork gives the command the user had in Settings → General → When Combwork quits, run, as it becomes one of Combwork's named commands (HI-1954). The user can rename it." })
 
 /** How often a list's runner looks for a control while a failure waits (main/closeCommand/listRunner.ts). */
 export const CONTROL_MS = 250
-/** Hive touches a list's `observer` file this often while it watches its run. */
+/** Combwork touches a list's `observer` file this often while it watches its run. */
 export const OBSERVE_MS = 5000
 /** An `observer` older than this: nobody watches, and a failure waiting for a choice is settled as unattended. */
 export const OBSERVER_STALE_MS = 30_000
@@ -84,19 +84,19 @@ export function cleanPoint(v: unknown, scopes: readonly CommandRef['scope'][], u
   return { run, ...(update && p.onUpdate === true ? { onUpdate: true } : {}) }
 }
 
-export const EMPTY_HIVE: CommandsHive = { list: [], onQuit: { run: [] } }
+export const EMPTY_CW: CommandsCombwork = { list: [], onQuit: { run: [] } }
 export const EMPTY_WORKSPACE: CommandsWorkspace = { list: [], onOpen: { run: [] }, onClose: { run: [] } }
 
-/** Hive's commands as saved (settings.commands). */
-export function cleanHive(v: unknown): CommandsHive {
+/** Combwork's commands as saved (settings.commands). */
+export function cleanCombwork(v: unknown): CommandsCombwork {
   const c = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>
-  return { list: cleanList(c.list), onQuit: cleanPoint(c.onQuit, ['hive'], true) }
+  return { list: cleanList(c.list), onQuit: cleanPoint(c.onQuit, ['combwork'], true) }
 }
 
-/** A workspace's commands as saved (workspace.json's commands): its points may use its own and Hive's. */
+/** A workspace's commands as saved (workspace.json's commands): its points may use its own and Combwork's. */
 export function cleanWorkspace(v: unknown): CommandsWorkspace {
   const c = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>
-  return { list: cleanList(c.list), onOpen: cleanPoint(c.onOpen, ['workspace', 'hive'], false), onClose: cleanPoint(c.onClose, ['workspace', 'hive'], true) }
+  return { list: cleanList(c.list), onOpen: cleanPoint(c.onOpen, ['workspace', 'combwork'], false), onClose: cleanPoint(c.onClose, ['workspace', 'combwork'], true) }
 }
 
 /** HI-1368's single command ({ command, onUpdate }), if it had one: its text as saved, and its box. */
@@ -127,20 +127,20 @@ export function migrateWorkspaceCommands(raw: { commands?: unknown; onClose?: un
   return { ...commands, onClose: point }
 }
 
-/** Hive's commands from what settings hold, HI-1368's `general.onQuit` adopted. */
-export function migrateHiveCommands(raw: { commands?: unknown; onQuit?: unknown }, name: string): CommandsHive {
-  const now = cleanHive(raw.commands)
-  const { commands, point } = adopt(now, now.onQuit, raw.onQuit, 'onQuit', name, 'hive')
+/** Combwork's commands from what settings hold, HI-1368's `general.onQuit` adopted. */
+export function migrateCombworkCommands(raw: { commands?: unknown; onQuit?: unknown }, name: string): CommandsCombwork {
+  const now = cleanCombwork(raw.commands)
+  const { commands, point } = adopt(now, now.onQuit, raw.onQuit, 'onQuit', name, 'combwork')
   return { ...commands, onQuit: point }
 }
 
 /** A point's commands in order, each found in its scope's list; a ref to one no longer there is null. */
-export function resolvePoint(point: CommandPoint, lists: { hive: readonly CustomCommand[]; workspace?: readonly CustomCommand[] }): { ref: CommandRef; command: CustomCommand | null }[] {
-  return point.run.map((ref) => ({ ref, command: (ref.scope === 'hive' ? lists.hive : (lists.workspace ?? [])).find((c) => c.id === ref.id) ?? null }))
+export function resolvePoint(point: CommandPoint, lists: { combwork: readonly CustomCommand[]; workspace?: readonly CustomCommand[] }): { ref: CommandRef; command: CustomCommand | null }[] {
+  return point.run.map((ref) => ({ ref, command: (ref.scope === 'combwork' ? lists.combwork : (lists.workspace ?? [])).find((c) => c.id === ref.id) ?? null }))
 }
 
 /** A scope's version: a hash of its commands and points, for a change proposed against them (HI-1954/s21). */
-export const commandsVersion = (c: CommandsHive | CommandsWorkspace): string => shortHash(JSON.stringify(c))
+export const commandsVersion = (c: CommandsCombwork | CommandsWorkspace): string => shortHash(JSON.stringify(c))
 
 /** What a command's placeholders stand for. `projects`: each project's path by its name (lower-cased). */
 export interface CommandValues {

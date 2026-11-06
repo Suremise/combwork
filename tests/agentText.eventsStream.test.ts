@@ -9,28 +9,28 @@ import { join } from 'path'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { closedNotice } from '../src/main/notices'
-import type { HiveEvent, Notice } from '../src/shared/types'
+import type { CombworkEvent, Notice } from '../src/shared/types'
 
 const AGENT = { workspace: 'C:\\ws', projectPath: 'C:\\ws\\webapp', agentId: 'a-1' }
-const noticeEvent = (n: Partial<Notice>): HiveEvent => ({ type: 'notice', notice: { id: 'n-1', kind: 'notice', title: 'Hive a été fermé', body: 'b', projectPath: AGENT.projectPath, ...n } as Notice }) as HiveEvent
+const noticeEvent = (n: Partial<Notice>): CombworkEvent => ({ type: 'notice', notice: { id: 'n-1', kind: 'notice', title: 'Combwork a été fermé', body: 'b', projectPath: AGENT.projectPath, ...n } as Notice }) as CombworkEvent
 
 describe("the events stream's lines, as broadcast says them", async () => {
   // The real resolver (sessions.ts registers it: a session's pinned chain, else the bound workspace's API chain) and two
   // workspaces with API files of their own.
-  const base = tempDir('hive-agenttext-events-')
+  const base = tempDir('cw-agenttext-events-')
   mkdirSync(join(base, 'profile'), { recursive: true })
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   afterAll(() => rmSync(base, { recursive: true, force: true }))
   const { apiTextTestHooks } = await import('../src/main/servers')
   const { apiChainReady, forgetApiChain, inApiWorkspace, requestApiWorkspace } = await import('../src/main/dialects/apiChain')
-  const hive = (name: string, closed: string): string => {
+  const workspace = (name: string, closed: string): string => {
     const dir = join(base, name, '.combwork')
     mkdirSync(join(dir, 'dialects', 'api'), { recursive: true })
     writeFileSync(join(dir, 'dialects', 'api', 'cli.json'), JSON.stringify({ name: 'API', texts: { 'main.quit.closed': { text: closed, why: 'a test' } } }))
     return dir
   }
-  const A = hive('alpha', 'A CLOSED')
-  const B = hive('beta', 'B CLOSED')
+  const A = workspace('alpha', 'A CLOSED')
+  const B = workspace('beta', 'B CLOSED')
   await apiChainReady(A)
   await apiChainReady(B)
   afterAll(() => [A, B].forEach(forgetApiChain))

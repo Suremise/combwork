@@ -11,7 +11,7 @@ import { tempDir } from './tempDir'
 import { as09, writeCard } from './boardDb'
 import { commit, gitRepo, sh } from './workflow/harness'
 
-const base = tempDir('hive-agentmoves-')
+const base = tempDir('cw-agentmoves-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -242,7 +242,7 @@ describe("an agent's old moves as intents (#1268)", () => {
   })
 
   it('S15: a commit authored with a personal email refuses the move to Review with the amend command', async () => {
-    const { w, wt } = await workspace({ ...PAIR, identity: { name: 'Hive Test', email: 'test@hive.invalid' } })
+    const { w, wt } = await workspace({ ...PAIR, identity: { name: 'Demo Test', email: 'test@example.invalid' } })
     const card = await create(w)
     await update(w, card, builder, { column: 'doing' })
     commit(wt, { 'x.txt': 'x\n' }, 'personal', { email: 'me@example.com' })
@@ -283,7 +283,7 @@ describe("an agent's old moves as intents (#1268)", () => {
     commit(repo, { 'x.txt': 'x\n' }, 'no trailer')
     const r = await refused(update(w, card, builder, { column: 'review' }, 'x'))
     expect(r?.rule).toBe('submit.trailer')
-    expect(r?.next).toContain(`git commit --amend --no-edit --trailer "Hive-Card: ${key}"`)
+    expect(r?.next).toContain(`git commit --amend --no-edit --trailer "Combwork-Card: ${key}"`)
     expect(stage(w, card)).toBe('active')
   })
 

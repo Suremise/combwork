@@ -128,7 +128,7 @@ function moveKeys<T>(map: Record<string, T> | undefined, moves: Map<string, stri
  * stop) left behind is followed when this runs again:
  * - the view preferences kept by project path (`ui`'s per-project maps; windows hear, `ui-pref-changed`) and Working on
  *   (config.json's activeProjects), with config.json's `renamesApplied` for the workspace;
- * - Hide or Remove from Hive (workspace.json's hiddenProjects, and its `renamesApplied`);
+ * - Hide or Remove from Combwork (workspace.json's hiddenProjects, and its `renamesApplied`);
  * - Progress runs, open and kept (with the kept runs);
  * - metrics measured under the old names (with the measurements).
  * The Progress panel's filter isn't: on a folder with no runs it shows them all.
@@ -162,7 +162,7 @@ export async function applyRenames(ws: WorkspaceService, j: NameJournal, open: (
   // (Each window applies them in order: a key cleared, then the value moved there.)
   for (const e of events.filter((x) => x.value === null)) emit({ type: 'ui-pref-changed', ...e })
   for (const e of events.filter((x) => x.value !== null)) emit({ type: 'ui-pref-changed', ...e })
-  // Hide or Remove from Hive: one write of workspace.json, with its number.
+  // Hide or Remove from Combwork: one write of workspace.json, with its number.
   // The settings change only once saved: a save that fails leaves them (and their number) as they were, so the next
   // run follows those renames again.
   const hiddenTo = ws.config.renamesApplied ?? 0

@@ -122,7 +122,7 @@ function state() {
 
   // --- Reads that fail while a result is shown (HR1's round 1): said as stale, with Retry, never passed off as current.
   const failing = (v) => app.evaluate((_, x) => {
-    process.env.HIVE_TEST_FAIL_IPC = x
+    process.env.CW_TEST_FAIL_IPC = x
   }, v)
   const stale = page.locator('[data-compare-stale]')
   await failing('git:compare*1')
@@ -131,7 +131,7 @@ function state() {
   await shots('stale-page')
   await stale.getByRole('button', { name: 'Retry' }).click()
   check('…Retry reads it: the next page, no longer stale', !!(await lib.until(async () => (await stale.count()) === 0 && /Page 2 of 3/.test(await text(commits.locator('.table-paging'))), HUNG_MS)), await text(page.locator('.split-main')))
-  // Hive reads the value again only when it changes: another one, so this read fails once too.
+  // Combwork reads the value again only when it changes: another one, so this read fails once too.
   await failing('git:compare*1,none-refresh')
   await page.locator('.split-list .pane-header [aria-label="Compare again"]').click()
   check('a refresh that fails: the last result stays, said to be stale', !!(await lib.until(async () => (await stale.count()) === 1, HUNG_MS)) && (await counts.getAttribute('data-compare-ahead')) === '121', await text(page.locator('.split-main')))
@@ -167,9 +167,9 @@ function state() {
   }
   const a = await op({ op: 'lend', agent: b1.id, card: 1758 })
   check('slot-a is lent to card 1758', a?.ok && a.slot.name === 'slot-a', JSON.stringify(a))
-  onBranch(a.slot.folder, 'hive/HI-1758-blocked', 'blocked.txt')
+  onBranch(a.slot.folder, 'cw/HI-1758-blocked', 'blocked.txt')
   const b = await op({ op: 'lend', agent: b2.id, card: 7 })
-  onBranch(b.slot.folder, 'hive/left-free', 'free.txt')
+  onBranch(b.slot.folder, 'cw/left-free', 'free.txt')
   // Left with uncommitted work: a clean slot is detached at its target once its card's lease ends (HI-2014), so only a
   // dirty one stays free on its card's branch.
   fs.writeFileSync(path.join(b.slot.folder, 'unsaved.txt'), 'not committed\n')
@@ -179,13 +179,13 @@ function state() {
   await page.locator('.tab', { hasText: 'Version Control' }).click()
   const slotGroup = picker.locator('optgroup[label^="Slots"]')
   const slotLabels = async () => (await slotGroup.locator('option').allInnerTexts().catch(() => [])).join('|')
-  check('Slots lists each slot with a branch: its name, its card (free when it has none) and its branch', !!(await lib.until(async () => (await slotLabels()) === 'slot-a · #1758 · hive/HI-1758-blocked|slot-b · free · hive/left-free', HUNG_MS)), await slotLabels())
+  check('Slots lists each slot with a branch: its name, its card (free when it has none) and its branch', !!(await lib.until(async () => (await slotLabels()) === 'slot-a · #1758 · cw/HI-1758-blocked|slot-b · free · cw/left-free', HUNG_MS)), await slotLabels())
   const branchValues = await picker.locator('optgroup[label^="Branches"] option').evaluateAll((os) => os.map((o) => o.value))
-  check('…each branch once: not under Branches too', !branchValues.some((v) => v.endsWith(':hive/HI-1758-blocked') || v.endsWith(':hive/left-free')), JSON.stringify(branchValues))
-  await picker.selectOption({ label: 'slot-a · #1758 · hive/HI-1758-blocked' })
+  check('…each branch once: not under Branches too', !branchValues.some((v) => v.endsWith(':cw/HI-1758-blocked') || v.endsWith(':cw/left-free')), JSON.stringify(branchValues))
+  await picker.selectOption({ label: 'slot-a · #1758 · cw/HI-1758-blocked' })
   // Its target as the pool recorded it: main here (slots:test lends with none, so the repository's default branch).
-  check('a slot opens its branch against where it merges (its target, main): its one commit and file', !!(await lib.until(async () => (await on('main', 'hive/HI-1758-blocked')) && (await counts.getAttribute('data-compare-ahead').catch(() => null)) === '1' && (await files.count()) === 1 && (await page.locator('[data-compare-file="blocked.txt"]').count()) === 1, HUNG_MS)), await text(page.locator('.split-main')))
-  check('…saying the files are its own since it left main', /The files hive\/HI-1758-blocked changes since it left main\./.test(await text(page.locator('[data-compare-files-hint]'))), await text(page.locator('[data-compare-files-hint]')))
+  check('a slot opens its branch against where it merges (its target, main): its one commit and file', !!(await lib.until(async () => (await on('main', 'cw/HI-1758-blocked')) && (await counts.getAttribute('data-compare-ahead').catch(() => null)) === '1' && (await files.count()) === 1 && (await page.locator('[data-compare-file="blocked.txt"]').count()) === 1, HUNG_MS)), await text(page.locator('.split-main')))
+  check('…saying the files are its own since it left main', /The files cw\/HI-1758-blocked changes since it left main\./.test(await text(page.locator('[data-compare-files-hint]'))), await text(page.locator('[data-compare-files-hint]')))
   await shots('slot')
 
   await app.close()

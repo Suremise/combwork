@@ -34,8 +34,11 @@ export interface GuardInputs {
   folder?: string
   dirty?: Ans<string[]>
   conflicts?: Ans<string[]>
-  /** A commit attributed to no card since the agent's last submission, when another card shares the folder. */
-  untrailered?: Ans<string | null>
+  /**
+   * A commit attributed to no card since the agent's last submission, when another card shares the folder, and whether
+   * it is the folder's head (HI-2562: only then is an amend safe).
+   */
+  untrailered?: Ans<{ commit: string; head: boolean } | null>
   /**
    * A commit not authored with the project's identity, read from git at the move (HI-2266: never a saved copy), with
    * that identity's email; `missing` when git has none for the project.
@@ -67,6 +70,14 @@ export interface GuardRefusal {
 const short = (r: string | null | undefined): string => (r ? r.slice(0, 7) : '—')
 
 /** Does the user's OK before merging (G10) apply to this card? */
+/**
+ * submit.trailer's refusal (HI-2562: also the submit's with nothing of its own): card `key`'s commit names no card. The
+ * amend that fixes it only when it is the folder's head: one other commits follow isn't amended, as that rewrites them.
+ */
+export function trailerRefusal(key: string, u: { commit: string; head: boolean }): GuardRefusal {
+  return { rule: 'submit.trailer', values: { card: key, commit: short(u.commit), at: u.head ? 'head' : 'older', command: `git commit --amend --no-edit --trailer "Combwork-Card: ${key}"` } } // i18n-ignore: a git command and select keys, as typed
+}
+
 export function okBeforeApplies(r: Ruleset, labels: string[]): boolean {
   const o = r.options.okBefore
   return o.mode === 'every' || (o.mode === 'labels' && labels.some((l) => o.labels.includes(l)))
@@ -139,7 +150,7 @@ export const GUARD_FNS: Record<GuardId, Guard> = {
     const u = i.untrailered
     if (u === undefined || u === null) return null
     if (isUnknownAnswer(u)) return unknownRefusal(i, 'submit.trailer', u)
-    return { rule: 'submit.trailer', values: { card: i.card.key, commit: short(u), command: `git commit --amend --no-edit --trailer "Hive-Card: ${i.card.key}"` } } // i18n-ignore: a git command, as typed
+    return trailerRefusal(i.card.key, u)
   },
   // G20 (HI-1367): a pick that failed or said "every test" stands only with the builder's own list (`tests`).
   'submit.focusedChosen': (i) => (!i.focused || choiceStands(i.focused) ? null : { rule: 'submit.focusedChosen', values: { card: i.card.key, revision: short(i.revision), state: i.focused.state, why: i.focused.why ?? 'none' } }), // i18n-ignore: codes (a why, a check name), never shown as text
@@ -149,7 +160,7 @@ export const GUARD_FNS: Record<GuardId, Guard> = {
     // Its last run's reason when it ran and didn't count (#1654): `none` when it didn't run or failed.
     const u = i.checkUncounted
     const why = { why: u?.whyNot ?? 'none', files: u?.changes?.length ? u.changes.join(', ') : 'none', copy: u?.isolatable ? 'yes' : 'no' } // i18n-ignore: select keys and paths, never shown as they are
-    return { rule: 'submit.checksPassed', values: { card: i.card.key, check: missing[0], revision: short(i.revision), command: `hive-progress --check ${missing[0]} --card ${i.card.key}`, ...why } } // i18n-ignore: a command, as typed
+    return { rule: 'submit.checksPassed', values: { card: i.card.key, check: missing[0], revision: short(i.revision), command: `cw-progress --check ${missing[0]} --card ${i.card.key}`, ...why } } // i18n-ignore: a command, as typed
   },
   'submit.identity': (i) => {
     const b = i.badIdentity

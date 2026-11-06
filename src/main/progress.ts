@@ -16,12 +16,12 @@ export type ProgressCaller =
   | { source: 'assistant'; workspacePath: string; agentName: string; provider: ProviderId | null }
   | { source: 'api'; workspacePath: string }
   /**
-   * Hive's own runs (#1349): its merge queue's checks for a project; `noInstall`, nothing was installed before them;
+   * Combwork's own runs (#1349): its merge queue's checks for a project; `noInstall`, nothing was installed before them;
    * `installAsWritten`, an install run as written (no clean form of it).
    */
-  | { source: 'hive'; workspacePath: string; projectPath: string; noInstall?: boolean; installAsWritten?: boolean; slot?: string; copy?: string; reviewer?: CopyHolder }
+  | { source: 'combwork'; workspacePath: string; projectPath: string; noInstall?: boolean; installAsWritten?: boolean; slot?: string; copy?: string; reviewer?: CopyHolder }
 
-/** The agent whose lease held a review copy as Hive's run in it started (HI-1710): the run is credited to it. */
+/** The agent whose lease held a review copy as Combwork's run in it started (HI-1710): the run is credited to it. */
 export interface CopyHolder {
   agentId: string
   agentName: string
@@ -86,51 +86,48 @@ export interface ProgressDeps {
 
 const key = (p: string): string => p.toLowerCase()
 
-/** The stored name of Hive's own runs (#1349); the window shows it in its language (`defaultName`). */
+/** The stored name of Combwork's own runs (#1349); the window shows it in its language (`defaultName`). */
 // agent-protocol: a run's stored name, which the window words in its language
-export const HIVE_RUNS = 'Combwork (merge queue)' // i18n-ignore: a run's stored name, which agents read too
-/** Its name before HI-2463, which runs and facts stored then still hold: read as HIVE_RUNS. */
-// agent-protocol: a run's stored name from before HI-2463, read back
-export const LEGACY_HIVE_RUNS = 'Hive (merge queue)' // i18n-ignore: a run's stored name, as stored before HI-2463
-/** The stored name of a slot's warming runs (#1429), "Hive (slot slot-b)"; the window shows it in its language. */
+export const CW_RUNS = 'Combwork (merge queue)' // i18n-ignore: a run's stored name, which agents read too
+/** The stored name of a slot's warming runs (#1429), "Combwork (slot slot-b)"; the window shows it in its language. */
 // agent-protocol: a run's stored name, which the window words in its language
 export const slotRunsName = (slot: string): string => `Combwork (slot ${slot})` // i18n-ignore: a run's stored name, which agents read too
 /**
  * The stored name of a review or check copy's warming runs (#1435) when no lease names its agent: one name for the pool
- * (HI-1710: it was "Hive (copy copy-1)", a filter entry a copy, which the window showed as "copy copy").
+ * (HI-1710: it was "<app name> (copy copy-1)", a filter entry a copy, which the window showed as "copy copy").
  */
 // agent-protocol: a run's stored name, which the window words in its language
 export const COPIES_RUNS = 'Combwork (review copies)' // i18n-ignore: a run's stored name, which agents read too
 /** A copy's name as a kept run may hold it (copies.ts names them so). */
 const COPY_NAME = /^copy-\d{1,4}$/
 /**
- * Hive's own run's stored name and default name: a slot's; a copy's, credited to the agent whose lease held it
+ * Combwork's own run's stored name and default name: a slot's; a copy's, credited to the agent whose lease held it
  * (HI-1710), else the copies'; else the merge queue's.
  */
-const hiveName = (slot: string | null | undefined, copy: string | null | undefined, holder?: CopyHolder | null): Pick<ProgressRun, 'agentName' | 'defaultName' | 'slot' | 'copy'> =>
-  slot ? { agentName: slotRunsName(slot), defaultName: 'slot', slot } : copy ? (holder ? { agentName: holder.agentName, copy } : { agentName: COPIES_RUNS, defaultName: 'copy', copy }) : { agentName: HIVE_RUNS, defaultName: 'mergeQueue' }
+const combworkName = (slot: string | null | undefined, copy: string | null | undefined, holder?: CopyHolder | null): Pick<ProgressRun, 'agentName' | 'defaultName' | 'slot' | 'copy'> =>
+  slot ? { agentName: slotRunsName(slot), defaultName: 'slot', slot } : copy ? (holder ? { agentName: holder.agentName, copy } : { agentName: COPIES_RUNS, defaultName: 'copy', copy }) : { agentName: CW_RUNS, defaultName: 'mergeQueue' }
 /** A slot's name as a kept run may hold it (slots.ts names them so). */
 const SLOT_NAME = /^[\w.-]{1,60}$/
 
 /** Optional integer field: undefined when absent, else a whole number in range (400 otherwise). */
 function int(v: unknown, name: string, min: number, max: number): number | undefined {
   if (v === undefined || v === null) return undefined
-  if (typeof v !== 'number' || !Number.isFinite(v)) throw new ProgressError(400, `${name} must be a number`) // i18n-ignore: the Agent API's progress replies, which agents and hive-progress read
+  if (typeof v !== 'number' || !Number.isFinite(v)) throw new ProgressError(400, `${name} must be a number`) // i18n-ignore: the Agent API's progress replies, which agents and cw-progress read
   const n = Math.round(v)
-  if (n < min || n > max) throw new ProgressError(400, `${name} must be between ${min} and ${max}`) // i18n-ignore: the Agent API's progress replies, which agents and hive-progress read
+  if (n < min || n > max) throw new ProgressError(400, `${name} must be between ${min} and ${max}`) // i18n-ignore: the Agent API's progress replies, which agents and cw-progress read
   return n
 }
 
 /** Optional text field, trimmed and cut to its limit; undefined when absent. */
 function text(v: unknown, name: string, max: number): string | undefined {
   if (v === undefined || v === null) return undefined
-  if (typeof v !== 'string') throw new ProgressError(400, `${name} must be text`) // i18n-ignore: the Agent API's progress replies, which agents and hive-progress read
+  if (typeof v !== 'string') throw new ProgressError(400, `${name} must be text`) // i18n-ignore: the Agent API's progress replies, which agents and cw-progress read
   const s = v.replace(/\s+/g, ' ').trim()
   return s.length > max ? `${s.slice(0, max - 1)}…` : s
 }
 
 const KEPT_STATES = new Set<unknown>(['passed', 'failed', 'stale', 'stopped'])
-const SOURCES = new Set<unknown>(['agent', 'assistant', 'api', 'hive'])
+const SOURCES = new Set<unknown>(['agent', 'assistant', 'api', 'combwork'])
 
 /** A kept text field, cut to its limit, or null when it isn't text. */
 const keptText = (v: unknown, max: number): string | null => (typeof v === 'string' ? text(v, '', max) || null : null)
@@ -157,22 +154,22 @@ export function keptRuns(saved: unknown, workspacePath: string): ProgressRun[] {
     ids.add(id)
     const source = r.source as ProgressSource
     const named = keptText(r.agentName, MAX_TITLE)
-    const slot = source === 'hive' && typeof r.slot === 'string' && SLOT_NAME.test(r.slot) ? r.slot : null
+    const slot = source === 'combwork' && typeof r.slot === 'string' && SLOT_NAME.test(r.slot) ? r.slot : null
     const copy = typeof r.copy === 'string' && COPY_NAME.test(r.copy) ? r.copy : null
     // A copy's warming run credited to its lease's agent (HI-1710): kept with that agent's id and name.
-    const keptHolder = source === 'hive' && copy && !slot ? keptText(r.agentId, 200) : null
-    const holder = keptHolder && named && r.defaultName !== 'copy' && named !== COPIES_RUNS && !named.startsWith('Combwork (') && !named.startsWith('Hive (') ? { agentId: keptHolder, agentName: named } : null
+    const keptHolder = source === 'combwork' && copy && !slot ? keptText(r.agentId, 200) : null
+    const holder = keptHolder && named && r.defaultName !== 'copy' && named !== COPIES_RUNS && !named.startsWith('Combwork (') ? { agentId: keptHolder, agentName: named } : null
     out.push({
       id,
       workspacePath,
-      projectPath: source === 'agent' || source === 'hive' ? keptText(r.projectPath, 1000) : null,
+      projectPath: source === 'agent' || source === 'combwork' ? keptText(r.projectPath, 1000) : null,
       agentId: source === 'agent' ? keptText(r.agentId, 200) : (holder?.agentId ?? null),
-      agentName: source === 'hive' ? hiveName(slot, copy, holder).agentName : (named ?? (source === 'api' ? 'Script' : 'Agent')), // i18n-ignore: a run's stored name for a script, which agents read too
-      // A script's name is always Hive's (scripts don't name themselves, start()), as is the merge queue's; an agent's
-      // only when it has none, or when Hive's "Agent" was saved with its mark (a nameless run kept before: this file is
+      agentName: source === 'combwork' ? combworkName(slot, copy, holder).agentName : (named ?? (source === 'api' ? 'Script' : 'Agent')), // i18n-ignore: a run's stored name for a script, which agents read too
+      // A script's name is always Combwork's (scripts don't name themselves, start()), as is the merge queue's; an agent's
+      // only when it has none, or when Combwork's "Agent" was saved with its mark (a nameless run kept before: this file is
       // read again after a save).
-      ...(source === 'hive' ? hiveName(slot, copy, holder) : source === 'api' ? (named === null || named === 'Script' ? { defaultName: 'script' as const } : {}) : named === null || (named === 'Agent' && r.defaultName === 'agent') ? { defaultName: 'agent' as const } : {}),
-      provider: source !== 'hive' && PROVIDERS.some((p) => p.id === r.provider) ? (r.provider as ProviderId) : null,
+      ...(source === 'combwork' ? combworkName(slot, copy, holder) : source === 'api' ? (named === null || named === 'Script' ? { defaultName: 'script' as const } : {}) : named === null || (named === 'Agent' && r.defaultName === 'agent') ? { defaultName: 'agent' as const } : {}),
+      provider: source !== 'combwork' && PROVIDERS.some((p) => p.id === r.provider) ? (r.provider as ProviderId) : null,
       source,
       title,
       command: keptText(r.command, MAX_COMMAND),
@@ -197,12 +194,12 @@ export function keptRuns(saved: unknown, workspacePath: string): ProgressRun[] {
       exitCode: keptNumber(r.exitCode),
       logPath: keptText(r.logPath, MAX_LOG_PATH),
       ...(r.titleFromCommand === true ? { titleFromCommand: true as const } : {}),
-      ...(source === 'hive' && r.noInstall === true ? { noInstall: true as const } : {}),
-      ...(source === 'hive' && r.installAsWritten === true ? { installAsWritten: true as const } : {}),
+      ...(source === 'combwork' && r.noInstall === true ? { noInstall: true as const } : {}),
+      ...(source === 'combwork' && r.installAsWritten === true ? { installAsWritten: true as const } : {}),
       ...runFor(keptFor(r)),
-      ...(source !== 'hive' && copy ? { copy } : {}),
+      ...(source !== 'combwork' && copy ? { copy } : {}),
       ...keptCounts(r.counts),
-      ...(source === 'hive' ? keptTransient(r.transient) : {})
+      ...(source === 'combwork' ? keptTransient(r.transient) : {})
     })
   }
   return out
@@ -227,7 +224,7 @@ const WHY_NOT = new Set<string>(['notCheck', 'notContained', 'dirty', 'changed',
 
 const CAUSES = new Set<string>(['spawn', 'notFound', 'timeout', 'killed', 'exit75', 'network'])
 
-/** Why Hive's own failed run counts as temporary (#1362), checked: a known cause, and a network error code (letters, digits, _). */
+/** Why Combwork's own failed run counts as temporary (#1362), checked: a known cause, and a network error code (letters, digits, _). */
 export function keptTransient(v: unknown): Pick<ProgressRun, 'transient'> {
   if (!v || typeof v !== 'object') return {}
   const t = v as Record<string, unknown>
@@ -332,7 +329,7 @@ export class ProgressStore {
     return load
   }
 
-  /** Saves at once each workspace's history that has a save waiting, and waits for every write (Hive is quitting). */
+  /** Saves at once each workspace's history that has a save waiting, and waits for every write (Combwork is quitting). */
   async saveNow(): Promise<void> {
     for (const [k, { timer, path }] of [...this.saves]) {
       clearTimeout(timer)
@@ -377,7 +374,7 @@ export class ProgressStore {
   start(caller: ProgressCaller, body: Record<string, unknown>, link: RunFor = {}): ProgressRun {
     // Every field is checked before anything changes.
     const title = text(body.title, 'title', MAX_TITLE)
-    if (!title) throw new ProgressError(400, 'title is required') // i18n-ignore: the Agent API's progress replies, which agents and hive-progress read
+    if (!title) throw new ProgressError(400, 'title is required') // i18n-ignore: the Agent API's progress replies, which agents and cw-progress read
     const total = int(body.total, 'total', 1, MAX_TOTAL)
     const step = int(body.step, 'step', 0, total ?? MAX_TOTAL)
     const command = text(body.command, 'command', MAX_COMMAND)
@@ -385,21 +382,21 @@ export class ProgressStore {
     const estimateMs = int(body.estimateMs, 'estimateMs', 0, MAX_ESTIMATE_MS)
     const waiting = text(body.waiting, 'waiting', MAX_STEP_NAME)
     const pid = int(body.pid, 'pid', 1, 4_294_967_295)
-    if (body.titleFromCommand !== undefined && typeof body.titleFromCommand !== 'boolean') throw new ProgressError(400, 'titleFromCommand must be true or false') // i18n-ignore: the Agent API's progress replies, which agents and hive-progress read
+    if (body.titleFromCommand !== undefined && typeof body.titleFromCommand !== 'boolean') throw new ProgressError(400, 'titleFromCommand must be true or false') // i18n-ignore: the Agent API's progress replies, which agents and cw-progress read
     const list = this.runs.get(key(caller.workspacePath)) ?? []
     const mine = list.filter((r) => isOpenRun(r) && this.owns(caller, r, true))
-    if (mine.length >= MAX_OPEN_PER_OWNER) throw new ProgressError(429, `At most ${MAX_OPEN_PER_OWNER} runs can be open at once: finish one first`) // i18n-ignore: the Agent API's progress replies, which agents and hive-progress read
+    if (mine.length >= MAX_OPEN_PER_OWNER) throw new ProgressError(429, `At most ${MAX_OPEN_PER_OWNER} runs can be open at once: finish one first`) // i18n-ignore: the Agent API's progress replies, which agents and cw-progress read
     // The workspace's bound holds whoever reports. Ended runs don't count: Recent keeps the newest RECENT_KEPT.
-    if (list.filter((r) => r.finishedAt === null).length >= MAX_OPEN_PER_WORKSPACE) throw new ProgressError(429, `This workspace already has ${MAX_OPEN_PER_WORKSPACE} open runs: finish some first`) // i18n-ignore: the Agent API's progress replies, which agents and hive-progress read
+    if (list.filter((r) => r.finishedAt === null).length >= MAX_OPEN_PER_WORKSPACE) throw new ProgressError(429, `This workspace already has ${MAX_OPEN_PER_WORKSPACE} open runs: finish some first`) // i18n-ignore: the Agent API's progress replies, which agents and cw-progress read
     const now = this.deps.now()
     const run: ProgressRun = {
       id: randomUUID(),
       workspacePath: caller.workspacePath,
-      projectPath: caller.source === 'agent' || caller.source === 'hive' ? caller.projectPath : null,
-      agentId: caller.source === 'agent' ? caller.agentId : caller.source === 'hive' && caller.copy && !caller.slot && caller.reviewer ? caller.reviewer.agentId : null,
-      agentName: caller.source === 'api' ? 'Script' : caller.source === 'hive' ? hiveName(caller.slot, caller.copy, caller.reviewer).agentName : caller.agentName, // i18n-ignore: a run's stored name for a script, which agents read too
-      ...(caller.source === 'api' ? { defaultName: 'script' as const } : caller.source === 'hive' ? hiveName(caller.slot, caller.copy, caller.reviewer) : {}),
-      provider: caller.source === 'api' || caller.source === 'hive' ? null : caller.provider,
+      projectPath: caller.source === 'agent' || caller.source === 'combwork' ? caller.projectPath : null,
+      agentId: caller.source === 'agent' ? caller.agentId : caller.source === 'combwork' && caller.copy && !caller.slot && caller.reviewer ? caller.reviewer.agentId : null,
+      agentName: caller.source === 'api' ? 'Script' : caller.source === 'combwork' ? combworkName(caller.slot, caller.copy, caller.reviewer).agentName : caller.agentName, // i18n-ignore: a run's stored name for a script, which agents read too
+      ...(caller.source === 'api' ? { defaultName: 'script' as const } : caller.source === 'combwork' ? combworkName(caller.slot, caller.copy, caller.reviewer) : {}),
+      provider: caller.source === 'api' || caller.source === 'combwork' ? null : caller.provider,
       source: caller.source as ProgressSource,
       title,
       command: command || null,
@@ -425,8 +422,8 @@ export class ProgressStore {
       exitCode: null,
       logPath: null,
       ...(body.titleFromCommand === true ? { titleFromCommand: true as const } : {}),
-      ...(caller.source === 'hive' && caller.noInstall ? { noInstall: true as const } : {}),
-      ...(caller.source === 'hive' && caller.installAsWritten ? { installAsWritten: true as const } : {}),
+      ...(caller.source === 'combwork' && caller.noInstall ? { noInstall: true as const } : {}),
+      ...(caller.source === 'combwork' && caller.installAsWritten ? { installAsWritten: true as const } : {}),
       ...runFor(link)
     }
     this.runs.set(key(caller.workspacePath), [run, ...list])
@@ -436,10 +433,10 @@ export class ProgressStore {
 
   update(caller: ProgressCaller, id: string, body: Record<string, unknown>): ProgressRun {
     const run = this.find(caller, id)
-    if (run.finishedAt !== null) throw new ProgressError(409, 'That run has finished') // i18n-ignore: the Agent API's progress replies, which agents and hive-progress read
+    if (run.finishedAt !== null) throw new ProgressError(409, 'That run has finished') // i18n-ignore: the Agent API's progress replies, which agents and cw-progress read
     // A total comes at the start, or once later on a run started without one (a command that counts its steps late).
     const total = int(body.total, 'total', 1, MAX_TOTAL)
-    if (total !== undefined && run.total !== null) throw new ProgressError(409, 'That run already has a total') // i18n-ignore: the Agent API's progress replies, which agents and hive-progress read
+    if (total !== undefined && run.total !== null) throw new ProgressError(409, 'That run already has a total') // i18n-ignore: the Agent API's progress replies, which agents and cw-progress read
     const step = int(body.step, 'step', 0, total ?? run.total ?? MAX_TOTAL)
     const stepName = text(body.stepName, 'stepName', MAX_STEP_NAME)
     const estimateMs = int(body.estimateMs, 'estimateMs', 0, MAX_ESTIMATE_MS)
@@ -480,15 +477,15 @@ export class ProgressStore {
   }
 
   finish(caller: ProgressCaller, id: string, body: Record<string, unknown>): ProgressRun {
-    if (typeof body.ok !== 'boolean') throw new ProgressError(400, 'ok (true or false) is required') // i18n-ignore: the Agent API's progress replies, which agents and hive-progress read
-    if (body.stopped !== undefined && typeof body.stopped !== 'boolean') throw new ProgressError(400, 'stopped must be true or false') // i18n-ignore: the Agent API's progress replies, which agents and hive-progress read
+    if (typeof body.ok !== 'boolean') throw new ProgressError(400, 'ok (true or false) is required') // i18n-ignore: the Agent API's progress replies, which agents and cw-progress read
+    if (body.stopped !== undefined && typeof body.stopped !== 'boolean') throw new ProgressError(400, 'stopped must be true or false') // i18n-ignore: the Agent API's progress replies, which agents and cw-progress read
     // stopped (#549): it neither passed nor failed: its command was interrupted (Ctrl+C), whatever ok says.
     const stopped = body.stopped === true
     const summary = text(body.summary, 'summary', MAX_SUMMARY)
     const exitCode = int(body.exitCode, 'exitCode', -2_147_483_648, 4_294_967_295)
     const logPath = text(body.logPath, 'logPath', MAX_LOG_PATH)
     const run = this.find(caller, id)
-    if (run.finishedAt !== null) throw new ProgressError(409, 'That run has finished') // i18n-ignore: the Agent API's progress replies, which agents and hive-progress read
+    if (run.finishedAt !== null) throw new ProgressError(409, 'That run has finished') // i18n-ignore: the Agent API's progress replies, which agents and cw-progress read
     const now = this.deps.now()
     run.finishedAt = now
     run.updatedAt = now
@@ -500,8 +497,8 @@ export class ProgressStore {
     run.seenAt = null
     if (exitCode !== undefined) run.exitCode = exitCode
     if (logPath) run.logPath = logPath
-    // Why Hive's own failed run counts as temporary (#1362): only Hive's runs say it.
-    if (caller.source === 'hive' && run.state === 'failed') Object.assign(run, keptTransient(body.transient))
+    // Why Combwork's own failed run counts as temporary (#1362): only Combwork's runs say it.
+    if (caller.source === 'combwork' && run.state === 'failed') Object.assign(run, keptTransient(body.transient))
     if (run.state === 'passed' && run.total !== null) run.step = run.total
     if (run.state === 'failed') this.unseenFailure.add(key(run.workspacePath))
     this.ended(run.workspacePath)
@@ -556,8 +553,8 @@ export class ProgressStore {
           continue
         }
         if (r.state !== 'running') continue
-        // Hive's own runs have no reporter to fall quiet: Hive ends each one itself (its time limit included).
-        if (r.source === 'hive') continue
+        // Combwork's own runs have no reporter to fall quiet: Combwork ends each one itself (its time limit included).
+        if (r.source === 'combwork') continue
         const stopped = r.source !== 'api' && !this.deps.ownerRunning(r)
         if (stopped || isOverdue(r, now)) {
           r.state = 'stale'
@@ -638,13 +635,13 @@ export class ProgressStore {
   }
 
   /**
-   * Whether a caller may change a run: its own agent, the Assistant its own, a script any in its workspace but Hive's,
-   * and Hive (its merge queue) only its own for that project.
+   * Whether a caller may change a run: its own agent, the Assistant its own, a script any in its workspace but Combwork's,
+   * and Combwork (its merge queue) only its own for that project.
    */
   private owns(caller: ProgressCaller, r: ProgressRun, forLimit = false): boolean {
     if (key(r.workspacePath) !== key(caller.workspacePath)) return false
-    if (caller.source === 'hive') return r.source === 'hive' && key(r.projectPath ?? '') === key(caller.projectPath)
-    if (r.source === 'hive') return false
+    if (caller.source === 'combwork') return r.source === 'combwork' && key(r.projectPath ?? '') === key(caller.projectPath)
+    if (r.source === 'combwork') return false
     if (caller.source === 'api') return forLimit ? r.source === 'api' : true
     if (caller.source === 'assistant') return r.source === 'assistant'
     return r.source === 'agent' && r.agentId === caller.agentId && key(r.projectPath ?? '') === key(caller.projectPath)
@@ -653,7 +650,7 @@ export class ProgressStore {
   /** A run the caller may change; another's answers as if it didn't exist. */
   private find(caller: ProgressCaller, id: string): ProgressRun {
     const run = typeof id === 'string' ? this.runs.get(key(caller.workspacePath))?.find((r) => r.id === id) : undefined
-    if (!run || !this.owns(caller, run)) throw new ProgressError(404, 'Unknown progress run') // i18n-ignore: the Agent API's progress replies, which agents and hive-progress read
+    if (!run || !this.owns(caller, run)) throw new ProgressError(404, 'Unknown progress run') // i18n-ignore: the Agent API's progress replies, which agents and cw-progress read
     return run
   }
 

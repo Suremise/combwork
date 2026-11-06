@@ -127,7 +127,7 @@ describe('in the Default, the text reads as the code wrote it', () => {
     // slotRelease.ts, templateApi.ts: the old templates, restated, over each branch.
     for (const slots of [[], ['slot-a'], ['slot-a', 'slot-b']]) expect(said('slot.release.noSlot', { slot: 'x', listed: slots.length ? 'yes' : 'no', slots: slots.join(', ') })).toBe(`No slot x in this project${slots.length ? ` (its slots: ${slots.join(', ')})` : ''}.`)
     expect(said('slot.release.confirm', { slot: 'slot-a' })).toBe('Releasing slot-a\'s writer needs confirm: { slot: "slot-a", run: "<its run>" }, the slot and run the user agreed to release (list shows them).')
-    for (const scope of ['', 'hive']) for (const from of ['', 'Web']) expect(said('template.find.none', { template: 't', scoped: scope ? 'yes' : 'no', scope, fromProject: from ? 'yes' : 'no', from })).toBe(`No template "t"${scope ? ` in the ${scope} scope` : ''}${from ? ` kept in ${from}` : ''}: list gives them.`)
+    for (const scope of ['', 'combwork']) for (const from of ['', 'Web']) expect(said('template.find.none', { template: 't', scoped: scope ? 'yes' : 'no', scope, fromProject: from ? 'yes' : 'no', from })).toBe(`No template "t"${scope ? ` in the ${scope} scope` : ''}${from ? ` kept in ${from}` : ''}: list gives them.`)
     for (const bad of [['x'], ['x', 'y'], Array.from({ length: 1000 }, (_, i) => `k${i}`)]) expect(said('template.connections.bad', { keys: bad.join(', '), count: bad.length, roles: 'builder, reviewer', agents: '1 (A)' })).toBe(`connections: ${bad.join(', ')} ${bad.length === 1 ? 'is' : 'are'} not "*", a role (builder, reviewer) or one of its agents: 1 (A).`)
     expect(said('template.taken.refused', { taken: [said('template.taken.one', { name: 'B1', project: 'web', suggestion: 'AL-B1' }), said('template.taken.one', { name: 'R1', project: 'api', suggestion: 'AL-R1' })].join('; ') })).toBe('"B1" is web\'s agent: try "AL-B1"; "R1" is api\'s agent: try "AL-R1". Agent names are unique across the workspace: give each a free name in names. Nothing was changed.')
   })
@@ -174,7 +174,7 @@ describe('the canary dialect over them', () => {
 /** The files this card emptied, and where a literal there would be agent text whatever its words look like. */
 const FILES = ['src/main/slots.ts', 'src/main/slotCards.ts', 'src/main/slotRelease.ts', 'src/main/slotsApp.ts', 'src/main/copies.ts', 'src/main/copiesApp.ts', 'src/main/reviewCopies.ts', 'src/main/templateApi.ts', 'src/main/agentTokens.ts', 'src/main/hookTokens.ts', 'src/shared/templates.ts', 'src/shared/templateConnections.ts']
 const TEXT_KEYS = /^(error|why|wait|waiting|refused|retry|failed|detail|notSaved|note|body|by|text|reason)$/
-const CALLS = /^(refused|Error|SlotReleaseRefused|HiveError|OpLost|fail|keep|giveUp|pass)$/
+const CALLS = /^(refused|Error|SlotReleaseRefused|CombworkError|OpLost|fail|keep|giveUp|pass)$/
 
 describe('no literal agent text left in these files', () => {
   it('has no words in an error, a refusal or a field agents read, but what agent-protocol marks', () => {

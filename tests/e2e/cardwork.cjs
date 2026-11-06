@@ -50,21 +50,21 @@ const commit = (dir, file, text, message) => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' })
 
   let app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   let page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 950 })
   await lib.appReady(page)
-  let inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  let inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await inv('project:setActive', notes, true)
   const live = async (p, id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === p.toLowerCase() && s.agentId === id)
   const idle = async (p, id) => ['ready', 'finished'].includes((await live(p, id))?.status)
   const say = async (p, id, text) => {
     await lib.until(() => idle(p, id), HUNG_MS)
-    // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+    // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
     await lib.typeLine(inv, lib.ptyKey(p, id), claudeHome, null, text, { live: () => live(p, id) })
   }
   const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
@@ -193,7 +193,7 @@ const commit = (dir, file, text, message) => {
   const base0 = (await inv('app:info')).language
   const deDir = path.join(lib.ROOT, 'locales', 'de')
   const deMessages = Object.assign({}, ...fs.readdirSync(deDir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(deDir, f), 'utf8'))))
-  const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language })
+  const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
   await speak({ ...base0, code: 'de', locale: 'de', messages: deMessages })
   const english = /not read|latest commit|no base|no target|Its next submission/
   check('German: nothing read before the change, said in German', !!(await lib.until(async () => { const t = await nText(); return t.includes('Keine Revision aufgezeichnet: Combwork hat keine gelesen, als die Karte nach Review kam.') && t.includes('Dateien nicht gelesen') && !english.test(t) }, HUNG_MS)), await nText())
@@ -272,7 +272,7 @@ const commit = (dir, file, text, message) => {
   for (const p of [alpha, notes]) await inv('session:stop', p)
   await lib.until(async () => (await inv('session:live')).length === 0, HUNG_MS)
   await app.close()
-  const db = new DatabaseSync(path.join(ws, '.combwork', 'hive.db'), { timeout: 5000 })
+  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })
   db.prepare('UPDATE cards SET pre_workflow = 1 WHERE number = ?').run(old)
   db.close()
   app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
@@ -280,7 +280,7 @@ const commit = (dir, file, text, message) => {
     page = await app.firstWindow()
     await lib.fitWindow(app, page, { width: 1500, height: 950 })
     await lib.appReady(page)
-    inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.until(async () => (await inv('workspace:get'))?.path?.toLowerCase() === ws.toLowerCase(), HUNG_MS)
     await showBoard(page)
     await openByTitle(page, old)

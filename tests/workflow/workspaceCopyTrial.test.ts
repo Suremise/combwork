@@ -1,12 +1,12 @@
 // The 1.0 upgrade's migration of agents' worktrees into slots (#1441), tried on a copy of a real 0.9 workspace. Skipped
-// unless HIVE_TRIAL_WS names one (never committed with a path in it). Its Hive files are copied read-only into a
+// unless CW_TRIAL_WS names one (never committed with a path in it). Its Combwork files are copied read-only into a
 // tempDir() (the board through SQLite's backup, workspace.json and each project.json), each project with git is a scratch
 // clone sharing the original's objects (read, never written), and each agent's worktree is made again as a worktree of
 // it at the same layout and commit. The copy's board is upgraded and adopted as the upgrade does, its sessions' folders
 // moved to the copy's, and the migration run twice; what it did is printed as counts and names only (no card or
-// conversation text), into HIVE_TRIAL_REPORT (else report.txt in its temp folder). Nothing is written in the original,
+// conversation text), into CW_TRIAL_REPORT (else report.txt in its temp folder). Nothing is written in the original,
 // and no real profile is used.
-//   HIVE_TRIAL_WS=<workspace> HIVE_TRIAL_REPORT=<file> npx vitest run tests/workflow/workspaceCopyTrial.test.ts
+//   CW_TRIAL_WS=<workspace> CW_TRIAL_REPORT=<file> npx vitest run tests/workflow/workspaceCopyTrial.test.ts
 import { execFileSync } from 'child_process'
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { basename, join } from 'path'
@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from '../tempDir'
 
-const SRC = process.env.HIVE_TRIAL_WS ?? ''
+const SRC = process.env.CW_TRIAL_WS ?? ''
 const base = tempDir('wscopy-trial-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -40,9 +40,9 @@ describe.skipIf(!SRC)('the slots migration on a copy of a 0.9 workspace (#1441)'
     // The workspace's own files, read-only.
     mkdirSync(join(dst, '.combwork'), { recursive: true })
     copyFileSync(join(SRC, '.combwork', 'workspace.json'), join(dst, '.combwork', 'workspace.json'))
-    const src = new DatabaseSync(join(SRC, '.combwork', 'hive.db'), { readOnly: true })
+    const src = new DatabaseSync(join(SRC, '.combwork', 'combwork.db'), { readOnly: true })
     try {
-      await backup(src, join(dst, '.combwork', 'hive.db'))
+      await backup(src, join(dst, '.combwork', 'combwork.db'))
     } finally {
       src.close()
     }
@@ -114,7 +114,7 @@ describe.skipIf(!SRC)('the slots migration on a copy of a 0.9 workspace (#1441)'
     } finally {
       stopSlotMigration()
       await disposeWorkspaceService(ws)
-      writeFileSync(process.env.HIVE_TRIAL_REPORT || join(base, 'report.txt'), report.join('\n') + '\n')
+      writeFileSync(process.env.CW_TRIAL_REPORT || join(base, 'report.txt'), report.join('\n') + '\n')
     }
   })
 })

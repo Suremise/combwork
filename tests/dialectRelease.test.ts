@@ -10,8 +10,8 @@ import { DIALECT_CHECKS, dialectCheckArgs, dialectReleaseProblem, lastReleaseTag
 import { tempDir } from './tempDir'
 
 type Files = Record<string, string>
-const pkg = (version: string, extra: object = {}) => JSON.stringify({ name: 'hive-desktop', version, ...extra }, null, 2)
-const lock = (version: string, dep = '1.0.0') => JSON.stringify({ name: 'hive-desktop', version, packages: { '': { name: 'hive-desktop', version }, 'node_modules/x': { version: dep } } }, null, 2)
+const pkg = (version: string, extra: object = {}) => JSON.stringify({ name: 'combwork', version, ...extra }, null, 2)
+const lock = (version: string, dep = '1.0.0') => JSON.stringify({ name: 'combwork', version, packages: { '': { name: 'combwork', version }, 'node_modules/x': { version: dep } } }, null, 2)
 const history = (dialects: object, skills: object = { s: ['a'] }) => JSON.stringify({ skills, modes: { m: ['b'] }, dialects })
 
 /** The rules over two fake trees: the tag's and HEAD's, with what changed between them worked out from both. */
@@ -92,7 +92,7 @@ describe('a dialect-only release (scripts/dialectRelease.mjs)', () => {
 })
 
 describe('a dialect-only release over a real repository (what release.mjs asks git)', () => {
-  const dir = tempDir('hive-dialect-release-')
+  const dir = tempDir('cw-dialect-release-')
   afterAll(() => rmSync(dir, { recursive: true, force: true }))
   const git = (...a: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'core.autocrlf=false', ...a], { cwd: dir, encoding: 'utf8' })
   const put = (files: Files) => {

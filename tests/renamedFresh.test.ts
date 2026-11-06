@@ -25,6 +25,11 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const { sessions } = await import('../src/main/sessions')
 const { DEFAULT_PROJECT_CONFIG } = await import('../src/shared/defaults')
 
+// old-name: begin renamedFresh-inputs
+/** A project's folder as 1.0 named it, which the move renames to .combwork. */
+const OLD_DIR = '.hive'
+// old-name: end renamedFresh-inputs
+
 const wsPath = join(base, 'ws')
 const project = join(wsPath, 'alpha')
 const ws = createWorkspaceService()
@@ -57,15 +62,15 @@ beforeAll(async () => {
 })
 
 /**
- * HI-2462's fixture, which a case sets up itself (it runs alone too; doing it again changes nothing): alpha's .hive moved
- * to .combwork, b3's current conversation (6) ran in a slot inside it, b4's (7) in the project folder. Returns the slot.
+ * HI-2462's fixture, which a case sets up itself (it runs alone too; doing it again changes nothing): alpha's 1.0
+ * folder moved to .combwork, b3's current conversation (6) ran in a slot inside it, b4's (7) in the project folder. Returns the slot.
  */
 async function movedFixture(): Promise<string> {
-  // alpha's .hive moved to .combwork: its folder holds the move's marker (combworkMove.ts writes it before the rename).
-  writeFileSync(join(project, '.combwork', 'combwork-move-id'), JSON.stringify({ kind: 'combwork-move', version: 1, id: 'test', from: '.hive' }))
+  // alpha's 1.0 folder moved to .combwork: its folder holds the move's marker (combworkMove.ts writes it before the rename).
+  writeFileSync(join(project, '.combwork', 'combwork-move-id'), JSON.stringify({ kind: 'combwork-move', version: 1, id: 'test', from: OLD_DIR }))
   // Folders move only at the move's boundaries, which publish the map readers use: this one stands in for the move.
   await (await import('../src/main/combworkMove')).moveFolders(wsPath)
-  const slot = join(project, '.hive', 'slots', 'HI-1')
+  const slot = join(project, OLD_DIR, 'slots', 'HI-1')
   await run(() => ws.upsertSession(project, { id: '00000000-0000-4000-8000-000000000006', agent: 'claude-code', agentId: 'b3', cwd: slot, names: 2, name: 'x', lastActiveAt: '2026-11-02T00:00:00.000Z' }))
   await run(() => ws.upsertSession(project, { id: '00000000-0000-4000-8000-000000000007', agent: 'claude-code', agentId: 'b4', cwd: project, names: 2, name: 'y', lastActiveAt: '2026-11-02T00:00:00.000Z' }))
   return slot
@@ -105,7 +110,7 @@ describe('a conversation from before the rename (HI-2463)', () => {
     }
   })
 
-  it('HI-2462: a current conversation whose folder moved with .hive starts fresh, its record (and transcript key) kept; one in the project folder resumes', async () => {
+  it('HI-2462: a current conversation whose folder moved with the 1.0 folder starts fresh, its record (and transcript key) kept; one in the project folder resumes', async () => {
     told.toasts.length = 0
     seen.launches.length = 0
     seen.carried.length = 0
@@ -122,7 +127,7 @@ describe('a conversation from before the rename (HI-2463)', () => {
       // The record keeps the folder it ran in: Claude Code files its transcript by that, so it stays readable.
       expect((await run(() => ws.sessionRecord(project, '00000000-0000-4000-8000-000000000006')))?.cwd).toBe(slot)
       await vi.runAllTimersAsync()
-      expect(told.toasts.map((t) => t.body)).toEqual([expect.stringMatching(/^1 conversation started fresh: its folder moved with \.hive to \.combwork/)])
+      expect(told.toasts.map((t) => t.body)).toEqual([expect.stringMatching(/^1 conversation started fresh: its folder moved to \.combwork with the old data folders/)])
     } finally {
       vi.useRealTimers()
     }

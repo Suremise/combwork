@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-revisions-')
+const base = tempDir('cw-revisions-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -109,27 +109,27 @@ describe('status polls', () => {
     const ws = join(base, 'headers')
     const w = await open(ws)
     addSkill(ws, 'long-body', 'Words.\n'.repeat(2 * 1024 * 1024))
-    const { hiveSkills } = await import('../src/main/skills')
-    const r = await reads(() => inWorkspace(w, () => hiveSkills()))
+    const { combworkSkills } = await import('../src/main/skills')
+    const r = await reads(() => inWorkspace(w, () => combworkSkills()))
     expect(r.value.find((s) => s.name === 'long-body')?.description).toBe('Skill long-body')
     // The 12 MB skill isn't bundled, so nothing of it is hashed, and only 64 KB of its SKILL.md is read.
     expect(r.metaBytes).toBeLessThan(r.value.length * 64 * 1024 + 1)
-    const again = await reads(() => inWorkspace(w, () => hiveSkills()))
+    const again = await reads(() => inWorkspace(w, () => combworkSkills()))
     expect(again.metaBytes).toBe(0)
     // An edit is read again.
     appendFileSync(join(ws, '.combwork', 'skills', 'long-body', 'SKILL.md'), 'more')
-    const edited = await reads(() => inWorkspace(w, () => hiveSkills()))
+    const edited = await reads(() => inWorkspace(w, () => combworkSkills()))
     expect(edited.metaBytes).toBe(64 * 1024)
     await disposeWorkspaceService(w)
   })
 
-  // Real file work, not a wait (#596): three workspaces opened with Hive's bundled skills, two with 20 more, and polled:
+  // Real file work, not a wait (#596): three workspaces opened with Combwork's bundled skills, two with 20 more, and polled:
   // about 8,000 file system calls through Node's four I/O threads. Measured: 1 s alone, 2 to 5 s under a full unit run
   // beside other runs, over 20 s under heavier load. So it is bounded by FS_HUNG_MS rather than the suite's 20 s: only a
   // hung read takes a minute.
   const FS_HUNG_MS = 60_000
   it('ten polls at once on a cold workspace read what one poll does', { timeout: FS_HUNG_MS }, async () => {
-    // Hive's shipped skills have one inventory for the whole process (revisions.ts), hashed by its first poll, whichever
+    // Combwork's shipped skills have one inventory for the whole process (revisions.ts), hashed by its first poll, whichever
     // test makes it: polled here first, so the polls compared below read only their own workspaces' skills.
     const warm = await open(join(base, 'cold-warm'))
     await inWorkspace(warm, () => skillRevisions())
@@ -426,7 +426,7 @@ describe('limits', () => {
     const project = join(dir, 'claude-project')
     mkdirSync(project, { recursive: true })
     const before = readStats.bytes
-    const delivered = await claudeCode.prepareLaunch({ projectPath: project, agentId: 'a1', cwd: project, skills: [{ name: 'deep', sourcePath: deep }, { name: 'big', sourcePath: big }, { name: 'ok', sourcePath: ok }], mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=x', env: {}, extraArgs: [], hookAuthFile: 'C:/hive/hook-auth/x.txt', privateDir: `${project}-private` } as never)
+    const delivered = await claudeCode.prepareLaunch({ projectPath: project, agentId: 'a1', cwd: project, skills: [{ name: 'deep', sourcePath: deep }, { name: 'big', sourcePath: big }, { name: 'ok', sourcePath: ok }], mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=x', env: {}, extraArgs: [], hookAuthFile: 'C:/profile/hook-auth/x.txt', privateDir: `${project}-private` } as never)
     const skills = join(project, '.combwork', 'launch-a1', 'plugin', 'skills')
     expect(delivered.deep).toEqual({ revision: null, problem: 'it is too big for Combwork to check (it has folders more than 12 deep)', lasting: true })
     expect(delivered.big).toEqual({ revision: null, problem: 'it is too big for Combwork to check (it is over 1 MB)', lasting: true })
@@ -469,7 +469,7 @@ describe('limits', () => {
   it("skillFiles lists a folder's files in order, and says when it stopped short", async () => {
     const s = join(dir, 'skill')
     mkdirSync(join(s, 'a', 'b', 'c'), { recursive: true })
-    for (const f of ['SKILL.md', 'z.md', 'a/1.md', 'a/b/2.md', 'a/b/c/3.md', '.hive-copy']) writeFileSync(join(s, f), '')
+    for (const f of ['SKILL.md', 'z.md', 'a/1.md', 'a/b/2.md', 'a/b/c/3.md', '.combwork-copy']) writeFileSync(join(s, f), '')
     expect(await skillFiles(s)).toEqual({ files: ['SKILL.md', 'a/1.md', 'a/b/2.md', 'a/b/c/3.md', 'z.md'], truncated: false })
     expect(await skillFiles(s, { files: 2, entries: 100, depth: 8 })).toEqual({ files: ['SKILL.md', 'a/1.md'], truncated: true })
     expect(await skillFiles(s, { files: 100, entries: 100, depth: 2 })).toEqual({ files: ['SKILL.md', 'a/1.md', 'z.md'], truncated: true })

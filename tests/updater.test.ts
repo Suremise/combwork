@@ -1,6 +1,6 @@
-// Update checks (src/main/updater.ts): a packaged Hive checks GitHub 30 s after it starts and every 6 hours; one a test
-// started (HIVE_TEST_QUIET=1) never does, automatically or when asked (#1332), since each check counts as a download of
-// the release's latest.yml. A downloaded update installs at the end of Hive's quit, or by Restart and Update, only over an
+// Update checks (src/main/updater.ts): a packaged Combwork checks GitHub 30 s after it starts and every 6 hours; one a test
+// started (CW_TEST_QUIET=1) never does, automatically or when asked (#1332), since each check counts as a download of
+// the release's latest.yml. A downloaded update installs at the end of Combwork's quit, or by Restart and Update, only over an
 // older copy read from disk (#1647); a local build is offered, never given, a release of its own version.
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -45,7 +45,7 @@ vi.mock('../src/main/notify', () => ({ resolveOffer: (offer: string, outcome: st
 vi.mock('../src/main/events',() => ({ emit: () => undefined, toast: (level: string, title: string, _message: string, actions?: never) => void st.toasts.push({ level, title, actions }) }))
 vi.mock('../src/main/logger', async (original) => ({ ...(await original<typeof import('../src/main/logger')>()), createLogger: () => ({ info: (m: string) => st.logged.push(m), warn: (m: string) => st.warned.push(m), error: () => undefined }) }))
 
-const saved = { quiet: process.env.HIVE_TEST_QUIET, delay: process.env.HIVE_UPDATE_DELAY }
+const saved = { quiet: process.env.CW_TEST_QUIET, delay: process.env.CW_UPDATE_DELAY }
 beforeEach(async () => {
   vi.resetModules()
   vi.useFakeTimers()
@@ -60,21 +60,21 @@ beforeEach(async () => {
   st.settingsChanged = []
   st.toasts = []
   st.resolved = []
-  delete process.env.HIVE_UPDATE_DELAY
+  delete process.env.CW_UPDATE_DELAY
   ;((await import('electron')).app as { isPackaged: boolean }).isPackaged = true
 })
 afterEach(async () => {
   vi.useRealTimers()
   ;((await import('electron')).app as { isPackaged: boolean }).isPackaged = false
-  for (const [k, v] of [['HIVE_TEST_QUIET', saved.quiet], ['HIVE_UPDATE_DELAY', saved.delay]] as const) {
+  for (const [k, v] of [['CW_TEST_QUIET', saved.quiet], ['CW_UPDATE_DELAY', saved.delay]] as const) {
     if (v === undefined) delete process.env[k]
     else process.env[k] = v
   }
 })
 
 describe('update checks', () => {
-  it('a packaged Hive checks 30 s after it starts, then every 6 hours', async () => {
-    delete process.env.HIVE_TEST_QUIET
+  it('a packaged Combwork checks 30 s after it starts, then every 6 hours', async () => {
+    delete process.env.CW_TEST_QUIET
     const updater = await import('../src/main/updater')
     updater.initUpdater({ restart: () => undefined })
     await vi.advanceTimersByTimeAsync(30_000)
@@ -84,7 +84,7 @@ describe('update checks', () => {
   })
 
   it('automatic checks turned off before the first one: none runs; turned on again: one at once, then every 6 hours (HI-2324)', async () => {
-    delete process.env.HIVE_TEST_QUIET
+    delete process.env.CW_TEST_QUIET
     const updater = await import('../src/main/updater')
     updater.initUpdater({ restart: () => undefined })
     const change = (checkAutomatically: boolean): void => {
@@ -107,7 +107,7 @@ describe('update checks', () => {
   })
 
   it('automatic checks turned off and on again before the first one: one check at once, not a second at 30 s (HI-2324)', async () => {
-    delete process.env.HIVE_TEST_QUIET
+    delete process.env.CW_TEST_QUIET
     ;(await import('../src/main/updater')).initUpdater({ restart: () => undefined })
     const change = (checkAutomatically: boolean): void => {
       const prev = { updates: st.updates }
@@ -120,11 +120,11 @@ describe('update checks', () => {
     expect(st.checks).toBe(1)
   })
 
-  it("a packaged Hive reads GitHub's releases through Hive's provider (HI-2311); a development build sets no feed", async () => {
-    delete process.env.HIVE_TEST_QUIET
-    const { HiveGitHubProvider } = await import('../src/main/updateFeed')
+  it("a packaged Combwork reads GitHub's releases through Combwork's provider (HI-2311); a development build sets no feed", async () => {
+    delete process.env.CW_TEST_QUIET
+    const { CombworkGitHubProvider } = await import('../src/main/updateFeed')
     ;(await import('../src/main/updater')).initUpdater({ restart: () => undefined })
-    expect(st.feeds).toEqual([{ provider: 'custom', updateProvider: HiveGitHubProvider, owner: 'Suremise', repo: 'combwork' }])
+    expect(st.feeds).toEqual([{ provider: 'custom', updateProvider: CombworkGitHubProvider, owner: 'Suremise', repo: 'combwork' }])
     vi.resetModules()
     st.feeds = []
     ;((await import('electron')).app as { isPackaged: boolean }).isPackaged = false
@@ -132,8 +132,8 @@ describe('update checks', () => {
     expect(st.feeds).toEqual([])
   })
 
-  it('a packaged Hive a test started (HIVE_TEST_QUIET=1) never checks, and says so (#1332)', async () => {
-    process.env.HIVE_TEST_QUIET = '1'
+  it('a packaged Combwork a test started (CW_TEST_QUIET=1) never checks, and says so (#1332)', async () => {
+    process.env.CW_TEST_QUIET = '1'
     const updater = await import('../src/main/updater')
     updater.initUpdater({ restart: () => undefined })
     await vi.advanceTimersByTimeAsync(7 * 60 * 60 * 1000)
@@ -150,16 +150,16 @@ describe('update checks', () => {
 describe('installing a downloaded update (#1647)', () => {
   // oxlint-disable-next-line typescript/no-require-imports -- the e2e suites' CommonJS helper, shared with them
   const { fakeInstall } = require('./e2e/fakeInstall.cjs') as { fakeInstall: (dir: string, o?: { version?: string; identity?: unknown }) => string }
-  const base = tempDir('hive-updater-')
+  const base = tempDir('cw-updater-')
   let n = 0
-  /** A packaged Hive whose install folder's resources are a stand-in (what it reads as the copy on disk), started. */
+  /** A packaged Combwork whose install folder's resources are a stand-in (what it reads as the copy on disk), started. */
   const start = async (copy: { version?: string; identity?: unknown }) => {
     const resources = fakeInstall(join(base, `r${++n}`), copy)
     ;(process as { resourcesPath?: string }).resourcesPath = resources
     const electron = (await import('electron')).app as unknown as { quit?: () => void }
     const quits = { n: 0 }
     electron.quit = () => void quits.n++
-    process.env.HIVE_TEST_QUIET = '0'
+    process.env.CW_TEST_QUIET = '0'
     const updater = await import('../src/main/updater')
     const restarts = { n: 0 }
     updater.initUpdater({ restart: () => void restarts.n++ })
@@ -199,7 +199,7 @@ describe('installing a downloaded update (#1647)', () => {
     expect(st.resolved.at(-1)?.[0]).toBe('update:9.0.0')
   })
 
-  it('over a local build of its own version: neither the quit nor Restart and Update installs it, and Hive says why', async () => {
+  it('over a local build of its own version: neither the quit nor Restart and Update installs it, and Combwork says why', async () => {
     const { updater, quits, restarts } = await start({ version: '9.1.1', identity: { version: '9.1.1', commit: 'abc1234', local: true } })
     downloaded(updater)
     // Never told it is ready to install: the state says why not, from the download on.
@@ -255,7 +255,7 @@ describe('installing a downloaded update (#1647)', () => {
     const { updater, resources, quits } = await start({ version: '9.1.0' })
     downloaded(updater)
     expect(updater.installsOnQuit()).toBe(true)
-    // A local 9.1.2 installed over it before the quit ends (another Hive's quit, say).
+    // A local 9.1.2 installed over it before the quit ends (another Combwork's quit, say).
     fakeInstall(resources, { version: '9.1.2', identity: { version: '9.1.2', commit: 'abc1234', local: true } })
     updater.installNow(false)
     expect(st.installs).toEqual([])

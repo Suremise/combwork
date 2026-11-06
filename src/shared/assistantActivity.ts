@@ -2,7 +2,7 @@ import { agentMsg, inDefaultDialect, say, type AgentMsg } from './agentText'
 import { TASK_COLUMNS } from './tasks'
 
 /**
- * What each Hive Assistant action is about, as fields (#763): its kind, from a fixed set, and its targets (project,
+ * What each Combwork Assistant action is about, as fields (#763): its kind, from a fixed set, and its targets (project,
  * agent, card or cards, lane, column, setting), so a viewer such as Apiary follows the Assistant without reading its
  * English line, which is for people and will be translated. Never what it quotes: no prompt or message text, no
  * setting's values. The Agent API's assistant-activity event carries them through activityFields' allow-list.
@@ -75,7 +75,7 @@ export interface ActivityTarget {
 }
 
 /**
- * What a refusal's or failure's public `error` says (#763): Hive's own words for the kind of refusal, from the status it
+ * What a refusal's or failure's public `error` says (#763): Combwork's own words for the kind of refusal, from the status it
  * answered with, never the error's text, which can quote what the Assistant sent (a setting's value, a prompt). Its
  * panel keeps the whole message.
  */

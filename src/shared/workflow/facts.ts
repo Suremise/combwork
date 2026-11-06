@@ -1,9 +1,9 @@
-// A card's fact log (SPEC §16.4): typed, append-only, recorded by Hive or observed from the platform, and the pure fold
+// A card's fact log (SPEC §16.4): typed, append-only, recorded by Combwork or observed from the platform, and the pure fold
 // that derives the card's state from it. The same fold runs in the spike, main and tests (ARCHITECTURE "Facts and
 // derived state"). Facts carry platform-neutral words (revision, line, target, result); anything only one platform
 // has goes in `data.platform`, which only its adapter reads.
 //
-// In the app since P3: hive.db's `card_facts` (main/workflow/factStore.ts), folded wherever a card's state is read.
+// In the app since P3: combwork.db's `card_facts` (main/workflow/factStore.ts), folded wherever a card's state is read.
 
 import type { ConflictsRecord } from './conflicts'
 import type { FocusedChoice, FocusedTest } from './focused'
@@ -11,7 +11,7 @@ import type { StoredText, TransientCause } from '../types'
 import { samePath } from '../movePaths'
 
 /** Who caused a fact. */
-export type Actor = 'user' | 'assistant' | 'hive' | 'outside' | `agent:${string}`
+export type Actor = 'user' | 'assistant' | 'combwork' | 'outside' | `agent:${string}`
 
 export const agentActor = (agent: string): Actor => `agent:${agent}`
 export const agentOf = (a: Actor): string | null => (a.startsWith('agent:') ? a.slice(6) : null)
@@ -134,14 +134,14 @@ export type ForYouKind = 'approve' | 'decide' | 'test' | 'signIn' | 'other'
 export const ROUND_CHOICES = ['carryOn', 'split', 'accept', 'takeOver'] as const
 export type RoundChoice = (typeof ROUND_CHOICES)[number]
 
-/** The gate of Hive's question at a card's round limit (§16.11.4). */
+/** The gate of Combwork's question at a card's round limit (§16.11.4). */
 export const ROUND_LIMIT_GATE = 'roundLimit'
 
-/** The gate of Hive's questions about a builder's line held up between a lane's cards (§16.19.2, #1271). */
+/** The gate of Combwork's questions about a builder's line held up between a lane's cards (§16.19.2, #1271). */
 export const LINE_GATE = 'lineUpdate'
 
 /**
- * The gate of Hive's question before it updates a target checked out in a folder (§16.9.2, OP-40, #1351: Settings →
+ * The gate of Combwork's question before it updates a target checked out in a folder (§16.9.2, OP-40, #1351: Settings →
  * Advanced, Merge into a checked-out branch, Ask each time): bound to the queue entry and the target's expected revision.
  */
 export const QUEUE_ADVANCE_GATE = 'queueAdvance'
@@ -151,7 +151,7 @@ export const MERGE_CHOICE_GATE = 'mergeChoice'
 /** HI-1697: the project's board meta recording its answer to that question, first (the file follows: optionsForm.ts). */
 export const MERGE_CHOICE_KEY = 'mergeChoice'
 
-/** The gate of Hive's notice that an advance into a checked-out target stopped part way (§16.9.2's terminal state, #1351). */
+/** The gate of Combwork's notice that an advance into a checked-out target stopped part way (§16.9.2's terminal state, #1351). */
 export const QUEUE_STUCK_GATE = 'queueStuck'
 
 /**
@@ -178,13 +178,13 @@ export interface AskAction {
 export const ASK_ACTIONS_MAX = 3
 
 /**
- * The gates of Hive's own requests (§16.8.5): the user's review, the OK before merging, the round limit, a line held up,
+ * The gates of Combwork's own requests (§16.8.5): the user's review, the OK before merging, the round limit, a line held up,
  * the merge queue's (an advance to approve, one stopped part way) and a decision after a merge (asked on a Done card).
  * A request under any other gate is a question someone asked: an agent, the Assistant (`ask`), or a rule it couldn't
- * keep. A question settled another way is closed (#1638); Hive's own requests stay until met.
+ * keep. A question settled another way is closed (#1638); Combwork's own requests stay until met.
  */
-const HIVE_GATES: ReadonlySet<string> = new Set(['review', 'okBefore', ROUND_LIMIT_GATE, LINE_GATE, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, FOCUSED_SKIP_GATE, SLOT_DIRTY_GATE, 'decision'])
-export const askedQuestion = (r: Pick<FactData['ApprovalRequested'], 'gate'>): boolean => !HIVE_GATES.has(r.gate)
+const CW_GATES: ReadonlySet<string> = new Set(['review', 'okBefore', ROUND_LIMIT_GATE, LINE_GATE, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, FOCUSED_SKIP_GATE, SLOT_DIRTY_GATE, 'decision'])
+export const askedQuestion = (r: Pick<FactData['ApprovalRequested'], 'gate'>): boolean => !CW_GATES.has(r.gate)
 
 /** An answer as the user gives it (§16.8.5): its outcome, whether it has a reply or a decision, a choice and its rounds, or an action offered (#1630). */
 export interface AnswerShape {
@@ -213,7 +213,7 @@ export function answerFits(req: Pick<FactData['ApprovalRequested'], 'kind' | 'ga
 /**
  * What a note given with Approve becomes (HI-2286): on an agent's question (gate `ask`), a reply and the user's decision
  * on the card (the asker works against decisions, and a reviewer checks them); on one offering a single action, that
- * action's reason (approving it is the action, HI-1734); on Hive's own gates (the user's review, the OK before merging,
+ * action's reason (approving it is the action, HI-1734); on Combwork's own gates (the user's review, the OK before merging,
  * the merge queue's advance), a reply only: approving moves the card on at once, so a decision would come too late.
  */
 export const approveNote = (r: Pick<FactData['ApprovalRequested'], 'gate' | 'actions'>): 'decision' | 'reason' | 'comment' => (r.actions?.length === 1 ? 'reason' : r.gate === 'ask' ? 'decision' : 'comment')
@@ -221,7 +221,7 @@ export const approveNote = (r: Pick<FactData['ApprovalRequested'], 'gate' | 'act
 /**
  * Whether a decision the user made may answer a request (HI-1932, Darren's decision: the Assistant records it naming
  * the requests it answers): a question someone asked (an agent, the Assistant, a rule it couldn't keep), answered with a
- * decision. Never one of Hive's own gates (a review, the OK before merging, the round limit's choice, the merge queue's),
+ * decision. Never one of Combwork's own gates (a review, the OK before merging, the round limit's choice, the merge queue's),
  * the merge queue's merge choice, or an approval: those are approved, declined or chosen in For you.
  */
 export const decisionAnswers = (r: Pick<FactData['ApprovalRequested'], 'kind' | 'gate' | 'actions'>): boolean => askedQuestion(r) && r.gate !== MERGE_CHOICE_GATE && answerFits(r, { outcome: 'answered', decision: true }, 1)
@@ -280,10 +280,10 @@ export interface FactData {
   /**
    * A card's slot made ready for its start (#1438): the line checked out at `revision` (installed again with G15) under
    * `lease`. Written after the slot's preparation, in a write that finds the card's start the same: until then the start's
-   * preparation is owed, and a pass of Hive's (after a restart too) does it.
+   * preparation is owed, and a pass of Combwork's (after a restart too) does it.
    */
   SlotPrepared: { lease: string; line: string; revision: string }
-  /** Its builder's placement in the slot claimed by a Hive (its process), so two never place it; one gone is taken over. */
+  /** Its builder's placement in the slot claimed by a Combwork (its process), so two never place it; one gone is taken over. */
   PlacementClaimed: { lease: string; pid: number; started: number }
   /** Its builder given the card in the slot: typed in, or a new conversation started there; `delivery` the one made. */
   /** `resumed`: its builder's conversation bound to the lease, resumed with the card (HI-1746). */
@@ -299,7 +299,7 @@ export interface FactData {
   LineMoveUndone: { line: string; at: string }
   CommitAttributed: { commit: string; how: 'trailer' | 'onlyCard' | 'assigned' }
   Stale: { approved: string | null; current: string | null; why: 'change' | 'decision' | 'exact' }
-  /** `text` in English (agents, the Agent API); `requestText`, Hive's own request as data for the window (an agent's words have none). */
+  /** `text` in English (agents, the Agent API); `requestText`, Combwork's own request as data for the window (an agent's words have none). */
   /** `entry` and `result`: the queue entry a merge queue's request is about, and its test merge's result (#1351). */
   ApprovalRequested: { request: string; kind: ForYouKind; gate: string; revision?: string | null; submission?: number; text: string; requestText?: StoredText; stage?: StageId; generation?: number; for?: 'user'; asker?: string; checklist?: string[]; entry?: string; result?: string; actions?: AskAction[]; tests?: string[] }
   /**
@@ -330,7 +330,7 @@ export interface FactData {
    * counted run at the submitted revision (`run`), review evidence at that revision, never a run at the merged result.
    */
   FocusedAccepted: { entry: string; revision: string; result: string; test: string; run: string }
-  Integrated: { entry?: string; revision: string; target: string; result: string; method: 'merge' | 'squash' | 'fastForward' | 'sameTree' | 'committed'; by: 'hive' | 'agent' | 'outside'; outsideRules?: string[] }
+  Integrated: { entry?: string; revision: string; target: string; result: string; method: 'merge' | 'squash' | 'fastForward' | 'sameTree' | 'committed'; by: 'combwork' | 'agent' | 'outside'; outsideRules?: string[] }
   /** Some of an unfinished card's work found in the target (a partial hand merge): a mark, not a move (§16.4.4). */
   MergedInPart: { revision: string; target: string }
   /** A Done card's revision no longer in its target (the target was reset): a mark (§16.4.4). */
@@ -359,7 +359,7 @@ export interface FactData {
   Decision: { decision: string; generation: number; text: string; removed?: boolean }
   DecisionsReceived: { agent: string; generation: number }
   /**
-   * Paths the card's builder took Hive's file locks on this cycle (#1481, G16: its own changes in a shared folder),
+   * Paths the card's builder took Combwork's file locks on this cycle (#1481, G16: its own changes in a shared folder),
    * relative to the project folder with `/`: each only once a cycle, and only while the card is its builder's current one.
    */
   FilesLocked: { agent: string; paths: string[] }

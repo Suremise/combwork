@@ -1,4 +1,4 @@
-// Test copies of Hive an earlier run left running (HI-1453), ended at a run's start: only in the lanes no running runner
+// Test copies of Combwork an earlier run left running (HI-1453), ended at a run's start: only in the lanes no running runner
 // holds, only those started before the lanes were read (a runner claiming a lane after that starts its own after it).
 // The real processes: the harnessleftovers e2e.
 import { readFileSync, writeFileSync } from 'fs'
@@ -12,7 +12,7 @@ import { tempDir } from './tempDir'
 
 describe('the lanes a run sweeps at its start (HI-1453)', () => {
   it("are those with no claim or a gone runner's, a running runner's kept however old its claim", async () => {
-    const dir = tempDir('hive-idle-lanes-')
+    const dir = tempDir('cw-idle-lanes-')
     const day = 25 * 60 * 60_000
     writeFileSync(join(dir, 'lane-0.json'), JSON.stringify({ pid: 100, at: Date.now() }))
     writeFileSync(join(dir, 'lane-1.json'), JSON.stringify({ pid: 200, at: Date.now() }))
@@ -25,10 +25,10 @@ describe('the lanes a run sweeps at its start (HI-1453)', () => {
   })
 
   it("ends the copies recorded in those lanes' folders started before they were read, and none while every lane is held", async () => {
-    const dir = tempDir('hive-left-copies-')
+    const dir = tempDir('cw-left-copies-')
     const work = join(dir, 'e2e')
     const calls: { folders: string[]; before: number }[] = []
-    const unrecorded = [{ pid: 7, commandLine: 'electron.exe --hive-test-profile=x' }]
+    const unrecorded = [{ pid: 7, commandLine: 'electron.exe --combwork-test-profile=x' }]
     const end = (folders: string[], o: { before: number }) => (calls.push({ folders, before: o.before }), { ended: 3, unrecorded })
     const runner = await claimLane(dir, { owner: 100, alive: () => true, free: async () => true })
     expect(runner.lane).toBe(0)

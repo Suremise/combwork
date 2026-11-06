@@ -1,7 +1,7 @@
-// Hooks health, part 2 (#1371): a quick turn with its hooks off, over before Hive's first look at its screen, is caught by
+// Hooks health, part 2 (#1371): a quick turn with its hooks off, over before Combwork's first look at its screen, is caught by
 // its transcript: the turn the CLI recorded (Claude Code's promptId, Codex's turn_id), which no hook named. With the
-// fake Claude Code and the fake Codex, and Hive's bound (Hooks missing: wait) at 3 s. Hive's checks are held while a file
-// is there (HIVE_TEST_HOOKS_HOLD), so each turn is over, its screen idle and its transcript written before any check
+// fake Claude Code and the fake Codex, and Combwork's bound (Hooks missing: wait) at 3 s. Combwork's checks are held while a file
+// is there (CW_TEST_HOOKS_HOLD), so each turn is over, its screen idle and its transcript written before any check
 // looks: only the transcript can show it (a condition, not a race with the check's period).
 // - a healthy quick turn (its hooks came) is never flagged; then its hooks are turned off and a quick marked turn runs:
 //   released, the flag is "transcript", naming that turn's own id, never the healthy one's;
@@ -65,14 +65,14 @@ const rollouts = (dir = path.join(codexHome, 'sessions')) => {
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
   fs.writeFileSync(path.join(userData, 'advanced.json'), JSON.stringify({ format: 1, values: { 'cw.hooks.missingSeconds': 3 } }, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47846), ...cenv, CODEX_HOME: codexHome, FAKE_CODEX_VERSION: '0.162.1', HIVE_TEST_TIPS: 'off', HIVE_TEST_HOOKS_HOLD: hold })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47846), ...cenv, CODEX_HOME: codexHome, FAKE_CODEX_VERSION: '0.162.1', CW_TEST_TIPS: 'off', CW_TEST_HOOKS_HOLD: hold })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1400, height: 850 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     await inv('project:setActive', alpha, true)
     await lib.waitForProvider(inv)
@@ -81,7 +81,7 @@ const rollouts = (dir = path.join(codexHome, 'sessions')) => {
     const raw = async (a) => (await inv('pty:buffer', lib.ptyKey(alpha, a.id)).catch(() => '')) ?? ''
 
     /**
-     * One quick turn, with Hive's checks held: typed, then over on its screen (this prompt's own end, after a mark) and
+     * One quick turn, with Combwork's checks held: typed, then over on its screen (this prompt's own end, after a mark) and
      * idle, its transcript holding its turn (`turnOf`: its id there, by its text); then the hold is let go. Its id.
      */
     const quickTurn = async (a, text, turnOf, ended) => {

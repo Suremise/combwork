@@ -1,4 +1,4 @@
-// The merge queue's checks as Hive's own runs (#1349, SPEC §16.9.1 steps 5 and 8, §16.13): the runner (queueChecks.ts)
+// The merge queue's checks as Combwork's own runs (#1349, SPEC §16.9.1 steps 5 and 8, §16.13): the runner (queueChecks.ts)
 // on real temporary repositories with P2's MergeQueue: only a counted green advances, a check that changed the folder is
 // tested again and then pauses, installs from scratch when the manifests changed (or always), transient vs red, the
 // environment a check gets, and S4's and S13's cores.
@@ -14,7 +14,7 @@ import { checkEnv, classifyCheckFailure, installPlan, MAX_LOG_BYTES, networkCode
 import { advancedDef, QUEUE_NETWORK_CODES } from '../../src/shared/advanced'
 import { runDetails } from '../../src/shared/progress'
 import { tr } from '../../src/shared/i18n'
-import { HIVE_RUNS, keptRuns, ProgressStore } from '../../src/main/progress'
+import { CW_RUNS, keptRuns, ProgressStore } from '../../src/main/progress'
 import { publicRun } from '../../src/main/apiEvents'
 import type { RunCheck } from '../../src/shared/types'
 
@@ -55,12 +55,12 @@ const base = (): Record<string, string> => ({
   PATH: process.env.PATH ?? '',
   SystemRoot: process.env.SystemRoot ?? '',
   ComSpec: process.env.ComSpec ?? 'cmd.exe',
-  HIVE_TOKEN: 'secret',
-  Hive_Agent_Id: 'B1',
+  CW_TOKEN: 'secret',
+  Cw_Agent_Id: 'B1',
   ELECTRON_RUN_AS_NODE: '1'
 })
 
-/** Hive's runs as the runner reports them. */
+/** Combwork's runs as the runner reports them. */
 function runsLog() {
   const started: Parameters<QueueRuns['start']>[0][] = []
   const finished: ({ id: string } & Parameters<QueueRuns['finish']>[1])[] = []
@@ -222,7 +222,7 @@ describe('which failed checks are temporary (#1362)', () => {
     expect(oracle(texts[3])).toBeNull()
   })
 
-  it("Hive's run keeps why (shown in its details), across a restart; another source's run can't say it", () => {
+  it("Combwork's run keeps why (shown in its details), across a restart; another source's run can't say it", () => {
     const store = new ProgressStore({ now: () => Date.now(), changed: () => undefined, ownerRunning: () => false })
     const ws = tempDir('qc-ws-')
     const runs = progressRuns(store, () => true, ws, join(ws, 'app'))
@@ -244,16 +244,16 @@ describe("finding a check's program before it starts (Windows: cmd exits 1 for o
     expect(programFound('git status', e, cwd, 'win32')).toBe(true)
     expect(programFound('echo hi && exit 1', e, cwd, 'win32')).toBe(true)
     expect(programFound('%COMSPEC% /c exit 0', e, cwd, 'win32')).toBe(true)
-    expect(programFound('hive-no-such-command-1349 --x', e, cwd, 'win32')).toBe(false)
+    expect(programFound('cw-no-such-command-1349 --x', e, cwd, 'win32')).toBe(false)
     expect(programFound('"C:\\no\\such\\tool.exe"', e, cwd, 'win32')).toBe(false)
-    expect(programFound('hive-no-such-command-1349', e, cwd, 'linux')).toBe(true)
+    expect(programFound('cw-no-such-command-1349', e, cwd, 'linux')).toBe(true)
   })
 })
 
 describe("a check's environment", () => {
-  it('has no HIVE_* variable (in any case) and none of Electron\'s switches, and keeps the rest', () => {
-    const e = checkEnv({ ...base(), hive_port: '47821', electron_run_as_node: '1', CHROME_CRASHPAD_PIPE_NAME: 'x', FOO: 'bar' })
-    expect(Object.keys(e).filter((k) => /^hive_|^electron_|crashpad/i.test(k))).toEqual([])
+  it('has no CW_* variable (in any case) and none of Electron\'s switches, and keeps the rest', () => {
+    const e = checkEnv({ ...base(), cw_port: '47821', electron_run_as_node: '1', CHROME_CRASHPAD_PIPE_NAME: 'x', FOO: 'bar' })
+    expect(Object.keys(e).filter((k) => /^cw_|^electron_|crashpad/i.test(k))).toEqual([])
     expect(e.FOO).toBe('bar')
     expect(e.PATH).toBe(process.env.PATH ?? '')
   })
@@ -306,14 +306,14 @@ describe('the mergeInstall option', () => {
   })
 })
 
-describe("Hive's runs in the Progress panel", () => {
-  const caller = { source: 'hive' as const, workspacePath: 'C:\\ws', projectPath: 'C:\\ws\\app' }
+describe("Combwork's runs in the Progress panel", () => {
+  const caller = { source: 'combwork' as const, workspacePath: 'C:\\ws', projectPath: 'C:\\ws\\app' }
   const store = () => new ProgressStore({ now: () => Date.now(), changed: () => undefined, ownerRunning: () => false })
 
-  it('are "Hive (merge queue)" in the project, no agent; only Hive changes them; they never go stale; kept as they were', () => {
+  it('are "Combwork (merge queue)" in the project, no agent; only Combwork changes them; they never go stale; kept as they were', () => {
     const p = store()
     const r = p.start({ ...caller, noInstall: true }, { title: 'AM-1 · check · a3f2c1d', command: 'npm test' }, { card: 1, revision: 'a'.repeat(40), testedCheckout: 'a'.repeat(40) })
-    expect(r).toMatchObject({ source: 'hive', agentName: HIVE_RUNS, defaultName: 'mergeQueue', projectPath: caller.projectPath, agentId: null, provider: null, noInstall: true, card: 1 })
+    expect(r).toMatchObject({ source: 'combwork', agentName: CW_RUNS, defaultName: 'mergeQueue', projectPath: caller.projectPath, agentId: null, provider: null, noInstall: true, card: 1 })
     // A script (the workspace's token) can't end it, and neither can another project's queue.
     expect(() => p.finish({ source: 'api', workspacePath: caller.workspacePath }, r.id, { ok: true })).toThrow('Unknown progress run')
     expect(() => p.finish({ ...caller, projectPath: 'C:\\ws\\other' }, r.id, { ok: true })).toThrow('Unknown progress run')
@@ -323,24 +323,24 @@ describe("Hive's runs in the Progress panel", () => {
     p.finish(caller, r.id, { ok: false, exitCode: 1, logPath: 'C:\\logs\\x.log' })
     p.noteCheck(caller.workspacePath, r.id, { name: 'check', counted: false, whyNot: 'changed' })
     const [kept] = keptRuns(JSON.parse(JSON.stringify({ runs: p.list(caller.workspacePath) })), caller.workspacePath)
-    expect(kept).toMatchObject({ source: 'hive', agentName: HIVE_RUNS, defaultName: 'mergeQueue', projectPath: caller.projectPath, noInstall: true, logPath: 'C:\\logs\\x.log', counts: { name: 'check', counted: false, whyNot: 'changed' } })
+    expect(kept).toMatchObject({ source: 'combwork', agentName: CW_RUNS, defaultName: 'mergeQueue', projectPath: caller.projectPath, noInstall: true, logPath: 'C:\\logs\\x.log', counts: { name: 'check', counted: false, whyNot: 'changed' } })
   })
 })
 
 describe("the runner's own runs, outside the queue", () => {
   const ctx = { card: 'AM-1', number: 1, revision: 'a'.repeat(40) }
 
-  it("an install's command line (a token in it) stays in Hive: the Agent API's public run and its event give no part of it", async () => {
+  it("an install's command line (a token in it) stays in Combwork: the Agent API's public run and its event give no part of it", async () => {
     const store = new ProgressStore({ now: () => Date.now(), changed: () => undefined, ownerRunning: () => false })
     const ws = tempDir('qc-ws-')
     const project = join(ws, 'app')
     const r = queueChecks({ env: base, runs: progressRuns(store, () => true, ws, project), logDir: tempDir('qc-logs-'), timeoutMs: () => 60_000, setupCommand: () => 'echo fake-token-review-1349' })
     expect(await r.install(tempDir('qc-folder-'), true, ctx)).toMatchObject({ ok: true })
     const [run] = store.list(ws)
-    expect(run).toMatchObject({ source: 'hive', titleFromCommand: true, installAsWritten: true, state: 'passed' })
+    expect(run).toMatchObject({ source: 'combwork', titleFromCommand: true, installAsWritten: true, state: 'passed' })
     expect(run.title).toContain('fake-token-review-1349')
     const pub = publicRun(run)
-    expect(pub).toMatchObject({ titleFromCommand: true, source: 'hive' })
+    expect(pub).toMatchObject({ titleFromCommand: true, source: 'combwork' })
     expect(JSON.stringify(pub)).not.toContain('fake-token')
     // A check's title is its name, which the project gave it: kept.
     await r.runCheck('lint', 'echo ok', tempDir('qc-folder-'), ctx)
@@ -375,7 +375,7 @@ describe("the runner's own runs, outside the queue", () => {
   it("a full disk on the startup failure's own line (a program not found) still finishes the run, transient, the file closed", async () => {
     const io = fullDisk()
     const r = runner({ logIo: io })
-    const out = await r.runCheck('check', 'hive-no-such-command-1349', tempDir('qc-folder-'), ctx)
+    const out = await r.runCheck('check', 'cw-no-such-command-1349', tempDir('qc-folder-'), ctx)
     expect(out).toMatchObject({ ok: false, transient: true })
     expect(r.finished).toEqual([{ id: 'run1', ok: false, exitCode: null, logPath: null, transient: { cause: 'notFound' } }])
     expect(io.closed).toBe(1)
@@ -445,27 +445,30 @@ describe('the install from scratch with real npm (offline, a local tarball)', ()
   })
 })
 
-describe('merge checks as Hive\'s runs (temporary repositories)', () => {
-  it('a green check runs in the queue\'s folder as "Hive (merge queue)" for the result revision, counted; the target advances', async () => {
+describe('merge checks as Combwork\'s runs (temporary repositories)', () => {
+  it('a green check runs in the queue\'s folder as "Combwork (merge queue)" for the result revision, counted; the target advances', async () => {
     const out = join(tempDir('qc-env-'), 'env.json')
     const e = team({}, script(`require('fs').writeFileSync(${JSON.stringify(out)}, JSON.stringify({ env: process.env, cwd: process.cwd() }))`))
     const r = runner()
     const { card } = await queued(e)
     const q = e.queue({ runCheck: r.runCheck, install: r.install, manifests: [] })
+    const target = mainHead(e)
     const [o] = await q.drain('main')
     expect(o).toMatchObject({ outcome: 'integrated' })
     const result = mainHead(e)
-    // What the check saw: the queue's folder, and no HIVE_* or ELECTRON_RUN_AS_NODE.
+    // What the check saw: the queue's folder, no session's CW_* or ELECTRON_RUN_AS_NODE, and the target's head it was
+    // tested on, CW_CHECK_BASE (HI-2617).
     const seen = JSON.parse(readFileSync(out, 'utf8')) as { env: Record<string, string>; cwd: string }
     expect(seen.cwd.toLowerCase()).toBe(join(e.home, 'queue').toLowerCase())
-    expect(Object.keys(seen.env).filter((k) => /^hive_|^electron_run_as_node$/i.test(k))).toEqual([])
+    expect(Object.keys(seen.env).filter((k) => /^cw_|^electron_run_as_node$/i.test(k))).toEqual(['CW_CHECK_BASE'])
+    expect(seen.env.CW_CHECK_BASE).toBe(target)
     // Its run, and its CheckRan at the result revision, counted.
     expect(r.started[0]).toMatchObject({ title: `${card.key} · check · ${result.slice(0, 7)}`, card: card.id, revision: result })
     expect(r.finished[0]).toMatchObject({ ok: true, exitCode: 0 })
     expect(readFileSync(r.finished[0].logPath!, 'utf8')).toBe('')
     expect(r.counted[0].c).toEqual({ name: 'check', counted: true })
     const ran = e.wf.state(card).checks.at(-1)!
-    expect(ran).toMatchObject({ name: 'check', revision: result, tested: result, result: 'passed', by: HIVE_RUNS, counted: true, run: 'run1' })
+    expect(ran).toMatchObject({ name: 'check', revision: result, tested: result, result: 'passed', by: CW_RUNS, counted: true, run: 'run1' })
     // Nothing installed (no setup command, no lock file): said once, on that check's run.
     expect(r.started[0].noInstall).toBe(true)
   })
@@ -515,7 +518,7 @@ describe('merge checks as Hive\'s runs (temporary repositories)', () => {
   })
 
   it("transient: a command the shell can't find returns the card marked transient; the builder sends the same revision straight back", async () => {
-    const e = team({}, 'hive-no-such-command-1349')
+    const e = team({}, 'cw-no-such-command-1349')
     const { card } = await queued(e)
     const [o] = await e.queue({ runCheck: runner().runCheck, manifests: [] }).drain('main')
     expect(o).toMatchObject({ outcome: 'returned', reason: 'checks', transient: true })
@@ -579,7 +582,7 @@ describe('installing from scratch before the merge checks (S13, #187)', () => {
     expect(await installs('always', [null, null])).toEqual([1, 2])
   })
 
-  it("the install is one of Hive's runs, the setup command with its clean state; it fails → the card returns", async () => {
+  it("the install is one of Combwork's runs, the setup command with its clean state; it fails → the card returns", async () => {
     const e = team()
     const r = runner({ setupCommand: () => script("console.error('npm ERR! missing script'); process.exit(1)") })
     const { card } = await queued(e)

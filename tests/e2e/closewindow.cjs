@@ -1,6 +1,6 @@
 // File → Close Window and File → Exit with one window and with several. Close Window (menu, palette, Ctrl+Shift+W)
 // does what the window's X does: on the last window it quits (asking first), with several it closes that window,
-// asking about its workspace's agents only. With several windows Exit reads "Exit Hive (all windows)", its dialog
+// asking about its workspace's agents only. With several windows Exit reads "Exit Combwork (all windows)", its dialog
 // says it closes them all and lists the agents by workspace, and "Close this window only" closes just that window
 // (its agents stop, the other window's keep running). With busy agents that dialog keeps every control inside it, at
 // 100% and 125%; from the unsaved-files question that comes first, Close this window only still asks about that
@@ -29,7 +29,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
 
 ;(async () => {
   for (const d of [userData, wsA, wsB, path.dirname(wsDup1), path.dirname(wsDup2), claudeHome]) fs.rmSync(d, { recursive: true, force: true })
@@ -47,7 +47,7 @@ const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.hive.invo
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'always', closeToTray: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const { app, page: p1, inv: inv1 } = await lib.launch({ userData, env: { HIVE_API_PORT: lib.port(47915), CLAUDE_CONFIG_DIR: claudeHome } })
+  const { app, page: p1, inv: inv1 } = await lib.launch({ userData, env: { CW_API_PORT: lib.port(47915), CLAUDE_CONFIG_DIR: claudeHome } })
   app.on('window', (p) => p.on('pageerror', (e) => check('no page errors', false, e.message)))
   p1.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.openWorkspace(inv1, p1, wsA)

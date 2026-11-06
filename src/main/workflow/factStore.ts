@@ -1,14 +1,14 @@
 // The fact log's store (SPEC §16.4.1, §16.4.5): facts, the card's stage cache and the durable actions they cause, written
 // in one transaction, so a fact and the move it caused can't diverge and nothing outside happens for a write that
-// rolled back. Observed facts carry a dedupe key, unique per card and kind, so two Hives observing one workspace write
+// rolled back. Observed facts carry a dedupe key, unique per card and kind, so two Combworks observing one workspace write
 // each transition once (§16.17).
 //
-// In the workspace's hive.db since #1215 (Darren, #1118: "the fact store replaced by hive.db tables written inside
+// In the workspace's combwork.db since #1215 (Darren, #1118: "the fact store replaced by combwork.db tables written inside
 // boardWrite"): the 1.0 group's facts step makes its tables (schema/v1_0.ts), and a card is the board's own row. A store
 // is one project's: its cards, its lanes, its queue's pauses and its values. It reaches the database one of two ways
 // (HR4's #1215 round 1): on the board's (`forBoard`), its writes are part of the caller's boardWrite only, through the
 // board's own guarded write path, and its reads are the board's, on one snapshot; on a connection of its own (`open`:
-// another Hive, a restart, the runtime's tests), its writes are its own transactions and its reads one snapshot each.
+// another Combwork, a restart, the runtime's tests), its writes are its own transactions and its reads one snapshot each.
 
 import { AsyncLocalStorage } from 'async_hooks'
 import type { DatabaseSync } from 'node:sqlite'
@@ -78,11 +78,11 @@ export interface QueuePause {
   reason: string
   card: string
   files?: string[]
-  /** A process Hive couldn't end (a dead runner's, at a takeover: #1360). */
+  /** A process Combwork couldn't end (a dead runner's, at a takeover: #1360). */
   pid?: number
   /** What git (or a signer) said, for a pause it caused (#1350): its message, in its own words. */
   message?: string
-  /** Who paused it (#1353: Pause queue); left out, Hive (its reason says why). */
+  /** Who paused it (#1353: Pause queue); left out, Combwork (its reason says why). */
   by?: 'user' | 'assistant'
   /** When (ISO), as the store saved it; left out of a pause written, the store's time then. */
   at?: string
@@ -213,7 +213,7 @@ const lostTx = (): Error => new Error("The fact store's write was undone part wa
 
 /**
  * A connection of the store's own (nothing else uses it): a write is a transaction of its own (BEGIN IMMEDIATE: another
- * Hive's write waits for it), and what the store does inside it (synchronously: nothing else runs meanwhile) is part of
+ * Combwork's write waits for it), and what the store does inside it (synchronously: nothing else runs meanwhile) is part of
  * it; a read outside one is a read transaction of its own, one snapshot.
  */
 class OwnConn implements Conn {
@@ -309,9 +309,9 @@ export class FactStore {
     return new FactStore(boardConn(ws), scope)
   }
 
-  /** A store on a connection of its own to a workspace database's file, opened as the board opens it (another Hive on it; a restart). */
+  /** A store on a connection of its own to a workspace database's file, opened as the board opens it (another Combwork on it; a restart). */
   static open(file: string, scope: Scope): FactStore {
-    return new FactStore(new OwnConn(openDb(file, { migrations: BOARD_MIGRATIONS, hiveVersion: 'workflow' }), true), scope)
+    return new FactStore(new OwnConn(openDb(file, { migrations: BOARD_MIGRATIONS, appVersion: 'workflow' }), true), scope)
   }
 
   /** Closes the connection the store opened; once. */
@@ -384,7 +384,7 @@ export class FactStore {
   /**
    * A card of this project by its key (`HI-12`, any case; an old key of its project's too, and a card's name in a project
    * it left: #1219's resolver), its old number (`#1061`), or the name keys had before (`<name>-<old number>`, the scope's
-   * name, which may hold hyphens: Hive-Card trailers written before #1294 say it), or null.
+   * name, which may hold hyphens: card trailers written before #1294 said it), or null.
    * A prefix any project holds or held as a key is a key, never that name form (HR5's #1294 round 1): a key no card has
    * here, or another project's card, is null, not the card with that number on the board. So where a project's name is
    * one of its keys, a name-form trailer finds only a card from before 1.0 (which kept its number in its project, #1219).
@@ -445,7 +445,7 @@ export class FactStore {
     return this.conn.write((db) => {
       const n = takeNumberIn(db)
       const at = this.now().toISOString()
-      const doc = { number: n, title: c.title, description: '', project: this.scope.project, agent: null, column: STAGE_CATEGORY[stage], order: n, labels: c.labels, blocked: null, blockedBy: c.blockedBy, links: [], comments: [], history: [], archived: false, createdAt: at, createdBy: 'Hive', updatedAt: at }
+      const doc = { number: n, title: c.title, description: '', project: this.scope.project, agent: null, column: STAGE_CATEGORY[stage], order: n, labels: c.labels, blocked: null, blockedBy: c.blockedBy, links: [], comments: [], history: [], archived: false, createdAt: at, createdBy: 'Combwork', updatedAt: at }
       writeCardRows(db, decomposeCard(n, doc))
       db.prepare('UPDATE cards SET stage = ?, kind = ?, pre_workflow = ? WHERE number = ?').run(stage, c.kind, c.preWorkflow ? 1 : 0, n)
       setColumns(db, n, c)
@@ -465,7 +465,7 @@ export class FactStore {
     })
   }
 
-  /** None: the paths Hive saw a card's agents edit (its pre-fill, §16.3.3), in the order seen. */
+  /** None: the paths Combwork saw a card's agents edit (its pre-fill, §16.3.3), in the order seen. */
   prefill(id: number): string[] {
     return this.conn.read((db) => (db.prepare("SELECT path FROM card_paths WHERE card = ? AND kind = 'prefill' ORDER BY ord").all(id) as { path: string }[]).map((r) => r.path))
   }
@@ -604,7 +604,7 @@ export class FactStore {
 
   /**
    * The runtime starts a lane of this project (tests/workflow until #1270 wires the app's): lanes.ts's lane of that id,
-   * its cards and reviewer (if given) set, or a new one by Hive when there is none; with the ruleset in force now.
+   * its cards and reviewer (if given) set, or a new one by Combwork when there is none; with the ruleset in force now.
    */
   startLane(id: string, cards: number[], ruleset: string, reviewer?: string, rounds = LOOP_ROUNDS): LaneList {
     this.conn.write((db) => {
@@ -614,7 +614,7 @@ export class FactStore {
       if (!had) {
         const ord = (db.prepare('SELECT COALESCE(MAX(ord), -1) + 1 AS n FROM lanes').get() as { n: number }).n
         db.prepare(
-          "INSERT INTO lanes (id, ord, project, builder_id, builder_name, reviewer_id, reviewer_name, rounds, wait_minutes, state, started_by, started_at, updated_at) VALUES (?, ?, ?, 'hive', 'Hive', ?, ?, ?, ?, 'active', 'Hive', ?, ?)"
+          "INSERT INTO lanes (id, ord, project, builder_id, builder_name, reviewer_id, reviewer_name, rounds, wait_minutes, state, started_by, started_at, updated_at) VALUES (?, ?, ?, 'combwork', 'Combwork', ?, ?, ?, ?, 'active', 'Combwork', ?, ?)"
         ).run(id, ord, this.scope.project, reviewer ?? null, reviewer ?? null, rounds, LOOP_WAIT_HOURS * 60, at, at)
       } else if (reviewer) db.prepare('UPDATE lanes SET reviewer_id = ?, reviewer_name = ?, updated_at = ? WHERE id = ?').run(reviewer, reviewer, at, id)
       writeLane(db, newLane(id, cards, ruleset), at)
@@ -672,7 +672,7 @@ export class FactStore {
 
   /**
    * Pauses a target's queue (`pause`), or resumes it (null). `keep`: only when it isn't paused already, decided in the same
-   * write (HR4's #1351 round 1: Hive's pause never replaces one saved meanwhile, the user's Pause queue say); whether it
+   * write (HR4's #1351 round 1: Combwork's pause never replaces one saved meanwhile, the user's Pause queue say); whether it
    * was written.
    */
   setQueuePause(target: string, pause: QueuePause | null, keep = false): boolean {

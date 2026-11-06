@@ -1,7 +1,7 @@
 // Screenshot cases for the `providers` area (#797): the provider adapters' user text, reached for the i18nshots route
 // (tests/e2e/i18nshots.cjs has the case format) with locale-independent means only: IPC, command ids and structural
 // hooks, never English text. Codex and GitHub Copilot are turned on for these screens (and off again after): their CLIs
-// are looked for with the test copy's empty homes (lib.cjs gives every test Hive its own), so Provider Setup shows their
+// are looked for with the test copy's empty homes (lib.cjs gives every test Combwork its own), so Provider Setup shows their
 // readiness (not installed, or not signed in, or the sandbox to set up), whatever this machine has.
 const fs = require('fs')
 const path = require('path')
@@ -26,7 +26,7 @@ async function agentSetup(ctx) {
 }
 
 /**
- * Provider Setup on a provider's tab, as its command opens it with the provider's id; `n` is the tab's place in Hive's
+ * Provider Setup on a provider's tab, as its command opens it with the provider's id; `n` is the tab's place in Combwork's
  * order (Claude Code, Codex, GitHub Copilot), checked selected.
  */
 async function setupTab(ctx, id, n) {
@@ -92,7 +92,7 @@ async function closeStray(ctx) {
 
 /**
  * A start refused at its launch (#842): alpha's Claude Code agents get a --settings with no value, so the window's New
- * Session fails with main's HiveError, in the run's language.
+ * Session fails with main's CombworkError, in the run's language.
  */
 async function launchRefused(ctx) {
   const { inv, page } = ctx

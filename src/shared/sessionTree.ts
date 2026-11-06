@@ -7,7 +7,7 @@ import { removedAgentName } from './sessionOrigin'
  * The Sessions tab's tree: provider → agent → session → the sub-sessions it started (Codex's guardian reviews, other
  * sub-agents), newest first. Sessions without an agent go under "Not from an agent"; a removed agent's sessions keep
  * its name, marked removed. A sub-session whose parent isn't listed is an orphan: it stays under its own agent,
- * marked. The Hive Assistant's conversations skip the agent level (it has one).
+ * marked. The Combwork Assistant's conversations skip the agent level (it has one).
  */
 
 export interface SessionNode {
@@ -46,8 +46,8 @@ export interface SessionTreeOptions {
   match?: ((s: SessionListItem) => boolean) | null
 }
 
-/** The group of sessions no agent ran (adopted, or from before Hive recorded agents), as the Sessions tab names it. */
-export const notFromAgent = (): string => tr(msg({ id: 'sessions.tree.notFromAgent', defaultMessage: 'Not from an agent', description: "A group in the Sessions tab's list: sessions no agent ran (adopted, or from before Hive recorded agents)." }))
+/** The group of sessions no agent ran (adopted, or from before Combwork recorded agents), as the Sessions tab names it. */
+export const notFromAgent = (): string => tr(msg({ id: 'sessions.tree.notFromAgent', defaultMessage: 'Not from an agent', description: "A group in the Sessions tab's list: sessions no agent ran (adopted, or from before Combwork recorded agents)." }))
 
 const providerKey = (p: ProviderId): string => `p:${p}`
 export const sessionKey = (id: string): string => `s:${id}`
@@ -92,7 +92,7 @@ export function buildSessionTree(items: readonly SessionListItem[], opts: Sessio
 
   const providers = new Map<ProviderId, SessionNode[]>()
   for (const r of roots) providers.set(r.item.provider, [...(providers.get(r.item.provider) ?? []), r])
-  // In Hive's order (HI-2139), a provider this Hive doesn't know last.
+  // In Combwork's order (HI-2139), a provider this Combwork doesn't know last.
   const order = (p: ProviderId): number => {
     const i = PROVIDERS.findIndex((d) => d.id === p)
     return i < 0 ? PROVIDERS.length : i

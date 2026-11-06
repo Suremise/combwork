@@ -13,7 +13,7 @@
 // project, the agents migrated (#1434's contract then stops reading their 0.9 worktrees). An agent not migrated yet (its
 // worktree missing at the upgrade, or made since: 1.0 can still give an agent its own worktree) keeps working in its
 // worktree as in 0.9, Repair and Recreate included, and is migrated at a later opening once its worktree is there. Safe
-// to repeat and to run in two Hives at once: each agent's adoption, with its record, is one board write, decided again
+// to repeat and to run in two Combworks at once: each agent's adoption, with its record, is one board write, decided again
 // in it (the partial unique indexes refuse a second carried lease for an agent or a second open lease on a slot).
 // One-way: nothing restores what 0.9.3 had once slots have moved on (the upgrade's ask says so).
 
@@ -119,11 +119,11 @@ function adoptedName(store: SlotStore, folder: string): string {
 /**
  * A workspace's migration (#1441), one at a time per workspace: in each project of a 1.0 board, the agents not migrated
  * yet have their worktrees adopted. A failure leaves those agents as they were, for the next opening. Test copies (unpackaged) with
- * `HIVE_TEST_SLOT_MIGRATION=off` skip it, so a suite can run a workspace as 0.9 left it before its upgrade (slotupgrade).
+ * `CW_TEST_SLOT_MIGRATION=off` skip it, so a suite can run a workspace as 0.9 left it before its upgrade (slotupgrade).
  */
 export function migrateSlots(ws: WorkspaceService): Promise<void> {
   const path = ws.path
-  if (!path || (!app.isPackaged && process.env.HIVE_TEST_SLOT_MIGRATION === 'off')) return Promise.resolve()
+  if (!path || (!app.isPackaged && process.env.CW_TEST_SLOT_MIGRATION === 'off')) return Promise.resolve()
   return coalesced(`slot-migration:${path.toLowerCase()}`, async () => {
     try {
       if (upgradeWaiting(path) || boardValue(ws, ADOPTION_UPTO) === null) return
@@ -188,7 +188,7 @@ async function migrateProject(ws: WorkspaceService, projectPath: string, name: s
     const kept: KeptFor = lane ? { lane: lane.id } : card !== null ? { card } : null
     const slotName = adoptedName(store, w.path)
     const lease = await store.conn.write((db) => {
-      // Adopted already (a rerun, another Hive): recorded, nothing more.
+      // Adopted already (a rerun, another Combwork): recorded, nothing more.
       if (db.prepare("SELECT 1 FROM slot_leases WHERE project = ? AND agent = ? AND kind = 'carried' AND ended_at IS NULL").get(id, a.id)) { // i18n-ignore: SQL
         markIn(db, id, [a.id])
         return null

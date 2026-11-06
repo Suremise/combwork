@@ -6,7 +6,7 @@ import type { LiveSessionState, ProjectInfo, SessionStatus } from '../shared/typ
 import { appName } from '../shared/appName'
 import { msg, onLanguageChange, tr, type Msg } from '../shared/i18n'
 import { knownStatus } from './branchWatch'
-import { emitTo, onHiveEvent } from './events'
+import { emitTo, onCombworkEvent } from './events'
 import { resourcesDir } from './paths'
 import { presentWindow } from './testQuiet'
 import { sessions } from './sessions'
@@ -86,12 +86,12 @@ export function createTray(getWindow: () => BrowserWindow | null, actions: TrayA
     attention = needYou > 0
     tray.setImage(icon(attention ? 'tray-attention' : 'tray'))
     const working = live.filter((s) => s.status === 'working' || s.status === 'background').length
-    // Hive's name and its workspaces, then (each a line) what its agents do and whether it waits to quit.
+    // Combwork's name and its workspaces, then (each a line) what its agents do and whether it waits to quit.
     tray.setToolTip(
       [
         `${appName(app.isPackaged)}${open.length ? ` — ${open.map((w) => basename(w.path!)).join(', ')}` : ''}`,
         live.length ? tr(msg({ id: 'main.tray.counts', defaultMessage: '{working} working, {needYou, plural, one {# needs you} other {# need you}}', description: "A line of the tray icon's tooltip: how many agents are working and how many need you." }), { working, needYou }) : '',
-        pendingQuit ? tr(msg({ id: 'main.tray.willQuit', defaultMessage: 'Will quit when agents finish', description: "A line of the tray icon's tooltip while Hive waits for agents to finish before quitting." })) : ''
+        pendingQuit ? tr(msg({ id: 'main.tray.willQuit', defaultMessage: 'Will quit when agents finish', description: "A line of the tray icon's tooltip while Combwork waits for agents to finish before quitting." })) : ''
       ]
         .filter(Boolean)
         .join('\n')
@@ -135,7 +135,7 @@ export function createTray(getWindow: () => BrowserWindow | null, actions: TrayA
     if (!projectItems.length) projectItems.push({ label: tr(msg({ id: 'main.tray.noProjects', defaultMessage: 'No active projects', description: 'The tray menu when no project is active.' })), enabled: false })
     tray.setContextMenu(
       Menu.buildFromTemplate([
-        { label: tr(msg({ id: 'main.tray.show', defaultMessage: 'Show Combwork', description: "The tray menu: brings Hive's window up." })), click: () => { const w = getWindow(); if (w) showWindow(w) } },
+        { label: tr(msg({ id: 'main.tray.show', defaultMessage: 'Show Combwork', description: "The tray menu: brings Combwork's window up." })), click: () => { const w = getWindow(); if (w) showWindow(w) } },
         { type: 'separator' },
         ...inboxSection(tr(msg({ id: 'main.tray.needYou', defaultMessage: 'Need you', description: 'A section of the tray menu: agents waiting for you.' })), (b) => b.needYou),
         // Finished since you last looked (#1632): apart from what needs you, and not counted with it.
@@ -148,11 +148,11 @@ export function createTray(getWindow: () => BrowserWindow | null, actions: TrayA
         ...(updateState().status === 'ready' ? [{ label: tr(msg({ id: 'main.tray.restartToUpdate', defaultMessage: 'Restart to Update ({version})', description: 'The tray menu when an update is downloaded. {version} is its version.' }), { version: updateState().version ?? '' }), click: () => restartAndInstall() }] : []),
         ...(pendingQuit
           ? [
-              { label: tr(msg({ id: 'main.tray.quitting', defaultMessage: '{n, plural, one {Quitting when the agent finishes} other {Quitting when # agents finish}}', description: 'The tray menu while Hive waits for working agents to finish before quitting.' }), { n: working }), enabled: false },
+              { label: tr(msg({ id: 'main.tray.quitting', defaultMessage: '{n, plural, one {Quitting when the agent finishes} other {Quitting when # agents finish}}', description: 'The tray menu while Combwork waits for working agents to finish before quitting.' }), { n: working }), enabled: false },
               { label: tr(msg({ id: 'main.tray.quitNow', defaultMessage: 'Quit Now', description: 'The tray menu: quits without waiting for the agents.' })), click: actions.quitNow },
-              { label: tr(msg({ id: 'main.tray.cancelQuit', defaultMessage: 'Cancel Pending Quit', description: 'The tray menu: Hive no longer quits when the agents finish.' })), click: actions.cancelPendingQuit }
+              { label: tr(msg({ id: 'main.tray.cancelQuit', defaultMessage: 'Cancel Pending Quit', description: 'The tray menu: Combwork no longer quits when the agents finish.' })), click: actions.cancelPendingQuit }
             ]
-          : [{ label: tr(msg({ id: 'main.tray.quit', defaultMessage: 'Quit Combwork', description: 'The tray menu: quits Hive.' })), click: actions.quit }])
+          : [{ label: tr(msg({ id: 'main.tray.quit', defaultMessage: 'Quit Combwork', description: 'The tray menu: quits Combwork.' })), click: actions.quit }])
       ])
     )
   }
@@ -165,7 +165,7 @@ export function createTray(getWindow: () => BrowserWindow | null, actions: TrayA
   })
   // A working agent's status changes many times a minute (its cost with every status line): rebuild at most every 500 ms.
   let pending: NodeJS.Timeout | null = null
-  onHiveEvent((e) => {
+  onCombworkEvent((e) => {
     if (e.type !== 'session-status' && e.type !== 'session-exit' && e.type !== 'workspace-changed' && e.type !== 'update-state' && e.type !== 'branch-status') return
     pending ??= setTimeout(() => {
       pending = null

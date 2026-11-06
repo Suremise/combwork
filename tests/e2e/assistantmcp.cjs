@@ -1,8 +1,8 @@
-// The Hive Assistant's MCP servers (HI-1472, HI-2059), in the window: a workspace from #1093's switches (notes and
+// The Combwork Assistant's MCP servers (HI-1472, HI-2059), in the window: a workspace from #1093's switches (notes and
 // sandbox on in the workspace, extra off; demo has sandbox on and extra remembered while off; other has notes on) opens
 // converted to added servers: demo has sandbox only, other notes, the Assistant none, and the dropped choice is said
 // once. Settings → Assistant links to the Assistant's view, whose MCP Servers section adds one with the picker (search,
-// what it runs, then Add) and removes it. The MCP view says where each is added; Add to… lists the Hive Assistant after
+// what it runs, then Add) and removes it. The MCP view says where each is added; Add to… lists the Combwork Assistant after
 // the projects. The Assistant's launch (the fake Claude Code's --mcp-config) has notes and not sandbox; demo's agent
 // sandbox and not notes. GET /v1/mcp says where each is added for the workspace's token, and only its own project's for
 // an agent's (demo's and other's, each its own); a project's status says `added`. Removing it tells the running
@@ -43,7 +43,7 @@ const check = (name, ok, extra = '') => {
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  const { app, page, inv } = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT) } })
+  const { app, page, inv } = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT) } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)
@@ -98,11 +98,11 @@ const check = (name, ok, extra = '') => {
     check("…and listed in the Assistant's view", !!(await lib.until(async () => (await section.locator('.row[data-mcp="notes"]').count()) === 1, HUNG_MS)))
     await shots('view')
 
-    // --- The MCP view says where each is added; Add to… lists the Hive Assistant last.
+    // --- The MCP view says where each is added; Add to… lists the Combwork Assistant last.
     await page.keyboard.press('Control+Shift+M')
     const row = (name) => page.locator('.pane-body .row', { has: page.locator('.label', { hasText: new RegExp(`^${name}\\s*$`) }) })
     const where = (name) => row(name).locator('.mcp-where').innerText().catch(() => '')
-    check('notes: added in other and for the Hive Assistant', !!(await lib.until(async () => (await where('notes')) === 'Added in other and for the Assistant', HUNG_MS)), await where('notes'))
+    check('notes: added in other and for the Combwork Assistant', !!(await lib.until(async () => (await where('notes')) === 'Added in other and for the Assistant', HUNG_MS)), await where('notes'))
     check('sandbox: added in demo', (await where('sandbox')) === 'Added in demo', await where('sandbox'))
     check('extra: not added anywhere, and no switch in the list', (await where('extra')) === 'Not added anywhere' && (await row('extra').getByRole('switch').count()) === 0, await where('extra'))
     await shots('mcp-view')
@@ -111,7 +111,7 @@ const check = (name, ok, extra = '') => {
     const places = page.getByRole('dialog', { name: 'Add extra to…' })
     const group = places.getByRole('group', { name: 'Projects to add it to' })
     const box = (name) => group.getByRole('checkbox', { name, exact: true })
-    check("extra's Add to… lists the Hive Assistant after the projects, unticked", !!(await lib.until(async () => (await box('Assistant').count()) === 1, HUNG_MS)) && !(await box('Assistant').isChecked()) && (await group.locator('label').last().getAttribute('data-assistant')) !== null)
+    check("extra's Add to… lists the Combwork Assistant after the projects, unticked", !!(await lib.until(async () => (await box('Assistant').count()) === 1, HUNG_MS)) && !(await box('Assistant').isChecked()) && (await group.locator('label').last().getAttribute('data-assistant')) !== null)
     check('…and what it runs', (await places.innerText()).includes('Runs: node extra.js'))
     await shots('add-to')
     // All projects and No projects: the Assistant only ever by its own box.
@@ -123,7 +123,7 @@ const check = (name, ok, extra = '') => {
     await places.getByRole('button', { name: 'Cancel' }).click()
     check('…cancelled, nothing changes', !!(await lib.until(async () => (await places.count()) === 0, HUNG_MS)) && JSON.stringify(wsMcp().assistant) === '["notes"]' && projectMcp(proj).enabled.join() === 'sandbox')
 
-    // --- Each launch has only its own servers, the hive server in both.
+    // --- Each launch has only its own servers, the combwork server in both.
     const assistantHome = (await inv('workspace:refresh')).assistant.path
     const agent = await lib.addAgent(inv, proj, { name: 'Builder' })
     const otherAgent = await lib.addAgent(inv, other, { name: 'Writer' })
@@ -136,16 +136,16 @@ const check = (name, ok, extra = '') => {
       for (const l of lines.map((x) => JSON.parse(x)).reverse()) {
         const f = l.opts?.['--mcp-config']
         const servers = f && fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')).mcpServers : null
-        if (agentId === 'assistant' ? l.cwd?.toLowerCase() === ws.toLowerCase() : servers?.combwork?.env?.HIVE_AGENT_ID === agentId) return servers
+        if (agentId === 'assistant' ? l.cwd?.toLowerCase() === ws.toLowerCase() : servers?.combwork?.env?.CW_AGENT_ID === agentId) return servers
       }
       return null
     }
     const a = await lib.until(() => launched('assistant'), 30000)
     const b = await lib.until(() => launched(agent.id), 30000)
     const c = await lib.until(() => launched(otherAgent.id), 30000)
-    check("the Assistant's launch has notes and the hive server, not sandbox", !!a?.notes && !!a?.combwork && !a?.sandbox && !a?.extra, JSON.stringify(Object.keys(a ?? {})))
-    check("demo's agent has sandbox and the hive server, not notes or extra", !!b?.sandbox && !!b?.combwork && !b?.notes && !b?.extra, JSON.stringify(Object.keys(b ?? {})))
-    check("…without Hive's own fields (its tags)", !('tags' in (c?.notes ?? { tags: 1 })) && !('description' in (c?.notes ?? {})), JSON.stringify(c?.notes))
+    check("the Assistant's launch has notes and Combwork's server, not sandbox", !!a?.notes && !!a?.combwork && !a?.sandbox && !a?.extra, JSON.stringify(Object.keys(a ?? {})))
+    check("demo's agent has sandbox and Combwork's server, not notes or extra", !!b?.sandbox && !!b?.combwork && !b?.notes && !b?.extra, JSON.stringify(Object.keys(b ?? {})))
+    check("…without Combwork's own fields (its tags)", !('tags' in (c?.notes ?? { tags: 1 })) && !('description' in (c?.notes ?? {})), JSON.stringify(c?.notes))
 
     // --- The Agent API: where each is added for the workspace's token; only its own project's for an agent's.
     const of = (body, n) => body?.find((m) => m.name === n)

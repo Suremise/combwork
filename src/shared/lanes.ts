@@ -1,5 +1,5 @@
 import { currentCard, idleKey, laneCardState } from './laneBar'
-import type { LaneCard, LaneInfo, LaneSlotInfo, LaneState, LaneStatus, LaneWaitReason, TaskCard } from './types'
+import type { DueDeps, LaneCard, LaneInfo, LaneSlotInfo, LaneState, LaneStatus, LaneWaitReason, TaskCard } from './types'
 import type { StageId } from './workflow/facts'
 import { cardRef } from './projectKeys'
 import { unsubmittedText, type UnsubmittedCard } from './unsubmitted'
@@ -8,9 +8,9 @@ import { agentMsg, say, type AgentMsg } from './agentText'
 /**
  * Lanes (#483): a builder and a reviewer taking a project's cards in order, as the card-loop skill registers them. What
  * a lane is made of, how it reads against the board now (its cards, the current one, paused or not), which lanes are
- * listed, and how a hive tool says so. Pure, so the service, the Agent API and tests share it.
+ * listed, and how a Combwork tool says so. Pure, so the service, the Agent API and tests share it.
  *
- * A lane is bookkeeping, never a gate: a loop runs the same without one (an older Hive, a failed registration), and a
+ * A lane is bookkeeping, never a gate: a loop runs the same without one (an older version, a failed registration), and a
  * solo agent working a card has none.
  */
 
@@ -24,7 +24,7 @@ export interface LaneAgent {
 /**
  * A lane agent's new conversation owed (HI-2034, LaneRecord `freshStart`). `id`: this obligation (a retry is a new one).
  * `oldSession`: the conversation it must leave (its session id when deferred; null when unknown). `launching`: when a
- * launch of it began (set under the lock just before it): one still set when Hive looks again (a crash in between) is
+ * launch of it began (set under the lock just before it): one still set when Combwork looks again (a crash in between) is
  * never launched again by itself, only proven done by a new conversation of the agent since then, else blocked as
  * `uncertain`. `blocked`: no more automatic tries (`timeout`: not free within the wait; `uncertain`; `failed`, with why)
  * until the user retries it.
@@ -83,7 +83,7 @@ export interface LaneRecord {
    */
   frozen?: LaneCard[]
   /**
-   * Hive owns the lane (#1270, SPEC §16.11): the ruleset in force when it started (its cards, Todo ones too, use it until
+   * Combwork owns the lane (#1270, SPEC §16.11): the ruleset in force when it started (its cards, Todo ones too, use it until
    * it ends), a list change made while a card was in flight (applied at the next card boundary), and the runtime's card
    * in flight. Each only when set; kept in `lane_runs` and `lane_pending`.
    */
@@ -99,7 +99,7 @@ export interface LaneRecord {
   /**
    * The lane's agents still owed their new conversation (HI-2034): its start found one in a turn or with a prompt it
    * hadn't taken yet, so it is launched once free (laneStarts.ts' pass), within `cw.lanes.freshStartWaitMinutes`.
-   * Kept with the lane (its row's `extra`), changed only under the lanes' lock. While its builder's is here, Hive gives
+   * Kept with the lane (its row's `extra`), changed only under the lanes' lock. While its builder's is here, Combwork gives
    * the builder no card (never into the old conversation).
    */
   freshStart?: FreshStart[]
@@ -115,6 +115,21 @@ export interface LaneRecord {
    * given to the next free pooled reviewer. Kept with the lane (its row's `extra`).
    */
   pool?: true
+  /**
+   * Its due card's wait for the cards it depends on (HI-2618): an episode begins once Combwork sees that card due with one
+   * of them not Done (`waiting`, a new `id` each time), is claimed once none is open (`pending`: with the rules off, its
+   * builder is owed one readiness wake, made with a receipt in the deliveries' own transaction), and is checkpointed
+   * `sent`. Kept with the lane (its row's `extra`), changed only under the lanes' lock.
+   */
+  depEpisode?: DepEpisode
+}
+
+/** A lane's due card's dependency wait (HI-2618, LaneRecord.depEpisode). */
+export interface DepEpisode {
+  card: number
+  id: string
+  state: 'waiting' | 'pending' | 'sent'
+  at: string
 }
 
 // The limits and defaults (loopLimits.ts). A loop's rounds, wait and design check wait when its request doesn't say are
@@ -176,10 +191,10 @@ const finished = (c: LaneCard): boolean => c.column === 'passed' || c.column ===
 export const ownOpen = (c: LaneCard): boolean => c.column !== 'done' && c.column !== 'gone' && c.column !== 'unrecorded' && !c.elsewhere
 
 /**
- * A running lane's card for Hive to start on its builder (HI-1990), or null: the first of its own open cards, in Todo
+ * A running lane's card for Combwork to start on its builder (HI-1990), or null: the first of its own open cards, in Todo
  * and not blocked, in an active lane (every card before it Done or another lane's). Its first card too (HI-2029: a lane
  * started over a running builder never had it started, and read "active" for hours); a builder starting it itself, in
- * the turn it registers its lane, is never free in between, and its own start of one Hive started is that start.
+ * the turn it registers its lane, is never free in between, and its own start of one Combwork started is that start.
  */
 export function laneStartDue(lane: Pick<LaneInfo, 'state' | 'cards'>): LaneCard | null {
   if (lane.state !== 'active') return null
@@ -191,8 +206,8 @@ export function laneStartDue(lane: Pick<LaneInfo, 'state' | 'cards'>): LaneCard 
 
 /**
  * Why a lane's card due to start (laneStartDue) isn't started yet (HI-2029), as laneStarts.ts finds it: its builder in a
- * turn or starting (`busy`), waiting on a watch of other work (`watching`), a line of Hive's on its way to it (`queued`),
- * its last start failed (`failed`), Hive's start refused for now and tried again (`refused`), or a card it depends on
+ * turn or starting (`busy`), waiting on a watch of other work (`watching`), a line of Combwork's on its way to it (`queued`),
+ * its last start failed (`failed`), Combwork's start refused for now and tried again (`refused`), or a card it depends on
  * not Done yet where its rules wait for that (`dependencies`, HI-2129: `waitsFor` names it).
  */
 export type LaneStartWhy = 'busy' | 'watching' | 'queued' | 'failed' | 'refused' | 'fresh' | 'dependencies'
@@ -203,13 +218,15 @@ export interface LaneStartWait {
   agent: string
   /** `dependencies`: the card it waits for, by its key. */
   waitsFor?: string
+  /** `dependencies` (HI-2618): every card it depends on that isn't Done yet, by key, in `blockedBy` order. */
+  waitingOn?: string[]
   /** `refused` (HI-2468): the slot its start was refused as held, and what holds it (as a lane waiting for a slot says it). */
   held?: LaneSlotHeld
 }
 
 /**
  * The free slot a lane waiting for a slot was last refused as held (HI-2466), and what holds it: a session (`agent`,
- * its agent's name) or a process (a file or folder in it open). Hive tries the lend again until it is free. `broker`
+ * its agent's name) or a process (a file or folder in it open). Combwork tries the lend again until it is free. `broker`
  * (HI-2467): a process, and Windows Sandbox's broker (`broker`: its process name) was seen working in it, a Sandbox
  * running or not (`idle`; absent: not known).
  */
@@ -237,7 +254,7 @@ const heldStatus = (h: LaneSlotHeld): Pick<LaneStatus, 'slot' | 'held' | 'heldBy
 export const isFrozen = (rec: Pick<LaneRecord, 'state' | 'frozen'>): boolean => !running(rec) && !!rec.frozen
 
 /**
- * An ended lane's card with no record of where it was (#512): ended before Hive kept one, or the record didn't read back.
+ * An ended lane's card with no record of where it was (#512): ended before Combwork kept one, or the record didn't read back.
  * Only its title comes from the board; where it is now is another lane's business, never this one's history.
  */
 const unrecordedCard = (n: number, card: TaskCard | null): LaneCard => ({ number: n, title: card?.title ?? '', column: 'unrecorded', blocked: null, round: 1, reviewing: false })
@@ -250,7 +267,7 @@ const unrecordedCard = (n: number, card: TaskCard | null): LaneCard => ({ number
  * (currentCard); an ended lane without its record has none. A card held elsewhere (HI-1821: another agent's, or, given
  * to none, another lane's: `owners`, main's owner lane by card) is never its current card nor why it waits.
  */
-export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | null>, names?: ReadonlyMap<string, string>, facts?: ReadonlyMap<number, LaneCardFacts> | null, atLimit?: ReadonlySet<number>, line?: number | null, hooksOut?: ReadonlySet<string>, rulesetNow?: string | null, rulesetStages?: StageId[] | null, slot?: { slot: string | null; waiting: boolean; info?: LaneSlotInfo | null; held?: LaneSlotHeld | null } | null, owners?: ReadonlyMap<number, string | null>, startWait?: LaneStartWait | null, teamPaused = false): LaneInfo {
+export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | null>, names?: ReadonlyMap<string, string>, facts?: ReadonlyMap<number, LaneCardFacts> | null, atLimit?: ReadonlySet<number>, line?: number | null, hooksOut?: ReadonlySet<string>, rulesetNow?: string | null, rulesetStages?: StageId[] | null, slot?: { slot: string | null; waiting: boolean; info?: LaneSlotInfo | null; held?: LaneSlotHeld | null } | null, owners?: ReadonlyMap<number, string | null>, startWait?: LaneStartWait | null, teamPaused = false, dueDeps?: DueDeps | null): LaneInfo {
   const unrecorded = !running(rec) && !rec.frozen
   // A card at its round limit waits for the user's answer (§16.11.4, `atLimit`: the main side's facts): it pauses the lane.
   const live = (n: number): LaneCard => ({ ...laneCard(n, cards.get(n) ?? null, { lane: rec.id, builder: rec.builder.id, owner: owners?.get(n) }), ...(atLimit?.has(n) ? { roundLimit: true } : {}) })
@@ -272,8 +289,13 @@ export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | 
   const preparing = running(rec) && !unrecorded && slot?.info?.state === 'preparing' ? { reason: 'preparing' as const, card: current, slot: slot.info.name } : null
   // Its card due to start and not started yet (HI-2029, laneStarts.ts: `startWait`), only while that card is the current
   // one and nothing else says why the lane waits: never "active" with its card untouched and nothing said. Not a pause.
-  const waitsStart = running(rec) && !unrecorded && startWait && startWait.card === current && list.find((c) => c.number === current)?.column === 'todo' ? { reason: 'startWait' as const, card: startWait.card, why: startWait.why, agent: startWait.agent, ...(startWait.waitsFor ? { waitsFor: startWait.waitsFor } : {}), ...(startWait.why === 'refused' && startWait.held ? heldStatus(startWait.held) : {}) } : null
-  // An agent still owed its new conversation (HI-2034, `freshStart`; its builder's first): said while Hive waits for it
+  const dueTodo = list.find((c) => c.number === current)?.column === 'todo'
+  const waitsStart = running(rec) && !unrecorded && startWait && startWait.card === current && dueTodo ? { reason: 'startWait' as const, card: startWait.card, why: startWait.why, agent: startWait.agent, ...(startWait.waitsFor ? { waitsFor: startWait.waitsFor } : {}), ...(startWait.waitingOn?.length ? { waitingOn: startWait.waitingOn } : {}), ...(startWait.why === 'refused' && startWait.held ? heldStatus(startWait.held) : {}) } : null
+  // Its due card waiting for the cards it depends on (HI-2618, `dueDeps`: main's, from the board): a state said from the
+  // board itself, whatever the lane-start look last found (or with the rules off, where nothing looks), and before it.
+  const due = running(rec) && !unrecorded && dueDeps && dueDeps.card === current && dueTodo ? dueDeps : null
+  const depsWait = due && due.open.length ? { reason: 'startWait' as const, card: due.card, why: 'dependencies' as const, agent: rec.builder.name, waitsFor: due.open[0], waitingOn: due.open } : null
+  // An agent still owed its new conversation (HI-2034, `freshStart`; its builder's first): said while Combwork waits for it
   // to be free, and before anything else but its hooks and its slot once no more is tried (the user retries it or ends
   // the lane). Not a pause.
   const owed = running(rec) && !unrecorded ? (rec.freshStart?.find((f) => f.role === 'builder') ?? rec.freshStart?.[0] ?? null) : null
@@ -281,7 +303,7 @@ export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | 
   const fresh = owed ? { reason: 'startWait' as const, card: current, why: 'fresh' as const, agent: freshName, ...(owed.blocked ? { freshBlocked: owed.blocked.why, ...(owed.blocked.message ? { freshWhy: owed.blocked.message } : {}) } : {}) } : null
   // Its workspace's team paused (HI-2081, `teamPaused`: main's): before anything else, as nothing of it moves until it resumes.
   const pausedTeam = running(rec) && !unrecorded && teamPaused ? { reason: 'teamPause' as const, card: current } : null
-  const status = running(rec) ? (pausedTeam ?? hooks ?? noSlot ?? (fresh?.freshBlocked ? fresh : null) ?? found ?? (line != null ? { reason: 'lineUpdate' as const, card: line } : null) ?? fresh ?? waitsStart ?? preparing) : null
+  const status = running(rec) ? (pausedTeam ?? hooks ?? noSlot ?? (fresh?.freshBlocked ? fresh : null) ?? found ?? (line != null ? { reason: 'lineUpdate' as const, card: line } : null) ?? fresh ?? depsWait ?? waitsStart ?? preparing) : null
   // Reviewed by the pool (#1443): who gave its current card's last verdict, and who reviews it now (#1446), by name.
   const now = rec.pool && running(rec) && current !== null ? facts?.get(current) : undefined
   const agentName = (id: string): string => names?.get(id) ?? (rec.builder.id === id ? rec.builder.name : id)
@@ -310,7 +332,8 @@ export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | 
     stages: running(rec) && rec.ruleset && rulesetStages ? [...rulesetStages] : null,
     slot: running(rec) ? (slot?.slot ?? null) : null,
     slotInfo: running(rec) ? (slot?.info ?? null) : null,
-    ...(now ? { poolReview: { lastVerdict: now.lastVerdict ? { name: agentName(now.lastVerdict.reviewer), pass: now.lastVerdict.pass } : null, reviewing: now.reviewing ? agentName(now.reviewing) : null } } : {})
+    ...(now ? { poolReview: { lastVerdict: now.lastVerdict ? { name: agentName(now.lastVerdict.reviewer), pass: now.lastVerdict.pass } : null, reviewing: now.reviewing ? agentName(now.reviewing) : null } } : {}),
+    ...(due ? { dueDeps: due } : {})
   }
 }
 
@@ -404,8 +427,8 @@ export function stampWait(was: WaitStamp | undefined, status: LaneStatus | null,
 }
 
 /**
- * What the hive tools say of lanes (dialects, HI-2435): a lane's line, its state and why it waits, and the replies of
- * cw_lane. Said where the text is sent (hive-mcp.js formats these replies in its own process, with its session's
+ * What the Combwork tools say of lanes (dialects, HI-2435): a lane's line, its state and why it waits, and the replies of
+ * cw_lane. Said where the text is sent (cw-mcp.js formats these replies in its own process, with its session's
  * dialect); `{card}` is a card's key or number, `{agent}` an agent's name.
  */
 const L = {
@@ -429,20 +452,20 @@ const L = {
   hooks: agentMsg({ id: 'lane.status.hooks', text: "paused: {agent}'s hooks aren't arriving", note: "A lane pauses while its builder's or reviewer's hooks aren't arriving (#1336): nothing is typed into that agent." }),
   checkCopy: agentMsg({ id: 'lane.status.checkCopy', text: 'waiting for a check copy for {card}', note: "A lane waits for a check copy (a copy at the card's revision for its checks)." }),
   slot: agentMsg({ id: 'lane.status.slot', text: 'waiting for a slot', note: 'A lane started with no slot free waits for one to be lent to it (#1438).' }),
-  slotHeld: agentMsg({ id: 'lane.status.slotHeld', text: "waiting for {slot}: {held, select, session {{agent}'s session is still in it} broker {a process still has a file or folder in it open: Windows Sandbox's broker ({broker}) is working in it{idle, select, yes {, with no Sandbox running} no {, with a Sandbox running} other {}}} other {a process still has a file or folder in it open}}", note: "HI-2466: a lane waiting for a slot, the only free one ({slot}) held: a session of the agent {agent} still runs in it, or (other) a process holds it. broker (HI-2467): a process holds it, and Windows Sandbox's broker ({broker}: its process name, such as WindowsSandboxServer) has the slot as its current folder; idle: yes, no Sandbox runs; no, one does; other, not known. Hive tries again until it is free." }),
+  slotHeld: agentMsg({ id: 'lane.status.slotHeld', text: "waiting for {slot}: {held, select, session {{agent}'s session is still in it} broker {a process still has a file or folder in it open: Windows Sandbox's broker ({broker}) is working in it{idle, select, yes {, with no Sandbox running} no {, with a Sandbox running} other {}}} other {a process still has a file or folder in it open}}", note: "HI-2466: a lane waiting for a slot, the only free one ({slot}) held: a session of the agent {agent} still runs in it, or (other) a process holds it. broker (HI-2467): a process holds it, and Windows Sandbox's broker ({broker}: its process name, such as WindowsSandboxServer) has the slot as its current folder; idle: yes, no Sandbox runs; no, one does; other, not known. Combwork tries again until it is free." }),
   teamPause: agentMsg({ id: 'lane.status.teamPause', text: 'paused: the team is pausing', note: "The workspace's team is paused (before an update, HI-2081): nothing of a lane moves until it resumes." }),
   preparing: agentMsg({ id: 'lane.status.preparing', text: 'waiting: preparing {slot}', note: "A lane's slot is being prepared (warming, its setup or an install, #1446); {slot} is its name." }),
   freshTimeout: agentMsg({ id: 'lane.status.fresh.timeout', text: "{agent}'s new conversation didn't start (it wasn't free in time): retry it from the lane's row, or end the lane", note: "An agent owed a new conversation for its lane (HI-2034) wasn't free within the wait: no more automatic tries until the user retries it." }),
-  freshUncertain: agentMsg({ id: 'lane.status.fresh.uncertain', text: "{agent}'s new conversation didn't start (Combwork closed as it started): retry it from the lane's row, or end the lane", note: 'An agent owed a new conversation (HI-2034) was being launched when Hive closed: never launched again by itself.' }),
+  freshUncertain: agentMsg({ id: 'lane.status.fresh.uncertain', text: "{agent}'s new conversation didn't start (Combwork closed as it started): retry it from the lane's row, or end the lane", note: 'An agent owed a new conversation (HI-2034) was being launched when Combwork closed: never launched again by itself.' }),
   freshFailed: agentMsg({ id: 'lane.status.fresh.failed', text: "{agent}'s new conversation didn't start ({why}): retry it from the lane's row, or end the lane", note: "An agent's new conversation for its lane (HI-2034) failed to launch; {why} is why, as recorded." }),
   freshFailedBare: agentMsg({ id: 'lane.status.fresh.failedBare', text: "{agent}'s new conversation didn't start (its start failed): retry it from the lane's row, or end the lane", note: "An agent's new conversation for its lane (HI-2034) failed to launch, with no reason recorded." }),
-  freshWaits: agentMsg({ id: 'lane.status.fresh.waits', text: 'waiting: {agent} starts in a new conversation once it is free', note: 'An agent is owed a new conversation for its lane (HI-2034): Hive launches it once the agent is free.' }),
-  startDependencies: agentMsg({ id: 'lane.status.start.dependencies', text: '{card} waits to start: it waits for {waitsFor} to merge', note: "A lane's next card waits for a card it depends on to be merged (HI-2129); {waitsFor} is that card's key." }),
+  freshWaits: agentMsg({ id: 'lane.status.fresh.waits', text: 'waiting: {agent} starts in a new conversation once it is free', note: 'An agent is owed a new conversation for its lane (HI-2034): Combwork launches it once the agent is free.' }),
+  startDependencies: agentMsg({ id: 'lane.status.start.dependencies', text: '{card} waits to start: it waits for {waitsFor} to merge', note: "A lane's next card waits for the cards it depends on to be merged (HI-2129, HI-2618); {waitsFor} is their keys, comma-separated." }),
   startWatching: agentMsg({ id: 'lane.status.start.watching', text: '{card} waits to start: {agent} is waiting on other work', note: "A lane's next card isn't started yet (HI-2029): its builder waits on a watch of other cards." }),
-  startQueued: agentMsg({ id: 'lane.status.start.queued', text: "{card} waits to start: a line of Combwork's is on its way to {agent}", note: "A lane's next card isn't started yet (HI-2029): a line Hive types is on its way to the builder." }),
-  startFailed: agentMsg({ id: 'lane.status.start.failed', text: "{card} waits to start: {agent}'s last start failed", note: "A lane's next card isn't started yet (HI-2029): Hive's last start of it on the builder failed." }),
-  startRefusedHeld: agentMsg({ id: 'lane.status.start.refusedHeld', text: "{card} waits to start: its start was refused for now, {slot} still in use ({held, select, session {{heldBy}'s session is still in it} left {{heldBy}'s last run left {program}{more, plural, =0 {} other { and # more}} running in it} lastRun {{heldBy}'s last run there isn't known to have ended} broker {a process still has a file or folder in it open: Windows Sandbox's broker ({broker}) is working in it{idle, select, yes {, with no Sandbox running} no {, with a Sandbox running} other {}}} other {a process still has a file or folder in it open}}); Combwork tries again", note: "A lane's next card isn't started yet (HI-2468): Hive's start of it was refused because its slot {slot} is still in use: a session of the agent {heldBy} still runs in it; left, the agent {heldBy}'s last run left programs running in it ({program}: the first one's name, such as node; {more}: how many more); lastRun, that run isn't known to have ended; or (broker) a process holds it, and Windows Sandbox's broker ({broker}: its process name) has the slot as its current folder, idle: yes, no Sandbox runs; no, one does; other, not known; or (other) a process holds it. Hive tries the start again." }),
-  startRefused: agentMsg({ id: 'lane.status.start.refused', text: '{card} waits to start: its start was refused for now; Combwork tries again', note: "A lane's next card isn't started yet (HI-2029): Hive's start of it was refused for now, and is tried again." }),
+  startQueued: agentMsg({ id: 'lane.status.start.queued', text: "{card} waits to start: a line of Combwork's is on its way to {agent}", note: "A lane's next card isn't started yet (HI-2029): a line Combwork types is on its way to the builder." }),
+  startFailed: agentMsg({ id: 'lane.status.start.failed', text: "{card} waits to start: {agent}'s last start failed", note: "A lane's next card isn't started yet (HI-2029): Combwork's last start of it on the builder failed." }),
+  startRefusedHeld: agentMsg({ id: 'lane.status.start.refusedHeld', text: "{card} waits to start: its start was refused for now, {slot} still in use ({held, select, session {{heldBy}'s session is still in it} left {{heldBy}'s last run left {program}{more, plural, =0 {} other { and # more}} running in it} lastRun {{heldBy}'s last run there isn't known to have ended} broker {a process still has a file or folder in it open: Windows Sandbox's broker ({broker}) is working in it{idle, select, yes {, with no Sandbox running} no {, with a Sandbox running} other {}}} other {a process still has a file or folder in it open}}); Combwork tries again", note: "A lane's next card isn't started yet (HI-2468): Combwork's start of it was refused because its slot {slot} is still in use: a session of the agent {heldBy} still runs in it; left, the agent {heldBy}'s last run left programs running in it ({program}: the first one's name, such as node; {more}: how many more); lastRun, that run isn't known to have ended; or (broker) a process holds it, and Windows Sandbox's broker ({broker}: its process name) has the slot as its current folder, idle: yes, no Sandbox runs; no, one does; other, not known; or (other) a process holds it. Combwork tries the start again." }),
+  startRefused: agentMsg({ id: 'lane.status.start.refused', text: '{card} waits to start: its start was refused for now; Combwork tries again', note: "A lane's next card isn't started yet (HI-2029): Combwork's start of it was refused for now, and is tried again." }),
   startBusy: agentMsg({ id: 'lane.status.start.busy', text: '{card} waits to start: {agent} is in a turn', note: "A lane's next card isn't started yet (HI-2029): its builder is in a turn, or starting." }),
   column: {
     hold: agentMsg({ id: 'lane.column.hold', text: 'On Hold', note: "A card's column in a lane's line (a column name)." }),
@@ -460,7 +483,7 @@ const L = {
   pairInSlot: agentMsg({ id: 'lane.line.pairInSlot', text: '{builder} / {reviewer} ({project}, in {slot})', note: "A lane's builder and reviewer, its project and the slot its cards are built in (#1438), at the start of its line." }),
   pool: agentMsg({ id: 'lane.line.pool', text: 'the reviewer pool', note: "In place of {reviewer}: the lane is reviewed by the project's reviewer pool (#1443)." }),
   noReviewer: agentMsg({ id: 'lane.line.noReviewer', text: 'no reviewer', note: 'In place of {reviewer}: the lane has no reviewer yet.' }),
-  line: agentMsg({ id: 'lane.line.text', text: '{pair}: {state}; {cards}; rounds {rounds}, wait {wait}. {id}', note: 'A lane in one line, for the hive tools: "B1 / R1 (hive): active, on #405; #483 Passed, #405 Review r2; rounds 10, wait 6 h. lane-3fa2". {cards}: its cards, each "key column"; {id}: the lane\'s id.' }),
+  line: agentMsg({ id: 'lane.line.text', text: '{pair}: {state}; {cards}; rounds {rounds}, wait {wait}. {id}', note: 'A lane in one line, for the Combwork tools: "B1 / R1 (demo): active, on #405; #483 Passed, #405 Review r2; rounds 10, wait 6 h. lane-3fa2". {cards}: its cards, each "key column"; {id}: the lane\'s id.' }),
   lineNamed: agentMsg({ id: 'lane.line.named', text: '{pair} {name}: {state}; {cards}; rounds {rounds}, wait {wait}. {id}', note: "A lane in one line, as lane.line.text, with the lane's own name ({name})." }),
   hours: agentMsg({ id: 'lane.wait.hours', text: '{n} h', note: 'A lane\'s wait in hours ("6 h", "1.5 h").' }),
   minutes: agentMsg({ id: 'lane.wait.minutes', text: '{n} min', note: 'A lane\'s wait in minutes ("90 min").' }),
@@ -487,7 +510,7 @@ const L = {
   carryOnIn: agentMsg({ id: 'lane.next.carryOnIn', text: 'Carry on with {card} in {slot}{also}.', note: 'cw_lane next: the card in flight to carry on, in the slot its lane builds in (#1438); {also} as in lane.next.carryOn.' }),
   afterQueue: agentMsg({ id: 'lane.next.afterQueue', text: 'Next: {card}, once {n, plural, one {it is} other {they are}} Done.', note: "cw_lane next, after its passed cards' places in the merge queue (#1354): the next card waits for them to be Done (one card at a time); {n} is how many." }),
   start: agentMsg({ id: 'lane.next.start', text: 'Next: {card}. Start it.', note: 'cw_lane next: the card to start next; {card} is its key and title.' }),
-  startIn: agentMsg({ id: 'lane.next.startIn', text: 'Next: {card}. Start it: it is built in {slot}, on a new branch Combwork makes there.', note: "cw_lane next: the card to start next, built in the lane's slot (#1438), where Hive makes its line as it starts." }),
+  startIn: agentMsg({ id: 'lane.next.startIn', text: 'Next: {card}. Start it: it is built in {slot}, on a new branch Combwork makes there.', note: "cw_lane next: the card to start next, built in the lane's slot (#1438), where Combwork makes its line as it starts." }),
   cardsNone: agentMsg({ id: 'lane.args.cardsNone', text: 'cards must be the card numbers, in order (at least one)', note: "cw_lane start's refusal of its cards argument: none given, or not a list." }),
   cardsMax: agentMsg({ id: 'lane.args.cardsMax', text: 'at most {max} cards in a lane', note: "cw_lane start's refusal: too many cards." }),
   cardsNumbers: agentMsg({ id: 'lane.args.cardsNumbers', text: 'cards must be card numbers', note: "cw_lane start's refusal: a card in cards isn't a whole card number." }),
@@ -495,7 +518,7 @@ const L = {
   numberRange: agentMsg({ id: 'lane.args.numberRange', text: '{what} must be from 1 to {max}', note: "cw_lane start's refusal of rounds or waitMinutes ({what}, the argument's name) out of range." })
 }
 
-/** Why a lane waits, in a few English words for the hive tools ("waiting: HI-11 not merged"). */
+/** Why a lane waits, in a few English words for the Combwork tools ("waiting: HI-11 not merged"). */
 export function laneStatusText(s: LaneStatus): string {
   const card = s.card !== null ? cardRef(s.card) : say(L.aCard)
   switch (s.reason) {
@@ -538,7 +561,7 @@ export function laneStatusText(s: LaneStatus): string {
         if (s.freshBlocked === 'uncertain') return say(L.freshUncertain, { agent })
         return s.freshWhy !== undefined ? say(L.freshFailed, { agent, why: s.freshWhy }) : say(L.freshFailedBare, { agent })
       }
-      if (s.why === 'dependencies') return say(L.startDependencies, { card, waitsFor: s.waitsFor ?? say(L.aDependency) })
+      if (s.why === 'dependencies') return say(L.startDependencies, { card, waitsFor: s.waitingOn?.length ? s.waitingOn.join(', ') : (s.waitsFor ?? say(L.aDependency)) })
       if (s.why === 'refused' && s.slot && s.held) return say(L.startRefusedHeld, { card, slot: s.slot, held: s.held, heldBy: s.heldBy ?? say(L.anAgent), broker: s.broker ?? '', idle: idleKey(s.idle), program: s.program ?? '', more: s.more ?? 0 })
       if (s.why === 'refused') return say(L.startRefused, { card })
       const agent = s.agent ?? say(L.itsBuilder)
@@ -620,7 +643,8 @@ export function readLane(v: unknown): LaneRecord | null {
     ...(isObj(v.slotWait) && time(v.slotWait.since) && typeof v.slotWait.note === 'string' ? { slotWait: { since: v.slotWait.since as string, note: (v.slotWait.note as string).slice(0, 4000), ...(v.slotWait.stoppedOnly === true ? { stoppedOnly: true as const } : {}) } } : {}),
     ...(isObj(v.brief) && whole(v.brief.rev, 1e9) && (v.brief.text === null || typeof v.brief.text === 'string') && (v.brief.out === null || whole(v.brief.out, 1e9)) ? { brief: { text: v.brief.text === null ? null : (v.brief.text as string).slice(0, LANE_BRIEF_MAX), rev: v.brief.rev as number, out: v.brief.out as number | null, ...(text(v.brief.notIn, 128) ? { notIn: v.brief.notIn as string } : {}) } } : {}),
     ...(v.pool === true && !reviewer ? { pool: true as const } : {}),
-    ...(fresh ? { freshStart: fresh } : {})
+    ...(fresh ? { freshStart: fresh } : {}),
+    ...(v.state === 'active' && isObj(v.depEpisode) && whole(v.depEpisode.card, 1e9) && text(v.depEpisode.id, 64) && ['waiting', 'pending', 'sent'].includes(v.depEpisode.state as string) && time(v.depEpisode.at) ? { depEpisode: { card: v.depEpisode.card as number, id: v.depEpisode.id as string, state: v.depEpisode.state as DepEpisode['state'], at: v.depEpisode.at as string } } : {})
   }
 }
 
@@ -667,7 +691,7 @@ export const waitText = (minutes: number): string => (minutes >= 60 && minutes %
 const cardWord = (c: LaneCard): string => `${cardRef(c.number)} ${say(L.column[c.column])}${c.round > 1 && c.column !== 'gone' && c.column !== 'unrecorded' ? ` ${say(L.cardRound, { round: c.round })}` : ''}${c.blocked ? ` ${say(L.cardBlocked)}` : ''}`
 
 /**
- * A lane in one line, for the hive tools: "B1 / R1 (hive) lanes and loops: active, on #405; #483 Passed, #405 Review r2,
+ * A lane in one line, for the Combwork tools: "B1 / R1 (demo) lanes and loops: active, on #405; #483 Passed, #405 Review r2,
  * #412 Todo; rounds 10, wait 6 h. lane-3fa2".
  */
 export function laneLine(l: LaneInfo): string {
@@ -715,7 +739,7 @@ export function laneEndText(l: LaneInfo & { note?: string }): string {
 
 /**
  * What cw_lane next says (#1270): the card to start or carry on, or why the lane waits, or that every card is Done.
- * `queue`: the lane's passed cards Hive merges, each with where it is in the merge queue (#1354): the lane takes one card
+ * `queue`: the lane's passed cards Combwork merges, each with where it is in the merge queue (#1354): the lane takes one card
  * at a time, so the next waits for them to be Done.
  */
 export function laneNextText(r: { lane: LaneInfo; next: { card: number; title: string; carryOn: boolean } | null; waits: LaneStatus | null; queue?: { card: number; line: string }[]; unsubmitted?: UnsubmittedCard[] }): string {
@@ -725,7 +749,7 @@ export function laneNextText(r: { lane: LaneInfo; next: { card: number; title: s
   if (!r.next) return queued ? `${queued} ${say(L.nothingElse)}` : say(L.allDone)
   const card = `${cardRef(r.next.card)} ${r.next.title}`
   const also = r.waits ? ` (${laneStatusText(r.waits)})` : ''
-  // Its slot (#1438): where the card is built; Hive makes its line there as it starts.
+  // Its slot (#1438): where the card is built; Combwork makes its line there as it starts.
   const slot = r.lane.slot
   // HI-2245: carried on in Review with commits past its submission: not handed over yet.
   const first = r.next.carryOn ? unsubmittedText(r.unsubmitted?.filter((u) => u.card === r.next!.card), undefined, true) : null

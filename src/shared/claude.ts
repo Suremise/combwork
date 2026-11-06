@@ -279,7 +279,7 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
   pricingUrl: 'https://platform.claude.com/docs/en/about-claude/pricing',
   permissionModes: withCliOwn(CLAUDE_PERMISSION_MODES),
   defaultPermissionMode: 'auto',
-  // Plan mode would block the hive tools.
+  // Plan mode would block the Combwork tools.
   assistantMode: 'auto',
   modeCaveat: claudeModeCaveat,
   effortLevels: [
@@ -339,7 +339,7 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
         presets: [
           // DeepSeek's Claude Code guide (api-docs.deepseek.com/quick_start/agent_integrations/claude_code, 27 Oct 2026):
           // its recommended models for each alias. (Its server also maps any claude-opus* name to deepseek-v4-pro, a
-          // fallback Hive doesn't rely on: v4-pro is listed for the user to map.)
+          // fallback Combwork doesn't rely on: v4-pro is listed for the user to map.)
           {
             id: 'deepseek',
             name: 'DeepSeek',
@@ -376,9 +376,9 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
   signInHelp: 'Type /login in one of its agents’ terminals (that agent then carries on by itself), or use Help → Provider Setup → Claude Code → Sign in.', // i18n-ignore: English for main's notices (text has the window's)
   safeguardHelp: 'In its terminal: /feedback reports a false positive, /model switches back, and /config sets whether it switches models by itself when a message is flagged.', // i18n-ignore: English, the same as its message (text has it: a card comment stores the message, #866)
   text: {
-    installNote: msg({ id: 'agents.claude.installNote', defaultMessage: 'The installer runs `irm https://claude.ai/install.ps1 | iex` in PowerShell and installs to `%USERPROFILE%\\.local\\bin`. After installing, sign in with your Claude account (Pro, Max, Team or Enterprise) or an Anthropic Console account. If the CLI is installed somewhere else, set its path in Settings → Claude Code.', description: "Provider Setup → Claude Code: how its installer works. Keep the command and the path in backticks exactly as they are, and the plan names (Pro, Max, Team, Enterprise); Settings → Claude Code is a place in Hive's settings." }),
-    extensionNote: msg({ id: 'agents.claude.extensionNote', defaultMessage: "You have the Claude Code extension for VS Code (or a similar editor). Combwork doesn't use it — the extension's built-in copy moves with every extension update and can't be updated on its own. Install the CLI; your extension keeps working as before.", description: 'Provider Setup → Claude Code, when only an editor extension was found: why Hive needs the standalone CLI.' }),
-    signInHelp: msg({ id: 'agents.claude.signInHelp', defaultMessage: 'Type /login in one of its agents’ terminals (that agent then carries on by itself), or use Help → Provider Setup → Claude Code → Sign in.', description: "How to sign in to Claude Code again after its sign-in expired (an agent's pane, a notification). /login is a command: keep it; Help → Provider Setup → Claude Code → Sign in is a menu path in Hive." }),
+    installNote: msg({ id: 'agents.claude.installNote', defaultMessage: 'The installer runs `irm https://claude.ai/install.ps1 | iex` in PowerShell and installs to `%USERPROFILE%\\.local\\bin`. After installing, sign in with your Claude account (Pro, Max, Team or Enterprise) or an Anthropic Console account. If the CLI is installed somewhere else, set its path in Settings → Claude Code.', description: "Provider Setup → Claude Code: how its installer works. Keep the command and the path in backticks exactly as they are, and the plan names (Pro, Max, Team, Enterprise); Settings → Claude Code is a place in Combwork's settings." }),
+    extensionNote: msg({ id: 'agents.claude.extensionNote', defaultMessage: "You have the Claude Code extension for VS Code (or a similar editor). Combwork doesn't use it — the extension's built-in copy moves with every extension update and can't be updated on its own. Install the CLI; your extension keeps working as before.", description: 'Provider Setup → Claude Code, when only an editor extension was found: why Combwork needs the standalone CLI.' }),
+    signInHelp: msg({ id: 'agents.claude.signInHelp', defaultMessage: 'Type /login in one of its agents’ terminals (that agent then carries on by itself), or use Help → Provider Setup → Claude Code → Sign in.', description: "How to sign in to Claude Code again after its sign-in expired (an agent's pane, a notification). /login is a command: keep it; Help → Provider Setup → Claude Code → Sign in is a menu path in Combwork." }),
     safeguardHelp: msg({ id: 'agents.claude.safeguardHelp', defaultMessage: 'In its terminal: /feedback reports a false positive, /model switches back, and /config sets whether it switches models by itself when a message is flagged.', description: "What to do after Claude Code's safety classifier stopped a response (an agent's safeguard note). /feedback, /model and /config are commands: keep them." }),
     modelPlaceholder: msg({ id: 'agents.claude.modelPlaceholder', defaultMessage: 'Full model ID, e.g. claude-opus-5-5 or claude-opus-4-6[1m]', description: 'Placeholder of the custom model ID box (Claude Code). Keep the model IDs exactly as they are.' })
   },

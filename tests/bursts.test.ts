@@ -17,12 +17,12 @@ describe('chimes', () => {
 
 describe('finished notifications', () => {
   it('one alone reads as before', () => {
-    expect(finishedNotice([finish('hive', 'Claude')])).toEqual({ title: 'hive · Claude finished', body: 'Claude is done.' })
+    expect(finishedNotice([finish('alpha', 'Claude')])).toEqual({ title: 'alpha · Claude finished', body: 'Claude is done.' })
   })
 
   it('several in one project are named; across projects, counted per project', () => {
-    expect(finishedNotice([finish('hive', 'Claude'), finish('hive', 'Codex'), finish('hive', 'Agent 3')])).toEqual({ title: '3 agents finished in hive', body: 'Claude, Codex, Agent 3' })
-    expect(finishedNotice([finish('hive', 'Claude'), finish('web', 'One'), finish('hive', 'Codex')])).toEqual({ title: '3 agents finished', body: 'hive (2), web (1)' })
+    expect(finishedNotice([finish('alpha', 'Claude'), finish('alpha', 'Codex'), finish('alpha', 'Agent 3')])).toEqual({ title: '3 agents finished in alpha', body: 'Claude, Codex, Agent 3' })
+    expect(finishedNotice([finish('alpha', 'Claude'), finish('web', 'One'), finish('alpha', 'Codex')])).toEqual({ title: '3 agents finished', body: 'alpha (2), web (1)' })
   })
 
   describe('grouping', () => {
@@ -32,9 +32,9 @@ describe('finished notifications', () => {
     it('finishes within a few seconds of each other go together, once they stop coming', () => {
       const sent: Finish[][] = []
       const b = new FinishBatcher((items) => sent.push(items))
-      b.add(finish('hive', 'A'))
+      b.add(finish('alpha', 'A'))
       vi.advanceTimersByTime(FINISH_GROUP_MS - 500)
-      b.add(finish('hive', 'B'))
+      b.add(finish('alpha', 'B'))
       vi.advanceTimersByTime(FINISH_GROUP_MS - 500)
       expect(sent).toEqual([])
       vi.advanceTimersByTime(500)
@@ -49,7 +49,7 @@ describe('finished notifications', () => {
       const sent: Finish[][] = []
       const b = new FinishBatcher((items) => sent.push(items))
       for (let i = 0; i < 8; i++) {
-        b.add(finish('hive', `Agent ${i}`))
+        b.add(finish('alpha', `Agent ${i}`))
         vi.advanceTimersByTime(2000)
       }
       expect(sent.length).toBeGreaterThanOrEqual(1)
@@ -61,7 +61,7 @@ describe('finished notifications', () => {
 // SessionManager's own path (notify → the finish group → the Windows notification), with Electron's Notification
 // recording what it would show and each project's window a stand-in whose focus the test sets.
 describe('a group of finishes, when it is shown', () => {
-  const ws = tempDir('hive-bursts-')
+  const ws = tempDir('cw-bursts-')
   const alpha = join(ws, 'alpha')
   const beta = join(ws, 'beta')
   let focused: Set<string>
@@ -107,7 +107,7 @@ describe('a group of finishes, when it is shown', () => {
       return fake as unknown as BrowserWindow
     }
     sessions.setWindowProvider((p) => (p ? windowFor(p.toLowerCase()) : null))
-    // The Hive window in use: the one the test says is focused, showing its project (one window per project here); with
+    // The Combwork window in use: the one the test says is focused, showing its project (one window per project here); with
     // none, an entry's own project's window owns it.
     const { setNotifyHost } = await import('../src/main/notify')
     setNotifyHost({
@@ -153,7 +153,7 @@ describe('a group of finishes, when it is shown', () => {
     }
   })
 
-  it('a Hive window focused meanwhile: the group pops up in it, never a Windows notification too (HI-2320: once, in one place)', async () => {
+  it('a Combwork window focused meanwhile: the group pops up in it, never a Windows notification too (HI-2320: once, in one place)', async () => {
     await finished(alpha, 'One')
     focused.add(alpha.toLowerCase())
     await vi.advanceTimersByTimeAsync(FINISH_GROUP_MS)
@@ -162,7 +162,7 @@ describe('a group of finishes, when it is shown', () => {
     expect(bellOnly).toEqual([])
   })
 
-  it('Hive in the background: a Windows notification, and its row in its window\'s bell, never a pop-up', async () => {
+  it('Combwork in the background: a Windows notification, and its row in its window\'s bell, never a pop-up', async () => {
     await finished(alpha, 'One')
     await vi.advanceTimersByTimeAsync(FINISH_GROUP_MS)
     expect(titles()).toEqual(['alpha · One finished'])
@@ -170,7 +170,7 @@ describe('a group of finishes, when it is shown', () => {
     expect(bellOnly).toEqual([[alpha.toLowerCase(), 'alpha · One finished']])
   })
 
-  it("finishes in two windows, one focused meanwhile: one grouped banner in the focused window, counted from both; Hive in the background: a Windows notification opened from the first", async () => {
+  it("finishes in two windows, one focused meanwhile: one grouped banner in the focused window, counted from both; Combwork in the background: a Windows notification opened from the first", async () => {
     await finished(alpha, 'One')
     await finished(beta, 'Two')
     await finished(beta, 'Three')
@@ -205,7 +205,7 @@ describe('a group of finishes, when it is shown', () => {
     expect(titles()).toEqual(['beta · Two needs your input'])
     await vi.advanceTimersByTimeAsync(FINISH_GROUP_MS)
     expect(titles()).toEqual(['beta · Two needs your input', 'alpha · One finished'])
-    // The same settings apply: a Hive window focused, it pops up there, not a Windows notification; waiting
+    // The same settings apply: a Combwork window focused, it pops up there, not a Windows notification; waiting
     // notifications off, it isn't told at all.
     focused.add(beta.toLowerCase())
     ;(sessions as unknown as { notify: (...a: unknown[]) => void }).notify(beta, 'beta · Two needs your input', 'Allow Bash?', 'waiting')

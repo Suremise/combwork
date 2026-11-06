@@ -1,4 +1,4 @@
-// Git's worker (HI-1783): Hive's git commands start their processes in a thread of their own, so a process start (about
+// Git's worker (HI-1783): Combwork's git commands start their processes in a thread of their own, so a process start (about
 // 4 ms of the calling thread on Windows) never holds main's thread. Here: git() through the built worker gives exactly
 // what it gives in-process (as it ran before), for an answer, git's own failure, input, output small and large, an
 // environment, a time limit, a folder that isn't there and output over its bound; and many commands at once each get
@@ -21,7 +21,7 @@ const HUNG_MS = 30_000
 // process's environment).
 const { gitEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { gitEnv: (vars?: Record<string, string>) => NodeJS.ProcessEnv }
 
-const tmp = tempDir('hive-git-worker-')
+const tmp = tempDir('cw-git-worker-')
 const bundle = join(tmp, 'git-worker.cjs')
 const repo = join(tmp, 'repo')
 
@@ -41,7 +41,7 @@ afterAll(() => useGitWorker(null))
  * bound. Ended when the test finishes, passed, failed or timed out, and waited for until it has gone.
  */
 function holding(): { args: string[]; running: () => boolean } {
-  const dir = tempDir('hive-git-holder-')
+  const dir = tempDir('cw-git-holder-')
   const fwd = (p: string): string => p.replace(/\\/g, '/')
   const script = join(dir, 'holder.cjs')
   writeFileSync(script, `const fs = require('fs'), path = require('path'), dir = process.argv[2]
@@ -142,18 +142,18 @@ describe("git's worker (HI-1783)", () => {
   }, HUNG_MS)
 
   it("reads a repository's lines, folders, HEADs and reflogs as this thread does (HI-1814)", async () => {
-    const r = tempDir('hive-git-worker-refs-')
+    const r = tempDir('cw-git-worker-refs-')
     const g = (cwd: string, ...args: string[]): void => void execFileSync('git', ['-C', cwd, '-c', 'user.name=T', '-c', 'user.email=t@example.com', ...args], { windowsHide: true, env: gitEnv() })
     g(r, 'init', '-q', '-b', 'main')
     g(r, 'commit', '-q', '--allow-empty', '-m', 'first')
-    g(r, 'branch', 'hive/HI/one')
+    g(r, 'branch', 'cw/HI/one')
     g(r, 'branch', 'packed')
     g(r, 'pack-refs', '--all')
     g(r, 'commit', '-q', '--allow-empty', '-m', 'second')
-    g(r, 'worktree', 'add', '-q', '-b', 'side', join(tempDir('hive-git-worker-wt-'), 'wt'))
+    g(r, 'worktree', 'add', '-q', '-b', 'side', join(tempDir('cw-git-worker-wt-'), 'wt'))
     const common = join(r, '.git')
     const here = readRepoRefs(common, 64)
-    expect([...here.lines.keys()].sort()).toEqual(['hive/HI/one', 'main', 'packed', 'side'])
+    expect([...here.lines.keys()].sort()).toEqual(['cw/HI/one', 'main', 'packed', 'side'])
     expect(here.folders).toHaveLength(2)
     useGitWorker(bundle)
     expect(await readRefsOffMain(common, 64)).toEqual(here)

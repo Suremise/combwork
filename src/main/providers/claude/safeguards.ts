@@ -32,10 +32,10 @@ const str = (v: unknown): string | undefined => (typeof v === 'string' && v ? v 
  * - A flagged request answered by another model, or by none, is a system record (SAFEGUARD_DEFAULTS.claudeRecords:
  *   `model_refusal_fallback` with `originalModel`, `fallbackModel` and `scope`; `model_refusal_no_fallback`), a stop by
  *   its `requestId`, and for the session a switch the safeguard made (flagged). Claude Code may first have asked the user
- *   about it (its prompt, which Hive sees on screen): `asked`.
+ *   about it (its prompt, which Combwork sees on screen): `asked`.
  * Each stop counts once by its identity, however close two are, and carries its turn (the person's prompt that started
- * it, in the transcript's order), so a stop Hive saw on screen and Claude Code's record of it match whenever, and in
- * whichever order, Hive reads them (withScreenStops). Commands typed in it (/feedback about a stop, a
+ * it, in the transcript's order), so a stop Combwork saw on screen and Claude Code's record of it match whenever, and in
+ * whichever order, Combwork reads them (withScreenStops). Commands typed in it (/feedback about a stop, a
  * local_command entry), the person's own prompts and side conversations (subagents) never count. The model an assistant
  * message ran on (`message.model`) changing after a stop is the fallback too; Claude Code's own synthetic messages, and
  * a response another model answered alone (scope local), don't change it.

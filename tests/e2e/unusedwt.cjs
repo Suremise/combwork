@@ -6,7 +6,7 @@
 // Overview has one line linking there; Changes' project folder says so only while one holds work; Storage has a line
 // for them; the Agent API's project status counts them for the Assistant (no way to remove them). Without git, nothing is
 // removed. Then one is merged from Changes and removed after (its commit on the main branch, its folder and branch gone). A throwaway repository with worktree agents
-// added through Hive (not started), fake Claude Code configured, throwaway profile and workspace, quiet.
+// added through Combwork (not started), fake Claude Code configured, throwaway profile and workspace, quiet.
 // Dev build only (#1580): 0.9 worktrees on purpose: Merged, Ahead and Claudette are 0.9 worktree agents
 // (agents:testLegacy, refused by a packaged build), whose worktrees are left unused.
 const lib = require('./lib.cjs')
@@ -26,7 +26,7 @@ const check = (name, ok, extra = '') => {
 
 /** The run context's PATH for a test copy without the folders that hold git. */
 function pathWithoutGit() {
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData })
   const key = Object.keys(env).find((k) => k.toUpperCase() === 'PATH')
   return (env[key] ?? '')
     .split(path.delimiter)
@@ -86,7 +86,7 @@ function pathWithoutGit() {
   check('Review opens Changes at Unused worktrees (2)', !!(await lib.until(async () => (await section.count()) === 1 && /Unused worktrees\s*2/.test(await section.locator('h2').innerText()), 10000)) && (await page.locator('.tab.active, .tab[aria-selected="true"]', { hasText: 'Version Control' }).count()) >= 1, await section.innerText().catch(() => ''))
   const picker = page.locator('.split-list .root-select')
   check('…the folder picker shows "Unused worktrees (2)", first, in its group (#476)', (await picker.inputValue()) === 'unused' && (await picker.locator('optgroup[label^="Unused worktrees"] option').allInnerTexts()).join('|').includes('Unused worktrees (2)') && (await picker.locator('option').evaluateAll((os) => os.map((o) => o.value).find((v) => !(v.startsWith('compare:') || v === 'leftovers')))) === 'unused', (await picker.locator('option').allInnerTexts()).join('|'))
-  check('…each made by Combwork (its agent never ran a session there)', (await section.locator('[data-origin="hive"]').count()) === 2, await section.innerText().catch(() => ''))
+  check('…each made by Combwork (its agent never ran a session there)', (await section.locator('[data-origin="combwork"]').count()) === 2, await section.innerText().catch(() => ''))
   check('…and says what they are', (await section.locator('.info-icon, [aria-label*="info" i]').count()) >= 1)
   // Its ⓘ says where they come from, without promising a template gives them back (#1562: 1.0's agents get no worktree).
   await section.locator('h2 .info-icon').first().hover()
@@ -124,7 +124,7 @@ function pathWithoutGit() {
   // --- A narrow window with the Projects sidebar, Progress and the Assistant's rail (#906): the list goes above the
   // detail, which keeps the tab's width (not squeezed to nothing behind Progress), its buttons clickable; then a wide one
   // as before, the list beside it.
-  const command = (id, ...args) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'menu-command', command: id, args })
+  const command = (id, ...args) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'menu-command', command: id, args })
   const layout = () =>
     page.evaluate(() => {
       const box = (sel) => document.querySelector(sel)?.getBoundingClientRect() ?? null
@@ -245,7 +245,7 @@ function pathWithoutGit() {
   await lib.until(async () => (await danger.count()) === 1, 5000)
   check('Remove anyway… names what goes', (await danger.innerText()).includes(`1 commit on ${ahead.worktree.branch} not on ${main}`), await danger.innerText())
   await shot('anyway')
-  // Changed while the question is open: confirming removes nothing; the question closes, Hive checks again and asks
+  // Changed while the question is open: confirming removes nothing; the question closes, Combwork checks again and asks
   // afresh with what it holds now (#377), never a Try Again with the spent check.
   fs.writeFileSync(path.join(ahead.worktree.path, 'later.txt'), 'written after the question')
   await danger.getByRole('button', { name: 'Remove Anyway' }).click()

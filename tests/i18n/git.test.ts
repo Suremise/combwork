@@ -8,7 +8,7 @@ import { gitFixText, gitOldText, gitProblemEnglish, gitProblemText } from '../..
 import { folderBusy, folderBusyData, gitStatusText, gitStatusTip, headText, identityWarnings, type GitRepoSummary } from '../../src/shared/gitRepo'
 import { gitignoreName, initAbout, type GitInitCheck } from '../../src/shared/gitInit'
 import { englishText } from '../../src/shared/advanced'
-import { hiveVcsText } from '../../src/shared/hiveVcsText'
+import { combworkVcsText } from '../../src/shared/combworkVcsText'
 
 // #804: the `git` area (the Git tab, Initialise repository, the .combwork notice, and what the shared git modules say). Its
 // messages are read from the English catalogue (tests/i18nCatalogues.test.ts checks it is current); the sentences that
@@ -107,7 +107,7 @@ describe('git missing or too old', () => {
 
   it("stays English for the main process's errors, whatever the window's language", () => {
     setLanguage(PSEUDO_LANGUAGE, {})
-    expect(gitProblemText({ state: 'missing' })).not.toBe("Git isn't installed (or isn't on Hive's PATH)")
+    expect(gitProblemText({ state: 'missing' })).not.toBe("Git isn't installed (or isn't on Combwork's PATH)")
     expect(gitProblemEnglish({ state: 'missing' })).toBe("Git isn't installed (or isn't on Combwork's PATH)")
     expect(gitProblemEnglish({ state: 'old', version: '2.16.0' })).toBe('Git 2.16.0 is too old for Combwork (it needs 2.38 or later)')
     expect(gitProblemEnglish({ state: 'old', version: '2.30.0' })).toBeNull()
@@ -165,13 +165,13 @@ describe('the sentences once built by hand read as before, in English', () => {
   })
 
   it('the .combwork notice', () => {
-    expect(hiveVcsText({ state: 'excluded', tracked: 1 })?.title).toBe('1 file in .combwork is committed to git')
-    expect(hiveVcsText({ state: 'not-excluded', tracked: 3 })?.detail).toBe(
+    expect(combworkVcsText({ state: 'excluded', tracked: 1 })?.title).toBe('1 file in .combwork is committed to git')
+    expect(combworkVcsText({ state: 'not-excluded', tracked: 3 })?.detail).toBe(
       "Excluding .combwork keeps new files out of git, but these were committed before, so git still tracks them and commits their changes. Run `git rm -r --cached .combwork` in the project folder, then commit: the files stay on disk. Combwork couldn't exclude .combwork either: a rule in a .gitignore may bring it back."
     )
-    expect(tr(m('git.hiveVcs.titleSentence'), { title: 'X' })).toBe('X.')
-    expect(tr(m('git.hiveVcs.untrackTitle'), { count: 1 })).toBe('Untrack this file?')
-    expect(tr(m('git.hiveVcs.untrackTitle'), { count: 4 })).toBe('Untrack these 4 files?')
+    expect(tr(m('git.combworkVcs.titleSentence'), { title: 'X' })).toBe('X.')
+    expect(tr(m('git.combworkVcs.untrackTitle'), { count: 1 })).toBe('Untrack this file?')
+    expect(tr(m('git.combworkVcs.untrackTitle'), { count: 4 })).toBe('Untrack these 4 files?')
     expect(tr(m('git.init.commitsAs'), { name: 'A', email: 'a@b' })).toBe('Commits as A <a@b>.')
   })
 

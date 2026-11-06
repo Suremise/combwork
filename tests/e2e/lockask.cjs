@@ -1,6 +1,6 @@
 // "Ask me" file locks for Codex (HI-2386), on two fake Codex agents (fake-codex/: its "patch FILE" step, an apply_patch
-// edit Hive's lock may refuse). Holder edits x.txt and holds it (its turn held open); Asker's edit of it is refused and
-// Hive asks with a notice's Allow. Asker ends its turn at once to wait, as Codex does; the ask outlives that turn's end:
+// edit Combwork's lock may refuse). Holder edits x.txt and holds it (its turn held open); Asker's edit of it is refused and
+// Combwork asks with a notice's Allow. Asker ends its turn at once to wait, as Codex does; the ask outlives that turn's end:
 // its notice still offers Allow, and Allow then types the go-ahead, after which Asker's retry edits the file. Before
 // HI-2386 the turn's end withdrew the ask, and Allow did nothing (codex-extra's real run on 2 Nov). Dev build,
 // throwaway profile, workspace and CODEX_HOME; nothing signs in or spends tokens.
@@ -38,17 +38,17 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  // What Asker does once it has read the go-ahead (its inbox, after Hive's doorbell): the edit again, as Codex does.
+  // What Asker does once it has read the go-ahead (its inbox, after Combwork's doorbell): the edit again, as Codex does.
   fs.writeFileSync(path.join(codexHome, 'fake-wakes-Asker.txt'), 'patch x.txt\n')
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, HIVE_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1300, height: 800 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.waitForProvider(inv, 'codex')
     await lib.openWorkspace(inv, page, ws)
     await page.getByText('alpha', { exact: true }).first().click()
@@ -77,9 +77,9 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     await say(holder.id, 'patch x.txt then hold')
     check('Holder edits x.txt and holds it', !!(await until(async () => edits('Holder').some((e) => e.allowed) && ((await live(holder.id))?.lockedFiles ?? []).some((f) => /x\.txt$/i.test(f)))), JSON.stringify({ edits: edits('Holder'), live: (await live(holder.id))?.lockedFiles }))
 
-    // --- Asker's edit is refused, Hive asks, and Asker ends its turn to wait (as Codex does, within seconds).
+    // --- Asker's edit is refused, Combwork asks, and Asker ends its turn to wait (as Codex does, within seconds).
     const since = await say(asker.id, 'patch x.txt')
-    check("Asker's edit is held back: it is told Hive has asked the user", !!(await until(() => edits('Asker').some((e) => !e.allowed && /Combwork has asked the user/.test(e.reason ?? '')), HUNG_MS)), JSON.stringify(edits('Asker')))
+    check("Asker's edit is held back: it is told Combwork has asked the user", !!(await until(() => edits('Asker').some((e) => !e.allowed && /Combwork has asked the user/.test(e.reason ?? '')), HUNG_MS)), JSON.stringify(edits('Asker')))
     check("…and Asker's blocked turn ends", !!(await until(turnOver(asker.id, since))), JSON.stringify(await live(asker.id)))
     const asking = page.locator('.toast', { hasText: 'wants to edit x.txt' })
     // Exactly Allow: the entry's own text is a button too (it opens the agent), and says "Allow Asker to edit it too?".
@@ -89,8 +89,8 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
 
     // --- Allow, after the blocked turn's end: the go-ahead is typed, Asker reads it and edits the file.
     await allow.first().click()
-    const hiveLog = () => (fs.existsSync(path.join(userData, 'logs', 'hive.log')) ? fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8') : '')
-    check('Allow is answered: Asker is allowed to edit x.txt', !!(await until(() => /Lock: .*Asker.* allowed to edit .*x\.txt/.test(hiveLog()))), JSON.stringify({ log: hiveLog().match(/.*Lock: .*/g), toasts: await page.locator('.toast').allInnerTexts() }))
+    const combworkLog = () => (fs.existsSync(path.join(userData, 'logs', 'combwork.log')) ? fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8') : '')
+    check('Allow is answered: Asker is allowed to edit x.txt', !!(await until(() => /Lock: .*Asker.* allowed to edit .*x\.txt/.test(combworkLog()))), JSON.stringify({ log: combworkLog().match(/.*Lock: .*/g), toasts: await page.locator('.toast').allInnerTexts() }))
     const wakes = () => lines(path.join(codexHome, 'fake-wakes.jsonl')).filter((w) => w.agent === 'Asker')
     check('the go-ahead is typed into Asker, which reads it in its inbox', !!(await until(() => wakes().some((w) => /allowed you to edit x\.txt/.test(w.text)))), JSON.stringify(wakes()))
     check("…and Asker's retry edits x.txt", !!(await until(() => edits('Asker').some((e) => e.allowed))) && /edited by Asker/.test(fs.readFileSync(path.join(alpha, 'x.txt'), 'utf8')), JSON.stringify(edits('Asker')))

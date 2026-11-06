@@ -6,7 +6,7 @@ import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import type { HiveEvent, TaskCard } from '../src/shared/types'
+import type { CombworkEvent, TaskCard } from '../src/shared/types'
 import { preferencesOf } from '../src/shared/workflow/preferences'
 import { allDone, keptLanes, laneLine, laneNextText, laneView, listedLanes, readLane, readLanes, laneCards, laneNumber, laneName, LANE_LINGER_MS, LANE_KEEP_MS, MAX_LANES, type LaneRecord, type LaneSlotHeld } from '../src/shared/lanes'
 import { tempDir } from './tempDir'
@@ -14,21 +14,21 @@ import { storeDocs } from './storeDocs'
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 10000
 
-const base = tempDir('hive-lanes-')
+const base = tempDir('cw-lanes-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const tasks = await import('../src/main/tasks')
 const lanes = await import('../src/main/lanes')
 
-/** Workflow rules off for one test (#1270: Hive owns the lane while they are on), on again after it. */
+/** Workflow rules off for one test (#1270: Combwork owns the lane while they are on), on again after it. */
 const { advanced } = await import('../src/main/advanced')
 const { ENFORCE } = await import('../src/main/workflow/service')
 const rulesOff = (): Promise<unknown> => advanced.set(ENFORCE, false)
 afterEach(async () => {
   await advanced.set(ENFORCE, true)
 })
-const { onHiveEvent } = await import('../src/main/events')
+const { onCombworkEvent } = await import('../src/main/events')
 const { saveTable } = await import('../src/main/storeTables')
 
 vi.setConfig({ testTimeout: 30_000 })
@@ -58,7 +58,7 @@ describe('a lane on slots (#1438)', () => {
   const cards = new Map([[1, card(1, 'done')], [2, card(2, 'todo')], [3, card(3, 'todo')]])
 
   it("its slot's details for the row's hover (#1446): lent or carried, its line, ready or preparing, waiting while preparing", () => {
-    const info = { name: 'slot-b', carried: false, line: 'hive/HI/HI-2-lane-hover', state: 'ready' as const, since: '2026-10-23T10:00:00.000Z' }
+    const info = { name: 'slot-b', carried: false, line: 'cw/HI/HI-2-lane-hover', state: 'ready' as const, since: '2026-10-23T10:00:00.000Z' }
     const v = laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: 'slot-b', waiting: false, info })
     expect([v.slot, v.slotInfo, v.status]).toEqual(['slot-b', info, null])
     // Its builder's carried slot (a 0.9 worktree, #1441): named the same way.
@@ -291,7 +291,7 @@ describe('which lanes are listed and kept', () => {
 })
 
 describe("a card loop's rounds and wait when the request doesn't say (#412, HI-1766: workflow options)", () => {
-  it("the project's, else the workspace's, else Hive's, else 10 rounds and 6 hours; values out of range are passed over", () => {
+  it("the project's, else the workspace's, else Combwork's, else 10 rounds and 6 hours; values out of range are passed over", () => {
     const of = (levels: Parameters<typeof preferencesOf>[1]) => {
       const v = preferencesOf('git', levels).values
       return { rounds: v.loopRounds, waitHours: v.loopWaitHours }
@@ -309,7 +309,7 @@ describe('the lanes service', () => {
   type WS = ReturnType<typeof createWorkspaceService>
   let w: WS
   const wsPath = join(base, 'ws')
-  const events: HiveEvent[] = []
+  const events: CombworkEvent[] = []
   let off: () => void
   const user = { kind: 'user' } as const
   beforeAll(async () => {
@@ -319,7 +319,7 @@ describe('the lanes service', () => {
     w = createWorkspaceService()
     await w.open(wsPath)
     lanes.startLanes()
-    off = onHiveEvent((e) => e.type === 'lanes-changed' && events.push(e))
+    off = onCombworkEvent((e) => e.type === 'lanes-changed' && events.push(e))
   })
   afterAll(async () => {
     off()
@@ -543,8 +543,8 @@ describe('the lanes service', () => {
   it('follows the board: paused while blocked, ended once every card is Done, and the window is told', async () => {
     const [c1, c2] = [await make('F1'), await make('F2')]
     const l = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c1.number, c2.number], by: 'B1 (alpha)' })).lane
-    const told = (fn: (x: Extract<HiveEvent, { type: 'lanes-changed' }>) => boolean) => until(() => events.some((e) => e.type === 'lanes-changed' && fn(e)), HUNG_MS)
-    const mine = (e: Extract<HiveEvent, { type: 'lanes-changed' }>) => e.lanes.find((x) => x.id === l.id)
+    const told = (fn: (x: Extract<CombworkEvent, { type: 'lanes-changed' }>) => boolean) => until(() => events.some((e) => e.type === 'lanes-changed' && fn(e)), HUNG_MS)
+    const mine = (e: Extract<CombworkEvent, { type: 'lanes-changed' }>) => e.lanes.find((x) => x.id === l.id)
     expect(await told((e) => mine(e)?.state === 'active')).toBe(true)
     await run(() => tasks.updateTask(c1.number, { column: 'doing', blocked: 'Asked the user' }, user))
     expect(await told((e) => mine(e)?.state === 'paused' && mine(e)?.pausedOn === c1.number)).toBe(true)

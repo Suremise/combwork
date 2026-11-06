@@ -46,7 +46,7 @@ describe('the committed notices are up to date (#386)', () => {
   })
 
   it('finds a dependency whose version changed, one added and one gone, and says to regenerate', () => {
-    const root = tempDir('hive-notices-')
+    const root = tempDir('cw-notices-')
     try {
       const pkg = (name: string, version: string, licence = 'MIT') => {
         mkdirSync(join(root, 'node_modules', name), { recursive: true })
@@ -126,7 +126,7 @@ describe("the notices' links", () => {
   })
 
   it("falls back to the homepage when the repository isn't a web page, else lists the name without a link", () => {
-    const root = tempDir('hive-notices-links-')
+    const root = tempDir('cw-notices-links-')
     try {
       const pkg = (meta: Record<string, unknown>) => {
         const dir = join(root, 'node_modules', meta.name as string)

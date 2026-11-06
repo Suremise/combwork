@@ -2,7 +2,7 @@ import { config } from './config'
 import { emit } from './events'
 import { movedPrefKey, PROJECT_PREFS, type ProjectPref } from '../shared/uiPrefs'
 
-// HI-2008: Hive's view preferences kept by folder in config.json's ui (each project's, and the workspace's panes)
+// HI-2008: Combwork's view preferences kept by folder in config.json's ui (each project's, and the workspace's panes)
 // follow a moved workspace, or a project moved on its own, with their other records by folder (workspaceMove.ts
 // carryProfile).
 

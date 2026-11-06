@@ -2,13 +2,13 @@
  * A workspace's dialect files on disk (dialects, HI-2065; plans/2026-11-03-dialects-design.md, sections 3–5), in
  * `.combwork/dialects/`:
  *
- *   workspace.json            the Workspace layer (the user's: Hive never ships into it)
+ *   workspace.json            the Workspace layer (the user's: Combwork never ships into it)
  *   api/cli.json              the API layer, for callers with no session
  *   <provider>/cli.json       a CLI's file
  *   <provider>/<label>.json   a model file (with "model") or a test copy (without)
  *   .state.json               the on/off switches: { "off": [paths] }
  *
- * Hive's shipped copies arrive through bundled.ts (kind `dialects`), which records them as it does skills and modes.
+ * Combwork's shipped copies arrive through bundled.ts (kind `dialects`), which records them as it does skills and modes.
  * Each change here is refused with a reason as data (`DialectRefusal`), for the Dialects view to say in its words: a
  * text that fails the schema, a second claim on a model in a folder, a name taken. Nothing here checks what a text says.
  */
@@ -25,7 +25,7 @@ import { dialectModelProblem } from '../../shared/models'
 const log = createLogger('dialects')
 
 /** A workspace's dialects folder. */
-export const dialectsDir = (hiveDir: string): string => join(hiveDir, 'dialects')
+export const dialectsDir = (combworkDir: string): string => join(combworkDir, 'dialects')
 
 /** A folder: a provider's id, or `api`. */
 const FOLDER = /^[a-z0-9][a-z0-9-]*$/
@@ -121,7 +121,7 @@ const nameInUse = async (folder: string, fileName: string): Promise<boolean> =>
 
 /**
  * Loads a workspace's dialects, each file checked against the schema. Within a folder, files are taken in name order,
- * and a model claimed twice (two files made outside Hive) is the first one's: the other is marked and Auto skips it.
+ * and a model claimed twice (two files made outside Combwork) is the first one's: the other is marked and Auto skips it.
  */
 export async function loadDialects(dir: string, schema: DialectSchema): Promise<DialectSet> {
   const { off: offList } = await readState(dir)
@@ -345,7 +345,7 @@ export async function duplicateDialect(dir: string, from: string, label: string)
  * Set Model (HI-2523; Promote, "Use for <model>", before it): moves a model's claim onto a model file or test copy. The
  * file that had it keeps its texts and becomes a test copy, as a backup. The claim is taken off the old file before it
  * is put on this one, so the folder never has two. Agents on Auto pick it up at their next launch. `shipped` (the ids
- * Hive ships): a shipped file is refused (`notYours`): only the user's own files are retargeted. All or nothing, as
+ * Combwork ships): a shipped file is refused (`notYours`): only the user's own files are retargeted. All or nothing, as
  * writeClaiming says.
  */
 export async function promoteDialect(dir: string, path: string, model: string, opts: { shipped?: ReadonlySet<string> } = {}): Promise<{ from: string | null } | DialectRefusal> {
@@ -362,7 +362,7 @@ export async function promoteDialect(dir: string, path: string, model: string, o
 }
 
 // ---------------------------------------------------------------------------
-// A session's resolved texts, for hive-mcp.js and hive-progress.js
+// A session's resolved texts, for cw-mcp.js and cw-progress.js
 // ---------------------------------------------------------------------------
 
 /** The file a launch's resolved texts go in, in its private folder. */

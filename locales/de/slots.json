@@ -5,7 +5,7 @@
   "slots.release.changed": "{slot} hat sich inzwischen geändert: Sein Schreiber ist nicht mehr der angezeigte. Sieh noch einmal nach.",
   "slots.release.live": "Der Schreiber von {slot} läuft noch in diesem Combwork: Stoppe zuerst den Agenten oder beende bzw. behalte, was er weiterlaufen ließ.",
   "slots.release.notEnded": "Einige der aufgeführten Prozesse laufen noch: Windows hat Combwork sie nicht beenden lassen, daher wurde {slot} nicht freigegeben. Versuche es erneut oder gib ihn frei, ohne sie zu beenden.",
-  "slots.release.otherHive": "{slot} wird von einem anderen Combwork gehalten, das noch läuft (Prozess {pid}): Gib ihn dort frei oder beende zuerst dieses Combwork.",
+  "slots.release.otherCombwork": "{slot} wird von einem anderen Combwork gehalten, das noch läuft (Prozess {pid}): Gib ihn dort frei oder beende zuerst dieses Combwork.",
   "slots.setting.bad": "Diese Slot-Einstellung gibt es in Combwork nicht.",
   "slots.setting.badSize": "Die Zahl der Review- und Check-Kopien ist eine ganze Zahl von {min, number} bis {max, number}.",
   "slots.setting.badText": "Ein Slot-Skript oder eine Dateiliste ist Text mit höchstens {max, number} Zeichen."

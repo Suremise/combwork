@@ -15,7 +15,7 @@ const T = {
   line: msg({
     id: 'panes.stopped.line',
     defaultMessage: 'Stopped · {time} · {why, select, you {stopped by you} assistant {stopped by the Assistant} agent {stopped by an agent} lane {its lane ended} closed {its workspace closed} quit {Combwork quit} exited {its CLI exited} crashed {its CLI exited with code {code}} other {stopped}}',
-    description: "The bar over a stopped agent's dimmed pane (HI-1881): when its session ended ({time}: a time of day) and why. {why} is who stopped it (you, the Hive Assistant, an agent, its card loop's lane ending, its workspace closing), Hive quitting, or its CLI ending by itself (cleanly, or with an error code {code}). Keep the · separators."
+    description: "The bar over a stopped agent's dimmed pane (HI-1881): when its session ended ({time}: a time of day) and why. {why} is who stopped it (you, the Combwork Assistant, an agent, its card loop's lane ending, its workspace closing), Combwork quitting, or its CLI ending by itself (cleanly, or with an error code {code}). Keep the · separators."
   }),
   label: msg({ id: 'panes.stopped.label', defaultMessage: 'Stopped · {time}', description: "A stopped agent's status in its pane's header and on its tile (HI-1881): {time} is when its session ended (a time of day)." })
 }

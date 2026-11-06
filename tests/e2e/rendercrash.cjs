@@ -1,7 +1,7 @@
 // A window whose page crashes is reloaded, its terminals reattach and the agents keep running; a second crash
-// within a minute asks instead (Reload / Open Logs / Quit Hive); a hang offers Wait / Reload, and recovering
+// within a minute asks instead (Reload / Open Logs / Quit Combwork); a hang offers Wait / Reload, and recovering
 // dismisses that. Native dialogs are stubbed in the test build's main process. Crashes only this test build's
-// page (forcefullyCrashRenderer), never another Hive. The agent is the fake Claude Code. Dev build, throwaway
+// page (forcefullyCrashRenderer), never another Combwork. The agent is the fake Claude Code. Dev build, throwaway
 // profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -46,12 +46,12 @@ process.on('uncaughtException', (e) => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47901), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47901), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   await lib.fitWindow(app, page, { width: 1300, height: 800 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('alpha', { exact: true }).first().click()
   const agent = await lib.addAgent(inv, alpha, { name: 'Steady' })
@@ -81,7 +81,7 @@ process.on('uncaughtException', (e) => {
       app.evaluate(({ BrowserWindow }, c) => BrowserWindow.getAllWindows()[0].webContents.executeJavaScript(c), code),
       new Promise((_, reject) => setTimeout(() => reject(new Error('no answer from the page')), 3000))
     ])
-  const invMain = (ch, ...a) => js(`window.hive.invoke(${JSON.stringify(ch)}, ...${JSON.stringify(a)})`)
+  const invMain = (ch, ...a) => js(`window.combwork.invoke(${JSON.stringify(ch)}, ...${JSON.stringify(a)})`)
   const liveMain = async () => (await invMain('session:live')).find((s) => s.agentId === agent.id)
   const shot = async (name) => {
     const b64 = await app.evaluate(async ({ BrowserWindow }) => (await BrowserWindow.getAllWindows()[0].webContents.capturePage()).toPNG().toString('base64'))
@@ -93,7 +93,7 @@ process.on('uncaughtException', (e) => {
     await app.evaluate(({ BrowserWindow }) => void BrowserWindow.getAllWindows()[0].webContents.forcefullyCrashRenderer())
     await lib.sleep(1000) // A fixed wait on purpose: the crash has to take the page down first, so what follows sees the reloaded page, not the old one.
   }
-  const pageBack = () => until(() => js("!!window.hive && !!document.querySelector('.menubar')"), 20000)
+  const pageBack = () => until(() => js("!!window.combwork && !!document.querySelector('.menubar')"), 20000)
   const toastText = () => js(`[...document.querySelectorAll('.toast')].map((t) => t.innerText).find((t) => t.includes("Combwork's window stopped and was reloaded")) ?? ''`)
 
   // --- A crash: reloaded, with a note, the agent still running and its terminal attached.
@@ -102,7 +102,7 @@ process.on('uncaughtException', (e) => {
   check('a note says it was reloaded and the agents kept running', !!(await until(async () => /Your agents kept running/.test(await toastText()), 10000)))
   check('no question was asked', (await boxes()).length === 0)
   check('the agent is still running', (await liveMain())?.status === 'finished')
-  check("its terminal shows what it printed before", !!(await until(() => js(`window.__hiveTerminalTextAt?.(${JSON.stringify(key)}, 'remember this line') ?? null`), 10000)))
+  check("its terminal shows what it printed before", !!(await until(() => js(`window.__cwTerminalTextAt?.(${JSON.stringify(key)}, 'remember this line') ?? null`), 10000)))
   await shot('rendercrash-1-reloaded.png')
 
   // --- Again within a minute: it asks instead of reloading in a loop.

@@ -3,7 +3,7 @@
 //   Control tab at the step, Git in the header, Pair suggested; Choose asks once (nothing in flight) and saves Pair, and
 //   the header reads "Workflow: Git · Pair";
 // - the switch sequence: to None, None's step (Git's answer doesn't stop it); Not now; a folder found meanwhile gets the
-//   notice, Not now; Hive restarted: no step for None and no notice; back to Git, Pair restored and no step; to None
+//   notice, Not now; Combwork restarted: no step for None and no notice; back to Git, Pair restored and no step; to None
 //   again, its Not now respected;
 // - New Project (a folder with no version control): its tab opens at None's step, with no notice; Customise… fills the
 //   Workflow section with the preset, not saved;
@@ -44,7 +44,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
   fs.writeFileSync(path.join(old, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [], workflow: { platform: 'git', preset: null, options: { review: 'none', finish: 'notChecked', folder: 'project' } } }))
 
   let { app, page } = await lib.launch({ userData, viewport: { width: 1400, height: 900 } })
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     const text = async (loc) => ((await loc.innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ').trim()
@@ -74,7 +74,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     const base = (await inv('app:info')).language
     const dir = path.join(lib.ROOT, 'locales', 'fr')
     const french = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))))
-    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language })
+    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
 
     // --- A Git folder found in the workspace: the notice, then the step.
     await lib.openWorkspace(inv, page, ws)
@@ -276,7 +276,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
 
     // --- An upgraded workspace: no step, no notice, only the old presets notice.
     await lib.openWorkspace(inv, page, upgradedWs)
-    const db = new DatabaseSync(path.join(upgradedWs, '.combwork', 'hive.db'), { timeout: 5000 })
+    const db = new DatabaseSync(path.join(upgradedWs, '.combwork', 'combwork.db'), { timeout: 5000 })
     try {
       db.prepare("INSERT INTO board_meta (key, value) VALUES ('adoption_upto', '3') ON CONFLICT (key) DO UPDATE SET value = excluded.value").run()
     } finally {

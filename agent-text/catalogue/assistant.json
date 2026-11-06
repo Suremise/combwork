@@ -26,12 +26,12 @@
   },
   "assistant.template.badToken": {
     "text": "{name} uses {token}: an agent’s name may only hold '{key}' (the project’s key) and '{n}' (its number among the agents with that name).",
-    "note": "Why a template file can't be used: an agent's name pattern ({name}) holds {token}, a token Hive doesn't know. The quoted '{key}' and '{n}' are shown as {key} and {n}: keep them, with their straight quotes, as they are.",
+    "note": "Why a template file can't be used: an agent's name pattern ({name}) holds {token}, a token Combwork doesn't know. The quoted '{key}' and '{n}' are shown as {key} and {n}: keep them, with their straight quotes, as they are.",
     "audience": "both"
   },
   "assistant.template.from09": {
-    "text": "This template is from Combwork 0.9 and can't be loaded in 1.0. Recreate it from your agents with Save as Template.",
-    "note": "Why a template file can't be used: Hive 0.9 made it (its agents had worktrees of their own; 1.0's don't). Save as Template is a command: as Hive names it.",
+    "text": "This template is from version 0.9 and can't be loaded in 1.0. Recreate it from your agents with Save as Template.",
+    "note": "Why a template file can't be used: version 0.9 made it (its agents had worktrees of their own; 1.0's don't). Save as Template is a command: as Combwork names it.",
     "audience": "both"
   },
   "assistant.template.longNote": {
@@ -41,7 +41,7 @@
   },
   "assistant.template.newer": {
     "text": "It was made by a newer version of Combwork: update Combwork to use it.",
-    "note": "Why a template file can't be used: a newer Hive made it.",
+    "note": "Why a template file can't be used: a newer Combwork made it.",
     "audience": "both"
   },
   "assistant.template.noAgents": {

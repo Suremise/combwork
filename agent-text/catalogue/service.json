@@ -1,7 +1,7 @@
 {
   "service.advanced.asIs": {
     "text": "{problem}",
-    "note": "Why advanced.json can't be used, in English (kept from before Hive translated it). Keep it as {problem} alone.",
+    "note": "Why advanced.json can't be used, in English (kept from before Combwork translated it). Keep it as {problem} alone.",
     "audience": "both"
   },
   "service.advanced.changedOutside": {
@@ -21,12 +21,12 @@
   },
   "service.advanced.newer": {
     "text": "advanced.json is from a newer Combwork (format {format}): this one reads format {supported}.",
-    "note": "Above Settings → Advanced's list: advanced.json (a file name: keep it) was written by a newer version of Hive, in a format ({format}) this one can't read ({supported} is the one it reads).",
+    "note": "Above Settings → Advanced's list: advanced.json (a file name: keep it) was written by a newer version of Combwork, in a format ({format}) this one can't read ({supported} is the one it reads).",
     "audience": "both"
   },
   "service.advanced.notJson": {
     "text": "advanced.json isn't valid JSON ({error}).",
-    "note": "Above Settings → Advanced's list: Hive's advanced settings file (advanced.json, a file name: keep it) can't be read as JSON; {error} is the JSON reader's own words (English, with no full stop of its own). A sentence of its own: more follows it.",
+    "note": "Above Settings → Advanced's list: Combwork's advanced settings file (advanced.json, a file name: keep it) can't be read as JSON; {error} is the JSON reader's own words (English, with no full stop of its own). A sentence of its own: more follows it.",
     "audience": "both"
   },
   "service.advanced.notObject": {
@@ -41,22 +41,22 @@
   },
   "service.advanced.unknown": {
     "text": "No advanced setting \"{id}\".",
-    "note": "An error changing an advanced setting: Hive has none with the id {id}.",
+    "note": "An error changing an advanced setting: Combwork has none with the id {id}.",
     "audience": "both"
   },
   "service.attachments.badFolder": {
     "text": "Not a session folder name.",
-    "note": "An error: a name given for a session's attachments folder isn't one Hive makes (a session id).",
+    "note": "An error: a name given for a session's attachments folder isn't one Combwork makes (a session id).",
     "audience": "both"
   },
   "service.attachments.badRecord": {
     "text": "{file} is not a record of moved files",
-    "note": "An error: the file {file} where Hive records attachments it renamed can't be read as one (damaged).",
+    "note": "An error: the file {file} where Combwork records attachments it renamed can't be read as one (damaged).",
     "audience": "both"
   },
   "service.attachments.notOwn": {
     "text": "{folder} is a link or not a folder of the project's own, so Combwork keeps no attachments in it.",
-    "note": "An error keeping a pasted or dropped file for a session: its folder {folder} (in the project's .combwork) is a link or leads elsewhere, so Hive writes nothing through it.",
+    "note": "An error keeping a pasted or dropped file for a session: its folder {folder} (in the project's .combwork) is a link or leads elsewhere, so Combwork writes nothing through it.",
     "audience": "both"
   },
   "service.benchmarks.allPinned": {
@@ -111,12 +111,12 @@
   },
   "service.benchmarks.unwritable": {
     "text": "Combwork refused to write a list of kept comparisons it couldn’t read back: nothing was changed.",
-    "note": "An error on the Performance page: the list of kept comparisons Hive was about to write wouldn't read back as valid, so it wasn't written.",
+    "note": "An error on the Performance page: the list of kept comparisons Combwork was about to write wouldn't read back as valid, so it wasn't written.",
     "audience": "both"
   },
   "service.benchmarks.why": {
     "text": "{why, select, missing {the list of kept comparisons was missing} damaged {the list of kept comparisons was damaged} entry {an entry of the list of kept comparisons was damaged} other {the list of kept comparisons had too many entries}}",
-    "note": "Why Hive rebuilt the list of kept comparisons from their files: it was missing, damaged, had a damaged entry, or had too many entries. A clause, lower case (it follows \"Recovered:\").",
+    "note": "Why Combwork rebuilt the list of kept comparisons from their files: it was missing, damaged, had a damaged entry, or had too many entries. A clause, lower case (it follows \"Recovered:\").",
     "audience": "both"
   },
   "service.benchmarks.wrongScope": {
@@ -151,7 +151,7 @@
   },
   "service.cardAttach.refused": {
     "text": "{path} is not a file that can be attached here: give the path of a file of your own project (its folder, its slots) or of the temp folder. Nothing was attached.",
-    "note": "An error attaching a file to a card by its path (HI-1700): it is missing, a folder or a link, or in a place the caller may not attach from (another project, Hive’s own folders). Nothing was attached.",
+    "note": "An error attaching a file to a card by its path (HI-1700): it is missing, a folder or a link, or in a place the caller may not attach from (another project, Combwork’s own folders). Nothing was attached.",
     "audience": "both"
   },
   "service.cardAttach.refusedFrom": {
@@ -172,6 +172,61 @@
   "service.cardCleanup.stale": {
     "text": "This list is out of date: nothing was removed. Open Clean Up Now again.",
     "note": "An error of Clean Up Now (Project Settings → Storage, HI-1842): the list of archived cards' files it showed expired, was used already, or belongs to a workspace closed since; nothing was removed.",
+    "audience": "both"
+  },
+  "service.combworkMove.busy": {
+    "text": "Another Combwork is moving this workspace's old data folders to .combwork ({profile}). Open it again once it has finished.",
+    "note": "An error opening a workspace (HI-2462): another copy of the app ({profile}: its profile folder's name) is renaming the workspace's old data folders to .combwork now. Keep .combwork as it is.",
+    "audience": "both"
+  },
+  "service.combworkMove.closed": {
+    "text": "The workspace was closed while Combwork was moving its old data folders to .combwork. Open it again to finish.",
+    "note": "An error opening a workspace (HI-2462): it was closed, or another was opened in its window, during the rename of its old data folders to .combwork. Keep .combwork as it is.",
+    "audience": "both"
+  },
+  "service.combworkMove.locked": {
+    "text": "Combwork couldn't move {folder} to .combwork: a program has a file in it open. Close that program (or another Combwork, or a 1.0 copy, using this workspace), then open the workspace again. Nothing was lost.",
+    "note": "An error opening a workspace (HI-2462): its old data folder, renamed .combwork in this version, couldn't be renamed because a file in it is open. {folder} is the folder. A 1.0 copy: the app's version 1.0, from before it was renamed. Keep .combwork as it is (a folder name).",
+    "audience": "both"
+  },
+  "service.combworkMove.otherOpen": {
+    "text": "This workspace is open in another Combwork or a 1.0 copy ({profile}). Close it there, then open it here: Combwork moves its old data folders to .combwork first.",
+    "note": "An error opening a workspace (HI-2462): another copy of the app ({profile}: its profile folder's name; a 1.0 copy: the app's version 1.0, from before it was renamed) has it open, so its old data folders can't be renamed .combwork now. Keep .combwork as it is.",
+    "audience": "both"
+  },
+  "service.combworkMove.phaseFailed": {
+    "text": "Combwork moved this workspace's old data folders to .combwork, but couldn't finish updating {what}: {error} Open the workspace again to finish.",
+    "note": "An error opening a workspace (HI-2462): its old data folders were renamed .combwork, but a step after that failed; the next open finishes it. {what} is what it was updating (main.combworkMove.what.*); {error} says why, a sentence. Keep .combwork as it is.",
+    "audience": "both"
+  },
+  "service.combworkVcs.cantList": {
+    "text": "Git couldn't list the files it tracks in .combwork.",
+    "note": "An error untracking the project's .combwork folder from git: git couldn't list them. Keep .combwork as it is (a folder name).",
+    "audience": "both"
+  },
+  "service.combworkVcs.cantListWhy": {
+    "text": "Git couldn't list the files it tracks in .combwork ({problem}).",
+    "note": "An error untracking the project's .combwork folder from git: git can't run; {problem} says why (\"Git isn't installed\"). Keep .combwork as it is (a folder name).",
+    "audience": "both"
+  },
+  "service.combworkVcs.changed": {
+    "text": "The files git tracks in .combwork changed since you were shown them: nothing was untracked. Look again.",
+    "note": "An error untracking the project's .combwork folder from git: the list of its tracked files changed after Combwork showed it, so nothing changed. Keep .combwork as it is.",
+    "audience": "both"
+  },
+  "service.combworkVcs.exitCode": {
+    "text": "exit code {code}",
+    "note": "Why a git command failed when git said nothing: the number it exited with.",
+    "audience": "both"
+  },
+  "service.combworkVcs.noRepo": {
+    "text": "No git repository holds this project.",
+    "note": "An error untracking the project's .combwork folder (Combwork's own files) from git: the project isn't in a git repository.",
+    "audience": "both"
+  },
+  "service.combworkVcs.rmFailed": {
+    "text": "git rm --cached failed: {why}",
+    "note": "An error untracking the project's .combwork folder from git: the git command (git rm --cached: keep it) failed; {why} is git's own first line, or why git can't run.",
     "audience": "both"
   },
   "service.files.badName": {
@@ -221,7 +276,7 @@
   },
   "service.files.notKept": {
     "text": "Not one of the session attachments Combwork keeps.",
-    "note": "An error deleting a session's attachment (a file pasted or dropped into a session): it isn't one Hive keeps, or it is a link.",
+    "note": "An error deleting a session's attachment (a file pasted or dropped into a session): it isn't one Combwork keeps, or it is a link.",
     "audience": "both"
   },
   "service.files.outside": {
@@ -236,17 +291,17 @@
   },
   "service.fsutil.keptBusy": {
     "text": "{file} is being saved by something else: nothing was changed. Try again in a moment.",
-    "note": "An error: one of Hive's settings or records files ({file}: its path) was still being written by another program (an editor, a script), so Hive's change to it wasn't made.",
+    "note": "An error: one of Combwork's settings or records files ({file}: its path) was still being written by another program (an editor, a script), so Combwork's change to it wasn't made.",
     "audience": "both"
   },
   "service.fsutil.keptUnreadable": {
     "text": "{file} couldn't be read: nothing was changed. Try again in a moment.",
-    "note": "An error: one of Hive's settings or records files ({file}: its path) is there but couldn't be read (another program had it locked, or a disk error), so Hive's change to it wasn't made and the file was left as it is.",
+    "note": "An error: one of Combwork's settings or records files ({file}: its path) is there but couldn't be read (another program had it locked, or a disk error), so Combwork's change to it wasn't made and the file was left as it is.",
     "audience": "both"
   },
   "service.fsutil.notCopied": {
     "text": "{name} could not be copied",
-    "note": "An error putting back one of Hive's skills or modes: its copy couldn't be made ({name}: its folder or file name); nothing was replaced.",
+    "note": "An error putting back one of Combwork's skills or modes: its copy couldn't be made ({name}: its folder or file name); nothing was replaced.",
     "audience": "both"
   },
   "service.git.exitCode": {
@@ -306,7 +361,7 @@
   },
   "service.gitRepo.diverged": {
     "text": "{branch} and {upstream} have diverged ({ahead, plural, one {# commit} other {# commits}} here, {behind, number} there), so pulling needs a merge or rebase. Do that in a terminal, or ask an agent to.",
-    "note": "An error pulling in the Git view: the branch {branch} has {ahead} commits the remote branch {upstream} hasn't, and it has {behind} the branch hasn't; Hive pulls only when no merge is needed.",
+    "note": "An error pulling in the Git view: the branch {branch} has {ahead} commits the remote branch {upstream} hasn't, and it has {behind} the branch hasn't; Combwork pulls only when no merge is needed.",
     "audience": "both"
   },
   "service.gitRepo.exitCode": {
@@ -361,7 +416,7 @@
   },
   "service.gitRepo.noTarget": {
     "text": "There's no branch {target} here to check the branches against.",
-    "note": "An error deleting branches in Version Control → Branches & remotes: the branch the project's work merges into ({target}; the default branch when none is set) isn't in the repository, so Hive can't tell which branches are merged.",
+    "note": "An error deleting branches in Version Control → Branches & remotes: the branch the project's work merges into ({target}; the default branch when none is set) isn't in the repository, so Combwork can't tell which branches are merged.",
     "audience": "both"
   },
   "service.gitRepo.noUpstream": {
@@ -371,7 +426,7 @@
   },
   "service.gitRepo.notOnRemote": {
     "text": "{remote} has no {branch} (as of the last fetch): push it there first, or fetch.",
-    "note": "An error choosing what a branch tracks in the Git view: the remote {remote} has no branch {branch} that Hive knows of.",
+    "note": "An error choosing what a branch tracks in the Git view: the remote {remote} has no branch {branch} that Combwork knows of.",
     "audience": "both"
   },
   "service.gitRepo.notRepo": {
@@ -421,7 +476,7 @@
   },
   "service.gitRepo.remoteDeleteRefused": {
     "text": "{remote} refused to delete {branches}: it has commits there you haven't fetched, or it doesn't allow deleting them.",
-    "note": "After deleting branches on the remote {remote}: it refused those listed in {branches} (Hive deletes a remote branch only at the commit you were shown).",
+    "note": "After deleting branches on the remote {remote}: it refused those listed in {branches} (Combwork deletes a remote branch only at the commit you were shown).",
     "audience": "both"
   },
   "service.gitRepo.remoteTaken": {
@@ -466,7 +521,7 @@
   },
   "service.gitRepo.update.conflict": {
     "text": "{how, select, rebase {Rebasing} other {Merging}} {branch} with {target} stopped at a conflict in {files}, so it was undone: {branch} is as it was. Update it by hand, or ask its builder to.",
-    "note": "An error updating a branch from its target: git stopped at a conflict, and Hive aborted it, leaving the branch and its folder as they were. {how}: merge or rebase (select: translate each); {branch} the branch, {target} the target; {files} the files in conflict, joined (src/a.ts and src/b.ts).",
+    "note": "An error updating a branch from its target: git stopped at a conflict, and Combwork aborted it, leaving the branch and its folder as they were. {how}: merge or rebase (select: translate each); {branch} the branch, {target} the target; {files} the files in conflict, joined (src/a.ts and src/b.ts).",
     "audience": "both"
   },
   "service.gitRepo.update.dirty": {
@@ -476,7 +531,7 @@
   },
   "service.gitRepo.update.failed": {
     "text": "Couldn't update {branch} from {target}, so it is as it was: {why}",
-    "note": "An error updating a branch from its target that isn't a conflict (a hook refused the commit, signing failed…); Hive undid what git started. {why} is git's own words.",
+    "note": "An error updating a branch from its target that isn't a conflict (a hook refused the commit, signing failed…); Combwork undid what git started. {why} is git's own words.",
     "audience": "both"
   },
   "service.gitRepo.update.isTarget": {
@@ -496,7 +551,7 @@
   },
   "service.gitRepo.update.moved": {
     "text": "{branch} changed while it was being updated, so nothing was changed: try again.",
-    "note": "An error updating a branch from its target: the branch moved to another commit meanwhile (a commit, a push), so Hive left it as it is.",
+    "note": "An error updating a branch from its target: the branch moved to another commit meanwhile (a commit, a push), so Combwork left it as it is.",
     "audience": "both"
   },
   "service.gitRepo.update.noTarget": {
@@ -506,22 +561,22 @@
   },
   "service.gitRepo.update.notUndone": {
     "text": "Updating {branch} from {target} stopped, and Combwork couldn't undo it: {folder} is {state, select, none {left changed} merge {still in the middle of a merge} rebase {still in the middle of a rebase} other {still in the middle of a git operation}}. Finish or abort it there yourself (git status says how), then check {branch}. Git said: {why}",
-    "note": "An error updating a branch from its target (HI-1180): git stopped, and Hive's own abort failed, so the folder ({folder}: a slot's name, a folder's name or a path) is left as git left it ({state}: none, merge, rebase or another operation; select: translate each). {why} is git's own words.",
+    "note": "An error updating a branch from its target (HI-1180): git stopped, and Combwork's own abort failed, so the folder ({folder}: a slot's name, a folder's name or a path) is left as git left it ({state}: none, merge, rebase or another operation; select: translate each). {why} is git's own words.",
     "audience": "both"
   },
   "service.gitRepo.update.notUndoneTemporary": {
     "text": "Updating {branch} from {target} stopped, and Combwork couldn't undo it in its temporary folder {folder}, kept as git left it: {branch} itself is as it was. Remove that folder in Unused worktrees once you have looked. Git said: {why}",
-    "note": "An error updating a branch from its target (HI-1180) that was checked out nowhere: git stopped in the temporary folder Hive made ({folder}: its path), and Hive's abort failed, so the folder is kept; the branch itself wasn't moved. {state} is unused here. {why} is git's own words.",
+    "note": "An error updating a branch from its target (HI-1180) that was checked out nowhere: git stopped in the temporary folder Combwork made ({folder}: its path), and Combwork's abort failed, so the folder is kept; the branch itself wasn't moved. {state} is unused here. {why} is git's own words.",
     "audience": "both"
   },
   "service.gitRepo.update.queued": {
     "text": "{card} is in the merge queue, which brings it up to date itself: take it out of the queue first to update {branch} here.",
-    "note": "Why updating a branch from its target is refused: the branch is the line of a card ({card}: its key, such as HI-12) that Hive's merge queue is merging now. {branch} is the branch.",
+    "note": "Why updating a branch from its target is refused: the branch is the line of a card ({card}: its key, such as HI-12) that Combwork's merge queue is merging now. {branch} is the branch.",
     "audience": "both"
   },
   "service.gitRepo.update.temporaryLeft": {
     "text": "Combwork couldn't remove its temporary folder {folder}: remove it in Unused worktrees.",
-    "note": "A second line after Update from <target> on a branch checked out nowhere (HI-1180): the temporary folder Hive made for it ({folder}: its path) could not be removed.",
+    "note": "A second line after Update from <target> on a branch checked out nowhere (HI-1180): the temporary folder Combwork made for it ({folder}: its path) could not be removed.",
     "audience": "both"
   },
   "service.gitRepo.upstreamGone": {
@@ -534,61 +589,6 @@
     "note": "An error changing the address of the remote {remote} in the Git view; {why} is git's own words.",
     "audience": "both"
   },
-  "service.hiveMove.busy": {
-    "text": "Another Combwork is moving this workspace's .hive folders to .combwork ({profile}). Open it again once it has finished.",
-    "note": "An error opening a workspace (HI-2462): another copy of the app ({profile}: its profile folder's name) is renaming the workspace's .hive folders to .combwork now. Keep .hive and .combwork as they are.",
-    "audience": "both"
-  },
-  "service.hiveMove.closed": {
-    "text": "The workspace was closed while Combwork was moving its .hive folders to .combwork. Open it again to finish.",
-    "note": "An error opening a workspace (HI-2462): it was closed, or another was opened in its window, during the rename of its .hive folders to .combwork. Keep .hive and .combwork as they are.",
-    "audience": "both"
-  },
-  "service.hiveMove.locked": {
-    "text": "Combwork couldn't move {folder} to .combwork: a program has a file in it open. Close that program (or the other Combwork or Hive using this workspace), then open the workspace again. Nothing was lost.",
-    "note": "An error opening a workspace (HI-2462): its .hive folder, renamed .combwork in this version, couldn't be renamed because a file in it is open. {folder} is the folder. Keep .hive and .combwork as they are (folder names).",
-    "audience": "both"
-  },
-  "service.hiveMove.otherOpen": {
-    "text": "This workspace is open in another Combwork or Hive ({profile}). Close it there, then open it here: Combwork moves its .hive folders to .combwork first.",
-    "note": "An error opening a workspace (HI-2462): another copy of the app ({profile}: its profile folder's name) has it open, so its .hive folders can't be renamed .combwork now. Keep .hive and .combwork as they are.",
-    "audience": "both"
-  },
-  "service.hiveMove.phaseFailed": {
-    "text": "Combwork moved this workspace's .hive folders to .combwork, but couldn't finish updating {what}: {error} Open the workspace again to finish.",
-    "note": "An error opening a workspace (HI-2462): its .hive folders were renamed .combwork, but a step after that failed; the next open finishes it. {what} is what it was updating (main.hiveMove.what.*); {error} says why, a sentence. Keep .hive and .combwork as they are.",
-    "audience": "both"
-  },
-  "service.hiveVcs.cantList": {
-    "text": "Git couldn't list the files it tracks in .combwork.",
-    "note": "An error untracking the project's .combwork folder from git: git couldn't list them. Keep .combwork as it is (a folder name).",
-    "audience": "both"
-  },
-  "service.hiveVcs.cantListWhy": {
-    "text": "Git couldn't list the files it tracks in .combwork ({problem}).",
-    "note": "An error untracking the project's .combwork folder from git: git can't run; {problem} says why (\"Git isn't installed\"). Keep .combwork as it is (a folder name).",
-    "audience": "both"
-  },
-  "service.hiveVcs.changed": {
-    "text": "The files git tracks in .combwork changed since you were shown them: nothing was untracked. Look again.",
-    "note": "An error untracking the project's .combwork folder from git: the list of its tracked files changed after Hive showed it, so nothing changed. Keep .combwork as it is.",
-    "audience": "both"
-  },
-  "service.hiveVcs.exitCode": {
-    "text": "exit code {code}",
-    "note": "Why a git command failed when git said nothing: the number it exited with.",
-    "audience": "both"
-  },
-  "service.hiveVcs.noRepo": {
-    "text": "No git repository holds this project.",
-    "note": "An error untracking the project's .combwork folder (Hive's own files) from git: the project isn't in a git repository.",
-    "audience": "both"
-  },
-  "service.hiveVcs.rmFailed": {
-    "text": "git rm --cached failed: {why}",
-    "note": "An error untracking the project's .combwork folder from git: the git command (git rm --cached: keep it) failed; {why} is git's own first line, or why git can't run.",
-    "audience": "both"
-  },
   "service.intent.noWorkflow": {
     "text": "{card} has no workflow: it is a card about the workspace, or its project has no version control chosen yet. Move it on the board instead.",
     "note": "An error: an intent (a card's start, submission, verdict…) was asked for a card that has no workflow, because it belongs to no project or its project's version control (Git or None) isn't chosen yet. {card} is the card's key (HI-12).",
@@ -596,7 +596,7 @@
   },
   "service.intent.queueNotAgents": {
     "text": "Only the user, or the Assistant within Settings → Assistant → Control, takes a card out of the merge queue or retries its merge.",
-    "note": "An error: an agent or a script asked to remove a card from the merge queue or retry its merge, which only the user and the Hive Assistant (within its Control setting, a setting name: use it as Hive shows it) can do.",
+    "note": "An error: an agent or a script asked to remove a card from the merge queue or retry its merge, which only the user and the Combwork Assistant (within its Control setting, a setting name: use it as Combwork shows it) can do.",
     "audience": "both"
   },
   "service.keys.closed": {
@@ -621,7 +621,7 @@
   },
   "service.keys.unknownProject": {
     "text": "That project has no id yet, so it can’t have a key: open it in Combwork first.",
-    "note": "An error changing a project's key: the project hasn't been given Hive's id (it hasn't been opened yet).",
+    "note": "An error changing a project's key: the project hasn't been given Combwork's id (it hasn't been opened yet).",
     "audience": "both"
   },
   "service.laneStart.busy": {
@@ -681,7 +681,7 @@
   },
   "service.lanes.teamPaused": {
     "text": "The team is paused (before an update): resume the team first, then start the lane.",
-    "note": "An error starting a lane (a card loop) while the user or the Hive Assistant has paused the whole team before an update (HI-2081): nothing of a lane starts until the team resumes (Resume the Team, in the Progress panel's Lanes).",
+    "note": "An error starting a lane (a card loop) while the user or the Combwork Assistant has paused the whole team before an update (HI-2081): nothing of a lane starts until the team resumes (Resume the Team, in the Progress panel's Lanes).",
     "audience": "both"
   },
   "service.lanes.unknown": {
@@ -704,9 +704,24 @@
     "note": "An error reading metrics: the role filter isn't one of its values. Keep role, agent, assistant, api and viewer as they are (a parameter and its values).",
     "audience": "both"
   },
+  "service.nameUpgrade.boardNotFolded": {
+    "text": "Combwork couldn't rename the board's file {file} to combwork.db: its log {log} still holds changes after it was closed. Close any other program using the workspace, then open it again. Nothing was lost.",
+    "note": "An error opening a workspace (HI-2587): the task board database, renamed combwork.db in this version, still had changes in its SQLite log beside it, so it was left as it is. {file} and {log} are file paths. Keep combwork.db as it is (a file name).",
+    "audience": "both"
+  },
+  "service.nameUpgrade.boardOrphan": {
+    "text": "The workspace's board file is missing, but {file} beside where it was holds changes that may be the only copy of them. Combwork won't start an empty board over it. Close Combwork, put the board's file back beside it under its old name, {old} (from .combwork\\backups or another copy), then open the workspace again.",
+    "note": "An error opening a workspace (HI-2587): no task board database is there, but an SQLite log or journal of the old one is, holding data. {file} is its path; {old} is the board file's name from before 1.1. Keep .combwork\\backups as it is (a folder name).",
+    "audience": "both"
+  },
+  "service.nameUpgrade.failed": {
+    "text": "Combwork couldn't finish renaming {what} from the old names to Combwork's: {error} Open the workspace again to finish. Nothing was lost.",
+    "note": "An error opening a workspace (HI-2587): a step of the one-time upgrade of the names the app stored before 1.1 (files, settings) to Combwork's failed; the next open tries again. {what} is what it was renaming (main.nameUpgrade.what.*); {error} says why, a sentence.",
+    "audience": "both"
+  },
   "service.providers.noSetup": {
     "text": "{cli} has no setup task.",
-    "note": "An error: the coding agent CLI {cli} (\"Codex\") has no setup task for Hive to run.",
+    "note": "An error: the coding agent CLI {cli} (\"Codex\") has no setup task for Combwork to run.",
     "audience": "both"
   },
   "service.providers.notInstalled": {
@@ -726,12 +741,12 @@
   },
   "service.providers.stillLooking": {
     "text": "Combwork is still looking for {cli}. Try again in a moment.",
-    "note": "An error: Hive hasn't finished finding the coding agent CLI {cli} (\"Codex\"), so it can't use it yet.",
+    "note": "An error: Combwork hasn't finished finding the coding agent CLI {cli} (\"Codex\"), so it can't use it yet.",
     "audience": "both"
   },
   "service.providers.stillLookingAll": {
     "text": "Combwork is still looking for the coding agent CLIs. Try again in a moment.",
-    "note": "An error: Hive hasn't finished finding the coding agent CLIs installed (it does when it starts), so it can't choose one yet.",
+    "note": "An error: Combwork hasn't finished finding the coding agent CLIs installed (it does when it starts), so it can't choose one yet.",
     "audience": "both"
   },
   "service.providers.stopFirst": {
@@ -741,17 +756,17 @@
   },
   "service.slots.notPrepared": {
     "text": "Combwork couldn't get {slot} ready for {card}: {why}",
-    "note": "A notice: a card was started in a slot (a worktree Hive lends to a card or a lane), and Hive couldn't check out the card's branch there or install its dependencies. {slot} is the slot's name (slot-b), {card} the card's key, {why} git's or the setup's reason, in English.",
+    "note": "A notice: a card was started in a slot (a worktree Combwork lends to a card or a lane), and Combwork couldn't check out the card's branch there or install its dependencies. {slot} is the slot's name (slot-b), {card} the card's key, {why} git's or the setup's reason, in English.",
     "audience": "both"
   },
   "service.slots.resumeFailed": {
     "text": "Combwork couldn't resume {agent}'s conversation in {slot} for {card} (three tries): {why}. Resume {agent} from Sessions, or start it fresh, and Combwork gives it {card}.",
-    "note": "A notice (HI-1746): a card was started for an agent (its builder) in a slot, and Hive's resumes of the agent's last conversation there failed three times, so it stopped trying. Once the user resumes the agent, or starts it, Hive hands it the card. {card} is the card's key, {agent} the agent's name, {slot} the slot's name (slot-b), {why} the last failure's reason, in English.",
+    "note": "A notice (HI-1746): a card was started for an agent (its builder) in a slot, and Combwork's resumes of the agent's last conversation there failed three times, so it stopped trying. Once the user resumes the agent, or starts it, Combwork hands it the card. {card} is the card's key, {agent} the agent's name, {slot} the slot's name (slot-b), {why} the last failure's reason, in English.",
     "audience": "both"
   },
   "service.slots.resumeHeld": {
     "text": "Combwork can't give {card} to {agent} yet: {agent}'s conversation in {slot} can't resume now ({why}). Combwork gives it {card} once it can.",
-    "note": "A notice (HI-1746): a card was started for an agent (its builder) in a slot, and Hive hasn't handed the card to it yet; the agent's last conversation, in that slot, can't be resumed now, and Hive never starts a new conversation instead. {card} is the card's key, {agent} the agent's name, {slot} the slot's name (slot-b), {why} the reason, in English.",
+    "note": "A notice (HI-1746): a card was started for an agent (its builder) in a slot, and Combwork hasn't handed the card to it yet; the agent's last conversation, in that slot, can't be resumed now, and Combwork never starts a new conversation instead. {card} is the card's key, {agent} the agent's name, {slot} the slot's name (slot-b), {why} the reason, in English.",
     "audience": "both"
   },
   "service.transcripts.busy": {
@@ -796,7 +811,7 @@
   },
   "service.workspace.advancedNotHere": {
     "text": "{setting} can't be set for a workspace.",
-    "note": "An error: the advanced setting {setting} (its title, or its id) has no value of its own for a workspace, only for Hive.",
+    "note": "An error: the advanced setting {setting} (its title, or its id) has no value of its own for a workspace, only for Combwork.",
     "audience": "both"
   },
   "service.workspace.agentGone": {
@@ -826,12 +841,12 @@
   },
   "service.workspace.holdsOpen": {
     "text": "The workspace {workspace}, open in another window, is inside {folder}. Close it first to open {name} as a workspace.",
-    "note": "An error opening a workspace: another Hive window's workspace {workspace} is inside the folder {folder} (its name: {name}).",
+    "note": "An error opening a workspace: another Combwork window's workspace {workspace} is inside the folder {folder} (its name: {name}).",
     "audience": "both"
   },
   "service.workspace.insideOpen": {
     "text": "{folder} is inside the workspace {workspace}, which is open in another window. Close that workspace first, or open this folder's projects from there.",
-    "note": "An error opening a workspace: the folder {folder} is inside {workspace}, the workspace of another Hive window (a workspace inside another would share its projects).",
+    "note": "An error opening a workspace: the folder {folder} is inside {workspace}, the workspace of another Combwork window (a workspace inside another would share its projects).",
     "audience": "both"
   },
   "service.workspace.none": {
@@ -856,7 +871,7 @@
   },
   "service.workspace.openElsewhere": {
     "text": "{folder} is already open in another window.",
-    "note": "An error opening a workspace: the folder {folder} is the workspace of another Hive window.",
+    "note": "An error opening a workspace: the folder {folder} is the workspace of another Combwork window.",
     "audience": "both"
   },
   "service.workspace.stillClosing": {
@@ -866,7 +881,7 @@
   },
   "service.workspace.stillOpening": {
     "text": "{name} is still opening: wait for it to finish, then try again.",
-    "note": "An error opening, making or closing a workspace while this window is still opening its workspace {name} (bringing its skills up to date, or upgrading it to Hive 1.0).",
+    "note": "An error opening, making or closing a workspace while this window is still opening its workspace {name} (bringing its skills up to date, or upgrading it to 1.0).",
     "audience": "both"
   }
 }

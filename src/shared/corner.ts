@@ -1,6 +1,6 @@
 /**
  * Where the bottom-right corner's floating things (the tip card, and the toasts stacked above it) go so they never
- * cover what is under them: left of the Hive Assistant's panel while it is open, and lifted just above a bar with
+ * cover what is under them: left of the Combwork Assistant's panel while it is open, and lifted just above a bar with
  * buttons in that corner (a pane's or the Assistant's "ended" or "couldn't start" bar).
  */
 export interface Box {

@@ -217,7 +217,7 @@
   },
   "panes.footer.costEstimated": {
     "defaultMessage": "API-equivalent cost of this session, estimated by Combwork from its tokens",
-    "description": "Hover of a pane footer's cost (≈): Hive estimated it from the session's tokens at API prices."
+    "description": "Hover of a pane footer's cost (≈): Combwork estimated it from the session's tokens at API prices."
   },
   "panes.footer.costFreeTip": {
     "defaultMessage": "This conversation runs only on a server on this PC, so it costs nothing. Its tokens are still counted.",
@@ -234,6 +234,10 @@
   "panes.footer.handOverWhen": {
     "defaultMessage": "{when, select, now {Hand it over to a new conversation: click for Hand Over to…, and choose the agent itself.} other {It can hand over to a new conversation when it has finished: not while it works, merges or is on a card loop's card.}}",
     "description": "What to do about a long transcript, in its hover (pane footer): now (the agent is idle: \"Hand Over to…\" is the agent menu's item, use its translation); other (it is working, merging or on a card loop's card)."
+  },
+  "panes.footer.modelSwitched": {
+    "defaultMessage": "Launched with {launched}, its connection's model; {provider} now runs {running}. Restart the agent to go back to {launched}.",
+    "description": "The first paragraph of the hover of the model in a pane's footer, shown with a warning while the agent runs another model than Combwork started it with (HI-2609: Codex switched to a cheaper model at a prompt of its own). {launched} and {running} are model names (\"GPT-6 Astra\"), {provider} the coding agent (\"Codex\"); its connection is the account Combwork started it on."
   },
   "panes.footer.modelTip": {
     "defaultMessage": "{chosenAs, select, none {} other {{model} · chosen as {chosenAs}. }}{provider} {effort, select, yes {model and effort} other {model}} {live, select, yes {of this session} other {for new sessions}}{reported, select, yes { (effort as the session reports it)} other {}}. Change them in {where}.",
@@ -253,7 +257,7 @@
   },
   "panes.footer.stale": {
     "defaultMessage": "Couldn’t read it again just now: this may be behind.",
-    "description": "A line of the hover of a pane footer's context: Hive couldn't read the usage again, so the numbers may be old."
+    "description": "A line of the hover of a pane footer's context: Combwork couldn't read the usage again, so the numbers may be old."
   },
   "panes.footer.tasks": {
     "defaultMessage": "{n, plural, one {# background task} other {# background tasks}}",
@@ -289,7 +293,7 @@
   },
   "panes.header.inputBlocked": {
     "defaultMessage": "Its input takes no keys",
-    "description": "A pane's status: keys Hive typed into the agent's input didn't reach it (something on its screen takes them). Keep it short."
+    "description": "A pane's status: keys Combwork typed into the agent's input didn't reach it (something on its screen takes them). Keep it short."
   },
   "panes.header.inputBlockedTip": {
     "defaultMessage": "Keys Combwork typed into this agent's input didn't reach it: something on its screen, such as a question of its CLI's own, is taking them. Combwork types nothing more into it and gives it nothing until it takes keys again. Answer it in its terminal, then press Try again.",
@@ -297,7 +301,7 @@
   },
   "panes.header.inputRetry": {
     "defaultMessage": "Try again",
-    "description": "Button beside a pane's status when the agent's input takes no keys: Hive checks once that its input takes keys again (after the user answered what took them). Keep it short."
+    "description": "Button beside a pane's status when the agent's input takes no keys: Combwork checks once that its input takes keys again (after the user answered what took them). Keep it short."
   },
   "panes.header.inputRetryFailed": {
     "defaultMessage": "Could not try the input again",
@@ -313,7 +317,7 @@
   },
   "panes.header.markIdle": {
     "defaultMessage": "Mark idle",
-    "description": "Button beside a pane's unknown state, and an item of its ⋯ menu: tells Hive the agent is idle (its terminal shows it at its prompt). Keep it short."
+    "description": "Button beside a pane's unknown state, and an item of its ⋯ menu: tells Combwork the agent is idle (its terminal shows it at its prompt). Keep it short."
   },
   "panes.header.markIdleFailed": {
     "defaultMessage": "Could not mark the agent idle",
@@ -329,7 +333,7 @@
   },
   "panes.header.retryLarge": {
     "defaultMessage": "This conversation is large, and each request sends all of it. A new conversation (a handover, then a fresh session) sends less, which can help under a rate limit.",
-    "description": "Tooltip of a pane's status while its coding agent is rate-limited and its conversation is large: a suggestion, not something Hive does."
+    "description": "Tooltip of a pane's status while its coding agent is rate-limited and its conversation is large: a suggestion, not something Combwork does."
   },
   "panes.header.retrySince": {
     "defaultMessage": "Retrying since {time}.",
@@ -341,7 +345,7 @@
   },
   "panes.header.slotHeld": {
     "defaultMessage": "Waiting for its slot",
-    "description": "A pane's status (HI-2304): Hive will start or resume the agent in its slot (a worktree Hive lends it) once the processes another run left running there have ended. The tooltip says what holds it."
+    "description": "A pane's status (HI-2304): Combwork will start or resume the agent in its slot (a worktree Combwork lends it) once the processes another run left running there have ended. The tooltip says what holds it."
   },
   "panes.header.stopTip": {
     "defaultMessage": "Stop this agent (the conversation is kept; resume it any time)",
@@ -353,11 +357,11 @@
   },
   "panes.header.untaken": {
     "defaultMessage": "A line Combwork typed wasn't taken",
-    "description": "A pane's status: a line Hive typed into the agent's CLI wasn't taken."
+    "description": "A pane's status: a line Combwork typed into the agent's CLI wasn't taken."
   },
   "panes.header.untakenTip": {
     "defaultMessage": "Combwork typed this, but its CLI hasn't taken it (it wasn't reading its input): \"{line}\". Click its terminal and press Enter. Combwork types nothing more into it until its CLI takes it.",
-    "description": "Tooltip of a pane's status when a line Hive typed into the agent's CLI wasn't taken ({line}: the line)."
+    "description": "Tooltip of a pane's status when a line Combwork typed into the agent's CLI wasn't taken ({line}: the line)."
   },
   "panes.header.watchTip": {
     "defaultMessage": "{watch}: Combwork types a line into it when {kind, select, agent {{n, plural, one {it finishes} other {one of them finishes}}, waits for you or stops} lane {a review fails, a card is blocked or stalled, or a lane is due to merge or ends} other {{n, plural, one {the card changes} other {one of them changes}}}}, or at {limit} if nothing does. Nothing runs meanwhile, and it takes no other work.",
@@ -445,7 +449,7 @@
   },
   "panes.menu.hooks": {
     "defaultMessage": "Hooks…",
-    "description": "Menu item (an agent's menu): opens its Hooks dialog: the hooks its session has, and what Hive received from them. The … says it opens a dialog: keep it."
+    "description": "Menu item (an agent's menu): opens its Hooks dialog: the hooks its session has, and what Combwork received from them. The … says it opens a dialog: keep it."
   },
   "panes.menu.moveDown": {
     "defaultMessage": "Move Down",
@@ -465,7 +469,7 @@
   },
   "panes.menu.releaseHeld": {
     "defaultMessage": "Release Slot…",
-    "description": "Menu item (an agent's menu): a slot the agent's last session there still holds (it ended, but Hive doesn't know everything it started has) is freed for other work (asks first, showing what Hive knows)."
+    "description": "Menu item (an agent's menu): a slot the agent's last session there still holds (it ended, but Combwork doesn't know everything it started has) is freed for other work (asks first, showing what Combwork knows)."
   },
   "panes.menu.releaseSlot": {
     "defaultMessage": "Release Slot…",
@@ -501,7 +505,7 @@
   },
   "panes.messages.noWakesHint": {
     "defaultMessage": "Wake an idle agent is off, so nothing is typed by itself. Deliver Now types the line once.",
-    "description": "A hint line under the heading of an agent's unread messages menu, when the setting Wake an idle agent is off. Wake an idle agent names a setting and Deliver Now a menu item below: use their names as Hive shows them."
+    "description": "A hint line under the heading of an agent's unread messages menu, when the setting Wake an idle agent is off. Wake an idle agent names a setting and Deliver Now a menu item below: use their names as Combwork shows them."
   },
   "panes.messages.notDelivered": {
     "defaultMessage": "{agent} wasn't told now",
@@ -633,11 +637,11 @@
   },
   "panes.runtime.hooksMissing": {
     "defaultMessage": "Status unknown: no hooks from {provider}",
-    "description": "An agent's status (its pane, the agents table): its coding agent ({provider}, a product name) has stopped sending Hive its hooks (the calls that tell Hive what it is doing), so Hive can't tell what it is doing. Keep it short."
+    "description": "An agent's status (its pane, the agents table): its coding agent ({provider}, a product name) has stopped sending Combwork its hooks (the calls that tell Combwork what it is doing), so Combwork can't tell what it is doing. Keep it short."
   },
   "panes.runtime.hooksMissingNote": {
     "defaultMessage": "Combwork isn't hearing from {provider}'s hooks, so its status may be wrong. {why, select, refused {Combwork refused its hooks: they didn't carry this session's token.} off {{where} turns hooks off (disableAllHooks).} newer {This {provider} is newer than the version Combwork was tested with, and an update may have changed its hooks.} other {{after, select, start {None came after it started.} other {None came after a prompt it went to work on.}}}} Until its hooks arrive, Combwork types nothing into it. Restart the session; if this happens again, update Combwork, or check {provider}'s settings for hooks turned off.",
-    "description": "A notice on an agent's pane and in Notifications: its coding agent ({provider}, a product name) has stopped sending Hive its hooks (the calls that tell Hive what it is doing). why: Hive refused them (a security token didn't match); the settings file {where} (its name, such as \"managed settings\") turns hooks off (disableAllHooks is the setting's name: keep it); the coding agent is newer than the one Hive was tested with; else what showed it (after: no hook after its start, or after a prompt). Keep the select keys."
+    "description": "A notice on an agent's pane and in Notifications: its coding agent ({provider}, a product name) has stopped sending Combwork its hooks (the calls that tell Combwork what it is doing). why: Combwork refused them (a security token didn't match); the settings file {where} (its name, such as \"managed settings\") turns hooks off (disableAllHooks is the setting's name: keep it); the coding agent is newer than the one Combwork was tested with; else what showed it (after: no hook after its start, or after a prompt). Keep the select keys."
   },
   "panes.runtime.needsInput": {
     "defaultMessage": "Needs your input",
@@ -653,7 +657,7 @@
   },
   "panes.runtime.silent": {
     "defaultMessage": "Silent {known, select, yes {{minutes, number}} other {?}} min · state unknown",
-    "description": "An agent's status (its pane, the agents table): Hive has heard nothing of its turn for {minutes} minutes (? when it can't tell: known is no) and can't tell what it is doing. Keep it short."
+    "description": "An agent's status (its pane, the agents table): Combwork has heard nothing of its turn for {minutes} minutes (? when it can't tell: known is no) and can't tell what it is doing. Keep it short."
   },
   "panes.runtime.starting": {
     "defaultMessage": "Starting…",
@@ -729,7 +733,7 @@
   },
   "panes.stopped.line": {
     "defaultMessage": "Stopped · {time} · {why, select, you {stopped by you} assistant {stopped by the Assistant} agent {stopped by an agent} lane {its lane ended} closed {its workspace closed} quit {Combwork quit} exited {its CLI exited} crashed {its CLI exited with code {code}} other {stopped}}",
-    "description": "The bar over a stopped agent's dimmed pane (HI-1881): when its session ended ({time}: a time of day) and why. {why} is who stopped it (you, the Hive Assistant, an agent, its card loop's lane ending, its workspace closing), Hive quitting, or its CLI ending by itself (cleanly, or with an error code {code}). Keep the · separators."
+    "description": "The bar over a stopped agent's dimmed pane (HI-1881): when its session ended ({time}: a time of day) and why. {why} is who stopped it (you, the Combwork Assistant, an agent, its card loop's lane ending, its workspace closing), Combwork quitting, or its CLI ending by itself (cleanly, or with an error code {code}). Keep the · separators."
   },
   "panes.tab.failed": {
     "defaultMessage": "failed to start: {why}",
@@ -813,7 +817,7 @@
   },
   "panes.table.projectPrefix": {
     "defaultMessage": "in {value}",
-    "description": "The agent's project in a line of text (screen readers, a dialog's copy): {value} is its name (\"in hive\"). Lower case."
+    "description": "The agent's project in a line of text (screen readers, a dialog's copy): {value} is its name (\"in demo\"). Lower case."
   },
   "panes.table.role": {
     "defaultMessage": "Role",
@@ -857,15 +861,15 @@
   },
   "panes.table.worktreePrefix": {
     "defaultMessage": "worktree {value}",
-    "description": "The agent's worktree in a line of text (screen readers, a dialog's copy): {value} is its branch (\"hive/b1\"). Lower case."
+    "description": "The agent's worktree in a line of text (screen readers, a dialog's copy): {value} is its branch (\"cw/b1\"). Lower case."
   },
   "panes.template.detail": {
     "defaultMessage": "{n, plural, one {# agent} other {# agents}} · {layout}",
     "description": "A template's detail in + Add ▾ → Templates: how many agents it has and its layout ({layout}: \"two columns\")."
   },
   "panes.template.heading": {
-    "defaultMessage": "{template} · {scope, select, hive {Combwork} workspace {workspace} other {this project}}",
-    "description": "A heading in Add Agent from Template: the template's name ({template}) and where it is kept (lower case; Hive: one of Hive's own templates, #1436)."
+    "defaultMessage": "{template} · {scope, select, combwork {Combwork} workspace {workspace} other {this project}}",
+    "description": "A heading in Add Agent from Template: the template's name ({template}) and where it is kept (lower case; Combwork: one of Combwork's own templates, #1436)."
   },
   "panes.template.layout": {
     "defaultMessage": "{layout, select, auto {automatic layout} single {one at a time} columns2 {two columns} columns3 {three columns} grid {grid of four} grid6 {grid of six} other {{layout}}}",
@@ -873,7 +877,7 @@
   },
   "panes.template.listFailed": {
     "defaultMessage": "Could not list the templates",
-    "description": "An error's title: Hive couldn't read the templates (+ Add ▾ → Templates, Add Agent from Template)."
+    "description": "An error's title: Combwork couldn't read the templates (+ Add ▾ → Templates, Add Agent from Template)."
   },
   "panes.template.noneSaved": {
     "defaultMessage": "No templates saved yet",
@@ -888,8 +892,8 @@
     "description": "Menu item (+ Add ▾ → Templates): saves this project's agents and layout as a template."
   },
   "panes.template.scopeHeading": {
-    "defaultMessage": "{scope, select, hive {Combwork's templates} workspace {Workspace templates} other {This project's templates}}",
-    "description": "A heading in + Add ▾ → Templates above Hive's own templates (#1436), those kept in the workspace, or in this project."
+    "defaultMessage": "{scope, select, combwork {Combwork's templates} workspace {Workspace templates} other {This project's templates}}",
+    "description": "A heading in + Add ▾ → Templates above Combwork's own templates (#1436), those kept in the workspace, or in this project."
   },
   "panes.terminal.exited": {
     "defaultMessage": "process exited with code {code}",
@@ -989,7 +993,7 @@
   },
   "panes.tiles.transcript": {
     "defaultMessage": "Transcript {size}",
-    "description": "A warning badge on an agent's tile: its transcript is past the size Hive flags ({size}: \"24 MB\")."
+    "description": "A warning badge on an agent's tile: its transcript is past the size Combwork flags ({size}: \"24 MB\")."
   },
   "panes.tiles.waitingCard": {
     "defaultMessage": "Waiting for its card",

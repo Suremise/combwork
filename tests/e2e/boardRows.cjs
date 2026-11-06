@@ -1,5 +1,5 @@
 // A workspace board's cards read and written by a test on a connection of its own, whichever form its file has (#1209):
-// Hive 1.0's tables, through src/main/schema/cardRows.ts (the card JSON contract; Node runs it as it is, its types
+// 1.0's tables, through src/main/schema/cardRows.ts (the card JSON contract; Node runs it as it is, its types
 // stripped, and it imports nothing), or 0.9's, a row per card holding its JSON document (a board waiting for its upgrade).
 
 /** The 1.0 card rows' module, loaded when first needed. */
@@ -26,11 +26,16 @@ function readDocs(db, numbers) {
  */
 function readCitingDocs(db) {
   if (legacy(db)) return readDocs(db)
+  // A board this build hasn't opened yet (the installed Combwork's, before the names upgrade's step 25, HI-2587): its
+  // comments' column has the old name. Read through a view of this connection's own, so the file is never changed.
+  // old-name: begin old-comments-column
+  if (db.prepare("SELECT 1 FROM pragma_table_info('card_comments') WHERE name = 'hive_text'").get() !== undefined) db.exec('CREATE TEMP VIEW IF NOT EXISTS card_comments AS SELECT *, hive_text AS app_text FROM main.card_comments')
+  // old-name: end old-comments-column
   const { readCardRows, composeCard } = cardRows()
   return readCardRows(db, { where: "archived = 0 AND col <> 'done'", parts: ['comments'] }).map((r) => ({ number: r.card.number, doc: composeCard(r) }))
 }
 
-/** Saves a card's document as another program would, in one transaction (a running Hive sees it within about a second). */
+/** Saves a card's document as another program would, in one transaction (a running Combwork sees it within about a second). */
 function writeDoc(db, n, doc) {
   if (legacy(db)) {
     db.prepare('INSERT INTO cards (number, doc) VALUES (?, ?) ON CONFLICT(number) DO UPDATE SET doc = excluded.doc').run(n, JSON.stringify(doc))

@@ -1,4 +1,4 @@
-// The Hive Assistant after its conversation ends: the ended bar's Resume and New are buttons a real pointer can
+// The Combwork Assistant after its conversation ends: the ended bar's Resume and New are buttons a real pointer can
 // click (nothing of the terminal on top of them), Resume reopens the same conversation and New a fresh one, both work
 // from the keyboard; the header's own Resume (|▷) resumes it without the ⋯ menu, also in a narrow panel and in the
 // light theme; with no conversation to resume there is Start and no Resume. The Assistant runs the fake Claude Code
@@ -34,13 +34,13 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47898), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47898), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const home = (await inv('workspace:refresh')).assistant.path
   const live = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === home.toLowerCase() && s.agentId === 'assistant')
@@ -143,7 +143,7 @@ const check = (name, ok, extra = '') => {
   await until(async () => (await live())?.status === 'ready', HUNG_MS)
   check('stopped for the narrow panel', await stopFromHeader())
   await inv('settings:update', { appearance: { theme: 'light' } }).catch(() => undefined)
-  await page.evaluate(() => window.hive.invoke('ui:setPane', 'assistant', 300))
+  await page.evaluate(() => window.combwork.invoke('ui:setPane', 'assistant', 300))
   await page.reload()
   await until(async () => (await header.count()) === 1, 10000)
   check('narrow: Resume is still in the header', !!(await until(async () => (await header.getByRole('button', { name: 'Resume', exact: true }).count()) === 1, 5000)), String((await header.boundingBox())?.width))
@@ -154,7 +154,7 @@ const check = (name, ok, extra = '') => {
   // --- Nothing it can resume: an Assistant now on Codex can't go back to a Claude Code conversation.
   await until(async () => (await live())?.status === 'ready', HUNG_MS)
   // Wide again, where Stop is a header button.
-  await page.evaluate(() => window.hive.invoke('ui:setPane', 'assistant', 430))
+  await page.evaluate(() => window.combwork.invoke('ui:setPane', 'assistant', 430))
   await page.reload()
   await until(async () => (await header.getByRole('button', { name: 'Stop', exact: true }).count()) === 1, 10000)
   // After a reload the panel shows its start page rather than the ended bar: stopped is what counts here.

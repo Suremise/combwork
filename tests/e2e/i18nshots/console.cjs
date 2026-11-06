@@ -55,7 +55,7 @@ module.exports = {
       name: 'source',
       open: async (ctx) => {
         const win = await consoleWindow(ctx)
-        // The first source after the empty choice: an agent or Hive, whatever the language names them.
+        // The first source after the empty choice: an agent or Combwork, whatever the language names them.
         const options = await win.locator('.dc-source option').count()
         if (options < 2) throw new Error('the console offered no source')
         await win.locator('.dc-source').selectOption({ index: 1 })

@@ -40,10 +40,13 @@ export function installerOf(lines) {
 }
 
 /**
- * A workspace's folder of Combwork's: `.combwork` from 1.1 (HI-2462), else `.hive` in a workspace no 1.1 has opened yet
- * (the installed 1.0's), where that Hive reads its markers and the first open of 1.1 moves them with it. Null: neither.
+ * A workspace's folder of Combwork's, `.combwork` (HI-2462), or null when it has none. A workspace only 1.0 has opened
+ * isn't one: its builds are recorded once 1.1 has opened it and moved its data.
  */
-const dataOf = (dir) => ['.combwork', '.hive'].map((f) => join(dir, f)).find((d) => existsSync(join(d, 'workspace.json'))) ?? null
+const dataOf = (dir) => {
+  const d = join(dir, '.combwork')
+  return existsSync(join(d, 'workspace.json')) ? d : null
+}
 
 /** The workspace a checkout's builds are recorded in, or null. */
 export function workspaceOf(root, env = process.env) {
@@ -58,7 +61,7 @@ export function workspaceOf(root, env = process.env) {
   }
 }
 
-/** The token a session's hive tools use: its token file's (it changes each launch), never HIVE_API_TOKEN (HI-2262). */
+/** The token a session's Combwork tools use: its token file's (it changes each launch), never a token variable (HI-2262). */
 function tokenOf(env) {
   try {
     if (env.CW_API_TOKEN_FILE) return JSON.parse(readFileSync(env.CW_API_TOKEN_FILE, 'utf8')).token || null
@@ -90,7 +93,7 @@ export function postBuild(fact, { url, token, workspace }, timeoutMs = 10_000) {
       const u = new URL('/v1/builds', url)
       const body = JSON.stringify(fact)
       const headers = { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body), authorization: `Bearer ${token}` }
-      if (workspace) headers['x-hive-workspace'] = encodeURIComponent(workspace)
+      if (workspace) headers['x-combwork-workspace'] = encodeURIComponent(workspace)
       req = request(u, { method: 'POST', headers }, (res) => {
         let text = ''
         res.setEncoding('utf8')

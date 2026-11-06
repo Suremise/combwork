@@ -15,15 +15,15 @@ import { JournalView } from './JournalView'
 import { msg, tr } from '@shared/i18n'
 
 /**
- * The Hive Assistant's view (activity bar): a summary of what it has used, then its modes, its MCP servers (HI-2059:
+ * The Combwork Assistant's view (activity bar): a summary of what it has used, then its modes, its MCP servers (HI-2059:
  * added and removed here, as a project's in its MCP tab), its conversations (the same tree as a project's Sessions tab),
  * its journal (#1033) and the files attached to them (a project's Attachments tab, for its home). Its settings are in
  * Settings → Assistant and its panel.
  */
 
 const M = {
-  summaryTip: msg({ id: 'assistant.view.summaryTip', defaultMessage: "What this workspace's Assistant has used across its conversations, in the period chosen (by calendar day: Today is since midnight). It isn't counted in any project's Overview. The cost is what the work would have cost at API prices: on a subscription you are not charged this.", description: "The Assistant view: tooltip on Used so far. Today and Overview as Hive names them." }),
-  title: msg({ id: 'assistant.view.title', defaultMessage: 'Assistant', description: "The Assistant view's heading in the sidebar. Hive's name stays as it is." }),
+  summaryTip: msg({ id: 'assistant.view.summaryTip', defaultMessage: "What this workspace's Assistant has used across its conversations, in the period chosen (by calendar day: Today is since midnight). It isn't counted in any project's Overview. The cost is what the work would have cost at API prices: on a subscription you are not charged this.", description: "The Assistant view: tooltip on Used so far. Today and Overview as Combwork names them." }),
+  title: msg({ id: 'assistant.view.title', defaultMessage: 'Assistant', description: "The Assistant view's heading in the sidebar. Combwork's name stays as it is." }),
   titleTip: msg({ id: 'assistant.view.titleTip', defaultMessage: "Your workspace's overseer: what it has used, its modes, its conversations and the files attached to them. Its panel is on the right (Ctrl+Alt+I); its defaults are in Settings → Assistant.", description: "The Assistant view: tooltip on its heading. Keep the shortcut as it is." }),
   showPanel: msg({ id: 'assistant.view.showPanel', defaultMessage: "Show the Assistant's panel", description: "The Assistant view: a button that opens the Assistant's panel on the right." }),
   noWorkspace: msg({ id: 'assistant.view.noWorkspace', defaultMessage: 'Open a workspace to see its Assistant.', description: 'The Assistant view with no workspace open.' }),
@@ -47,7 +47,7 @@ const M = {
   cost: msg({ id: 'assistant.view.statCost', defaultMessage: 'Cost', description: 'The Assistant view, Used so far: what it cost at API prices.' }),
   unpriced: msg({ id: 'assistant.view.unpriced', defaultMessage: '{count, plural, one {# conversation without a price} other {# conversations without a price}}', description: "The Assistant view: tooltip on Cost when some conversations' models have no known price." }),
   mcp: msg({ id: 'assistant.view.mcp', defaultMessage: 'MCP Servers', description: "The Assistant view (HI-2059): the section of the workspace's MCP servers added for the Assistant. MCP is a protocol's name: keep it." }),
-  mcpTip: msg({ id: 'assistant.view.mcpTip', defaultMessage: "The workspace's MCP servers the Assistant gets, as a project's MCP tab has them: add one with +, Remove takes it off the Assistant only. Applies from its next session.", description: "The Assistant view: the info tip of its MCP Servers section (HI-2059). \"MCP tab\" as Hive names it; + is the add button." }),
+  mcpTip: msg({ id: 'assistant.view.mcpTip', defaultMessage: "The workspace's MCP servers the Assistant gets, as a project's MCP tab has them: add one with +, Remove takes it off the Assistant only. Applies from its next session.", description: "The Assistant view: the info tip of its MCP Servers section (HI-2059). \"MCP tab\" as Combwork names it; + is the add button." }),
   addMcp: msg({ id: 'assistant.view.addMcp', defaultMessage: 'Add Server…', description: "The Assistant view's MCP Servers section (HI-2059): the + button that opens the picker of the workspace's servers to add." }),
   noMcp: msg({ id: 'assistant.view.noMcp', defaultMessage: 'No servers added.', description: "The Assistant view's MCP Servers section (HI-2059) when none is added for the Assistant." }),
   removeMcp: msg({ id: 'assistant.view.removeMcp', defaultMessage: 'Remove {name} from the Assistant', description: "The Assistant view's MCP Servers section (HI-2059): the button on a server that removes it from the Assistant. {name} is the server." }),
@@ -168,8 +168,8 @@ function AssistantSummary({ assistant }: { assistant: ProjectInfo }) {
   const { items, kept } = useSessions(assistant)
   const [period, setPeriod] = useState<Period>('all')
   const now = useNow(60000)
-  const hive = [...(items ?? []).filter((i) => i.source === 'hive'), ...kept]
-  const t = sumUsage(hive, periodFrom(period, now))
+  const combwork = [...(items ?? []).filter((i) => i.source === 'combwork'), ...kept]
+  const t = sumUsage(combwork, periodFrom(period, now))
   const tokens = t.input + t.cached + t.cacheWrite + t.output
   return (
     <div className="assistant-summary">

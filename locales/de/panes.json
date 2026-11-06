@@ -215,13 +215,13 @@
   "panes.table.worktree": "Worktree",
   "panes.table.worktreePrefix": "Worktree {value}",
   "panes.template.detail": "{n, plural, one {# Agent} other {# Agenten}} · {layout}",
-  "panes.template.heading": "{template} · {scope, select, hive {Combwork} workspace {Arbeitsbereich} other {dieses Projekt}}",
+  "panes.template.heading": "{template} · {scope, select, combwork {Combwork} workspace {Arbeitsbereich} other {dieses Projekt}}",
   "panes.template.layout": "{layout, select, auto {automatisches Layout} single {einzeln} columns2 {zwei Spalten} columns3 {drei Spalten} grid {Vierer-Raster} grid6 {Sechser-Raster} other {{layout}}}",
   "panes.template.listFailed": "Vorlagen konnten nicht aufgelistet werden",
   "panes.template.noneSaved": "Noch keine Vorlagen gespeichert",
   "panes.template.noneYet": "Noch keine Vorlagen: zuerst + Hinzufügen ▾ → Vorlagen → Vorlage speichern…",
   "panes.template.save": "Vorlage speichern…",
-  "panes.template.scopeHeading": "{scope, select, hive {Vorlagen von Combwork} workspace {Vorlagen des Arbeitsbereichs} other {Vorlagen dieses Projekts}}",
+  "panes.template.scopeHeading": "{scope, select, combwork {Vorlagen von Combwork} workspace {Vorlagen des Arbeitsbereichs} other {Vorlagen dieses Projekts}}",
   "panes.terminal.exited": "Prozess mit Code {code} beendet",
   "panes.terminal.osc52.askCopy": "Kopieren",
   "panes.terminal.osc52.askDont": "Nicht kopieren",
@@ -259,5 +259,6 @@
   "panes.watchCancel.failed": "Beobachtung konnte nicht abgebrochen werden",
   "panes.watchCell.agents": "Abschluss von {agents}",
   "panes.watchCell.cardsInto": "{cards} → {column}",
-  "panes.worktree.toMerge": "Zu mergen: {work}"
+  "panes.worktree.toMerge": "Zu mergen: {work}",
+  "panes.footer.modelSwitched": "Gestartet mit {launched}, dem Modell seiner Verbindung; {provider} nutzt jetzt {running}. Starte den Agenten neu, um zu {launched} zurückzukehren."
 }

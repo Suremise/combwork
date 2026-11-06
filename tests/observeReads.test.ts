@@ -29,7 +29,7 @@ const run = (cwd: string, ...args: string[]): string => execFileSync('git', args
 
 /** A repository on main with one commit. */
 function repo(): string {
-  const p = tempDir('hive-observe-reads-')
+  const p = tempDir('cw-observe-reads-')
   run(p, 'init', '-q', '-b', 'main')
   for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) run(p, 'config', k, v)
   writeFileSync(join(p, 'a.txt'), 'a\n')

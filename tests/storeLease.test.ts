@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-store-lease-')
+const base = tempDir('cw-store-lease-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 ;(electron.shell as unknown as { trashItem: (f: string) => Promise<void> }).trashItem = async (f) => rmSync(f, { force: true })
 // A store's move in, its file read: `whileReading`, when set, runs once the file is read, before the move goes on.

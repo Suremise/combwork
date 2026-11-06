@@ -33,13 +33,13 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47898), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47898), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const until = async (fn, ms = 10000) => {
     const t = Date.now()
@@ -86,9 +86,9 @@ const check = (name, ok, extra = '') => {
   // The session's name: the detail before " · since …".
   const text = async () => (await detail()).replace(/ · since .*$/, '')
   check("the session is in the agent's ⋯, not in its footer or header", !!(await until(async () => (await detail()) !== '', 8000)) && (await footer.locator('.session-tag').count()) === 0 && (await header.locator('.session-tag').count()) === 0)
-  // Hive's automatic name is "alpha · <date>": the footer shows only the start time.
+  // Combwork's automatic name is "alpha · <date>": the footer shows only the start time.
   const auto = records().find((r) => r.id === st.sessionId)?.name ?? ''
-  check('Hive named it automatically and passed that to Claude Code', auto.startsWith('alpha · ') && launches().at(-1).opts['--name'] === auto, auto)
+  check('Combwork named it automatically and passed that to Claude Code', auto.startsWith('alpha · ') && launches().at(-1).opts['--name'] === auto, auto)
   // The footer and the Sessions tab name it by one time, its record's, which is when the launch started: recorded
   // after it with a time of its own, the two could show different minutes (#630).
   const began = { record: records().find((r) => r.id === st.sessionId)?.createdAt, live: (await live())?.sessionCreatedAt, launch: (await live())?.startedAt }
@@ -96,7 +96,7 @@ const check = (name, ok, extra = '') => {
   check('until it has a name, it is named by when it started, as yyyy-mm-dd hh:mm', /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(await text()), await text())
   check('its detail has when it started, in the same format', / · since \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(await detail()), await detail())
   // Settings → General → Date format and Time format: the automatic name follows them, here and in the Sessions tab;
-  // Hive's own record of the name doesn't change.
+  // Combwork's own record of the name doesn't change.
   await inv('settings:update', { general: { dateFormat: 'dmy', timeFormat: '12h' } })
   const dmy = /^\d{2}\/\d{2}\/\d{4} \d{1,2}:\d{2} (AM|PM)$/
   check('dd/mm/yyyy, 12-hour: the name follows', !!(await until(async () => dmy.test(await text()), 5000)), await text())
@@ -109,7 +109,7 @@ const check = (name, ok, extra = '') => {
   const whenTip = await until(async () => ((await page.locator('.tip').count()) ? await page.locator('.tip').innerText() : ''), 5000)
   check('…where "how long ago" has the date on hover, in the same format', /^Last active \d{2}\/\d{2}\/\d{4} \d{1,2}:\d{2} (AM|PM)$/.test(whenTip.trim()), whenTip)
   await page.mouse.move(5, 5)
-  check("…and Hive's record of the name is unchanged", records().find((r) => r.id === st.sessionId)?.name === auto)
+  check("…and Combwork's record of the name is unchanged", records().find((r) => r.id === st.sessionId)?.name === auto)
   // Exported, the title and timestamps follow the format too (the save dialog answered in main, to a test path).
   const exportFile = path.join(lib.WORK, 'sessionname-export.md')
   fs.rmSync(exportFile, { force: true })
@@ -143,7 +143,7 @@ const check = (name, ok, extra = '') => {
   await dialog.getByRole('button', { name: 'Rename' }).click()
   check('renamed from the ⋯', !!(await until(async () => (await text()) === 'Docs pass', 5000)), await text())
   const rec = () => records().find((r) => r.id === st.sessionId)
-  check('Hive keeps the name, and what Claude Code called it then', rec().name === 'Docs pass' && rec().titleAtRename === auto, JSON.stringify(rec()))
+  check('Combwork keeps the name, and what Claude Code called it then', rec().name === 'Docs pass' && rec().titleAtRename === auto, JSON.stringify(rec()))
 
   // /rename in Claude Code after it: the newer name wins.
   await type('/rename Guide only', false)
@@ -157,11 +157,11 @@ const check = (name, ok, extra = '') => {
   await page.locator('.tabs .tab', { hasText: 'Session' }).first().click()
   await lib.sleep(500)
 
-  // Renamed in Hive again: Hive's is the newer.
+  // Renamed in Combwork again: Combwork's is the newer.
   await inv('session:rename', alpha, st.sessionId, 'Final docs')
-  check('a Hive rename after that wins again', !!(await until(async () => (await text()) === 'Final docs', 5000)), await text())
+  check('a Combwork rename after that wins again', !!(await until(async () => (await text()) === 'Final docs', 5000)), await text())
 
-  // A /rename, then the session stops and is resumed: Hive takes the name rather than passing its own back.
+  // A /rename, then the session stops and is resumed: Combwork takes the name rather than passing its own back.
   await type('/rename Release notes', false)
   check('the /rename shows', !!(await until(async () => (await text()) === 'Release notes', 10000)), await text())
   await inv('session:stop', alpha, agent.id)
@@ -172,7 +172,7 @@ const check = (name, ok, extra = '') => {
   // Unnamed, it would be named by when it began, as in the Sessions tab, not when it was resumed.
   const resumed = { record: rec().createdAt, live: (await live())?.sessionCreatedAt, launch: (await live())?.startedAt }
   check('a resumed session keeps the time it began', resumed.live === resumed.record && resumed.record === began.record && resumed.launch !== resumed.record, JSON.stringify(resumed))
-  check('Hive keeps it as the session name', rec().name === 'Release notes', rec().name)
+  check('Combwork keeps it as the session name', rec().name === 'Release notes', rec().name)
   check('and the ⋯ still shows it', !!(await until(async () => (await text()) === 'Release notes', 8000)), await text())
 
   // Narrow, with a long name (in the ⋯ only): the context stays whole.

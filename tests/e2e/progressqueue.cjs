@@ -1,8 +1,8 @@
-// The merge queue in the Progress panel (#1356): a project set to "Hive merges" into `integration` (queueFixture.cjs),
+// The merge queue in the Progress panel (#1356): a project set to "Combwork merges" into `integration` (queueFixture.cjs),
 // fake Claude Code agents acting by their own tokens, one merge check the test steers.
-// - the queue's card shows, empty ("Nothing queued."), while the options have Hive merge;
+// - the queue's card shows, empty ("Nothing queued."), while the options have Combwork merge;
 // - a red check: returned with its check's name, Open card and Show log (its run's log) working;
-// - the check's run in Runs as "Hive (merge queue)", with Open log, and in the Agent filter;
+// - the check's run in Runs as "Combwork (merge queue)", with Open log, and in the Agent filter;
 // - testing (the card, the target's head, its step), queued (in order, its revision, Remove), Pulse's line, the badge;
 // - old rules: the options switch to "The agent merges" with one card testing and two queued; the queue's card stays,
 //   with Pause queue, Resume and Remove (with its confirmation) working, through paused (the testing card finishes its
@@ -12,8 +12,8 @@
 // - once nothing keeps it (its outcomes seen, no card in flight under the old rules), the queue's card goes.
 // Screenshots of the Merges tab (wide and narrow) and Pulse, both themes. Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR.
-// Builders on slots (#1578). Many returns makes the list of returns small with a test seam (HIVE_TEST_QUEUE_RETURNS):
-// NOT RUN on a packaged build (HIVE_EXE), where the rest runs.
+// Builders on slots (#1578). Many returns makes the list of returns small with a test seam (CW_TEST_QUEUE_RETURNS):
+// NOT RUN on a packaged build (CW_EXE), where the rest runs.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -32,12 +32,12 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
 
 ;(async () => {
   q.prepare(fx)
-  // A second project, also on Hive merges (its queue's card shows, empty): the project filter has both.
+  // A second project, also on Combwork merges (its queue's card shows, empty): the project filter has both.
   const beta = path.join(fx.ws, 'beta')
   lib.gitProject(beta, { 'b.txt': 'b\n', '.gitignore': '.combwork/\n' })
   lib.git(beta, ['branch', '-M', 'main'])
   lib.git(beta, ['branch', 'integration'])
-  const h = await q.startHive(fx, { port: PORT })
+  const h = await q.startCombwork(fx, { port: PORT })
   try {
     const { page, inv } = h
     page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -49,7 +49,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     })
     const opened = () => h.app.evaluate(() => globalThis.__opened)
     // Looking at the Merges tab in a focused window sees a return: the window's focus is stubbed (as inbox.cjs does; a
-    // test copy never takes the OS focus) and the event Hive listens for is sent with it.
+    // test copy never takes the OS focus) and the event Combwork listens for is sent with it.
     await h.app.evaluate(({ BrowserWindow }) => {
       const w = BrowserWindow.getAllWindows()[0]
       w.isFocused = () => true
@@ -95,7 +95,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     await projectFilter.selectOption({ label: 'All projects' })
     await until(async () => (await card.count()) === 0, HUNG_MS)
 
-    // --- Hive merges, nothing queued: the queue's card shows, empty, for the project being worked on (HI-2165: beta,
+    // --- Combwork merges, nothing queued: the queue's card shows, empty, for the project being worked on (HI-2165: beta,
     // not worked on, is left out under All projects while its queue is idle).
     const reviewer = await q.agent(fx, h, 'R1')
     check('the reviewer has its token', !!reviewer.token)
@@ -178,7 +178,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     await setWidth(420)
     await shoot('merges-wide')
 
-    // The check's run, in Runs as Hive (merge queue), Open log; the Agent filter has it beside an agent's run.
+    // The check's run, in Runs as Combwork (merge queue), Open log; the Agent filter has it beside an agent's run.
     const runId = testing.testing.run
     const own = await fetch(`http://127.0.0.1:${PORT}/v1/progress`, { method: 'POST', headers: { Authorization: `Bearer ${one.builder.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 'unit', command: 'npm test' }) })
     check("an agent's own run beside it", own.status === 200)
@@ -192,7 +192,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     check('…which shows only Combwork\'s runs', !!(await until(async () => (await panel.locator('.progress-tab-runs [data-run]').count()) >= 1 && (await panel.locator('.progress-tab-runs').innerText()).includes('Combwork (merge queue)') && !(await panel.locator('.progress-tab-runs').innerText()).includes('npm test\n'), HUNG_MS)))
     await panel.getByRole('button', { name: 'Clear' }).click()
     // A finished one (Zero's red check) has its log: Open log in its details.
-    const zeroRun = (await inv('progress:snapshot')).runs.find((r) => r.source === 'hive' && r.card === zero.n && r.state === 'failed')
+    const zeroRun = (await inv('progress:snapshot')).runs.find((r) => r.source === 'combwork' && r.card === zero.n && r.state === 'failed')
     const zeroRunRow = panel.locator(`.progress-tab-runs [data-run="${zeroRun?.id}"]`)
     // Its card's runs and the queue's folded line opened (HI-1701: runs by card, the queue's checks in one line).
     await until(async () => {
@@ -213,7 +213,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     // --- Old rules: the next cards go to the agent; the queue's card stays, controllable.
     await inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { finish: 'agentMerges', mergeChecks: [] }) })
     const after = await view()
-    check('the options say the agent merges now; the queue keeps its cards in flight', after?.hiveMerges === false && after.inFlight.includes(one.n) && after.queued.length === 2, JSON.stringify({ hiveMerges: after?.hiveMerges, inFlight: after?.inFlight }))
+    check('the options say the agent merges now; the queue keeps its cards in flight', after?.combworkMerges === false && after.inFlight.includes(one.n) && after.queued.length === 2, JSON.stringify({ combworkMerges: after?.combworkMerges, inFlight: after?.inFlight }))
     check("…its card stays", (await card.count()) === 1 && (await cardText()).includes(`${twoKey} and ${threeKey} waiting`), await cardText())
     // Remove from queue, asked first.
     await card.locator(`.progress-queue-list li[data-entry^="${threeKey}/"]`).getByRole('button', { name: `Remove ${threeKey} from the queue` }).click()
@@ -300,12 +300,12 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     for (const c of [zero, two, three]) await inv('tasks:archive', c.n, true)
     check('once none is, and its outcomes are seen, the queue\'s card goes', !!(await until(async () => (await card.count()) === 0, HUNG_MS)), await panel.locator('.progress-tab-merges').innerText().catch(() => ''))
 
-    if (q.devSeam('many returns (the list of returns made small, HIVE_TEST_QUEUE_RETURNS)')) {
+    if (q.devSeam('many returns (the list of returns made small, CW_TEST_QUEUE_RETURNS)')) {
       // --- Many returns (#1356's returns policy, HR3's rounds 1 to 4): the window's list of returns made small (the seam: a
       // bound of 2), so four cards pass it. A card queued again takes no place; the rest are counted; a row shown and seen
       // stays usable for its 10 s, and only then does the next come, with nothing else happening (the queue paused).
       await h.app.evaluate(() => {
-        process.env.HIVE_TEST_QUEUE_RETURNS = '2'
+        process.env.CW_TEST_QUEUE_RETURNS = '2'
       })
       await inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx) })
       // Not seen meanwhile: the window counts as not focused.
@@ -354,7 +354,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
       const last = await view()
       check('…still paused, P2 still queued, never shown as returned', last?.paused?.reason === 'user' && last.queued.some((e) => e.card === p2.n) && !(await cardText()).includes(`${p2.key} returned`), JSON.stringify({ paused: last?.paused, queued: last?.queued.map((e) => e.key) }))
       await h.app.evaluate(() => {
-        delete process.env.HIVE_TEST_QUEUE_RETURNS
+        delete process.env.CW_TEST_QUEUE_RETURNS
       })
     }
   } catch (e) {

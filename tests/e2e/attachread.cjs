@@ -1,8 +1,8 @@
-// A reviewer in a review copy reads the builder's attached files through Hive (HI-1751: HR2, a Codex reviewer, couldn't
-// read HI-1702's evidence: the document tools refuse .combwork, and it rightly didn't go round Hive to the files). A fake
+// A reviewer in a review copy reads the builder's attached files through Combwork (HI-1751: HR2, a Codex reviewer, couldn't
+// read HI-1702's evidence: the document tools refuse .combwork, and it rightly didn't go round Combwork to the files). A fake
 // Claude Code builder (B1) attaches a probe, its results (over a page long, a character of several bytes at the page's
 // end) and a screenshot to its card, and submits; a fake Codex reviewer (R1) and a fake Claude Code one (E1, either) each
-// start a review, which leases each a review copy, and call cw_read_attachment through their launch's own hive MCP
+// start a review, which leases each a review copy, and call cw_read_attachment through their launch's own Combwork MCP
 // server: the probe whole, the results in pages from the offset each reply names (from 0 to its size), the screenshot by
 // its path. An agent of another project (X in beta) asking for the same card is told there is no such card. Dev build,
 // throwaway profile, workspace, CLAUDE_CONFIG_DIR and CODEX_HOME.
@@ -59,7 +59,7 @@ const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, HIVE_TEST_TIPS: 'off' }, viewport: { width: 1400, height: 850 } })
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, CW_TEST_TIPS: 'off' }, viewport: { width: 1400, height: 850 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.waitForProvider(inv, 'codex')
@@ -80,14 +80,14 @@ const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0
     for (const [p, a] of [[alpha, b1], [alpha, r1], [alpha, e1], [beta, x]]) await inv('session:start', p, { agentId: a.id })
     check('the agents start', !!(await ready(alpha, b1.id)) && !!(await ready(alpha, r1.id)) && !!(await ready(alpha, e1.id)) && !!(await ready(beta, x.id)))
 
-    // The hive API as B1 (its token, from its launch's hive server), to build and attach as a builder does.
+    // Combwork's API as B1 (its token, from its launch's combwork server), to build and attach as a builder does.
     const lines = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l)) : [])
     const b1Launch = await until(async () => {
       const sid = (await live(alpha, b1.id))?.sessionId
       return lines(path.join(claudeHome, 'fake-launches.jsonl')).findLast((l) => l.sessionId === sid && l.opts['--mcp-config'])
     }, HUNG_MS)
-    const hiveEnv = JSON.parse(fs.readFileSync(b1Launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork.env
-    const tb1 = JSON.parse(fs.readFileSync(hiveEnv.CW_API_TOKEN_FILE, 'utf8')).token
+    const combworkEnv = JSON.parse(fs.readFileSync(b1Launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork.env
+    const tb1 = JSON.parse(fs.readFileSync(combworkEnv.CW_API_TOKEN_FILE, 'utf8')).token
     const call = async (method, p, body) => {
       const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { method, headers: { Authorization: `Bearer ${tb1}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
       return { status: res.status, body: await res.json().catch(() => null) }
@@ -103,14 +103,14 @@ const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0
       keys[n] = (await card(n)).key
       const s = await call('POST', `/v1/tasks/${encodeURIComponent(keys[n])}/start`)
       fs.writeFileSync(path.join(alpha, 'a.ts'), `export const a = ${v}\n`)
-      gitIn(alpha, 'commit', '-qam', `card ${n}`, '-m', `Hive-Card: ${keys[n]}`)
+      gitIn(alpha, 'commit', '-qam', `card ${n}`, '-m', `Combwork-Card: ${keys[n]}`)
       const files = n === a ? ['probe.cjs', 'results.txt', 'shot.png'] : ['probe.cjs']
       const attached = await call('PATCH', `/v1/tasks/${n}`, { comment: 'The probe, its results and a screenshot.', attachments: files.map((f) => path.join(evidence, f)), reply: 'short' })
       const sub = await call('POST', `/v1/tasks/${encodeURIComponent(keys[n])}/submit`, { summary: `Card ${n} done.`, revision: gitIn(alpha, 'rev-parse', 'HEAD') })
       check(`B1 attaches its evidence to ${keys[n]} and submits it`, s.status === 200 && attached.status === 200 && sub.status === 200 && !!(await until(async () => (await card(n))?.column === 'review', HUNG_MS)), JSON.stringify({ s: s.body, attached: attached.body, sub: sub.body }))
     }
 
-    // What an agent's hive tool call got back, from its transcript (both fake CLIs write the call and its reply there).
+    // What an agent's Combwork tool call got back, from its transcript (both fake CLIs write the call and its reply there).
     const replies = async (p, id) => {
       const s = await live(p, id)
       const items = s?.sessionId ? ((await inv('transcript:read', p, s.sessionId).catch(() => null))?.items ?? []) : []
@@ -118,14 +118,14 @@ const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0
     }
     const ask = async (p, id, args) => {
       const before = (await replies(p, id)).length
-      const sent = await lib.sendPrompt(inv, lib.ptyKey(p, id), `hive cw_read_attachment ${JSON.stringify(args)}`, { submitted: async () => (await replies(p, id)).length > before })
+      const sent = await lib.sendPrompt(inv, lib.ptyKey(p, id), `cw cw_read_attachment ${JSON.stringify(args)}`, { submitted: async () => (await replies(p, id)).length > before })
       return sent ? (await until(async () => (await replies(p, id))[before], HUNG_MS)) ?? null : null
     }
     const body = (reply) => reply.slice(reply.indexOf('\n\n') + 2)
     const nextOf = (reply) => Number(/more from offset (\d+)\)/.exec(reply)?.[1] ?? NaN)
     /**
      * Every page of a text attachment, as the agent reads them, from the offset each reply names: each page's byte range
-     * (its line) and its text as the transcript shows it (Hive's transcript view keeps a tool result's first 4,000
+     * (its line) and its text as the transcript shows it (Combwork's transcript view keeps a tool result's first 4,000
      * characters: the pages joined in full are replysize's and the unit tests'). Checked: the ranges follow on from 0 to
      * the file's size, and each page's text is the file's from its first byte.
      */
@@ -148,7 +148,7 @@ const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0
       return { ok: false, ranges }
     }
 
-    // --- R1 (Codex) starts its review of A: a review copy; then reads the evidence through Hive.
+    // --- R1 (Codex) starts its review of A: a review copy; then reads the evidence through Combwork.
     const codexToken = async () => {
       const run = (await live(alpha, r1.id))?.runId
       const launch = await until(() => lines(path.join(codexHome, 'fake-launches.jsonl')).findLast((l) => l.args.some((y) => run && y.includes(run))), HUNG_MS)
@@ -163,7 +163,7 @@ const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0
     const inCopy = (r) => (r.body?.changes ?? []).find((s) => /^Review in .*[\\/]copies[\\/]copy-\d+ at /.test(s))
     check(`R1 (Codex) starts its review of ${keys[a]} in a review copy`, ra.status === 200 && !!inCopy(ra), JSON.stringify(ra.body))
     const p1 = await ask(alpha, r1.id, { card: a, name: 'probe.cjs' })
-    check('…reads the probe through Hive, whole', p1 === `probe.cjs (${Buffer.byteLength(probe)} bytes)\n\n${probe}`, p1)
+    check('…reads the probe through Combwork, whole', p1 === `probe.cjs (${Buffer.byteLength(probe)} bytes)\n\n${probe}`, p1)
     const r1Results = await allPages(alpha, r1.id, a, 'results.txt', results)
     // The 4-byte character across the page's end: the first page stops before it, the second starts with it.
     check('…and the results in pages from the offset each names, from 0 to its size, each its bytes (a 4-byte character at the page end starting the second)', r1Results.ok && r1Results.ranges.length >= 2 && r1Results.ranges[1].from === PAGE - 2 && r1Results.ranges[1].starts.startsWith('😀run 1'), JSON.stringify(r1Results))
@@ -178,7 +178,7 @@ const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0
     const rc = await startReview(e1Token, c)
     check(`E1 (Claude Code) starts its review of ${keys[c]} in a review copy`, rc.status === 200 && !!inCopy(rc), JSON.stringify(rc.body))
     const p2 = await ask(alpha, e1.id, { card: c, name: 'probe.cjs' })
-    check('…reads its probe through Hive, whole', p2 === `probe.cjs (${Buffer.byteLength(probe)} bytes)\n\n${probe}`, p2)
+    check('…reads its probe through Combwork, whole', p2 === `probe.cjs (${Buffer.byteLength(probe)} bytes)\n\n${probe}`, p2)
     const e1Results = await allPages(alpha, e1.id, a, 'results.txt', results)
     check("…and A's results, in the same pages", e1Results.ok && JSON.stringify(e1Results.ranges) === JSON.stringify(r1Results.ranges), JSON.stringify(e1Results))
 

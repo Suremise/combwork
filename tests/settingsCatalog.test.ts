@@ -1,5 +1,5 @@
 // The settings catalog (#186): one description of every setting, for Settings, Project Settings and the Assistant's
-// settings tools. A field added to Hive's settings or a project's config without a catalog entry fails here, as does a
+// settings tools. A field added to Combwork's settings or a project's config without a catalog entry fails here, as does a
 // view drawing a row the catalog doesn't have.
 import { readFileSync } from 'fs'
 import { join } from 'path'
@@ -16,13 +16,13 @@ const entry = (id: string) => {
   return e
 }
 
-/** Fields that are kept in the settings but aren't settings: what Hive remembers, or set elsewhere. */
+/** Fields that are kept in the settings but aren't settings: what Combwork remembers, or set elsewhere. */
 const NOT_SETTINGS = new Set(['keybindings'])
-/** Provider fields that aren't on its page: remembered by Hive, or shown as part of another row. */
+/** Provider fields that aren't on its page: remembered by Combwork, or shown as part of another row. */
 const PROVIDER_INTERNAL = new Set(['pricesRemoved'])
-/** Project config fields that aren't Project Settings rows: kept by Hive, or changed elsewhere (agents, layout, MCP, skills). */
+/** Project config fields that aren't Project Settings rows: kept by Combwork, or changed elsewhere (agents, layout, MCP, skills). */
 const PROJECT_INTERNAL = new Set(['version', 'agents', 'layout', 'layouts', 'mcp', 'skills', 'keybindings', 'templates'])
-/** A CLI's launch settings: on connections since HI-2107 (decision F), kept in Hive's settings only as migration input. */
+/** A CLI's launch settings: on connections since HI-2107 (decision F), kept in Combwork's settings only as migration input. */
 const LAUNCH_FIELDS = ['defaultModel', 'defaultEffort', 'defaultPermissionMode', 'extraArgs', 'use200kContext']
 
 describe('the settings catalog', () => {
@@ -55,7 +55,7 @@ describe('the settings catalog', () => {
     }
   })
 
-  it("describes every field of Hive's settings", () => {
+  it("describes every field of Combwork's settings", () => {
     const missing: string[] = []
     for (const [section, value] of Object.entries(DEFAULT_SETTINGS)) {
       if (NOT_SETTINGS.has(section)) continue
@@ -151,7 +151,7 @@ describe('the settings catalog', () => {
 
   it("marks what the Assistant can't change: permissions, what runs, the Agent API, its own settings", () => {
     const ro = (id: string) => !!entry(id).sensitive
-    for (const id of ['agentApi.enabled', 'agentApi.port', 'agentApi.allowSessionInput', 'agentApi.provideHiveMcp', 'assistant.control', 'assistant.typingPause', 'claude-code.enableDangerousMode', 'claude-code.executablePath', 'codex.executablePath', 'project.worktreeSetup', 'claude-code.allowBackgroundSessions']) expect(ro(id), id).toBe(true)
+    for (const id of ['agentApi.enabled', 'agentApi.port', 'agentApi.allowSessionInput', 'agentApi.provideCombworkMcp', 'assistant.control', 'assistant.typingPause', 'claude-code.enableDangerousMode', 'claude-code.executablePath', 'codex.executablePath', 'project.worktreeSetup', 'claude-code.allowBackgroundSessions']) expect(ro(id), id).toBe(true)
     for (const id of ['general.progressPanel', 'sessions.transcriptWarnMB', 'workflow.git.fileLocks', 'copilot.checkUpdatesOnLaunch', 'project.compactSuggestTokens', 'assistant.panelSide', 'assistant.compactSuggestTokens']) expect(ro(id), id).toBe(false)
     expect(settingReadOnly(entry('assistant.control'))).toMatch(/only the user can change it, in Settings → Assistant → Control/)
   })
@@ -164,10 +164,10 @@ describe('the settings catalog', () => {
       expect(entry(id).docs, id).toBe(id.endsWith('commands') ? 'commands' : 'close-commands')
       expect(settingDefault(entry(id)), id).toEqual([])
     }
-    const settings = { ...DEFAULT_SETTINGS, commands: { list: [{ id: 'c-0000000a', name: 'Backup', command: 'backup.cmd' }], onQuit: { run: [{ scope: 'hive' as const, id: 'c-0000000a' }], onUpdate: true } } }
+    const settings = { ...DEFAULT_SETTINGS, commands: { list: [{ id: 'c-0000000a', name: 'Backup', command: 'backup.cmd' }], onQuit: { run: [{ scope: 'combwork' as const, id: 'c-0000000a' }], onUpdate: true } } }
     expect(settingValue(entry('general.commands'), settings)).toEqual(['Backup'])
     expect(settingValue(entry('general.onQuit'), settings)).toEqual(['Backup'])
-    const ws = { commands: { list: [{ id: 'c-0000000b', name: 'Serve', command: 'serve' }], onOpen: { run: [{ scope: 'workspace' as const, id: 'c-0000000b' }, { scope: 'hive' as const, id: 'c-0000000a' }, { scope: 'hive' as const, id: 'c-0000000c' }] }, onClose: { run: [] } } }
+    const ws = { commands: { list: [{ id: 'c-0000000b', name: 'Serve', command: 'serve' }], onOpen: { run: [{ scope: 'workspace' as const, id: 'c-0000000b' }, { scope: 'combwork' as const, id: 'c-0000000a' }, { scope: 'combwork' as const, id: 'c-0000000c' }] }, onClose: { run: [] } } }
     expect(settingValue(entry('workspace.onOpen'), settings, null, ws)).toEqual(['Serve', 'Backup', '(deleted)'])
     expect(settingValue(entry('workspace.onClose'), settings, null, {})).toEqual([])
   })
@@ -195,7 +195,7 @@ describe('the settings catalog', () => {
     expect(checkSettingValue(entry('keybindings.editor'), 'x')).toMatchObject({ error: expect.stringMatching(/\(Shortcuts are read-only to the Assistant for now: the user changes them in Settings → Keyboard Shortcuts → .+\.\): change it in Settings → Keyboard Shortcuts → /) })
   })
 
-  it("checks tables: column colours, prices, fallback lists (null puts back Hive's)", () => {
+  it("checks tables: column colours, prices, fallback lists (null puts back Combwork's)", () => {
     const v = (id: string, x: unknown) => checkSettingValue(entry(id), x)
     expect(v('board.colors', { doing: '#FF0000' })).toEqual({ value: { doing: '#ff0000' } })
     expect(v('board.colors', { nowhere: '#ff0000' })).toHaveProperty('error')
@@ -240,7 +240,7 @@ describe('the settings catalog', () => {
     expect(settingChangeTexts(entry('claude-code.effortFallback'), [{ value: 'high', label: 'High' }], [{ value: 'high', label: 'Very high' }])).toEqual({ oldText: 'high: High', newText: 'high: Very high' })
     // Only the order: the order shows.
     expect(settingChangeTexts(entry('codex.modelFallback'), models, [models[1], models[0]])).toEqual({ oldText: 'gpt-7, gpt-6', newText: 'gpt-6, gpt-7' })
-    // Back to Hive's list: the whole list.
+    // Back to Combwork's list: the whole list.
     expect(settingChangeTexts(entry('codex.modelFallback'), models, [])).toEqual({ oldText: 'gpt-7, gpt-6', newText: "(Combwork's list)" })
     // Bounded as the other tables are.
     const long = Array.from({ length: 40 }, (_, i) => ({ value: `model-${i}`, label: `A long label for model ${i}` }))

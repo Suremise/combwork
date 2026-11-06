@@ -1,5 +1,5 @@
 // A terminal is killed once (#297): on Windows node-pty closes the pseudoconsole a moment after kill(), and a second
-// kill before the first has finished closed it again, which corrupted the heap and took Hive's main process down
+// kill before the first has finished closed it again, which corrupted the heap and took Combwork's main process down
 // (Stop, then switching workspace or quitting at once). Until it exits, nothing more is sent to it either.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 

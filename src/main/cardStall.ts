@@ -1,8 +1,13 @@
 import { basename, join } from 'path'
 import { projectAgents } from '../shared/defaults'
 import { agentRuntime } from '../shared/runtime'
-import { REVIEW_WAIT_STALL_MS, backgroundTaskMinutes, builderJobOf, columnSince, laneOrderWaitReason, loopStepWaitReason, notWatchingReason, pendingDesign, reviewVerdictWaitReason, reviewWaitReason, stalledReason, startFailedReason, startWaitingReason, type BuilderJob, type LaneOrderView, type StallAgent } from '../shared/tasks'
-import type { AgentInfo, AgentStart, LaneStatus, ProgressRun, TaskCard } from '../shared/types'
+import { REVIEW_WAIT_STALL_MS, backgroundTaskMinutes, builderJobOf, columnSince, laneOrderWaitReason, loopStepWaitReason, notWatchingReason, pendingDesign, reviewVerdictWaitReason, reviewWaitReason, stalledReason, startFailedReason, startWaitingReason, type BuilderJob, type LaneOrderView, type ReviewOwed, type StallAgent } from '../shared/tasks'
+import { agentWorkflowRole, reviewsWork } from '../shared/workflow/roles'
+import { poolReviewerOf } from './loopReviewer'
+import { FactStore } from './workflow/factStore'
+import { advanced } from './advanced'
+import { WORKFLOW_ENFORCE } from '../shared/advanced'
+import type { AgentInfo, AgentStart, DueDeps, LaneStatus, ProgressRun, TaskCard } from '../shared/types'
 import { LOOP_STEP_WAIT_MINUTES, laneStatusText } from '../shared/lanes'
 import { forYouOfCards } from './workflow/cardWork'
 import { projectPreferences } from './workflow/preferences'
@@ -14,6 +19,10 @@ import { workspaceOf, type WorkspaceService } from './workspace'
 import { config } from './config'
 import { pausedFor, resumedAt } from './teamPause'
 import { IDLE_WATCH_STALL_MS, idleWatchReason, nothingWaitsOn } from '../shared/idleWatch'
+import { agentMsg, say } from '../shared/agentText'
+
+/** Why a lane's next card is stalled once the cards it depends on are Done (HI-2618). Agent-facing. */
+const DEPS_DONE = agentMsg({ id: 'stall.laneNext.depsDone', text: "{card} is the lane's next card: the last of the cards it depends on went Done {minutes} min ago, and {doing}", note: "The Agent API's and lane watches' stalled (HI-2618): a lane's next card whose dependencies are all Done, not started since. card: its key; minutes: how long since the last of them went Done; doing: what its builder does, a sentence (\"B1 is only watching without starting it.\")." })
 
 /**
  * Why a card is stalled, in one place (the Agent API's `stalled`, and lane watches, #531): a Doing card nobody works on
@@ -117,23 +126,32 @@ export const LANE_NEXT_STALL_MS = 15 * 60_000
  * Why a running lane's next card is stalled (HI-1741), or null: in Todo, not blocked, every card before it in the lane
  * Done, the last of them Done for LANE_NEXT_STALL_MS, and the lane's builder not in a turn (idle, only watching, or not
  * running: HB3 read HI-1727's Done and ended its turn without starting HI-1735, and the lane sat for two hours). A
- * paused lane's isn't, nor one whose start waits for a card it depends on to be Done (HI-2129). `builder`: the lane's builder as it is now (null: not running and not about to resume, else
+ * paused lane's isn't, nor one whose start waits for a card it depends on to be Done (HI-2129), nor one with a card it
+ * depends on not Done on the board (HI-2618, `due`: then counted from the last of them going Done). `builder`: the lane's builder as it is now (null: not running and not about to resume, else
  * its name and status). Agent-facing.
  */
 export function laneNextWaitReason(c: Pick<TaskCard, 'number' | 'key' | 'column' | 'archived' | 'blocked'>, lane: LaneOrderView | null | undefined, builder: { name: string; status: string | null }, now = Date.now()): string | null {
   if (!lane || lane.state === 'paused' || c.archived || c.blocked || c.column !== 'todo') return null
-  // Waiting for a card it depends on to be Done (HI-2129): Hive starts it then, so its builder has nothing to do yet.
+  // Waiting for a card it depends on to be Done (HI-2129): Combwork starts it then, so its builder has nothing to do yet.
   if (lane.waitsForDependency?.card === c.number) return null
+  // Waiting on the cards it depends on, as the board has them (HI-2618: HB6's HI-2616 was reported stalled 29 times while
+  // its three dependencies were still in other lanes), whatever the lane-start look last said.
+  const due = lane.due?.card === c.number ? lane.due : null
+  if (due?.open.length) return null
   const at = lane.cards.findIndex((x) => x.number === c.number)
   if (at < 0 || lane.cards.slice(0, at).some((x) => x.column !== 'done')) return null
   if (builder.status !== null && !IDLE.includes(builder.status)) return null
   // Its first card (HI-2029): since the lane started; a later one, since the card before it went Done.
   const before = at > 0 ? lane.cards[at - 1] : null
-  const since = Date.parse((before ? before.movedAt : lane.startedAt) ?? '')
+  // Once its dependencies are all Done, from when the last of them went Done if that was later (HI-2618).
+  const prior = Date.parse((before ? before.movedAt : lane.startedAt) ?? '') || 0
+  const ready = Date.parse(due?.readyAt ?? '') || 0
+  const since = Math.max(prior, ready)
   if (!since || now - since < LANE_NEXT_STALL_MS) return null
   const min = Math.round((now - since) / 60_000)
   const name = (x: { number: number; key?: string }): string => x.key ?? `#${x.number}`
   const doing = `${builder.name} ${builder.status === null ? "isn't running" : builder.status === 'watching' ? 'is only watching' : 'is idle'} without starting it.` // i18n-ignore: agent-facing (the Agent API's stalled)
+  if (ready > prior) return say(DEPS_DONE, { card: name(c), minutes: String(min), doing })
   return before ? `${name(c)} is the lane's next card: ${name(before)} went Done ${min} min ago, and ${doing}` : `${name(c)} is the lane's first card: the lane started ${min} min ago, and ${doing}` // i18n-ignore: agent-facing (the Agent API's stalled)
 }
 
@@ -199,9 +217,13 @@ function ownQuestionOpen(wsPath: string, c: TaskCard, agentId: string): boolean 
 /**
  * Why a card is stalled, given its agent as it is now (null: removed; its name, whether it runs, why its start failed),
  * its workspace's folder, its running lane (none: no lane's deadlock is looked for), and how long a design waits for its
- * check (stepWaitMs: its project's workflow option Design check wait, HI-1766).
+ * check (stepWaitMs: its project's workflow option Design check wait, HI-1766), and who owes its review (`due`,
+ * reviewDueOf, HI-2636).
  */
-export function cardStall(c: TaskCard, agentNow: StallAgent | null, wsPath: string | null, lane?: LaneOrderView | null, stepWaitMs = LOOP_STEP_WAIT_MINUTES * 60_000, returned?: { at: string } | null, stale?: { since: string; approved: string | null; current: string | null } | null): string | null {
+export function cardStall(c: TaskCard, agentNow: StallAgent | null, wsPath: string | null, lane?: LaneOrderView | null, stepWaitMs = LOOP_STEP_WAIT_MINUTES * 60_000, returned?: { at: string } | null, stale?: { since: string; approved: string | null; current: string | null } | null, due?: ReviewDue): string | null {
+  // Waiting on purpose (HI-2618: HB3 held HI-2590 for a quiet window and was reported stalled four times): what it
+  // waits for is said on the card, never a stall, until it is cleared or the card leaves Doing.
+  if (c.waitingFor && c.column === 'doing') return null
   // Its team paused (HI-2081): its agents parking (idle, stopped, not watching) is what was asked of them, never a stall.
   // Once it resumes the usual checks apply again, each timed one counted from the resume too (HR1's s12 check): it needs
   // its own wait since then as well as since what it times.
@@ -230,7 +252,7 @@ export function cardStall(c: TaskCard, agentNow: StallAgent | null, wsPath: stri
     const why = replyWaitReason(c, reviewer ? { name: reviewer.name, status: reviewer.status } : null, c.agent ? (of(c.agent) ?? null) : null, job)
     return why && wsPath && ownQuestionOpen(wsPath, c, c.review.agent) ? null : why
   }
-  return startFailedReason(c, agentNow) ?? startWaitingReason(c, agentNow) ?? stalledReason(c, agentNow) ?? notWatchingReason(c, live.filter((a) => a.notWatching?.length)) ?? back ?? (waited(REVIEW_WAIT_STALL_MS) ? reviewWaitReason(c, watchers) : null) ?? verdictWait() ?? replyWait() ?? (waited(REVIEW_WAIT_STALL_MS) ? laneOrderWaitReason(c, lane, watchers) : null) ?? (waited(REVIEW_WAIT_STALL_MS) ? loopStepWaitReason(c, watchers, stepWaitMs) : null) ?? (waited(IDLE_WATCH_STALL_MS) ? idleWatch(c, lane, live, wsPath) : null) ?? (waited(LANE_NEXT_STALL_MS) ? laneNext(c, lane, live, agentNow) : null) ?? reviewCopyWaitReason?.(c, wsPath) ?? null
+  return startFailedReason(c, agentNow) ?? startWaitingReason(c, agentNow) ?? stalledReason(c, agentNow) ?? notWatchingReason(c, live.filter((a) => a.notWatching?.length)) ?? back ?? (waited(REVIEW_WAIT_STALL_MS) ? reviewWaitReason(c, watchers, Date.now(), undefined, due?.owed, due?.reviews) : null) ?? verdictWait() ?? replyWait() ?? (waited(REVIEW_WAIT_STALL_MS) ? laneOrderWaitReason(c, lane, watchers) : null) ?? (waited(REVIEW_WAIT_STALL_MS) ? loopStepWaitReason(c, watchers, stepWaitMs) : null) ?? (waited(IDLE_WATCH_STALL_MS) ? idleWatch(c, lane, live, wsPath) : null) ?? (waited(LANE_NEXT_STALL_MS) ? laneNext(c, lane, live, agentNow) : null) ?? reviewCopyWaitReason?.(c, wsPath) ?? null
 }
 
 /**
@@ -268,7 +290,7 @@ function laneNext(c: TaskCard, lane: LaneOrderView | null | undefined, live: Ret
 }
 
 /**
- * A lane's next card held by its builder's new conversation that Hive stopped trying to start (HI-2034, the lane's status
+ * A lane's next card held by its builder's new conversation that Combwork stopped trying to start (HI-2034, the lane's status
  * `startWait` `fresh` with `freshBlocked`): stalled at once, as only the user's Retry or ending the lane moves it (the
  * lane watch's `stalled`). Its card, in Todo with every card before it Done; null otherwise.
  */
@@ -280,20 +302,67 @@ function freshBlockedReason(c: Pick<TaskCard, 'number' | 'key' | 'column'>, lane
 }
 
 /** A running lane as the stall check reads it (#1410), its cards' keys and last moves from the board's cards (`card`). */
-export const laneOrderView = (l: { builder: { id: string }; reviewer: { id: string } | null; state?: string; startedAt?: string; status?: LaneStatus | null; cards: { number: number; column: string }[] }, card: (n: number) => Pick<TaskCard, 'key' | 'history'> | undefined): LaneOrderView => ({
+export const laneOrderView = (l: { builder: { id: string }; reviewer: { id: string } | null; state?: string; startedAt?: string; status?: LaneStatus | null; dueDeps?: DueDeps; cards: { number: number; column: string }[] }, card: (n: number) => Pick<TaskCard, 'key' | 'history'> | undefined): LaneOrderView => ({
   builder: l.builder.id,
   reviewer: l.reviewer?.id ?? null,
   ...(l.state ? { state: l.state } : {}),
   ...(l.startedAt ? { startedAt: l.startedAt } : {}),
   // Its agent's new conversation no more tried (HI-2034), said as the lane's status says it.
   ...(l.status?.reason === 'startWait' && l.status.why === 'fresh' && l.status.freshBlocked ? { freshBlocked: laneStatusText(l.status) } : {}),
-  // Its next card waiting for a card it depends on (HI-2129): Hive starts it once that one is Done.
+  // Its next card waiting for a card it depends on (HI-2129): Combwork starts it once that one is Done.
   ...(l.status?.reason === 'startWait' && l.status.why === 'dependencies' && l.status.card !== null ? { waitsForDependency: { card: l.status.card, on: l.status.waitsFor ?? '' } } : {}),
+  // Its due card's dependencies as the board has them (HI-2618).
+  ...(l.dueDeps ? { due: { card: l.dueDeps.card, open: [...l.dueDeps.open], readyAt: l.dueDeps.readyAt } } : {}),
   cards: l.cards.map((c) => {
     const t = card(c.number)
     return { number: c.number, column: c.column, movedAt: t ? columnSince(t) : null, ...(t?.key ? { key: t.key } : {}) }
   })
 })
+
+/**
+ * Who owes the review of a card waiting in Review, unstarted (HI-2636), for reviewWaitReason: its lane's reviewer; else
+ * the reviewer the pool gave its latest submission, with when (its `ReviewerAssigned`, none given up since), and how it is
+ * now; else null for a card nobody was given yet that the pool gives out (a pool lane's, or one in no lane while workflow
+ * rules are on, HI-2046). Only with the rules off (or its record unreadable) does a watcher count when its workflow role
+ * reviews (`reviews`). None for a card the check can't stall.
+ */
+export async function reviewDueOf(ws: WorkspaceService, c: TaskCard, agents = new Map<string, Promise<ReturnType<typeof projectAgents>>>()): Promise<ReviewDue | undefined> {
+  if (c.archived || c.column !== 'review' || c.review || c.blocked || !c.project || !ws.path) return undefined
+  const p = join(ws.path, c.project)
+  const key = p.toLowerCase()
+  if (!agents.has(key)) agents.set(key, ws.projectConfig(p).then(projectAgents, () => []))
+  const all = await agents.get(key)!
+  const reviews = (id: string): boolean => {
+    const a = all.find((x) => x.id === id)
+    return !!a && reviewsWork(agentWorkflowRole(a))
+  }
+  const store = FactStore.forBoard(ws, { project: c.project, key: '' })
+  let rec: ReturnType<typeof store.card>
+  try {
+    rec = store.card(c.number)
+  } catch {
+    return { reviews }
+  }
+  const named = (id: string, givenAt?: string): ReviewOwed | null => {
+    const a = all.find((x) => x.id === id)
+    if (!a) return null
+    const status = sessions.liveFor(p, id)?.status
+    return { agentId: id, name: a.name, ...(givenAt ? { givenAt } : {}), ...(status ? { status } : {}) }
+  }
+  if (rec.reviewer) return { owed: named(rec.reviewer) }
+  const facts = store.facts(c.number)
+  const given = poolReviewerOf(facts)
+  if (given) return { owed: named(given, facts.findLast((f) => f.kind === 'ReviewerAssigned' && (f.data as { reviewer?: string }).reviewer === given)?.at) }
+  // Nobody given it yet: a pool lane's card, or one in no lane while the rules are on (the pool gives those out too,
+  // HI-2046), owes nobody; only with the rules off may any watcher that reviews count.
+  return rec.reviewerPool || advanced.get<boolean>(WORKFLOW_ENFORCE) ? { owed: null } : { reviews }
+}
+
+/** Who owes a card's review (reviewDueOf): `owed` when its record says (null: nobody yet), else which agents may review. */
+export interface ReviewDue {
+  owed?: ReviewOwed | null
+  reviews?: (agentId: string) => boolean
+}
 
 /** How long a card's design waits for its check (#1382), from its project's options: read only for a card with one waiting. */
 export async function stepWaitOf(ws: WorkspaceService, c: TaskCard): Promise<number | undefined> {
@@ -320,5 +389,5 @@ export async function cardStallIn(ws: WorkspaceService, c: TaskCard, agents = ne
   const returned = c.column === 'doing' && c.agent && c.project && ws.path ? await queueReturnOf(ws, join(ws.path, c.project), c.number) : null
   // An approved card whose pass went stale (HI-1763).
   const stale = c.column === 'passed' && c.agent && c.project && ws.path ? await staleApprovalOf(ws, join(ws.path, c.project), c.number) : null
-  return cardStall(c, now, ws.path, lane, await stepWaitOf(ws, c), returned, stale)
+  return cardStall(c, now, ws.path, lane, await stepWaitOf(ws, c), returned, stale, await reviewDueOf(ws, c, agents))
 }

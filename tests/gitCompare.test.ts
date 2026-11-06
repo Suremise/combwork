@@ -31,8 +31,8 @@ function fixture(n: number): string {
     const commits = Array.from({ length: n - 2 }, (_, k) => {
       const msg = `commit ${k + 2}`
       const file = `${k + 2}\n`
-      const when = `<test@hive.invalid> ${t + k} +0000`
-      return ['commit refs/heads/1.0.0', `author Hive Test ${when}`, `committer Hive Test ${when}`, `data ${Buffer.byteLength(msg)}`, msg, ...(k === 0 ? [`from ${sh(repo, 'rev-parse', '1.0.0')}`] : []), 'M 100644 inline count.txt', `data ${Buffer.byteLength(file)}`, file].join('\n')
+      const when = `<test@example.invalid> ${t + k} +0000`
+      return ['commit refs/heads/1.0.0', `author Combwork Test ${when}`, `committer Combwork Test ${when}`, `data ${Buffer.byteLength(msg)}`, msg, ...(k === 0 ? [`from ${sh(repo, 'rev-parse', '1.0.0')}`] : []), 'M 100644 inline count.txt', `data ${Buffer.byteLength(file)}`, file].join('\n')
     })
     execFileSync('git', ['fast-import', '--quiet'], { cwd: repo, input: `${commits.join('\n')}\n`, stdio: ['pipe', 'pipe', 'pipe'] })
   }
@@ -49,14 +49,14 @@ function state(repo: string): { refs: string; index: string; mtime: number; stat
 describe('compareLines: what the Changes tab can compare', () => {
   it('every local branch, main, and the integration line when it is a local branch other than main', async () => {
     const repo = fixture(3)
-    sh(repo, 'worktree', 'add', '-q', join(repo, '..', 'slot-a'), '-b', 'hive/card')
+    sh(repo, 'worktree', 'add', '-q', join(repo, '..', 'slot-a'), '-b', 'cw/card')
     const lines = await compareLines(repo, '1.0.0')
     expect(lines.isRepo).toBe(true)
     expect(lines.main).toBe('main')
     expect(lines.integration).toBe('1.0.0')
-    expect(lines.branches.map((b) => b.name)).toEqual(['1.0.0', 'hive/card', 'main'])
+    expect(lines.branches.map((b) => b.name)).toEqual(['1.0.0', 'cw/card', 'main'])
     // The folder a branch is checked out in, as git says it (a slot's, the project's).
-    expect(lines.branches.find((b) => b.name === 'hive/card')?.folder?.toLowerCase()).toBe(join(repo, '..', 'slot-a').replace(/\\/g, '/').toLowerCase())
+    expect(lines.branches.find((b) => b.name === 'cw/card')?.folder?.toLowerCase()).toBe(join(repo, '..', 'slot-a').replace(/\\/g, '/').toLowerCase())
     // No integration line: the target is main itself, isn't set, or isn't a branch here.
     expect((await compareLines(repo, 'main')).integration).toBeNull()
     expect((await compareLines(repo, null)).integration).toBeNull()
@@ -66,8 +66,8 @@ describe('compareLines: what the Changes tab can compare', () => {
   it("each slot whose folder has a branch, with its lease's card (a blocked card's slot, a free one), never one without", async () => {
     const repo = fixture(3)
     const slot = (name: string) => join(repo, '..', name)
-    sh(repo, 'worktree', 'add', '-q', slot('slot-a'), '-b', 'hive/HI/HI-1-a')
-    sh(repo, 'worktree', 'add', '-q', slot('slot-c'), '-b', 'hive/HI/HI-1758-blocked')
+    sh(repo, 'worktree', 'add', '-q', slot('slot-a'), '-b', 'cw/HI/HI-1-a')
+    sh(repo, 'worktree', 'add', '-q', slot('slot-c'), '-b', 'cw/HI/HI-1758-blocked')
     sh(repo, 'worktree', 'add', '-q', '--detach', slot('slot-d'))
     const records = [
       { name: 'slot-a', folder: slot('slot-a'), card: null, agent: null, target: null },
@@ -78,8 +78,8 @@ describe('compareLines: what the Changes tab can compare', () => {
     ]
     const lines = await compareLines(repo, '1.0.0', records)
     expect(lines.slots).toEqual([
-      { name: 'slot-a', folder: slot('slot-a'), branch: 'hive/HI/HI-1-a', card: null, agent: null, target: null },
-      { name: 'slot-c', folder: slot('slot-c'), branch: 'hive/HI/HI-1758-blocked', card: 1758, agent: 'a-hb3', target: '1.0.0' }
+      { name: 'slot-a', folder: slot('slot-a'), branch: 'cw/HI/HI-1-a', card: null, agent: null, target: null },
+      { name: 'slot-c', folder: slot('slot-c'), branch: 'cw/HI/HI-1758-blocked', card: 1758, agent: 'a-hb3', target: '1.0.0' }
     ])
   })
 

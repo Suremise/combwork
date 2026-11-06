@@ -7,14 +7,14 @@ import { basename } from 'path'
 import type { OpenProgress } from '../shared/types'
 import { msg } from '../shared/i18n'
 import { emitTo } from './events'
-import { hiveError } from './hiveError'
+import { combworkError } from './combworkError'
 import { createLogger, userText } from './logger'
 import type { WorkspaceService } from './workspace'
 
 const log = createLogger('workspace')
 
 const M = {
-  busy: msg({ id: 'service.workspace.stillOpening', defaultMessage: '{name} is still opening: wait for it to finish, then try again.', description: "An error opening, making or closing a workspace while this window is still opening its workspace {name} (bringing its skills up to date, or upgrading it to Hive 1.0)." }),
+  busy: msg({ id: 'service.workspace.stillOpening', defaultMessage: '{name} is still opening: wait for it to finish, then try again.', description: "An error opening, making or closing a workspace while this window is still opening its workspace {name} (bringing its skills up to date, or upgrading it to 1.0)." }),
   closing: msg({ id: 'service.workspace.stillClosing', defaultMessage: '{name} is still closing: wait for it to finish, then try again.', description: 'An error opening, making or closing a workspace while this window is still closing its workspace {name}.' })
 }
 
@@ -139,5 +139,5 @@ export class AfterOpen {
 /** Throws the user's reason while the window is claimed: for another open, a new workspace or a close (asked early, and again at the claim). */
 export function assertNotOpening(ws: WorkspaceService): void {
   const c = claims.get(ws)
-  if (c) throw hiveError(c.step ? M.busy : M.closing, { name: c.name }, { kind: 'conflict' })
+  if (c) throw combworkError(c.step ? M.busy : M.closing, { name: c.name }, { kind: 'conflict' })
 }

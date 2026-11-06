@@ -8,7 +8,7 @@ import { tempDir } from './tempDir'
 import { CARD_TITLE_NUDGE } from '../src/shared/advanced'
 import { changedText, createdText, type TaskChange } from '../src/shared/toolReplies'
 
-const base = tempDir('hive-title-nudge-')
+const base = tempDir('cw-title-nudge-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 mkdirSync(join(base, 'profile'), { recursive: true })
 
@@ -25,7 +25,7 @@ afterAll(() => {
 })
 
 const agent = { kind: 'agent' as const, name: 'B1 (alpha)' }
-const long = 'Tray: the restart notice stays after Hive restarts, because the update check in updater.ts runs before the window opens'
+const long = 'Tray: the restart notice stays after Combwork restarts, because the update check in updater.ts runs before the window opens'
 const change = (nudge: string | null): TaskChange => ({ number: 7, key: 'AL-7', title: long, column: 'todo', position: 1, of: 1, project: 'alpha', agent: null, changes: [], ...(nudge ? { nudge } : {}) })
 
 describe('titleNudge', () => {

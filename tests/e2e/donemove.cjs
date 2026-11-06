@@ -1,4 +1,4 @@
-// Agents move cards into and out of Done like any other column: an agent's hive tools (the fake Claude Code's
+// Agents move cards into and out of Done like any other column: an agent's Combwork tools (the fake Claude Code's
 // "boardmove N COLUMN", which calls the API as they do) move a card to Done with no question, its history names the
 // agent, and the move is undone from the board (right-click → Move to) or by the agent. The card's prompt asks for
 // Review when the work is done. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
@@ -38,13 +38,13 @@ const until = async (fn, ms = 10000) => {
   cfg.settings.notifications = { ...cfg.settings.notifications, desktopNotifications: false, chimeEnabled: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47906), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47906), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1300, height: 800 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   // The board's own moves, as before 1.0's rules (#1275): its project has every rule off, where Review isn't a stage, so
   // with the rules enforced the board refuses it (boardgates covers that); turned off, every column is a plain move.
@@ -116,7 +116,7 @@ const until = async (fn, ms = 10000) => {
     return typeof content === 'string' || content === null ? content : (content.find?.((c) => typeof c.content === 'string')?.content ?? null)
   }, 15000)
   // The prompt points to the work-on-card skill, which the agent's launch carries, and which says Review when done (by
-  // submitting it, #1274) and Done only once merged (#170). The session's Hive instructions say both too, with "or when the
+  // submitting it, #1274) and Done only once merged (#170). The session's Combwork instructions say both too, with "or when the
   // user asks", for a session without the skill (tests/guidance.test.ts checks those).
   check('the card prompt points to the work-on-card skill', typeof prompt === 'string' && prompt.includes('Use the work-on-card skill.'), String(prompt))
   const skill = path.join(alpha, '.combwork', `launch-${agent.id}`, 'plugin', 'skills', 'work-on-card', 'SKILL.md')

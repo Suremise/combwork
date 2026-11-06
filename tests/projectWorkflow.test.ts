@@ -1,6 +1,6 @@
 // One writer for project.json's `workflow` (#1417): the form's Save, a preset and a Paste (setWorkflowOptions) and the
 // Assistant's settings tool set the platform, preset and options through `writeWorkflow`, and every other field of
-// `workflow` (`kept`, `presetAsked`, a field a later Hive adds) survives. Stage names (N5) through the same paths: a
+// `workflow` (`kept`, `presetAsked`, a field a later Combwork adds) survives. Stage names (N5) through the same paths: a
 // rename is checked, applies at once (no lane or card keeps old rules, the ruleset id stays), and shows in
 // `workflow:stages` and `cw_project_status`.
 import { execFileSync } from 'child_process'
@@ -10,7 +10,7 @@ import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-projworkflow-')
+const base = tempDir('cw-projworkflow-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -39,8 +39,8 @@ const git = (cwd: string, ...args: string[]): string => execFileSync('git', args
 let n = 0
 const user = { kind: 'user' } as const
 
-/** Fields of `workflow` this card's writers don't set: the other platform's kept options, the answer, a later Hive's. */
-const OTHERS = { kept: { none: { preset: 'solo', options: { review: 'none' }, presetAsked: 'notNow' } }, presetAsked: 'chosen', later: { from: 'a newer Hive' } }
+/** Fields of `workflow` this card's writers don't set: the other platform's kept options, the answer, a later Combwork's. */
+const OTHERS = { kept: { none: { preset: 'solo', options: { review: 'none' }, presetAsked: 'notNow' } }, presetAsked: 'chosen', later: { from: 'a newer Combwork' } }
 
 /** A workspace with a git project `p` whose project.json has `workflow` as given. */
 async function workspace(workflow?: unknown): Promise<{ w: WS; repo: string }> {
@@ -65,7 +65,7 @@ const onDisk = (repo: string): Record<string, unknown> => JSON.parse(readFileSyn
 
 describe('writeWorkflow (#1417)', () => {
   it('sets the platform, preset and options, and keeps every other field', () => {
-    const now = { platform: 'git', preset: 'pair', options: { finish: 'hiveMerges' }, ...OTHERS } as never
+    const now = { platform: 'git', preset: 'pair', options: { finish: 'combworkMerges' }, ...OTHERS } as never
     expect(writeWorkflow(now, { platform: 'git', preset: null, options: { review: 'none' } })).toEqual({ platform: 'git', preset: null, options: { review: 'none' }, ...OTHERS })
     expect(writeWorkflow(undefined, { platform: 'none', preset: 'solo', options: {} })).toEqual({ platform: 'none', preset: 'solo', options: {} })
   })
@@ -80,9 +80,9 @@ describe("the workflow's writers keep its other fields", () => {
     // A preset chosen and saved.
     const { platform: _p, ...pair } = preset('git', 'pair')
     await form.setWorkflowOptions(w, repo, { preset: 'pair', options: pair })
-    expect(onDisk(repo)).toMatchObject({ preset: 'pair', options: { finish: 'hiveMerges' }, ...OTHERS })
+    expect(onDisk(repo)).toMatchObject({ preset: 'pair', options: { finish: 'combworkMerges' }, ...OTHERS })
     // A Paste: another project's copied options, saved as they came.
-    const pasted = JSON.parse(JSON.stringify({ hiveWorkflow: 1, platform: 'git', preset: 'solo', options: preset('git', 'solo') }))
+    const pasted = JSON.parse(JSON.stringify({ combworkWorkflow: 1, platform: 'git', preset: 'solo', options: preset('git', 'solo') }))
     const { platform: _q, ...solo } = pasted.options
     await form.setWorkflowOptions(w, repo, { preset: pasted.preset, options: solo })
     expect(onDisk(repo)).toMatchObject({ preset: 'solo', options: { finish: 'committed' }, ...OTHERS })
@@ -151,7 +151,7 @@ describe('stage names (N5) through the writers (#1417)', () => {
     expect((await workflowFor(w, repo))!.store.facts(card.number).filter((f) => f.kind === 'Override')).toEqual([])
   })
 
-  it("refuses a name the window shows for another stage in Hive's language, through the form and the tool (HR2's round 1, finding 2)", async () => {
+  it("refuses a name the window shows for another stage in Combwork's language, through the form and the tool (HR2's round 1, finding 2)", async () => {
     const { platform: _p, ...pair } = preset('git', 'pair')
     const { w, repo } = await workspace({ platform: 'git', preset: 'pair', options: pair })
     setLanguage('de', await loadCatalogue('de'), 'de')

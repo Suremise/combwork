@@ -24,17 +24,17 @@ const HUNG_MS = 10000
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(path.join(ws, 'demo'), { recursive: true })
   lib.enableProviders(userData)
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47896) })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47896) })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.appReady(page)
-  await page.evaluate((folder) => window.hive.invoke('workspace:open', folder), ws)
+  await page.evaluate((folder) => window.combwork.invoke('workspace:open', folder), ws)
   await sleep(800)
   fs.writeFileSync(note, '# Plan\n')
   fs.mkdirSync(path.dirname(server), { recursive: true })
   fs.writeFileSync(server, '{ "command": "node", "args": [] }\n')
-  await page.evaluate(() => window.hive.invoke('workspace:refresh'))
+  await page.evaluate(() => window.combwork.invoke('workspace:refresh'))
 
   const toolbar = page.locator('.split-main .editor-toolbar').first()
   const typeAtEnd = async (text) => {
@@ -84,14 +84,14 @@ const HUNG_MS = 10000
   check('note: Overwrite saves my version', !!(await lib.until(async () => read(note).includes('DRAFT-1') && !(await unsaved()), HUNG_MS)))
   await typeAtEnd('DRAFT-2 ')
 
-  // An MCP server saved without its final newline (Hive adds one) saves again without a false conflict.
+  // An MCP server saved without its final newline (Combwork adds one) saves again without a false conflict.
   await openServer()
   await page.locator('.split-main .monaco').first().click({ position: { x: 200, y: 10 } })
   await page.keyboard.press('Control+End')
   await page.keyboard.press('Backspace')
   check('mcp: removing the final newline is an edit', !!(await lib.until(unsaved, HUNG_MS)))
   await toolbar.locator('.btn', { hasText: 'Save' }).click()
-  // The file is unchanged by this save (Hive adds the newline back), so the dot going is what says it's done.
+  // The file is unchanged by this save (Combwork adds the newline back), so the dot going is what says it's done.
   check('mcp: saved with a final newline', !!(await lib.until(async () => !(await unsaved()), HUNG_MS)) && read(server) === '{ "command": "node", "args": [] }\n', JSON.stringify(read(server)))
   await typeAtEnd(' ')
   await toolbar.locator('.btn', { hasText: 'Save' }).click()
@@ -106,20 +106,20 @@ const HUNG_MS = 10000
   check('mcp: unsaved edits kept after changing view', !!(await lib.until(unsaved, HUNG_MS)))
 
   // Quitting lists both and saves them.
-  await page.evaluate(() => window.hive.invoke('app:quit'))
+  await page.evaluate(() => window.combwork.invoke('app:quit'))
   const quit = (await lib.until(async () => { const t = await dialogText(); return /plan\.md/.test(t) && /demo\.json/.test(t) && t }, HUNG_MS)) || (await dialogText())
   check('quit: lists the unsaved note and server', /plan\.md/.test(quit) && /demo\.json/.test(quit), quit.replace(/\s+/g, ' ').slice(0, 200))
-  // Hive's part (saving both, then app.quit) and the process's exit are waited for separately (#424): the limits only
+  // Combwork's part (saving both, then app.quit) and the process's exit are waited for separately (#424): the limits only
   // bound a hang, since a loaded machine stretches both (#563).
   const quitting = await lib.quitWatch(app)
   const clicked = Date.now()
   await page.getByRole('button', { name: 'Save and quit' }).click()
   const quits = !!(await quitting.untilDecided(30000)) && (await quitting.gone(30000))
-  check('quit: Hive quits after saving', quits, quitting.timings(clicked))
+  check('quit: Combwork quits after saving', quits, quitting.timings(clicked))
   console.log(`quit: ${quitting.timings(clicked)}`)
   check('quit: the note was saved', read(note).includes('DRAFT-2'))
   check('quit: the server was saved', read(server) !== '{ "command": "node", "args": [] }\n' && !!JSON.parse(read(server)))
-  // Hive has quit (that was the test): Playwright may already have let go of it, so asking about it can throw.
+  // Combwork has quit (that was the test): Playwright may already have let go of it, so asking about it can throw.
   await app.close().catch(() => undefined)
   process.exit(failed ? 1 : 0)
 })().catch((e) => {

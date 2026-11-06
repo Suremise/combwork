@@ -15,7 +15,7 @@ afterEach(() => {
   env = null
 })
 
-/** Pair (Hive merges), merge style Rebase and fast-forward; `main` checked out nowhere unless `checkedOut`. */
+/** Pair (Combwork merges), merge style Rebase and fast-forward; `main` checked out nowhere unless `checkedOut`. */
 function rebasing(over: Partial<ReturnType<typeof preset>> = {}, checkedOut = false): Env {
   const e = (env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [], style: 'rebase', ...over }))
   if (!checkedOut) sh(e.project, 'checkout', '-q', '--detach')
@@ -75,11 +75,11 @@ describe("G6's Rebase and fast-forward (#1184)", () => {
     linear(e, before)
     expect(landed(e, before).map((c) => sh(e.project, 'log', '-1', '--format=%s', c.commit))).toEqual(['AM-1: one', 'AM-1: two'])
     expect(sh(e.project, 'rev-parse', 'main')).toBe((o as { result: string }).result)
-    expect(tree(e, 'main')).toBe(tree(e, `refs/hive/queue/${card.key.toLowerCase()}`))
-    expect(integrated(e, card.id)).toMatchObject({ method: 'fastForward', by: 'hive', result: sh(e.project, 'rev-parse', 'main') })
+    expect(tree(e, 'main')).toBe(tree(e, `refs/cw/queue/${card.key.toLowerCase()}`))
+    expect(integrated(e, card.id)).toMatchObject({ method: 'fastForward', by: 'combwork', result: sh(e.project, 'rev-parse', 'main') })
     expect(e.wf.state(card).stage).toBe('done')
     // The reviewed revision stays pinned.
-    expect(sh(e.project, 'rev-parse', `refs/hive/cards/${card.key.toLowerCase()}/1`)).toBe(e.wf.state(card).latest!.revision)
+    expect(sh(e.project, 'rev-parse', `refs/cw/cards/${card.key.toLowerCase()}/1`)).toBe(e.wf.state(card).latest!.revision)
   })
 
   it('a linear card already on top of the target: its reviewed commits land as they are, no rewrite', async () => {
@@ -120,7 +120,7 @@ describe("G6's Rebase and fast-forward (#1184)", () => {
     const before = sh(e.project, 'rev-parse', 'main')
     await expect(e.queue({ hooks: { afterAdvance: () => Promise.reject(new Error('crash')) } }).drain('main')).rejects.toThrow('crash')
     expect((await e.queue().recover('main')).map((x) => x.outcome)).toEqual(['integrated'])
-    expect(integrated(e, card.id)).toMatchObject({ method: 'fastForward', by: 'hive' })
+    expect(integrated(e, card.id)).toMatchObject({ method: 'fastForward', by: 'combwork' })
     linear(e, before)
   })
 

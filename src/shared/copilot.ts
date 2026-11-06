@@ -10,7 +10,7 @@ import { agentMsg, say } from './agentText'
 /**
  * GitHub Copilot's side of the shared provider data (the Copilot CLI, `copilot`): its modes, reasoning levels and models.
  * Its footer shows two things, the agent mode (Interactive, Plan, Autopilot: Shift+Tab cycles them) and the approval
- * (Manual Approval, or Allow All), and Hive's modes are the combinations it can tell apart there. The approval is Allow
+ * (Manual Approval, or Allow All), and Combwork's modes are the combinations it can tell apart there. The approval is Allow
  * All when launched with --allow-all, and also once a turn has run in Autopilot: entering it sets Allow All for the rest
  * of the session ("Permission policy: Allow All for this session"), which stays when Shift+Tab leaves Autopilot
  * ("Interactive · Allow All", read as Allow all; #490). Checked with Copilot CLI 1.0.93 (the #403 spike, #490's probes).
@@ -19,14 +19,14 @@ import { agentMsg, say } from './agentText'
 
 export const COPILOT = 'copilot'
 
-// Hive's own tools (the hive MCP server) never ask, in any mode: the adapter pre-approves them.
+// Combwork's own tools (the combwork MCP server) never ask, in any mode: the adapter pre-approves them.
 /** GitHub Copilot's permission modes as agents and the Agent API read them (dialects, HI-2065): said when read (the getters below), so in the reader's dialect. The window has its own messages (`text`). */
 const M = {
   askLabel: agentMsg({ id: 'mode.copilot.ask.label', text: 'Ask', note: "GitHub Copilot's permission mode ask: its name, as agents and the Agent API read it (the window has its own message)." }),
   askDescription: agentMsg({ id: 'mode.copilot.ask.desc', text: 'Reads files and runs harmless commands without asking; asks before edits, other commands, other MCP tools and web access.', note: "What GitHub Copilot's permission mode ask does, as agents and the Agent API read it (the window has its own message)." }),
   acceptEditsLabel: agentMsg({ id: 'mode.copilot.acceptEdits.label', text: 'Accept edits', note: "GitHub Copilot's permission mode accept-edits: its name, as agents and the Agent API read it (the window has its own message)." }),
   acceptEditsDescription: agentMsg({ id: 'mode.copilot.acceptEdits.desc', text: 'Edits files in its folder without asking (not where the folder’s path has parentheses: Copilot can’t approve them there); still asks before other commands, other MCP tools, web access and changes outside its folder.', note: "What GitHub Copilot's permission mode accept-edits does, as agents and the Agent API read it (the window has its own message)." }),
-  acceptEditsCliNote: agentMsg({ id: 'mode.copilot.acceptEdits.cliNote', text: 'Copilot’s own footer still says Manual Approval: Combwork starts it with edits in its folder approved (an allow rule), which Copilot’s label doesn’t show.', note: "GitHub Copilot's permission mode accept-edits: why the CLI's own screen names another mode (shown with Hive's mode badge while a session runs in it)." }),
+  acceptEditsCliNote: agentMsg({ id: 'mode.copilot.acceptEdits.cliNote', text: 'Copilot’s own footer still says Manual Approval: Combwork starts it with edits in its folder approved (an allow rule), which Copilot’s label doesn’t show.', note: "GitHub Copilot's permission mode accept-edits: why the CLI's own screen names another mode (shown with Combwork's mode badge while a session runs in it)." }),
   planLabel: agentMsg({ id: 'mode.copilot.plan.label', text: 'Plan', note: "GitHub Copilot's permission mode plan: its name, as agents and the Agent API read it (the window has its own message)." }),
   planDescription: agentMsg({ id: 'mode.copilot.plan.desc', text: 'Plans the work and asks before changing anything.', note: "What GitHub Copilot's permission mode plan does, as agents and the Agent API read it (the window has its own message)." }),
   autopilotLabel: agentMsg({ id: 'mode.copilot.autopilot.label', text: 'Autopilot', note: "GitHub Copilot's permission mode autopilot: its name, as agents and the Agent API read it (the window has its own message)." }),
@@ -156,7 +156,7 @@ export function copilotModeFlags(mode: PermissionMode, folder: string): string[]
  * Each mode's footer, by its two parts ("Plan · Manual Approval"), read by each part's first word: in a narrow terminal
  * Copilot wraps its footer item by item ("← open ·Interactive · Manual · / commands" over "sidebar Approval next tab",
  * 1.0.93). The defaults of the advanced settings copilot.footer.<key> (#696), case sensitive. Accept edits has none: its
- * footer is Ask's. Hive has no mode for Assisted approval.
+ * footer is Ask's. Combwork has no mode for Assisted approval.
  */
 export const COPILOT_FOOTER_MODES: readonly FooterModeDef[] = [
   { mode: 'ask', key: 'ask', label: 'Ask', pattern: String.raw`\bInteractive ?· ?Manual\b` }, // i18n-ignore: a footer's name in Settings → Advanced (advanced.ts words it)
@@ -241,7 +241,7 @@ export const COPILOT_DESCRIPTOR: ProviderDescriptor = {
   permissionModes: withCliOwn(COPILOT_PERMISSION_MODES),
   // Ask, with edits in the agent's folder approved (#468).
   defaultPermissionMode: 'accept-edits',
-  // Reads are approved by Copilot itself, and Hive's own tools are pre-approved (the Assistant's: trustedHiveTools).
+  // Reads are approved by Copilot itself, and Combwork's own tools are pre-approved (the Assistant's: trustedCombworkTools).
   assistantMode: 'ask',
   effortLevels: [
     { value: 'none', label: 'None', text: EFFORT_TEXT.none }, // i18n-ignore: agent-facing English (text is the window's)
@@ -295,9 +295,9 @@ export const COPILOT_DESCRIPTOR: ProviderDescriptor = {
   // Its session events have no record of a safety classifier stopping a response or rerouting it (checked with 1.0.x, #606).
   safeguardHelp: null,
   text: {
-    installNote: msg({ id: 'agents.copilot.installNote', defaultMessage: 'Install the GitHub Copilot CLI with WinGet (`winget install GitHub.Copilot`) or npm (`npm install -g @github/copilot`), then sign in once with `copilot login` in a terminal (or with the GitHub CLI, which Copilot also uses). Copilot Free runs the Auto model only; choosing a model needs a paid plan. If the CLI is installed somewhere else, set its path in Settings → GitHub Copilot.', description: "Provider Setup → GitHub Copilot: how to install it. Keep the commands in backticks exactly as they are; Copilot Free is a plan's name and Auto a model's; Settings → GitHub Copilot is a place in Hive's settings." }),
-    extensionNote: msg({ id: 'agents.copilot.extensionNote', defaultMessage: "You have GitHub Copilot in VS Code (or a similar editor). Combwork doesn't use the editor's copy — it moves with every extension update. Install the Copilot CLI; your extension keeps working as before.", description: 'Provider Setup → GitHub Copilot, when only an editor extension was found: why Hive needs the standalone CLI.' }),
-    signInHelp: msg({ id: 'agents.copilot.signInHelp', defaultMessage: 'Sign in again: run copilot login in a terminal (Help → Provider Setup → GitHub Copilot shows how).', description: "How to sign in to GitHub Copilot again after its sign-in expired (an agent's pane, a notification). copilot login is a command: keep it; Help → Provider Setup → GitHub Copilot is a menu path in Hive." }),
+    installNote: msg({ id: 'agents.copilot.installNote', defaultMessage: 'Install the GitHub Copilot CLI with WinGet (`winget install GitHub.Copilot`) or npm (`npm install -g @github/copilot`), then sign in once with `copilot login` in a terminal (or with the GitHub CLI, which Copilot also uses). Copilot Free runs the Auto model only; choosing a model needs a paid plan. If the CLI is installed somewhere else, set its path in Settings → GitHub Copilot.', description: "Provider Setup → GitHub Copilot: how to install it. Keep the commands in backticks exactly as they are; Copilot Free is a plan's name and Auto a model's; Settings → GitHub Copilot is a place in Combwork's settings." }),
+    extensionNote: msg({ id: 'agents.copilot.extensionNote', defaultMessage: "You have GitHub Copilot in VS Code (or a similar editor). Combwork doesn't use the editor's copy — it moves with every extension update. Install the Copilot CLI; your extension keeps working as before.", description: 'Provider Setup → GitHub Copilot, when only an editor extension was found: why Combwork needs the standalone CLI.' }),
+    signInHelp: msg({ id: 'agents.copilot.signInHelp', defaultMessage: 'Sign in again: run copilot login in a terminal (Help → Provider Setup → GitHub Copilot shows how).', description: "How to sign in to GitHub Copilot again after its sign-in expired (an agent's pane, a notification). copilot login is a command: keep it; Help → Provider Setup → GitHub Copilot is a menu path in Combwork." }),
     safeguardHelp: null,
     modelPlaceholder: msg({ id: 'agents.copilot.modelPlaceholder', defaultMessage: 'Model ID, e.g. claude-sonnet-5.5 or auto', description: 'Placeholder of the custom model ID box (GitHub Copilot). Keep the model IDs exactly as they are.' })
   },

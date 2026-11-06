@@ -17,7 +17,7 @@
   },
   "dialects.claimTaken": {
     "defaultMessage": "Another file of this folder, {by}, claims model {model} first: Auto never picks this one.",
-    "description": "A warning on a dialect file whose model another file of the same CLI folder claims too (made outside Hive): {by} is that file, {model} the model ID. Glossary: dialect."
+    "description": "A warning on a dialect file whose model another file of the same CLI folder claims too (made outside Combwork): {by} is that file, {model} the model ID. Glossary: dialect."
   },
   "dialects.claimedBy": {
     "defaultMessage": "{name} already has this model: it becomes a test copy.",
@@ -37,7 +37,7 @@
   },
   "dialects.defaultNow": {
     "defaultMessage": "The Default now: {text}",
-    "description": "In the Dialects view, beside an outdated override: Hive's current wording of the text. Glossary: Default (dialects), outdated."
+    "description": "In the Dialects view, beside an outdated override: Combwork's current wording of the text. Glossary: Default (dialects), outdated."
   },
   "dialects.delete": {
     "defaultMessage": "Delete",
@@ -105,7 +105,7 @@
   },
   "dialects.from.default": {
     "defaultMessage": "from Default",
-    "description": "Where an inherited text in the Dialects view comes from: Hive's own wording (the Default). Glossary: Default (dialects)."
+    "description": "Where an inherited text in the Dialects view comes from: Combwork's own wording (the Default). Glossary: Default (dialects)."
   },
   "dialects.from.file": {
     "defaultMessage": "This file",
@@ -177,7 +177,7 @@
   },
   "dialects.keepMine": {
     "defaultMessage": "Keep My Changes",
-    "description": "The Dialects view's button on a file changed outside Hive: keeps the unsaved changes; the next Save writes over the change made outside."
+    "description": "The Dialects view's button on a file changed outside Combwork: keeps the unsaved changes; the next Save writes over the change made outside."
   },
   "dialects.kind.api": {
     "defaultMessage": "Callers with no session",
@@ -193,7 +193,7 @@
   },
   "dialects.kind.model": {
     "defaultMessage": "Model {model}",
-    "description": "What a model file applies to, under its name in the Dialects view's list: agents running that model ID ({model}, as Hive matches it). Glossary: dialect."
+    "description": "What a model file applies to, under its name in the Dialects view's list: agents running that model ID ({model}, as Combwork matches it). Glossary: dialect."
   },
   "dialects.kind.workspace": {
     "defaultMessage": "Every agent in the workspace",
@@ -265,7 +265,7 @@
   },
   "dialects.noDefault": {
     "defaultMessage": "No current Default: this text was removed or renamed in this Combwork.",
-    "description": "In the Dialects view, beside an outdated override whose id this Hive no longer has. Glossary: Default (dialects), outdated."
+    "description": "In the Dialects view, beside an outdated override whose id this Combwork no longer has. Glossary: Default (dialects), outdated."
   },
   "dialects.noMatch": {
     "defaultMessage": "No text matches.",
@@ -289,7 +289,7 @@
   },
   "dialects.note": {
     "defaultMessage": "Note",
-    "description": "In a text's expanded view (Dialects view): the note beside the text in Hive's code, saying where it is used."
+    "description": "In a text's expanded view (Dialects view): the note beside the text in Combwork's code, saying where it is used."
   },
   "dialects.onFailed": {
     "defaultMessage": "Couldn't switch {name} on or off",
@@ -305,11 +305,11 @@
   },
   "dialects.outdatedBadge": {
     "defaultMessage": "{count, plural, one {# outdated} other {# outdated}}",
-    "description": "A warning badge on a dialect file in the Dialects view: how many of its texts no longer match this Hive's (they fall through to the layer below). Glossary: outdated."
+    "description": "A warning badge on a dialect file in the Dialects view: how many of its texts no longer match this Combwork's (they fall through to the layer below). Glossary: outdated."
   },
   "dialects.outdatedGroup": {
     "defaultMessage": "Outdated",
-    "description": "The Dialects view's group of a file's overrides that no longer match this Hive's texts: they fall through to the layer below until edited or removed. Glossary: outdated."
+    "description": "The Dialects view's group of a file's overrides that no longer match this Combwork's texts: they fall through to the layer below until edited or removed. Glossary: outdated."
   },
   "dialects.override": {
     "defaultMessage": "Change Here",
@@ -337,7 +337,7 @@
   },
   "dialects.problem.unknown": {
     "defaultMessage": "{id}: no such text in this Combwork (removed or renamed).",
-    "description": "Why a dialect override is outdated or refused: its id ({id}) isn't one of this Hive's texts."
+    "description": "Why a dialect override is outdated or refused: its id ({id}) isn't one of this Combwork's texts."
   },
   "dialects.problem.unparsable": {
     "defaultMessage": "{id}: its text can't be read ({detail}).",
@@ -397,7 +397,7 @@
   },
   "dialects.refused.path": {
     "defaultMessage": "That isn't a dialect file's place.",
-    "description": "A dialect file's save, import or copy refused: its path isn't one Hive accepts."
+    "description": "A dialect file's save, import or copy refused: its path isn't one Combwork accepts."
   },
   "dialects.refused.protected": {
     "defaultMessage": "The Workspace file, a CLI's file and a shipped file can't be deleted.",
@@ -409,7 +409,7 @@
   },
   "dialects.reload": {
     "defaultMessage": "Reload (Lose My Changes)",
-    "description": "The Dialects view's button on a file changed outside Hive: reads it again, dropping the unsaved changes."
+    "description": "The Dialects view's button on a file changed outside Combwork: reads it again, dropping the unsaved changes."
   },
   "dialects.removeOverride": {
     "defaultMessage": "Remove Override",
@@ -421,11 +421,11 @@
   },
   "dialects.revert": {
     "defaultMessage": "Revert to Shipped",
-    "description": "A button of an edited shipped dialect file: puts back the file as Hive ships it. Glossary: dialect."
+    "description": "A button of an edited shipped dialect file: puts back the file as Combwork ships it. Glossary: dialect."
   },
   "dialects.revertMessage": {
     "defaultMessage": "Your changes to it are lost, and it follows Combwork's updates again.",
-    "description": "The confirmation before reverting a dialect file to the version Hive ships. Glossary: dialect."
+    "description": "The confirmation before reverting a dialect file to the version Combwork ships. Glossary: dialect."
   },
   "dialects.revertTitle": {
     "defaultMessage": "Revert {name}?",
@@ -433,7 +433,7 @@
   },
   "dialects.save": {
     "defaultMessage": "Save",
-    "description": "The Dialects view's Save button: writes the file's changes, checked against this Hive's texts first."
+    "description": "The Dialects view's Save button: writes the file's changes, checked against this Combwork's texts first."
   },
   "dialects.saved": {
     "defaultMessage": "{name} saved: it applies at each agent's next launch.",
@@ -477,15 +477,15 @@
   },
   "dialects.state.edited": {
     "defaultMessage": "Edited",
-    "description": "A badge on a dialect file in the Dialects view: shipped with Hive, and changed here (Revert puts it back). Glossary: dialect."
+    "description": "A badge on a dialect file in the Dialects view: shipped with Combwork, and changed here (Revert puts it back). Glossary: dialect."
   },
   "dialects.state.shipped": {
     "defaultMessage": "Shipped",
-    "description": "A badge on a dialect file in the Dialects view: as Hive ships it. Glossary: dialect."
+    "description": "A badge on a dialect file in the Dialects view: as Combwork ships it. Glossary: dialect."
   },
   "dialects.state.yours": {
     "defaultMessage": "Yours",
-    "description": "A badge on a dialect file in the Dialects view: one the user made (a copy, an import), not Hive's. Glossary: dialect."
+    "description": "A badge on a dialect file in the Dialects view: one the user made (a copy, an import), not Combwork's. Glossary: dialect."
   },
   "dialects.tab.json": {
     "defaultMessage": "JSON",
@@ -509,7 +509,7 @@
   },
   "dialects.title": {
     "defaultMessage": "Dialects",
-    "description": "Title of the Dialects view (HI-2444): the wording Hive gives agents, tuned per model and CLI. Glossary: dialect."
+    "description": "Title of the Dialects view (HI-2444): the wording Combwork gives agents, tuned per model and CLI. Glossary: dialect."
   },
   "dialects.unresolvedAlias": {
     "defaultMessage": "{model} is an alias Combwork can't resolve now: agents running it show as model unknown, so this file wouldn't match. Type the model's ID.",
@@ -517,7 +517,7 @@
   },
   "dialects.updateBadge": {
     "defaultMessage": "Update available",
-    "description": "A badge on an edited shipped dialect file: this Hive ships a newer version (Revert brings it in). Glossary: dialect."
+    "description": "A badge on an edited shipped dialect file: this Combwork ships a newer version (Revert brings it in). Glossary: dialect."
   },
   "dialects.usedBy": {
     "defaultMessage": "{count, plural, one {Used by # running agent: {agents}} other {Used by # running agents: {agents}}}",

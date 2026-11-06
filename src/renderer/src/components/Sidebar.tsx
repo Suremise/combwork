@@ -13,7 +13,7 @@ import { commandKeybinding, runCommand } from '../commands'
 import { get, leaveSettingsForSidePanel, notify, projectKeyOf, projectStarting, projectState, startingLabel, prompt, set, setProjectTab, toggleCompactSidebar, useStore } from '../store'
 import { cx, formatKeybinding } from '../util'
 import { Icon, IconButton, InfoTip, LoadFailed, OneLineDesc, OneLineTitle, SearchInput, StaleNote, StatusDot, STATUS_TEXT, Switch, Tooltip, useContextMenu, type MenuEntry } from './ui'
-import { addSkill, deleteSkill, DeliveredSwitch, HiveSkillsWarning, restoreBundled, SKILL_LEVEL_TIP, skillDescription, SkillRow } from './Skills'
+import { addSkill, deleteSkill, DeliveredSwitch, CombworkSkillsWarning, restoreBundled, SKILL_LEVEL_TIP, skillDescription, SkillRow } from './Skills'
 import { DialectsPanel } from './Dialects'
 import { TemplatesPanel } from './Templates'
 import { hasEditorDraftsUnder } from '../editorDrafts'
@@ -64,7 +64,7 @@ const M = {
   projects: msg({ id: 'assistant.sidebar.projects', defaultMessage: 'Projects', description: "The Projects sidebar's heading with no workspace open." }),
   bypassTip: msg({ id: 'assistant.sidebar.bypassTip', defaultMessage: 'Bypass permissions: sessions run every action without asking.', description: "Tooltip on a project's warning: an agent runs in a provider's no-guardrails mode." }),
   restartTip: msg({ id: 'assistant.sidebar.restartTip', defaultMessage: 'Settings changed since this session started. Restart the session to apply them.', description: "Tooltip on a project's restart mark." }),
-  unmanagedTip: msg({ id: 'assistant.sidebar.unmanagedTip', defaultMessage: 'Project MCP servers not in the workspace (disabled): {servers}', description: "Tooltip on a project's plug: MCP servers in its own config that Hive turned off." }),
+  unmanagedTip: msg({ id: 'assistant.sidebar.unmanagedTip', defaultMessage: 'Project MCP servers not in the workspace (disabled): {servers}', description: "Tooltip on a project's plug: MCP servers in its own config that Combwork turned off." }),
   statusLabel: msg({ id: 'assistant.sidebar.statusLabel', defaultMessage: '{project} agents: {status}', description: "A project's status, for screen readers (its agents' table follows on focus)." }),
   activeTip: msg({ id: 'assistant.sidebar.activeTip', defaultMessage: 'Working on this project. Click to mark it as not being worked on.', description: "Tooltip on an active project's switch." }),
   inactiveTip: msg({ id: 'assistant.sidebar.inactiveTip', defaultMessage: 'Mark as a project you are working on. Only active projects run sessions and show status.', description: "Tooltip on an inactive project's switch." }),
@@ -102,30 +102,30 @@ const M = {
   newNoteButton: msg({ id: 'assistant.sidebar.newNoteButton', defaultMessage: 'New Note…', description: "A button over the shared notes: creates a note." }),
   newFolderButton: msg({ id: 'assistant.sidebar.newFolderButton', defaultMessage: 'New Folder…', description: "A button over the shared notes: creates a folder." }),
   openFolder: msg({ id: 'assistant.sidebar.openFolder', defaultMessage: 'Open Folder', description: "Shared Notes: a button that opens .combwork/shared in Explorer." }),
-  workspaceNotes: msg({ id: 'assistant.sidebar.workspaceNotes', defaultMessage: 'Workspace notes', description: "The pinned first row of Shared Notes: the note Hive gives every agent when it starts (notes about this machine). Keep Workspace notes in English: it is the note's name (its file is Workspace notes.md) and what agents are told." }),
+  workspaceNotes: msg({ id: 'assistant.sidebar.workspaceNotes', defaultMessage: 'Workspace notes', description: "The pinned first row of Shared Notes: the note Combwork gives every agent when it starts (notes about this machine). Keep Workspace notes in English: it is the note's name (its file is Workspace notes.md) and what agents are told." }),
   workspaceNotesTip: msg({ id: 'assistant.sidebar.workspaceNotesTip', defaultMessage: "Notes about this machine (a full path, a local tool's version) that every agent gets when it starts, on every coding agent and in any folder. Kept in .combwork/shared, out of git.", description: 'Tooltip on the pinned Workspace notes row of Shared Notes. Keep .combwork/shared as it is.' }),
   noNotes: msg({ id: 'assistant.sidebar.noNotes', defaultMessage: 'No notes yet. Create one, or ask an agent to write a handover with the Combwork MCP tools.', description: "The Shared Notes sidebar when the workspace has no notes." }),
   openFirst: msg({ id: 'assistant.sidebar.openFirst', defaultMessage: 'Open a workspace first', description: 'A notice: adding a skill with no workspace open.' }),
-  skills: msg({ id: 'assistant.sidebar.skills', defaultMessage: 'Skills', description: "The heading of the Skills sidebar: the workspace's Hive skills." }),
-  newSkill: msg({ id: 'assistant.sidebar.newSkill', defaultMessage: 'New Skill…', description: "A button over the Hive skills: creates a skill." }),
+  skills: msg({ id: 'assistant.sidebar.skills', defaultMessage: 'Skills', description: "The heading of the Skills sidebar: the workspace's Combwork skills." }),
+  newSkill: msg({ id: 'assistant.sidebar.newSkill', defaultMessage: 'New Skill…', description: "A button over the Combwork skills: creates a skill." }),
   skillFromFile: msg({ id: 'assistant.sidebar.skillFromFile', defaultMessage: 'Add Skill from File (.md or .zip)…', description: 'The Skills sidebar: a button. Keep .md and .zip as they are.' }),
   openSkillsFolder: msg({ id: 'assistant.sidebar.openSkillsFolder', defaultMessage: 'Open Combwork Skills Folder', description: 'The Skills sidebar: a button that opens .combwork/skills in Explorer.' }),
   filterSkills: msg({ id: 'assistant.sidebar.filterSkills', defaultMessage: 'Filter skills', description: "The Skills sidebar's filter box, empty." }),
-  hiveGroup: msg({ id: 'assistant.sidebar.hiveGroup', defaultMessage: 'Combwork', description: "The Skills sidebar: the section of the workspace's Hive skills. Usually kept as Hive." }),
+  combworkGroup: msg({ id: 'assistant.sidebar.combworkGroup', defaultMessage: 'Combwork', description: "The Skills sidebar: the section of the workspace's Combwork skills. Usually kept as Combwork." }),
   noWorkspaceSkills: msg({ id: 'assistant.sidebar.noWorkspaceSkills', defaultMessage: 'Open a workspace to manage Combwork skills.', description: 'The Skills sidebar with no workspace open.' }),
-  skillsLoadTarget: msg({ id: 'assistant.sidebar.skillsLoadTarget', defaultMessage: 'the skills', description: 'What could not be loaded when the Hive skills were first read: shown in "Could not load {what}: {error}", with Retry.' }),
+  skillsLoadTarget: msg({ id: 'assistant.sidebar.skillsLoadTarget', defaultMessage: 'the skills', description: 'What could not be loaded when the Combwork skills were first read: shown in "Could not load {what}: {error}", with Retry.' }),
   skillsRefreshTarget: msg({ id: 'assistant.sidebar.skillsRefreshTarget', defaultMessage: 'the skills', description: 'What could not be refreshed while the skills shown stay on screen: shown in "Could not refresh {what}; last updated …", with Retry.' }),
-  loading: msg({ id: 'assistant.sidebar.loading', defaultMessage: 'Loading…', description: "The Skills sidebar while the Hive skills are read." }),
-  noSkills: msg({ id: 'assistant.sidebar.noSkills', defaultMessage: 'No Combwork skills yet. Create one with +, or add one from a .md or .zip.', description: 'The Skills sidebar with no Hive skills. + is the add button.' }),
-  restoreSkill: msg({ id: 'assistant.sidebar.restoreSkill', defaultMessage: 'Restore this skill that ships with Combwork', description: "A button beside a deleted skill of Hive's own." }),
-  deleteSkill: msg({ id: 'assistant.sidebar.deleteSkill', defaultMessage: 'Delete skill', description: "A trash button beside a Hive skill: deletes it." }),
+  loading: msg({ id: 'assistant.sidebar.loading', defaultMessage: 'Loading…', description: "The Skills sidebar while the Combwork skills are read." }),
+  noSkills: msg({ id: 'assistant.sidebar.noSkills', defaultMessage: 'No Combwork skills yet. Create one with +, or add one from a .md or .zip.', description: 'The Skills sidebar with no Combwork skills. + is the add button.' }),
+  restoreSkill: msg({ id: 'assistant.sidebar.restoreSkill', defaultMessage: 'Restore this skill that ships with Combwork', description: "A button beside a deleted skill of Combwork's own." }),
+  deleteSkill: msg({ id: 'assistant.sidebar.deleteSkill', defaultMessage: 'Delete skill', description: "A trash button beside a Combwork skill: deletes it." }),
   skillsHint: msg({ id: 'assistant.sidebar.skillsHint', defaultMessage: "Each goes to the project agents in every project, unless it's marked <b>Assistant</b> (only the Assistant gets it) or <b>Agents + Assistant</b>. A project's own skills, and your user and plugin skills, are in its <b>Skills</b> tab.", description: "Under the Skills sidebar's list. <b> is bold: the badges' words (Assistant, Agents + Assistant) and the tab's name, as they show." }),
   mcpServers: msg({ id: 'assistant.sidebar.mcpServers', defaultMessage: 'MCP Servers', description: "The heading of the MCP sidebar: the workspace's MCP servers." }),
   newServerTitle: msg({ id: 'assistant.sidebar.newServerTitle', defaultMessage: 'New MCP Server', description: "The title of the dialog that creates an MCP server." }),
   newServerMessage: msg({ id: 'assistant.sidebar.newServerMessage', defaultMessage: 'Creates {file} in the workspace from a template you can edit.', description: 'New MCP Server. {file} is .combwork/mcp/<name>.json, <name> standing for the name you type.' }),
-  serverNameRule: msg({ id: 'assistant.sidebar.serverNameRule', defaultMessage: 'Use letters, numbers, "-" and "_". "combwork" and "hive" are reserved.', description: "New MCP Server: a name that can't be used. Keep combwork and hive as they are (the built-in server's name and its old one, HI-2463)." }),
+  serverNameRule: msg({ id: 'assistant.sidebar.serverNameRule', defaultMessage: 'Use letters, numbers, "-" and "_". "combwork" is reserved.', description: "New MCP Server: a name that can't be used. Keep combwork as it is (the built-in server's name)." }),
   createServerFailed: msg({ id: 'assistant.sidebar.createServerFailed', defaultMessage: 'Could not create server', description: "An error notice: New MCP Server couldn't create the server's file; the reason follows." }),
-  mcpTip: msg({ id: 'assistant.sidebar.mcpTipAdded', defaultMessage: "MCP servers deployed to the workspace (.combwork/mcp) are available to every project and the Assistant, and run only where they are added: a project's MCP tab, the Assistant's view, or Add to… here. Changes apply to new sessions.", description: 'Tooltip on MCP Servers (HI-2059). Keep .combwork/mcp as it is; "MCP tab" and "Add to…" as Hive shows them.' }),
+  mcpTip: msg({ id: 'assistant.sidebar.mcpTipAdded', defaultMessage: "MCP servers deployed to the workspace (.combwork/mcp) are available to every project and the Assistant, and run only where they are added: a project's MCP tab, the Assistant's view, or Add to… here. Changes apply to new sessions.", description: 'Tooltip on MCP Servers (HI-2059). Keep .combwork/mcp as it is; "MCP tab" and "Add to…" as Combwork shows them.' }),
   newServer: msg({ id: 'assistant.sidebar.newServer', defaultMessage: 'New MCP Server…', description: "A button over the MCP servers: creates a server from a template." }),
   serverFromFile: msg({ id: 'assistant.sidebar.serverFromFile', defaultMessage: 'Add MCP Server from File (.json or .zip)…', description: 'The MCP sidebar: a button. Keep .json and .zip as they are.' }),
   openMcpFolder: msg({ id: 'assistant.sidebar.openMcpFolder', defaultMessage: 'Open MCP Folder', description: 'The MCP sidebar: a button that opens .combwork/mcp in Explorer.' }),
@@ -135,9 +135,9 @@ const M = {
   noMatch: msg({ id: 'assistant.sidebar.mcpNoMatch', defaultMessage: 'No server matches.', description: "The MCP view (HI-2059) when no server matches its search and filter." }),
   noServers: msg({ id: 'assistant.sidebar.noServers', defaultMessage: 'No MCP servers yet. Create one with +, or add one from a .json definition or a .zip of a server folder.', description: 'The MCP sidebar with no servers. + is the add button.' }),
   deleteServer: msg({ id: 'assistant.sidebar.deleteServer', defaultMessage: 'Delete server', description: "A trash button beside an MCP server of the workspace: deletes it." }),
-  builtIn: msg({ id: 'assistant.sidebar.builtIn', defaultMessage: 'Built-in', description: "The MCP sidebar: the section of Hive's own server." }),
-  hiveServerDesc: msg({ id: 'assistant.sidebar.hiveServerDesc', defaultMessage: 'Combwork tools for agents: projects, shared notes, handovers, notifications', description: "Under the built-in combwork server: what it gives agents." }),
-  hiveServerTip: msg({ id: 'assistant.sidebar.hiveServerTip', defaultMessage: 'Controlled in Settings → Agent API', description: "Tooltip on the built-in server's On or Off." }),
+  builtIn: msg({ id: 'assistant.sidebar.builtIn', defaultMessage: 'Built-in', description: "The MCP sidebar: the section of Combwork's own server." }),
+  combworkServerDesc: msg({ id: 'assistant.sidebar.combworkServerDesc', defaultMessage: 'Combwork tools for agents: projects, shared notes, handovers, notifications', description: "Under the built-in combwork server: what it gives agents." }),
+  combworkServerTip: msg({ id: 'assistant.sidebar.combworkServerTip', defaultMessage: 'Controlled in Settings → Agent API', description: "Tooltip on the built-in server's On or Off." }),
   on: msg({ id: 'assistant.sidebar.on', defaultMessage: 'On', description: 'A badge: the built-in combwork server is on.' }),
   off: msg({ id: 'assistant.sidebar.off', defaultMessage: 'Off', description: 'A badge: the built-in combwork server is off.' })
 }
@@ -305,7 +305,7 @@ function RailLabel({ text }: { text: string }) {
   return <span className={cx('rail-initials', text.length > 2 && `rail-initials-${Math.min(text.length, 4)}`)}>{text}</span>
 }
 
-/** Short label for the rail: the initials of a multi-word name ("web-dashboard" → "WD"), else its first two letters ("hive" → "Hi"). */
+/** Short label for the rail: the initials of a multi-word name ("web-dashboard" → "WD"), else its first two letters ("demo" → "De"). */
 export function projectInitials(name: string): string {
   const words = name
     .replace(/([a-z])([A-Z])/g, '$1 $2')
@@ -717,7 +717,7 @@ function SkillsPanel() {
 
   const add = async (mode: 'new' | 'file'): Promise<void> => {
     if (!workspace) return notify('warning', tr(M.openFirst))
-    const s = await addSkill(mode, { kind: 'hive' })
+    const s = await addSkill(mode, { kind: 'combwork' })
     if (s) set({ selectedSkill: s.path })
   }
 
@@ -736,12 +736,12 @@ function SkillsPanel() {
           <IconButton icon="folder-opened" title={tr(M.openSkillsFolder)} onClick={() => void call('skills:openFolder')} disabled={!workspace} />
         </div>
       </div>
-      {workspace && <HiveSkillsWarning />}
+      {workspace && <CombworkSkillsWarning />}
       <div style={{ padding: '0 8px 6px 12px' }}>
         <SearchInput style={{ height: 24 }} placeholder={tr(M.filterSkills)} value={filter} onChange={setFilter} />
       </div>
       <div className="pane-body">
-        <Section title={tr(M.hiveGroup)} count={skills.length - missing} tip={SKILL_LEVEL_TIP.hive}>
+        <Section title={tr(M.combworkGroup)} count={skills.length - missing} tip={SKILL_LEVEL_TIP.combwork}>
           {!workspace && <div className="pane-empty">{tr(M.noWorkspaceSkills)}</div>}
           {workspace && error && loaded.data && <StaleNote what={tr(M.skillsRefreshTarget)} error={error} at={loaded.at} onRetry={reload} />}
           {workspace && error && !loaded.data && <LoadFailed inline what={tr(M.skillsLoadTarget)} error={error} onRetry={reload} />}
@@ -830,7 +830,7 @@ function McpPanel() {
     load()
   }
 
-  const hiveOn = !!(settings?.agentApi.enabled && settings.agentApi.provideHiveMcp && api?.running)
+  const combworkOn = !!(settings?.agentApi.enabled && settings.agentApi.provideCombworkMcp && api?.running)
   const shown = servers.filter((m) => mcpServerShown(m, query, filter))
 
   return (
@@ -887,14 +887,14 @@ function McpPanel() {
           ))}
         </Section>
         <Section title={tr(M.builtIn)} count={1}>
-          <div className={cx(/* i18n-ignore: class names */ 'row tall', selected === '__hive' && 'selected')} onClick={() => set({ selectedMcp: '__hive' })}>
+          <div className={cx(/* i18n-ignore: class names */ 'row tall', selected === '__cw' && 'selected')} onClick={() => set({ selectedMcp: '__cw' })}>
             <Icon name="hubot" />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div className="label">{TOOLS_SERVER /* i18n-ignore: the server's name */}</div>
-              <div className="desc">{tr(M.hiveServerDesc)}</div>
+              <div className="desc">{tr(M.combworkServerDesc)}</div>
             </div>
-            <Tooltip content={tr(M.hiveServerTip)}>
-              <span className={cx('badge', hiveOn ? 'success' : '')}>{tr(hiveOn ? M.on : M.off)}</span>
+            <Tooltip content={tr(M.combworkServerTip)}>
+              <span className={cx('badge', combworkOn ? 'success' : '')}>{tr(combworkOn ? M.on : M.off)}</span>
             </Tooltip>
           </div>
         </Section>

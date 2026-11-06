@@ -1,5 +1,5 @@
-// A stand-in for an installed Hive's resources folder (#1647): an app.asar holding only its package.json (with the
-// version), and its build-identity.json when given one, for HIVE_TEST_RESOURCES (an unpackaged build with a test update
+// A stand-in for an installed Combwork's resources folder (#1647): an app.asar holding only its package.json (with the
+// version), and its build-identity.json when given one, for CW_TEST_RESOURCES (an unpackaged build with a test update
 // feed reads its own and the installed copy's identity there; src/main/buildIdentity.ts) and the unit tests.
 const fs = require('fs')
 const path = require('path')
@@ -33,7 +33,7 @@ function asarOf(files) {
 /** Makes `dir` a stand-in resources folder: its app's `version`, and `identity` (an object, or raw text) if given. */
 function fakeInstall(dir, { version, identity } = {}) {
   fs.mkdirSync(dir, { recursive: true })
-  if (version !== undefined) fs.writeFileSync(path.join(dir, 'app.asar'), asarOf({ 'package.json': JSON.stringify({ name: 'hive', version }) }))
+  if (version !== undefined) fs.writeFileSync(path.join(dir, 'app.asar'), asarOf({ 'package.json': JSON.stringify({ name: 'combwork', version }) }))
   const file = path.join(dir, 'build-identity.json')
   if (identity === undefined) fs.rmSync(file, { force: true })
   else fs.writeFileSync(file, typeof identity === 'string' ? identity : JSON.stringify(identity))

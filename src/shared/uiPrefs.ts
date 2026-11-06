@@ -5,7 +5,7 @@
 import { isKnownProvider } from './providers'
 import type { AppConfig } from './types'
 
-export const PROJECT_PREFS = ['skillsProvider', 'skillsFold', 'sessionsTree', 'hiveVcsNotice', 'assistantFold'] as const
+export const PROJECT_PREFS = ['skillsProvider', 'skillsFold', 'sessionsTree', 'combworkVcsNotice', 'assistantFold'] as const
 export type ProjectPref = (typeof PROJECT_PREFS)[number]
 export type ProjectPrefValue<P extends ProjectPref> = NonNullable<AppConfig['ui'][P]>[string]
 
@@ -22,11 +22,11 @@ const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'obj
 export function projectPrefValue<P extends ProjectPref>(pref: P, value: unknown): ProjectPrefValue<P> | undefined {
   if (pref === 'skillsProvider') return (typeof value === 'string' && isKnownProvider(value) ? value : undefined) as ProjectPrefValue<P> | undefined
   if (pref === 'assistantFold') return (value === true ? true : undefined) as ProjectPrefValue<P> | undefined
-  if (pref === 'hiveVcsNotice') return (typeof value === 'string' && value.length <= 200 ? value : undefined) as ProjectPrefValue<P> | undefined
+  if (pref === 'combworkVcsNotice') return (typeof value === 'string' && value.length <= 200 ? value : undefined) as ProjectPrefValue<P> | undefined
   if (!isRecord(value)) return undefined
   if (pref === 'skillsFold') {
-    const fold: { hive?: boolean; provider?: boolean } = {}
-    if (typeof value.hive === 'boolean') fold.hive = value.hive
+    const fold: { combwork?: boolean; provider?: boolean } = {}
+    if (typeof value.combwork === 'boolean') fold.combwork = value.combwork
     if (typeof value.provider === 'boolean') fold.provider = value.provider
     return fold as ProjectPrefValue<P>
   }

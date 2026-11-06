@@ -1,5 +1,5 @@
 // HI-2466: a lane that waits for a slot gets it once what held the slot is gone, with no restart. On fake Claude Code
-// agents, the Assistant off, one slot (Maximum agents: 1), Pair with Hive merges and each card in its own folder:
+// agents, the Assistant off, one slot (Maximum agents: 1), Pair with Combwork merges and each card in its own folder:
 // 1. B1's first lane is lent slot-a, B1 runs there; the lane is ended and B1 stopped, slot-a free (ready, no lease);
 // 2. a process still holds slot-a (a file in it open, as a CLI's child holds it for a while after its session ends:
 //    the incident's "busy" leases); B1's next lane, started then, can't be lent slot-a: it waits for a slot, and its
@@ -10,13 +10,13 @@
 // what B1's own run left there (the incident's: a Windows Sandbox server started from the agent's slot, its working
 // folder slot-a, outliving the session):
 // 4. B1, in a turn in slot-a, starts a process that outlives it (detached, a file in slot-a open); its lane is ended
-//    and its next one recorded over it while its turn still runs: Hive leaves the running builder as it is and gives it
+//    and its next one recorded over it while its turn still runs: Combwork leaves the running builder as it is and gives it
 //    the lane's first card once it is free. Its turn ends and it is stopped; the card's start is refused while the
 //    process holds slot-a, its status (HI-2468) and its row in the Progress panel naming slot-a and the program B1's run left
 //    (text, hover, screenshot); once the process ends, the card starts in slot-a with no other call;
 // 5. the Assistant's second sighting: B1 stopped, a process holding slot-a, a lane recorded through the API waits for a
 //    slot, its row in the Progress panel saying what holds it (screenshot), and is lent slot-a once the process ends.
-// HI-2467, Windows Sandbox's broker (a stand-in whose current folder is slot-a, HIVE_TEST_SYSTEM_BROKER):
+// HI-2467, Windows Sandbox's broker (a stand-in whose current folder is slot-a, CW_TEST_SYSTEM_BROKER):
 // 6. a broker working elsewhere while a process holds slot-a: only the process is said; the broker working in slot-a
 //    once the process has gone: a retry names it, idle (status and the Progress panel's row, screenshot); a Sandbox
 //    starting and stopping: later retries say so; the broker ending: the lane is lent slot-a with no other call.
@@ -38,14 +38,14 @@ const shots = at('shots')
 const alpha = path.join(ws, 'alpha')
 const slotA = path.join(`${ws}.worktrees`, 'alpha', 'slot-a')
 const PORT = Number(lib.port(47790))
-const identity = { name: 'Hive Slot Retry Test', email: 'slotretry@example.com' }
+const identity = { name: 'Combwork Slot Retry Test', email: 'slotretry@example.com' }
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase()
-/** Whether a folder can be renamed now (Hive's own look at a free slot, slots.ts quiet): nothing holds it. */
+/** Whether a folder can be renamed now (Combwork's own look at a free slot, slots.ts quiet): nothing holds it. */
 const renamable = (dir) => {
   try {
     fs.renameSync(dir, `${dir}.probe`)
@@ -82,14 +82,14 @@ const renamable = (dir) => {
   const beat4 = path.join(tools, 'hold4-beat.txt')
   fs.writeFileSync(turn, `const fs = require('fs'); const { spawn } = require('child_process'); const c = spawn(process.execPath, [${JSON.stringify(hold)}, require('path').join(process.cwd(), '.combwork', 'hold4.lock'), ${JSON.stringify(go4)}, ${JSON.stringify(beat4)}, '${HUNG_MS * 4}'], { detached: true, stdio: 'ignore', windowsHide: true }); c.unref(); const t = Date.now(); const tick = () => { if (fs.existsSync(${JSON.stringify(turnGo)}) || Date.now() - t > ${HUNG_MS * 3}) process.exit(0); setTimeout(tick, 100) }; tick()\n`)
   // Step 6's stand-in broker (HI-2467): only its current folder in the slot, no file open, until stand-go.txt (bounded),
-  // writing its own PID/current-folder heartbeat. brokers.txt lists the stand-ins' ids (HIVE_TEST_SYSTEM_BROKER), brokers-active.txt the
-  // Sandbox's own processes running now (HIVE_TEST_SYSTEM_BROKER_ACTIVE; while it is missing, none).
+  // writing its own PID/current-folder heartbeat. brokers.txt lists the stand-ins' ids (CW_TEST_SYSTEM_BROKER), brokers-active.txt the
+  // Sandbox's own processes running now (CW_TEST_SYSTEM_BROKER_ACTIVE; while it is missing, none).
   const stand = path.join(tools, 'stand.js')
   fs.writeFileSync(stand, `const fs = require('fs'); const [go, beat, ms] = process.argv.slice(2); const t = Date.now(); const tick = () => { if (fs.existsSync(go) || Date.now() - t > Number(ms)) process.exit(0); fs.writeFileSync(beat, JSON.stringify({ pid: process.pid, cwd: process.cwd(), at: Date.now() })); setTimeout(tick, 100) }; tick()\n`)
   const brokers = path.join(tools, 'brokers.txt')
   const brokersActive = path.join(tools, 'brokers-active.txt')
   fs.writeFileSync(brokers, '')
-  const env = { ...lib.fakeClaude(userData, home, [alpha, ws, slotA]), HIVE_TEST_SYSTEM_BROKER: brokers, HIVE_TEST_SYSTEM_BROKER_ACTIVE: brokersActive }
+  const env = { ...lib.fakeClaude(userData, home, [alpha, ws, slotA]), CW_TEST_SYSTEM_BROKER: brokers, CW_TEST_SYSTEM_BROKER_ACTIVE: brokersActive }
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never', showTips: false }
@@ -97,7 +97,7 @@ const renamable = (dir) => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off' } })
+  const h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off' } })
   const { app, page, inv } = h
   let holder = null
   let stopBrokerStatus = null
@@ -106,7 +106,7 @@ const renamable = (dir) => {
     await lib.waitForProvider(inv)
     await lib.openWorkspace(inv, page, ws)
     const until = (fn, ms) => lib.until(fn, ms, 250)
-    await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'hiveMerges', folder: 'slots', target: 'integration', style: 'merge', preChecks: [], mergeChecks: [], identity, okBefore: { mode: 'never', labels: [] } } })
+    await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'combworkMerges', folder: 'slots', target: 'integration', style: 'merge', preChecks: [], mergeChecks: [], identity, okBefore: { mode: 'never', labels: [] } } })
     const b1 = await lib.addAgent(inv, alpha, { name: 'B1', workflowRole: 'builder' })
     const r1 = await lib.addAgent(inv, alpha, { name: 'R1', workflowRole: 'reviewer' })
     await lib.setMaxAgents(inv, 1)
@@ -182,7 +182,7 @@ const renamable = (dir) => {
     // The passes its start asked for (its own, the lanes' and the board's) are over: no try to lend it a slot for 2 s,
     // so what lends it one from here is what notices the process has gone.
     const lastTry = () => {
-      const db = new DatabaseSync(path.join(ws, '.combwork', 'hive.db'), { readOnly: true })
+      const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { readOnly: true })
       try {
         return Date.parse(db.prepare('SELECT MAX(from_at) AS at FROM slot_leases WHERE lane = ?').get(second.lane.id)?.at ?? '') || 0
       } finally {
@@ -206,7 +206,7 @@ const renamable = (dir) => {
     const t4 = Date.now()
     const stop4 = watchStatus(c3, t4)
     const third = await apiLane([c3])
-    check('B1’s next lane, recorded through the API while B1 is still in its turn: B1 left as it is, Hive to give it the card', third.status === 200 && (await live(b1.id))?.status === 'working', JSON.stringify(third.body))
+    check('B1’s next lane, recorded through the API while B1 is still in its turn: B1 left as it is, Combwork to give it the card', third.status === 200 && (await live(b1.id))?.status === 'working', JSON.stringify(third.body))
     fs.writeFileSync(turnGo, 'go')
     check('…B1’s turn ends and it is stopped (its old lane’s lease gone), the process still holding slot-a', !!(await until(async () => !(await live(b1.id)), HUNG_MS)) && beating(beat4) && !renamable(slotA), JSON.stringify(await live(b1.id)))
     check('…its card isn’t started while slot-a is held', !!(await until(async () => (await laneOf(c3))?.status?.reason === 'startWait' || (await laneOf(c3))?.status?.reason === 'slot', HUNG_MS)) && (await card(c3))?.column === 'todo' && beating(beat4), JSON.stringify((await laneOf(c3))?.status))
@@ -260,7 +260,7 @@ const renamable = (dir) => {
     console.log(`INFO step 5's lane, as it went: ${(await stop5()).join(' | ')}`)
 
     // --- 6. HI-2467: Windows Sandbox's broker working in slot-a (a stand-in: a process whose current folder is slot-a,
-    // its id in HIVE_TEST_SYSTEM_BROKER, so its path, read by the helper, is taken as the broker's). Named only while it
+    // its id in CW_TEST_SYSTEM_BROKER, so its path, read by the helper, is taken as the broker's). Named only while it
     // is seen working there, idle or not as the Sandbox's own processes run, looked at again on each retry.
     await inv('lanes:end', (await laneOf(c4)).id, true)
     check('the lane is ended, B1 stopped, slot-a free and held by nothing', !!(await until(settled, HUNG_MS)), JSON.stringify(await slotNow()))

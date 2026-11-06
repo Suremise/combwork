@@ -1,4 +1,4 @@
-// The Hive Assistant's template load through the Agent API (HI-1502): names given by an agent's place or name (an
+// The Combwork Assistant's template load through the Agent API (HI-1502): names given by an agent's place or name (an
 // ambiguous key, two keys for one agent, a place out of range and a name that isn't text refused), a template found by
 // file or name (several refused, never one picked), the plan (names taken, each with a free one), the load (the window's,
 // its workflow saved; Git never set up; workflow: false leaves the options), what races refuse (a name taken while it
@@ -13,7 +13,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import type { StoredAgent } from '../src/shared/agentFolders'
 
-const base = tempDir('hive-template-api-')
+const base = tempDir('cw-template-api-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 mkdirSync(join(base, 'profile'), { recursive: true })
 
@@ -68,7 +68,7 @@ describe('loading a template for the Assistant, and undoing it', () => {
   const cfgOf = (p: string) => JSON.parse(readFileSync(join(p, '.combwork', 'project.json'), 'utf8'))
   const names = (p: string): string[] => cfgOf(p).agents.map((a: StoredAgent) => a.name)
   const live = new Set<string>()
-  /** alpha's key (#704), as Hive's own templates' names are made with it. */
+  /** alpha's key (#704), as Combwork's own templates' names are made with it. */
   let K = ''
   const k = (n: string): string => `${K}-${n}`
   const ALPHA_AGENTS = [
@@ -143,7 +143,7 @@ describe('loading a template for the Assistant, and undoing it', () => {
   })
 
   it('finds a template by file or name; several of one name are refused naming each, an unknown one too', async () => {
-    expect((await find(alpha, 'team-3x3.json')).scope).toBe('hive')
+    expect((await find(alpha, 'team-3x3.json')).scope).toBe('combwork')
     expect((await find(alpha, 'Git only')).file).toBe('git-only.json')
     await expect(find(alpha, 'same')).rejects.toThrow(/Several templates are called "same": name one by scope and file \(workspace: same\.json; project alpha: same\.json\)/)
     expect((await find(alpha, 'Same', 'project')).scope).toBe('project')

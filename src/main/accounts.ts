@@ -4,7 +4,7 @@ import { app } from 'electron'
 import { watch, type FSWatcher } from 'original-fs'
 import { lstat, mkdir, readdir, readlink, realpath, rename, rmdir, symlink, unlink } from 'original-fs/promises'
 import type { AgentDef, AgentInfo, AppConfig, Account, Connection, ConnectionDefaults, ConnectionObserved, ConnectionProblem, LaunchValues, ProjectConfig, ProjectInfo, ProviderId, ServerConnection, ServerModel, UsageMoveRule, WorkspaceConfig, WorkspaceConnections } from '../shared/types'
-import { HIVE_DIR } from '../shared/defaults'
+import { CW_DIR } from '../shared/defaults'
 import { readKeptJson, withFileLock } from './fsutil'
 import { baseValues, cliDefaults, connectionFor, COPILOT_ACCOUNT, homeAccount, seamAccountId, type AccountStore } from '../shared/connectionDefaults'
 import { acceptable, accountState, baseConnection, cleanTag, connectionsOn, TAG_MAX, launchValues, movedInGroup, resolveAgentConnection, type AgentConnection, type ConnectionPatch, type ConnectionRow, type ConnectionTrust, type ConnectionUser, movedConnection, topOfOrder, valuesOf, workspaceAccounts, switchedOn, type ConnectionsView } from '../shared/accounts'
@@ -15,8 +15,8 @@ import { agentProvider, extraArgsProblem, isProviderEnabled, modeOption, provide
 import { fmt, msg, tr, type Msg } from '../shared/i18n'
 import { advanced } from './advanced'
 import { config } from './config'
-import { emit, onHiveEvent } from './events'
-import { capturedText, hiveError, HiveError } from './hiveError'
+import { emit, onCombworkEvent } from './events'
+import { capturedText, combworkError, CombworkError } from './combworkError'
 import { createLogger, userText } from './logger'
 import { connectionLoginChanged, forgetConnectionUsage, usageLogin } from './planUsage'
 import { childEnv, hasPty, killPty, ptyGone } from './ptyHost'
@@ -32,11 +32,11 @@ import { dropKeysExcept, keyInfo, loadKeys, removeKey, withKey } from './keyStor
 import { coverageView } from './keyCoverage'
 import { aliasModels, MODEL_ALIASES, originOf, parseBaseUrl, serverDefaultModel, withRemote } from '../shared/serverConnection'
 import type { ServerCaps } from '../shared/providers'
-import { dataFolder } from './hiveFolder'
+import { treeOf } from './combworkMove'
 
 /**
- * Hive's accounts (HI-980, SPEC §11.2): a CLI login per folder, under `<accounts>\<id>\`, each signed in through the
- * CLI's own sign-in (its login stays in its folder: Hive never reads, stores or passes a token). Each account's folder
+ * Combwork's accounts (HI-980, SPEC §11.2): a CLI login per folder, under `<accounts>\<id>\`, each signed in through the
+ * CLI's own sign-in (its login stays in its folder: Combwork never reads, stores or passes a token). Each account's folder
  * links the CLI's shared folders (Claude Code's `projects\`: transcripts and memory) back to the CLI's own home by a
  * junction, so every account finds every conversation. Removing one removes its junctions first, checks they are gone,
  * and only then deletes the folder, by a walk that stops at any link (never following one into the CLI's home).
@@ -68,14 +68,14 @@ const CONFIRM_ROUNDS = 3
 
 /**
  * The accounts folder: the installed app's `%LOCALAPPDATA%\Combwork\accounts`, a dev build's `Combwork-Dev`'s, and a
- * test profile's own (under HIVE_USER_DATA), so no test reaches the user's. The local profile folder is the one this run
- * uses (HI-2461: the old `Hive` folder while the installer hasn't moved it).
+ * test profile's own (under CW_USER_DATA), so no test reaches the user's. The local profile folder is the one this run
+ * uses (HI-2461; Combwork's old one moved to it before, by the installer or at start: HI-2594).
  */
 export function accountsRoot(): string {
-  // The local folder this run chose first: a test copy's (HIVE_TEST_PROFILE_CHOOSE) too.
+  // The local folder this run chose first: a test copy's (CW_TEST_PROFILE_CHOOSE) too.
   const inUse = localProfileInUse()
   if (inUse) return join(inUse, 'accounts')
-  if (process.env.HIVE_USER_DATA) return join(process.env.HIVE_USER_DATA, 'accounts')
+  if (process.env.CW_USER_DATA) return join(process.env.CW_USER_DATA, 'accounts')
   const local = process.env.LOCALAPPDATA || join(app.getPath('home'), 'AppData', 'Local')
   return join(local, profileFolder(app.isPackaged), 'accounts')
 }
@@ -84,13 +84,13 @@ export const accountFolder = (id: string): string => join(accountsRoot(), id)
 
 const samePath = (a: string, b: string): boolean => resolve(a).toLowerCase() === resolve(b).toLowerCase()
 
-/** Hive's accounts: its folders (never the CLI's own homes: Copilot's sign-in, a test home), in the order. */
+/** Combwork's accounts: its folders (never the CLI's own homes: Copilot's sign-in, a test home), in the order. */
 function list(): Account[] {
   return (config.get().accounts ?? []).filter((a) => !a.home)
 }
 
-/** Hive's accounts (list): what today's screens and the Agent API call connections, until HI-2107 and HI-2108. */
-export const hiveAccounts = (): Account[] => list()
+/** Combwork's accounts (list): what today's screens and the Agent API call connections, until HI-2107 and HI-2108. */
+export const combworkAccounts = (): Account[] => list()
 
 /** Every account, the CLI's own homes too (HI-2106: Copilot's sign-in, a test home), in the order. */
 export function allAccounts(): Account[] {
@@ -131,7 +131,7 @@ const NO_ACCOUNT = msg({ id: 'main.accounts.notFound', defaultMessage: 'There is
 
 function mustGet(id: string): Account {
   const a = getAccount(id)
-  if (!a) throw hiveError(NO_ACCOUNT, undefined, { kind: 'notFound' })
+  if (!a) throw combworkError(NO_ACCOUNT, undefined, { kind: 'notFound' })
   return a
 }
 
@@ -141,17 +141,17 @@ function mustGet(id: string): Account {
  */
 function assertNotHeld(a: Account): void {
   if (!provider(a.provider).accountHeld?.(accountFolder(a.id))) return
-  throw hiveError(msg({ id: 'main.accounts.checkHeld', defaultMessage: "{name} is being checked: Combwork is still making sure {cli}'s check of it has ended. Try again in a moment.", description: "An error signing in or removing a connection ({name}, its name in Settings → Accounts & Connections): the coding agent CLI's ({cli}: \"Codex\") check of who it is signed in as hasn't been confirmed ended yet, so the connection is held." }), { name: a.name, cli: providerDescriptor(a.provider).name }, { kind: 'conflict' })
+  throw combworkError(msg({ id: 'main.accounts.checkHeld', defaultMessage: "{name} is being checked: Combwork is still making sure {cli}'s check of it has ended. Try again in a moment.", description: "An error signing in or removing a connection ({name}, its name in Settings → Accounts & Connections): the coding agent CLI's ({cli}: \"Codex\") check of who it is signed in as hasn't been confirmed ended yet, so the connection is held." }), { name: a.name, cli: providerDescriptor(a.provider).name }, { kind: 'conflict' })
 }
 
 /** Whether the CLI's sign-in names an organisation, which an identity then needs (HI-1757: Codex's names none). */
 const namesOrgs = (id: ProviderId): boolean => providerDescriptor(id).capabilities.connections?.orgs !== false
 
-/** The provider's account support, or a refusal: one without it can't have accounts in Hive. */
+/** The provider's account support, or a refusal: one without it can't have accounts in Combwork. */
 function support(id: ProviderId): { homeEnv: string; shared: readonly string[]; adapter: ReturnType<typeof provider> } {
   const caps = providerDescriptor(id).capabilities.connections
   const adapter = provider(id)
-  if (!caps || !adapter.accountStatus || !adapter.accountSharedTarget || !adapter.configHome) throw hiveError(msg({ id: 'main.accounts.noProvider', defaultMessage: "{cli} can't have sign-in connections in Combwork yet.", description: 'An error: connections were asked for a coding agent CLI ({cli}: "Codex") that Hive keeps no connections for.' }), { cli: providerDescriptor(id).name }, { kind: 'invalid' })
+  if (!caps || !adapter.accountStatus || !adapter.accountSharedTarget || !adapter.configHome) throw combworkError(msg({ id: 'main.accounts.noProvider', defaultMessage: "{cli} can't have sign-in connections in Combwork yet.", description: 'An error: connections were asked for a coding agent CLI ({cli}: "Codex") that Combwork keeps no connections for.' }), { cli: providerDescriptor(id).name }, { kind: 'invalid' })
   return { homeEnv: caps.homeEnv, shared: caps.shared, adapter }
 }
 
@@ -177,7 +177,7 @@ const claims = new Map<string, number>()
 
 /**
  * Takes a launch's claim on an account (HI-1755 holds it through the launch's start): taken under the account's lock,
- * so never while a removal runs, and only on an account still there whose folder is the one Hive made. Removal is
+ * so never while a removal runs, and only on an account still there whose folder is the one Combwork made. Removal is
  * refused while one is held. Returns its release.
  */
 export async function claimAccount(id: string): Promise<() => void> {
@@ -250,11 +250,11 @@ function sharedTarget(id: ProviderId, name: string): string {
   const root = resolve(accountsRoot()).toLowerCase()
   const t = target.toLowerCase()
   if (!samePath(resolve(target, '..'), home) || t === root || t.startsWith(root + '\\') || root.startsWith(t + '\\'))
-    throw hiveError(msg({ id: 'main.accounts.badTarget', defaultMessage: "Combwork won't link a connection to {target}: it isn't one of {cli}'s own folders.", description: "An error adding a connection: the folder a connection's shared folder would link to ({target}, a path) isn't in the coding agent CLI's ({cli}) own folder." }), { target, cli: providerDescriptor(id).name }, { kind: 'invalid' })
+    throw combworkError(msg({ id: 'main.accounts.badTarget', defaultMessage: "Combwork won't link a connection to {target}: it isn't one of {cli}'s own folders.", description: "An error adding a connection: the folder a connection's shared folder would link to ({target}, a path) isn't in the coding agent CLI's ({cli}) own folder." }), { target, cli: providerDescriptor(id).name }, { kind: 'invalid' })
   return target
 }
 
-/** How a link in an account's folder stands: absent, the junction Hive made, or something else (refused). */
+/** How a link in an account's folder stands: absent, the junction Combwork made, or something else (refused). */
 async function linkState(link: string, target: string): Promise<'absent' | 'ours' | string> {
   let st
   try {
@@ -278,18 +278,18 @@ async function makeFolder(a: Account): Promise<void> {
     await assertRealFolder(dir)
     for (const name of shared) {
       const target = sharedTarget(a.provider, name)
-      // Missing (the CLI never ran here): the empty folder, its home's only change Hive ever makes (Darren, 26 Oct). Not
+      // Missing (the CLI never ran here): the empty folder, its home's only change Combwork ever makes (Darren, 26 Oct). Not
       // its home: refused, rather than made.
       await mkdir(target).catch((e: NodeJS.ErrnoException) => {
         if (e.code === 'EEXIST') return
-        if (e.code === 'ENOENT') throw hiveError(msg({ id: 'main.accounts.noHome', defaultMessage: "{cli}'s folder ({folder}) isn't there yet: run {cli} once, then add the connection.", description: "An error adding a connection: the coding agent CLI's ({cli}) own folder ({folder}, a path) doesn't exist on this PC." }), { cli: providerDescriptor(a.provider).name, folder: resolve(target, '..') }, { kind: 'conflict' })
+        if (e.code === 'ENOENT') throw combworkError(msg({ id: 'main.accounts.noHome', defaultMessage: "{cli}'s folder ({folder}) isn't there yet: run {cli} once, then add the connection.", description: "An error adding a connection: the coding agent CLI's ({cli}) own folder ({folder}, a path) doesn't exist on this PC." }), { cli: providerDescriptor(a.provider).name, folder: resolve(target, '..') }, { kind: 'conflict' })
         throw e
       })
       const tst = await lstat(target)
       if (tst.isSymbolicLink() || !tst.isDirectory()) throw new Unsafe(`${target} isn't a folder`) // i18n-ignore: for the log
       const link = join(dir, name)
       await symlink(target, link, 'junction')
-      if ((await linkState(link, target)) !== 'ours') throw new Unsafe(`${link} isn't the junction Hive made`) // i18n-ignore: for the log
+      if ((await linkState(link, target)) !== 'ours') throw new Unsafe(`${link} isn't the junction Combwork made`) // i18n-ignore: for the log
     }
   } catch (e) {
     await removeFolder(a).catch((r) => log.warn(`couldn't take back the half-made folder of account ${a.id}: ${userText(String(r))}`))
@@ -365,15 +365,15 @@ async function removeFolder(a: Account): Promise<void> {
     const target = sharedTarget(a.provider, name)
     const state = await linkState(link, target)
     if (state === 'absent') continue
-    if (state !== 'ours') throw new Unsafe(`${link} is ${state}, not the junction Hive made`) // i18n-ignore: for the log
+    if (state !== 'ours') throw new Unsafe(`${link} is ${state}, not the junction Combwork made`) // i18n-ignore: for the log
     // The link alone (unlink removes a junction, never what it points at: tests/accounts.test.ts).
     await unlink(link)
     if ((await linkState(link, target)) !== 'absent') throw new Unsafe(`${link} is still there after it was removed`) // i18n-ignore: for the log
   }
   const links = await linksUnder(dir)
-  if (links.length) throw new Unsafe(`links Hive didn't make are in it: ${links.join(', ')}`) // i18n-ignore: for the log
+  if (links.length) throw new Unsafe(`links Combwork didn't make are in it: ${links.join(', ')}`) // i18n-ignore: for the log
   // Renamed aside, one rename that follows nothing, so no account is ever at its own path half deleted; then deleted
-  // there by the walk. The threat model (the Assistant's call on HI-980, 26 Oct): Hive's own junction, the CLI's
+  // there by the walk. The threat model (the Assistant's call on HI-980, 26 Oct): Combwork's own junction, the CLI's
   // writes and the user's changes before removal began, not another process racing the walk (SPEC §11.2).
   const aside = removingFolder(a.id)
   await rename(dir, aside)
@@ -399,7 +399,7 @@ async function finishRemoving(aside: string): Promise<void> {
   if (!(await exists(aside))) return
   await assertRealFolder(aside)
   const links = await linksUnder(aside)
-  if (links.length) throw new Unsafe(`links Hive didn't make are in it: ${links.join(', ')}`) // i18n-ignore: for the log
+  if (links.length) throw new Unsafe(`links Combwork didn't make are in it: ${links.join(', ')}`) // i18n-ignore: for the log
   await deleteTree(aside)
 }
 
@@ -437,7 +437,7 @@ export async function finishLeftoverRemovals(): Promise<void> {
 export async function addAccount(id: ProviderId, name: string, server?: ServerConnection): Promise<Account> {
   support(id)
   const n = name.trim()
-  if (!n) throw hiveError(NO_NAME, undefined, { kind: 'invalid' })
+  if (!n) throw combworkError(NO_NAME, undefined, { kind: 'invalid' })
   // Its base connection (HI-2106) holds what an agent with nothing of its own on it launched with before connections were
   // setups: the CLI's old per-CLI model, effort and context for its CLI's first sign-in account only (taken once,
   // HI-1774), and the CLI's mode and extra arguments; a server's models aren't the CLI's, so no model, effort or context.
@@ -448,7 +448,7 @@ export async function addAccount(id: ProviderId, name: string, server?: ServerCo
       await makeFolder(a)
     } catch (e) {
       log.warn(`account ${a.id} couldn't be made: ${userText(String(e))}`)
-      if (e instanceof Unsafe) throw hiveError(msg({ id: 'main.accounts.makeFailed', defaultMessage: "Couldn't make the connection's folder: {error}", description: "An error adding a connection: its folder or link couldn't be made. {error} is the reason, in English." }), { error: e.message })
+      if (e instanceof Unsafe) throw combworkError(msg({ id: 'main.accounts.makeFailed', defaultMessage: "Couldn't make the connection's folder: {error}", description: "An error adding a connection: its folder or link couldn't be made. {error} is the reason, in English." }), { error: e.message })
       throw e
     }
     generations.set(a.id, generation(a.id) + 1)
@@ -486,7 +486,7 @@ const EFFORT_REFUSED = msg({ id: 'worktrees.agent.effortRefused', defaultMessage
  * changes. One the migration carried over, or a later CLI's catalogue left, is kept and not passed at launch.
  */
 export function assertEffortTaken(cli: ProviderId, model: string | null, account: Pick<Account, 'id' | 'home'> | null, effort: string): void {
-  if (!effortUsable(cli, model, account, effort)) throw hiveError(EFFORT_REFUSED, { chosen: model ? 'yes' : 'no', model: model ?? '', effort }, { kind: 'invalid' })
+  if (!effortUsable(cli, model, account, effort)) throw combworkError(EFFORT_REFUSED, { chosen: model ? 'yes' : 'no', model: model ?? '', effort }, { kind: 'invalid' })
 }
 
 /**
@@ -560,7 +560,7 @@ const USER_IN = msg({ id: 'main.connections.userIn', defaultMessage: '{agent} ({
 function mustConnection(id: string): { c: Connection; a: Account } {
   const c = getConnection(id)
   const a = accountById(c?.account)
-  if (!c || !a) throw hiveError(NO_CONNECTION, undefined, { kind: 'notFound' })
+  if (!c || !a) throw combworkError(NO_CONNECTION, undefined, { kind: 'notFound' })
   return { c, a }
 }
 
@@ -573,11 +573,11 @@ function savedValues(a: Account, now: LaunchValues, patch: ConnectionPatch): Lau
   const next: Record<string, unknown> = { ...valuesOf(now) }
   for (const k of ['model', 'effort', 'use200kContext', 'permissionMode', 'extraArgs'] as const) if (patch[k] !== undefined) next[k] = patch[k] ?? undefined
   const mode = next.permissionMode as string | undefined
-  if (mode && !modeOption(a.provider, mode as LaunchValues['permissionMode'])) throw hiveError(BAD_MODE, { cli: providerDescriptor(a.provider).name, mode }, { kind: 'invalid' })
-  // A bare "--" (#523): Hive passes the task after its own, and a launch refuses it; refused here, before it is saved.
+  if (mode && !modeOption(a.provider, mode as LaunchValues['permissionMode'])) throw combworkError(BAD_MODE, { cli: providerDescriptor(a.provider).name, mode }, { kind: 'invalid' })
+  // A bare "--" (#523): Combwork passes the task after its own, and a launch refuses it; refused here, before it is saved.
   const argsProblem = typeof next.extraArgs === 'string' ? capturedText((t) => extraArgsProblem(next.extraArgs as string, t)) : null
   // agent-text: extraArgsProblem
-  if (argsProblem) throw new HiveError(argsProblem, { kind: 'invalid' })
+  if (argsProblem) throw new CombworkError(argsProblem, { kind: 'invalid' })
   // Kept as the user chose it (a mode the CLI calls its default is still the user's choice), only emptied values dropped.
   const out = launchValues(next as LaunchValues, a.provider, isServer(a))
   if (mode) out.permissionMode = mode as LaunchValues['permissionMode']
@@ -590,14 +590,14 @@ const TAG_TOO_LONG = msg({ id: 'main.connections.tagTooLong', defaultMessage: 'A
 /** A connection's tag as saved (HI-2530), from what it had and a patch: trimmed, '' or null none, refused when too long. */
 function savedTag(now: string | undefined, patch: ConnectionPatch): { tag?: string } {
   const tag = patch.tag === undefined ? now : cleanTag(patch.tag)
-  if (tag && tag.length > TAG_MAX) throw hiveError(TAG_TOO_LONG, { max: TAG_MAX }, { kind: 'invalid' })
+  if (tag && tag.length > TAG_MAX) throw combworkError(TAG_TOO_LONG, { max: TAG_MAX }, { kind: 'invalid' })
   return tag ? { tag } : {}
 }
 
 function assertNameFree(a: Account, name: string, except?: string): string {
   const n = name.trim()
-  if (!n) throw hiveError(NO_CONNECTION_NAME, undefined, { kind: 'invalid' })
-  if (connectionsOn(a.id, allConnections()).some((x) => x.id !== except && x.name.trim().toLowerCase() === n.toLowerCase())) throw hiveError(NAME_TAKEN, { account: a.name, name: n }, { kind: 'conflict' })
+  if (!n) throw combworkError(NO_CONNECTION_NAME, undefined, { kind: 'invalid' })
+  if (connectionsOn(a.id, allConnections()).some((x) => x.id !== except && x.name.trim().toLowerCase() === n.toLowerCase())) throw combworkError(NAME_TAKEN, { account: a.name, name: n }, { kind: 'conflict' })
   return n
 }
 
@@ -609,7 +609,7 @@ function refreshOpen(): void {
 /** Adds a connection on an account (HI-2107: Settings' Add Connection, the Agent API's), after its others. */
 export function addConnection(accountId: string, input: ConnectionPatch & { name: string }): Connection {
   const a = accountById(accountId)
-  if (!a) throw hiveError(NO_ACCOUNT, undefined, { kind: 'notFound' })
+  if (!a) throw combworkError(NO_ACCOUNT, undefined, { kind: 'notFound' })
   const name = assertNameFree(a, input.name)
   const made: Connection = { id: newConnectionId(), account: a.id, name, ...savedValues(a, {}, input), ...savedTag(undefined, input) }
   changeConnections((all) => {
@@ -672,7 +672,7 @@ export function connectionUsers(): Map<string, ConnectionUser[]> {
 /** Removes a connection (HI-2107): refused while an agent or the Assistant in an open workspace uses it, naming them. */
 export async function removeConnection(id: string): Promise<void> {
   const { c } = mustConnection(id)
-  if (removing.has(id)) throw hiveError(CONNECTION_BEING_REMOVED, { name: c.name }, { kind: 'conflict' })
+  if (removing.has(id)) throw combworkError(CONNECTION_BEING_REMOVED, { name: c.name }, { kind: 'conflict' })
   // Marked first: from here no write gives it to an agent (mutateProjectConfig asks connectionAssignable under each
   // project's lock), and each project's agents are read as saved, under that lock, never from a window's snapshot. A
   // write that got in before the mark is either saved by the time its project is read (the lock waits for it) or refused.
@@ -680,7 +680,7 @@ export async function removeConnection(id: string): Promise<void> {
   try {
     await accountTestHooks.beforeUsersRead?.()
     const users = await savedUsers(id)
-    if (users.length) throw hiveError(CONNECTION_IN_USE, { name: c.name, users: fmt.list(users.map((u) => (u.assistant ? u.agent : tr(USER_IN, { agent: u.agent, project: u.project })))) }, { kind: 'conflict' })
+    if (users.length) throw combworkError(CONNECTION_IN_USE, { name: c.name, users: fmt.list(users.map((u) => (u.assistant ? u.agent : tr(USER_IN, { agent: u.agent, project: u.project })))) }, { kind: 'conflict' })
     changeConnections((all) => all.splice(0, all.length, ...all.filter((x) => x.id !== id)))
     log.info(`connection ${id} removed`)
   } finally {
@@ -707,7 +707,7 @@ async function savedUsers(id: string): Promise<ConnectionUser[]> {
     for (const h of homes) {
       if (seen.has(h.path.toLowerCase())) continue
       seen.add(h.path.toLowerCase())
-      const file = join(h.path, HIVE_DIR, 'project.json')
+      const file = join(h.path, CW_DIR, 'project.json')
       const cfg = await withFileLock(file, () => readKeptJson<Partial<ProjectConfig>>(file, {}))
       for (const a of cfg.agents ?? []) if (a.connection === id) out.push({ projectPath: h.path, project: h.name, agentId: a.id, agent: h.assistant ? ASSISTANT_NAME : (a.name ?? a.id), ...(h.assistant ? { assistant: true as const } : {}) })
     }
@@ -793,7 +793,7 @@ export function setUsageMove(id: string, rule: UsageMoveRule | null): void {
     const percent = Math.round(Number(rule.percent))
     const target = getAccount(String(rule.to))
     const BAD = msg({ id: 'main.accounts.usageMove.bad', defaultMessage: 'Choose a share from 1% to 100%, a limit, and another account of the same CLI to move its agents to.', description: "An error setting an account's usage move in Settings → Accounts & Connections (HI-2195): the share, the limit or the account to move to isn't one it can be." })
-    if (!(percent >= 1 && percent <= 100) || !['weekly', 'fiveHour', 'any'].includes(rule.limit) || !target || target.id === a.id || target.provider !== a.provider) throw hiveError(BAD, undefined, { kind: 'invalid' })
+    if (!(percent >= 1 && percent <= 100) || !['weekly', 'fiveHour', 'any'].includes(rule.limit) || !target || target.id === a.id || target.provider !== a.provider) throw combworkError(BAD, undefined, { kind: 'invalid' })
     changeAccount(id, (x) => (x.usageMove = { percent, limit: rule.limit, to: target.id }))
   } else changeAccount(id, (x) => delete x.usageMove)
 }
@@ -801,7 +801,7 @@ export function setUsageMove(id: string, rule: UsageMoveRule | null): void {
 export function renameAccount(id: string, name: string): void {
   mustGet(id)
   const n = name.trim()
-  if (!n) throw hiveError(NO_NAME, undefined, { kind: 'invalid' })
+  if (!n) throw combworkError(NO_NAME, undefined, { kind: 'invalid' })
   changeAccount(id, (a) => (a.name = n))
 }
 
@@ -821,8 +821,8 @@ export async function removeAccount(id: string, opts: { closeTerminal?: boolean 
   const RUNNING = msg({ id: 'main.accounts.running', defaultMessage: '{name} has agents running on it: stop them, then remove it.', description: 'An error removing a connection ({name}, its name in Settings → Accounts & Connections): agents run on it, or one is starting.' })
   const IN_USE = msg({ id: 'main.accounts.inUse', defaultMessage: '{name} is in use: stop the agents on it and close its sign-in, then remove it.', description: 'An error removing a connection ({name}, its name in Settings → Accounts & Connections): agents run on it, or its sign-in terminal is open.' })
   const refuse = (): void => {
-    if (running()) throw hiveError(RUNNING, { name: a.name }, { kind: 'conflict' })
-    if (terminalOpen()) throw hiveError(IN_USE, { name: a.name }, { kind: 'conflict' })
+    if (running()) throw combworkError(RUNNING, { name: a.name }, { kind: 'conflict' })
+    if (terminalOpen()) throw combworkError(IN_USE, { name: a.name }, { kind: 'conflict' })
   }
   if (running()) refuse()
   if (opts.closeTerminal && hasPty(loginKey(a))) {
@@ -844,7 +844,7 @@ export async function removeAccount(id: string, opts: { closeTerminal?: boolean 
         await removeKey(id)
       } catch (e) {
         log.warn(`connection ${id}'s key couldn't be removed: ${userText(String((e as Error).message ?? e))}`)
-        throw hiveError(msg({ id: 'main.accounts.keyRemoveFailed', defaultMessage: "{name} wasn't removed: its key couldn't be deleted. Nothing was changed; Remove tries again.", description: "An error removing a server connection ({name}, its name in Settings → Accounts & Connections): its stored API key couldn't be deleted, so the connection was left as it was." }), { name: a.name }, { kind: 'conflict' })
+        throw combworkError(msg({ id: 'main.accounts.keyRemoveFailed', defaultMessage: "{name} wasn't removed: its key couldn't be deleted. Nothing was changed; Remove tries again.", description: "An error removing a server connection ({name}, its name in Settings → Accounts & Connections): its stored API key couldn't be deleted, so the connection was left as it was." }), { name: a.name }, { kind: 'conflict' })
       }
     }
     // Checks started before are dropped from here (their result would bring it back).
@@ -857,7 +857,7 @@ export async function removeAccount(id: string, opts: { closeTerminal?: boolean 
       log.warn(`account ${id}'s folder couldn't all be removed: ${userText(why)}`)
       changeAccount(id, (x) => (x.leftover = why))
       syncWatches()
-      throw hiveError(msg({ id: 'main.accounts.removeFailed', defaultMessage: "{name} wasn't removed: {error}. Nothing outside its folder was touched; Remove tries again.", description: "An error removing a connection ({name}): its folder couldn't all be deleted. {error} is the reason, in English." }), { name: a.name, error: why }, { kind: 'conflict' })
+      throw combworkError(msg({ id: 'main.accounts.removeFailed', defaultMessage: "{name} wasn't removed: {error}. Nothing outside its folder was touched; Remove tries again.", description: "An error removing a connection ({name}): its folder couldn't all be deleted. {error} is the reason, in English." }), { name: a.name, error: why }, { kind: 'conflict' })
     }
     // Its connections go with it (HI-2106): agents on one launch on their CLI's first usable connection, saying so (decision H).
     config.update((c) => void (c.connections = (c.connections ?? []).filter((x) => x.account !== id)))
@@ -1054,11 +1054,11 @@ async function runTrust(key: string, id: string, st: TrustState): Promise<void> 
 }
 
 /**
- * Tests only (unpackaged builds): HIVE_TEST_HOLD_TRUST=<file> holds each trust read until that file exists, so a suite
+ * Tests only (unpackaged builds): CW_TEST_HOLD_TRUST=<file> holds each trust read until that file exists, so a suite
  * can show Checking… (HI-1870 round 3).
  */
 async function trustTestHold(): Promise<void> {
-  const file = !app.isPackaged ? process.env.HIVE_TEST_HOLD_TRUST : undefined
+  const file = !app.isPackaged ? process.env.CW_TEST_HOLD_TRUST : undefined
   if (!file) return
   while (!(await lstat(file).then(() => true, () => false))) await new Promise((r) => setTimeout(r, 100))
 }
@@ -1132,8 +1132,8 @@ export async function setUpPlace(id: string): Promise<ConnectionTrust['setUpIn']
   if (!a || !workspace.path || !onHere(a)) return undefined
   const st = requestTrust(id, workspace.path, projectsFor(a), true)
   const answer = await new Promise<TrustAnswer | null | 'cancelled'>((r) => st.waiters.push(r))
-  // Removed, or its workspace closed, while Hive checked: Set Up opens nowhere (never its own folder instead).
-  if (answer === 'cancelled') throw hiveError(msg({ id: 'main.accounts.setUpCancelled', defaultMessage: "{name}'s Set Up didn't open: the connection was removed or its workspace closed while Combwork checked its folders.", description: "An error opening a connection's Set Up (Settings → Accounts & Connections, HI-1870; {name}, its name): Hive was checking which of the workspace's folders its coding agent CLI trusts when the connection was removed or the workspace closed, so nothing was started." }), { name: a.name }, { kind: 'conflict' })
+  // Removed, or its workspace closed, while Combwork checked: Set Up opens nowhere (never its own folder instead).
+  if (answer === 'cancelled') throw combworkError(msg({ id: 'main.accounts.setUpCancelled', defaultMessage: "{name}'s Set Up didn't open: the connection was removed or its workspace closed while Combwork checked its folders.", description: "An error opening a connection's Set Up (Settings → Accounts & Connections, HI-1870; {name}, its name): Combwork was checking which of the workspace's folders its coding agent CLI trusts when the connection was removed or the workspace closed, so nothing was started." }), { name: a.name }, { kind: 'conflict' })
   return answer ? setUpTarget(a, answer.pending) : undefined
 }
 
@@ -1283,7 +1283,7 @@ export async function confirmAccount(id: string): Promise<{ observed: Connection
 }
 
 /**
- * Opens the account's sign-in: the CLI's own login in a terminal of Hive's, on its folder. Once it ends, the account is
+ * Opens the account's sign-in: the CLI's own login in a terminal of Combwork's, on its folder. Once it ends, the account is
  * checked; its first good login becomes the one accepted. Returns the terminal's key.
  */
 export function signInAccount(id: string): Promise<string> {
@@ -1293,7 +1293,7 @@ export function signInAccount(id: string): Promise<string> {
 /**
  * Opens a sign-in connection's Set Up (HI-1826): the CLI itself on its folder, so the user answers its first-run screens
  * (its theme, its notes), which a browser sign-in (`claude auth login`) leaves unanswered, before an agent starts on it.
- * Hive types nothing and writes none of its files. The terminal is the sign-in's (one of the two at a time), and once it
+ * Combwork types nothing and writes none of its files. The terminal is the sign-in's (one of the two at a time), and once it
  * ends the account is checked as after a sign-in. Returns the terminal's key.
  */
 export function setUpSignInConnection(id: string, folder?: string): Promise<string> {
@@ -1302,9 +1302,9 @@ export function setUpSignInConnection(id: string, folder?: string): Promise<stri
 
 async function openLoginTerminal(id: string, setUp: boolean, folder?: string): Promise<string> {
   // A server connection has no sign-in: its Set Up opens the CLI instead (serverConnections.ts).
-  if (isServer(mustGet(id))) throw hiveError(NO_ACCOUNT, undefined, { kind: 'invalid' })
+  if (isServer(mustGet(id))) throw combworkError(NO_ACCOUNT, undefined, { kind: 'invalid' })
   // Started under the account's lock, so never while it is being removed: the account checked still there (a removal
-  // before it wins), and its folder still the one Hive made (a folder replaced by a link would take the CLI's login
+  // before it wins), and its folder still the one Combwork made (a folder replaced by a link would take the CLI's login
   // writes elsewhere).
   return locked(id, async () => {
     const a = mustGet(id)
@@ -1333,16 +1333,16 @@ async function openLoginTerminal(id: string, setUp: boolean, folder?: string): P
 }
 
 /**
- * Refuses an account that can't be used now: half removed, or its folder not the one Hive made (missing, or replaced by
+ * Refuses an account that can't be used now: half removed, or its folder not the one Combwork made (missing, or replaced by
  * a link). Called under its lock, before anything is started on it.
  */
 async function assertUsable(a: Account): Promise<void> {
-  if (a.leftover) throw hiveError(msg({ id: 'main.accounts.leftover', defaultMessage: '{name} is half removed: remove it again first.', description: "An error signing a connection in ({name}): an earlier removal stopped partway, so it can't be used." }), { name: a.name }, { kind: 'conflict' })
+  if (a.leftover) throw combworkError(msg({ id: 'main.accounts.leftover', defaultMessage: '{name} is half removed: remove it again first.', description: "An error signing a connection in ({name}): an earlier removal stopped partway, so it can't be used." }), { name: a.name }, { kind: 'conflict' })
   try {
     await assertRealFolder(accountFolder(a.id))
   } catch (e) {
     log.warn(`account ${a.id}'s folder can't be used: ${userText(String((e as Error).message ?? e))}`)
-    throw hiveError(msg({ id: 'main.accounts.folderNotUsable', defaultMessage: "{name}'s folder isn't the one Combwork made (it is missing, or was moved or replaced), so nothing was started on it. Remove the connection and add it again.", description: "An error signing a connection in or starting on it ({name}, its name): its folder is missing or isn't the one Hive made." }), { name: a.name }, { kind: 'conflict' })
+    throw combworkError(msg({ id: 'main.accounts.folderNotUsable', defaultMessage: "{name}'s folder isn't the one Combwork made (it is missing, or was moved or replaced), so nothing was started on it. Remove the connection and add it again.", description: "An error signing a connection in or starting on it ({name}, its name): its folder is missing or isn't the one Combwork made." }), { name: a.name }, { kind: 'conflict' })
   }
 }
 
@@ -1350,7 +1350,7 @@ async function assertUsable(a: Account): Promise<void> {
 export function keepNewLogin(id: string): void {
   const a = mustGet(id)
   const ok = acceptable(a.observed, namesOrgs(a.provider))
-  if (!ok) throw hiveError(msg({ id: 'main.accounts.nothingToKeep', defaultMessage: "{name} isn't signed in as anyone Combwork could check, so there's no login to keep.", description: "An error: Keep the new login was asked for a connection ({name}) whose latest check didn't find it signed in." }), { name: a.name }, { kind: 'conflict' })
+  if (!ok) throw combworkError(msg({ id: 'main.accounts.nothingToKeep', defaultMessage: "{name} isn't signed in as anyone Combwork could check, so there's no login to keep.", description: "An error: Keep the new login was asked for a connection ({name}) whose latest check didn't find it signed in." }), { name: a.name }, { kind: 'conflict' })
   changeAccount(id, (x) => (x.accepted = ok))
 }
 
@@ -1486,7 +1486,7 @@ function attach(id: string): void {
         lost(id, e)
       }
     },
-    // Not there, or not the folder Hive made: missing until the accounts folder's watch sees it back.
+    // Not there, or not the folder Combwork made: missing until the accounts folder's watch sees it back.
     () => {
       if (watched.get(id) === w) void checkAccount(id)
     }
@@ -1562,7 +1562,7 @@ export function syncWatches(): void {
   syncRoot()
 }
 
-/** Every watch closed (Hive quitting, tests). */
+/** Every watch closed (Combwork quitting, tests). */
 export function stopAccountWatches(): void {
   for (const id of [...watched.keys()]) unwatch(id)
   syncRoot()
@@ -1644,11 +1644,11 @@ export async function setAccountOn(id: string, on: boolean): Promise<void> {
 
 /**
  * Moves an account to `index` in the one order of accounts (HI-2107, decision A: every CLI's, the CLI's own homes too;
- * Hive-wide). It never turns one on or off: what a new agent gets, and what an agent whose connection can't be used
+ * Combwork-wide). It never turns one on or off: what a new agent gets, and what an agent whose connection can't be used
  * here falls back to, is the first in the order that's on there, for new launches only.
  */
 export function moveConnection(id: string, index: number): void {
-  if (!accountById(id)) throw hiveError(NO_ACCOUNT, undefined, { kind: 'notFound' })
+  if (!accountById(id)) throw combworkError(NO_ACCOUNT, undefined, { kind: 'notFound' })
   const before = allAccounts().map((a) => a.id).join()
   config.update((c) => void (c.accounts = movedInGroup(c.accounts ?? [], id, Math.trunc(index))))
   if (allAccounts().map((a) => a.id).join() === before) return
@@ -1672,7 +1672,7 @@ export async function migrateConnectionOrder(): Promise<void> {
   const before = list().map((a) => a.id).join()
   const tops = new Map<ProviderId, string>()
   for (const ws of config.get().recentWorkspaces) {
-    const cfg = await readKeptJson<Partial<WorkspaceConfig>>(join(dataFolder(ws, 'workspace'), 'workspace.json'), {})
+    const cfg = await readKeptJson<Partial<WorkspaceConfig>>(join(treeOf(ws), 'workspace.json'), {})
     for (const [p, w] of Object.entries(cfg.connections ?? {}) as [ProviderId, WorkspaceConnections | undefined][]) {
       const id = w?.default
       if (id && !tops.has(p) && getAccount(id)?.provider === p) tops.set(p, id)
@@ -1772,10 +1772,10 @@ const LAUNCH = {
   none: msg({ id: 'main.connections.launch.none', defaultMessage: 'No {cli} account is on in this workspace. Add one in Settings → Accounts & Connections and sign it in, then start {agent} again.', description: "Starting an agent ({agent}, its name) is refused: its workspace has no account on for its coding agent CLI ({cli}: \"Claude Code\"). Settings → Accounts & Connections names a section." }),
   offNoDefault: msg({ id: 'main.connections.launch.offNoDefault', defaultMessage: "{agent}'s account, {name}, is off in this workspace, and no other {cli} account is on. Turn one on in Settings → Accounts & Connections.", description: "Starting an agent ({agent}) is refused: the connection chosen for it ({name}) is off in this workspace and there's no default to use instead. {cli} is the coding agent CLI." }),
   deleted: msg({ id: 'main.connections.launch.deleted', defaultMessage: "The connection chosen for {agent} no longer exists. Choose another in its Agent Settings.", description: 'Starting an agent ({agent}) is refused: the connection chosen for it was removed. Agent Settings names a dialog.' }),
-  changedAgain: msg({ id: 'main.connections.launch.changedAgain', defaultMessage: "{agent}'s connection was changed again while it was starting. Start it again.", description: "Starting an agent ({agent}, its name) failed: the connection chosen for it was changed while it was starting, and again while Hive started it once more on the new choice. A connection is how a coding agent CLI signs in or reaches its model (Settings → Accounts & Connections)." }),
+  changedAgain: msg({ id: 'main.connections.launch.changedAgain', defaultMessage: "{agent}'s connection was changed again while it was starting. Start it again.", description: "Starting an agent ({agent}, its name) failed: the connection chosen for it was changed while it was starting, and again while Combwork started it once more on the new choice. A connection is how a coding agent CLI signs in or reaches its model (Settings → Accounts & Connections)." }),
   otherProvider: msg({ id: 'main.connections.launch.otherProvider', defaultMessage: 'The connection chosen for {agent} is for another CLI. Pick a {cli} connection in its Agent Settings.', description: 'Starting an agent ({agent}) is refused: the connection chosen for it belongs to another coding agent CLI. {cli} is the agent\'s CLI ("Claude Code").' }),
   signedOut: msg({ id: 'main.connections.launch.signedOut', defaultMessage: '{name} is signed out. Sign it in again in Settings → Accounts & Connections, then start {agent}.', description: "Starting an agent ({agent}) is refused: its account ({name}) isn't signed in." }),
-  changing: msg({ id: 'main.connections.launch.changing', defaultMessage: "{name}'s login kept changing while Combwork checked it. Try starting {agent} again in a moment.", description: "Starting an agent ({agent}) is refused: its connection's ({name}) login changed again and again while Hive checked who it is signed in as." }),
+  changing: msg({ id: 'main.connections.launch.changing', defaultMessage: "{name}'s login kept changing while Combwork checked it. Try starting {agent} again in a moment.", description: "Starting an agent ({agent}) is refused: its connection's ({name}) login changed again and again while Combwork checked who it is signed in as." }),
   noKey: msg({ id: 'main.connections.launch.noKey', defaultMessage: '{name} has no key. Add one in Settings → Accounts & Connections, then start {agent}.', description: "Starting an agent ({agent}) is refused: its server account ({name}) reaches a server that needs an API key, and none is saved for it. Settings → Accounts & Connections names a section." })
 }
 
@@ -1831,9 +1831,9 @@ function shownServer(a: Account): Account {
  */
 async function serverPart(a: Account, caps: ServerCaps, agentName: string): Promise<{ part: NonNullable<LaunchConnection['server']>; keyV: string | null; origin: string }> {
   const b = parseBaseUrl(a.server?.baseUrl ?? '')
-  if (!a.server || !b.ok) throw hiveError(LAUNCH.noKey, { name: a.name, agent: agentName }, { kind: 'conflict' })
+  if (!a.server || !b.ok) throw combworkError(LAUNCH.noKey, { name: a.name, agent: agentName }, { kind: 'conflict' })
   const got = await withKey(a.id, b.origin)
-  if (!got && !b.local) throw hiveError(LAUNCH.noKey, { name: a.name, agent: agentName }, { kind: 'conflict' })
+  if (!got && !b.local) throw combworkError(LAUNCH.noKey, { name: a.name, agent: agentName }, { kind: 'conflict' })
   return { part: { env: serverEnv(caps, a.server, got?.key ?? null), models: effectiveModels(caps, a.server), local: runsLocally(caps, a.server, b.local) }, keyV: got?.v ?? null, origin: b.origin }
 }
 
@@ -1858,7 +1858,7 @@ export async function connectionForLaunch(o: { provider: ProviderId; workspaceCo
   if (!choice.ok) {
     if (choice.why === 'none' && testHomeSeam(caps.homeEnv)) return null
     const name = choice.wanted ? (getConnection(choice.wanted)?.name ?? choice.wanted) : ''
-    throw hiveError(LAUNCH[choice.why], { agent: o.agentName, cli, name }, { kind: 'conflict' })
+    throw combworkError(LAUNCH[choice.why], { agent: o.agentName, cli, name }, { kind: 'conflict' })
   }
   // A test home's account (the seam): the CLI's own home, as before connections.
   if (choice.account.home) return null
@@ -1877,7 +1877,7 @@ export async function connectionForLaunch(o: { provider: ProviderId; workspaceCo
         return generation(id) === gen && !!now && isServer(now) && originOf(now.server?.baseUrl ?? '') === origin && (keyInfo(id)?.origin === origin ? keyInfo(id)!.v : null) === keyV
       }
       if (!a || !same()) {
-        throw hiveError(NO_ACCOUNT, undefined, { kind: 'notFound' })
+        throw combworkError(NO_ACCOUNT, undefined, { kind: 'notFound' })
       }
       noteLastUsed(o.provider, id)
       return {
@@ -1893,10 +1893,10 @@ export async function connectionForLaunch(o: { provider: ProviderId; workspaceCo
     }
     const { observed, fresh } = await confirmAccount(id)
     const a = getAccount(id)
-    if (!a || generation(id) !== gen) throw hiveError(NO_ACCOUNT, undefined, { kind: 'notFound' })
-    if (!fresh) throw hiveError(LAUNCH.changing, { name: a.name, agent: o.agentName }, { kind: 'conflict' })
+    if (!a || generation(id) !== gen) throw combworkError(NO_ACCOUNT, undefined, { kind: 'notFound' })
+    if (!fresh) throw combworkError(LAUNCH.changing, { name: a.name, agent: o.agentName }, { kind: 'conflict' })
     if (observed?.missing) await assertUsable(a)
-    if (observed?.loggedIn === false) throw hiveError(LAUNCH.signedOut, { name: a.name, agent: o.agentName }, { kind: 'conflict' })
+    if (observed?.loggedIn === false) throw combworkError(LAUNCH.signedOut, { name: a.name, agent: o.agentName }, { kind: 'conflict' })
     const note = choice.note ?? (observed?.loggedIn === null ? 'unknownLogin' : accountState(a) === 'changed' ? 'loginChanged' : undefined)
     noteLastUsed(o.provider, id)
     return {
@@ -1937,7 +1937,7 @@ export async function launchOnChosen(o: { provider: ProviderId; workspaceConfig:
       return
     } catch (e) {
       if (!(e instanceof ConnectionChanged)) throw e
-      if (again) throw hiveError(LAUNCH.changedAgain, { agent: o.agentName }, { kind: 'conflict' })
+      if (again) throw combworkError(LAUNCH.changedAgain, { agent: o.agentName }, { kind: 'conflict' })
       log.info(`${userText(o.agentName)}: its connection was changed while it was starting; starting it on the one chosen now`)
     } finally {
       conn?.release()
@@ -1954,7 +1954,7 @@ export interface ConnectionHome {
 
 /**
  * The homes of a provider's connections on in a workspace (or, with no workspace given, in every open one), for what
- * Hive shows or allows from a CLI's home; undefined when the provider's sign-in isn't its connections' (it has none, or
+ * Combwork shows or allows from a CLI's home; undefined when the provider's sign-in isn't its connections' (it has none, or
  * the test seam is on), so the CLI's own home is used as before.
  */
 export function connectionHomes(id: ProviderId, cfg?: WorkspaceConfig | null): ConnectionHome[] | undefined {
@@ -1986,7 +1986,7 @@ export function connectionProblem(id: string, cli: ProviderId, projectPath: stri
 /** Refuses a connection that can't be an agent's own choice here (connectionProblem), saying why. */
 export function assertConnectionHere(id: string, cli: ProviderId, projectPath: string, agent: string): void {
   const why = connectionProblem(id, cli, projectPath)
-  if (why) throw hiveError(CHOICE[why], { agent, name: accountById(id)?.name ?? id }, { kind: 'conflict' })
+  if (why) throw combworkError(CHOICE[why], { agent, name: accountById(id)?.name ?? id }, { kind: 'conflict' })
 }
 
 /** Whether a connection is one of the provider's on in the workspace a project (or host) belongs to (HI-1755). */
@@ -1996,13 +1996,13 @@ export function connectionOnHere(id: string, cli: ProviderId, projectPath: strin
 }
 
 /**
- * Connections' part of Hive's start (index.ts; nothing runs as this module loads, which other modules import): a new
+ * Connections' part of Combwork's start (index.ts; nothing runs as this module loads, which other modules import): a new
  * workspace starts with the last-used connections, and the watches follow the open workspaces and their choices.
  */
 /** The connections' one-time order move under way or done (HI-1875 round 1): what depends on the order waits for it. */
 let orderReady: Promise<void> = Promise.resolve()
 
-/** Starts the one-time order move (once, at Hive's start); its failure is logged, the order then as it was. */
+/** Starts the one-time order move (once, at Combwork's start); its failure is logged, the order then as it was. */
 export function startConnectionOrder(): Promise<void> {
   orderReady = migrateConnectionOrder().catch((e) => log.warn("connections: the preference order's one-time move failed", e))
   return orderReady
@@ -2023,7 +2023,7 @@ export function initConnections(): Promise<void> {
     const connections = newWorkspaceAccounts()
     return connections ? { connections } : {}
   })
-  onHiveEvent((e) => {
+  onCombworkEvent((e) => {
     if (e.type !== 'workspace-changed') return
     syncWatches()
     // A workspace closed: its connections' trust reads are dropped, and a Set Up waiting on one is cancelled (HI-1870).

@@ -9,7 +9,7 @@
   },
   "mcp.add.message": {
     "defaultMessage": "The workspace’s servers not added here yet. Sessions started from now on get the one you add.",
-    "description": "The Add server picker (HI-2059), above its search and list: the workspace servers not added to this project (or the Hive Assistant); new sessions start the one added."
+    "description": "The Add server picker (HI-2059), above its search and list: the workspace servers not added to this project (or the Combwork Assistant); new sessions start the one added."
   },
   "mcp.add.title": {
     "defaultMessage": "Add a server to {project}",
@@ -17,11 +17,11 @@
   },
   "mcp.add.titleAssistant": {
     "defaultMessage": "Add a server for the Assistant",
-    "description": "Title of the Add server picker (HI-2059) in the Hive Assistant's view."
+    "description": "Title of the Add server picker (HI-2059) in the Combwork Assistant's view."
   },
   "mcp.addFile.messageAdded": {
     "defaultMessage": "Adds {file} to the workspace (.combwork/mcp){files, plural, =0 {} one {, with its file in a folder of its own} other {, with its # files in a folder of its own}}, added to no project yet. Add it where it should run: a project’s MCP tab, the Assistant’s view, or Add to… here. It runs:",
-    "description": "Add MCP Server from File (HI-2059), above the command the server runs. {file} is the file added; {files} how many files a .zip brings. Keep .combwork/mcp as it is; \"MCP tab\" and \"Add to…\" as Hive shows them."
+    "description": "Add MCP Server from File (HI-2059), above the command the server runs. {file} is the file added; {files} how many files a .zip brings. Keep .combwork/mcp as it is; \"MCP tab\" and \"Add to…\" as Combwork shows them."
   },
   "mcp.addFile.replaceDetailAdded": {
     "defaultMessage": "Replace moves it (and the folder of one added from a .zip) to the Recycle Bin and adds this one to no project yet: projects and the Assistant that had the old one lose it. Or choose another name.",
@@ -32,8 +32,8 @@
     "description": "The Catalogue's source picker (HI-545): every catalogue."
   },
   "mcp.catalog.badName": {
-    "defaultMessage": "Server names may contain letters, numbers, \"-\" and \"_\" (max 64 characters). \"combwork\" and \"hive\" are reserved.",
-    "description": "An error installing a catalogue server (HI-545) under a name a server can't have."
+    "defaultMessage": "Server names may contain letters, numbers, \"-\" and \"_\" (max 64 characters). \"combwork\" is reserved.",
+    "description": "An error installing a catalogue server (HI-545) under a name a server can't have. Keep combwork as it is (Combwork's own server)."
   },
   "mcp.catalog.badgeInstalled": {
     "defaultMessage": "Installed",
@@ -53,11 +53,11 @@
   },
   "mcp.catalog.cantRun": {
     "defaultMessage": "This PC doesn't meet a requirement above, so it can't be installed.",
-    "description": "A catalogue server's view (HI-545) when a requirement Hive checked is not met: Install is greyed out."
+    "description": "A catalogue server's view (HI-545) when a requirement Combwork checked is not met: Install is greyed out."
   },
   "mcp.catalog.check.app": {
     "defaultMessage": "{value}",
-    "description": "A requirement of a catalogue server (HI-545) given in the catalogue's own words ({value}, as it is): Hive can't check it."
+    "description": "A requirement of a catalogue server (HI-545) given in the catalogue's own words ({value}, as it is): Combwork can't check it."
   },
   "mcp.catalog.check.build": {
     "defaultMessage": "Windows build {value} or later",
@@ -105,7 +105,7 @@
   },
   "mcp.catalog.filterMeets": {
     "defaultMessage": "Runs on this PC",
-    "description": "The Catalogue's filter (HI-545): servers whose requirements this PC meets (or Hive can't check)."
+    "description": "The Catalogue's filter (HI-545): servers whose requirements this PC meets (or Combwork can't check)."
   },
   "mcp.catalog.filterNotInstalled": {
     "defaultMessage": "Not installed",
@@ -169,7 +169,7 @@
   },
   "mcp.catalog.mismatch": {
     "defaultMessage": "{name}'s download doesn't match its catalogue (its size or checksum differ): not installed.",
-    "description": "An error installing a server from an MCP catalogue (HI-545): the zip downloaded is not the one the catalogue describes, so Hive used none of it. {name} is the server."
+    "description": "An error installing a server from an MCP catalogue (HI-545): the zip downloaded is not the one the catalogue describes, so Combwork used none of it. {name} is the server."
   },
   "mcp.catalog.more": {
     "defaultMessage": "Show more ({left, number} left)",
@@ -177,7 +177,7 @@
   },
   "mcp.catalog.needs": {
     "defaultMessage": "{name} can't run on this PC: {needs}.",
-    "description": "An error installing a server from an MCP catalogue (HI-545): a requirement Hive checked is not met. {needs} lists them."
+    "description": "An error installing a server from an MCP catalogue (HI-545): a requirement Combwork checked is not met. {needs} lists them."
   },
   "mcp.catalog.no": {
     "defaultMessage": "Not met",
@@ -189,7 +189,7 @@
   },
   "mcp.catalog.none": {
     "defaultMessage": "No catalogues are on. Turn ours on, or add one, in Settings → MCP Catalogues.",
-    "description": "The Catalogue (HI-545) with every source off. Settings → MCP Catalogues as Hive names it."
+    "description": "The Catalogue (HI-545) with every source off. Settings → MCP Catalogues as Combwork names it."
   },
   "mcp.catalog.notInstalled": {
     "defaultMessage": "{name} isn't installed from this catalogue: install it instead.",
@@ -197,7 +197,7 @@
   },
   "mcp.catalog.notRead": {
     "defaultMessage": "Couldn't read this catalogue: {reason}",
-    "description": "An MCP catalogue source in the MCP view (HI-545) that could not be read or is not a catalogue Hive reads. {reason} says why (as the network, the file or the checker said it, in English)."
+    "description": "An MCP catalogue source in the MCP view (HI-545) that could not be read or is not a catalogue Combwork reads. {reason} says why (as the network, the file or the checker said it, in English)."
   },
   "mcp.catalog.ok": {
     "defaultMessage": "Met",
@@ -209,7 +209,7 @@
   },
   "mcp.catalog.placesChanged": {
     "defaultMessage": "Where {name} is added changed while the update waited: look again.",
-    "description": "An error updating a server from an MCP catalogue (HI-545): a project (or the Hive Assistant) gained or lost the server after the Update dialog showed where it is added, so nothing was changed."
+    "description": "An error updating a server from an MCP catalogue (HI-545): a project (or the Combwork Assistant) gained or lost the server after the Update dialog showed where it is added, so nothing was changed."
   },
   "mcp.catalog.redirects": {
     "defaultMessage": "Too many redirects downloading {url}.",
@@ -217,7 +217,7 @@
   },
   "mcp.catalog.refreshAgain": {
     "defaultMessage": "Refresh (↻) to list this catalogue again: Combwork keeps only so many in memory.",
-    "description": "A catalogue source in the MCP view's Catalogue (HI-545) whose list Hive no longer holds (too much in memory): ↻ reads it again."
+    "description": "A catalogue source in the MCP view's Catalogue (HI-545) whose list Combwork no longer holds (too much in memory): ↻ reads it again."
   },
   "mcp.catalog.requires": {
     "defaultMessage": "Requirements",
@@ -237,7 +237,7 @@
   },
   "mcp.catalog.skipped": {
     "defaultMessage": "{n, plural, one {# entry skipped: not as catalogues give a server} other {# entries skipped: not as catalogues give a server}}",
-    "description": "Under a catalogue source (HI-545): entries Hive left out because they are not valid."
+    "description": "Under a catalogue source (HI-545): entries Combwork left out because they are not valid."
   },
   "mcp.catalog.source": {
     "defaultMessage": "Source",
@@ -265,11 +265,11 @@
   },
   "mcp.catalog.unknown": {
     "defaultMessage": "Combwork can't check this: make sure it's there",
-    "description": "A requirement's state in a catalogue server's view (HI-545): Hive can't check it on this PC."
+    "description": "A requirement's state in a catalogue server's view (HI-545): Combwork can't check it on this PC."
   },
   "mcp.catalog.unvetted": {
     "defaultMessage": "Servers from this source aren't checked by Combwork. Look at what one runs before you install it.",
-    "description": "A note under a catalogue source the user added (HI-545), shown once: Hive does not vet its servers."
+    "description": "A note under a catalogue source the user added (HI-545), shown once: Combwork does not vet its servers."
   },
   "mcp.catalog.updateAction": {
     "defaultMessage": "Update to {version}…",
@@ -281,7 +281,7 @@
   },
   "mcp.catalog.updateMessage": {
     "defaultMessage": "{where}: those places keep it, your values for its environment and headers too. What it runs changes (− now, + after):",
-    "description": "The question before updating a catalogue server (HI-545), above the lines of what it runs that change. {where} says where it is added (\"Added in hive\", \"Not added anywhere\")."
+    "description": "The question before updating a catalogue server (HI-545), above the lines of what it runs that change. {where} says where it is added (\"Added in demo\", \"Not added anywhere\")."
   },
   "mcp.catalog.updateSame": {
     "defaultMessage": "{where}: those places keep it, your values for its environment and headers too. What it runs stays the same:",
@@ -301,23 +301,23 @@
   },
   "mcp.enable.all": {
     "defaultMessage": "All projects",
-    "description": "The MCP view’s Add to… dialog: a button that ticks every project (not the Hive Assistant, which has its own box)."
+    "description": "The MCP view’s Add to… dialog: a button that ticks every project (not the Combwork Assistant, which has its own box)."
   },
   "mcp.enable.assistant": {
     "defaultMessage": "Assistant",
-    "description": "The MCP view’s Add to… dialog: the box that adds the server for the Hive Assistant, after the projects."
+    "description": "The MCP view’s Add to… dialog: the box that adds the server for the Combwork Assistant, after the projects."
   },
   "mcp.enable.none": {
     "defaultMessage": "No projects",
-    "description": "The MCP view’s Add to… dialog: a button that unticks every project (not the Hive Assistant, which has its own box)."
+    "description": "The MCP view’s Add to… dialog: a button that unticks every project (not the Combwork Assistant, which has its own box)."
   },
   "mcp.error.cannotClear": {
     "defaultMessage": "Couldn't read the settings of {project}, so {name} wasn't changed: it may still be added there. Try again once the project can be read.",
-    "description": "An error replacing, creating or deleting an MCP server (HI-2059): a project's settings file could not be read, so Hive could not make sure the server is removed there, and changed nothing. {project} is the project's folder name, {name} the server."
+    "description": "An error replacing, creating or deleting an MCP server (HI-2059): a project's settings file could not be read, so Combwork could not make sure the server is removed there, and changed nothing. {project} is the project's folder name, {name} the server."
   },
   "mcp.error.invalidName": {
     "defaultMessage": "Invalid server name",
-    "description": "An error: an MCP server name Hive refuses."
+    "description": "An error: an MCP server name Combwork refuses."
   },
   "mcp.error.noProject": {
     "defaultMessage": "{project} is no longer a project in this workspace.",
@@ -325,7 +325,7 @@
   },
   "mcp.error.noServerAdd": {
     "defaultMessage": "The workspace has no MCP server named {name}.",
-    "description": "An error adding a server to a project or the Hive Assistant. {name} is its name."
+    "description": "An error adding a server to a project or the Combwork Assistant. {name} is its name."
   },
   "mcp.import.added": {
     "defaultMessage": "Added to {project} for new sessions.",
@@ -353,7 +353,7 @@
   },
   "mcp.picker.added": {
     "defaultMessage": "Added somewhere",
-    "description": "The MCP servers' filter: servers added to a project or the Hive Assistant."
+    "description": "The MCP servers' filter: servers added to a project or the Combwork Assistant."
   },
   "mcp.picker.all": {
     "defaultMessage": "All",
@@ -361,7 +361,7 @@
   },
   "mcp.picker.allAdded": {
     "defaultMessage": "Every server in the workspace is added here already.",
-    "description": "The Add server picker (HI-2059) when every workspace server is added to this project or the Hive Assistant."
+    "description": "The Add server picker (HI-2059) when every workspace server is added to this project or the Combwork Assistant."
   },
   "mcp.picker.choose": {
     "defaultMessage": "Choose a server to see what it runs.",
@@ -369,7 +369,7 @@
   },
   "mcp.picker.errors": {
     "defaultMessage": "With problems",
-    "description": "The MCP view's filter: servers whose definition Hive can't use."
+    "description": "The MCP view's filter: servers whose definition Combwork can't use."
   },
   "mcp.picker.filter": {
     "defaultMessage": "Show",
@@ -381,7 +381,7 @@
   },
   "mcp.picker.nowhere": {
     "defaultMessage": "Added nowhere",
-    "description": "The MCP servers' filter: servers added to no project and not to the Hive Assistant."
+    "description": "The MCP servers' filter: servers added to no project and not to the Combwork Assistant."
   },
   "mcp.picker.runs": {
     "defaultMessage": "It runs:",
@@ -393,7 +393,7 @@
   },
   "mcp.places.addedIn": {
     "defaultMessage": "Added: {places}",
-    "description": "After Add to… (HI-2059) failed in part: the places the server was added to. {places} lists projects (and the Hive Assistant)."
+    "description": "After Add to… (HI-2059) failed in part: the places the server was added to. {places} lists projects (and the Combwork Assistant)."
   },
   "mcp.places.button": {
     "defaultMessage": "Save",
@@ -401,11 +401,11 @@
   },
   "mcp.places.failedIn": {
     "defaultMessage": "Not changed in {place}: {error}",
-    "description": "After Add to… (HI-2059) failed in part: a place where the change could not be written, and why ({error}, as Hive or Windows said it)."
+    "description": "After Add to… (HI-2059) failed in part: a place where the change could not be written, and why ({error}, as Combwork or Windows said it)."
   },
   "mcp.places.message": {
     "defaultMessage": "Sessions started from now on get it wherever it is ticked; unticking removes it there. It runs:",
-    "description": "The MCP view’s Add to… dialog (HI-2059), above the command the server runs and the projects (and the Hive Assistant) to tick."
+    "description": "The MCP view’s Add to… dialog (HI-2059), above the command the server runs and the projects (and the Combwork Assistant) to tick."
   },
   "mcp.places.noProjects": {
     "defaultMessage": "The workspace has no projects yet: add it in a project's MCP tab once there is one.",
@@ -425,11 +425,11 @@
   },
   "mcp.places.removedFrom": {
     "defaultMessage": "Removed: {places}",
-    "description": "After Add to… (HI-2059) failed in part: the places the server was removed from. {places} lists projects (and the Hive Assistant)."
+    "description": "After Add to… (HI-2059) failed in part: the places the server was removed from. {places} lists projects (and the Combwork Assistant)."
   },
   "mcp.places.title": {
     "defaultMessage": "Add {name} to…",
-    "description": "Title of the dialog in the MCP view (HI-2059) that chooses the projects, and the Hive Assistant, an MCP server is added to. {name} is the server."
+    "description": "Title of the dialog in the MCP view (HI-2059) that chooses the projects, and the Combwork Assistant, an MCP server is added to. {name} is the server."
   },
   "mcp.tab.hintAdded": {
     "defaultMessage": "The workspace's MCP servers this project's agents get. Add one from the workspace's servers; Remove takes it off this project only.",
@@ -441,15 +441,15 @@
   },
   "mcp.view.addTo": {
     "defaultMessage": "Add to…",
-    "description": "A button in an MCP server's view (HI-2059): chooses the projects, and the Hive Assistant, it is added to."
+    "description": "A button in an MCP server's view (HI-2059): chooses the projects, and the Combwork Assistant, it is added to."
   },
   "mcp.where.addedAssistantOnly": {
     "defaultMessage": "Added for the Assistant only",
-    "description": "Where an MCP server is added (HI-2059), under it in the MCP view: for the Hive Assistant, in no project."
+    "description": "Where an MCP server is added (HI-2059), under it in the MCP view: for the Combwork Assistant, in no project."
   },
   "mcp.where.addedNone": {
     "defaultMessage": "Not added anywhere",
-    "description": "Where an MCP server is added (HI-2059), under it in the MCP view: no project and not the Hive Assistant, so it runs nowhere."
+    "description": "Where an MCP server is added (HI-2059), under it in the MCP view: no project and not the Combwork Assistant, so it runs nowhere."
   },
   "mcp.where.addedSome": {
     "defaultMessage": "Added in {projects}",
@@ -457,7 +457,7 @@
   },
   "mcp.where.addedSomeAndAssistant": {
     "defaultMessage": "Added in {projects} and for the Assistant",
-    "description": "Where an MCP server is added (HI-2059), under it in the MCP view: in some projects and for the Hive Assistant. {projects} lists the projects."
+    "description": "Where an MCP server is added (HI-2059), under it in the MCP view: in some projects and for the Combwork Assistant. {projects} lists the projects."
   },
   "mcp.where.assistantName": {
     "defaultMessage": "the Assistant",

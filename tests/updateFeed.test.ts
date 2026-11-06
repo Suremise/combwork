@@ -1,4 +1,4 @@
-// Hive's GitHub update feed (HI-2311, src/main/updateFeed.ts): with Include pre-releases on, a pre-release install is
+// Combwork's GitHub update feed (HI-2311, src/main/updateFeed.ts): with Include pre-releases on, a pre-release install is
 // offered the newest version newer by semver, whichever of beta, RC or release it is (electron-updater alone offers a
 // running RC only a later RC, and a running beta never an RC). A stable install, or pre-releases off, is unchanged.
 // The provider runs electron-updater's real code on a fake feed: nothing here reaches GitHub, and a URL the fake doesn't
@@ -7,7 +7,7 @@ import { createRequire } from 'module'
 import { describe, expect, it } from 'vitest'
 import type { AppUpdater } from 'electron-updater'
 import { GitHubProvider } from 'electron-updater/out/providers/GitHubProvider'
-import { HiveGitHubProvider, pickTag, withFirst } from '../src/main/updateFeed'
+import { CombworkGitHubProvider, pickTag, withFirst } from '../src/main/updateFeed'
 
 // The updater's version is a SemVer of electron-updater's own semver (a copy of its own, nested): another copy's isn't
 // recognised as one, and reads as a stable version.
@@ -16,11 +16,11 @@ const { SemVer } = createRequire(createRequire(import.meta.url).resolve('electro
 const BASE = 'https://github.com/Suremise/combwork/releases'
 
 const entry = (tag: string): string =>
-  `<entry><id>tag:github.com,2008:Repository/1/${tag}</id><updated>2026-11-01T00:00:00Z</updated><link rel="alternate" type="text/html" href="${BASE}/tag/${tag}"/><title>Hive ${tag}</title><content type="html">Notes of ${tag}</content></entry>`
+  `<entry><id>tag:github.com,2008:Repository/1/${tag}</id><updated>2026-11-01T00:00:00Z</updated><link rel="alternate" type="text/html" href="${BASE}/tag/${tag}"/><title>Combwork ${tag}</title><content type="html">Notes of ${tag}</content></entry>`
 const atom = (tags: string[]): string => `<?xml version="1.0" encoding="UTF-8"?>\n<feed xmlns="http://www.w3.org/2005/Atom"><id>tag:github.com,2008:${BASE}</id><title>Release notes from combwork</title>${tags.map(entry).join('')}</feed>`
 const yml = (tag: string): string => {
   const v = tag.replace(/^v/, '')
-  return `version: ${v}\nfiles:\n  - url: Hive-Setup-${v}.exe\n    sha512: abc\n    size: 1\npath: Hive-Setup-${v}.exe\nsha512: abc\nreleaseDate: '2026-11-01T00:00:00.000Z'\n`
+  return `version: ${v}\nfiles:\n  - url: Combwork-Setup-${v}.exe\n    sha512: abc\n    size: 1\npath: Combwork-Setup-${v}.exe\nsha512: abc\nreleaseDate: '2026-11-01T00:00:00.000Z'\n`
 }
 
 /** Checks `running` against a feed of `tags` (newest first, as GitHub lists them), with `latest` as releases/latest. */
@@ -44,7 +44,7 @@ async function check(running: string, tags: string[], opts: { prerelease?: boole
   }
   const updater = { allowPrerelease: opts.prerelease ?? true, currentVersion: new SemVer(running), channel: null, fullChangelog: false } as unknown as AppUpdater
   const runtime = { isUseMultipleRangeRequest: false, platform: 'win32', executor } as never
-  const provider = opts.upstream ? new GitHubProvider({ provider: 'github', owner: 'Suremise', repo: 'combwork' }, updater, runtime) : new HiveGitHubProvider({ provider: 'custom', owner: 'Suremise', repo: 'combwork' } as never, updater, runtime)
+  const provider = opts.upstream ? new GitHubProvider({ provider: 'github', owner: 'Suremise', repo: 'combwork' }, updater, runtime) : new CombworkGitHubProvider({ provider: 'custom', owner: 'Suremise', repo: 'combwork' } as never, updater, runtime)
   try {
     const info = await provider.getLatestVersion()
     return { version: info.version, tag: info.tag, notes: info.releaseNotes, asked, unexpected }
@@ -53,7 +53,7 @@ async function check(running: string, tags: string[], opts: { prerelease?: boole
   }
 }
 
-describe('electron-updater alone (why Hive has its own provider)', () => {
+describe('electron-updater alone (why Combwork has its own provider)', () => {
   it('offers a running RC no release, and a running beta no RC', async () => {
     // The release is skipped for the RC itself (up to date), or, with no RC in the feed, nothing is found at all.
     expect((await check('1.0.0-rc.2', ['v1.0.0', 'v1.0.0-rc.2'], { upstream: true })).version).toBe('1.0.0-rc.2')

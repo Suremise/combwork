@@ -1,4 +1,4 @@
-// Hive closing unexpectedly (#984): while it runs, Hive keeps a marker in its profile listing its running agents. A
+// Combwork closing unexpectedly (#984): while it runs, Combwork keeps a marker in its profile listing its running agents. A
 // test copy ended from outside (by its own pid and start time, lib.identify, never by name) leaves it, and the next
 // start says so: when it was last seen, which agents were running where, Nothing was resumed, with Resume All (which
 // resumes the agent into its conversation) and Show Overview; nothing resumes on its own. The Assistant is told, and
@@ -19,7 +19,7 @@ const claudeHome = path.join(lib.WORK, 'unexpectedclose-claude-home')
 const ws = path.join(lib.WORK, 'unexpectedclose-ws')
 const proj = path.join(ws, 'alpha')
 const markerFile = path.join(userData, 'running.json')
-const logFile = path.join(userData, 'logs', 'hive.log')
+const logFile = path.join(userData, 'logs', 'combwork.log')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -36,7 +36,7 @@ const logText = () => (fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8')
 /** The log since the last start: this run's lines. */
 const thisRun = () => {
   const text = logText()
-  const at = text.lastIndexOf('] Hive ')
+  const at = Math.max(-1, ...[...text.matchAll(/\] Combwork \S+ starting \(/g)].map((m) => m.index))
   return at < 0 ? '' : text.slice(text.lastIndexOf('\n', at) + 1)
 }
 /**
@@ -63,13 +63,13 @@ let claudeEnv = null
 
 /** Starts a copy of Combwork on the profile, with its workspace restored. */
 async function start(extra = {}) {
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, ...claudeEnv, ...extra })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, ...claudeEnv, ...extra })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   identities.push(...lib.identify([app.process().pid]))
   const page = await app.firstWindow()
   await lib.fitWindow(app, page, { width: 1300, height: 850 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   return { app, page, inv }
 }
 
@@ -135,7 +135,7 @@ const liveAgent = async (inv, agentId) => (await inv('session:live')).find((l) =
       // The merge slot recovery is held (as on a slow start, many projects) until the window is up and the notice waits.
       const release = path.join(lib.WORK, 'unexpectedclose-release-recovery')
       fs.rmSync(release, { force: true })
-      current = await start({ HIVE_TEST_HOLD_MERGE_RECOVERY: release })
+      current = await start({ CW_TEST_HOLD_MERGE_RECOVERY: release })
       const { page, inv } = current
       check('with the recovery held, the notice waits for it (the window is up)', !!(await lib.until(() => /The notice waits for \d+ startup step/.test(thisRun()) && /Merge slot recovery held/.test(thisRun()), HUNG_MS)), why())
       check('…and is not shown meanwhile',(await notice(page)) === '')
@@ -150,7 +150,7 @@ const liveAgent = async (inv, agentId) => (await inv('session:live')).find((l) =
       const home = (await inv('workspace:refresh'))?.assistant?.path
       const told = () => {
         try {
-          return require('./storeDocs.cjs').deliveriesOf(home).find((r) => r.agentId === 'assistant' && r.from?.kind === 'hive' && /Combwork closed unexpectedly: last seen/.test(r.body))
+          return require('./storeDocs.cjs').deliveriesOf(home).find((r) => r.agentId === 'assistant' && r.from?.kind === 'combwork' && /Combwork closed unexpectedly: last seen/.test(r.body))
         } catch {
           return null
         }
@@ -158,7 +158,7 @@ const liveAgent = async (inv, agentId) => (await inv('session:live')).find((l) =
       const line = home ? await lib.until(told, HUNG_MS) : null
       check("the Assistant finds it in its inbox for its next start, with the agents and that nothing was resumed", !!line && /Steady \(alpha\)/.test(line.body) && /Nothing was resumed/.test(line.body), JSON.stringify(line ?? home))
       check('nothing resumed on its own', !(await liveAgent(inv, agent.id)))
-      check('hive.log says so, with the time', thisRun().includes(`ended without quitting: last seen ${left.lastSeen}`), thisRun().split('\n').slice(0, 8).join(' | '))
+      check('combwork.log says so, with the time', thisRun().includes(`ended without quitting: last seen ${left.lastSeen}`), thisRun().split('\n').slice(0, 8).join(' | '))
       check('Copy Diagnostics says the last run ended without quitting', /The last run ended without quitting: last seen [^;]+; 1 agent\(s\) were running/.test(await inv('app:diagnostics')))
       check('this run has its own marker', !!(await lib.until(() => marker()?.startedAt && marker().startedAt !== left.startedAt, HUNG_MS)))
       await page.locator('.toast', { hasText: 'Combwork closed unexpectedly' }).getByRole('button', { name: 'Resume All' }).click()
@@ -173,7 +173,7 @@ const liveAgent = async (inv, agentId) => (await inv('session:live')).find((l) =
       await inv('app:quit').catch(() => undefined)
       check('a normal quit ends the copy', await quitting.gone(HUNG_MS))
       check('…and removes the marker', !fs.existsSync(markerFile))
-      check('…saying why in hive.log', /Removed the running marker: Hive is quitting/.test(thisRun()))
+      check('…saying why in combwork.log', /Removed the running marker: Combwork is quitting/.test(thisRun()))
       current = null
     }
     {

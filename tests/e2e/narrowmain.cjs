@@ -26,13 +26,13 @@ const check = (name, ok, extra = '') => {
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
   for (const p of [alpha, beta]) lib.gitProject(p)
   const claude = lib.fakeClaude(userData, path.join(lib.WORK, 'narrowmain-claude-home'), [ws])
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47936), ...claude })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47936), ...claude })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   // beta: one agent, never started, two columns chosen (its second pane empty where there is room for two).
   await lib.addAgent(inv, beta, { name: 'Coder' })
@@ -261,13 +261,13 @@ const check = (name, ok, extra = '') => {
   // German, two stopped agents in two columns (HI-2536): "Neue Sitzung" and the split "Fortsetzen" are wider than
   // English, and at 900 px their row made a sideways scrollbar under each pane. They wrap instead: no placeholder
   // scrolls sideways, at 900 px and 1400 px, in both themes.
-  const de = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47936), ...claude, HIVE_LANG: 'de' }) })
+  const de = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47936), ...claude, CW_LANG: 'de' }) })
   try {
     const dpage = await de.firstWindow()
     dpage.on('pageerror', (e) => check('German: no page errors', false, e.message))
     await lib.fitWindow(de, dpage, { width: 900, height: 860 })
     await lib.appReady(dpage)
-    const dinv = (ch, ...a) => dpage.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const dinv = (ch, ...a) => dpage.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await dpage.locator('.project-row', { hasText: 'beta' }).first().click()
     const placeholders = () =>
       dpage.evaluate(() =>

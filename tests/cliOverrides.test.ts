@@ -5,19 +5,19 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { advanced } from '../src/main/advanced'
 import { overridesNow } from '../src/main/advancedValues'
 import { claudeCode } from '../src/main/providers/claude/adapter'
-import { codex, outrankNativeHive } from '../src/main/providers/codex/adapter'
+import { codex, outrankNativeCombwork } from '../src/main/providers/codex/adapter'
 import { copilot, toolNamesLine } from '../src/main/providers/copilot/adapter'
 import { copilotEnv } from '../src/main/providers/copilot/home'
 import { copilotCheckEnv, copilotSignIn, ignoredTokens } from '../src/main/providers/copilot/install'
 import { catalogArgs } from '../src/main/providers/copilot/models'
 import type { LaunchContext } from '../src/main/providers/types'
 import { ADVANCED_DEFS, advancedDef, overrideId, rightClickToCliId } from '../src/shared/advanced'
-import { HIVE_TOOLS } from '../src/shared/assistantTools'
+import { CW_TOOLS } from '../src/shared/assistantTools'
 import { tempDir } from './tempDir'
 
-// The off switches for Hive's overrides of the CLIs' own behaviour (#966, #1167): each one's effect on the launch, on and off.
+// The off switches for Combwork's overrides of the CLIs' own behaviour (#966, #1167): each one's effect on the launch, on and off.
 
-const base = tempDir('hive-cli-overrides-')
+const base = tempDir('cw-cli-overrides-')
 const homes = { CODEX_HOME: process.env.CODEX_HOME, COPILOT_HOME: process.env.COPILOT_HOME }
 beforeAll(() => {
   // Never the user's own homes: the adapters read their config.
@@ -44,19 +44,19 @@ function context(over: Partial<LaunchContext> = {}): LaunchContext {
   return {
     projectPath: cwd, agentId: 'a-1', executable: 'C:\\bin\\cli.exe', cwd, workspacePath: base, runId: 'r1', sessionId: '0cb916db-26aa-40f2-86b5-1ba81b225fd2',
     resume: false, name: '', skills: [], mcpServers: { combwork: { command: 'node', args: ['cw-mcp.js'] } }, model: null, effort: null, permissionMode: null, extraArgs: [],
-    hookUrl: 'http://127.0.0.1:5000/hook?run=r1', hookAuthFile: join(base, 'auth.txt'), privateDir: join(base, 'private'), guidance: 'Hive guidance', allowBackgroundSessions: false, use200kContext: false,
+    hookUrl: 'http://127.0.0.1:5000/hook?run=r1', hookAuthFile: join(base, 'auth.txt'), privateDir: join(base, 'private'), guidance: 'Combwork guidance', allowBackgroundSessions: false, use200kContext: false,
     env: { PATH: 'C:\\Windows' },
     ...over
   }
 }
 
 describe('the override switches', () => {
-  it('are booleans, on by default (what Hive does today), named <provider>.override.<what>, taken by sessions started afterwards', () => {
+  it('are booleans, on by default (what Combwork does today), named <provider>.override.<what>, taken by sessions started afterwards', () => {
     const switches = ADVANCED_DEFS.filter((d) => d.override)
     expect(switches.map((d) => d.id).sort()).toEqual([
-      'claude-code.override.mcpIsolation', 'claude-code.override.preApproveHiveTools', 'claude-code.override.promptSnapshotOff', 'claude-code.override.statusLine',
-      'codex.override.mcpIsolation', 'codex.override.preApproveHiveTools', 'codex.override.terminalTitle',
-      'copilot.override.allMcpInstructions', 'copilot.override.mcpIsolation', 'copilot.override.noAutoUpdate', 'copilot.override.preApproveHiveTools', 'copilot.override.stripGitHubTokens'
+      'claude-code.override.mcpIsolation', 'claude-code.override.preApproveCombworkTools', 'claude-code.override.promptSnapshotOff', 'claude-code.override.statusLine',
+      'codex.override.mcpIsolation', 'codex.override.preApproveCombworkTools', 'codex.override.terminalTitle',
+      'copilot.override.allMcpInstructions', 'copilot.override.mcpIsolation', 'copilot.override.noAutoUpdate', 'copilot.override.preApproveCombworkTools', 'copilot.override.stripGitHubTokens'
     ])
     for (const d of switches) {
       expect(d, d.id).toMatchObject({ kind: 'boolean', default: true, applies: 'sessions' })
@@ -79,7 +79,7 @@ describe('Claude Code: --system-prompt-snapshot off on the Assistant’s resumes
     expect(snapshot()).toEqual(['--system-prompt-snapshot', 'off'])
     await advanced.set(overrideId('claude-code', 'promptSnapshotOff'), false)
     expect(snapshot()).toEqual([])
-    // Hive's other launch arguments stay.
+    // Combwork's other launch arguments stay.
     expect(claudeCode.buildCommand('C:\\bin\\claude.exe', assistant()).args).toContain('--append-system-prompt-file')
   })
 })
@@ -93,22 +93,22 @@ describe("Codex: its terminal title (row 34)", () => {
     await advanced.set(overrideId('codex', 'terminalTitle'), false)
     expect(title()).toEqual([])
     expect(title(context({ resume: true }))).toEqual([])
-    // Hive can't read "Action Required" from a title it didn't set: the hooks tell it instead.
+    // Combwork can't read "Action Required" from a title it didn't set: the hooks tell it instead.
     expect(codex.titleAttention!('0.163.0')).toBeNull()
-    // Codex's setup keeps Hive's title: its busy wait reads the spinner.
+    // Codex's setup keeps Combwork's title: its busy wait reads the spinner.
     expect(codex.setupCommand('C:\\bin\\codex.exe').args.some((a) => a.startsWith('tui.terminal_title='))).toBe(true)
   })
 })
 
 describe("Copilot: every MCP server's instructions (row 21)", () => {
-  const instructions = (ctx: LaunchContext): string => readFileSync(join(ctx.privateDir, 'instructions', '.github', 'instructions', 'hive.instructions.md'), 'utf8')
+  const instructions = (ctx: LaunchContext): string => readFileSync(join(ctx.privateDir, 'instructions', '.github', 'instructions', 'combwork.instructions.md'), 'utf8')
 
-  it("shows the hive server's instructions with the switch on; off, Hive's guidance comes as custom instructions instead", async () => {
+  it("shows the combwork server's instructions with the switch on; off, Combwork's guidance comes as custom instructions instead", async () => {
     const agent = context({ privateDir: join(base, 'private-on') })
     await copilot.prepareLaunch(agent)
     const on = copilot.buildCommand('C:\\bin\\copilot.exe', agent)
     expect(on.args).toContain('--allow-all-mcp-server-instructions')
-    // Only the line on the hive tools' names (#1530) is custom then.
+    // Only the line on the Combwork tools' names (#1530) is custom then.
     expect(on.env?.COPILOT_CUSTOM_INSTRUCTIONS_DIRS).toBe(join(agent.privateDir, 'instructions'))
     expect(instructions(agent)).toBe(`---\napplyTo: '**'\n---\n${toolNamesLine()}\n`)
 
@@ -117,14 +117,14 @@ describe("Copilot: every MCP server's instructions (row 21)", () => {
     await copilot.prepareLaunch(off)
     const cmd = copilot.buildCommand('C:\\bin\\copilot.exe', off)
     expect(cmd.args).not.toContain('--allow-all-mcp-server-instructions')
-    expect(instructions(off)).toBe(`---\napplyTo: '**'\n---\nHive guidance\n\n${toolNamesLine()}\n`)
-    // The user's own folders stay, Hive's after them.
+    expect(instructions(off)).toBe(`---\napplyTo: '**'\n---\nCombwork guidance\n\n${toolNamesLine()}\n`)
+    // The user's own folders stay, Combwork's after them.
     expect(cmd.env?.COPILOT_CUSTOM_INSTRUCTIONS_DIRS).toBe(`D:\\mine,${join(off.privateDir, 'instructions')}`)
 
-    // The Assistant gets its role after the guidance; a launch without Hive's tools gets no guidance.
+    // The Assistant gets its role after the guidance; a launch without Combwork's tools gets no guidance.
     const assistant = context({ privateDir: join(base, 'private-assistant'), instructions: 'You are in Planner mode.' })
     await copilot.prepareLaunch(assistant)
-    expect(instructions(assistant)).toBe(`---\napplyTo: '**'\n---\nHive guidance\n\n${toolNamesLine()}\n\nYou are in Planner mode.\n`)
+    expect(instructions(assistant)).toBe(`---\napplyTo: '**'\n---\nCombwork guidance\n\n${toolNamesLine()}\n\nYou are in Planner mode.\n`)
     const bare = context({ privateDir: join(base, 'private-bare'), mcpServers: {} })
     await copilot.prepareLaunch(bare)
     expect(copilot.buildCommand('C:\\bin\\copilot.exe', bare).env?.COPILOT_CUSTOM_INSTRUCTIONS_DIRS).toBeUndefined()
@@ -141,7 +141,7 @@ describe('a launch reads its switches once (overridesNow), so its stages agree w
     const cmd = copilot.buildCommand('C:\\bin\\copilot.exe', ctx)
     // Still the launch it was prepared as: the flag, and the instructions folder holding only the tool names' line.
     expect(cmd.args).toContain('--allow-all-mcp-server-instructions')
-    expect(readFileSync(join(cmd.env!.COPILOT_CUSTOM_INSTRUCTIONS_DIRS!, '.github', 'instructions', 'hive.instructions.md'), 'utf8')).not.toContain('Combwork guidance')
+    expect(readFileSync(join(cmd.env!.COPILOT_CUSTOM_INSTRUCTIONS_DIRS!, '.github', 'instructions', 'combwork.instructions.md'), 'utf8')).not.toContain('Combwork guidance')
   })
 
   it('Copilot: prepared with it off, then turned on before the command is built', async () => {
@@ -153,10 +153,10 @@ describe('a launch reads its switches once (overridesNow), so its stages agree w
     expect(cmd.args).not.toContain('--allow-all-mcp-server-instructions')
     const dir = cmd.env?.COPILOT_CUSTOM_INSTRUCTIONS_DIRS
     expect(dir).toBe(join(ctx.privateDir, 'instructions'))
-    expect(readFileSync(join(dir!, '.github', 'instructions', 'hive.instructions.md'), 'utf8')).toContain('Hive guidance')
+    expect(readFileSync(join(dir!, '.github', 'instructions', 'combwork.instructions.md'), 'utf8')).toContain('Combwork guidance')
   })
 
-  it("Codex: the title and whether Hive reads it come from the same launch's switch", async () => {
+  it("Codex: the title and whether Combwork reads it come from the same launch's switch", async () => {
     const ctx = context({ overrides: overridesNow('codex') })
     await advanced.set(overrideId('codex', 'terminalTitle'), false)
     expect(codex.buildCommand('C:\\bin\\codex.exe', ctx).args.some((a) => a.startsWith('tui.terminal_title='))).toBe(true)
@@ -199,23 +199,23 @@ describe('Copilot: not updating itself (row 22)', () => {
   })
 })
 
-describe("Hive's tools pre-approved (row 3)", () => {
-  const assistant = (over: Partial<LaunchContext> = {}): LaunchContext => context({ trustedHiveTools: ['cw_list_tasks', 'cw_read_task'], ...over })
+describe("Combwork's tools pre-approved (row 3)", () => {
+  const assistant = (over: Partial<LaunchContext> = {}): LaunchContext => context({ trustedCombworkTools: ['cw_list_tasks', 'cw_read_task'], ...over })
 
-  it('Claude Code: the Assistant’s trusted Hive tools with the switch on, none with it off', async () => {
+  it('Claude Code: the Assistant’s trusted Combwork tools with the switch on, none with it off', async () => {
     const allowed = (): string[] => { const a = claudeCode.buildCommand('C:\\bin\\claude.exe', assistant()).args; const i = a.indexOf('--allowedTools'); return i < 0 ? [] : a[i + 1].split(',') }
     expect(allowed()).toEqual(['mcp__combwork__cw_list_tasks', 'mcp__combwork__cw_read_task'])
-    await advanced.set(overrideId('claude-code', 'preApproveHiveTools'), false)
+    await advanced.set(overrideId('claude-code', 'preApproveCombworkTools'), false)
     expect(allowed()).toEqual([])
-    // Hive's tools are still there: only Claude Code's trust changed.
+    // Combwork's tools are still there: only Claude Code's trust changed.
     expect(claudeCode.buildCommand('C:\\bin\\claude.exe', assistant()).args).toContain('--mcp-config')
   })
 
-  it('Copilot: hive (an agent) or the Assistant’s subset with the switch on, nothing with it off', async () => {
+  it('Copilot: combwork (an agent) or the Assistant’s subset with the switch on, nothing with it off', async () => {
     const allowTools = (ctx: LaunchContext): string[] => copilot.buildCommand('C:\\bin\\copilot.exe', ctx).args.filter((a) => a.startsWith('--allow-tool=combwork'))
     expect(allowTools(context())).toEqual(['--allow-tool=combwork'])
     expect(allowTools(assistant())).toEqual(['--allow-tool=combwork(cw_list_tasks)', '--allow-tool=combwork(cw_read_task)'])
-    await advanced.set(overrideId('copilot', 'preApproveHiveTools'), false)
+    await advanced.set(overrideId('copilot', 'preApproveCombworkTools'), false)
     expect(allowTools(context())).toEqual([])
     expect(allowTools(assistant())).toEqual([])
     expect(copilot.buildCommand('C:\\bin\\copilot.exe', context()).args).toContain('--additional-mcp-config')
@@ -249,8 +249,8 @@ describe("Copilot: other tools' GitHub tokens (row 8)", () => {
   })
 })
 
-describe("Codex: Hive's tools pre-approved (row 3, #1174) and its own MCP servers (row 5)", () => {
-  const hiveTable = (ctx: LaunchContext): string | undefined => codex.buildCommand('C:\\bin\\codex.exe', ctx).args.find((a) => a.startsWith('mcp_servers.combwork='))
+describe("Codex: Combwork's tools pre-approved (row 3, #1174) and its own MCP servers (row 5)", () => {
+  const combworkTable = (ctx: LaunchContext): string | undefined => codex.buildCommand('C:\\bin\\codex.exe', ctx).args.find((a) => a.startsWith('mcp_servers.combwork='))
   const home = (): string => process.env.CODEX_HOME!
   const nativeConfig = (toml: string): void => {
     mkdirSync(home(), { recursive: true })
@@ -258,16 +258,16 @@ describe("Codex: Hive's tools pre-approved (row 3, #1174) and its own MCP server
   }
   afterEach(() => rmSync(join(home(), 'config.toml'), { force: true }))
 
-  it("approves the whole hive server for an agent, only the Assistant's trusted tools for it, and none with the switch off", async () => {
-    expect(hiveTable(context())).toContain('default_tools_approval_mode="approve"')
-    expect(hiveTable(context())).toContain('enabled=true')
-    const assistant = hiveTable(context({ trustedHiveTools: ['cw_list_tasks', 'cw_read_task'] }))!
+  it("approves the whole combwork server for an agent, only the Assistant's trusted tools for it, and none with the switch off", async () => {
+    expect(combworkTable(context())).toContain('default_tools_approval_mode="approve"')
+    expect(combworkTable(context())).toContain('enabled=true')
+    const assistant = combworkTable(context({ trustedCombworkTools: ['cw_list_tasks', 'cw_read_task'] }))!
     expect(assistant).not.toContain('default_tools_approval_mode')
     expect(assistant).toContain('tools={cw_list_tasks={approval_mode="approve"},cw_read_task={approval_mode="approve"}}')
-    await advanced.set(overrideId('codex', 'preApproveHiveTools'), false)
-    for (const t of [hiveTable(context()), hiveTable(context({ trustedHiveTools: ['cw_list_tasks'] }))]) {
+    await advanced.set(overrideId('codex', 'preApproveCombworkTools'), false)
+    for (const t of [combworkTable(context()), combworkTable(context({ trustedCombworkTools: ['cw_list_tasks'] }))]) {
       expect(t).not.toContain('approval_mode')
-      // Still Hive's server, on.
+      // Still Combwork's server, on.
       expect(t).toContain('enabled=true')
     }
   })
@@ -282,9 +282,9 @@ describe("Codex: Hive's tools pre-approved (row 3, #1174) and its own MCP server
 
 })
 
-// Codex merges Hive's -c mcp_servers.hive={…} into the user's own [mcp_servers.hive] key by key (0.163.0, probed), so
-// each key a native one sets gets Hive's value, whatever the isolation switch, in the user's config or the project's.
-describe("Codex: Hive's hive server over a native one of that name", () => {
+// Codex merges Combwork's -c mcp_servers.combwork={…} into the user's own [mcp_servers.combwork] key by key (0.163.0, probed), so
+// each key a native one sets gets Combwork's value, whatever the isolation switch, in the user's config or the project's.
+describe("Codex: Combwork's server over a native one of that name", () => {
   // The suite's own home, as beforeAll set it (read then, not as the module loads, when it isn't set yet: putting that
   // back would leave the string "undefined", a folder in the current one, for the tests after these).
   let homeBefore: string | undefined
@@ -306,23 +306,23 @@ describe("Codex: Hive's hive server over a native one of that name", () => {
   afterEach(() => {
     process.env.CODEX_HOME = homeBefore
   })
-  /** Hive's hive table as Codex is given it. */
+  /** Combwork's server table as Codex is given it. */
   const table = (ctx: LaunchContext): Record<string, any> => {
     const arg = codex.buildCommand('C:\\bin\\codex.exe', ctx).args.find((a) => a.startsWith('mcp_servers.combwork='))!
     return parseToml(`combwork = ${arg.slice('mcp_servers.combwork='.length)}`).combwork as Record<string, any>
   }
   const places = ['home', 'project'] as const
 
-  it('its tool lists and its off switch: all of Hive’s tools shown, on, isolation on and off', async () => {
+  it('its tool lists and its off switch: all of Combwork’s tools shown, on, isolation on and off', async () => {
     for (const isolation of [true, false])
       for (const place of places) {
         await advanced.set(overrideId('codex', 'mcpIsolation'), isolation ? null : false)
         const t = table(where(place, 'command = "node"\nargs = ["native.js"]\nenabled = false\nenabled_tools = ["only_this"]\ndisabled_tools = ["cw_notify"]\n'))
-        expect(t, `${place}, isolation ${isolation}`).toMatchObject({ command: 'node', args: ['cw-mcp.js'], enabled: true, enabled_tools: [...HIVE_TOOLS], disabled_tools: [] })
+        expect(t, `${place}, isolation ${isolation}`).toMatchObject({ command: 'node', args: ['cw-mcp.js'], enabled: true, enabled_tools: [...CW_TOOLS], disabled_tools: [] })
       }
   })
 
-  it('how it starts: the session’s folder, Hive’s startup timeout (Codex’s own default, from Settings → Advanced), not required, its environment emptied', async () => {
+  it('how it starts: the session’s folder, Combwork’s startup timeout (Codex’s own default, from Settings → Advanced), not required, its environment emptied', async () => {
     for (const place of places) {
       const ctx = where(place, 'command = "node"\ncwd = "Z:/does-not-exist"\nstartup_timeout_sec = 1\nstartup_timeout_ms = 500\nrequired = true\nenv = { NODE_OPTIONS = "--inspect", CW_API_URL = "http://elsewhere" }\nenv_vars = ["SECRET"]\n')
       expect(table(ctx), place).toMatchObject({ cwd: ctx.cwd, startup_timeout_sec: 10, startup_timeout_ms: 10000, required: false, env: { NODE_OPTIONS: '' }, env_vars: [] })
@@ -330,24 +330,24 @@ describe("Codex: Hive's hive server over a native one of that name", () => {
     // The startup timeout follows Settings → Advanced.
     await advanced.set('codex.mcp.startupTimeoutSeconds', 45)
     expect(table(where('home', 'command = "node"\nstartup_timeout_sec = 1\nstartup_timeout_ms = 500\n'))).toMatchObject({ startup_timeout_sec: 45, startup_timeout_ms: 45000 })
-    // Hive's own env stays Hive's (here the context's server has none to set).
-    const own = outrankNativeHive([], { env: { CW_PROJECT: 'p' } }, 'all', 'C:\\p')
+    // Combwork's own env stays Combwork's (here the context's server has none to set).
+    const own = outrankNativeCombwork([], { env: { CW_PROJECT: 'p' } }, 'all', 'C:\\p')
     expect(own).toEqual({})
   })
 
-  it("its approvals: Hive's for every tool it names, Codex's own policy (auto) for the rest", async () => {
+  it("its approvals: Combwork's for every tool it names, Codex's own policy (auto) for the rest", async () => {
     const native = 'command = "node"\ndefault_tools_approval_mode = "approve"\ntools = { cw_write_shared_note = { approval_mode = "approve" }, cw_list_tasks = { approval_mode = "prompt" } }\n'
     for (const place of places) {
       // An agent: everything approved, the native per-tool "prompt" too.
       expect(table(where(place, native)), place).toMatchObject({ default_tools_approval_mode: 'approve', tools: { cw_write_shared_note: { approval_mode: 'approve' }, cw_list_tasks: { approval_mode: 'approve' } } })
       // The Assistant: its trusted tools approved, the native blanket and per-tool approvals of the rest taken back.
-      const a = table({ ...where(place, native), trustedHiveTools: ['cw_list_tasks'] })
+      const a = table({ ...where(place, native), trustedCombworkTools: ['cw_list_tasks'] })
       expect(a, place).toMatchObject({ default_tools_approval_mode: 'auto', tools: { cw_list_tasks: { approval_mode: 'approve' }, cw_write_shared_note: { approval_mode: 'auto' } } })
       // An Assistant trusted with nothing: nothing approved.
-      expect(table({ ...where(place, native), trustedHiveTools: [] }), place).toMatchObject({ default_tools_approval_mode: 'auto', tools: { cw_write_shared_note: { approval_mode: 'auto' }, cw_list_tasks: { approval_mode: 'auto' } } })
+      expect(table({ ...where(place, native), trustedCombworkTools: [] }), place).toMatchObject({ default_tools_approval_mode: 'auto', tools: { cw_write_shared_note: { approval_mode: 'auto' }, cw_list_tasks: { approval_mode: 'auto' } } })
     }
     // The switch off: nothing approved, for an agent either.
-    await advanced.set(overrideId('codex', 'preApproveHiveTools'), false)
+    await advanced.set(overrideId('codex', 'preApproveCombworkTools'), false)
     expect(table(where('home', native))).toMatchObject({ default_tools_approval_mode: 'auto', tools: { cw_write_shared_note: { approval_mode: 'auto' }, cw_list_tasks: { approval_mode: 'auto' } } })
   })
 
@@ -361,12 +361,12 @@ describe("Codex: Hive's hive server over a native one of that name", () => {
   })
 
   it('none: nothing added', () => {
-    expect(outrankNativeHive([join(base, 'missing.toml')], {}, 'all', 'C:\\p')).toEqual({})
+    expect(outrankNativeCombwork([join(base, 'missing.toml')], {}, 'all', 'C:\\p')).toEqual({})
   })
 
-  // HI-2463: the user's own copy of Combwork's server under its name before (their [mcp_servers.hive], with the old
-  // cw_* tools) is turned off for the session by a launch override, isolation on or off; their config isn't changed.
-  it('a native server named hive (the name before HI-2463): off for the session, isolation on and off, its file untouched', async () => {
+  // HI-2594: a native server of another name is the user's own like any other: turned off
+  // with the user's other servers while isolation is on, loaded with them when it is off; their config isn't changed.
+  it('a native server of another name: off with the others under isolation, loaded with it off, its file untouched', async () => {
     for (const isolation of [true, false])
       for (const place of places) {
         await advanced.set(overrideId('codex', 'mcpIsolation'), isolation ? null : false)
@@ -376,26 +376,18 @@ describe("Codex: Hive's hive server over a native one of that name", () => {
         const dir = place === 'home' ? process.env.CODEX_HOME : join(cwd, '.codex')
         mkdirSync(dir, { recursive: true })
         mkdirSync(cwd, { recursive: true })
-        const text = '[mcp_servers.hive]\ncommand = "node"\nargs = ["old-hive-mcp.js"]\n'
+        const text = '[mcp_servers.theirs]\ncommand = "node"\nargs = ["their-server.js"]\n'
         writeFileSync(join(dir, 'config.toml'), text)
         const args = codex.buildCommand('C:\\bin\\codex.exe', context({ cwd })).args
-        expect(args.filter((a) => a === 'mcp_servers.hive.enabled=false'), `${place}, isolation ${isolation}`).toHaveLength(1)
+        expect(args.filter((a) => a === 'mcp_servers.theirs.enabled=false'), `${place}, isolation ${isolation}`).toHaveLength(isolation ? 1 : 0)
         expect(args.some((a) => a.startsWith('mcp_servers.combwork=')), `${place}, isolation ${isolation}`).toBe(true)
         expect(readFileSync(join(dir, 'config.toml'), 'utf8')).toBe(text)
       }
   })
-
-  it('no native hive: nothing turned off for it', () => {
-    const root = join(base, `legacy-${++n}`)
-    process.env.CODEX_HOME = join(root, 'codex-home')
-    mkdirSync(process.env.CODEX_HOME, { recursive: true })
-    const args = codex.buildCommand('C:\\bin\\codex.exe', context({ cwd: root })).args
-    expect(args.some((a) => a.startsWith('mcp_servers.hive'))).toBe(false)
-  })
 })
 
 describe("Claude Code's and Copilot's own MCP servers (rows 4 and 6)", () => {
-  it('Claude Code: --strict-mcp-config with the switch on; off, Hive’s file only (its servers still win by name)', async () => {
+  it('Claude Code: --strict-mcp-config with the switch on; off, Combwork’s file only (its servers still win by name)', async () => {
     const args = (): string[] => claudeCode.buildCommand('C:\\bin\\claude.exe', context()).args
     expect(args()).toContain('--strict-mcp-config')
     await advanced.set(overrideId('claude-code', 'mcpIsolation'), false)
@@ -403,19 +395,19 @@ describe("Claude Code's and Copilot's own MCP servers (rows 4 and 6)", () => {
     expect(args()[args().indexOf('--mcp-config') + 1]).toBe(join(base, 'private', 'mcp.json'))
   })
 
-  it('Copilot: built-ins and the user’s servers off with the switch on; off, none disabled, Hive’s by name least of all', async () => {
+  it('Copilot: built-ins and the user’s servers off with the switch on; off, none disabled, Combwork’s by name least of all', async () => {
     const home = process.env.COPILOT_HOME!
     mkdirSync(home, { recursive: true })
-    writeFileSync(join(home, 'mcp-config.json'), JSON.stringify({ mcpServers: { mine: { command: 'node' }, hive: { command: 'node', args: ['native.js'] } } }))
+    writeFileSync(join(home, 'mcp-config.json'), JSON.stringify({ mcpServers: { mine: { command: 'node' }, theirs: { command: 'node', args: ['native.js'] } } }))
     try {
       const args = (): string[] => copilot.buildCommand('C:\\bin\\copilot.exe', context()).args
       expect(args()).toContain('--disable-builtin-mcps')
-      // The user's own hive (Combwork's server's name before HI-2463) is theirs now: off with the others…
-      expect(args().filter((a, i, all) => all[i - 1] === '--disable-mcp-server')).toEqual(['mine', 'hive'])
+      // A server of the user's is theirs like any other (HI-2594): off with the others…
+      expect(args().filter((a, i, all) => all[i - 1] === '--disable-mcp-server')).toEqual(['mine', 'theirs'])
       await advanced.set(overrideId('copilot', 'mcpIsolation'), false)
       expect(args()).not.toContain('--disable-builtin-mcps')
-      // …and with the switch off too, alone: its old hive_* tools never reach a session beside the cw_* ones.
-      expect(args().filter((a, i, all) => all[i - 1] === '--disable-mcp-server')).toEqual(['hive'])
+      // …and with the switch off, none disabled.
+      expect(args().filter((a, i, all) => all[i - 1] === '--disable-mcp-server')).toEqual([])
       expect(args()).toContain('--additional-mcp-config')
     } finally {
       rmSync(join(home, 'mcp-config.json'), { force: true })
@@ -436,7 +428,7 @@ describe("Claude Code's status line (#1285, row 12)", () => {
     rmSync(project, { recursive: true, force: true })
   })
 
-  it("is Hive's alone with the switch on, whatever the user's settings say", async () => {
+  it("is Combwork's alone with the switch on, whatever the user's settings say", async () => {
     mkdirSync(claudeDir, { recursive: true })
     writeFileSync(join(claudeDir, 'settings.json'), JSON.stringify({ statusLine: { type: 'command', command: 'node mine.js', padding: 2 } }))
     const line = await launch()
@@ -444,7 +436,7 @@ describe("Claude Code's status line (#1285, row 12)", () => {
     expect(line.command).not.toContain('mine.js')
   })
 
-  it("off, runs the user's own after Hive's, given the JSON Hive's server echoes back, with their padding", async () => {
+  it("off, runs the user's own after Combwork's, given the JSON Combwork's server echoes back, with their padding", async () => {
     await advanced.set(overrideId('claude-code', 'statusLine'), false)
     mkdirSync(claudeDir, { recursive: true })
     writeFileSync(join(claudeDir, 'settings.json'), JSON.stringify({ statusLine: { type: 'command', command: 'node mine.js && echo done', padding: 2 } }))
@@ -455,7 +447,7 @@ describe("Claude Code's status line (#1285, row 12)", () => {
     mkdirSync(project, { recursive: true })
     writeFileSync(join(project, 'settings.json'), JSON.stringify({ statusLine: { type: 'command', command: 'project-line' } }))
     expect((await launch()).command).toMatch(/\| \(\nproject-line\n\)$/)
-    // None of theirs: Hive's own, as with the switch on.
+    // None of theirs: Combwork's own, as with the switch on.
     rmSync(join(claudeDir, 'settings.json'))
     rmSync(join(project, 'settings.json'))
     expect(await launch()).toEqual({ type: 'command', command: expect.stringMatching(/&statusline"$/), padding: 0 })
@@ -467,12 +459,12 @@ describe("Claude Code's status line (#1285, row 12)", () => {
     const { execFileSync, spawnSync } = await import('child_process')
     const bash = join(execFileSync('git', ['--exec-path'], { encoding: 'utf8' }).trim(), '..', '..', '..', 'bin', 'bash.exe')
     expect(existsSync(bash), bash).toBe(true)
-    const { hiveStatusLine } = await import('../src/main/providers/claude/launchSettings')
+    const { combworkStatusLine } = await import('../src/main/providers/claude/launchSettings')
     const json = '{"model":{"display_name":"Opus 5.5"},"note":"a  b\\n#c"}'
-    // Hive's forwarding command stands in as what it prints: the JSON its server echoed.
+    // Combwork's forwarding command stands in as what it prints: the JSON its server echoed.
     const forward = (echo: boolean): string => (echo ? `printf '%s' '${json}'` : 'true')
     const run = (command: string): { out: string; code: number | null } => {
-      const line = hiveStatusLine(forward, { type: 'command', command, padding: 3 })
+      const line = combworkStatusLine(forward, { type: 'command', command, padding: 3 })
       expect(line.padding).toBe(3)
       const r = spawnSync(bash, ['-c', line.command], { encoding: 'utf8', env: { PATH: process.env.PATH ?? '' } })
       return { out: r.stdout, code: r.status }
@@ -482,12 +474,12 @@ describe("Claude Code's status line (#1285, row 12)", () => {
     expect(run('cat | wc -c | tr -d " "')).toEqual({ out: `${json.length}\n`, code: 0 })
     // The input whole, byte for byte.
     expect(run('cat')).toEqual({ out: json, code: 0 })
-    // A command of its own that fails still fails alone: nothing of Hive's around it hides that.
+    // A command of its own that fails still fails alone: nothing of Combwork's around it hides that.
     expect(run('exit 3').code).toBe(3)
   })
 })
 
-describe("Hive's guidance for agents (#1285, row 13)", () => {
+describe("Combwork's guidance for agents (#1285, row 13)", () => {
   const codexArgs = (ctx: LaunchContext): string[] => codex.buildCommand('C:\\bin\\codex.exe', ctx).args
   const developer = (args: string[]): string | null => {
     const a = args.findLast((x) => x.startsWith('developer_instructions='))
@@ -498,7 +490,7 @@ describe("Hive's guidance for agents (#1285, row 13)", () => {
   afterEach(() => rmSync(join(process.env.CODEX_HOME!, 'config.toml'), { force: true }))
 
   // What Codex itself would give the session (#1285, the Assistant's design in round 4): its offline prompt rendered
-  // with the agent's own arguments, as is and with developer_instructions cleared. Hive parses no profile and ranks no
+  // with the agent's own arguments, as is and with developer_instructions cleared. Combwork parses no profile and ranks no
   // layer; e2e codexownhooks checks the real Codex at every layer (HR4's probes). Here the fake Codex renders it.
   it('reads them from two renders of the prompt: one text more in front is the value, the same renders none', async () => {
     const { developerInstructionsOf } = await import('../src/main/providers/codex/adapter')
@@ -508,7 +500,7 @@ describe("Hive's guidance for agents (#1285, row 13)", () => {
     // The same renders: none set, or set empty or blank (an empty one clears every layer below it, in Codex).
     expect(developerInstructionsOf(rest, rest)).toBe('')
     expect(developerInstructionsOf([], [])).toBe('')
-    // Anything else Hive can't tell apart, or a render missing: no answer (Hive's guidance alone).
+    // Anything else Combwork can't tell apart, or a render missing: no answer (Combwork's guidance alone).
     expect(developerInstructionsOf(['Mine.', 'other', ...rest], rest)).toBeNull()
     expect(developerInstructionsOf(['Mine.', '<skills_instructions> changed', rest[1]], rest)).toBeNull()
     expect(developerInstructionsOf(null, rest)).toBeNull()
@@ -535,7 +527,7 @@ describe("Hive's guidance for agents (#1285, row 13)", () => {
     expect(developerTexts({})).toBeNull()
   })
 
-  it("Codex: Hive's guidance after the developer_instructions Codex renders for the session's own arguments, never in their place", async () => {
+  it("Codex: Combwork's guidance after the developer_instructions Codex renders for the session's own arguments, never in their place", async () => {
     const fake = join(__dirname, 'e2e', 'fake-codex', 'fake-codex.cmd')
     // A Codex home of this test's own.
     const homeBefore = process.env.CODEX_HOME
@@ -545,7 +537,7 @@ describe("Hive's guidance for agents (#1285, row 13)", () => {
     const said = join(home, 'fake-developer-instructions.txt')
     const runs = (): { args: string[] }[] => (existsSync(join(home, 'fake-prompt-input.jsonl')) ? readFileSync(join(home, 'fake-prompt-input.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [])
     const env = { PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '', ComSpec: process.env.ComSpec ?? '', CODEX_HOME: home }
-    /** A launch as Hive makes it: the developer_instructions Codex keeps (the last given), every one given, and its notice. */
+    /** A launch as Combwork makes it: the developer_instructions Codex keeps (the last given), every one given, and its notice. */
     const launch = async (over: Partial<LaunchContext> = {}) => {
       const ctx = context({ executable: fake, runId: `dev-${Math.random()}`, env, ...over })
       await codex.prepareLaunch(ctx)
@@ -554,36 +546,36 @@ describe("Hive's guidance for agents (#1285, row 13)", () => {
     }
     const launched = async (over: Partial<LaunchContext> = {}): Promise<string | null> => (await launch(over)).kept
     try {
-      // Codex renders none: Hive's alone.
-      expect(await launched()).toBe('Hive guidance')
-      // Codex renders some (whatever layer they came from): Hive's after them, the Assistant's role after that.
+      // Codex renders none: Combwork's alone.
+      expect(await launched()).toBe('Combwork guidance')
+      // Codex renders some (whatever layer they came from): Combwork's after them, the Assistant's role after that.
       writeFileSync(said, 'Codex says this.')
-      expect(await launched()).toBe('Codex says this.\n\nHive guidance')
-      expect(await launched({ instructions: 'You are the Assistant.' })).toBe('Codex says this.\n\nHive guidance\n\nYou are the Assistant.')
+      expect(await launched()).toBe('Codex says this.\n\nCombwork guidance')
+      expect(await launched({ instructions: 'You are the Assistant.' })).toBe('Codex says this.\n\nCombwork guidance\n\nYou are the Assistant.')
       // The agent's own arguments reach Codex untouched (it parses -pmine, -p=mine and the rest), with the cleared render.
       const before = runs().length
-      expect(await launched({ extraArgs: ['-pmine', '-m', 'gpt-x'] })).toBe('Codex says this.\n\nHive guidance')
+      expect(await launched({ extraArgs: ['-pmine', '-m', 'gpt-x'] })).toBe('Codex says this.\n\nCombwork guidance')
       expect(runs().slice(before).map((r) => r.args)).toEqual(expect.arrayContaining([['-pmine', '-m', 'gpt-x'], ['-pmine', '-m', 'gpt-x', '-c', 'developer_instructions=""']]))
       expect(runs().slice(before)).toHaveLength(2)
-      // Asked again at every launch (HR4's round 4: no cache): only what Codex renders changed, and Hive takes it.
+      // Asked again at every launch (HR4's round 4: no cache): only what Codex renders changed, and Combwork takes it.
       writeFileSync(said, 'SECOND-TARGET')
-      expect(await launched({ extraArgs: ['-pmine', '-m', 'gpt-x'] })).toBe('SECOND-TARGET\n\nHive guidance')
-      // Set empty or blank where Codex takes them: the same renders, Hive's alone.
+      expect(await launched({ extraArgs: ['-pmine', '-m', 'gpt-x'] })).toBe('SECOND-TARGET\n\nCombwork guidance')
+      // Set empty or blank where Codex takes them: the same renders, Combwork's alone.
       for (const v of ['', '   ']) {
         writeFileSync(said, v)
-        expect(await launched(), JSON.stringify(v)).toBe('Hive guidance')
+        expect(await launched(), JSON.stringify(v)).toBe('Combwork guidance')
       }
 
       // The user's own -c developer_instructions in Extra arguments (HR4's round 4): already in what Codex renders, and
-      // Hive's combined value comes after it, so it is the one Codex keeps. Its forms, with the Assistant's role too.
+      // Combwork's combined value comes after it, so it is the one Codex keeps. Its forms, with the Assistant's role too.
       rmSync(said)
       for (const flag of ['-c', '--config']) {
         const extra = [flag, 'developer_instructions="EXTRA-ONLY"']
         const agent = await launch({ extraArgs: extra })
-        expect(agent.kept, flag).toBe('EXTRA-ONLY\n\nHive guidance')
-        expect(agent.all, flag).toEqual(['EXTRA-ONLY', 'EXTRA-ONLY\n\nHive guidance'])
-        expect((await launch({ extraArgs: extra, instructions: 'You are the Assistant.' })).kept).toBe('EXTRA-ONLY\n\nHive guidance\n\nYou are the Assistant.')
-        // No guidance of Hive's: theirs alone, as they gave it.
+        expect(agent.kept, flag).toBe('EXTRA-ONLY\n\nCombwork guidance')
+        expect(agent.all, flag).toEqual(['EXTRA-ONLY', 'EXTRA-ONLY\n\nCombwork guidance'])
+        expect((await launch({ extraArgs: extra, instructions: 'You are the Assistant.' })).kept).toBe('EXTRA-ONLY\n\nCombwork guidance\n\nYou are the Assistant.')
+        // No guidance of Combwork's: theirs alone, as they gave it.
         expect((await launch({ extraArgs: extra, guidance: '' })).all).toEqual(['EXTRA-ONLY'])
       }
 
@@ -602,7 +594,7 @@ describe("Hive's guidance for agents (#1285, row 13)", () => {
       // A launch Codex could answer has no notice.
       writeFileSync(said, 'Codex says this.')
       expect((await launch()).notice).toBeNull()
-      // No guidance of Hive's (the switch off, or no Hive tools): nothing passed, and Codex isn't asked.
+      // No guidance of Combwork's (the switch off, or no Combwork tools): nothing passed, and Codex isn't asked.
       const none = runs().length
       expect(await launched({ guidance: '' })).toBeNull()
       expect(runs()).toHaveLength(none)
@@ -616,16 +608,16 @@ describe("Hive's guidance for agents (#1285, row 13)", () => {
     expect(advancedDef('codex.promptInput.timeoutSeconds')).toMatchObject({ group: 'codex', kind: 'number', default: 15, unit: 's', applies: 'sessions' })
   })
 
-  it('is a switch of its own under Hive, on by default, taken by sessions started afterwards (e2e agentguidance checks the hive server it gives)', async () => {
-    const { HIVE_GUIDANCE } = await import('../src/shared/advanced')
-    expect(advancedDef(HIVE_GUIDANCE)).toMatchObject({ group: 'cw', kind: 'boolean', default: true, applies: 'sessions' })
+  it('is a switch of its own under Combwork, on by default, taken by sessions started afterwards (e2e agentguidance checks the combwork server it gives)', async () => {
+    const { CW_GUIDANCE } = await import('../src/shared/advanced')
+    expect(advancedDef(CW_GUIDANCE)).toMatchObject({ group: 'cw', kind: 'boolean', default: true, applies: 'sessions' })
   })
 })
 
-// Row 11 has no switch (Darren, 21 Oct): Codex keeps the user's hooks beside Hive's, each layer's under its own key, and
-// merges the trust table (e2e codexownhooks asks the installed Codex). Hive's part: its hooks and its trust records are
-// its own session-flags keys only, so nothing of the user's is named, replaced or trusted by Hive.
-describe("Codex: Hive's hooks beside the user's own (row 11)", () => {
+// Row 11 has no switch (Darren, 21 Oct): Codex keeps the user's hooks beside Combwork's, each layer's under its own key, and
+// merges the trust table (e2e codexownhooks asks the installed Codex). Combwork's part: its hooks and its trust records are
+// its own session-flags keys only, so nothing of the user's is named, replaced or trusted by Combwork.
+describe("Codex: Combwork's hooks beside the user's own (row 11)", () => {
   it("passes its hooks per event and trust records for its own session-flags keys alone, whatever the user's config has", () => {
     mkdirSync(process.env.CODEX_HOME!, { recursive: true })
     writeFileSync(join(process.env.CODEX_HOME!, 'config.toml'), '[[hooks.Stop]]\n[[hooks.Stop.hooks]]\ntype = "command"\ncommand = "echo mine"\n')

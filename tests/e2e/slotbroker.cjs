@@ -1,26 +1,26 @@
 // Windows Sandbox's broker and a connection switch's held slot (HI-2304, SPEC §16.10.3): MB1 switched connection, its
-// run left Windows Sandbox's WindowsSandboxServer.exe running, Hive held the slot for it, and MB1 never resumed.
+// run left Windows Sandbox's WindowsSandboxServer.exe running, Combwork held the slot for it, and MB1 never resumed.
 // B1 starts a real card in slot-a on the fake Claude Code, keeping its active lease across the restarts. A test copy takes
-// the processes whose ids are in the file HIVE_TEST_SYSTEM_BROKER as the Sandbox's broker (no test can put one in
+// the processes whose ids are in the file CW_TEST_SYSTEM_BROKER as the Sandbox's broker (no test can put one in
 // WindowsApps; their paths are still asked of the helper by id and start time), and the names in the file
-// HIVE_TEST_SYSTEM_BROKER_ACTIVE as running on the machine.
+// CW_TEST_SYSTEM_BROKER_ACTIVE as running on the machine.
 // 1. B1 leaves the fake broker running (fake-claude's "hidden-linger") while a "Sandbox" runs, and its connection is
 //    switched at its safe point: it exits, slot-a stays held (the broker counts while a Sandbox runs), and the switch's
 //    resume waits, saying so in a notice once, starting nothing meanwhile.
 // 2. The "Sandbox" closes: within a look at the leftovers B1's run counts as ended (the broker isn't its work), slot-a is
-//    freed, and the switch resumes B1 there, in the same conversation. The broker still runs: Hive never ends it.
+//    freed, and the switch resumes B1 there, in the same conversation. The broker still runs: Combwork never ends it.
 // 3. A real writer: B1 leaves a node running ("linger 1") and is switched again: slot-a stays held, named by that
 //    process; once it ends (here from outside, by pid and start time), the switch resumes B1.
 // 4. (HI-2309) A quit with only the broker left: B1 leaves it while a "Sandbox" runs and is stopped (slot-a held, the
-//    broker listed); the "Sandbox" closes and Hive quits at once. The next Hive, on the same profile, finds slot-a free
+//    broker listed); the "Sandbox" closes and Combwork quits at once. The next Combwork, on the same profile, finds slot-a free
 //    (its run kept as ended: the quit's look, or the leftovers' if it came first, both by the one rule), the broker not
 //    listed as B1's, and still running.
-// 5. (HI-2313) Hive is ended from outside while B1 runs, its broker left running, as a crash would, and its keeper
-//    outlives it (HI-2314), writing its own "live" receipt listing only the broker. The next Hive asks that keeper for
+// 5. (HI-2313) Combwork is ended from outside while B1 runs, its broker left running, as a crash would, and its keeper
+//    outlives it (HI-2314), writing its own "live" receipt listing only the broker. The next Combwork asks that keeper for
 //    B1's run now (its "live" is no proof), is told only the broker, and frees slot-a by itself, with no notice. The
 //    broker and its keeper still run.
 // 6. (HI-2309) The same, but its keeper is ended from outside after its receipt, so nothing can answer now: the next
-//    Hive keeps slot-a held, says once in a notice that only the idle broker holds it and releasing is safe; its Release
+//    Combwork keeps slot-a held, says once in a notice that only the idle broker holds it and releasing is safe; its Release
 //    Slot… (from the notice's button) says so with "End these processes first" off. Screenshots of the notice and the
 //    question, light and dark. Released, the broker still runs.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
@@ -51,7 +51,7 @@ const check = (name, ok, extra = '') => {
 }
 const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase()
 /**
- * Ends a test Hive from outside, as a crash would (slotrelease's way): its main process first, then all it started but
+ * Ends a test Combwork from outside, as a crash would (slotrelease's way): its main process first, then all it started but
  * `spare`. True once its main process has exited and none of those it ended still runs as the same process (HI-2316).
  */
 async function endFromOutside(app, spare = []) {
@@ -65,13 +65,13 @@ async function endFromOutside(app, spare = []) {
   return ended > 0 && !!(await lib.until(() => gone, HUNG_MS)) && !!(await lib.until(() => lib.stillSame([{ pid: top.pid, started: top.started }, ...rest]).length === 0, HUNG_MS, 250))
 }
 /**
- * A row of a gone Hive's hive.db, read once a read succeeds (HI-2316). Windows reports the ended Hive's exit a moment
- * before its view of hive.db-shm is unmapped: a first connection then can't truncate that file and is refused ("disk
+ * A row of a gone Combwork's combwork.db, read once a read succeeds (HI-2316). Windows reports the ended Combwork's exit a moment
+ * before its view of combwork.db-shm is unmapped: a first connection then can't truncate that file and is refused ("disk
  * I/O error", SQLITE_IOERR_TRUNCATE, 1546), with the keeper still running and holding nothing. So each refusal is
  * noted, with how long after `since`, and the read is tried again until one succeeds. Returns { row, refused }: row
  * null if none succeeded within the bound.
  */
-async function readGoneHiveDb(file, sql, since) {
+async function readGoneCombworkDb(file, sql, since) {
   const refused = []
   const row = await lib.until(() => {
     let db
@@ -109,7 +109,7 @@ const pids = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim
   let h = null
   const kept = []
   const start = async () => {
-    h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_SYSTEM_BROKER: brokers, HIVE_TEST_SYSTEM_BROKER_ACTIVE: active }, viewport: { width: 1400, height: 950 } })
+    h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT), CW_TEST_SYSTEM_BROKER: brokers, CW_TEST_SYSTEM_BROKER_ACTIVE: active }, viewport: { width: 1400, height: 950 } })
     h.page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.waitForProvider(h.inv)
     await lib.openWorkspace(h.inv, h.page, ws)
@@ -205,7 +205,7 @@ const pids = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim
     const s3 = await until(async () => ((await idle(b1.id)) ? live(b1.id) : null), HUNG_MS)
     check('the node ended: the switch resumes B1 in slot-a, in the same conversation', s3?.slot === 'slot-a' && s3.runId !== s2.runId && s3.sessionId === s1.sessionId, JSON.stringify(s3))
 
-    // --- 4. (HI-2309) A quit with only the idle broker left: the next Hive finds slot-a free, the broker still running.
+    // --- 4. (HI-2309) A quit with only the idle broker left: the next Combwork finds slot-a free, the broker still running.
     fs.writeFileSync(active, 'windowssandboxclient.exe\n')
     const before = pids(brokerFile)
     await lib.sendPrompt(inv, key, 'hidden-linger', { submitted: async () => (await live(b1.id))?.status === 'working' || pids(brokerFile).length > before.length })
@@ -223,7 +223,7 @@ const pids = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim
     await h.app.close()
     h = null
     await start()
-    check(`the next Hive finds slot-a free: no writer, still lent to ${card.key} under the same lease`, !!(await until(async () => {
+    check(`the next Combwork finds slot-a free: no writer, still lent to ${card.key} under the same lease`, !!(await until(async () => {
       const s = await slotA()
       return s && !s.writer && s.lease?.card === card.number && s.lease.id === lease
     }, HUNG_MS)), JSON.stringify(await slotA()))
@@ -234,10 +234,10 @@ const pids = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim
     check('B1 starts in slot-a', s4?.slot === 'slot-a', JSON.stringify(s4))
 
     /**
-     * B1, running in slot-a as `run`, leaves the broker again; Hive is then ended from outside, as a crash would, the
-     * broker and its keeper (the helper the profile bound the run to, outside the job Node ends Hive's children with,
+     * B1, running in slot-a as `run`, leaves the broker again; Combwork is then ended from outside, as a crash would, the
+     * broker and its keeper (the helper the profile bound the run to, outside the job Node ends Combwork's children with,
      * HI-2314) spared. Returns them once the keeper's own receipt is "live" with only the broker, as that helper for the
-     * gone Hive (the CLI and the rest ended with Hive).
+     * gone Combwork (the CLI and the rest ended with Combwork).
      */
     const crashLeavingBroker = async (run, part) => {
       const had = pids(brokerFile)
@@ -246,7 +246,7 @@ const pids = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim
       kept.push(...lib.identify(pid ? [pid] : []))
       asBroker(pid)
       check(`${part}: B1 leaves the broker again, still running in slot-a`, !!pid && !!(await live(b1.id)))
-      // Its launch's processes as Hive's running marker lists them (id and start time, as the keeper names its members).
+      // Its launch's processes as Combwork's running marker lists them (id and start time, as the keeper names its members).
       const marked = () => {
         try {
           return JSON.parse(fs.readFileSync(path.join(userData, 'running.json'), 'utf8')).processes?.find((l) => l.runId === run)?.processes.find((p) => p.pid === pid) ?? null
@@ -261,10 +261,10 @@ const pids = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim
       const keeper = lib.identify(helperPid ? [helperPid] : [])
       check(`${part}: …its run bound to a running helper`, keeper.length === 1, JSON.stringify(helper))
       kept.push(...keeper)
-      check(`${part}: …and Hive is ended from outside, the broker and its keeper left running`, await endFromOutside(h.app, [pid, helperPid]))
+      check(`${part}: …and Combwork is ended from outside, the broker and its keeper left running`, await endFromOutside(h.app, [pid, helperPid]))
       h = null
-      const read = await readGoneHiveDb(path.join(ws, '.combwork', 'hive.db'), "SELECT writer_run AS run, writer_pid AS pid, writer_started AS started FROM slots WHERE name = 'slot-a'", Date.now())
-      if (read.refused.length) console.log(`INFO ${part}: hive.db refused ${read.refused.length} read(s) before one succeeded, the keeper ${lib.stillSame(keeper).length ? 'running' : 'gone'}: ${read.refused.slice(0, 5).join(' | ')}`)
+      const read = await readGoneCombworkDb(path.join(ws, '.combwork', 'combwork.db'), "SELECT writer_run AS run, writer_pid AS pid, writer_started AS started FROM slots WHERE name = 'slot-a'", Date.now())
+      if (read.refused.length) console.log(`INFO ${part}: combwork.db refused ${read.refused.length} read(s) before one succeeded, the keeper ${lib.stillSame(keeper).length ? 'running' : 'gone'}: ${read.refused.slice(0, 5).join(' | ')}`)
       const row = read.row
       check(`${part}: …slot-a still names its run as writer`, row?.run === run, JSON.stringify(row))
       const receiptFile = path.join(userData, 'keeper', `keeper-${run}.json`)
@@ -279,15 +279,15 @@ const pids = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim
         const now = receipt()
         return now?.state === 'live' && now.total === 1 && now.members?.[0]?.pid === pid ? now : null
       }, HUNG_MS)
-      check(`${part}: its keeper outlives it and writes "live", only the broker, as that helper for the gone Hive`, !!r && r.helper === helper && r.hive === `${row?.pid}:${row?.started}` && r.members[0].created === member?.created && lib.identify([helperPid]).length === 1, JSON.stringify(receipt()))
+      check(`${part}: its keeper outlives it and writes "live", only the broker, as that helper for the gone Combwork`, !!r && r.helper === helper && r.app === `${row?.pid}:${row?.started}` && r.members[0].created === member?.created && lib.identify([helperPid]).length === 1, JSON.stringify(receipt()))
       return { pid, keeper }
     }
 
-    // --- 5. (HI-2313) Hive closes unexpectedly while B1 runs, its broker left: the next Hive asks its keeper for the run
+    // --- 5. (HI-2313) Combwork closes unexpectedly while B1 runs, its broker left: the next Combwork asks its keeper for the run
     // now, is told only the broker, and frees slot-a by itself. No notice; the broker and its keeper still run.
     const crash5 = await crashLeavingBroker(s4.runId, '5')
     await start()
-    check('5: the next Hive asks its keeper, told only the idle broker, and frees the writer while keeping the active card lease', !!(await until(async () => {
+    check('5: the next Combwork asks its keeper, told only the idle broker, and frees the writer while keeping the active card lease', !!(await until(async () => {
       const s = await slotA()
       return s && !s.writer && s.lease?.id === lease && s.lease.card === card.number
     }, HUNG_MS)), JSON.stringify(await slotA()))
@@ -295,7 +295,7 @@ const pids = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim
     check('5: …the broker and its keeper still running: nothing ended', lib.identify([crash5.pid]).length === 1 && lib.stillSame(crash5.keeper).length === 1)
 
     // --- 6. (HI-2309) The same, but its keeper ended from outside after its receipt: nothing can answer now, so the next
-    // Hive keeps slot-a held, tells the user once that releasing it is safe, and its Release Slot… says so, "End these
+    // Combwork keeps slot-a held, tells the user once that releasing it is safe, and its Release Slot… says so, "End these
     // processes first" off. Released, the broker still runs.
     await inv('session:start', alpha, { agentId: b1.id })
     const s6 = await until(async () => ((await idle(b1.id)) ? live(b1.id) : null), HUNG_MS)

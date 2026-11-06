@@ -1,7 +1,7 @@
 {
   "tabs.unsaved": {
     "defaultMessage": "Unsaved changes",
-    "description": "Tooltip of the dot on a tab whose page has changes not saved yet (Settings → Version Control's Hive defaults, say), and read out with the tab's name."
+    "description": "Tooltip of the dot on a tab whose page has changes not saved yet (Settings → Version Control's Combwork defaults, say), and read out with the tab's name."
   },
   "tabs.unsavedNamed": {
     "defaultMessage": "{tab} (unsaved changes)",

@@ -1,6 +1,6 @@
-// A card's Read first references (#818): doc sections by file and heading, set through the Agent API, the hive tools and
+// A card's Read first references (#818): doc sections by file and heading, set through the Agent API, the Combwork tools and
 // the card dialog, checked (a Markdown file with an optional #slug, never a line number), recorded in the card's
-// history, shown in the dialog as links that open each section in Hive's viewer (Open in Files at its heading), and given
+// history, shown in the dialog as links that open each section in Combwork's viewer (Open in Files at its heading), and given
 // to the agent in its start prompt with each section's size, not the sections themselves. References that don't resolve
 // (#819) are flagged on the card's tile and in its dialog with the closest headings, whether saved so or broken by a
 // change before the start, and named in the prompt. The agent is the fake Claude Code. Pictured in both themes. Dev
@@ -43,14 +43,14 @@ const NOTES = '# Notes\n\n## Open questions\n\nWhich QUESTION-MARKER first?\n'
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1400, height: 900 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     const token = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
     const api = async (method, p, body) => {
@@ -79,7 +79,7 @@ const NOTES = '# Notes\n\n## Open questions\n\nWhich QUESTION-MARKER first?\n'
     check('…the card keeps what it had', JSON.stringify(r.body.context) === JSON.stringify(refs), JSON.stringify(r.body.context))
     r = await api('PATCH', `/v1/tasks/${n}`, { context: [] })
     check('[] clears them, said in its history', r.status === 200 && r.body.context === undefined && r.body.history.some((h) => /Removed the doc sections to read first/.test(JSON.stringify(h))), JSON.stringify(r.body).slice(0, 400))
-    // Through the hive tools, as an agent sets them.
+    // Through the Combwork tools, as an agent sets them.
     const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
       input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'cw_update_task', arguments: { number: n, context: refs } } }) + '\n',
       env: lib.childEnv({ CW_API_URL: `http://127.0.0.1:${PORT}`, CW_WORKSPACE: ws, CW_API_TOKEN_FILE: lib.tokenFile(token), CW_PROJECT: 'alpha' }),

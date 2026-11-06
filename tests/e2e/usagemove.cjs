@@ -41,7 +41,7 @@ const check = (name, ok, extra = '') => {
   fs.mkdirSync(path.join(alpha, '.combwork'), { recursive: true })
   fs.writeFileSync(path.join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One' }, { id: 'a-two', name: 'Two' }, { id: 'a-three', name: 'Three' }] }))
 
-  const { app, page, inv } = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_CLI_HOME_CONNECTION: '0', HIVE_TEST_NOTIFY_LOG: notifyLog }, viewport: { width: 1400, height: 900 } })
+  const { app, page, inv } = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT), CW_TEST_CLI_HOME_CONNECTION: '0', CW_TEST_NOTIFY_LOG: notifyLog }, viewport: { width: 1400, height: 900 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)
@@ -94,7 +94,7 @@ const check = (name, ok, extra = '') => {
     const rule = settingsDialog.locator('[data-usage-move]')
     await rule.waitFor({ timeout: HUNG_MS })
     check('the rule is off by default', (await rule.getAttribute('data-usage-move')) === 'off')
-    // Controlled by the saved rule: ticked once Hive has it (a click, then the wait below).
+    // Controlled by the saved rule: ticked once Combwork has it (a click, then the wait below).
     await rule.locator('input[type="checkbox"]').click()
     check('ticked, it is on: 98% of the weekly limit, to Max 2', !!(await lib.until(async () => (await rule.getAttribute('data-usage-move')) === 'on', HUNG_MS)) && JSON.stringify((await inv('connections:list')).connections.find((c) => c.id === max1.id)?.usageMove) === JSON.stringify({ percent: 98, limit: 'weekly', to: max2.id }))
     const percent = rule.locator('.usage-move-percent')
@@ -190,7 +190,7 @@ const check = (name, ok, extra = '') => {
     // --- The Assistant's view: GET /v1/connections gives the limits and the rule (cw_connection list's lines).
     const token = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
     const conns = await lib.until(async () => {
-      const r = await fetch(`http://127.0.0.1:${PORT}/v1/connections`, { headers: { Authorization: `Bearer ${token}`, 'X-Hive-Workspace': encodeURIComponent(ws) } }).then((x) => x.json()).catch(() => null)
+      const r = await fetch(`http://127.0.0.1:${PORT}/v1/connections`, { headers: { Authorization: `Bearer ${token}`, 'X-Combwork-Workspace': encodeURIComponent(ws) } }).then((x) => x.json()).catch(() => null)
       return r?.usage?.length ? r : null
     }, HUNG_MS)
     const mine = conns?.usage?.find((u) => u.account === 'Max 1')

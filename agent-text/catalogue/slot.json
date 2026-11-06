@@ -17,15 +17,15 @@
   },
   "slot.check.noBase": {
     "text": "no merge base with {target}",
-    "note": "Why Hive can't tell whether a slot's work is merged: it shares no history with its target branch."
+    "note": "Why Combwork can't tell whether a slot's work is merged: it shares no history with its target branch."
   },
   "slot.check.noBranch": {
     "text": "no {target}",
-    "note": "Why Hive can't tell whether a slot's work is merged: its target branch doesn't exist. {target} is its name."
+    "note": "Why Combwork can't tell whether a slot's work is merged: its target branch doesn't exist. {target} is its name."
   },
   "slot.check.noTarget": {
     "text": "no target branch",
-    "note": "Why Hive can't tell whether a slot's work is merged: the project has no default branch."
+    "note": "Why Combwork can't tell whether a slot's work is merged: the project has no default branch."
   },
   "slot.error.closed": {
     "text": "the workspace closed",
@@ -41,11 +41,11 @@
   },
   "slot.error.interrupted": {
     "text": "its setup was interrupted",
-    "note": "A slot's setup error, kept on the slot, when the setup was taken over from a Hive that is gone (#1429). Read by agents and in the log."
+    "note": "A slot's setup error, kept on the slot, when the setup was taken over from a Combwork that is gone (#1429). Read by agents and in the log."
   },
   "slot.error.notListed": {
     "text": "its folder is there but git does not list it as a worktree",
-    "note": "A slot's setup error: its folder exists but isn't a worktree git knows, so Hive leaves it alone."
+    "note": "A slot's setup error: its folder exists but isn't a worktree git knows, so Combwork leaves it alone."
   },
   "slot.error.opLost": {
     "text": "the operation no longer holds {slot}",
@@ -173,7 +173,7 @@
   },
   "slot.refusal.busy": {
     "text": "{held, select, session {{slot} still has a session in it} process {{slot} still has a process running in it (a file or a folder in it open)} broker {{slot} still has a process running in it (a file or a folder in it open): Windows Sandbox's broker ({name}) is working in it{idle, select, yes {, with no Sandbox running} no {, with a Sandbox running} other {}}} other {{slot} has a session or a process in it}}",
-    "note": "A start's wait: something still runs in a free slot, so it isn't lent (HI-2466: held, what: a session, a process, or not known). broker (HI-2467): Windows Sandbox's broker ({name}: its process name, such as WindowsSandboxServer) has the slot as its current folder; idle: yes, no Sandbox runs; no, one does; other, not known. Hive tries again until it is free."
+    "note": "A start's wait: something still runs in a free slot, so it isn't lent (HI-2466: held, what: a session, a process, or not known). broker (HI-2467): Windows Sandbox's broker ({name}: its process name, such as WindowsSandboxServer) has the slot as its current folder; idle: yes, no Sandbox runs; no, one does; other, not known. Combwork tries again until it is free."
   },
   "slot.refusal.inUse": {
     "text": "{slot} is in use by {agent} for {what}",
@@ -241,7 +241,7 @@
   },
   "slot.run.noSupervisor": {
     "text": "Combwork's process supervisor isn't running, so it can't run a slot's commands",
-    "note": "A slot's or copy's setup error: Hive runs their commands in a job of its own, and can't now."
+    "note": "A slot's or copy's setup error: Combwork runs their commands in a job of its own, and can't now."
   },
   "slot.start.leaseEnded": {
     "text": "its slot's lease {lease} ended while the start took it: the start tries again",
@@ -279,9 +279,9 @@
     "text": "isn't ready ({state})",
     "note": "As slot.takeover.gone: the slot isn't lent. {state} is its state's id (ready, dirty…)."
   },
-  "slot.takeover.otherHive": {
+  "slot.takeover.otherCombwork": {
     "text": "is held by another Combwork's run",
-    "note": "As slot.takeover.gone: a run of another Hive (another profile) holds it."
+    "note": "As slot.takeover.gone: a run of another Combwork (another profile) holds it."
   },
   "slot.takeover.otherRun": {
     "text": "has another run in it now",

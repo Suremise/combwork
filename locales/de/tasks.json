@@ -181,5 +181,10 @@
   "tasks.start.notGiven": "Agent {agent} hat {card} nicht bekommen: {why}.",
   "tasks.start.noteTooLong": "Die Notiz ist zu lang (höchstens {max, number} Zeichen).",
   "tasks.start.reassigned": "{card} wurde inzwischen {who, select, another {einem anderen Agenten} other {niemandem}} zugewiesen. Starte die Karte erneut, wenn sie noch zu erledigen ist.",
-  "tasks.start.userTyping": "Der Benutzer hat gerade im Terminal von Agent {agent} getippt und schreibt dort vielleicht noch. Frag zuerst den Benutzer."
+  "tasks.start.userTyping": "Der Benutzer hat gerade im Terminal von Agent {agent} getippt und schreibt dort vielleicht noch. Frag zuerst den Benutzer.",
+  "tasks.error.waitingNotActive": "{card} ist nicht in {active}: Nur eine Karte in {active} kann als wartend markiert werden.",
+  "tasks.error.waitingNotYours": "Nur der eigene Agent von {card}, der Benutzer oder der Assistent kann sie als wartend markieren oder das aufheben.",
+  "tasks.error.waitingTooLong": "Der Grund für das Warten ist zu lang (höchstens {max, number} Zeichen).",
+  "tasks.history.notWaiting": "Wartet nicht mehr",
+  "tasks.history.waiting": "Wartet: {reason}"
 }

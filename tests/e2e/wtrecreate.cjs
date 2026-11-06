@@ -30,15 +30,15 @@ const check = (name, ok, extra = '') => {
   for (const d of [userData, ws, `${ws}.worktrees`]) fs.rmSync(d, { recursive: true, force: true })
   lib.gitProject(proj)
   const claude = lib.fakeClaude(userData, path.join(lib.WORK, 'wtrecreate-claude-home'), [path.join(wtRoot, 'keeper'), path.join(wtRoot, 'gone')])
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47938), ...claude })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47938), ...claude })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1600, height: 950 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
-  await inv('project:updateConfig', proj, { worktreeSetup: 'echo HIVE-SETUP-RAN' })
+  await inv('project:updateConfig', proj, { worktreeSetup: 'echo CW-SETUP-RAN' })
   const add = (name) => inv('agents:testLegacy', proj, { location: 'new-worktree', name })
   const keeper = await add('Keeper')
   const gone = await add('Gone')
@@ -69,9 +69,9 @@ const check = (name, ok, extra = '') => {
   check('…the agent starts', !!(await lib.until(async () => !!(await live(keeper.id)), 20000)))
   const buf = (await lib.until(async () => {
     const b = await inv('pty:buffer', lib.ptyKey(proj, keeper.id))
-    return b.includes('HIVE-SETUP-RAN') ? b : null
+    return b.includes('CW-SETUP-RAN') ? b : null
   }, 20000)) ?? ''
-  check('…after the setup command ran, as for a new worktree', buf.includes('HIVE-SETUP-RAN'))
+  check('…after the setup command ran, as for a new worktree', buf.includes('CW-SETUP-RAN'))
   await lib.acceptClaudeTrust(inv, proj, keeper.id, 20000)
   check('…in the worktree made again at its place, on its branch, with its commit', fs.existsSync(path.join(keeper.worktree.path, 'work.txt')) && git(keeper.worktree.path, ['rev-parse', '--abbrev-ref', 'HEAD']).trim() === keeper.worktree.branch && git(keeper.worktree.path, ['log', '--oneline']).includes('keeper work'))
   check('…its session runs there', same((await live(keeper.id))?.cwd, keeper.worktree.path), (await live(keeper.id))?.cwd)
@@ -106,7 +106,7 @@ const check = (name, ok, extra = '') => {
   if (noDrive) {
     fs.rmSync(mover.worktree.path, { recursive: true, force: true })
     git(proj, ['worktree', 'prune'])
-    const away = path.join(noDrive, 'hive-test-missing', 'mover')
+    const away = path.join(noDrive, 'combwork-test-missing', 'mover')
     const cfgFile = path.join(proj, '.combwork', 'project.json')
     const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
     cfg.agents.find((a) => a.id === mover.id).worktree.path = away

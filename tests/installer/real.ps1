@@ -1,4 +1,4 @@
-# The installer handoff with Hive's real installers (#1647), in Windows Sandbox only (never on the host): a local build's
+# The installer handoff with Combwork's real installers (#1647), in Windows Sandbox only (never on the host): a local build's
 # installer (npm run dist, local-setup.exe) and a release-style one of the same code (local: false, release-setup.exe) in
 # the mapped build folder. Which ends up installed is read from the installed copy's resources\build-identity.json.
 # Results in C:\out\real-results.txt, a line each (PASS/FAIL); exit 1 on any FAIL. -Timeout adds the 10-minute wait's
@@ -10,6 +10,11 @@ $mutex = '10a7595a-0e90-558c-b6b6-ae33bdd80748'
 $installed = Join-Path $env:LOCALAPPDATA 'Programs\Combwork'
 $exeName = 'Combwork.exe'
 $out = 'C:\out\real-results.txt'
+# old-name: begin real-inputs
+# A 1.0 release's pending download, in 1.0's electron-updater cache (the installer drops it too).
+$oldPending = Join-Path $env:LOCALAPPDATA 'hive-updater\pending'
+$oldSetup = 'Hive-Setup-1.0.0-rc.2.exe'
+# old-name: end real-inputs
 $fails = 0
 function Say($ok, $what, $detail) {
   $line = "$(if ($ok) { 'PASS' } else { 'FAIL' }) $what $detail"
@@ -37,8 +42,8 @@ Set-Content $out "real installer handoff $(Get-Date -Format o)"
 # 1. The pending update first: the release's installer as electron-updater runs it on quit (--updated /S), then the local
 # one started while it runs. The local one waits, then installs last.
 Baseline
-New-Item -ItemType Directory -Force (Join-Path $env:LOCALAPPDATA 'hive-updater\pending') | Out-Null
-Set-Content (Join-Path $env:LOCALAPPDATA 'hive-updater\pending\Hive-Setup-1.0.0-rc.2.exe') 'stand-in for a downloaded update'
+New-Item -ItemType Directory -Force $oldPending | Out-Null
+Set-Content (Join-Path $oldPending $oldSetup) 'stand-in for a downloaded update'
 $rel = Run 'release-setup.exe' @('--updated', '/S')
 Wait-Held
 $t0 = Get-Date
@@ -47,9 +52,9 @@ $rc = Wait-Exit $rel; $relEnd = Get-Date
 $lc = Wait-Exit $loc; $locEnd = Get-Date
 $id = Identity
 Say ($rc -eq 0 -and $lc -eq 0 -and $id.local -eq $true -and $locEnd -gt $relEnd) 'pending update first: the local installer waits and its build is the one installed' "exits release $rc, local $lc; installed local=$($id.local); release done $([int]($relEnd - $t0).TotalSeconds) s, local $([int]($locEnd - $t0).TotalSeconds) s after the local one started"
-Say (-not (Test-Path (Join-Path $env:LOCALAPPDATA 'hive-updater\pending'))) "…and the local install dropped the updater's pending download" ''
+Say (-not (Test-Path $oldPending)) "…and the local install dropped the updater's pending download" ''
 
-# 2. The local installer first, then the pending update's (Hive quit while it ran): the release's quits, the local stays.
+# 2. The local installer first, then the pending update's (Combwork quit while it ran): the release's quits, the local stays.
 Baseline
 $loc = Run 'local-setup.exe' @('/S')
 Wait-Held

@@ -45,10 +45,10 @@ afterEach(() => {
 })
 
 const setting = 'cw.mcp.replySeconds'
-const legacy = 'hive.assistant.otherMcpServers'
+const legacy = 'cw.assistant.otherMcpServers'
 const text = (values: Record<string, unknown>): string => JSON.stringify({ format: 1, values })
 function opened(values: Record<string, unknown>) {
-  const folder = tempDir('hive-advanced-reload-')
+  const folder = tempDir('cw-advanced-reload-')
   const file = join(folder, 'advanced.json')
   writeFileSync(file, text(values))
   const store = new AdvancedStore()

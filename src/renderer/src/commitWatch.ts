@@ -5,17 +5,17 @@
 import { burstCounter, chainCounter, COMMIT_BURST_MARKER, COMMIT_CHAIN_MARKER, FROM_MAIN_EVENT } from '../../shared/commitWatch'
 
 interface Watched {
-  hive?: { commitWatch?: boolean }
+  combwork?: { commitWatch?: boolean }
   __REACT_DEVTOOLS_GLOBAL_HOOK__?: unknown
   /** The largest burst and the longest chain so far, for suites (commitburst) and lib.cjs. */
-  __hiveCommitBurst?: () => { max: number; chain: number }
+  __cwCommitBurst?: () => { max: number; chain: number }
 }
 
 /** The DOM events that start work from outside: the user's input, focus, scrolling, sizes, loads, animations ending. */
 const OUTSIDE_EVENTS = ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'pointerover', 'pointerout', 'mousedown', 'mousemove', 'mouseup', 'mouseover', 'mouseout', 'click', 'auxclick', 'dblclick', 'contextmenu', 'wheel', 'touchstart', 'touchmove', 'touchend', 'keydown', 'keyup', 'keypress', 'beforeinput', 'input', 'change', 'compositionstart', 'compositionupdate', 'compositionend', 'focusin', 'focusout', 'focus', 'blur', 'paste', 'copy', 'cut', 'dragstart', 'drag', 'dragenter', 'dragover', 'dragleave', 'drop', 'dragend', 'scroll', 'resize', 'load', 'error', 'transitionend', 'animationend', 'visibilitychange', 'selectionchange', 'submit', 'toggle', 'message']
 
 const w = window as unknown as Watched
-if (w.hive?.commitWatch && w.__REACT_DEVTOOLS_GLOBAL_HOOK__ === undefined) {
+if (w.combwork?.commitWatch && w.__REACT_DEVTOOLS_GLOBAL_HOOK__ === undefined) {
   const bursts = burstCounter()
   const chains = chainCounter()
   // Each new largest, small ones too (a window's normal work is what step 2's threshold is set from).
@@ -53,7 +53,7 @@ if (w.hive?.commitWatch && w.__REACT_DEVTOOLS_GLOBAL_HOOK__ === undefined) {
     onScheduleFiberRoot: noop,
     checkDCE: noop
   }
-  w.__hiveCommitBurst = () => ({ max: bursts.max, chain: chains.max })
+  w.__cwCommitBurst = () => ({ max: bursts.max, chain: chains.max })
 }
 
 /** Timers' and frames' callbacks start work from outside too: each marks it first (a string to evaluate stays as it is). */

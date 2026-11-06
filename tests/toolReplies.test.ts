@@ -1,4 +1,4 @@
-// The hive tools' short replies (shared/toolReplies.ts): a change confirms what changed and where the card is now,
+// The Combwork tools' short replies (shared/toolReplies.ts): a change confirms what changed and where the card is now,
 // a listing is one line per item, and nothing echoes a card's description, comments or history.
 import { describe, expect, it } from 'vitest'
 import { addRetryWaited, retryWaitEnd } from '../src/shared/runtime'
@@ -110,11 +110,11 @@ describe('task rows', () => {
 
 describe('task changes', () => {
   it('a new card: its number and place', () => {
-    expect(createdText({ number: 61, title: 'Lean replies', column: 'todo', position: 51, of: 51, project: 'hive', agent: 'Coder', changes: [] })).toBe('#61 created in Todo (51st of 51) for hive, given to Coder: Lean replies')
+    expect(createdText({ number: 61, title: 'Lean replies', column: 'todo', position: 51, of: 51, project: 'alpha', agent: 'Coder', changes: [] })).toBe('#61 created in Todo (51st of 51) for alpha, given to Coder: Lean replies')
   })
 
   it('a change: what changed and where the card is now', () => {
-    expect(changedText({ number: 60, title: 'Reorder', column: 'review', position: 1, of: 4, project: 'hive', agent: null, changes: ['Moved to Review', 'Commented'] })).toBe('#60 Reorder: Moved to Review; Commented. Now in Review (1st of 4), hive.')
+    expect(changedText({ number: 60, title: 'Reorder', column: 'review', position: 1, of: 4, project: 'alpha', agent: null, changes: ['Moved to Review', 'Commented'] })).toBe('#60 Reorder: Moved to Review; Commented. Now in Review (1st of 4), alpha.')
     expect(changedText({ number: 8, title: 'T', column: 'todo', position: 12, of: 12, project: '', agent: null, changes: [] })).toBe('#8 T: No change. Now in Todo (12th of 12).')
   })
 
@@ -149,7 +149,7 @@ describe("an agent's model, effort and retry waits (HI-1996)", () => {
     expect(retryWaitsView({})).toBeUndefined()
   })
 
-  it('a wait ends at its retry time when Hive notices later, never before it began; the waits add up', () => {
+  it('a wait ends at its retry time when Combwork notices later, never before it began; the waits add up', () => {
     expect(retryWaitEnd(wait, at('2026-10-29T10:06:45.000Z'))).toBe(at(wait.retryAt))
     expect(retryWaitEnd(wait, at('2026-10-29T10:02:00.000Z'))).toBe(at('2026-10-29T10:02:00.000Z'))
     expect(retryWaitEnd({ ...wait, retryAt: null }, at('2026-10-29T09:59:00.000Z'))).toBe(at(wait.since))
@@ -168,7 +168,7 @@ describe("an agent's model, effort and retry waits (HI-1996)", () => {
 })
 
 describe("a card's open requests (HI-1992)", () => {
-  const asked = { card: 7, project: 'p', request: 'HI-7/r15', kind: 'decide', gate: 'ask', text: `Which icon: the bee or the hive cell?\n\n${LONG}`, asker: 'Coder', since: '2026-10-29T01:00:00.000Z', for: 'user' as const }
+  const asked = { card: 7, project: 'p', request: 'HI-7/r15', kind: 'decide', gate: 'ask', text: `Which icon: the bee or the honeycomb cell?\n\n${LONG}`, asker: 'Coder', since: '2026-10-29T01:00:00.000Z', for: 'user' as const }
   const gate = { ...asked, request: 'HI-7/r16', kind: 'approve', gate: 'okBefore', text: 'Approve the merge.', asker: null, since: '2026-10-29T02:00:00.000Z' }
 
   it('none: absent, so a card with none reads as before', () => {
@@ -176,7 +176,7 @@ describe("a card's open requests (HI-1992)", () => {
     expect(cardRequests([], true)).toBeUndefined()
   })
 
-  it('each with its id, who asked, its words and when; Hive asked: no asker', () => {
+  it('each with its id, who asked, its words and when; Combwork asked: no asker', () => {
     expect(cardRequests([asked, gate])).toEqual([
       { request: 'HI-7/r15', kind: 'decide', gate: 'ask', text: asked.text, asker: 'Coder', since: asked.since },
       { request: 'HI-7/r16', kind: 'approve', gate: 'okBefore', text: 'Approve the merge.', since: gate.since }
@@ -185,7 +185,7 @@ describe("a card's open requests (HI-1992)", () => {
 
   it("summary: its words cut as a comment's summary, with the whole length when cut", () => {
     const [q, g] = cardRequests([asked, gate], true)!
-    expect(q).toMatchObject({ text: 'Which icon: the bee or the hive cell?', length: asked.text.length, asker: 'Coder', since: asked.since })
+    expect(q).toMatchObject({ text: 'Which icon: the bee or the honeycomb cell?', length: asked.text.length, asker: 'Coder', since: asked.since })
     expect(g.text).toBe('Approve the merge.')
     expect('length' in g).toBe(false)
   })
@@ -194,10 +194,10 @@ describe("a card's open requests (HI-1992)", () => {
 describe('projects and notes', () => {
   it('projects: one line each, with their agents', () => {
     const text = projectListText([
-      { name: 'alpha', workspace: 'ws', active: true, branch: 'main', agents: [{ name: 'Coder', provider: 'claude-code', status: 'working', branch: null, backgroundTasks: 0 }, { name: 'Two', provider: 'codex', status: 'finished', branch: 'hive/two', backgroundTasks: 1 }] },
+      { name: 'alpha', workspace: 'ws', active: true, branch: 'main', agents: [{ name: 'Coder', provider: 'claude-code', status: 'working', branch: null, backgroundTasks: 0 }, { name: 'Two', provider: 'codex', status: 'finished', branch: 'cw/two', backgroundTasks: 1 }] },
       { name: 'beta', workspace: 'ws', active: false, branch: null, agents: [] }
     ])
-    expect(text.split('\n').slice(0, 2)).toEqual(['alpha (on, main): Coder [claude-code] working; Two [codex, hive/two] idle (1 background)', 'beta (off): no agents'])
+    expect(text.split('\n').slice(0, 2)).toEqual(['alpha (on, main): Coder [claude-code] working; Two [codex, cw/two] idle (1 background)', 'beta (off): no agents'])
   })
 
   it('a watching agent says what it waits for', () => {
@@ -219,7 +219,7 @@ describe('projects and notes', () => {
     expect(projectListText([{ name: 'a', workspace: 'one', active: true, branch: null, agents: [] }, { name: 'b', workspace: 'two', active: true, branch: null, agents: [] }])).toMatch(/^one\/a \(on\): no agents\ntwo\/b/)
   })
 
-  it("a project's status leaves out what its settings only repeat or keep for Hive (HI-1712)", () => {
+  it("a project's status leaves out what its settings only repeat or keep for Combwork (HI-1712)", () => {
     const status = { name: 'alpha', path: 'C:\\ws\\alpha', settings: { version: 2, chime: 'inherit', id: 'p-1', lastPath: 'C:\\ws\\alpha', stepsDone: ['a step'] } }
     expect(projectStatusReply(status)).toEqual({ name: 'alpha', path: 'C:\\ws\\alpha', settings: { chime: 'inherit', id: 'p-1' } })
     expect(projectStatusReply({ name: 'alpha' })).toEqual({ name: 'alpha' })

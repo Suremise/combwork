@@ -27,7 +27,7 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 
-/** A CLI found at a long path, not signed in, newer than the version Hive was tested with. */
+/** A CLI found at a long path, not signed in, newer than the version Combwork was tested with. */
 function stubInfo(p) {
   return {
     provider: p.id,
@@ -54,8 +54,8 @@ function stubInfo(p) {
   const { app, page, inv } = await lib.launch({ userData, viewport: SMALLEST })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   try {
-    // Hive has finished looking for the CLIs (launch waits for it): nothing it finds replaces the stand-ins below.
-    const sendEvent = (e) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), e)
+    // Combwork has finished looking for the CLIs (launch waits for it): nothing it finds replaces the stand-ins below.
+    const sendEvent = (e) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), e)
     for (const p of PROVIDERS) await sendEvent({ type: 'provider-install', provider: p.id, info: stubInfo(p) })
 
     await page.keyboard.press('Control+Shift+P')

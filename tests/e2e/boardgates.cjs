@@ -64,14 +64,14 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_TEST_TIPS: 'off', CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_TEST_TIPS: 'off', CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1500, height: 900 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
     const facts = async (n) => (await inv('tasks:facts', n)).map((f) => f.kind)
@@ -146,7 +146,7 @@ const check = (name, ok, extra = '') => {
     const b = await create('Tidy the menu', 'alpha')
     await inv('tasks:move', b, 'doing', { agent: 'b1' })
     // Its start's slot work recorded first (#1548: SlotPrepared, PlacementClaimed, then BuilderPlaced, its last, come
-    // after the move's reply; slotCards.ts), so what follows compares only what the drag records: the facts Hive
+    // after the move's reply; slotCards.ts), so what follows compares only what the drag records: the facts Combwork
     // records, not what a reconcile observes of the folder and its target meanwhile (TargetMoved, #1543).
     const recorded = async (n) => (await inv('tasks:facts', n)).filter((f) => f.source === 'recorded').map((f) => f.kind)
     await lib.until(async () => (await facts(b)).includes('BuilderPlaced'), HUNG_MS)
@@ -237,7 +237,7 @@ const check = (name, ok, extra = '') => {
     const base = (await inv('app:info')).language
     const dir = path.join(lib.ROOT, 'locales', 'pl')
     const messages = Object.assign({}, ...fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))))
-    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language })
+    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
     await speak({ ...base, code: 'pl', locale: 'pl', messages })
     const plDialog = page.locator('.dialog', { hasText: 'mimo to?' })
     const plDone = page.locator('.board-column', { has: page.locator('.board-column-label', { hasText: 'Gotowe' }) })

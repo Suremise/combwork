@@ -1,4 +1,4 @@
-// Hive's background git calls never write the index (#212): `git status` (the Changes tab, branch status) and `git diff`
+// Combwork's background git calls never write the index (#212): `git status` (the Changes tab, branch status) and `git diff`
 // against the working tree refresh it as a side effect, taking index.lock, so a user's or agent's own `git add` or
 // `commit` at that moment failed with "index.lock: File exists". Real git, in throwaway repositories.
 import { execFileSync } from 'child_process'
@@ -8,7 +8,7 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { GIT_PREFIX, git, gitStatus } from '../src/main/git'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-gitlocks-')
+const base = tempDir('cw-gitlocks-')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 let n = 0
 
@@ -48,7 +48,7 @@ function staleIndex(dir: string, index: string, files: string[]): number {
   return statSync(index).mtimeMs
 }
 
-describe("Hive's git calls and the index (#212)", () => {
+describe("Combwork's git calls and the index (#212)", () => {
   it('every git call turns optional locks and diff index refreshes off', () => {
     expect(GIT_PREFIX).toEqual(expect.arrayContaining(['--no-optional-locks', 'diff.autoRefreshIndex=false']))
     expect(GIT_PREFIX[0]).toBe('--no-optional-locks')
@@ -92,7 +92,7 @@ describe("Hive's git calls and the index (#212)", () => {
     expect(run('diff', '--summary', 'main')).toContain('mode change 100644 => 100755 g.txt')
   })
 
-  it("the user's git add and commit never meet index.lock while Hive refreshes", async () => {
+  it("the user's git add and commit never meet index.lock while Combwork refreshes", async () => {
     const { dir, run } = repo()
     run('checkout', '-qb', 'agent')
     const running = { on: true }

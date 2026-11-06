@@ -21,27 +21,27 @@
   },
   "hooks.col.ledger": {
     "defaultMessage": "Taken as",
-    "description": "A column of the Hooks dialog: what Hive made of the hook for the agent's status (applied, or ignored and why)."
+    "description": "A column of the Hooks dialog: what Combwork made of the hook for the agent's status (applied, or ignored and why)."
   },
   "hooks.col.ms": {
     "defaultMessage": "Combwork took",
-    "description": "A column of the Hooks dialog: how long Hive took to handle the hook (not how long a hook command ran)."
+    "description": "A column of the Hooks dialog: how long Combwork took to handle the hook (not how long a hook command ran)."
   },
   "hooks.col.reply": {
     "defaultMessage": "Combwork's reply",
-    "description": "A column of the Hooks dialog: what Hive answered the hook."
+    "description": "A column of the Hooks dialog: what Combwork answered the hook."
   },
   "hooks.col.source": {
     "defaultMessage": "From",
-    "description": "A column of the Hooks dialog: where a hook comes from (Hive, the user, the project…)."
+    "description": "A column of the Hooks dialog: where a hook comes from (Combwork, the user, the project…)."
   },
   "hooks.col.status": {
     "defaultMessage": "Loaded",
-    "description": "A column of the Hooks dialog: whether the hook is loaded, and how sure Hive is."
+    "description": "A column of the Hooks dialog: whether the hook is loaded, and how sure Combwork is."
   },
   "hooks.col.time": {
     "defaultMessage": "When",
-    "description": "A column of the Hooks dialog: when Hive received a hook."
+    "description": "A column of the Hooks dialog: when Combwork received a hook."
   },
   "hooks.count": {
     "defaultMessage": "{n, number} ×",
@@ -49,7 +49,7 @@
   },
   "hooks.firedHeading": {
     "defaultMessage": "What fired",
-    "description": "A heading in the Hooks dialog, over the hooks Hive received from the agent's session."
+    "description": "A heading in the Hooks dialog, over the hooks Combwork received from the agent's session."
   },
   "hooks.firedWhat": {
     "defaultMessage": "Combwork's own hooks it received, newest first (the last 50): Combwork's reply, and what Combwork made of it. Other hooks aren't seen by Combwork.",
@@ -57,7 +57,7 @@
   },
   "hooks.ledger": {
     "defaultMessage": "{ledger, select, applied {Applied} continued {Carried on by Combwork} ignored {Ignored} other {Not reached}}",
-    "description": "What Hive made of a hook for the agent's status, in the Hooks dialog's Taken as column. Ignored is followed by why (an earlier turn's, a duplicate…)."
+    "description": "What Combwork made of a hook for the agent's status, in the Hooks dialog's Taken as column. Ignored is followed by why (an earlier turn's, a duplicate…)."
   },
   "hooks.loadWhat": {
     "defaultMessage": "the agent's hooks",
@@ -73,7 +73,7 @@
   },
   "hooks.ms": {
     "defaultMessage": "{ms, number} ms",
-    "description": "How long Hive took to handle a hook, in milliseconds, in the Hooks dialog."
+    "description": "How long Combwork took to handle a hook, in milliseconds, in the Hooks dialog."
   },
   "hooks.noneFired": {
     "defaultMessage": "None received yet.",
@@ -81,7 +81,7 @@
   },
   "hooks.notObserved": {
     "defaultMessage": "Not observed by Combwork",
-    "description": "In the Hooks dialog, under a hook that isn't Hive's: Hive never sees when it runs."
+    "description": "In the Hooks dialog, under a hook that isn't Combwork's: Combwork never sees when it runs."
   },
   "hooks.notRunning": {
     "defaultMessage": "The agent isn't running: its hooks are listed while it runs.",
@@ -105,19 +105,19 @@
   },
   "hooks.note.othersUnread": {
     "defaultMessage": "The coding agent may also load hooks Combwork doesn't read (its own plugins, the folder's). Only Combwork's are listed.",
-    "description": "A note in the Hooks dialog for a CLI whose other hooks Hive doesn't read."
+    "description": "A note in the Hooks dialog for a CLI whose other hooks Combwork doesn't read."
   },
   "hooks.note.unreadable": {
     "defaultMessage": "{file} couldn't be read ({why}): its hooks aren't listed.",
-    "description": "A note in the Hooks dialog: a settings file Hive couldn't read. {why} says why."
+    "description": "A note in the Hooks dialog: a settings file Combwork couldn't read. {why} says why."
   },
   "hooks.note.unsure": {
     "defaultMessage": "{what}: {why}",
-    "description": "A note in the Hooks dialog: an argument that leaves Hive unsure what the CLI reads ({what}, such as --bare) and why."
+    "description": "A note in the Hooks dialog: an argument that leaves Combwork unsure what the CLI reads ({what}, such as --bare) and why."
   },
   "hooks.receiver": {
     "defaultMessage": "through Combwork's {form} hook",
-    "description": "In the Hooks dialog, under a hook event: which of Hive's hooks it came through. {form} is its form (http, command): keep it."
+    "description": "In the Hooks dialog, under a hook event: which of Combwork's hooks it came through. {form} is its form (http, command): keep it."
   },
   "hooks.refresh": {
     "defaultMessage": "Refresh",
@@ -125,10 +125,10 @@
   },
   "hooks.response": {
     "defaultMessage": "{response, select, none {Nothing to say} context {Sent context} allowed {Allowed} warned {Allowed, with a warning} asked {Asked you} blocked {Blocked} error {Error} other {Unknown}}",
-    "description": "Hive's reply to a hook, in the Hooks dialog's Hive's reply column. Allowed is only what Hive answered, not any other hook's answer."
+    "description": "Combwork's reply to a hook, in the Hooks dialog's Combwork's reply column. Allowed is only what Combwork answered, not any other hook's answer."
   },
   "hooks.source": {
-    "defaultMessage": "{source, select, hive {Combwork} managed {Managed settings} cli {Command line} project {Project} local {Project (local)} user {User} plugin {Plugin} other {Other}}",
+    "defaultMessage": "{source, select, combwork {Combwork} managed {Managed settings} cli {Command line} project {Project} local {Project (local)} user {User} plugin {Plugin} other {Other}}",
     "description": "Where a hook comes from, in the Hooks dialog's From column."
   },
   "hooks.stale": {
@@ -137,7 +137,7 @@
   },
   "hooks.status": {
     "defaultMessage": "{status, select, passed {Passed by Combwork} trusted {Trusted} untrusted {Not trusted: won't run} modified {Changed since trusted: won't run} unverified {Configured · loading unverified} disabled {Turned off} notLoaded {Not loaded} unsupported {Unknown form} other {Unknown}}",
-    "description": "How sure Hive is that a hook is loaded, in the Hooks dialog's Loaded column. Trusted, Not trusted and Changed since trusted are the coding agent's own trust in a hook."
+    "description": "How sure Combwork is that a hook is loaded, in the Hooks dialog's Loaded column. Trusted, Not trusted and Changed since trusted are the coding agent's own trust in a hook."
   },
   "hooks.timeSpan": {
     "defaultMessage": "{from}–{to}",

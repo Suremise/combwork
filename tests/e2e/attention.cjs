@@ -1,4 +1,4 @@
-// Who a Codex agent asks: Hive says an agent needs you only while a person is asked. Codex's auto-reviewer answering
+// Who a Codex agent asks: Combwork says an agent needs you only while a person is asked. Codex's auto-reviewer answering
 // a permission request (Approve for me) isn't you being asked; an approval prompt is (waiting, told once, over once
 // answered); an async question is asked while Codex works on (a pending question, told once, gone once answered).
 // The fake Codex (fake-codex/) sends Codex 0.160.0's hooks and terminal titles. Dev build, throwaway profile,
@@ -35,13 +35,13 @@ const check = (name, ok, extra = '') => {
   cfg.settings.notifications = { ...cfg.settings.notifications, desktopNotifications: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47897), CODEX_HOME: codexHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47897), CODEX_HOME: codexHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   const until = async (fn, ms = 10000) => {
     const t = Date.now()
     let v
@@ -60,7 +60,7 @@ const check = (name, ok, extra = '') => {
   check('the agents start', !!(await until(async () => (await live(reviewed.id))?.status === 'ready' && (await live(asking.id))?.status === 'ready', 20000)), `${(await live(reviewed.id))?.status} ${(await live(asking.id))?.status}`)
   check('in their modes', (await live(reviewed.id))?.permissionMode === 'approve-for-me' && (await live(asking.id))?.permissionMode === 'ask', `${(await live(reviewed.id))?.permissionMode} ${(await live(asking.id))?.permissionMode}`)
 
-  // Every state an agent goes through (status | message | question | review), and the times Hive says it needs you (the log).
+  // Every state an agent goes through (status | message | question | review), and the times Combwork says it needs you (the log).
   const seen = new Map()
   const watch = setInterval(async () => {
     try {
@@ -74,7 +74,7 @@ const check = (name, ok, extra = '') => {
       // The window is closing.
     }
   }, 60)
-  const logText = () => fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8')
+  const logText = () => fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8')
   const told = (name) => logText().split('\n').filter((l) => l.includes(`· ${name}`) && /waits for you|asks a question/.test(l)).length
   const turn = async (a, text) => {
     seen.set(a.id, [])
@@ -116,7 +116,7 @@ const check = (name, ok, extra = '') => {
     const shown = await until(async () => mark.isVisible().catch(() => false), HUNG_MS)
     const text = await header.innerText().catch(() => '')
     check(`${width}px ${theme}: the long request is under review`, !!shown && (await status()) === 'Working…', await status())
-    check(`${width}px ${theme}: none of it in the header`, !/\$env|npm\.cmd|hive-test|Codex asks/.test(text), text.replace(/\s+/g, ' '))
+    check(`${width}px ${theme}: none of it in the header`, !/\$env|npm\.cmd|combwork-test|Codex asks/.test(text), text.replace(/\s+/g, ' '))
     check(`${width}px ${theme}: the header fits, its buttons inside it`, await header.evaluate((h) => h.scrollWidth <= h.clientWidth + 1 && [...h.querySelectorAll('button')].every((b) => b.getBoundingClientRect().right <= h.getBoundingClientRect().right + 1)))
     const tip = page.locator('.tip', { hasText: 'npm.cmd run e2e' })
     const hovered = await until(async () => {
@@ -199,7 +199,7 @@ const check = (name, ok, extra = '') => {
   {
     const before = told('Asking')
     // The question first, told on its own, then the prompt: a new need, told too. The fake holds before the prompt until
-    // Hive shows the question (#329): sent at once, the prompt's hooks could reach Hive before Codex's title (its sign
+    // Combwork shows the question (#329): sent at once, the prompt's hooks could reach Combwork before Codex's title (its sign
     // that a person must act) said the question was asked, and both then came on with the title, rightly told together
     // in one notice.
     await turn(asking, 'question then hold then approve')

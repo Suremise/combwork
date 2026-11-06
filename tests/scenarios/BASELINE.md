@@ -1,7 +1,7 @@
 # Scenario baseline, 3 October 2026
 
 **Fixtures v5** (`scenarios.cjs`), with evidence only of what ran:
-- **Hive calls**: the hive MCP server's own log of executed calls. Transcript names count as mentions only.
+- **Combwork calls**: the Combwork MCP server's own log of executed calls. Transcript names count as mentions only.
 - **Skill reads**: a successful read showing the skill.
 - **Tokens**: the actual values are checked for in tool output and replies.
 
@@ -9,7 +9,7 @@
 - the source commit;
 - a fingerprint of everything uncommitted (the diff and the contents of untracked files), taken when the run starts and
   checked again at its end;
-- the running Hive's guidance and skill revisions before setup;
+- the running Combwork's guidance and skill revisions before setup;
 - what the session itself was given at launch (its guidance and delivered skills).
 
 v3 adds checks that an edited skill was delivered as edited and a deleted one wasn't delivered.
@@ -18,7 +18,7 @@ v3 adds checks that an edited skill was delivered as edited and a deleted one wa
 - **Fake Claude Code**: fixtures v5, all 26 pass (`results/2026-10-03T18-21-32-fake`, kept as the baseline
   `baselines/fake-claude.json`); guidance revision `63db94808e669a5e`.
 - **Fake Codex**: fixtures v5, all 26 pass (`results/2026-10-03T18-28-52-fake-codex`, baseline
-  `baselines/fake-codex.json`). Its board steps and tool calls go through the real hive MCP server, so its benchmark
+  `baselines/fake-codex.json`). Its board steps and tool calls go through the real Combwork MCP server, so its benchmark
   measures their replies.
 - **Codex** (a model): fixtures v2 (below). No model trial has run under v5 yet; one would be its first benchmark.
 
@@ -36,6 +36,7 @@ Codex run.
 
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
+<!-- old-name: begin baseline-run-records -->
 ## A known Codex habit (accepted for 1.0.0): Codex, fixtures v119–v120, 1 November 2026
 
 **assistant-card-question**, Codex 0 of 2 before and after HI-2265's fixes (and 0 of 3 on df1676127, HI-2190); Haiku
@@ -242,7 +243,7 @@ Darren's scope (24 Oct): each key scenario once on Claude Code and on Codex, wit
 full trials come before the release (#1541). The 40 key scenarios: the intent tools, the inbox, lanes, #1346's five (with
 the other #1346 items 2–4 scenarios), the fresh-workspace set (#1539's model evidence), merge-main-moved and
 merged-to-done.
-- **A clean context**, checked before the run (`hive-test\scratch\1537-trials-20261025-054351\clean-context-before.json`):
+- **A clean context**, checked before the run (`combwork-test\scratch\1537-trials-20261025-054351\clean-context-before.json`):
   no memory files in Claude Code's test home and no CLAUDE.md; Codex's has no AGENTS.md and empty memory tables; each
   scenario runs in a new workspace (no shared notes). Both homes hold skills that aren't Hive's: Claude Code's synced
   from the account, and Codex's system skills (imagegen, openai-docs, review-agent, skill-creator, skill-installer).
@@ -846,7 +847,7 @@ polite closing ("Please let me know if you need anything else", "Tell me if anyt
 ## Merging through the merge slot: fakes, Codex (its default model, `gpt-5.6-luna`), fixtures v51 (v52 once merged with main), 11 October 2026
 
 #374 checks that merge-ready's merge slot is used, from what ran rather than mentions. The evidence:
-- Hive's own record (`HIVE_TEST_MERGE_SLOT_LOG`, development builds only): each change to the slots (who holds one,
+- Hive's own record (`CW_TEST_MERGE_SLOT_LOG`, development builds only): each change to the slots (who holds one,
   told so or not, and who waits) and each claim or release as Hive resolved it (the branch, and what it did), timed.
 - The checks' own runs: check.js records each run's start (commit, base, any merge in progress, and the tree it
   checked: the tracked files as they are on disk, staged or not) and its end with the result. What went into a merge is
@@ -1374,7 +1375,7 @@ Under fixtures v1, two Codex runs failed and passed when repeated:
 
 ## Claude Code: not yet run under fixtures v2
 
-The trials now run Claude Code only in its own test home (`%LOCALAPPDATA%\hive-test\claude`, never the user's
+The trials now run Claude Code only in its own test home (`%LOCALAPPDATA%\combwork-test\claude`, never the user's
 `~/.claude`). That home isn't signed in yet, so `--provider claude-code` prints a skip. Signing in is a one-time step
 by hand (README.md).
 
@@ -1445,3 +1446,4 @@ From real launches (`node tests/scenarios/measure.cjs`, with the fake CLIs; sour
 - **A resumed session measures the same as a new one.**
 - **The user's own skills reach project agents only**: the long catalog doesn't change the Assistant's size.
 - **The tool schemas are the largest fixed part.**
+<!-- old-name: end baseline-run-records -->

@@ -1,5 +1,5 @@
 // A lane's stages in the window (#1421): the stage a card's segment names, and the lanes' legend, from each project's
-// stages and names (`workflow:stages`). Apart from laneBar.ts, which hive-mcp reaches: stage names load the translations.
+// stages and names (`workflow:stages`). Apart from laneBar.ts, which cw-mcp reaches: stage names load the translations.
 
 import { columnName, type Tr } from './tasks'
 import type { ProjectStages, TaskCard } from './types'

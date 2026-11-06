@@ -1,11 +1,11 @@
 // The slot pool in the app (#1429, slots.ts): one pool per open workspace and project, on the workspace's board (its
 // writes inside boardWrite, so they wait for and join the board's other changes), keyed by the project's id so a rename
-// keeps its slots. A slot's setup, installs and archive command run as Hive's own runs, attributed to "Hive (slot
-// <name>)" in the Progress panel, each in the job its operation recorded on the slot, on Hive's process supervisor
+// keeps its slots. A slot's setup, installs and archive command run as Combwork's own runs, attributed to "Combwork (slot
+// <name>)" in the Progress panel, each in the job its operation recorded on the slot, on Combwork's process supervisor
 // (shared with agents' launches and the merge queue): with no supervisor nothing runs, and a job counts as settled only
 // once its processes are seen ended. Each run gets a session command's environment plus the slot's own (CW_SLOT,
-// CW_SLOT_PORT_BASE), its output in a bounded log in Hive's own folder. This process holds its pools' operations
-// (its pid and start: another Hive takes one over only once it is gone). A workspace closing ends its pools' commands
+// CW_SLOT_PORT_BASE), its output in a bounded log in Combwork's own folder. This process holds its pools' operations
+// (its pid and start: another Combwork takes one over only once it is gone). A workspace closing ends its pools' commands
 // and awaits their operations. Every hour, each open workspace's pools with slots are tidied (Settings → Advanced,
 // Remove idle slots after a day).
 
@@ -28,7 +28,7 @@ import { sessions } from './sessions'
 import { removeCopiesIn } from './skillCopies'
 import { settleSlotJob } from './slotJobs'
 import { builderCountOf, SlotPool, slotLevelsOf, slotOptionsOf, SlotStore, type OpHolder, type Slot, type SlotConn, type SlotLease, type SlotRenamer, type SlotRunEnd, type SlotRunner, type SlotWriter } from './slots'
-import { onHiveEvent } from './events'
+import { onCombworkEvent } from './events'
 import { agentBusy } from './workflow/lineUpdates'
 import { agentRunsGoing } from './workflow/service'
 import { openWorkspaces, workspaceFor, WorkspaceService } from './workspace'
@@ -48,7 +48,7 @@ const log = createLogger('slots')
 /** How often each open workspace's pools are tidied. */
 const TIDY_MS = 60 * 60 * 1000
 
-/** Where slot runs keep their logs: Hive's own folder, never a project's. */
+/** Where slot runs keep their logs: Combwork's own folder, never a project's. */
 export const slotLogDir = (): string => join(app.getPath('userData'), 'logs', 'slots')
 
 /** The board's database as a pool's connection: reads its readers', writes inside boardWrite (quiet: the window shows no slots yet). */
@@ -64,7 +64,7 @@ export function boardConn(ws: WorkspaceService): SlotConn {
 }
 
 /**
- * Starts a command in its job on Hive's process supervisor: the launcher is put in the job before it runs the command
+ * Starts a command in its job on Combwork's process supervisor: the launcher is put in the job before it runs the command
  * (queueJobs.ts), and one that can't be is ended having run nothing.
  */
 function jobSpawn(job: LeaseJob): Spawn {
@@ -90,31 +90,31 @@ function jobSpawn(job: LeaseJob): Spawn {
   }
 }
 
-/** How this Hive tells processes apart (pid and start), ends them, and knows itself. */
+/** How this Combwork tells processes apart (pid and start), ends them, and knows itself. */
 const probe = defaultProbe()
 
 /** Where a project's slot jobs keep their journals (what their supervisor follows outside them). */
 export const journalsOf = (root: string): string => join(root, '.slot-journals')
 
-/** Whether a settled lease's job is gone (HI-1723), asked of this Hive's supervisor; false with none to ask. */
+/** Whether a settled lease's job is gone (HI-1723), asked of this Combwork's supervisor; false with none to ask. */
 async function sealGone(lease: string): Promise<boolean> {
   const host = processSupervisor()
   return host.usable && (await host.ensure()) && (await leaseJobGone(host, lease))
 }
 
-/** A settled job's seal removed once its job is gone (HI-1723), after this Hive let its own handle go. */
+/** A settled job's seal removed once its job is gone (HI-1723), after this Combwork let its own handle go. */
 export function retireSealOf(root: string, job: string): void {
   void retireSeal(root, job, journalsOf(root), sealGone).catch(() => false)
 }
 
-/** The journals folders being swept now, and the ones swept since this Hive started. */
+/** The journals folders being swept now, and the ones swept since this Combwork started. */
 const sweeping = new Set<string>()
 const swept = new Set<string>()
 
 /**
  * Removes the seals in a project's journals folder whose jobs are gone (HI-1723: an empty folder per slot or copy job
  * piled up). One sweep a folder at a time (a call while one runs does nothing); `once`: only the first since this
- * Hive started (a pool made).
+ * Combwork started (a pool made).
  */
 export function sweepSealsOf(root: string, o: { once?: boolean } = {}): void {
   const dir = journalsOf(root)
@@ -130,7 +130,7 @@ export function sweepSealsOf(root: string, o: { once?: boolean } = {}): void {
 
 /** A slot run's errors (dialects, HI-2447): its end's error, kept on the slot by the pool (said in the Default there). */
 const T = {
-  noSupervisor: agentMsg({ id: 'slot.run.noSupervisor', text: "Combwork's process supervisor isn't running, so it can't run a slot's commands", note: "A slot's or copy's setup error: Hive runs their commands in a job of its own, and can't now." }),
+  noSupervisor: agentMsg({ id: 'slot.run.noSupervisor', text: "Combwork's process supervisor isn't running, so it can't run a slot's commands", note: "A slot's or copy's setup error: Combwork runs their commands in a job of its own, and can't now." }),
   noJob: agentMsg({ id: 'slot.run.noJob', text: "its job couldn't be made: {problem}", note: "A slot's or copy's setup error: the job its command runs in couldn't be made. {problem} is why." }),
   closed: agentMsg({ id: 'slot.run.closed', text: 'the workspace closed', note: "A slot's or copy's setup error: its workspace closed before its command ran." }),
   merged: agentMsg({ id: 'slot.laneEnd.merged', text: '{card} merged at {commit}', note: "A card in slot.laneEnd.note's list: merged, with its merge commit's first 12 characters." }),
@@ -141,7 +141,7 @@ const T = {
 const sayStored = (m: AgentMsg, values?: AgentValues): string => inDefaultDialect(() => say(m, values))
 
 /**
- * A project's slot runs: each a run of "Hive (slot <name>)" in the Progress panel, in the job the pool recorded for it.
+ * A project's slot runs: each a run of "Combwork (slot <name>)" in the Progress panel, in the job the pool recorded for it.
  * Fails closed: with no process supervisor, or its job not made, nothing runs. Its job is ended when the command
  * ends, when the workspace closes (`signal`) or at its time limit, and the run is settled only once the job is seen
  * empty: otherwise the job stays recorded on the slot for `settle`.
@@ -157,7 +157,7 @@ export function appRunner(ws: WorkspaceService, projectPath: string, root: strin
     // A copy's run is credited to the agent whose lease holds it (HI-1710), named as the project names it now.
     const holder = r.of === 'copy' && r.holder ? r.holder : null
     const reviewer = holder ? { agentId: holder, agentName: (await ws.projectConfig(projectPath).then((c) => projectAgents(c).find((a) => a.id === holder)?.name, () => undefined)) ?? holder } : null
-    const caller = { source: 'hive' as const, workspacePath, projectPath, ...(r.of === 'copy' ? { copy: r.slot, ...(reviewer ? { reviewer } : {}) } : { slot: r.slot }) }
+    const caller = { source: 'combwork' as const, workspacePath, projectPath, ...(r.of === 'copy' ? { copy: r.slot, ...(reviewer ? { reviewer } : {}) } : { slot: r.slot }) }
     let id: string | null = null
     if (workspacePath && progressGate.on()) {
       try {
@@ -206,7 +206,7 @@ export function appRunner(ws: WorkspaceService, projectPath: string, root: strin
 
 /**
  * Settles a job an operation recorded (its holder gone, or a job that couldn't be emptied), by #1360's protocol
- * (slotJobs.ts): ended by its name on this Hive's supervisor, its journal sealed and read, what it names ended. True
+ * (slotJobs.ts): ended by its name on this Combwork's supervisor, its journal sealed and read, what it names ended. True
  * once none of it runs; its journal is then cleared, and the pool clears the slot's job.
  */
 export function appSettle(root: string): (job: string) => Promise<boolean> {
@@ -305,10 +305,10 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
       removeSkillCopies: (folder) => removeCopiesIn(projectPath, folder, { always: true, why: 'slot removed' }), // i18n-ignore: the log's reason (English)
       renamer: renamerFor(ws, projectPath)
     })
-    // The seals of jobs settled before this Hive started (HI-1723).
+    // The seals of jobs settled before this Combwork started (HI-1723).
     sweepSealsOf(root, { once: true })
-    // Writers a Hive that has gone left, settled where what was kept of their runs allows (HI-1886).
-    void made.settleGoneWriters().catch((e) => log.warn(`settling the slot writers of a Hive that has gone in ${userText(projectPath)}`, e))
+    // Writers a Combwork that has gone left, settled where what was kept of their runs allows (HI-1886).
+    void made.settleGoneWriters().catch((e) => log.warn(`settling the slot writers of a Combwork that has gone in ${userText(projectPath)}`, e))
     return made
   })()
   pools.set(key, { life: ws.lifetime, pool })
@@ -363,7 +363,7 @@ export function stopLeaseSession(projectPath: string, lease: SlotLease, slot: Sl
       (e) => keep(`may work elsewhere (that couldn't be told: ${e instanceof Error ? e.message : String(e)})`) // i18n-ignore: a log line
     )
   }
-  // This Hive's run of it, still (another Hive's run, or one already over, isn't this Hive's to stop).
+  // This Combwork's run of it, still (another Combwork's run, or one already over, isn't this Combwork's to stop).
   const mine = (): { run: string; starting: boolean } | null => {
     const r = sessions.runNow(projectPath, w.agent)
     return r && r.run === w.run ? r : null
@@ -433,7 +433,7 @@ function stopWhenIdle(projectPath: string, lease: SlotLease, slot: Slot, w: Slot
     log.info(`Stopping ${userText(w.agent)}'s ${r.starting ? 'start' : 'session'} in ${userText(slot.name)}: its lease ${lease.id} ended (${lease.why ?? 'released'})`)
     sessions.stop(projectPath, w.agent)
   }
-  off = onHiveEvent((e) => {
+  off = onCombworkEvent((e) => {
     if ((e.type === 'session-status' && e.state.agentId === w.agent && e.state.projectPath.toLowerCase() === projectPath.toLowerCase()) || e.type === 'progress-changed') look()
   })
   look()
@@ -461,7 +461,7 @@ export function laneEndNote(lane: string, abandoned: boolean, cards: readonly { 
 
 /**
  * Why a lane's builder's run isn't done with its turn yet (HI-1706), or null when it is: in a turn as its status or its
- * hooks say (a Stop the drain carried on is still one), a line of Hive's or the user's not taken, its runs or background
+ * hooks say (a Stop the drain carried on is still one), a line of Combwork's or the user's not taken, its runs or background
  * tasks going, or a delivery still to reach it (the lane's note among them until it is read), whether or not the gate
  * gives it yet. No settle time: each is a state. All read at one moment with nothing awaited (HR1's round 1 finding 1),
  * so the answer is never older than the look that acts on it; sessions.quit asks it again at each key and before Enter.
@@ -486,7 +486,7 @@ export async function laneEndWaitsFor(projectPath: string, agent: string, run: s
   return laneEndHeldNow(projectPath, agent, run)
 }
 
-/** What laneEnd works with (HI-1706): the real ones in Hive, a test's own in unit tests. */
+/** What laneEnd works with (HI-1706): the real ones in Combwork, a test's own in unit tests. */
 export interface LaneEndDeps {
   /** Whether the end still owns that run: its workspace open, the run the agent's now, the slot's writer under the lease. */
   fenced: () => boolean
@@ -682,7 +682,7 @@ function laneEnd(projectPath: string, lease: SlotLease, slotName: string, w: Slo
       return { key: cardKeyOf(ws, c.number)?.key ?? `#${c.number}`, merged }
     })
     const st = sessions.liveFor(projectPath, w.agent)
-    const r = await createDelivery(projectPath, { agentId: w.agent, agentName: st?.agentName, conversation: st?.sessionId || null, kind: 'control', from: { kind: 'hive', name: 'Combwork' }, body: inDialectOf({ projectPath, agentId: w.agent }, () => laneEndNote(lane?.name ?? lease.lane ?? '', lease.why === 'laneAbandoned', cards)), source: LANE_END_SOURCE, ref: lease.id, forRun: w.run }) // i18n-ignore: the product's name, as a delivery's sender
+    const r = await createDelivery(projectPath, { agentId: w.agent, agentName: st?.agentName, conversation: st?.sessionId || null, kind: 'control', from: { kind: 'combwork', name: 'Combwork' }, body: inDialectOf({ projectPath, agentId: w.agent }, () => laneEndNote(lane?.name ?? lease.lane ?? '', lease.why === 'laneAbandoned', cards)), source: LANE_END_SOURCE, ref: lease.id, forRun: w.run }) // i18n-ignore: the product's name, as a delivery's sender
     await offerNow(projectPath, w.agent)
     return r.id
   }
@@ -693,7 +693,7 @@ function laneEnd(projectPath: string, lease: SlotLease, slotName: string, w: Slo
     retire: async (why) => void (await cancelFromSource(projectPath, LANE_END_SOURCE, lease.id, why)),
     quit: (why, force) => sessions.quit(projectPath, w.agent, w.run, { fenced, why, force, ready: () => laneEndHeldNow(projectPath, w.agent, w.run), cause: 'lane' }),
     watch: (look) => {
-      const offEvents = onHiveEvent((e) => {
+      const offEvents = onCombworkEvent((e) => {
         if ((e.type === 'session-status' && e.state.agentId === w.agent && e.state.projectPath.toLowerCase() === projectPath.toLowerCase()) || e.type === 'progress-changed') look()
       })
       const offDeliveries = onDeliveriesChanged((host, agents) => {
@@ -765,7 +765,7 @@ export function startSlots(): void {
   timer = setInterval(() => void tidyOpenPools(), TIDY_MS)
   timer.unref()
   WorkspaceService.closingTasks.add(forgetPools)
-  // Slots' writers (#1434, agentFolders.ts): this Hive as their holder, their runs' tokens among its live ones, a claim
+  // Slots' writers (#1434, agentFolders.ts): this Combwork as their holder, their runs' tokens among its live ones, a claim
   // tracked as its project's pool's work (close awaits it), and a writer released handed to its pool.
   setWriterHost({
     self: holder.self,
@@ -801,7 +801,7 @@ export function stopSlots(): void {
 
 /**
  * A pool's slots as the window reads them (`slots:list`). A writer is held (#1506) when its run isn't live here and its
- * Hive is this one or one known to have gone: Release Slot… is offered for it.
+ * Combwork is this one or one known to have gone: Release Slot… is offered for it.
  */
 export async function slotViews(pool: SlotPool): Promise<SlotView[]> {
   return Promise.all(
@@ -837,7 +837,7 @@ export async function slotTest(pool: SlotPool, op: SlotTestOp): Promise<unknown>
       testHomes.set(pool.deps.project.toLowerCase(), op.folders)
       return true
     case 'writer':
-      // A run of another Hive's writing in a lent slot (#1561's scenario): its Hive gone when that process has ended.
+      // A run of another Combwork's writing in a lent slot (#1561's scenario): its Combwork gone when that process has ended.
       return pool.deps.store.conn.write((db) => Number(db.prepare("UPDATE slots SET writer_run = ?, writer_lease = (SELECT l.id FROM slot_leases l WHERE l.project = slots.project AND l.slot = slots.name AND l.ended_at IS NULL), writer_agent = ?, writer_pid = ?, writer_started = ? WHERE project = ? AND name = ? AND writer_run IS NULL").run(op.run, op.agent, op.pid, op.started, pool.deps.store.project, op.slot).changes) === 1) // i18n-ignore: SQL
     case 'quit': {
       // A lane's end's quit of a running CLI (HI-1706's cliquit, the real Claude Code and Codex): its run now, unfenced.

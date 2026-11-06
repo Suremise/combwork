@@ -13,7 +13,7 @@ import { utf8Bytes } from '../src/shared/metrics'
 import { START_VIEW_MAX_BYTES, startView, type StartViewInput, type ViewCard, type ViewEntry } from '../src/shared/startView'
 import type { LiveSessionState } from '../src/shared/types'
 
-const base = tempDir('hive-start-view-')
+const base = tempDir('cw-start-view-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -235,7 +235,7 @@ describe('the state view in a workspace', () => {
   const live = [{ projectPath: alpha, agentId: 'b1', agentName: 'B1', status: 'working' }, { projectPath: alpha, agentId: 'r1', agentName: 'R1', status: 'waiting', statusMessage: 'Allow Bash?' }] as LiveSessionState[]
 
   beforeAll(async () => {
-    process.env.HIVE_TEST_TRASH_DIR = join(base, 'trash')
+    process.env.CW_TEST_TRASH_DIR = join(base, 'trash')
     mkdirSync(join(alpha, '.combwork'), { recursive: true })
     writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }] }))
     w = createWorkspaceService()
@@ -251,7 +251,7 @@ describe('the state view in a workspace', () => {
     await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [cards.doing], by: 'B1' })
   })
   afterAll(async () => {
-    delete process.env.HIVE_TEST_TRASH_DIR
+    delete process.env.CW_TEST_TRASH_DIR
     await disposeWorkspaceService(w)
   })
 

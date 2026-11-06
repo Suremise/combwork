@@ -13,7 +13,7 @@
 // reason, fails. A file the parser can't read fails; it is never skipped.
 //
 // And for the window's messages agents read (HI-2440, agentTextBoth.mjs), in src/main and src/shared:
-//   - `unresolved|<call>|<argument>`: a call that reads text (agentText, englishText, storedText, a HiveError and its
+//   - `unresolved|<call>|<argument>`: a call that reads text (agentText, englishText, storedText, a CombworkError and its
 //     subclasses, any function passing its parameter on to one) whose argument it can't follow to its messages. Mark it
 //     `// agent-text: <the table, message or function its messages are in>` (followed into the catalogue; one that leads
 //     nowhere fails) or `// agent-protocol: <why>`;

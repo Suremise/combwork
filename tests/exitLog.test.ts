@@ -1,5 +1,5 @@
-// Why Hive stopped (#985): the profile's crash dumps are listed newest first and named in Copy Diagnostics, and every
-// place Hive's main process ends or restarts the app goes through exitBy(), which logs it with its caller.
+// Why Combwork stopped (#985): the profile's crash dumps are listed newest first and named in Copy Diagnostics, and every
+// place Combwork's main process ends or restarts the app goes through exitBy(), which logs it with its caller.
 import { readdirSync, readFileSync, utimesSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
@@ -45,13 +45,13 @@ describe('crash dumps (#985)', () => {
 })
 
 describe('every way out is logged (#985)', () => {
-  // The main process's own files; the hive MCP server, hive-progress and a close command's runner (HI-1368: its own
+  // The main process's own files; the combwork MCP server, cw-progress and a close command's runner (HI-1368: its own
   // build entry, started detached as Node) are processes of their own.
   const files = (dir: string): string[] =>
     readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
       const p = join(dir, e.name)
       if (e.isDirectory()) return e.name === 'mcp' || e.name === 'progressReporters' ? [] : files(p)
-      return e.name.endsWith('.ts') && e.name !== 'hive-close-runner.ts' ? [p] : []
+      return e.name.endsWith('.ts') && e.name !== 'cw-close-runner.ts' ? [p] : []
     })
 
   it('ends or restarts the app only inside exitBy()', () => {

@@ -90,7 +90,7 @@ is kept in English, it is as Brazilian developers say it.
 | agent | agente (o) | Put the noun before a name (above). |
 | provider | provedor | |
 | session | sessão | |
-| the Assistant | o Assistente | Its only name: the full English name *Hive Assistant* went with the rename (HI-2458). |
+| the Assistant | o Assistente | Its only name: the full English name it had before went with the rename (HI-2458). |
 | persona | persona | |
 | task board / board | quadro de tarefas / quadro | |
 | card | cartão (o), cartões | Never *tarefa* for a card; *tarefas* only in *quadro de tarefas* and the *Tasks* tab („Tarefas“). |

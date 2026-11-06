@@ -282,7 +282,7 @@ const TipParent = createContext<((inner: boolean) => void) | null>(null)
  */
 let hovered: { owner: object; wrap: HTMLElement; hide: () => void } | null = null
 /** Whether a hover tooltip holds the slot, and whether its anchor is still in the page, for tests (HI-2084). */
-;(window as unknown as { __hiveHoveredTip?: () => { connected: boolean } | null }).__hiveHoveredTip = () => (hovered ? { connected: hovered.wrap.isConnected } : null)
+;(window as unknown as { __cwHoveredTip?: () => { connected: boolean } | null }).__cwHoveredTip = () => (hovered ? { connected: hovered.wrap.isConnected } : null)
 
 /**
  * Two sentences one after the other, each with its own full stop, spaced as the language does: a space in English,
@@ -641,7 +641,7 @@ export const STATUS_TEXT: Readonly<Record<SessionStatus | 'idle', string>> = Obj
 
 /**
  * What an agent is doing, in words: projected from its runtime's facts (#648: asking, compacting, silent with its state
- * unknown, working…); when no turn runs, Hive's policy words: what its watch waits for, its status message, finished or
+ * unknown, working…); when no turn runs, Combwork's policy words: what its watch waits for, its status message, finished or
  * ready, with any background tasks it is running.
  */
 /** A server connection's refused key (HI-1772), where a sign-in connection's agent needs sign-in. */
@@ -660,7 +660,7 @@ export function statusText(live: Pick<LiveSessionState, 'status' | 'statusMessag
     // Waiting on cards: what for, in the window's words and its card names ("Waiting for HI-12 → Review", HI-1679: never
     // the watch's `label`, the English agents read).
     if (live.status === 'watching' && live.watch) return watchStatus(live.watch)
-    // Hive's own words in the window's language (#847), or the CLI's as they came.
+    // Combwork's own words in the window's language (#847), or the CLI's as they came.
     if (live.statusMessage) return shownStatusMessage(live)!
     // At the merge slot (#350): waiting for it, or merging.
     if (live.mergeSlot) return shownMergeSlot(live)!
@@ -732,7 +732,7 @@ export function SafeguardMark({ live }: { live: Pick<LiveSessionState, 'safeguar
 export function signInNote(live: Pick<LiveSessionState, 'status' | 'signIn' | 'provider' | 'launchedConnection'> | null | undefined): string | null {
   if (!live?.signIn) return null
   const d = providerDescriptor(live.provider)
-  // Hive's own message in the window's language (#847), else what the CLI said, as it said it.
+  // Combwork's own message in the window's language (#847), else what the CLI said, as it said it.
   const message = live.signIn.messageText ? shownText(live.signIn.messageText) : live.signIn.message
   const said = message.length > 160 ? `${message.slice(0, 160)}…` : message
   // On a server connection (HI-1772): its key was refused, replaced in Settings → Accounts & Connections (no sign-in).
@@ -851,7 +851,7 @@ export function useBackdrop(): () => boolean {
   return useCallback(() => backdrops[backdrops.length - 1] === me.current, [])
 }
 
-/** Where a moved dialog may go: its header wholly in the window, below Hive's title bar (whose native buttons would cover its ×). */
+/** Where a moved dialog may go: its header wholly in the window, below Combwork's title bar (whose native buttons would cover its ×). */
 function clampOffset(dialog: HTMLElement, offset: { x: number; y: number }, want: { x: number; y: number }): { x: number; y: number } {
   const header = dialog.querySelector('.dialog-header')
   if (!header) return want
@@ -941,7 +941,7 @@ export function Modal({
 }) {
   const busyNow = useRef(busy)
   busyNow.current = busy
-  // Open: where the window is, for hive.log's long-task and hang lines (HI-1775).
+  // Open: where the window is, for combwork.log's long-task and hang lines (HI-1775).
   useEffect(() => dialogOpened(title), [title])
   // Escape runs this render's onClose, never an earlier one's: a dialog whose fields fill in after it opens would
   // otherwise answer an Escape with its first render's view of them (#288).
@@ -1052,7 +1052,7 @@ export function Modal({
 }
 
 marked.setOptions({ gfm: true, breaks: false })
-// GitHub-style heading ids, so the docs' #links work in Hive as they do on GitHub; a heading's explicit id
+// GitHub-style heading ids, so the docs' #links work in Combwork as they do on GitHub; a heading's explicit id
 // (`<a id="git"></a>`, #1535) is its id instead, and its empty anchor is dropped.
 marked.use({
   renderer: {
@@ -1072,8 +1072,8 @@ export interface MarkdownCards {
 }
 
 /**
- * Wraps the card references in rendered Markdown's text in links (`hive-card:N`), never inside a link, code or a code
- * block. Done on the sanitized HTML, whose text nodes only gain links of Hive's own scheme.
+ * Wraps the card references in rendered Markdown's text in links (`cw-card:N`), never inside a link, code or a code
+ * block. Done on the sanitized HTML, whose text nodes only gain links of Combwork's own scheme.
  */
 function linkCards(html: string, cards: MarkdownCards): string {
   const doc = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html')
@@ -1089,7 +1089,7 @@ function linkCards(html: string, cards: MarkdownCards): string {
     for (const m of found) {
       frag.append(text.slice(at, m.start))
       const a = doc.createElement('a')
-      a.setAttribute('href', `hive-card:${m.number}`)
+      a.setAttribute('href', `cw-card:${m.number}`)
       a.className = 'card-ref'
       const title = cards.title(m.number)
       if (title) a.setAttribute('title', title)
@@ -1111,7 +1111,7 @@ export function Markdown({ source, className, onLink, cards, breaks, images }: {
   const clean = DOMPurify.sanitize(marked.parse(source, { async: false, ...(breaks ? { breaks: true } : {}) }) as string)
   const html = cards ? linkCards(clean, cards) : clean
   // Images the caller gives a source of its own once shown (HI-1700: a card's attachments, by a relative placeholder the
-  // sanitiser keeps; their hive-img: and blob: URLs it wouldn't).
+  // sanitiser keeps; their combwork-img: and blob: URLs it wouldn't).
   const ref = useRef<HTMLDivElement>(null)
   useLayoutEffect(() => {
     if (!images || !ref.current) return
@@ -1129,10 +1129,10 @@ export function Markdown({ source, className, onLink, cards, breaks, images }: {
         if (!a) return
         const href = a.getAttribute('href') ?? ''
         e.preventDefault()
-        const card = /^hive-card:(\d+)$/.exec(href)
+        const card = /^cw-card:(\d+)$/.exec(href)
         if (card && cards) return cards.open(Number(card[1]))
         if (onLink?.(href)) return
-        if (/^https?:/.test(href)) void window.hive.invoke('app:openExternal', href)
+        if (/^https?:/.test(href)) void window.combwork.invoke('app:openExternal', href)
         else if (href.startsWith('#')) document.getElementById(href.slice(1))?.scrollIntoView({ behavior: 'smooth' })
       }}
       dangerouslySetInnerHTML={{ __html: html }}

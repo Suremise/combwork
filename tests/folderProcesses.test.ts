@@ -31,10 +31,10 @@ const { namesFolder, namesFile, ownedBy, descendantsIn, stillRunning, filetimeMs
 const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
 
 describe("a scenario's leftover processes (#542, #402)", () => {
-  const dir = 'C:\\hive-test\\scenarios\\lanes\\1\\scenario'
+  const dir = 'C:\\combwork-test\\scenarios\\lanes\\1\\scenario'
   it('the folder itself or inside it, in any spelling: backslashes, slashes, case, quoted', () => {
-    expect(namesFolder(`cmd.exe /c "${dir}\\profile\\bin\\hive-progress.cmd" --title x`, dir)).toBe(true)
-    expect(namesFolder('node C:/HIVE-TEST/scenarios/lanes/1/scenario/run.js', dir)).toBe(true)
+    expect(namesFolder(`cmd.exe /c "${dir}\\profile\\bin\\cw-progress.cmd" --title x`, dir)).toBe(true)
+    expect(namesFolder('node C:/COMBWORK-TEST/scenarios/lanes/1/scenario/run.js', dir)).toBe(true)
     expect(namesFolder(`node -e x "${dir}"`, dir)).toBe(true)
     expect(namesFolder(`node -e x ${dir}`, dir + '\\')).toBe(true)
   })
@@ -42,7 +42,7 @@ describe("a scenario's leftover processes (#542, #402)", () => {
     expect(namesFolder(`node x ${dir}-2\\run.js`, dir)).toBe(false)
     expect(namesFolder(`node x "${dir}-2"`, dir)).toBe(false)
     expect(namesFolder(`node x ${dir}s`, dir)).toBe(false)
-    expect(namesFolder('node x C:\\hive-test\\scenarios\\lanes\\1', dir)).toBe(false)
+    expect(namesFolder('node x C:\\combwork-test\\scenarios\\lanes\\1', dir)).toBe(false)
   })
   it("a command naming the run's own file, as a whole name: another suite's file never counts (#658)", () => {
     const own = 'bg-done-4242-mfx1.txt'
@@ -67,7 +67,7 @@ describe("a scenario's leftover processes (#542, #402)", () => {
     expect(ownedBy(list, dir, 0, 14)).toEqual([11, 12])
   })
 
-  it("its Hive's tree: descendants only, a reused pid (started before its parent) never, and only while the same process", () => {
+  it("its Combwork's tree: descendants only, a reused pid (started before its parent) never, and only while the same process", () => {
     const list = [
       { pid: 100, parent: 1, started: 1000, commandLine: 'electron .' },
       { pid: 101, parent: 100, started: 1100, commandLine: 'pty host' },
@@ -78,12 +78,12 @@ describe("a scenario's leftover processes (#542, #402)", () => {
     ]
     const tree = descendantsIn(list, 100)
     expect(tree.map((t) => t.pid).sort()).toEqual([101, 102, 103])
-    // Once Hive closed: 103 still runs, 102 ended, and 101's pid now belongs to another process.
+    // Once Combwork closed: 103 still runs, 102 ended, and 101's pid now belongs to another process.
     const after = [list[3], { pid: 101, parent: 7, started: 5000, commandLine: 'someone else' }, list[5]]
     expect(stillRunning(after, tree)).toEqual([103])
   })
 
-  it("what Hive lists as its agents' leftovers: those processes by pid and start time, never a pid given to another since (HI-2217)", () => {
+  it("what Combwork lists as its agents' leftovers: those processes by pid and start time, never a pid given to another since (HI-2217)", () => {
     // 2026-10-31T09:49:34.123Z as a FILETIME, and as ms.
     const at = Date.parse('2026-10-31T09:49:34.123Z')
     const ft = (ms: number, extra = 0n): string => String(BigInt(ms) * 10000n + 116444736000000000n + extra)
@@ -128,7 +128,7 @@ describe("a scenario's leftover processes (#542, #402)", () => {
     expect(childrenFirst(list, [at(grandchild), at(parent)])).toEqual([at(grandchild), at(parent)])
   })
 
-  const tmp = tempDir('hive-folder-processes-')
+  const tmp = tempDir('cw-folder-processes-')
   afterAll(() => rmSync(tmp, { recursive: true, force: true }))
   it.runIf(process.platform === 'win32')('stops its own process; a sibling-prefix folder\'s and an unrelated one keep running', async () => {
     const own = join(tmp, 'scenario')
@@ -312,11 +312,11 @@ describe("a scenario's leftover processes (#542, #402)", () => {
   }, 60000)
 })
 
-// HI-1453: a test copy of Hive that outlived its suite (12 h, its runner gone). Each copy is recorded as it starts, and
+// HI-1453: a test copy of Combwork that outlived its suite (12 h, its runner gone). Each copy is recorded as it starts, and
 // the runner ends those still running as the processes recorded (pid and start time): nothing else, never by name or by a
 // command line (the Assistant's design call in round 3), never another process given the pid since. What only looks
 // like a copy is listed for a person. The real processes: the harnessleftovers e2e.
-describe("a suite's test copies of Hive (HI-1453)", () => {
+describe("a suite's test copies of Combwork (HI-1453)", () => {
   type Copy = { pid: number; started: number; profile?: string | null }
   const { COPIES_FILE, recordCopy, recordedCopies, copiesIn, lookLikeCopies, launchedCopy } = req('./e2e/folderProcesses.cjs') as {
     COPIES_FILE: string
@@ -326,10 +326,10 @@ describe("a suite's test copies of Hive (HI-1453)", () => {
     lookLikeCopies: (list: Proc[], folders: string[]) => Proc[]
     launchedCopy: (list: Proc[], launcher: number, from: number) => Proc | null
   }
-  const lane = 'C:\\t\\hive-test\\e2e\\lanes\\1'
+  const lane = 'C:\\t\\combwork-test\\e2e\\lanes\\1'
 
   it('are read back from the folder and its own (a nested runner), a line cut short or without a start time skipped', () => {
-    const dir = tempDir('hive-copies-')
+    const dir = tempDir('cw-copies-')
     recordCopy(dir, { pid: 10, started: 1500, profile: join(dir, 'p') })
     mkdirSync(join(dir, 'suite', 'nested', 'inner'), { recursive: true })
     recordCopy(join(dir, 'suite', 'nested', 'inner'), { pid: 11, started: 3500 })
@@ -401,7 +401,7 @@ describe("a suite's test copies of Hive (HI-1453)", () => {
     ]
 
     it.runIf(process.platform === 'win32')("the launcher's child, by its pid and start time, while the launcher runs; the exit listener removed", async () => {
-      const dir = tempDir('hive-record-')
+      const dir = tempDir('cw-record-')
       const l = launcherOf(42)
       const d = deferred()
       const done = recordMainProcess(dir, l, 1000, 'p', () => d.promise)
@@ -413,7 +413,7 @@ describe("a suite's test copies of Hive (HI-1453)", () => {
     })
 
     it.runIf(process.platform === 'win32')('nothing, when the launcher exits while the listing is under way, its pid now a later process with a child', async () => {
-      const dir = tempDir('hive-record-')
+      const dir = tempDir('cw-record-')
       const l = launcherOf(42)
       const d = deferred()
       const done = recordMainProcess(dir, l, 1000, 'p', () => d.promise)
@@ -433,7 +433,7 @@ describe("a suite's test copies of Hive (HI-1453)", () => {
     })
 
     it.runIf(process.platform === 'win32')('nothing, when the launcher had exited already, is missing, or the listing fails', async () => {
-      const dir = tempDir('hive-record-')
+      const dir = tempDir('cw-record-')
       let listed = 0
       const list = async () => (listed++, shellNow)
       const gone = launcherOf(42)
@@ -451,9 +451,9 @@ describe("a suite's test copies of Hive (HI-1453)", () => {
 
   it('what only looks like a copy in a folder (for the report, never ended) has a profile flag and names the folder', () => {
     const list: Proc[] = [
-      { pid: 1, commandLine: `"electron.exe" "--hive-test-profile=${lane}\\a\\profile"`, started: 1 },
+      { pid: 1, commandLine: `"electron.exe" "--combwork-test-profile=${lane}\\a\\profile"`, started: 1 },
       { pid: 2, commandLine: `photos.exe ${lane}\\x\\shot.png`, started: 1 },
-      { pid: 3, commandLine: `electron.exe --hive-test-profile=${lane}0\\x\\profile`, started: 1 }
+      { pid: 3, commandLine: `electron.exe --combwork-test-profile=${lane}0\\x\\profile`, started: 1 }
     ]
     expect(lookLikeCopies(list, [lane]).map((p) => p.pid)).toEqual([1])
   })
@@ -469,7 +469,7 @@ describe('test tooling ends processes by identity, never by a remembered pid (#6
     readdirSync(join(root, dir), { withFileTypes: true }).flatMap((e) =>
       e.isDirectory() ? (['node_modules', 'fixtures'].includes(e.name) ? [] : files(join(dir, e.name))) : /\.(c|m)?[jt]s$/.test(e.name) ? [join(dir, e.name)] : []
     )
-  // And in Hive itself: hive-progress ends its command's tree by identity too (wrapper.ts endTree, #655).
+  // And in Combwork itself: cw-progress ends its command's tree by identity too (wrapper.ts endTree, #655).
   it('no process.kill on a pid (other than signal 0) and no taskkill, in tests, scripts or src', () => {
     const found: string[] = []
     for (const f of [...files('tests'), ...files('scripts'), ...files('src')]) {

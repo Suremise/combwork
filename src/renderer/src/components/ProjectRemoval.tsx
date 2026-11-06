@@ -21,7 +21,7 @@ const CHOICES: { id: ProjectRemoval; label: Msg; icon: string; summary: Msg }[] 
     id: 'remove',
     label: msg({ id: 'workspace.removal.remove', defaultMessage: 'Remove from Combwork', description: "Remove Project: a choice, and the dialog's button for it." }),
     icon: 'export',
-    summary: msg({ id: 'workspace.removal.removeSummary', defaultMessage: 'The folder stays on disk, and its handovers and cards are packed into it (.combwork/removed), so you can move it elsewhere. Combwork offers them back wherever it sees the folder again.', description: 'Remove Project: what Remove from Hive does. Keep .combwork/removed as it is.' })
+    summary: msg({ id: 'workspace.removal.removeSummary', defaultMessage: 'The folder stays on disk, and its handovers and cards are packed into it (.combwork/removed), so you can move it elsewhere. Combwork offers them back wherever it sees the folder again.', description: 'Remove Project: what Remove from Combwork does. Keep .combwork/removed as it is.' })
   },
   {
     id: 'delete',
@@ -33,9 +33,9 @@ const CHOICES: { id: ProjectRemoval; label: Msg; icon: string; summary: Msg }[] 
 
 const M = {
   hidden: msg({ id: 'workspace.removal.hiddenDone', defaultMessage: '{name} is hidden', description: 'A notice after Hide.' }),
-  removed: msg({ id: 'workspace.removal.removedDone', defaultMessage: '{name} was removed from Combwork', description: 'A notice after Remove from Hive.' }),
+  removed: msg({ id: 'workspace.removal.removedDone', defaultMessage: '{name} was removed from Combwork', description: 'A notice after Remove from Combwork.' }),
   deleted: msg({ id: 'workspace.removal.deletedDone', defaultMessage: '{name} was moved to the Recycle Bin', description: 'A notice after Delete.' }),
-  restoreIn: msg({ id: 'workspace.removal.restoreIn', defaultMessage: 'Restore it in Settings → Workspace.', description: 'Under the notice after Hide or Remove from Hive.' }),
+  restoreIn: msg({ id: 'workspace.removal.restoreIn', defaultMessage: 'Restore it in Settings → Workspace.', description: 'Under the notice after Hide or Remove from Combwork.' }),
   notAll: msg({ id: 'workspace.removal.notAll', defaultMessage: 'Not everything of {name} could be removed', description: "A notice: some of the project's things stayed (why follows, one a line)." }),
   title: msg({ id: 'workspace.removal.title', defaultMessage: 'Remove {name}', description: "Remove Project's dialog title." }),
   cancel: msg({ id: 'workspace.removal.cancel', defaultMessage: 'Cancel', description: "Remove Project's button that closes it." }),
@@ -54,8 +54,8 @@ const M = {
   handoversHow: msg({ id: 'workspace.removal.handoversHow', defaultMessage: '{how, select, hide {left in the shared notes} remove {packed into the folder, then moved to the Recycle Bin} other {to the Recycle Bin}}', description: "Remove Project, What it touches, What happens to the project's handovers, for the choice made." }),
   cards: msg({ id: 'workspace.removal.cardsThing', defaultMessage: '{count, plural, =0 {No cards} one {# card} other {# cards}}{archived, plural, =0 {} other { (and # archived)}}', description: "Remove Project, What it touches, the What column: the project's cards on the board, and its archived ones." }),
   cardsHow: msg({ id: 'workspace.removal.cardsHow', defaultMessage: '{how, select, delete {deleted} remove {archived, and a copy packed into the folder} other {archived until you restore it}}', description: "Remove Project, What it touches, What happens to the project's cards, for the choice made." }),
-  folders: msg({ id: 'workspace.removal.foldersThing', defaultMessage: '{count, plural, one {# slot, copy or old folder} other {# slots, copies and old folders}}', description: "Remove Project, What it touches, the What column (#1447): the project's slots (working folders Hive lends to cards), review copies and old reviewer folders, each on a row under it." }),
-  foldersHow: msg({ id: 'workspace.removal.foldersHow', defaultMessage: '{how, select, hide {left as they are} delete {to the Recycle Bin, with what is in them} other {removed when clean and merged; the rest stay, listed}}', description: "Remove Project, What it touches, what happens to the project's slots, copies and old folders for the choice made (#1447): Hive removes those with nothing to lose, and keeps the others." }),
+  folders: msg({ id: 'workspace.removal.foldersThing', defaultMessage: '{count, plural, one {# slot, copy or old folder} other {# slots, copies and old folders}}', description: "Remove Project, What it touches, the What column (#1447): the project's slots (working folders Combwork lends to cards), review copies and old reviewer folders, each on a row under it." }),
+  foldersHow: msg({ id: 'workspace.removal.foldersHow', defaultMessage: '{how, select, hide {left as they are} delete {to the Recycle Bin, with what is in them} other {removed when clean and merged; the rest stay, listed}}', description: "Remove Project, What it touches, what happens to the project's slots, copies and old folders for the choice made (#1447): Combwork removes those with nothing to lose, and keeps the others." }),
   folderRemoved: msg({ id: 'workspace.removal.folderRemoved', defaultMessage: 'removed', description: "Remove Project, What it touches (#1447): a slot or copy that goes, nothing in it being lost." }),
   folderKept: msg({ id: 'workspace.removal.folderKept', defaultMessage: 'kept: {why}', description: "Remove Project, What it touches (#1447): a slot, copy or old folder that stays, and why ({why}: a clause, such as \"2 files in it aren't committed\")." }),
   deleteBlocked: msg({ id: 'workspace.removal.deleteBlocked', defaultMessage: "Delete can't go ahead while a slot or old folder listed above stops it.", description: "Remove Project, with Delete chosen (#1447): why its button is off: a slot or old folder in the list says why it stops Delete." }),
@@ -68,7 +68,7 @@ const M = {
   worktreeWork: msg({ id: 'workspace.removal.worktreeWork', defaultMessage: '{hasError, select, yes {{error}} other {{ahead, plural, =0 {{dirty, plural, =0 {nothing unmerged} one {# uncommitted file} other {# uncommitted files}}} one {# commit not merged{dirty, plural, =0 {} one {, # uncommitted file} other {, # uncommitted files}}} other {# commits not merged{dirty, plural, =0 {} one {, # uncommitted file} other {, # uncommitted files}}}}}}', description: "Remove Project, What it touches: what in an agent's worktree isn't merged ({error}: why git couldn't check it)." }),
   transcripts: msg({ id: 'workspace.removal.transcriptsThing', defaultMessage: "Coding agents' transcripts", description: "Remove Project, What it touches, the What column: the coding agents' own conversation files." }),
   transcriptsHow: msg({ id: 'workspace.removal.transcriptsHow', defaultMessage: 'left alone (in ~/.claude and ~/.codex)', description: "Remove Project, What it touches, What happens to the coding agents' own transcripts. Keep the paths as they are." }),
-  blocked: msg({ id: 'workspace.removal.blocked', defaultMessage: "Merge or discard the work in {agents}'s worktree first: a worktree can't go with the project folder.{unchecked, select, yes { Git couldn't check one, so Combwork can't tell whether anything would be lost.} other {}}", description: "Remove Project: why Remove from Hive can't go yet ({agents}: the agents whose worktrees hold work)." }),
+  blocked: msg({ id: 'workspace.removal.blocked', defaultMessage: "Merge or discard the work in {agents}'s worktree first: a worktree can't go with the project folder.{unchecked, select, yes { Git couldn't check one, so Combwork can't tell whether anything would be lost.} other {}}", description: "Remove Project: why Remove from Combwork can't go yet ({agents}: the agents whose worktrees hold work)." }),
   drafts: msg({ id: 'workspace.removal.drafts', defaultMessage: 'Files of this project have unsaved edits in Combwork. They are lost.', description: 'Remove Project, before Delete.' }),
   typeName: msg({ id: 'workspace.removal.typeName', defaultMessage: 'Type <b>{name}</b> to delete it.', description: "Remove Project, before Delete: type the project's name in the box below. <b> is bold." }),
   noWorkspace: msg({ id: 'workspace.removal.noWorkspace', defaultMessage: 'Open a workspace to see its hidden projects.', description: 'Settings → Workspace, hidden projects, with no workspace open.' }),
@@ -80,18 +80,18 @@ const M = {
   restoreFailed: msg({ id: 'workspace.removal.restoreFailed', defaultMessage: 'Could not restore {name}', description: 'An error notice.' }),
   forgetFailed: msg({ id: 'workspace.removal.forgetFailed', defaultMessage: 'Could not forget {name}', description: 'An error notice.' }),
   project: msg({ id: 'workspace.removal.project', defaultMessage: 'Project', description: "Settings → Workspace's hidden projects table: a column." }),
-  how: msg({ id: 'workspace.removal.how', defaultMessage: 'How', description: "Settings → Workspace's hidden projects table: a column (hidden, or removed from Hive)." }),
+  how: msg({ id: 'workspace.removal.how', defaultMessage: 'How', description: "Settings → Workspace's hidden projects table: a column (hidden, or removed from Combwork)." }),
   when: msg({ id: 'workspace.removal.when', defaultMessage: 'When', description: "Settings → Workspace's hidden projects table: a column." }),
   modeHidden: msg({ id: 'workspace.removal.modeHidden', defaultMessage: 'Hidden', description: 'A hidden project, in Settings → Workspace.' }),
-  modeRemoved: msg({ id: 'workspace.removal.modeRemoved', defaultMessage: 'Removed from Combwork', description: 'A project removed from Hive, in Settings → Workspace.' }),
+  modeRemoved: msg({ id: 'workspace.removal.modeRemoved', defaultMessage: 'Removed from Combwork', description: 'A project removed from Combwork, in Settings → Workspace.' }),
   folderGone: msg({ id: 'workspace.removal.folderGone', defaultMessage: 'The folder is no longer in the workspace.', description: 'Under a hidden project whose folder is gone.' }),
   restore: msg({ id: 'workspace.removal.restore', defaultMessage: 'Restore', description: 'A button: brings a hidden project (or its packed data) back.' }),
-  forget: msg({ id: 'workspace.removal.forget', defaultMessage: 'Forget', description: "A button: drops a removed project whose folder is gone from Hive's list." }),
-  what: msg({ id: 'workspace.removal.what', defaultMessage: '{which, select, both {{handovers, plural, one {# handover} other {# handovers}} and {cards, plural, one {# board card} other {# board cards}}} handovers {{handovers, plural, one {# handover} other {# handovers}}} cards {{cards, plural, one {# board card} other {# board cards}}} other {Combwork data}}', description: 'What a folder holds from when its project was removed from Hive: handovers, board cards, or both.' }),
+  forget: msg({ id: 'workspace.removal.forget', defaultMessage: 'Forget', description: "A button: drops a removed project whose folder is gone from Combwork's list." }),
+  what: msg({ id: 'workspace.removal.what', defaultMessage: '{which, select, both {{handovers, plural, one {# handover} other {# handovers}} and {cards, plural, one {# board card} other {# board cards}}} handovers {{handovers, plural, one {# handover} other {# handovers}}} cards {{cards, plural, one {# board card} other {# board cards}}} other {Combwork data}}', description: 'What a folder holds from when its project was removed from Combwork: handovers, board cards, or both.' }),
   restored: msg({ id: 'workspace.removal.restored', defaultMessage: '{project}: {what} restored', description: "A notice: the folder's packed handovers and cards are back ({what}: \"2 handovers and 3 board cards\")." }),
   restoreThemFailed: msg({ id: 'workspace.removal.restoreThemFailed', defaultMessage: 'Could not restore them', description: "An error notice: the folder's packed data." }),
   discardFailed: msg({ id: 'workspace.removal.discardFailed', defaultMessage: 'Could not discard them', description: "An error notice: the folder's packed data." }),
-  banner: msg({ id: 'workspace.removal.banner', defaultMessage: 'This folder holds {what} from when it was removed from Combwork ({when}). Restore them to this workspace?', description: 'A banner over a project whose folder holds what Remove from Hive packed ({when}: "3 days ago").' }),
+  banner: msg({ id: 'workspace.removal.banner', defaultMessage: 'This folder holds {what} from when it was removed from Combwork ({when}). Restore them to this workspace?', description: 'A banner over a project whose folder holds what Remove from Combwork packed ({when}: "3 days ago").' }),
   discard: msg({ id: 'workspace.removal.discard', defaultMessage: 'Discard', description: "A button on that banner: drops the folder's packed data." })
 }
 
@@ -150,7 +150,7 @@ function touchRows(info: ProjectRemovalInfo, how: ProjectRemoval): ItemRow[] {
   return rows
 }
 
-/** Project → Remove Project…: hide it, remove it from Hive (keeping its files), or delete it. */
+/** Project → Remove Project…: hide it, remove it from Combwork (keeping its files), or delete it. */
 export function RemoveProjectDialog() {
   const path = useStore((s) => s.removeProjectFor)
   const [info, setInfo] = useState<ProjectRemovalInfo | null>(null)
@@ -257,7 +257,7 @@ export function RemoveProjectDialog() {
   )
 }
 
-/** Settings → Workspace: projects hidden or removed from Hive, to restore (or forget, once the folder is gone). */
+/** Settings → Workspace: projects hidden or removed from Combwork, to restore (or forget, once the folder is gone). */
 export function HiddenProjectsList() {
   const workspace = useStore((s) => s.workspace)
   // This workspace's hidden projects: another workspace's never show (or restore) here.
@@ -331,7 +331,7 @@ export function HiddenProjectsList() {
   )
 }
 
-/** On a project whose folder holds what Remove from Hive packed: bring it in, or discard it. */
+/** On a project whose folder holds what Remove from Combwork packed: bring it in, or discard it. */
 export function RemovedDataBanner({ project }: { project: ProjectInfo }) {
   const d = project.removedData
   const [busy, setBusy] = useState(false)

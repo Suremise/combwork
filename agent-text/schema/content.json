@@ -264,6 +264,9 @@
       "error": "plain"
     }
   },
+  "content.templates.combworkOnly": {
+    "placeholders": {}
+  },
   "content.templates.connectionAmbiguous": {
     "placeholders": {
       "ref": "plain",
@@ -296,7 +299,7 @@
   "content.templates.gone": {
     "placeholders": {}
   },
-  "content.templates.hiveOnly": {
+  "content.templates.importFrom10": {
     "placeholders": {}
   },
   "content.templates.importNotJson": {

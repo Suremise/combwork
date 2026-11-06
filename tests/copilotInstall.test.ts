@@ -58,8 +58,8 @@ describe('Copilot sign-in detection', () => {
     expect(parseGhStatus('not json')).toBeNull()
   })
 
-  it('checks with the environment agents get: no GH_TOKEN or GITHUB_TOKEN, no auto-update, nothing of Hive’s', () => {
-    const env = copilotCheckEnv({ PATH: 'C:\\bin', GH_TOKEN: 'a', GITHUB_TOKEN: 'b', HIVE_SESSION: 'x', ELECTRON_RUN_AS_NODE: '1', CHROME_CRASHPAD_PIPE_NAME: 'p', GH_CONFIG_DIR: 'D:\\gh' })
+  it('checks with the environment agents get: no GH_TOKEN or GITHUB_TOKEN, no auto-update, nothing of Combwork’s', () => {
+    const env = copilotCheckEnv({ PATH: 'C:\\bin', GH_TOKEN: 'a', GITHUB_TOKEN: 'b', CW_SESSION: 'x', ELECTRON_RUN_AS_NODE: '1', CHROME_CRASHPAD_PIPE_NAME: 'p', GH_CONFIG_DIR: 'D:\\gh' })
     expect(env).toEqual({ PATH: 'C:\\bin', GH_CONFIG_DIR: 'D:\\gh', COPILOT_AUTO_UPDATE: 'false' })
     expect(copilotSignIn(env, null, null).loggedIn).toBe(false)
     expect(ignoredTokens({ GH_TOKEN: 'a', GITHUB_TOKEN: '', PATH: 'x' })).toEqual(['GH_TOKEN'])
@@ -125,7 +125,7 @@ describe('Copilot readiness', () => {
     expect(issue.detail!.join('\n')).not.toContain('GH_TOKEN')
   })
 
-  it('says when a token in Hive’s environment isn’t passed to agents', () => {
+  it('says when a token in Combwork’s environment isn’t passed to agents', () => {
     const [issue] = copilotReadiness({ ...base, loggedIn: false }, { GH_TOKEN: 'secret-not-read', PATH: 'x' })
     expect(issue.detail!.at(-1)).toContain('`GH_TOKEN`')
     expect(issue.detail!.join('\n')).not.toContain('secret-not-read')
@@ -143,7 +143,7 @@ describe('Copilot readiness', () => {
 describe('Copilot discovery log', () => {
   it('leaves a candidate’s path and what it printed out of Copy Diagnostics (userText)', async () => {
     // A custom path in a private folder whose CLI prints a private name instead of its version.
-    const dir = tempDir('hive-copilot-')
+    const dir = tempDir('cw-copilot-')
     const exe = join(dir, 'Private Client', 'copilot.exe')
     mkdirSync(dirname(exe), { recursive: true })
     writeFileSync(exe, '')

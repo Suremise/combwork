@@ -15,7 +15,7 @@ import { tempDir } from './tempDir'
 const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
 const HUNG_MS = 60_000
-const dir = tempDir('hive-jobhost-workingin-')
+const dir = tempDir('cw-jobhost-workingin-')
 const SLOT = join(dir, 'slot-a')
 const ELSEWHERE = join(dir, 'elsewhere')
 for (const d of [SLOT, ELSEWHERE]) mkdirSync(d, { recursive: true })
@@ -59,7 +59,7 @@ afterAll(async () => {
 describe.runIf(process.platform === 'win32')("the helper reads a process's current folder (HI-2467)", () => {
   it('a process asked by id is described by identity, with its executable and its current folder', async () => {
     const c = await idleIn(SLOT)
-    const r = parseWorkingIn(await host.request('workingin', 'hive-test-2467-none.exe', String(c.pid)), MAX_WORKING_IN)
+    const r = parseWorkingIn(await host.request('workingin', 'combwork-test-2467-none.exe', String(c.pid)), MAX_WORKING_IN)
     expect(r?.complete).toBe(true)
     expect(r?.processes).toHaveLength(1)
     const p = r!.processes[0]
@@ -75,7 +75,7 @@ describe.runIf(process.platform === 'win32')("the helper reads a process's curre
 
   it('one working elsewhere is described with its own folder, not the slot', async () => {
     const c = await idleIn(ELSEWHERE)
-    const r = parseWorkingIn(await host.request('workingin', 'hive-test-2467-none.exe', String(c.pid)), MAX_WORKING_IN)
+    const r = parseWorkingIn(await host.request('workingin', 'combwork-test-2467-none.exe', String(c.pid)), MAX_WORKING_IN)
     expect(r?.processes.map((p) => p.pid)).toEqual([c.pid])
     expect(await folderInside(SLOT, r!.processes[0].cwd)).toBe(false)
     expect(await folderInside(ELSEWHERE, r!.processes[0].cwd)).toBe(true)
@@ -88,12 +88,12 @@ describe.runIf(process.platform === 'win32')("the helper reads a process's curre
       c.once('exit', () => resolve())
       c.kill()
     })
-    const r = parseWorkingIn(await host.request('workingin', 'hive-test-2467-none.exe', String(pid)), MAX_WORKING_IN)
+    const r = parseWorkingIn(await host.request('workingin', 'combwork-test-2467-none.exe', String(pid)), MAX_WORKING_IN)
     expect(r?.processes.filter((p) => p.pid === pid)).toEqual([])
   }, HUNG_MS)
 
   it('names alone are asked of the snapshot: none running, an empty answer that is whole', async () => {
-    expect(parseWorkingIn(await host.request('workingin', 'hive-test-2467-none.exe'), MAX_WORKING_IN)).toEqual({ complete: true, processes: [] })
+    expect(parseWorkingIn(await host.request('workingin', 'combwork-test-2467-none.exe'), MAX_WORKING_IN)).toEqual({ complete: true, processes: [] })
   }, HUNG_MS)
 
   it('ids only from a host that allows test requests; a malformed request is refused before it is sent', async () => {

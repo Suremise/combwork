@@ -1,4 +1,4 @@
-// Hive owns the lane (#1270, SPEC §16.11): a list change made while a card is in flight is queued and applied at the
+// Combwork owns the lane (#1270, SPEC §16.11): a list change made while a card is in flight is queued and applied at the
 // next card boundary (the builder told, none dropped: S3); a lane's cards start under the ruleset it started with (S19);
 // one card at a time (a lane's card starts only once the ones before it are Done: S43's P4 form); a lane ends by itself
 // once its cards are Done, its merge commit from their facts (an agent's ignored) and a verified lane-end event fired
@@ -8,7 +8,7 @@ import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import type { HiveEvent, LaneCard } from '../src/shared/types'
+import type { CombworkEvent, LaneCard } from '../src/shared/types'
 import { laneNextText, laneStatus, laneStatusText, type LaneCardFacts } from '../src/shared/lanes'
 import { laneHits, type LaneNow } from '../src/shared/laneWatch'
 import { tempDir } from './tempDir'
@@ -16,7 +16,7 @@ import { tempDir } from './tempDir'
 /** The bound for a hung run: the lanes are read again within it after each change. */
 const HUNG_MS = 15_000
 
-const base = tempDir('hive-lane-ownership-')
+const base = tempDir('cw-lane-ownership-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -26,7 +26,7 @@ const store = await import('../src/main/boardStore')
 const { advanced } = await import('../src/main/advanced')
 const { ENFORCE, workflowFor } = await import('../src/main/workflow/service')
 const { FactStore } = await import('../src/main/workflow/factStore')
-const { onHiveEvent } = await import('../src/main/events')
+const { onCombworkEvent } = await import('../src/main/events')
 const { deliveriesOf } = await import('../src/main/deliveries')
 const { agentActor } = await import('../src/shared/workflow/facts')
 const tables = await import('../src/main/storeTables')
@@ -72,7 +72,7 @@ describe('why a lane waits (laneStatus)', () => {
     expect(laneStatus(rec, [lc(1, 'doing', { blocked: 'Why' })], 1, true, null)).toEqual({ reason: 'blocked', card: 1, blocked: 'Why' })
   })
 
-  it('reads in English for the hive tools', () => {
+  it('reads in English for the Combwork tools', () => {
     expect(laneStatusText({ reason: 'notMerged', card: 11 })).toBe('waiting: #11 not merged')
     expect(laneStatusText({ reason: 'listChanges', card: 12 })).toBe('list changes after #12')
   })
@@ -87,12 +87,12 @@ describe('why a lane waits (laneStatus)', () => {
 
 // --- The service.
 
-describe('Hive owns the lane (lanes.ts, #1270)', () => {
+describe('Combwork owns the lane (lanes.ts, #1270)', () => {
   type WS = ReturnType<typeof createWorkspaceService>
   let w: WS
   const wsPath = join(base, 'ws')
   const project = join(wsPath, 'alpha')
-  const ended: HiveEvent[] = []
+  const ended: CombworkEvent[] = []
   let off: () => void
   const user = { kind: 'user' } as const
   beforeAll(async () => {
@@ -105,7 +105,7 @@ describe('Hive owns the lane (lanes.ts, #1270)', () => {
     w = createWorkspaceService()
     await w.open(wsPath)
     lanes.startLanes()
-    off = onHiveEvent((e) => e.type === 'lane-ended' && ended.push(e))
+    off = onCombworkEvent((e) => e.type === 'lane-ended' && ended.push(e))
   })
   afterAll(async () => {
     off()

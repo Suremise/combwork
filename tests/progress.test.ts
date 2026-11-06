@@ -23,7 +23,7 @@ const betty: ProgressCaller = { source: 'agent', workspacePath: WS, projectPath:
 const alfieTwin: ProgressCaller = { ...alfie, projectPath: 'C:\\ws\\gamma' }
 const script: ProgressCaller = { source: 'api', workspacePath: WS }
 const otherWsScript: ProgressCaller = { source: 'api', workspacePath: 'C:\\other' }
-const assistant: ProgressCaller = { source: 'assistant', workspacePath: WS, agentName: 'Hive Assistant', provider: 'claude-code' }
+const assistant: ProgressCaller = { source: 'assistant', workspacePath: WS, agentName: 'Combwork Assistant', provider: 'claude-code' }
 
 let now = 1_000_000
 let changes: { ws: string; runs: ProgressRun[]; patch?: ProgressRun[] | null }[] = []
@@ -240,7 +240,7 @@ describe('progress runs', () => {
     const r = s.start(alfie, { title: 'e2e: 12 suites', total: 12, agentName: 'Mallory', source: 'api' })
     expect(r).toMatchObject({ agentName: 'Alfie', agentId: 'a-1', projectPath: 'C:\\ws\\alpha', provider: 'claude-code', source: 'agent', total: 12, step: 0, state: 'running' })
     expect(s.start(script, { title: 'build' })).toMatchObject({ agentName: 'Script', agentId: null, source: 'api' })
-    expect(s.start(assistant, { title: 'x' })).toMatchObject({ agentName: 'Hive Assistant', source: 'assistant' })
+    expect(s.start(assistant, { title: 'x' })).toMatchObject({ agentName: 'Combwork Assistant', source: 'assistant' })
   })
 
   it("projects renamed together (#514): each one's runs, open and ended, are its own at its folder now (a swap keeps each one's), once", async () => {
@@ -432,7 +432,7 @@ describe('progress runs', () => {
     expect(s.list(WS).find((r) => r.id === sc.id)!.state).toBe('running')
   })
 
-  it("a keep-alive (an empty report: hive-progress's command still writing output, HI-1993) keeps it running, and its deadline", () => {
+  it("a keep-alive (an empty report: cw-progress's command still writing output, HI-1993) keeps it running, and its deadline", () => {
     const s = store()
     const loop = s.start(alfie, { title: 'stress loop' })
     const timed = s.start(betty, { title: 'timed', estimateMs: 20 * 60_000 })
@@ -904,19 +904,19 @@ describe('progress rules', () => {
       holder: holder ? { id: `h-${holder}`, kind: 'agent', agentId: holder, name: holder.toUpperCase(), cards: [], since: 0, until: 0, taken } : null,
       waiting: waiting.map((w) => ({ agentId: w, name: w.toUpperCase(), cards: [], since: 0 }))
     })
-    // Hive's own slot, as its folder may be written (another case, forward slashes, a trailing separator), and another project's.
-    const hive = slot('C:/ws/Hive/', 'hb3', true, ['hb2'])
+    // A project's slot, as its folder may be written (another case, forward slashes, a trailing separator), and another project's.
+    const demo = slot('C:/ws/Demo/', 'hb3', true, ['hb2'])
     const ambrosia = slot('C:\\ws\\ambrosia', 'amb2', true)
     // A turn not claimed yet isn't a merge.
-    const turn = slot('C:\\ws\\hive', 'hb1', false)
-    const slots = [hive, ambrosia, turn]
-    expect(filterMergeSlots(slots, SHOW_ALL)).toEqual([hive, ambrosia])
-    expect(filterMergeSlots(slots, { project: 'c:\\ws\\hive' })).toEqual([hive])
+    const turn = slot('C:\\ws\\demo', 'hb1', false)
+    const slots = [demo, ambrosia, turn]
+    expect(filterMergeSlots(slots, SHOW_ALL)).toEqual([demo, ambrosia])
+    expect(filterMergeSlots(slots, { project: 'c:\\ws\\demo' })).toEqual([demo])
     expect(filterMergeSlots(slots, { project: 'c:\\ws\\ambrosia' })).toEqual([ambrosia])
     // An agent: the slot it holds, or one it waits for; none for an agent in neither.
-    expect(filterMergeSlots(slots, { project: 'c:\\ws\\hive', agent: 'hb3' })).toEqual([hive])
-    expect(filterMergeSlots(slots, { project: 'c:\\ws\\hive', agent: 'hb2' })).toEqual([hive])
-    expect(filterMergeSlots(slots, { project: 'c:\\ws\\hive', agent: 'hb1' })).toEqual([])
+    expect(filterMergeSlots(slots, { project: 'c:\\ws\\demo', agent: 'hb3' })).toEqual([demo])
+    expect(filterMergeSlots(slots, { project: 'c:\\ws\\demo', agent: 'hb2' })).toEqual([demo])
+    expect(filterMergeSlots(slots, { project: 'c:\\ws\\demo', agent: 'hb1' })).toEqual([])
     // The Assistant's and scripts' runs hold no project's slot.
     expect(filterMergeSlots(slots, { project: NO_PROJECT })).toEqual([])
   })
@@ -925,11 +925,11 @@ describe('progress rules', () => {
     setDateStyle({ date: 'ymd', time: '24h' })
     const start = new Date(2026, 9, 5, 20, 57).getTime()
     const full = run({ title: 'e2e: full set before merging', command: 'npm run e2e -- --all --real --build --record', agentName: 'Claudio', provider: 'claude-code', source: 'agent', total: 96, step: 95, stepName: 'taskbar', startedAt: start, finishedAt: start + 10 * 60_000, expectedMs: 9 * 60_000, state: 'failed', exitCode: 1, logPath: 'C:\\t\\run-record.md', summary: '1 failed: taskbar' })
-    expect(runDetailsText(full, 'hive', start + 11 * 60_000)).toBe(
+    expect(runDetailsText(full, 'demo', start + 11 * 60_000)).toBe(
       [
         'Run: e2e: full set before merging',
         'Command: npm run e2e -- --all --real --build --record',
-        'Agent: Claudio · hive',
+        'Agent: Claudio · demo',
         'Provider: Claude Code',
         'Started: 2026-10-05 20:57',
         'Ended: 2026-10-05 21:07',
@@ -966,7 +966,7 @@ describe('progress history (#352): Recent kept across restarts', () => {
   const withHistory = (h: ProgressHistory): ProgressStore =>
     new ProgressStore({ now: () => now, changed: (ws, runs) => changes.push({ ws, runs }), ownerRunning: () => running, emitEveryMs: 250, history: h, saveAfterMs: 2000 })
 
-  it("keeps Hive's mark on a name it gave across a save and a restart, and never marks an agent named Agent (#872)", async () => {
+  it("keeps Combwork's mark on a name it gave across a save and a restart, and never marks an agent named Agent (#872)", async () => {
     const ended = { state: 'passed', startedAt: 1, finishedAt: 2 }
     const records = [
       { ...ended, id: 'k1', title: 'nameless', source: 'agent', agentId: 'a-1', projectPath: alfie.projectPath },
@@ -979,7 +979,7 @@ describe('progress history (#352): Recent kept across restarts', () => {
     const once = keptRuns({ runs: records }, WS)
     expect(marks(once)).toEqual(want)
     expect(marks(keptRuns(JSON.parse(JSON.stringify({ runs: once })), WS))).toEqual(want)
-    // A mark on a name that isn't Hive's (an edited file) is dropped, so the window shows that name as it is.
+    // A mark on a name that isn't Combwork's (an edited file) is dropped, so the window shows that name as it is.
     expect(keptRuns({ runs: [{ ...records[1], defaultName: 'script' }, { ...records[0], agentName: 'Ada', defaultName: 'agent' }] }, WS).map((r) => r.defaultName ?? null)).toEqual([null, null])
     // Through the store: loaded, saved with a new run, loaded again after a restart.
     const h = files()
@@ -1085,7 +1085,7 @@ describe('progress history (#352): Recent kept across restarts', () => {
     expect(keptRuns({ runs: [{ ...good, titleFromCommand: 'x' }] }, WS)[0]).not.toHaveProperty('titleFromCommand')
   })
 
-  it("marks the names Hive gives a run, never an agent's own (#872): the window translates only those, agents get the English", () => {
+  it("marks the names Combwork gives a run, never an agent's own (#872): the window translates only those, agents get the English", () => {
     const s = store()
     const agentNamedAgent: ProgressCaller = { ...alfie, agentId: 'a-9', agentName: 'Agent' }
     const fromScript = s.start(script, { title: 'build' })
@@ -1093,7 +1093,7 @@ describe('progress history (#352): Recent kept across restarts', () => {
     expect(fromScript).toMatchObject({ agentName: 'Script', defaultName: 'script' })
     expect(fromAgent.agentName).toBe('Agent')
     expect(fromAgent).not.toHaveProperty('defaultName')
-    // Kept history: a record with no name gets Hive's "Agent", marked; one named "Agent" keeps its name, unmarked.
+    // Kept history: a record with no name gets Combwork's "Agent", marked; one named "Agent" keeps its name, unmarked.
     const ended = { state: 'passed', startedAt: 1, finishedAt: 2 }
     const runs = keptRuns({ runs: [
       { ...ended, id: 'k1', title: 'nameless', source: 'agent', agentId: 'a-1', projectPath: alfie.projectPath },
@@ -1146,34 +1146,34 @@ describe('progress history (#352): Recent kept across restarts', () => {
   })
 })
 
-describe("Hive's set-up runs in review copies (HI-1710)", () => {
-  const hive = (extra: Partial<Extract<ProgressCaller, { source: 'hive' }>> = {}): ProgressCaller => ({ source: 'hive', workspacePath: WS, projectPath: alfie.projectPath, ...extra })
+describe("Combwork's set-up runs in review copies (HI-1710)", () => {
+  const combwork = (extra: Partial<Extract<ProgressCaller, { source: 'combwork' }>> = {}): ProgressCaller => ({ source: 'combwork', workspacePath: WS, projectPath: alfie.projectPath, ...extra })
 
-  it("are credited to the agent whose lease held the copy, in that copy, else to one 'Hive (review copies)'", () => {
+  it("are credited to the agent whose lease held the copy, in that copy, else to one 'Combwork (review copies)'", () => {
     const s = store()
-    const held = s.start(hive({ copy: 'copy-1', reviewer: { agentId: 'r-6', agentName: 'HR6' } }), { title: 'npm ci' })
-    expect(held).toMatchObject({ source: 'hive', agentId: 'r-6', agentName: 'HR6', copy: 'copy-1' })
+    const held = s.start(combwork({ copy: 'copy-1', reviewer: { agentId: 'r-6', agentName: 'HR6' } }), { title: 'npm ci' })
+    expect(held).toMatchObject({ source: 'combwork', agentId: 'r-6', agentName: 'HR6', copy: 'copy-1' })
     expect(held.defaultName).toBeUndefined()
     expect(runAgentName(held, tr)).toBe('HR6')
     expect(runDetailsText(held, 'alpha', now)).toContain('copy-1')
-    const idle = [s.start(hive({ copy: 'copy-1' }), { title: 'npm ci' }), s.start(hive({ copy: 'copy-2' }), { title: 'npm ci' })]
+    const idle = [s.start(combwork({ copy: 'copy-1' }), { title: 'npm ci' }), s.start(combwork({ copy: 'copy-2' }), { title: 'npm ci' })]
     expect(idle.map((r) => [r.agentId, r.agentName, r.defaultName, r.copy])).toEqual([[null, 'Combwork (review copies)', 'copy', 'copy-1'], [null, 'Combwork (review copies)', 'copy', 'copy-2']])
     expect(idle.map((r) => runAgentName(r, tr))).toEqual(['Combwork (review copies)', 'Combwork (review copies)'])
     // A slot's run never takes a reviewer.
-    expect(s.start(hive({ slot: 'slot-b', reviewer: { agentId: 'r-6', agentName: 'HR6' } }), { title: 'npm ci' })).toMatchObject({ agentId: null, agentName: 'Combwork (slot slot-b)', defaultName: 'slot' })
-    // The reviewer's run is still Hive's: the agent can't change or end it.
+    expect(s.start(combwork({ slot: 'slot-b', reviewer: { agentId: 'r-6', agentName: 'HR6' } }), { title: 'npm ci' })).toMatchObject({ agentId: null, agentName: 'Combwork (slot slot-b)', defaultName: 'slot' })
+    // The reviewer's run is still Combwork's: the agent can't change or end it.
     const r6: ProgressCaller = { ...alfie, agentId: 'r-6', agentName: 'HR6' }
     expect(status(() => s.update(r6, held.id, { step: 1 }))).not.toBeNull()
-    expect(status(() => s.update(hive(), held.id, { step: 1 }))).toBeNull()
+    expect(status(() => s.update(combwork(), held.id, { step: 1 }))).toBeNull()
   })
 
-  it('keep their reviewer across a save; older "Hive (copy copy-1)" runs fold into "Combwork (review copies)"', () => {
-    const ended = { state: 'passed', startedAt: 1, finishedAt: 2, source: 'hive', projectPath: alfie.projectPath }
+  it('keep their reviewer across a save; older "Combwork (copy copy-1)" runs fold into "Combwork (review copies)"', () => {
+    const ended = { state: 'passed', startedAt: 1, finishedAt: 2, source: 'combwork', projectPath: alfie.projectPath }
     const records = [
       { ...ended, id: 'c1', title: 'npm ci', copy: 'copy-1', agentId: 'r-6', agentName: 'HR6' },
-      { ...ended, id: 'c2', title: 'npm ci', copy: 'copy-1', agentName: 'Hive (copy copy-1)', defaultName: 'copy' },
+      { ...ended, id: 'c2', title: 'npm ci', copy: 'copy-1', agentName: 'Combwork (copy copy-1)', defaultName: 'copy' },
       // An id on a run of the pool's (an edited file) doesn't make it an agent's.
-      { ...ended, id: 'c3', title: 'npm ci', copy: 'copy-2', agentId: 'r-6', agentName: 'Hive (review copies)', defaultName: 'copy' },
+      { ...ended, id: 'c3', title: 'npm ci', copy: 'copy-2', agentId: 'r-6', agentName: 'Combwork (review copies)', defaultName: 'copy' },
       { ...ended, id: 'c4', title: 'npm ci', slot: 'slot-b', agentId: 'r-6', agentName: 'HR6' }
     ]
     const marks = (runs: ProgressRun[]): unknown[][] => runs.map((r) => [r.id, r.agentId, r.agentName, r.defaultName ?? null])

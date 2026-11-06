@@ -34,8 +34,8 @@ export const CATEGORY_TEXT: Record<CommandCategory, Msg> = {
   session: msg({ id: 'shell.category.session', defaultMessage: 'Session', description: "A command's category: commands about an agent's session." }),
   help: msg({ id: 'shell.category.help', defaultMessage: 'Help', description: "A command's category (the Help menu's)." }),
   preferences: msg({ id: 'shell.category.preferences', defaultMessage: 'Preferences', description: "A command's category: Settings and what is in it." }),
-  assistant: msg({ id: 'shell.category.assistant', defaultMessage: 'Assistant', description: "A command's category: the Hive Assistant's." }),
-  developer: msg({ id: 'shell.category.developer', defaultMessage: 'Developer', description: "A command's category: tools for developing Hive and debugging it." }),
+  assistant: msg({ id: 'shell.category.assistant', defaultMessage: 'Assistant', description: "A command's category: the Combwork Assistant's." }),
+  developer: msg({ id: 'shell.category.developer', defaultMessage: 'Developer', description: "A command's category: tools for developing Combwork and debugging it." }),
   tasks: msg({ id: 'shell.category.tasks', defaultMessage: 'Tasks', description: "A command's category: the task board's cards." }),
   notes: msg({ id: 'shell.category.notes', defaultMessage: 'Notes', description: "A command's category: shared notes." }),
   mcp: msg({ id: 'shell.category.mcp', defaultMessage: 'MCP', description: "A command's category: MCP servers. MCP is a name: keep it." })
@@ -251,7 +251,7 @@ const COMMAND_DEFS: CommandDef[] = [
   { id: 'project.tab.images', name: msg({ id: 'shell.command.project.tab.images', defaultMessage: 'Go to Attachments', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', keybinding: 'Alt+7', when: hasProject, run: tab('images') },
   { id: 'project.tab.changes', name: msg({ id: 'shell.command.project.tab.changes', defaultMessage: 'Go to Version Control', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category: shows the Version Control tab (glossary 2.1).' }), category: 'project', keybinding: 'Alt+8', when: hasProject, run: tab('changes') },
   { id: 'project.tab.activity', name: msg({ id: 'shell.command.project.tab.activity', defaultMessage: 'Go to Activity', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category: shows the Activity tab, the project's live work as a tree." }), category: 'project', keybinding: 'Alt+9', when: hasProject, run: tab('activity') },
-  { id: 'project.openVersionControl', name: msg({ id: 'shell.command.project.openVersionControl', defaultMessage: 'Open Version Control', description: "A command, in the Project category: shows a project's Version Control tab (glossary 2.1). It isn't in the menus or the palette: notifications run it by its name (Hive found another version control in a project's folder)." }), category: 'project', internal: true, run: (path?: string, section?: VcSection) => typeof path === 'string' && openVersionControl(path, section ?? get().vcSection[path] ?? 'workflow') },
+  { id: 'project.openVersionControl', name: msg({ id: 'shell.command.project.openVersionControl', defaultMessage: 'Open Version Control', description: "A command, in the Project category: shows a project's Version Control tab (glossary 2.1). It isn't in the menus or the palette: notifications run it by its name (Combwork found another version control in a project's folder)." }), category: 'project', internal: true, run: (path?: string, section?: VcSection) => typeof path === 'string' && openVersionControl(path, section ?? get().vcSection[path] ?? 'workflow') },
   { id: 'project.tab.memory', name: msg({ id: 'shell.command.project.tab.memory', defaultMessage: 'Go to Memory', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', when: hasProject, run: tab('memory') },
   { id: 'project.tab.skills', name: msg({ id: 'shell.command.project.tab.skills', defaultMessage: 'Go to Skills', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', when: hasProject, run: tab('skills') },
   { id: 'project.tab.templates', name: msg({ id: 'shell.command.project.tab.templates', defaultMessage: 'Go to Templates', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', when: hasProject, run: tab('templates') },
@@ -356,29 +356,29 @@ const COMMAND_DEFS: CommandDef[] = [
     id: 'session.resumeAfterClose',
     name: msg({ id: 'shell.command.session.resumeAfterClose', defaultMessage: 'Resume the Agents Running When Combwork Closed', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category. It isn't in the menus or the palette: notifications and buttons run it by its name." }),
     category: 'session',
-    // Only from the notice that Hive closed unexpectedly (#984), which lists them.
+    // Only from the notice that Combwork closed unexpectedly (#984), which lists them.
     internal: true,
-    run: () => actions.attempt(tr(msg({ id: 'shell.error.resumeAfterClose', defaultMessage: 'Could not resume the agents', description: "An error's title: resuming the agents that were running when Hive closed unexpectedly failed." })), () => call('app:resumeAfterClose'))
+    run: () => actions.attempt(tr(msg({ id: 'shell.error.resumeAfterClose', defaultMessage: 'Could not resume the agents', description: "An error's title: resuming the agents that were running when Combwork closed unexpectedly failed." })), () => call('app:resumeAfterClose'))
   },
   {
     id: 'session.stopLeftAfterClose',
-    name: msg({ id: 'shell.command.session.stopLeftAfterClose', defaultMessage: 'Stop What the Agents Started Before Combwork Closed', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: ends the processes the agents had started that still run after Hive closed unexpectedly. It isn't in the menus or the palette: notifications and buttons run it by its name." }),
+    name: msg({ id: 'shell.command.session.stopLeftAfterClose', defaultMessage: 'Stop What the Agents Started Before Combwork Closed', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: ends the processes the agents had started that still run after Combwork closed unexpectedly. It isn't in the menus or the palette: notifications and buttons run it by its name." }),
     category: 'session',
-    // Only from the notice that Hive closed unexpectedly (#987), which lists them.
+    // Only from the notice that Combwork closed unexpectedly (#987), which lists them.
     internal: true,
-    run: () => actions.attempt(tr(msg({ id: 'shell.error.stopLeftAfterClose', defaultMessage: 'Could not stop the processes', description: "An error's title: ending the processes the agents had started before Hive closed unexpectedly failed." })), () => call('app:stopLeftAfterClose'))
+    run: () => actions.attempt(tr(msg({ id: 'shell.error.stopLeftAfterClose', defaultMessage: 'Could not stop the processes', description: "An error's title: ending the processes the agents had started before Combwork closed unexpectedly failed." })), () => call('app:stopLeftAfterClose'))
   },
   {
     id: 'session.resumeRestart',
-    name: msg({ id: 'shell.command.session.resumeRestart', defaultMessage: 'Resume the Agents Working When Combwork Closed', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: resumes the agents that were working when Hive was last quit or restarted. It isn't in the menus or the palette: notifications and buttons run it by its name." }),
+    name: msg({ id: 'shell.command.session.resumeRestart', defaultMessage: 'Resume the Agents Working When Combwork Closed', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: resumes the agents that were working when Combwork was last quit or restarted. It isn't in the menus or the palette: notifications and buttons run it by its name." }),
     category: 'session',
     // Only from the notice offering it (HI-1707), which lists them.
     internal: true,
-    run: () => actions.attempt(tr(msg({ id: 'shell.error.resumeRestart', defaultMessage: 'Could not resume the agents', description: "An error's title: resuming the agents that were working when Hive was last quit or restarted failed." })), () => call('app:resumeRestart'))
+    run: () => actions.attempt(tr(msg({ id: 'shell.error.resumeRestart', defaultMessage: 'Could not resume the agents', description: "An error's title: resuming the agents that were working when Combwork was last quit or restarted failed." })), () => call('app:resumeRestart'))
   },
   {
     id: 'session.dismissRestart',
-    name: msg({ id: 'shell.command.session.dismissRestart', defaultMessage: "Don't Resume the Agents Working When Combwork Closed", description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: declines the offer to resume the agents that were working when Hive was last quit or restarted. It isn't in the menus or the palette: notifications and buttons run it by its name." }),
+    name: msg({ id: 'shell.command.session.dismissRestart', defaultMessage: "Don't Resume the Agents Working When Combwork Closed", description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: declines the offer to resume the agents that were working when Combwork was last quit or restarted. It isn't in the menus or the palette: notifications and buttons run it by its name." }),
     category: 'session',
     // Only from the notice offering it (HI-1707).
     internal: true,
@@ -415,7 +415,7 @@ const COMMAND_DEFS: CommandDef[] = [
   },
   {
     id: 'agent.hooks',
-    name: msg({ id: 'shell.command.agent.hooks', defaultMessage: 'Agent Hooks…', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: opens the focused agent's Hooks dialog (the hooks its session has, and what Hive received). The … says it opens a dialog first: keep it." }),
+    name: msg({ id: 'shell.command.agent.hooks', defaultMessage: 'Agent Hooks…', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: opens the focused agent's Hooks dialog (the hooks its session has, and what Combwork received). The … says it opens a dialog first: keep it." }),
     category: 'session',
     when: () => !!selected()?.agents.length,
     run: (path?: string, agentId?: string) => {
@@ -541,7 +541,7 @@ const COMMAND_DEFS: CommandDef[] = [
   },
   {
     id: 'task.reviewSetAside',
-    name: msg({ id: 'shell.command.task.reviewSetAside', defaultMessage: 'Review Cards Made by an Older Combwork…', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Tasks category: opens the dialog listing cards an older version of Hive saved, set aside, to add each to the board or discard it. The … says it opens a dialog first: keep it." }),
+    name: msg({ id: 'shell.command.task.reviewSetAside', defaultMessage: 'Review Cards Made by an Older Combwork…', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Tasks category: opens the dialog listing cards an older version of Combwork saved, set aside, to add each to the board or discard it. The … says it opens a dialog first: keep it." }),
     category: 'tasks',
     when: hasWorkspace,
     run: () => set({ setAsideOpen: true })
@@ -605,7 +605,7 @@ const COMMAND_DEFS: CommandDef[] = [
   },
   { id: 'view.notes', name: msg({ id: 'shell.command.view.notes', defaultMessage: 'Show Shared Notes', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category.' }), category: 'view', keybinding: 'Mod+Shift+H', run: () => setActivity('notes') }, // i18n-ignore: a shortcut's keys
   { id: 'view.skills', name: msg({ id: 'shell.command.view.skills', defaultMessage: 'Show Skills', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category.' }), category: 'view', keybinding: 'Mod+Shift+K', run: () => setActivity('skills') }, // i18n-ignore: a shortcut's keys
-  { id: 'view.dialects', name: msg({ id: 'shell.command.view.dialects', defaultMessage: 'Show Dialects', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category (HI-2444: the Dialects view, where the wording Hive gives agents is tuned per model). Glossary: dialect.' }), category: 'view', run: () => setActivity('dialects') },
+  { id: 'view.dialects', name: msg({ id: 'shell.command.view.dialects', defaultMessage: 'Show Dialects', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category (HI-2444: the Dialects view, where the wording Combwork gives agents is tuned per model). Glossary: dialect.' }), category: 'view', run: () => setActivity('dialects') },
   { id: 'view.templates', name: msg({ id: 'shell.command.view.templates', defaultMessage: 'Show Templates', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category.' }), category: 'view', run: () => setActivity('templates') },
   { id: 'view.mcp', name: msg({ id: 'shell.command.view.mcp', defaultMessage: 'Show MCP Servers', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category.' }), category: 'view', keybinding: 'Mod+Shift+M', run: () => setActivity('mcp') }, // i18n-ignore: a shortcut's keys
   { id: 'view.assistant', name: msg({ id: 'shell.command.view.assistant', defaultMessage: 'Show Assistant View', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the View category.' }), category: 'view', run: () => setActivity('assistant') },
@@ -675,19 +675,19 @@ const COMMAND_DEFS: CommandDef[] = [
   { id: 'help.logs', name: msg({ id: 'shell.command.help.logs', defaultMessage: 'Open Logs Folder', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category.' }), category: 'help', run: () => call('app:openLogs') },
   {
     id: 'help.restoreBoard09',
-    name: msg({ id: 'shell.command.help.restoreBoard09', defaultMessage: 'Restore the 0.9 Board Backup…', description: "A command (the Help menu, the command palette), in the Help category: puts back the copy of the workspace's board Hive kept when it upgraded the board to 1.0, for going back to Hive 0.9. The … says it asks first: keep it." }),
+    name: msg({ id: 'shell.command.help.restoreBoard09', defaultMessage: 'Restore the 0.9 Board Backup…', description: "A command (the Help menu, the command palette), in the Help category: puts back the copy of the workspace's board Combwork kept when it upgraded the board to 1.0, for going back to version 0.9. The … says it asks first: keep it." }),
     category: 'help',
     when: () => hasWorkspace() && !!get().boardState?.backup09,
-    tip: () => tr(msg({ id: 'shell.tip.help.restoreBoard09', defaultMessage: 'Puts back the board as it was before its upgrade to 1.0, to go back to Combwork 0.9', description: 'What a command does, on hover in the menus.' })),
+    tip: () => tr(msg({ id: 'shell.tip.help.restoreBoard09', defaultMessage: 'Puts back the board as it was before its upgrade to 1.0, to go back to version 0.9', description: 'What a command does, on hover in the menus.' })),
     run: () => void restoreBoard09()
   },
   { id: 'help.diagnostics', name: msg({ id: 'shell.command.help.diagnostics', defaultMessage: 'Copy Diagnostics…', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category. The … says it opens a dialog first: keep it.' }), category: 'help', run: () => set({ diagnosticsOpen: true }) },
-  { id: 'help.about', name: msg({ id: 'shell.command.help.about', defaultMessage: 'About {app}', description: "A command (the Help menu, the command palette), in the Help category. {app} is Hive's name." }), nameValues: { app: APP_NAME }, category: 'help', run: () => set({ aboutOpen: true }) },
+  { id: 'help.about', name: msg({ id: 'shell.command.help.about', defaultMessage: 'About {app}', description: "A command (the Help menu, the command palette), in the Help category. {app} is Combwork's name." }), nameValues: { app: APP_NAME }, category: 'help', run: () => set({ aboutOpen: true }) },
   { id: 'help.checkUpdates', name: msg({ id: 'shell.command.help.checkUpdates', defaultMessage: 'Check for Updates…', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category. The … says it opens a dialog first: keep it.' }), category: 'help', run: () => checkForUpdates() },
   { id: 'update.show', name: msg({ id: 'shell.command.update.show', defaultMessage: 'Show Combwork Update', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category.' }), category: 'help', when: () => ['available', 'downloading', 'ready'].includes(get().update?.status ?? ''), run: () => set({ updateOpen: true }) },
   { id: 'update.install', name: msg({ id: 'shell.command.update.install', defaultMessage: 'Restart and Update Combwork', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category.' }), category: 'help', when: () => get().update?.status === 'ready', run: (version?: unknown) => call('update:install', typeof version === 'string' ? version : undefined) },
   // Pausing the team before an update (HI-2081): every open workspace's lanes, wakes and hand-outs held until it resumes.
-  { id: 'team.pause', name: msg({ id: 'shell.command.team.pause', defaultMessage: 'Pause the Team', description: "A command (the command palette, Settings → Keyboard Shortcuts), in the Help category (HI-2081): before an update, Hive starts no lane card, wakes no agent with card events and gives no reviews out in every open workspace, and tells each running agent to park (finish its turn, end its runs, commit). The Progress panel's Lanes shows what still runs." }), category: 'help', when: () => hasWorkspace() && !workspacePaused(get().workspace?.path), run: () => void pauseTheTeam() },
+  { id: 'team.pause', name: msg({ id: 'shell.command.team.pause', defaultMessage: 'Pause the Team', description: "A command (the command palette, Settings → Keyboard Shortcuts), in the Help category (HI-2081): before an update, Combwork starts no lane card, wakes no agent with card events and gives no reviews out in every open workspace, and tells each running agent to park (finish its turn, end its runs, commit). The Progress panel's Lanes shows what still runs." }), category: 'help', when: () => hasWorkspace() && !workspacePaused(get().workspace?.path), run: () => void pauseTheTeam() },
   { id: 'team.resume', name: msg({ id: 'shell.command.team.resume', defaultMessage: 'Resume the Team', description: 'A command (the command palette, Settings → Keyboard Shortcuts), in the Help category (HI-2081): lifts the pause of every open workspace, so lanes start their cards and agents are woken again.' }), category: 'help', when: () => hasWorkspace() && workspacePaused(get().workspace?.path), run: () => void resumeTheTeam() },
   { id: 'update.releaseNotes', name: msg({ id: 'shell.command.update.releaseNotes', defaultMessage: "What's New in Combwork", description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category.' }), category: 'help', run: (version?: unknown) => openReleaseNotes(typeof version === 'string' ? version : get().appInfo?.version) },
   // As the window's X: with several open, it closes this one (stopping its workspace's agents); the last one goes to the tray or quits.
@@ -829,7 +829,7 @@ export function terminalReserved(provider?: ProviderId): Set<string> {
   return new Set(provider ? providerDescriptor(provider).reservedKeys : PROVIDERS.flatMap((p) => p.reservedKeys))
 }
 
-/** Keys the terminal must pass through to Hive instead of the agent. Chords are not started from the terminal. */
+/** Keys the terminal must pass through to Combwork instead of the agent. Chords are not started from the terminal. */
 export function isAppShortcut(e: KeyboardEvent, provider?: ProviderId, allKeysToCli = false): boolean {
   if (e.type !== 'keydown') return false
   const key = eventToKey(e)

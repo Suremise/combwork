@@ -1,8 +1,8 @@
 // Maximum agents (HI-2001), on fake Claude Code with no agent started: Agents per project from before (advanced.json's
-// 16, the workspace's own 5) becomes Hive's and the workspace's Maximum agents, and leaves advanced.json. A project on
+// 16, the workspace's own 5) becomes Combwork's and the workspace's Maximum agents, and leaves advanced.json. A project on
 // Solo (Maximum agents 1, one agent): the Agent API's add is refused (409), naming Maximum agents and where the user
 // raises it; the user's own too (HI-2058): + Add ▾'s entries greyed out with why, the shortcut's warning linking to
-// Version Control → Workflow. Hive's Team 6 + pool loaded by hand into it: with its workflow, the dialog says its 8 is
+// Version Control → Workflow. Combwork's Team 6 + pool loaded by hand into it: with its workflow, the dialog says its 8 is
 // saved with its agents; unticked, Load is greyed out with why and a link that opens Workflow, nothing loaded; loaded
 // with it, Maximum agents is 8 at once, the form showing it as the project's own, and Discard Changes keeps it; lowered
 // again in the form, the note says the agents stay; Team's preview shows the Maximum agents it sets against the value
@@ -37,8 +37,10 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
   const soloOptions = { review: 'none', dependenciesDone: true, maxAgents: 1 }
   fs.writeFileSync(path.join(solo, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'a-s1', name: 'SO-B1', workflowRole: 'builder', provider: 'claude-code' }], workflow: { platform: 'none', preset: 'solo', options: soloOptions } }))
   // Agents per project from before HI-2001: Settings → Advanced's (advanced.json) and this workspace's own.
+  // old-name: begin old-agents-setting
   fs.writeFileSync(path.join(userData, 'advanced.json'), JSON.stringify({ format: 1, values: { 'hive.agents.perProject': 16 } }))
   fs.writeFileSync(path.join(ws, '.combwork', 'workspace.json'), JSON.stringify({ advanced: { 'hive.agents.perProject': 5 } }))
+  // old-name: end old-agents-setting
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws, solo, assistantHome].map((p) => p.toLowerCase())))
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')
@@ -46,7 +48,7 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
   cfg.settings.providers['claude-code'].executablePath = path.join(__dirname, 'fake-claude', 'fake-claude.cmd')
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never', showTips: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' }, viewport: { width: 1500, height: 950 } })
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' }, viewport: { width: 1500, height: 950 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)
@@ -64,12 +66,14 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
       await inv('settings:update', { appearance: { theme: 'dark' } })
     }
 
-    // --- Agents per project carried over: Hive's 16 and the workspace's own 5, each its level's Maximum agents.
+    // --- Agents per project carried over: Combwork's 16 and the workspace's own 5, each its level's Maximum agents.
     const levelMax = async (level, platform) => (await inv('workflow:levelForm', level, platform)).own.maxAgents
-    check("Hive's Agents per project (16) is Maximum agents in Hive's workflow defaults, for None and Git", !!(await until(async () => (await levelMax('global', 'none')) === 16 && (await levelMax('global', 'git')) === 16)), JSON.stringify([await levelMax('global', 'none'), await levelMax('global', 'git')]))
+    check("Combwork's Agents per project (16) is Maximum agents in Combwork's workflow defaults, for None and Git", !!(await until(async () => (await levelMax('global', 'none')) === 16 && (await levelMax('global', 'git')) === 16)), JSON.stringify([await levelMax('global', 'none'), await levelMax('global', 'git')]))
     check("…and the workspace's own (5) in the workspace's", (await levelMax('workspace', 'none')) === 5 && (await levelMax('workspace', 'git')) === 5, JSON.stringify([await levelMax('workspace', 'none'), await levelMax('workspace', 'git')]))
     const advancedValues = () => JSON.parse(fs.readFileSync(path.join(userData, 'advanced.json'), 'utf8')).values ?? {}
+    // old-name: begin old-agents-setting-gone
     check('…and gone from advanced.json', !!(await until(() => !('hive.agents.perProject' in advancedValues()))), JSON.stringify(advancedValues()))
+    // old-name: end old-agents-setting-gone
 
     // --- On Solo: the Assistant, through the Agent API, keeps to Maximum agents (1); so does the user (HI-2058).
     const live = async (project, agentId) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === project.toLowerCase() && s.agentId === agentId && s.status !== 'stopped') ?? null
@@ -111,7 +115,7 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
     check('…which opens Version Control → Workflow, Maximum agents there', !!(await until(async () => (await box.count()) === 1 && (await box.inputValue()) === '1')), await text(page.locator('.vc-view')))
     check('…nothing added', JSON.stringify(agentNames()) === '["SO-B1"]', JSON.stringify(agentNames()))
 
-    // --- Hive's Team 6 + pool (8 agents) loaded by hand: its workflow raises Maximum agents with its agents (HI-2058).
+    // --- Combwork's Team 6 + pool (8 agents) loaded by hand: its workflow raises Maximum agents with its agents (HI-2058).
     const openLoad = async () => {
       // From the project's Session tab, where + Add ▾ is.
       await page.locator('.tabs .tab', { hasText: 'Session' }).first().click()

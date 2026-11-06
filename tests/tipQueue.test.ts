@@ -5,7 +5,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 vi.stubGlobal('window', {
-  hive: { invoke: async () => undefined, onEvent: () => () => undefined, send: () => undefined },
+  combwork: { invoke: async () => undefined, onEvent: () => () => undefined, send: () => undefined },
   addEventListener: () => undefined,
   removeEventListener: () => undefined,
   setInterval: () => 0,

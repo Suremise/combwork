@@ -8,7 +8,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { junction } from './pathAliases'
 
-const base = tempDir('hive-agenttemp-')
+const base = tempDir('cw-agenttemp-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -40,19 +40,19 @@ describe('the setting', () => {
   })
   it('takes one full path or a leading %VARIABLE%, and refuses two, a relative path, or text', () => {
     expect(checkAdvanced(def, 'D:\\agent-tmp')).toEqual({ value: ['D:\\agent-tmp'] })
-    expect(checkAdvanced(def, '%LOCALAPPDATA%\\hive-test\\agent-tmp')).toEqual({ value: ['%LOCALAPPDATA%\\hive-test\\agent-tmp'] })
+    expect(checkAdvanced(def, '%LOCALAPPDATA%\\combwork-test\\agent-tmp')).toEqual({ value: ['%LOCALAPPDATA%\\combwork-test\\agent-tmp'] })
     expect(checkAdvanced(def, [])).toEqual({ value: [] })
     for (const bad of ['D:\\a; E:\\b', 'agent-tmp', 'tmp\\x', 42]) expect('error' in checkAdvanced(def, bad), String(bad)).toBe(true)
     expect((checkAdvanced(def, 'agent-tmp') as { error: string }).error).toMatch(/one folder's full path/)
   })
-  it("reads the workspace's own over Hive's; empty, none", async () => {
+  it("reads the workspace's own over Combwork's; empty, none", async () => {
     expect(agentTempSetting(null)).toBeNull()
-    await advanced.set(AGENT_TEMP_FOLDER_ID, 'D:\\hive-wide')
-    expect(agentTempSetting(null)).toBe('D:\\hive-wide')
+    await advanced.set(AGENT_TEMP_FOLDER_ID, 'D:\\app-wide')
+    expect(agentTempSetting(null)).toBe('D:\\app-wide')
     const ws = { config: { advanced: { [AGENT_TEMP_FOLDER_ID]: ['E:\\own'] } } } as unknown as Parameters<typeof agentTempSetting>[0]
     expect(agentTempSetting(ws)).toBe('E:\\own')
     const emptied = { config: { advanced: { [AGENT_TEMP_FOLDER_ID]: [] } } } as unknown as Parameters<typeof agentTempSetting>[0]
-    expect(agentTempSetting(emptied)).toBe('D:\\hive-wide')
+    expect(agentTempSetting(emptied)).toBe('D:\\app-wide')
     await advanced.set(AGENT_TEMP_FOLDER_ID, [])
     expect(agentTempSetting(null)).toBeNull()
   })

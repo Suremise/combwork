@@ -1,5 +1,5 @@
-// Claude Code's agent view stays off in Hive's sessions: ← on an empty prompt must not move the session into
-// Claude Code's background service (where Hive can't see or stop it). Throwaway profile and workspace; no prompt
+// Claude Code's agent view stays off in Combwork's sessions: ← on an empty prompt must not move the session into
+// Claude Code's background service (where Combwork can't see or stop it). Throwaway profile and workspace; no prompt
 // is sent. If a background job appears anyway, it is stopped and removed. Claude Code runs in a home of the suite's
 // own with a made-up API key (lib.ownClaudeHome, #368), never the user's ~/.claude; the job check asks it about that home.
 const lib = require('./lib.cjs')
@@ -20,12 +20,12 @@ const check = (name, ok, extra = '') => {
   fs.mkdirSync(proj, { recursive: true })
   lib.enableProviders(userData, ['claude-code'])
   const claudeHome = lib.ownClaudeHome('agentview')
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47894), ...claudeHome.env })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47894), ...claudeHome.env })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   await lib.fitWindow(app, page, { width: 1200, height: 750 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const settings = await inv('settings:get')
   check('background sessions are off by default', settings.providers['claude-code'].allowBackgroundSessions === false)
@@ -48,8 +48,8 @@ const check = (name, ok, extra = '') => {
   await inv('pty:write', lib.ptyKey(proj, agent.id), '\x1b[D')
   await lib.sleep(6000) // A fixed wait on purpose: this checks that the session does NOT move into Claude Code's background view after ←.
   const left = jobs()
-  check('← on an empty prompt keeps the session in Hive', left.length === 0, JSON.stringify(left))
-  check('the session is still running in Hive', (await inv('session:live'))[0]?.status === 'ready')
+  check('← on an empty prompt keeps the session in Combwork', left.length === 0, JSON.stringify(left))
+  check('the session is still running in Combwork', (await inv('session:live'))[0]?.status === 'ready')
   for (const j of left) {
     try {
       execFileSync(claude, ['stop', j.id], { env: lib.childEnv(claudeHome.env) })

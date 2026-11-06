@@ -18,7 +18,7 @@ import { UsageMoveRuleRow } from './UsageMoveRule'
 import { AddConnectionDialog, MaskingBanner, ServerConnectionDetail, setUpConnection, setUpHint, setUpLabel } from './ServerConnections'
 
 /**
- * Settings → Accounts & Connections (HI-980; HI-2107, HI-2105's design). Accounts: Hive's sign-ins, each a CLI login in
+ * Settings → Accounts & Connections (HI-980; HI-2107, HI-2105's design). Accounts: Combwork's sign-ins, each a CLI login in
  * a folder of its own signed in through the CLI's own sign-in (nothing typed into it), servers it reaches, and
  * Copilot's one sign-in for the PC; in one order for every CLI (decision A), each on or off in this window's workspace.
  * Under each, its connections: the setups agents and the Assistant choose, each with who uses it.
@@ -35,10 +35,10 @@ const M = {
   rename: msg({ id: 'settings.accounts.rename', defaultMessage: 'Rename…', description: 'Button on a connection (Settings → Accounts & Connections): changes its name only.' }),
   renameTitle: msg({ id: 'settings.accounts.renameTitle', defaultMessage: 'Rename {name}', description: "Title of the dialog renaming a connection ({name}, its name)." }),
   renameConfirm: msg({ id: 'settings.accounts.renameConfirm', defaultMessage: 'Rename', description: 'The confirm button of the dialog renaming a connection.' }),
-  signIn: msg({ id: 'settings.accounts.signIn', defaultMessage: 'Sign In', description: "Button on a connection (Settings → Accounts & Connections): opens the CLI's own sign-in for it, in a terminal of Hive's." }),
+  signIn: msg({ id: 'settings.accounts.signIn', defaultMessage: 'Sign In', description: "Button on a connection (Settings → Accounts & Connections): opens the CLI's own sign-in for it, in a terminal of Combwork's." }),
   signInAgain: msg({ id: 'settings.accounts.signInAgain', defaultMessage: 'Sign In Again', description: "Button on a connection (Settings → Accounts & Connections) that is signed out, or whose login changed: opens the CLI's own sign-in for it again." }),
   signingIn: msg({ id: 'settings.accounts.signingIn', defaultMessage: "Signing in: finish in your browser, or in the terminal below. Combwork doesn't type into it.", description: "Settings → Accounts & Connections while a connection's sign-in terminal is open: the user signs in through the CLI's own flow." }),
-  signingInElsewhere: msg({ id: 'settings.accounts.signingInElsewhere', defaultMessage: 'Signing in, in another window', description: "A connection's line in Settings → Accounts & Connections while its sign-in is open in another of Hive's windows." }),
+  signingInElsewhere: msg({ id: 'settings.accounts.signingInElsewhere', defaultMessage: 'Signing in, in another window', description: "A connection's line in Settings → Accounts & Connections while its sign-in is open in another of Combwork's windows." }),
   signInFailed: msg({ id: 'settings.accounts.signInFailed', defaultMessage: "Couldn't open the sign-in", description: "An error's title: a connection's sign-in terminal couldn't be opened." }),
   close: msg({ id: 'settings.accounts.closeTerminal', defaultMessage: 'Close', description: "Button under a connection's sign-in or Set Up terminal (Settings → Accounts & Connections): hides it, ending the CLI in it if it still runs (asks first then)." }),
   closeRunningTitle: msg({ id: 'settings.accounts.closeRunningTitle', defaultMessage: 'Close the terminal?', description: "Title of the dialog asked by Close under a connection's sign-in or Set Up terminal while the CLI in it still runs (Settings → Accounts & Connections)." }),
@@ -73,7 +73,7 @@ const M = {
   moreProjects: msg({ id: 'settings.accounts.moreProjects', defaultMessage: '{n, plural, one {# more} other {# more}}', description: 'The last item of that list when it names only the first projects: how many more there are.' }),
   setUpIn: msg({ id: 'settings.accounts.setUpIn', defaultMessage: "It opens in {project}'s folder, {folder}: answer {cli}'s question to trust it.", description: "Above a connection's Set Up terminal when it opens in a project's folder its coding agent CLI ({cli}) doesn't trust yet (HI-1870): {project} is the project's name, {folder} the folder." }),
   setUpInWorkspace: msg({ id: 'settings.accounts.setUpInWorkspace', defaultMessage: "It opens in this workspace's folder, {folder}: answer {cli}'s question to trust it, and with it every project in it that isn't a Git repository. A Git repository is asked in its own folder next.", description: "Above a connection's Set Up terminal when it opens in the open workspace's folder (HI-1871): the coding agent CLI ({cli}) asks once whether to trust that folder; trusting it covers the projects inside it that aren't Git repositories, and Set Up then asks in each Git repository's own folder (HI-2520). {folder} is the folder." }),
-  setUpChecking: msg({ id: 'settings.accounts.setUpChecking', defaultMessage: 'Checking…', description: "A connection's state (Settings → Accounts & Connections, HI-1870): Hive is still reading whether its coding agent CLI trusts the open workspace's project folders, so it doesn't say yet whether it is set up." }),
+  setUpChecking: msg({ id: 'settings.accounts.setUpChecking', defaultMessage: 'Checking…', description: "A connection's state (Settings → Accounts & Connections, HI-1870): Combwork is still reading whether its coding agent CLI trusts the open workspace's project folders, so it doesn't say yet whether it is set up." }),
   setUpNeeded: msg({ id: 'settings.accounts.setUpNeeded', defaultMessage: 'Needs set up', description: "A connection's state (Settings → Accounts & Connections, HI-1870): its CLI's one-time first-run setup (Set Up, a button beside it) hasn't been done in its folder yet." }),
   setUpDone: msg({ id: 'settings.accounts.setUpDone', defaultMessage: 'Set up', description: "A connection's state (Settings → Accounts & Connections, HI-1870): its CLI's one-time first-run setup is done. An adjective (\"is set up\"), not the button." }),
   checkedAt: msg({ id: 'settings.accounts.checkedAt', defaultMessage: 'Checked {when}', description: "The tooltip of a connection's state (Settings → Accounts & Connections): when it was last checked. {when} is how long ago (\"5 min ago\")." }),
@@ -122,9 +122,9 @@ const STATE: Record<ConnectionState, ReturnType<typeof msg>> = {
   signedIn: msg({ id: 'settings.accounts.state.signedIn', defaultMessage: 'Signed in', description: "A connection's state (Settings → Accounts & Connections)." }),
   signedOut: msg({ id: 'settings.accounts.state.signedOut', defaultMessage: 'Signed out', description: "A connection's state (Settings → Accounts & Connections): the CLI says its folder isn't signed in." }),
   changed: msg({ id: 'settings.accounts.state.changed', defaultMessage: 'Login changed', description: "A connection's state (Settings → Accounts & Connections): signed in as another login than the one it was added with." }),
-  failed: msg({ id: 'settings.accounts.state.failed', defaultMessage: "Couldn't check", description: "A connection's state (Settings → Accounts & Connections): Hive couldn't ask the CLI who it's signed in as (not the same as signed out)." }),
-  missing: msg({ id: 'settings.accounts.state.missing', defaultMessage: 'Folder missing', description: "A connection's state (Settings → Accounts & Connections): its folder isn't there, or isn't the one Hive made." }),
-  unchecked: msg({ id: 'settings.accounts.state.unchecked', defaultMessage: 'Not checked yet', description: "A connection's state (Settings → Accounts & Connections): Hive hasn't asked the CLI yet." })
+  failed: msg({ id: 'settings.accounts.state.failed', defaultMessage: "Couldn't check", description: "A connection's state (Settings → Accounts & Connections): Combwork couldn't ask the CLI who it's signed in as (not the same as signed out)." }),
+  missing: msg({ id: 'settings.accounts.state.missing', defaultMessage: 'Folder missing', description: "A connection's state (Settings → Accounts & Connections): its folder isn't there, or isn't the one Combwork made." }),
+  unchecked: msg({ id: 'settings.accounts.state.unchecked', defaultMessage: 'Not checked yet', description: "A connection's state (Settings → Accounts & Connections): Combwork hasn't asked the CLI yet." })
 }
 const STATE_ICON: Record<ConnectionState, string> = { signedIn: 'pass-filled', signedOut: 'circle-slash', changed: 'warning', failed: 'question', missing: 'warning', unchecked: 'circle-outline' }
 
@@ -211,7 +211,7 @@ export function AccountsSettings() {
   const affected = (projects ?? []).flatMap((p) => p.agents).filter((a) => a.live?.launchedConnection && !a.live.switchPending && connectionOf(a.connection, a.live.provider, a.live.launchedConnection, view)?.other).length
   const dups = duplicateLogins(view.connections)
   const nameOf = (id: string): string => view.connections.find((a) => a.id === id)?.name ?? id
-  // One list in the one order (decision A): Hive's accounts of the CLIs turned on, and Copilot's sign-in while it is on.
+  // One list in the one order (decision A): Combwork's accounts of the CLIs turned on, and Copilot's sign-in while it is on.
   const byId = new Map<string, AccountView | Account>([...view.connections, ...view.homes].map((a) => [a.id, a]))
   const shown = view.order.map((id) => byId.get(id)).filter((a): a is AccountView | Account => !!a && (a.home ? a.id === COPILOT_ACCOUNT && isProviderEnabled(settings, a.provider) : view.providers.includes(a.provider)))
   // Its place in the one order, every account counted (those hidden here too): what a move names.
@@ -392,7 +392,7 @@ export function AccountsSettings() {
     )
   }
 
-  /** GitHub Copilot's one sign-in for the PC (decision C): no folder, sign-in or removal of Hive's; its ⋯ opens Provider Setup. */
+  /** GitHub Copilot's one sign-in for the PC (decision C): no folder, sign-in or removal of Combwork's; its ⋯ opens Provider Setup. */
   const copilotRow = (a: Account) => {
     const who = copilotInfo?.account
     return (

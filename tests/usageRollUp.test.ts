@@ -30,9 +30,9 @@ function transcript(path: string, at: number, n: number): void {
 type Timelines = (StoredSession & { timeline: UsageTimeline | null; summary: UsageSummary; firstActivity: string | null; lastActivity: string | null })[]
 
 async function setup(advanced: Record<string, unknown> = {}) {
-  const dir = tempDir('hive-usage-rollup-')
+  const dir = tempDir('cw-usage-rollup-')
   const file = join(dir, '.combwork', 'usage.db')
-  await call({ type: 'config', advanced, providers: DEFAULT_SETTINGS.providers, hiveVersion: '9.9.9-test' })
+  await call({ type: 'config', advanced, providers: DEFAULT_SETTINGS.providers, appVersion: '9.9.9-test' })
   const session = async (name: string, at: number, n: number): Promise<void> => {
     const path = join(dir, `${name}.jsonl`)
     transcript(path, at, n)
@@ -173,10 +173,10 @@ describe("an ended session's timeline in 1-hour steps (HI-1648)", () => {
     await t.session('month', Date.now() - 30 * DAY, 100)
     expect(await t.rollUp()).toMatchObject({ sessions: 0 })
     expect((await t.timeline('month')).step).toBe(1)
-    await call({ type: 'config', advanced: { [USAGE_TIMELINE_DETAIL_DAYS]: 20 }, providers: DEFAULT_SETTINGS.providers, hiveVersion: '9.9.9-test' })
+    await call({ type: 'config', advanced: { [USAGE_TIMELINE_DETAIL_DAYS]: 20 }, providers: DEFAULT_SETTINGS.providers, appVersion: '9.9.9-test' })
     expect(await t.rollUp()).toMatchObject({ sessions: 1 })
     expect((await t.timeline('month')).step).toBe(COARSE_STEP)
-    await call({ type: 'config', advanced: {}, providers: DEFAULT_SETTINGS.providers, hiveVersion: '9.9.9-test' })
+    await call({ type: 'config', advanced: {}, providers: DEFAULT_SETTINGS.providers, appVersion: '9.9.9-test' })
     await t.close()
   })
 

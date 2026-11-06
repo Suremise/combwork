@@ -1,16 +1,17 @@
 // Which e2e suites a change needs (npm run e2e -- --affected [base]): for review rounds that fixed a few things, rather
 // than the whole set. A tool, not a merge's gate: merges run focused checks (#1010, tests/e2e/README.md). Errs towards more, never fewer: the files every
-// part of Hive goes through, the test tooling, and any file that isn't in an area or known to need no suite (DOCS_ONLY,
+// part of Combwork goes through, the test tooling, and any file that isn't in an area or known to need no suite (DOCS_ONLY,
 // the unit tests'), mean every suite. The full set itself runs at checkpoints (each RC and release, on request:
 // tests/e2e/README.md). Suites that start a real CLI (the real tier) are picked only when a change touches what they
 // cover (an area naming them, or REAL_TIER), which is when a merge also needs the real tier. tests/e2esuites.test.ts
 // checks that every suite is in an area, every source file is covered, and what no area names falls back to every suite.
 //
-// `node tests/e2e/affected.mjs --pick` is the hive project's focused-test picker (HI-1367, the merge queue's "each
+// `node tests/e2e/affected.mjs --pick` is this repository's focused-test picker (HI-1367, the merge queue's "each
 // card's focused tests"): see pickTests and UNIT_SCANS below. Imported (run.mjs, the unit tests), it does nothing.
 import { execFileSync, spawnSync } from 'child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'fs'
 import { createRequire } from 'module'
+import { SCOPE_FILES as PRESENCE_SCOPE } from '../presenceChecks.mjs'
 import { join, resolve } from 'path'
 import { pathToFileURL } from 'url'
 
@@ -33,14 +34,14 @@ export const EVERYTHING = [
   'src/main/openingFence.ts',
   'src/main/paths.ts',
   'src/main/logger.ts',
-  // Its thread writes every line hive.log and hooks.log get (HI-1730).
+  // Its thread writes every line combwork.log and hooks.log get (HI-1730).
   'src/main/logWriter.ts',
   // Every IPC call, database step and slow log write is marked through it (HI-1692).
   'src/main/stallWork.ts',
   'src/main/ptyHost.ts',
   'src/main/testQuiet.ts',
   // Every IPC call's errors and the Agent API's go through it (#845).
-  'src/main/hiveError.ts',
+  'src/main/combworkError.ts',
   // The language (#767): chosen before every window starts, and every translated text goes through it.
   'src/main/i18n.ts',
   'src/renderer/src/i18n.ts',
@@ -125,9 +126,9 @@ export const AREAS = [
   { paths: ['src/main/workflow/reconcile.ts', 'src/main/workflow/reconciler.ts', 'src/main/platform/observe.ts'], suites: ['mergeburst'] },
   // The real CLIs' background processes (#515): only when what tracks them changes, not with every sessions.ts change.
   { paths: ['src/main/agentProcesses.ts', 'src/main/processSupervisor.ts', 'src/main/launchGate.ts'], suites: ['leftovers-claude', 'leftovers-codex'] },
-  // The Agent API for apps that show Hive (#620): viewer tokens, the discovery file, the event stream's events.
+  // The Agent API for apps that show Combwork (#620): viewer tokens, the discovery file, the event stream's events.
   { paths: ['src/main/apiEvents.ts', 'src/shared/assistantActivity.ts', 'src/main/activityTargets.ts', 'src/main/apiDiscovery.ts', 'src/main/viewerTokens.ts', 'src/main/notices.ts', 'src/main/progressService.ts', 'src/main/mergeSlots.ts'], suites: ['viewer'] },
-  // The developer console (#636): capture, its rings and redaction, the agents' reads and the hive tool's replies.
+  // The developer console (#636): capture, its rings and redaction, the agents' reads and the Combwork tool's replies.
   { paths: ['src/main/devConsole.ts', 'src/main/devConsoleSources.ts', 'src/main/devConsoleWords.ts', 'src/shared/devConsole.ts', 'tests/e2e/devconsole.cjs', 'src/main/mergeSlotHost.ts', 'src/main/watches.ts', 'src/main/sessions.ts', 'src/main/servers.ts'], suites: ['devconsole', 'replysize'] },
   { paths: ['src/main/consoleWindow.ts', 'src/renderer/src/ConsoleApp.tsx', 'src/renderer/src/styles/console.css', 'src/renderer/src/main.tsx', 'src/shared/consoleView.ts', 'src/shared/devConsole.ts', 'src/main/devConsole.ts', 'src/main/devConsoleSources.ts', 'src/renderer/src/components/TitleBar.tsx', 'tests/e2e/consolewindow.cjs'], suites: ['consolewindow'] },
   { paths: ['src/main/consoleRecorder.ts', 'src/shared/consoleFixtures.mts', 'src/shared/devConsole.ts', 'src/main/devConsole.ts', 'src/main/providers/copilot/adapter.ts', 'src/main/providers/copilot/events.ts', 'src/main/screenRecognition.ts', 'tests/fixtures/console/copilot.json', 'scripts/consoleFixture.mjs', 'tests/e2e/contract-copilot.cjs'], suites: ['contract-copilot', 'devconsole'] },
@@ -136,20 +137,20 @@ export const AREAS = [
   { paths: ['src/main/consoleWindow.ts', 'src/renderer/src/ConsoleApp.tsx', 'src/renderer/src/styles/console.css', 'src/shared/devConsole.ts', 'src/main/devConsole.ts', 'src/main/ipc.ts', 'src/shared/advanced.ts', 'src/main/advanced.ts', 'src/shared/redact.ts', 'tests/e2e/consoletext.cjs'], suites: ['consoletext'] },
   // The developer console's flight recorder (#698): its triggers, captures and notices.
   { paths: ['src/main/flightRecorder.ts', 'src/shared/flightRecorder.ts', 'src/main/consoleRecorder.ts', 'tests/e2e/flightrecorder.cjs'], suites: ['flightrecorder'] },
-  // Advanced settings (#367): the list, advanced.json, the workspace's own values, and what uses them (the hive MCP server's waits).
+  // Advanced settings (#367): the list, advanced.json, the workspace's own values, and what uses them (the combwork MCP server's waits).
   { paths: ['src/main/advanced.ts', 'src/shared/advanced.ts', 'src/renderer/src/advanced.ts', 'src/renderer/src/components/AdvancedSettings.tsx', 'src/main/diagnostics.ts', 'src/shared/settingsCatalog.ts', 'tests/fixtures/advanced/', 'tests/e2e/advanced.cjs'], suites: ['advanced'] },
   { paths: ['src/main/advanced.ts'], suites: ['replysize', 'assistantsettings'] },
-  // The hive tools' description limits (HI-2012): replysize checks them.
+  // The Combwork tools' description limits (HI-2012): replysize checks them.
   { paths: ['tests/e2e/toolLimits.cjs'], suites: ['replysize'] },
   { paths: ['src/main/journal.ts', 'src/main/journalService.ts', 'src/main/walCheckpoint.ts', 'src/main/walCheckpointWorker.ts','src/shared/journal.ts', 'src/renderer/src/components/JournalSettings.tsx', 'tests/e2e/journal.cjs'], suites: ['journal', 'replysize'] },
   { paths: ['src/main/startView.ts', 'src/shared/startView.ts'], suites: ['journal', 'assistantcompact', 'assistantresume'] },
-  // Builds recorded as facts (#1534): the scripts' side, Hive's route and markers, the Advanced switch.
+  // Builds recorded as facts (#1534): the scripts' side, Combwork's route and markers, the Advanced switch.
   { paths: ['scripts/buildFact.mjs', 'src/main/buildFacts.ts', 'src/shared/buildFacts.ts', 'src/renderer/src/components/journalBuilds.ts', 'src/main/journalService.ts', 'src/shared/advanced.ts', 'tests/e2e/buildfacts.cjs'], suites: ['buildfacts'] },
   // The journal browser (#1033): the store's browse and forget, its IPC, the Assistant view's Journal.
   { paths: ['src/main/journal.ts', 'src/main/journalService.ts', 'src/shared/journal.ts', 'src/renderer/src/components/JournalView.tsx', 'src/renderer/src/components/journalBuilds.ts', 'src/renderer/src/components/AssistantView.tsx', 'tests/e2e/journalbrowse.cjs'], suites: ['journalbrowse'] },
   // Disable hardware acceleration (#676): the early read, the restart offer, the terminals' renderer, diagnostics.
   { paths: ['src/main/gpu.ts', 'src/shared/advanced.ts', 'src/main/advanced.ts', 'src/renderer/src/components/AdvancedSettings.tsx', 'src/renderer/src/components/TerminalView.tsx', 'src/main/diagnostics.ts', 'tests/e2e/hwaccel.cjs'], suites: ['hwaccel'] },
-  { paths: ['src/main/agentTokens.ts'], suites: ['boardscope', 'review', 'progress', 'progressreport', 'cardloop', 'replysize', 'hivetools'] },
+  { paths: ['src/main/agentTokens.ts'], suites: ['boardscope', 'review', 'progress', 'progressreport', 'cardloop', 'replysize', 'combworktools'] },
   { paths: ['src/main/assistantControl.ts', 'src/main/assistantChanges.ts', 'src/main/assistantUndo.ts', 'src/shared/assistantActivity.ts', 'src/main/activityTargets.ts', 'src/main/taskBatch.ts', 'src/shared/assistant.ts', 'src/shared/assistantStatus.ts', 'src/shared/assistantTools.ts', 'src/main/modes.ts', 'src/renderer/src/components/Assistant.tsx', 'src/renderer/src/components/AssistantChanges.tsx', 'src/renderer/src/assistantUndo.ts', 'src/shared/assistantChangeList.ts', 'src/renderer/src/components/AssistantMark.tsx', 'src/renderer/src/components/AssistantView.tsx', 'src/renderer/src/components/Modes.tsx', 'src/shared/modeDescriptions.ts'], suites: ['assistantside', 'assistant', 'assistant-control', 'assistantend', 'assistantimages', 'tipcorner', 'replysize', 'claude-real', 'assistantoverview', 'assistantbatch', 'assistantcompact', 'assistantsettings', 'assistantmode', 'cardchip', 'assistantpanel', 'assistantundo'] },
   { paths: ['src/main/installDir.ts'], suites: ['installdir'] },
   { paths: ['src/main/benchmarks.ts', 'src/shared/benchmark.ts', 'src/renderer/src/views/PerformanceCompare.tsx'], suites: ['perfcompare'] },
@@ -158,7 +159,7 @@ export const AREAS = [
   { paths: ['src/main/metrics.ts', 'src/main/metricsUsage.ts', 'src/shared/metrics.ts', 'src/shared/metricsView.ts', 'src/renderer/src/views/Performance.tsx'], suites: ['performance', 'perfcompare', 'bridgereport', 'perftable', 'cardcost'] },
   // A launch's side of the workflow for its metrics (HI-2049): replysize checks each real launch's guidance and tool list carry it.
   { paths: ['src/main/launchSides.ts', 'src/shared/workflow/roles.ts'], suites: ['replysize'] },
-  // The hive tool list's parts as the bridge measures them (HI-2063): replysize checks a real launch's, bridgereport the bridge's reports.
+  // The Combwork tool list's parts as the bridge measures them (HI-2063): replysize checks a real launch's, bridgereport the bridge's reports.
   { paths: ['src/shared/toolListSize.ts'], suites: ['replysize', 'bridgereport'] },
   { paths: ['src/main/branchWatch.ts', 'src/main/git.ts', 'src/main/worktrees.ts'], suites: ['unmerged', 'agents', 'changes', 'paneheader', 'claude-real', 'wsmove', 'wtrecreate', 'removeall', 'gitmissing', 'unusedwt', 'changespicker', 'gitview'] },
   // git.ts's processes, started off main's thread (HI-1783): git.ts's suites.
@@ -187,23 +188,23 @@ export const AREAS = [
   { paths: ['tests/e2e/unusedslots.cjs'], suites: ['unusedslots'] },
   { paths: ['src/main/branchMerge.ts', 'src/renderer/src/components/BranchMerge.tsx', 'tests/e2e/mergedialogslots.cjs'], suites: ['mergedialogslots'] },
   { paths: ['src/renderer/src/mergeChoice.ts'], suites: ['mergedialogslots', 'agents-ui'] },
-  { paths: ['src/main/combworkMove.ts', 'src/main/hiveFolder.ts', 'src/main/hiveMoveWorker.ts', 'src/shared/hiveFolderMove.ts', 'tests/e2e/hivefolder.cjs'], suites: ['hivefolder', 'hivevcs', 'wsmove'] },
+  { paths: ['src/main/combworkMove.ts', 'src/main/combworkFolder.ts', 'src/main/combworkMoveWorker.ts', 'src/main/boardFileMove.ts', 'src/main/nameUpgrade.ts', 'src/main/nameUpgradeFiles.ts', 'src/main/nameUpgradeProjects.ts', 'src/main/nameUpgradeValues.ts', 'src/main/storedNames.ts', 'src/main/fsPresence.ts', 'src/shared/combworkFolderMove.ts', 'tests/e2e/combworkfolder.cjs'], suites: ['combworkfolder', 'combworkvcs', 'wsmove'] },
   { paths: ['src/main/workspaceMove.ts', 'src/main/viewPrefs.ts', 'src/shared/movePaths.ts', 'src/renderer/src/components/MoveRepair.tsx', 'src/main/agentWorktree.ts', 'src/shared/projectIds.ts', 'src/main/beforeIds.ts', 'src/main/leftovers.ts', 'src/main/projectRename.ts', 'src/main/projectNames.ts'], suites: ['wsmove', 'wtrecreate', 'projectrename', 'repairbranches', 'repairdefender'] },
   { paths: ['src/main/bundled.ts', 'src/main/bundledHistory.json', 'src/main/skills.ts', 'src/main/revisions.ts', 'src/renderer/src/components/Skills.tsx', 'src/shared/skillDescriptions.ts', 'src/shared/skillLinks.ts'], suites: ['skills', 'skillaudience', 'skilldelivery'] },
-  { paths: ['src/main/guidance.ts', 'src/shared/hiveGuidance.ts', 'src/shared/toolReplies.ts', 'src/shared/hiveToolLoad.ts', 'src/main/mcp/'], suites: ['skilldelivery', 'replysize', 'mcp', 'bridgereport', 'cardloop', 'slotguidance'] },
+  { paths: ['src/main/guidance.ts', 'src/shared/combworkGuidance.ts', 'src/shared/toolReplies.ts', 'src/shared/combworkToolLoad.ts', 'src/main/mcp/'], suites: ['skilldelivery', 'replysize', 'mcp', 'bridgereport', 'cardloop', 'slotguidance'] },
   // Agent text (HI-2065): the module every agent message is said through, and its extracted catalogue and schema; the
-  // canary runs through the built hive-mcp.js in agentguidance.
+  // canary runs through the built cw-mcp.js in agentguidance.
   { paths: ['src/shared/agentText/', 'agent-text/catalogue/', 'agent-text/schema/', 'src/main/apiText.ts', 'src/main/sessionText.ts'], suites: ['agentguidance', 'replysize', 'mcp', 'skilldelivery', 'bridgereport'] },
   // HI-2245: a builder's card watch and cw_lane next saying its card in Review has unsubmitted commits.
   { paths: ['src/main/unsubmitted.ts', 'src/shared/unsubmitted.ts'], suites: ['replysize', 'cardloop'] },
   // HI-2285: a lane's builder watching its own card while nothing waits on it: its watch's reply, and the stall.
   { paths: ['src/main/idleWatch.ts', 'src/shared/idleWatch.ts'], suites: ['replysize', 'cardloop', 'lanewatch'] },
-  // Hive's skill copies per folder and the skills delivered (#1431).
+  // Combwork's skill copies per folder and the skills delivered (#1431).
   { paths: ['src/main/skillCopies.ts', 'src/shared/skillDelivery.ts', 'src/main/providers/common.ts'], suites: ['skilldelivery', 'skills'] },
   { paths: ['src/main/workspaceNotes.ts', 'src/shared/workspaceNotes.ts', 'src/renderer/src/components/WorkspaceNotes.tsx', 'src/main/providers/claude/adapter.ts', 'src/main/providers/codex/adapter.ts', 'src/main/providers/copilot/adapter.ts'], suites: ['workspacenotes'] },
   { paths: ['src/main/cardSessions.ts', 'src/renderer/src/components/CardChip.tsx'], suites: ['cardchip', 'sessionorigin'] },
   { paths: ['src/main/cardAttachments.ts', 'src/shared/cardAttachments.ts', 'src/renderer/src/components/CardAttachments.tsx', 'src/renderer/src/cardAttachLinks.ts', 'src/main/attachmentsFolder.ts', 'src/main/cardAttachmentCleanup.ts', 'src/main/cardCleanupFs.ts', 'src/shared/cardCleanup.ts', 'tests/e2e/cardattach.cjs'], suites: ['cardattach', 'storage', 'files', 'carddialog', 'attachread'] },
-  // A card's attachment read through Hive (HI-1751).
+  // A card's attachment read through Combwork (HI-1751).
   { paths: ['tests/e2e/attachread.cjs'], suites: ['attachread'] },
   // Accounts (HI-980): the store, its checks and watches, Settings → Accounts, and the fake's sign-in.
   { paths: ['src/main/accounts.ts', 'src/shared/accounts.ts', 'src/renderer/src/components/AccountsSettings.tsx', 'src/renderer/src/components/accountCard.ts', 'tests/e2e/accounts.cjs'], suites: ['accounts', 'connections', 'connections-codex', 'connections-server', 'usagemove'] },
@@ -216,7 +217,7 @@ export const AREAS = [
   { paths: ['src/main/planUsage.ts', 'src/renderer/src/connectionUsage.ts', 'tests/e2e/connectionusage.cjs'], suites: ['connectionusage', 'planusage'] },
   { paths: ['src/main/usageMoves.ts', 'src/shared/usageMoves.ts', 'src/main/connectionSwitch.ts', 'src/main/agentChoice.ts', 'src/renderer/src/components/UsageMoveRule.tsx', 'tests/e2e/usagemove.cjs'], suites: ['usagemove'] },
   // The Agent API and connections (HI-1771): references, visibility, the agent routes' connection, the status.
-  { paths: ['src/main/servers.ts', 'src/main/mcp/hive-mcp.ts', 'tests/e2e/connectionapi.cjs'], suites: ['connectionapi'] },
+  { paths: ['src/main/servers.ts', 'src/main/mcp/cw-mcp.ts', 'tests/e2e/connectionapi.cjs'], suites: ['connectionapi'] },
   // Model, effort and context belong to the connection (HI-1770): the resolver, the move, the defaults and the notice.
   { paths: ['src/shared/connectionDefaults.ts', 'src/main/connectionMoves.ts', 'src/renderer/src/components/ConnectionDefaults.tsx', 'tests/e2e/connectiondefaults.cjs'], suites: ['connectiondefaults', 'connections', 'context'] },
   // The agent rows and templates name connections (HI-1769).
@@ -231,6 +232,8 @@ export const AREAS = [
   { paths: ['src/main/files.ts', 'src/renderer/src/views/FilesTab.tsx', 'src/renderer/src/components/FileView.tsx', 'src/renderer/src/components/DocEditor.tsx', 'src/renderer/src/components/Editors.tsx', 'src/renderer/src/editorDrafts.ts', 'src/renderer/src/monaco.ts', 'src/renderer/src/monacoLang.ts'], suites: ['files', 'editor', 'drafts', 'unsaved', 'icons', 'image', 'assistantimages', 'asarfiles'] },
   { paths: ['src/main/attachmentsFolder.ts', 'src/shared/attachments.ts', 'src/renderer/src/attach.ts', 'src/renderer/src/components/AttachmentChips.tsx'], suites: ['image', 'files', 'assistantimages', 'storage', 'storageclose', 'dialogs', 'asarfiles', 'codex-extra'] },
   { paths: ['src/main/heldLine.ts', 'tests/e2e/idlequestion.cjs'], suites: ['idlequestion', 'wakeuntaken'] },
+  // Codex's offer of a cheaper model (HI-2609): read on its screen, hidden per launch, and a model switch marked.
+  { paths: ['tests/e2e/codexnudge.cjs', 'src/main/providers/codex/adapter.ts', 'src/renderer/src/views/ActivityTab.tsx'], suites: ['codexnudge'] },
   { paths: ['tests/e2e/inputblocked.cjs', 'src/main/lineWriter.ts', 'src/main/slotCards.ts'], suites: ['inputblocked', 'idlequestion'] },
   { paths: ['src/main/hookStatus.ts', 'src/main/terminalTitle.ts', 'src/shared/terminalInput.ts'], suites: ['background', 'idlequestion', 'attention', 'mode', 'busy', 'codex', 'codex-background', 'signin', 'idlestatus', 'turnledger', 'safeguards'] },
   // The turn ledger (#648): status by the CLIs' turn ids, reconciliation, the unknown state and Mark idle.
@@ -240,7 +243,7 @@ export const AREAS = [
   // Hooks health (#1336): an agent whose hooks stop arriving shows as unknown, takes no lines, and pauses its lane.
   { paths: ['src/main/hooksHealth.ts', 'src/main/readiness.ts'], suites: ['hookshealth', 'hookstranscript', 'turnledger', 'idlestatus'] },
   { paths: ['src/main/turnsReader.ts', 'src/main/providers/turns.ts', 'src/main/providers/claude/turns.ts', 'src/main/providers/codex/turns.ts', 'src/main/providers/copilot/turns.ts', 'tests/e2e/hookstranscript.cjs', 'tests/e2e/hookscopilot.cjs'], suites: ['hookstranscript', 'hookscopilot', 'hookshealth'] },
-  // The rendered screen Hive reads Claude Code's footer (the live permission mode) from.
+  // The rendered screen Combwork reads Claude Code's footer (the live permission mode) from.
   { paths: ['src/main/terminalScreen.ts'], suites: ['mode', 'assistant', 'wakepaste'] },
   // The footer's mode read from that screen, by Claude Code's and Copilot's per-mode patterns (#696).
   { paths: ['src/shared/footerModes.ts'], suites: ['mode', 'copilot', 'advanced'] },
@@ -257,7 +260,7 @@ export const AREAS = [
   // Models and capabilities from the CLIs, and their fallbacks (#125).
   { paths: ['src/shared/models.ts', 'tests/fixtures/claude-initialize.json', 'tests/fixtures/codex-debug-models.json'], suites: ['models', 'assistant', 'footerfit', 'agents-ui', 'automode'] },
   { paths: ['src/main/power.ts', 'src/shared/keepAwake.ts'], suites: ['quitwait', 'quit'] },
-  // The close commands (HI-1368): run as a workspace closes and as Hive quits, after the drain of its writes.
+  // The close commands (HI-1368): run as a workspace closes and as Combwork quits, after the drain of its writes.
   { paths: ['src/main/closeCommand/', 'src/main/dbWrites.ts', 'src/shared/closeCommand.ts', 'src/shared/commands.ts', 'src/main/openGate.ts', 'src/renderer/src/components/CloseCommandPanel.tsx', 'src/renderer/src/components/CommandsSettings.tsx', 'tests/e2e/onclose/', 'tests/e2e/onopen.cjs'], suites: ['onclose', 'onopen', 'quit', 'closewindow'] },
   { paths: ['src/main/progress.ts', 'src/main/progressService.ts', 'src/shared/progress.ts', 'src/renderer/src/components/Progress.tsx', 'src/renderer/src/components/ShowAllList.tsx', 'src/shared/progressTabs.ts', 'tests/e2e/progresstabs.cjs'], suites: ['progress', 'progressgates', 'progresslanes', 'progressreport', 'progressstates', 'progresstabs', 'replysize'] },
   { paths: ['src/renderer/src/components/ProgressLanes.tsx', 'src/renderer/src/components/ProgressMerge.tsx', 'src/renderer/src/laneSource.ts', 'src/shared/laneBar.ts', 'tests/e2e/progressgates.cjs'], suites: ['agentstable', 'lanestages', 'lanestart', 'progressgates', 'progresslanes', 'cardcost'] },
@@ -282,9 +285,9 @@ export const AREAS = [
   { paths: ['tests/e2e/maxagents.cjs', 'src/shared/agentLimits.ts', 'src/renderer/src/components/ManyAgentsNote.tsx', 'src/main/workflow/preferences.ts', 'src/shared/workflow/preferences.ts'], suites: ['maxagents', 'agents24'] },
   { paths: ['src/main/repoLock.ts', 'src/main/repoLockCore.ts', 'src/main/repoLockWorker.ts', 'tests/e2e/repolock.cjs'], suites: ['repolock', 'repolocktyping', 'gitview', 'mergeslot'] },
   { paths: ['src/main/workflow/queueHost.ts', 'src/main/workflow/mergeQueue.ts', 'src/main/workflow/mergeMessage.ts', 'src/main/workflow/queueRunner.ts', 'src/main/workflow/queueJobs.ts', 'src/main/workflow/queueChecks.ts', 'src/main/workflow/queueChecksApp.ts', 'src/main/repoLock.ts', 'tests/e2e/queueFixture.cjs', 'tests/e2e/mergequeue.cjs'], suites: ['mergequeue', 'queueagents', 'queueupgrade'] },
-  // Agents under Hive merges (#1354): the refusals, the wakes and the card's queue state.
+  // Agents under Combwork merges (#1354): the refusals, the wakes and the card's queue state.
   { paths: ['src/main/workflow/queueState.ts', 'src/shared/workflow/refusals.ts', 'src/main/mergeSlots.ts', 'tests/e2e/queueagents.cjs'], suites: ['queueagents'] },
-  // Each card's focused tests (G20, HI-1367): chosen at submit, run by the merge queue; the hive project's picker and runner.
+  // Each card's focused tests (G20, HI-1367): chosen at submit, run by the merge queue; this repository's picker and runner.
   { paths: ['tests/e2e/queuefocused.cjs', 'scripts/focusedTests.mjs'], suites: ['queuefocused'] },
   // The queue's controls (#1353): its model, Pause/Resume, Remove from queue and Retry merge, cw_queue.
   { paths: ['src/main/workflow/mergeQueue.ts', 'src/main/workflow/queueHost.ts', 'src/main/workflow/queueControls.ts', 'src/main/folderFence.ts', 'src/shared/workflow/facts.ts', 'tests/e2e/queueFixture.cjs', 'tests/e2e/mergequeuefolder.cjs', 'tests/e2e/mergequeuecrash.cjs'], suites: ['mergequeuecrash', 'mergequeuefolder'] },
@@ -292,16 +295,16 @@ export const AREAS = [
   { paths: ['src/main/workflow/queueControls.ts', 'src/shared/workflow/queue.ts', 'src/main/workflow/mergeQueue.ts', 'src/main/workflow/queueHost.ts', 'src/main/cardIntents.ts', 'tests/e2e/queueFixture.cjs', 'tests/e2e/queuecontrols.cjs'], suites: ['queuecontrols', 'replysize'] },
   // The queue on the card, in the Git tab and in the Merge dialog (#1357).
   { paths: ['src/renderer/src/components/CardQueue.tsx', 'src/renderer/src/components/GitQueueSection.tsx', 'src/renderer/src/components/CardWork.tsx', 'src/renderer/src/components/ForYou.tsx', 'src/renderer/src/components/AgentDialogs.tsx', 'src/shared/workflow/workView.ts', 'src/main/workflow/queueControls.ts', 'src/shared/workflow/queue.ts', 'tests/e2e/queueFixture.cjs', 'tests/e2e/queuecard.cjs'], suites: ['queuecard'] },
-  // The queue in the Progress panel (#1356): its cards, Pulse's line, the badge, the announcements, Hive's runs in Runs.
+  // The queue in the Progress panel (#1356): its cards, Pulse's line, the badge, the announcements, Combwork's runs in Runs.
   { paths: ['src/shared/progressQueue.ts', 'src/renderer/src/components/ProgressQueue.tsx', 'src/renderer/src/queueSource.ts', 'src/renderer/src/components/Progress.tsx', 'src/renderer/src/components/ProgressMerge.tsx', 'src/shared/progressTabs.ts', 'src/main/workflow/queueControls.ts', 'src/shared/workflow/queue.ts', 'tests/e2e/queueFixture.cjs', 'tests/e2e/progressqueue.cjs'], suites: ['progressqueue', 'progresstabs'] },
   { paths: ['src/main/mergeSlots.ts', 'src/main/mergeSlotHost.ts', 'src/shared/mergeSlot.ts', 'src/renderer/src/components/MergeSlots.tsx'], suites: ['mergeslot', 'progresslanes', 'replysize'] },
   // Lanes (#483): the card loop registers its lane; replysize measures cw_lane; the Progress panel shows them (#484).
   { paths: ['src/main/lanes.ts', 'src/shared/lanes.ts', 'src/main/workflow/lineUpdates.ts'], suites: ['cardloop', 'lanestages', 'progresslanes', 'replysize'] },
-  // HI-1990: Hive starts a lane's next card once the one before it is Done: the suites whose lanes go on from a Done card.
-  { paths: ['src/main/laneStarts.ts'], suites: ['p4lane', 'p5lane', 'p6lane', 'p7lane', 'linecarried', 'reviewerpool', 'slotcards', 'slotswitches', 'slotupgrade', 'cardloop'] },
+  // HI-1990: Combwork starts a lane's next card once the one before it is Done: the suites whose lanes go on from a Done card.
+  { paths: ['src/main/laneStarts.ts', 'src/main/laneDeps.ts'], suites: ['p4lane', 'p5lane', 'p6lane', 'p7lane', 'linecarried', 'reviewerpool', 'slotcards', 'slotswitches', 'slotupgrade', 'cardloop'] },
   // HI-2081: pausing the team before an update: its holds, what still runs, Install Now, the Assistants' authority.
   { paths: ['src/main/teamPause.ts', 'src/main/teamParked.ts', 'src/shared/teamPause.ts', 'src/renderer/src/teamPause.ts', 'src/renderer/src/components/TeamPause.tsx', 'tests/e2e/teampause.cjs'], suites: ['teampause', 'lanewatch', 'progresslanes'] },
-  // P5's acceptance (#1358): S55's lane, the scenarios first proven in the app, one queue runner across Hives.
+  // P5's acceptance (#1358): S55's lane, the scenarios first proven in the app, one queue runner across copies of Combwork.
   { paths: ['tests/e2e/p5lane.cjs', 'tests/e2e/queueFixture.cjs', 'src/main/workflow/mergeQueue.ts', 'src/main/workflow/queueHost.ts', 'src/main/workflow/lineUpdates.ts', 'src/main/laneStart.ts', 'src/main/workflow/optionsForm.ts'], suites: ['p5lane'] },
   // P6's acceptance (#1425): a project from added to Done through the Version Control tab, Solo, all off, S19 and S20.
   { paths: ['tests/e2e/p6lane.cjs', 'tests/e2e/queueFixture.cjs', 'src/main/workflow/presetStep.ts', 'src/renderer/src/components/PresetStep.tsx', 'src/main/workflow/platformSwitch.ts', 'src/renderer/src/boardStages.ts', 'src/main/laneStart.ts', 'src/main/workflow/optionsForm.ts'], suites: ['p6lane'] },
@@ -339,26 +342,26 @@ export const AREAS = [
   { paths: ['tests/e2e/slotwindows.cjs', 'src/main/agentFolders.ts', 'src/main/agentProcesses.ts', 'src/main/index.ts'], suites: ['slotwindows'] },
   { paths: ['tests/e2e/slotreleaseapi.cjs', 'src/main/slotRelease.ts', 'src/main/agentFolders.ts', 'src/main/slotMigration.ts'], suites: ['slotreleaseapi'] },
   // The Agent API's agents on slots (#1451): where each is, and adding none in a worktree.
-  { paths: ['tests/e2e/agentapislots.cjs', 'src/main/agentFolders.ts', 'src/shared/agentFolders.ts', 'src/main/projectAgents.ts', 'src/main/mcp/hive-mcp.ts'], suites: ['agentapislots', 'replysize'] },
+  { paths: ['tests/e2e/agentapislots.cjs', 'src/main/agentFolders.ts', 'src/shared/agentFolders.ts', 'src/main/projectAgents.ts', 'src/main/mcp/cw-mcp.ts'], suites: ['agentapislots', 'replysize'] },
   { paths: ['tests/e2e/p4lane.cjs','src/main/workflow/lineUpdates.ts', 'src/main/workflow/runtime.ts', 'src/main/cardIntents.ts', 'src/main/laneStart.ts', 'src/main/workflow/optionsForm.ts'], suites: ['p4lane'] },
   // §16.19.2's continuation on a lane carried over the upgrade on a 0.9 worktree (#1579).
   { paths: ['tests/e2e/linecarried.cjs', 'src/main/workflow/lineUpdates.ts', 'src/main/worktrees.ts', 'src/main/laneStart.ts'], suites: ['linecarried'] },
   // The workspace database's small stores (#1018): lanes, card watches and deliveries.
   { paths: ['src/main/storeRows.ts'], suites: ['progresslanes', 'cardloop', 'deliveries', 'agentmessage', 'inbox', 'lanewatch', 'agentwatch', 'loopwatch', 'watchrelease', 'unexpectedclose'] },
-  { paths: ['src/main/projectKeys.ts', 'src/main/schema/keysStep.ts', 'src/shared/projectKeys.ts', 'tests/e2e/projectkeys.cjs'], suites: ['projectkeys', 'keysui', 'replysize', 'hivetools', 'cardloop', 'boardupgrade'] },
+  { paths: ['src/main/projectKeys.ts', 'src/main/schema/keysStep.ts', 'src/main/schema/namesStep.ts', 'src/main/schema/valuesStep.ts', 'src/shared/projectKeys.ts', 'tests/e2e/projectkeys.cjs'], suites: ['projectkeys', 'keysui', 'replysize', 'combworktools', 'cardloop', 'boardupgrade'] },
   { paths: ['src/renderer/src/components/CardWork.tsx', 'src/renderer/src/cardWork.ts', 'src/shared/workflow/workView.ts', 'src/main/workflow/cardWork.ts', 'tests/e2e/cardwork.cjs'], suites: ['cardwork', 'board', 'carddialog', 'progressgates', 'progresslanes'] },
   { paths: ['src/renderer/src/projectKeys.ts', 'src/shared/cardLinks.ts', 'src/renderer/src/cardLinks.ts', 'tests/e2e/keysui.cjs'], suites: ['keysui', 'cardlinks', 'board', 'boardarchive', 'cardchip', 'progresslanes', 'rail'] },
   { paths: ['src/main/storeTables.ts', 'src/main/storeBackup.ts', 'src/main/schema/storeCodec.ts'], suites: ['progresslanes', 'cardloop', 'lanewatch', 'agentwatch', 'loopwatch', 'watchrelease', 'performance'] },
   { paths: ['src/main/projectRemoval.ts', 'src/renderer/src/components/ProjectRemoval.tsx'], suites: ['board', 'storage'] },
-  // Hive's one way to the Recycle Bin (a test copy's trash folder, #414): the suites that delete something.
+  // Combwork's one way to the Recycle Bin (a test copy's trash folder, #414): the suites that delete something.
   { paths: ['src/main/trash.ts'], suites: ['board', 'files', 'storage', 'sessiontree', 'templateshare', 'unusedwt', 'skills', 'transcript', 'unsaved', 'assistantimages'] },
   { paths: ['src/main/providerService.ts', 'src/main/taskKeys.ts'], suites: ['providers', 'codex-setup', 'startfail', 'models', 'testedclis', 'freshpath', 'providerdetect'] },
   { paths: ['src/main/keySteps.ts'], suites: ['codex', 'codex-setup'] },
   { paths: ['src/main/rendererWatch.ts'], suites: ['rendercrash', 'windowhealth'] },
   { paths: ['src/shared/windowHealth.ts', 'src/renderer/src/windowHealth.ts', 'src/renderer/src/pageMarks.ts'], suites: ['windowhealth'] },
-  // Why Hive stopped (#985): crash dumps and a log line for every way out; the updater and install-folder checks end the app through it.
-  // Hive closing unexpectedly (#984): the running marker, the notice, Resume All and the setting; a merge left half done is told in it.
-  { paths: ['src/main/lastRun.ts', 'src/main/listenRetry.ts', 'src/shared/unexpectedClose.ts', 'src/main/mergeSlotHost.ts', 'src/main/mergeSlots.ts', 'tests/e2e/unexpectedclose.cjs', 'tests/e2e/unexpectedclose-leftovers.cjs'], suites: ['unexpectedclose', 'unexpectedclose-leftovers', 'restartresume'] },
+  // Why Combwork stopped (#985): crash dumps and a log line for every way out; the updater and install-folder checks end the app through it.
+  // Combwork closing unexpectedly (#984): the running marker, the notice, Resume All and the setting; a merge left half done is told in it.
+  { paths: ['src/main/lastRun.ts', 'src/main/nameUpgradeProfile.ts', 'src/main/listenRetry.ts', 'src/shared/unexpectedClose.ts', 'src/main/mergeSlotHost.ts', 'src/main/mergeSlots.ts', 'tests/e2e/unexpectedclose.cjs', 'tests/e2e/unexpectedclose-leftovers.cjs'], suites: ['unexpectedclose', 'unexpectedclose-leftovers', 'restartresume'] },
   { paths: ['src/main/restartResume.ts', 'src/shared/restartResume.ts', 'tests/e2e/restartresume.cjs'], suites: ['restartresume', 'unexpectedclose'] },
   // Resuming after a connection drops (HI-1612): the wait, its status, Progress run and note.
   { paths: ['src/main/outageResume.ts', 'src/main/outageCore.ts', 'src/main/assistantNotes.ts', 'tests/e2e/outage.cjs'], suites: ['outage'] },
@@ -367,7 +370,7 @@ export const AREAS = [
   { paths: ['src/main/mainStalls.ts', 'src/shared/mainStalls.ts', 'src/renderer/src/views/PerformanceStalls.tsx', 'src/main/threadPool.ts', 'src/main/stallWatchdog.ts', 'tests/e2e/stalls.cjs'], suites: ['stalls'] },
   { paths: ['src/main/exitLog.ts', 'src/main/memory.ts', 'src/main/diagnostics.ts', 'src/main/updater.ts', 'src/main/installDir.ts'], suites: ['crashdumps'] },
   // .combwork kept out of version control, and its notice (#345).
-  { paths: ['src/main/hiveVcs.ts', 'src/shared/hiveVcsText.ts', 'src/renderer/src/components/HiveVcsNotice.tsx'], suites: ['hivevcs', 'gitinit'] },
+  { paths: ['src/main/combworkVcs.ts', 'src/shared/combworkVcsText.ts', 'src/renderer/src/components/CombworkVcsNotice.tsx'], suites: ['combworkvcs', 'gitinit'] },
   // Hook tokens per launch (#345): the hook server, and hook commands reading their header from the auth file.
   { paths: ['src/main/hookTokens.ts'], suites: ['agents', 'ctxpercent', 'codex-extra', 'attention', 'claude-real', 'claudehome', 'codex', 'review'] },
   { paths: ['src/main/storage.ts', 'src/shared/storage.ts', 'src/renderer/src/components/Storage.tsx'], suites: ['storage', 'storageclose', 'asarfiles', 'purge'] },
@@ -399,16 +402,16 @@ export const AREAS = [
   { paths: ['src/main/agentMessages.ts'], suites: ['agentmessage', 'deliveries', 'replysize'] },
   // Deliveries and cw_inbox (#647).
   // The delivery service, its writer and readiness (#647, #649): every way into an agent goes through them.
-  { paths: ['src/main/deliveries.ts', 'src/shared/deliveries.ts', 'src/main/schema/sessionDeliveryTables.ts', 'src/main/schema/sessionDeliveryCodec.ts', 'src/main/lineWriter.ts', 'src/main/readiness.ts'], suites: ['deliveries', 'idlequestion', 'agentmessage', 'viewer', 'replysize', 'loopwakes', 'agentwatch', 'wakeuntaken', 'wakepaste', 'cardloop', 'decisionwake', 'loopwatch', 'lanewatch', 'assistantmode', 'assistant-control', 'signin', 'watchrelease', 'inboxnotices', 'hivetools', 'carryingon', 'codexqueued', 'wakeputoff'] },
+  { paths: ['src/main/deliveries.ts', 'src/shared/deliveries.ts', 'src/main/schema/sessionDeliveryTables.ts', 'src/main/schema/sessionDeliveryCodec.ts', 'src/main/lineWriter.ts', 'src/main/readiness.ts'], suites: ['deliveries', 'idlequestion', 'agentmessage', 'viewer', 'replysize', 'loopwakes', 'agentwatch', 'wakeuntaken', 'wakepaste', 'cardloop', 'decisionwake', 'loopwatch', 'lanewatch', 'assistantmode', 'assistant-control', 'signin', 'watchrelease', 'inboxnotices', 'combworktools', 'carryingon', 'codexqueued', 'wakeputoff'] },
   { paths: ['src/main/inboxNotices.ts', 'src/shared/doorbell.ts', 'tests/e2e/fake-claude/fake-claude.cjs'], suites: ['inboxnotices', 'deliveries', 'agentmessage', 'turnledger', 'carryingon'] },
   { paths: ['src/shared/inboxSwitches.ts'], suites: ['carryingon', 'inboxnotices'] },
   // A long conversation's Hand Over (#1057): the notice, the footer, the dialog and the hand-over's own checks.
   { paths: ['src/main/handOverCheck.ts', 'src/shared/handOver.ts', 'src/main/sessions.ts', 'src/main/lanes.ts', 'src/renderer/src/components/AgentPanes.tsx', 'src/renderer/src/components/AgentDialogs.tsx'], suites: ['handovernotice', 'longsession', 'sessionsize'] },
-  // Hive's loop wakes (#405).
+  // Combwork's loop wakes (#405).
   { paths: ['src/main/loopWakes.ts', 'src/main/lanes.ts', 'src/main/queueReturn.ts'], suites: ['loopwakes', 'lanenotices'] },
   // A card's loop reviewer (#1382): who loop wakes go to, and who answers a builder's design.
   { paths: ['src/main/loopReviewer.ts'], suites: ['loopwakes', 'intents'] },
-  // Hive's own notices of the work (#1266): a card's request for the user, a lane's events without the Assistant.
+  // Combwork's own notices of the work (#1266): a card's request for the user, a lane's events without the Assistant.
   { paths: ['src/main/workflowNotices.ts', 'tests/e2e/lanenotices.cjs'], suites: ['lanenotices'] },
   { paths: ['src/main/reviewsOnOpen.ts'], suites: ['review', 'stopswitch', 'recent'] },
   { paths: ['src/renderer/src/components/Board.tsx', 'src/renderer/src/components/CardWork.tsx', 'src/renderer/src/components/Overlays.tsx', 'src/shared/laneBar.ts', 'src/main/tasks.ts', 'src/shared/workflow/workView.ts', 'tests/e2e/boardgates.cjs'], suites: ['boardgates'] },
@@ -519,7 +522,7 @@ export const AREAS = [
   { paths: ['src/main/templateUpgrade.ts', 'tests/e2e/templatesv2.cjs'], suites: ['templatesv2'] },
   { paths: ['src/main/agentNames.ts', 'src/shared/agentNames.ts'], suites: ['agents', 'agents-ui', 'templatenames', 'templates'] },
   { paths: ['tests/e2e/templatenames.cjs'], suites: ['templatenames'] },
-  { paths: ['src/shared/hiveBranches.ts'], suites: ['agents', 'agents-ui', 'templates', 'templateshare', 'unusedwt', 'changespicker', 'removeall', 'wtrecreate'] },
+  { paths: ['src/shared/agentBranches.ts'], suites: ['agents', 'agents-ui', 'templates', 'templateshare', 'unusedwt', 'changespicker', 'removeall', 'wtrecreate'] },
   { paths: ['src/renderer/src/stripMenus.ts'], suites: ['templates'] },
   { paths: ['src/renderer/src/components/Templates.tsx'], suites: ['templateshare', 'templatesv2'] },
   { paths: ['src/renderer/src/assets/'], suites: ['about', 'providers'] },
@@ -531,7 +534,7 @@ export const AREAS = [
   { paths: ['tests/e2e/fake-copilot-api.cjs'], suites: ['copilot', 'copilotsize', 'copilotcopy', 'workspacenotes', 'slotguidance'] },
   // A folder being changed under its agents (#646): the Git view takes it; deliveries and starts wait for it.
   { paths: ['src/main/folderFence.ts'], suites: ['gitview', 'deliveries', 'inbox', 'agentmessage', 'background'] },
-  // How Hive's lines reach a busy real Codex or Copilot (#600): their runner, and what they check.
+  // How Combwork's lines reach a busy real Codex or Copilot (#600): their runner, and what they check.
   { paths: ['tests/e2e/wakepaste-cli/', 'src/main/terminalScreen.ts', 'src/main/lineWriter.ts', 'src/main/deliveries.ts'], suites: ['wakepaste-codex', 'wakepaste-copilot'] },
   { paths: ['src/shared/copilot.ts', 'tests/e2e/fake-copilot-api.cjs'], suites: ['wakepaste-copilot'] },
   { paths: ['src/main/providers/codex/', 'src/shared/codex.ts'], suites: ['wakepaste-codex'] },
@@ -539,36 +542,36 @@ export const AREAS = [
   { paths: ['src/main/providers/codex/'], suites: ['codex-appserver'] },
   // Codex's Advanced switches (#1167): right-click passed to Codex, and its terminal title left to the user's config.
   { paths: ['src/main/providers/codex/', 'src/main/advancedValues.ts', 'src/renderer/src/components/TerminalView.tsx', 'tests/e2e/codexoverrides.cjs'], suites: ['codexoverrides'] },
-  // The switches for an agent pane's Ctrl+C and Ctrl+V and for what Hive types (#1286).
+  // The switches for an agent pane's Ctrl+C and Ctrl+V and for what Combwork types (#1286).
   { paths: ['src/renderer/src/components/TerminalView.tsx', 'src/shared/terminalInput.ts', 'src/main/sessions.ts', 'tests/e2e/fake-claude/fake-claude.cjs', 'tests/e2e/terminalinput.cjs', 'src/renderer/src/commands.ts', 'src/main/taskStart.ts'], suites: ['terminalinput'] },
-  // Claude Code's status line, Hive's guidance and the user's own Codex hooks (#1285).
+  // Claude Code's status line, Combwork's guidance and the user's own Codex hooks (#1285).
   { paths: ['src/main/providers/claude/launchSettings.ts', 'src/main/providers/claude/adapter.ts', 'src/main/servers.ts', 'tests/e2e/claudestatusline.cjs'], suites: ['claudestatusline'] },
-  { paths: ['src/main/mcp/hive-mcp.ts', 'src/main/index.ts', 'tests/e2e/agentguidance.cjs'], suites: ['agentguidance'] },
+  { paths: ['src/main/mcp/cw-mcp.ts', 'src/main/index.ts', 'tests/e2e/agentguidance.cjs'], suites: ['agentguidance'] },
   { paths: ['src/main/providers/codex/adapter.ts', 'tests/e2e/codexownhooks.cjs'], suites: ['codexownhooks'] },
   // Codex's app server asked one thing, owned until it ends (HI-1757): a connection's sign-in check, a launch's hook check.
   { paths: ['src/main/codexChecks.ts'], suites: ['connections-codex', 'codexownhooks'] },
   // The CLI's own setting and the Assistant's other MCP servers (#1284).
   { paths: ['src/shared/cliOwnMode.ts', 'src/renderer/src/components/PermissionMode.tsx', 'src/main/providers/claude/', 'tests/e2e/cliownmode.cjs'], suites: ['cliownmode'] },
-  // The run context: every suite (above); isolation checks what it gives a test Hive and the children a suite starts.
+  // The run context: every suite (above); isolation checks what it gives a test Combwork and the children a suite starts.
   { paths: ['tests/e2e/runContext.cjs', 'src/main/testQuiet.ts'], suites: ['isolation'] },
   // A typed prompt's line breaks for Codex (HI-1327): the fake Codex's (codexnewline) and the real one's (codex-newline).
   { paths: ['tests/e2e/codexnewline.cjs', 'tests/e2e/codex-newline.cjs', 'src/shared/terminalInput.ts', 'src/main/providers/codex/'], suites: ['codexnewline', 'codex-newline'] },
   // An agent's Hooks dialog and Activity's lock blocks (HI-982), on the fake Claude Code and the fake Codex.
   { paths: ['tests/e2e/hooksview.cjs', 'src/main/hookListing.ts', 'src/shared/hooks.ts', 'src/renderer/src/components/HooksDialog.tsx', 'src/main/servers.ts', 'src/main/providers/codex/', 'src/main/providers/claude/', 'src/main/providers/copilot/'], suites: ['hooksview'] },
   // The fake Codex CLI: every suite that runs it.
-  { paths: ['tests/e2e/fake-codex/'], suites: ['accounts', 'attachread', 'connectionfirst','carryingon', 'codexqueued', 'attention', 'footerfit', 'skilldelivery', 'models', 'sessiontree', 'termsize', 'freshpath', 'defaultprovider', 'providerdetect', 'codexfolder', 'turnledger', 'flightrecorder', 'hookshealth', 'hookstranscript', 'workspacenotes', 'reviewcopies', 'slotguidance', 'p7lane', 'codexnewline', 'hooksview', 'wakeputoff', 'lockask', 'dialectlaunch', 'agenttemp'] },
+  { paths: ['tests/e2e/fake-codex/'], suites: ['accounts', 'attachread', 'connectionfirst','carryingon', 'codexqueued', 'codexnudge', 'attention', 'footerfit', 'skilldelivery', 'models', 'sessiontree', 'termsize', 'freshpath', 'defaultprovider', 'providerdetect', 'codexfolder', 'turnledger', 'flightrecorder', 'hookshealth', 'hookstranscript', 'workspacenotes', 'reviewcopies', 'slotguidance', 'p7lane', 'codexnewline', 'hooksview', 'wakeputoff', 'lockask', 'dialectlaunch', 'agenttemp'] },
   // Agents' temp folder (HI-2496): each launch's TEMP, TMP, TMPDIR and CLAUDE_CODE_TMPDIR, the empty default, a refused folder.
   { paths: ['src/main/agentTemp.ts', 'tests/e2e/agenttemp.cjs'], suites: ['agenttemp'] },
   // "Ask me" file locks for Codex: the notice's Allow after the blocked turn's end, and the go-ahead (HI-2386).
   { paths: ['tests/e2e/lockask.cjs', 'src/main/sessions.ts', 'src/main/deliveries.ts', 'src/main/notify.ts', 'src/main/providers/codex/'], suites: ['lockask', 'codex-extra'] },
-  // Hive's bundled skills and modes, read at runtime (not documentation).
+  // Combwork's bundled skills and modes, read at runtime (not documentation).
   { paths: ['resources/skills/', 'src/main/bundledHistory.json'], suites: ['skills', 'skillaudience', 'skilldelivery', 'cardloop', 'replysize', 'slotguidance'] },
   { paths: ['resources/modes/', 'src/main/assistantMode.ts'], suites: ['assistant', 'assistant-control', 'assistantend', 'assistantmode', 'assistantresume'] },
   // The shipped dialect files (HI-2442): synced into each workspace as it opens, beside the skills and modes, and each
   // session's chain is pinned from them at its launch (HI-2443).
   { paths: ['resources/dialects/'], suites: ['skills', 'openspeed', 'dialectlaunch', 'dialectsview'] },
   // The dialects service wired into sessions and the Agent API (HI-2443): chains pinned at launch, the Dialect setting,
-  // the launch record, CW_DIALECT_FILE for hive-mcp.js and hive-progress, the API chain.
+  // the launch record, CW_DIALECT_FILE for cw-mcp.js and cw-progress, the API chain.
   { paths: ['src/main/dialects/', 'tests/e2e/dialectlaunch.cjs'], suites: ['dialectlaunch', 'agentguidance', 'dialectsview'] },
   // The Dialects view (HI-2444): its list, a file's texts and layers, Save's checks, the JSON tab, the file actions,
   // Agent Settings' Dialect.
@@ -581,9 +584,9 @@ export const AREAS = [
   { paths: ['tests/e2e/i18nshots/', 'locales/', 'src/renderer/src/views/ProjectTabs.tsx', 'src/renderer/src/components/Progress.tsx', 'src/renderer/src/components/Popups.tsx', 'src/renderer/src/components/Overlays.tsx', 'src/renderer/src/views/SettingsView.tsx', 'src/main/progress.ts'], suites: ['i18nshots'] },
   // The installer's copies (npm run dist first).
   { paths: ['electron-builder.yml', 'scripts/dist.mjs', 'scripts/distCopy.mjs'], suites: ['packaged', 'packaged-mcp', 'packaged-progress', 'packaged-transcript', 'packaged-workers'] },
-  // Hive's worker threads in the installed copy, their scripts inside app.asar (HI-1880).
+  // Combwork's worker threads in the installed copy, their scripts inside app.asar (HI-1880).
   { paths: ['src/main/workerThreads.ts', 'src/main/places.ts', 'src/main/usageWorker.ts', 'src/main/gitWorker.ts', 'src/main/repoLockWorker.ts', 'src/main/walCheckpointWorker.ts', 'src/main/codexLogWorker.ts', 'src/main/noneBaselineWorker.ts', 'src/main/stallWatchdog.ts', 'tests/e2e/packaged-workers.cjs'], suites: ['packaged-workers'] },
-  // Session records in the workspace's database (#1061): the suites that read or write them, Remove from Hive and Repair.
+  // Session records in the workspace's database (#1061): the suites that read or write them, Remove from Combwork and Repair.
   { paths: ['src/main/sessionStore.ts', 'tests/e2e/storeDocs.cjs', 'src/main/schema/sessionDeliveryTables.ts', 'src/main/schema/sessionDeliveryCodec.ts', 'tests/e2e/sessionDeliveryCodec.cjs'], suites: ['agents', 'assistantimages', 'assistantmode', 'cardchip', 'overview', 'providerdetect', 'quit', 'restart', 'resume', 'review', 'safeguards', 'sessionname', 'sessioncleanup', 'sessionorigin', 'sessionsize', 'sessiontree', 'wtrecreate', 'storage', 'transcript', 'wsmove', 'changespicker', 'dialogs', 'files', 'i18nlive', 'performance', 'projectrename', 'wsoverview', 'removeall', 'codex', 'codex-handover'] },
   // Background tasks read from Claude Code's transcript (#640: one the agent stopped wakes nothing).
   { paths: ['src/main/providers/claude/background.ts'], suites: ['background', 'turnledger', 'idlestatus'] }
@@ -599,8 +602,8 @@ export function under(file, paths) {
 }
 
 /**
- * Files that need no suite: notes for people and agents (the skills for developing Hive, in .claude/skills and
- * .agents/skills, are neither shipped nor read by the app; Hive's own copies there are git-ignored), and the unit tests
+ * Files that need no suite: notes for people and agents (the skills for developing Combwork, in .claude/skills and
+ * .agents/skills, are neither shipped nor read by the app; Combwork's own copies there are git-ignored), and the unit tests
  * (npm test runs those).
  */
 export const DOCS_ONLY = ['README.md', 'CONTRIBUTING.md', 'AGENTS.md', 'CLAUDE.md', 'RELEASING.md', 'tests/README.md', 'tests/e2e/README.md', 'tests/scenarios/', 'reference/', '.gitattributes', '.gitignore', '.claude/skills/', '.agents/skills/']
@@ -622,13 +625,13 @@ const FAKE_FIXTURES = ['tests/fixtures/claude-initialize.json', 'tests/fixtures/
  * (src/main/dialects) has its area since card 6b (HI-2443) wired it into sessions. The dialect-only release's rules
  * (scripts/dialectRelease.mjs, HI-2442: release.mjs runs them, tests/dialectRelease.test.ts tests them) are unit-only.
  */
-export const UNIT_ONLY = ['scripts/dialectRelease.mjs', 'vitest.config.ts', '.github/workflows/ci.yml', 'scripts/testWaits.mjs', 'scripts/i18nExtract.mjs', 'scripts/i18nValues.mjs', 'scripts/i18nCheck.mjs', 'scripts/i18nCoverage.mjs', 'scripts/i18nGuard.mjs', 'i18n/allow/', 'scripts/agentTextExtract.mjs', 'scripts/agentTextGuard.mjs', 'scripts/agentTextBoth.mjs', 'scripts/agentTextFiles.mjs', 'agent-text/allow/', 'tests/i18n/', 'tests/workflow/', 'src/shared/workflow/', 'src/shared/platform/', 'src/main/workflow/', 'src/main/platform/']
+export const UNIT_ONLY = ['scripts/dialectRelease.mjs', 'tests/oldNames.mjs', 'tests/oldNamesAllow.json', 'tests/presenceChecks.mjs', 'tests/presenceAllow.json', 'vitest.config.ts', '.github/workflows/ci.yml', 'scripts/testWaits.mjs', 'scripts/i18nExtract.mjs', 'scripts/i18nValues.mjs', 'scripts/i18nCheck.mjs', 'scripts/i18nCoverage.mjs', 'scripts/i18nGuard.mjs', 'i18n/allow/', 'scripts/agentTextExtract.mjs', 'scripts/agentTextGuard.mjs', 'scripts/agentTextBoth.mjs', 'scripts/agentTextFiles.mjs', 'agent-text/allow/', 'tests/i18n/', 'tests/workflow/', 'src/shared/workflow/', 'src/shared/platform/', 'src/main/workflow/', 'src/main/platform/']
 
 /** Whether a file is a unit test (tests/*.test.ts, their helpers and fixtures, UNIT_ONLY): npm test covers it, no e2e suite. */
 export const unitTest = (f) => /^tests\/[^/]+\.ts$/i.test(f) || under(f, UNIT_ONLY) || (/^tests\/fixtures\//i.test(f) && !FAKE_FIXTURES.includes(f))
 
 /**
- * Hive's side of every real CLI: launching it, its hooks and the status they give, reading its transcripts, its
+ * Combwork's side of every real CLI: launching it, its hooks and the status they give, reading its transcripts, its
  * readiness, and the suites' CLI helpers. A change here needs every real-CLI suite (the real tier: run.mjs --real), not
  * only the fake ones. Each provider's own adapter (PROVIDER_OWN) needs only the real suites its area names.
  */
@@ -672,7 +675,7 @@ export function affectedSuites(files, suiteNames, realNames = []) {
     const areas = AREAS.filter((a) => under(file, a.paths))
     for (const a of areas) for (const s of a.suites) picked.add(s)
     if (under(file, EVERYTHING)) {
-      all ??= `${file}: shared by every part of Hive`
+      all ??= `${file}: shared by every part of Combwork`
       continue
     }
     if (areas.length) {
@@ -701,8 +704,8 @@ export function changedFiles(base = 'main', cwd = process.cwd()) {
 
 // --- The focused-test picker (HI-1367): which unit tests and e2e suites a change needs.
 //
-// Hive's merge queue calls the project's `focused.pick` command in a clean checkout of the revision, with the base
-// commit in HIVE_FOCUSED_BASE and the changed paths on stdin, and reads one JSON line per test (or {"every":true}).
+// Combwork's merge queue calls the project's `focused.pick` command in a clean checkout of the revision, with the base
+// commit in CW_FOCUSED_BASE and the changed paths on stdin, and reads one JSON line per test (or {"every":true}).
 // The unit tests come from three places: a changed test file itself; Vitest's import graph (`vitest list --changed`,
 // which the CLI runs, so a change to code a test imports selects it); and UNIT_SCANS, for the tests that read the
 // repository by `git ls-files`, folder scans or file reads rather than imports, which the import graph can't see.
@@ -720,20 +723,29 @@ export const UNIT_SCANS = [
   // the suites' own sources are read for their rules (headers, waits, ports, CLI steps); the seams src reads.
   { test: 'tests/e2esuites.test.ts', adds: true },
   { test: 'tests/e2esuites.test.ts', paths: ['tests/e2e/'] },
-  { test: 'tests/e2esuites.test.ts', paths: ['src/'], lines: ['HIVE_TEST_'] },
+  { test: 'tests/e2esuites.test.ts', paths: ['src/'], lines: ['CW_TEST_'] },
   // No suite or scenario loads a unit test's helper (tests/*.ts).
   { test: 'tests/e2esuites.test.ts', paths: ['tests/scenarios/'], lines: ['require\\(', '\\bimport\\b', '\\bfrom\\s+[\'"`]'] },
   // Every source file: no control character (#1040), no mixed line endings (#149).
   { test: 'tests/controlCharacters.test.ts', lines: ['[\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f\\x7f]'] },
   { test: 'tests/lineEndings.test.ts' },
-  // Test tooling and Hive end processes by identity (#603).
+  // The upgrade's code and the test area's: no existsSync, no handler swallowing an I/O failure (HI-2617).
+  { test: 'tests/presenceChecks.test.ts', paths: [...PRESENCE_SCOPE, 'tests/presenceAllow.json'] },
+  // Test tooling and Combwork end processes by identity (#603).
   { test: 'tests/folderProcesses.test.ts', paths: ['tests/', 'scripts/', 'src/'], lines: ['process\\.kill', 'task[k]ill'] },
   // Test tooling starts nothing through the shell (#599).
   { test: 'tests/windowsExits.test.ts', paths: ['tests/', 'scripts/'], lines: ['start-process', 'invoke-item', 'shell\\.open(path|external)', '\\bstart\\b'] },
   // Tests name the temp folder only through tests/tempDir.ts (#448).
   { test: 'tests/tempDir.test.ts', paths: ['tests/'], lines: ['\\btmpdir\\b', '\\benv\\s*(\\.\\s*|\\[\\s*[\'"`])(temp|tmp)\\b'] },
-  // Every e2e suite and scenario starts Hive with a test profile, quiet.
-  { test: 'tests/testQuiet.test.ts', paths: ['tests/e2e/', 'tests/scenarios/'], lines: ['_electron\\.launch\\(', 'HIVE_USER_DATA', 'HIVE_TEST_QUIET'] },
+  // Every e2e suite and scenario starts Combwork with a test profile, quiet.
+  // old-name: begin test-area-pick
+  { test: 'tests/testArea.test.ts', lines: ['hive-test'] }, // the test area's old name only in its move (HI-2590)
+  // old-name: end test-area-pick
+  // Only upgradelane gives a profile the fakes' old-release mode (HI-2614).
+  { test: 'tests/fakeOldRelease.test.ts', paths: ['tests/e2e/'], lines: ['oldRelease'] },
+  { test: 'tests/testQuiet.test.ts', paths: ['tests/e2e/', 'tests/scenarios/'], lines: ['_electron\\.launch\\(', 'CW_USER_DATA', 'CW_TEST_QUIET'] },
+  // The tools-connected log line (HI-2584): sessions.ts writes it, and suites read it only through lib.combworkToolsConnected.
+  { test: 'tests/toolsConnectedLine.test.ts', paths: ['src/main/sessions.ts', 'tests/e2e/', 'tests/scenarios/', 'scripts/'], lines: ['tools connected'] },
   // Every caller of copilotTestEnv gives it `above` (#1308).
   { test: 'tests/fakeCopilotApi.test.ts', paths: ['tests/'], lines: ['copilotTestEnv'] },
   // Source scans of src/ for one rule each.
@@ -766,7 +778,7 @@ export const UNIT_SCANS = [
   { test: 'tests/globCache.test.ts', paths: ['agent-text/schema/', 'src/main/installDir.ts', 'src/shared/i18n/catalogues.ts'] },
   { test: 'tests/agentText.test.ts', paths: ['src/'], lines: ['agentMsg\\('] },
   // HI-2440: the window's messages agents read, followed from the calls that read text (the catalogue's audience both).
-  { test: 'tests/agentText.test.ts', paths: ['src/main/', 'src/shared/'], lines: ['msg\\(', 'agent-text:', 'HiveError', 'englishText', 'agentText'] },
+  { test: 'tests/agentText.test.ts', paths: ['src/main/', 'src/shared/'], lines: ['msg\\(', 'agent-text:', 'CombworkError', 'englishText', 'agentText'] },
   { test: 'tests/agentTextBoth.test.ts', paths: ['agent-text/catalogue/', 'agent-text/schema/'] },
   // The dialects service checks files against the schema it bundles (an import glob, which --changed doesn't follow).
   { test: 'tests/dialects.test.ts', paths: ['agent-text/schema/'] },
@@ -783,11 +795,16 @@ export const UNIT_SCANS = [
   { test: 'tests/laneBar.test.ts', paths: ['locales/'] },
   // Every workflow refusal rendered in each locale (HI-2281): a translation changed alone imports nothing it sees.
   { test: 'tests/workflow/texts.test.ts', paths: ['locales/'] },
-  // What the Sandbox checks' window driver relies on (HI-2298): Hive's English text, the selectors, IPC channels and
+  // What the Sandbox checks' window driver relies on (HI-2298): Combwork's English text, the selectors, IPC channels and
   // Agent API routes it uses, and the e2e fake Claude Code its stand-in installer copies.
   { test: 'tests/sandboxChecks.test.ts', paths: ['locales/en/', 'src/shared/api.ts', 'src/main/servers.ts'] },
   { test: 'tests/sandboxChecks.test.ts', paths: ['src/renderer/src/'], lines: ['providers-banner', 'setup-tab', 'welcome', 'workbench', 'statusbar', 'status-item', 'data-git', 'palette', 'data-command', 'help\\.agentSetup', 'overview-page', 'ws-projects', 'board', 'data-note', 'skill-row', 'pane-empty', 'sessions-(list|tree)', 'main-area', 'empty-state', 'name="loading"'] },
   { test: 'tests/sandboxChecks.test.ts', paths: ['tests/e2e/fake-claude/', 'tests/e2e/fake-bridge.cjs'], adds: true },
+  // The profile move's script (HI-2602) reads the record of a move and the sign-in check's log lines the app writes.
+  { test: 'tests/sandboxChecks.test.ts', paths: ['src/main/profileNotices.ts', 'src/main/profileFolders.ts', 'src/main/index.ts'] },
+  // The clean-install check's step (HI-2592): the English text, IPC channels, palette commands and Settings selectors it
+  // uses, and StartOptions' prompt, which gives the agent its first task.
+  { test: 'tests/sandboxClean.test.ts', paths: ['locales/en/', 'src/shared/api.ts', 'src/renderer/src/commands.ts', 'src/renderer/src/components/ui.tsx', 'src/main/sessions.ts'] },
   // The bundled skills and modes (resources/), and the guidance that names them.
   { test: 'tests/assistant.test.ts', paths: ['resources/modes/'] },
   { test: 'tests/modeDescriptions.test.ts', paths: ['resources/modes/'] },
@@ -797,7 +814,7 @@ export const UNIT_SCANS = [
   { test: 'tests/bundledrace.test.ts', paths: ['resources/'] },
   // The shipped dialect files (HI-2442): each one's form, model and schema, and their sync into a workspace.
   { test: 'tests/dialectsShipped.test.ts', paths: ['resources/dialects/', 'src/main/bundledHistory.json'] },
-  { test: 'tests/guidance.test.ts', paths: ['resources/skills/', 'resources/modes/', '.claude/skills/', '.agents/skills/', 'AGENTS.md', 'RELEASING.md', 'docs/AGENT_API.md', 'tests/scenarios/scenarios.cjs', 'src/main/mcp/hive-mcp.ts'] },
+  { test: 'tests/guidance.test.ts', paths: ['resources/skills/', 'resources/modes/', '.claude/skills/', '.agents/skills/', 'AGENTS.md', 'RELEASING.md', 'docs/AGENT_API.md', 'tests/scenarios/scenarios.cjs', 'src/main/mcp/cw-mcp.ts'] },
   // THIRD_PARTY_NOTICES.md is generated from what ships (package.json's dependencies, the renderer's libraries).
   { test: 'tests/licenses.test.ts', paths: ['package.json', 'package-lock.json', 'THIRD_PARTY_NOTICES.md', 'LICENSE', 'scripts/thirdPartyNotices.mjs', 'scripts/licenseText.mjs', 'scripts/licenses.mjs', 'scripts/notices/'] },
   // Advanced settings (#367): the list, and the recorded fixtures each CLI-facing default is checked against.
@@ -925,8 +942,8 @@ const git = (cwd, args) => execFileSync('git', ['-c', 'core.quotepath=false', ..
 /** The CLI: gathers pickTests' inputs in the checkout (cwd) and prints its lines. Diagnostics go to stderr. */
 async function pickCli() {
   const cwd = process.cwd()
-  const base = process.env.HIVE_FOCUSED_BASE
-  if (!base) throw new Error('HIVE_FOCUSED_BASE (the base commit) is not set')
+  const base = process.env.CW_FOCUSED_BASE
+  if (!base) throw new Error('CW_FOCUSED_BASE (the base commit) is not set')
   git(cwd, ['rev-parse', '--verify', '--quiet', `${base}^{commit}`])
   const paths = [...new Set(readFileSync(0, 'utf8').split(/\r?\n/).map((l) => slashes(l.trim())).filter(Boolean))]
   if (!paths.length) return

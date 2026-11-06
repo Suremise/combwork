@@ -1,5 +1,5 @@
 // A skill's reference files (HI-2011): SKILL.md as a contents page linking files beside it. The skill page lists a
-// skill's files only for a skill Hive lists (skills:files), and a link in its preview opens a file of that skill only
+// skill's files only for a skill Combwork lists (skills:files), and a link in its preview opens a file of that skill only
 // when it names one exactly: no traversal, no escape, no path outside the folder.
 import { mkdirSync, rmSync, symlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -8,7 +8,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { skillLinkTarget } from '../src/shared/skillLinks'
 
-const base = tempDir('hive-skill-files-')
+const base = tempDir('cw-skill-files-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 

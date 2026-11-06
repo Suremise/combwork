@@ -1,7 +1,7 @@
 // The Sandbox checks' runner (tests/sandbox/checks.cjs): the build folder, its options, where it finds the windows-sandbox
 // server, what it gives the server, that a Sandbox it started is always cleaned up, and Smart App Control. It runs against
 // a fake server (tests/sandbox/fake-server.cjs) and a stand-in for wsb.exe (tests/sandbox/stub-wsb.cjs), which share one
-// state file: no Sandbox, no hive-mcp checkout. Moved from the hive-mcp repo with the checks (HI-2298), and the scripts
+// state file: no Sandbox, no MCP servers' checkout. Moved here from the old MCP repository with the checks (HI-2298), and the scripts
 // it runs inside the Sandbox now live beside it, so a change to the window they drive is checked here too.
 import assert from 'assert'
 import { spawnSync } from 'child_process'
@@ -21,6 +21,12 @@ const RUNNER = path.join(SANDBOX, 'checks.cjs')
 const FAKE_SERVER = path.join(SANDBOX, 'fake-server.cjs')
 const STUB = path.join(SANDBOX, 'stub-wsb.cjs')
 const { baseEnv } = require('./e2e/runContext.cjs')
+// old-name: begin sandboxChecks-inputs
+/** The 1.0 release's installer name (kept in dist as the previous release), its product name and its folder's and exe's. */
+const OLD_SETUP = 'Hive-Setup'
+const OLD_APP = 'Hive Desktop'
+const OLD_DIR = 'Hive'
+// old-name: end sandboxChecks-inputs
 
 // The runner's own wsb.cjs reads these when it is loaded (the retry pause) and on each call (the stub).
 const saved = { WSB_STUB: process.env.WSB_STUB, WSB_STUB_STATE: process.env.WSB_STUB_STATE, WSB_STOP_RETRY_MS: process.env.WSB_STOP_RETRY_MS }
@@ -40,8 +46,8 @@ afterAll(() => {
 /** A new folder with a build folder holding an installer, and the fakes' state file. */
 function scratch(name: string, fail: Json = {}) {
   const dir = tempDir(`sandbox-${name}-`)
-  fs.mkdirSync(path.join(dir, 'builds', 'hive'), { recursive: true })
-  fs.writeFileSync(path.join(dir, 'builds', 'hive', 'Hive-Setup-0.6.0.exe'), 'MZ')
+  fs.mkdirSync(path.join(dir, 'builds', 'app'), { recursive: true })
+  fs.writeFileSync(path.join(dir, 'builds', 'app', 'Combwork-Setup-0.6.0.exe'), 'MZ')
   const state = path.join(dir, 'stub.json')
   fs.writeFileSync(state, JSON.stringify({ fail, sandboxes: [], calls: [] }))
   return {
@@ -50,37 +56,37 @@ function scratch(name: string, fail: Json = {}) {
     read: (): Json => JSON.parse(fs.readFileSync(state, 'utf8')),
     patch: (fn: (s: Json) => void) => { const s = JSON.parse(fs.readFileSync(state, 'utf8')); fn(s); fs.writeFileSync(state, JSON.stringify(s)) },
     /** The runner's environment: the run context's allowlist, the fakes, and `vars`. */
-    env: (vars: Json = {}) => ({ ...baseEnv(), WSB_STUB: STUB, WSB_STUB_STATE: state, WSB_STOP_RETRY_MS: '10', HIVE_SANDBOX_TEST_SETTINGS_MS: '0', ...vars })
+    env: (vars: Json = {}) => ({ ...baseEnv(), WSB_STUB: STUB, WSB_STUB_STATE: state, WSB_STOP_RETRY_MS: '10', CW_SANDBOX_TEST_SETTINGS_MS: '0', ...vars })
   }
 }
 const stops = (s: Json, by: string) => s.calls.filter((c: Json[string][]) => c[0] === 'stop' && c[2] === by).length
 const runner = (args: string[], env: Json) => spawnSync(process.execPath, [RUNNER, ...args], { env, encoding: 'utf8', timeout: 60_000 })
 
 test('build folder: the common folder of both installers; different drives and the drive root refused (no endless climb)', () => {
-  assert.strictEqual(buildRoot('D:\\h\\dist\\rc\\Hive-Setup-0.6.0.exe', 'D:\\h\\dist\\Hive-Setup-0.5.1.exe'), 'D:\\h\\dist')
-  assert.strictEqual(buildRoot('D:\\h\\dist\\rc\\Hive-Setup-0.6.0.exe', null), 'D:\\h\\dist\\rc')
-  assert.throws(() => buildRoot('D:\\rc\\Hive-Setup-0.6.0.exe', 'C:\\release\\Hive-Setup-0.5.1.exe'), /different drives \(D:\\ and C:\\\)/)
-  assert.throws(() => buildRoot('D:\\rc\\Hive-Setup-0.6.0.exe', 'D:\\release\\Hive-Setup-0.5.1.exe'), /only common folder is the drive root \(D:\\\)/)
-  assert.throws(() => buildRoot('D:\\Hive-Setup-0.6.0.exe', null), /drive root/)
+  assert.strictEqual(buildRoot('D:\\h\\dist\\rc\\Combwork-Setup-0.6.0.exe', 'D:\\h\\dist\\Combwork-Setup-0.5.1.exe'), 'D:\\h\\dist')
+  assert.strictEqual(buildRoot('D:\\h\\dist\\rc\\Combwork-Setup-0.6.0.exe', null), 'D:\\h\\dist\\rc')
+  assert.throws(() => buildRoot('D:\\rc\\Combwork-Setup-0.6.0.exe', 'C:\\release\\Combwork-Setup-0.5.1.exe'), /different drives \(D:\\ and C:\\\)/)
+  assert.throws(() => buildRoot('D:\\rc\\Combwork-Setup-0.6.0.exe', 'D:\\release\\Combwork-Setup-0.5.1.exe'), /only common folder is the drive root \(D:\\\)/)
+  assert.throws(() => buildRoot('D:\\Combwork-Setup-0.6.0.exe', null), /drive root/)
 })
 
-test('--only: anything but fresh, upgrade, manual or edges is refused before anything runs', () => {
-  assert.throws(() => plan(['--only', 'frseh', '--installer', 'x']), /--only is fresh or upgrade or manual or edges, not "frseh"/)
+test('--only: anything but fresh, upgrade, manual, edges, clean, upgrade-rc or profile-move is refused before anything runs', () => {
+  assert.throws(() => plan(['--only', 'frseh', '--installer', 'x']), /--only is fresh or upgrade or manual or edges or clean or upgrade-rc or profile-move, not "frseh"/)
   const s = scratch('only')
   const r = runner(['--only', 'frseh', '--installer', 'x', '--report', path.join(s.dir, 'report')], s.env())
   assert.strictEqual(r.status, 2)
-  assert.match(r.stderr, /NOT RUN: --only is fresh or upgrade or manual or edges/)
+  assert.match(r.stderr, /NOT RUN: --only is fresh or upgrade or manual or edges or clean or upgrade-rc or profile-move/)
   assert.deepStrictEqual(s.read().calls, [], 'wsb or the server was called')
 })
 
-test('the server: --server, else the workspace\'s installed copy, else a hive-mcp checkout beside the repo; none is NOT RUN', () => {
+test('the server: --server, else the workspace\'s installed copy, else an MCP servers\' checkout beside the repo; none is NOT RUN', () => {
   const s = scratch('server')
-  const installer = path.join(s.dir, 'builds', 'hive', 'Hive-Setup-0.6.0.exe')
-  const hive = path.join(s.dir, 'ws', 'hive')
-  fs.mkdirSync(hive, { recursive: true })
-  const opts = ['--installer', installer, '--only', 'fresh', '--hive', hive]
+  const installer = path.join(s.dir, 'builds', 'app', 'Combwork-Setup-0.6.0.exe')
+  const repo = path.join(s.dir, 'ws', 'combwork')
+  fs.mkdirSync(repo, { recursive: true })
+  const opts = ['--installer', installer, '--only', 'fresh', '--repo', repo]
   assert.throws(() => plan([...opts]), /No windows-sandbox server found \(looked in .*\.combwork.*mcp.*windows-sandbox.*server\.js and .*mcp.*servers.*windows-sandbox.*server\.js\): pass --server/)
-  const [installed, checkout] = serverCandidates(hive)
+  const [installed, checkout] = serverCandidates(repo)
   assert.strictEqual(installed, path.join(s.dir, 'ws', '.combwork', 'mcp', 'windows-sandbox', 'server.js'))
   assert.strictEqual(checkout, path.join(s.dir, 'ws', 'mcp', 'servers', 'windows-sandbox', 'server.js'))
   for (const f of [installed, checkout]) { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, '') }
@@ -89,8 +95,8 @@ test('the server: --server, else the workspace\'s installed copy, else a hive-mc
   assert.strictEqual(plan(opts).serverJs, checkout)
   assert.strictEqual(plan([...opts, '--server', FAKE_SERVER]).serverJs, FAKE_SERVER)
   assert.throws(() => plan([...opts, '--server', path.join(s.dir, 'nope.js')]), /--server .*nope\.js doesn't exist/)
-  // Without --hive, the repo is this checkout (it gives the previous installer from its dist only when asked to).
-  assert.strictEqual(plan(['--installer', installer, '--only', 'fresh', '--server', FAKE_SERVER]).hive, path.resolve(__dirname, '..'))
+  // Without --repo, the repo is this checkout (it gives the previous installer from its dist only when asked to).
+  assert.strictEqual(plan(['--installer', installer, '--only', 'fresh', '--server', FAKE_SERVER]).repo, path.resolve(__dirname, '..'))
 })
 
 test('inSandbox: a body that throws still stops the Sandbox, confirmed', async () => {
@@ -129,23 +135,27 @@ test('inSandbox: the server\'s stops failing but the fallback succeeding → cle
 })
 
 // As a real Sandbox wrote it (RC2), but wrapped mid-word: PowerShell wraps at the console width wherever that falls.
-const BLOCKED_ERR = 'Start-Process : This command cannot be run due to the error: An Applic \r\nation Control policy has blocked this file.\r\nAt C:\\tools\\hive-tests\\sandbox\\inside\\install.ps1:17 char:6'
+const BLOCKED_ERR = 'Start-Process : This command cannot be run due to the error: An Applic \r\nation Control policy has blocked this file.\r\nAt C:\\tools\\combwork-tests\\sandbox\\inside\\install.ps1:17 char:6'
 const SAC_ON = '\r\nHKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\CI\\Policy\r\n    VerifiedAndReputablePolicyState    REG_DWORD    0x1\r\n'
 
 /** Runs the checks on the fakes with these guest commands scripted: two installers in one build folder. */
 function runChecks(name: string, guest: Json[], extra: string[] = [], vars: Json = {}, fail: Json = {}) {
   const s = scratch(name, { guest, ...fail })
-  const previous = path.join(s.dir, 'builds', 'hive', 'previous', 'Hive-Setup-0.5.1.exe')
+  const previous = path.join(s.dir, 'builds', 'app', 'previous', 'Combwork-Setup-0.5.1.exe')
   fs.mkdirSync(path.dirname(previous))
   fs.writeFileSync(previous, 'MZ')
+  // Git for Windows' folder, for the clean install's git project (HI-2592): mapped, never run.
+  const git = path.join(s.dir, 'git')
+  fs.mkdirSync(path.join(git, 'cmd'), { recursive: true })
+  fs.writeFileSync(path.join(git, 'cmd', 'git.exe'), 'MZ')
   const report = path.join(s.dir, 'report')
-  const r = runner(['--installer', path.join(s.dir, 'builds', 'hive', 'Hive-Setup-0.6.0.exe'), '--previous', previous, '--server', FAKE_SERVER, '--report', report, ...extra],
-    s.env({ HIVE_SANDBOX_CHECKS_ROOT: path.join(s.dir, 'sandbox'), ...vars }))
+  const r = runner(['--installer', path.join(s.dir, 'builds', 'app', 'Combwork-Setup-0.6.0.exe'), '--previous', previous, '--server', FAKE_SERVER, '--report', report, '--git', git, ...extra],
+    s.env({ CW_SANDBOX_CHECKS_ROOT: path.join(s.dir, 'sandbox'), ...vars }))
   const calls: Json[string][][] = s.read().calls
   const guests: string[] = calls.filter((c) => c[0] === 'run').map((c) => c[1])
   const starts: Json[] = calls.filter((c) => c[0] === 'start').map((c) => c[1])
   const log = fs.readFileSync(path.join(report, 'run.log'), 'utf8')
-  return { s, r, report, guests, starts, calls, log, json: JSON.parse(fs.readFileSync(path.join(report, 'report.json'), 'utf8')), md: fs.readFileSync(path.join(report, 'report.md'), 'utf8') }
+  return { s, git, r, report, guests, starts, calls, log, json: JSON.parse(fs.readFileSync(path.join(report, 'report.json'), 'utf8')), md: fs.readFileSync(path.join(report, 'report.md'), 'utf8') }
 }
 
 const SAC_BLOCKS = [{ match: 'install\\.ps1', exit: 1, stderr: BLOCKED_ERR }, { match: '^reg\\.exe query', stdout: SAC_ON }]
@@ -159,22 +169,24 @@ function oneNotRunLine({ r, log }: { r: { stdout: string }; log: string }) {
   }
 }
 
-test('what the server gets: hive\'s own scripts and fakes mapped from this checkout, its run folders in hive-test\\sandbox, nothing else of the shell', () => {
-  const run = runChecks('server-env', [], [], { HIVE_SANDBOX_CHECKS_ROOT: undefined, HIVE_API_TOKEN: 'from-the-shell' })
+test('what the server gets: Combwork\'s own scripts and fakes mapped from this checkout, its run folders in combwork-test\\sandbox, nothing else of the shell', () => {
+  const run = runChecks('server-env', [], [], { CW_SANDBOX_CHECKS_ROOT: undefined, CW_API_TOKEN: 'from-the-shell' })
   assert.strictEqual(run.r.status, 1, run.r.stdout + run.r.stderr) // the fake drivers write no results: checks fail
   const repo = path.resolve(__dirname, '..')
   const env = run.calls.find((c) => c[0] === 'env')?.[1]
   assert.deepStrictEqual(env, {
-    WSB_SANDBOX_ROOT: path.join(process.env.LOCALAPPDATA ?? '', 'hive-test', 'sandbox'),
-    WSB_TOOL_DIRS: [`node=${path.dirname(process.execPath)}`, `playwright=${path.join(repo, 'node_modules', 'playwright-core')}`, `hive-tests=${path.join(repo, 'tests')}`].join(';'),
+    WSB_SANDBOX_ROOT: path.join(process.env.LOCALAPPDATA ?? '', 'combwork-test', 'sandbox'),
+    WSB_TOOL_DIRS: [`node=${path.dirname(process.execPath)}`, `playwright=${path.join(repo, 'node_modules', 'playwright-core')}`, `combwork-tests=${path.join(repo, 'tests')}`, `git=${run.git}`].join(';'),
     WSB_MCP_ENABLED: '1',
     WSB_ALLOWED_ROOTS: '',
-    HIVE_API_TOKEN: null
+    CW_API_TOKEN: null
   })
-  assert.deepStrictEqual(run.starts.map((a) => [a.build, a.network, a.tools]), [[path.join(run.s.dir, 'builds', 'hive'), false, ['node', 'playwright', 'hive-tests']], [path.join(run.s.dir, 'builds', 'hive'), false, ['node', 'playwright', 'hive-tests']]])
+  const build = path.join(run.s.dir, 'builds', 'app')
+  // Git only in the clean install's Sandbox (HI-2592), for its git project; the profile move's (HI-2602) is the fourth.
+  assert.deepStrictEqual(run.starts.map((a) => [a.build, a.network, a.tools]), [[build, false, ['node', 'playwright', 'combwork-tests']], [build, false, ['node', 'playwright', 'combwork-tests']], [build, false, ['node', 'playwright', 'combwork-tests', 'git']], [build, false, ['node', 'playwright', 'combwork-tests']]])
   // Every script the runner runs inside is here, at the path the Sandbox maps it to.
-  const inside = run.guests.flatMap((g) => [...g.matchAll(/C:\\tools\\hive-tests\\([^\s"]+)/g)].map((m) => m[1]))
-  assert.deepStrictEqual([...new Set(inside)].sort(), ['sandbox\\inside\\drive.cjs', 'sandbox\\inside\\install.ps1', 'sandbox\\inside\\start-app.ps1'])
+  const inside = run.guests.flatMap((g) => [...g.matchAll(/C:\\tools\\combwork-tests\\([^\s"]+)/g)].map((m) => m[1]))
+  assert.deepStrictEqual([...new Set(inside)].sort(), ['sandbox\\inside\\clean-scan.cjs', 'sandbox\\inside\\drive.cjs', 'sandbox\\inside\\install.ps1', 'sandbox\\inside\\profile-move.ps1', 'sandbox\\inside\\start-app.ps1'])
   for (const f of inside) assert.ok(fs.existsSync(path.join(__dirname, ...f.split('\\'))), f)
   assert.ok(!run.guests.some((g) => /wsb-mcp/i.test(g)), 'a script from the server\'s own folder')
   assert.match(run.log, new RegExp(`server ${FAKE_SERVER.replace(/[\\.]/g, '\\$&')}`))
@@ -200,18 +212,18 @@ test('Smart App Control blocking the installers → one NOT RUN line with the re
   const { s, r, json, md, guests } = run
   assert.strictEqual(r.status, 2, r.stdout + r.stderr)
   oneNotRunLine(run)
-  assert.deepStrictEqual(json.notRun.map((n: Json) => [n.kind, n.installer]), [['fresh', 'Hive-Setup-0.6.0.exe'], ['upgrade', 'Hive-Setup-0.5.1.exe']])
+  assert.deepStrictEqual(json.notRun.map((n: Json) => [n.kind, n.installer]), [['fresh', 'Combwork-Setup-0.6.0.exe'], ['upgrade', 'Combwork-Setup-0.5.1.exe'], ['clean', 'Combwork-Setup-0.6.0.exe'], ['profile-move', 'Combwork-Setup-0.5.1.exe']])
   assert.strictEqual(json.failed, 0)
   assert.strictEqual(json.checks.length, 0)
   assert.deepStrictEqual(json.meta.smartAppControl, { state: 1, option: 'keep', note: 'left as Windows set it (read only)' })
   assert.doesNotMatch(md, /Smart App Control in the Sandbox: /)
   assert.match(md, /^\*\*NOT RUN: Smart App Control in the Sandbox blocks unsigned installers \(VerifiedAndReputablePolicyState = 1\): sign the installer, or run the checks with --smart-app-control off\.\*\* · /m)
-  assert.match(md, /## Not run[\s\S]*- \*\*fresh\*\*: Windows refused `Hive-Setup-0\.6\.0\.exe`\.\n- \*\*upgrade\*\*: Windows refused `Hive-Setup-0\.5\.1\.exe`\./)
+  assert.match(md, /## Not run[\s\S]*- \*\*fresh\*\*: Windows refused `Combwork-Setup-0\.6\.0\.exe`\.\n- \*\*upgrade\*\*: Windows refused `Combwork-Setup-0\.5\.1\.exe`\.\n- \*\*clean\*\*: Windows refused `Combwork-Setup-0\.6\.0\.exe`\.\n- \*\*profile-move\*\*: Windows refused `Combwork-Setup-0\.5\.1\.exe`\./)
   assert.doesNotMatch(md, /FAIL/)
-  // Nothing ran after the blocked install in either Sandbox, and the policy was only ever read.
-  assert.strictEqual(guests.filter((g) => /install\.ps1/.test(g)).length, 2)
-  assert.ok(!guests.some((g) => /drive\.cjs/.test(g)), guests.join('\n'))
-  assert.deepStrictEqual(guests.filter((g) => /CI\\Policy|SmartAppControl|VerifiedAndReputable|CiTool/i.test(g)).map((g) => g.split(' ').slice(0, 2).join(' ')), ['reg.exe query', 'reg.exe query'])
+  // Nothing ran after the blocked install in any Sandbox, and the policy was only ever read.
+  assert.strictEqual(guests.filter((g) => /install\.ps1/.test(g)).length, 4)
+  assert.ok(!guests.some((g) => /drive\.cjs|clean-scan\.cjs scan|profile-move\.ps1/.test(g)), guests.join('\n'))
+  assert.deepStrictEqual(guests.filter((g) => /CI\\Policy|SmartAppControl|VerifiedAndReputable|CiTool/i.test(g)).map((g) => g.split(' ').slice(0, 2).join(' ')), Array(4).fill('reg.exe query'))
   assert.deepStrictEqual(s.read().sandboxes, [])
 })
 
@@ -240,15 +252,30 @@ test('the previous installer: a release sorts above its prereleases, so 0.9.0 is
   const sorted = ['0.9.0-beta.1', '0.9.0', '0.9.0-rc.10', '0.8.2', '0.9.0-rc.2', '0.8.2-rc.3', '0.9.0-rc', '0.10.0-rc.1'].sort(cmpVersion)
   assert.deepStrictEqual(sorted, ['0.8.2-rc.3', '0.8.2', '0.9.0-beta.1', '0.9.0-rc', '0.9.0-rc.2', '0.9.0-rc.10', '0.9.0', '0.10.0-rc.1'])
   const s = scratch('previous-pick')
-  const hive = path.join(s.dir, 'builds', 'hive')
-  const dist = path.join(hive, 'dist')
+  const repo = path.join(s.dir, 'builds', 'app')
+  const dist = path.join(repo, 'dist')
   fs.mkdirSync(dist)
-  // As in Hive's dist on 18 Oct: the RC run picked 0.9.0-beta.1, which sorted level with 0.9.0 and came first.
-  for (const v of ['0.8.2-rc.3', '0.9.0-beta.1', '0.9.0-rc.1', '0.9.0', '0.9.1-rc.1']) fs.writeFileSync(path.join(dist, `Hive-Setup-${v}.exe`), 'MZ')
-  const pick = (installer: string) => path.basename(plan(['--installer', path.join(dist, installer), '--hive', hive, '--server', FAKE_SERVER]).previous)
-  assert.strictEqual(pick('Hive-Setup-0.9.1-rc.1.exe'), 'Hive-Setup-0.9.0.exe')
+  // As in the repository's dist on 18 Oct: the RC run picked 0.9.0-beta.1, which sorted level with 0.9.0 and came first.
+  for (const v of ['0.8.2-rc.3', '0.9.0-beta.1', '0.9.0-rc.1', '0.9.0', '0.9.1-rc.1']) fs.writeFileSync(path.join(dist, `Combwork-Setup-${v}.exe`), 'MZ')
+  const pick = (installer: string) => path.basename(plan(['--installer', path.join(dist, installer), '--repo', repo, '--server', FAKE_SERVER]).previous)
+  assert.strictEqual(pick('Combwork-Setup-0.9.1-rc.1.exe'), 'Combwork-Setup-0.9.0.exe')
   // The newest other than the installer itself, even when that is a prerelease.
-  assert.strictEqual(pick('Hive-Setup-0.9.0.exe'), 'Hive-Setup-0.9.1-rc.1.exe')
+  assert.strictEqual(pick('Combwork-Setup-0.9.0.exe'), 'Combwork-Setup-0.9.1-rc.1.exe')
+})
+
+test('--previous-rc (HI-2587): a 1.1 release candidate adds scenario 10 beside the upgrade from 1.0; --only upgrade-rc needs it', () => {
+  const s = scratch('previous-rc')
+  const repo = path.join(s.dir, 'builds', 'app')
+  const dist = path.join(repo, 'dist')
+  fs.mkdirSync(dist)
+  for (const v of [`${OLD_SETUP}-1.0.0`, 'Combwork-Setup-1.1.0-rc.2', 'Combwork-Setup-1.1.0']) fs.writeFileSync(path.join(dist, `${v}.exe`), 'MZ')
+  const installer = path.join(dist, 'Combwork-Setup-1.1.0.exe')
+  const rc = path.join(dist, 'Combwork-Setup-1.1.0-rc.2.exe')
+  const p = plan(['--installer', installer, '--previous', path.join(dist, `${OLD_SETUP}-1.0.0.exe`), '--previous-rc', rc, '--repo', repo, '--server', FAKE_SERVER])
+  assert.deepStrictEqual(p.ran, ['fresh', 'upgrade', 'clean', 'profile-move', 'upgrade-rc'])
+  assert.strictEqual(p.guestPreviousRc, 'C:\\build\\Combwork-Setup-1.1.0-rc.2.exe')
+  assert.deepStrictEqual(plan(['--installer', installer, '--previous', path.join(dist, `${OLD_SETUP}-1.0.0.exe`), '--repo', repo, '--server', FAKE_SERVER]).ran, ['fresh', 'upgrade', 'clean', 'profile-move'])
+  assert.throws(() => plan(['--only', 'upgrade-rc', '--installer', installer, '--repo', repo, '--server', FAKE_SERVER]), /--only upgrade-rc needs --previous-rc/)
 })
 
 test('--smart-app-control: only "off"; anything else is refused before anything runs', () => {
@@ -269,10 +296,10 @@ test('--smart-app-control off: each Sandbox started with it, the state read back
   assert.strictEqual(r.status, 1, r.stdout + r.stderr) // the fake drivers write no results: checks fail, nothing NOT RUN
   assert.deepStrictEqual(json.notRun, [])
   // The server turns it off (its sandbox_start option); the runner reads it at each Sandbox's start and before each install.
-  assert.deepStrictEqual(starts.map((a) => a.smartAppControl), ['off', 'off'])
-  assert.deepStrictEqual(guests.filter((g) => /CI\\Policy|CiTool/i.test(g)).map((g) => g.split(' ').slice(0, 2).join(' ')), Array(5).fill('reg.exe query'))
+  assert.deepStrictEqual(starts.map((a) => a.smartAppControl), ['off', 'off', 'off', 'off'])
+  assert.deepStrictEqual(guests.filter((g) => /CI\\Policy|CiTool/i.test(g)).map((g) => g.split(' ').slice(0, 2).join(' ')), Array(9).fill('reg.exe query'))
   const installs = guests.map((g, i) => [g, i] as const).filter(([g]) => /install\.ps1 -Exe "C:\\build\\/.test(g))
-  assert.strictEqual(installs.length, 3)
+  assert.strictEqual(installs.length, 5)
   for (const [, i] of installs) assert.match(guests[i - 1], /^reg\.exe query /)
   assert.deepStrictEqual(json.meta.smartAppControl, { state: 0, option: 'off', note: 'turned off by option' })
   assert.match(md, /^- \*\*Smart App Control in the Sandbox: turned off by option\*\* \(`--smart-app-control off`; state 0, read before each install\)\. Inside the Sandbox only: the host isn't changed\./m)
@@ -285,7 +312,7 @@ test('--smart-app-control off that does not take (still 1) → NOT RUN with that
   const { r, json, md, guests } = run
   assert.strictEqual(r.status, 2, r.stdout + r.stderr)
   const reason = 'Smart App Control was to be turned off in the Sandbox (--smart-app-control off), but it reads 1 (VerifiedAndReputablePolicyState), not 0: the installers weren\'t run.'
-  assert.deepStrictEqual(json.notRun, [{ kind: 'fresh', reason, installer: 'Hive-Setup-0.6.0.exe' }, { kind: 'upgrade', reason, installer: 'Hive-Setup-0.5.1.exe' }])
+  assert.deepStrictEqual(json.notRun, [{ kind: 'fresh', reason, installer: 'Combwork-Setup-0.6.0.exe' }, { kind: 'upgrade', reason, installer: 'Combwork-Setup-0.5.1.exe' }, { kind: 'clean', reason, installer: 'Combwork-Setup-0.6.0.exe' }, { kind: 'profile-move', reason, installer: 'Combwork-Setup-0.5.1.exe' }])
   assert.ok(!guests.some((g) => /install\.ps1/.test(g)), guests.join('\n'))
   assert.deepStrictEqual(json.meta.smartAppControl, { state: 1, option: 'off', note: 'asked off by option, but not off' })
   assert.match(md, new RegExp(`^\\*\\*NOT RUN: ${reason.replace(/[.()]/g, '\\$&')}\\*\\*`, 'm'))
@@ -293,10 +320,10 @@ test('--smart-app-control off that does not take (still 1) → NOT RUN with that
   assert.deepStrictEqual(run.s.read().sandboxes, [])
 })
 
-// The driver (tests/sandbox/inside/drive.cjs) finds Hive's window by its text and selectors, and calls its IPC channels and
+// The driver (tests/sandbox/inside/drive.cjs) finds Combwork's window by its text and selectors, and calls its IPC channels and
 // Agent API: when one changes, the Sandbox checks fail only at the next release candidate (MC-1478: Agent Setup renamed
 // Provider Setup). These are checked here, so the change and the driver are fixed together.
-test('what the Sandbox driver relies on in Hive\'s window, IPC and Agent API is still there', () => {
+test('what the Sandbox driver relies on in Combwork\'s window, IPC and Agent API is still there', () => {
   const root = path.resolve(__dirname, '..')
   const drive = fs.readFileSync(path.join(SANDBOX, 'inside', 'drive.cjs'), 'utf8')
   const english = fs.readdirSync(path.join(root, 'locales', 'en')).map((f) => fs.readFileSync(path.join(root, 'locales', 'en', f), 'utf8')).join('\n')
@@ -304,7 +331,7 @@ test('what the Sandbox driver relies on in Hive\'s window, IPC and Agent API is 
   const ui = renderer(path.join(root, 'src', 'renderer', 'src'))
   const api = fs.readFileSync(path.join(root, 'src', 'shared', 'api.ts'), 'utf8')
   const servers = fs.readFileSync(path.join(root, 'src', 'main', 'servers.ts'), 'utf8')
-  const texts = ['Provider Setup', 'Choose providers', 'Check again', 'No coding agents are turned on', 'No coding agent CLI is installed', '{provider} is not installed', '— found via {source}', 'Use {name}', 'Workspace Overview', 'Task Board', 'Shared Notes', 'MCP Servers', 'Hive Assistant']
+  const texts = ['Provider Setup', 'Choose providers', 'Check again', 'No coding agents are turned on', 'No coding agent CLI is installed', '{provider} is not installed', '— found via {source}', 'Use {name}', 'Workspace Overview', 'Task Board', 'Shared Notes', 'MCP Servers', 'Assistant']
   // Selectors, and the palette command it waits for before pressing Enter.
   const classes = ['providers-banner', 'setup-tab', 'welcome', 'workbench', 'statusbar', 'status-item', 'data-git', 'palette-item', 'data-command', "'help.agentSetup'"]
   const channels = ['provider:info', 'settings:update', 'workspace:open']
@@ -323,7 +350,58 @@ test('what the Sandbox driver relies on in Hive\'s window, IPC and Agent API is 
   for (const f of ['fake-claude/fake-claude.cjs', 'fake-bridge.cjs']) assert.ok(fs.existsSync(path.join(__dirname, 'e2e', f)), f)
 })
 
-// The driver's readiness (tests/sandbox/inside/ready.cjs): what Hive says is done, never a quiet spell. Each case holds a
+// The driver's Launch at login reading (drive.cjs runValues, HI-2460): HKCU's Run values that start either exe, the 1.0
+// app's before the upgrade and Combwork.exe after, so 4.login-registered sees the old one and 4.login-moved a stale one
+// (HI-2567 round 1's finding). Its PowerShell filter, -match (case-insensitive), applied to stand-in Run values.
+test("the driver's Launch at login reading keeps the 1.0 exe's and Combwork.exe's Run values, and nothing else", () => {
+  const drive = fs.readFileSync(path.join(SANDBOX, 'inside', 'drive.cjs'), 'utf8')
+  // A constant of the driver's joined into the filter (`" + OLD_EXE.replace('.', '\\.') + "`) reads as its value, escaped as in the source.
+  const constant = (name: string): string => new RegExp(`const ${name} = '([^']+)'`).exec(drive)?.[1] ?? ''
+  const body = drive
+    .slice(drive.indexOf('function runValues()'))
+    .replace(/" \+ (\w+)\.replace\('\.', '\\\\\.'\) \+ "/g, (_m, name: string) => constant(name).replace('.', '\\\\.'))
+  const filter = /\$_\.command -match '([^']+)'/.exec(body.slice(0, body.indexOf('\n}')))?.[1]
+  assert.ok(filter, 'runValues filters its Run values with -match')
+  const re = new RegExp(filter.replace(/\\\\/g, '\\'), 'i')
+  const old = { name: `electron.app.${OLD_APP}`, command: `"C:\\Users\\u\\AppData\\Local\\Programs\\${OLD_DIR}\\${OLD_DIR}.exe" --hidden` }
+  const combwork = { name: 'electron.app.Combwork', command: '"C:\\Users\\u\\AppData\\Local\\Programs\\Combwork\\Combwork.exe" --hidden' }
+  const other = { name: 'OneDrive', command: '"C:\\Program Files\\Microsoft OneDrive\\OneDrive.exe" /background' }
+  const kept = (values: { name: string; command: string }[]) => values.filter((v) => re.test(v.command)).map((v) => v.name)
+  assert.deepStrictEqual(kept([old, other]), [old.name])
+  assert.deepStrictEqual(kept([old, combwork, other]), [old.name, combwork.name])
+  assert.deepStrictEqual(kept([other]), [])
+})
+
+// Scenario 11's script (tests/sandbox/inside/profile-move.ps1, HI-2602) records the checks the report requires, and reads
+// what the app writes: the record of a move (its file name, by, signInChecked) and the sign-in check's log lines
+// (profileNotices.ts). When one changes, the script must change with it, not fail at the next release candidate.
+test("the profile move's script records the report's check ids, and reads the record and log lines the app writes", () => {
+  const { PROFILE_MOVE_IDS, REQUIRED } = require('./sandbox/report.cjs')
+  const script = fs.readFileSync(path.join(SANDBOX, 'inside', 'profile-move.ps1'), 'utf8')
+  const ids = [...script.matchAll(/^\s*Check '([^']+)'/gm)].map((m) => m[1])
+  assert.deepStrictEqual(ids.filter((id) => id !== '11.error'), PROFILE_MOVE_IDS)
+  for (const shot of REQUIRED['profile-move'].shots.filter((s: string) => s.endsWith('.png'))) assert.ok(script.includes(`Shot '${shot.replace(/\.png$/, '')}'`), shot)
+  const root = path.resolve(__dirname, '..')
+  const notices = fs.readFileSync(path.join(root, 'src', 'main', 'profileNotices.ts'), 'utf8')
+  const folders = fs.readFileSync(path.join(root, 'src', 'main', 'profileFolders.ts'), 'utf8') + notices
+  const said = (name: string) => /^\$\w+ = '([^']+)'/m.exec(script.slice(script.indexOf(`$${name} = `)))?.[1]
+  assert.strictEqual(said('record'), 'profile-move.json')
+  assert.ok(folders.includes("'profile-move.json'"), 'the record is profile-move.json')
+  assert.ok(notices.includes(`log.info(\`${said('checkLine')}`), `profileNotices.ts logs "${said('checkLine')}…" once per check`)
+  assert.ok(notices.includes(`log.info('${said('doneLine')}')`), `profileNotices.ts logs "${said('doneLine')}"`)
+  assert.ok(/signInChecked: true/.test(notices) && /by: 'installer'/.test(notices), 'the record says signInChecked: true, and by')
+  // The refused start (HI-2603): the error box the script finds by its English title, and the stderr line naming the folder.
+  const refusedTitle = /^\$refusedTitle = "([^"]+)"/m.exec(script)?.[1]
+  assert.ok(refusedTitle, 'the script says $refusedTitle')
+  const english = JSON.parse(fs.readFileSync(path.join(root, 'locales', 'en', 'main.json'), 'utf8'))
+  assert.ok(english['main.profileMove.refusedTitle']?.defaultMessage.includes(refusedTitle), `locales/en's main.profileMove.refusedTitle holds "${refusedTitle}"`)
+  const index = fs.readFileSync(path.join(root, 'src', 'main', 'index.ts'), 'utf8')
+  const refuse = index.slice(index.indexOf('function refuseStart('), index.indexOf('exitBeforeProfile(1)', index.indexOf('function refuseStart(')))
+  assert.ok(refuse.includes("id: 'main.profileMove.refusedTitle'") && refuse.includes('dialog.showErrorBox(title,') && refuse.includes('process.stderr.write(`${title}: ${e.message}'), 'refuseStart shows the title and writes the move\'s message to stderr')
+  assert.ok(/export class ProfileMoveRefused extends Error/.test(folders) && folders.includes('super(`${from} → ${to}: ${reason}`)'), 'ProfileMoveRefused\'s message names the folder it moves from')
+})
+
+// The driver's readiness (tests/sandbox/inside/ready.cjs): what Combwork says is done, never a quiet spell. Each case holds a
 // loading state unchanged for many polls before the ready one: the wait must not end on it (HI-2298 round 2's finding).
 const ready = require('./sandbox/inside/ready.cjs')
 /** A reader that answers `before` for n calls and `after` from then on, counting its calls. */
@@ -332,7 +410,7 @@ const scripted = <T>(n: number, before: T, after: T) => {
   return { read: async () => (++calls <= n ? before : after), calls: () => calls }
 }
 
-test('the new workspace counts as set up only once Hive\'s status names it with its Hive skills, however long it stays the same before', async () => {
+test('the new workspace counts as set up only once Combwork\'s status names it with its Combwork skills, however long it stays the same before', async () => {
   const ws = 'C:\\Users\\WDAGUtilityAccount\\Workspaces\\Fresh'
   const done = { workspace: { path: `${ws}\\` }, guidance: { skills: [{ name: 'handover' }] } }
   for (const partial of [{ workspace: null, guidance: { skills: null } }, { workspace: { path: ws }, guidance: { skills: [] } }, { workspace: { path: 'C:\\Other' }, guidance: { skills: [{ name: 'handover' }] } }]) {
@@ -342,7 +420,7 @@ test('the new workspace counts as set up only once Hive\'s status names it with 
   }
   // Never set up within the bound: null (the driver fails the check), not what was read last.
   assert.strictEqual(await ready.workspaceSetUp(async () => ({ workspace: { path: ws }, guidance: { skills: [] } }), ws, 30, 1), null)
-  // A status that fails (its request timed out while Hive was still setting up) is not yet, not an end.
+  // A status that fails (its request timed out while Combwork was still setting up) is not yet, not an end.
   let n = 0
   assert.strictEqual(await ready.workspaceSetUp(async () => { if (++n < 5) throw new Error('timeout'); return done }, ws, 5000, 1), done)
 })
@@ -371,7 +449,7 @@ test('a view counts as loaded only on its own loaded markers, however long its l
   assert.deepStrictEqual(ready.VIEWS.map((v: Json) => v.slug), ['workspace-overview', 'task-board', 'shared-notes', 'skills', 'mcp-servers', 'assistant'])
 })
 
-test('every view marker the driver waits for is in Hive\'s window: its classes and attributes in the renderer, its text in English', () => {
+test('every view marker the driver waits for is in Combwork\'s window: its classes and attributes in the renderer, its text in English', () => {
   const root = path.resolve(__dirname, '..')
   const english = fs.readdirSync(path.join(root, 'locales', 'en')).map((f) => fs.readFileSync(path.join(root, 'locales', 'en', f), 'utf8')).join('\n')
   const renderer = (dir: string): string => fs.readdirSync(dir, { withFileTypes: true }).map((e) => (e.isDirectory() ? renderer(path.join(dir, e.name)) : /\.tsx?$/.test(e.name) ? fs.readFileSync(path.join(dir, e.name), 'utf8') : '')).join('\n')

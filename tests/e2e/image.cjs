@@ -25,7 +25,7 @@ fs.mkdirSync(shots, { recursive: true })
 
 ;(async () => {
   const claude = lib.fakeClaude(userData, path.join(scratch, 'image-claude-home'), [path.join(ws, 'demo')])
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, ...claude })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, ...claude })
   const app = await _electron.launch({
     executablePath: lib.ELECTRON,
     args: [lib.ROOT],
@@ -35,7 +35,7 @@ fs.mkdirSync(shots, { recursive: true })
   const page = await app.firstWindow()
   await page.waitForLoadState('domcontentloaded')
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   const proj = path.join(ws, 'demo')
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('demo', { exact: true }).first().click()
@@ -45,7 +45,7 @@ fs.mkdirSync(shots, { recursive: true })
   await lib.acceptClaudeTrust(inv, proj, agent.id)
   check('the session starts', !!(await lib.until(async () => (await inv('session:live')).some((l) => l.status === 'ready'), 30000)))
   const typed = async () => (await inv('pty:buffer', lib.ptyKey(proj, agent.id))).replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '')
-  /** The attachments' paths on the CLI's input line: copies Hive keeps with the session (.combwork/attachments/<session>/…). */
+  /** The attachments' paths on the CLI's input line: copies Combwork keeps with the session (.combwork/attachments/<session>/…). */
   // A copy's name may have spaces (its own name after the time), when its path is quoted.
   const kept = async (ext = 'png') => [...new Set([...(await typed()).matchAll(new RegExp(`[\\\\/]\\.combwork[\\\\/]attachments[\\\\/][^"\\r\\n]+?\\.${ext}(?=["\\s]|$)`, 'gi'))].map((m) => m[0]))]
   const images = () => kept('png')

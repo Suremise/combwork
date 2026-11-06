@@ -1,4 +1,4 @@
-// A stand-in for Codex in end-to-end tests: Hive launches it through its real Codex adapter (Settings → Codex →
+// A stand-in for Codex in end-to-end tests: Combwork launches it through its real Codex adapter (Settings → Codex →
 // path = fake-codex.cmd), so who is asked (an approval, a question, the auto-reviewer) is tested without signing
 // in or spending tokens. It sends the hooks, in the order, and sets the terminal title the way Codex 0.160.0 did
 // (tests/hookStatus.test.ts has the sequences):
@@ -14,31 +14,31 @@
 //   "approve": the request is put to you: "y" approves it (another command ends beside it first), Esc rejects
 //   it (the turn is interrupted).
 //   "question": an async question (request_user_input_async): it works on meanwhile; "a" answers it, which it
-//   waits for at the end of the turn. "late question": its hooks reach Hive after its title.
-//   "hold": waits for "g" before its next step, so a test can wait until Hive has taken the steps before (#329).
+//   waits for at the end of the turn. "late question": its hooks reach Combwork after its title.
+//   "hold": waits for "g" before its next step, so a test can wait until Combwork has taken the steps before (#329).
 //   Steps combine with " then " ("question then review deny").
 //   The scenarios' steps, as the fake Claude Code takes them: "skill NAME" (a shell read of its SKILL.md),
-//   "boardmove", "boardreview", "boardcomment" and "hive TOOL {json}" (through the launch's real hive MCP server),
+//   "boardmove", "boardreview", "boardcomment" and "cw TOOL {json}" (through the launch's real Combwork MCP server),
 //   "work N" and "shell: <command line>" (run in cmd with the session's environment, between its PreToolUse and
 //   PostToolUse; fake-shell.jsonl in CODEX_HOME records it, #1486). "planusage F W": its rollout's rate limits, F% of
 //   the 5-hour window and W% of the weekly one (HI-1882). "patch FILE" (HI-2386): an apply_patch edit of FILE, which
-//   Hive's file lock may refuse (fake-edits.jsonl in CODEX_HOME records each try). Anything else: a short turn.
-//   The turn ledger's cases (#648): "latetool" (a command whose PostToolUse reaches Hive after the turn's Stop),
-//   "loststop" (no Stop reaches Hive; its rollout records the turn's end, task_complete) and "silent" (neither).
+//   Combwork's file lock may refuse (fake-edits.jsonl in CODEX_HOME records each try). Anything else: a short turn.
+//   The turn ledger's cases (#648): "latetool" (a command whose PostToolUse reaches Combwork after the turn's Stop),
+//   "loststop" (no Stop reaches Combwork; its rollout records the turn's end, task_complete) and "silent" (neither).
 //   "ratelimited" (HI-1972): a 429 recorded only in its log database (logs_2.sqlite), then no hook until
 //   fake-retried-<agent> is in CODEX_HOME.
 //   Notices (#650), as Codex 0.162.1 takes them: context in a PostToolUse reply reaches "the model", and a Stop blocked
 //   carries the same turn on to another Stop with stop_hook_active. Each ("[CW] …") is logged in fake-notices.jsonl in
 //   CODEX_HOME; with fake-follow-notices.txt (or fake-follow-notices-<agent>.txt) there, it reads its inbox (cw_inbox)
-//   and acks what it listed. "checkpoint": a command (PreToolUse, PostToolUse) whose reply it reads. Hive's doorbell
+//   and acks what it listed. "checkpoint": a command (PreToolUse, PostToolUse) whose reply it reads. Combwork's doorbell
 //   ("[CW] New in your inbox: …") it follows as a model does: it reads its inbox; new work it read (a task, a
 //   handover) is its prompt, anything else (a wake, a message) is logged in fake-wakes.jsonl in CODEX_HOME, with the
 //   doorbell's line as it was sent (`doorbell`, HI-1974).
 // - Each prompt is a turn with its own id, which its hooks carry (turn_id) and its rollout records (task_started,
 //   task_complete after Stop), as Codex 0.162.1 does.
 // - With fake-code-mode.txt in CODEX_HOME (the scenarios', HI-2235) it works in code mode, as Codex 0.166.0 does: its
-//   hive calls and skill reads are each made from a script (exec), its rollout recording each call the script made.
-// - It connects the launch's hive MCP server as it starts (#865: the real server, which tells Hive it has connected).
+//   Combwork calls and skill reads are each made from a script (exec), its rollout recording each call the script made.
+// - It connects the launch's Combwork MCP server as it starts (#865: the real server, which tells Combwork it has connected).
 // - A first prompt as its last plain argument (after "resume <id>" too) is its first turn, as Codex starts on one.
 // - Ctrl+C twice ends it with SessionEnd.
 // - While fake-nohooks-<agent> is in CODEX_HOME it sends no hook at all, as when a Codex update broke them (#1336). A
@@ -47,14 +47,22 @@
 // - "selfcompact" (HI-1916): a compaction it begins itself (PreCompact, PostCompact), then the turn under the same turn_id,
 //   as Codex 0.164.0 did.
 // - "compacting N" (#1514): a turn that compacts its conversation for N seconds first, as Codex's auto-compaction does
-//   at a turn's start, sending no hook meanwhile (no UserPromptSubmit: Hive sees no prompt, as with RR2 on 23 Oct). With
+//   at a turn's start, sending no hook meanwhile (no UserPromptSubmit: Combwork sees no prompt, as with RR2 on 23 Oct). With
 //   fake-queue-<agent> in CODEX_HOME, a line typed while a turn runs is queued (as Codex queues input) and taken in the
 //   same turn once it has compacted: recorded as a user message, with no UserPromptSubmit; a doorbell read as above.
+// - "nudge" (HI-2609): after the turn, its offer of a cheaper model near the account's limit, as Codex 0.166.0 draws it
+//   (tests/fixtures/advanced/ratelimit-nudge-codex-0.166.0.txt) in place of its input, its first choice selected. Every key
+//   read while it shows is logged in fake-nudge.jsonl in CODEX_HOME; Enter takes the selected choice (its rollout's
+//   thread_settings_applied names gpt-6-luna), "2" or Esc keeps the model. With -c notice.hide_rate_limit_model_nudge=true
+//   it isn't shown (logged as hidden). "creditnudge", "usagenudge" (HI-2619): after the turn, its prompt at a workspace's
+//   credit or usage limit ("Notify owner?", "Request increase?"), "2. No (default)" selected, keys logged there too (with
+//   its prompt): "y", "1" or Enter on Yes ask the owner, "n", "2", Esc or Enter on No don't; nothing hides it. "switchmodel M": its rollout's thread_settings_applied names M, as /model does.
+//   With fake-turn-context.txt in CODEX_HOME, each turn's rollout has a turn_context naming its -m model.
 const fs = require('fs')
 const path = require('path')
 const { randomUUID } = require('crypto')
 const { spawn } = require('child_process')
-const { callHiveTool, connectHive, fromCodexTable, parseHiveStep, isDoorbell, doorbellIsWork, inboxRows } = require('../fake-bridge.cjs')
+const { callOwnTool, connectOwnServer, fromCodexTable, parseToolStep, isDoorbell, doorbellIsWork, inboxRows } = require('../fake-bridge.cjs')
 
 const args = process.argv.slice(2)
 if (args[0] === '--version') {
@@ -62,7 +70,7 @@ if (args[0] === '--version') {
   process.exit(0)
 }
 if (args[0] === 'debug' && args[1] === 'models') {
-  // Codex 0.160's recorded catalog (tests/fixtures/codex-debug-models.json), as Hive asks for its models (#125).
+  // Codex 0.160's recorded catalog (tests/fixtures/codex-debug-models.json), as Combwork asks for its models (#125).
   process.stdout.write(fs.readFileSync(path.join(__dirname, '..', '..', 'fixtures', 'codex-debug-models.json'), 'utf8'))
   process.exit(0)
 }
@@ -111,7 +119,7 @@ if (setUpRun) {
   if (path.relative(connectionHome, cwd).startsWith('..') && !next.includes(`[projects.'${cwd}']`)) next += `\n[projects.'${cwd}']\ntrust_level = "trusted"\n`
   if (next !== now) fs.writeFileSync(toml, next)
 }
-// A busy connection (HI-1873): while fake-busy is in a connection's folder, each run there (an agent, and Hive's own
+// A busy connection (HI-1873): while fake-busy is in a connection's folder, each run there (an agent, and Combwork's own
 // check's app server) writes at its top level as Codex's databases and logs do, in bursts, making and deleting a journal,
 // so Windows reports some of it with no file name. Its login file is never touched.
 if (inConnection) {
@@ -125,7 +133,7 @@ if (inConnection) {
   }, 500).unref()
 }
 if (args[0] === 'app-server') {
-  // Hive asks how this version names and hashes its hooks (none), or who its connection's folder is signed in as. Its
+  // Combwork asks how this version names and hashes its hooks (none), or who its connection's folder is signed in as. Its
   // pid goes to FAKE_CODEX_APPSERVER_LOG when a suite names one (HI-1757: none may be left running); its arguments to
   // fake-appservers.jsonl in a connection's folder (HI-1893: the sandbox its checks are given).
   if (process.env.FAKE_CODEX_APPSERVER_LOG) fs.appendFileSync(process.env.FAKE_CODEX_APPSERVER_LOG, `${process.pid}\n`)
@@ -145,7 +153,7 @@ if (args[0] === 'app-server') {
         // A request it doesn't know (an advanced setting naming another, HI-982), answered as Codex's app server does.
         process.stdout.write(JSON.stringify({ id: m.id, error: { code: -32601, message: `unknown method: ${m.method}` } }) + '\n')
       } else if (m.method === 'hooks/list' && process.env.CODEX_HOME && fs.existsSync(path.join(process.env.CODEX_HOME, 'fake-hooks-list-hang.txt'))) {
-        // No answer while fake-hooks-list-hang.txt is there (HI-982: Hive's listing timeout).
+        // No answer while fake-hooks-list-hang.txt is there (HI-982: Combwork's listing timeout).
       } else if (m.method === 'hooks/list' && process.env.CODEX_HOME && fs.existsSync(path.join(process.env.CODEX_HOME, 'fake-hooks-list.json'))) {
         // A suite's hooks (HI-982: hooksview): those of fake-hooks-list.json, after the -c hooks.<event> it was given,
         // listed as Codex 0.164 lists the session flags' (codexownhooks pins the fields), trusted.
@@ -169,7 +177,7 @@ if (args[0] === 'app-server') {
 // fake-developer-instructions.txt in CODEX_HOME (standing for whatever layers Codex took them from), or the last
 // -c/--config developer_instructions=<TOML string> in the options (as Codex takes them: the last wins, "" clears
 // them), then Codex's own texts; "!fail" exits with an error. Each run's options go in fake-prompt-input.jsonl, so a
-// test sees Hive passed the agent's own arguments untouched.
+// test sees Combwork passed the agent's own arguments untouched.
 const debugAt = args.indexOf('debug')
 if (debugAt >= 0 && args[debugAt + 1] === 'prompt-input') {
   const opts = args.slice(0, debugAt)
@@ -190,13 +198,13 @@ if (debugAt >= 0 && args[debugAt + 1] === 'prompt-input') {
   return
 }
 
-// Each launch is recorded in fake-launches.jsonl in CODEX_HOME: its folder and arguments (for what Hive tells it).
+// Each launch is recorded in fake-launches.jsonl in CODEX_HOME: its folder and arguments (for what Combwork tells it).
 // With its home, agent, and the names (never the values) of the login variables it was given (HI-1757).
 const loginVars = Object.keys(process.env).filter((k) => /^(CODEX_ACCESS_TOKEN|CODEX_API_KEY|OPENAI_API_KEY)$/i.test(k))
 if (process.env.CODEX_HOME) fs.appendFileSync(path.join(process.env.CODEX_HOME, 'fake-launches.jsonl'), JSON.stringify({ cwd: process.cwd(), args, home: process.env.CODEX_HOME, agent: process.env.CW_AGENT || null, loginVars, temp: Object.fromEntries(Object.entries(process.env).filter(([k]) => /^(TEMP|TMP)(DIR)?$/i.test(k))) }) + '\n')
 
 const hookUrl = /(http:\/\/127\.0\.0\.1:\d+\/hook\?run=[\w-]+)/.exec(args.find((a) => a.startsWith('hooks.Stop=')) ?? '')?.[1]
-// Codex runs Hive's hook command, whose curl reads the Authorization header from the launch's auth file (#345).
+// Codex runs Combwork's hook command, whose curl reads the Authorization header from the launch's auth file (#345).
 const authFile = /-H \\?"@([^"\\]+)\\?"/.exec(args.find((a) => a.startsWith('hooks.Stop=')) ?? '')?.[1]
 const authHeader = () => {
   try {
@@ -209,15 +217,17 @@ const project = path.basename(process.cwd())
 // "resume <id>" carries on that conversation, as Codex does; otherwise a new one.
 const resuming = args[0] === 'resume' && /^[0-9a-f-]{36}$/i.test(args[1] ?? '')
 const sessionId = resuming ? args[1] : randomUUID()
-// Options that take a value, so a first prompt (the last plain argument, as Hive's adapter gives one) can be told apart.
+// Options that take a value, so a first prompt (the last plain argument, as Combwork's adapter gives one) can be told apart.
 const WITH_VALUE = new Set(['-c', '--config', '-m', '--model', '-s', '--sandbox', '-a', '--ask-for-approval', '-C', '--cd', '-p', '--profile', '-i', '--image', '--add-dir'])
 let firstPrompt = ''
+/** The model it runs (HI-2609): its -m, until its offer of a cheaper one is taken or "switchmodel" changes it. */
+let model = args.includes('-m') ? (args[args.indexOf('-m') + 1] ?? 'gpt-fake') : 'gpt-fake'
 for (let i = resuming ? 2 : 0; i < args.length; i++) {
   if (WITH_VALUE.has(args[i])) i++
   else if (!args[i].startsWith('-')) firstPrompt = args[i]
 }
 /**
- * The terminal's size, recorded in fake-sizes.jsonl in its home at the start and at each change (#247): what Hive tells
+ * The terminal's size, recorded in fake-sizes.jsonl in its home at the start and at each change (#247): what Combwork tells
  * the CLI. Polled as well as on 'resize', which a ConPTY child doesn't always get.
  */
 function recordSizes(dir, id) {
@@ -261,7 +271,7 @@ function rolloutPath() {
   fs.mkdirSync(dir, { recursive: true })
   const file = path.join(dir, `rollout-${now.toISOString().slice(0, 19).replace(/:/g, '-')}-${sessionId}.jsonl`)
   fs.writeFileSync(file, JSON.stringify({ timestamp: now.toISOString(), type: 'session_meta', payload: { id: sessionId, cwd: process.cwd(), timestamp: now.toISOString() } }) + '\n')
-  // Hive's instructions (-c developer_instructions=…), recorded as the developer message Codex starts its rollout with.
+  // Combwork's instructions (-c developer_instructions=…), recorded as the developer message Codex starts its rollout with.
   const given = args.find((a, i) => args[i - 1] === '-c' && a.startsWith('developer_instructions='))
   if (given) fs.appendFileSync(file, JSON.stringify({ timestamp: now.toISOString(), type: 'response_item', payload: { type: 'message', role: 'developer', content: [{ type: 'input_text', text: JSON.parse(given.slice('developer_instructions='.length)) }] } }) + '\n')
   return file
@@ -282,7 +292,7 @@ let turnId = null
  */
 const hooksOff = () => !!process.env.CODEX_HOME && fs.existsSync(path.join(process.env.CODEX_HOME, `fake-nohooks-${String(process.env.CW_AGENT || 'agent').replace(/[^\w-]/g, '_')}`))
 
-/** Sends a hook as Codex's curl command does; Hive's reply (JSON), or null. */
+/** Sends a hook as Codex's curl command does; Combwork's reply (JSON), or null. */
 async function hook(event, extra = {}) {
   if (!hookUrl || hooksOff()) return null
   const res = await fetch(hookUrl, {
@@ -293,7 +303,7 @@ async function hook(event, extra = {}) {
   return res ? await res.json().catch(() => null) : null
 }
 
-/** Hive's notice in a hook's reply (#650: context after a tool call, a block's reason at Stop), logged in fake-notices.jsonl; null when none. */
+/** Combwork's notice in a hook's reply (#650: context after a tool call, a block's reason at Stop), logged in fake-notices.jsonl; null when none. */
 function noticeIn(reply, at) {
   const text = reply?.hookSpecificOutput?.additionalContext ?? (reply?.decision === 'block' ? reply.reason : null)
   if (typeof text !== 'string' || !text.startsWith('[CW]') || !process.env.CODEX_HOME) return null
@@ -302,7 +312,7 @@ function noticeIn(reply, at) {
   return text
 }
 
-/** Whether this agent follows Hive's notices (fake-follow-notices.txt in CODEX_HOME, or its own fake-follow-notices-<agent>.txt). */
+/** Whether this agent follows Combwork's notices (fake-follow-notices.txt in CODEX_HOME, or its own fake-follow-notices-<agent>.txt). */
 function followsNotices() {
   const home = process.env.CODEX_HOME
   const agent = String(process.env.CW_AGENT || 'agent').replace(/[^\w-]/g, '_')
@@ -311,9 +321,9 @@ function followsNotices() {
 
 /** Acts on a notice as a model that follows them: reads its inbox (cw_inbox), then acks the ids it listed. */
 async function readInbox() {
-  const listed = await hiveCall('cw_inbox', {})
+  const listed = await ownCall('cw_inbox', {})
   const ids = [...new Set([...String(listed?.text ?? '').matchAll(/\bm\d+\b/g)].map((m) => m[0]))]
-  if (ids.length) await hiveCall('cw_inbox', { ack: ids })
+  if (ids.length) await ownCall('cw_inbox', { ack: ids })
 }
 
 /** Codex's own record of a turn starting or ending (task_started, task_complete), by its turn id. */
@@ -345,7 +355,7 @@ const bash = (command) => ({ tool_name: 'Bash', tool_input: { command } })
 let busy = false
 
 /** A long command, the kind that used to fill an agent's header while under review. */
-const LONG = bash("$env:HIVE_E2E_DIR = 'C:\\Users\\someone\\AppData\\Local\\hive-test\\e2e'; npm.cmd run e2e -- icons bell resumeall --reporter verbose")
+const LONG = bash("$env:CW_E2E_DIR = 'C:\\Users\\someone\\AppData\\Local\\combwork-test\\e2e'; npm.cmd run e2e -- icons bell resumeall --reporter verbose")
 
 /** A permission request its auto-reviewer answers: nobody is asked, and the title doesn't change. */
 async function review(allow, call = CURL, ms = 1500) {
@@ -375,7 +385,7 @@ async function approve() {
   return true
 }
 
-/** An async question: it returns at once, and Codex works on. `late`: its hooks reach Hive after the title. */
+/** An async question: it returns at once, and Codex works on. `late`: its hooks reach Combwork after the title. */
 async function question(late) {
   const input = { questions: [{ title: 'Which colour?', options: ['Red', 'Blue'] }] }
   if (late) asked(1)
@@ -389,8 +399,8 @@ async function question(late) {
 /** One rollout entry, as Codex writes it. */
 const record = (payload) => fs.appendFileSync(rollout, JSON.stringify({ timestamp: new Date().toISOString(), type: 'response_item', payload }) + '\n')
 
-/** The launch's hive MCP server (its -c mcp_servers.combwork table), or null. */
-function hiveServer() {
+/** The launch's Combwork MCP server (its -c mcp_servers.combwork table), or null. */
+function ownServer() {
   const arg = args.find((a) => a.startsWith('mcp_servers.combwork='))
   try {
     return arg ? fromCodexTable(arg.slice('mcp_servers.combwork='.length)) : null
@@ -408,7 +418,7 @@ const codeMode = () => !!process.env.CODEX_HOME && fs.existsSync(path.join(proce
 async function inScript(code, run) {
   const id = `call_${randomUUID().slice(0, 8)}`
   record({ type: 'custom_tool_call', name: 'exec', input: code, call_id: id })
-  // With its start (started_at_ms), as Codex 0.166 records a call: Hive gives a call to the script it started in (HI-2240).
+  // With its start (started_at_ms), as Codex 0.166 records a call: Combwork gives a call to the script it started in (HI-2240).
   const done = (item) => fs.appendFileSync(rollout, JSON.stringify({ timestamp: new Date().toISOString(), type: 'event_msg', payload: { type: 'item_completed', turn_id: turnId, item: { id: `exec-${randomUUID()}`, ...item }, started_at_ms: Date.now() } }) + '\n')
   const printed = await run(done)
   record({ type: 'custom_tool_call_output', call_id: id, output: [{ type: 'input_text', text: 'Script completed\nWall time 0.1 seconds\nOutput:\n' }, { type: 'input_text', text: printed }] })
@@ -429,27 +439,27 @@ function readFile(file) {
   record({ type: 'function_call_output', call_id: id, output: text ?? 'Process exited with code 1: no such file' })
 }
 
-/** A hive tool call through the launch's own hive MCP server, recorded as Codex records an MCP call and its output. */
-async function hiveCall(tool, input) {
-  const server = hiveServer()
+/** A Combwork tool call through the launch's own Combwork MCP server, recorded as Codex records an MCP call and its output. */
+async function ownCall(tool, input) {
+  const server = ownServer()
   if (codeMode()) {
     let r = null
     await inScript(`text(await tools.mcp__combwork__${tool}(${JSON.stringify(input)}));`, async (done) => {
-      r = server ? await callHiveTool(server, tool, input) : { text: 'error: no hive server', isError: true }
+      r = server ? await callOwnTool(server, tool, input) : { text: 'error: no Combwork MCP server', isError: true }
       const result = { content: [{ type: 'text', text: r.text }], ...(r.isError ? { isError: true } : {}) }
-      done({ type: 'McpToolCall', server: 'hive', tool, arguments: input, status: r.isError ? 'failed' : 'completed', result })
+      done({ type: 'McpToolCall', server: 'combwork', tool, arguments: input, status: r.isError ? 'failed' : 'completed', result })
       return JSON.stringify(result)
     })
     return r
   }
   const id = `call_${randomUUID().slice(0, 8)}`
   record({ type: 'function_call', name: `mcp__combwork__${tool}`, arguments: JSON.stringify(input), call_id: id })
-  const r = server ? await callHiveTool(server, tool, input) : { text: 'error: no hive server', isError: true }
+  const r = server ? await callOwnTool(server, tool, input) : { text: 'error: no Combwork MCP server', isError: true }
   record({ type: 'function_call_output', call_id: id, output: r.isError && !/^error/i.test(r.text) ? `error: ${r.text}` : r.text })
   return r
 }
 
-/** Reads a skill as Codex does: its SKILL.md from the folder Hive delivered it to, with a shell command. */
+/** Reads a skill as Codex does: its SKILL.md from the folder Combwork delivered it to, with a shell command. */
 function readSkill(name) {
   const dir = path.join(process.cwd(), '.agents', 'skills')
   const folder = [name, `cw-${name}`].map((d) => path.join(dir, d, 'SKILL.md')).find((f) => fs.existsSync(f)) ?? path.join(dir, name, 'SKILL.md')
@@ -469,7 +479,7 @@ function readSkillRef(name, file) {
 
 /**
  * The scenario steps the fake Claude Code takes too (tests/scenarios): "skill NAME", "boardmove N COLUMN", "boardreview N
- * ACTION [COLUMN]", "boardcomment N", "hive TOOL {json}" and "work N". Board changes go through the real hive MCP
+ * ACTION [COLUMN]", "boardcomment N", "cw TOOL {json}" and "work N". Board changes go through the real Combwork MCP
  * server (cw_update_task), as a model's would. Whether the step was one of these.
  */
 async function scripted(step) {
@@ -483,16 +493,16 @@ async function scripted(step) {
     any = true
   }
   const move = /\bboardmove\s+(\d+)\s+(\w+)/i.exec(step)
-  if (move) await hiveCall('cw_update_task', { number: Number(move[1]), column: move[2].toLowerCase() })
+  if (move) await ownCall('cw_update_task', { number: Number(move[1]), column: move[2].toLowerCase() })
   const rev = /\bboardreview\s+(\d+)\s+(\w+)(?:\s+(hold|todo|doing|review|passed|done)\b)?/i.exec(step)
-  if (rev) await hiveCall('cw_update_task', { number: Number(rev[1]), review: rev[2].toLowerCase(), ...(rev[3] ? { column: rev[3].toLowerCase(), comment: 'Fake review: passed.' } : {}) })
+  if (rev) await ownCall('cw_update_task', { number: Number(rev[1]), review: rev[2].toLowerCase(), ...(rev[3] ? { column: rev[3].toLowerCase(), comment: 'Fake review: passed.' } : {}) })
   const comment = /\bboardcomment\s+(\d+)/i.exec(step)
-  if (comment) await hiveCall('cw_update_task', { number: Number(comment[1]), comment: 'Fake: done, see the files.' })
-  const call = parseHiveStep(step)
-  if (call) await hiveCall(call.tool, call.args)
+  if (comment) await ownCall('cw_update_task', { number: Number(comment[1]), comment: 'Fake: done, see the files.' })
+  const call = parseToolStep(step)
+  if (call) await ownCall(call.tool, call.args)
   const pause = /\bwork\s+(\d+)/i.exec(step)
   if (pause) await sleep(Number(pause[1]) * 1000)
-  // "checkpoint": a command of its own, whose PostToolUse reply may carry Hive's notice (#650).
+  // "checkpoint": a command of its own, whose PostToolUse reply may carry Combwork's notice (#650).
   const check = /\bcheckpoint\b/i.test(step)
   if (check) {
     const c = { ...bash('ls'), tool_use_id: `exec-${randomUUID()}` }
@@ -515,8 +525,8 @@ async function scripted(step) {
     const rateLimits = { primary: { used_percent: Number(plan[1]), window_minutes: 300, resets_at: resets }, secondary: { used_percent: Number(plan[2]), window_minutes: 10080, resets_at: resets }, plan_type: 'plus' }
     fs.appendFileSync(rollout, JSON.stringify({ timestamp: new Date().toISOString(), type: 'event_msg', payload: { type: 'token_count', info: null, rate_limits: rateLimits } }) + '\n')
   }
-  // "patch FILE" (HI-2386): an apply_patch edit appending a line to FILE (in its folder), which Codex asks Hive about first;
-  // refused (Hive's file lock), the file is left alone. Each try goes in fake-edits.jsonl: allowed or not, and why.
+  // "patch FILE" (HI-2386): an apply_patch edit appending a line to FILE (in its folder), which Codex asks Combwork about first;
+  // refused (Combwork's file lock), the file is left alone. Each try goes in fake-edits.jsonl: allowed or not, and why.
   const edit = /\bpatch\s+([\w.-]+)/i.exec(step)
   if (edit) {
     const c = { tool_name: 'apply_patch', tool_use_id: `patch-${randomUUID()}`, tool_input: { command: `*** Begin Patch\n*** Update File: ${edit[1]}\n@@\n+edited\n*** End Patch` } }
@@ -594,7 +604,7 @@ const queued = []
 /** A user line as Codex records it: the message and the turn's item (#1371). */
 function userLine(text) {
   fs.appendFileSync(rollout, JSON.stringify({ timestamp: new Date().toISOString(), type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text }] } }) + '\n')
-  // Its prompt as a turn's item, with the turn's id, as 0.159 records it (#1371: how Hive tells the person's turns).
+  // Its prompt as a turn's item, with the turn's id, as 0.159 records it (#1371: how Combwork tells the person's turns).
   fs.appendFileSync(rollout, JSON.stringify({ timestamp: new Date().toISOString(), type: 'event_msg', payload: { type: 'item_completed', turn_id: turnId, item: { type: 'UserMessage', content: [{ type: 'text', text }] } } }) + '\n')
 }
 
@@ -604,9 +614,9 @@ async function takeQueued() {
     const text = queued.shift()
     userLine(text)
     if (!isDoorbell(text)) continue
-    const r = await hiveCall('cw_inbox', {})
+    const r = await ownCall('cw_inbox', {})
     const rows = r.isError ? [] : inboxRows(r.text)
-    if (rows.length && followsNotices()) await hiveCall('cw_inbox', { ack: rows.flatMap((x) => x.ids) })
+    if (rows.length && followsNotices()) await ownCall('cw_inbox', { ack: rows.flatMap((x) => x.ids) })
     if (process.env.CODEX_HOME) fs.appendFileSync(path.join(process.env.CODEX_HOME, 'fake-wakes.jsonl'), JSON.stringify({ agent: String(process.env.CW_AGENT || 'agent').replace(/[^\w-]/g, '_'), text: rows.map((x) => x.text).join(' '), at: new Date().toISOString(), queued: true }) + '\n')
   }
 }
@@ -622,6 +632,8 @@ async function runPrompt(text) {
   }
   turnId = randomUUID()
   turnRecord('task_started')
+  // Its model, as each turn's context records it (HI-2609), when the suite asks.
+  if (process.env.CODEX_HOME && fs.existsSync(path.join(process.env.CODEX_HOME, 'fake-turn-context.txt'))) fs.appendFileSync(rollout, JSON.stringify({ timestamp: new Date().toISOString(), type: 'turn_context', payload: { model, turn_id: turnId } }) + '\n')
   // Compacting first (#1514): no hook meanwhile, then what was queued is taken in this turn.
   const compacting = /^compacting (\d+)\b/.exec(text)
   if (compacting) {
@@ -641,22 +653,22 @@ async function runPrompt(text) {
     userLine(text)
     await hook('UserPromptSubmit', { prompt: text })
   }
-  // Hive's doorbell (#650): it reads its inbox (cw_inbox), as a model does, and acts on what it read (one that follows
+  // Combwork's doorbell (#650): it reads its inbox (cw_inbox), as a model does, and acts on what it read (one that follows
   // notices acks it too); what else it read (a wake, a message) is logged in fake-wakes.jsonl in CODEX_HOME.
   if (isDoorbell(text)) {
     const work = doorbellIsWork(text)
-    const r = await hiveCall('cw_inbox', {})
+    const r = await ownCall('cw_inbox', {})
     const rows = r.isError ? [] : inboxRows(r.text)
-    if (rows.length && followsNotices()) await hiveCall('cw_inbox', { ack: rows.flatMap((x) => x.ids) })
+    if (rows.length && followsNotices()) await ownCall('cw_inbox', { ack: rows.flatMap((x) => x.ids) })
     const read = rows.map((x) => x.text).join(' ')
     if (!work && process.env.CODEX_HOME) fs.appendFileSync(path.join(process.env.CODEX_HOME, 'fake-wakes.jsonl'), JSON.stringify({ agent: String(process.env.CW_AGENT || 'agent').replace(/[^\w-]/g, '_'), text: read, doorbell: text, at: new Date().toISOString() }) + '\n')
     if (rows.length) text = work ? read : nextScripted() || ''
   }
-  // As 0.162.1 does (FAKE_CODEX_VERSION), its Working line while a turn runs (#1336: what Hive's screen reading looks for).
+  // As 0.162.1 does (FAKE_CODEX_VERSION), its Working line while a turn runs (#1336: what Combwork's screen reading looks for).
   if (/^0\.16[2-9]|^0\.1[7-9]|^[1-9]/.test(process.env.FAKE_CODEX_VERSION || '')) out(`\r\n• Working (0s • esc to interrupt)\r\n`)
   let questions = 0
   let scriptedSteps = false
-  // "latetool": a command whose PostToolUse reaches Hive only after the turn's Stop (#648).
+  // "latetool": a command whose PostToolUse reaches Combwork only after the turn's Stop (#648).
   let late = null
   for (const step of text.split(' then ')) {
     if (step === 'latetool') {
@@ -670,6 +682,12 @@ async function runPrompt(text) {
       questions++
     } else if (step === 'hold') {
       await key(['g'])
+    } else if (step === 'nudge') {
+      nudgeAfter = true
+    } else if (step === 'creditnudge' || step === 'usagenudge') {
+      nudgeAfter = step === 'creditnudge' ? 'credits' : 'usage'
+    } else if (/^switchmodel \S+$/.test(step)) {
+      switchModel(step.slice('switchmodel '.length))
     } else if (step === 'ratelimited') {
       await rateLimited()
     } else if (step === 'approve') {
@@ -697,10 +715,10 @@ async function runPrompt(text) {
   record({ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: `Done: ${text}` }] })
   fs.appendFileSync(rollout, JSON.stringify({ timestamp: new Date().toISOString(), type: 'event_msg', payload: { type: 'item_completed', turn_id: turnId, item: { type: 'AgentMessage', content: [{ type: 'Text', text: `Done: ${text}` }] } } }) + '\n')
   out(`\r\nDone: ${text}\r\n`)
-  // "loststop": its Stop never reaches Hive, though Codex records the turn's end; "silent": neither (#648).
+  // "loststop": its Stop never reaches Combwork, though Codex records the turn's end; "silent": neither (#648).
   if (!/\b(loststop|silent)\b/.test(text)) {
     const reply = await hook('Stop', { last_assistant_message: `Done: ${text}`, stop_hook_active: false })
-    // Blocked (#650: Hive's drain): the reason goes on in the same turn as a hook prompt (no UserPromptSubmit), then Stop again.
+    // Blocked (#650: Combwork's drain): the reason goes on in the same turn as a hook prompt (no UserPromptSubmit), then Stop again.
     if (reply?.decision === 'block') {
       if (noticeIn(reply, 'drain') && followsNotices()) await readInbox()
       await hook('Stop', { last_assistant_message: `Done: ${text}`, stop_hook_active: true })
@@ -709,10 +727,81 @@ async function runPrompt(text) {
   if (!/\bsilent\b/.test(text)) turnRecord('task_complete')
   if (late) await hook('PostToolUse', late)
   busy = false
+  if (nudgeAfter) {
+    const which = nudgeAfter
+    nudgeAfter = false
+    return which === true ? showNudge() : showOwnerNudge(which)
+  }
   promptLine()
 }
 
 const promptLine = () => out('\r\n› Ask Codex to do anything\r\n')
+
+/**
+ * A "nudge" step this turn (true): its offer of a cheaper model shows once the turn is over (HI-2609); "creditnudge" or
+ * "usagenudge" ('credits', 'usage'): its prompt at a workspace's limit (HI-2619).
+ */
+let nudgeAfter = false
+/** Its offer showing: the choice selected (1: switch). */
+let nudge = null
+const NUDGE_TO = 'gpt-6-luna'
+const nudgeLog = (o) => process.env.CODEX_HOME && fs.appendFileSync(path.join(process.env.CODEX_HOME, 'fake-nudge.jsonl'), JSON.stringify({ agent: String(process.env.CW_AGENT || 'agent').replace(/[^\w-]/g, '_'), at: new Date().toISOString(), ...o }) + '\n')
+/** Its model changed (HI-2609), as Codex records it: thread_settings_applied in its rollout, and a line on its screen. */
+function switchModel(to) {
+  model = to
+  if (rollout) fs.appendFileSync(rollout, JSON.stringify({ timestamp: new Date().toISOString(), type: 'event_msg', payload: { type: 'thread_settings_applied', thread_settings: { model: to } } }) + '\n')
+  out(`\r\n• Model changed to ${to}.\r\n`)
+}
+/** Its offer of a cheaper model, drawn in place of its input as Codex 0.166.0 draws it; none when the launch hid it. */
+function showNudge() {
+  if (args.includes('notice.hide_rate_limit_model_nudge=true')) {
+    nudgeLog({ shown: false })
+    return promptLine()
+  }
+  nudge = { selected: 1 }
+  nudgeLog({ shown: true })
+  out(`\r\n\r\n  Approaching rate limits\r\n  Switch to ${NUDGE_TO} for lower credit usage?\r\n\r\n› 1. Switch to ${NUDGE_TO}                    Uses fewer credits for upcoming turns.\r\n  2. Keep current model\r\n  3. Keep current model (never show again)   Hide future rate limit reminders about switching models\r\n`)
+}
+/** A key read while its offer shows: every one logged; Enter takes the selected choice, "2"/"3" or Esc keep the model. */
+function nudgeKey(ch) {
+  nudgeLog({ key: ch })
+  if (ch === '1' || ch === '2' || ch === '3') nudge.selected = Number(ch)
+  if (ch !== '\r' && ch !== '\x1b' && ch !== '2' && ch !== '3') return
+  const take = ch === '\r' && nudge.selected === 1
+  nudge = null
+  nudgeLog({ answer: take ? 'switch' : 'keep' })
+  out('\x1b[2J\x1b[H')
+  if (take) switchModel(NUDGE_TO)
+  promptLine()
+}
+
+/** Its prompt at a workspace's limit showing (HI-2619): which one, and the choice selected (2: No). */
+let ownerNudge = null
+const OWNER_NUDGE = {
+  credits: ["You've reached your workspace credit limit", 'Your workspace is out of credits. Ask your workspace owner to add more. Notify owner?'],
+  usage: ['Usage limit reached', 'Request a limit increase from your owner to continue using codex. Request increase?']
+}
+/**
+ * Its prompt once a workspace member's turn failed at the workspace's limit, drawn in place of its input as Codex 0.166.0
+ * draws it (tests/fixtures/advanced/credit-limit-nudge-codex-0.166.0.txt), "No" selected. No launch argument hides it.
+ */
+function showOwnerNudge(which) {
+  ownerNudge = { which, selected: 2 }
+  nudgeLog({ shown: true, prompt: which })
+  const [title, asks] = OWNER_NUDGE[which]
+  out(`\r\n■ Usage limit reached.\r\n\r\n\r\n  ${title}\r\n  ${asks}\r\n\r\n\r\n  1. Yes (y)\r\n› 2. No (default) (n)\r\n\r\n  enter select · esc back\r\n`)
+}
+/** A key read while it shows: every one logged; "y" or "1" asks the owner, "n", "2" or Esc doesn't, Enter takes the selected one. */
+function ownerNudgeKey(ch) {
+  nudgeLog({ key: ch, prompt: ownerNudge.which })
+  const answer = ch === 'y' || ch === '1' || (ch === '\r' && ownerNudge.selected === 1) ? 'ask-owner' : ch === 'n' || ch === '2' || ch === '\x1b' || ch === '\r' ? 'no' : null
+  if (!answer) return
+  nudgeLog({ answer, prompt: ownerNudge.which })
+  ownerNudge = null
+  out('\x1b[2J\x1b[H')
+  if (answer === 'ask-owner') out('\r\n• Workspace owner notified.\r\n')
+  promptLine()
+}
 
 let line = ''
 let ctrlC = 0
@@ -723,6 +812,14 @@ process.stdin.on('data', (data) => {
   // on) is a key of its own: a new line in the prompt, not a send, as Codex 0.164's editor takes it (HI-1327).
   const keys = data === '\x1b' ? ['\x1b'] : data.split('\x1b\r').flatMap((part, i) => [...(i > 0 ? ['alt-enter'] : []), ...part.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '')])
   for (const ch of keys) {
+    if (nudge) {
+      nudgeKey(ch)
+      continue
+    }
+    if (ownerNudge) {
+      ownerNudgeKey(ch)
+      continue
+    }
     if (onKey?.(ch)) continue
     if (ch === '\x03') {
       if (++ctrlC >= 2) void hook('SessionEnd').then(() => process.exit(0))
@@ -743,9 +840,9 @@ process.stdin.on('data', (data) => {
   }
 })
 
-out('OpenAI Codex (fake, for Hive tests)\r\n')
-// Its MCP servers connect as it starts (#865): the launch's hive server, through the real server, which tells Hive.
-void connectHive(hiveServer())
+out('OpenAI Codex (fake, for Combwork tests)\r\n')
+// Its MCP servers connect as it starts (#865): the launch's Combwork MCP server, through the real server, which tells Combwork.
+void connectOwnServer(ownServer())
 setTitle(project)
 promptLine()
 if (firstPrompt) void runPrompt(firstPrompt)

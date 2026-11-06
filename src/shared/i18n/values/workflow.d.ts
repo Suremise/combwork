@@ -1,10 +1,10 @@
 // Generated from locales/en/workflow.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
-interface HiveMessageValues {
+interface CombworkMessageValues {
   'workflow.approveNote': { becomes: string }
+  'workflow.contradiction.combworkMergesNeedsGit': undefined
   'workflow.contradiction.committedNeedsFolder': undefined
   'workflow.contradiction.focusedNeedsRunner': undefined
-  'workflow.contradiction.hiveMergesNeedsGit': undefined
   'workflow.contradiction.mergeNeedsSlots': undefined
   'workflow.contradiction.noneHasNoSlots': undefined
   'workflow.contradiction.okWithReview': undefined
@@ -267,19 +267,19 @@ interface HiveMessageValues {
   'workflow.refused.loop.tooEarly.change': undefined
   'workflow.refused.loop.tooEarly.message': { card: string | number; minutes: number }
   'workflow.refused.loop.tooEarly.next': undefined
-  'workflow.refused.merge.hiveMerges.change': undefined
-  'workflow.refused.merge.hiveMerges.message': { card: string | number }
-  'workflow.refused.merge.hiveMerges.next': undefined
-  'workflow.refused.merge.hiveMerges.nextMerged': undefined
-  'workflow.refused.merge.hiveMerges.nextPaused': { reader: string; target: string | number }
-  'workflow.refused.merge.hiveMerges.nextPausedAnswer': { reader: string; target: string | number }
-  'workflow.refused.merge.hiveMerges.nextPausedFix': { reader: string; target: string | number }
-  'workflow.refused.merge.hiveMerges.nextPausedFolder': { reader: string; target: string | number }
-  'workflow.refused.merge.hiveMerges.nextPausedRules': { reader: string; target: string | number }
-  'workflow.refused.merge.hiveMerges.nextQueued': { target: string | number; n: number }
-  'workflow.refused.merge.hiveMerges.nextReturned': undefined
-  'workflow.refused.merge.hiveMerges.nextStale': { current: string | number }
-  'workflow.refused.merge.hiveMerges.nextTesting': { target: string | number }
+  'workflow.refused.merge.combworkMerges.change': undefined
+  'workflow.refused.merge.combworkMerges.message': { card: string | number }
+  'workflow.refused.merge.combworkMerges.next': undefined
+  'workflow.refused.merge.combworkMerges.nextMerged': undefined
+  'workflow.refused.merge.combworkMerges.nextPaused': { reader: string; target: string | number }
+  'workflow.refused.merge.combworkMerges.nextPausedAnswer': { reader: string; target: string | number }
+  'workflow.refused.merge.combworkMerges.nextPausedFix': { reader: string; target: string | number }
+  'workflow.refused.merge.combworkMerges.nextPausedFolder': { reader: string; target: string | number }
+  'workflow.refused.merge.combworkMerges.nextPausedRules': { reader: string; target: string | number }
+  'workflow.refused.merge.combworkMerges.nextQueued': { target: string | number; n: number }
+  'workflow.refused.merge.combworkMerges.nextReturned': undefined
+  'workflow.refused.merge.combworkMerges.nextStale': { current: string | number }
+  'workflow.refused.merge.combworkMerges.nextTesting': { target: string | number }
   'workflow.refused.move.doingNobody.message': { card: string | number; stage: string | number; also: string; rules: string | number }
   'workflow.refused.move.doingNobody.next': { reader: string }
   'workflow.refused.move.needsOverride.change': { reader: string }
@@ -359,7 +359,7 @@ interface HiveMessageValues {
   'workflow.refused.submit.sameRevisionNote.next': undefined
   'workflow.refused.submit.trailer.change': undefined
   'workflow.refused.submit.trailer.message': { card: string | number; commit: string | number }
-  'workflow.refused.submit.trailer.next': { command: string | number }
+  'workflow.refused.submit.trailer.next': { at: string; command: string | number }
   'workflow.refused.submit.unchanged.message': { card: string | number }
   'workflow.refused.submit.unchanged.next': undefined
   'workflow.refused.verdict.currentSubmission.message': { submission: string | number; card: string | number }
@@ -489,10 +489,10 @@ interface HiveMessageValues {
   'workflow.unreadable.worktrees': { folder: string | number }
   'workflow.unreadable.writes': { folder: string | number }
   'workflow.value.commitMessage.branch': undefined
-  'workflow.value.commitMessage.hive': undefined
+  'workflow.value.commitMessage.cw': undefined
   'workflow.value.finish.agentMerges': undefined
+  'workflow.value.finish.combworkMerges': undefined
   'workflow.value.finish.committed': undefined
-  'workflow.value.finish.hiveMerges': undefined
   'workflow.value.finish.notChecked': undefined
   'workflow.value.folder.project': undefined
   'workflow.value.folder.slots': undefined

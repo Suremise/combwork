@@ -1,14 +1,14 @@
 import { basename, dirname } from 'path'
-import { HIVE_DIR } from '../shared/defaults'
+import { CW_DIR } from '../shared/defaults'
 import { placeKey } from './fsutil'
 
 /**
- * Admission to a workspace's databases (#1395, replacing #1379's fence and #1381's list of closed workspaces): hive.db,
+ * Admission to a workspace's databases (#1395, replacing #1379's fence and #1381's list of closed workspaces): combwork.db,
  * the Assistant's journal and usage.db are kept open (a persistent open: the board, the journal, the usage worker's file)
  * only for a workspace a window holds now, admitted as the window opens it and dismissed first as it closes it. Anything
  * else is a transient open (a lease: open, use, close in `finally`, as a store's last save as its workspace closes) or
  * is refused: work still going on for a closed workspace (a read that resumes after the close, a job queued before it)
- * used to open them again, holding the folder until Hive quit, so it couldn't be moved or deleted. Keyed on the
+ * used to open them again, holding the folder until Combwork quit, so it couldn't be moved or deleted. Keyed on the
  * workspace, not on who asks: work of no window's request (a timer, a session's end) is refused as well. By real paths
  * (`placeKey`): a junction, a symlink or an 8.3 short name is the same workspace and the same file, however it is spelt.
  */
@@ -65,9 +65,9 @@ export const isAdmitted = (place: string): boolean => admitted.has(place)
  * already its real location (`realPath`), not resolved again (HI-1887: each usage history request's).
  */
 export function ownerOf(file: string, real = false): string | null {
-  const hive = HIVE_DIR.toLowerCase()
+  const combwork = CW_DIR.toLowerCase()
   for (let d = dirname(real ? file.toLowerCase() : placeKey(file)); ; ) {
-    if (basename(d) === hive) return dirname(d)
+    if (basename(d) === combwork) return dirname(d)
     const up = dirname(d)
     if (up === d) return null
     d = up

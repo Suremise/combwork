@@ -1,5 +1,5 @@
 // Screenshot cases for the `content` area (#849): what main says about the workspace's content, shown in the run's
-// language: a Hive skill whose header is broken (why nobody gets it, in its badge's tip), an MCP server whose definition
+// language: a Combwork skill whose header is broken (why nobody gets it, in its badge's tip), an MCP server whose definition
 // isn't one (why, in the MCP view's list), and a template that can't be loaded yet (the reasons main gives, here an agent
 // it would replace running). Reached for the i18nshots route (tests/e2e/i18nshots.cjs has the case format and ctx)
 // with locale-independent means only: files in the test workspace, IPC, command ids and structural hooks (classes,
@@ -40,7 +40,7 @@ const skillDir = (ctx) => path.join(ctx.workspace, '.combwork', 'skills', 'broke
 const mcpFile = (ctx) => path.join(ctx.workspace, '.combwork', 'mcp', 'not-a-server.json')
 const templateFile = (ctx) => path.join(ctx.workspace, '.combwork', 'templates', 'aardvark.json')
 
-/** A Hive skill whose header names an audience Hive doesn't know: its Not given badge, hovered, says why in the window's language. */
+/** A Combwork skill whose header names an audience Combwork doesn't know: its Not given badge, hovered, says why in the window's language. */
 async function skillProblem(ctx) {
   fs.mkdirSync(skillDir(ctx), { recursive: true })
   fs.writeFileSync(path.join(skillDir(ctx), 'SKILL.md'), '---\nname: broken-header\ndescription: x\nmetadata:\n  audience: everyone\n---\n\n# x\n')
@@ -80,7 +80,7 @@ async function closeMcpError(ctx) {
 const liveOne = async (ctx) => (await ctx.inv('session:live')).find((s) => s.projectPath.toLowerCase() === ctx.project.toLowerCase() && s.agentId === ctx.agents[0].id)
 
 /**
- * A workspace template for a coding agent this Hive doesn't know (the view notes it), loaded into the project from the
+ * A workspace template for a coding agent this Combwork doesn't know (the view notes it), loaded into the project from the
  * Templates view while the project's first agent runs: it can't be loaded yet, and main says why (HI-2159: since
  * HI-2109 an unknown coding agent no longer stops a load; an agent it would replace running does). Named to sort first
  * in the view.
@@ -91,7 +91,7 @@ async function templateBlocked(ctx) {
   fs.mkdirSync(path.dirname(templateFile(ctx)), { recursive: true })
   fs.writeFileSync(templateFile(ctx), JSON.stringify({ version: 2, name: 'Aardvark', savedAt: '', layout: 'auto', agents: [{ name: 'Gem', role: 'builder', provider: 'gemini' }] }, null, 2))
   await showView(ctx, 'view.templates', '.sidebar .template-row')
-  // The workspace's (Hive's own are listed first, #1436).
+  // The workspace's (Combwork's own are listed first, #1436).
   const rows = ctx.page.locator('.sidebar .template-row[data-scope="workspace"]')
   // Until the new one is there, first by name (its name is the template's, in any language).
   const first = async () => (await rows.count()) > 0 && (await rows.first().getAttribute('aria-label')) === 'Aardvark'

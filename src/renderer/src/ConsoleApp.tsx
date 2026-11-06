@@ -2,7 +2,7 @@ import { Children, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from '@shared/devConsole'
 import { language, msg, onLanguageChange, tr, tRich, type Msg } from '@shared/i18n'
 import { clockTime, filterChoices, filterEvents, mergeEvents, sourceGroups, sourceOption, startsOpen } from '@shared/consoleView'
-import type { AppSettings, HiveEvent } from '@shared/types'
+import type { AppSettings, CombworkEvent } from '@shared/types'
 import { providerName } from '@shared/providers'
 import { FLIGHT_TRIGGER_NAME, readFlightWhat, FLIGHT_WHAT, type FlightTrigger } from '@shared/flightRecorder'
 import { timeAgo } from './util'
@@ -12,8 +12,8 @@ import { cx } from './util'
 import './styles/console.css'
 
 /**
- * The developer console window (#366, #637): pick a source (an agent's session, the Assistant or Hive itself) and watch
- * what comes in next to what Hive made of it. Capture runs while this window watches a source (#636); pause stops the
+ * The developer console window (#366, #637): pick a source (an agent's session, the Assistant or Combwork itself) and watch
+ * what comes in next to what Combwork made of it. Capture runs while this window watches a source (#636); pause stops the
  * list moving (capture goes on, and resuming fills in from the ring), clear hides what came before. Record writes the
  * source's events from then on to a file in main (#638), redacted unless the user ticks text for that recording. While
  * Settings → Advanced → Developer console: show text is on (#699), main sends this window the text too (never secrets):
@@ -29,12 +29,12 @@ function applyTheme(s: AppSettings | null): void {
 
 const NO_SOURCES: ConsoleSource[] = []
 
-// The window's own words (#1104). The events it lists (names, kinds, summaries, payloads) are Hive's records, as
+// The window's own words (#1104). The events it lists (names, kinds, summaries, payloads) are Combwork's records, as
 // recordings save them: they stay English.
 const M = {
-  source: msg({ id: 'console.source', defaultMessage: 'Source', description: "The developer console's source picker (accessible name): which agent's session, the Assistant or Hive itself it watches." }),
+  source: msg({ id: 'console.source', defaultMessage: 'Source', description: "The developer console's source picker (accessible name): which agent's session, the Assistant or Combwork itself it watches." }),
   pickSource: msg({ id: 'console.pickSource', defaultMessage: 'Pick a source…', description: "The developer console's source picker, while it watches none." }),
-  refresh: msg({ id: 'console.refresh', defaultMessage: 'Refresh the sources', description: "The developer console's button that lists the sources (agents, the Assistant, Hive) again." }),
+  refresh: msg({ id: 'console.refresh', defaultMessage: 'Refresh the sources', description: "The developer console's button that lists the sources (agents, the Assistant, Combwork) again." }),
   notWatching: msg({ id: 'console.notWatching', defaultMessage: 'Not watching', description: "The developer console's indicator: no source is picked, so nothing is captured." }),
   paused: msg({ id: 'console.paused', defaultMessage: '{waiting, plural, =0 {Paused} other {Paused ({waiting, number} new)}}', description: "The developer console's indicator while paused: the list holds still; {waiting} events came meanwhile (shown on resume)." }),
   live: msg({ id: 'console.live', defaultMessage: 'Live', description: "The developer console's indicator: events show as they come." }),
@@ -44,7 +44,7 @@ const M = {
   stopRecording: msg({ id: 'console.stopRecording', defaultMessage: 'Stop recording', description: "The developer console's button while it records the source's events to a file." }),
   recordToFile: msg({ id: 'console.recordToFile', defaultMessage: 'Record to a file', description: "The developer console's button that opens the recording box: the source's events from now on go to a file." }),
   record: msg({ id: 'console.record', defaultMessage: 'Record', description: "The developer console's recording box (accessible name)." }),
-  recordWhat: msg({ id: 'console.recordWhat', defaultMessage: 'Record {source} to a file, from now until you stop. Redacted unless you tick text: no prompt or reply text, commands, tokens or sign-ins.', description: "The developer console's recording box. {source} is the watched agent's name, the Assistant, Hive, or the words 'this source'. 'Tick text' refers to the box below it (include prompt and reply text)." }),
+  recordWhat: msg({ id: 'console.recordWhat', defaultMessage: 'Record {source} to a file, from now until you stop. Redacted unless you tick text: no prompt or reply text, commands, tokens or sign-ins.', description: "The developer console's recording box. {source} is the watched agent's name, the Assistant, Combwork, or the words 'this source'. 'Tick text' refers to the box below it (include prompt and reply text)." }),
   thisSource: msg({ id: 'console.thisSource', defaultMessage: 'this source', description: "The developer console's recording box, where the watched source's name goes when it isn't known: 'Record this source to a file…'." }),
   includeText: msg({ id: 'console.includeText', defaultMessage: 'Include prompt and reply text in this recording (tokens and sign-ins stay masked)', description: "A check box in the developer console's recording box: the recording keeps the prompts', replies' and commands' text; secrets stay hidden." }),
   cancel: msg({ id: 'console.cancel', defaultMessage: 'Cancel', description: "The developer console's recording box: closes it without recording." }),
@@ -64,12 +64,12 @@ const M = {
   outline: msg({ id: 'console.outline', defaultMessage: 'cut down to its outline', description: "The developer console's event detail: the payload was too large to keep, so only its shape (fields, sizes) was kept." }),
   close: msg({ id: 'console.close', defaultMessage: 'Close (Esc)', description: "The developer console's event detail: closes it. Esc is its key: keep it." }),
   raw: msg({ id: 'console.raw', defaultMessage: 'Raw', description: "The developer console's event detail: the heading of what came in, as it came (from the CLI)." }),
-  made: msg({ id: 'console.made', defaultMessage: 'What Combwork made of it', description: "The developer console's event detail: the heading of what Hive read from what came in." }),
+  made: msg({ id: 'console.made', defaultMessage: 'What Combwork made of it', description: "The developer console's event detail: the heading of what Combwork read from what came in." }),
   events: msg({ id: 'console.events', defaultMessage: '{n, plural, one {# event} other {# events}}{cleared, select, yes { (cleared)} other {}}', description: "The developer console's status bar: how many events it lists; (cleared) when Clear hid the earlier ones." }),
   eventsOf: msg({ id: 'console.eventsOf', defaultMessage: '{shown, number} of {n, plural, one {# event} other {# events}}{cleared, select, yes { (cleared)} other {}}', description: "The developer console's status bar: how many events the search and filters show, of how many; (cleared) when Clear hid the earlier ones." }),
   dropped: msg({ id: 'console.dropped', defaultMessage: '{n, number} not delivered (too many at once)', description: "The developer console's status bar: events that came too fast for the window, so it never got them." }),
-  capturing: msg({ id: 'console.capturing', defaultMessage: 'Capturing', description: "The developer console's status bar: Hive is capturing the watched source's events." }),
-  notCapturing: msg({ id: 'console.notCapturing', defaultMessage: 'Not capturing', description: "The developer console's status bar: Hive isn't capturing the watched source's events." }),
+  capturing: msg({ id: 'console.capturing', defaultMessage: 'Capturing', description: "The developer console's status bar: Combwork is capturing the watched source's events." }),
+  notCapturing: msg({ id: 'console.notCapturing', defaultMessage: 'Not capturing', description: "The developer console's status bar: Combwork isn't capturing the watched source's events." }),
   recording: msg({ id: 'console.recording', defaultMessage: 'Recording {n, plural, one {# event} other {# events}} to {name}{withText, select, yes { (with text)} other {}}', description: "The developer console's status bar while it records: how many events so far, to the file {name}; (with text) when prompt and reply text are kept." }),
   failed: msg({ id: 'console.failed', defaultMessage: 'Recording failed after {n, plural, one {# event} other {# events}} in {name}: {error}', description: "The developer console's status bar: a recording to the file {name} stopped as it couldn't be written; {error} says why." }),
   notWritten: msg({ id: 'console.notWritten', defaultMessage: 'it could not be written', description: "The developer console: why a recording failed, when there's no other reason: 'Recording failed after 3 events in <file>: it could not be written'." }),
@@ -77,21 +77,21 @@ const M = {
   showInFolder: msg({ id: 'console.showInFolder', defaultMessage: 'Show in folder', description: "The developer console's status bar: shows the recording's file in File Explorer." }),
   unredactedStatus: msg({ id: 'console.unredactedStatus', defaultMessage: 'Unredacted: text shown; tokens and sign-ins masked', description: "The developer console's status bar while the setting that shows text is on." }),
   redactedStatus: msg({ id: 'console.redactedStatus', defaultMessage: 'Redacted: no prompt or reply text, commands, tokens or sign-ins', description: "The developer console's status bar: what it hides." }),
-  nothing: msg({ id: 'console.nothing', defaultMessage: 'Nothing', description: "The developer console's event detail: an empty side (nothing came in, or Hive made nothing of it)." }),
-  captures: msg({ id: 'console.captures', defaultMessage: 'Captures', description: "The developer console's button and list of the flight recorder's captures: recent events Hive saved by itself when something rare happened to an agent." }),
-  capturesNone: msg({ id: 'console.capturesNone', defaultMessage: 'No captures yet. Turn on a flight recorder trigger in Settings → Advanced, and Combwork saves an agent\'s recent events by itself when it fires.', description: "The developer console's list of captures, while there are none. Settings → Advanced is where the triggers are: use its name as Hive shows it." }),
+  nothing: msg({ id: 'console.nothing', defaultMessage: 'Nothing', description: "The developer console's event detail: an empty side (nothing came in, or Combwork made nothing of it)." }),
+  captures: msg({ id: 'console.captures', defaultMessage: 'Captures', description: "The developer console's button and list of the flight recorder's captures: recent events Combwork saved by itself when something rare happened to an agent." }),
+  capturesNone: msg({ id: 'console.capturesNone', defaultMessage: 'No captures yet. Turn on a flight recorder trigger in Settings → Advanced, and Combwork saves an agent\'s recent events by itself when it fires.', description: "The developer console's list of captures, while there are none. Settings → Advanced is where the triggers are: use its name as Combwork shows it." }),
   captureRow: msg({ id: 'console.captureRow', defaultMessage: 'Captured {trigger} on {agent}, {when}', description: "A capture in the developer console's list, as the flight recorder's notice says it: what it caught (\"a safeguard stop\"), on which agent, and how long ago (\"5 minutes ago\")." }),
   captureEvents: msg({ id: 'console.captureEvents', defaultMessage: '{events, plural, one {# event} other {# events}}', description: "A capture in the developer console's list: how many events it holds." }),
   showCapture: msg({ id: 'console.showCapture', defaultMessage: 'Show in folder', description: "A link beside a capture in the developer console's list: shows its file in File Explorer." })
 }
 
-/** What a capture saw, in Hive's language when its file says it as a message this Hive knows; else its English. */
+/** What a capture saw, in Combwork's language when its file says it as a message this Combwork knows; else its English. */
 const whatOf = (c: ConsoleRecordingInfo['capture']): string => {
   const w = readFlightWhat(c?.whatText)
   return w ? tr(FLIGHT_WHAT[w.id] as Msg, w.values as never) : (c?.what ?? '')
 }
 
-/** What the console's list calls a capture's trigger: one Hive knows, in its language; another as its file says it. */
+/** What the console's list calls a capture's trigger: one Combwork knows, in its language; another as its file says it. */
 const triggerName = (t: string): string => (Object.hasOwn(FLIGHT_TRIGGER_NAME, t) ? tr(FLIGHT_TRIGGER_NAME[t as FlightTrigger]) : t)
 
 const bold = (chunks: ReactNode[]): ReactNode => <b>{chunks}</b>
@@ -148,7 +148,7 @@ export function ConsoleApp() {
     const mq = window.matchMedia('(prefers-color-scheme: dark)')
     const onScheme = (): void => applyTheme(settings)
     mq.addEventListener('change', onScheme)
-    const off = window.hive.onEvent((e: HiveEvent) => {
+    const off = window.combwork.onEvent((e: CombworkEvent) => {
       if (e.type === 'settings-changed') {
         settings = e.settings
         applyTheme(e.settings)

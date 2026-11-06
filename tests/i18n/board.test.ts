@@ -22,7 +22,7 @@ const card = (number: number, column: TaskColumn, extra: Partial<TaskCard> = {})
   number,
   title: `Card ${number}`,
   description: '',
-  project: 'hive',
+  project: 'alpha',
   agent: null,
   column,
   order: 0,
@@ -81,17 +81,17 @@ const pseudo = (s: string): boolean => s.includes('[') && !/\b(?:the|and|of|in|f
 function windowTexts(): string[] {
   const doing = card(4, 'doing', { agent: 'a-1', agentName: 'B1' })
   const watched = card(5, 'review', { history: [{ at: new Date(0).toISOString(), by: 'B1', what: 'Moved to Review' }] })
-  const watchers = [{ name: 'R1', project: 'hive', agentId: 'a-2', cards: [5], status: 'working' }]
+  const watchers = [{ name: 'R1', project: 'alpha', agentId: 'a-2', cards: [5], status: 'working' }]
   const failed = card(6, 'review', { history: [{ at: new Date(0).toISOString(), by: 'R1', what: 'Review failed' }], blocked: 'Which colour?' })
   const lane: LaneCard = { number: 7, title: 'Card 7', column: 'review', round: 2, blocked: null } as LaneCard
-  const item = (kind: InboxItem['kind'], extra: Partial<InboxItem> = {}): InboxItem => ({ projectPath: 'C:\\ws\\hive', projectName: 'hive', agentId: 'a', agentName: 'A', assistant: false, kind, since: '', ...extra })
+  const item = (kind: InboxItem['kind'], extra: Partial<InboxItem> = {}): InboxItem => ({ projectPath: 'C:\\ws\\alpha', projectName: 'alpha', agentId: 'a', agentName: 'A', assistant: false, kind, since: '', ...extra })
   const cost = { number: 4, build: part(), review: part(), total: part(), rounds: 2, lastHeld: null, unmatched: 0 } as unknown as CardCost
   return [
     ...TASK_COLUMNS.flatMap((c) => [tr(COLUMN_TEXT[c.id].label), tr(COLUMN_TEXT[c.id].description)]),
     stalledReason(card(1, 'doing'), null, tr)!,
     stalledReason(doing, null, tr)!,
     stalledReason(doing, { name: 'B1', running: false }, tr)!,
-    notWatchingReason(card(2, 'doing'), [{ name: 'B1', project: 'hive', notWatching: [2] }], tr)!,
+    notWatchingReason(card(2, 'doing'), [{ name: 'B1', project: 'alpha', notWatching: [2] }], tr)!,
     reviewWaitReason(watched, watchers, 60 * 60_000, tr)!,
     reviewVerdictWaitReason(card(8, 'review', { review: { agent: 'a-2', agentName: 'R1', since: new Date(0).toISOString() } }), [{ ...watchers[0], cards: [8], status: 'watching' }], 60 * 60_000, tr)!,
     reviewStalled(card(3, 'review', { review: { agent: 'a-2', agentName: 'R1', since: '' } as unknown as TaskCard['review'] }), null, tr)!,
@@ -101,7 +101,7 @@ function windowTexts(): string[] {
     runStatusLine(run({ waiting: 'a test slot', waitingSince: 60_000 }), 180_000, tr),
     runWords(run({ title: 'x', state: 'stale' }), tr),
     stripSummary(stripRuns([run({}), run({ state: 'failed' })]).counts, tr, (l) => fmt.list(l, 'unit')),
-    ...runDetails(run({ command: 'npm test', total: 4, step: 2, stepName: 'unit', exitCode: 1, logPath: 'C:\\log.md', state: 'failed', finishedAt: 60_000 }), 'hive', 60_000, tr).map((d) => d.label),
+    ...runDetails(run({ command: 'npm test', total: 4, step: 2, stepName: 'unit', exitCode: 1, logPath: 'C:\\log.md', state: 'failed', finishedAt: 60_000 }), 'alpha', 60_000, tr).map((d) => d.label),
     runDetails(run({ state: 'failed', finishedAt: 60_000 }), null, 60_000, tr).at(-1)!.text,
     cardSegment(5, watched, tr).label,
     ...cardSegment(6, failed, tr).notes.slice(0, 1),
@@ -151,16 +151,16 @@ describe('the board area', () => {
     expect(stalledReason(doing, null, tr)).toBe(stalledReason(doing, null))
     expect(stalledReason({ ...doing, agentName: undefined }, null, tr)).toBe('Its agent was removed.')
     expect(stalledReason(doing, { name: 'B1', running: false }, tr)).toBe("B1 isn't running.")
-    const loops = [{ name: 'B1', project: 'hive', notWatching: [2] }]
+    const loops = [{ name: 'B1', project: 'alpha', notWatching: [2] }]
     expect(notWatchingReason(card(2, 'review'), loops, tr)).toBe(notWatchingReason(card(2, 'review'), loops))
     const watched = card(5, 'review', { history: [{ at: new Date(0).toISOString(), by: 'B1', what: 'Moved to Review' }] })
     for (const w of [{}, { status: 'working' }, { silentMinutes: 37 }]) {
-      const watchers = [{ name: 'R1', project: 'hive', agentId: 'a-2', cards: [5], ...w }]
+      const watchers = [{ name: 'R1', project: 'alpha', agentId: 'a-2', cards: [5], ...w }]
       for (const now of [20 * 60_000, 60 * 60_000, 65 * 60_000]) expect(reviewWaitReason(watched, watchers, now, tr)).toBe(reviewWaitReason(watched, watchers, now))
     }
     // #843: a started review with no verdict, its reviewer only watching.
     const started = card(8, 'review', { review: { agent: 'a-2', agentName: 'R1', since: new Date(0).toISOString() } })
-    const reviewer = [{ name: 'R1', project: 'hive', agentId: 'a-2', cards: [8], status: 'watching', watchSince: new Date(60_000).toISOString() }]
+    const reviewer = [{ name: 'R1', project: 'alpha', agentId: 'a-2', cards: [8], status: 'watching', watchSince: new Date(60_000).toISOString() }]
     for (const now of [20 * 60_000, 61 * 60_000, 66 * 60_000, 121 * 60_000]) expect(reviewVerdictWaitReason(started, reviewer, now, tr)).toBe(reviewVerdictWaitReason(started, reviewer, now))
   })
 
@@ -207,7 +207,7 @@ describe('the board area', () => {
     setLanguage(PSEUDO_LANGUAGE, {})
     for (const label of names) expect(pseudo(archiveBatchText(label, tr)), archiveBatchText(label, tr)).toBe(true)
     expect(archiveBatchLabel('done', null)).toBe('All in Done')
-    // Any other name (one Hive didn't make, or a column it doesn't know) is shown as it is.
+    // Any other name (one Combwork didn't make, or a column it doesn't know) is shown as it is.
     expect(archiveBatchText('Spring clean', tr)).toBe('Spring clean')
     expect(archiveBatchText('All in Somewhere', tr)).toBe('All in Somewhere')
   })
@@ -223,7 +223,7 @@ describe('the board area', () => {
 })
 
 describe("a run's name in the Progress panel (#872)", () => {
-  it("shows Hive's stored names for a script and a nameless agent in the window's language, and other names as given", () => {
+  it("shows Combwork's stored names for a script and a nameless agent in the window's language, and other names as given", () => {
     const script = run({ source: 'api', agentName: 'Script', defaultName: 'script', agentId: null, projectPath: null })
     const nameless = run({ source: 'agent', agentName: 'Agent', defaultName: 'agent', agentId: 'a-1', projectPath: 'C:\\ws\\alpha' })
     const named = run({ source: 'agent', agentName: 'Script', agentId: 'a-2', projectPath: 'C:\\ws\\alpha' })
@@ -232,11 +232,11 @@ describe("a run's name in the Progress panel (#872)", () => {
     const all = [script, nameless, named, namedAgent, assistant]
     expect(all.map((r) => runAgentName(r, tr))).toEqual(['Script', 'Agent', 'Script', 'Agent', 'Agent'])
     setLanguage('de', { 'board.progress.script': 'Skript', 'board.progress.anAgent': 'Ein Agent' })
-    // Only the names Hive gave (defaultName) are translated: agents called "Script" or "Agent", and the Assistant's own name, stay as they are.
+    // Only the names Combwork gave (defaultName) are translated: agents called "Script" or "Agent", and the Assistant's own name, stay as they are.
     expect(all.map((r) => runAgentName(r, tr))).toEqual(['Skript', 'Ein Agent', 'Script', 'Agent', 'Agent'])
     expect(runDetails(script, null, script.startedAt, tr).find((d) => d.text.startsWith('Skript'))).toBeTruthy()
     expect(agentChoices([nameless, named, namedAgent], 'c:\\ws\\alpha', tr).map((c) => c.label)).toEqual(['Agent', 'Ein Agent', 'Script'])
-    // The stored name, which the Agent API and hive-progress give agents, is unchanged.
+    // The stored name, which the Agent API and cw-progress give agents, is unchanged.
     expect([script.agentName, nameless.agentName]).toEqual(['Script', 'Agent'])
   })
 })

@@ -1,6 +1,6 @@
-// Shared helpers for Hive's end-to-end suites (tests/e2e). They drive the real app with Playwright's
+// Shared helpers for Combwork's end-to-end suites (tests/e2e). They drive the real app with Playwright's
 // _electron against a dev build (npx electron-vite build), in throwaway profiles and workspaces under
-// WORK, and never touch the real Hive profile, ~/.codex or the clipboard.
+// WORK, and never touch the real Combwork profile, ~/.codex or the clipboard.
 //
 // Needs: the standalone Claude Code CLI (signed in) and, for the Codex suites, Codex signed in to the test
 // home CODEX_HOME. The first Claude Code run in a test folder asks whether to trust it; acceptClaudeTrust
@@ -11,9 +11,11 @@ const { execFileSync, execSync } = require('child_process')
 const { _electron } = require('playwright-core')
 
 // The run context (runContext.cjs): the environments of everything a suite starts, its folders and the CLI test homes.
-const { TEST_ROOT, WORK, CODEX_HOME, CLAUDE_TEST_HOME, hiveEnv, childEnv, baseEnv, isHiveEnv, isUserCliHome, trashDir, TEST_GIT_IDENTITY, gitConfig, writeGitConfig, gitEnv: contextGitEnv, isUserGitConfig } = require('./runContext.cjs')
+const { TEST_ROOT, WORK, CODEX_HOME, CLAUDE_TEST_HOME, combworkEnv, childEnv, baseEnv, isCombworkEnv, isUserCliHome, trashDir, TEST_GIT_IDENTITY, gitConfig, writeGitConfig, gitEnv: contextGitEnv, isUserGitConfig } = require('./runContext.cjs')
 
 const ROOT = path.resolve(__dirname, '..', '..')
+// A suite run alone refuses, as the runners do, while the test area's move (HI-2590) is to do or unfinished.
+require('../testArea.cjs').assertReady()
 /** Electron's executable (the electron package resolves to its path in plain Node). */
 const ELECTRON = require('electron')
 const { windowsCodesIn } = require('./windowsExits.cjs')
@@ -25,13 +27,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 /**
  * A new folder for a probe of your own (a Playwright script's profile, workspace and screenshots; #304), in
- * hive-test\scratch, named for it and the time: `scratch\<name>-<yyyymmdd-hhmmss>-<random>`. Every run gets a new one,
+ * combwork-test\scratch, named for it and the time: `scratch\<name>-<yyyymmdd-hhmmss>-<random>`. Every run gets a new one,
  * so nothing needs deleting first (never `rm -rf` a computed path: Claude Code asks, and unattended it denies). The
  * clean-up prunes them after a few days (`npm run test:clean`), unless a card that isn't Done cites one.
  */
 /**
  * Removes a folder a suite made outside the runner's (one the runner doesn't remove for it, e.g. update's download
- * cache) at its end, best effort (#324): a file a CLI or a scanner still holds for a moment after the test Hive closed
+ * cache) at its end, best effort (#324): a file a CLI or a scanner still holds for a moment after the test Combwork closed
  * is retried a few times, and one that still can't go is said in the log and left for the next run's clear, never
  * failing a suite whose checks passed. A suite's own folders in its lane need no removal at all: the runner removes them.
  */
@@ -47,7 +49,7 @@ function tidyUp(dir) {
 const TRASH = trashDir()
 
 /**
- * What the test copies of Hive this suite started have deleted, oldest first: `{ at, from, to }` each (the original
+ * What the test copies of Combwork this suite started have deleted, oldest first: `{ at, from, to }` each (the original
  * path, and where it is now in TRASH). `match` keeps those whose original path contains it (any case, either slash).
  */
 function trashed(match = '') {
@@ -62,12 +64,12 @@ function trashed(match = '') {
 }
 
 /**
- * A card of a workspace's board as Hive saved it (in .combwork\hive.db: its JSON document, from 1.0's tables, #1209), read on a
- * connection of its own (read-only; Hive writing meanwhile is fine). Throws when there is no such card.
+ * A card of a workspace's board as Combwork saved it (in .combwork\combwork.db: its JSON document, from 1.0's tables, #1209), read on a
+ * connection of its own (read-only; Combwork writing meanwhile is fine). Throws when there is no such card.
  */
 function readCard(ws, n) {
   const { DatabaseSync } = require('node:sqlite')
-  const db = new DatabaseSync(path.join(ws, '.combwork', 'hive.db'), { readOnly: true, timeout: 5000 })
+  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { readOnly: true, timeout: 5000 })
   try {
     const [row] = readDocs(db, [n])
     if (!row) throw new Error(`no card #${n} in ${ws}`)
@@ -77,10 +79,10 @@ function readCard(ws, n) {
   }
 }
 
-/** Saves a card's document as another program would (a running Hive sees it within about a second, #1017). */
+/** Saves a card's document as another program would (a running Combwork sees it within about a second, #1017). */
 function writeCard(ws, n, doc) {
   const { DatabaseSync } = require('node:sqlite')
-  const db = new DatabaseSync(path.join(ws, '.combwork', 'hive.db'), { timeout: 5000 })
+  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })
   try {
     writeDoc(db, n, doc)
   } finally {
@@ -99,7 +101,7 @@ function probeDir(name = 'probe', root = TEST_ROOT) {
   return fs.mkdtempSync(path.join(base, `${label}-${stamp}-`))
 }
 /**
- * A token in a file of its own, as Hive gives a session its token (HI-2262: CW_API_TOKEN_FILE, never HIVE_API_TOKEN):
+ * A token in a file of its own, as Combwork gives a session its token (HI-2262: CW_API_TOKEN_FILE, never CW_API_TOKEN):
  * its path, for a child's CW_API_TOKEN_FILE. `dir`: where (a new probe folder by default).
  */
 function tokenFile(token, dir = probeDir('token')) {
@@ -108,10 +110,10 @@ function tokenFile(token, dir = probeDir('token')) {
   return file
 }
 /**
- * A suite's Agent API port, as a string: the runner's (HIVE_E2E_PORT, one per suite running at the same time, so suites
+ * A suite's Agent API port, as a string: the runner's (CW_E2E_PORT, one per suite running at the same time, so suites
  * can run side by side), else the suite's own default when it runs alone (node tests/e2e/<suite>.cjs).
  */
-const port = (fallback) => process.env.HIVE_E2E_PORT || String(fallback)
+const port = (fallback) => process.env.CW_E2E_PORT || String(fallback)
 
 /** Waits until fn() returns something truthy (checking every interval ms), up to ms; returns its last value. */
 async function until(fn, ms = 10000, interval = 100) {
@@ -136,11 +138,11 @@ async function hoverTip(page, locator, want, ms = 10000) {
 
 let quitWatches = 0
 /**
- * Watches a test copy of Hive quit, telling Hive's part from the process's (#424). Start it before the quit.
- * `untilDecided(ms)`: the time Hive called app.quit (or app.exit), recorded in main as it calls it: its own quit work is
+ * Watches a test copy of Combwork quit, telling Combwork's part from the process's (#424). Start it before the quit.
+ * `untilDecided(ms)`: the time Combwork called app.quit (or app.exit), recorded in main as it calls it: its own quit work is
  * done (sessions stopped, state saved), or null if it hasn't within ms. `gone(ms)`: the process has ended since. What
  * comes between (Electron closing windows and processes) is the machine's, and a loaded one stretches it to seconds, so
- * a suite times Hive's part and only waits for the rest. `timings()` says both, for the suite's log.
+ * a suite times Combwork's part and only waits for the rest. `timings()` says both, for the suite's log.
  */
 async function quitWatch(app) {
   const file = path.join(WORK, `quit-watch-${process.pid}-${++quitWatches}.txt`)
@@ -183,12 +185,12 @@ async function quitWatch(app) {
       }),
     timings: (from) => {
       const d = decided()
-      return `Hive's quit work ${d ? `${d - from} ms` : 'not done'}, the process gone ${d && exitedAt ? `${exitedAt - d} ms after` : exitedAt ? 'without it' : 'not yet'}`
+      return `Combwork's quit work ${d ? `${d - from} ms` : 'not done'}, the process gone ${d && exitedAt ? `${exitedAt - d} ms after` : exitedAt ? 'without it' : 'not yet'}`
     }
   }
 }
 
-/** Turns providers on in a test profile's config before Hive starts (fresh profiles start with none). */
+/** Turns providers on in a test profile's config before Combwork starts (fresh profiles start with none). */
 function enableProviders(userData, providers = ['claude-code']) {
   fs.mkdirSync(userData, { recursive: true })
   const file = path.join(userData, 'config.json')
@@ -214,32 +216,37 @@ function enableProviders(userData, providers = ['claude-code']) {
  * prompt with no sign-in, and never in the user's ~/.claude. The key is valid for nothing: a suite using it sends no
  * prompt, and no tokens are spent (one that sends prompts uses the signed-in CLAUDE_TEST_HOME, claudeHome: 'test', as
  * assistantresume does). Said in the log, so the run shows the home. Returns { home, env }: env ({ CLAUDE_CONFIG_DIR,
- * ANTHROPIC_API_KEY }) goes into hiveEnv.
+ * ANTHROPIC_API_KEY }) goes into combworkEnv.
  */
 function ownClaudeHome(name) {
   const home = path.join(WORK, `${name}-claude-home`)
   fs.rmSync(home, { recursive: true, force: true })
   fs.mkdirSync(home, { recursive: true })
   // Made up: shaped like an API key, valid for nothing.
-  const apiKey = `sk-ant-api03-hivetest-${require('crypto').randomBytes(24).toString('hex')}`
+  const apiKey = `sk-ant-api03-cwtest-${require('crypto').randomBytes(24).toString('hex')}`
   fs.writeFileSync(path.join(home, '.claude.json'), JSON.stringify({ hasCompletedOnboarding: true, customApiKeyResponses: { approved: [apiKey.slice(-20)], rejected: [] } }))
   console.log(`Claude Code home: ${home} (CLAUDE_CONFIG_DIR, the suite's own; a made-up API key, no sign-in)`)
   return { home, env: { CLAUDE_CONFIG_DIR: home, ANTHROPIC_API_KEY: apiKey } }
 }
 
 /**
- * The fake Claude Code (fake-claude/) for a test profile, for a suite about Hive's own behaviour that only needs some
+ * The fake Claude Code (fake-claude/) for a test profile, for a suite about Combwork's own behaviour that only needs some
  * session running (#194): turns Claude Code on in userData's config with the fake as its path, makes home a fresh
  * Claude Code config folder in which the fake trusts `trusted` (so it asks nothing), and returns the variables to start
- * Hive with: { CLAUDE_CONFIG_DIR }. A config written before (a 0.1 one, settings of the suite's) is kept.
+ * Combwork with: { CLAUDE_CONFIG_DIR }. A config written before (a 0.1 one, settings of the suite's) is kept.
  */
-function fakeClaude(userData, home, trusted = []) {
+/**
+ * Points a profile's Claude Code at the fake (fake-claude/), its home made afresh with the folders it trusts. `oldRelease`:
+ * the old-release wrapper instead (fake-claude-old-release.cmd, oldRelease.cjs), for upgradelane's released 0.9 build
+ * alone (HI-2614); every other profile gets the current fake, which refuses an old release's names.
+ */
+function fakeClaude(userData, home, trusted = [], { oldRelease = false } = {}) {
   enableProviders(userData)
   const file = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(file, 'utf8'))
   cfg.settings = cfg.settings ?? {}
   cfg.settings.providers = cfg.settings.providers ?? {}
-  cfg.settings.providers['claude-code'] = { checkUpdatesOnLaunch: false, ...cfg.settings.providers['claude-code'], executablePath: path.join(__dirname, 'fake-claude', 'fake-claude.cmd') }
+  cfg.settings.providers['claude-code'] = { checkUpdatesOnLaunch: false, ...cfg.settings.providers['claude-code'], executablePath: path.join(__dirname, 'fake-claude', oldRelease ? 'fake-claude-old-release.cmd' : 'fake-claude.cmd') }
   fs.writeFileSync(file, JSON.stringify(cfg, null, 2))
   fs.rmSync(home, { recursive: true, force: true })
   fs.mkdirSync(home, { recursive: true })
@@ -266,7 +273,7 @@ async function fitWindow(app, page, size) {
 }
 
 /**
- * Waits until Hive's window has rendered with its settings loaded, and Hive has finished looking for the providers'
+ * Waits until Combwork's window has rendered with its settings loaded, and Combwork has finished looking for the providers'
  * CLIs (it does that in the background after start; starting an agent before then fails with "… is required").
  * Instead of a fixed wait after launch.
  */
@@ -275,12 +282,12 @@ async function appReady(page, ms = 90000) {
     page
       .evaluate(async () => {
         if (!document.querySelector('.app .workbench')) return false
-        const info = await window.hive.invoke('provider:info')
+        const info = await window.combwork.invoke('provider:info')
         return Object.values(info).every((p) => !p.checking)
       })
       .catch(() => false)
   const ok = await until(ready, ms)
-  if (!ok) throw new Error("Hive's window wasn't ready (rendered, providers found) within " + ms / 1000 + ' s')
+  if (!ok) throw new Error("Combwork's window wasn't ready (rendered, providers found) within " + ms / 1000 + ' s')
 }
 
 /** Opens a workspace and waits until the window shows it (its name in the title), instead of a fixed wait. */
@@ -292,16 +299,16 @@ async function openWorkspace(inv, page, ws, ms = 20000) {
 }
 
 /**
- * Starts the dev build with a test profile, or the packaged Hive.exe HIVE_EXE names (the Sandbox upgrade checks run
+ * Starts the dev build with a test profile, or the packaged Combwork.exe CW_EXE names (the Sandbox upgrade checks run
  * boardupgrade and upgradelane against an installed build that way, #1227). Returns { app, page, inv } (inv calls an
  * IPC channel). readyMs bounds the wait for its window to be ready; one that isn't is closed and the failure thrown.
  */
 async function launch({ userData, env = {}, viewport = { width: 1400, height: 850 }, readyMs = 90000 }) {
-  const exe = process.env.HIVE_EXE
-  if (exe && !launch.said) console.log(`Hive: ${exe} (HIVE_EXE), not the dev build`)
+  const exe = process.env.CW_EXE
+  if (exe && !launch.said) console.log(`Combwork: ${exe} (CW_EXE), not the dev build`)
   launch.said = !!exe
   // The run context's environment (quiet, tips off, the suite's port) with the profile and the suite's own variables.
-  const app = await _electron.launch({ executablePath: exe || ELECTRON, args: exe ? [] : [ROOT], cwd: ROOT, env: hiveEnv({ HIVE_USER_DATA: userData, ...env }) }).catch((e) => {
+  const app = await _electron.launch({ executablePath: exe || ELECTRON, args: exe ? [] : [ROOT], cwd: ROOT, env: combworkEnv({ CW_USER_DATA: userData, ...env }) }).catch((e) => {
     // Electron that failed to start (0xc0000142 under heavy load, #599): its exit code said with what it means.
     const said = windowsCodesIn(e?.message)
     if (said.length && e instanceof Error) e.message = `${e.message}\nWindows: ${said.join('; ')}`
@@ -317,12 +324,12 @@ async function launch({ userData, env = {}, viewport = { width: 1400, height: 85
     await app.close().catch(() => undefined)
     throw e
   }
-  const inv = (ch, ...a) => page.evaluate(([c, args]) => window.hive.invoke(c, ...args), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, args]) => window.combwork.invoke(c, ...args), [ch, a])
   return { app, page, inv }
 }
 
 /**
- * Waits until Hive has finished looking for a provider's CLI (it does so in the background after start): starting
+ * Waits until Combwork has finished looking for a provider's CLI (it does so in the background after start): starting
  * an agent before then fails with "Claude Code is required". Throws if it isn't found.
  */
 async function waitForProvider(inv, provider = 'claude-code', timeoutMs = 60000) {
@@ -422,7 +429,7 @@ const CLAUDE_AT_PROMPT = /for shortcuts|\? for|shift\+tab to cycle|\bmode on\b/i
 
 /**
  * Answers Claude Code's "trust this folder" question in an agent's terminal, if it asks: true when it answered, false
- * as soon as the session is past it (Claude Code's prompt on screen, or Hive has the session ready: a trusted folder
+ * as soon as the session is past it (Claude Code's prompt on screen, or Combwork has the session ready: a trusted folder
  * asks nothing, #188), or at the timeout. Never answers anything else (a sign-in screen least of all).
  */
 async function acceptClaudeTrust(inv, proj, agentId, timeoutMs = 15000) {
@@ -551,9 +558,9 @@ function trustForCodex(folder, home = CODEX_HOME) {
 }
 
 /**
- * Failures that come from the machine, not from Hive: the CLI's usage or rate limit, its sign-in, the network to its
+ * Failures that come from the machine, not from Combwork: the CLI's usage or rate limit, its sign-in, the network to its
  * API. Matched in the CLI's own output (terminal text, a session's status message), conservatively: anything not
- * clearly one of these stays a FAIL. Hook errors (127.0.0.1) are Hive's, never the environment's.
+ * clearly one of these stays a FAIL. Hook errors (127.0.0.1) are Combwork's, never the environment's.
  */
 const ENVIRONMENT = [
   { why: 'usage or rate limit', re: /(?:usage|5-hour|weekly|session|opus|sonnet) limit reached|hit your (?:usage )?limit|rate_limit_error|rate limit(?:ed| exceeded)|too many requests|API Error: 429/i },
@@ -630,41 +637,41 @@ function transcriptText(file) {
   }
 }
 
-// Every Hive a suite starts, whether through launch() or Playwright's _electron.launch directly (most suites do that):
+// Every Combwork a suite starts, whether through launch() or Playwright's _electron.launch directly (most suites do that):
 // require('playwright-core') is one module, so suites get this _electron. cliStep reads their sessions. Each must have
-// the run context's environment (hiveEnv): without one, Playwright would pass on the suite's own.
+// the run context's environment (combworkEnv): without one, Playwright would pass on the suite's own.
 const apps = new Set()
 const launchElectron = _electron.launch.bind(_electron)
 _electron.launch = async (...args) => {
   const env = args[0]?.env
-  if (!isHiveEnv(env)) throw new Error("Start a test Hive with lib.hiveEnv({ HIVE_USER_DATA, … }) as its env (tests/e2e/runContext.cjs), never the suite's own environment")
-  // The CLI homes, test folders (#382, #452): Hive looks for the CLIs when it starts, and their sign-in checks read these.
+  if (!isCombworkEnv(env)) throw new Error("Start a test Combwork with lib.combworkEnv({ CW_USER_DATA, … }) as its env (tests/e2e/runContext.cjs), never the suite's own environment")
+  // The CLI homes, test folders (#382, #452): Combwork looks for the CLIs when it starts, and their sign-in checks read these.
   for (const k of ['CLAUDE_CONFIG_DIR', 'CODEX_HOME', 'COPILOT_HOME', 'GH_CONFIG_DIR']) {
-    if (!env[k]) throw new Error(`A test Hive needs ${k} (hiveEnv gives an empty one of the suite's; a suite may give a test home, never none): without it the CLI reads the user's own home (#382)`)
-    if (isUserCliHome(env[k])) throw new Error(`A test Hive's ${k} is the user's own home (${env[k]}): give it a test home (#382)`)
+    if (!env[k]) throw new Error(`A test Combwork needs ${k} (combworkEnv gives an empty one of the suite's; a suite may give a test home, never none): without it the CLI reads the user's own home (#382)`)
+    if (isUserCliHome(env[k])) throw new Error(`A test Combwork's ${k} is the user's own home (${env[k]}): give it a test home (#382)`)
     // The suite's empty one is made here (Codex refuses a CODEX_HOME that doesn't exist).
     fs.mkdirSync(env[k], { recursive: true })
   }
   // Its git's global config, the suite's (#1466): without one its git reads the user's ~/.gitconfig, and the user's name
   // and email show in its screens. The work folder's is written here, with the test identity.
-  if (!env.GIT_CONFIG_GLOBAL) throw new Error("A test Hive needs GIT_CONFIG_GLOBAL (hiveEnv gives the suite's, with a test identity): without it its git reads the user's ~/.gitconfig (#1466)")
-  if (isUserGitConfig(env.GIT_CONFIG_GLOBAL)) throw new Error(`A test Hive's GIT_CONFIG_GLOBAL is the user's own (${env.GIT_CONFIG_GLOBAL}): give it the suite's (#1466)`)
+  if (!env.GIT_CONFIG_GLOBAL) throw new Error("A test Combwork needs GIT_CONFIG_GLOBAL (combworkEnv gives the suite's, with a test identity): without it its git reads the user's ~/.gitconfig (#1466)")
+  if (isUserGitConfig(env.GIT_CONFIG_GLOBAL)) throw new Error(`A test Combwork's GIT_CONFIG_GLOBAL is the user's own (${env.GIT_CONFIG_GLOBAL}): give it the suite's (#1466)`)
   if (env.GIT_CONFIG_GLOBAL === gitConfig()) writeGitConfig(env.GIT_CONFIG_GLOBAL)
   const packaged = testExecutable(args[0].executablePath ?? ELECTRON) === 'packaged'
-  // Its profile on its command line (#614), which Hive ignores: the runner stops what names a suite's folder once the
-  // suite ends, and a test Hive's own line names only the checkout, so a suite killed before closing its Hive (HB1's,
+  // Its profile on its command line (#614), which Combwork ignores: the runner stops what names a suite's folder once the
+  // suite ends, and a test Combwork's own line names only the checkout, so a suite killed before closing its Combwork (HB1's,
   // 10 Oct) left it running for a day. Chromium's own processes already name it (--user-data-dir).
-  if (env.HIVE_USER_DATA) args[0] = { ...args[0], args: [...(args[0].args ?? []), `--hive-test-profile=${env.HIVE_USER_DATA}`] }
+  if (env.CW_USER_DATA) args[0] = { ...args[0], args: [...(args[0].args ?? []), `--combwork-test-profile=${env.CW_USER_DATA}`] }
   if (packaged) {
     args[0] = { ...args[0], args: [...args[0].args, ...PACKAGED_ARGS], env: { ...env, ...NO_UPDATE_CHECK } }
-    unmaximized(env.HIVE_USER_DATA)
-    noUpdateChecks(env.HIVE_USER_DATA)
-    if (env.HIVE_USER_DATA) packagedLaunches.push({ profile: env.HIVE_USER_DATA, since: new Date().toISOString() })
+    unmaximized(env.CW_USER_DATA)
+    noUpdateChecks(env.CW_USER_DATA)
+    if (env.CW_USER_DATA) packagedLaunches.push({ profile: env.CW_USER_DATA, since: new Date().toISOString() })
   }
   const from = Date.now()
   const app = await launchElectron(...args)
   // An app.evaluate reaches main through Node's inspector, which runs it at once even while main's JS is running: in a
-  // V8 interrupt, in the middle of whatever main was doing. A function that calls into Hive (a window event, a setting)
+  // V8 interrupt, in the middle of whatever main was doing. A function that calls into Combwork (a window event, a setting)
   // then changes Node's timer queue while main is half way through changing it, which breaks the queue for good (#997:
   // "reading 'expiry'" from ConfigStore.scheduleSave's clearTimeout under load, and every save after it failed). So
   // each runs after an await: V8 queues the rest, which runs once the code it interrupted has finished. Not
@@ -686,17 +693,17 @@ _electron.launch = async (...args) => {
     const shown = await app.evaluate(keepPackagedQuiet).catch((e) => ({ error: e.message }))
     if (!Array.isArray(shown) || shown.length) {
       await app.close().catch(() => undefined)
-      throw new Error(`A packaged test Hive (${args[0].executablePath}) couldn't be kept off the screen (#1253): ${Array.isArray(shown) ? `its windows were shown before it was reached (${shown.join(', ')})` : shown.error}`)
+      throw new Error(`A packaged test Combwork (${args[0].executablePath}) couldn't be kept off the screen (#1253): ${Array.isArray(shown) ? `its windows were shown before it was reached (${shown.join(', ')})` : shown.error}`)
     }
   }
   // Recorded by its pid and when it started (HI-1453), in the folder its runner gave the suite: whatever ends the run, the
   // runner ends each copy still running once the suite has ended, and the next run's start those an earlier run left.
   // Its main process's own pid: Playwright starts Electron through `cmd.exe /c` on Windows, so app.process() is that
-  // shell, which ends with a killed suite while Hive runs on outside the suite's job (how one ran 12 h): the shell's
+  // shell, which ends with a killed suite while Combwork runs on outside the suite's job (how one ran 12 h): the shell's
   // child, by the process tree alone, trusted only while this process holds the shell's handle (it hasn't exited). Looked
   // up in the background, so the launch returns as it did: only a record, which never fails or holds up the suite. A
   // copy whose record isn't made (in time, or at all) is never ended by the runner, only listed.
-  if (process.env.HIVE_E2E_DIR) recordMainProcess(WORK, app.process(), from, env.HIVE_USER_DATA ?? null).catch(() => undefined)
+  if (process.env.CW_E2E_DIR) recordMainProcess(WORK, app.process(), from, env.CW_USER_DATA ?? null).catch(() => undefined)
   return app
 }
 
@@ -707,15 +714,15 @@ _electron.launch = async (...args) => {
 // reaches React's nested-update limit. The burst is recorded only: input makes bursts as large as a loop's (HI-1864).
 // The chain fails the suite at the limit (HI-1865: a full run's normal suites stayed at 8 or under), unless the suite
 // accepts its chain (acceptCommitChain: commitburst's deliberate loop).
-const COMMIT_BURST_MARKER = '[hive commit burst]'
-const COMMIT_CHAIN_MARKER = '[hive commit chain]'
+const COMMIT_BURST_MARKER = '[combwork commit burst]'
+const COMMIT_CHAIN_MARKER = '[combwork commit chain]'
 const COMMIT_BURST_LIMIT = 50
 /**
  * A suite's record of its windows' bursts: each window's own largest, from its console lines and read once from the page
  * as it is watched (one said before the listener was there isn't said again); the suite's, the largest of them, null
  * while no window has reported (no watch there, which isn't a burst of 0). onFirst: once, when the first window
  * reports; onReach(n): once, when the suite's first reaches the limit. Never throws into the suite: only a record.
- * marker and read: the count's console marker and its field in the page's `__hiveCommitBurst()` (the chain's: HI-1865).
+ * marker and read: the count's console marker and its field in the page's `__cwCommitBurst()` (the chain's: HI-1865).
  */
 function burstWatcher({ onFirst = () => {}, onReach = () => {}, marker = COMMIT_BURST_MARKER, read = 'max' } = {}) {
   const perWindow = new Map()
@@ -750,7 +757,7 @@ function burstWatcher({ onFirst = () => {}, onReach = () => {}, marker = COMMIT_
     }
     // What the page reached before the listener was there: its own count, read once.
     try {
-      Promise.resolve(page.evaluate((field) => window.__hiveCommitBurst?.()[field], read)).then(
+      Promise.resolve(page.evaluate((field) => window.__cwCommitBurst?.()[field], read)).then(
         (n) => {
           if (typeof n === 'number') note(page, n)
         },
@@ -812,10 +819,15 @@ const watchCommitBursts = (app) => {
 }
 
 /**
- * The Hives a suite may never start (#1253): the installed app (the one hosting the agents, with its own profile and app
- * ID), Combwork's (HI-2460) and Hive Desktop's from before.
+ * The copies a suite may never start (#1253): the installed app (the one hosting the agents, with its own profile and app
+ * ID), Combwork's (HI-2460), and a 1.0 still installed under its folder from before the rename (OLD_INSTALL_FOLDER, a
+ * fence: never started, whatever the dialect of the fakes, HI-2614).
  */
-const INSTALLED = ['Combwork', 'Hive'].flatMap((n) => [path.join(process.env.LOCALAPPDATA ?? '', 'Programs', n), path.join(process.env.PROGRAMFILES ?? 'C:\\Program Files', n)])
+const INSTALL_FOLDER = 'Combwork'
+// old-name: begin old-install-folder
+const OLD_INSTALL_FOLDER = 'Hive'
+// old-name: end old-install-folder
+const INSTALLED = [INSTALL_FOLDER, OLD_INSTALL_FOLDER].flatMap((n) => [path.join(process.env.LOCALAPPDATA ?? '', 'Programs', n), path.join(process.env.PROGRAMFILES ?? 'C:\\Program Files', n)])
 /** This checkout's packaged build's executable (npm run dist): Combwork.exe since HI-2460. */
 const PACKAGED_EXE = path.join(ROOT, 'dist', 'win-unpacked', 'Combwork.exe')
 /** A folder's path as compared: real (a junction resolved), lower case, no trailing separator. */
@@ -834,32 +846,32 @@ const inside = (file, dir) => {
 }
 
 /**
- * Which Hive a suite starts: 'dev' (this checkout's Electron, the dev build) or 'packaged' (a Hive.exe: this checkout's
+ * Which Combwork a suite starts: 'dev' (this checkout's Electron, the dev build) or 'packaged' (a Combwork.exe: this checkout's
  * dist\win-unpacked, the main checkout's 0.9 one boardupgrade and upgradelane use, one in the test folders, or what
- * HIVE_E2E_HIVE09 or HIVE_EXE name). Never the installed Hive, nor one from anywhere else (#1253): it would open the user's
+ * CW_E2E_V09 or CW_EXE name). Never the installed Combwork, nor one from anywhere else (#1253): it would open the user's
  * app on their screen. Throws for those.
  */
 function testExecutable(exe) {
   if (comparable(exe) === comparable(ELECTRON)) return 'dev'
-  if (INSTALLED.some((d) => d && inside(exe, d))) throw new Error(`A test may never start the installed Hive (${exe}): use this checkout's build, or a 0.9 build's win-unpacked folder (HIVE_E2E_HIVE09) (#1253)`)
-  const named = [ROOT, TEST_ROOT, process.env.HIVE_E2E_HIVE09, process.env.HIVE_EXE && path.dirname(process.env.HIVE_EXE)].filter(Boolean)
+  if (INSTALLED.some((d) => d && inside(exe, d))) throw new Error(`A test may never start the installed Combwork (${exe}): use this checkout's build, or a 0.9 build's win-unpacked folder (CW_E2E_V09) (#1253)`)
+  const named = [ROOT, TEST_ROOT, process.env.CW_E2E_V09, process.env.CW_EXE && path.dirname(process.env.CW_EXE)].filter(Boolean)
   if (named.some((d) => inside(exe, d))) return 'packaged'
   // Asked of git only now: in Windows Sandbox the checkout is a mapped copy, not a repository (#1227).
   const main = /^worktree (.+)$/m.exec(git(ROOT, 'worktree list --porcelain'))?.[1]
-  if (!main || !inside(exe, path.join(main, 'dist', 'win-unpacked'))) throw new Error(`A test starts Hive from this checkout, its dist, the main checkout's dist\\win-unpacked or the test folders, never ${exe} (#1253)`)
+  if (!main || !inside(exe, path.join(main, 'dist', 'win-unpacked'))) throw new Error(`A test starts Combwork from this checkout, its dist, the main checkout's dist\\win-unpacked or the test folders, never ${exe} (#1253)`)
   return 'packaged'
 }
 
 /**
- * What a packaged test Hive starts with (#1253): --hidden (Hive makes its windows but never shows them, as when started at
+ * What a packaged test Combwork starts with (#1253): --hidden (Combwork makes its windows but never shows them, as when started at
  * sign-in: 0.9 too), so nothing is on screen before keepPackagedQuiet reaches it; and Chromium's occlusion tracking off,
  * so its windows, once shown off screen, still draw (main does that itself for a quiet copy).
  */
 const PACKAGED_ARGS = ['--hidden', '--disable-features=CalculateNativeWinOcclusion']
 
 /**
- * A profile saved with its window maximised: Hive would maximise it as it starts, and maximising shows a hidden window.
- * A packaged test Hive's profile is set not to (#1253). Kept files' copies (.bak) are left: config.json is read first.
+ * A profile saved with its window maximised: Combwork would maximise it as it starts, and maximising shows a hidden window.
+ * A packaged test Combwork's profile is set not to (#1253). Kept files' copies (.bak) are left: config.json is read first.
  */
 function unmaximized(profile) {
   const file = profile && path.join(profile, 'config.json')
@@ -870,17 +882,17 @@ function unmaximized(profile) {
     cfg.window.maximized = false
     fs.writeFileSync(file, JSON.stringify(cfg, null, 2))
   } catch {
-    // Unreadable: Hive starts with its defaults.
+    // Unreadable: Combwork starts with its defaults.
   }
 }
 
 /**
- * A packaged test Hive never checks GitHub for updates (#1332): each check fetches the release's latest.yml, which
- * GitHub counts as a download. 1.0 doesn't for HIVE_TEST_QUIET=1 (hiveEnv); a released build (0.9) can't be changed, so
- * its first check, 30 s after it starts, is put off as far as a timer goes (about 24.8 days: HIVE_UPDATE_DELAY, which
+ * A packaged test Combwork never checks GitHub for updates (#1332): each check fetches the release's latest.yml, which
+ * GitHub counts as a download. 1.0 doesn't for CW_TEST_QUIET=1 (combworkEnv); a released build (0.9) can't be changed, so
+ * its first check, 30 s after it starts, is put off as far as a timer goes (about 24.8 days: CW_UPDATE_DELAY, which
  * every build reads), and a profile it has saved has automatic checks off, so it schedules no 6-hourly check either.
  */
-const NO_UPDATE_CHECK = { HIVE_UPDATE_DELAY: String(2 ** 31 - 1) }
+const NO_UPDATE_CHECK = { CW_UPDATE_DELAY: String(2 ** 31 - 1) }
 function noUpdateChecks(profile) {
   const file = profile && path.join(profile, 'config.json')
   // A new profile is left alone: a config.json of settings alone would read as one from before every migration.
@@ -891,19 +903,19 @@ function noUpdateChecks(profile) {
     cfg.settings = { ...cfg.settings, updates: { ...cfg.settings?.updates, checkAutomatically: false } }
     fs.writeFileSync(file, JSON.stringify(cfg, null, 2))
   } catch {
-    // Unreadable: Hive starts with its defaults, and HIVE_UPDATE_DELAY still puts its check off.
+    // Unreadable: Combwork starts with its defaults, and CW_UPDATE_DELAY still puts its check off.
   }
 }
 
 /**
- * The guard (#1332): when a suite ends, the log of each packaged Hive it started (hive.log and its older copy) must show
- * no update check since that launch (electron-updater's "Checking for update", in Hive's [updates] scope), or the suite
+ * The guard (#1332): when a suite ends, the log of each packaged Combwork it started (combwork.log and its older copy) must show
+ * no update check since that launch (electron-updater's "Checking for update", in Combwork's [updates] scope), or the suite
  * fails, whatever it said.
  */
 const packagedLaunches = []
 function updateChecksLogged({ profile, since }) {
   const found = []
-  for (const name of ['hive.1.log', 'hive.log']) {
+  for (const name of ['combwork.1.log', 'combwork.log']) {
     let text = ''
     try {
       text = fs.readFileSync(path.join(profile, 'logs', name), 'utf8')
@@ -917,12 +929,12 @@ function updateChecksLogged({ profile, since }) {
 process.on('exit', () => {
   const found = packagedLaunches.flatMap(updateChecksLogged)
   if (!found.length) return
-  console.error(`FAILED: a packaged test Hive checked GitHub for updates (#1332):\n${found.join('\n')}`)
+  console.error(`FAILED: a packaged test Combwork checked GitHub for updates (#1332):\n${found.join('\n')}`)
   process.exitCode = 1
 })
 
 /**
- * Run in a packaged test Hive's main process as soon as Playwright reaches it (#1253), making it quiet from outside, as
+ * Run in a packaged test Combwork's main process as soon as Playwright reaches it (#1253), making it quiet from outside, as
  * a dev test copy is from inside (testQuiet): a released build can't be changed, and isn't quiet. Its windows go off
  * screen (kept there however they're moved), unfocusable and off the taskbar, then are shown without taking the focus
  * (they draw, for screenshots); a window shown, focused, maximised, raised or flashed later stays off screen; Windows
@@ -939,8 +951,8 @@ function keepPackagedQuiet(electron) {
   const proto = BrowserWindow.prototype
   const showInactive = proto.showInactive
   const quiet = (win) => {
-    if (win.isDestroyed() || win.hiveTestQuiet) return
-    win.hiveTestQuiet = true
+    if (win.isDestroyed() || win.combworkTestQuiet) return
+    win.combworkTestQuiet = true
     const away = () => {
       if (win.isDestroyed()) return
       const b = win.getBounds()
@@ -962,7 +974,7 @@ function keepPackagedQuiet(electron) {
   dialog.showMessageBox = async (a, b) => ({ response: answer(a, b), checkboxChecked: false })
   dialog.showMessageBoxSync = answer
   dialog.showErrorBox = () => undefined
-  // One made later, hidden too (--hidden), is shown once it has drawn, as Hive shows its own.
+  // One made later, hidden too (--hidden), is shown once it has drawn, as Combwork shows its own.
   app.on('browser-window-created', (_e, win) => {
     quiet(win)
     win.once('ready-to-show', () => win.isDestroyed() || showInactive.call(win))
@@ -975,7 +987,7 @@ function keepPackagedQuiet(electron) {
 }
 
 /**
- * The environment failures in each session of the running test Hives: Map<pty key, problems> (its terminal and status,
+ * The environment failures in each session of the running test copies: Map<pty key, problems> (its terminal and status,
  * and the launches Codex's sandbox refused as its running session's transcript records them).
  */
 async function sessionProblems() {
@@ -984,18 +996,18 @@ async function sessionProblems() {
     for (const page of app.windows()) {
       const texts = await page
         .evaluate(async () => {
-          const ws = await window.hive.invoke('workspace:get')
+          const ws = await window.combwork.invoke('workspace:get')
           const hosts = ws ? [...ws.projects, ...(ws.assistant ? [ws.assistant] : [])] : []
-          const live = await window.hive.invoke('session:live').catch(() => [])
+          const live = await window.combwork.invoke('session:live').catch(() => [])
           const found = []
           for (const h of hosts) {
             let records = null
             for (const a of h.agents ?? []) {
               const key = `session:${h.path.toLowerCase()}#${a.id}`
               const sessionId = live.find((s) => s.projectPath.toLowerCase() === h.path.toLowerCase() && s.agentId === a.id)?.sessionId
-              if (sessionId) records ??= await window.hive.invoke('session:list', h.path).catch(() => [])
+              if (sessionId) records ??= await window.combwork.invoke('session:list', h.path).catch(() => [])
               const transcript = (sessionId && records?.find((r) => r.id === sessionId)?.transcriptPath) || null
-              found.push([key, `${await window.hive.invoke('pty:buffer', key).catch(() => '')}\n${a.live?.statusMessage ?? ''}`, transcript])
+              found.push([key, `${await window.combwork.invoke('pty:buffer', key).catch(() => '')}\n${a.live?.statusMessage ?? ''}`, transcript])
             }
           }
           return found
@@ -1041,7 +1053,7 @@ function checked(ok) {
   else checks.failed++
 }
 
-/** The longest a skipped step waits for its test Hives to close before the suite exits: a bound for a hung close. */
+/** The longest a skipped step waits for its test copies to close before the suite exits: a bound for a hung close. */
 const CLOSE_MS = 10000
 
 /**
@@ -1070,7 +1082,7 @@ async function cliStep(name, opts, fn) {
     if (v?.skip) {
       console.log(`SKIPPED ${v.skip}`)
       console.log(`SKIPPED-FAILS ${step.failed}`)
-      // Its test Hives close first, so nothing it started is left running.
+      // Its test copies close first, so nothing it started is left running.
       await Promise.race([Promise.all([...apps].map((a) => a.close().catch(() => undefined))), sleep(CLOSE_MS)])
       process.exit(0)
     }
@@ -1086,7 +1098,7 @@ const pasteOn = (raw) => raw.lastIndexOf('\x1b[?2004h') > raw.lastIndexOf('\x1b[
 
 /**
  * Types a prompt into a CLI's terminal (pty key) and presses Enter until it is submitted: submitted() turns true (the
- * session working, say) within waitMs. Each attempt types as Hive does (sessions.sendPrompt): Ctrl+U as a write of its
+ * session working, say) within waitMs. Each attempt types as Combwork does (sessions.sendPrompt): Ctrl+U as a write of its
  * own to clear the input (in a write with the text it can become part of it, doubling a retried prompt: #1168, #1547),
  * then the prompt, then Enter. submitted() is checked before each retry, so a prompt taken late isn't sent twice.
  * - Pasted (a CLI with bracketed paste on, the prompt not a slash command): an attempt not taken is pasted again whole.
@@ -1097,7 +1109,7 @@ const pasteOn = (raw) => raw.lastIndexOf('\x1b[?2004h') > raw.lastIndexOf('\x1b[
  *   when this attempt's text was drawn, the next attempt is Enter alone (typed again, the prompt would follow that new
  *   line); when it wasn't (dropped while the CLI drew), or on the last attempt, it is typed again.
  * ready(), if given, is waited for (within waitMs) before the first attempt: the CLI able to take a prompt
- * (hiveToolsConnected); not ready by then, it is typed anyway and said. Up to `tries` times; returns the attempt that
+ * (combworkToolsConnected); not ready by then, it is typed anyway and said. Up to `tries` times; returns the attempt that
  * worked (1 = the first), or 0.
  */
 async function sendPrompt(inv, key, text, { submitted, ready = null, tries = 3, waitMs = 20000 } = {}) {
@@ -1133,18 +1145,19 @@ async function sendPrompt(inv, key, text, { submitted, ready = null, tries = 3, 
 }
 
 /**
- * Whether Hive's log in a test profile (HIVE_USER_DATA) says an agent's hive tools connected (#865), at or after
- * `since` (a line count from hiveLogLines, so a relaunch's own connect is waited for): a ready() for sendPrompt into a
- * just-started Claude Code, as Hive itself types nothing before it (sessions.hiveToolsSettled).
+ * Whether Combwork's log in a test profile (CW_USER_DATA) says an agent's Combwork tools connected (#865), at or after
+ * `since` (a line count from combworkLogLines, so a relaunch's own connect is waited for): a ready() for sendPrompt into a
+ * just-started Claude Code, as Combwork itself types nothing before it (sessions.combworkToolsSettled). The current line
+ * only (HI-2614): a packaged suite needs a build of this source (npm run dist).
  */
-const hiveLogLines = (userData) => {
+const combworkLogLines = (userData) => {
   try {
-    return fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8').split('\n')
+    return fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8').split('\n')
   } catch {
     return []
   }
 }
-const hiveToolsConnected = (userData, agentId, since = 0) => hiveLogLines(userData).slice(since).some((l) => l.includes(`⁨${agentId}⁩'s hive tools connected`))
+const combworkToolsConnected = (userData, agentId, since = 0) => combworkLogLines(userData).slice(since).some((l) => l.includes(`⁨${agentId}⁩'s Combwork tools connected`))
 
 /**
  * The longest a fake Claude Code's prompt waits to be taken, or its turn to end: a bound for a hung run, never how long
@@ -1166,7 +1179,7 @@ function logFakeInput(home) {
 
 /**
  * Types a line into a fake Claude Code (pty `key`, its home `home`, the agent's name `agent`, or null for live()'s
- * agentName: its CW_AGENT, which the fake's records carry) that Hive may type a wake
+ * agentName: its CW_AGENT, which the fake's records carry) that Combwork may type a wake
  * into at the same moment (#1553, #1560): the wake's Ctrl+U clears the line, or the two lines mix, or the line lands
  * while the agent is busy with the wake and is dropped (fake-dropped.jsonl). So its Enter goes only once the CLI has
  * read the line whole (fake-input.jsonl: logFakeInput() before the fake starts), the line counts only when nothing
@@ -1186,10 +1199,10 @@ function logFakeInput(home) {
  * Returns { attempt, lost }: the attempt taken (1 = the first; 0 if none of `tries` was), and why each before it wasn't.
  */
 /**
- * Whether Hive has nothing waiting to type into an agent (HI-1918): none of its deliveries waiting to be offered (queued,
+ * Whether Combwork has nothing waiting to type into an agent (HI-1918): none of its deliveries waiting to be offered (queued,
  * or uncertain: to be offered again), as GET …/deliveries reads them with a token of its project (its own). One offered
  * is typed already (a doorbell, or a launch's first prompt, which stays offered until the agent reads its inbox: never
- * waited for). With the agent idle and its composer free (Hive not typing a line into it now, `agentQuiet`), for
+ * waited for). With the agent idle and its composer free (Combwork not typing a line into it now, `agentQuiet`), for
  * typeLine's ready with `strict`.
  */
 async function inboxQuiet(apiPort, project, agent, token) {
@@ -1198,8 +1211,8 @@ async function inboxQuiet(apiPort, project, agent, token) {
 }
 
 /**
- * Whether Hive will type nothing into an agent now or next (HI-1918): idle (ready or finished), its composer free (no
- * line of Hive's being typed, just typed or confirmed: RuntimeFacts.composer), and nothing waiting to be offered
+ * Whether Combwork will type nothing into an agent now or next (HI-1918): idle (ready or finished), its composer free (no
+ * line of Combwork's being typed, just typed or confirmed: RuntimeFacts.composer), and nothing waiting to be offered
  * (inboxQuiet). `state` is its session:live entry.
  */
 async function agentQuiet(apiPort, project, state, token) {
@@ -1210,7 +1223,7 @@ async function agentQuiet(apiPort, project, state, token) {
 /**
  * Whether an agent a lane gave a new conversation (HI-2232: an idle builder outside slots, whose first turn is the lane's
  * brief) is done with that brief, so a line typed into it now is taken: a new conversation (its sessionId isn't
- * `before`), its turn over, and quiet (agentQuiet). Quiet alone isn't the brief done (HI-2350, HI-2357): Hive answers a
+ * `before`), its turn over, and quiet (agentQuiet). Quiet alone isn't the brief done (HI-2350, HI-2357): Combwork answers a
  * hook before it handles it, so under load the brief's UserPromptSubmit can reach its status after the CLI has read its
  * inbox, and the conversation looks ready, its composer free and nothing waiting, while the brief runs; a line typed
  * then is dropped (fake-dropped.jsonl). `state` is its session:live entry.
@@ -1229,7 +1242,7 @@ async function inboxPending(apiPort, project, agent, token) {
 
 /**
  * What is left on a fake CLI's input line after it read `s` (HI-2385): an Enter or a Ctrl+U clears it, a DEL or a
- * Backspace erases its last character (as fake-claude does; Hive withdraws a doorbell it typed with DELs), the rest is
+ * Backspace erases its last character (as fake-claude does; Combwork withdraws a doorbell it typed with DELs), the rest is
  * typed onto it.
  */
 function lineLeft(s) {
@@ -1268,7 +1281,7 @@ async function typeLine(inv, key, home, agent, text, { live = null, taken = null
     const from = readAll().length
     const readSince = () => readAll().slice(from)
     const dropped = jsonl('fake-dropped.jsonl').length
-    // Its line empty first: a wake Hive is typing (its Ctrl+U and text read, its Enter not yet) is let finish. Bounded:
+    // Its line empty first: a wake Combwork is typing (its Ctrl+U and text read, its Enter not yet) is let finish. Bounded:
     // what never clears is typed over, and seen as disturbed below.
     await until(() => lineLeft(readAll()) === '', hungMs)
     if (disturb === 'before' && attempt === 1) {
@@ -1321,17 +1334,17 @@ async function typeLine(inv, key, home, agent, text, { live = null, taken = null
  * Prompts typed into the fake Claude Code (fake-claude/) in a session (pty `key`; `live()` gives its session:live entry),
  * each waited for by its own turn (#672, #684). Two gaps open under load when a suite types a prompt and then waits for
  * the status: the status is still the last turn's "finished" until the fake takes the new prompt, so the wait returns
- * at once; and Hive has a turn finished at the fake's Stop hook, but the fake ends it on its side (drawing "✻ Worked
+ * at once; and Combwork has a turn finished at the fake's Stop hook, but the fake ends it on its side (drawing "✻ Worked
  * for" and its input line) only after the hook's reply, and drops an Enter typed in between.
- * A third: a line Hive types into the session itself (a mode message, a wake) can be taken late, and a prompt typed
- * meanwhile is dropped while the turn that ends is Hive's. So a prompt counts as taken only once its conversation has it,
- * and as answered once a reply follows it there and Hive's turn ledger has the turn over.
+ * A third: a line Combwork types into the session itself (a mode message, a wake) can be taken late, and a prompt typed
+ * meanwhile is dropped while the turn that ends is Combwork's. So a prompt counts as taken only once its conversation has it,
+ * and as answered once a reply follows it there and Combwork's turn ledger has the turn over.
  * - type(text): types `text` and Enter once the fake takes prompts: the session idle and its screen showing its last turn
  *   over (no spinner drawn since the last "✻ Worked for"). Throws, with what it showed, without typing if it never does.
  *   Returns what over() needs.
- * - over(typed): waits for the typed prompt in the conversation, then for its reply and the turn over (Hive's turn
+ * - over(typed): waits for the typed prompt in the conversation, then for its reply and the turn over (Combwork's turn
  *   ledger, a turn after the one before it); the turn's id, or null with the session, its conversation, its screen and
- *   the hooks that didn't reach Hive (fake-hook-errors.jsonl in `opts.home`, its CLAUDE_CONFIG_DIR) logged, and
+ *   the hooks that didn't reach Combwork (fake-hook-errors.jsonl in `opts.home`, its CLAUDE_CONFIG_DIR) logged, and
  *   `opts.why(text)` called for more evidence.
  * - say(text): both.
  * For the fake's prompts that end with a reply (not /compact, /rename or a refused sign-in: type() alone for those).
@@ -1357,7 +1370,7 @@ function fakePrompts(inv, key, live, { hungMs = TURN_HUNG_MS, home = null, why =
     if (looks > 1) console.log(`  (it took prompts again ${Date.now() - t} ms after ${short(text)} was due)`)
     const before = (await live())?.turn?.id ?? null
     const items = (await conversation()).total
-    // With the fake's input log on (lib.fakeClaude turns it on), typed as typeLine types (a wake of Hive's may disturb
+    // With the fake's input log on (lib.fakeClaude turns it on), typed as typeLine types (a wake of Combwork's may disturb
     // it, #1560); without, a pause before its Enter, on purpose: the fake reads a typed line before its Enter, as a CLI does.
     if (home && fs.existsSync(path.join(home, 'fake-log-input.txt'))) await typeLine(inv, key, home, null, text, { live, ready: takesPrompts, hungMs })
     else {
@@ -1386,7 +1399,7 @@ function fakePrompts(inv, key, live, { hungMs = TURN_HUNG_MS, home = null, why =
     console.log(`DIAGNOSTIC its conversation since: ${JSON.stringify((await conversation(items)).items.map((x) => `${x.kind}: ${String(x.text ?? '').slice(0, 80)}`))}`)
     console.log(`DIAGNOSTIC its screen ends ${JSON.stringify((await screen()).slice(-400))}`)
     const failed = home && fs.existsSync(path.join(home, 'fake-hook-errors.jsonl')) ? fs.readFileSync(path.join(home, 'fake-hook-errors.jsonl'), 'utf8').trim().split(/\r?\n/) : []
-    console.log(`DIAGNOSTIC hooks that didn't reach Hive: ${home ? (failed.length ? failed.join(' | ') : 'none') : '(its home not given)'}`)
+    console.log(`DIAGNOSTIC hooks that didn't reach Combwork: ${home ? (failed.length ? failed.join(' | ') : 'none') : '(its home not given)'}`)
     // Prompts the fake dropped because it was busy (#725: one typed as a compaction ended).
     const dropped = home && fs.existsSync(path.join(home, 'fake-dropped.jsonl')) ? fs.readFileSync(path.join(home, 'fake-dropped.jsonl'), 'utf8').trim().split(/\r?\n/) : []
     console.log(`DIAGNOSTIC prompts the fake dropped while busy: ${home ? (dropped.length ? dropped.join(' | ') : 'none') : '(its home not given)'}`)
@@ -1411,7 +1424,7 @@ const GIT_LOCKED = /Unable to create '[^']+\.lock': (File exists|Permission deni
 
 /**
  * Runs git in a test repository (cmd: a command line after `git`, or its arguments) and returns its output, waiting out
- * the Hive under test's own git (#199): Hive refreshes branch status and the Changes tab with `git status`, which holds
+ * the Combwork under test's own git (#199): Combwork refreshes branch status and the Changes tab with `git status`, which holds
  * the repository's index.lock for a moment, so a suite's git command that writes at that moment fails with "Unable to
  * create '…/index.lock': File exists" (or "Permission denied" while that lock is still being deleted on a busy
  * machine, #298). That alone is tried again every 100 ms for up to timeoutMs; any other failure throws at once.
@@ -1435,7 +1448,7 @@ function git(cwd, cmd, { timeoutMs = 15_000, ...opts } = {}) {
   }
 }
 
-/** A suite's git on its fixtures: its test Hive's config (runContext.gitEnv, #1466), written first, as a suite's git may run before any Hive starts. */
+/** A suite's git on its fixtures: its test Combwork's config (runContext.gitEnv, #1466), written first, as a suite's git may run before any Combwork starts. */
 function gitEnv(vars = {}) {
   writeGitConfig(gitConfig())
   return contextGitEnv(vars)
@@ -1443,9 +1456,9 @@ function gitEnv(vars = {}) {
 
 /** A git repository with one commit. */
 /**
- * A project's config as Hive reads it (HI-1749): its project.json with this user's view of it over it (Panes or Tiles, the
+ * A project's config as Combwork reads it (HI-1749): its project.json with this user's view of it over it (Panes or Tiles, the
  * layout and pane placement), which the test profile's ui-state.json keeps by the project's id (else its folder), not
- * project.json. A view saved shows here a moment after Hive has it (ui-state.json is written about 300 ms later).
+ * project.json. A view saved shows here a moment after Combwork has it (ui-state.json is written about 300 ms later).
  */
 function projectConfig(userData, projectPath) {
   const cfg = JSON.parse(fs.readFileSync(path.join(projectPath, '.combwork', 'project.json'), 'utf8'))
@@ -1468,7 +1481,7 @@ function gitProject(dir, files = { 'a.ts': 'export const a = 1\n' }) {
 }
 
 /**
- * The token in a launch's hook auth file, named in its hook commands (`-H "@<file>"`, in Hive's user data: no generated
+ * The token in a launch's hook auth file, named in its hook commands (`-H "@<file>"`, in Combwork's user data: no generated
  * file or argument holds the token itself, #345). Null when the text names none or it is gone (the launch ended).
  */
 function hookAuthToken(text) {
@@ -1481,7 +1494,7 @@ function hookAuthToken(text) {
   }
 }
 
-/** A running launch's private folder in the test Hive's user data (its settings, MCP config and hook auth file, #345). */
+/** A running launch's private folder in the test Combwork's user data (its settings, MCP config and hook auth file, #345). */
 const launchDir = (userData, runId) => path.join(userData, 'launches', runId)
 
 /**
@@ -1508,7 +1521,7 @@ function codexHook(runId) {
   return token && url ? { token, url } : null
 }
 
-// What still runs from a test's own folder after its Hive closed (#542): folderProcesses.cjs.
+// What still runs from a test's own folder after its Combwork closed (#542): folderProcesses.cjs.
 // A process by its identity (pid and start time), never by a remembered pid alone (#603).
 const { processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, recordMainProcess } = require('./folderProcesses.cjs')
 
@@ -1530,9 +1543,9 @@ const codexSignedIn = () => fs.existsSync(path.join(CODEX_HOME, 'auth.json'))
 
 /**
  * The run context's PATH without the Microsoft Store's app aliases (%LOCALAPPDATA%\Microsoft\WindowsApps), for a test
- * Hive whose agents run the real Codex (#584): give it as PATH in hiveEnv. Codex runs its commands in PowerShell 7 where
+ * Combwork whose agents run the real Codex (#584): give it as PATH in combworkEnv. Codex runs its commands in PowerShell 7 where
  * it finds one, and its sandbox can't start the Store's while any other process of that package runs on the machine
- * (#499: a test Hive's terminal, an agent's command), while Windows PowerShell is never refused. leftovers-codex keeps
+ * (#499: a test Combwork's terminal, an agent's command), while Windows PowerShell is never refused. leftovers-codex keeps
  * the Store's on purpose, and codex-storepwsh checks the refusal itself.
  */
 function pathWithoutStoreAliases(parent = process.env) {
@@ -1548,7 +1561,7 @@ function pathWithoutStoreAliases(parent = process.env) {
  * Text agents read with its cards named by number, as before keys (#1219): "AL-1" becomes "#1", so a suite's checks of
  * card numbers stay as they were; each suite checks the keyed form itself (KEYED). Only for a suite whose cards are all
  * one project's, made in order, so a key's digits are its card's number (HI-1661: texts name cards by key alone); a
- * suite where they differ fails its checks, never passes them wrongly. A branch's key (hive/AL/AL-1-…) stays as it is.
+ * suite where they differ fails its checks, never passes them wrongly. A branch's key (cw/AL/AL-1-…) stays as it is.
  */
 const unkey = (text) => (typeof text === 'string' ? text.replace(/(?<![\w/-])[A-Z]{2,4}-(\d+)\b(?!-)/g, '#$1') : text)
 /** A card as the window names it (#1221): its key, else #n (a workspace card, or one the board doesn't have). */
@@ -1604,7 +1617,7 @@ function samplePng(w = 64, h = 40) {
 }
 
 /**
- * Whether a progress run was given an estimate. Not whether time is left: Hive counts the estimate down as the run goes
+ * Whether a progress run was given an estimate. Not whether time is left: Combwork counts the estimate down as the run goes
  * (timeLeft), so a run that outlasts it ends with 0, while one never given an estimate keeps null.
  */
 function hadEstimate(run) {
@@ -1613,7 +1626,7 @@ function hadEstimate(run) {
 
 /**
  * Haiku asked for Auto (#129, #234): what the installed Claude Code says about Haiku and Auto (its catalog), the mode
- * it then showed itself (modeObserved: its footer, a hook; never the mode asked for at launch) and the mode Hive shows.
+ * it then showed itself (modeObserved: its footer, a hook; never the mode asked for at launch) and the mode Combwork shows.
  * Waits up to timeoutMs for the CLI to show a mode. The caller checks: observed in expected, and shown === observed.
  */
 async function haikuAutoMode(inv, host, agentId = 'assistant', timeoutMs = 15000) {
@@ -1635,10 +1648,10 @@ async function haikuAutoMode(inv, host, agentId = 'assistant', timeoutMs = 15000
  * nothing. Returns [ok, what it found].
  */
 async function haikuAutoCaveat(page, autoOffered, timeoutMs = 10000) {
-  // A Hive account on Claude Code (the view's `connections`: HI-2106 kept the old name); a test copy on its CLI test home
+  // A Combwork account on Claude Code (the view's `connections`: HI-2106 kept the old name); a test copy on its CLI test home
   // has none listed (that home isn't shown in Settings), so one is added for the look, never signed in, and removed after.
   // The warning depends on what the CLI said about its models, not on the account.
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   const listed = (await inv('connections:list')).connections.find((a) => a.provider === 'claude-code')
   const account = listed ?? (await inv('connections:add', 'claude-code', 'Auto with Haiku'))
   const form = page.locator('[data-connection-form]')
@@ -1697,7 +1710,7 @@ async function setOwnOptions(inv, projectPath, patch) {
 
 /**
  * Sets Maximum agents (HI-2001, before Settings → Advanced → Agents per project) at a level, for None and Git, as the
- * Workflow defaults' Save does, the level's other options kept: 'global' (Hive's), 'workspace' (this one's own), or a
+ * Workflow defaults' Save does, the level's other options kept: 'global' (Combwork's), 'workspace' (this one's own), or a
  * project's folder (its own options). `null` inherits again.
  */
 async function setMaxAgents(inv, n, level = 'global') {
@@ -1770,4 +1783,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { PACKAGED_EXE, projectConfig, tokenFile, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, hiveEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, hiveLogLines, hiveToolsConnected, TURN_HUNG_MS, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip }
+module.exports = { PACKAGED_EXE, projectConfig, tokenFile, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip }

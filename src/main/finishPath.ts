@@ -1,7 +1,7 @@
 // What follows a card's Done (HI-2014, SPEC §16.4.7): the `finish` action every move into Done writes (workflow/finish.ts)
 // runs one handler, whatever the route. Its steps are independent, each kept to once where its effect is made:
 // - requests: the card's asked questions closed (`FinishStep` `requests`, in whose write closeSettled closes them) and
-//   the Hive Assistant's unread asks on the card cancelled (cancelling one twice cancels nothing);
+//   the Combwork Assistant's unread asks on the card cancelled (cancelling one twice cancels nothing);
 // - dependents: an override's Done counts as accepted (finishAccepts), and each card waiting on it is told it starts
 //   without that card's work in the target, by a comment whose id is the finish's (written once on the card);
 // - the slot and the line: the project's slot pass, which decides from what is on disk and in the pool each time (the
@@ -12,12 +12,12 @@
 
 import { basename } from 'path'
 import { cancelDeliveries } from './deliveries'
-import { onHiveEvent } from './events'
+import { onCombworkEvent } from './events'
 import { journalFact } from './journalService'
 import { refresh as refreshLanes } from './lanes'
 import { createLogger, userText } from './logger'
 import { projectOfCard, settleSlotCards } from './slotCards'
-import { commentAsHive } from './tasks'
+import { commentAsCombwork } from './tasks'
 import { openWorkspaces, type WorkspaceService } from './workspace'
 import { onAction } from './workflow/actionWorker'
 import { finishAccepts } from './workflow/finish'
@@ -34,12 +34,12 @@ const log = createLogger('finish')
 /** The steps a finish records once each: one not recorded yet is owed. */
 const STEPS: readonly FinishStepId[] = ['requests', 'dependents', 'lane', 'wake', 'journal']
 
-/** What the finish writes for agents (dialects, HI-2438): stored, so said in the Default (Hive renders stored text when read). */
+/** What the finish writes for agents (dialects, HI-2438): stored, so said in the Default (Combwork renders stored text when read). */
 const A = {
   done: agentMsg({
     id: 'finish.journal.done',
     text: '{card} "{title}" is Done ({how, select, queue {merged by the merge queue} reported {merged, reported by its builder} unchecked {reported merged by its builder, not checked} accepted {accepted} override {moved there by an override} other {moved there on the board}}), by {byUser, select, yes {You} other {{by}}}',
-    note: "The journal's fact of a card reaching Done (HI-2014), the Assistant's to read. how: how it got there (FinishHow: queue, reported, unchecked, accepted, override, board). byUser: yes when the user moved it; by: else who did (an agent's name, or hive). Written once per finish: its summary and detail are the once-check's key, so it is always the Default's."
+    note: "The journal's fact of a card reaching Done (HI-2014), the Assistant's to read. how: how it got there (FinishHow: queue, reported, unchecked, accepted, override, board). byUser: yes when the user moved it; by: else who did (an agent's name, or Combwork). Written once per finish: its summary and detail are the once-check's key, so it is always the Default's."
   }),
   cancelled: agentMsg({
     id: 'finish.cancel.cardDone',
@@ -89,7 +89,7 @@ export async function runFinish(ws: WorkspaceService, wf: Workflow, projectPath:
     const key = card.key
     for (const dep of wf.store.cards()) {
       if (!dep.blockedBy.includes(n) || dep.stage === 'done' || wf.store.isArchived(dep.id)) continue
-      await commentAsHive(dep.id, storedText(HISTORY.startsWithout, { card: key, reason: f.reason ?? '' }), ws, (c) => c.column !== 'done' && current(), dependentNoteId(key, finish))
+      await commentAsCombwork(dep.id, storedText(HISTORY.startsWithout, { card: key, reason: f.reason ?? '' }), ws, (c) => c.column !== 'done' && current(), dependentNoteId(key, finish))
     }
   })
   // The lane first: it ends as its last card is Done, never later for its slot (its next card waits on the slot itself,
@@ -101,7 +101,7 @@ export async function runFinish(ws: WorkspaceService, wf: Workflow, projectPath:
   await step('journal', async () => {
     const f = wf.state(card).finished
     if (!f || !current()) return
-    const by = wf.store.facts(n).find((x) => x.seq === finish)?.actor ?? 'hive'
+    const by = wf.store.facts(n).find((x) => x.seq === finish)?.actor ?? 'combwork'
     // agent-protocol: the detail names the finish by its number, the once-check's key (writeEntryOnce)
     journalFact(ws, { summary: doneFact(cardRef(n), card.title, f.how, by), summaryText: doneFactText(cardRef(n), card.title, f.how, by), detail: `finish ${finish}`, project: basename(projectPath), links: [{ type: 'card', ref: String(n) }], tags: ['done'] }, { type: 'card', ref: String(n) }) // i18n-ignore: the journal's detail for agents, protocol (agent-protocol above)
   })
@@ -139,7 +139,7 @@ export function startFinishPath(): void {
     'repeatable'
   )
   const seen = new WeakSet<AbortSignal>()
-  onHiveEvent((e) => {
+  onCombworkEvent((e) => {
     if (e.type !== 'workspace-changed') return
     for (const ws of openWorkspaces()) {
       if (!ws.path || seen.has(ws.lifetime)) continue

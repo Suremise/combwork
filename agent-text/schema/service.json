@@ -150,6 +150,54 @@
   "service.cardCleanup.stale": {
     "placeholders": {}
   },
+  "service.combworkMove.busy": {
+    "placeholders": {
+      "profile": "plain"
+    }
+  },
+  "service.combworkMove.closed": {
+    "placeholders": {}
+  },
+  "service.combworkMove.locked": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "service.combworkMove.otherOpen": {
+    "placeholders": {
+      "profile": "plain"
+    }
+  },
+  "service.combworkMove.phaseFailed": {
+    "placeholders": {
+      "what": "plain",
+      "error": "plain"
+    }
+  },
+  "service.combworkVcs.cantList": {
+    "placeholders": {}
+  },
+  "service.combworkVcs.cantListWhy": {
+    "placeholders": {
+      "problem": "plain"
+    }
+  },
+  "service.combworkVcs.changed": {
+    "placeholders": {}
+  },
+  "service.combworkVcs.exitCode": {
+    "placeholders": {
+      "code": "plain"
+    }
+  },
+  "service.combworkVcs.noRepo": {
+    "placeholders": {}
+  },
+  "service.combworkVcs.rmFailed": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
   "service.files.badName": {
     "placeholders": {
       "name": "plain"
@@ -522,54 +570,6 @@
       "why": "plain"
     }
   },
-  "service.hiveMove.busy": {
-    "placeholders": {
-      "profile": "plain"
-    }
-  },
-  "service.hiveMove.closed": {
-    "placeholders": {}
-  },
-  "service.hiveMove.locked": {
-    "placeholders": {
-      "folder": "plain"
-    }
-  },
-  "service.hiveMove.otherOpen": {
-    "placeholders": {
-      "profile": "plain"
-    }
-  },
-  "service.hiveMove.phaseFailed": {
-    "placeholders": {
-      "what": "plain",
-      "error": "plain"
-    }
-  },
-  "service.hiveVcs.cantList": {
-    "placeholders": {}
-  },
-  "service.hiveVcs.cantListWhy": {
-    "placeholders": {
-      "problem": "plain"
-    }
-  },
-  "service.hiveVcs.changed": {
-    "placeholders": {}
-  },
-  "service.hiveVcs.exitCode": {
-    "placeholders": {
-      "code": "plain"
-    }
-  },
-  "service.hiveVcs.noRepo": {
-    "placeholders": {}
-  },
-  "service.hiveVcs.rmFailed": {
-    "placeholders": {
-      "why": "plain"
-    }
-  },
   "service.intent.noWorkflow": {
     "placeholders": {
       "card": "plain"
@@ -666,6 +666,24 @@
   },
   "service.metrics.badRole": {
     "placeholders": {}
+  },
+  "service.nameUpgrade.boardNotFolded": {
+    "placeholders": {
+      "file": "plain",
+      "log": "plain"
+    }
+  },
+  "service.nameUpgrade.boardOrphan": {
+    "placeholders": {
+      "file": "plain",
+      "old": "plain"
+    }
+  },
+  "service.nameUpgrade.failed": {
+    "placeholders": {
+      "what": "plain",
+      "error": "plain"
+    }
   },
   "service.providers.noSetup": {
     "placeholders": {

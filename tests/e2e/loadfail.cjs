@@ -3,8 +3,8 @@
 // loaded belongs to its project: switching to another whose load fails, or whose load is overtaken by a late answer
 // for the last project, never shows the last project's results as its own. The Skills and Templates views, whose
 // sidebar and main area both failed to read: the sidebar's Retry reads them again in both, so selecting an item shows it
-// (#841). Uses the test-only HIVE_TEST_FAIL_IPC and
-// HIVE_TEST_SLOW_IPC (unpackaged builds), set in the main process as each step needs it.
+// (#841). Uses the test-only CW_TEST_FAIL_IPC and
+// CW_TEST_SLOW_IPC (unpackaged builds), set in the main process as each step needs it.
 // No agents. Dev build, throwaway profile and workspace.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -33,19 +33,19 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(path.join(only, 'SKILL.md'), '---\nname: alpha-only\ndescription: Only in alpha.\n---\n\nAlpha.\n')
   lib.enableProviders(userData)
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 860 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   // Each call to fail (a new value each time: the same one again isn't read as a change).
   let round = 0
-  const failNext = (channel) => app.evaluate((_e, v) => (process.env.HIVE_TEST_FAIL_IPC = v), `${channel}*1,round${++round}`)
+  const failNext = (channel) => app.evaluate((_e, v) => (process.env.CW_TEST_FAIL_IPC = v), `${channel}*1,round${++round}`)
   // Every call fails until cleared (failAll('')): the sidebar's and the main area's read both fail.
-  const failAll = (channel) => app.evaluate((_e, v) => (process.env.HIVE_TEST_FAIL_IPC = v), channel && `${channel},round${++round}`)
-  const slowNext = (channel, ms) => app.evaluate((_e, v) => (process.env.HIVE_TEST_SLOW_IPC = v), `${channel}=${ms}*1,round${++round}`)
+  const failAll = (channel) => app.evaluate((_e, v) => (process.env.CW_TEST_FAIL_IPC = v), channel && `${channel},round${++round}`)
+  const slowNext = (channel, ms) => app.evaluate((_e, v) => (process.env.CW_TEST_SLOW_IPC = v), `${channel}=${ms}*1,round${++round}`)
   const until = async (fn, ms = 10000) => {
     const t = Date.now()
     let v
@@ -144,7 +144,7 @@ const check = (name, ok, extra = '') => {
   check('templates view: the failed read says so in the sidebar', !!(await until(async () => (await sideFailed.count()) === 1, HUNG_MS)))
   await failAll('')
   await sideFailed.getByRole('button', { name: 'Retry' }).click()
-  // (The workspace's: Hive's own are listed too, #1436.)
+  // (The workspace's: Combwork's own are listed too, #1436.)
   const templateRow = page.locator('.sidebar .template-row[data-scope="workspace"]').first()
   check("templates view: the sidebar's Retry lists the templates", !!(await until(async () => (await templateRow.count()) === 1, HUNG_MS)))
   await templateRow.click()

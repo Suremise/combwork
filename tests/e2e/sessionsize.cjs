@@ -1,6 +1,6 @@
 // Transcript sizes in the Sessions tab (#671): every session shows its transcript file's size beside its context, for
 // all three CLIs (Claude Code's projects folder, Codex's rollout, Copilot's events.jsonl); amber past Warn when a
-// transcript is over, with a tooltip suggesting a handover; "—" when the CLI has no file (only Hive's backup); a size
+// transcript is over, with a tooltip suggesting a handover; "—" when the CLI has no file (only Combwork's backup); a size
 // that grew shows when the list opens again. The Assistant's conversations show theirs too, with its own advice. Both
 // themes, and a narrow window. Fixtures only (nothing runs). Dev build, throwaway profile, workspace and CLI homes; quiet.
 const lib = require('./lib.cjs')
@@ -73,18 +73,18 @@ const sizeText = (n) => (n < MB ? `${Math.max(1, Math.round(n / 1024))} KB` : `$
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47830), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, COPILOT_HOME: copilotHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47830), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, COPILOT_HOME: copilotHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1400, height: 850 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     await page.getByText('alpha', { exact: true }).first().click()
 
-    // --- A session of each CLI, one past the limit, and one whose CLI transcript is gone (only Hive's backup).
+    // --- A session of each CLI, one past the limit, and one whose CLI transcript is gone (only Combwork's backup).
     const S = { small: id(1), long: id(2), gone: id(3), codex: id(4), copilot: id(5), assistant: id(6) }
     const files = {
       small: claudeFile(alpha, S.small),

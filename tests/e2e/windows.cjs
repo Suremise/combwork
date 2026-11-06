@@ -37,12 +37,12 @@ function api(method, p, headers = {}) {
 }
 
 async function start() {
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   app.on('window', (p) => p.on('pageerror', (e) => console.log('FAIL page error', e.message)))
   return app
 }
-const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
 async function waitFor(fn, ms = 15000) {
   const t = Date.now()
   while (Date.now() - t < ms) {
@@ -113,8 +113,13 @@ async function waitFor(fn, ms = 15000) {
   check('API: a project name in two workspaces is ambiguous (409)', r.status === 409, JSON.stringify(r))
   r = await api('GET', `/v1/projects/${encodeURIComponent('windows-ws-b/shared')}`)
   check('API: <workspace>/<project> picks one', r.status === 200 && r.body.path === path.join(wsB, 'shared'), JSON.stringify(r))
-  r = await api('GET', '/v1/projects/shared', { 'X-Hive-Workspace': encodeURIComponent(wsA) })
+  r = await api('GET', '/v1/projects/shared', { 'X-Combwork-Workspace': encodeURIComponent(wsA) })
   check("API: a session's workspace header picks its own", r.status === 200 && r.body.path === path.join(wsA, 'shared'), JSON.stringify(r))
+  r = await api('GET', '/v1/shared', { 'X-Combwork-Workspace': encodeURIComponent(wsB) })
+  check('API: X-Combwork-Workspace names the workspace of a workspace-wide call', r.status === 200, JSON.stringify(r))
+  // HI-2588: the header's name before 1.1 is renamed outright, not an alias: naming B with it names nothing.
+  r = await api('GET', '/v1/shared', { 'X-Other-Workspace': encodeURIComponent(wsB) })
+  check('API: …and a header other than X-Combwork-Workspace is not read (400, which workspace?)', r.status === 400, JSON.stringify(r))
   r = await api('GET', '/v1/shared')
   check('API: workspace-wide calls ask which workspace when several are open (400)', r.status === 400, JSON.stringify(r))
   r = await api('GET', '/v1/shared?workspace=windows-ws-b')
@@ -123,7 +128,7 @@ async function waitFor(fn, ms = 15000) {
   // --- Quit, and start again: both windows come back.
   const exited = app.waitForEvent('close', { timeout: 20000 }).then(() => true).catch(() => false)
   await inv1('app:quit').catch(() => undefined)
-  check('Hive quits with no agents running', await exited)
+  check('Combwork quits with no agents running', await exited)
   app = await start()
   await app.firstWindow()
   await waitFor(async () => app.windows().length >= 2, 15000)
@@ -131,7 +136,7 @@ async function waitFor(fn, ms = 15000) {
   const pages = app.windows()
   const shown = []
   for (const pg of pages) shown.push((await invOn(pg)('workspace:get'))?.path ?? null)
-  check('at start, the windows open when Hive quit come back', pages.length === 2 && shown.includes(wsA) && shown.includes(wsB), JSON.stringify(shown))
+  check('at start, the windows open when Combwork quit come back', pages.length === 2 && shown.includes(wsA) && shown.includes(wsB), JSON.stringify(shown))
 
   // --- Closing a window with a running agent: asks, then stops that workspace's agent only.
   const pb = pages[shown.indexOf(wsB)]
@@ -143,7 +148,7 @@ async function waitFor(fn, ms = 15000) {
   await invB('session:start', beta, { agentId: agent.id })
   await lib.acceptClaudeTrust(invB, beta, agent.id)
   check('an agent runs in window B', !!(await waitFor(async () => (await invA('session:live')).length === 1)))
-  await pb.evaluate(() => window.hive.invoke('window:close')).catch(() => undefined)
+  await pb.evaluate(() => window.combwork.invoke('window:close')).catch(() => undefined)
   const dialog = await waitFor(async () => (await pb.getByText('Close this window?').count()) > 0, 8000)
   check('closing it asks first ("Close this window?")', !!dialog)
   await pb.screenshot({ path: path.join(lib.WORK, 'windows-close.png') }).catch(() => undefined)
@@ -166,7 +171,7 @@ async function waitFor(fn, ms = 15000) {
   // Its own workspace by another name isn't a switch (#455): no question, its agent runs on, and it keeps the name it has.
   // Nor is it closed and opened again (HI-2141: that ended what its passes were writing): counted by the log's "Opened
   // workspace" lines once the switch below has logged its own, which comes after any this open would have written.
-  const openedLines = () => fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8').split('\n').filter((l) => l.includes('Opened workspace')).length
+  const openedLines = () => fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8').split('\n').filter((l) => l.includes('Opened workspace')).length
   const openedBefore = openedLines()
   const same = invA('workspace:open', aliasA)
   const asked = await waitFor(async () => (await pa.getByText('Switch workspace?').count()) > 0, 4000)

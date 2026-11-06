@@ -1,5 +1,5 @@
 // The board's stage model and names (#1417, SPEC §16.5.2, OP-1, OP-30): the board's column headers read Active and
-// Approved while the Agent API keeps the ids doing and passed; workflow:stages gives the stages a Pair (Hive merges), a
+// Approved while the Agent API keeps the ids doing and passed; workflow:stages gives the stages a Pair (Combwork merges), a
 // No review and a None project produce; a rename through the Assistant's settings tool (cw_update_setting's route)
 // shows in the project's status, keeps the ruleset a card starts under, and workflow:check says it applies at once; a
 // refused rename gives its reason; and a field of `workflow` written by hand into project.json survives a save.
@@ -26,10 +26,10 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 
-/** §16.6.3's Pair (Hive merges) at P7's values, as project.json keeps it: G15 On, so the start's one-time G15 step (#1445) leaves it as it is. */
-const PAIR = { review: 'agent', reviewers: 1, noSelfReview: true, preChecks: [], sameness: 'change', finish: 'hiveMerges', style: 'merge', target: 'main', strict: false, mergeChecks: [], mergeInstall: 'onManifestChange', okBefore: { mode: 'never', labels: [] }, folder: 'slots', identity: null, stopOwnRuns: true, dependenciesDone: true, slotsUpToDate: true, sharedFolderWarning: false, excluded: ['node_modules', '.venv'], commands: {} }
+/** §16.6.3's Pair (Combwork merges) at P7's values, as project.json keeps it: G15 On, so the start's one-time G15 step (#1445) leaves it as it is. */
+const PAIR = { review: 'agent', reviewers: 1, noSelfReview: true, preChecks: [], sameness: 'change', finish: 'combworkMerges', style: 'merge', target: 'main', strict: false, mergeChecks: [], mergeInstall: 'onManifestChange', okBefore: { mode: 'never', labels: [] }, folder: 'slots', identity: null, stopOwnRuns: true, dependenciesDone: true, slotsUpToDate: true, sharedFolderWarning: false, excluded: ['node_modules', '.venv'], commands: {} }
 
-/** A project's project.json, as Hive keeps it, with `workflow` as given. */
+/** A project's project.json, as Combwork keeps it, with `workflow` as given. */
 function projectJson(dir, platform, workflow) {
   fs.mkdirSync(path.join(dir, '.combwork'), { recursive: true })
   fs.writeFileSync(path.join(dir, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform, agents: [], ...(workflow ? { workflow } : {}) }))
@@ -42,8 +42,8 @@ function projectJson(dir, platform, workflow) {
   lib.gitProject(solo, { 'b.txt': 'two\n', '.gitignore': '.combwork/\n' })
   fs.mkdirSync(notes, { recursive: true })
   fs.writeFileSync(path.join(notes, 'plan.md'), '# Plan\n')
-  // Pair (Hive merges), with a field written by hand that no writer of this version sets: it must survive a save.
-  projectJson(pair, 'git', { platform: 'git', preset: 'pair', options: PAIR, handWritten: { by: 'a later Hive' } })
+  // Pair (Combwork merges), with a field written by hand that no writer of this version sets: it must survive a save.
+  projectJson(pair, 'git', { platform: 'git', preset: 'pair', options: PAIR, handWritten: { by: 'a later Combwork' } })
   // No review: Committed is done, everyone in the project folder.
   projectJson(solo, 'git', { platform: 'git', preset: null, options: { review: 'none', finish: 'committed', folder: 'project' } })
   // None: no version control.
@@ -59,14 +59,14 @@ function projectJson(dir, platform, workflow) {
   cfg.settings.assistant = { ...cfg.settings.assistant, changeSettings: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1400, height: 800 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     const api = async (token, method, p, body) => {
       const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
@@ -76,7 +76,7 @@ function projectJson(dir, platform, workflow) {
 
     // --- workflow:stages for the three projects (§16.5.2), in board order, Merging in Approved.
     const ids = async (p) => (await inv('workflow:stages', p))?.stages.map((s) => `${s.id}:${s.category}`).join(' ')
-    check('Pair (Hive merges): every stage, Merging in Approved', (await ids(pair)) === 'hold:hold todo:todo active:doing review:review approved:passed merging:passed done:done', await ids(pair))
+    check('Pair (Combwork merges): every stage, Merging in Approved', (await ids(pair)) === 'hold:hold todo:todo active:doing review:review approved:passed merging:passed done:done', await ids(pair))
     check('No review (Committed is done): On Hold, Todo, Active and Done', (await ids(solo)) === 'hold:hold todo:todo active:doing done:done', await ids(solo))
     check('None with no review: On Hold, Todo, Active and Done', (await ids(notes)) === 'hold:hold todo:todo active:doing done:done', await ids(notes))
     check('no names of its own yet', JSON.stringify((await inv('workflow:stages', pair)).names) === '{}')
@@ -98,7 +98,7 @@ function projectJson(dir, platform, workflow) {
     const headers = (await page.locator('.board-column-label').allTextContents()).join(' | ')
     check('no column says Doing or Passed', !/\bDoing\b|\bPassed\b/.test(headers), headers)
 
-    // The Assistant's own token, as its hive tools use it (it starts as the fake Claude Code).
+    // The Assistant's own token, as its Combwork tools use it (it starts as the fake Claude Code).
     const home = (await inv('workspace:refresh')).assistant.path
     await inv('session:start', home, { agentId: 'assistant' })
     const assistantLive = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === home.toLowerCase() && s.agentId === 'assistant')
@@ -148,9 +148,9 @@ function projectJson(dir, platform, workflow) {
     check('the window’s save refuses a name with a tab, with its reason', /The name of Review has a character that can’t be shown/.test(refusedSave ?? ''), refusedSave)
 
     // --- A hand-written field of `workflow` survives the tool's write and a form save.
-    check('the hand-written field survived the rename', JSON.stringify(onDisk().handWritten) === JSON.stringify({ by: 'a later Hive' }), JSON.stringify(onDisk()))
+    check('the hand-written field survived the rename', JSON.stringify(onDisk().handWritten) === JSON.stringify({ by: 'a later Combwork' }), JSON.stringify(onDisk()))
     await inv('workflow:setOptions', pair, { preset: 'pair', options: { ...PAIR, strict: true, stageNames: { active: 'Building', merging: 'In the queue' } } })
-    check('…and a save of the options', onDisk().options.strict === true && JSON.stringify(onDisk().handWritten) === JSON.stringify({ by: 'a later Hive' }), JSON.stringify(onDisk()))
+    check('…and a save of the options', onDisk().options.strict === true && JSON.stringify(onDisk().handWritten) === JSON.stringify({ by: 'a later Combwork' }), JSON.stringify(onDisk()))
     await inv('workflow:setOptions', pair, { preset: 'pair', options: { ...PAIR, stageNames: { active: 'Building', merging: 'In the queue' } } })
     await inv('session:stop', home, 'assistant')
 
@@ -166,7 +166,7 @@ function projectJson(dir, platform, workflow) {
     await header('doing').waitFor({ timeout: HUNG_MS })
     await boardShot('en')
     const base = (await inv('app:info')).language
-    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language })
+    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
     const words = { de: ['In Arbeit', 'Genehmigt'], pl: ['Aktywne', 'Zatwierdzone'], 'zh-CN': ['进行中', '已批准'] }
     for (const [code, [active, approved]] of Object.entries(words)) {
       const dir = path.join(lib.ROOT, 'locales', code)

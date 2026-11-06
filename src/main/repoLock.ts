@@ -9,7 +9,7 @@ import { advanced } from './advanced'
 import { toast } from './events'
 import { withFileLock } from './fsutil'
 import { git } from './git'
-import { hiveError } from './hiveError'
+import { combworkError } from './combworkError'
 import { commonDirSync } from './platform/git'
 import { createLogger, userText } from './logger'
 import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
@@ -18,8 +18,8 @@ import { REPO_LOCK_FILE } from './repoLockCore'
 const log = createLogger('repoLock')
 
 /**
- * The repository lock, as Hive's merges and ref moves take it (#1347, SPEC §16.9.3): across processes (repoLockCore.ts),
- * and within this one by withFileLock on the same file, so this Hive never waits on itself. Taken by the Git view's
+ * The repository lock, as Combwork's merges and ref moves take it (#1347, SPEC §16.9.3): across processes (repoLockCore.ts),
+ * and within this one by withFileLock on the same file, so this Combwork never waits on itself. Taken by the Git view's
  * folder actions (gitRepo.ts), a worktree's merge (the Merge dialog, agents' merges: projectAgents.ts) and the line
  * updater's move (gitPlatform.ts); later the merge queue's advance. Held for seconds: never across a test merge or merge
  * checks. No off switch: it is data safety (§16.6.4). Its takes and releases run in the lock's worker (HI-1680,
@@ -111,7 +111,7 @@ export function useLockWorker(file: string | null): void {
   thread = new LockThread()
 }
 
-/** How long a merge waits for another Hive's (Settings → Advanced). */
+/** How long a merge waits for another Combwork's (Settings → Advanced). */
 export const REPO_LOCK_WAIT = 'cw.merge.lockWaitSeconds'
 /** How long a wait goes before the user is told who holds the lock. */
 const NOTICE_AFTER_MS = 1000
@@ -126,7 +126,7 @@ const profile = (): string => {
 }
 
 /**
- * The repository's common git dir (its worktrees share it), absolute and real (one spelling for this Hive's own lock,
+ * The repository's common git dir (its worktrees share it), absolute and real (one spelling for this Combwork's own lock,
  * however the folder was reached); throws when git can't say. Read from `.git` with no git process where it says
  * (HI-1970: every line move asked it), else git's answer.
  */
@@ -135,7 +135,7 @@ export async function commonGitDir(folder: string): Promise<string> {
   const r = known ? null : await git(folder, ['rev-parse', '--path-format=absolute', '--git-common-dir'])
   const dir = known ?? (r?.ok ? r.out.trim() : '')
   if (dir) return realpath(dir).catch(() => dir)
-  throw hiveError(msg({ id: 'git.repoLock.noGitDir', defaultMessage: "Combwork couldn't find the git folder of {folder}, so nothing was changed: {why}", description: "An error: a merge or another change to a repository didn't start, because git couldn't name the repository's git folder (where Hive's merge lock lives). {why} is git's message." }), { folder, why: r?.err || r?.out || '' }, { kind: 'conflict' })
+  throw combworkError(msg({ id: 'git.repoLock.noGitDir', defaultMessage: "Combwork couldn't find the git folder of {folder}, so nothing was changed: {why}", description: "An error: a merge or another change to a repository didn't start, because git couldn't name the repository's git folder (where Combwork's merge lock lives). {why} is git's message." }), { folder, why: r?.err || r?.out || '' }, { kind: 'conflict' })
 }
 
 export interface RepoLockOptions {
@@ -147,7 +147,7 @@ export interface RepoLockOptions {
 
 /**
  * Runs fn holding the repository lock of `folder`'s repository. A wait longer than a moment shows who holds it ("Another
- * Hive is merging into this repository (Hive-Dev)"); one longer than the Advanced setting's bound gives up with that, the
+ * Combwork is merging into this repository (Combwork-Dev)"); one longer than the Advanced setting's bound gives up with that, the
  * lock staying the holder's (a live holder is never taken over), and nothing of fn runs.
  */
 export async function withRepoLock<T>(folder: string, fn: () => Promise<T>, opts: RepoLockOptions = {}): Promise<T> {
@@ -156,12 +156,12 @@ export async function withRepoLock<T>(folder: string, fn: () => Promise<T>, opts
     const waitSeconds = advanced.number(REPO_LOCK_WAIT)
     const onWait = (h: RepoLockHolder): void => {
       log.info(`Waiting for the repository lock of ${userText(folder)}, held by ${userText(h.profile)} (pid ${h.pid})`)
-      if (!opts.quiet) toast('info', tr(msg({ id: 'git.repoLock.waiting', defaultMessage: 'Another Combwork is merging into this repository ({profile})', description: "A notification's title: this Hive waits to merge into (or change) a repository because another Hive (its profile folder's name, {profile}, e.g. Hive-Dev) holds the repository's merge lock." }), { profile: h.profile }), tr(msg({ id: 'git.repoLock.waitingFor', defaultMessage: 'Combwork waits for it to finish, up to {seconds, number} s.', description: 'The notification\'s text under "Another Hive is merging into this repository": how long this Hive waits for the other one, in seconds.' }), { seconds: waitSeconds }), undefined, opts.project)
+      if (!opts.quiet) toast('info', tr(msg({ id: 'git.repoLock.waiting', defaultMessage: 'Another Combwork is merging into this repository ({profile})', description: "A notification's title: this Combwork waits to merge into (or change) a repository because another Combwork (its profile folder's name, {profile}, e.g. Combwork-Dev) holds the repository's merge lock." }), { profile: h.profile }), tr(msg({ id: 'git.repoLock.waitingFor', defaultMessage: 'Combwork waits for it to finish, up to {seconds, number} s.', description: 'The notification\'s text under "Another Combwork is merging into this repository": how long this Combwork waits for the other one, in seconds.' }), { seconds: waitSeconds }), undefined, opts.project)
     }
     const got = (await thread.ask({ type: 'take', dir, profile: profile(), waitMs: waitSeconds * 1000, noticeAfterMs: NOTICE_AFTER_MS }, onWait)) as TakeAnswer
     if ('timedOut' in got) {
       log.warn(`Gave up waiting for the repository lock of ${userText(folder)}, held by ${userText(got.timedOut.profile)} (pid ${got.timedOut.pid})`)
-      throw hiveError(msg({ id: 'git.repoLock.busy', defaultMessage: 'Another Combwork is merging into this repository ({profile}). Nothing was changed: try again once it has finished.', description: "An error: a merge or another change to a repository didn't start, because another Hive (its profile folder's name, {profile}) still held the repository's merge lock after Hive had waited for it." }), { profile: got.timedOut.profile }, { kind: 'conflict' })
+      throw combworkError(msg({ id: 'git.repoLock.busy', defaultMessage: 'Another Combwork is merging into this repository ({profile}). Nothing was changed: try again once it has finished.', description: "An error: a merge or another change to a repository didn't start, because another Combwork (its profile folder's name, {profile}) still held the repository's merge lock after Combwork had waited for it." }), { profile: got.timedOut.profile }, { kind: 'conflict' })
     }
     try {
       return await fn()
@@ -170,7 +170,7 @@ export async function withRepoLock<T>(folder: string, fn: () => Promise<T>, opts
         // Released before the next take in this process begins (withFileLock is held until then).
         await thread.ask({ type: 'release', dir, token: got.token })
       } catch (e) {
-        // Left behind, the row is this process's own: the next take here replaces it, and another Hive does once this one ends.
+        // Left behind, the row is this process's own: the next take here replaces it, and another Combwork does once this one ends.
         log.warn(`releasing the repository lock of ${userText(folder)}`, e)
       }
     }
@@ -201,7 +201,7 @@ export async function withNamedLock<T>(dir: string, file: string, fn: () => Prom
 
 /**
  * Runs fn holding the repository locks of several folders' repositories (#1642 round 5: a workflow options write, which
- * can change the target of every project it reaches, taken as Clean Up Merged Branches takes it, across Hives): each
+ * can change the target of every project it reaches, taken as Clean Up Merged Branches takes it, across Combworks): each
  * repository once, always in the same order (its git folder's path), so no two takers wait on each other. A folder in
  * no repository takes none. Taken before the turn of workflow writes, as everything that takes both does.
  */

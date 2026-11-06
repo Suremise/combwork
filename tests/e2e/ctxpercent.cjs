@@ -36,13 +36,13 @@ const until = async (fn, ms = 10000) => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47905), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47905), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1300, height: 800 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('alpha', { exact: true }).first().click()
   const agent = await lib.addAgent(inv, alpha, { name: 'Counter' })
@@ -162,7 +162,7 @@ const until = async (fn, ms = 10000) => {
   await restartWith(path.join(claudeHome, 'settings.json'), { autoCompactEnabled: false })
   check("auto-compaction off in Claude Code's settings: it says it doesn't compact by itself", !!(await until(async () => (await tip.innerText().catch(() => '')).includes("Claude Code doesn't compact by itself: auto-compaction is off (autoCompactEnabled: false in Claude Code's settings.json)"), 5000)), await tip.innerText().catch(() => ''))
   await page.screenshot({ path: path.join(lib.WORK, 'ctxpercent-autocompact-off.png') })
-  // DISABLE_AUTO_COMPACT in the sessions' environment (the test Hive's own, which sessions inherit) turns it off even
+  // DISABLE_AUTO_COMPACT in the sessions' environment (the test Combwork's own, which sessions inherit) turns it off even
   // over settings that turn it on.
   await app.evaluate(() => void (process.env.DISABLE_AUTO_COMPACT = '1'))
   await restartWith(path.join(claudeHome, 'settings.json'), { autoCompactEnabled: true })
@@ -177,16 +177,16 @@ const until = async (fn, ms = 10000) => {
   await lib.setProjectLaunch(inv, alpha, 'claude-code', { extraArgs: '--settings cli-settings.json' })
   await restartWith(path.join(alpha, 'cli-settings.json'), { autoCompactWindow: 250000 })
   check('a window in a --settings file of its arguments: read at launch, and why (#273)', JSON.stringify((await live())?.autoCompact) === JSON.stringify({ window: 250000, source: 'autoCompactWindow in --settings cli-settings.json' }), JSON.stringify((await live())?.autoCompact))
-  // Hive merges the user's --settings into its own launch settings and passes that alone (#330): the status line still
+  // Combwork merges the user's --settings into its own launch settings and passes that alone (#330): the status line still
   // reports the session's window (the setting's 250,000 capped at its 200,000), and the CLI was given one --settings
-  // holding Hive's hooks with the user's setting.
+  // holding Combwork's hooks with the user's setting.
   check('…and the tooltip shows it: the status line still reports (#330)', !!(await until(async () => / of 200,000\n[\s\S]*its auto-compact window is 200,000 \(autoCompactWindow in --settings cli-settings\.json\)/.test(await tip.innerText().catch(() => '')), 5000)), await tip.innerText().catch(() => ''))
   const lastLaunch = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).pop()
   const given = lastLaunch?.opts?.['--settings'] ? JSON.parse(fs.readFileSync(lastLaunch.opts['--settings'], 'utf8')) : null
-  check("…given Hive's settings file, with Hive's hooks and status line and the user's setting merged in (#330)", path.dirname(lastLaunch?.opts?.['--settings'] ?? '').toLowerCase().startsWith(path.join(userData, 'launches').toLowerCase()) && given?.autoCompactWindow === 250000 && !!given?.hooks?.Stop && !!given?.statusLine, JSON.stringify(lastLaunch?.opts))
+  check("…given Combwork's settings file, with Combwork's hooks and status line and the user's setting merged in (#330)", path.dirname(lastLaunch?.opts?.['--settings'] ?? '').toLowerCase().startsWith(path.join(userData, 'launches').toLowerCase()) && given?.autoCompactWindow === 250000 && !!given?.hooks?.Stop && !!given?.statusLine, JSON.stringify(lastLaunch?.opts))
   await lib.setProjectLaunch(inv, alpha, 'claude-code', { extraArgs: '' })
   fs.rmSync(path.join(alpha, 'cli-settings.json'), { force: true })
-  // --setting-sources leaving the project's files out (#333): Hive doesn't read them either, so the window set there
+  // --setting-sources leaving the project's files out (#333): Combwork doesn't read them either, so the window set there
   // isn't shown (Claude Code 2.1.292 reads only the sources it names).
   await lib.setProjectLaunch(inv, alpha, 'claude-code', { extraArgs: '--setting-sources=user' })
   await restartWith(localSettings, { autoCompactWindow: 150000 })

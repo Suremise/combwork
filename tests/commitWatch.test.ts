@@ -130,14 +130,14 @@ describe("React's commit watch (HI-1387)", () => {
     it("records the chain the same way, from its own marker and the page's chain (HI-1865)", async () => {
       const reached: number[] = []
       const w = burstWatcher({ marker: COMMIT_CHAIN_MARKER, read: 'chain', onReach: (n) => reached.push(n) })
-      // The page's count, as __hiveCommitBurst() gives both: the field it asks for.
+      // The page's count, as __cwCommitBurst() gives both: the field it asks for.
       const listeners: ((m: { text: () => string }) => void)[] = []
       const p: Page = {
         on: (_e, f) => listeners.push(f),
         evaluate: (fn, field) => Promise.resolve((fn as (f: unknown) => unknown).call(null, field)),
         say: (t) => listeners.forEach((f) => f({ text: () => t }))
       }
-      ;(globalThis as unknown as { window: unknown }).window = { __hiveCommitBurst: () => ({ max: 65, chain: 2 }) }
+      ;(globalThis as unknown as { window: unknown }).window = { __cwCommitBurst: () => ({ max: 65, chain: 2 }) }
       try {
         w.watch(p)
         await settled()
@@ -188,8 +188,8 @@ describe("React's commit watch (HI-1387)", () => {
     expect(preload).toContain('const commitWatch = process.argv.includes(COMMIT_WATCH_ARG)')
     // It tells the page of each message and reply from main (the chain's outside, HI-1865), before the page's own code.
     expect(preload).toContain('if (commitWatch) window.dispatchEvent(new Event(FROM_MAIN_EVENT))')
-    expect(FROM_MAIN_EVENT).toMatch(/^hive-/)
-    expect(COMMIT_WATCH_ARG).toMatch(/^--hive-/)
+    expect(FROM_MAIN_EVENT).toMatch(/^cw-/)
+    expect(COMMIT_WATCH_ARG).toMatch(/^--cw-/)
     const main = read('src/renderer/src/main.tsx')
     const firstImport = main.split(/\r?\n/).find((l) => l.startsWith('import '))
     expect(firstImport).toBe("import './commitWatch'")

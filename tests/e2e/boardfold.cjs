@@ -30,13 +30,16 @@ const LABELS = ['On Hold', 'Todo', 'Active', 'Review', 'Approved', 'Done']
   fs.mkdirSync(path.join(alpha, '.combwork'), { recursive: true })
   fs.writeFileSync(path.join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-coder', name: 'Coder' }] }))
   lib.enableProviders(userData)
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT) })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT) })
   let app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   let page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 800 })
   await lib.appReady(page)
-  let inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  // HI-2588: the preload bridge is window.combwork, and no other global offers Combwork's invoke.
+  const bridge = await page.evaluate(() => ({ combwork: typeof window.combwork?.invoke, others: Object.keys(window).filter((k) => k !== 'combwork' && typeof window[k]?.invoke === 'function' && typeof window[k]?.on === 'function') }))
+  check('the preload bridge is window.combwork, and no other global is one', bridge.combwork === 'function' && bridge.others.length === 0, JSON.stringify(bridge))
+  let inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const until = (fn, ms = 10000) => lib.until(fn, ms)
 
@@ -242,7 +245,7 @@ const LABELS = ['On Hold', 'Todo', 'Active', 'Review', 'Approved', 'Done']
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 800 })
   await lib.appReady(page)
-  inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   if (!(await inv('workspace:get'))?.path) await lib.openWorkspace(inv, page, ws)
   await page.getByRole('button', { name: 'Task Board' }).click()
   await until(async () => (await page.locator('.board-column').count()) === 6, 10000)
@@ -251,7 +254,7 @@ const LABELS = ['On Hold', 'Todo', 'Active', 'Review', 'Approved', 'Done']
   // In ui-state.json beside config.json since #1111, which no longer has it.
   const ui = JSON.parse(fs.readFileSync(path.join(userData, 'ui-state.json'), 'utf8')).boardFold ?? {}
   check('not in config.json', JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8')).ui?.boardFold === undefined)
-  check("kept in Hive's own settings for this workspace, not in the cards", Object.keys(ui).length === 1 && Object.keys(ui)[0] === ws.toLowerCase() && !Object.keys(lib.readCard(ws, n.t1)).some((k) => /fold|collapse/i.test(k)), JSON.stringify(ui))
+  check("kept in Combwork's own settings for this workspace, not in the cards", Object.keys(ui).length === 1 && Object.keys(ui)[0] === ws.toLowerCase() && !Object.keys(lib.readCard(ws, n.t1)).some((k) => /fold|collapse/i.test(k)), JSON.stringify(ui))
 
   // --- Two windows, each with its own workspace, both open before either changes its board: A's change, then B's,
   // keep each other (a window saves a change on what is saved now, never the folds it read when it opened).
@@ -260,7 +263,7 @@ const LABELS = ['On Hold', 'Todo', 'Active', 'Review', 'Approved', 'Done']
   const pageB = app.windows().find((w) => w !== page)
   pageB.on('pageerror', (e) => check('no page errors (second window)', false, e.message))
   await lib.appReady(pageB)
-  const invB = (ch, ...a) => pageB.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const invB = (ch, ...a) => pageB.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(invB, pageB, wsB)
   const bCard = (await invB('tasks:create', { title: 'A card of workspace B', project: 'beta' })).number
   await pageB.getByRole('button', { name: 'Task Board' }).click()
@@ -292,7 +295,7 @@ const LABELS = ['On Hold', 'Todo', 'Active', 'Review', 'Approved', 'Done']
   const byWorkspace = async (folder) => {
     for (const w of app.windows()) {
       await lib.appReady(w)
-      if ((await w.evaluate(() => window.hive.invoke('workspace:get')))?.path?.toLowerCase() === folder.toLowerCase()) return w
+      if ((await w.evaluate(() => window.combwork.invoke('workspace:get')))?.path?.toLowerCase() === folder.toLowerCase()) return w
     }
     return null
   }
