@@ -314,7 +314,7 @@ async function theForm(page, app, inv) {
       if ((await popups.count()) === 0) return true
       await popups.first().locator('.popup-close').click({ timeout: 2000 }).catch(() => undefined)
       return false
-    }, HUNG_MS)), await page.locator('.popups').innerText().catch(() => ''))
+    }, HUNG_MS)), (await popups.allInnerTexts()).join(' | '))
     const pasteIn = async (json) => {
       await section.getByRole('button', { name: 'Paste JSON…' }).click()
       const d = page.locator('.dialog', { hasText: 'Paste Workflow Options' })
