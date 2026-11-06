@@ -90,6 +90,7 @@ function citedBy(rel, cards, children = [], label = 'combwork-test') {
   return null
 }
 
+// old-name: begin HI-2622-board-lookup
 /**
  * The workspace's board for the repository at root, found up from its main checkout: its database (.combwork\hive.db, Hive 0.9
  * and later, #1017; .hive\hive.db until a 1.1 has opened the workspace, HI-2462) or, before that, its cards folder
@@ -122,6 +123,7 @@ function findBoard(root) {
     dir = up
   }
 }
+// old-name: end HI-2622-board-lookup
 
 /** A card that may cite evidence: neither Done nor archived, with its words (title, description, comments) as pathText. */
 const citing = (c) => (!c || c.archived || c.column === 'done' ? null : { number: c.number, text: pathText([c.title, c.description, ...(c.comments ?? []).map((m) => m.text)].join('\n')) })

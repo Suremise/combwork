@@ -1,0 +1,14 @@
+{
+  "exceptions": [
+    { "file": "src/main/combworkMove.ts", "text": "prev.catch(() => undefined)", "why": "Queue bookkeeping (inTurn): prev is the turn before's own settled promise; its failure went to that turn's caller, and the next turn runs either way." },
+    { "file": "src/main/combworkMove.ts", "text": "beside its moved .combwork`, e)", "why": "warnRecreated is only a warning: an old folder it can't look at is logged and the open goes on (HI-2612)." },
+    { "file": "src/main/combworkMove.ts", "text": "recording a new workspace's names upgrade done", "why": "recordNewWorkspace records nothing on failure, so the next open runs the names upgrade (HI-2612: left as it is)." },
+    { "file": "src/main/combworkMove.ts", "text": "keeping the folder move's lock file out of git", "why": "excludeMoveLock only keeps the lock out of git's status; on failure nothing is recorded (HI-2612: left as it is)." },
+    { "file": "src/main/nameUpgradeFiles.ts", "text": "later(", "why": "later() marks the run unsettled (settled = false, which the step returns), so the upgrade's record isn't written and the next open runs it again (HI-2611, HI-2612)." },
+    { "file": "src/main/nameUpgradeProfile.ts", "text": "{ force: true }) } catch { // left for the next start, which writes it again } return false", "why": "The write failed: false, so the profile's names upgrade isn't recorded done and the next start writes it again." },
+    { "file": "src/main/nameUpgradeProfile.ts", "text": "catch { // left for the next start, which writes it again }", "why": "Removing the failed write's own .upgrading file, after the step already answered false." },
+    { "file": "src/main/nameUpgradeValues.ts", "text": "couldn't be read: the names upgrade converts it at the next open", "why": "false: the file isn't settled, so the upgrade's record isn't written and the next open runs the step again (HI-2414)." },
+    { "file": "src/main/profileFolders.ts", "text": "Left in Combwork's folder: it is the move's own", "why": "Removing the move's own record after the rename failed (the failure itself is handled below it); the record is read only once the folder has moved." },
+    { "file": "tests/moveTestArea.mjs", "text": "remove it by hand.", "why": "The old update suite's throwaway download cache: a failure is said to the developer running the move, which is done by then." }
+  ]
+}

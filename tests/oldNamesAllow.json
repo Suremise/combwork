@@ -1,0 +1,16 @@
+{
+  "regions": [
+    { "file": "tests/oldNames.mjs", "id": "detector", "why": "The guard's own pattern and the ordinary words it passes (HI-2617)." },
+    { "file": "tests/oldNames.test.ts", "id": "truth-table", "why": "The guard's truth table and planted cases (HI-2617)." },
+    { "file": "tests/sandbox/clean.cjs", "id": "clean-install-detector", "why": "The clean-install check's pattern (HI-2592), the one place its search names it." },
+    { "file": "tests/e2e/evidence.cjs", "id": "HI-2622-board-lookup", "why": "Temporary: the board lookup still also reads the 1.0 board's file until the user has installed RC4; HI-2622 removes this entry (the Assistant's comment on HI-2617)." }
+  ],
+  "strings": [
+    { "file": "AGENTS.md", "text": "Combwork (named Hive before 1.1) is a Windows desktop app (Electron + TypeScript + React) for running coding agents (Claude Code, Codex) across the projects in a workspace. **You are probably running inside Combwork right now**, developing Combwork itself. The repository and its board project are still `hive` (`HI-` keys, older `hive/…` branches; new ones are `cw/…`): name those as they are. Code names say Combwork since HI-2591; only the upgrade's inputs keep the old names. History keeps the old name: commits and their `Hive-Card` trailers, and the CHANGELOG's sections before 1.1.0.", "why": "The rename line: what the old name still names, and why." }
+  ],
+  "files": [],
+  "paths": [],
+  "history": [
+    { "file": "CHANGELOG.md", "from": "## 1.0.0 — 2026-11-03", "why": "The released sections, history as published." }
+  ]
+}
