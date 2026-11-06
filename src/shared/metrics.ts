@@ -269,7 +269,7 @@ export interface MetricsCoverage {
   /** Separate stretches of observation in the range (more than one: there were gaps). */
   stretches: number
   /**
-   * History removed to keep the metrics file under its size limit (not by age), through this time (ISO), when that is in
+   * History removed to keep the metrics under their size limit (not by age), through this time (ISO), when that is in
    * the range: nothing before it is available, so it isn't counted as observed either.
    */
   evictedThrough?: string

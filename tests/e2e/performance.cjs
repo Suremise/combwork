@@ -167,7 +167,7 @@ const check = (name, ok, extra = '') => {
   await routes7.locator('th button', { hasText: 'p95' }).click()
   check('…fastest first: it comes last', (await routeOrder()).at(-1) === '/v1/projects', JSON.stringify(await routeOrder()))
   await routes7.locator('th button', { hasText: 'p95' }).click()
-  check('…and says history Combwork removed for space is unavailable', /removed to keep the metrics file under its size limit/.test(await page.locator('.perf-coverage').innerText()), await page.locator('.perf-coverage').innerText())
+  check('…and says history Combwork removed for space is unavailable', /removed to keep the performance history under its size limit/.test(await page.locator('.perf-coverage').innerText()), await page.locator('.perf-coverage').innerText())
   await page.locator('.performance-page:visible .segmented button', { hasText: '24 hours' }).click()
   await until(async () => (await requests()) === '47', HUNG_MS)
 

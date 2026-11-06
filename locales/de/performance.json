@@ -282,7 +282,7 @@
   "performance.compare.usePart.message": "Das ist ein Export des Arbeitsbereichs. Auf der Seite dieses Projekts lässt sich nur der Teil von {project} vergleichen.",
   "performance.compare.usePart.title": "Teil von {project} verwenden?",
   "performance.coverage.dropped": "{n, plural, one {# Messung} other {# Messungen}} nicht gespeichert (ein Limit war erreicht), daher sind die Summen eventuell zu niedrig.",
-  "performance.coverage.evicted": "Der Verlauf bis {when} wurde entfernt, damit die Metrikdatei unter ihrer Größengrenze bleibt: Davor ist nichts verfügbar.",
+  "performance.coverage.evicted": "Der Verlauf bis {when} wurde entfernt, damit der Leistungsverlauf unter seiner Größengrenze bleibt: Davor ist nichts verfügbar.",
   "performance.coverage.full": "Durchgehend aufgezeichnet.",
   "performance.coverage.none": "Combwork hat diesen Arbeitsbereich in diesem Zeitraum nicht aufgezeichnet, daher gibt es nichts anzuzeigen (keine Daten, nicht null).",
   "performance.coverage.partial": "Aufgezeichnet für {duration} davon ({percent}){sinceShown, select, yes {, seit {since}} other {}}{stretches, plural, =0 {} =1 {} other {, in # Abschnitten}}: Davor und in den Lücken (Combwork geschlossen, Aufzeichnung aus, Zurücksetzen) wurde nichts erfasst.",
