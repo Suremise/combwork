@@ -2,7 +2,7 @@ import { fmt, msg, tr } from '../shared/i18n'
 import { existsSync } from 'original-fs'
 import { lstat, readdir } from 'original-fs/promises'
 import { join } from 'path'
-import { cleanSwaps, contentHash, readJson, renameRetrying, SwapAbandoned, swapIn, swapOut, withFileLock, writeJsonAtomic } from './fsutil'
+import { cleanSwaps, contentHash, readJson, renameRetrying, SwapAbandoned, swapIn, swapOut, SwapUnreadable, withFileLock, writeJsonAtomic } from './fsutil'
 import { createLogger, userText } from './logger'
 import { resourcesDir } from './paths'
 import { revisionOf } from './revisions'
@@ -233,8 +233,9 @@ export async function syncBundled(opts: { fresh?: boolean } = {}): Promise<void>
           // A changed copy keeps the version it came from; one Combwork never gave (a same-name folder of the user's) has none.
           else m[kind][id] ??= { from: (history[kind][id] ?? []).includes(copy!) ? copy : null }
         } catch (e) {
-          // The user changed it meanwhile: it is theirs now, as the next scan will see; the manifest isn't changed.
-          if (e instanceof SwapAbandoned) {
+          // The user changed it meanwhile: it is theirs now, as the next scan will see; the manifest isn't changed. One that
+          // couldn't be read again as it went (SwapUnreadable, HI-2620) is put back too, but is a failure, tried next time.
+          if (e instanceof SwapAbandoned && !(e instanceof SwapUnreadable)) {
             log.info(`Left the bundled ${itemWord(kind)} ${userText(id)} as it is: it changed while Combwork was ${action === 'add' ? 'adding' : 'updating'} it`)
             return
           }
@@ -291,7 +292,7 @@ async function retirePersonas(m: Manifest): Promise<void> {
         await swapOut(dest, copy)
         log.info(`Removed the retired persona ${userText(id)}: it is now the ${userText(mode)} mode`)
       } catch (e) {
-        if (e instanceof SwapAbandoned) log.info(`Kept the retired persona ${userText(id)}: it changed while Combwork was removing it, so it is the user's`)
+        if (e instanceof SwapAbandoned && !(e instanceof SwapUnreadable)) log.info(`Kept the retired persona ${userText(id)}: it changed while Combwork was removing it, so it is the user's`)
         else log.warn(`Could not remove the retired persona ${userText(id)}; trying again next time`, e)
         continue
       }
