@@ -276,6 +276,13 @@
       "choices": "plain"
     }
   },
+  "api.card.archivedArg": {
+    "placeholders": {
+      "arg": "plain",
+      "min": "plain",
+      "raw": "plain"
+    }
+  },
   "api.card.atEnd": {
     "placeholders": {
       "position": "plain"
@@ -293,6 +300,9 @@
     "placeholders": {}
   },
   "api.card.commented": {
+    "placeholders": {}
+  },
+  "api.card.commentsMayHaveBeenLost": {
     "placeholders": {}
   },
   "api.card.confirmKindArg": {
@@ -391,6 +401,11 @@
   },
   "api.card.setSkipReview": {
     "placeholders": {}
+  },
+  "api.card.splitHint": {
+    "placeholders": {
+      "n": "plain"
+    }
   },
   "api.card.stayInProject": {
     "placeholders": {

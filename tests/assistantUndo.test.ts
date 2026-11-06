@@ -8,6 +8,7 @@ import { join } from 'path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { editCard } from './boardDb'
 
 const base = tempDir('cw-assistant-undo-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -589,6 +590,17 @@ describe('undo checks at the write (#1282 round 1)', async () => {
     expect(listed.some((x) => /comment/.test(x.final ?? ''))).toBe(true)
     const results = await userUndo(w, { group })
     expect(results.every((r) => !!r.final && !r.undone.length)).toBe(true)
+  })
+
+  it('a comment on a card already at its 500 comments is final too (HI-2642): the count stays, the oldest archived', async () => {
+    const c = await make('At the cap')
+    await editCard(w, c.number, (d) => void (d.comments = Array.from({ length: 500 }, (_, i) => ({ at: new Date(Date.UTC(2026, 0, 1, 0, 0, i)).toISOString(), by: 'someone', text: `c${i}`, id: `id${i}` }))))
+    const group = newMessage()
+    await asAssistant('comment on it', () => tasks.commentTask(c.number, 'Noted at the cap.', assistant), 'comment-task')
+    expect((await card(c.number)).comments).toHaveLength(500)
+    const listed = groupOf(group)!.changes
+    expect(listed.map((x) => x.kind)).toEqual(['final'])
+    expect(listed[0].final).toMatch(/comment/)
   })
 })
 

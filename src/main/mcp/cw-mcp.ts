@@ -136,11 +136,14 @@ const T = {
   'template.arg.names': agentMsg({ id: 'tool.template.arg.names', text: 'New names for its agents: place ("1") or name → the name.' }),
   'template.arg.connections': agentMsg({ id: 'tool.template.arg.connections', text: '"*", a role, or an agent\'s place ("1") or name → a connection\'s id or name (agent over role over "*").' }),
   'template.arg.workflow': agentMsg({ id: 'tool.template.arg.workflow', text: 'Set its workflow options (default true).' }),
-  'readTask.description': agentMsg({ id: 'tool.readTask.description', text: "One card as JSON: decisions first (the user's: they win over the description), then forYou (what waits for the user: agents' questions), description, comments, links. comments, latestComment and summary read less." }),
+  'readTask.description': agentMsg({ id: 'tool.readTask.description', text: "One card as JSON: decisions first (the user's: they win over the description), then forYou (what waits for the user), description, comments, links. comments, latestComment, summary read less." }),
   'readTask.arg.comments': agentMsg({ id: 'tool.readTask.arg.comments', text: 'Only the newest n.' }),
   'readTask.arg.latestComment': agentMsg({ id: 'tool.readTask.arg.latestComment', text: 'Only the newest comment.' }),
-  'readTask.arg.summary': agentMsg({ id: 'tool.readTask.arg.summary', text: "Each comment's first line, and its length." }),
+  'readTask.arg.summary': agentMsg({ id: 'tool.readTask.arg.summary', text: "Each comment's first line." }),
   'readTask.arg.attachments': agentMsg({ id: 'tool.readTask.arg.attachments', text: 'All, when narrowed.' }),
+  // HI-2641: a card's oldest comments past the 500 it keeps, its archive, read from an offset (commentsArchived counts them).
+  // Within HI-2012's agent total: the description's forYou gloss and summary's "and its length" were cut to pay for it.
+  'readTask.arg.archived': agentMsg({ id: 'tool.readTask.arg.archived', text: 'Archived older comments from this offset.' }),
   // HI-2561: Codex asked for the history to see why an agent stopped, which forYou already says. Within HI-2012's
   // total (toolLimits.cjs): the description dropped its history clause, and summary's words were cut, to pay for it.
   'readTask.arg.history': agentMsg({ id: 'tool.readTask.arg.history', text: 'Long; rarely needed.' }),
@@ -1040,12 +1043,14 @@ const tools: Tool[] = [
         latestComment: { type: 'boolean', description: say(T['readTask.arg.latestComment']) },
         summary: { type: 'boolean', description: say(T['readTask.arg.summary']) },
         history: { type: 'boolean', description: say(T['readTask.arg.history']) },
-        attachments: { type: 'boolean', description: say(T['readTask.arg.attachments']) }
+        attachments: { type: 'boolean', description: say(T['readTask.arg.attachments']) },
+        archived: { type: 'number', description: say(T['readTask.arg.archived']) }
       },
       required: ['number']
     },
     run: (a) => {
       const n = enc(String(a.number))
+      if (a.archived !== undefined && a.archived !== null) return api('GET', `/v1/tasks/${n}/comments/archived?offset=${enc(String(a.archived))}`)
       const all = a.attachments === true ? 'attachments=true' : ''
       if (a.latestComment) {
         const lq = [a.summary ? 'summary=true' : '', all].filter(Boolean).join('&')

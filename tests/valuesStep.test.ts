@@ -111,11 +111,12 @@ function fill10(db: DatabaseSync): void {
 const LONG_LINE = `[${OLD_NAME}] see ${OLD}_read_task ${'x'.repeat(WAKE_MAX_BYTES - 40)}`
 
 describe("the board's values step", () => {
-  it('is version 26, the 1.0 group\'s last', () => {
+  it('is version 26, in the 1.0 group', () => {
     const step = BOARD_MIGRATIONS.find((m) => m.version === 26)
     expect(step?.name).toBe(VALUES_STEP.name)
     expect(step?.group).toBe(BOARD_MIGRATIONS.find((m) => m.version === 25)?.group)
-    expect(Math.max(...BOARD_MIGRATIONS.map((m) => m.version))).toBe(26)
+    // HI-2641's comment archive (27) follows it, in the same group.
+    expect(BOARD_MIGRATIONS.find((m) => m.version === 27)?.group).toBe(step?.group)
   })
 
   it('on a fresh board, changes nothing', () => {

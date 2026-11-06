@@ -73,6 +73,9 @@ export const API = {
     unknown: agentMsg({ id: 'api.attachment.unknown', text: '{card} has no attachment called "{name}"{listed, select, yes {: {choices}} other { (it has none)}}' })
   },
   card: {
+    archivedArg: agentMsg({ id: 'api.card.archivedArg', text: '{arg} must be a whole number from {min}: "{raw}"', note: 'HI-2641: GET /v1/tasks/{n}/comments/archived\'s offset (from 0) or limit (from 1, at most 100) was not a whole number in range. arg: offset or limit; raw: what was given.' }),
+    commentsMayHaveBeenLost: agentMsg({ id: 'api.card.commentsMayHaveBeenLost', text: 'This card had 500 comments before Combwork kept older ones: earlier comments may have been dropped then, and can\'t be recovered from this board.', note: 'HI-2641: a card that held the cap when the board took the comment archive. Never says how many: that isn\'t known.' }),
+    splitHint: agentMsg({ id: 'api.card.splitHint', text: '{n} comments: a card this long is hard to follow. Consider splitting its remaining work into new cards.', note: 'HI-2641: a card read with more than 100 comments, its archived ones counted. n: how many in all.' }),
     atEnd: agentMsg({ id: 'api.card.atEnd', text: 'at the {position}', note: 'Where a card was put, in the Assistant\'s activity line (stored). position: top or bottom.' }),
     before: agentMsg({ id: 'api.card.before', text: 'before {card}' }),
     changedIt: agentMsg({ id: 'api.card.changedIt', text: 'changed it' }),
