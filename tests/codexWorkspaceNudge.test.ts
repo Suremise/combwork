@@ -24,6 +24,10 @@ const PROMPTS: [string, string, string][] = [
   ['usage limit', USAGE, USAGE_TITLE]
 ]
 const INPUT = '› Ask Codex to do anything\n\n  GPT-6-Astra low · C:\\work\\alpha\n  ? for shortcuts'
+/** Words wrapped at `width` columns, each line indented 2, as Codex's view header wraps them (BannerContent). */
+const wrapAt = (text: string, width: number): string => text.replace(new RegExp(`(.{1,${width - 2}})(?: |$)`, 'g'), '  $1\n').trimEnd()
+/** The screen as a 30-column pane draws its view: its title and its question word-wrapped. */
+const narrowed = (screen: string, title: string): string => screen.replace(`  ${title}\n`, `${wrapAt(title, 30)}\n`).replace(/^ {2}((?:Your workspace|Request a limit).*)$/m, (_l, q: string) => wrapAt(q, 30))
 /** The view from its title down, "Yes" selected. */
 const yesSelected = (screen: string): string => screen.replace('  1. Yes (y)', '› 1. Yes (y)').replace('› 2. No (default) (n)', '  2. No (default) (n)')
 
@@ -37,11 +41,23 @@ describe("Codex's prompts at a workspace's limit, on its screen (0.166.0)", () =
       expect(codexIdleQuestion(view)).toBe(title)
     })
 
-    it(`reads the ${name} prompt in a narrow pane: its question wrapped onto several lines`, () => {
-      // Wrapped at 30 columns, as a narrow pane draws it: four lines or more.
-      const narrow = screen.replace(/^( {2}(?:Your workspace|Request a limit).*)$/m, (q) => q.trim().replace(/(.{1,28})(?: |$)/g, '  $1\n').trimEnd())
+    it(`reads the ${name} prompt in a narrow pane: its title and question both wrapped (HR1's round 1)`, () => {
+      const narrow = narrowed(screen, title)
+      // The title on lines of its own (the credit one's at least two), the question on several more.
       expect(narrow.split('\n').length).toBeGreaterThan(screen.split('\n').length + 2)
+      if (title === CREDITS_TITLE) expect(narrow).not.toContain(title)
       expect(codexIdleQuestion(narrow)).toBe(title)
+      expect(codexIdleQuestion(yesSelected(narrow))).toBe(title)
+      // Its words wrapped in a reply above Codex's input are still no question.
+      expect(codexIdleQuestion(`${narrow.replace('› 2.', '  2.')}\n\n${INPUT}`)).toBeNull()
+    })
+
+    it(`a header wrapped beyond what Codex draws, or its title not first, is no question`, () => {
+      const view = screen.slice(screen.indexOf(`  ${title}\n`))
+      // The title second in its paragraph: another view's, or a reply's line.
+      expect(codexIdleQuestion(view.replace(`  ${title}\n`, `  Something else\n  ${title}\n`))).toBeNull()
+      // A paragraph longer than a view's header (more than 8 lines, then the blank lines) above its choices.
+      expect(codexIdleQuestion(view.replace(`  ${title}\n`, `  ${title}\n${'  more\n'.repeat(9)}`))).toBeNull()
     })
 
     it(`isn't fooled by the ${name} prompt's words above a real input line, or typed into it`, () => {
@@ -103,6 +119,24 @@ describe("a Codex agent at its workspace's limit (HI-2619)", () => {
       // Answered by the user ("n"): Codex's input again.
       await draw(e, IDLE)
       expect(sessions.cliAsks(project, id)).toBe(false)
+    })
+
+    it(`the ${name} prompt in a narrow pane, its title wrapped: still nothing typed (HR1's round 1)`, async () => {
+      vi.spyOn(internals, 'notify').mockImplementation(() => undefined)
+      const writes: string[] = []
+      vi.spyOn(pty, 'writePty').mockImplementation((_k, data) => void writes.push(data))
+      const e = running()
+      e.screen.dispose()
+      e.screen = new TerminalScreen(30, 40)
+      await draw(e, narrowed(screen, title))
+      expect(sessions.cliAsks(project, id)).toBe(true)
+      await expect(sessions.sendPrompt(project, id, '[CW] New in your inbox: 1 card event (HI-12)')).rejects.toThrow(/shows a question for you/)
+      expect(sessions.submitAgain(project, id, 'run1')).toBe(false)
+      expect(writer.whyNoLine(project, id)).toMatch(/shows a question for the user/)
+      internals.lookAtIdleScreen(liveKey(), e)
+      expect(e.state.status).toBe('waiting')
+      expect(String(e.state.statusMessage ?? '')).toContain(title)
+      expect(writes).toEqual([])
     })
   }
 })
