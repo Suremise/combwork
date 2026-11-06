@@ -65,7 +65,7 @@ const observed = [
   [now - 26 * HOUR, now - 10 * HOUR],
   [now - 6 * HOUR, now - 60_000]
 ]
-fs.writeFileSync(path.join(ws, '.combwork', 'metrics', 'metrics.json'), JSON.stringify({ version: 1, buckets, observed, evictedThrough: now - 5 * 24 * HOUR }))
+fs.writeFileSync(path.join(ws, '.combwork', 'metrics', 'metrics.json'), JSON.stringify({ version: 1, buckets, observed, evictedThrough: now - 5 * 24 * HOUR, foldedThrough: now - 4 * 24 * HOUR }))
 
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -105,7 +105,7 @@ const check = (name, ok, extra = '') => {
   check('an hourly trend with every hour of the range', (await bars.count()) === 25, String(await bars.count()))
   check('the tools table is sorted by characters', (await page.locator('.table-wrap').first().locator('tbody tr td:first-child').allInnerTexts()).join() === 'cw_read_task,cw_list_tasks', (await page.locator('.table-wrap').first().locator('tbody tr td:first-child').allInnerTexts()).join())
   check('the skill service is shown for the workspace', (await page.locator('h2', { hasText: 'Skill service' }).count()) === 1)
-  check('the 24 hours don’t reach history removed for space', !/removed to keep/.test(await page.locator('.perf-coverage').innerText()))
+  check('the 24 hours don’t reach history removed or folded for space', !/(removed|folded into days) to keep/.test(await page.locator('.perf-coverage').innerText()))
   check('coverage: how long Combwork was recording, and the gap', /Recorded for \d+ h/.test(await page.locator('.perf-coverage').innerText()), await page.locator('.perf-coverage').innerText())
   check('…the unrecorded hours are hatched in the trend, not shown as zero', (await page.locator('.perf-trend .daily-col.unobserved').count()) >= 3, String(await page.locator('.perf-trend .daily-col.unobserved').count()))
   // Each table sorts by a header, and remembers it (#250): the tools by calls, the routes by failures, launches by count.
@@ -168,6 +168,7 @@ const check = (name, ok, extra = '') => {
   check('…fastest first: it comes last', (await routeOrder()).at(-1) === '/v1/projects', JSON.stringify(await routeOrder()))
   await routes7.locator('th button', { hasText: 'p95' }).click()
   check('…and says history Combwork removed for space is unavailable', /removed to keep the performance history under its size limit/.test(await page.locator('.perf-coverage').innerText()), await page.locator('.perf-coverage').innerText())
+  check('…and that hours were folded into days for space (HI-2628)', /Hourly detail up to .+ was folded into days to keep the performance history under its size limit/.test(await page.locator('.perf-coverage').innerText()), await page.locator('.perf-coverage').innerText())
   await page.locator('.performance-page:visible .segmented button', { hasText: '24 hours' }).click()
   await until(async () => (await requests()) === '47', HUNG_MS)
 

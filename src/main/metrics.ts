@@ -665,8 +665,8 @@ class Store {
     }
     const iso = (t: number): string => new Date(t).toISOString()
     const what = [
-      ...(folded.hours ? [`${folded.hours} hours folded into their days (${iso(folded.from)} to ${iso(folded.to)})`] : []),
-      ...(dropped.days || dropped.hours ? [`${dropped.days} days and ${dropped.hours} hours dropped (${iso(dropped.from)} to ${iso(dropped.to)})`] : [])
+      ...(folded.hours ? [`${folded.hours} hours folded into their days (${iso(folded.from)} to ${iso(folded.to)})`] : []), // i18n-ignore: a line in the app's own log, which stays English
+      ...(dropped.days || dropped.hours ? [`${dropped.days} days and ${dropped.hours} hours dropped (${iso(dropped.from)} to ${iso(dropped.to)})`] : []) // i18n-ignore: a line in the app's own log, which stays English
     ]
     log.warn(`Performance history over its size limit (${before} bytes, limit ${cap}): ${what.join('; ') || 'observation trimmed'}; ${total()} bytes kept`) // i18n-ignore: a line in the app's own log, which stays English
   }
