@@ -220,12 +220,14 @@ describe('a card in Review its watching reviewer has not started on (#521)', () 
       expect(reviewWaitReason(inReview(), [hr2], at, undefined, given)).toBe("#506 was given to HR3 to review 18 min ago, and it hasn't started reviewing it: in Review for 20 min.")
       expect(reviewWaiter(inReview(), [hr2], given)).toBeNull()
       // The window's (laneReviewOwed from its pool lane): HR3 when it watches, nobody otherwise, never HR2.
+      // The window's tr, as its message's id and agent: which text it picked, for whom.
+      const fakeTr = ((m: { id: string }, v: Record<string, unknown>) => `${m.id}:${v.agent}`) as never
       const agents = [{ id: 'b1', name: 'HB1' }, { id: 'r2', name: 'HR2' }, { id: 'r3', name: 'HR3' }]
       const pool = (name: string | null, current: number | null = 506) => ({ builder: 'b2', reviewer: null, poolReviewing: { card: current, name }, cards: [{ number: 506, column: 'review' }] })
-      const board = (lane: ReturnType<typeof pool>) => reviewWaitReason(inReview(), [hr2, hb1], at, (m: never, v: Record<string, unknown>) => `${(m as { id: string }).id}:${v.agent}`, laneReviewOwed(inReview(), lane, agents, true))
+      const board = (lane: ReturnType<typeof pool>) => reviewWaitReason(inReview(), [hr2, hb1], at, fakeTr, laneReviewOwed(inReview(), lane, agents, true))
       expect(laneReviewOwed(inReview(), pool('HR3'), agents, true)).toEqual({ agentId: 'r3', name: 'HR3' })
       expect(board(pool('HR3'))).toBeNull()
-      expect(reviewWaitReason(inReview(), [hr2, hr3], at, (m: never, v: Record<string, unknown>) => `${(m as { id: string }).id}:${v.agent}`, laneReviewOwed(inReview(), pool('HR3'), agents, true))).toBe('board.stalled.reviewWait:HR3')
+      expect(reviewWaitReason(inReview(), [hr2, hr3], at, fakeTr, laneReviewOwed(inReview(), pool('HR3'), agents, true))).toBe('board.stalled.reviewWait:HR3')
       // Not given out yet, or its current card another: nobody.
       expect(laneReviewOwed(inReview(), pool(null), agents, true)).toBeNull()
       expect(laneReviewOwed(inReview(), pool('HR3', 507), agents, true)).toBeNull()
