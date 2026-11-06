@@ -1,30 +1,38 @@
 // The presence-check rule (HI-2617, after HI-2612): in the one-way upgrade's code and the test area's, only an absence
-// (ENOENT: src/main/fsPresence.ts, and the test area's own absent()) answers "not there", and an I/O failure is never
-// taken for a result. Read from each file's syntax tree, not its text:
+// (ENOENT or ENOTDIR: src/main/fsPresence.ts, and the test area's own absent()) answers "not there", and an I/O
+// failure is never taken for a result. Read from each file's syntax tree, not its text:
 //
 // - existsSync, by any name (imported under another, `fs.existsSync`, `fs['existsSync']`): it answers false for access
 //   denied or a held file as it does for an absence. Use fsPresence's present()/lstatOrNull(), or the error's code.
-// - A handler that swallows: a `catch` clause, or the function given to `.catch(f)` or as `.then(ok, f)`'s second, that
-//   passes nothing on. It passes the failure on when it (or a function of the same file it calls) throws, calls
-//   Promise.reject or reject(), ends the process, records it (push, add or set into a list or map, postMessage to
-//   the one waiting), puts the error in what it returns (`(e) => ({ ok: false, error: e })`), or sets it on a record; or
-//   when it is fsPresence's ifAbsent(). Logging the error and returning a success swallows it: `(e) => (log(e), true)`.
+// - A handler that swallows: a `catch` clause, or the function given to `.catch(f)` or as `.then(ok, f)`'s second, with
+//   any way out of it that passes the failure on. Each way out is followed (if and else, return, continue, the end):
+//   - the absence's own branch (`if (absent(e))`, `if (e.code === 'ENOENT')`, `!== 'ENOENT'`'s else) may answer
+//     anything: that is the one failure meaning "not there";
+//   - every other way out must throw, end the process, return the error in its value (`return { ok: false, error: e }`,
+//     not `(log(e), true)`) or Promise.reject, or come after the error was recorded for the caller: pushed, added or set
+//     into a list or map, posted to the one waiting, or set on a record, with the error itself in what is recorded (a
+//     `stats.push(1)` beside it records nothing), directly or through a function of the same file that records the
+//     argument it is given;
+//   - fsPresence's ifAbsent() passes, and a same-file function given by name (`.catch(noMarker)`) is read as the handler.
+//   Logging the error and answering a success swallows it.
 //   - Parse-only: a try whose only calls are JSON.parse, decodeURIComponent or new URL, with string methods inside
 //     their arguments, does no I/O. One that reads and parses (`JSON.parse(readFileSync(f))`) is not parse-only.
-//   - Queue bookkeeping: `p.catch(() => undefined)` on a promise its function returns, so its caller gets the failure
-//     from `p` itself.
-//   - A function of the same file given by name (`.catch(noMarker)`) is read as the handler.
-//   - Anything else is an exception in tests/presenceAllow.json, by file and its exact text, with why; an exception that
-//     excepts nothing fails as stale, so the list only shrinks.
+//   - Queue bookkeeping: `p.catch(() => undefined)` where p is a const its function returns at every return, and that
+//     function ends with that return, so its caller gets the failure from p itself.
+//   - Anything else is an exception in tests/presenceAllow.json: the file, the function it is in and the finding's
+//     whole text (whitespace as one space), with why. Each excepts one finding, and one that excepts none fails as
+//     stale, so the list only shrinks.
+// SCOPE names a file, or `file#function` for one function of a file whose other code the rule doesn't hold to.
 import { parse } from '@babel/parser'
 
-/** The files the rule holds to: the upgrade's steps and their presence helpers, and the test area's code. */
+/** What the rule holds to: the upgrade's steps and their presence helpers, and the test area's code. */
 export const SCOPE = [
   'src/main/boardFileMove.ts',
   'src/main/combworkFolder.ts',
   'src/main/combworkMove.ts',
   'src/main/combworkMoveWorker.ts',
   'src/main/fsPresence.ts',
+  'src/main/logger.ts#moveOldLogs',
   'src/main/nameUpgrade.ts',
   'src/main/nameUpgradeFiles.ts',
   'src/main/nameUpgradeProfile.ts',
@@ -37,6 +45,9 @@ export const SCOPE = [
   'tests/testArea.cjs'
 ]
 
+/** SCOPE's files, once each. */
+export const SCOPE_FILES = [...new Set(SCOPE.map((s) => s.split('#')[0]))]
+
 export const ALLOW_FILE = 'tests/presenceAllow.json'
 
 /** Calls a try may hold and still be parse-only: none of them does I/O. */
@@ -45,10 +56,10 @@ const PARSE_ONLY = new Set(['JSON.parse', 'decodeURIComponent', 'URL'])
 const STRING_METHODS = new Set(['replace', 'replaceAll', 'trim', 'trimStart', 'trimEnd', 'slice', 'toString'])
 /** fsPresence's helper whose handler passes on anything but an absence. */
 const PASSES_ABSENCE = new Set(['ifAbsent'])
-/** Calls that record a failure for the caller: into a list, set or map, or a message to the one waiting. */
-const RECORDS = new Set(['push', 'unshift', 'add', 'set', 'postMessage'])
-/** Calls that pass a failure on or end the run. */
-const ENDS = new Set(['Promise.reject', 'reject', 'process.exit'])
+/** Calls that record what they are given for the caller: into a list, set or map, a message to the one waiting, a rejection. */
+const RECORDS = new Set(['push', 'unshift', 'add', 'set', 'postMessage', 'reject'])
+/** The error codes that mean "not there". */
+const ABSENT_CODES = new Set(['ENOENT', 'ENOTDIR'])
 
 /** Each node's children (babel's nodes are plain objects). */
 function children(node) {
@@ -63,6 +74,9 @@ function children(node) {
 
 const isFunction = (n) => !!n && /^(ArrowFunctionExpression|FunctionExpression|FunctionDeclaration|ObjectMethod|ClassMethod|ClassPrivateMethod)$/.test(n.type)
 const isCall = (n) => n.type === 'CallExpression' || n.type === 'OptionalCallExpression' || n.type === 'NewExpression'
+const isMember = (n) => n.type === 'MemberExpression' || n.type === 'OptionalMemberExpression'
+/** An expression without its TypeScript wrapping and parentheses (`(e as X)`, `e!`). */
+const bare = (n) => (n && /^(TSAsExpression|TSNonNullExpression|TSSatisfiesExpression|TSTypeAssertion|ParenthesizedExpression)$/.test(n.type) ? bare(n.expression) : n)
 
 /** Walks `node`, calling `visit(n, parents)`; `into(n)` false skips a node's children. */
 function walk(node, visit, parents = [], into = () => true) {
@@ -81,40 +95,177 @@ function own(node, pred) {
 
 /** A callee's name: `f`, `a.b`, `new URL`'s `URL`. */
 function calleeName(c) {
+  c = bare(c)
   if (!c) return ''
   if (c.type === 'Identifier') return c.name
-  if (c.type === 'MemberExpression' || c.type === 'OptionalMemberExpression') return `${calleeName(c.object)}.${c.computed ? (c.property.type === 'StringLiteral' ? c.property.value : '?') : c.property.name}`
-  if (c.type === 'TSNonNullExpression' || c.type === 'TSAsExpression' || c.type === 'TSSatisfiesExpression') return calleeName(c.expression)
+  if (isMember(c)) return `${calleeName(c.object)}.${c.computed ? (c.property.type === 'StringLiteral' ? c.property.value : '?') : c.property.name}`
+  if (isCall(c)) return `${calleeName(c.callee)}()`
   return '?'
 }
 const lastName = (c) => calleeName(c).split('.').at(-1)
 
-/** Whether the identifier `name` is used in `node`. */
-const uses = (node, name) => !!name && own(node, (n) => n.type === 'Identifier' && n.name === name).length > 0
+/** Whether the identifier `name` (or the error, with the consts holding its code) is used in `node`. */
+const uses = (node, name) => {
+  if (!name) return false
+  const names = typeof name === 'string' ? new Set([name]) : new Set([name.name, ...(codes.get(name) ?? [])])
+  return own(node, (n) => n.type === 'Identifier' && names.has(n.name)).length > 0
+}
 
-/** Whether a function's body (its error's binding `err`) passes the failure on; `local` is the file's functions by name. */
-function passesOn(body, err, local, seen = new Set()) {
-  if (own(body, (n) => n.type === 'ThrowStatement').length) return true
-  const calls = own(body, isCall)
-  if (calls.some((c) => ENDS.has(calleeName(c.callee)) || RECORDS.has(lastName(c.callee)))) return true
-  // A function of this file it calls, read the same way.
-  for (const c of calls) {
-    const f = c.callee.type === 'Identifier' ? local.get(c.callee.name) : null
-    if (f && !seen.has(f) && (seen.add(f), passesOn(f.body, f.params[0]?.name, local, seen))) return true
-  }
+/** Whether `v` carries the error as a value: the error in it outside any call (`{ error: e }`, `e.code`), not `log(e)`'s result. */
+function carries(v, err) {
+  if (!v || !err || isCall(v)) return false
+  const names = new Set([err.name, ...(codes.get(err) ?? [])])
+  let found = false
+  walk(v, (n) => { if (n.type === 'Identifier' && names.has(n.name)) found = true }, [], (n) => n === v || (!isFunction(n) && !isCall(n)))
+  return found
+}
+
+/** The ways the file's own functions are known, by name. */
+function localFunctions(program) {
+  const local = new Map()
+  walk(program, (n) => {
+    if (n.type === 'FunctionDeclaration' && n.id) local.set(n.id.name, n)
+    if (n.type === 'VariableDeclarator' && n.id.type === 'Identifier' && isFunction(n.init)) local.set(n.id.name, n.init)
+  })
+  return local
+}
+
+/** Whether a function records its `i`th parameter: a RECORDS call with it in what is recorded. */
+function recordsParam(f, i) {
+  const p = f.params[i]
+  const name = p?.type === 'Identifier' ? p.name : p?.type === 'AssignmentPattern' && p.left.type === 'Identifier' ? p.left.name : null
+  if (!name) return false
+  return own(f.body, (n) => isCall(n) && RECORDS.has(lastName(n.callee)) && n.arguments.some((a) => uses(a, name))).length > 0
+}
+
+/** Whether `expr` records the error for the caller (see the header), directly or through a function of the file. */
+function records(expr, err, local) {
   if (!err) return false
-  // The error in the value it gives back: not only beside it (`(log(e), true)` gives true).
-  const value = (v) => {
-    if (!v) return false
-    if (v.type === 'SequenceExpression') return value(v.expressions.at(-1))
-    if (v.type === 'ConditionalExpression') return value(v.consequent) || value(v.alternate)
-    if (v.type === 'AwaitExpression') return value(v.argument)
-    if (isCall(v)) return false
-    return uses(v, err)
+  for (const c of own(expr, isCall)) {
+    if (RECORDS.has(lastName(c.callee)) && c.arguments.some((a) => uses(a, err))) return true
+    const f = bare(c.callee)?.type === 'Identifier' ? local.get(bare(c.callee).name) : null
+    if (f && c.arguments.some((a, i) => uses(a, err) && recordsParam(f, i))) return true
   }
-  if (body.type !== 'BlockStatement') return value(body)
-  if (own(body, (n) => n.type === 'ReturnStatement').some((r) => value(r.argument))) return true
-  return own(body, (n) => n.type === 'AssignmentExpression' && n.left.type === 'MemberExpression' && uses(n.right, err)).length > 0
+  return own(expr, (n) => n.type === 'AssignmentExpression' && isMember(n.left) && carries(n.right, err)).length > 0
+}
+
+/** Whether `expr` ends the process. */
+const ends = (expr) => own(expr, (n) => isCall(n) && calleeName(n.callee) === 'process.exit').length > 0
+
+/** The error's names in a handler: its binding, and the consts holding its code (`const code = (e as X).code`). */
+const codes = new WeakMap()
+/** `x.code` (through `?.`, casts and `?? ''`) with x the error, or a const holding it. */
+const isCodeOf = (n, err) => {
+  n = bare(n)
+  if (n?.type === 'LogicalExpression' && n.operator === '??' && n.right.type === 'StringLiteral') n = bare(n.left)
+  if (n?.type === 'Identifier') return codes.get(err)?.has(n.name) ?? false
+  return !!n && isMember(n) && !n.computed && n.property.name === 'code' && bare(n.object)?.type === 'Identifier' && bare(n.object).name === err.name
+}
+/** A handler's error: its binding's name, as an object the consts holding its code are kept by. */
+const errName = (name) => (name ? { name } : null)
+
+/**
+ * Whether a condition tests for the absence: 'then' when its true branch is the absence's, 'else' when its false one
+ * is, null when it isn't such a test (or tests something beside it).
+ */
+function absenceTest(t, err) {
+  t = bare(t)
+  if (!t || !err) return null
+  if (t.type === 'UnaryExpression' && t.operator === '!') {
+    const inner = absenceTest(t.argument, err)
+    return inner === 'then' ? 'else' : inner === 'else' ? 'then' : null
+  }
+  if (isCall(t) && /absent$/i.test(lastName(t.callee)) && t.arguments.length === 1 && bare(t.arguments[0])?.type === 'Identifier' && bare(t.arguments[0]).name === err.name) return 'then'
+  // ['ENOENT', 'ENOTDIR'].includes(e.code ?? '')
+  if (isCall(t) && isMember(t.callee) && lastName(t.callee) === 'includes' && bare(t.callee.object)?.type === 'ArrayExpression' && t.arguments.length === 1 && isCodeOf(t.arguments[0], err)) {
+    const els = bare(t.callee.object).elements
+    if (els.length && els.every((x) => x?.type === 'StringLiteral' && ABSENT_CODES.has(x.value))) return 'then'
+  }
+  if (t.type === 'BinaryExpression' && /^[!=]==?$/.test(t.operator)) {
+    const [a, b] = isCodeOf(t.left, err) ? [t.left, t.right] : [t.right, t.left]
+    if (isCodeOf(a, err) && b.type === 'StringLiteral' && ABSENT_CODES.has(b.value)) return t.operator.startsWith('=') ? 'then' : 'else'
+  }
+  if (t.type === 'LogicalExpression' && t.operator === '||' && absenceTest(t.left, err) === 'then' && absenceTest(t.right, err) === 'then') return 'then'
+  if (t.type === 'LogicalExpression' && t.operator === '&&' && absenceTest(t.left, err) === 'else' && absenceTest(t.right, err) === 'else') return 'else'
+  return null
+}
+
+/** Whether a value given back passes the failure on: the error in it, or Promise.reject. */
+function passingValue(v, err, rec, local) {
+  v = bare(v)
+  if (!v) return rec
+  if (v.type === 'AwaitExpression') return passingValue(v.argument, err, rec, local)
+  if (isCall(v) && calleeName(v.callee) === 'Promise.reject') return true
+  if (v.type === 'SequenceExpression') {
+    const r = rec || v.expressions.slice(0, -1).some((x) => records(x, err, local)) || v.expressions.slice(0, -1).some(ends)
+    return passingValue(v.expressions.at(-1), err, r, local)
+  }
+  if (v.type === 'ConditionalExpression') {
+    const a = absenceTest(v.test, err)
+    return (a === 'then' || passingValue(v.consequent, err, rec, local)) && (a === 'else' || passingValue(v.alternate, err, rec, local))
+  }
+  if (v.type === 'UnaryExpression' && v.operator === 'void') return rec || records(v.argument, err, local) || ends(v.argument)
+  if (isCall(v)) return rec || records(v, err, local) || ends(v)
+  return rec || carries(v, err)
+}
+
+/**
+ * The ways out of a statement: { ok } no way out swallows, { falls } it may go on to the next, { rec } the error is
+ * recorded on every way that goes on.
+ */
+function flow(s, err, rec, local) {
+  if (!s) return { ok: true, falls: true, rec }
+  switch (s.type) {
+    case 'BlockStatement': {
+      let st = { ok: true, falls: true, rec }
+      for (const x of s.body) {
+        if (!st.falls) break
+        const r = flow(x, err, st.rec, local)
+        st = { ok: st.ok && r.ok, falls: r.falls, rec: r.rec }
+      }
+      return st
+    }
+    case 'ThrowStatement':
+      return { ok: true, falls: false, rec }
+    case 'ReturnStatement':
+      return { ok: passingValue(s.argument, err, rec, local), falls: false, rec }
+    case 'ContinueStatement':
+    case 'BreakStatement':
+      return { ok: rec, falls: false, rec }
+    case 'ExpressionStatement':
+      if (ends(s.expression)) return { ok: true, falls: false, rec }
+      return { ok: true, falls: true, rec: rec || records(s.expression, err, local) }
+    case 'VariableDeclaration':
+      if (err && s.kind === 'const') for (const d of s.declarations) if (d.id.type === 'Identifier' && d.init && isCodeOf(d.init, err)) codes.set(err, new Set([...(codes.get(err) ?? []), d.id.name]))
+      return { ok: true, falls: true, rec: rec || s.declarations.some((d) => d.init && records(d.init, err, local)) }
+    case 'EmptyStatement':
+      return { ok: true, falls: true, rec }
+    case 'IfStatement': {
+      const a = absenceTest(s.test, err)
+      const absent = { ok: true, falls: false, rec }
+      const t = a === 'then' ? absent : flow(s.consequent, err, rec, local)
+      const e = a === 'else' ? absent : s.alternate ? flow(s.alternate, err, rec, local) : { ok: true, falls: true, rec }
+      return { ok: t.ok && e.ok, falls: t.falls || e.falls, rec: (!t.falls || t.rec) && (!e.falls || e.rec) }
+    }
+    case 'TryStatement': {
+      // Its own catch is a finding of its own; what it records holds only if its block and its catch both go on recorded.
+      const b = flow(s.block, err, rec, local)
+      const h = s.handler ? flow(s.handler.body, err, rec, local) : { ok: true, falls: false, rec }
+      const f = s.finalizer ? flow(s.finalizer, err, rec, local) : { ok: true, falls: true, rec }
+      return { ok: b.ok && h.ok && f.ok, falls: (b.falls || h.falls) && f.falls, rec: ((!b.falls || b.rec) && (!h.falls || h.rec)) || f.rec }
+    }
+    default:
+      // A loop, a switch, a label: not followed here, so not taken to pass anything on.
+      return { ok: false, falls: true, rec }
+  }
+}
+
+/** Whether a handler (a function, or a catch clause's body and binding) passes the failure on by every way out. */
+function handles(body, name, local) {
+  const err = errName(name)
+  if (body.type !== 'BlockStatement') return passingValue(body, err, false, local)
+  const r = flow(body, err, false, local)
+  return r.ok && (!r.falls || r.rec)
 }
 
 /** Whether a try's block is parse-only: each call in it JSON.parse and the like, or a string method inside one's arguments. */
@@ -123,52 +274,80 @@ function parseOnly(block) {
   if (!calls.length) return false
   const inside = new Set()
   for (const c of calls) if (PARSE_ONLY.has(calleeName(c.callee))) for (const a of c.arguments) for (const n of own(a, isCall)) inside.add(n)
-  return calls.every((c) => PARSE_ONLY.has(calleeName(c.callee)) || (inside.has(c) && c.callee.type === 'MemberExpression' && STRING_METHODS.has(lastName(c.callee))))
+  return calls.every((c) => PARSE_ONLY.has(calleeName(c.callee)) || (inside.has(c) && isMember(c.callee) && STRING_METHODS.has(lastName(c.callee))))
 }
 
-/** A finding: { file, line, rule, text, full }: the node's own source on one line (`text` shortened), after `head`. */
-function finding(file, src, node, rule, head = '') {
+/** Queue bookkeeping (see the header): `call` is `p.catch(…)` with p a const its function returns at every return, ending with it. */
+function bookkeeping(call, parents) {
+  const p = bare(call.callee.object)
+  const outer = [...parents].reverse().find(isFunction)
+  if (p?.type !== 'Identifier' || !outer || outer.body.type !== 'BlockStatement') return false
+  const constP = own(outer.body, (n) => n.type === 'VariableDeclaration' && n.kind === 'const' && n.declarations.some((d) => d.id.type === 'Identifier' && d.id.name === p.name)).length === 1
+  const returns = own(outer.body, (n) => n.type === 'ReturnStatement')
+  const last = outer.body.body.at(-1)
+  return constP && returns.length > 0 && returns.every((r) => bare(r.argument)?.type === 'Identifier' && bare(r.argument).name === p.name) && last?.type === 'ReturnStatement'
+}
+
+/** The name of the function a node is in (the innermost named one), or '(top)'. */
+function functionOf(parents) {
+  for (let i = parents.length - 1; i >= 0; i--) {
+    const n = parents[i]
+    if (n.type === 'FunctionDeclaration' && n.id) return n.id.name
+    if ((n.type === 'ClassMethod' || n.type === 'ObjectMethod' || n.type === 'ClassPrivateMethod') && n.key) return n.key.name ?? n.key.id?.name ?? '?'
+    if (n.type === 'VariableDeclarator' && n.id.type === 'Identifier' && isFunction(n.init)) return n.id.name
+  }
+  return '(top)'
+}
+
+/** The names of every function a node is in, outermost first. */
+function functionsOf(parents) {
+  const out = []
+  for (let i = 0; i < parents.length; i++) {
+    const n = parents[i]
+    if (n.type === 'FunctionDeclaration' && n.id) out.push(n.id.name)
+    else if ((n.type === 'ClassMethod' || n.type === 'ObjectMethod') && n.key?.name) out.push(n.key.name)
+    else if (n.type === 'VariableDeclarator' && n.id.type === 'Identifier' && isFunction(n.init)) out.push(n.id.name)
+  }
+  return out
+}
+
+/** A finding: { file, line, rule, fn, text, full }: `full` the node's source on one line (after `head`), `text` shortened. */
+function finding(file, src, node, parents, rule, head = '') {
   const full = `${head}${src.slice(node.start, node.end)}${head ? ')' : ''}`.replace(/\s+/g, ' ')
-  return { file, line: node.loc.start.line, at: node.start, rule, text: full.length > 160 ? `${full.slice(0, 159)}…` : full, full }
+  return { file, line: node.loc.start.line, at: node.start, rule, fn: functionOf(parents), within: functionsOf(parents), text: full.length > 160 ? `${full.slice(0, 159)}…` : full, full }
 }
 
-/** The rule over one file's source: its findings. */
+/** The rule over one file's source: its findings, in source order. */
 export function presenceFindings(file, src) {
   const ast = parse(src, { sourceType: 'unambiguous', plugins: ['typescript'], allowReturnOutsideFunction: true, allowAwaitOutsideFunction: true })
   const out = []
   const named = new Set()
-  const local = new Map()
-  walk(ast.program, (n) => {
-    if (n.type === 'FunctionDeclaration' && n.id) local.set(n.id.name, n)
-    if (n.type === 'VariableDeclarator' && n.id.type === 'Identifier' && isFunction(n.init)) local.set(n.id.name, n.init)
-  })
+  const local = localFunctions(ast.program)
   const handler = (arg, call, parents, kind) => {
-    let fn = arg
+    let fn = bare(arg)
     if (isCall(fn) && PASSES_ABSENCE.has(calleeName(fn.callee))) return
     if (fn.type === 'Identifier' && local.has(fn.name)) fn = local.get(fn.name)
+    const head = `${calleeName(call.callee.object)}${kind}(`
     if (!isFunction(fn)) {
-      out.push(finding(file, src, arg, `${kind}: a handler this rule can't read`))
+      out.push(finding(file, src, arg, parents, `${kind}: a handler this rule can't read`, head))
       return
     }
     const err = fn.params[0]?.type === 'Identifier' ? fn.params[0].name : null
-    if (passesOn(fn.body, err, local)) return
-    // Queue bookkeeping: the receiver is a promise its function returns, so the caller gets the failure from it.
-    const receiver = call.callee.object
-    const outer = [...parents].reverse().find(isFunction)
-    if (kind === '.catch' && receiver?.type === 'Identifier' && outer && own(outer.body, (n) => n.type === 'ReturnStatement').some((r) => r.argument?.type === 'Identifier' && r.argument.name === receiver.name)) return
-    out.push(finding(file, src, arg, `${kind}: swallows the error`, `${calleeName(receiver)}${kind}(`))
+    if (handles(fn.body, err, local)) return
+    if (kind === '.catch' && bookkeeping(call, parents)) return
+    out.push(finding(file, src, arg, parents, `${kind}: swallows the error`, head))
   }
   walk(ast.program, (n, parents) => {
     // Once a place: an import's specifier holds the name twice (imported and local), at the same place.
     if (((n.type === 'Identifier' && n.name === 'existsSync') || (n.type === 'StringLiteral' && n.value === 'existsSync')) && !named.has(n.start)) {
       named.add(n.start)
-      out.push(finding(file, src, n, 'existsSync'))
+      out.push(finding(file, src, n, parents, 'existsSync'))
     }
     if (n.type === 'TryStatement' && n.handler && !parseOnly(n.block)) {
       const err = n.handler.param?.type === 'Identifier' ? n.handler.param.name : null
-      if (!passesOn(n.handler.body, err, local)) out.push(finding(file, src, n.handler, 'catch: swallows the error'))
+      if (!handles(n.handler.body, err, local)) out.push(finding(file, src, n.handler, [...parents, n], 'catch: swallows the error'))
     }
-    if (isCall(n) && (n.callee.type === 'MemberExpression' || n.callee.type === 'OptionalMemberExpression') && !n.callee.computed) {
+    if (isCall(n) && isMember(n.callee) && !n.callee.computed) {
       const m = n.callee.property.name
       if (m === 'catch' && n.arguments[0]) handler(n.arguments[0], n, parents, '.catch')
       if (m === 'then' && n.arguments[1]) handler(n.arguments[1], n, parents, '.then')
@@ -178,25 +357,35 @@ export function presenceFindings(file, src) {
 }
 
 /**
- * The rule over the files: { findings, problems }. `read(file)` gives a file's text (null when it isn't there).
- * `exceptions` are { file, text, why }: a finding of that file whose text holds `text` is excepted; an exception that
- * excepts nothing is a problem (stale).
+ * The rule over SCOPE-like entries: { findings, problems }. `read(file)` gives a file's text (null when it isn't there).
+ * `exceptions` are { file, in, node, why }: each excepts one finding of that file, in that function, whose whole text
+ * is `node`; one that excepts none is a problem (stale).
  */
-export function checkPresence({ files, read, exceptions }) {
+export function checkPresence({ scope, read, exceptions }) {
   const findings = []
   const used = new Set()
-  for (const file of files) {
+  const files = new Map()
+  for (const s of scope) {
+    const [file, fn] = s.split('#')
+    if (!files.has(file)) files.set(file, [])
+    files.get(file).push(fn ?? null)
+  }
+  for (const [file, fns] of files) {
     const src = read(file)
     if (src === null) {
-      findings.push({ file, line: 0, rule: 'scope', text: "isn't there: SCOPE names it" })
+      findings.push({ file, line: 0, rule: 'scope', fn: '(top)', text: "isn't there: SCOPE names it" })
       continue
     }
-    for (const f of presenceFindings(file, src)) {
-      const i = exceptions.findIndex((e) => e.file === file && f.full.includes(e.text))
+    const found = presenceFindings(file, src)
+    // A function SCOPE names must be there, or the entry holds nothing.
+    for (const fn of fns) if (fn && !new RegExp(`\\bfunction ${fn}\\b|\\b(?:const|let) ${fn}\\b`).test(src)) findings.push({ file, line: 0, rule: 'scope', fn, text: `has no function ${fn}: SCOPE names it` })
+    for (const f of found) {
+      if (!fns.includes(null) && !fns.some((fn) => f.within.includes(fn))) continue
+      const i = exceptions.findIndex((e, k) => !used.has(k) && e.file === file && e.in === f.fn && e.node === f.full)
       if (i >= 0) used.add(i)
-      else findings.push({ file: f.file, line: f.line, rule: f.rule, text: f.text })
+      else findings.push({ file: f.file, line: f.line, rule: f.rule, fn: f.fn, text: f.text })
     }
   }
-  const problems = exceptions.flatMap((e, i) => (used.has(i) ? [] : [`exception ${i} (${e.file}: ${e.text}) excepts nothing: remove it`]))
+  const problems = exceptions.flatMap((e, i) => (used.has(i) ? [] : [`exception ${i} (${e.file}, ${e.in}) excepts nothing: remove it`]))
   return { findings, problems }
 }

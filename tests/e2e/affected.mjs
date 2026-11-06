@@ -11,7 +11,7 @@
 import { execFileSync, spawnSync } from 'child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'fs'
 import { createRequire } from 'module'
-import { SCOPE as PRESENCE_SCOPE } from '../presenceChecks.mjs'
+import { SCOPE_FILES as PRESENCE_SCOPE } from '../presenceChecks.mjs'
 import { join, resolve } from 'path'
 import { pathToFileURL } from 'url'
 
