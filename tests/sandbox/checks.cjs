@@ -71,8 +71,8 @@ function mainCheckout(dir) {
  * holding the repo's main checkout, then a combwork-mcp checkout beside it (from a worktree, its main checkout's workspace).
  */
 function serverCandidates(repo) {
-  const main = mainCheckout(repo)
-  return [path.join(main, '..', '.combwork', 'mcp', 'windows-sandbox', 'server.js'), path.join(main, '..', 'mcp', 'servers', 'windows-sandbox', 'server.js')]
+  const checkout = mainCheckout(repo)
+  return [path.join(checkout, '..', '.combwork', 'mcp', 'windows-sandbox', 'server.js'), path.join(checkout, '..', 'mcp', 'servers', 'windows-sandbox', 'server.js')]
 }
 
 // The installer's name: Combwork-Setup since HI-2458, 1.0's before (a previous release's, kept in dist); and where 1.0's
