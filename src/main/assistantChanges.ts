@@ -116,7 +116,10 @@ function finalsOf(before: TaskCard | null, after: TaskCard): string[] {
   const out: string[] = []
   // Why, in the Assistant's tool replies (English); the window words it from its code (finalWhys, #1283).
   if ((after.decisions?.length ?? 0) > (before.decisions?.length ?? 0)) out.push(UNDO_FINAL.decision)
-  if (after.comments.length > before.comments.length) out.push(UNDO_FINAL.comment)
+  // A comment added (HI-2642): one the card didn't have, by its id; a card at its 500 keeps the same count as the oldest
+  // is archived (HI-2641), so a count alone misses it. A comment without an id is an older one's: counted as before.
+  const had = new Set(before.comments.flatMap((c) => (c.id ? [c.id] : [])))
+  if (after.comments.length > before.comments.length || after.comments.some((c) => c.id && !had.has(c.id))) out.push(UNDO_FINAL.comment)
   if (after.order !== before.order && after.column === before.column) out.push(UNDO_FINAL.cardPlace)
   if (!sameValue(after.context ?? [], before.context ?? [])) out.push(UNDO_FINAL.context)
   return out
