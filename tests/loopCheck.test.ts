@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { cardsInPlay, othersCards, owedCards, unwatched } from '../src/main/loopCheck'
 import { providerDescriptor } from '../src/shared/providers'
-import { backgroundTaskMinutes, builderJobOf, laneOrderWait, laneOrderWaitReason, LOOP_STEP_STALL_GRACE_MS, loopStepWait, loopStepWaitReason, notWatchingAgent, pendingDesign, pendingStep, notWatchingReason, REVIEW_WAIT_STALL_MS, reviewVerdictWaitReason, reviewWaitReason } from '../src/shared/tasks'
+import { backgroundTaskMinutes, builderJobOf, laneOrderWait, laneOrderWaitReason, LOOP_STEP_STALL_GRACE_MS, loopStepWait, loopStepWaitReason, notWatchingAgent, pendingDesign, pendingStep, notWatchingReason, REVIEW_WAIT_STALL_MS, reviewVerdictWaitReason, reviewWaitReason, reviewWaiter } from '../src/shared/tasks'
 import type { TaskCard } from '../src/shared/types'
 
 const card = (number: number, over: Partial<TaskCard> = {}): TaskCard => ({ number, title: `Card ${number}`, project: 'alpha', column: 'todo', agent: null, archived: false, labels: [], blockedBy: [], links: [], comments: [], history: [], ...over }) as unknown as TaskCard
@@ -192,6 +192,34 @@ describe('a card in Review its watching reviewer has not started on (#521)', () 
     const back = [...failed, h(600, 'HB2 (alpha)', 'Returned for review, round 2')]
     expect(reviewWaitReason(inReview({ history: back }), watchers, t0 + 600_000 + REVIEW_WAIT_STALL_MS - 1000)).toBeNull()
     expect(reviewWaitReason(inReview({ history: back }), watchers, t0 + 600_000 + REVIEW_WAIT_STALL_MS)).toBe("HR2 is watching #506 but hasn't started reviewing it: in Review for 15 min.")
+  })
+  describe('names the agent that owes the review, never a builder only watching it (HI-2636)', () => {
+    // HB1, another lane's builder, watches the card for Done; HR3 is the pool's reviewer given it, idle, with no watch.
+    const hb1 = { name: 'HB1', project: 'alpha', agentId: 'b1', cards: [506], status: 'watching' }
+    const hr3 = { name: 'HR3', project: 'alpha', agentId: 'r3', cards: [506], status: 'watching' }
+    const at = t0 + 20 * 60_000
+    const given = { agentId: 'r3', name: 'HR3', givenAt: new Date(t0 + 2 * 60_000).toISOString(), status: 'finished' }
+    it('a pool card: its given reviewer, watching or not, said as given', () => {
+      expect(reviewWaitReason(inReview(), [hb1], at, undefined, given)).toBe("#506 was given to HR3 to review 18 min ago, and it hasn't started reviewing it: in Review for 20 min.")
+      expect(reviewWaitReason(inReview(), [hb1, hr3], at, undefined, given)).toBe("#506 was given to HR3 to review 18 min ago, and it hasn't started reviewing it: in Review for 20 min.")
+      expect(reviewWaitReason(inReview(), [hb1], at, undefined, { ...given, status: 'working' })).toBe("#506 was given to HR3 to review 18 min ago, and it hasn't started reviewing it (it is working on something else): in Review for 20 min.")
+      // Given only just now (every reviewer was busy): its own wait first.
+      expect(reviewWaitReason(inReview(), [hb1], at, undefined, { ...given, givenAt: new Date(at - 60_000).toISOString() })).toBeNull()
+    })
+    it('a pool card nobody was given yet: no stall, whoever watches it', () => {
+      expect(reviewWaitReason(inReview(), [hb1, hr3], at, undefined, null)).toBeNull()
+    })
+    it("a lane's reviewer: only it, when it watches", () => {
+      const lane = { agentId: 'r3', name: 'HR3' }
+      expect(reviewWaitReason(inReview(), [hb1], at, undefined, lane)).toBeNull()
+      expect(reviewWaitReason(inReview(), [hb1, hr3], at, undefined, lane)).toBe("HR3 is watching #506 but hasn't started reviewing it: in Review for 20 min.")
+    })
+    it('nobody known to owe it: a watcher that may review, never a builder', () => {
+      const reviews = (id: string): boolean => id.startsWith('r')
+      expect(reviewWaitReason(inReview(), [hb1], at, undefined, undefined, reviews)).toBeNull()
+      expect(reviewWaitReason(inReview(), [hb1, hr3], at, undefined, undefined, reviews)).toBe("HR3 is watching #506 but hasn't started reviewing it: in Review for 20 min.")
+      expect(reviewWaiter(inReview(), [hb1, hr3], undefined, reviews)?.name).toBe('HR3')
+    })
   })
 })
 

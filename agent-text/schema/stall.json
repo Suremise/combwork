@@ -85,6 +85,15 @@
       "card": "plain"
     }
   },
+  "stall.review.given": {
+    "placeholders": {
+      "card": "plain",
+      "agent": "plain",
+      "given": "plain",
+      "state": "select",
+      "waited": "plain"
+    }
+  },
   "stall.review.noVerdict": {
     "placeholders": {
       "agent": "plain",

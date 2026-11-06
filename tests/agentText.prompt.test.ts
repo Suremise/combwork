@@ -71,6 +71,8 @@ function stalls(): { name: string; text: string | null }[] {
   for (const [minAgo, label] of [[40, 'minutes'], [120, 'hours'], [125, 'hours and minutes']] as const) {
     const r = { ...review, history: [{ at: at(minAgo), by: 'You', what: 'Moved to Review' }] }
     for (const w of [{}, { status: 'working' }, { silentMinutes: 25 }]) out.push({ name: `review wait ${label} ${JSON.stringify(w)}`, text: reviewWaitReason(r as never, [{ name: 'R1', project: 'alpha', agentId: 'r', cards: [9], ...w }], now) })
+    // HI-2636: given by the pool, idle or busy, its watch or none.
+    for (const status of ['finished', 'working']) out.push({ name: `review given ${label} ${status}`, text: reviewWaitReason(r as never, [], now, undefined, { agentId: 'r', name: 'R1', givenAt: at(minAgo - 1), status }) })
   }
   out.push({ name: 'no verdict', text: reviewVerdictWaitReason({ ...review, review: { agent: 'r', agentName: 'R1', since: at(60) } } as never, [{ name: 'R1', project: 'alpha', agentId: 'r', cards: [9], status: 'watching', watchSince: at(30) }], now) })
   out.push({

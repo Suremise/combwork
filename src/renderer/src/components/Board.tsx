@@ -5,7 +5,8 @@ import { gitProblemText } from '@shared/gitTool'
 import { agentRuntime, hooksMissingText } from '@shared/runtime'
 import { LOOP_STEP_WAIT_MINUTES } from '@shared/lanes'
 import { projectInfoPreferences } from '@shared/workflow/preferences'
-import { COLUMN_TEXT, REVIEW_WAIT_STALL_MS, TASK_COLUMNS, applyBoardFold, archiveBatchLabel, archiveBatchText, backgroundTaskMinutes, builderJobOf, cardMatches, newSinceStart, archivedAt, columnColor, columnName, laneOrderWaitReason, loopStepWait, loopStepWaitReason, notWatchingAgent, notWatchingReason, reviewStalled, reviewVerdictWaitReason, reviewWaitReason, stallAgentOf, stalledReason, startFailedReason, startWaitingReason, taskOverview, type BoardFoldChange, type LaneOrderView } from '@shared/tasks'
+import { COLUMN_TEXT, REVIEW_WAIT_STALL_MS, TASK_COLUMNS, applyBoardFold, archiveBatchLabel, archiveBatchText, backgroundTaskMinutes, builderJobOf, cardMatches, newSinceStart, archivedAt, columnColor, columnName, laneOrderWaitReason, loopStepWait, loopStepWaitReason, notWatchingAgent, notWatchingReason, reviewStalled, reviewVerdictWaitReason, reviewWaitReason, reviewWaiter, stallAgentOf, stalledReason, startFailedReason, startWaitingReason, taskOverview, type BoardFoldChange, type LaneOrderView, type ReviewOwed } from '@shared/tasks'
+import { agentWorkflowRole, reviewsWork } from '@shared/workflow/roles'
 import { isProviderEnabled, providerMessage, providerName } from '@shared/providers'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { call, errorMessage } from '../api'
@@ -147,7 +148,11 @@ function cardStall(projects: ProjectInfo[], c: TaskCard, lane?: LaneOrderView | 
   const { loopers, watchers } = stallAgentsNow(projects)
   const looping = notWatchingReason(c, loopers, tr)
   if (looping) return { text: looping, kind: notWatchingAgent(c, loopers)?.untaken ? 'wake-untaken' : 'not-watching' }
-  const waiting = waited(REVIEW_WAIT_STALL_MS) ? reviewWaitReason(c, watchers, Date.now(), tr) : null
+  // Only the agent owing the review (HI-2636): its lane's reviewer, else a watcher that may review, never a builder only
+  // watching it (the pool's choice is main's; its stall says it).
+  const owed = lane?.reviewer ? reviewerOwed(projects, c, lane.reviewer) : undefined
+  const reviews = (id: string): boolean => mayReview(projects, c, id)
+  const waiting = waited(REVIEW_WAIT_STALL_MS) ? reviewWaitReason(c, watchers, Date.now(), tr, owed, reviews) : null
   if (!waiting) {
     if (!waited(REVIEW_WAIT_STALL_MS)) return null
     const verdict = reviewVerdictWaitReason(c, watchers, Date.now(), tr, reviewJob(c, agent))
@@ -165,8 +170,23 @@ function cardStall(projects: ProjectInfo[], c: TaskCard, lane?: LaneOrderView | 
     return step ? { text: step, kind: loopStepWait(c, watchers, bound)?.step === 'followUp' ? 'follow-up' : 'loop-step' } : null
   }
   // The watcher reviewWaitReason names: its state unknown (silent) or not.
-  const w = watchers.find((x) => x.project.toLowerCase() === c.project.toLowerCase() && x.agentId !== c.agent && x.cards.includes(c.number))
+  const w = reviewWaiter(c, watchers, owed, reviews)
   return { text: waiting, kind: w?.silentMinutes !== undefined ? 'review-silent' : 'review-wait' }
+}
+
+/** The card's project's agent, as the window knows it. */
+const projectAgentOf = (projects: ProjectInfo[], c: Pick<TaskCard, 'project'>, id: string): AgentInfo | undefined => projects.find((p) => p.name.toLowerCase() === c.project.toLowerCase())?.agents.find((a) => a.id === id)
+
+/** A lane's reviewer owing a card's review (HI-2636), or null when it isn't one of the project's agents now. */
+function reviewerOwed(projects: ProjectInfo[], c: Pick<TaskCard, 'project'>, id: string): ReviewOwed | null {
+  const a = projectAgentOf(projects, c, id)
+  return a ? { agentId: a.id, name: a.name } : null
+}
+
+/** Whether an agent of the card's project may review (its workflow role, HI-2636). */
+function mayReview(projects: ProjectInfo[], c: Pick<TaskCard, 'project'>, id: string): boolean {
+  const a = projectAgentOf(projects, c, id)
+  return !!a && reviewsWork(agentWorkflowRole(a))
 }
 
 /**

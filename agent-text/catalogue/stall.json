@@ -59,6 +59,10 @@
     "text": "{agent} hasn't taken the wake Combwork typed for {card}: it waits in its prompt.",
     "note": "#777: the agent watched the card, and its wake waits untaken in its prompt (its CLI didn't take the line)."
   },
+  "stall.review.given": {
+    "text": "{card} was given to {agent} to review {given} ago, and it hasn't started reviewing it{state, select, busy { (it is working on something else)} other {}}: in Review for {waited}.",
+    "note": "HI-2636: a card waiting in Review that Combwork's reviewer pool gave to a reviewer, which hasn't started its review (watching it or not). given: how long ago it was given; waited: how long it has been in Review (both durations, stall.duration.*). state: busy (working on something else) or none."
+  },
   "stall.review.noVerdict": {
     "text": "{agent} started reviewing {card} but has given no verdict, and has only been watching it for {waited}.",
     "note": "A card in Review: its reviewer started the review, then went back to watching without a verdict. waited: a duration (stall.duration.*)."
