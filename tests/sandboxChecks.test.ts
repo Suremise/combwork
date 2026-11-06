@@ -32,7 +32,7 @@ const OLD_DIR = 'Hive'
 const saved = { WSB_STUB: process.env.WSB_STUB, WSB_STUB_STATE: process.env.WSB_STUB_STATE, WSB_STOP_RETRY_MS: process.env.WSB_STOP_RETRY_MS }
 process.env.WSB_STOP_RETRY_MS = '10'
 process.env.WSB_STUB = STUB
-const { buildRoot, plan, inSandbox, sacState, blockedReason, cmpVersion, serverCandidates, setLogSink } = require('./sandbox/checks.cjs')
+const { buildRoot, plan, inSandbox, sacState, blockedReason, cmpVersion, serverCandidates, mainCheckout, setLogSink } = require('./sandbox/checks.cjs')
 const logged: string[] = []
 beforeAll(() => setLogSink((line: string) => logged.push(line)))
 afterAll(() => {
@@ -97,6 +97,37 @@ test('the server: --server, else the workspace\'s installed copy, else an MCP se
   assert.throws(() => plan([...opts, '--server', path.join(s.dir, 'nope.js')]), /--server .*nope\.js doesn't exist/)
   // Without --repo, the repo is this checkout (it gives the previous installer from its dist only when asked to).
   assert.strictEqual(plan(['--installer', installer, '--only', 'fresh', '--server', FAKE_SERVER]).repo, path.resolve(__dirname, '..'))
+})
+
+test('the server from a worktree: the workspace of its main checkout, not the worktrees\' folder (HI-2644)', () => {
+  const s = scratch('worktree')
+  const installer = path.join(s.dir, 'builds', 'app', 'Combwork-Setup-0.6.0.exe')
+  // A workspace (ws) holding the main checkout, and a slot in ws.worktrees, as Combwork lays them out.
+  const main = path.join(s.dir, 'ws', 'combwork')
+  const slot = path.join(s.dir, 'ws.worktrees', 'combwork', 'slot-a')
+  fs.mkdirSync(main, { recursive: true })
+  const git = (cwd: string, ...args: string[]) => {
+    const r = spawnSync('git', ['-c', 'user.name=Combwork Test', '-c', 'user.email=combwork-test@example.invalid', ...args], { cwd, env: baseEnv(), encoding: 'utf8', windowsHide: true, timeout: 30_000 })
+    assert.strictEqual(r.status, 0, `git ${args.join(' ')}: ${r.stderr}`)
+  }
+  git(main, 'init', '-q')
+  git(main, 'commit', '-q', '--allow-empty', '-m', 'first')
+  fs.mkdirSync(path.dirname(slot), { recursive: true })
+  git(main, 'worktree', 'add', '-q', '--detach', slot)
+  const installed = path.join(s.dir, 'ws', '.combwork', 'mcp', 'windows-sandbox', 'server.js')
+  fs.mkdirSync(path.dirname(installed), { recursive: true })
+  fs.writeFileSync(installed, '')
+  const same = (a: string, b: string) => assert.strictEqual(fs.realpathSync.native(a).toLowerCase(), fs.realpathSync.native(b).toLowerCase())
+  // From the slot (its own --repo, as a worktree's default is) and from the main checkout: the workspace's copy.
+  same(serverCandidates(slot)[0], installed)
+  same(plan(['--installer', installer, '--only', 'fresh', '--repo', slot]).serverJs, installed)
+  same(plan(['--installer', installer, '--only', 'fresh', '--repo', main]).serverJs, installed)
+  assert.strictEqual(path.resolve(mainCheckout(main)), path.resolve(main))
+  same(mainCheckout(slot), main)
+  // The repo stays the slot: --previous is still looked for in its own dist.
+  assert.strictEqual(plan(['--installer', installer, '--only', 'fresh', '--repo', slot]).repo, path.resolve(slot))
+  // A folder git doesn't know is its own checkout.
+  assert.strictEqual(mainCheckout(path.join(s.dir, 'builds')), path.join(s.dir, 'builds'))
 })
 
 test('inSandbox: a body that throws still stops the Sandbox, confirmed', async () => {
