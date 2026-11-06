@@ -1,7 +1,7 @@
 // The log line an agent's Combwork tools connected (sessions.ts, #865) and its one reader, lib.combworkToolsConnected:
-// e2e suites and the scenario harness wait on it before typing into a real CLI. HI-2584 renamed it from "hive tools
-// connected" and a suite with its own copy of the text (wakepaste-cli) missed the change (HR2's round 1), so the line
-// is read only through the helper, which still accepts the old form.
+// e2e suites and the scenario harness wait on it before typing into a real CLI. A suite with its own copy of the text
+// (wakepaste-cli) once missed a change to it (HI-2584, HR2's round 1), so the line is read only through the helper,
+// which reads the current line alone (HI-2614): any other wording doesn't count.
 import { createRequire } from 'module'
 import { execFileSync } from 'child_process'
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
@@ -27,9 +27,10 @@ describe("the tools-connected log line and its reader (lib.combworkToolsConnecte
     expect(source).toContain("${userText(agentId)}'s Combwork tools connected")
   })
 
-  it('reads the line as Combwork writes it, and as a build from before HI-2584 did, for that agent only', () => {
+  it('reads the line as Combwork writes it, for that agent only, and no other wording', () => {
     expect(combworkToolsConnected(profile([`${T} ⁨a-1⁩'s Combwork tools connected 1200 ms after it became ready`]), 'a-1')).toBe(true)
-    expect(combworkToolsConnected(profile([`${T} ⁨a-1⁩'s hive tools connected`]), 'a-1')).toBe(true)
+    expect(combworkToolsConnected(profile([`${T} ⁨a-1⁩'s other tools connected`]), 'a-1')).toBe(false)
+    expect(combworkToolsConnected(profile([`${T} ⁨a-1⁩'s tools connected`]), 'a-1')).toBe(false)
     expect(combworkToolsConnected(profile([`${T} ⁨a-2⁩'s Combwork tools connected`]), 'a-1')).toBe(false)
     expect(combworkToolsConnected(profile([`${T} ⁨a-1⁩'s Combwork tools connected`, `${T} other`]), 'a-1', 1)).toBe(false)
   })
