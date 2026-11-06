@@ -426,6 +426,12 @@ test("the profile move's script records the report's check ids, and reads the re
   assert.ok(refusedTitle, 'the script says $refusedTitle')
   const english = JSON.parse(fs.readFileSync(path.join(root, 'locales', 'en', 'main.json'), 'utf8'))
   assert.ok(english['main.profileMove.refusedTitle']?.defaultMessage.includes(refusedTitle), `locales/en's main.profileMove.refusedTitle holds "${refusedTitle}"`)
+  // showErrorBox's title is the box's heading on Windows; its caption is Electron's "Error" (HI-2648): the check finds the
+  // title among the box's texts (UI Automation), and the caption is only "Error".
+  assert.match(script, /^\$refusedCaption = 'Error'$/m)
+  const refused = script.slice(script.indexOf("Check '11.refused' "), script.indexOf('\n', script.indexOf("Check '11.refused' ")))
+  assert.ok(refused.includes('$caption -eq $refusedCaption') && refused.includes('$texts -like "*$refusedTitle*"') && !refused.includes('$title -like'), "11.refused reads the title in the box's texts, not the caption")
+  assert.ok(/function TextsOf\(\$p\)[\s\S]*?AutomationElement\]::FromHandle\(\$g\.MainWindowHandle\)/.test(script), 'TextsOf reads the window with UI Automation')
   const index = fs.readFileSync(path.join(root, 'src', 'main', 'index.ts'), 'utf8')
   const refuse = index.slice(index.indexOf('function refuseStart('), index.indexOf('exitBeforeProfile(1)', index.indexOf('function refuseStart(')))
   assert.ok(refuse.includes("id: 'main.profileMove.refusedTitle'") && refuse.includes('dialog.showErrorBox(title,') && refuse.includes('process.stderr.write(`${title}: ${e.message}'), 'refuseStart shows the title and writes the move\'s message to stderr')
