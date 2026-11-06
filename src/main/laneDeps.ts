@@ -8,7 +8,7 @@ import { lanesEnforced, listLanes, mutateLanes, rawLanes } from './lanes'
 import { createLogger, userText } from './logger'
 import { cardsNow } from './tasks'
 import { workspaceFor, type WorkspaceService } from './workspace'
-import type { PassFence } from './laneStarts'
+import { setDepWakeOwed, type PassFence } from './laneStarts'
 
 /**
  * A lane's due card waiting for the cards it depends on (HI-2618). On 5 Nov HB6's HI-2616 was next in its lane while the
@@ -68,7 +68,11 @@ export async function settleDepEpisodes(ws: WorkspaceService, enforced: boolean,
     if (!rec || rec.state !== 'active') continue
     const due = dueOf(v)
     const ep = rec.depEpisode
+    // Owed a readiness wake not made yet (HI-2618, HR1's round 1): laneStarts.ts looks again as its builder's status or
+    // deliveries change, and on its tick, until it is made; a lane with nothing owed is dropped from that.
+    const owed = (o: boolean): void => setDepWakeOwed(ws.path!, rec.project, rec.builder.id, o)
     if (due && due.open.length) {
+      owed(false)
       // Waiting: an episode begins (or carries on) for this card.
       if (!(ep && ep.card === due.card && ep.state === 'waiting')) await change(ws, fence, rec, due.card, (e) => (e && e.card === due.card && e.state === 'waiting' ? e : { card: due.card, id: randomBytes(6).toString('hex'), state: 'waiting', at: nowIso() }))
       continue
@@ -78,17 +82,27 @@ export async function settleDepEpisodes(ws: WorkspaceService, enforced: boolean,
         // The last of them Done: claimed. With the rules on Combwork's start is the one task, so nothing is owed.
         const claimed = await change(ws, fence, rec, due.card, (e) => (e && e.card === due.card && e.id === ep.id && e.state === 'waiting' ? { ...e, state: enforced ? 'sent' : 'pending', at: nowIso() } : e))
         if (!claimed || enforced) continue
+        // Owed from the claim on: a crash or a refusal after it is retried by the next look (its receipt making it once).
+        owed(true)
         await laneDepsTestHooks.afterClaim?.(rec.id)
-        await owe(ws, fence, rec, { ...ep, state: 'pending' })
+        const got = await owe(ws, fence, rec, { ...ep, state: 'pending' })
+        if (got !== 'refused') owed(got !== 'made' && got !== 'gone')
       } else if (ep.state === 'pending') {
         // Owed and not checkpointed (a crash, or a delivery refused for now): retried, its receipt making it once; with
         // the rules now on, or too old, given up.
-        if (enforced || Date.now() - Date.parse(ep.at) > ONCE_RETRY_MS) await change(ws, fence, rec, due.card, (e) => (e && e.id === ep.id && e.state === 'pending' ? { ...e, state: 'sent', at: nowIso() } : e))
-        else await owe(ws, fence, rec, ep)
-      }
+        if (enforced || Date.now() - Date.parse(ep.at) > ONCE_RETRY_MS) {
+          await change(ws, fence, rec, due.card, (e) => (e && e.id === ep.id && e.state === 'pending' ? { ...e, state: 'sent', at: nowIso() } : e))
+          owed(false)
+        } else {
+          owed(true)
+          const got = await owe(ws, fence, rec, ep)
+          if (got !== 'refused') owed(got !== 'made' && got !== 'gone')
+        }
+      } else owed(false)
       continue
     }
     // Its due card has no wait now (it started, moved, or another card is due): the cursor goes.
+    owed(false)
     if (ep) await change(ws, fence, rec, null, (e) => (e && e.id === ep.id ? null : e))
   }
 }
@@ -115,15 +129,20 @@ async function change(ws: WorkspaceService, fence: PassFence, rec: LaneRecord, c
   return changed
 }
 
-/** The readiness wake a pending episode owes its builder (the rules off): made once (its receipt), then checkpointed. */
-async function owe(ws: WorkspaceService, fence: PassFence, rec: LaneRecord, ep: DepEpisode): Promise<void> {
-  if (!ws.path || !fence.current()) return
+/**
+ * The readiness wake a pending episode owes its builder (the rules off): made once (its receipt), then checkpointed.
+ * `made` (or found made); `refused` for now (tried again); `gone`, no longer owed (the lane or its episode moved on);
+ * `skipped`, this look no longer current (the next one decides).
+ */
+async function owe(ws: WorkspaceService, fence: PassFence, rec: LaneRecord, ep: DepEpisode): Promise<'made' | 'refused' | 'gone' | 'skipped'> {
+  if (!ws.path || !fence.current()) return 'skipped'
   // Still owed, as the lanes have it now (after the awaits since the look read them).
   const now = (await rawLanes(ws)).find((l) => l.id === rec.id)
-  if (!fence.current() || !now || now.state !== 'active' || now.depEpisode?.id !== ep.id || now.depEpisode.state !== 'pending' || now.builder.id !== rec.builder.id) return
+  if (!fence.current()) return 'skipped'
+  if (!now || now.state !== 'active' || now.depEpisode?.id !== ep.id || now.depEpisode.state !== 'pending' || now.builder.id !== rec.builder.id) return 'gone'
   const projectPath = join(ws.path, rec.project)
   const { key, deps } = await depKeys(ws, projectPath, ep.card)
-  if (!fence.current()) return
+  if (!fence.current()) return 'skipped'
   try {
     // agent-protocol: the sender is the product's name, Combwork
     const got = await createDeliveryOnce(projectPath, { agentId: now.builder.id, agentName: now.builder.name, kind: 'card-event', from: { kind: 'combwork', name: 'Combwork' }, card: ep.card, body: inDefaultDialect(() => say(A.ready, { card: key, deps: deps.join(', ') })), source: LANE_DEPS_SOURCE, ref: refOf(rec.id, ep.card, ep.id), meta: { lane: rec.id, episode: ep.id }, once: onceOf(rec.id, ep.card, ep.id) }) // i18n-ignore: who a delivery is from, as agents read it
@@ -131,10 +150,11 @@ async function owe(ws: WorkspaceService, fence: PassFence, rec: LaneRecord, ep: 
   } catch (e) {
     // Refused for now (its inbox full, its agent can't read one): the next look tries again, its receipt making it once.
     log.warn(`telling ${userText(now.builder.name)} lane ${rec.id}'s #${ep.card} can start`, e)
-    return
+    return 'refused'
   }
   await laneDepsTestHooks.afterEnqueue?.(rec.id)
   await checkpoint(ws, rec.id, ep.id)
+  return 'made'
 }
 
 /** Card n's key and the cards it depends on, by key, as its workflow names them (the board's where it can't). */

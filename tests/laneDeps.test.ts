@@ -272,6 +272,37 @@ describe("a lane's due card waiting on its dependencies (HI-2618)", () => {
     expect(await laneDepsRefreshForTests(again, p)).toMatchObject({ cancel: /no longer running/ })
   })
 
+  it("a wake refused for now (its builder can't take one yet) is retried by Combwork's own looks once it can: one wake, with no card changed (HR1's round 1)", async () => {
+    await advanced.set(ENFORCE, false)
+    const { config } = await import('../src/main/config')
+    const { emit } = await import('../src/main/events')
+    const { laneStartsSettled, startLaneStarts } = await import('../src/main/laneStarts')
+    startLaneStarts()
+    const { lane, deps } = await hb6('b6')
+    await checkLaneStarts(w)
+    // Its builder can't be given an inbox item now (no Combwork tools for agents): the wake is refused, and owed.
+    const was = config.settings.agentApi.provideCombworkMcp
+    config.settings.agentApi.provideCombworkMcp = false
+    try {
+      for (const d of deps) await move(d, 'done')
+      // The board's changes and the lanes' own write after the claim are looked at (Combwork's own looks), then drained.
+      await vi.waitFor(async () => expect((await episode(lane))?.state).toBe('pending'), { timeout: HUNG_MS })
+      await laneStartsSettled()
+      expect(await wakes('b6')).toEqual([])
+    } finally {
+      config.settings.agentApi.provideCombworkMcp = was
+    }
+    // It can now. Its builder's status changes (its turn over): the look that follows makes the wake, once.
+    emit({ type: 'session-exit', projectPath: p, agentId: 'b6' } as never)
+    await vi.waitFor(async () => expect(await wakes('b6')).toHaveLength(1), { timeout: HUNG_MS })
+    await laneStartsSettled()
+    expect(await episode(lane)).toMatchObject({ state: 'sent' })
+    // Nothing more owed: another status change makes none.
+    emit({ type: 'session-exit', projectPath: p, agentId: 'b6' } as never)
+    await laneStartsSettled()
+    expect(await wakes('b6')).toHaveLength(1)
+  })
+
   it('a look held while the same service closes and reopens the same workspace writes no cursor and publishes nothing into the new open', async () => {
     await advanced.set(ENFORCE, false)
     const { lane } = await hb6('b8')

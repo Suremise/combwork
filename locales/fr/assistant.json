@@ -682,7 +682,7 @@
   "assistant.undo.ended": "le couloir est terminé",
   "assistant.undo.error": "échec : {error}",
   "assistant.undo.failed": "Impossible d’annuler la modification de l’Assistant",
-  "assistant.undo.field": "{field, select, title {titre} description {description} labels {étiquettes} blocked {bloquée} blockedBy {bloquée par} links {liens} agent {agent} column {colonne} project {projet} created {la carte} cards {cartes} reviewer {relecteur} rounds {tours} waitMinutes {attente} name {nom} provider {fournisseur} connection {connexion} model {modèle} effort {effort} permissionMode {mode d’autorisation} use200kContext {taille du contexte} mcpServers {serveurs MCP} lastSessionId {conversation} value {valeur} removed {modèles retirés} run {le démarrage} agents {agents} layout {disposition} workflow {options du flux de travail} other {{field}}}",
+  "assistant.undo.field": "{field, select, title {titre} description {description} labels {étiquettes} blocked {bloquée} blockedBy {bloquée par} links {liens} agent {agent} column {colonne} project {projet} waitingFor {attente} created {la carte} cards {cartes} reviewer {relecteur} rounds {tours} waitMinutes {attente} name {nom} provider {fournisseur} connection {connexion} model {modèle} effort {effort} permissionMode {mode d’autorisation} use200kContext {taille du contexte} mcpServers {serveurs MCP} lastSessionId {conversation} value {valeur} removed {modèles retirés} run {le démarrage} agents {agents} layout {disposition} workflow {options du flux de travail} other {{field}}}",
   "assistant.undo.final": "Impossible à annuler",
   "assistant.undo.gone": "n’existe plus",
   "assistant.undo.kept": "Conservé",

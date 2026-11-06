@@ -682,7 +682,7 @@
   "assistant.undo.ended": "die Lane ist beendet",
   "assistant.undo.error": "fehlgeschlagen: {error}",
   "assistant.undo.failed": "Die Änderung des Assistenten konnte nicht rückgängig gemacht werden",
-  "assistant.undo.field": "{field, select, title {Titel} description {Beschreibung} labels {Labels} blocked {blockiert} blockedBy {blockiert durch} links {Verknüpfungen} agent {Agent} column {Spalte} project {Projekt} created {die Karte} cards {Karten} reviewer {Reviewer} rounds {Runden} waitMinutes {Wartezeit} name {Name} provider {Anbieter} connection {Verbindung} model {Modell} effort {Aufwand} permissionMode {Berechtigungsmodus} use200kContext {Kontextgröße} mcpServers {MCP-Server} lastSessionId {Unterhaltung} value {Wert} removed {entfernte Modelle} run {der Start} agents {Agenten} layout {Layout} workflow {Workflow-Optionen} other {{field}}}",
+  "assistant.undo.field": "{field, select, title {Titel} description {Beschreibung} labels {Labels} blocked {blockiert} blockedBy {blockiert durch} links {Verknüpfungen} agent {Agent} column {Spalte} project {Projekt} waitingFor {Warten} created {die Karte} cards {Karten} reviewer {Reviewer} rounds {Runden} waitMinutes {Wartezeit} name {Name} provider {Anbieter} connection {Verbindung} model {Modell} effort {Aufwand} permissionMode {Berechtigungsmodus} use200kContext {Kontextgröße} mcpServers {MCP-Server} lastSessionId {Unterhaltung} value {Wert} removed {entfernte Modelle} run {der Start} agents {Agenten} layout {Layout} workflow {Workflow-Optionen} other {{field}}}",
   "assistant.undo.final": "Nicht rückgängig zu machen",
   "assistant.undo.gone": "nicht mehr vorhanden",
   "assistant.undo.kept": "Beibehalten",

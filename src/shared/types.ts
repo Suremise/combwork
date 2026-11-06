@@ -1393,9 +1393,10 @@ export interface TaskPatch {
   blocked?: string | null
   /**
    * Marks a card in Doing as waiting on purpose, with why (HI-2618: held for a quiet window); '' or null clears it. Only
-   * its own agent, the user or the Assistant. Combwork reports it as stalled for nothing while it waits.
+   * its own agent, the user or the Assistant. Combwork reports it as stalled for nothing while it waits. A whole mark
+   * (TaskWaiting) is undo's, putting back one as it was (who marked it and when): never from the Agent API (a string).
    */
-  waitingFor?: string | null
+  waitingFor?: string | null | TaskWaiting
   blockedBy?: number[]
   links?: number[]
   /** The doc sections to read first (#818), replacing the list; [] clears it. */

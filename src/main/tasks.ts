@@ -2430,13 +2430,16 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
       // Marked or cleared (HI-2618): by its own agent, the user or the Assistant (a script with the workspace token too),
       // never another project agent, who would silence this card's stalls.
       if (actor.kind === 'agent' && actor.self && card.agent !== actor.self.agentId) throw new TaskPermissionError(withValues(ERR.waitingNotYours, { card: cardRef(n) }))
-      const reason = patch.waitingFor?.trim() ?? ''
+      // A whole mark is undo's, put back as it was (who marked it, when); a string is a new one, by the caller, now.
+      const whole = patch.waitingFor && typeof patch.waitingFor === 'object' ? patch.waitingFor : null
+      const reason = (whole ? whole.reason : (patch.waitingFor as string | null))?.trim() ?? ''
       if (reason.length > MAX_WAITING) throw combworkError(ERR.waitingTooLong, { max: MAX_WAITING }, { kind: 'invalid' })
       if (reason) {
         if (card.column !== 'doing') throw combworkError(ERR.waitingNotActive, { card: cardRef(n), active: stageName('active', await stageNamesOf(ws, card.project)) }, { kind: 'conflict' })
-        if (reason !== card.waitingFor?.reason) {
-          card.waitingFor = { reason, by, at: new Date().toISOString() }
-          said.push(storedText(HISTORY.waiting, { reason }))
+        const mark = whole ? { reason, by: whole.by, at: whole.at } : { reason, by, at: new Date().toISOString() }
+        if (reason !== card.waitingFor?.reason || (whole && (whole.by !== card.waitingFor?.by || whole.at !== card.waitingFor?.at))) {
+          if (reason !== card.waitingFor?.reason) said.push(storedText(HISTORY.waiting, { reason }))
+          card.waitingFor = mark
         }
       } else if (card.waitingFor) {
         delete card.waitingFor

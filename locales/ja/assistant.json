@@ -682,7 +682,7 @@
   "assistant.undo.ended": "レーンは終了しています",
   "assistant.undo.error": "失敗：{error}",
   "assistant.undo.failed": "アシスタントの変更を元に戻せませんでした",
-  "assistant.undo.field": "{field, select, title {タイトル} description {説明} labels {ラベル} blocked {ブロック} blockedBy {ブロック元} links {リンク} agent {エージェント} column {列} project {プロジェクト} created {カード} cards {カード} reviewer {レビュアー} rounds {ラウンド} waitMinutes {待ち時間} name {名前} provider {プロバイダー} connection {接続} model {モデル} effort {エフォート} permissionMode {権限モード} use200kContext {コンテキストのサイズ} mcpServers {MCPサーバー} lastSessionId {会話} value {値} removed {削除したモデル} run {起動} agents {エージェント} layout {レイアウト} workflow {ワークフローのオプション} other {{field}}}",
+  "assistant.undo.field": "{field, select, title {タイトル} description {説明} labels {ラベル} blocked {ブロック} blockedBy {ブロック元} links {リンク} agent {エージェント} column {列} project {プロジェクト} waitingFor {待機} created {カード} cards {カード} reviewer {レビュアー} rounds {ラウンド} waitMinutes {待ち時間} name {名前} provider {プロバイダー} connection {接続} model {モデル} effort {エフォート} permissionMode {権限モード} use200kContext {コンテキストのサイズ} mcpServers {MCPサーバー} lastSessionId {会話} value {値} removed {削除したモデル} run {起動} agents {エージェント} layout {レイアウト} workflow {ワークフローのオプション} other {{field}}}",
   "assistant.undo.final": "元に戻せません",
   "assistant.undo.gone": "存在しません",
   "assistant.undo.kept": "そのまま",

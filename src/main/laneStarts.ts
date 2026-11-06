@@ -13,7 +13,7 @@ import { launchFresh } from './laneStart'
 import { changeFreshStart, freshStartsNow, laneNow, lanesEnforced, laneStartHeld, laneViewsChanged, laneWaitsForSlot, listLanes, rawLanes, setLaneStartWaits } from './lanes'
 import { createLogger, userText } from './logger'
 import { withCardNames } from './projectKeys'
-import { offerNow, waitingForRun } from './deliveries'
+import { offerNow, onDeliveriesChanged, waitingForRun } from './deliveries'
 import { whyNoLine } from './lineWriter'
 import { sessions } from './sessions'
 import { startTask } from './taskStart'
@@ -67,6 +67,17 @@ const inFlight = new Set<Promise<unknown>>()
  */
 const owed = new Set<string>()
 const launchingNow = new Set<string>()
+/**
+ * Builders owed a lane's readiness wake that isn't made yet (HI-2618, laneDeps.ts: its delivery refused for now, an inbox
+ * full say), by the same key: looked at again as each one's status or deliveries change, and by the tick, as `waiting`.
+ */
+const depWakes = new Set<string>()
+/** laneDeps.ts: whether a lane's builder is owed its readiness wake now (retried until it is made, then dropped). */
+export function setDepWakeOwed(wsPath: string, project: string, agentId: string, isOwed: boolean): void {
+  const k = builderKey(wsPath, project, agentId)
+  if (isOwed) depWakes.add(k)
+  else depWakes.delete(k)
+}
 
 const M = {
   freshBlockedTitle: msg({ id: 'service.laneStarts.freshBlockedTitle', defaultMessage: '{agent}’s new conversation didn’t start', description: "A notification's title (HI-2034): a lane's agent ({agent}, its name) is owed a new conversation for the lane, and Combwork has stopped trying to start it." }),
@@ -360,7 +371,7 @@ function agentChanged(projectPath: string, agentId: string): void {
   if (!ws?.path) return
   const project = projectPath.slice(ws.path.length).replace(/^[\\/]+/, '')
   const k = builderKey(ws.path, project, agentId)
-  if (!waiting.has(k) && !owed.has(k)) return
+  if (!waiting.has(k) && !owed.has(k) && !depWakes.has(k)) return
   // Its status changed (a line Combwork was typing into it went in, its turn ended): a start refused for that is tried again
   // now, not after RETRY_MS.
   for (const [key, t] of tried) if (t.builder === k) tried.delete(key)
@@ -389,8 +400,12 @@ export function startLaneStarts(): void {
   })
   // A start refused for now (a slot or a line to wait for, the user typing) is tried again while its card waits.
   const tick = setInterval(() => {
-    if (!waiting.size && !owed.size) return
-    for (const ws of openWorkspaces()) if (ws.path && [...waiting.keys(), ...owed].some((k) => k.startsWith(`${ws.path!.toLowerCase()}#`))) soon(ws)
+    if (!waiting.size && !owed.size && !depWakes.size) return
+    for (const ws of openWorkspaces()) if (ws.path && [...waiting.keys(), ...owed, ...depWakes].some((k) => k.startsWith(`${ws.path!.toLowerCase()}#`))) soon(ws)
   }, RETRY_MS)
   tick.unref?.()
+  // A builder owed a readiness wake whose deliveries changed (one acked, room in its inbox): looked at again (HI-2618).
+  onDeliveriesChanged((host, agents) => {
+    for (const a of agents) agentChanged(host, a)
+  })
 }

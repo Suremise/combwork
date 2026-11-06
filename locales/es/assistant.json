@@ -682,7 +682,7 @@
   "assistant.undo.ended": "el carril ha terminado",
   "assistant.undo.error": "falló: {error}",
   "assistant.undo.failed": "No se pudo deshacer el cambio del Asistente",
-  "assistant.undo.field": "{field, select, title {título} description {descripción} labels {etiquetas} blocked {bloqueada} blockedBy {bloqueada por} links {enlaces} agent {agente} column {columna} project {proyecto} created {la tarjeta} cards {tarjetas} reviewer {revisor} rounds {rondas} waitMinutes {espera} name {nombre} provider {proveedor} connection {conexión} model {modelo} effort {esfuerzo} permissionMode {modo de permisos} use200kContext {tamaño del contexto} mcpServers {servidores MCP} lastSessionId {conversación} value {valor} removed {modelos quitados} run {el inicio} agents {agentes} layout {diseño} workflow {opciones del flujo de trabajo} other {{field}}}",
+  "assistant.undo.field": "{field, select, title {título} description {descripción} labels {etiquetas} blocked {bloqueada} blockedBy {bloqueada por} links {enlaces} agent {agente} column {columna} project {proyecto} waitingFor {espera} created {la tarjeta} cards {tarjetas} reviewer {revisor} rounds {rondas} waitMinutes {espera} name {nombre} provider {proveedor} connection {conexión} model {modelo} effort {esfuerzo} permissionMode {modo de permisos} use200kContext {tamaño del contexto} mcpServers {servidores MCP} lastSessionId {conversación} value {valor} removed {modelos quitados} run {el inicio} agents {agentes} layout {diseño} workflow {opciones del flujo de trabajo} other {{field}}}",
   "assistant.undo.final": "No se puede deshacer",
   "assistant.undo.gone": "ya no existe",
   "assistant.undo.kept": "Conservado",
