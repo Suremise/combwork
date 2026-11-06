@@ -50,7 +50,7 @@ function project(ws: string, name: string, extra: Record<string, unknown> = {}, 
   writeFileSync(join(p, '.combwork', 'sessions.json'), JSON.stringify({ version: 1, sessions: sessions.map((id) => ({ id, agent: 'claude-code', name: id, createdAt: '2026-10-01T00:00:00.000Z', lastActiveAt: '2026-10-01T00:00:00.000Z', archived: false })) }))
   return p
 }
-/** A handover as an older Hive wrote it (no owner recorded): its name's project slug, and its header. */
+/** A handover as an older version wrote it (no owner recorded): its name's project slug, and its header. */
 function oldHandover(ws: string, file: string, projectName: string, session?: string): void {
   mkdirSync(join(ws, '.combwork', 'shared', 'handovers'), { recursive: true })
   writeFileSync(join(ws, '.combwork', 'shared', 'handovers', file), `# Handover\n\n- **Project:** ${projectName}\n${session ? `- **Session:** ${session}\n` : ''}- **Date:** 2026-10-01 10:00 (2026-10-01T10:00:00Z)\n\nWhere things stand.\n`)
@@ -109,13 +109,13 @@ describe('a project renamed: found by its id (#514)', () => {
 
   it('from before (project.json lastPath in this folder, no record yet): once; a copy, even of a renamed project, never', async () => {
     const ws = newWs()
-    project(ws, 'website', { id: 'p-00000000aaaa', lastPath: join(ws, 'hive-website') })
-    // Copied by an older Hive (no ids), its original still a project.
+    project(ws, 'website', { id: 'p-00000000aaaa', lastPath: join(ws, 'acme-website') })
+    // Copied by an older version (no ids), its original still a project.
     project(ws, 'old', { lastPath: join(ws, 'old') })
     cpSync(join(ws, 'old'), join(ws, 'old-2'), { recursive: true })
     let w = await open(ws)
     expect(await until(w, () => !!journal(ws).projects['p-00000000aaaa'])).toBe(true)
-    expect(journal(ws).renames.map((r) => [r.from, r.to])).toEqual([['hive-website', 'website']])
+    expect(journal(ws).renames.map((r) => [r.from, r.to])).toEqual([['acme-website', 'website']])
     // website renamed, then copied: the copy (an id of its own) has no earlier names.
     await disposeWorkspaceService(w)
     await move(join(ws, 'website'), join(ws, 'site'))
@@ -126,7 +126,7 @@ describe('a project renamed: found by its id (#514)', () => {
     expect(copyId).not.toBe('p-00000000aaaa')
     expect(await until(w, () => !!journal(ws).projects[copyId])).toBe(true)
     expect(journal(ws).projects[copyId]).toEqual({ name: 'site-copy', former: [] })
-    expect(journal(ws).projects['p-00000000aaaa']).toEqual({ name: 'site', former: ['website', 'hive-website'] })
+    expect(journal(ws).projects['p-00000000aaaa']).toEqual({ name: 'site', former: ['website', 'acme-website'] })
     await disposeWorkspaceService(w)
   })
 })
@@ -169,22 +169,22 @@ describe('handovers and kept comparisons are owned by id (#514)', () => {
 
   it('older ones are given owners once, from what they say: a contradicting header is never overruled by a file name', async () => {
     const ws = newWs()
-    // website was hive-website, and a Repair already recorded it where it is (lastPath website): its name before is lost.
-    project(ws, 'hive')
+    // website was acme-website, and a Repair already recorded it where it is (lastPath website): its name before is lost.
+    project(ws, 'acme')
     project(ws, 'website', { lastPath: join(ws, 'website') }, ['sess-web'])
-    oldHandover(ws, '2026-10-01-hive-website-launch.md', 'hive-website')
-    oldHandover(ws, '2026-10-02-hive-website-notes.md', 'hive-website', 'sess-web')
-    oldHandover(ws, '2026-10-03-hive-plan.md', 'hive')
+    oldHandover(ws, '2026-10-01-acme-website-launch.md', 'acme-website')
+    oldHandover(ws, '2026-10-02-acme-website-notes.md', 'acme-website', 'sess-web')
+    oldHandover(ws, '2026-10-03-acme-plan.md', 'acme')
     const w = await open(ws)
     await until(w, () => existsSync(join(ws, '.combwork', 'project-names.json')))
-    // Its conversation tells (sessions.json); the other can't be known yet: nobody's, never hive's.
-    expect(await handovers(w, 'website')).toEqual(['2026-10-02-hive-website-notes.md'])
-    expect(await handovers(w, 'hive')).toEqual(['2026-10-03-hive-plan.md'])
-    // Repair finds website was hive-website (its cards there), and records it: that one is website's too.
-    await names.noteFormerName(w, w.projectIdsNow().byPath.get(join(ws, 'website').toLowerCase())!, 'hive-website')
+    // Its conversation tells (sessions.json); the other can't be known yet: nobody's, never acme's.
+    expect(await handovers(w, 'website')).toEqual(['2026-10-02-acme-website-notes.md'])
+    expect(await handovers(w, 'acme')).toEqual(['2026-10-03-acme-plan.md'])
+    // Repair finds website was acme-website (its cards there), and records it: that one is website's too.
+    await names.noteFormerName(w, w.projectIdsNow().byPath.get(join(ws, 'website').toLowerCase())!, 'acme-website')
     await inWorkspace(w, () => notes.adoptHandovers(w))
-    expect(await handovers(w, 'website')).toEqual(['2026-10-02-hive-website-notes.md', '2026-10-01-hive-website-launch.md'])
-    expect(await handovers(w, 'hive')).toEqual(['2026-10-03-hive-plan.md'])
+    expect(await handovers(w, 'website')).toEqual(['2026-10-02-acme-website-notes.md', '2026-10-01-acme-website-launch.md'])
+    expect(await handovers(w, 'acme')).toEqual(['2026-10-03-acme-plan.md'])
     await disposeWorkspaceService(w)
   })
 
@@ -402,12 +402,12 @@ describe('at the edges: a switched workspace, a name taken again, a failed write
 
   it("Repair that can't give the handovers their project records what it found first: the next Repair finishes it, and isn't done until then", async () => {
     const ws = newWs()
-    // website was hive-website, and was recorded where it is (lastPath website) before ids: only its old card tells.
+    // website was acme-website, and was recorded where it is (lastPath website) before ids: only its old card tells.
     project(ws, 'website', { lastPath: join(ws, 'website'), agents: [{ id: 'site-builder', name: 'Builder', provider: 'claude-code' }] })
-    project(ws, 'hive')
-    oldHandover(ws, '2026-10-01-hive-website-old.md', 'hive-website')
+    project(ws, 'acme')
+    oldHandover(ws, '2026-10-01-acme-website-old.md', 'acme-website')
     mkdirSync(join(ws, '.combwork', 'tasks'), { recursive: true })
-    writeFileSync(join(ws, '.combwork', 'tasks', '1.json'), JSON.stringify({ number: 1, title: 'Old card', project: 'hive-website', agent: 'site-builder', column: 'done', archived: true, history: [], comments: [] }))
+    writeFileSync(join(ws, '.combwork', 'tasks', '1.json'), JSON.stringify({ number: 1, title: 'Old card', project: 'acme-website', agent: 'site-builder', column: 'done', archived: true, history: [], comments: [] }))
     const w = await open(ws)
     await until(w, () => existsSync(join(ws, '.combwork', 'project-names.json')))
     const owners = join(ws, '.combwork', 'handover-owners.json')
@@ -420,15 +420,15 @@ describe('at the edges: a switched workspace, a name taken again, a failed write
     const first = await inWorkspace(w, () => repairMove(w))
     expect(first.complete).toBe(false)
     expect(first.failed.join(' ')).toMatch(/Repair tries again/)
-    expect(journal(ws).projects[w.projectIdsNow().byPath.get(join(ws, 'website').toLowerCase())!].former).toContain('hive-website')
+    expect(journal(ws).projects[w.projectIdsNow().byPath.get(join(ws, 'website').toLowerCase())!].former).toContain('acme-website')
     // The card moved; the next Repair, still failing, isn't done either.
-    expect(readCardIn(ws, 1).project).not.toBe('hive-website')
+    expect(readCardIn(ws, 1).project).not.toBe('acme-website')
     expect((await inWorkspace(w, () => repairMove(w))).complete).toBe(false)
     spy.mockRestore()
     const third = await inWorkspace(w, () => repairMove(w))
     expect(third.complete).toBe(true)
-    expect(await handovers(w, 'website')).toEqual(['2026-10-01-hive-website-old.md'])
-    expect(await handovers(w, 'hive')).toEqual([])
+    expect(await handovers(w, 'website')).toEqual(['2026-10-01-acme-website-old.md'])
+    expect(await handovers(w, 'acme')).toEqual([])
     await disposeWorkspaceService(w)
   })
 

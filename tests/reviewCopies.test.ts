@@ -197,7 +197,7 @@ function world(size = 2, tell?: ConstructorParameters<typeof ReviewCopies>[0]['t
     },
     settle: async () => true,
     holder: { self: async () => ({ pid: 1, started: 1001 }), alive: async () => true, live: new Set() },
-    profile: 'hive-1',
+    profile: 'profile-1',
     runIn: () => null,
     holderBusy: (agent) => busy.get(agent) ?? null,
     leaseOver: () => null,

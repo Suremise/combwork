@@ -127,7 +127,7 @@ describe('the harness measures the subject apart from the other agents (benchmar
     expect(m.agents.find((r: any) => r.agent === 'Implementer')).toEqual({ agent: 'Implementer', role: 'reviewer', side: 'other', combworkCalls: 0, toolListStarts: 1 })
   })
 
-  it('a fake’s board move straight to the API ran no server: a hive call of the window, never a tool call or a tool list', () => {
+  it('a fake’s board move straight to the API ran no server: a Combwork call of the window, never a tool call or a tool list', () => {
     const m = measuresOf(report(0, 0), report(0, 1), log([call(CODER), call(CODER, LATER, true, { direct: true })], [list(CODER)]), null, coderSubject())
     expect(m.subject).toMatchObject({ toolCalls: 1, toolListStarts: 1 })
     expect(m.agents[0]).toEqual({ agent: 'Coder', role: 'builder', side: 'subject', combworkCalls: 2, toolListStarts: 1 })
@@ -284,7 +284,7 @@ describe('Compare shows the subject apart from the other agents (shared/benchmar
     expect(wo(compareArtifacts(back, a)).split).not.toBeNull()
   })
 
-  it('a run on the fake Claude Code or fake Codex says its API requests and tool lists count per hive call; fake-copilot’s doesn’t', () => {
+  it('a run on the fake Claude Code or fake Codex says its API requests and tool lists count per Combwork call; fake-copilot’s doesn’t', () => {
     const perCall = (x: Artifact, y: Artifact) => compareArtifacts(x, y).notes.some((n) => /per call, not per session/.test(n))
     expect(perCall(withSplit(1, 1), withSplit(1, 1))).toBe(true)
     const on = (provider: string): Artifact => {

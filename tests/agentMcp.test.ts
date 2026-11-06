@@ -35,17 +35,17 @@ describe("an agent's choice", () => {
     expect([agentChoosesMcp({}), agentChoosesMcp({ mcpServers: [] })]).toEqual([false, true])
   })
 
-  it('is cleaned as it is saved: names only, each once, never combwork (hive an ordinary name: HI-2594)', () => {
+  it('is cleaned as it is saved: names only, each once, never combwork (any other name an ordinary one: HI-2594)', () => {
     expect(cleanMcpServers(undefined)).toBeUndefined()
     expect(cleanMcpServers(null)).toBeUndefined()
     expect(cleanMcpServers([' notes', 'sandbox', 'notes'])).toEqual(['notes', 'sandbox'])
     expect(cleanMcpServers([])).toEqual([])
     expect(() => cleanMcpServers('notes')).toThrow("list of the project's server names")
     expect(() => cleanMcpServers(['combwork'])).toThrow('the built-in combwork server is always given')
-    expect(cleanMcpServers(['hive'])).toEqual(['hive'])
+    expect(cleanMcpServers(['acme'])).toEqual(['acme'])
     expect(() => cleanMcpServers(['../x'])).toThrow("isn't an MCP server's name")
     expect(() => cleanMcpServers(Array.from({ length: 51 }, (_, i) => `s${i}`))).toThrow('at most 50')
-    expect([isMcpServerName('windows-sandbox'), isMcpServerName('combwork'), isMcpServerName('hive'), isMcpServerName('-x')]).toEqual([true, false, true, false])
+    expect([isMcpServerName('windows-sandbox'), isMcpServerName('combwork'), isMcpServerName('acme'), isMcpServerName('-x')]).toEqual([true, false, true, false])
   })
 
   it('is said in words, naming a chosen server that is not on', () => {
@@ -67,16 +67,16 @@ describe("an agent's choice", () => {
 describe('a launch', () => {
   const ws = join(base, 'ws')
   const proj = join(ws, 'proj')
-  const server = (name: string): McpServerDef => ({ command: 'node', args: [`\${HIVE_MCP_DIR}/${name}/server.js`] })
+  const server = (name: string): McpServerDef => ({ command: 'node', args: [`\${CW_MCP_DIR}/${name}/server.js`] })
 
   it('passes each agent only its servers, for every provider; the Assistant still gets none', async () => {
     mkdirSync(join(proj, '.combwork'), { recursive: true })
     mkdirSync(join(ws, '.combwork', 'mcp'), { recursive: true })
     for (const n of ['notes', 'sandbox', 'github', 'idle']) writeFileSync(join(ws, '.combwork', 'mcp', `${n}.json`), JSON.stringify(server(n)))
-    // A hand-made server under Combwork's reserved name: the CLIs pre-approve hive's tools, so it never reaches a launch (#1166).
-    writeFileSync(join(ws, '.combwork', 'mcp', 'hive.json'), JSON.stringify({ command: 'impostor' }))
+    // A hand-made server under Combwork's reserved name: the CLIs pre-approve combwork's tools, so it never reaches a launch (#1166).
+    writeFileSync(join(ws, '.combwork', 'mcp', 'combwork.json'), JSON.stringify({ command: 'impostor' }))
     // On in the workspace: notes, sandbox, github; github turned off in the project; idle off everywhere.
-    writeFileSync(join(ws, '.combwork', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['notes', 'sandbox', 'github', 'hive'] } }))
+    writeFileSync(join(ws, '.combwork', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['notes', 'sandbox', 'github', 'combwork'] } }))
     const agents = [
       { id: 'a-all', name: 'Builder', provider: 'claude-code' },
       { id: 'a-only', name: 'Tester', provider: 'claude-code', mcpServers: ['sandbox', 'github', 'idle'] },
@@ -88,7 +88,7 @@ describe('a launch', () => {
     const w = createWorkspaceService()
     await w.open(ws)
     try {
-      const of = async (id: string) => Object.keys((await sessions.effective(proj, agents.find((a) => a.id === id) as never)).mcpServers).filter((n) => n !== 'hive').sort()
+      const of = async (id: string) => Object.keys((await sessions.effective(proj, agents.find((a) => a.id === id) as never)).mcpServers).filter((n) => n !== 'combwork').sort()
       expect(await of('a-all')).toEqual(['notes', 'sandbox'])
       // Only those it was given that the project has on: github is off here, idle off in the workspace.
       expect(await of('a-only')).toEqual(['sandbox'])
@@ -100,7 +100,7 @@ describe('a launch', () => {
       expect(await sig(agents[0])).not.toBe(await sig(agents[1]))
       // The Assistant gets Combwork's own tools, not the projects' servers, whatever it is given: its own choices are
       // tests/assistantMcp.test.ts's (HI-1472), none until switched on.
-      expect(Object.keys((await sessions.effective(w.assistantHome, { id: 'assistant', name: 'Assistant', mcpServers: ['notes'] } as never)).mcpServers).filter((n) => n !== 'hive')).toEqual([])
+      expect(Object.keys((await sessions.effective(w.assistantHome, { id: 'assistant', name: 'Assistant', mcpServers: ['notes'] } as never)).mcpServers).filter((n) => n !== 'combwork')).toEqual([])
 
       // Each provider's launch config has the tester's server and not the builder's other one.
       const servers = (await sessions.effective(proj, agents[1] as never)).mcpServers

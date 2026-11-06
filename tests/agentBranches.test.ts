@@ -61,7 +61,7 @@ describe("a branch Combwork made for an agent", () => {
   })
 
   it("isn't another agent's, another workspace's or project's (two workspaces in one repository), or a branch not Combwork's", () => {
-    for (const b of ['cw/OTHER/ambrosia/amb1', 'cw/Work/other/amb1', 'cw/WorkX/ambrosia/amb1', 'feature/amb1', 'cw/Work/amb1', 'cw/a/b/c/d', 'main', 'hive', 'cw/amb10', 'cw/Work/ambrosia/amb1-x']) expect(agentBranchNumber(b, home, 'AMB1')).toBeNull()
+    for (const b of ['cw/OTHER/ambrosia/amb1', 'cw/Work/other/amb1', 'cw/WorkX/ambrosia/amb1', 'feature/amb1', 'cw/Work/amb1', 'cw/a/b/c/d', 'main', 'cw', 'cw/amb10', 'cw/Work/ambrosia/amb1-x']) expect(agentBranchNumber(b, home, 'AMB1')).toBeNull()
   })
 
   it("Add Agent's new worktree on an agent's own branch finds only that branch without recorded parts; any other only itself", () => {

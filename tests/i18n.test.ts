@@ -98,14 +98,14 @@ describe('messages', () => {
   const cards = msg({ id: 'test.cards', defaultMessage: '{n, plural, one {# card} other {# cards}} in {project}', description: 'Test.' })
 
   it('English is the message as written, with ICU plurals', () => {
-    expect(tr(cards, { n: 1, project: 'hive' })).toBe('1 card in hive')
-    expect(tr(cards, { n: 3, project: 'hive' })).toBe('3 cards in hive')
+    expect(tr(cards, { n: 1, project: 'demo' })).toBe('1 card in demo')
+    expect(tr(cards, { n: 3, project: 'demo' })).toBe('3 cards in demo')
   })
 
   it("Polish has its plural forms (one, few, many, other), in the translation's words", () => {
     setLanguage('pl', { 'test.cards': '{n, plural, one {# karta} few {# karty} many {# kart} other {# karty}} w {project}' })
     expect(language()).toBe('pl')
-    expect([1, 2, 5, 22, 25, 112].map((n) => tr(cards, { n, project: 'hive' }))).toEqual(['1 karta w hive', '2 karty w hive', '5 kart w hive', '22 karty w hive', '25 kart w hive', '112 kart w hive'])
+    expect([1, 2, 5, 22, 25, 112].map((n) => tr(cards, { n, project: 'demo' }))).toEqual(['1 karta w demo', '2 karty w demo', '5 kart w demo', '22 karty w demo', '25 kart w demo', '112 kart w demo'])
   })
 
   it('a translation that renames a placeholder or does not parse shows in English, reported once', () => {
@@ -144,11 +144,11 @@ describe('messages', () => {
 
   it('the pseudo-locale accents and lengthens the text, keeping placeholders and plurals', () => {
     setLanguage(PSEUDO_LANGUAGE, {})
-    const out = tr(cards, { n: 3, project: 'hive' })
+    const out = tr(cards, { n: 3, project: 'demo' })
     expect(out.startsWith('[')).toBe(true)
     expect(out.endsWith(']')).toBe(true)
-    expect(out).toContain(`3 ${pseudoText('cards in')} hive`)
-    expect(out.length).toBeGreaterThanOrEqual(Math.round('3 cards in hive'.length * 1.25))
+    expect(out).toContain(`3 ${pseudoText('cards in')} demo`)
+    expect(out.length).toBeGreaterThanOrEqual(Math.round('3 cards in demo'.length * 1.25))
     // English for formatting: Intl isn't pseudo.
     expect(locale()).toBe('en')
   })

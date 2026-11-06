@@ -36,7 +36,7 @@ describe('quiet test copies', () => {
     process.env.CW_TEST_QUIET = '1'
     expect(testQuiet()).toBe(true)
     // A test profile: quiet however the copy was started (a suite run on its own, a script), unless turned off.
-    process.env.CW_USER_DATA = join(tempRoot(), 'hive-quiet-profile')
+    process.env.CW_USER_DATA = join(tempRoot(), 'quiet-profile')
     delete process.env.CW_TEST_QUIET
     expect(testQuiet()).toBe(true)
     process.env.CW_TEST_QUIET = '0'
@@ -48,7 +48,7 @@ describe('quiet test copies', () => {
     const packaged = app as { isPackaged: boolean }
     packaged.isPackaged = true
     try {
-      process.env.CW_USER_DATA = join(tempRoot(), 'hive-quiet-profile')
+      process.env.CW_USER_DATA = join(tempRoot(), 'quiet-profile')
       delete process.env.CW_TEST_QUIET
       expect(testQuiet()).toBe(false)
       process.env.CW_TEST_QUIET = '0'

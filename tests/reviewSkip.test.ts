@@ -68,7 +68,7 @@ const git = (cwd: string, ...args: string[]): string => execFileSync('git', args
 let n = 0
 
 /** "Combwork merges" into main, a reviewer agent, one merge check. */
-const CW_MERGES = { ...allOff('git'), review: 'agent', noSelfReview: true, finish: 'hiveMerges', folder: 'slots', mergeChecks: ['quick'], commands: { quick: 'quick' } } as const
+const CW_MERGES = { ...allOff('git'), review: 'agent', noSelfReview: true, finish: 'combworkMerges', folder: 'slots', mergeChecks: ['quick'], commands: { quick: 'quick' } } as const
 
 async function workspace(options: object = CW_MERGES): Promise<{ w: WS; repo: string; wt: string }> {
   const ws = join(base, `ws-${++n}`)

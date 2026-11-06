@@ -184,7 +184,7 @@ describe("agents' worktrees become slots (#1441)", () => {
 // beside it a solo agent with a worktree and no cards, a solo agent without one, and a project without git.
 describe("Darren's workspace's shape, and solo agents (#1441)", () => {
   const dPath = join(base, 'darren')
-  const hive = join(dPath, 'hive')
+  const demo = join(dPath, 'demo')
   const solo = join(dPath, 'solo')
   const bare = join(dPath, 'bare')
   const plain = join(dPath, 'plain')
@@ -196,7 +196,7 @@ describe("Darren's workspace's shape, and solo agents (#1441)", () => {
   let dStore: InstanceType<typeof SlotStore>
   let soloStore: InstanceType<typeof SlotStore>
   const cfgFile = (p: string) => join(p, '.combwork', 'project.json')
-  const builder = (n: number) => ({ id: `hb${n}`, name: `HB${n}`, provider: 'claude-code', workflowRole: 'builder', worktree: { path: join(dTrees, 'hive', `hb${n}`), branch: `cw/hb${n}`, base: 'main' } })
+  const builder = (n: number) => ({ id: `hb${n}`, name: `HB${n}`, provider: 'claude-code', workflowRole: 'builder', worktree: { path: join(dTrees, 'demo', `hb${n}`), branch: `cw/hb${n}`, base: 'main' } })
   const reviewer = (n: number) => ({ id: `hr${n}`, name: `HR${n}`, provider: 'codex', workflowRole: 'reviewer' })
   const agentsOf = (p: string): { id: string }[] => JSON.parse(readFileSync(cfgFile(p), 'utf8')).agents
   const writeD = (p: string, agents: object[]) => writeFileSync(cfgFile(p), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, ...(ids[p] ? { id: ids[p] } : {}), agents }))
@@ -210,33 +210,33 @@ describe("Darren's workspace's shape, and solo agents (#1441)", () => {
   beforeAll(async () => {
     mkdirSync(join(plain, '.combwork'), { recursive: true })
     writeFileSync(cfgFile(plain), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, agents: bareAgents() }))
-    for (const p of [hive, solo, bare]) {
+    for (const p of [demo, solo, bare]) {
       gitRepo(p)
       commit(p, { '.gitignore': '.combwork/\n', 'a.txt': 'a\n' }, 'first')
       mkdirSync(join(p, '.combwork'), { recursive: true })
     }
-    for (const n of [1, 2, 3, 4, 5, 6]) sh(hive, 'worktree', 'add', '-q', '-b', `cw/hb${n}`, join(dTrees, 'hive', `hb${n}`))
-    commit(join(dTrees, 'hive', 'hb4'), { 'b.txt': 'unmerged\n' }, 'unmerged')
-    sh(hive, 'worktree', 'remove', '--force', join(dTrees, 'hive', 'hb6'))
+    for (const n of [1, 2, 3, 4, 5, 6]) sh(demo, 'worktree', 'add', '-q', '-b', `cw/hb${n}`, join(dTrees, 'demo', `hb${n}`))
+    commit(join(dTrees, 'demo', 'hb4'), { 'b.txt': 'unmerged\n' }, 'unmerged')
+    sh(demo, 'worktree', 'remove', '--force', join(dTrees, 'demo', 'hb6'))
     sh(solo, 'worktree', 'add', '-q', '-b', 'cw/me', join(dTrees, 'solo', 'me'))
-    writeD(hive, dAgents())
+    writeD(demo, dAgents())
     writeD(solo, soloAgents())
     writeD(bare, bareAgents())
     await dw.open(dPath)
-    for (const p of [hive, solo, bare]) ids[p] = (await dw.projectConfig(p)).id ?? basename(p)
-    writeD(hive, dAgents())
+    for (const p of [demo, solo, bare]) ids[p] = (await dw.projectConfig(p)).id ?? basename(p)
+    writeD(demo, dAgents())
     writeD(solo, soloAgents())
     writeD(bare, bareAgents())
     await dw.refresh()
-    for (const p of [hive, solo, bare]) before[p] = readFileSync(cfgFile(p), 'utf8')
-    dStore = new SlotStore(fileSlotConn(boardFile(dPath)), ids[hive])
+    for (const p of [demo, solo, bare]) before[p] = readFileSync(cfgFile(p), 'utf8')
+    dStore = new SlotStore(fileSlotConn(boardFile(dPath)), ids[demo])
     soloStore = new SlotStore(fileSlotConn(boardFile(dPath)), ids[solo])
-    const card = (title: string, agent: string, column?: 'doing') => runD(() => tasks.createTask({ title, project: 'hive', agent, ...(column ? { column } : {}) }, { kind: 'user' }))
+    const card = (title: string, agent: string, column?: 'doing') => runD(() => tasks.createTask({ title, project: 'demo', agent, ...(column ? { column } : {}) }, { kind: 'user' }))
     const lane = [await card('Doing', 'hb1', 'doing'), await card('Review', 'hb1'), await card('Passed', 'hb1')].map((c) => c.number)
-    await lanes.startLane(dw, { project: 'hive', builder: 'hb1', reviewer: 'hr1', cards: lane, by: 'test' })
+    await lanes.startLane(dw, { project: 'demo', builder: 'hb1', reviewer: 'hr1', cards: lane, by: 'test' })
     await card('HB2 in flight', 'hb2', 'doing')
-    for (const n of [1, 2, 3, 4, 5]) await sessionAt(hive, `s-hb${n}`, `hb${n}`, join(dTrees, 'hive', `hb${n}`))
-    await sessionAt(hive, 's-hr1', 'hr1', hive)
+    for (const n of [1, 2, 3, 4, 5]) await sessionAt(demo, `s-hb${n}`, `hb${n}`, join(dTrees, 'demo', `hb${n}`))
+    await sessionAt(demo, 's-hr1', 'hr1', demo)
     await sessionAt(solo, 's-me', 'me', join(dTrees, 'solo', 'me'))
     await sessionAt(bare, 's-only', 'only', bare)
     // A second migration started beside the first (two openings at once): one adoption per agent.
@@ -260,17 +260,17 @@ describe("Darren's workspace's shape, and solo agents (#1441)", () => {
   })
 
   it("each builder's sessions bound and resuming in place; reviewers start in the project folder", async () => {
-    const facts = await runD(() => folderFacts(hive))
+    const facts = await runD(() => folderFacts(demo))
     for (const n of [1, 2, 3, 4, 5]) {
-      const r = await recordOf(hive, `s-hb${n}`)
+      const r = await recordOf(demo, `s-hb${n}`)
       expect(r.lease).toBe(dStore.openLeases().find((l) => l.agent === `hb${n}`)!.id)
-      expect(canResumeNow(facts, defOf(hive, `hb${n}`), r)).toBe(true)
-      expect(launchFolder(facts, defOf(hive, `hb${n}`), 'build').toLowerCase()).toBe(join(dTrees, 'hive', `hb${n}`).toLowerCase())
+      expect(canResumeNow(facts, defOf(demo, `hb${n}`), r)).toBe(true)
+      expect(launchFolder(facts, defOf(demo, `hb${n}`), 'build').toLowerCase()).toBe(join(dTrees, 'demo', `hb${n}`).toLowerCase())
     }
-    expect(canResumeNow(facts, defOf(hive, 'hr1'), await recordOf(hive, 's-hr1'))).toBe(true)
-    expect(launchFolder(facts, defOf(hive, 'hr1'), 'review').toLowerCase()).toBe(hive.toLowerCase())
+    expect(canResumeNow(facts, defOf(demo, 'hr1'), await recordOf(demo, 's-hr1'))).toBe(true)
+    expect(launchFolder(facts, defOf(demo, 'hr1'), 'review').toLowerCase()).toBe(demo.toLowerCase())
     // HB6's worktree is gone: nothing made, it stays its folder, so its start says so and offers Recreate as before.
-    expect(launchFolder(facts, defOf(hive, 'hb6'), 'build').toLowerCase()).toBe(join(dTrees, 'hive', 'hb6').toLowerCase())
+    expect(launchFolder(facts, defOf(demo, 'hb6'), 'build').toLowerCase()).toBe(join(dTrees, 'demo', 'hb6').toLowerCase())
   })
 
   it('a solo agent with a worktree and no cards: carried, kept for nothing, resuming there; one without: nothing', async () => {
@@ -288,7 +288,7 @@ describe("Darren's workspace's shape, and solo agents (#1441)", () => {
   })
 
   it("project.json's agents unchanged (the 0.9 worktree fields kept, nothing written)", () => {
-    for (const p of [hive, solo, bare]) expect(readFileSync(cfgFile(p), 'utf8')).toBe(before[p])
+    for (const p of [demo, solo, bare]) expect(readFileSync(cfgFile(p), 'utf8')).toBe(before[p])
   })
 
   it('run again: nothing changes', async () => {

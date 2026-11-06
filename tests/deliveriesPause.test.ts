@@ -46,8 +46,8 @@ describe("the team pause's hold on deliveries (HI-2081)", async () => {
     }
   })
   deliveries.setSenderCheckForTests(() => null)
-  const hive: DeliverySender = { kind: 'combwork', name: 'Combwork' }
-  const wake = (o: Record<string, unknown> = {}) => deliveries.createDelivery(alpha, { agentId: 'b1', agentName: 'B1', kind: 'card-event', from: hive, card: 7, body: 'is in Review', source: 'loop', ref: '#7', ...o })
+  const combwork: DeliverySender = { kind: 'combwork', name: 'Combwork' }
+  const wake = (o: Record<string, unknown> = {}) => deliveries.createDelivery(alpha, { agentId: 'b1', agentName: 'B1', kind: 'card-event', from: combwork, card: 7, body: 'is in Review', source: 'loop', ref: '#7', ...o })
   const states = async () => (await deliveries.deliveriesOf(alpha, 'b1')).map((r) => `${r.id} ${r.state}`)
   beforeEach(() => {
     alpha = join(base, `alpha${++n}`)
@@ -59,7 +59,7 @@ describe("the team pause's hold on deliveries (HI-2081)", async () => {
   it("held while paused: not offered, not read, not counted; a message and the user's answer still go", async () => {
     pause.on = true
     const w = await wake()
-    const msg = await deliveries.createDelivery(alpha, { agentId: 'b1', agentName: 'B1', kind: 'rebrief', from: hive, body: 'Rebase first.' })
+    const msg = await deliveries.createDelivery(alpha, { agentId: 'b1', agentName: 'B1', kind: 'rebrief', from: combwork, body: 'Rebase first.' })
     const answer = await wake({ kind: 'answer', from: { kind: 'user', name: 'Darren' }, body: 'Yes', ref: '#7/answer' })
     expect(await deliveries.countable(alpha, 'b1')).toEqual([expect.objectContaining({ id: msg.id }), expect.objectContaining({ id: answer.id })].sort((a, b) => (a.id < b.id ? -1 : 1)))
     const read = await deliveries.readInbox(alpha, 'b1')

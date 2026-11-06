@@ -85,7 +85,7 @@ describe('diagnostics redaction', () => {
 
   it("the log: a credential masks the rest of its line, and the lines a continuation carries it onto", () => {
     const T = '2026-10-02T10:00:00.000Z [INFO] [sessions]'
-    const log = [`${T} Hive 0.7.0 starting (${MARKED_LOG})`, `${T} ran curl --api-key \``, '  continuedLogSecret `', '  againLogSecret', `${T} next line stays`].join('\n')
+    const log = [`${T} Combwork 0.7.0 starting (${MARKED_LOG})`, `${T} ran curl --api-key \``, '  continuedLogSecret `', '  againLogSecret', `${T} next line stays`].join('\n')
     const out = redactLog(log, ctx)
     expect(out).not.toMatch(/continuedLogSecret|againLogSecret/)
     expect(out).toContain(`${T} next line stays`)
@@ -183,7 +183,7 @@ describe('diagnostics redaction of the log', () => {
   const T = '2026-10-02T10:00:00.000Z [INFO]'
   it("the user's own text the log marked: card titles, Assistant activity, session names, prompts", () => {
     const lines = [
-      `${T} [tasks] #1 created by ${userText('Claudette (hive)')}: ${userText('Confidential customer merger notes')}`,
+      `${T} [tasks] #1 created by ${userText('Claudette (alpha)')}: ${userText('Confidential customer merger notes')}`,
       `${T} [assistant] ${userText('D:\\Secret\\ws')}: ${userText('Moved #3 Fire Bob to Doing')}`,
       `${T} [sessions] Session 1 takes the name ${userText('Q3 layoffs plan')} it was given in the CLI`,
       `${T} [pty] spawn ${userText('D:\\Secret\\ws\\alpha#a-1')}: claude.exe ${JSON.stringify(['--model', 'opus', userText('Draft the merger memo for Acme')])}`
@@ -216,18 +216,18 @@ describe('diagnostics redaction of the log', () => {
 
   it("keeps Combwork's and the CLIs' own paths, and each line's [scope]", () => {
     const keep = [
-      `${T} [main] at f (C:\\Users\\Jo Smith\\AppData\\Local\\Programs\\Hive\\resources\\app.asar\\out\\main\\index.js:12:3)`,
+      `${T} [main] at f (C:\\Users\\Jo Smith\\AppData\\Local\\Programs\\Combwork\\resources\\app.asar\\out\\main\\index.js:12:3)`,
       `${T} [claude] Candidate C:\\Users\\Jo Smith\\.local\\bin\\claude.exe did not report a version`,
       `${T} [codex] Candidate C:\\Program Files\\nodejs\\codex.cmd did not report a version`
     ]
     const out = redactLog(keep.join('\n'), ctx)
-    expect(out).toContain('(~\\AppData\\Local\\Programs\\Hive\\resources\\app.asar\\out\\main\\index.js:12:3)')
+    expect(out).toContain('(~\\AppData\\Local\\Programs\\Combwork\\resources\\app.asar\\out\\main\\index.js:12:3)')
     expect(out).toContain('~\\.local\\bin\\claude.exe')
     expect(out).toContain('C:\\Program Files\\nodejs')
     expect(out).not.toContain('<path>')
     const sessions: RedactContext = { ...ctx, names: [{ name: 'sessions', as: '<project>' }] }
     expect(redactLog(`${T} [sessions] sessions finished`, sessions)).toBe(`${T} [sessions] <project> finished`)
-    expect(redactLog(`${T} [main] D:\\dev\\hive\\out\\main\\index.js:5`, { ...ctx, app: 'D:\\dev\\hive' })).toBe(`${T} [main] <combwork>\\out\\main\\index.js:5`)
+    expect(redactLog(`${T} [main] D:\\dev\\combwork\\out\\main\\index.js:5`, { ...ctx, app: 'D:\\dev\\combwork' })).toBe(`${T} [main] <combwork>\\out\\main\\index.js:5`)
   })
 
   it("lines logged before Combwork marked the user's text keep only their time, level and scope", () => {
@@ -253,7 +253,7 @@ describe('diagnostics redaction of the log', () => {
 
   it("a start line under another name (a log from before 1.1) is an older version's, marked or not: more left out, never less (HI-2594)", () => {
     const lines = [
-      `${T} [main] Hive 1.0.0 starting (Electron 44.5.1; ${MARKED_LOG})`,
+      `${T} [main] Demo 1.0.0 starting (Electron 44.5.1; ${MARKED_LOG})`,
       `${T} [tasks] #1 created by ${userText('You')}: Confidential customer merger notes`,
       `${T} [main] Combwork 1.1.0 starting (Electron 44.5.1; ${MARKED_LOG})`,
       `${T} [tasks] #2 created by ${userText('You')}: ${userText('Another secret plan')}`,

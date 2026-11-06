@@ -6,7 +6,7 @@ import { APP_NAME, DEV_APP_NAME, appName, profileFolder } from '../src/shared/ap
 import { oldProfileFolder } from '../src/main/nameUpgradeProfile'
 import { RELEASES_REPO } from '../src/shared/defaults'
 
-// #443, HI-2458: the app is displayed as "Combwork" ("Hive Desktop" before), and nothing users have stored moves. These pin the names Windows and
+// #443, HI-2458: the app is displayed as "Combwork", and nothing users have stored moves. These pin the names Windows and
 // the installer use, so a change to productName or electron-builder can't move the profile or install folder.
 
 const read = (path: string): string => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8')

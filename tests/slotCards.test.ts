@@ -1728,7 +1728,7 @@ describe('Combwork quitting (#1628)', { timeout: 60_000 }, () => {
 })
 
 describe("a card's cycle in a slot (#1438)", () => {
-  const f = (seq: number, kind: string, data: object): Fact => ({ seq, card: 1, kind, at: '', actor: 'hive', source: 'recorded', data }) as unknown as Fact
+  const f = (seq: number, kind: string, data: object): Fact => ({ seq, card: 1, kind, at: '', actor: 'combwork', source: 'recorded', data }) as unknown as Fact
   const started = (seq: number, lease: string) => f(seq, 'Started', { folder: 'F', line: 'cw/AM/AM-1-x', base: 'b', target: 'main', builder: 'B1', cardKind: 'code', slot: 'slot-a', lease })
 
   it("is its last start's, with what was done for it since; a start outside slots has none", () => {
@@ -1779,7 +1779,7 @@ describe("a lane's slot in the Progress panel (#1446)", () => {
       // alpha's own carried slot is its slot, with the line of the card last started under that lease.
       slot('alpha-id', 'hb1')
       lease('l-alpha', 'alpha-id', 'hb1', 'carried', 'b1')
-      db.prepare("INSERT INTO card_facts (card, seq, kind, at, actor, source, data) VALUES (?, 99, 'Started', ?, 'hive', 'recorded', ?)").run(card.id, at, JSON.stringify({ lease: 'l-alpha', line: 'cw/AM/AM-1-own-line' }))
+      db.prepare("INSERT INTO card_facts (card, seq, kind, at, actor, source, data) VALUES (?, 99, 'Started', ?, 'combwork', 'recorded', ?)").run(card.id, at, JSON.stringify({ lease: 'l-alpha', line: 'cw/AM/AM-1-own-line' }))
       expect(laneSlotIn(db, 'alpha-id', alphaLane)).toEqual({ name: 'hb1', carried: true, line: 'cw/AM/AM-1-own-line', state: 'ready', since: at })
       // A slot lent to the lane wins over the carried one; one being made reads as being prepared.
       slot('alpha-id', 'slot-a', 'creating')

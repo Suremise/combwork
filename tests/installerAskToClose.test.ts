@@ -1,5 +1,5 @@
 // The installer's request to a running Combwork to close for the install (HI-1707, build/askToClose.ps1, run by
-// installer.nsh's customInit), against a stand-in Hive: a copy of Node named Hive.exe in its own install folder, running
+// installer.nsh's customInit), against a stand-in Combwork: a copy of Node named Combwork.exe in its own install folder, running
 // a script that answers as Combwork does (or doesn't). Only this test's own processes are found, asked and ended.
 import { spawn, spawnSync, type ChildProcess } from 'child_process'
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
@@ -9,6 +9,8 @@ import { powershellEnv } from './powershellEnv'
 import { tempDir } from './tempDir'
 
 const HUNG_MS = 30_000
+/** The executable the script looks for, as legacyUpgrade.ps1 names the new install's. */
+const EXE = 'Combwork.exe'
 const SCRIPT = join(__dirname, '..', 'build', 'askToClose.ps1')
 const root = join(process.env.SystemRoot ?? 'C:\\Windows')
 const ps = join(root, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
@@ -40,7 +42,7 @@ const started: ChildProcess[] = []
 /** A stand-in Combwork installed in `folder`, answering as `mode` says; resolves once it watches. */
 async function standIn(folder: string, profile: string, mode: 'ack-exit' | 'ack-stay' | 'none', seen: string): Promise<ChildProcess> {
   mkdirSync(folder, { recursive: true })
-  const exe = join(folder, 'Hive.exe')
+  const exe = join(folder, EXE)
   if (!existsSync(exe)) copyFileSync(process.execPath, exe)
   const child = spawn(exe, [join(dir, 'stand-in.cjs'), profile, mode, seen], { env: { SystemRoot: root }, windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] })
   started.push(child)
@@ -56,7 +58,7 @@ async function standIn(folder: string, profile: string, mode: 'ack-exit' | 'ack-
 
 /** The installer's script, as customInit runs it (shorter waits): its exit code. */
 const ask = (install: string, profile: string, waits = { ack: 3000, exit: 3000 }): number | null =>
-  spawnSync(ps, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', SCRIPT, '-InstallDir', install, '-Profile', profile, '-AckMs', String(waits.ack), '-ExitMs', String(waits.exit)], { env: psEnv, windowsHide: true, timeout: HUNG_MS }).status
+  spawnSync(ps, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', SCRIPT, '-InstallDir', install, '-ExeName', EXE, '-Profile', profile, '-AckMs', String(waits.ack), '-ExitMs', String(waits.exit)], { env: psEnv, windowsHide: true, timeout: HUNG_MS }).status
 
 describe("the installer asks a running Combwork to close (askToClose.ps1, HI-1707)", () => {
   beforeAll(() => {
@@ -79,11 +81,11 @@ describe("the installer asks a running Combwork to close (askToClose.ps1, HI-170
     const profile = join(dir, 'profile-a')
     mkdirSync(profile)
     const seen = join(dir, 'seen-a.json')
-    const hive = await standIn(install, profile, 'ack-exit', seen)
+    const app = await standIn(install, profile, 'ack-exit', seen)
     expect(ask(install, profile)).toBe(0)
-    expect(hive.exitCode ?? (await new Promise((r) => hive.once('exit', r)))).toBe(0)
+    expect(app.exitCode ?? (await new Promise((r) => app.once('exit', r)))).toBe(0)
     const { request, pid } = JSON.parse(readFileSync(seen, 'utf8'))
-    expect(request).toMatchObject({ v: 1, pid, exe: join(install, 'Hive.exe'), reason: 'install' })
+    expect(request).toMatchObject({ v: 1, pid, exe: join(install, EXE), reason: 'install' })
     expect(request.nonce).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
     expect(Math.abs(Date.parse(request.at) - Date.now())).toBeLessThan(HUNG_MS)
   })
@@ -101,9 +103,9 @@ describe("the installer asks a running Combwork to close (askToClose.ps1, HI-170
     const install = join(dir, 'install-c')
     const profile = join(dir, 'profile-c')
     mkdirSync(profile)
-    const hive = await standIn(install, profile, 'ack-stay', join(dir, 'seen-c.json'))
+    const app = await standIn(install, profile, 'ack-stay', join(dir, 'seen-c.json'))
     expect(ask(install, profile, { ack: 3000, exit: 1000 })).toBe(4)
-    expect(hive.exitCode).toBe(null)
+    expect(app.exitCode).toBe(null)
   })
 
   it("never asks a Combwork of another install folder (0, and that one sees no request)", async () => {

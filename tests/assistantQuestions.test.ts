@@ -14,7 +14,7 @@ const { answer, ask, questions } = await import('../src/main/assistantControl')
 const { STOP_ASK_MS, REPLY_MS } = await import('../src/main/mcp/agentApiCall')
 
 const WS = join(base, 'ws')
-const q = { title: 'Stop HR1 in hive?', message: 'The Assistant wants to stop HR1, which is working.', yes: 'Stop', no: "Don't stop" }
+const q = { title: 'Stop HR1 in alpha?', message: 'The Assistant wants to stop HR1, which is working.', yes: 'Stop', no: "Don't stop" }
 
 describe("the Assistant's questions to the user (HI-1994)", () => {
   afterEach(() => {
@@ -58,7 +58,7 @@ describe("the Assistant's questions to the user (HI-1994)", () => {
     expect(questions(WS)).toEqual([])
   })
 
-  it("a stop's wait ends before the hive tools stop waiting for its reply, so the Assistant hears it timed out", () => {
+  it("a stop's wait ends before Combwork's tools stop waiting for its reply, so the Assistant hears it timed out", () => {
     expect(STOP_ASK_MS).toBeLessThan(REPLY_MS)
     expect(REPLY_MS - STOP_ASK_MS).toBeGreaterThanOrEqual(30_000)
   })

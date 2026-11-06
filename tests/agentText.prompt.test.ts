@@ -19,7 +19,7 @@ const chain = (texts: Record<string, string>): DialectChain => ({ texts, files: 
 afterEach(() => setProcessChain(null))
 
 /** What a test put in an output (names, keys, titles, paths, column names): not Combwork's wording. */
-const VALUES = ['Fix it', 'The details', 'Only the tests', 'First thoughts', 'Failed', 'the redirect loops', 'Reviewer', 'alpha', 'You', 'Agent2', 'B1', 'R1', 'R2', 'R3', 'AL-1', 'AL-2', 'Lane data', 'Lane hover', 'Keep the API stable', 'typecheck', 'lint', 'ui', 'api', 'slot', 'hive', 'Done', 'Review', 'Passed', 'docs', 'md', 'intro', 'setup', 'install', 'att', 'png', 'x', 'k', 'Slot', 'held', 'no', 'CLI']
+const VALUES = ['Fix it', 'The details', 'Only the tests', 'First thoughts', 'Failed', 'the redirect loops', 'Reviewer', 'alpha', 'You', 'Agent2', 'B1', 'R1', 'R2', 'R3', 'AL-1', 'AL-2', 'Lane data', 'Lane hover', 'Keep the API stable', 'typecheck', 'lint', 'ui', 'api', 'slot', 'acme', 'Done', 'Review', 'Passed', 'docs', 'md', 'intro', 'setup', 'install', 'att', 'png', 'x', 'k', 'Slot', 'held', 'no', 'CLI']
 
 function prompts(): { name: string; text: string }[] {
   const out: { name: string; text: string }[] = []
@@ -100,7 +100,7 @@ function briefs(): { name: string; text: string }[] {
       { key: 'AL-1', title: 'Lane data' },
       { key: 'AL-2', title: 'Lane hover' }
     ],
-    builder: { name: 'B1', folder: 'D:/hive/b1', branch: 'cw/b1' },
+    builder: { name: 'B1', folder: 'D:/acme/b1', branch: 'cw/b1' },
     reviewer: { name: 'R1' },
     options: { review: 'agent', preChecks: ['typecheck', 'lint'], finish: 'agentMerges', okBefore: { mode: 'labels', labels: ['ui', 'api'] }, target: 'main' },
     rounds: 10,
@@ -108,7 +108,7 @@ function briefs(): { name: string; text: string }[] {
     ...over
   })
   const out: { name: string; text: string }[] = []
-  const builders = [{ name: 'B1', folder: 'D:/hive/b1', branch: 'cw/b1' }, { name: 'B1', folder: 'D:/hive/b1', branch: null }, { name: 'B1', folder: null, branch: null }, { name: 'B1', folder: null, branch: null, slot: 'slot-b' }]
+  const builders = [{ name: 'B1', folder: 'D:/acme/b1', branch: 'cw/b1' }, { name: 'B1', folder: 'D:/acme/b1', branch: null }, { name: 'B1', folder: null, branch: null }, { name: 'B1', folder: null, branch: null, slot: 'slot-b' }]
   const reviewers: Partial<LaneBriefInput>[] = [{}, { reviewer: null }, { reviewer: null, pool: [] }, { reviewer: null, pool: ['R1', 'R2', 'R3'] }]
   for (const [i, builder] of builders.entries()) for (const [j, r] of reviewers.entries()) for (const role of ['builder', 'reviewer'] as const) out.push({ name: `brief ${i} ${j} ${role}`, text: laneBrief(input({ builder, ...r }), role) })
   out.push({ name: 'brief no target, no note', text: laneBrief(input({ options: { review: 'none', preChecks: [], finish: 'combworkMerges', okBefore: { mode: 'none' } } as never, note: '' }), 'builder') })

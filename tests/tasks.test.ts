@@ -1248,7 +1248,7 @@ describe('card decisions', () => {
   it('marks a decision recorded after work on the card started as new since start', () => {
     const card = { history: [{ at: '2026-10-07T10:00:00.000Z', by: 'You', what: 'Created in Todo' }] }
     expect(newSinceStart(card, { at: '2026-10-07T11:00:00.000Z' })).toBe(false)
-    const started = { history: [...card.history, { at: '2026-10-07T10:30:00.000Z', by: 'B5 (hive)', what: 'Moved to Doing' }] }
+    const started = { history: [...card.history, { at: '2026-10-07T10:30:00.000Z', by: 'B5 (alpha)', what: 'Moved to Doing' }] }
     expect(workStartedAt(started)).toBe(Date.parse('2026-10-07T10:30:00.000Z'))
     expect(newSinceStart(started, { at: '2026-10-07T10:20:00.000Z' })).toBe(false)
     expect(newSinceStart(started, { at: '2026-10-07T11:00:00.000Z' })).toBe(true)
@@ -2066,7 +2066,7 @@ describe('task prompt', () => {
     expect(rawTaskPrompt(card, '  Only the tests. ')).toBe('Fix it\n\nOnly the tests.\n\nThe details.')
     expect(rawTaskPrompt({ title: ' Fix it ', description: '' }, ' ')).toBe('Fix it')
     const raw = rawTaskPrompt({ ...card, blockedBy: [3], context: ['docs/A.md'], comments: [{ at: '2026-10-01T10:00:00Z', by: 'You', text: 'x' }] } as never)
-    expect(raw).not.toMatch(/(?:Hive|Combwork) task board|work-on-card|depends on|Read these first|cw_read_task/)
+    expect(raw).not.toMatch(/Combwork task board|work-on-card|depends on|Read these first|cw_read_task/)
   })
 
   it('says when a card is back for more work, and puts the note before the card', async () => {

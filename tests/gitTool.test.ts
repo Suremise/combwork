@@ -94,7 +94,7 @@ describe('git missing', () => {
   })
 
   it('a missing working folder is not a missing git', async () => {
-    const r = await git(join(tempRoot(), 'hive-gittool-no-such-folder'), ['status'])
+    const r = await git(join(tempRoot(), 'cw-gittool-no-such-folder'), ['status'])
     expect(r.missing).toBeUndefined()
     expect(gitTool().state).not.toBe('missing')
   })

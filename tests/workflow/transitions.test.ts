@@ -195,7 +195,7 @@ describe('dependencies and decisions', () => {
 })
 
 describe('observations, idempotent', () => {
-  it('attribution and an integration found after an override are written once, by two Hives', async () => {
+  it('attribution and an integration found after an override are written once, by two Combworks', async () => {
     const e = (env = setup({ platform: 'git', folder: 'project' }))
     const other = e.another()
     const card = e.wf.createCard({ title: 'Shared' })

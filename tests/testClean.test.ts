@@ -95,8 +95,8 @@ describe('what cards cite (they keep it)', () => {
 
   it("…nor the unit tests' temp folder: naming combwork-test\\tmp keeps nothing in it (#992's own text did)", () => {
     const tmp = [card(992, 'make the root a folder in the test area (for example `%LOCALAPPDATA%\\combwork-test\\tmp\\<run or worker>`)')]
-    for (const rel of ['tmp/hive-git-x1y2z3', 'tmp/bfWnGRfHtqeLL_lF45dTU', 'tmp/config.json']) expect(citedBy(rel, tmp), rel).toBe(null)
-    expect(citedBy('tmp/hive-git-x1y2z3', [card(10, 'the repo it left: combwork-test\\tmp\\hive-git-x1y2z3')])).toBe(10)
+    for (const rel of ['tmp/cw-git-x1y2z3', 'tmp/bfWnGRfHtqeLL_lF45dTU', 'tmp/config.json']) expect(citedBy(rel, tmp), rel).toBe(null)
+    expect(citedBy('tmp/cw-git-x1y2z3', [card(10, 'the repo it left: combwork-test\\tmp\\cw-git-x1y2z3')])).toBe(10)
   })
 
   it('…but a path through a folder keeps only what it names, and a name only with its boundary', () => {
@@ -226,8 +226,8 @@ describe('the clean-up (clean.mjs)', () => {
       'checks.txt': 10,
       'scratch/claudio-2026-10-01/': 10,
       'scratch/claudio-2026-10-06/': 0,
-      'tmp/hive-git-old-x/repo/a.txt': 2,
-      'tmp/hive-git-new-y/repo/a.txt': 0,
+      'tmp/cw-git-old-x/repo/a.txt': 2,
+      'tmp/cw-git-new-y/repo/a.txt': 0,
       'progress-timings.json': 30,
       'config.json': 30,
       'heavy-slots/': 30,
@@ -257,7 +257,7 @@ describe('the clean-up (clean.mjs)', () => {
     const m = machine()
     const r = await run(m)
     const gone = r.removed.map((x: { rel: string }) => x.rel).sort()
-    expect(gone).toEqual(['charts-132', 'checks.txt', 'e2e/lanes/0/about', 'e2e/lanes/0/about-7', 'e2e/lanes/0/board', 'e2e/lanes/0/board-profile', 'e2e/lanes/0/board.png', 'e2e/lanes/3/about', 'e2e/lanes/3/board-profile', 'e2e/review12-probe', 'e2e/review14-done', 'scenarios/lanes/0/new-scenario-3', 'scenarios/lanes/0/old-scenario', 'scratch/claudio-2026-10-01', 'tmp/hive-git-old-x'])
+    expect(gone).toEqual(['charts-132', 'checks.txt', 'e2e/lanes/0/about', 'e2e/lanes/0/about-7', 'e2e/lanes/0/board', 'e2e/lanes/0/board-profile', 'e2e/lanes/0/board.png', 'e2e/lanes/3/about', 'e2e/lanes/3/board-profile', 'e2e/review12-probe', 'e2e/review14-done', 'scenarios/lanes/0/new-scenario-3', 'scenarios/lanes/0/old-scenario', 'scratch/claudio-2026-10-01', 'tmp/cw-git-old-x'])
     // Never the test homes' sign-ins, scenario results, logs, the claims, the timings and the machine's test settings.
     for (const p of ['codex/auth.json', 'codex/packages', 'claude/.credentials.json', 'scenarios/results/run1/results.json', 'e2e/logs/run-20260101-000000/board.log', 'progress-timings.json', 'config.json', 'heavy-slots', 'build-locks'])
       expect(there(m.root, p), p).toBe(true)
@@ -278,7 +278,7 @@ describe('the clean-up (clean.mjs)', () => {
     expect(r.items.find((i: { rel: string }) => i.rel === 'e2e/lanes/3/plan').why).toBe('cited by #304')
     expect(there(m.root, 'scenarios/lanes/2/kept-scenario/ws')).toBe(true)
     // New things stay.
-    for (const p of ['short tmp', 'e2e/board-profile', 'scratch/claudio-2026-10-06', 'tmp/hive-git-new-y']) expect(there(m.root, p), p).toBe(true)
+    for (const p of ['short tmp', 'e2e/board-profile', 'scratch/claudio-2026-10-06', 'tmp/cw-git-new-y']) expect(there(m.root, p), p).toBe(true)
     expect(r.freed).toBeGreaterThan(0)
     // The lane it cleaned is free again; the runner's claim is untouched.
     expect(readdirSync(m.lanesDir).sort()).toEqual(['lane-1.json'])
@@ -351,8 +351,8 @@ describe('the clean-up (clean.mjs)', () => {
     expect(why('charts-132')).toMatch(/days old/)
     expect(why('short tmp')).toBe('newer than 3 days')
     // The unit tests' temp folders (tests/tempDir.ts, #992) go after a day; the folder itself stays.
-    expect(why('tmp/hive-git-old-x')).toMatch(/^2\.\d days old$/)
-    expect(why('tmp/hive-git-new-y')).toBe('newer than 1 day')
+    expect(why('tmp/cw-git-old-x')).toMatch(/^2\.\d days old$/)
+    expect(why('tmp/cw-git-new-y')).toBe('newer than 1 day')
     expect(why('tmp')).toBe(undefined)
     expect(why('codex')).toBe(undefined)
   })
@@ -914,7 +914,7 @@ describe('no shell deletes before a rerun (#304): a new folder each run, or clea
       'Temp/claude/D--proj/session/scratchpad/shots/a.png': 0,
       'Temp/claude/D--proj/session/scratchpad/kept/b.png': 0,
       'Temp/cw-r2-291-x/c.png': 0,
-      'Temp/hive-r2-291-x/c.png': 0,
+      'Temp/xcw-r2-291-x/c.png': 0,
       'Temp/other-app/d.txt': 0,
       'combwork-test/scratch/probe-1/e.png': 0,
       'combwork-test/e2e/startall-ws/f.ts': 0,
@@ -948,8 +948,8 @@ describe('no shell deletes before a rerun (#304): a new folder each run, or clea
       [tmp, /outside the temp folder and combwork-test/],
       [join(top, 'elsewhere'), /outside the temp folder and combwork-test/],
       [join(tmp, 'other-app'), /isn't a probe's folder/],
-      // One-way rename (HI-2600): a hive… temp folder is no longer a probe's.
-      [join(tmp, 'hive-r2-291-x'), /isn't a probe's folder: .*cw… folders/],
+      // A temp folder whose name only holds cw, not starting with it, is not a probe's (HI-2600).
+      [join(tmp, 'xcw-r2-291-x'), /isn't a probe's folder: .*cw… folders/],
       [join(tmp, 'claude'), /isn't a probe's folder/],
       [join(tmp, 'claude', 'D--proj', 'session'), /isn't a probe's folder/],
       [pad, /isn't a probe's folder/],
@@ -962,7 +962,7 @@ describe('no shell deletes before a rerun (#304): a new folder each run, or clea
     ] as const
     for (const [p, why] of refused) expect(() => clear(p), p).toThrow(why)
     expect(readFileSync(join(tmp, 'other-app', 'd.txt'), 'utf8')).toHaveLength(100)
-    expect(readdirSync(join(tmp, 'hive-r2-291-x'))).toEqual(['c.png'])
+    expect(readdirSync(join(tmp, 'xcw-r2-291-x'))).toEqual(['c.png'])
     expect(readFileSync(join(testRoot, 'e2e', 'lanes', '0', 'board', 'g.png'), 'utf8')).toHaveLength(100)
   })
 

@@ -64,7 +64,7 @@ describe('the board on a real board’s copy', () => {
       await tasks.getTask(card, w)
       await tasks.updateTask(card, { column: 'doing' }, user)
     }
-    const agent = { projectPath: join(ws, 'hive'), agentId: 'bench' }
+    const agent = { projectPath: join(ws, 'demo'), agentId: 'bench' }
     // A comment on the largest card (#1210), and that change written whole (before) and by what changed (after), each in a
     // transaction undone, on the writer.
     const rows = await import('../src/main/schema/cardRows')

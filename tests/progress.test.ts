@@ -432,7 +432,7 @@ describe('progress runs', () => {
     expect(s.list(WS).find((r) => r.id === sc.id)!.state).toBe('running')
   })
 
-  it("a keep-alive (an empty report: hive-progress's command still writing output, HI-1993) keeps it running, and its deadline", () => {
+  it("a keep-alive (an empty report: cw-progress's command still writing output, HI-1993) keeps it running, and its deadline", () => {
     const s = store()
     const loop = s.start(alfie, { title: 'stress loop' })
     const timed = s.start(betty, { title: 'timed', estimateMs: 20 * 60_000 })
@@ -904,19 +904,19 @@ describe('progress rules', () => {
       holder: holder ? { id: `h-${holder}`, kind: 'agent', agentId: holder, name: holder.toUpperCase(), cards: [], since: 0, until: 0, taken } : null,
       waiting: waiting.map((w) => ({ agentId: w, name: w.toUpperCase(), cards: [], since: 0 }))
     })
-    // Combwork's own slot, as its folder may be written (another case, forward slashes, a trailing separator), and another project's.
-    const hive = slot('C:/ws/Hive/', 'hb3', true, ['hb2'])
+    // A project's slot, as its folder may be written (another case, forward slashes, a trailing separator), and another project's.
+    const demo = slot('C:/ws/Demo/', 'hb3', true, ['hb2'])
     const ambrosia = slot('C:\\ws\\ambrosia', 'amb2', true)
     // A turn not claimed yet isn't a merge.
-    const turn = slot('C:\\ws\\hive', 'hb1', false)
-    const slots = [hive, ambrosia, turn]
-    expect(filterMergeSlots(slots, SHOW_ALL)).toEqual([hive, ambrosia])
-    expect(filterMergeSlots(slots, { project: 'c:\\ws\\hive' })).toEqual([hive])
+    const turn = slot('C:\\ws\\demo', 'hb1', false)
+    const slots = [demo, ambrosia, turn]
+    expect(filterMergeSlots(slots, SHOW_ALL)).toEqual([demo, ambrosia])
+    expect(filterMergeSlots(slots, { project: 'c:\\ws\\demo' })).toEqual([demo])
     expect(filterMergeSlots(slots, { project: 'c:\\ws\\ambrosia' })).toEqual([ambrosia])
     // An agent: the slot it holds, or one it waits for; none for an agent in neither.
-    expect(filterMergeSlots(slots, { project: 'c:\\ws\\hive', agent: 'hb3' })).toEqual([hive])
-    expect(filterMergeSlots(slots, { project: 'c:\\ws\\hive', agent: 'hb2' })).toEqual([hive])
-    expect(filterMergeSlots(slots, { project: 'c:\\ws\\hive', agent: 'hb1' })).toEqual([])
+    expect(filterMergeSlots(slots, { project: 'c:\\ws\\demo', agent: 'hb3' })).toEqual([demo])
+    expect(filterMergeSlots(slots, { project: 'c:\\ws\\demo', agent: 'hb2' })).toEqual([demo])
+    expect(filterMergeSlots(slots, { project: 'c:\\ws\\demo', agent: 'hb1' })).toEqual([])
     // The Assistant's and scripts' runs hold no project's slot.
     expect(filterMergeSlots(slots, { project: NO_PROJECT })).toEqual([])
   })
@@ -925,11 +925,11 @@ describe('progress rules', () => {
     setDateStyle({ date: 'ymd', time: '24h' })
     const start = new Date(2026, 9, 5, 20, 57).getTime()
     const full = run({ title: 'e2e: full set before merging', command: 'npm run e2e -- --all --real --build --record', agentName: 'Claudio', provider: 'claude-code', source: 'agent', total: 96, step: 95, stepName: 'taskbar', startedAt: start, finishedAt: start + 10 * 60_000, expectedMs: 9 * 60_000, state: 'failed', exitCode: 1, logPath: 'C:\\t\\run-record.md', summary: '1 failed: taskbar' })
-    expect(runDetailsText(full, 'hive', start + 11 * 60_000)).toBe(
+    expect(runDetailsText(full, 'demo', start + 11 * 60_000)).toBe(
       [
         'Run: e2e: full set before merging',
         'Command: npm run e2e -- --all --real --build --record',
-        'Agent: Claudio · hive',
+        'Agent: Claudio · demo',
         'Provider: Claude Code',
         'Started: 2026-10-05 20:57',
         'Ended: 2026-10-05 21:07',
@@ -1147,31 +1147,31 @@ describe('progress history (#352): Recent kept across restarts', () => {
 })
 
 describe("Combwork's set-up runs in review copies (HI-1710)", () => {
-  const hive = (extra: Partial<Extract<ProgressCaller, { source: 'combwork' }>> = {}): ProgressCaller => ({ source: 'combwork', workspacePath: WS, projectPath: alfie.projectPath, ...extra })
+  const combwork = (extra: Partial<Extract<ProgressCaller, { source: 'combwork' }>> = {}): ProgressCaller => ({ source: 'combwork', workspacePath: WS, projectPath: alfie.projectPath, ...extra })
 
   it("are credited to the agent whose lease held the copy, in that copy, else to one 'Combwork (review copies)'", () => {
     const s = store()
-    const held = s.start(hive({ copy: 'copy-1', reviewer: { agentId: 'r-6', agentName: 'HR6' } }), { title: 'npm ci' })
+    const held = s.start(combwork({ copy: 'copy-1', reviewer: { agentId: 'r-6', agentName: 'HR6' } }), { title: 'npm ci' })
     expect(held).toMatchObject({ source: 'combwork', agentId: 'r-6', agentName: 'HR6', copy: 'copy-1' })
     expect(held.defaultName).toBeUndefined()
     expect(runAgentName(held, tr)).toBe('HR6')
     expect(runDetailsText(held, 'alpha', now)).toContain('copy-1')
-    const idle = [s.start(hive({ copy: 'copy-1' }), { title: 'npm ci' }), s.start(hive({ copy: 'copy-2' }), { title: 'npm ci' })]
+    const idle = [s.start(combwork({ copy: 'copy-1' }), { title: 'npm ci' }), s.start(combwork({ copy: 'copy-2' }), { title: 'npm ci' })]
     expect(idle.map((r) => [r.agentId, r.agentName, r.defaultName, r.copy])).toEqual([[null, 'Combwork (review copies)', 'copy', 'copy-1'], [null, 'Combwork (review copies)', 'copy', 'copy-2']])
     expect(idle.map((r) => runAgentName(r, tr))).toEqual(['Combwork (review copies)', 'Combwork (review copies)'])
     // A slot's run never takes a reviewer.
-    expect(s.start(hive({ slot: 'slot-b', reviewer: { agentId: 'r-6', agentName: 'HR6' } }), { title: 'npm ci' })).toMatchObject({ agentId: null, agentName: 'Combwork (slot slot-b)', defaultName: 'slot' })
+    expect(s.start(combwork({ slot: 'slot-b', reviewer: { agentId: 'r-6', agentName: 'HR6' } }), { title: 'npm ci' })).toMatchObject({ agentId: null, agentName: 'Combwork (slot slot-b)', defaultName: 'slot' })
     // The reviewer's run is still Combwork's: the agent can't change or end it.
     const r6: ProgressCaller = { ...alfie, agentId: 'r-6', agentName: 'HR6' }
     expect(status(() => s.update(r6, held.id, { step: 1 }))).not.toBeNull()
-    expect(status(() => s.update(hive(), held.id, { step: 1 }))).toBeNull()
+    expect(status(() => s.update(combwork(), held.id, { step: 1 }))).toBeNull()
   })
 
-  it('keep their reviewer across a save; older "Hive (copy copy-1)" runs fold into "Combwork (review copies)"', () => {
+  it('keep their reviewer across a save; older "Combwork (copy copy-1)" runs fold into "Combwork (review copies)"', () => {
     const ended = { state: 'passed', startedAt: 1, finishedAt: 2, source: 'combwork', projectPath: alfie.projectPath }
     const records = [
       { ...ended, id: 'c1', title: 'npm ci', copy: 'copy-1', agentId: 'r-6', agentName: 'HR6' },
-      { ...ended, id: 'c2', title: 'npm ci', copy: 'copy-1', agentName: 'Hive (copy copy-1)', defaultName: 'copy' },
+      { ...ended, id: 'c2', title: 'npm ci', copy: 'copy-1', agentName: 'Combwork (copy copy-1)', defaultName: 'copy' },
       // An id on a run of the pool's (an edited file) doesn't make it an agent's.
       { ...ended, id: 'c3', title: 'npm ci', copy: 'copy-2', agentId: 'r-6', agentName: 'Combwork (review copies)', defaultName: 'copy' },
       { ...ended, id: 'c4', title: 'npm ci', slot: 'slot-b', agentId: 'r-6', agentName: 'HR6' }

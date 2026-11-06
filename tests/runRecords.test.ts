@@ -267,9 +267,9 @@ describe("a run's record for its slot writer (HI-1886)", () => {
    * revoked. A lost helper is revoked before its replacement is given a launch, kept before it is.
    */
   describe("a keeper's state (HI-2055)", () => {
-    const HIVE = '100:5'
+    const APP = '100:5'
     const keeperFile = (run: string) => join(profile.dir, 'keeper', `keeper-${run}.json`)
-    const state = (run: string, o: Record<string, unknown> = {}) => ({ v: 1, run, helper: '4001:1', app: HIVE, state: 'ended', observed: 'complete', total: 0, members: [], at: 1, ...o })
+    const state = (run: string, o: Record<string, unknown> = {}) => ({ v: 1, run, helper: '4001:1', app: APP, state: 'ended', observed: 'complete', total: 0, members: [], at: 1, ...o })
     const plantState = (run: string, data: unknown) => {
       mkdirSync(join(profile.dir, 'keeper'), { recursive: true })
       writeFileSync(keeperFile(run), typeof data === 'string' ? data : JSON.stringify(data))
@@ -283,7 +283,7 @@ describe("a run's record for its slot writer (HI-1886)", () => {
       jobs.onEnsure = () => undefined
       jobs.onAdd = () => undefined
       const m = await restarted()
-      m.setCombworkIdentity(async () => HIVE)
+      m.setCombworkIdentity(async () => APP)
       return m
     }
     const failWrites = (m: typeof import('../src/main/agentProcesses')) => {
@@ -300,13 +300,13 @@ describe("a run's record for its slot writer (HI-1886)", () => {
       // Combwork gone without quitting: a new start reads the binding back.
       const next = await restarted()
       plantState('k-run', state('k-run'))
-      expect(await next.keeperState('k-run', HIVE)).toEqual({ state: 'ended', helper: '4001:1' })
+      expect(await next.keeperState('k-run', APP)).toEqual({ state: 'ended', helper: '4001:1' })
       plantState('k-run', state('k-run', { state: 'live', total: 2, members: [{ pid: 7001, created: '133000000000000000', name: 'node' }] }))
       // Its total counts one member it doesn't describe (HI-2309, HR1's round 3): said, so nothing takes the list as all.
-      expect(await next.keeperState('k-run', HIVE)).toMatchObject({ state: 'live', helper: '4001:1', members: [{ pid: 7001, created: '133000000000000000', name: 'node' }], more: 1 })
+      expect(await next.keeperState('k-run', APP)).toMatchObject({ state: 'live', helper: '4001:1', members: [{ pid: 7001, created: '133000000000000000', name: 'node' }], more: 1 })
       // Console hosts it describes are counted, never listed: not "more".
       plantState('k-run', state('k-run', { state: 'live', total: 2, members: [{ pid: 7001, created: '133000000000000000', name: 'node' }, { pid: 7002, created: '133000000000000000', name: 'conhost' }] }))
-      expect(await next.keeperState('k-run', HIVE)).toMatchObject({ state: 'live', members: [{ pid: 7001 }], more: 0 })
+      expect(await next.keeperState('k-run', APP)).toMatchObject({ state: 'live', members: [{ pid: 7001 }], more: 0 })
     })
 
     it.runIf(process.platform === 'win32')("none taken unless whole and its own: another helper, Combwork or run, a version, an incomplete or non-empty \"ended\", a bad member, malformed or too large", async () => {
@@ -328,14 +328,14 @@ describe("a run's record for its slot writer (HI-1886)", () => {
       ]
       for (const b of bad) {
         plantState('k-bad', b)
-        expect(await m.keeperState('k-bad', HIVE), JSON.stringify(b).slice(0, 120)).toBeNull()
+        expect(await m.keeperState('k-bad', APP), JSON.stringify(b).slice(0, 120)).toBeNull()
       }
       // A run never bound (tracked before this change, or by no keeper): none.
       plantState('k-unbound', state('k-unbound'))
-      expect(await m.keeperState('k-unbound', HIVE)).toBeNull()
+      expect(await m.keeperState('k-unbound', APP)).toBeNull()
       // The good one, for contrast.
       plantState('k-bad', state('k-bad'))
-      expect(await m.keeperState('k-bad', HIVE)).toEqual({ state: 'ended', helper: '4001:1' })
+      expect(await m.keeperState('k-bad', APP)).toEqual({ state: 'ended', helper: '4001:1' })
     })
 
     it.runIf(process.platform === 'win32')('a lost helper is revoked at once, and kept before its replacement is given a launch; a receipt it writes later frees nothing', async () => {
@@ -346,7 +346,7 @@ describe("a run's record for its slot writer (HI-1886)", () => {
       jobs.lose()
       // Known at once (a clear's guard reads it), before anything is written.
       expect(m.keeperStillBound('k-old', '4001:1')).toBe(false)
-      expect(await m.keeperState('k-old', HIVE)).toBeNull()
+      expect(await m.keeperState('k-old', APP)).toBeNull()
       // The next launch goes to the new helper, bound to it, once the revocation is kept.
       expect(await track(m, 'k-new')).toBe(true)
       expect(m.keeperStillBound('k-new', '4002:1')).toBe(true)
@@ -356,7 +356,7 @@ describe("a run's record for its slot writer (HI-1886)", () => {
       // The revoked helper's binding went with its revocation.
       expect(kept.helpers).toEqual({ 'k-new': '4002:1' })
       // After a restart too.
-      expect(await (await restarted()).keeperState('k-old', HIVE)).toBeNull()
+      expect(await (await restarted()).keeperState('k-old', APP)).toBeNull()
     })
 
     it.runIf(process.platform === 'win32')('a revocation never lapses: after more losses than the revoked list keeps, the first helper still frees nothing, after a restart too (HR2\'s round 1)', async () => {
@@ -367,13 +367,13 @@ describe("a run's record for its slot writer (HI-1886)", () => {
         jobs.lose()
         expect(await track(m, `k-${i}`)).toBe(true)
       }
-      expect(await m.keeperState('k-oldest', HIVE)).toBeNull()
+      expect(await m.keeperState('k-oldest', APP)).toBeNull()
       await m.leftoversSaved()
       const kept = JSON.parse(readFileSync(file, 'utf8')) as { revoked?: string[]; helpers?: Record<string, string> }
       // The list kept is bounded, the binding went with the revocation.
       expect(kept.revoked).not.toContain('4001:1')
       expect(kept.helpers?.['k-oldest']).toBeUndefined()
-      expect(await (await restarted()).keeperState('k-oldest', HIVE)).toBeNull()
+      expect(await (await restarted()).keeperState('k-oldest', APP)).toBeNull()
     })
 
     it.runIf(process.platform === 'win32')("a helper lost while the launch's helper is made ready, its revocation not kept: the launch isn't tracked", async () => {
@@ -471,12 +471,12 @@ describe("a run's record for its slot writer (HI-1886)", () => {
       // The next start: each one's keeper says it ended, and its writer settles by it.
       const next = await restarted()
       for (const run of held) plantState(run, state(run))
-      for (const run of held) expect(await next.keeperState(run, HIVE)).toEqual({ state: 'ended', helper: '4001:1' })
+      for (const run of held) expect(await next.keeperState(run, APP)).toEqual({ state: 'ended', helper: '4001:1' })
       next.forgetKeeperRun('u-1')
       expect(next.keeperStillBound('u-1', '4001:1')).toBe(false)
       await next.leftoversSaved()
       expect(Object.keys((JSON.parse(readFileSync(file, 'utf8')) as { helpers?: Record<string, string> }).helpers ?? {}).sort()).toEqual(['u-2', 'u-3'])
-      expect(await next.keeperState('u-2', HIVE)).toEqual({ state: 'ended', helper: '4001:1' })
+      expect(await next.keeperState('u-2', APP)).toEqual({ state: 'ended', helper: '4001:1' })
     })
 
     it.runIf(process.platform === 'win32')("an earlier Combwork's binding goes at the start only when its helper has gone and left no state: one keeping, or with a state, stays", async () => {
@@ -489,7 +489,7 @@ describe("a run's record for its slot writer (HI-1886)", () => {
         await m.pruneKeeperStates()
         await m.leftoversSaved()
         expect((JSON.parse(readFileSync(file, 'utf8')) as { helpers?: Record<string, string> }).helpers).toEqual({ 'o-state': '4007:1', 'o-keeping': '4008:1' })
-        expect(await m.keeperState('o-state', HIVE)).toEqual({ state: 'ended', helper: '4007:1' })
+        expect(await m.keeperState('o-state', APP)).toEqual({ state: 'ended', helper: '4007:1' })
         // Which still run can't be told (the host doesn't answer): none goes.
         writeFileSync(file, JSON.stringify({ version: 1, launches: [], helpers: { 'o-gone': '4007:1' } }))
         jobs.identifyFails = true

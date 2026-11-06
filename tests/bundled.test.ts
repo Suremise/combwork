@@ -203,7 +203,7 @@ describe('a workspace', () => {
     writeFileSync(join(base, 'old-coordinator.md'), OLD_COORDINATOR)
     oldCoordinator = await contentHash(join(base, 'old-coordinator.md'))
     history.modes.coordinator = [oldCoordinator, ...history.modes.coordinator]
-    // A use-hive-api this Hive "shipped" before the skill was renamed use-cw-api (HI-2463).
+    // A use-hive-api an earlier version "shipped" before the skill was renamed use-cw-api (HI-2463).
     mkdirSync(join(base, 'old-use-hive-api'), { recursive: true })
     writeFileSync(join(base, 'old-use-hive-api', 'SKILL.md'), OLD_USE_HIVE_API)
     history.skills['use-hive-api'] = [...(history.skills['use-hive-api'] ?? []), await contentHash(join(base, 'old-use-hive-api'))]
@@ -261,7 +261,7 @@ describe('a workspace', () => {
 
   it('an older one: untouched copies updated, edited ones and the user’s kept, deleted ones left, new ones added', async () => {
     const ws = join(base, 'older')
-    // Hive 0.3's workspace: skills (one untouched old, one edited, one deleted, one a user folder) and no modes folder.
+    // A 0.3 workspace: skills (one untouched old, one edited, one deleted, one a user folder) and no modes folder.
     mkdirSync(join(ws, '.combwork', 'skills', 'handover'), { recursive: true })
     writeFileSync(join(skillsDir(ws), 'handover', 'SKILL.md'), OLD_HANDOVER.replace(/\n/g, '\r\n'))
     mkdirSync(join(skillsDir(ws), 'merge-ready'), { recursive: true })
@@ -357,7 +357,7 @@ describe('a workspace', () => {
     const legacy = join(ws, '.combwork', 'personas')
     const modes = join(ws, '.combwork', 'modes')
     mkdirSync(legacy, { recursive: true })
-    // Hive 0.9.2's workspace: an untouched older Coordinator, an edited Planner, the user's own mode, QA triager deleted.
+    // A 0.9.2 workspace: an untouched older Coordinator, an edited Planner, the user's own mode, QA triager deleted.
     writeFileSync(join(legacy, 'coordinator.md'), OLD_COORDINATOR)
     writeFileSync(join(legacy, 'planner.md'), '---\nname: Planner\n---\n\nMy own planning.\n')
     writeFileSync(join(legacy, 'my-own.md'), '---\nname: My own\n---\n\nMine.\n')
@@ -393,7 +393,7 @@ describe('a workspace', () => {
       expect(cfg.agents.find((a) => a.id === 'assistant')).toMatchObject({ mode: 'my-own' })
       expect(cfg.agents.find((a) => a.id === 'assistant')).not.toHaveProperty('persona')
 
-      // An older Hive opening it again makes .combwork/personas once more: it is left alone, and .combwork/modes is used.
+      // An older version opening it again makes .combwork/personas once more: it is left alone, and .combwork/modes is used.
       mkdirSync(legacy, { recursive: true })
       writeFileSync(join(legacy, 'coordinator.md'), OLD_COORDINATOR)
       await wsMod.inWorkspace(w, () => mod.syncBundled())

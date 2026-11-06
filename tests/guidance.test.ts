@@ -962,7 +962,7 @@ describe("Combwork's development skills", () => {
   const claude = '.claude/skills'
   const agents = '.agents/skills'
   // What git has of a folder (tracked, or new and not ignored), relative to it: a checkout where Combwork ran agents also
-  // holds Combwork's own hive-* copies in .agents/skills, which .git/info/exclude ignores (#923).
+  // holds Combwork's own cw-* copies in .agents/skills, which .git/info/exclude ignores (#923).
   const files = (dir: string): string[] =>
     execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--deduplicate', '--', dir], { cwd: ROOT, encoding: 'utf8' })
       .split('\0')
@@ -976,8 +976,8 @@ describe("Combwork's development skills", () => {
     for (const f of files(claude)) expect(readFileSync(join(ROOT, agents, f), 'utf8').replace(/\r\n/g, '\n'), f).toBe(readFileSync(join(ROOT, claude, f), 'utf8').replace(/\r\n/g, '\n'))
   })
 
-  it("don't start with hive-, the prefix of Combwork's git-excluded copies in .agents/skills", () => {
-    for (const name of [...skills(claude), ...skills(agents)]) expect(name, name).not.toMatch(/^\.?hive-/)
+  it("don't start with cw-, the prefix of Combwork's git-excluded copies in .agents/skills", () => {
+    for (const name of [...skills(claude), ...skills(agents)]) expect(name, name).not.toMatch(/^\.?cw-/)
   })
 
   it('are valid skills that link only inside the repository', () => {

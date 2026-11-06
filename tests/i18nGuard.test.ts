@@ -285,7 +285,7 @@ describe('the i18n guard: what review round 1 found', () => {
     // A comment on its own line above, a block comment, and one in JSX.
     expect(sitesIn(lines('// i18n-ignore: a deliberate name', `export const row = { label: 'none' }`))).toEqual({ sites: [], problems: [] })
     expect(sitesIn(`export const row = { label: 'none' } /* i18n-ignore: a deliberate name */`)).toEqual({ sites: [], problems: [] })
-    expect(sitesIn(`export const row = <span>{/* i18n-ignore: a product name */}Hive Desktop</span>`)).toEqual({ sites: [], problems: [] })
+    expect(sitesIn(`export const row = <span>{/* i18n-ignore: a product name */}Acme Desktop</span>`)).toEqual({ sites: [], problems: [] })
     // A bare marker anywhere fails, and exempts nothing.
     expect(sitesIn(lines('/* i18n-ignore */', `export const row = { label: 'none' }`))).toEqual({ sites: ['prop|label|none'], problems: [expect.stringMatching(/^BARE IGNORE src\/renderer\/src\/Panel\.tsx:1 /)] })
   })

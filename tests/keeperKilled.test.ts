@@ -63,12 +63,12 @@ app.on('window-all-closed', () => undefined)
 `
     )
     const electron = req('electron') as string
-    const hive = spawn(electron, [parent, `--user-data-dir=${join(dir, 'electron-profile')}`], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, env: baseEnv(), cwd: dir })
-    started.push(hive)
+    const combwork = spawn(electron, [parent, `--user-data-dir=${join(dir, 'electron-profile')}`], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, env: baseEnv(), cwd: dir })
+    started.push(combwork)
     let out = ''
-    hive.stdout.setEncoding('utf8').on('data', (d: string) => (out += d))
+    combwork.stdout.setEncoding('utf8').on('data', (d: string) => (out += d))
     let closed = false
-    hive.once('close', () => (closed = true))
+    combwork.once('close', () => (closed = true))
     const pid = await vi.waitFor(() => {
       const m = /helper (\d+)/.exec(out)
       if (!m) throw new Error(`not ready: ${out}`)
@@ -76,7 +76,7 @@ app.on('window-all-closed', () => undefined)
     }, { timeout: HUNG_MS, interval: 100 })
     const helper = identify([pid])
     helpers.push(...helper)
-    await exited(hive)
+    await exited(combwork)
     // Its pipe closed while the helper (outside the parent's job) still runs.
     await waitFor(() => expect(closed, 'the test’s pipe to the Combwork still open: the helper holds it').toBe(true))
     expect(stillSame(helper)).toEqual([pid])
@@ -86,11 +86,11 @@ app.on('window-all-closed', () => undefined)
     const keepDir = join(dir, 'keeper')
     const member = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 120000)'], { stdio: 'ignore', windowsHide: true, env: baseEnv() })
     started.push(member)
-    const hive = spawn(process.execPath, [bundle, '100:5', keepDir, 'killed-run', String(member.pid)], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, env: baseEnv(), cwd: dir })
-    started.push(hive)
+    const combwork = spawn(process.execPath, [bundle, '100:5', keepDir, 'killed-run', String(member.pid)], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, env: baseEnv(), cwd: dir })
+    started.push(combwork)
     let out = ''
-    hive.stdout.setEncoding('utf8').on('data', (d: string) => (out += d))
-    hive.stderr.setEncoding('utf8').on('data', (d: string) => (out += d))
+    combwork.stdout.setEncoding('utf8').on('data', (d: string) => (out += d))
+    combwork.stderr.setEncoding('utf8').on('data', (d: string) => (out += d))
     const ready = await vi.waitFor(() => {
       const m = /ready (\d+) (\d+:\d+)/.exec(out)
       if (!m) throw new Error(`not ready: ${out}`)
@@ -103,8 +103,8 @@ app.on('window-all-closed', () => undefined)
     helpers.push(...helper)
 
     // Ended as a crash ends it: its main process only (TerminateProcess), nothing it started.
-    hive.kill()
-    await exited(hive)
+    combwork.kill()
+    await exited(combwork)
     const receipt = (): Record<string, unknown> | null => {
       const f = join(keepDir, 'keeper-killed-run.json')
       return existsSync(f) ? (JSON.parse(readFileSync(f, 'utf8')) as Record<string, unknown>) : null

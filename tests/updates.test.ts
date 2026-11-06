@@ -65,7 +65,7 @@ describe('the copy installed on disk (#1647)', () => {
     const src = dir()
     mkdirSync(join(src, 'out'), { recursive: true })
     writeFileSync(join(src, 'out', 'main.js'), 'x'.repeat(5000))
-    writeFileSync(join(src, 'package.json'), JSON.stringify({ name: 'hive', version: '1.0.0-rc.2' }))
+    writeFileSync(join(src, 'package.json'), JSON.stringify({ name: 'combwork', version: '1.0.0-rc.2' }))
     // oxlint-disable-next-line typescript/no-require-imports -- a dev-only dependency of electron-builder's
     const asar = require('@electron/asar') as { createPackage: (src: string, dest: string) => Promise<void> }
     const real = join(dir(), 'app.asar')

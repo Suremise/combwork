@@ -161,7 +161,7 @@ describe('listing', () => {
 
   it("says who made each (#476): the Combwork agent whose session last ran there, else Combwork's folder, else not Combwork", async () => {
     const ran = await tree(`ran${++n}`)
-    const hive = await tree(`hive${n}`)
+    const ours = await tree(`ours${n}`)
     const other = { path: join(base, 'elsewhere', `other${n}`), branch: `feature/other${n}` }
     await createWorktree(proj, other.path, other.branch, 'main')
     const at = (m: number): string => new Date(Date.UTC(2026, 9, 9, 10, m)).toISOString()
@@ -174,10 +174,10 @@ describe('listing', () => {
       const list = await listOf()
       const of = (path: string): UnusedWorktree => list.find((x) => placeKey(x.path) === placeKey(path))!
       expect(of(ran.path).origin).toEqual({ madeBy: 'combwork', agentName: 'B4' })
-      expect(of(hive.path).origin).toEqual({ madeBy: 'combwork' })
+      expect(of(ours.path).origin).toEqual({ madeBy: 'combwork' })
       expect(of(other.path).origin).toEqual({ madeBy: 'other' })
       expect(originLabel(of(ran.path))).toBe('was B4')
-      expect(originLabel(of(hive.path))).toBe('made by Combwork')
+      expect(originLabel(of(ours.path))).toBe('made by Combwork')
       expect(originLabel(of(other.path))).toBe('not made by Combwork')
       expect(unusedPickerLabel(of(other.path))).toBe(`feature/other${n} · not made by Combwork · merged, clean`)
     } finally {

@@ -129,7 +129,7 @@ describe('the tabs (HI-1743)', () => {
 })
 
 
-const session = (id: string, agentId: string, s: number, more: Partial<SessionListItem> = {}): SessionListItem => ({ id, provider: 'claude-code', source: 'hive', agentId, name: id, lastActivity: iso(s), lastActiveAt: iso(s), hasTranscript: true, hasBackup: false, usage: null, recache: null, title: null, ...more }) as SessionListItem
+const session = (id: string, agentId: string, s: number, more: Partial<SessionListItem> = {}): SessionListItem => ({ id, provider: 'claude-code', source: 'combwork', agentId, name: id, lastActivity: iso(s), lastActiveAt: iso(s), hasTranscript: true, hasBackup: false, usage: null, recache: null, title: null, ...more }) as SessionListItem
 const keys = (nodes: readonly (ActivityNode | null)[]): (string | null)[] => nodes.map((n) => n?.key ?? null)
 const withCommand = (p: AgentProcess, command: string): AgentProcess & { command: string } => ({ ...p, command })
 

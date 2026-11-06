@@ -20,7 +20,7 @@ const entry = (tag: string): string =>
 const atom = (tags: string[]): string => `<?xml version="1.0" encoding="UTF-8"?>\n<feed xmlns="http://www.w3.org/2005/Atom"><id>tag:github.com,2008:${BASE}</id><title>Release notes from combwork</title>${tags.map(entry).join('')}</feed>`
 const yml = (tag: string): string => {
   const v = tag.replace(/^v/, '')
-  return `version: ${v}\nfiles:\n  - url: Hive-Setup-${v}.exe\n    sha512: abc\n    size: 1\npath: Hive-Setup-${v}.exe\nsha512: abc\nreleaseDate: '2026-11-01T00:00:00.000Z'\n`
+  return `version: ${v}\nfiles:\n  - url: Combwork-Setup-${v}.exe\n    sha512: abc\n    size: 1\npath: Combwork-Setup-${v}.exe\nsha512: abc\nreleaseDate: '2026-11-01T00:00:00.000Z'\n`
 }
 
 /** Checks `running` against a feed of `tags` (newest first, as GitHub lists them), with `latest` as releases/latest. */

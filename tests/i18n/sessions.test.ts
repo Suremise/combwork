@@ -12,7 +12,7 @@ import { countText, notFromAgent } from '../../src/shared/sessionTree'
 // a session holds (prompts, replies, its name, paths, agent names) is never translated.
 
 const ROOT = resolve(__dirname, '../..')
-const PROJECT = 'C:\\ws\\hive'
+const PROJECT = 'C:\\ws\\alpha'
 
 afterEach(() => setLanguage('en', {}))
 
@@ -21,7 +21,7 @@ const pseudo = (s: string): boolean => s.includes('[') && !/\b(?:the|and|of|in|i
 
 const origins = () => [
   sessionOrigin(PROJECT, [{ id: 'a-1', name: 'Coder' }], { source: 'combwork', agentId: 'a-1', agentName: 'Coder', cwd: PROJECT } as never)!,
-  sessionOrigin(PROJECT, [], { source: 'combwork', agentId: 'a-2', agentName: 'Helper', cwd: 'C:\\ws\\hive-wt\\b1', branch: 'cw/b1' } as never)!,
+  sessionOrigin(PROJECT, [], { source: 'combwork', agentId: 'a-2', agentName: 'Helper', cwd: 'C:\\ws\\alpha-wt\\b1', branch: 'cw/b1' } as never)!,
   sessionOrigin(PROJECT, [], { source: 'combwork', agentId: 'a-3', cwd: PROJECT } as never)!,
   sessionOrigin(PROJECT, [], { source: 'combwork', cwd: PROJECT } as never)!
 ]
@@ -43,7 +43,7 @@ describe('the sessions area', () => {
     const [mine, gone, unnamed, none] = origins()
     expect(mine).toEqual({ agent: 'Coder', location: 'Project folder', label: 'Coder · Project folder', detail: `Ran in ${PROJECT}\nAgent Coder (a-1).` })
     expect(gone.label).toBe('Helper (removed) · Worktree · cw/b1')
-    expect(gone.detail).toBe('Ran in C:\\ws\\hive-wt\\b1\nIts agent (a-2) has since been removed.')
+    expect(gone.detail).toBe('Ran in C:\\ws\\alpha-wt\\b1\nIts agent (a-2) has since been removed.')
     expect(unnamed.agent).toBe('Removed agent')
     expect(none.detail).toBe(`Ran in ${PROJECT}\nNo agent recorded (adopted, or from before Combwork recorded agents).`)
     expect(attachmentLabel('image', ['image'], 'Claude Code')).toEqual({ label: 'Image', native: true, detail: 'Claude Code sees the image itself.' })
@@ -57,7 +57,7 @@ describe('the sessions area', () => {
     for (const t of texts) expect(pseudo(t), t).toBe(true)
     const [mine, gone] = origins()
     expect(mine.agent).toBe('Coder')
-    expect(gone.detail).toContain('C:\\ws\\hive-wt\\b1')
+    expect(gone.detail).toContain('C:\\ws\\alpha-wt\\b1')
     expect(gone.location).toContain('cw/b1')
   })
 

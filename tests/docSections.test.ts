@@ -204,7 +204,7 @@ describe('every way of naming a heading decides ambiguity alike (#1535)', () => 
   })
 })
 
-describe("the hive tools' replies", () => {
+describe("Combwork's tools' replies", () => {
   const outline = { path: 'docs/PLAN.md', size: 12_345, headings: docOutline(doc) }
   it('an outline: a heading a line, indented by level, with its slug and size', () => {
     const text = docOutlineText(outline)

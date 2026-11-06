@@ -82,16 +82,16 @@ describe('what a launch has', () => {
   })
 
   it("Codex's own listing: Combwork's by the exact command Combwork passed (with Codex's trust), anyone else's with theirs and their file", () => {
-    const hive = { command: 'curl.exe hive', flagsFile: 'C:\\<session-flags>\\config.toml' }
+    const ours = { command: 'curl.exe combwork', flagsFile: 'C:\\<session-flags>\\config.toml' }
     const got = codexListedHooks(
       [
-        { key: 'C:\\<session-flags>\\config.toml:pre_tool_use:0:0', source: 'sessionFlags', command: 'curl.exe hive', trustStatus: 'trusted' },
-        { key: 'C:\\<session-flags>\\config.toml:stop:0:0', source: 'sessionFlags', command: 'curl.exe hive', trustStatus: 'modified' },
+        { key: 'C:\\<session-flags>\\config.toml:pre_tool_use:0:0', source: 'sessionFlags', command: 'curl.exe combwork', trustStatus: 'trusted' },
+        { key: 'C:\\<session-flags>\\config.toml:stop:0:0', source: 'sessionFlags', command: 'curl.exe combwork', trustStatus: 'modified' },
         // The user's own -c hook that names Combwork's endpoint isn't Combwork's: only Combwork's exact command is.
-        { key: 'C:\\<session-flags>\\config.toml:stop:1:0', source: 'sessionFlags', command: 'curl.exe hive --extra', trustStatus: 'untrusted' },
+        { key: 'C:\\<session-flags>\\config.toml:stop:1:0', source: 'sessionFlags', command: 'curl.exe combwork --extra', trustStatus: 'untrusted' },
         { key: 'C:\\home\\config.toml:post_tool_use:0:0', source: 'user', command: 'echo user', trustStatus: 'trusted', matcher: '*' }
       ],
-      hive
+      ours
     )
     expect([...got.combworkTrust]).toEqual([['PreToolUse', 'trusted'], ['Stop', 'modified']])
     expect(got.rows.map((r) => [r.event, r.source, r.status, r.file ?? null, r.observed])).toEqual([
@@ -101,7 +101,7 @@ describe('what a launch has', () => {
   })
 
   it("asks Codex with the launch's config overrides only, never its other arguments", () => {
-    expect(hookQueryArgs(['resume', 'x', '-s', 'read-only', '-c', 'hooks.Stop=[]', '--config', 'projects={}', '-a', 'never', '--config=features.x=true', '-c', 'developer_instructions="d"', '-c', 'mcp_servers.hive={}'])).toEqual(['-c', 'hooks.Stop=[]', '-c', 'projects={}', '-c', 'features.x=true'])
+    expect(hookQueryArgs(['resume', 'x', '-s', 'read-only', '-c', 'hooks.Stop=[]', '--config', 'projects={}', '-a', 'never', '--config=features.x=true', '-c', 'developer_instructions="d"', '-c', 'mcp_servers.combwork={}'])).toEqual(['-c', 'hooks.Stop=[]', '-c', 'projects={}', '-c', 'features.x=true'])
   })
 })
 

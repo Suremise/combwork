@@ -226,11 +226,11 @@ describe("a card's work from the board (#1223)", () => {
 
   it("gives each fact a short row, revisions as the project's platform shows them", () => {
     const short = (id: string): string => revisionShort('git', id)
-    const row = (kind: string, data: unknown, actor = 'hive') => factRow({ seq: 3, card: 1, kind, at: '2026-10-20T10:00:00.000Z', actor, source: 'recorded', data } as never, short)
+    const row = (kind: string, data: unknown, actor = 'combwork') => factRow({ seq: 3, card: 1, kind, at: '2026-10-20T10:00:00.000Z', actor, source: 'recorded', data } as never, short)
     expect(row('Submitted', submitted('0123456789abcdef'), 'agent:B1')).toEqual({ seq: 3, kind: 'Submitted', at: '2026-10-20T10:00:00.000Z', actor: 'agent:B1', what: '0123456, round 1, 1 file' })
     expect(row('Verdict', { reviewer: 'R1', submission: 2, revision: 'fedcba9876', pass: false, round: 1, generation: 0, comment: 'c' }).what).toBe('failed by R1, submission 2 (fedcba9), round 1')
     expect(row('CheckRan', { name: 'unit', command: 'npm test', revision: 'abcdef12345', tested: 'abcdef12345', result: 'passed', run: 'r', durationMs: 1, by: 'B1', counted: false, whyNot: 'dirty' }).what).toBe('unit passed on abcdef1, not counted (dirty)')
-    expect(row('Integrated', { revision: 'abcdef12345', target: 'main', result: '99999999aa', method: 'merge', by: 'hive' }).what).toBe('abcdef1 into main as 9999999 (merge, by hive)')
+    expect(row('Integrated', { revision: 'abcdef12345', target: 'main', result: '99999999aa', method: 'merge', by: 'combwork' }).what).toBe('abcdef1 into main as 9999999 (merge, by combwork)')
     expect(row('Moved', { from: 'review', to: 'approved', cause: 'intent' }).what).toBe('review to approved (intent)')
     expect(row('Accepted', { revision: 'abcdef12345' }).what).toBe('abcdef1')
     expect(row('Accepted', { submission: 4 }).what).toBe('submission 4')

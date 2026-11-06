@@ -242,7 +242,7 @@ describe("an agent's old moves as intents (#1268)", () => {
   })
 
   it('S15: a commit authored with a personal email refuses the move to Review with the amend command', async () => {
-    const { w, wt } = await workspace({ ...PAIR, identity: { name: 'Hive Test', email: 'test@hive.invalid' } })
+    const { w, wt } = await workspace({ ...PAIR, identity: { name: 'Demo Test', email: 'test@example.invalid' } })
     const card = await create(w)
     await update(w, card, builder, { column: 'doing' })
     commit(wt, { 'x.txt': 'x\n' }, 'personal', { email: 'me@example.com' })

@@ -110,11 +110,11 @@ describe('task rows', () => {
 
 describe('task changes', () => {
   it('a new card: its number and place', () => {
-    expect(createdText({ number: 61, title: 'Lean replies', column: 'todo', position: 51, of: 51, project: 'hive', agent: 'Coder', changes: [] })).toBe('#61 created in Todo (51st of 51) for hive, given to Coder: Lean replies')
+    expect(createdText({ number: 61, title: 'Lean replies', column: 'todo', position: 51, of: 51, project: 'alpha', agent: 'Coder', changes: [] })).toBe('#61 created in Todo (51st of 51) for alpha, given to Coder: Lean replies')
   })
 
   it('a change: what changed and where the card is now', () => {
-    expect(changedText({ number: 60, title: 'Reorder', column: 'review', position: 1, of: 4, project: 'hive', agent: null, changes: ['Moved to Review', 'Commented'] })).toBe('#60 Reorder: Moved to Review; Commented. Now in Review (1st of 4), hive.')
+    expect(changedText({ number: 60, title: 'Reorder', column: 'review', position: 1, of: 4, project: 'alpha', agent: null, changes: ['Moved to Review', 'Commented'] })).toBe('#60 Reorder: Moved to Review; Commented. Now in Review (1st of 4), alpha.')
     expect(changedText({ number: 8, title: 'T', column: 'todo', position: 12, of: 12, project: '', agent: null, changes: [] })).toBe('#8 T: No change. Now in Todo (12th of 12).')
   })
 
@@ -168,7 +168,7 @@ describe("an agent's model, effort and retry waits (HI-1996)", () => {
 })
 
 describe("a card's open requests (HI-1992)", () => {
-  const asked = { card: 7, project: 'p', request: 'HI-7/r15', kind: 'decide', gate: 'ask', text: `Which icon: the bee or the hive cell?\n\n${LONG}`, asker: 'Coder', since: '2026-10-29T01:00:00.000Z', for: 'user' as const }
+  const asked = { card: 7, project: 'p', request: 'HI-7/r15', kind: 'decide', gate: 'ask', text: `Which icon: the bee or the honeycomb cell?\n\n${LONG}`, asker: 'Coder', since: '2026-10-29T01:00:00.000Z', for: 'user' as const }
   const gate = { ...asked, request: 'HI-7/r16', kind: 'approve', gate: 'okBefore', text: 'Approve the merge.', asker: null, since: '2026-10-29T02:00:00.000Z' }
 
   it('none: absent, so a card with none reads as before', () => {
@@ -185,7 +185,7 @@ describe("a card's open requests (HI-1992)", () => {
 
   it("summary: its words cut as a comment's summary, with the whole length when cut", () => {
     const [q, g] = cardRequests([asked, gate], true)!
-    expect(q).toMatchObject({ text: 'Which icon: the bee or the hive cell?', length: asked.text.length, asker: 'Coder', since: asked.since })
+    expect(q).toMatchObject({ text: 'Which icon: the bee or the honeycomb cell?', length: asked.text.length, asker: 'Coder', since: asked.since })
     expect(g.text).toBe('Approve the merge.')
     expect('length' in g).toBe(false)
   })

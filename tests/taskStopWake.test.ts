@@ -1,4 +1,4 @@
-// #640: HB3 showed "working" after its turn ended (13 Oct, Hive 0.6.0). It had stopped its only background task (a
+// #640: HB3 showed "working" after its turn ended (13 Oct, version 0.6.0). It had stopped its only background task (a
 // `sleep 2400` slot timer) with TaskStop 9 s before its Stop; its Stop left it waiting on background tasks, and when Combwork
 // then read the TaskStop it took the task's end for a wake, as a <task-notification> is, and showed it working: Claude
 // Code tells the agent of a task that ends, starting a turn, but not of one it stopped itself. Here the transcript is read

@@ -244,9 +244,9 @@ describe("finding a check's program before it starts (Windows: cmd exits 1 for o
     expect(programFound('git status', e, cwd, 'win32')).toBe(true)
     expect(programFound('echo hi && exit 1', e, cwd, 'win32')).toBe(true)
     expect(programFound('%COMSPEC% /c exit 0', e, cwd, 'win32')).toBe(true)
-    expect(programFound('hive-no-such-command-1349 --x', e, cwd, 'win32')).toBe(false)
+    expect(programFound('cw-no-such-command-1349 --x', e, cwd, 'win32')).toBe(false)
     expect(programFound('"C:\\no\\such\\tool.exe"', e, cwd, 'win32')).toBe(false)
-    expect(programFound('hive-no-such-command-1349', e, cwd, 'linux')).toBe(true)
+    expect(programFound('cw-no-such-command-1349', e, cwd, 'linux')).toBe(true)
   })
 })
 
@@ -375,7 +375,7 @@ describe("the runner's own runs, outside the queue", () => {
   it("a full disk on the startup failure's own line (a program not found) still finishes the run, transient, the file closed", async () => {
     const io = fullDisk()
     const r = runner({ logIo: io })
-    const out = await r.runCheck('check', 'hive-no-such-command-1349', tempDir('qc-folder-'), ctx)
+    const out = await r.runCheck('check', 'cw-no-such-command-1349', tempDir('qc-folder-'), ctx)
     expect(out).toMatchObject({ ok: false, transient: true })
     expect(r.finished).toEqual([{ id: 'run1', ok: false, exitCode: null, logPath: null, transient: { cause: 'notFound' } }])
     expect(io.closed).toBe(1)
@@ -515,7 +515,7 @@ describe('merge checks as Combwork\'s runs (temporary repositories)', () => {
   })
 
   it("transient: a command the shell can't find returns the card marked transient; the builder sends the same revision straight back", async () => {
-    const e = team({}, 'hive-no-such-command-1349')
+    const e = team({}, 'cw-no-such-command-1349')
     const { card } = await queued(e)
     const [o] = await e.queue({ runCheck: runner().runCheck, manifests: [] }).drain('main')
     expect(o).toMatchObject({ outcome: 'returned', reason: 'checks', transient: true })

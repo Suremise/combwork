@@ -398,7 +398,7 @@ describe('saving', () => {
   })
 })
 
-describe('a session’s resolved texts for hive-mcp.js', () => {
+describe('a session’s resolved texts for cw-mcp.js', () => {
   const dir = tempDir('cw-dialects-launch-')
   afterAll(() => rmSync(dir, { recursive: true, force: true }))
 

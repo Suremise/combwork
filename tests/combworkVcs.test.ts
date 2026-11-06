@@ -67,7 +67,7 @@ describe('.combwork kept out of version control (#345)', () => {
     expect(await combworkVcs(p)).toEqual({ state: 'excluded' })
   })
 
-  it('takes an entry Hive wrote before 1.1 as its own, adding nothing (HI-2575)', async () => {
+  it('takes an entry 1.0 wrote, before 1.1, as its own, adding nothing (HI-2575)', async () => {
     const p = folder('project')
     mkdirSync(join(p, '.git', 'info'), { recursive: true })
     const old = '# Hive project metadata (added by Hive)\n/.combwork/\n'
@@ -208,7 +208,7 @@ describe('.combwork committed before it was excluded (#364)', () => {
     mkdirSync(join(p, '.combwork'), { recursive: true })
     writeFileSync(join(p, '.combwork', 'project.json'), '{}')
     git(p, 'add', '-A')
-    git(p, 'commit', '-qm', 'hive')
+    git(p, 'commit', '-qm', 'first')
     expect((await combworkVcs(p)).tracked).toBe(1)
     git(p, 'rm', '-r', '--cached', '-q', '.combwork')
     expect((await combworkVcs(p)).tracked).toBeUndefined()
@@ -234,7 +234,7 @@ describe('.combwork committed before it was excluded (#364)', () => {
     mkdirSync(join(p, '.combwork'), { recursive: true })
     writeFileSync(join(p, '.combwork', 'old.txt'), 'old')
     git(p, 'add', '-A')
-    git(p, 'commit', '-qm', 'hive')
+    git(p, 'commit', '-qm', 'first')
     failing = (args) => args.includes('ls-files')
     expect(await trackedCombworkFiles(p, p)).toBeNull()
     expect((await combworkVcs(p)).tracked).toBeUndefined()
@@ -250,7 +250,7 @@ describe('.combwork committed before it was excluded (#364)', () => {
     writeFileSync(join(p, '.combwork', 'old.txt'), 'old')
     writeFileSync(join(p, '.combwork', '[x].txt'), 'a pattern for a name')
     git(p, 'add', '-A')
-    git(p, 'commit', '-qm', 'hive')
+    git(p, 'commit', '-qm', 'first')
     const shown = (await trackedCombworkFiles(p, p, { fresh: true }))!
     expect(shown.sort()).toEqual(['.combwork/[x].txt', '.combwork/old.txt'])
     writeFileSync(join(p, '.combwork', 'new.txt'), 'new')

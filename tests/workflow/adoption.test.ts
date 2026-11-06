@@ -149,7 +149,7 @@ describe("the upgrade's adoption (#1218)", () => {
   })
 
   it('a Started fact, and an Adopted one from before round 2, keep their base as the head', () => {
-    const started = (kind: 'Started' | 'Adopted'): Fact => ({ card: 1, seq: 1, kind, at, actor: 'hive', source: 'observed', data: { folder: 'project', line: 'main', base: 'b0', target: 'main', builder: 'b1', cardKind: 'code' } }) as unknown as Fact
+    const started = (kind: 'Started' | 'Adopted'): Fact => ({ card: 1, seq: 1, kind, at, actor: 'combwork', source: 'observed', data: { folder: 'project', line: 'main', base: 'b0', target: 'main', builder: 'b1', cardKind: 'code' } }) as unknown as Fact
     expect(foldCard([started('Started')]).head).toBe('b0')
     expect(foldCard([started('Adopted')]).head).toBe('b0')
   })
@@ -252,7 +252,7 @@ describe("the upgrade's adoption (#1218)", () => {
 
   it('leaves a card started before it runs, and options already set, as they are', async () => {
     const { ws, w } = await world()
-    // Card 2 started under 1.0 by another Hive before this one adopts it: it has facts, so it isn't adopted.
+    // Card 2 started under 1.0 by another Combwork before this one adopts it: it has facts, so it isn't adopted.
     const other = FactStore.open(store.boardFile(ws), { project: 'p', key: 'p' })
     other.tx((tx) => tx.append(2, { kind: 'Moved', actor: 'user', source: 'recorded', data: { from: 'todo', to: 'active', cause: 'user' } }))
     other.close()

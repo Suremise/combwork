@@ -52,7 +52,7 @@ async function until(cond: () => boolean, ms: number): Promise<void> {
 describe('answerRelay: a relay ended unread', () => {
   it('logs a failure to tell the user, with no unhandled rejection', async () => {
     st.noteFails = true
-    st.source!.ended({ meta: { card: 12, project: 'hive', askerName: 'HB1' } }, 'C:\\ws\\.combwork\\assistant')
+    st.source!.ended({ meta: { card: 12, project: 'demo', askerName: 'HB1' } }, 'C:\\ws\\.combwork\\assistant')
     await until(() => st.warned.length > 0, HUNG_MS)
     expect(st.warned[0].line).toBe('telling the user an answer reached nobody else')
     expect(String(st.warned[0].error)).toContain('the board is locked')
@@ -62,7 +62,7 @@ describe('answerRelay: a relay ended unread', () => {
   })
 
   it('tells the user on the card, logging nothing', async () => {
-    st.source!.ended({ meta: { card: 12, project: 'hive' } }, 'C:\\ws\\.combwork\\assistant')
+    st.source!.ended({ meta: { card: 12, project: 'demo' } }, 'C:\\ws\\.combwork\\assistant')
     await until(() => st.noted.length > 0, HUNG_MS)
     await new Promise((r) => setImmediate(r))
     expect(st.noted).toEqual([12])
