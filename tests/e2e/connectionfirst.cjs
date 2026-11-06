@@ -106,6 +106,8 @@ async function settled(env) {
     const start = add.locator('label', { hasText: 'Start a session now' })
     const noAccount = add.locator('[data-no-account]')
     check('no account on here: the choice says so, with a link to Accounts & Connections', !!(await lib.until(async () => (await noAccount.count()) === 1, HUNG_MS)) && (await noAccount.locator('a', { hasText: 'Open Accounts & Connections' }).count()) === 1, await noAccount.innerText().catch(() => ''))
+    // Both added but off here (HI-2650): named as off, the installed CLI's first, never "add one".
+    check('…naming the one off here on an installed CLI (Usable Claude), never "add one"', /No account is on in this workspace: Usable Claude is off here\. Turn one on with On here/.test(await noAccount.innerText()) && !/Add one/.test(await noAccount.innerText()), await noAccount.innerText().catch(() => ''))
     check('…and "Start a session now" is unticked and off, saying why beside it', !!(await lib.until(async () => (await start.locator('input').isDisabled()) && !(await start.locator('input').isChecked()), HUNG_MS)) && (await start.locator('[data-start-now-why]').innerText().catch(() => '')).includes('No account is on here yet') && /No account is on in this workspace/.test((await start.getAttribute('title')) ?? ''), JSON.stringify({ disabled: await start.locator('input').isDisabled(), why: await start.locator('[data-start-now-why]').innerText().catch(() => ''), title: await start.getAttribute('title') }))
     for (const theme of ['dark', 'light']) {
       await inv('settings:update', { appearance: { theme } })

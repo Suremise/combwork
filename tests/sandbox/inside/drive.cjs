@@ -477,9 +477,19 @@ const steps = {
       }
     }
 
-    // The account turned on in this workspace, as a user does with its On here switch (Settings → Accounts & Connections;
-    // HI-2646): each workspace chooses which are on, and one added before the workspace was made is on in none.
-    if (account?.id) res.facts.accountOn = await inv('connections:setOn', account.id, true).then(() => true, (e) => String(e))
+    // The account turned on in this workspace as a user does (HI-2650): nothing is turned on by itself, so the project,
+    // with no agent yet, says the account is off here and offers Turn On Here on its empty card, which the user clicks.
+    await page.locator('.activity-btn[aria-label="Projects"]').click({ timeout: 5000 }).catch(() => {})
+    await page.locator('.sidebar .tree-item', { hasText: 'demo' }).first().click({ timeout: 10_000 }).catch(() => {})
+    const offHere = page.locator('.session-empty-card [data-connection-setup="empty"][data-off-here="one"]')
+    const offered = await until(async () => (await offHere.count()) > 0 && /Sandbox, your Claude Code account, is off in this workspace/.test(await offHere.innerText()), 20_000)
+    res.facts.offHere = await offHere.innerText().catch((e) => String(e.message))
+    check('9.account-off-here', "The empty project says the account is off here and offers Turn On Here (nothing on by itself)", !!offered, res.facts.offHere)
+    await keep('project, account off here')
+    await shot('off-here')
+    if (account?.id) await offHere.locator(`[data-turn-on-here="${account.id}"]`).click({ timeout: 10_000 }).catch((e) => { res.facts.turnOnError = String(e.message) })
+    res.facts.accountOn = !!account?.id && !!(await until(async () => ((await inv('connections:list')).workspace['claude-code']?.on ?? []).includes(account.id), 20_000))
+    check('9.account-on', 'Turn On Here turns the account on in this workspace', res.facts.accountOn, res.facts.turnOnError || '')
 
     // An agent, started briefly: its first task is `set`, which the fake runs in the session's shell (fake-shell.jsonl).
     const agent = await inv('agents:add', proj, { provider: 'claude-code' }).catch((e) => ({ error: String(e) }))

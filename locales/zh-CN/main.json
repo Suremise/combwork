@@ -53,6 +53,7 @@
   "main.connections.launch.deleted": "为 {agent} 选择的连接已不存在。请在它的“智能体设置”中另选一个。",
   "main.connections.launch.noKey": "{name} 没有密钥。请在“设置”→“账号与连接”中添加一个，然后启动 {agent}。",
   "main.connections.launch.none": "此工作区中没有已启用的 {cli} 账号。请在“设置”→“账号与连接”中添加一个并登录，然后再次启动 {agent}。",
+  "main.connections.launch.offHere": "{n, plural, other {{cli} 账号 {names} 在此工作区中已停用。}}请在“设置”→“账号与连接”中用“在此工作区中启用”启用其中一个，然后再次启动 {agent}。",
   "main.connections.launch.offNoDefault": "{agent} 的账号 {name} 在此工作区中已停用，并且没有其他已启用的 {cli} 账号。请在“设置”→“账号与连接”中启用一个。",
   "main.connections.launch.otherProvider": "为 {agent} 选择的连接属于另一个 CLI。请在它的“智能体设置”中选择一个 {cli} 连接。",
   "main.connections.launch.signedOut": "{name} 已退出登录。请在“设置”→“账号与连接”中重新登录，然后启动 {agent}。",

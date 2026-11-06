@@ -53,8 +53,8 @@ const REQUIRED = {
   // HI-2592: a new user's first session (drive.cjs clean), then the scan (inside/clean-scan.cjs, its checks clean.cjs's).
   clean: {
     // Each a step a new user takes.
-    drivers: { s9: { scenario: 9, ids: ['9.first-run', '9.provider-on', '9.account', '9.workspace', '9.git-project', '9.agent-started', '9.agent-env', '9.card', '9.settings', '9.diagnostics', '9.export', '9.quit'], facts: ['version', 'workspace', 'exportDir'] } },
-    shots: ['s9-desktop.jpg', 's9-start.png', 's9-agent.png', 's9-board.png', 's9-settings.png']
+    drivers: { s9: { scenario: 9, ids: ['9.first-run', '9.provider-on', '9.account', '9.workspace', '9.git-project', '9.account-off-here', '9.account-on', '9.agent-started', '9.agent-env', '9.card', '9.settings', '9.diagnostics', '9.export', '9.quit'], facts: ['version', 'workspace', 'exportDir'] } },
+    shots: ['s9-desktop.jpg', 's9-start.png', 's9-off-here.png', 's9-agent.png', 's9-board.png', 's9-settings.png']
   },
   // HI-2602: profile-move.ps1's record (PROFILE_MOVE_IDS), not a driver's; the error box and the moved app's window.
   'profile-move': { drivers: {}, shots: ['s11-refused.png', 's11-moved.png', 's11-desktop.jpg'] }

@@ -825,8 +825,6 @@ describe("a workspace's accounts", () => {
       const ids = () => (config.get().accounts ?? []).filter((a) => a.provider === 'claude-code').map((a) => a.id)
       expect(ids()).toEqual([two.id, one.id, three.id])
       expect(config.get().connectionOrderMigrated).toBe(true)
-      // A new workspace starts with the top of the order on.
-      expect(accounts.newWorkspaceAccounts()?.['claude-code']).toEqual({ on: [two.id] })
       // Once only: reordered since, it stays as the user ordered it.
       accounts.moveConnection(three.id, 0)
       await accounts.migrateConnectionOrder()
@@ -874,12 +872,13 @@ describe("a workspace's accounts", () => {
       await disposeWorkspaceService(w)
     })
 
-    it('turning one on saves it in workspace.json, as its default, and remembers it for new workspaces', async () => {
+    it('turning one on saves it in workspace.json, as its default, and nowhere else (HI-2650)', async () => {
       const a = await accounts.addAccount('claude-code', 'Here')
+      // Added, it is on nowhere: nothing is turned on by itself (Darren, 6 Nov).
+      expect(JSON.parse(readFileSync(join(wsPath, '.combwork', 'workspace.json'), 'utf8')).connections?.['claude-code']?.on ?? []).not.toContain(a.id)
       await run(() => accounts.setAccountOn(a.id, true))
       expect(JSON.parse(readFileSync(join(wsPath, '.combwork', 'workspace.json'), 'utf8')).connections).toEqual({ 'claude-code': { on: [a.id] } })
-      expect(config.get().lastUsedConnection?.['claude-code']).toBe(a.id)
-      expect(accounts.newWorkspaceAccounts()).toEqual({ 'claude-code': { on: [a.id] } })
+      expect(config.get().lastUsedConnection?.['claude-code']).toBeUndefined()
       await run(() => accounts.setAccountOn(a.id, false))
       expect(run(() => accounts.accountsView()).workspace['claude-code']).toEqual({ on: [], default: null })
     })

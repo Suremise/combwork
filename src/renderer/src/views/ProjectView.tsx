@@ -45,7 +45,6 @@ const M = {
   moreSettings: msg({ id: 'project.tabs.moreSettings', defaultMessage: 'Project Settings…', description: "The last item of the project tabs' More ▾ menu, after a separator (HI-1840): opens the project's settings. Keep the …." }),
   moreTip: msg({ id: 'project.tabs.moreTip', defaultMessage: "The project's {tabs}", description: "Tooltip on the project tabs' More ▾ button. {tabs} lists the tabs in its menu, such as Memory, Skills, Templates and MCP." }),
   tabTip: msg({ id: 'project.tabs.tip', defaultMessage: '{tab} ({key})', description: "A project tab's tooltip with its keyboard shortcut. {tab} is the tab's name, {key} the shortcut, such as Alt+4." }),
-  noAccount: msg({ id: 'project.empty.noAccount', defaultMessage: 'No account is on in this workspace — Settings → Accounts & Connections', description: "Warning on the Session tab of a project with no agents (HI-2108): no account (a sign-in or server a coding agent CLI uses) is on in this workspace, so a new agent has no connection to run on. Settings → Accounts & Connections: name it as Settings does." }),
   noCli: msg({ id: 'project.empty.noCli', defaultMessage: 'No account on here has its coding agent CLI installed — Help → Provider Setup', description: "Warning on the Session tab of a project with no agents (HI-2132): accounts are on in this workspace, but none of their CLIs (Claude Code, Codex…) is installed, so a new agent can't run. Help → Provider Setup is the menu item." }),
   providerOff: msg({ id: 'project.empty.providerOff', defaultMessage: '{provider} is turned off — Settings → Providers', description: "Warning on the Session tab when the agent's provider is turned off. Settings → Providers: name it as Settings does." }),
   providerMissing: msg({ id: 'project.empty.providerMissing', defaultMessage: '{provider} is required — Help → Provider Setup', description: "Warning on the Session tab when the agent's CLI isn't installed. Help → Provider Setup is the menu item." }),
@@ -307,9 +306,10 @@ function SessionEmpty({ project, framed }: { project: ProjectInfo; framed: boole
   const noAccount = !focused && !!view && !offered.length && !view.testHome.length
   // Accounts on here but none on an installed CLI: a new agent can't run.
   const noCli = !!ready && !ready.id && !ready.checking
-  // An agent's own provider by name; with none, what a new agent's connection needs.
+  // An agent's own provider by name; with none, what a new agent's connection needs. No account on here is the banner's
+  // (HI-2650: one off here, Turn On Here; several, Choose in Settings; none, Add an Account), below.
   const warning = noAccount
-    ? tr(M.noAccount)
+    ? null
     : focused
     ? !on
       ? tr(M.providerOff, { provider: providerName(provider) })
@@ -363,6 +363,7 @@ function SessionEmpty({ project, framed }: { project: ProjectInfo; framed: boole
               </span>
             </p>
           )}
+          {noAccount && <NoConnectionBanner where="empty" />}
           <div className="btns">
             <button className="btn act-start solid" disabled={!!startBlocked || !!starting} aria-busy={startingNew || undefined} title={startBlocked ?? undefined} onClick={() => void actions.newSession(project.path)}>
               <Icon name={startingNew ? 'loading' : 'add'} spin={startingNew} /> {startingNew ? startingLabel(starting) : tr(M.newSession)} {newKey && <kbd style={{ marginLeft: 6 }}>{formatKeybinding(newKey)}</kbd>}

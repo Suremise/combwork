@@ -317,6 +317,7 @@
   "shell.search.clear": "クリア",
   "shell.setup.checkAgain": "再確認",
   "shell.setup.connections": "{n, plural, =0 {{cli}はアカウントごとにサインインしますが、このワークスペースで有効なアカウントはまだありません。アカウントを追加してサインインしてください。} other {{cli}はアカウントごとにサインインします。このワークスペースで有効なアカウント：#件}}",
+  "shell.setup.connectionsOff": "{cli}はアカウントごとにサインインしますが、このワークスペースで有効なアカウントはありません。{n, plural, other {{names}はここで無効です。}}「このワークスペースで有効」でいずれかを有効にしてください。",
   "shell.setup.docs": "{provider}のドキュメント",
   "shell.setup.done": "{what}このウィンドウは閉じてかまいません。",
   "shell.setup.found": "<b>{provider} {version}</b> <muted>— {source}で検出</muted>",

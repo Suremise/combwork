@@ -12,15 +12,21 @@ interface CombworkMessageValues {
   'project.agents.turnedOff': { provider: string | number }
   'project.apply.new': { live: string }
   'project.banner.change': undefined
+  'project.banner.chooseInSettings': undefined
   'project.banner.connectionSetup': { cli: string | number }
   'project.banner.connectionSetupAdd': undefined
   'project.banner.copyToWorkspace': undefined
   'project.banner.dangerous': { modes: string | number; count: number }
   'project.banner.dangerousMode': { agent: string | number; mode: string | number }
+  'project.banner.noAccountEmpty': undefined
+  'project.banner.offHereOne': { where: string; name: string | number; cli: string | number }
+  'project.banner.offHereSeveral': { where: string; names: string | number }
   'project.banner.restart': undefined
   'project.banner.restartNeeded': { many: string; agent: string | number }
   'project.banner.restartWhenDone': undefined
   'project.banner.switchFailed': undefined
+  'project.banner.turnOnFailed': { name: string | number }
+  'project.banner.turnOnHere': undefined
   'project.banner.unmanagedMcp': { names: string | number }
   'project.card.asReported': undefined
   'project.card.cache': undefined
@@ -176,7 +182,6 @@ interface CombworkMessageValues {
   'project.empty.allSessions': undefined
   'project.empty.markActive': undefined
   'project.empty.markWorking': undefined
-  'project.empty.noAccount': undefined
   'project.empty.noAgents': undefined
   'project.empty.noCli': undefined
   'project.empty.noSession': undefined

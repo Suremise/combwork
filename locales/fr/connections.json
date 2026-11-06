@@ -6,6 +6,7 @@
   "connections.choice.noneHere": "Aucun compte n’est activé dans cet espace de travail. Ajoutes-en un dans Paramètres → Comptes et connexions.",
   "connections.choice.notInstalled": "{cli} n’est pas installé",
   "connections.choice.offHere": "{name} (son compte est désactivé ici : l’agent fonctionne avec la première connexion utilisable de sa CLI)",
+  "connections.choice.offHereAll": "Aucun compte n’est activé dans cet espace de travail : {n, plural, one {{names} est désactivé ici.} many {{names} sont désactivés ici.} other {{names} sont désactivés ici.}} Actives-en un avec « Activée dans cet espace de travail » dans Paramètres → Comptes et connexions.",
   "connections.choice.pick": "Choisir une connexion",
   "connections.choice.removed": "Une connexion supprimée (l’agent fonctionne avec la première connexion utilisable de sa CLI)",
   "connections.choice.unavailable": "{name} – {why}",

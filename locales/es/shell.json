@@ -317,6 +317,7 @@
   "shell.search.clear": "Borrar",
   "shell.setup.checkAgain": "Volver a comprobar",
   "shell.setup.connections": "{n, plural, =0 {{cli} inicia sesión por cuenta, y todavía no hay ninguna activada en este espacio de trabajo: agrega una e inicia sesión en ella.} one {{cli} inicia sesión por cuenta: hay # activada en este espacio de trabajo.} many {{cli} inicia sesión por cuenta: hay # activadas en este espacio de trabajo.} other {{cli} inicia sesión por cuenta: hay # activadas en este espacio de trabajo.}}",
+  "shell.setup.connectionsOff": "{cli} inicia sesión por cuenta, y ninguna está activada en este espacio de trabajo: {n, plural, one {{names} está desactivada aquí.} many {{names} están desactivadas aquí.} other {{names} están desactivadas aquí.}} Activa una con «Activada en este espacio de trabajo».",
   "shell.setup.docs": "Documentación de {provider}",
   "shell.setup.done": "{what} Puedes cerrar esta ventana.",
   "shell.setup.found": "<b>{provider} {version}</b> <muted>— encontrado mediante {source}</muted>",

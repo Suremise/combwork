@@ -317,6 +317,7 @@
   "shell.search.clear": "清除",
   "shell.setup.checkAgain": "重新检查",
   "shell.setup.connections": "{n, plural, =0 {{cli} 按账号登录，此工作区中还没有已启用的账号：请添加一个并登录。} other {{cli} 按账号登录：此工作区中有 # 个已启用。}}",
+  "shell.setup.connectionsOff": "{cli} 按账号登录，此工作区中没有已启用的账号：{n, plural, other {{names} 在此已停用。}}请用“在此工作区中启用”启用其中一个。",
   "shell.setup.docs": "{provider} 文档",
   "shell.setup.done": "{what}你可以关闭此窗口了。",
   "shell.setup.found": "<b>{provider} {version}</b> <muted>— 通过 {source} 找到</muted>",

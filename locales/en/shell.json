@@ -1271,6 +1271,10 @@
     "defaultMessage": "{n, plural, =0 {{cli} signs in per account, and none is on in this workspace yet: add one and sign it in.} one {{cli} signs in per account: # is on in this workspace.} other {{cli} signs in per account: # are on in this workspace.}}",
     "description": "Provider Setup, for a coding agent CLI ({cli}: \"Claude Code\") that signs in per account (Settings → Accounts & Connections) rather than here (HI-1774; HI-2108). {n} is how many of its accounts are on in the open workspace."
   },
+  "shell.setup.connectionsOff": {
+    "defaultMessage": "{cli} signs in per account, and none is on in this workspace: {n, plural, one {{names} is off here.} other {{names} are off here.}} Turn one on with On here.",
+    "description": "Provider Setup (HI-2650), for a coding agent CLI ({cli}: \"Claude Code\") that signs in per account, when it has accounts but none is on in the open workspace. {names}: their names, joined (\"Work and Personal\"); {n}: how many. On here is the switch on each account's row in Settings → Accounts & Connections, which the button beside it opens."
+  },
   "shell.setup.docs": {
     "defaultMessage": "{provider} docs",
     "description": "Provider Setup's button: opens the coding agent's own documentation. {provider} is its name."

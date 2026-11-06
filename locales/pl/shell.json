@@ -317,6 +317,7 @@
   "shell.search.clear": "Wyczyść",
   "shell.setup.checkAgain": "Sprawdź ponownie",
   "shell.setup.connections": "{n, plural, =0 {{cli} loguje się osobno dla każdego konta, a w tym obszarze roboczym nie jest jeszcze włączone żadne: dodaj konto i je zaloguj.} one {{cli} loguje się osobno dla każdego konta: w tym obszarze roboczym włączone jest # konto.} few {{cli} loguje się osobno dla każdego konta: w tym obszarze roboczym włączone są # konta.} many {{cli} loguje się osobno dla każdego konta: w tym obszarze roboczym włączonych jest # kont.} other {{cli} loguje się osobno dla każdego konta: w tym obszarze roboczym włączone są # konta.}}",
+  "shell.setup.connectionsOff": "{cli} loguje się osobno dla każdego konta, a w tym obszarze roboczym nie jest włączone żadne: {n, plural, one {{names} jest tu wyłączone.} few {{names} są tu wyłączone.} many {{names} są tu wyłączone.} other {{names} są tu wyłączone.}} Włącz jedno przełącznikiem „Włączone w tym obszarze roboczym”.",
   "shell.setup.docs": "Dokumentacja {provider}",
   "shell.setup.done": "{what} Możesz zamknąć to okno.",
   "shell.setup.found": "<b>{provider} {version}</b> <muted>– znaleziono przez {source}</muted>",

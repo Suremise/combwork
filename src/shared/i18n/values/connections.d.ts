@@ -8,6 +8,7 @@ interface CombworkMessageValues {
   'connections.choice.noneHere': undefined
   'connections.choice.notInstalled': { cli: string | number }
   'connections.choice.offHere': { name: string | number }
+  'connections.choice.offHereAll': { n: number; names: string | number }
   'connections.choice.pick': undefined
   'connections.choice.removed': undefined
   'connections.choice.unavailable': { name: string | number; why: string | number }

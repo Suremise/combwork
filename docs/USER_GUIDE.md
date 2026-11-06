@@ -99,9 +99,14 @@ Every agent, and the Assistant, runs on a **connection**. They're in **Settings 
 - **An account** is where an agent gets its model. It's either a sign-in that Combwork keeps in a folder of its own (signed in through the CLI's own sign-in), or a server (below). GitHub Copilot's account is its one sign-in for the whole PC.
 - **A connection** is a named setup on an account: its **model**, **effort**, **context**, **permission mode** and **extra arguments**, each left to the CLI when empty. An account can have as many as you like ("Claude · Medium" and "Claude · High" on one Claude sign-in).
 - **Agents and the Assistant each choose a connection, and nothing else decides how they launch.** There's no agent, project or CLI setting on top. The CLI follows from the connection.
-- **Each workspace chooses which accounts are on**, with **On here**; a connection is usable where its account is on.
+- **Each workspace chooses which accounts are on**, with **On here**; a connection is usable where its account is on. Nothing is turned on by itself: an account you add is on in no workspace, and a new workspace starts with none on.
 
-**Combwork doesn't use your own terminal's sign-in** (`~/.claude`, `~/.codex`), which stays yours as it is. Add an account and sign it in once. Until one is on in the workspace, its CLI's agents and the Assistant can't start, and the project, the Assistant panel and **Help → Provider Setup** each offer to add one. A notice says so once, until you add an account or dismiss it.
+**Combwork doesn't use your own terminal's sign-in** (`~/.claude`, `~/.codex`), which stays yours as it is. Add an account and sign it in once. Until one is on in the workspace, its CLI's agents and the Assistant can't start, and the project (an empty one too), the Assistant panel and **Help → Provider Setup** each say so:
+- **One account off here:** it's named, with **Turn On Here**, which turns it on in this workspace only.
+- **Several off here:** they're named, with **Choose in Settings**.
+- **None added yet:** they offer to add one.
+
+A notice says so once, until you add an account or dismiss it.
 
 **The list.** Each account is a card with the same fields in the same place:
 
@@ -145,7 +150,7 @@ Accounts have one **order**, for every CLI, the same in every workspace. A new a
 
 - **Reorder** in **Settings → Accounts & Connections** by dragging an account by its handle, or press Alt+Up or Alt+Down on the handle. An account's connections keep their own order under it.
 - **Agents already running keep their connection.** A change applies to new agents; the banner about agents running on another connection offers to switch them when their turn is over.
-- **A project with no agents** says which CLI its first agent will run (its first connection's), and warns when no account is on here, or when none of the accounts on here has its CLI installed (**Help → Provider Setup** installs one).
+- **A project with no agents** says which CLI its first agent will run (its first connection's). It warns when none of the accounts on here has its CLI installed (**Help → Provider Setup** installs one). When no account is on here, it shows the banner above, with **Turn On Here** when one account is off here.
 - **Updating from an earlier version,** each CLI's order of connections became the order of its accounts, and the default of the workspace you used most recently came first. There's no default provider and no order of providers any more: lists of coding agents are in Combwork's order (Claude Code, Codex, GitHub Copilot), even if you reordered them in 0.9.
 
 #### Moving agents at a usage threshold <a id="usage-moves"></a>
