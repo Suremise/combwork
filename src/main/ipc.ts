@@ -1853,7 +1853,9 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
   // Tests only (unpackaged builds), so a suite can see what the window does while an action runs or fails:
   // CW_TEST_SLOW_IPC="tasks:start=1500,git:diff=1500*1" delays those calls (`*n`: only the first n), and
   // CW_TEST_FAIL_IPC="git:status*1" makes them fail, and CW_TEST_BLOCK_IPC="app:info=1500*1" holds the main process
-  // that long in them (a stall, #1109).
+  // that long in them (a stall, #1109). CW_TEST_HOLD_IPC="activity:cardAgents" holds those calls until a suite takes
+  // the channel out of it, so a race is decided by the suite, not by a delay (HI-2652); main's
+  // globalThis.__cwHeldIpc counts the calls held now, by channel.
   // A suite may change them while Combwork runs (in the main process): they are read again when they change.
   type TestCalls = { from: string; calls: Map<string, { ms: number; left: number }> }
   const testCalls = (name: string, held: TestCalls): TestCalls => {
@@ -1877,6 +1879,17 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     c.left--
     return c
   }
+  const holding = (channel: string): boolean => !app.isPackaged && (process.env.CW_TEST_HOLD_IPC ?? '').split(',').some((x) => x.trim() === channel)
+  const heldIpc: Record<string, number> = {}
+  if (!app.isPackaged) (globalThis as { __cwHeldIpc?: Record<string, number> }).__cwHeldIpc = heldIpc
+  const hold = async (channel: string): Promise<void> => {
+    heldIpc[channel] = (heldIpc[channel] ?? 0) + 1
+    try {
+      while (holding(channel)) await new Promise((r) => setTimeout(r, 20))
+    } finally {
+      heldIpc[channel]--
+    }
+  }
   for (const [channel, fn] of Object.entries(impl)) {
     ipcMain.handle(channel, async (e, ...args: unknown[]) => {
       // Only Combwork's own pages may call: not another window, and not a frame inside one (e.g. an HTML preview). A developer
@@ -1888,6 +1901,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       blocking = testCalls('CW_TEST_BLOCK_IPC', blocking)
       const delay = take(slow, channel)
       if (delay?.ms) await new Promise((r) => setTimeout(r, delay.ms))
+      if (holding(channel)) await hold(channel)
       if (take(failing, channel)) throw new Error(`${channel} failed (CW_TEST_FAIL_IPC)`) // i18n-ignore: test-only
       // Named in a "main process was busy" warning that it overlaps (mainStalls.ts).
       const done = beginWork(`ipc ${channel}`) // i18n-ignore: a line of combwork.log, in English
