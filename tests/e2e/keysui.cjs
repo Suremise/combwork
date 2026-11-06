@@ -108,6 +108,9 @@ const check = (name, ok, extra = '') => {
     await themes('newproject', dialog)
     await dialog.getByRole('button', { name: 'Create', exact: true }).click()
     check('Create makes the project with the key chosen', !!(await lib.until(async () => (await keyOf('web-app'))?.key === 'WB', HUNG_MS)), JSON.stringify(await keyOf('web-app')))
+    // The window's Create is done once it says so: it then shows the new project's Version Control, after main has it
+    // (HI-2653: under load that came after the Task Board click below, and the board was never shown).
+    check('…and the window says it is created', !!(await lib.until(async () => (await page.locator('.toast', { hasText: 'Project "web-app" created' }).count()) === 1, HUNG_MS)))
 
     // --- Cards by key on the board.
     const c1 = await inv('tasks:create', { title: 'Login form', project: 'web-app' })
