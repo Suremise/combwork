@@ -462,7 +462,7 @@
     "text": "Read a shared note by path in .combwork/shared (e.g. \"handovers/2026-01-01-auth.md\"), with its revision."
   },
   "tool.readTask.arg.archived": {
-    "text": "Its archived older comments instead, from this offset (oldest 0)."
+    "text": "Archived older comments from this offset."
   },
   "tool.readTask.arg.attachments": {
     "text": "All, when narrowed."
@@ -477,10 +477,10 @@
     "text": "Only the newest comment."
   },
   "tool.readTask.arg.summary": {
-    "text": "Each comment's first line, and its length."
+    "text": "Each comment's first line."
   },
   "tool.readTask.description": {
-    "text": "One card as JSON: decisions first (the user's: they win over the description), then forYou (what waits for the user: agents' questions), description, comments, links. comments, latestComment and summary read less."
+    "text": "One card as JSON: decisions first (the user's: they win over the description), then forYou (what waits for the user), description, comments, links. comments, latestComment, summary read less."
   },
   "tool.releaseSlot.arg.confirm": {
     "text": "A held writer: the slot and run the user agreed to, as list gave them."
