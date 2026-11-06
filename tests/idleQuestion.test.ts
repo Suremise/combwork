@@ -54,9 +54,7 @@ describe("Claude Code's question by itself and its input box, on its screen (2.1
   })
 
   it("reads what its input holds: the recorded line, an empty box, wrapped rows joined; none under a dialog or a menu's ❯", () => {
-    // old-name: begin recorded-input
-    expect(claudeCode.promptText(fixture('advanced/input-claude-2.1.312.txt'))).toBe('hive wake line typed and not sent')
-    // old-name: end recorded-input
+    expect(claudeCode.promptText(fixture('advanced/input-claude-2.1.312.txt'))).toBe('test wake line typed and not sent')
     expect(claudeCode.promptText(fixture('screen-claude-2.1.296-idle.txt'))).toBe('')
     expect(claudeCode.promptText(`${RULE}\n❯ [CW] New in your inbox: 1 task (HI-1959)\n  (m21559). Call cw_inbox to read it\n${RULE}\n  ⏵⏵ auto mode on`)).toBe('[CW] New in your inbox: 1 task (HI-1959) (m21559). Call cw_inbox to read it')
     // The last box drawn is the input: an earlier one scrolled up is not.

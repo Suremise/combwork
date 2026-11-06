@@ -218,7 +218,7 @@ function evaluate(meta, files) {
     const scan = need(9, 's9-scan')
     if (scan) {
       const asar = cleanChecks(scan, (id, name, ok, detail) => add(9, name, ok, detail))
-      asarNote = `**app.asar** holds ${asar.total} hit(s) of the old name (${asar.files.map(a => `${a.place}: ${a.count}`).join(', ') || 'none found'}): counted, not failed. The app's own code, with the upgrade code that knows the 1.0 names.`
+      asarNote = `**app.asar** holds ${asar.total} hit(s) of the old name (${asar.files.map(a => `${a.place}: ${a.count}`).join(', ') || 'none found'}): counted, not failed. The app's own code, with the upgrade code that knows the 1.0 names. The bundled code in app.asar.unpacked (${Number(scan.code) || 0} file(s)) is named, not read: which code may name the old name is the repository's name guard's job (tests/oldNames.mjs, HI-2647).`
     }
   }
 
