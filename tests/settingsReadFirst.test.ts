@@ -4,7 +4,8 @@
 // Sandbox probe) wrote those defaults over the workspace's own. A save then waits for the read and changes what was
 // read, the setters' too (their change worked out in the save, never made to the defaults first); a save of the
 // settings as they are in memory is refused then; one whose open ends first writes nothing; and the migration leaves a
-// workspace still opening for its open's workspace-changed. For a new workspace (what its creation seeded) and an existing one (its own settings).
+// workspace still opening for its open's workspace-changed. For an existing workspace (its own settings) and a new one
+// (made with the defaults since HI-2650: what a save during its open changes still has to count).
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -15,7 +16,7 @@ const base = tempDir('cw-settings-read-')
 process.env.CW_USER_DATA = join(base, 'profile')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
-const { configTestHooks, createWorkspaceService, disposeWorkspaceService, setNewWorkspaceExtras } = await import('../src/main/workspace')
+const { configTestHooks, createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
 const { emit } = await import('../src/main/events')
 const moves = await import('../src/main/connectionMoves')
 const { CARD_ATTACHMENT_FOLDERS_ID } = await import('../src/shared/advanced')
@@ -29,21 +30,24 @@ let n = 0
 afterEach(async () => {
   delete configTestHooks.beforeSettingsRead
   delete configTestHooks.saveWaitsForRead
-  setNewWorkspaceExtras(async () => ({}))
   for (const w of services) await disposeWorkspaceService(w)
   services.clear()
 })
 
-/** A workspace folder: `existing` has its own settings in workspace.json (none migrated); a new one is seeded with them. */
-function workspaceFolder(kind: 'new' | 'existing'): string {
+/**
+ * A workspace folder: `existing` has its own settings in workspace.json (none migrated), returned as what it must keep; a
+ * new one is made with the defaults (HI-2650), nothing of its own to keep, but a change saved during its open still counts.
+ */
+function workspaceFolder(kind: 'new' | 'existing'): { path: string; own: Partial<typeof OWN> } {
   const path = join(base, `ws-${kind}-${++n}`)
   mkdirSync(join(path, 'alpha', '.combwork'), { recursive: true })
   writeFileSync(join(path, 'alpha', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
   if (kind === 'existing') {
     mkdirSync(join(path, '.combwork'), { recursive: true })
     writeFileSync(join(path, '.combwork', 'workspace.json'), JSON.stringify(OWN))
-  } else setNewWorkspaceExtras(async () => structuredClone(OWN))
-  return path
+    return { path, own: OWN }
+  }
+  return { path, own: {} }
 }
 
 const saved = (path: string) => JSON.parse(readFileSync(join(path, '.combwork', 'workspace.json'), 'utf8'))
@@ -56,7 +60,7 @@ function service() {
 
 describe("a workspace's settings are never saved before its open has read them (HI-2651)", () => {
   it.each(['new', 'existing'] as const)('a save started before the read waits for it and changes what was read; one of the settings as they are is refused (%s workspace)', async (kind) => {
-    const path = workspaceFolder(kind)
+    const { path, own } = workspaceFolder(kind)
     const w = service()
     let save: Promise<void> | null = null
     let asIs: Promise<string> | null = null
@@ -74,12 +78,12 @@ describe("a workspace's settings are never saved before its open has read them (
     await w.open(path)
     await save
     expect(await asIs).toMatch(/before its open read it/)
-    for (const c of [saved(path), w.config]) expect(c).toMatchObject({ ...OWN, migrations: { accounts1: { at: 'marked' } } })
+    for (const c of [saved(path), w.config]) expect(c).toMatchObject({ ...own, migrations: { accounts1: { at: 'marked' } } })
     expect(w.readingSettings).toBe(false)
   })
 
   it.each(['new', 'existing'] as const)("the setters called before the read change the settings read, keeping the workspace's own (%s workspace)", async (kind) => {
-    const path = workspaceFolder(kind)
+    const { path, own } = workspaceFolder(kind)
     const w = service()
     const changes: Promise<void>[] = []
     configTestHooks.beforeSettingsRead = async () => {
@@ -93,14 +97,14 @@ describe("a workspace's settings are never saved before its open has read them (
     await w.open(path)
     await Promise.all(changes)
     for (const c of [saved(path), w.config]) {
-      expect(c).toMatchObject({ ...OWN, advanced: { [CARD_ATTACHMENT_FOLDERS_ID]: [base] } })
+      expect(c).toMatchObject({ ...own, advanced: { [CARD_ATTACHMENT_FOLDERS_ID]: [base] } })
       expect(c.hiddenProjects).toEqual([expect.objectContaining({ name: 'alpha', mode: 'hidden' })])
     }
   })
 
   it.each(['new', 'existing'] as const)("connections-changed while it opens doesn't migrate it from the defaults; its open does, from its own (%s workspace)", async (kind) => {
     moves.initConnectionMoves()
-    const path = workspaceFolder(kind)
+    const { path, own } = workspaceFolder(kind)
     const w = service()
     configTestHooks.beforeSettingsRead = async () => {
       emit({ type: 'connections-changed' })
@@ -113,11 +117,11 @@ describe("a workspace's settings are never saved before its open has read them (
     // during the open saved the defaults with its record: whichever write landed last lost the settings (the probe's)
     // or the record (here, behind the open's own MCP save).
     await vi.waitFor(() => expect(saved(path).migrations?.accounts1).toBeTruthy(), { timeout: HUNG_MS, interval: 20 })
-    for (const c of [saved(path), w.config]) expect(c).toMatchObject(OWN)
+    for (const c of [saved(path), w.config]) expect(c).toMatchObject(own)
   })
 
   it('a save waiting for an open that fails before the read writes nothing', async () => {
-    const path = workspaceFolder('existing')
+    const { path } = workspaceFolder('existing')
     const w = service()
     let save: Promise<void> | null = null
     configTestHooks.beforeSettingsRead = async () => {
