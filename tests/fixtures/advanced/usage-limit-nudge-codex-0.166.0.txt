@@ -1,0 +1,19 @@
+
+  >_ OpenAI Codex (v0.166.0)
+     C:\work\alpha
+
+
+› Print a.txt contents
+
+
+■ Usage limit reached.
+
+
+  Usage limit reached
+  Request a limit increase from your owner to continue using codex. Request increase?
+
+
+  1. Yes (y)
+› 2. No (default) (n)
+
+  enter select · esc back

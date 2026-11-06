@@ -152,16 +152,21 @@ const SELECTED_ROW = /^›\s*\d+\.\s/
 const VIEW_ROW_ABOVE = /^\s+\d+\.\s|^\s{4,}\S/
 /** How many choices a view's rows above its selected row may take (a bound: Codex's views have a few). */
 const VIEW_ROWS_MOST = 12
-/** How far above its first choice a choice view's title may be: its title, its question line and a blank line. */
-const VIEW_TITLE_ABOVE = 4
+/**
+ * How far above its first choice a choice view's title may be (HI-2619): its title and question, which Codex wraps to the
+ * pane and cuts at 8 lines, and the 2 blank lines it leaves before the choices (0.166.0's snapshots of these views).
+ */
+const VIEW_TITLE_ABOVE = 10
 /**
  * The question Codex shows by itself between turns, sending no hook (HI-2609, 0.166.0: "Approaching rate limits", its
- * offer of a cheaper model with that choice selected, which Enter takes): its title (codex.screen.idleQuestion) and one
- * of its choices (codex.screen.idleQuestionChoice), read by the view's own layout. Such a view replaces the input while
+ * offer of a cheaper model with that choice selected, which Enter takes; HI-2619: at a workspace's credit or usage limit,
+ * "You've reached your workspace credit limit" or "Usage limit reached", whose "1. Yes (y)" asks the workspace's owner,
+ * a key typed reaching outside the PC): its title (codex.screen.idleQuestion) and one of its choices
+ * (codex.screen.idleQuestionChoice), read by the view's own layout. Such a view replaces the input while
  * it shows, so it is the last thing drawn: the last line Codex marks with "›" in its first column is the view's selected
  * row ("› 1. Switch to …", whichever choice is selected), the choices above it (not selected, or a choice's text
  * wrapped) go up to the view's first choice, and the title starts a paragraph of its own just above that (its title, its
- * question, a blank line); one of its choices is in the view. Anything else is no question (HR2's round 1): an input
+ * question however it wraps, blank lines); one of its choices is in the view. Anything else is no question (HR2's round 1): an input
  * line last (the view gone, or leftovers of one above it), the words in a reply or a prompt above the input, or typed
  * into the input however it wraps or is numbered (a first line "› 1. …" has nothing of the view above it, and a draft's
  * other lines follow its "›"). Null when none shows.
@@ -607,7 +612,8 @@ export class CodexAdapter implements ProviderAdapter {
   busyScreen(screen: string): boolean {
     return codexHoldsInput(screen)
   }
-  // Its offer of a cheaper model near the account's limit (HI-2609): the agent waits for the user, and nothing is typed.
+  // Its offer of a cheaper model near the account's limit (HI-2609), its prompts at a workspace's limit (HI-2619): the
+  // agent waits for the user, and nothing is typed.
   idleQuestion(screen: string): string | null {
     return codexIdleQuestion(screen)
   }

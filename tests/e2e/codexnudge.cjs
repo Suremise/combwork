@@ -5,7 +5,9 @@
 // typed into it (no key reaches it), the user keeps the model ("2"), and only then is the message delivered, the model
 // unchanged. A model changed another way (switchmodel, as /model does) is marked in the footer and Activity, said in the
 // Agent API and told once. With the switch on (its default), each launch hides the offer (-c
-// notice.hide_rate_limit_model_nudge=true) and it never shows. Dev build, throwaway profile, workspace, CLAUDE_CONFIG_DIR
+// notice.hide_rate_limit_model_nudge=true) and it never shows. Its prompt at a workspace's credit limit (HI-2619,
+// "creditnudge": "Notify owner?", whose "y" would email the owner) is a question the same way: nothing is typed into it
+// until the user answers it. Dev build, throwaway profile, workspace, CLAUDE_CONFIG_DIR
 // and CODEX_HOME.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -16,6 +18,7 @@ const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 60000
 const TITLE = 'Approaching rate limits'
+const CREDIT_TITLE = "You've reached your workspace credit limit"
 const NUDGE_OFF = 'notice.hide_rate_limit_model_nudge=true'
 
 const userData = path.join(lib.WORK, 'codexnudge-profile')
@@ -130,6 +133,31 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const kept = activity()
     check('the agent still runs its connection\'s model, nothing marked', kept.model === 'gpt-6-astra' && kept.launchedModel === undefined && !(await live(codex.id))?.modelSwitch, JSON.stringify({ model: kept.model, launchedModel: kept.launchedModel }))
     check('…and its footer marks nothing', (await page.locator('.foot-model[data-switched]').count()) === 0)
+
+    // ---- HI-2619: a turn failed at the workspace's credit limit, then Codex's prompt to notify its owner ("1. Yes (y)",
+    // "› 2. No (default) (n)"), which no launch argument hides. A wake typed into it would answer it ("y" asks the owner).
+    await until(() => idle(codex.id), HUNG_MS)
+    const ownerFrom = nudges().length
+    const ownerKeys = () => nudges().slice(ownerFrom).filter((n) => n.key !== undefined).map((n) => n.key)
+    await say(codex.id, 'creditnudge')
+    const owner = await until(async () => {
+      const s = await live(codex.id)
+      return s?.status === 'waiting' && s
+    }, HUNG_MS)
+    check("at the workspace's credit limit, Codex's prompt shows it waiting for the user", !!owner && String(owner.statusMessage ?? '').includes(CREDIT_TITLE), JSON.stringify(owner && { status: owner.status, message: owner.statusMessage }))
+    check('…the prompt is on its screen', nudges().slice(ownerFrom).some((n) => n.shown === true && n.prompt === 'credits'), JSON.stringify(nudges().slice(ownerFrom)))
+    await page.screenshot({ path: path.join(lib.WORK, 'codexnudge-owner.png') })
+    // A message with a "y" in it, left meanwhile.
+    const m2 = leave('Check your inbox for HI-13.')
+    check('a message can be left meanwhile', !!m2, String(m2))
+    check('…Deliver Now types nothing into the prompt', (await inv('session:deliverNow', alpha, codex.id)) === false)
+    check("no key of Combwork's reached the prompt, so its owner isn't asked", ownerKeys().length === 0 && !nudges().some((n) => n.answer === 'ask-owner'), JSON.stringify(nudges().slice(ownerFrom)))
+    check('…and the message is not read yet', !wakes().some((w) => w.text.includes('HI-13')), JSON.stringify(wakes()))
+    // The user answers No ("n"): idle again, and only then is the message typed and read.
+    await inv('pty:write', lib.ptyKey(alpha, codex.id), 'n')
+    check('answered, the agent is idle again', !!(await until(() => idle(codex.id), HUNG_MS)), JSON.stringify(await live(codex.id)))
+    check('…the message is delivered and read', !!(await until(() => wakes().some((w) => w.text.includes('HI-13')), HUNG_MS)), JSON.stringify(wakes()))
+    check("the prompt's only key was the user's \"n\", and its answer No", JSON.stringify(ownerKeys()) === '["n"]' && JSON.stringify(nudges().slice(ownerFrom).filter((n) => n.answer).map((n) => n.answer)) === '["no"]', JSON.stringify(nudges().slice(ownerFrom)))
 
     // ---- A model changed another way (as /model does): the footer and Activity mark it, the API says it, told once.
     await until(() => idle(codex.id), HUNG_MS)

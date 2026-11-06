@@ -1427,7 +1427,7 @@
   "settings.advanced.codex.rateLimitNudge.hide.title": "接近上限时不提议更便宜的模型",
   "settings.advanced.codex.rateLimitNudge.hide.desc": "每个 Codex 智能体启动时，都会在本次启动中关闭 Codex 切换到更便宜模型的提议，这样账户接近上限时它仍使用其连接的模型。不会向 Codex 的文件写入任何内容。关闭后，Codex 可能会询问，智能体会在其终端中等你回答：在此期间 Combwork 不会向其中输入任何内容。",
   "settings.advanced.codex.screen.idleQuestion.title": "屏幕：空闲时的问题",
-  "settings.advanced.codex.screen.idleQuestion.desc": "Codex 在两轮之间自行显示、不发送任何 hook 的问题（账户接近上限时提议更便宜的模型）的标题，在它最后绘制的几行中查找。当它与其中一个选项（屏幕：问题的选项）一起显示时，智能体会等你，Combwork 不会向其中输入任何内容，因为 Enter 会回答它。设置错误时，唤醒的 Enter 可能会回答这个问题。",
+  "settings.advanced.codex.screen.idleQuestion.desc": "Codex 在两轮之间自行显示、且不发送任何 hook 的问题的标题（账户接近上限时它提出改用更便宜的模型，以及工作区达到上限时询问是否请工作区所有者增加额度或提高上限），在它最后绘制的几行中查找。其中一个与它的某个选项（屏幕：问题的选项）一起显示时，代理会等待你回答，Combwork 不会向其中输入任何内容，因为按键或回车会回答它。设置错误时，输入到问题中的唤醒可能会回答它。",
   "settings.advanced.codex.screen.idleQuestionChoice.title": "屏幕：问题的选项",
-  "settings.advanced.codex.screen.idleQuestionChoice.desc": "该问题（屏幕：空闲时的问题）的一个选项，按 Codex 的编号。两者都必须显示在其屏幕底部附近、且不在其输入框中，问题才算数，因此对话中出现相同的文字不会阻止 Combwork 输入。"
+  "settings.advanced.codex.screen.idleQuestionChoice.desc": "这些问题（屏幕：空闲时的问题）的某个选项，按 Codex 的编号方式。两者都必须显示在其屏幕底部附近、且不在其输入框中，问题才算数，这样对话中的相同文字不会阻止 Combwork 输入。"
 }

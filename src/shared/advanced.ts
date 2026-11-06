@@ -2040,23 +2040,31 @@ const SOURCES: readonly AdvancedSource[] = [
     id: 'codex.screen.idleQuestion',
     group: 'codex',
     title: msg({ id: 'settings.advanced.codex.screen.idleQuestion.title', defaultMessage: 'Screen: question while idle', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
-    desc: msg({ id: 'settings.advanced.codex.screen.idleQuestion.desc', defaultMessage: "The title of a question Codex shows by itself between turns, sending no hook (its offer of a cheaper model near the account's limit), in the lines it drew last. While it shows with one of its choices (Screen: question's choice), the agent waits for you and Combwork types nothing into it, since Enter would answer it. Wrong, a wake's Enter can answer the question.", description: 'What the advanced setting "Screen: question while idle" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-2609). "Screen: question\'s choice" is another advanced setting\'s title: keep it as translated there.' }),
+    desc: msg({ id: 'settings.advanced.codex.screen.idleQuestion.desc', defaultMessage: "The titles of the questions Codex shows by itself between turns, sending no hook (its offer of a cheaper model near the account's limit, and its offers to ask your workspace's owner for more credits or a higher limit once a workspace reaches its limit), in the lines it drew last. While one shows with one of its choices (Screen: question's choice), the agent waits for you and Combwork types nothing into it, since a key or Enter would answer it. Wrong, a wake typed into the question can answer it.", description: 'What the advanced setting "Screen: question while idle" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-2609, HI-2619). "Screen: question\'s choice" is another advanced setting\'s title: keep it as translated there.' }),
     kind: 'pattern',
-    default: String.raw`Approaching rate limits`,
+    default: String.raw`Approaching rate limits|You've reached your workspace credit limit|Usage limit reached`,
     flags: 'i',
     applies: 'now',
-    samples: [{ from: `${FIX}/advanced/ratelimit-nudge-codex-0.166.0.txt`, version: '0.166.0', text: 'Approaching rate limits' }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [
+      { from: `${FIX}/advanced/ratelimit-nudge-codex-0.166.0.txt`, version: '0.166.0', text: 'Approaching rate limits' }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/credit-limit-nudge-codex-0.166.0.txt`, version: '0.166.0', text: "You've reached your workspace credit limit" }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/usage-limit-nudge-codex-0.166.0.txt`, version: '0.166.0', text: 'Usage limit reached' } // i18n-ignore: a CLI's recorded text (#367)
+    ]
   },
   {
     id: 'codex.screen.idleQuestionChoice',
     group: 'codex',
     title: msg({ id: 'settings.advanced.codex.screen.idleQuestionChoice.title', defaultMessage: "Screen: question's choice", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
-    desc: msg({ id: 'settings.advanced.codex.screen.idleQuestionChoice.desc', defaultMessage: "One of the choices of that question (Screen: question while idle), as Codex numbers it. Both must show, near the bottom of its screen and not in its input, for the question to count, so the same words in the conversation don't stop Combwork typing.", description: 'What the advanced setting "Screen: question\'s choice" is for (Settings → Advanced, HI-2609). "Screen: question while idle" is another advanced setting\'s title: keep it as translated there.' }),
+    desc: msg({ id: 'settings.advanced.codex.screen.idleQuestionChoice.desc', defaultMessage: "One of the choices of those questions (Screen: question while idle), as Codex numbers it. Both must show, near the bottom of its screen and not in its input, for the question to count, so the same words in the conversation don't stop Combwork typing.", description: 'What the advanced setting "Screen: question\'s choice" is for (Settings → Advanced, HI-2609, HI-2619). "Screen: question while idle" is another advanced setting\'s title: keep it as translated there.' }),
     kind: 'pattern',
-    default: String.raw`\b\d\.\s+Keep current model\b`,
+    default: String.raw`\b\d\.\s+(?:Keep current model\b|No \(default\))`,
     flags: 'i',
     applies: 'now',
-    samples: [{ from: `${FIX}/advanced/ratelimit-nudge-codex-0.166.0.txt`, version: '0.166.0', text: '2. Keep current model' }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [
+      { from: `${FIX}/advanced/ratelimit-nudge-codex-0.166.0.txt`, version: '0.166.0', text: '2. Keep current model' }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/credit-limit-nudge-codex-0.166.0.txt`, version: '0.166.0', text: '2. No (default)' }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/usage-limit-nudge-codex-0.166.0.txt`, version: '0.166.0', text: '2. No (default)' } // i18n-ignore: a CLI's recorded text (#367)
+    ]
   },
   {
     id: 'codex.fullAccess.warning',

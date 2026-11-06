@@ -2043,6 +2043,8 @@ When your account nears its usage limit, Codex can offer to switch to a cheaper 
 - If Codex shows it anyway, the agent shows **Needs input** with *Codex asks: Approaching rate limits*, as for Claude Code's question above. Combwork types nothing into it and presses no Enter; wakes and messages wait until you answer it in the agent's pane.
 - If an agent ends up on another model all the same (it took the offer, or someone used `/model`), its footer marks the model (below), and you're told once.
 
+On a workspace (business) plan, when a turn stops because your workspace is out of credits or you've reached your usage limit, Codex asks whether to tell the workspace's owner: *You've reached your workspace credit limit … Notify owner?* or *Usage limit reached … Request increase?* Answering **Yes** sends your owner a request, so Combwork never answers for you. The agent shows **Needs input** with *Codex asks: …*, and wakes and messages wait, nothing typed into it, until you answer it in the agent's pane (**y** for Yes, **n** for No). Codex has no setting that hides these prompts.
+
 A question or dialog of a CLI's own that Combwork doesn't recognise can take an agent's keys the same way. Before Combwork types into Claude Code, it checks that the agent's input takes a key. When three tries in a row get no answer, Combwork stops typing there:
 
 - The agent shows **Needs input** with *Something on its screen is taking its keys: answer it there, then Try again*, and its pane's header says **Its input takes no keys**. You're notified, and the Assistant is told it waits for you. If the agent already waits for you on something else, that stays its reason.
