@@ -43,6 +43,10 @@
     "defaultMessage": "Change",
     "description": "Button in that banner: opens Project Settings."
   },
+  "project.banner.chooseInSettings": {
+    "defaultMessage": "Choose in Settings",
+    "description": "Button on the banner (HI-2650) when several accounts are off in this workspace: opens Settings → Accounts & Connections to turn one on."
+  },
   "project.banner.connectionSetup": {
     "defaultMessage": "No {cli} account is on in this workspace, so its agents can't start. Add one and sign it in.",
     "description": "Banner in a project whose agents' CLI ({cli}: \"Claude Code\") has no account (a sign-in or server) on in the workspace (HI-1755; HI-2108)."
@@ -63,6 +67,18 @@
     "defaultMessage": "{agent}: {mode}",
     "description": "One agent and its permission mode, in the banner about modes that run without asking."
   },
+  "project.banner.noAccountEmpty": {
+    "defaultMessage": "No account is on in this workspace, so a new agent can't start. Add one and sign it in.",
+    "description": "Banner in a project with no agents yet (HI-2650) when no account (a sign-in or server a coding agent CLI uses) exists to run one. Its button opens Settings → Accounts & Connections."
+  },
+  "project.banner.offHereOne": {
+    "defaultMessage": "{where, select, assistant {{name}, your {cli} account, is off in this workspace, so the Assistant can't start.} empty {{name}, your {cli} account, is off in this workspace, so a new agent can't start.} other {{name}, your {cli} account, is off in this workspace, so its agents can't start.}}",
+    "description": "Banner (HI-2650) where nothing can start for want of a connection, and exactly one account ({name}, the user's name for it; {cli}: \"Claude Code\") exists but is off in this workspace. {where}: assistant, the Assistant panel; empty, a project with no agents yet; other, a project's agents. Its button turns the account on here."
+  },
+  "project.banner.offHereSeveral": {
+    "defaultMessage": "{where, select, assistant {{names} are off in this workspace, so the Assistant can't start. Turn one on in Settings.} empty {{names} are off in this workspace, so a new agent can't start. Turn one on in Settings.} other {{names} are off in this workspace, so its agents can't start. Turn one on in Settings.}}",
+    "description": "Banner (HI-2650) where nothing can start for want of a connection, and several accounts exist but are all off in this workspace. {names}: their names, joined (\"Work and Personal\"). {where}: assistant, the Assistant panel; empty, a project with no agents yet; other, a project's agents. Its button opens Settings → Accounts & Connections."
+  },
   "project.banner.restart": {
     "defaultMessage": "Restart session",
     "description": "Button in that banner."
@@ -78,6 +94,14 @@
   "project.banner.switchFailed": {
     "defaultMessage": "Couldn't arrange the restart",
     "description": "An error's title: Restart When Its Turn Is Over failed."
+  },
+  "project.banner.turnOnFailed": {
+    "defaultMessage": "Couldn't turn {name} on here",
+    "description": "An error's title (HI-2650): the banner's Turn On Here, turning the account {name} on in this workspace, failed."
+  },
+  "project.banner.turnOnHere": {
+    "defaultMessage": "Turn On Here",
+    "description": "Button on the banner (HI-2650): turns the one account it names on in this workspace (as its On here switch in Settings → Accounts & Connections does)."
   },
   "project.banner.unmanagedMcp": {
     "defaultMessage": "This project defines MCP servers that are not in the workspace: <b>{names}</b>. They stay disabled until copied to the workspace.",
@@ -698,10 +722,6 @@
   "project.empty.markWorking": {
     "defaultMessage": "Mark as working on",
     "description": "Button: marks the project as one you are working on."
-  },
-  "project.empty.noAccount": {
-    "defaultMessage": "No account is on in this workspace — Settings → Accounts & Connections",
-    "description": "Warning on the Session tab of a project with no agents (HI-2108): no account (a sign-in or server a coding agent CLI uses) is on in this workspace, so a new agent has no connection to run on. Settings → Accounts & Connections: name it as Settings does."
   },
   "project.empty.noAgents": {
     "defaultMessage": "No agents yet",

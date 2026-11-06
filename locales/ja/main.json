@@ -53,6 +53,7 @@
   "main.connections.launch.deleted": "{agent}に選ばれた接続はもうありません。「エージェント設定」で別の接続を選んでください。",
   "main.connections.launch.noKey": "{name}にキーがありません。「設定」→「アカウントと接続」でキーを追加してから、{agent}を起動してください。",
   "main.connections.launch.none": "このワークスペースで有効な{cli}のアカウントがありません。「設定」→「アカウントと接続」でアカウントを追加してサインインしてから、{agent}をもう一度起動してください。",
+  "main.connections.launch.offHere": "{n, plural, other {{cli}のアカウント（{names}）はこのワークスペースで無効になっています。}}「設定」→「アカウントと接続」の「このワークスペースで有効」でいずれかを有効にしてから、{agent}をもう一度起動してください。",
   "main.connections.launch.offNoDefault": "{agent}のアカウント{name}はこのワークスペースでは無効で、ほかに有効な{cli}のアカウントもありません。「設定」→「アカウントと接続」でどれかをオンにしてください。",
   "main.connections.launch.otherProvider": "{agent}に選ばれた接続は別のCLI用です。「エージェント設定」で{cli}の接続を選んでください。",
   "main.connections.launch.signedOut": "{name}はサインアウトしています。「設定」→「アカウントと接続」でサインインし直してから、{agent}を起動してください。",

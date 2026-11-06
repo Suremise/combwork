@@ -317,6 +317,7 @@
   "shell.search.clear": "Leeren",
   "shell.setup.checkAgain": "Erneut prüfen",
   "shell.setup.connections": "{n, plural, =0 {{cli} meldet sich pro Konto an, und in diesem Arbeitsbereich ist noch keines eingeschaltet: Füge eines hinzu und melde es an.} one {{cli} meldet sich pro Konto an: # ist in diesem Arbeitsbereich eingeschaltet.} other {{cli} meldet sich pro Konto an: # sind in diesem Arbeitsbereich eingeschaltet.}}",
+  "shell.setup.connectionsOff": "{cli} meldet sich pro Konto an, und in diesem Arbeitsbereich ist keines eingeschaltet: {n, plural, one {{names} ist hier ausgeschaltet.} other {{names} sind hier ausgeschaltet.}} Schalte eines mit „In diesem Arbeitsbereich eingeschaltet“ ein.",
   "shell.setup.docs": "Dokumentation von {provider}",
   "shell.setup.done": "{what} Du kannst dieses Fenster schließen.",
   "shell.setup.found": "<b>{provider} {version}</b> <muted>– gefunden über {source}</muted>",

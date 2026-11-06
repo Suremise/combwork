@@ -6,6 +6,7 @@
   "connections.choice.noneHere": "No account is on in this workspace. Add one in Settings → Accounts & Connections.",
   "connections.choice.notInstalled": "{cli} isn't installed",
   "connections.choice.offHere": "{name} (its account is off here: its CLI's first usable connection runs it)",
+  "connections.choice.offHereAll": "No account is on in this workspace: {n, plural, one {{names} is off here.} other {{names} are off here.}} Turn one on with On here in Settings → Accounts & Connections.",
   "connections.choice.pick": "Choose a connection",
   "connections.choice.removed": "A removed connection (its CLI's first usable one runs it)",
   "connections.choice.unavailable": "{name} — {why}",

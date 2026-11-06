@@ -319,6 +319,7 @@ interface CombworkMessageValues {
   'shell.search.clear': undefined
   'shell.setup.checkAgain': undefined
   'shell.setup.connections': { n: number; cli: string | number }
+  'shell.setup.connectionsOff': { cli: string | number; n: number; names: string | number }
   'shell.setup.docs': { provider: string | number }
   'shell.setup.done': { what: string | number }
   'shell.setup.found': { provider: string | number; version: string | number; source: string | number }

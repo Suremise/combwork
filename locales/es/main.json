@@ -53,6 +53,7 @@
   "main.connections.launch.deleted": "La conexión elegida para el agente {agent} ya no existe. Elige otra en su Configuración del agente.",
   "main.connections.launch.noKey": "{name} no tiene clave. Agrega una en Configuración → Cuentas y conexiones y luego inicia {agent}.",
   "main.connections.launch.none": "No hay ninguna cuenta de {cli} activada en este espacio de trabajo. Agrega una en Configuración → Cuentas y conexiones e inicia sesión en ella; luego vuelve a iniciar {agent}.",
+  "main.connections.launch.offHere": "{n, plural, one {La cuenta de {cli}, {names}, está desactivada en este espacio de trabajo.} many {Las cuentas de {cli}, {names}, están desactivadas en este espacio de trabajo.} other {Las cuentas de {cli}, {names}, están desactivadas en este espacio de trabajo.}} Activa una con «Activada en este espacio de trabajo» en Configuración → Cuentas y conexiones; luego vuelve a iniciar {agent}.",
   "main.connections.launch.offNoDefault": "La cuenta del agente {agent}, {name}, está desactivada en este espacio de trabajo y no hay ninguna otra cuenta de {cli} activada. Activa una en Configuración → Cuentas y conexiones.",
   "main.connections.launch.otherProvider": "La conexión elegida para {agent} es de otra CLI. Elige una conexión de {cli} en la Configuración del agente.",
   "main.connections.launch.signedOut": "{name} tiene la sesión cerrada. Vuelve a iniciar sesión en ella en Configuración → Cuentas y conexiones y luego inicia {agent}.",

@@ -224,8 +224,8 @@ export function AddAgentDialog() {
       wide
       footer={
         <>
-          <label className="flex muted" style={{ marginRight: 'auto' }} title={noAccount ? noAccountText() : undefined} data-start-now={noAccount ? 'no-account' : undefined}>
-            <input type="checkbox" className="checkbox" checked={startNow && !noAccount} disabled={noAccount} aria-description={noAccount ? noAccountText() : undefined} onChange={(e) => setStartNow(e.target.checked)} /> {tr(msg({ id: 'agents.add.startNow', defaultMessage: 'Start a session now', description: 'Checkbox in the Add Agent dialog: start the new agent at once.' }))}
+          <label className="flex muted" style={{ marginRight: 'auto' }} title={noAccount ? noAccountText(view, providers) : undefined} data-start-now={noAccount ? 'no-account' : undefined}>
+            <input type="checkbox" className="checkbox" checked={startNow && !noAccount} disabled={noAccount} aria-description={noAccount ? noAccountText(view, providers) : undefined} onChange={(e) => setStartNow(e.target.checked)} /> {tr(msg({ id: 'agents.add.startNow', defaultMessage: 'Start a session now', description: 'Checkbox in the Add Agent dialog: start the new agent at once.' }))}
             {noAccount && <span className="faint" data-start-now-why> — {tr(msg({ id: 'agents.add.noAccountStart', defaultMessage: 'No account is on here yet', description: "After Add Agent's \"Start a session now\", greyed out (HI-2127): why it can't start a session: no account (a sign-in or server a coding agent CLI uses) is on in this workspace. The agent can still be added, for later. Short." }))}</span>}
           </label>
           <button className="btn subtle" onClick={close}>

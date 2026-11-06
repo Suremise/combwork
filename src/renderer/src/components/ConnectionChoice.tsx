@@ -4,9 +4,9 @@ import { connectionSummary } from './ConnectionDefaults'
 import { connectionsOn, type ConnectionsView } from '@shared/accounts'
 import { enabledProviders, providerDescriptor, providerName, providersInUse, providerWarnings } from '@shared/providers'
 import { fmt, msg, tr } from '@shared/i18n'
-import { call } from '../api'
-import { set, setActivity, useStore } from '../store'
-import { cliReadyOf, connectionCli, connectionOf, firstReadyConnection, firstUsableConnection, offeredConnections, orderedAccounts, type ConnectionShown } from '@shared/connectionLabel'
+import { call, errorMessage } from '../api'
+import { notify, set, setActivity, useStore } from '../store'
+import { cliReadyOf, connectionCli, connectionOf, firstReadyConnection, firstUsableConnection, offeredConnections, offHereChoice, orderedAccounts, type ConnectionShown } from '@shared/connectionLabel'
 
 export { cliReadyOf, connectionCli, firstReadyConnection, firstUsableConnection, offeredConnections }
 import { Icon, Tooltip } from './ui'
@@ -29,6 +29,15 @@ const M = {
   newConnection: msg({ id: 'connections.choice.new', defaultMessage: 'New Connection…', description: "Button beside the choice of connection (Add Agent, HI-2108): opens the connection dialog to make another setup (model, effort, mode) on the chosen connection's account." }),
   none: msg({ id: 'connections.choice.noneHere', defaultMessage: 'No account is on in this workspace. Add one in Settings → Accounts & Connections.', description: 'Under the choice of connection when no account is on in this workspace (HI-2108). Settings → Accounts & Connections names a section.' }),
   noneCli: msg({ id: 'connections.choice.noneCli', defaultMessage: 'No {cli} account is on in this workspace. Add one in Settings → Accounts & Connections.', description: 'Under the choice of connection when no account of the coding agent CLI it is limited to ({cli}: "Claude Code") is on in this workspace (HI-2108). Settings → Accounts & Connections names a section.' }),
+  offHere: msg({ id: 'connections.choice.offHereAll', defaultMessage: 'No account is on in this workspace: {n, plural, one {{names} is off here.} other {{names} are off here.}} Turn one on with On here in Settings → Accounts & Connections.', description: 'Under the choice of connection (HI-2650) when no account is on in this workspace but some exist, all off here. {names}: their names, joined ("Work and Personal"); {n}: how many. On here is the switch on each account\'s row in Settings → Accounts & Connections.' })
+}
+
+/** Why no account is usable here, as a line (HI-2650): those off here named, else none to add (`cli`: that CLI's only). */
+function noAccountLine(view: ConnectionsView, ready: ReturnType<typeof cliReadyOf>, cli?: ProviderId): string {
+  const off = offHereChoice(view, ready, cli)
+  if (off.kind === 'one') return tr(M.offHere, { n: 1, names: off.name })
+  if (off.kind === 'several') return tr(M.offHere, { n: off.names.length, names: fmt.list(off.names) })
+  return cli ? tr(M.noneCli, { cli: providerName(cli) }) : tr(M.none)
 }
 
 /**
@@ -147,7 +156,7 @@ export function ConnectionChoice({ id, value, onChange, cli, unavailable, onNew,
         {/* None usable (not for a test copy on its CLI test home, whose account is made as its first agent needs it). */}
         {!offered.length && !view.testHome.length && (
           <div className="hint" data-no-account>
-            {cli ? tr(M.noneCli, { cli: providerName(cli) }) : tr(M.none)}{' '}
+            {noAccountLine(view, ready, cli)}{' '}
             <a onClick={openConnections}>{tr(SETUP.open)}</a>
           </div>
         )}
@@ -193,8 +202,8 @@ export function connectionCellText(own: string | undefined, provider: ProviderId
   return s.shown ? `${s.shown.name}${s.other ? ' ⟳' : ''}` : unusable(s, providerDescriptor(provider).name, false)
 }
 
-/** Why nothing can start here (HI-2108): no account is on in this workspace, as the choice says it. */
-export const noAccountText = (): string => tr(M.none)
+/** Why nothing can start here (HI-2108): no account is on in this workspace, as the choice says it (HI-2650: those off here named). */
+export const noAccountText = (view: ConnectionsView | null, providers: Parameters<typeof cliReadyOf>[0]): string => (view ? noAccountLine(view, cliReadyOf(providers)) : tr(M.none))
 
 /**
  * Whether no account is on in this workspace for a choice to offer (HI-2108): none offered, and this isn't a test copy
@@ -220,26 +229,65 @@ const SETUP = {
   assistant: msg({ id: 'assistant.banner.connectionSetup', defaultMessage: "No {cli} account is on in this workspace, so the Assistant can't start. Add one and sign it in.", description: 'Banner in the Assistant panel when its coding agent CLI ({cli}: "Claude Code") has no account (a sign-in or server) on in the workspace (HI-1774; HI-2108): it can\'t start until one is.' }),
   add: msg({ id: 'project.banner.connectionSetupAdd', defaultMessage: 'Add an Account', description: 'Button on the banner asking for an account (HI-2108): opens Settings → Accounts & Connections.' }),
   setupLine: msg({ id: 'shell.setup.connections', defaultMessage: '{n, plural, =0 {{cli} signs in per account, and none is on in this workspace yet: add one and sign it in.} one {{cli} signs in per account: # is on in this workspace.} other {{cli} signs in per account: # are on in this workspace.}}', description: 'Provider Setup, for a coding agent CLI ({cli}: "Claude Code") that signs in per account (Settings → Accounts & Connections) rather than here (HI-1774; HI-2108). {n} is how many of its accounts are on in the open workspace.' }),
+  setupLineOff: msg({ id: 'shell.setup.connectionsOff', defaultMessage: '{cli} signs in per account, and none is on in this workspace: {n, plural, one {{names} is off here.} other {{names} are off here.}} Turn one on with On here.', description: 'Provider Setup (HI-2650), for a coding agent CLI ({cli}: "Claude Code") that signs in per account, when it has accounts but none is on in the open workspace. {names}: their names, joined ("Work and Personal"); {n}: how many. On here is the switch on each account\'s row in Settings → Accounts & Connections, which the button beside it opens.' }),
   open: msg({ id: 'shell.setup.openConnections', defaultMessage: 'Open Accounts & Connections', description: "Provider Setup's button (HI-2108): opens Settings → Accounts & Connections, where a coding agent CLI's accounts are added and signed in." })
+}
+
+const OFF = {
+  one: msg({ id: 'project.banner.offHereOne', defaultMessage: "{where, select, assistant {{name}, your {cli} account, is off in this workspace, so the Assistant can't start.} empty {{name}, your {cli} account, is off in this workspace, so a new agent can't start.} other {{name}, your {cli} account, is off in this workspace, so its agents can't start.}}", description: "Banner (HI-2650) where nothing can start for want of a connection, and exactly one account ({name}, the user's name for it; {cli}: \"Claude Code\") exists but is off in this workspace. {where}: assistant, the Assistant panel; empty, a project with no agents yet; other, a project's agents. Its button turns the account on here." }),
+  several: msg({ id: 'project.banner.offHereSeveral', defaultMessage: "{where, select, assistant {{names} are off in this workspace, so the Assistant can't start. Turn one on in Settings.} empty {{names} are off in this workspace, so a new agent can't start. Turn one on in Settings.} other {{names} are off in this workspace, so its agents can't start. Turn one on in Settings.}}", description: "Banner (HI-2650) where nothing can start for want of a connection, and several accounts exist but are all off in this workspace. {names}: their names, joined (\"Work and Personal\"). {where}: assistant, the Assistant panel; empty, a project with no agents yet; other, a project's agents. Its button opens Settings → Accounts & Connections." }),
+  turnOn: msg({ id: 'project.banner.turnOnHere', defaultMessage: 'Turn On Here', description: "Button on the banner (HI-2650): turns the one account it names on in this workspace (as its On here switch in Settings → Accounts & Connections does)." }),
+  choose: msg({ id: 'project.banner.chooseInSettings', defaultMessage: 'Choose in Settings', description: "Button on the banner (HI-2650) when several accounts are off in this workspace: opens Settings → Accounts & Connections to turn one on." }),
+  empty: msg({ id: 'project.banner.noAccountEmpty', defaultMessage: "No account is on in this workspace, so a new agent can't start. Add one and sign it in.", description: "Banner in a project with no agents yet (HI-2650) when no account (a sign-in or server a coding agent CLI uses) exists to run one. Its button opens Settings → Accounts & Connections." }),
+  failed: msg({ id: 'project.banner.turnOnFailed', defaultMessage: "Couldn't turn {name} on here", description: "An error's title (HI-2650): the banner's Turn On Here, turning the account {name} on in this workspace, failed." })
 }
 
 /**
  * Asks for a connection (HI-1755, Darren's 1a): where a CLI with connections has none on in the workspace, nothing of it
- * starts (never on the CLI's own login): Add an Account opens Settings → Accounts & Connections. `where`: a project's agents, or
- * the Assistant (HI-1774).
+ * starts (never on the CLI's own login). What it offers (HI-2650, offHereChoice; nothing turned on until clicked): one
+ * account off here, Turn On Here (this window's workspace only); several, Choose in Settings; none, Add an Account.
+ * `where`: a project's agents (`cli`: theirs), the Assistant (HI-1774), or a project with no agents yet (`empty`, any CLI).
  */
-export function NoConnectionBanner({ cli, where = 'project' }: { cli: ProviderId; where?: 'project' | 'assistant' }) {
+export function NoConnectionBanner({ cli, where = 'project' }: { cli?: ProviderId; where?: 'project' | 'assistant' | 'empty' }) {
+  const view = useConnections()
+  const providers = useStore((s) => s.providers)
+  const [busy, setBusy] = useState(false)
+  const choice = view ? offHereChoice(view, cliReadyOf(providers), cli) : { kind: 'none' as const, ...(cli ? { cli } : {}) }
+  const text =
+    choice.kind === 'one'
+      ? tr(OFF.one, { where, name: choice.name, cli: providerDescriptor(choice.cli).name })
+      : choice.kind === 'several'
+        ? tr(OFF.several, { where, names: fmt.list(choice.names) })
+        : cli
+          ? tr(where === 'assistant' ? SETUP.assistant : SETUP.text, { cli: providerDescriptor(cli).name })
+          : tr(OFF.empty)
+  const turnOn = async (id: string, name: string): Promise<void> => {
+    setBusy(true)
+    try {
+      await call('connections:setOn', id, true)
+    } catch (e) {
+      notify('error', tr(OFF.failed, { name }), errorMessage(e))
+    } finally {
+      setBusy(false)
+    }
+  }
   return (
     // The wrap-banner layout (HI-2535): in a narrow pane the button goes under the message, not beside a thin column of it.
-    <div className="banner warn wrap-banner" data-connection-setup={where}>
+    <div className="banner warn wrap-banner" data-connection-setup={where} data-off-here={choice.kind}>
       <span className="wrap-banner-text">
         <Icon name="plug" />
-        <span className="grow">{tr(where === 'assistant' ? SETUP.assistant : SETUP.text, { cli: providerDescriptor(cli).name })}</span>
+        <span className="grow">{text}</span>
       </span>
       <span className="wrap-banner-actions">
-        <button className="btn small primary" onClick={openConnections}>
-          {tr(SETUP.add)}
-        </button>
+        {choice.kind === 'one' ? (
+          <button className="btn small primary" data-turn-on-here={choice.id} disabled={busy} aria-busy={busy || undefined} onClick={() => void turnOn(choice.id, choice.name)}>
+            {tr(OFF.turnOn)}
+          </button>
+        ) : (
+          <button className="btn small primary" data-open-connections onClick={openConnections}>
+            {tr(choice.kind === 'several' ? OFF.choose : SETUP.add)}
+          </button>
+        )}
       </span>
     </div>
   )
@@ -282,12 +330,16 @@ export function ConnectionsIntroBanner() {
  */
 export function ConnectionSetupLine({ cli, onOpen }: { cli: ProviderId; onOpen: () => void }) {
   const view = useConnections()
+  const providers = useStore((s) => s.providers)
   if (!view?.providers.includes(cli) || view.testHome.includes(cli)) return null
   const n = view.workspace[cli]?.on.length ?? 0
+  // None on, but some added (HI-2650): they are off here, never "add one".
+  const off = n ? null : offHereChoice(view, cliReadyOf(providers), cli)
+  const offNames = off?.kind === 'one' ? [off.name] : off?.kind === 'several' ? off.names : []
   return (
     <div className={['banner', n ? 'info' : 'warn'].join(' ')} data-connection-setup-line={n} style={{ borderRadius: 6, marginBottom: 10 }}>
       <Icon name="plug" />
-      <span className="grow">{tr(SETUP.setupLine, { cli: providerDescriptor(cli).name, n })}</span>
+      <span className="grow">{offNames.length ? tr(SETUP.setupLineOff, { cli: providerDescriptor(cli).name, n: offNames.length, names: fmt.list(offNames) }) : tr(SETUP.setupLine, { cli: providerDescriptor(cli).name, n })}</span>
       <button className="btn small primary" data-open-connections onClick={() => {
           onOpen()
           openConnections()

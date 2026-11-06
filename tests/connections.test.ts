@@ -15,7 +15,7 @@ import { join } from 'path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { connectionRef, connectionsFor, connectionShown, resolveConnection, type ConnectionsView } from '../src/shared/accounts'
-import { cliReadyOf, connectionCli, connectionOf, connectionSwitchDue, firstReadyConnection, firstUsableConnection, launchedName, offeredConnections } from '../src/shared/connectionLabel'
+import { cliReadyOf, connectionCli, connectionOf, connectionSwitchDue, firstReadyConnection, firstUsableConnection, launchedName, offeredConnections, offHereChoice } from '../src/shared/connectionLabel'
 import type { Account, LiveSessionState } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
@@ -34,7 +34,7 @@ const { config } = await import('../src/main/config')
 const { advanced } = await import('../src/main/advanced')
 const { provider } = await import('../src/main/providers')
 const { providerService } = await import('../src/main/providerService')
-const { configTestHooks, createWorkspaceService, disposeWorkspaceService, inWorkspace, setConnectionGuard, setNewWorkspaceExtras } = await import('../src/main/workspace')
+const { configTestHooks, createWorkspaceService, disposeWorkspaceService, inWorkspace, setConnectionGuard } = await import('../src/main/workspace')
 const { runSwitch } = await import('../src/main/connectionSwitch')
 const { authScope, sessions } = await import('../src/main/sessions')
 const moves = await import('../src/main/connectionMoves')
@@ -215,6 +215,15 @@ describe('a launch on a connection (connectionForLaunch)', () => {
     expect(await outcome(launch())).toMatch(/No Claude Code account is on in this workspace/)
   })
 
+  it('accounts there but all off here: refused saying they are off here, never to add one (HI-2650)', async () => {
+    const a = await signedInConnection('Personal', 'me@example.com')
+    await here(() => accounts.setAccountOn(a.id, false))
+    expect(await outcome(launch())).toBe("Claude Code's account, Personal, is off in this workspace. Turn one on with On here in Settings → Accounts & Connections, then start Builder again.")
+    const b = await signedInConnection('Work', 'work@example.com')
+    await here(() => accounts.setAccountOn(b.id, false))
+    expect(await outcome(launch())).toMatch(/^Claude Code's accounts, Personal and Work, are off in this workspace\./)
+  })
+
   it('with the seam on and none on here, the old launch (null: the CLI test home), and only then', async () => {
     process.env.CW_TEST_CLI_HOME_CONNECTION = '1'
     try {
@@ -296,7 +305,7 @@ describe('a launch on a connection (connectionForLaunch)', () => {
     c2.release()
   })
 
-  it("waits for the order's one-time move at start (HI-1875 round 1): no launch and no new workspace on the order from before it", async () => {
+  it("waits for the order's one-time move at start (HI-1875 round 1): no launch on the order from before it; a new workspace starts with none on (HI-2650)", async () => {
     const a = await signedInConnection('Personal', 'me@example.com')
     const b = await signedInConnection('Work', 'work@example.com')
     // The most recently opened workspace's recorded default was Work, though Personal is first in the list.
@@ -317,7 +326,7 @@ describe('a launch on a connection (connectionForLaunch)', () => {
     try {
       const ready = accounts.initConnections()
       await vi.waitFor(() => expect(reached).toBe(true), { timeout: HUNG_MS })
-      // Asked for while held: a launch with no connection of its own, and a new workspace's seeding.
+      // Asked for while held: a launch with no connection of its own, and a new workspace made.
       const launched = launch()
       mkdirSync(fresh, { recursive: true })
       w2 = createWorkspaceService()
@@ -329,15 +338,14 @@ describe('a launch on a connection (connectionForLaunch)', () => {
       expect(c.id).toBe(b.id)
       c.release()
       await opened
-      expect(JSON.parse(readFileSync(join(fresh, '.combwork', 'workspace.json'), 'utf8')).connections).toEqual({ 'claude-code': { on: [b.id] } })
+      // Nothing is turned on by itself (Darren, 6 Nov): the new workspace has no connections on.
+      expect(JSON.parse(readFileSync(join(fresh, '.combwork', 'workspace.json'), 'utf8')).connections).toBeUndefined()
       expect(accounts.combworkAccounts().map((x) => x.id)).toEqual([b.id, a.id])
     } finally {
       accounts.accountTestHooks.beforeOrderRead = undefined
       release()
       if (w2) await disposeWorkspaceService(w2)
       config.update((c) => void (c.recentWorkspaces = was))
-      // initConnections set new workspaces' seeding (the top of the order on): the later tests' new workspaces start bare.
-      setNewWorkspaceExtras(async () => ({}))
     }
   })
 
@@ -714,6 +722,38 @@ describe('a choice saved while starting: the last look at its own choice, skills
     await accounts.launchOnChosen({ provider: 'copilot', workspaceConfig: w.config, agentName: 'Builder', chosen: async () => a.id }, async (conn) => void (ran = conn === null))
     expect(ran).toBe(true)
     await accounts.removeAccount(a.id)
+  })
+})
+
+describe('what a banner offers where none is on here (offHereChoice, HI-2650)', () => {
+  const acc = (id: string, cli: Account['provider'] = 'claude-code'): ConnectionsView['connections'][number] => ({ id, provider: cli, name: `Account ${id}`, createdAt: '', signingIn: false, folder: '' })
+  const view = (over: Partial<ConnectionsView> = {}): ConnectionsView => ({ providers: ['claude-code', 'codex'], connections: [], workspace: {}, testHome: [], order: [], homes: [], connectionRows: [], ...over })
+  const all: ReturnType<typeof cliReadyOf> = () => 'yes'
+  it('none at all: add one', () => {
+    expect(offHereChoice(view(), all)).toEqual({ kind: 'none' })
+    expect(offHereChoice(view(), all, 'claude-code')).toEqual({ kind: 'none', cli: 'claude-code' })
+  })
+  it('one off here: Turn On Here on it; on here, it is offered no more', () => {
+    expect(offHereChoice(view({ connections: [acc('a')], order: ['a'] }), all)).toEqual({ kind: 'one', id: 'a', name: 'Account a', cli: 'claude-code' })
+    expect(offHereChoice(view({ connections: [acc('a')], order: ['a'], workspace: { 'claude-code': { on: ['a'], default: 'a' } } }), all)).toEqual({ kind: 'none' })
+  })
+  it('several off here: Choose in Settings, named in the order; one CLI named only when all are its', () => {
+    expect(offHereChoice(view({ connections: [acc('a'), acc('b')], order: ['b', 'a'] }), all)).toEqual({ kind: 'several', names: ['Account b', 'Account a'], cli: 'claude-code' })
+    expect(offHereChoice(view({ connections: [acc('a'), acc('x', 'codex')], order: ['a', 'x'] }), all)).toEqual({ kind: 'several', names: ['Account a', 'Account x'] })
+  })
+  it("one per CLI, one CLI not installed: the installed one's, unless a CLI is asked for", () => {
+    const v = view({ connections: [acc('x', 'codex'), acc('a')], order: ['x', 'a'] })
+    const claudeOnly: ReturnType<typeof cliReadyOf> = (c) => (c === 'claude-code' ? 'yes' : 'no')
+    expect(offHereChoice(v, claudeOnly)).toMatchObject({ kind: 'one', id: 'a' })
+    expect(offHereChoice(v, claudeOnly, 'codex')).toMatchObject({ kind: 'one', id: 'x' })
+    // None installed: all of them.
+    expect(offHereChoice(v, () => 'no')).toMatchObject({ kind: 'several' })
+  })
+  it("never a CLI's own home, a CLI turned off in Settings, or a test copy's CLI on its test home", () => {
+    const cliHome = { ...acc('copilot', 'copilot'), home: 'cli' as const }
+    expect(offHereChoice(view({ connections: [acc('x', 'codex')], providers: ['claude-code'], order: ['x'] }), all)).toEqual({ kind: 'none' })
+    expect(offHereChoice(view({ connections: [acc('a')], testHome: ['claude-code'], order: ['a'] }), all)).toEqual({ kind: 'none' })
+    expect(offHereChoice(view({ homes: [cliHome], providers: ['claude-code', 'copilot'], order: ['copilot'] }), all)).toEqual({ kind: 'none' })
   })
 })
 

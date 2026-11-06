@@ -257,7 +257,8 @@ const looked = new Set<string>()
 export function initConnectionMoves(): void {
   const look = (): void => {
     for (const ws of openWorkspaces()) {
-      if (!ws.path || looked.has(ws.path.toLowerCase())) continue
+      // One still reading its settings (HI-2651) would be migrated from the defaults: its open's workspace-changed looks again.
+      if (!ws.path || ws.readingSettings || looked.has(ws.path.toLowerCase())) continue
       looked.add(ws.path.toLowerCase())
       void migrateWorkspace(ws)
     }

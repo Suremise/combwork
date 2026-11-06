@@ -6,6 +6,7 @@
   "connections.choice.noneHere": "No hay ninguna cuenta activada en este espacio de trabajo. Agrega una en Configuración → Cuentas y conexiones.",
   "connections.choice.notInstalled": "{cli} no está instalado",
   "connections.choice.offHere": "{name} (su cuenta está desactivada aquí: el agente se ejecuta con la primera conexión utilizable de su CLI)",
+  "connections.choice.offHereAll": "No hay ninguna cuenta activada en este espacio de trabajo: {n, plural, one {{names} está desactivada aquí.} many {{names} están desactivadas aquí.} other {{names} están desactivadas aquí.}} Activa una con «Activada en este espacio de trabajo» en Configuración → Cuentas y conexiones.",
   "connections.choice.pick": "Elegir una conexión",
   "connections.choice.removed": "Una conexión quitada (el agente se ejecuta con la primera conexión utilizable de su CLI)",
   "connections.choice.unavailable": "{name} — {why}",

@@ -6,6 +6,7 @@
   "connections.choice.noneHere": "In diesem Arbeitsbereich ist kein Konto eingeschaltet. Füge eines unter Einstellungen → Konten & Verbindungen hinzu.",
   "connections.choice.notInstalled": "{cli} ist nicht installiert",
   "connections.choice.offHere": "{name} (ihr Konto ist hier ausgeschaltet: Der Agent läuft mit der ersten nutzbaren Verbindung seiner CLI)",
+  "connections.choice.offHereAll": "In diesem Arbeitsbereich ist kein Konto eingeschaltet: {n, plural, one {{names} ist hier ausgeschaltet.} other {{names} sind hier ausgeschaltet.}} Schalte eines unter Einstellungen → Konten & Verbindungen mit „In diesem Arbeitsbereich eingeschaltet“ ein.",
   "connections.choice.pick": "Verbindung wählen",
   "connections.choice.removed": "Eine entfernte Verbindung (der Agent läuft mit der ersten nutzbaren Verbindung seiner CLI)",
   "connections.choice.unavailable": "{name} – {why}",
