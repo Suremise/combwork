@@ -3015,7 +3015,41 @@ route('GET', '/v1/tasks/:n', async ({ params, query }) => {
   // summary=true (#532): each comment as its first line, with the whole comment's length when there is more; its open
   // requests' words too (HI-1992).
   const told = summary ? { ...lean, ...(lean.forYou ? { forYou: lean.forYou.map(commentSummary) } : {}), comments: lean.comments.map(commentSummary) } : lean
-  return query.get('history') === 'false' ? withoutHistory(told) : told
+  // Its comment archive (HI-2641): how many older comments it archived (read with /comments/archived), whether it may
+  // have lost some before archiving existed, and past SPLIT_HINT_COMMENTS in all, a hint to split it.
+  const archive = tasks.commentArchive(seen.card.number)
+  const all = seen.card.comments.length + archive.archived
+  const withArchive = {
+    ...told,
+    ...(archive.archived ? { commentsArchived: archive.archived } : {}),
+    ...(archive.mayHaveBeenLost ? { commentsMayHaveBeenLost: true, commentsNote: say(API.card.commentsMayHaveBeenLost) } : {}),
+    ...(all > SPLIT_HINT_COMMENTS ? { hint: say(API.card.splitHint, { n: String(all) }) } : {})
+  }
+  return query.get('history') === 'false' ? withoutHistory(withArchive) : withArchive
+})
+
+/** Past this many comments on a card (its archived ones counted), a read of it suggests splitting it (HI-2641). */
+const SPLIT_HINT_COMMENTS = 100
+/** The most archived comments one read returns (HI-2641), and how many when limit is left out. */
+const ARCHIVED_PAGE_MAX = 100
+const ARCHIVED_PAGE = 50
+
+/** A whole number from `min` (an archive read's offset or limit), or the default when it is absent; else a 400. */
+function pageParam(raw: string | null, arg: string, min: number, fallback: number): number {
+  if (raw === null) return fallback
+  const n = raw.trim() === '' ? NaN : Number(raw)
+  if (!Number.isInteger(n) || n < min) throw new HttpError(400, say(API.card.archivedArg, { arg, min: String(min), raw }))
+  return n
+}
+
+// A card's archived comments (HI-2641): its oldest, past the 500 it keeps, a page at a time, oldest first.
+route('GET', '/v1/tasks/:n/comments/archived', async ({ params, query }) => {
+  requireWorkspace()
+  const offset = pageParam(query.get('offset'), 'offset', 0, 0)
+  const limit = Math.min(ARCHIVED_PAGE_MAX, pageParam(query.get('limit'), 'limit', 1, ARCHIVED_PAGE))
+  const r = await tasks.archivedCommentsOf(taskNumber(params[0]), await taskActor(), offset, limit)
+  const next = offset + r.comments.length
+  return { ...r, offset, ...(next < r.total ? { next } : {}) }
 })
 
 /** A new card's lane (HI-2167, POST /v1/tasks `lane`): a builder's name or id, or { builder, reviewer, brief, name, position }. */

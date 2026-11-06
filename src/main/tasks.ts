@@ -34,7 +34,8 @@ import { answerFits, approveNote, ASK_ACTIONS, CATEGORY_STAGE, DECISION_ANSWERS_
 import { askActionAvailable, kindProposed, reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
 import { LANE_MAX_ROUNDS } from '../shared/lanes'
 import { REFUSALS, refusal as refusalOf, type Refusal } from '../shared/workflow/refusals'
-import { archiveBatchDocs, boardReadToken, boardGeneration, boardSavepoint, cardChanges, movedNames, boardRead, boardReadOnly, cardHeads, cardHeadDocs, headChanges, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, cardRevs, hasCard, holdChanges, holdDocs, keepOwnNumber, putCard, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, decisionChanges, cardsOnBoard, type CardQuery } from './boardStore'
+import { archiveBatchDocs, boardReadToken, boardGeneration, boardSavepoint, cardChanges, movedNames, boardRead, boardReadOnly, cardHeads, cardHeadDocs, headChanges, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, cardRevs, hasCard, holdChanges, holdDocs, keepOwnNumber, putCard, archiveComments, archivedComments, commentArchiveOf, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, decisionChanges, cardsOnBoard, type CardQuery } from './boardStore'
+import type { Evicted } from './schema/commentArchive'
 import { keysForSearch } from './projectKeys'
 import { config } from './config'
 import { CombworkError, combworkError } from './combworkError'
@@ -676,6 +677,9 @@ async function saveCard(ws: WorkspaceService, n: number, card: TaskCard, before?
   }
   const { number, title, description, project: _shown, key: _key, ...rest } = card
   putCard(ws, n, { number, title, description, project: saved, ...(projectId ? { projectId } : {}), ...rest })
+  // Its comments evicted past the cap (HI-2641), archived in the same transaction: the card and its archive commit together.
+  const out = evicted.get(card)
+  if (out?.length) archiveComments(ws, n, out)
   // What the caller writes with its row before its facts are recorded (a new card's kind, #1277: a card made in Doing
   // starts as the kind it was made).
   withRow?.()
@@ -2778,6 +2782,21 @@ export async function latestComment(n: number, actor: TaskActor): Promise<{ numb
   return { number: c.number, comment: last ? withoutId(last) : null, commentId: last?.id ?? null, sources: c.comments.map(({ id, by, at }) => ({ id, by, at })) }
 }
 
+/**
+ * A page of a card's archived comments (HI-2641: its oldest, past the MAX_COMMENTS it keeps), oldest first, with how many
+ * it has in all. Read as `readTask` reads: a confined agent can't read another project's.
+ */
+export async function archivedCommentsOf(n: number, actor: TaskActor, offset: number, limit: number): Promise<{ number: number; key?: string; total: number; comments: TaskComment[] }> {
+  const c = await readTask(n, actor)
+  const got = archivedComments(workspace, c.number, offset, limit)
+  return { number: c.number, ...(c.key ? { key: c.key } : {}), total: got.total, comments: (got.comments as TaskComment[]).map(withoutId) }
+}
+
+/** What a card's comment archive holds (HI-2641): how many it archived, and whether it may have lost older ones before archiving existed. */
+export function commentArchive(n: number): { archived: number; mayHaveBeenLost: boolean } {
+  return commentArchiveOf(workspace, n)
+}
+
 /** A comment or history entry as callers see it: its id is the card watches' (#224). */
 export const withoutId = <T extends { id?: string }>({ id: _id, ...rest }: T): Omit<T, 'id'> => rest
 
@@ -2790,8 +2809,32 @@ function commentText(comment: string): string {
 
 /** Adds a comment, at `at` (its change's one time) or as a change of its own; one Combwork writes itself can carry its text as data (`appText`) beside its English. */
 function addComment(c: TaskCard, by: string, t: string, appText?: StoredText, id?: string, at = changeTime(c)): void {
-  c.comments = [...c.comments, { at, by, text: t, ...(appText ? { appText } : {}), id: id ?? entryId() }].slice(-MAX_COMMENTS)
+  const all = [...c.comments, { at, by, text: t, ...(appText ? { appText } : {}), id: id ?? entryId() }]
+  // Past the cap (HI-2641): the oldest wait on the card for its save, which archives them (saveCard), never dropped.
+  const over = all.length - MAX_COMMENTS
+  if (over > 0) evict(c, all.slice(0, over))
+  c.comments = over > 0 ? all.slice(over) : all
   c.updatedAt = at
+}
+
+/**
+ * A card's comments evicted past MAX_COMMENTS, waiting for saveCard to archive them (HI-2641), oldest first: several adds
+ * before one save add up. Each has a key of its own, given here and never taken from its content, so the archive adds it
+ * once however often the card is saved (twice in one change, or again after a change rolled back), and two comments
+ * alike in every field stay two. Kept as long as the card object is: never cleared, as a save that rolled back (the
+ * change, or a batch's savepoint) has archived nothing.
+ */
+const evicted = new WeakMap<TaskCard, Evicted[]>()
+function evict(c: TaskCard, comments: TaskComment[]): void {
+  const list = evicted.get(c) ?? []
+  if (!evicted.has(c)) evicted.set(c, list)
+  for (const comment of comments) list.push({ key: entryId(), comment })
+}
+
+/** For tests (HI-2641): a comment added to a card object, and the object saved, inside a board change, as the board's own changes do. */
+export const commentTestSeam = {
+  add: (c: TaskCard, by: string, said: string): void => addComment(c, by, said),
+  save: (ws: WorkspaceService, c: TaskCard): Promise<void> => saveCard(ws, c.number, c)
 }
 
 /** Comments on a card. `commit`: a revocable caller's last check before the write (HI-2415, as updateTask's). */

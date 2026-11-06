@@ -15,6 +15,7 @@ import { LANE_RECORD_STEP, moveLaneRecords } from './schema/laneRecordStep'
 import { ACTIONS_DELIVERED_STEP, ASSISTANT_CHANGES_STEP, CARD_ATTACHMENTS_STEP, CARD_REVS_STEP, CARD_SEARCH_STEP, CARDS_STEP, FACTS_STEP, QUERIES, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_RUNNERS_STEP, COPIES_STEP, QUEUE_SEEN_STEP, SESSION_LEASES_STEP, SKILL_COPIES_STEP, SLOTS_STEP, UNDO_OUTCOMES_STEP } from './schema/v1_0'
 import { NAMES_STEP } from './schema/namesStep'
 import { VALUES_STEP } from './schema/valuesStep'
+import { addCommentArchive, allArchivedComments, archivedCommentCount, archivedCommentRows, archiveCommentRows, COMMENT_ARCHIVE_STEP, mayHaveLostCards, type Evicted } from './schema/commentArchive'
 import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, isIoError, openDb, OPENABLE_WAIT_MS, schemaVersion, soleCopy, untilOpenable, type Db, type Migration, type PendingGroup } from './db'
 import { checkpointsReleased, checkpointWhenIdle, timedCommit } from './walCheckpoint'
 import { beginWrite, countedWrite } from './dbWrites'
@@ -331,7 +332,7 @@ export const BOARD_MIGRATIONS: Migration[] = [
   {
     // HI-2598, the names upgrade's stored values (its design HI-2598/s9 §2): what 1.0 and the release candidates stored
     // under the old names (a fact's actor, who merges, the rulesets compiled from it, a lane's builder, Combwork's own
-    // deliveries…) takes Combwork's, once (schema/valuesStep.ts). The 1.0 group's last step: taken unasked as 25 is.
+    // deliveries…) takes Combwork's, once (schema/valuesStep.ts). In the 1.0 group, taken unasked as 25 is.
     version: 26,
     name: VALUES_STEP.name,
     group: UPGRADE_GROUP_ID,
@@ -339,6 +340,15 @@ export const BOARD_MIGRATIONS: Migration[] = [
       const changed = VALUES_STEP.up(db)
       if (Object.keys(changed).length) log.info(`names: values converted ${JSON.stringify(changed)}`)
     }
+  },
+  {
+    // HI-2641: a card's oldest comments past the 500 it keeps are archived, not dropped (schema/commentArchive.ts). In the
+    // 1.0 group, its last, as 25 and 26 are: a board the group upgraded (1.0, an RC) takes it unasked, and one still
+    // waiting for its approved upgrade from 0.9 takes it only with that (every step outside the group is 0.9's).
+    version: 27,
+    name: COMMENT_ARCHIVE_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: (db) => addCommentArchive(db)
   }
 ]
 
@@ -1686,6 +1696,27 @@ export function putCard(ws: WorkspaceService, n: number, doc: Record<string, unk
   })
 }
 
+/**
+ * A card's evicted comments into its archive (HI-2641, schema/commentArchive.ts), inside boardWrite with the card's save:
+ * both commit or neither. One already archived by its key is skipped, so the same eviction saved twice adds it once.
+ */
+export function archiveComments(ws: WorkspaceService, n: number, evicted: readonly Evicted[]): number {
+  return writeOp(ws, (b) => archiveCommentRows(b.db.writer, n, evicted))
+}
+
+/**
+ * What a card's archive holds: how many comments, and whether it may have lost older ones before archiving existed
+ * (it held 500 when the board took the archive's step). Nothing on a board waiting for its 1.0 upgrade.
+ */
+export function commentArchiveOf(ws: WorkspaceService, n: number): { archived: number; mayHaveBeenLost: boolean } {
+  return readSnapshot(ws, (b, db) => (b.legacy || b.db.pending ? { archived: 0, mayHaveBeenLost: false } : { archived: archivedCommentCount(db, n), mayHaveBeenLost: mayHaveLostCards(db).has(n) }))
+}
+
+/** A page of a card's archived comments, oldest first, with how many it has in all. */
+export function archivedComments(ws: WorkspaceService, n: number, offset: number, limit: number): { total: number; comments: unknown[] } {
+  return readSnapshot(ws, (b, db) => (b.legacy || b.db.pending ? { total: 0, comments: [] } : { total: archivedCommentCount(db, n), comments: archivedCommentRows(db, n, offset, limit) }))
+}
+
 // ---------------------------------------------------------------------------
 // Project keys (#1219, #704): the queries are keysStep.ts's; these run them on the board's connections.
 // ---------------------------------------------------------------------------
@@ -2104,10 +2135,12 @@ export async function restoreBoardBackup(ws: WorkspaceService, agentsRunning: ()
  */
 export async function exportBoard(ws: WorkspaceService, dir: string, mask: <T>(v: T) => T = (v) => v): Promise<number> {
   // Its cards, next number and batches as one snapshot of the board.
-  const { docs, next, batches } = readSnapshot(ws, (_b, db) => ({ docs: cardDocs(ws), next: nextOf(db), batches: archiveBatchDocs(ws) }))
+  // Its cards' archived comments too (HI-2641), in the same snapshot: `<n>.comments-archive.json` beside a card with some.
+  const { docs, next, batches, archives } = readSnapshot(ws, (b, db) => ({ docs: cardDocs(ws), next: nextOf(db), batches: archiveBatchDocs(ws), archives: b.legacy || b.db.pending ? new Map<number, unknown[]>() : allArchivedComments(db) }))
   await mkdir(dir, { recursive: true })
   // `mask`: each value masked before it is written (HI-1772: no server connection's key in an export).
   for (const { number, doc } of docs) await writeFile(join(dir, `${number}.json`), JSON.stringify(mask(doc), null, 2) + '\n', 'utf8')
+  for (const [number, comments] of archives) await writeFile(join(dir, `${number}.comments-archive.json`), JSON.stringify({ version: 1, card: number, comments: mask(comments) }, null, 2) + '\n', 'utf8')
   await writeFile(join(dir, 'board.json'), JSON.stringify({ version: 1, next }, null, 2) + '\n', 'utf8')
   if (batches.length) await writeFile(join(dir, 'archive-batches.json'), JSON.stringify({ version: 1, batches: mask(batches) }, null, 2) + '\n', 'utf8')
   log.info(`exported ${docs.length} card(s) to ${userText(dir)}`)

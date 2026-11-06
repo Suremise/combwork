@@ -461,6 +461,9 @@
   "tool.readSharedNote.description": {
     "text": "Read a shared note by path in .combwork/shared (e.g. \"handovers/2026-01-01-auth.md\"), with its revision."
   },
+  "tool.readTask.arg.archived": {
+    "text": "Its archived older comments instead, from this offset (oldest 0)."
+  },
   "tool.readTask.arg.attachments": {
     "text": "All, when narrowed."
   },

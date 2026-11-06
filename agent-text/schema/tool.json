@@ -521,6 +521,9 @@
   "tool.readSharedNote.description": {
     "placeholders": {}
   },
+  "tool.readTask.arg.archived": {
+    "placeholders": {}
+  },
   "tool.readTask.arg.attachments": {
     "placeholders": {}
   },

@@ -141,6 +141,8 @@ const T = {
   'readTask.arg.latestComment': agentMsg({ id: 'tool.readTask.arg.latestComment', text: 'Only the newest comment.' }),
   'readTask.arg.summary': agentMsg({ id: 'tool.readTask.arg.summary', text: "Each comment's first line, and its length." }),
   'readTask.arg.attachments': agentMsg({ id: 'tool.readTask.arg.attachments', text: 'All, when narrowed.' }),
+  // HI-2641: a card's oldest comments past the 500 it keeps, its archive, read from an offset (commentsArchived counts them).
+  'readTask.arg.archived': agentMsg({ id: 'tool.readTask.arg.archived', text: 'Its archived older comments instead, from this offset (oldest 0).' }),
   // HI-2561: Codex asked for the history to see why an agent stopped, which forYou already says. Within HI-2012's
   // total (toolLimits.cjs): the description dropped its history clause, and summary's words were cut, to pay for it.
   'readTask.arg.history': agentMsg({ id: 'tool.readTask.arg.history', text: 'Long; rarely needed.' }),
@@ -1040,12 +1042,14 @@ const tools: Tool[] = [
         latestComment: { type: 'boolean', description: say(T['readTask.arg.latestComment']) },
         summary: { type: 'boolean', description: say(T['readTask.arg.summary']) },
         history: { type: 'boolean', description: say(T['readTask.arg.history']) },
-        attachments: { type: 'boolean', description: say(T['readTask.arg.attachments']) }
+        attachments: { type: 'boolean', description: say(T['readTask.arg.attachments']) },
+        archived: { type: 'number', description: say(T['readTask.arg.archived']) }
       },
       required: ['number']
     },
     run: (a) => {
       const n = enc(String(a.number))
+      if (a.archived !== undefined && a.archived !== null) return api('GET', `/v1/tasks/${n}/comments/archived?offset=${enc(String(a.archived))}`)
       const all = a.attachments === true ? 'attachments=true' : ''
       if (a.latestComment) {
         const lq = [a.summary ? 'summary=true' : '', all].filter(Boolean).join('&')
