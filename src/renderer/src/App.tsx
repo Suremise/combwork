@@ -411,15 +411,20 @@ export function App() {
   useEffect(() => {
     // What another window changes while this one loads must outlive the older snapshot it loads (#295).
     const early = startupReplay(handleEvent)
+    // The workspace reports heard (HI-2638): one heard after the snapshot's answer is newer than it. A workspace reopened at
+    // start reports itself once, as its open ends; asked before then, the snapshot has none, and its other answers can
+    // come after that report: applied then, it put back no workspace, and the window stayed empty.
+    let wsTold = 0
     const off = window.combwork.onEvent((e) => {
+      if (e.type === 'workspace-changed') wsTold++
       handleEvent(e)
       early.note(e)
     })
     void (async () => {
-      const [s, ui, ws, recent, ag, api, info, live] = await Promise.all([
+      const [s, ui, snap, recent, ag, api, info, live] = await Promise.all([
         call('settings:get'),
         call('ui:get'),
-        call('workspace:get'),
+        call('workspace:get').then((w) => ({ w, told: wsTold })),
         call('workspace:recent'),
         call('provider:info'),
         call('api:info'),
@@ -428,6 +433,7 @@ export function App() {
       ])
       // A startup cleaned up meanwhile (StrictMode's first, in development) leaves the window to the newer one (#337).
       if (!early.active()) return
+      const ws = wsTold > snap.told ? get().workspace : snap.w
       set({ settings: s, sidebarWidth: ui.sidebarWidth, sidebarVisible: ui.sidebarVisible, sidebarCompact: !!ui.sidebarCompact, panes: ui.panes ?? {}, skillsProvider: ui.skillsProvider ?? {}, skillsFold: ui.skillsFold ?? {}, sessionsTree: ui.sessionsTree ?? {}, combworkVcsNotice: ui.combworkVcsNotice ?? {}, assistantFold: ui.assistantFold ?? {}, boardFold: ui.boardFold ?? {}, progressFilter: ui.progressFilter ?? {}, tabs: ui.tabs ?? {}, laneOrder: ui.laneOrder ?? {}, tips: tipsState(ui.tips), workspace: ws, recent, providers: ag, api, appInfo: info })
       early.settle()
       set({ assistantOpen: assistantWasOpen(ws?.path) })
