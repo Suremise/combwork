@@ -86,9 +86,10 @@ async function linked(repo: string, wt: string): Promise<boolean> {
 
 /** Records where the workspace and its projects are, for those that have no record yet (opened before #146). */
 async function recordNew(ws: WorkspaceService, projects: string[]): Promise<void> {
-  if (!ws.config.lastPath && ws.path) {
-    ws.config.lastPath = ws.path
-    await ws.saveWorkspaceConfig()
+  const here = ws.path
+  if (!ws.config.lastPath && here) {
+    // Worked out from the settings as saved (HI-2651), never set on them before.
+    await ws.saveWorkspaceConfigWith((c) => (c.lastPath ? {} : { lastPath: here }))
   }
   for (const p of projects) if (!(await ws.projectConfig(p)).lastPath) await ws.mutateProjectConfig(p, (c) => (c.lastPath ? {} : { lastPath: p }))
 }
@@ -803,10 +804,8 @@ export async function checkMoved(ws: WorkspaceService): Promise<void> {
 /** Records the hosts' folders as where they are now, and the workspace's when all of them are (the Assistant's included). */
 async function recordDone(ws: WorkspaceService, hosts: string[], all: boolean): Promise<void> {
   for (const h of hosts) if (!samePath(h, ws.assistantHome)) await ws.mutateProjectConfig(h, () => ({ lastPath: h }))
-  if (all && ws.path && ws.config.lastPath !== ws.path) {
-    ws.config.lastPath = ws.path
-    await ws.saveWorkspaceConfig()
-  }
+  const here = ws.path
+  if (all && here && ws.config.lastPath !== here) await ws.saveWorkspaceConfigWith(() => ({ lastPath: here }))
 }
 
 const trimList = (list: string[], max = 5): string =>

@@ -2,8 +2,9 @@
 // path set, so it is among the open workspaces) and its read of workspace.json, its settings in memory are still the
 // defaults its last close left: a save then (the connections' migration on connections-changed, found on HI-2650's
 // Sandbox probe) wrote those defaults over the workspace's own. A save then waits for the read and changes what was
-// read; one whose open ends first writes nothing; and the migration leaves a workspace still opening for its open's
-// workspace-changed. For a new workspace (what its creation seeded) and an existing one (its own settings).
+// read, the setters' too (their change worked out in the save, never made to the defaults first); a save of the
+// settings as they are in memory is refused then; one whose open ends first writes nothing; and the migration leaves a
+// workspace still opening for its open's workspace-changed. For a new workspace (what its creation seeded) and an existing one (its own settings).
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -17,6 +18,7 @@ process.env.CW_USER_DATA = join(base, 'profile')
 const { configTestHooks, createWorkspaceService, disposeWorkspaceService, setNewWorkspaceExtras } = await import('../src/main/workspace')
 const { emit } = await import('../src/main/events')
 const moves = await import('../src/main/connectionMoves')
+const { CARD_ATTACHMENT_FOLDERS_ID } = await import('../src/shared/advanced')
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
 const HUNG_MS = 10_000
@@ -53,25 +55,47 @@ function service() {
 }
 
 describe("a workspace's settings are never saved before its open has read them (HI-2651)", () => {
-  it.each(['new', 'existing'] as const)('a save started before the read waits for it and changes what was read (%s workspace)', async (kind) => {
+  it.each(['new', 'existing'] as const)('a save started before the read waits for it and changes what was read; one of the settings as they are is refused (%s workspace)', async (kind) => {
     const path = workspaceFolder(kind)
     const w = service()
-    const saves: Promise<void>[] = []
+    let save: Promise<void> | null = null
+    let asIs: Promise<string> | null = null
     configTestHooks.beforeSettingsRead = async () => {
-      // Each save either writes now (what the bug did: the defaults over the file) or says it waits for the read.
-      let waits = 0
-      let bothWait!: () => void
-      const waiting = new Promise<void>((r) => (bothWait = r))
-      configTestHooks.saveWaitsForRead = () => void (++waits === 2 && bothWait())
+      // The save either writes now (what the bug did: the defaults over the file) or says it waits for the read.
+      let waits!: () => void
+      const waiting = new Promise<void>((r) => (waits = r))
+      configTestHooks.saveWaitsForRead = () => waits()
       expect(w.readingSettings).toBe(true)
-      saves.push(w.saveWorkspaceConfigWith((c) => ({ migrations: { ...c.migrations, accounts1: { at: 'marked' } } })))
-      saves.push(w.saveWorkspaceConfig())
-      await Promise.race([Promise.all(saves), waiting])
+      save = w.saveWorkspaceConfigWith((c) => ({ migrations: { ...c.migrations, accounts1: { at: 'marked' } } }))
+      // A change made in memory now would be made to the defaults, and lost with them: refused, never written.
+      asIs = w.saveWorkspaceConfig().then(() => 'saved', (e: Error) => e.message)
+      await Promise.race([save, waiting])
     }
     await w.open(path)
-    await Promise.all(saves)
+    await save
+    expect(await asIs).toMatch(/before its open read it/)
     for (const c of [saved(path), w.config]) expect(c).toMatchObject({ ...OWN, migrations: { accounts1: { at: 'marked' } } })
     expect(w.readingSettings).toBe(false)
+  })
+
+  it.each(['new', 'existing'] as const)("the setters called before the read change the settings read, keeping the workspace's own (%s workspace)", async (kind) => {
+    const path = workspaceFolder(kind)
+    const w = service()
+    const changes: Promise<void>[] = []
+    configTestHooks.beforeSettingsRead = async () => {
+      let waits = 0
+      let allWait!: () => void
+      const waiting = new Promise<void>((r) => (allWait = r))
+      configTestHooks.saveWaitsForRead = () => void (++waits === 2 && allWait())
+      changes.push(w.setHidden('alpha', 'hidden'), w.setAdvanced(CARD_ATTACHMENT_FOLDERS_ID, [base]))
+      await Promise.race([Promise.all(changes), waiting])
+    }
+    await w.open(path)
+    await Promise.all(changes)
+    for (const c of [saved(path), w.config]) {
+      expect(c).toMatchObject({ ...OWN, advanced: { [CARD_ATTACHMENT_FOLDERS_ID]: [base] } })
+      expect(c.hiddenProjects).toEqual([expect.objectContaining({ name: 'alpha', mode: 'hidden' })])
+    }
   })
 
   it.each(['new', 'existing'] as const)("connections-changed while it opens doesn't migrate it from the defaults; its open does, from its own (%s workspace)", async (kind) => {

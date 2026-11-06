@@ -763,24 +763,22 @@ export class WorkspaceService {
     return this.settingsRead.promise.then(() => (this.generation === generation && this.path ? this.wsConfig : null))
   }
 
-  /** Saves workspace.json as the settings are; like saveWorkspaceConfigWith, never before its open has read it (HI-2651). */
+  /**
+   * Saves workspace.json as the settings are in memory, changed there already. Refused while its open hasn't read the
+   * file (HI-2651): a change made then was made to the defaults, and the read replaces them. A change to save goes
+   * through saveWorkspaceConfigWith, worked out from the settings as they are when it is written.
+   */
   saveWorkspaceConfig(): Promise<void> {
+    // i18n-ignore: internal, a caller's mistake, never shown
+    if (this.settingsPending) return Promise.reject(new Error("workspace.json saved as it is before its open read it: save the change with saveWorkspaceConfigWith"))
     // This workspace's file and settings object (another workspace opened meanwhile has its own).
     const file = join(this.combworkDir, 'workspace.json')
-    const settings = this.settingsToSave()
+    const data = this.wsConfig
     this.configSaves++
-    let text: string | null = null
-    const run = this.savingConfig
-      .then(async () => {
-        const data = await settings
-        if (!data) return
-        text = JSON.stringify(data, null, 2) + '\n'
-        await writeKeptJson(file, data, { holder: this })
-      })
-      .finally(() => {
-        this.configSaves--
-        if (text !== null) this.configWritten = text
-      })
+    const run = this.savingConfig.then(() => writeKeptJson(file, data, { holder: this })).finally(() => {
+      this.configSaves--
+      this.configWritten = JSON.stringify(data, null, 2) + '\n'
+    })
     this.savingConfig = run.catch(() => undefined)
     return run
   }
@@ -1250,25 +1248,30 @@ export class WorkspaceService {
     if (!this.path) throw combworkError(M.noWorkspace, undefined, { kind: 'conflict' })
     const def = advancedDef(id)
     if (!def?.workspace) throw combworkError(msg({ id: 'service.workspace.advancedNotHere', defaultMessage: "{setting} can't be set for a workspace.", description: 'An error: the advanced setting {setting} (its title, or its id) has no value of its own for a workspace, only for Combwork.' }), { setting: def?.text.title ?? id }, { kind: 'invalid' })
-    const own = { ...this.wsConfig.advanced }
-    if (raw === null || raw === undefined) delete own[id]
-    else {
+    let value: unknown = undefined
+    if (raw !== null && raw !== undefined) {
       const checked = checkAdvanced(def, raw)
       // agent-text: checkAdvanced
       if ('error' in checked) throw new CombworkError(checked.errorText, { kind: 'invalid' })
-      own[id] = checked.value
+      value = checked.value
     }
-    if (Object.keys(own).length) this.wsConfig.advanced = own
-    else delete this.wsConfig.advanced
-    await this.saveWorkspaceConfig()
+    // Worked out from the settings as saved (HI-2651): during the open, those it reads, not the defaults before them.
+    await this.saveWorkspaceConfigWith((c) => {
+      const own = { ...c.advanced }
+      if (value === undefined) delete own[id]
+      else own[id] = value
+      return { advanced: Object.keys(own).length ? own : undefined }
+    })
   }
 
   /** Leaves a project folder out of the workspace (mode says how), or takes it back (null). */
   async setHidden(name: string, mode: HiddenProject['mode'] | null): Promise<void> {
-    const rest = (this.wsConfig.hiddenProjects ?? []).filter((h) => h.name.toLowerCase() !== name.toLowerCase())
-    this.wsConfig.hiddenProjects = mode ? [...rest, { name, mode, at: new Date().toISOString() }] : rest
-    if (!this.wsConfig.hiddenProjects.length) delete this.wsConfig.hiddenProjects
-    await this.saveWorkspaceConfig()
+    const at = new Date().toISOString()
+    await this.saveWorkspaceConfigWith((c) => {
+      const rest = (c.hiddenProjects ?? []).filter((h) => h.name.toLowerCase() !== name.toLowerCase())
+      const hidden = mode ? [...rest, { name, mode, at }] : rest
+      return { hiddenProjects: hidden.length ? hidden : undefined }
+    })
   }
 
   isProjectPath(p: string): boolean {
@@ -1947,14 +1950,16 @@ export class WorkspaceService {
    */
   private flagDuplicateNames(projects: ProjectInfo[]): void {
     const all = projects.flatMap((p) => p.agents.map((a) => ({ project: p.name, path: p.path, name: a.name, id: a.id })))
+    // What it said is in the settings, not read yet during the open (HI-2651): its own refresh after the read says it.
+    if (this.settingsPending) return
     const dups = duplicateAgentNames(all)
     const now = dups.map((d) => d.name.toLowerCase()).sort()
     const before = this.wsConfig.flaggedAgentNames ?? []
     if (now.length === before.length && now.every((n, i) => n === before[i])) return
-    // In memory at once, so a refresh close behind this one doesn't say them again.
+    // In memory at once, so a refresh close behind this one doesn't say them again; the save sets it too.
     if (now.length) this.wsConfig.flaggedAgentNames = now
     else delete this.wsConfig.flaggedAgentNames
-    void this.saveWorkspaceConfig().catch((e) => log.warn('remembering the shared agent names', e))
+    void this.saveWorkspaceConfigWith(() => ({ flaggedAgentNames: now.length ? now : undefined })).catch((e) => log.warn('remembering the shared agent names', e))
     // No name shared any more: the notice's Rename… no longer applies (HI-2320).
     if (!now.length) resolveOffers((o) => o === `names:${this.path?.toLowerCase()}`, tr(OUTCOME.namesDiffer))
     const fresh = dups.filter((d) => !before.includes(d.name.toLowerCase()))
