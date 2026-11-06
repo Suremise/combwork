@@ -515,9 +515,9 @@ describe("whether a connection trusts a workspace's folders (HI-1870)", () => {
   })
 
   it('Claude Code: a Git root under a trusted folder is not trusted; a plain folder there is (HI-2520, measured with 2.1.316–2.1.318)', async () => {
-    // A real account's layout: D:/Development/ACME trusted, its repositories cli and apiary never trusted themselves.
-    const dir = trustHome('ancestor', JSON.stringify({ projects: { 'D:/Development/ACME': { hasTrustDialogAccepted: true }, 'D:/Development/ACME/acme': { hasTrustDialogAccepted: true }, 'D:/Development/ACME/scratch': { hasTrustDialogAccepted: false } } }))
-    expect(await trustsOf(dir, [t('D:\\Development\\ACME\\cli'), t('D:\\Development\\ACME\\apiary'), t('D:\\Development\\ACME\\acme'), plainT('D:\\Development\\ACME\\scratch'), plainT('D:\\Development\\ACME\\notes\\deep')])).toEqual([false, false, true, true, true])
+    // A real account's layout: D:/Projects/ACME trusted, its repositories cli and apiary never trusted themselves.
+    const dir = trustHome('ancestor', JSON.stringify({ projects: { 'D:/Projects/ACME': { hasTrustDialogAccepted: true }, 'D:/Projects/ACME/acme': { hasTrustDialogAccepted: true }, 'D:/Projects/ACME/scratch': { hasTrustDialogAccepted: false } } }))
+    expect(await trustsOf(dir, [t('D:\\Projects\\ACME\\cli'), t('D:\\Projects\\ACME\\apiary'), t('D:\\Projects\\ACME\\acme'), plainT('D:\\Projects\\ACME\\scratch'), plainT('D:\\Projects\\ACME\\notes\\deep')])).toEqual([false, false, true, true, true])
   })
 
   it("Claude Code: no .claude.json yet is untrusted; one it can't read is unknown", async () => {

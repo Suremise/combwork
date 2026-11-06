@@ -5,7 +5,7 @@ import { pathParts, shortName, shortPath } from '../src/shared/shortPath'
 
 describe('pathParts', () => {
   it('a drive, a share, a POSIX root, or none', () => {
-    expect(pathParts('D:\\Development\\ACME\\acme')).toEqual({ root: 'D:\\', names: ['Development', 'ACME', 'acme'], sep: '\\' })
+    expect(pathParts('D:\\Projects\\ACME\\acme')).toEqual({ root: 'D:\\', names: ['Projects', 'ACME', 'acme'], sep: '\\' })
     expect(pathParts('\\\\nas\\work\\acme\\api')).toEqual({ root: '\\\\nas\\work\\', names: ['acme', 'api'], sep: '\\' })
     expect(pathParts('/home/d/acme/')).toEqual({ root: '/', names: ['home', 'd', 'acme'], sep: '/' })
     expect(pathParts('acme/api')).toEqual({ root: '', names: ['acme', 'api'], sep: '/' })
@@ -15,8 +15,8 @@ describe('pathParts', () => {
 
 describe('shortPath', () => {
   it("alone: the folder's name", () => {
-    expect(shortPath('D:\\Development\\ACME\\acme')).toBe('acme')
-    expect(shortPath('D:\\Development\\ACME\\acme\\')).toBe('acme')
+    expect(shortPath('D:\\Projects\\ACME\\acme')).toBe('acme')
+    expect(shortPath('D:\\Projects\\ACME\\acme\\')).toBe('acme')
     expect(shortPath('/home/d/acme')).toBe('acme')
   })
 
@@ -61,11 +61,11 @@ describe('shortPath', () => {
 
 describe('shortName', () => {
   it("a CLI's folder named after a whole path: what follows the common start, cut at a dash", () => {
-    const was = 'C--Users-Darren--claude-projects-D--Development-Workspaces-Scratch-juniper'
-    const now = 'C--Users-Darren--claude-projects-D--Development-Workspaces-Tools-dialect'
+    const was = 'C--Users-tester--claude-projects-D--Projects-Workspaces-Scratch-juniper'
+    const now = 'C--Users-tester--claude-projects-D--Projects-Workspaces-Tools-dialect'
     expect(shortName(was, now)).toBe('…Scratch-juniper')
     expect(shortName(now, was)).toBe('…Tools-dialect')
-    expect(shortPath(`C:\\Users\\Darren\\.claude\\projects\\${was}`, `C:\\Users\\Darren\\.claude\\projects\\${now}`)).toBe('…Scratch-juniper')
+    expect(shortPath(`C:\\Users\\tester\\.claude\\projects\\${was}`, `C:\\Users\\tester\\.claude\\projects\\${now}`)).toBe('…Scratch-juniper')
   })
   it('names that share little stay whole', () => {
     expect(shortName('hb5', 'hb6')).toBe('hb5')

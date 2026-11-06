@@ -30,7 +30,7 @@ function connectionHome(name: string): { home: string; cliProjects: string } {
 
 describe("a project's memory folder name, as Claude Code makes it (2.1.312)", () => {
   it('turns every character but letters and digits into -', () => {
-    expect(memoryKey('D:\\Development\\ACME\\acme')).toBe('D--Development-ACME-acme')
+    expect(memoryKey('D:\\Projects\\ACME\\acme')).toBe('D--Projects-ACME-acme')
     expect(memoryKey('C:/work/my project.v2')).toBe('C--work-my-project-v2')
   })
 

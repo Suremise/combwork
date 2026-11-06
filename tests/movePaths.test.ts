@@ -85,7 +85,7 @@ describe('moveHasWork', () => {
 
 describe("Claude Code's folder for a path", () => {
   it('turns backslashes, colons and dots into dashes', () => {
-    expect(encodeProjectPath('D:\\Development\\ACME.worktrees\\acme\\claude')).toBe('D--Development-ACME-worktrees-acme-claude')
+    expect(encodeProjectPath('D:\\Projects\\ACME.worktrees\\acme\\claude')).toBe('D--Projects-ACME-worktrees-acme-claude')
     expect(encodeProjectPath('E:\\My Work\\v1.2\\app')).toBe('E--My-Work-v1-2-app')
   })
 })

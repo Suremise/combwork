@@ -97,7 +97,7 @@ describe("Claude Code's transcript folder (#493)", () => {
   it('looks for 8.3 names only in folders whose names may hold one (HI-1681)', () => {
     // `~n` after at most six characters of a name, its own `-`s included; the encoded drive and separators are `-` too.
     for (const n of ['C--Users-RUNNER-1-AppData', 'C--x-REALFO-1', 'C--combwork-test-BUILD--1', 'C--a-PROGRA-1-b', 'D--x-ACME-T-12']) expect(MAY_BE_SHORT.test(n), n).toBe(true)
-    for (const n of ['C--other-project-123', 'C--Users-Darren-AppData', 'D--Development-worktrees-review7']) expect(MAY_BE_SHORT.test(n), n).toBe(false)
+    for (const n of ['C--other-project-123', 'C--Users-tester-AppData', 'D--Projects-worktrees-review7']) expect(MAY_BE_SHORT.test(n), n).toBe(false)
   })
 
   it("finds a folder's first session once Claude Code makes its folder, on the same adapter (#1649)", async () => {
