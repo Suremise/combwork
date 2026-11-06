@@ -8,6 +8,7 @@ import { canaryProblems, canaryTexts } from '../src/shared/agentText/canary'
 import { laneBuilderSkill, laneOrderWaitReason, loopStepWaitReason, notWatchingReason, reviewStalled, reviewVerdictWaitReason, reviewWaitReason, stalledReason, startFailedReason, startWaitingReason, taskPrompt } from '../src/shared/tasks'
 import { laneBrief, laneRules, type LaneBriefInput } from '../src/shared/laneBrief'
 import type { TaskCard } from '../src/shared/types'
+import { laneNextWaitReason } from '../src/main/cardStall'
 // @ts-expect-error: a plain .mjs module without types
 import { readCatalogue } from '../scripts/agentTextExtract.mjs'
 
@@ -82,6 +83,16 @@ function stalls(): { name: string; text: string | null }[] {
         { name: 'R1', project: 'alpha', agentId: 'r', cards: [8], status: 'watching', watchSince: at(60) },
         { name: 'B1', project: 'alpha', agentId: 'b', cards: [9], status: 'watching', watchSince: at(60) }
       ],
+      now
+    )
+  })
+  // A lane's next card whose dependencies all went Done, not started since (HI-2618's DEPS_DONE; HI-2637).
+  out.push({
+    name: 'lane next, dependencies done',
+    text: laneNextWaitReason(
+      { number: 9, key: 'AL-2', column: 'todo', archived: false, blocked: null },
+      { builder: 'b', reviewer: 'r', state: 'active', startedAt: at(120), cards: [{ number: 8, key: 'AL-1', column: 'done', movedAt: at(90) }, { number: 9, key: 'AL-2', column: 'todo', movedAt: null }], due: { card: 9, open: [], readyAt: at(30) } } as never,
+      { name: 'B1', status: 'watching' },
       now
     )
   })
