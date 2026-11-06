@@ -3,8 +3,9 @@
 import { describe, expect, it } from 'vitest'
 import { freshReasonOf, SESSION_NAMES } from '../src/shared/sessionFresh'
 
-// old-name: begin old-folder-moves
+// old-name: begin old-folder-moves-1
 const moves = [{ from: 'C:\\ws\\alpha\\.hive', to: 'C:\\ws\\alpha\\.combwork' }]
+// old-name: end old-folder-moves-1
 
 describe('freshReasonOf', () => {
   it('renamed: launched by Combwork before HI-2463 (an agent or a folder, no names)', () => {
@@ -12,23 +13,28 @@ describe('freshReasonOf', () => {
     expect(freshReasonOf({ agentId: 'b1' }, [])).toBe('renamed')
     expect(freshReasonOf({ cwd: 'C:\\ws\\alpha' }, [])).toBe('renamed')
     // Before the move too: renamed is said first, as the start says it.
+    // old-name: begin old-folder-moves-2
     expect(freshReasonOf({ agentId: 'b1', cwd: 'C:\\ws\\alpha\\.hive\\slots\\HI-1' }, moves)).toBe('renamed')
+    // old-name: end old-folder-moves-2
   })
 
   it('a session adopted from outside (neither an agent nor a folder) never knew the old names: it resumes', () => {
     expect(freshReasonOf({}, moves)).toBeNull()
   })
 
-  it('moved: launched since, in a folder inside a .hive that moved (HI-2462), any spelling of its path', () => {
+  it('moved: launched since, in a folder inside an old data folder that moved (HI-2462), any spelling of its path', () => {
+    // old-name: begin old-folder-moves-3
     expect(freshReasonOf({ names: SESSION_NAMES, agentId: 'b1', cwd: 'C:\\ws\\alpha\\.hive\\slots\\HI-1' }, moves)).toBe('moved')
     expect(freshReasonOf({ names: SESSION_NAMES, agentId: 'b1', cwd: 'c:/ws/alpha/.HIVE/slots/HI-1' }, moves)).toBe('moved')
+    // old-name: end old-folder-moves-3
   })
 
   it('launched since, in a folder that did not move: it resumes', () => {
     expect(freshReasonOf({ names: SESSION_NAMES, agentId: 'b1', cwd: 'C:\\ws\\alpha' }, moves)).toBeNull()
     // A sibling whose name only starts like the moved folder's.
+    // old-name: begin old-folder-moves-4
     expect(freshReasonOf({ names: SESSION_NAMES, agentId: 'b1', cwd: 'C:\\ws\\alpha\\.hiveish' }, moves)).toBeNull()
     expect(freshReasonOf({ names: SESSION_NAMES, agentId: 'b1', cwd: 'C:\\ws\\alpha\\.hive\\x' }, [])).toBeNull()
-// old-name: end old-folder-moves
+    // old-name: end old-folder-moves-4
   })
 })

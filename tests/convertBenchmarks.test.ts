@@ -54,16 +54,20 @@ describe("the scenario benchmarks' names, converted once (HI-2605)", () => {
 
   it('leaves alone what is converted already and another schema, and what it can’t change alone', () => {
     expect(convertText(fixture('baseline'))).toEqual({ skip: 'converted already' })
-    // old-name: begin old-fields-cases
+    // old-name: begin old-fields-cases-1
     expect(convertText('{"schema":"combwork-metrics/1","hiveCalls":1}')).toMatchObject({ skip: expect.stringMatching(/another schema/) })
     expect(convertText('{"schema": "hive-')).toMatchObject({ error: expect.any(String) })
+    // old-name: end old-fields-cases-1
     expect(convertText('[1]')).toMatchObject({ error: expect.any(String) })
     // A schema with the old id nested before the top-level one; both names in one object.
     expect(convertText(`{"note":{"schema":"${OLD_SCHEMA}"},"schema":"${OLD_SCHEMA}"}`)).toMatchObject({ error: expect.any(String) })
+    // old-name: begin old-fields-cases-2
     expect(convertText(`{"schema":"${NEW_SCHEMA}","m":{"hiveCalls":1,"combworkCalls":2}}`)).toMatchObject({ error: expect.stringMatching(/both/) })
+    // old-name: end old-fields-cases-2
     // Only field names change: a value that says one stays.
+    // old-name: begin old-fields-cases-3
     expect(convertText(`{"schema":"${NEW_SCHEMA}","note":"hiveCalls","m":{"hiveCalls" : 1}}`)).toEqual({ text: `{"schema":"${NEW_SCHEMA}","note":"hiveCalls","m":{"combworkCalls" : 1}}` })
-    // old-name: end old-fields-cases
+    // old-name: end old-fields-cases-3
   })
 
   it('converts the baselines and each run’s benchmark, keeps the originals byte for byte, and a rerun changes nothing', () => {

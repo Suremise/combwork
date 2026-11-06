@@ -46,16 +46,19 @@ function oldArea(): { local: string; from: string; to: string } {
 const read = (dir: string, rel: string): string => readFileSync(join(dir, rel), 'utf8')
 
 describe("the test area's move (HI-2590)", () => {
-  // old-name: begin move-cases
   it('rewrites a path under the old folder in each spelling and case, and nothing else; again, it changes nothing', () => {
+    // old-name: begin move-cases-1
     const from = 'C:\\Users\\X\\AppData\\Local\\hive-test'
+    // old-name: end move-cases-1
     const to = 'C:\\Users\\X\\AppData\\Local\\combwork-test'
     const text = [
+      // old-name: begin move-cases-2
       '"C:\\\\Users\\\\X\\\\AppData\\\\Local\\\\hive-test\\\\claude\\\\plugins"',
       "[projects.'c:\\users\\x\\appdata\\local\\hive-test\\e2e\\demo']",
       '"C:/Users/X/AppData/Local/hive-test/scratch/a": {}',
       'C:\\Users\\X\\AppData\\Local\\hive-test',
       'C:\\Users\\X\\AppData\\Local\\hive-test-updater and C:\\Users\\X\\AppData\\Local\\hive-tests'
+      // old-name: end move-cases-2
     ].join('\n')
     const once = rewriteText(text, [from], to)
     expect(once.count).toBe(4)
@@ -64,7 +67,9 @@ describe("the test area's move (HI-2590)", () => {
       "[projects.'C:\\Users\\X\\AppData\\Local\\combwork-test\\e2e\\demo']",
       '"C:/Users/X/AppData/Local/combwork-test/scratch/a": {}',
       'C:\\Users\\X\\AppData\\Local\\combwork-test',
+      // old-name: begin move-cases-3
       'C:\\Users\\X\\AppData\\Local\\hive-test-updater and C:\\Users\\X\\AppData\\Local\\hive-tests'
+      // old-name: end move-cases-3
     ])
     expect(rewriteText(once.text, [from], to)).toEqual({ text: once.text, count: 0 })
   })
@@ -78,7 +83,9 @@ describe("the test area's move (HI-2590)", () => {
     expect(existsSync(from)).toBe(false)
     expect(existsSync(join(to, MARKER))).toBe(false)
     for (const rel of REWRITES) {
+      // old-name: begin move-cases-4
       expect(read(to, rel), rel).not.toMatch(/hive-test/i)
+      // old-name: end move-cases-4
       expect(read(to, rel), rel).toMatch(/combwork-test/)
     }
     expect(read(to, 'claude/.credentials.json')).toBe(before.cred)
@@ -92,15 +99,18 @@ describe("the test area's move (HI-2590)", () => {
     const original = read(from, 'claude/.claude.json')
     expect(() => moveArea(from, to, { failAfter: 1 })).toThrow(/stopped after 1/)
     expect(existsSync(join(to, MARKER))).toBe(true)
+    // old-name: begin move-cases-5
     expect(read(to, REWRITES[0])).not.toMatch(/hive-test/i)
     expect(read(to, REWRITES[2])).toMatch(/hive-test/i)
+    // old-name: end move-cases-5
     expect(notReady({ area: to, old: join(local, OLD_NAME) })).toMatch(/unfinished/)
     expect(moveState(from, to).state).toBe('resume')
     const r = moveArea(from, to)
     expect(r).toMatchObject({ state: 'resume', moved: true })
     expect(r.rewrites.map((w: { count: number }) => w.count)).toEqual([0, 1, 2])
+    // old-name: begin move-cases-6
     for (const rel of REWRITES) expect(read(to, rel), rel).not.toMatch(/hive-test/i)
-  // old-name: end move-cases
+    // old-name: end move-cases-6
     const backups = readdirSync(to).filter((n) => n.startsWith('move-backup-'))
     expect(backups).toHaveLength(1)
     expect(read(join(to, backups[0]), 'claude/.claude.json')).toBe(original)

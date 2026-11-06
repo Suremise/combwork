@@ -2211,10 +2211,10 @@ describe('the run context: what a test starts gets only the allowlist and its ow
     expect(Object.keys(ctx.baseEnv(parent)).every((k) => ctx.ALLOW.includes(k.toUpperCase()))).toBe(true)
   })
 
-  // old-name: begin old-shims
-  it("no child gets the user's Combworks' cw-progress shims on its PATH (nor a 1.0 profile's, Hive-Dev): they run the installed Combwork.exe (#1253)", () => {
+  it("no child gets the user's Combworks' cw-progress shims on its PATH (nor a 1.0 profile's): they run the installed Combwork.exe (#1253)", () => {
+    // old-name: begin old-shims-1
     const shell = { APPDATA: 'C:\\Users\\x\\AppData\\Roaming', Path: 'C:\\Windows;C:\\Users\\x\\AppData\\Roaming\\Combwork\\bin;C:\\tools;c:\\users\\x\\appdata\\roaming\\hive-dev\\bin\\;C:\\Users\\x\\AppData\\Roaming\\Combwork\\bin-other' }
-  // old-name: end old-shims
+    // old-name: end old-shims-1
     for (const env of [ctx.baseEnv(shell), ctx.childEnv({}, shell), ctx.combworkEnv({ CW_USER_DATA: 'C:\\p' }, shell)]) {
       expect(env.Path).toBe('C:\\Windows;C:\\tools;C:\\Users\\x\\AppData\\Roaming\\Combwork\\bin-other')
     }

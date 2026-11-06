@@ -331,26 +331,32 @@ describe('a workspace', () => {
     }
   })
 
-  // old-name: begin old-skill-retired
-  it('a skill shipped under a new name (HI-2463: use-hive-api is use-cw-api) goes as the names upgrade opens the workspace (HI-2611): a copy Combwork shipped goes, an edited one stays', async () => {
+  it('a skill shipped under a new name (HI-2463: the HTTP API skill is use-cw-api now) goes as the names upgrade opens the workspace (HI-2611): a copy Combwork shipped goes, an edited one stays', async () => {
     const make = (ws: string, text: string) => {
+      // old-name: begin old-skill-retired-2
       const dir = join(ws, '.combwork', 'skills', 'use-hive-api')
+      // old-name: end old-skill-retired-2
       mkdirSync(dir, { recursive: true })
       writeFileSync(join(dir, 'SKILL.md'), text)
       return dir
     }
     // A version it shipped (its hash in the history, as each shipped version's is), and one the user edited since.
+    // old-name: begin old-skill-retired-3
     make(join(base, 'renamed-skill'), OLD_USE_HIVE_API)
     const edited = make(join(base, 'renamed-skill-edited'), `${OLD_USE_HIVE_API}\nMy own notes.\n`)
+    // old-name: end old-skill-retired-3
     for (const [ws, kept] of [[join(base, 'renamed-skill'), false], [join(base, 'renamed-skill-edited'), true]] as const) {
       const w = await opened(ws)
       try {
         await wsMod.inWorkspace(w, () => mod.syncBundled())
+        // old-name: begin old-skill-retired-4
         expect(existsSync(join(ws, '.combwork', 'skills', 'use-hive-api')), ws).toBe(kept)
+        // old-name: end old-skill-retired-4
         expect(readFileSync(join(ws, '.combwork', 'skills', 'use-cw-api', 'SKILL.md'), 'utf8')).toBe(readFileSync(join(RES, 'skills', 'use-cw-api', 'SKILL.md'), 'utf8'))
         const m = JSON.parse(readFileSync(join(ws, '.combwork', 'bundled.json'), 'utf8'))
+        // old-name: begin old-skill-retired-5
         expect(m.skills['use-hive-api'], ws).toBeUndefined()
-  // old-name: end old-skill-retired
+        // old-name: end old-skill-retired-5
       } finally {
         await wsMod.disposeWorkspaceService(w)
       }

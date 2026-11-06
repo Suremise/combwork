@@ -867,9 +867,10 @@ describe("the cw-progress command on a session's PATH (main/progressReporters/sh
     await installShims(bin, { exec: node, script, data })
     expect(statSync(join(bin, 'cw-progress.cmd')).mtimeMs).toBe(mtimeMs)
     // Only cw-progress: the old name isn't made (HI-2594).
-    // old-name: begin old-progress-shims
+    // old-name: begin old-progress-shims-1
     expect(existsSync(join(bin, 'hive-progress'))).toBe(false)
     expect(existsSync(join(bin, 'hive-progress.cmd'))).toBe(false)
+    // old-name: end old-progress-shims-1
     const files = shimFiles({ exec: 'C:\\H\\Combwork.exe', script: 'C:\\H\\x.js', data: 'C:\\D' })
     expect(Object.keys(files).sort()).toEqual(['cw-progress', 'cw-progress.cmd'])
     expect(files['cw-progress']).toBe(
@@ -880,8 +881,9 @@ describe("the cw-progress command on a session's PATH (main/progressReporters/sh
   it("the names upgrade removes the old command's shims from the bin folder, and leaves cw-progress's (HI-2594)", async () => {
     const bin = join(dir, 'old bin')
     mkdirSync(bin, { recursive: true })
+    // old-name: begin old-progress-shims-2
     for (const f of ['hive-progress', 'hive-progress.cmd', 'cw-progress', 'cw-progress.cmd', 'other.cmd']) writeFileSync(join(bin, f), f)
-    // old-name: end old-progress-shims
+    // old-name: end old-progress-shims-2
     await removeOldShims(bin)
     expect(readdirSync(bin).sort()).toEqual(['cw-progress', 'cw-progress.cmd', 'other.cmd'])
     // Again, and on a folder that isn't there: nothing to do.
