@@ -96,6 +96,7 @@ describe("a skill's reference files read (skillRefsRead)", () => {
     expect(claude).toMatchObject({ skillsRead: [], skillRefsRead: ['card-loop/builder.md'] })
     const copilot = observe([tool('view', { path: '.agents/skills/cw-card-loop/builder.md' }, `1. ${HEAD}\n2.\n3. ## Builder`)], NAMES, REFS)
     expect(copilot.skillRefsRead).toEqual(['card-loop/builder.md'])
+    expect(observe([tool('view', { path: '.agents/skills/cw-card-loop/builder.md' }, `1. ${HEAD}\n2.\n3. ## Builder`)], NAMES, REFS).skillRefsRead).toEqual(['card-loop/builder.md'])
     const nested = tool('Script', 'text(await tools.exec_command({cmd:"Get-Content -Raw .agents/skills/cw-card-loop/builder.md"}))', JSON.stringify({ result: JSON.stringify({ output: BODY.replace(/\n/g, '\r\n') }) }))
     expect(observe([nested], NAMES, REFS).skillRefsRead).toEqual(['card-loop/builder.md'])
     // Both read: each counted where it belongs.

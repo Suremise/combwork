@@ -1,6 +1,17 @@
 # Release Notes
 
-## Unreleased
+## 1.1.0 — 2026-11-06
+
+<!-- old-name: begin changelog-upgrade -->
+**Combwork, formerly called Hive Desktop**, and agents can now be given words tuned to their model: **dialects**. Another open-source app with the old name runs coding agents too, and names around agent tools with bees in them are crowded, so the app has a name of its own. The honeycomb icon and the colours stay.
+
+**Before you update from 1.0:**
+- **Close every copy of 1.0 that has the workspace open**, on this PC and any other. Combwork renames the workspace's `.hive` folders the first time it opens it, and it can't while another copy has it open.
+- **The installer replaces 1.0.** It asks a running 1.0 to close, uninstalls it with your data kept, and moves your data folders to `%APPDATA%\Combwork` and `%LOCALAPPDATA%\Combwork`. Only Combwork is left in Installed apps. A taskbar pin of 1.0 and its notification history don't carry over: pin Combwork again.
+- **Your agents start new conversations once.** A conversation from before remembers 1.0's tool names, so on its next resume Combwork starts a new one with the same brief, what it was waiting for and its messages, and keeps the old one in Sessions to read.
+- **Update your antivirus exclusions.** If you excluded 1.0's folders from Microsoft Defender (or another antivirus), exclude the new ones: `%APPDATA%\Combwork` (Roaming), `%LOCALAPPDATA%\Combwork`, Combwork's install folder `%LOCALAPPDATA%\Programs\Combwork`, and each workspace's and project's `.combwork` folder if you excluded `.hive` on its own. Settings → Workspace → Antivirus scanning shows what Defender scans.
+- **Scripts of your own** that read 1.0's `HIVE_*` session variables or call `hive_*` tools need the new names (`CW_*`, `cw_*`; below).
+<!-- old-name: end changelog-upgrade -->
 
 ### Changed
 
@@ -47,7 +58,6 @@
 - **A workspace keeps its settings while it opens** (HI-2651). A sign-in check, a settings change or another window opening a workspace at the moment a workspace was opening could save its settings before they were read, writing Combwork's defaults over its own: its connections, commands, workflow defaults and other workspace settings. A change made to them then, such as hiding a project, could be lost too. Now nothing saves a workspace's settings until its open has read them.
 - **A card's oldest comments are archived, not lost** (HI-2641). A card keeps its newest 500 comments, and past that the oldest used to be deleted without a word, so design steps and answers that other cards pointed back to were gone. Now they move to the card's archive in the workspace's database. Agents and the Assistant read them with `cw_read_task`'s `archived` (`GET /v1/tasks/{n}/comments/archived`), and reading the card says how many are archived (`commentsArchived`). Export Board saves them as `<n>.comments-archive.json` beside the card. Comments dropped before 1.1 can't be recovered: a card that already had 500 comments says its earlier comments may have been dropped, without guessing how many. Reading a card of more than 100 comments also suggests splitting it into new cards.
 - **Undo says a comment stays on a card with 500 comments too** (HI-2642). A comment the Assistant added to a card that already had 500 comments wasn't listed as something undo can't take back, because the card's count of comments didn't change. It is now.
-- **A reviewer is told plainly where its commands run** (HI-2640). Start review's reply, which names the review copy, now also says that the reviewer's session and its shell stay in its own folder, so a command that doesn't change into the copy first runs there. A Claude Code reviewer on Haiku had run the card's test in the project folder before running it in its copy.
 - **A reviewer is told plainly where its commands run** (HI-2640). Start review's reply, which names the review copy, now also says that the reviewer's session and its shell stay in its own folder, so each command must change into the copy (HI-2643 kept the reply short). A Claude Code reviewer on Haiku had run the card's test in the project folder before running it in its copy.
 - **A window reopened at start no longer shows no workspace now and then** (HI-2638). If Combwork started while its workspace was still reopening and the window finished loading after that, the window could miss the workspace and show none until it was opened again.
 - **A busy workspace keeps its 30 days of performance history** (HI-2628). The history had a 2 MB limit left from when it was a file, so a workspace running many agents lost its oldest hours after about 5 days, well before the 30 it should keep, and nothing said so. The limit is now sized for the workspace's database (32 MB, about six times what a busy workspace needs). If it is ever reached, the oldest history goes as before, and that is now logged too. Folding a week-old day's hours into the day also keeps every total now: before, a day with more different requests and tool calls than it could hold lost the rest; they are now counted under *(other)*.
