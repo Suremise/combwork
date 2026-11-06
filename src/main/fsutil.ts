@@ -1045,7 +1045,7 @@ let swapCounter = 0
 export class SwapAbandoned extends Error {}
 
 /**
- * A swapOut abandoned because what it checks couldn't be read (access denied, held, a failed read: `cause`), not because
+ * A swapIn or swapOut abandoned because what it checks couldn't be read (access denied, held, a failed read: `cause`), not because
  * it differs (HI-2612): put back as any abandoned swap is, but a step that must not pass on an I/O failure (the names
  * upgrade's retirement of old copies) fails on it rather than take it for the user's change.
  */
@@ -1085,13 +1085,14 @@ async function hashChecked(path: string): Promise<string | null | Unreadable> {
   return contentHash(path).catch((e: unknown) => (e instanceof ContentTooLarge || (e as NodeJS.ErrnoException | null)?.code === 'ENOENT' ? '\0changed' : new Unreadable(e)))
 }
 
-/** What a path holds, to compare with what a swap expects: its contentHash, null if nothing is there. */
-async function hashOrNone(path: string): Promise<string | null> {
-  const there = await lstat(path).then(
-    () => true,
-    (e: NodeJS.ErrnoException) => (e.code === 'ENOENT' ? false : Promise.reject(e))
-  )
-  return there ? contentHash(path).catch(() => '\0unreadable') : null
+/**
+ * Null while `p` is still exactly `expected` (a contentHash, or null for nothing there); else the abandonment a swap
+ * throws: SwapUnreadable when it couldn't be read (HI-2620), SwapAbandoned (`why`) when it differs.
+ */
+async function unlikeHash(p: string, expected: string | null, why: string): Promise<SwapAbandoned | null> {
+  const h = await hashChecked(p)
+  if (h instanceof Unreadable) return new SwapUnreadable(why, { cause: h.error })
+  return h === expected ? null : new SwapAbandoned(why)
 }
 
 const exists = (path: string): Promise<boolean> => lstat(path).then(() => true, () => false)
@@ -1122,7 +1123,8 @@ async function filesIn(path: string): Promise<string[]> {
  * update, never a user's newer version. It is checked after the copy is made (under Combwork's own editors' file locks), on
  * the old one once it has been moved aside, and again before the old one is removed (a write through a file already
  * open); any difference puts the user's version back and throws SwapAbandoned, leaving the destination as the user has
- * it. What a rollback moves aside is removed only if it is still exactly what was staged, and anything a refused
+ * it. A check that can't read it does the same but throws SwapUnreadable (HI-2620): a failure to retry, not the user's
+ * change. What a rollback moves aside is removed only if it is still exactly what was staged, and anything a refused
  * rename leaves out of place is kept as a `-conflict-` copy: nothing that may hold the user's work is removed unchecked.
  * Without `expected` (Restore, Revert, Combwork's own copies) it replaces whatever is there.
  */
@@ -1158,19 +1160,33 @@ export async function swapIn(src: string, dest: string, o: { prepare?: (copy: st
   // What was staged: a rollback's backup of the destination is Combwork's only while it is this (prepare adds only files
   // contentHash leaves out, such as a copy's marker).
   const staged = check ? revision : null
-  /** Removes `p` if it is still `ok` (Combwork's: nothing of the user's in it), else keeps it as a visible conflict copy. */
+  const expected = o.expected ?? null
+  /**
+   * Removes `p` if it is still `ok` (Combwork's: nothing of the user's in it), else keeps it as a visible conflict copy.
+   * One that can't be read stays where it is (HI-2620), a name cleanSwaps looks at again: never a conflict copy on a guess.
+   */
   const dispose = async (p: string, ok: string | null): Promise<void> => {
-    if (ok !== null && (await hashOrNone(p)) === ok) await rm(p, { recursive: true, force: true }).catch(() => undefined)
+    const h = await hashChecked(p)
+    if (h instanceof Unreadable) return
+    if (ok !== null && h === ok) await rm(p, { recursive: true, force: true }).catch(() => undefined)
     else await keepAsConflict(p, parent, name)
   }
+  /**
+   * Keeps the old one where it can't be put back: as a conflict copy when it differs; when it couldn't be read, where it
+   * is, for cleanSwaps to settle once it can (HI-2620).
+   */
+  const keepOld = (why: SwapAbandoned): Promise<void> => (why instanceof SwapUnreadable ? Promise.resolve() : keepAsConflict(old, parent, name))
   const publish = async (): Promise<void> => {
-    if (check && (await hashOrNone(dest)) !== o.expected) throw new SwapAbandoned(stored(A.changedBeforeReplaced, { name }))
+    const before = check ? await unlikeHash(dest, expected, stored(A.changedBeforeReplaced, { name })) : null
+    if (before) throw before
     const had = await exists(dest)
     // A file in the old one held open by a running session keeps it from moving: a few tries, then it stays.
     if (had) await renameRetrying(dest, old, 5)
-    if (had && check && (await hashOrNone(old)) !== o.expected) {
-      await renameRetrying(old, dest).catch(() => keepAsConflict(old, parent, name))
-      throw new SwapAbandoned(stored(A.changedWhileReplaced, { name }))
+    // Checked again once moved aside: a difference, or a look that fails (HI-2620: never thrown past this), puts it back.
+    const moved = had && check ? await unlikeHash(old, expected, stored(A.changedWhileReplaced, { name })) : null
+    if (moved) {
+      await renameRetrying(old, dest).catch(() => keepOld(moved))
+      throw moved
     }
     try {
       // Something new in its place meanwhile (the user's): it stays. On Windows the rename would fail anyway.
@@ -1181,31 +1197,35 @@ export async function swapIn(src: string, dest: string, o: { prepare?: (copy: st
       // The old one back in its place if that is empty. If the user made a new one, theirs stays, and the old one goes
       // only if it is still the version this swap expected (else it is kept as a conflict copy).
       if (had && !(await exists(dest))) await renameRetrying(old, dest).catch(() => (check ? keepAsConflict(old, parent, name) : undefined))
-      else if (had && check) await dispose(old, o.expected ?? null)
+      else if (had && check) await dispose(old, expected)
       throw e
     }
     if (!had) return
     // Written to through a file left open before the move: the user's version goes back in its place. What is in the
     // place now is moved aside first, and removed only if it is still exactly what was staged; if it was edited too, it
-    // is kept as a conflict copy. Nothing that could hold the user's work is removed unchecked.
-    if (check && (await hashOrNone(old)) !== o.expected) {
+    // is kept as a conflict copy. Nothing that could hold the user's work is removed unchecked. One that can't be read
+    // now goes back the same way (HI-2620), and the swap fails as unreadable: tried again later, never taken as done.
+    const last = check ? await unlikeHash(old, expected, stored(A.changedWhileReplaced, { name })) : null
+    if (last) {
       const back = join(parent, `.${name}.cw-back-${tag}`)
+      // Where the old one can't go back: kept beside the new version (as a conflict copy, or aside when unreadable).
+      const keptBeside = (): SwapAbandoned => (last instanceof SwapUnreadable ? last : new SwapAbandoned(stored(A.changedKeptBeside, { name })))
       try {
         await renameRetrying(dest, back)
       } catch {
         // The new version can't move: it stays, and the user's edited old one is kept beside it.
-        await keepAsConflict(old, parent, name)
-        throw new SwapAbandoned(stored(A.changedKeptBeside, { name }))
+        await keepOld(last)
+        throw keptBeside()
       }
       try {
         await renameRetrying(old, dest)
       } catch {
         await renameRetrying(back, dest).catch(() => keepAsConflict(back, parent, name))
-        await keepAsConflict(old, parent, name)
-        throw new SwapAbandoned(stored(A.changedKeptBeside, { name }))
+        await keepOld(last)
+        throw keptBeside()
       }
       await dispose(back, staged)
-      throw new SwapAbandoned(stored(A.changedWhileReplaced, { name }))
+      throw last
     }
     await rm(old, { recursive: true, force: true }).catch(() => undefined)
   }
@@ -1231,12 +1251,7 @@ export async function swapOut(dest: string, expected: string): Promise<void> {
   const parent = dirname(dest)
   const name = dest.slice(parent.length + 1)
   const old = join(parent, `.${name}.cw-old-${tag}`)
-  /** Null while `p` is still exactly `expected`; else the abandonment to throw: SwapUnreadable when it couldn't be read. */
-  const unlike = async (p: string, why: string): Promise<SwapAbandoned | null> => {
-    const h = await hashChecked(p)
-    if (h instanceof Unreadable) return new SwapUnreadable(why, { cause: h.error })
-    return h === expected ? null : new SwapAbandoned(why)
-  }
+  const unlike = (p: string, why: string): Promise<SwapAbandoned | null> => unlikeHash(p, expected, why)
   const remove = async (): Promise<void> => {
     const before = await unlike(dest, stored(A.changedBeforeRemoved, { name }))
     if (before) throw before

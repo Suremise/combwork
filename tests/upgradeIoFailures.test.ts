@@ -4,7 +4,7 @@
 // failure reported), and once the file can be read again the next try finishes. The places: the folder move's test of a
 // `.hive` (combworkFolder.ts ours), its warning about a `.hive` made again (combworkMove.ts), the log's old files
 // (logger.ts), the names upgrade's record (nameUpgrade.ts), the progress command's old shims (nameUpgradeProfile.ts) and
-// the old skill copies' markers and hashes (nameUpgradeProjects.ts).
+// the old skill copies' markers and hashes (nameUpgradeProjects.ts). And swapIn's checks of what it replaces (HI-2620).
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -58,7 +58,7 @@ const { moveOldLogs } = await import('../src/main/logger')
 const { NAMES_DONE_FILE, NAMES_VERSION, projectNamesDone, upgradeWorkspace, workspaceNeeds } = await import('../src/main/nameUpgrade')
 const { removeOldShims } = await import('../src/main/nameUpgradeProfile')
 const { upgradeProject } = await import('../src/main/nameUpgradeProjects')
-const { contentHash, COPY_MARKER, SwapAbandoned, swapOut, SwapUnreadable } = await import('../src/main/fsutil')
+const { contentHash, COPY_MARKER, SwapAbandoned, swapIn, swapOut, SwapUnreadable } = await import('../src/main/fsutil')
 
 /** The three ways a look fails that aren't an absence. */
 const CODES = ['EACCES', 'EPERM', 'EIO'] as const
@@ -365,5 +365,80 @@ describe("the old skill copies' markers and hashes (nameUpgradeProjects.ts)", ()
     expect(readFileSync(join(c.dir, 'SKILL.md'), 'utf8')).toBe('# merge-ready')
     expect(readFileSync(join(noMarker, 'SKILL.md'), 'utf8')).toBe('# mine')
     expect(readFileSync(file, 'utf8')).toBe('notes')
+  })
+})
+
+// HI-2620: swapIn (a bundled skill's automatic update) checks the old one again once it has moved it aside, first at once,
+// then after the new one is in its place. A look that fails there, at its own entry (lstat) or its content, puts it back
+// as a change would, but throws SwapUnreadable (a failure, never taken for the user's change): the destination is as it
+// was, nothing is left aside, and once released the update goes through.
+describe("swapIn's checks after its rename (fsutil.ts)", () => {
+  const skill = (): { src: string; dest: string; parent: string } => {
+    const d = fresh()
+    write(join(d, 'src', 'SKILL.md'), '# new')
+    write(join(d, 'skills', 'merge-ready', 'SKILL.md'), '# old')
+    return { src: join(d, 'src'), dest: join(d, 'skills', 'merge-ready'), parent: join(d, 'skills') }
+  }
+  const ASIDE = /\.cw-old-[^\\/]+$/
+  const ASIDE_FILE = /\.cw-old-[^\\/]+[\\/]SKILL\.md$/
+  /** How many looks one check makes at what matches `match` with `call` (a swap that succeeds makes two checks there). */
+  const perCheck = async (match: RegExp, call?: string): Promise<number> => {
+    const s = skill()
+    const expected = await contentHash(s.dest)
+    later.push({ match, code: 'EIO', pass: 1000, call })
+    await swapIn(s.src, s.dest, { expected })
+    const looks = 1000 - later[0].pass
+    release()
+    expect(looks).toBeGreaterThan(0)
+    expect(looks % 2).toBe(0)
+    return looks / 2
+  }
+  const PLACES = [
+    { what: "the moved-aside folder's own entry", match: ASIDE, call: 'lstat' },
+    { what: "the moved-aside folder's content", match: ASIDE_FILE, call: undefined }
+  ]
+  for (const code of CODES) {
+    for (const p of PLACES) {
+      for (const check of ['first', 'last'] as const) {
+        it(`${code} on ${p.what} at the ${check} check after the rename: put back as it was, SwapUnreadable; released, the update goes through`, async () => {
+          const pass = check === 'first' ? 0 : await perCheck(p.match, p.call)
+          const s = skill()
+          const expected = await contentHash(s.dest)
+          later.push({ match: p.match, code, pass, call: p.call })
+          const e = await swapIn(s.src, s.dest, { expected }).catch((x: unknown) => x)
+          expect(later[0].pass).toBe(0)
+          release()
+          expect(e).toBeInstanceOf(SwapUnreadable)
+          expect(((e as Error).cause as NodeJS.ErrnoException).code).toBe(code)
+          expect(readdirSync(s.parent)).toEqual(['merge-ready'])
+          expect(readFileSync(join(s.dest, 'SKILL.md'), 'utf8')).toBe('# old')
+          await swapIn(s.src, s.dest, { expected })
+          expect(readdirSync(s.parent)).toEqual(['merge-ready'])
+          expect(readFileSync(join(s.dest, 'SKILL.md'), 'utf8')).toBe('# new')
+        })
+      }
+    }
+    it(`${code} reading it before it moves: nothing moved, SwapUnreadable; released, the update goes through`, async () => {
+      const s = skill()
+      const expected = await contentHash(s.dest)
+      hold(join(s.dest, 'SKILL.md'), code)
+      const e = await swapIn(s.src, s.dest, { expected }).catch((x: unknown) => x)
+      release()
+      expect(e).toBeInstanceOf(SwapUnreadable)
+      expect(readdirSync(s.parent)).toEqual(['merge-ready'])
+      expect(readFileSync(join(s.dest, 'SKILL.md'), 'utf8')).toBe('# old')
+      await swapIn(s.src, s.dest, { expected })
+      expect(readFileSync(join(s.dest, 'SKILL.md'), 'utf8')).toBe('# new')
+    })
+  }
+
+  it("a difference is still the user's change: SwapAbandoned, not SwapUnreadable, and theirs stays", async () => {
+    const s = skill()
+    const expected = await contentHash(s.dest)
+    writeFileSync(join(s.dest, 'SKILL.md'), '# old, edited')
+    const e = await swapIn(s.src, s.dest, { expected }).catch((x: unknown) => x)
+    expect(e).toBeInstanceOf(SwapAbandoned)
+    expect(e).not.toBeInstanceOf(SwapUnreadable)
+    expect(readFileSync(join(s.dest, 'SKILL.md'), 'utf8')).toBe('# old, edited')
   })
 })
