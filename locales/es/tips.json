@@ -538,5 +538,7 @@
   "tips.workspaceNotes.text": "Workspace notes, fijada arriba en Notas compartidas, es para lo que vale en este PC, como una ruta completa. Cada agente la recibe al iniciarse, en cualquier carpeta, así que no hace falta ponerla en un AGENTS.md con commit. Una sección titulada con el nombre de un proyecto es solo de ese proyecto.",
   "tips.workspaceNotes.title": "Notas sobre este PC para cada agente",
   "tips.modelSwitched.title": "Un agente con otro modelo queda marcado",
-  "tips.modelSwitched.text": "Si un agente acaba con otro modelo distinto del que le dio su conexión (la oferta de Codex de un modelo más barato cerca de tu límite, o /model), su pie marca el modelo con un aviso y Actividad dice Modelo cambiado. Reinicia el agente para volver."
+  "tips.modelSwitched.text": "Si un agente acaba con otro modelo distinto del que le dio su conexión (la oferta de Codex de un modelo más barato cerca de tu límite, o /model), su pie marca el modelo con un aviso y Actividad dice Modelo cambiado. Reinicia el agente para volver.",
+  "tips.waitingOnPurpose.title": "Una tarjeta que espera a propósito",
+  "tips.waitingOnPurpose.text": "¿Una tarjeta En curso espera un momento tranquilo o una respuesta? Haz clic derecho en ella, Marcar como en espera…, y di por qué: Combwork deja de marcarla como estancada hasta que lo quites o salga de En curso. Su agente sigue funcionando."
 }

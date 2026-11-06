@@ -1010,5 +1010,11 @@
   "board.workQueue.stuckRef": "{target} steht auf",
   "board.workQueue.testing": "Wird gerade getestet: {step}",
   "board.workQueue.unreadRef": "nicht gelesen",
-  "board.workflows": "Workflows"
+  "board.workflows": "Workflows",
+  "board.card.waitingMark": "Wartet",
+  "board.card.waitingTip": "Wartet: {reason} (markiert von {by}). Combwork meldet sie währenddessen nicht als festgefahren.",
+  "board.dialog.waiting": "Wartet",
+  "board.dialog.waitingPlaceholder": "Warum sie absichtlich wartet (leer: wartet nicht). Sie wird nicht als festgefahren gemeldet; ihr Agent läuft weiter.",
+  "board.menu.clearWaiting": "Warten beenden",
+  "board.menu.markWaiting": "Als wartend markieren…"
 }

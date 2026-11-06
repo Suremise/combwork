@@ -2,7 +2,7 @@ import { basename, join } from 'path'
 import { projectAgents } from '../shared/defaults'
 import { agentRuntime } from '../shared/runtime'
 import { REVIEW_WAIT_STALL_MS, backgroundTaskMinutes, builderJobOf, columnSince, laneOrderWaitReason, loopStepWaitReason, notWatchingReason, pendingDesign, reviewVerdictWaitReason, reviewWaitReason, stalledReason, startFailedReason, startWaitingReason, type BuilderJob, type LaneOrderView, type StallAgent } from '../shared/tasks'
-import type { AgentInfo, AgentStart, LaneStatus, ProgressRun, TaskCard } from '../shared/types'
+import type { AgentInfo, AgentStart, DueDeps, LaneStatus, ProgressRun, TaskCard } from '../shared/types'
 import { LOOP_STEP_WAIT_MINUTES, laneStatusText } from '../shared/lanes'
 import { forYouOfCards } from './workflow/cardWork'
 import { projectPreferences } from './workflow/preferences'
@@ -14,6 +14,10 @@ import { workspaceOf, type WorkspaceService } from './workspace'
 import { config } from './config'
 import { pausedFor, resumedAt } from './teamPause'
 import { IDLE_WATCH_STALL_MS, idleWatchReason, nothingWaitsOn } from '../shared/idleWatch'
+import { agentMsg, say } from '../shared/agentText'
+
+/** Why a lane's next card is stalled once the cards it depends on are Done (HI-2618). Agent-facing. */
+const DEPS_DONE = agentMsg({ id: 'stall.laneNext.depsDone', text: "{card} is the lane's next card: the last of the cards it depends on went Done {minutes} min ago, and {doing}", note: "The Agent API's and lane watches' stalled (HI-2618): a lane's next card whose dependencies are all Done, not started since. card: its key; minutes: how long since the last of them went Done; doing: what its builder does, a sentence (\"B1 is only watching without starting it.\")." })
 
 /**
  * Why a card is stalled, in one place (the Agent API's `stalled`, and lane watches, #531): a Doing card nobody works on
@@ -117,23 +121,32 @@ export const LANE_NEXT_STALL_MS = 15 * 60_000
  * Why a running lane's next card is stalled (HI-1741), or null: in Todo, not blocked, every card before it in the lane
  * Done, the last of them Done for LANE_NEXT_STALL_MS, and the lane's builder not in a turn (idle, only watching, or not
  * running: HB3 read HI-1727's Done and ended its turn without starting HI-1735, and the lane sat for two hours). A
- * paused lane's isn't, nor one whose start waits for a card it depends on to be Done (HI-2129). `builder`: the lane's builder as it is now (null: not running and not about to resume, else
+ * paused lane's isn't, nor one whose start waits for a card it depends on to be Done (HI-2129), nor one with a card it
+ * depends on not Done on the board (HI-2618, `due`: then counted from the last of them going Done). `builder`: the lane's builder as it is now (null: not running and not about to resume, else
  * its name and status). Agent-facing.
  */
 export function laneNextWaitReason(c: Pick<TaskCard, 'number' | 'key' | 'column' | 'archived' | 'blocked'>, lane: LaneOrderView | null | undefined, builder: { name: string; status: string | null }, now = Date.now()): string | null {
   if (!lane || lane.state === 'paused' || c.archived || c.blocked || c.column !== 'todo') return null
   // Waiting for a card it depends on to be Done (HI-2129): Combwork starts it then, so its builder has nothing to do yet.
   if (lane.waitsForDependency?.card === c.number) return null
+  // Waiting on the cards it depends on, as the board has them (HI-2618: HB6's HI-2616 was reported stalled 29 times while
+  // its three dependencies were still in other lanes), whatever the lane-start look last said.
+  const due = lane.due?.card === c.number ? lane.due : null
+  if (due?.open.length) return null
   const at = lane.cards.findIndex((x) => x.number === c.number)
   if (at < 0 || lane.cards.slice(0, at).some((x) => x.column !== 'done')) return null
   if (builder.status !== null && !IDLE.includes(builder.status)) return null
   // Its first card (HI-2029): since the lane started; a later one, since the card before it went Done.
   const before = at > 0 ? lane.cards[at - 1] : null
-  const since = Date.parse((before ? before.movedAt : lane.startedAt) ?? '')
+  // Once its dependencies are all Done, from when the last of them went Done if that was later (HI-2618).
+  const prior = Date.parse((before ? before.movedAt : lane.startedAt) ?? '') || 0
+  const ready = Date.parse(due?.readyAt ?? '') || 0
+  const since = Math.max(prior, ready)
   if (!since || now - since < LANE_NEXT_STALL_MS) return null
   const min = Math.round((now - since) / 60_000)
   const name = (x: { number: number; key?: string }): string => x.key ?? `#${x.number}`
   const doing = `${builder.name} ${builder.status === null ? "isn't running" : builder.status === 'watching' ? 'is only watching' : 'is idle'} without starting it.` // i18n-ignore: agent-facing (the Agent API's stalled)
+  if (ready > prior) return say(DEPS_DONE, { card: name(c), minutes: String(min), doing })
   return before ? `${name(c)} is the lane's next card: ${name(before)} went Done ${min} min ago, and ${doing}` : `${name(c)} is the lane's first card: the lane started ${min} min ago, and ${doing}` // i18n-ignore: agent-facing (the Agent API's stalled)
 }
 
@@ -202,6 +215,9 @@ function ownQuestionOpen(wsPath: string, c: TaskCard, agentId: string): boolean 
  * check (stepWaitMs: its project's workflow option Design check wait, HI-1766).
  */
 export function cardStall(c: TaskCard, agentNow: StallAgent | null, wsPath: string | null, lane?: LaneOrderView | null, stepWaitMs = LOOP_STEP_WAIT_MINUTES * 60_000, returned?: { at: string } | null, stale?: { since: string; approved: string | null; current: string | null } | null): string | null {
+  // Waiting on purpose (HI-2618: HB3 held HI-2590 for a quiet window and was reported stalled four times): what it
+  // waits for is said on the card, never a stall, until it is cleared or the card leaves Doing.
+  if (c.waitingFor && c.column === 'doing') return null
   // Its team paused (HI-2081): its agents parking (idle, stopped, not watching) is what was asked of them, never a stall.
   // Once it resumes the usual checks apply again, each timed one counted from the resume too (HR1's s12 check): it needs
   // its own wait since then as well as since what it times.
@@ -280,7 +296,7 @@ function freshBlockedReason(c: Pick<TaskCard, 'number' | 'key' | 'column'>, lane
 }
 
 /** A running lane as the stall check reads it (#1410), its cards' keys and last moves from the board's cards (`card`). */
-export const laneOrderView = (l: { builder: { id: string }; reviewer: { id: string } | null; state?: string; startedAt?: string; status?: LaneStatus | null; cards: { number: number; column: string }[] }, card: (n: number) => Pick<TaskCard, 'key' | 'history'> | undefined): LaneOrderView => ({
+export const laneOrderView = (l: { builder: { id: string }; reviewer: { id: string } | null; state?: string; startedAt?: string; status?: LaneStatus | null; dueDeps?: DueDeps; cards: { number: number; column: string }[] }, card: (n: number) => Pick<TaskCard, 'key' | 'history'> | undefined): LaneOrderView => ({
   builder: l.builder.id,
   reviewer: l.reviewer?.id ?? null,
   ...(l.state ? { state: l.state } : {}),
@@ -289,6 +305,8 @@ export const laneOrderView = (l: { builder: { id: string }; reviewer: { id: stri
   ...(l.status?.reason === 'startWait' && l.status.why === 'fresh' && l.status.freshBlocked ? { freshBlocked: laneStatusText(l.status) } : {}),
   // Its next card waiting for a card it depends on (HI-2129): Combwork starts it once that one is Done.
   ...(l.status?.reason === 'startWait' && l.status.why === 'dependencies' && l.status.card !== null ? { waitsForDependency: { card: l.status.card, on: l.status.waitsFor ?? '' } } : {}),
+  // Its due card's dependencies as the board has them (HI-2618).
+  ...(l.dueDeps ? { due: { card: l.dueDeps.card, open: [...l.dueDeps.open], readyAt: l.dueDeps.readyAt } } : {}),
   cards: l.cards.map((c) => {
     const t = card(c.number)
     return { number: c.number, column: c.column, movedAt: t ? columnSince(t) : null, ...(t?.key ? { key: t.key } : {}) }

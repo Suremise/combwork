@@ -181,5 +181,10 @@
   "tasks.start.notGiven": "{agent}に{card}を渡せませんでした：{why}。",
   "tasks.start.noteTooLong": "メモが長すぎます（最大{max, number}文字）。",
   "tasks.start.reassigned": "その間に{card}が{who, select, another {別のエージェントに割り当てられました} other {誰にも割り当てられなくなりました}}。まだ作業が必要なら、もう一度開始してください。",
-  "tasks.start.userTyping": "ユーザーが{agent}のターミナルに入力したばかりで、まだ書いている途中かもしれません。先にユーザーに確認してください。"
+  "tasks.start.userTyping": "ユーザーが{agent}のターミナルに入力したばかりで、まだ書いている途中かもしれません。先にユーザーに確認してください。",
+  "tasks.error.waitingNotActive": "{card} は {active} にありません。待機中にできるのは {active} のカードだけです。",
+  "tasks.error.waitingNotYours": "{card} を待機中にしたり解除したりできるのは、そのカード自身のエージェント、ユーザー、アシスタントだけです。",
+  "tasks.error.waitingTooLong": "待機の理由が長すぎます（最大 {max, number} 文字）。",
+  "tasks.history.notWaiting": "待機を解除",
+  "tasks.history.waiting": "待機中：{reason}"
 }

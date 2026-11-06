@@ -414,6 +414,21 @@
     "note": "An error: an agent tried to give a verdict on card {card} (its key, such as HI-12), which another agent ({agent}, its name) is reviewing.",
     "audience": "both"
   },
+  "tasks.error.waitingNotActive": {
+    "text": "{card} isn't in {active}: only a card in {active} can be marked waiting.",
+    "note": "An error (HI-2618): only a card in the stage {active} (the board's name for it, such as Active) can be marked as waiting on purpose; card {card} (its key, such as HI-12) is elsewhere.",
+    "audience": "both"
+  },
+  "tasks.error.waitingNotYours": {
+    "text": "Only {card}'s own agent, the user or the Assistant can mark it waiting or clear that.",
+    "note": "An error, read by agents (HI-2618): an agent tried to mark card {card} (its key, such as HI-12) as waiting on purpose, or clear that mark, but the card isn't its own. A waiting card isn't reported as stalled.",
+    "audience": "both"
+  },
+  "tasks.error.waitingTooLong": {
+    "text": "The waiting reason is too long (at most {max, number} characters).",
+    "note": "An error (HI-2618): the reason a card waits on purpose is longer than it may be; {max} is the most characters it takes.",
+    "audience": "both"
+  },
   "tasks.history.answerTold": {
     "text": "Told agent {agent} of your answer",
     "note": "A line in a card's history: Combwork told the agent {agent} (its name) of the user's answer to a request for them (For you: an approval, a reply, a decision, a choice at the round limit). A noun before the name (glossary §1 rule 4).",
@@ -634,6 +649,11 @@
     "note": "A line in a card's history: the list of cards that had to be done first was cleared.",
     "audience": "both"
   },
+  "tasks.history.notWaiting": {
+    "text": "No longer waiting",
+    "note": "A line in a card's history (HI-2618): the card's waiting mark was cleared, by hand or because the card left Active.",
+    "audience": "both"
+  },
   "tasks.history.notified": {
     "text": "Notified you {event, select, failed {that its review failed} blocked {that it's blocked} stalled {that it has stalled} mergeDue {that every card of lane {lane} passed review, so its merge is due} mergeStalled {that the merge of lane {lane} has stalled} other {that it needs you}}{hasWhy, select, yes {: {why}} other {}}",
     "note": "A line in a card's history: Combwork sent the user a notification about this card (a banner or a Windows notification): its review failed, it is blocked, it has stalled, every card of its lane ({lane}, a label such as “B1 / R1 (greetings)”) passed review so the lane's work can be merged, that merge has stalled, or the card needs the user (an approval, a question) (select: translate each). A lane is Combwork's record of a card loop. With hasWhy yes, it ends with what the notification said ({why}): why it is blocked or stalled, or the question (someone's own words, or Combwork's own sentence already translated).",
@@ -772,6 +792,11 @@
   "tasks.history.unblocked": {
     "text": "No longer blocked",
     "note": "A line in a card's history: the card's blocked reason was cleared.",
+    "audience": "both"
+  },
+  "tasks.history.waiting": {
+    "text": "Waiting: {reason}",
+    "note": "A line in a card's history (HI-2618): the card, in Active, was marked as waiting on purpose (held for a quiet window, say), with this reason ({reason}, written by whoever marked it). Combwork doesn't report it as stalled meanwhile. Not the same as Blocked.",
     "audience": "both"
   },
   "tasks.history.watchEnded": {

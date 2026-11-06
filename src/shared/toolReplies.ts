@@ -79,6 +79,7 @@ const R = {
   backgroundTasks: agentMsg({ id: 'reply.agent.backgroundTasks', text: '{n, plural, one {{n} background task} other {{n} background tasks}}', note: "How many background tasks an agent runs, in a card row's agent." }),
   rowAgent: agentMsg({ id: 'reply.row.agent', text: '{name} ({state})', note: "A card row's agent: its name, its status and background tasks (joined by \", \")." }),
   rowBlocked: agentMsg({ id: 'reply.row.blocked', text: 'blocked: {why}', note: "A card row (cw_list_tasks): why it is blocked." }),
+  rowWaiting: agentMsg({ id: 'reply.row.waiting', text: 'waiting: {why}', note: 'A card row (cw_list_tasks, HI-2618): the card in Doing waits on purpose, and why (its own words).' }),
   rowAfter: agentMsg({ id: 'reply.row.after', text: 'after {cards}', note: 'A card row: the cards it waits for.' }),
   rowElsewhere: agentMsg({ id: 'reply.row.elsewhere', text: '{card} (another project)', note: "A card row: a card it waits for that is another project's." }),
   rowStalled: agentMsg({ id: 'reply.row.stalled', text: 'stalled: {why}', note: 'A card row: why it has stalled.' }),
@@ -414,6 +415,8 @@ export interface TaskRow {
   agent: { name: string; status: string; backgroundTasks: number } | null
   labels: string[]
   blocked: string | null
+  /** Waiting on purpose (HI-2618): why. */
+  waitingFor?: string
   blockedBy: number[]
   /** Cards in blockedBy that are another project's (a project agent sees only their numbers). */
   elsewhere?: number[]
@@ -434,6 +437,7 @@ export function taskRow(v: TaskView): TaskRow {
     agent: v.agent && { name: v.agent.name, status: v.agent.status, backgroundTasks: v.agent.backgroundTasks },
     labels: v.labels,
     blocked: v.blocked,
+    ...(v.waitingFor ? { waitingFor: v.waitingFor.reason } : {}),
     blockedBy: v.blockedBy,
     ...(namesOf(v.blockedBy) ? { names: namesOf(v.blockedBy) } : {}),
     ...(v.elsewhere?.length ? { elsewhere: v.elsewhere } : {}),
@@ -765,6 +769,7 @@ function rowText(r: TaskRow): string {
   if (r.agent) bits.push(agentText(r.agent))
   if (r.labels.length) bits.push(r.labels.join(', '))
   if (r.blocked) bits.push(say(R.rowBlocked, { why: r.blocked }))
+  if (r.waitingFor) bits.push(say(R.rowWaiting, { why: r.waitingFor }))
   if (r.blockedBy.length) bits.push(say(R.rowAfter, { cards: r.blockedBy.map((n) => (r.elsewhere?.includes(n) ? say(R.rowElsewhere, { card: cardRef(n) }) : `${cardRef(n)}`)).join(', ') }))
   if (r.stalled) bits.push(say(R.rowStalled, { why: r.stalled }))
   if (r.reviewing) bits.push(say(R.rowReviewing, { name: r.reviewing.name, stalled: yn(r.reviewing.stalled), why: r.reviewing.stalled ?? '' }))

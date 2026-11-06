@@ -529,6 +529,8 @@ interface CombworkMessageValues {
   'tips.versionControlTab.title': undefined
   'tips.viewerTokens.text': undefined
   'tips.viewerTokens.title': undefined
+  'tips.waitingOnPurpose.text': undefined
+  'tips.waitingOnPurpose.title': undefined
   'tips.workflowDefaults.text': undefined
   'tips.workflowDefaults.title': undefined
   'tips.workflowOptions.text': undefined

@@ -682,7 +682,7 @@
   "assistant.undo.ended": "the lane has ended",
   "assistant.undo.error": "failed: {error}",
   "assistant.undo.failed": "Could not undo the Assistant's change",
-  "assistant.undo.field": "{field, select, title {title} description {description} labels {labels} blocked {blocked} blockedBy {blocked by} links {links} agent {agent} column {column} project {project} created {the card} cards {cards} reviewer {reviewer} rounds {rounds} waitMinutes {wait} name {name} provider {provider} connection {connection} model {model} effort {effort} permissionMode {permission mode} use200kContext {context size} mcpServers {MCP servers} lastSessionId {conversation} value {value} removed {removed models} run {the run} agents {agents} layout {layout} workflow {workflow options} other {{field}}}",
+  "assistant.undo.field": "{field, select, title {title} description {description} labels {labels} blocked {blocked} blockedBy {blocked by} links {links} agent {agent} column {column} project {project} waitingFor {waiting} created {the card} cards {cards} reviewer {reviewer} rounds {rounds} waitMinutes {wait} name {name} provider {provider} connection {connection} model {model} effort {effort} permissionMode {permission mode} use200kContext {context size} mcpServers {MCP servers} lastSessionId {conversation} value {value} removed {removed models} run {the run} agents {agents} layout {layout} workflow {workflow options} other {{field}}}",
   "assistant.undo.final": "Can't be undone",
   "assistant.undo.gone": "it's gone",
   "assistant.undo.kept": "Kept",

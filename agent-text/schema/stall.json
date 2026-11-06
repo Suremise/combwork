@@ -52,6 +52,13 @@
       "waited": "plain"
     }
   },
+  "stall.laneNext.depsDone": {
+    "placeholders": {
+      "card": "plain",
+      "minutes": "plain",
+      "doing": "plain"
+    }
+  },
   "stall.loop.designWait": {
     "placeholders": {
       "builder": "plain",

@@ -259,6 +259,10 @@
     "text": "{what}: list them (cw_lane list, cw_list_projects, cw_agent_activity) and read their cards.",
     "note": "A lane watch wake with only counts left. what: the counts, \", \" between (\"2 lanes changed, 1 of your cards changed\")."
   },
+  "wake.lane.depsReady": {
+    "text": "{card}'s dependencies are Done ({deps}): it is your lane's next card. Start it now (cw_lane next names it).",
+    "note": "HI-2618: with the workflow rules off, a lane's due card waited for the cards it depends on; once the last is Done its builder is told this, once. card: its key; deps: those cards' keys, comma-separated."
+  },
   "wake.lane.ended": {
     "text": "{merged, select, yes {ended: merged at {commit}} other {ended (merged)}}",
     "note": "A lane watch wake's event: the lane ended. merged: yes with its merge commit (commit: its first 12 characters), verified from its cards' facts (#1270)."

@@ -2111,6 +2111,14 @@
     "defaultMessage": "Let another app watch Combwork",
     "description": "A tip's title."
   },
+  "tips.waitingOnPurpose.text": {
+    "defaultMessage": "A card in Active held for a quiet window, or waiting for an answer? Right-click it, Mark as Waiting…, and say why: Combwork stops reporting it as stalled until you clear it or it leaves Active. Its agent keeps running.",
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Mark as Waiting… is a card's menu item, Active a board stage)."
+  },
+  "tips.waitingOnPurpose.title": {
+    "defaultMessage": "A card that waits on purpose",
+    "description": "A tip's title (HI-2618): a card in Active marked as waiting on purpose, so it isn't reported as stalled."
+  },
   "tips.workflowDefaults.text": {
     "defaultMessage": "Settings → Version Control sets the options every project starts from: Combwork defaults, for every workspace, and the open workspace’s over them. A project’s own options still win, and saving lists the projects that inherit the change.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (glossary 2.1: workflow)."

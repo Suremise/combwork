@@ -551,6 +551,10 @@
     "text": "stalled: {why}",
     "note": "A card row: why it has stalled."
   },
+  "reply.row.waiting": {
+    "text": "waiting: {why}",
+    "note": "A card row (cw_list_tasks, HI-2618): the card in Doing waits on purpose, and why (its own words)."
+  },
   "reply.setting.changed": {
     "text": "Changed {path}{hasProject, select, yes { in {project}} other {}} ({id}): {old} → {new}. {hasRestart, select, yes {It applies {restart}.} other {It applies now.}} The user can undo it in your panel's list.",
     "note": "cw_update_setting's reply: what changed, old → new, and when it applies."

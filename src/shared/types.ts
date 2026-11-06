@@ -1182,6 +1182,11 @@ export interface TaskCard {
   labels: string[]
   /** Why it can't go on, when it can't (shown in red in any column). */
   blocked: string | null
+  /**
+   * Waiting on purpose (HI-2618), only in Doing: why, who marked it and when. Its agent works on (nothing is stopped); the
+   * stall checks leave it alone until it is cleared or the card leaves Doing. Absent when it isn't.
+   */
+  waitingFor?: TaskWaiting
   /** Cards that have to be done first. */
   blockedBy: number[]
   /** Related cards. */
@@ -1346,6 +1351,14 @@ export interface TaskHold {
   to?: string
 }
 
+/** A card in Doing waiting on purpose (TaskCard.waitingFor, HI-2618). */
+export interface TaskWaiting {
+  reason: string
+  /** Who marked it (the user, the Assistant, an agent's name). */
+  by: string
+  at: string
+}
+
 /** An agent reviewing a card (TaskCard.review). */
 export interface TaskReview {
   /** The reviewing agent's id in the card's project, and its name then. */
@@ -1378,6 +1391,12 @@ export interface TaskPatch {
   /** Labels taken off where present, keeping the others (#1131). */
   removeLabels?: string[]
   blocked?: string | null
+  /**
+   * Marks a card in Doing as waiting on purpose, with why (HI-2618: held for a quiet window); '' or null clears it. Only
+   * its own agent, the user or the Assistant. Combwork reports it as stalled for nothing while it waits. A whole mark
+   * (TaskWaiting) is undo's, putting back one as it was (who marked it and when): never from the Agent API (a string).
+   */
+  waitingFor?: string | null | TaskWaiting
   blockedBy?: number[]
   links?: number[]
   /** The doc sections to read first (#818), replacing the list; [] clears it. */
@@ -3948,6 +3967,19 @@ export interface LaneInfo {
    * reviews it now, by name; absent for other lanes, or with no current card.
    */
   poolReview?: { lastVerdict: { name: string; pass: boolean } | null; reviewing: string | null }
+  /**
+   * A running lane's due card (in Todo, its next) that depends on other cards, where Combwork waits for them (HI-2618:
+   * the rules off, or its start's rule that they be Done): the ones not Done yet by key (`open`, in `blockedBy` order),
+   * and when the last of them went Done once none is open (`readyAt`, from the board's history). Absent otherwise.
+   */
+  dueDeps?: DueDeps
+}
+
+/** A lane's due card's dependencies (LaneInfo.dueDeps, HI-2618). */
+export interface DueDeps {
+  card: number
+  open: string[]
+  readyAt: string | null
 }
 
 /**
@@ -4021,6 +4053,8 @@ export interface LaneStatus {
   why?: 'busy' | 'watching' | 'queued' | 'failed' | 'refused' | 'fresh' | 'dependencies'
   /** startWait `dependencies` (HI-2129): the card it depends on that isn't Done yet, by its key. */
   waitsFor?: string
+  /** startWait `dependencies` (HI-2618): every card it depends on that isn't Done yet, by key, in its `blockedBy` order. */
+  waitingOn?: string[]
   /** startWait `fresh` (HI-2034): no more automatic tries, and why (the user retries it, or ends the lane); the reason a failure gave. */
   freshBlocked?: 'timeout' | 'uncertain' | 'failed'
   freshWhy?: string

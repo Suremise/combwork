@@ -411,6 +411,11 @@ export interface LaneOrderView {
   freshBlocked?: string
   /** Its next card waits for a card it depends on to be Done (HI-2129, its status's `dependencies`): its key. Not a stall. */
   waitsForDependency?: { card: number; on: string }
+  /**
+   * Its due card's dependencies from the board (HI-2618, LaneInfo.dueDeps): while one isn't Done it waits, and isn't
+   * stalled; once none is, its stall counts from when the last of them went Done (`readyAt`).
+   */
+  due?: { card: number; open: string[]; readyAt: string | null }
   /** In the lane's order; `movedAt`: when it last came into its column (columnSince), where known. */
   cards: { number: number; column: string; key?: string; movedAt?: string | null }[]
 }

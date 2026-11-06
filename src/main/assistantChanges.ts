@@ -73,7 +73,7 @@ export const recordedHere = (): number => recording.getStore()?.recorded ?? 0
 const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase()
 
 /** A card's fields undo puts back (SPEC §16.14): its words, labels, block, links, agent, column and project. */
-export const CARD_FIELDS = ['title', 'description', 'labels', 'blocked', 'blockedBy', 'links', 'agent', 'column', 'project'] as const
+export const CARD_FIELDS = ['title', 'description', 'labels', 'blocked', 'blockedBy', 'links', 'agent', 'column', 'project', 'waitingFor'] as const
 export type CardField = (typeof CARD_FIELDS)[number]
 
 /** The implicit field a card's move records (its review, as it was and became): checked by undo, never restored. */
@@ -94,6 +94,9 @@ export function cardValue(card: TaskCard, field: CardField): Value {
       return card.agent ?? null
     case 'blocked':
       return card.blocked ?? null
+    // Waiting on purpose (HI-2618), whole: why, who marked it and when, so undo puts back the mark as it was.
+    case 'waitingFor':
+      return card.waitingFor ? { reason: card.waitingFor.reason, by: card.waitingFor.by, at: card.waitingFor.at } : null
     default:
       return card[field]
   }

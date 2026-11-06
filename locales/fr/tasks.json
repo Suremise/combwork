@@ -181,5 +181,10 @@
   "tasks.start.notGiven": "L’agent {agent} n’a pas reçu la carte {card} : {why}.",
   "tasks.start.noteTooLong": "La note est trop longue ({max, number} caractères au plus).",
   "tasks.start.reassigned": "La carte {card} {who, select, another {a été confiée à un autre agent} other {a été retirée à son agent}} entre-temps. Redémarre-la si elle est toujours à faire.",
-  "tasks.start.userTyping": "L’utilisateur vient d’écrire dans le terminal de l’agent {agent} et est peut-être encore en train d’écrire. Demande d’abord à l’utilisateur."
+  "tasks.start.userTyping": "L’utilisateur vient d’écrire dans le terminal de l’agent {agent} et est peut-être encore en train d’écrire. Demande d’abord à l’utilisateur.",
+  "tasks.error.waitingNotActive": "{card} n’est pas dans {active} : seule une carte dans {active} peut être marquée en attente.",
+  "tasks.error.waitingNotYours": "Seul l’agent de {card}, l’utilisateur ou l’Assistant peut la marquer en attente ou lever cette attente.",
+  "tasks.error.waitingTooLong": "La raison de l’attente est trop longue ({max, number} caractères au plus).",
+  "tasks.history.notWaiting": "N’est plus en attente",
+  "tasks.history.waiting": "En attente : {reason}"
 }

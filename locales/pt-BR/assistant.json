@@ -682,7 +682,7 @@
   "assistant.undo.ended": "a raia terminou",
   "assistant.undo.error": "falhou: {error}",
   "assistant.undo.failed": "Não foi possível desfazer a alteração do Assistente",
-  "assistant.undo.field": "{field, select, title {título} description {descrição} labels {rótulos} blocked {bloqueado} blockedBy {bloqueado por} links {links} agent {agente} column {coluna} project {projeto} created {o cartão} cards {cartões} reviewer {revisor} rounds {rodadas} waitMinutes {espera} name {nome} provider {provedor} connection {conexão} model {modelo} effort {esforço} permissionMode {modo de permissão} use200kContext {tamanho do contexto} mcpServers {servidores MCP} lastSessionId {conversa} value {valor} removed {modelos removidos} run {o agente iniciado} agents {agentes} layout {layout} workflow {opções do fluxo de trabalho} other {{field}}}",
+  "assistant.undo.field": "{field, select, title {título} description {descrição} labels {rótulos} blocked {bloqueado} blockedBy {bloqueado por} links {links} agent {agente} column {coluna} project {projeto} waitingFor {espera} created {o cartão} cards {cartões} reviewer {revisor} rounds {rodadas} waitMinutes {espera} name {nome} provider {provedor} connection {conexão} model {modelo} effort {esforço} permissionMode {modo de permissão} use200kContext {tamanho do contexto} mcpServers {servidores MCP} lastSessionId {conversa} value {valor} removed {modelos removidos} run {o agente iniciado} agents {agentes} layout {layout} workflow {opções do fluxo de trabalho} other {{field}}}",
   "assistant.undo.final": "Não pode ser desfeito",
   "assistant.undo.gone": "não existe mais",
   "assistant.undo.kept": "Mantido",
