@@ -1,7 +1,8 @@
 // The clean-install check's search (HI-2592, tests/sandbox/clean.cjs) and its report (report.cjs, scenario 9): the old name
 // planted in each place it searches (file and folder names, text files, logs, a profile's database, the workspace's
 // .git, the registry, the agent's environment, the window's text, Copy Diagnostics and the export) is found with its
-// place and text, nothing else is, and app.asar's hits are counted but never fail the check.
+// place and text, nothing else is, app.asar's hits are counted but never fail the check, and the bundled code is named
+// but not read (HI-2647: its contents are the repository's name guard's).
 import assert from 'assert'
 import fs from 'fs'
 import { createRequire } from 'module'
@@ -13,7 +14,7 @@ const require = createRequire(import.meta.url)
 // What the scan writes and the report reads is plain JSON.
 // oxlint-disable-next-line typescript/no-explicit-any
 type Json = Record<string, any>
-const { CATEGORIES, oldNameHits, tally, scanText, scanTree, regEntries, newRegistryHits, cleanChecks } = require('./sandbox/clean.cjs')
+const { CATEGORIES, isBundledCode, oldNameHits, tally, scanText, scanTree, regEntries, newRegistryHits, cleanChecks } = require('./sandbox/clean.cjs')
 const { evaluate, markdown, verdict, REQUIRED } = require('./sandbox/report.cjs')
 
 const write = (file: string, data: string | Buffer): void => {
@@ -79,6 +80,36 @@ test('a folder: names and text files searched, logs apart, a profile\'s binaries
   assert.strictEqual(t.places.roaming.scanned, 0)
 })
 
+test("the bundled code: named, its contents not read (the repo's name guard's, HI-2647); a resource beside it and a code file's name still fail", () => {
+  const dir = tempDir('sandbox-clean-code-')
+  const install = path.join(dir, 'Programs', 'Combwork')
+  const unpacked = path.join(install, 'resources', 'app.asar.unpacked')
+  // The upgrade code as electron-vite bundles it (RC4's hits): main's chunks, its entries, preload's and renderer's.
+  write(path.join(unpacked, 'out', 'main', 'chunks', 'combworkFolderMove-oTlnoE2q.js'), 'const LEGACY_HIVE_DIR = ".hive";\nexports.LEGACY_HIVE_DIR = LEGACY_HIVE_DIR;\n')
+  write(path.join(unpacked, 'out', 'main', 'chunks', 'db-B_Gez7AX.js'), 'db.exec("ALTER TABLE schema_version RENAME COLUMN hive_version TO app_version");\n')
+  write(path.join(unpacked, 'out', 'main', 'cw-mcp.js'), 'require("./chunks/db-B_Gez7AX.js"); // hive\n')
+  write(path.join(unpacked, 'out', 'preload', 'index.cjs'), '"hive"\n')
+  write(path.join(unpacked, 'out', 'renderer', 'assets', 'index-AbCd1234.mjs'), '"hive"\n')
+  // Not code: a resource and a native module's text beside it, a code file under the old name, code outside out\.
+  write(path.join(unpacked, 'out', 'main', 'chunks', 'notes.txt'), 'Hive Desktop moved.\n')
+  write(path.join(unpacked, 'out', 'main', 'chunks', 'hiveGuidance-Xy12_-ab.js'), 'const x = 1;\n')
+  write(path.join(unpacked, 'node_modules', 'pty', 'lib', 'index.js'), '// from hive\n')
+  write(path.join(install, 'resources', 'out', 'main', 'loose.js'), 'hive\n')
+
+  const t = tally()
+  scanTree(t, 'install', install, { code: isBundledCode })
+  assert.strictEqual(t.code, 6)
+  assert.deepStrictEqual(places(t, 'install').sort(), [
+    path.join(unpacked, 'out', 'main', 'chunks', 'notes.txt'),
+    path.join(unpacked, 'out', 'main', 'chunks', 'hiveGuidance-Xy12_-ab.js'),
+    path.join(unpacked, 'node_modules', 'pty', 'lib', 'index.js'),
+    path.join(install, 'resources', 'out', 'main', 'loose.js')
+  ].sort())
+  // The rule, as the scan gives it paths: from the install folder, either slash.
+  assert.ok(isBundledCode('resources\\app.asar.unpacked\\out\\main\\chunks\\db-B_Gez7AX.js'))
+  for (const not of ['resources/app.asar.unpacked/out/main/chunks/x.json', 'resources/app.asar.unpacked/out/other/x.js', 'resources/app.asar.unpacked/node_modules/x.js', 'resources/out/main/x.js', 'app.asar.unpacked/out/main/x.js', 'resources/app.asar.unpacked/out/main/x.js.txt']) assert.ok(!isBundledCode(not), not)
+})
+
 test('a folder or file that can\'t be read is counted against its place, with why (HR1, round 1)', () => {
   const dir = tempDir('sandbox-clean-unread-')
   const ws = path.join(dir, 'Clean')
@@ -103,7 +134,7 @@ test('a folder or file that can\'t be read is counted against its place, with wh
   assert.strictEqual(t.places.logs.unread, 1)
   assert.deepStrictEqual(t.skipped.map((s: Json) => [s.category, path.relative(ws, s.place)]).sort(), [['logs', path.join('logs', 'busy.log')], ['workspace', 'locked'], ['workspace', path.join('demo', 'busy.json')]].sort())
   // Its check fails, naming each with why, though nothing that was read had a hit.
-  const scan = { places: t.places, asar: [{ place: 'app.asar', count: 0 }], skipped: t.skipped }
+  const scan = { places: t.places, asar: [{ place: 'app.asar', count: 0 }], code: 1, skipped: t.skipped }
   for (const c of CATEGORIES) if (!scan.places[c.id].scanned) scanText(t, c.id, `${c.id} place`, 'Combwork')
   const failed = collect(scan).filter((c) => !c.ok)
   assert.deepStrictEqual(failed.map((c) => c.id), ['9.no-old-name-workspace', '9.no-old-name-logs'])
@@ -169,7 +200,7 @@ const cleanScan = (): Json => {
   const t = tally()
   for (const c of CATEGORIES) scanText(t, c.id, `${c.id} place`, 'Combwork')
   t.asar.push({ place: 'C:\\Programs\\Combwork\\resources\\app.asar', count: 41 })
-  return { at: 't', places: t.places, asar: t.asar, skipped: [] }
+  return { at: 't', places: t.places, asar: t.asar, code: 12, skipped: [] }
 }
 const collect = (scan: Json): Json[] => {
   const checks: Json[] = []
@@ -179,9 +210,10 @@ const collect = (scan: Json): Json[] => {
 
 test("the check: passes on a scan with no hits, app.asar's hits counted but not failed", () => {
   const checks = collect(cleanScan())
-  assert.deepStrictEqual(checks.map((c) => c.id), [...CATEGORIES.map((c: Json) => `9.no-old-name-${c.id}`), '9.asar-counted'])
+  assert.deepStrictEqual(checks.map((c) => c.id), [...CATEGORIES.map((c: Json) => `9.no-old-name-${c.id}`), '9.asar-counted', '9.code-named'])
   assert.ok(checks.every((c) => c.ok), JSON.stringify(checks.filter((c) => !c.ok)))
-  assert.strictEqual(checks.at(-1)?.name, "app.asar's own hits counted, not failed: 41")
+  assert.strictEqual(checks.find((c) => c.id === '9.asar-counted')?.name, "app.asar's own hits counted, not failed: 41")
+  assert.strictEqual(checks.at(-1)?.name, "The bundled code's files named, their contents left to the repository's name guard (tests/oldNames.mjs): 12")
 })
 
 test('the check: a hit fails its place with the place and text; a place not searched fails too, never a silent pass', () => {
@@ -190,11 +222,13 @@ test('the check: a hit fails its place with the place and text; a place not sear
   scanText(t, 'env', 'env HIVE_API_URL', 'HIVE_API_URL=http://127.0.0.1:47821')
   scan.places.export = { scanned: 0, count: 0, hits: [], why: 'no exported board (the driver named none)' }
   scan.asar = []
+  delete scan.code
   const failed = collect(scan).filter((c) => !c.ok)
   assert.deepStrictEqual(failed.map((c) => [c.id, c.detail]), [
     ['9.no-old-name-env', '1 hit: env HIVE_API_URL: HIVE_API_URL=http://127.0.0.1:47821'],
     ['9.no-old-name-export', 'not searched: no exported board (the driver named none)'],
-    ['9.asar-counted', 'no app.asar in the install folder']
+    ['9.asar-counted', 'no app.asar in the install folder'],
+    ['9.code-named', 'no bundled code found in app.asar.unpacked']
   ])
 })
 
@@ -213,7 +247,7 @@ test('the report: scenario 9 passes with no hits and notes app.asar\'s count; a 
   assert.ok(ok.checks.length >= 1 + 12 + CATEGORIES.length + 1)
   const md = markdown(ok)
   assert.match(md, /## 9\. A clean install used as a new user would, then searched: no trace of the old name anywhere \(HI-2592\)/)
-  assert.match(md, /- \*\*app\.asar\*\* holds 41 hit\(s\) of the old name \(C:\\Programs\\Combwork\\resources\\app\.asar: 41\): counted, not failed\./)
+  assert.match(md, /- \*\*app\.asar\*\* holds 41 hit\(s\) of the old name \(C:\\Programs\\Combwork\\resources\\app\.asar: 41\): counted, not failed\..*The bundled code in app\.asar\.unpacked \(12 file\(s\)\) is named, not read/)
   assert.doesNotMatch(md, /Where the old name was found/)
 
   const scan = cleanScan()

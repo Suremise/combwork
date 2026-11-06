@@ -73,7 +73,7 @@ function overPrevious(n, pre, fromRc = false) {
   if (fromRc) {
     return {
       drivers: {
-        [`${pre}-mark`]: { scenario: n, ids: ['4.settings-saved', '4.workspace-made'], facts: ['version'] },
+        [`${pre}-mark`]: { scenario: n, ids: ['4.settings-saved', '4.workspace-made', '4.values-written'], facts: ['version'] },
         [`${pre}-after`]: { scenario: n, ids: ['4.settings-kept', '4.theme-applied', '4.combwork-runs', '4.workspace-moved', '4.workspace-card', '4.values-options', '4.values-facts', ...NAME_IDS], facts: ['version'] },
         [`${pre}-notify`]: { scenario: n, ids: [`${n}.notification`], facts: ['exe'] }
       },
@@ -82,7 +82,7 @@ function overPrevious(n, pre, fromRc = false) {
   }
   return {
     drivers: {
-      [`${pre}-mark`]: { scenario: n, ids: ['4.settings-saved', '4.login-registered', '4.workspace-made', '4.advanced-saved'], facts: ['version'] },
+      [`${pre}-mark`]: { scenario: n, ids: ['4.settings-saved', '4.login-registered', '4.workspace-made', '4.advanced-saved', '4.values-written'], facts: ['version'] },
       [`${pre}-after`]: { scenario: n, ids: ['4.settings-kept', '4.theme-applied', '4.combwork-runs', '4.local-moved', '4.trust-kept', '4.roaming-moved', '4.record', '4.login-moved', '4.no-fallback', '4.workspace-moved', '4.workspace-card', '4.values-options', '4.values-facts', '4.advanced-kept', '4.advanced-old-id', ...NAME_IDS], facts: ['version'] },
       [`${pre}-notify`]: { scenario: n, ids: [`${n}.notification`], facts: ['exe'] }
     },
@@ -218,7 +218,7 @@ function evaluate(meta, files) {
     const scan = need(9, 's9-scan')
     if (scan) {
       const asar = cleanChecks(scan, (id, name, ok, detail) => add(9, name, ok, detail))
-      asarNote = `**app.asar** holds ${asar.total} hit(s) of the old name (${asar.files.map(a => `${a.place}: ${a.count}`).join(', ') || 'none found'}): counted, not failed. The app's own code, with the upgrade code that knows the 1.0 names.`
+      asarNote = `**app.asar** holds ${asar.total} hit(s) of the old name (${asar.files.map(a => `${a.place}: ${a.count}`).join(', ') || 'none found'}): counted, not failed. The app's own code, with the upgrade code that knows the 1.0 names. The bundled code in app.asar.unpacked (${Number(scan.code) || 0} file(s)) is named, not read: which code may name the old name is the repository's name guard's job (tests/oldNames.mjs, HI-2647).`
     }
   }
 

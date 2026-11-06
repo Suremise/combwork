@@ -32,7 +32,7 @@ const OLD_DIR = 'Hive'
 const saved = { WSB_STUB: process.env.WSB_STUB, WSB_STUB_STATE: process.env.WSB_STUB_STATE, WSB_STOP_RETRY_MS: process.env.WSB_STOP_RETRY_MS }
 process.env.WSB_STOP_RETRY_MS = '10'
 process.env.WSB_STUB = STUB
-const { buildRoot, plan, inSandbox, sacState, blockedReason, cmpVersion, serverCandidates, setLogSink } = require('./sandbox/checks.cjs')
+const { buildRoot, plan, inSandbox, sacState, blockedReason, cmpVersion, serverCandidates, mainCheckout, setLogSink } = require('./sandbox/checks.cjs')
 const logged: string[] = []
 beforeAll(() => setLogSink((line: string) => logged.push(line)))
 afterAll(() => {
@@ -97,6 +97,37 @@ test('the server: --server, else the workspace\'s installed copy, else an MCP se
   assert.throws(() => plan([...opts, '--server', path.join(s.dir, 'nope.js')]), /--server .*nope\.js doesn't exist/)
   // Without --repo, the repo is this checkout (it gives the previous installer from its dist only when asked to).
   assert.strictEqual(plan(['--installer', installer, '--only', 'fresh', '--server', FAKE_SERVER]).repo, path.resolve(__dirname, '..'))
+})
+
+test('the server from a worktree: the workspace of its main checkout, not the worktrees\' folder (HI-2644)', () => {
+  const s = scratch('worktree')
+  const installer = path.join(s.dir, 'builds', 'app', 'Combwork-Setup-0.6.0.exe')
+  // A workspace (ws) holding the main checkout, and a slot in ws.worktrees, as Combwork lays them out.
+  const main = path.join(s.dir, 'ws', 'combwork')
+  const slot = path.join(s.dir, 'ws.worktrees', 'combwork', 'slot-a')
+  fs.mkdirSync(main, { recursive: true })
+  const git = (cwd: string, ...args: string[]) => {
+    const r = spawnSync('git', ['-c', 'user.name=Combwork Test', '-c', 'user.email=combwork-test@example.invalid', ...args], { cwd, env: baseEnv(), encoding: 'utf8', windowsHide: true, timeout: 30_000 })
+    assert.strictEqual(r.status, 0, `git ${args.join(' ')}: ${r.stderr}`)
+  }
+  git(main, 'init', '-q')
+  git(main, 'commit', '-q', '--allow-empty', '-m', 'first')
+  fs.mkdirSync(path.dirname(slot), { recursive: true })
+  git(main, 'worktree', 'add', '-q', '--detach', slot)
+  const installed = path.join(s.dir, 'ws', '.combwork', 'mcp', 'windows-sandbox', 'server.js')
+  fs.mkdirSync(path.dirname(installed), { recursive: true })
+  fs.writeFileSync(installed, '')
+  const same = (a: string, b: string) => assert.strictEqual(fs.realpathSync.native(a).toLowerCase(), fs.realpathSync.native(b).toLowerCase())
+  // From the slot (its own --repo, as a worktree's default is) and from the main checkout: the workspace's copy.
+  same(serverCandidates(slot)[0], installed)
+  same(plan(['--installer', installer, '--only', 'fresh', '--repo', slot]).serverJs, installed)
+  same(plan(['--installer', installer, '--only', 'fresh', '--repo', main]).serverJs, installed)
+  assert.strictEqual(path.resolve(mainCheckout(main)), path.resolve(main))
+  same(mainCheckout(slot), main)
+  // The repo stays the slot: --previous is still looked for in its own dist.
+  assert.strictEqual(plan(['--installer', installer, '--only', 'fresh', '--repo', slot]).repo, path.resolve(slot))
+  // A folder git doesn't know is its own checkout.
+  assert.strictEqual(mainCheckout(path.join(s.dir, 'builds')), path.join(s.dir, 'builds'))
 })
 
 test('inSandbox: a body that throws still stops the Sandbox, confirmed', async () => {
@@ -395,6 +426,12 @@ test("the profile move's script records the report's check ids, and reads the re
   assert.ok(refusedTitle, 'the script says $refusedTitle')
   const english = JSON.parse(fs.readFileSync(path.join(root, 'locales', 'en', 'main.json'), 'utf8'))
   assert.ok(english['main.profileMove.refusedTitle']?.defaultMessage.includes(refusedTitle), `locales/en's main.profileMove.refusedTitle holds "${refusedTitle}"`)
+  // showErrorBox's title is the box's heading on Windows; its caption is Electron's "Error" (HI-2648): the check finds the
+  // title among the box's texts (UI Automation), and the caption is only "Error".
+  assert.match(script, /^\$refusedCaption = 'Error'$/m)
+  const refused = script.slice(script.indexOf("Check '11.refused' "), script.indexOf('\n', script.indexOf("Check '11.refused' ")))
+  assert.ok(refused.includes('$caption -eq $refusedCaption') && refused.includes('$texts -like "*$refusedTitle*"') && !refused.includes('$title -like'), "11.refused reads the title in the box's texts, not the caption")
+  assert.ok(/function TextsOf\(\$p\)[\s\S]*?AutomationElement\]::FromHandle\(\$g\.MainWindowHandle\)/.test(script), 'TextsOf reads the window with UI Automation')
   const index = fs.readFileSync(path.join(root, 'src', 'main', 'index.ts'), 'utf8')
   const refuse = index.slice(index.indexOf('function refuseStart('), index.indexOf('exitBeforeProfile(1)', index.indexOf('function refuseStart(')))
   assert.ok(refuse.includes("id: 'main.profileMove.refusedTitle'") && refuse.includes('dialog.showErrorBox(title,') && refuse.includes('process.stderr.write(`${title}: ${e.message}'), 'refuseStart shows the title and writes the move\'s message to stderr')
@@ -447,6 +484,69 @@ test('a view counts as loaded only on its own loaded markers, however long its l
     assert.strictEqual(await ready.viewReady(view, async () => 0, 30, 1), null, view.name)
   }
   assert.deepStrictEqual(ready.VIEWS.map((v: Json) => v.slug), ['workspace-overview', 'task-board', 'shared-notes', 'skills', 'mcp-servers', 'assistant'])
+})
+
+// The driver's preload bridge (HI-2645): the new app's window.combwork, and only for the mark step (which drives the release
+// before the upgrade) that release's own as well, never in its place when the window has both.
+test('the driver talks to the new app as window.combwork, and to the release before only in its mark step', () => {
+  assert.strictEqual(ready.pickBridge(['combwork', 'old'], ['combwork']), 'combwork')
+  assert.strictEqual(ready.pickBridge(['combwork', 'old'], ['old']), 'old')
+  assert.strictEqual(ready.pickBridge(['combwork', 'old'], ['old', 'combwork']), 'combwork')
+  assert.strictEqual(ready.pickBridge(['combwork'], ['old']), null)
+  assert.strictEqual(ready.pickBridge(['combwork'], []), null)
+  assert.strictEqual(ready.pickBridge(['combwork'], undefined), null)
+  const drive = fs.readFileSync(path.join(SANDBOX, 'inside', 'drive.cjs'), 'utf8')
+  const preload = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'preload', 'index.ts'), 'utf8')
+  assert.ok(preload.includes("contextBridge.exposeInMainWorld('combwork', bridge)"), 'the preload bridge is window.combwork')
+  assert.ok(drive.includes("const BRIDGES = step === 'mark' ? ['combwork', OLD_BRIDGE] : ['combwork']"), 'only mark may use the old bridge')
+  assert.ok(/const OLD_BRIDGE = '\w+'/.test(drive) && !/window\.combwork\.invoke/.test(drive), 'every call goes through the bridge picked at launch')
+  // The step the checks run on the release before, before the upgrade, is mark (checks.cjs).
+  assert.ok(/s\.drive\(n, `\$\{n\}\. change settings`, 'mark'/.test(fs.readFileSync(path.join(SANDBOX, 'checks.cjs'), 'utf8')))
+})
+
+// Scenario 4's names checks against what the upgrade does now (HI-2645, RC4's run): the log's start lines told apart by
+// name as well as version, the names record's version, and an old advanced id answered as no setting (SPEC: the cw. ids).
+test("the driver's names checks expect what the names upgrade and the settings tools do now", () => {
+  const root = path.resolve(__dirname, '..')
+  const drive = fs.readFileSync(path.join(SANDBOX, 'inside', 'drive.cjs'), 'utf8')
+  const startLine = new RegExp(/const OLD_START_LINE = \/(.+)\/g\r?\n/.exec(drive)?.[1] ?? '^$', 'g')
+  // An RC carrying 1.0's version: its start line and the release before's are still two releases.
+  const log = `[a] ${OLD_DIR} 1.0.0 starting (Electron 38)\n[b] ${OLD_DIR} 1.0.0 starting (Electron 38)\n[c] Combwork 1.0.0 starting (Electron 39)\n[d] Combwork 1.0.0 starting (Electron 39)\n`
+  assert.deepStrictEqual(ready.releasesStarted(log, startLine), [`${OLD_DIR} 1.0.0`, 'Combwork 1.0.0'])
+  // From an RC (scenario 10): both Combwork's, told apart by version; only one release started is one.
+  assert.deepStrictEqual(ready.releasesStarted('Combwork 1.1.0-rc.2 starting\nCombwork 1.1.0 starting\n', startLine), ['Combwork 1.1.0-rc.2', 'Combwork 1.1.0'])
+  assert.deepStrictEqual(ready.releasesStarted('Combwork 1.1.0 starting\nCombwork 1.1.0 starting\n', startLine), ['Combwork 1.1.0'])
+  assert.deepStrictEqual(ready.releasesStarted(undefined, startLine), [])
+  // The record's version is the names upgrade's own.
+  const names = fs.readFileSync(path.join(root, 'src', 'main', 'nameUpgrade.ts'), 'utf8')
+  assert.strictEqual(/const NAMES_VERSION = (\d+)/.exec(drive)?.[1], /export const NAMES_VERSION = (\d+)/.exec(names)?.[1], "drive.cjs's NAMES_VERSION is nameUpgrade.ts's")
+  // The old id's answer is the settings tools' "no setting" one, which the driver's check starts with.
+  const tools = fs.readFileSync(path.join(root, 'src', 'main', 'settingsTools.ts'), 'utf8')
+  assert.ok(tools.includes(`text: 'No setting "{id}": `), 'settingsTools answers an unknown id with No setting "<id>"')
+  assert.ok(drive.includes('old.error.startsWith(`No setting "advanced.${ADV.app.old}"`)'), 'the driver expects that answer for the old id')
+})
+
+// Scenario 9's first run of Claude Code (HI-2646): Combwork adds a connection only once Claude Code's own folder is there,
+// never making it (accounts.ts, main.accounts.noHome), and a real first run makes it. The driver makes that folder, the one
+// Claude Code's adapter names, after installing the fake and before adding the connection.
+test("scenario 9 makes Claude Code's folder, as its first run would, before it adds the connection", () => {
+  const root = path.resolve(__dirname, '..')
+  const drive = fs.readFileSync(path.join(SANDBOX, 'inside', 'drive.cjs'), 'utf8')
+  const clean = drive.slice(drive.indexOf('async clean()'))
+  const at = (s: string): number => clean.indexOf(s)
+  const made = at("const claudeHome = path.join(process.env.USERPROFILE, '.claude')")
+  assert.ok(made > 0 && at('fs.mkdirSync(claudeHome, { recursive: true })') > made, 'clean makes %USERPROFILE%\\.claude')
+  assert.ok(at('fake-claude-install.ps1') < made, 'after installing the fake')
+  assert.ok(made < at("inv('connections:add', 'claude-code'"), 'before adding the connection')
+  // Then on in the workspace it opens (On here), before the agent it starts there.
+  const on = at("inv('connections:setOn', account.id, true)")
+  assert.ok(on > at("inv('workspace:open', ws)") && on < at("inv('agents:add', proj"), 'the account is turned on in the new workspace before its agent is added')
+  assert.ok(fs.readFileSync(path.join(root, 'src', 'shared', 'api.ts'), 'utf8').includes("'connections:setOn'"), 'connections:setOn is an IPC channel')
+  // The folder is the one Combwork looks for: Claude Code's home without CLAUDE_CONFIG_DIR, which a user's environment hasn't.
+  const adapter = fs.readFileSync(path.join(root, 'src', 'main', 'providers', 'claude', 'adapter.ts'), 'utf8')
+  assert.ok(adapter.includes("return process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude')"), "Claude Code's home is ~/.claude")
+  // Combwork's refusal stays: it never makes the CLI's own folder.
+  assert.ok(fs.readFileSync(path.join(root, 'src', 'main', 'accounts.ts'), 'utf8').includes("id: 'main.accounts.noHome'"))
 })
 
 test('every view marker the driver waits for is in Combwork\'s window: its classes and attributes in the renderer, its text in English', () => {

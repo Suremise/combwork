@@ -41,10 +41,12 @@ const OLD_BACKUP_PREFIX = 'hive-'
 const OLD_ADV = { app: 'hive.mcp.replySeconds', ws: 'hive.progress.lanesShown' }
 const OLD_GIT_OPTIONS = { finish: 'hiveMerges', commitMessage: 'hive' }
 const OLD_ACTOR = 'hive'
-const OLD_START_LINE = /\b(?:Hive|Combwork) (\S+) starting/g
+const OLD_START_LINE = /\b(Hive|Combwork) (\S+) starting/g
 const OLD_NAME_RE = /hive/i
 // The notice an RC showed when it ran from 1.0's folders (removed by HI-2594): a 1.1 must never show it.
 const OLD_FALLBACK_NOTICE = "Hive Desktop's data folders"
+// 1.0's preload bridge (window.hive; HI-2588 renamed it window.combwork), which the mark step drives before the upgrade (HI-2645).
+const OLD_BRIDGE = 'hive'
 // old-name: end drive-inputs
 // The installed app (HI-2460): Combwork's when it is installed, else the 1.0 app's (before an upgrade). Its
 // profile: Combwork's folder when it is there, else 1.0's own (before the upgrade moves it).
@@ -79,13 +81,19 @@ const save = () => fs.writeFileSync(path.join(OUT, `${prefix}.json`), JSON.strin
 // Each check has a stable id ("<scenario>.<what>"): the host's report requires the ids each step must produce.
 const check = (id, name, ok, detail) => { res.checks.push({ id, scenario: Number(String(id).split('.')[0]) || 0, name, ok: !!ok, detail: ok ? undefined : String(detail ?? '').slice(0, 1500) }); save() }
 // When what it reads is ready: conditions Combwork says are met, each bounded (ready.cjs, unit-tested in Combwork's npm test).
-const { until, workspaceSetUp, VIEWS, viewReady } = require(path.join(__dirname, 'ready.cjs'))
+const { until, workspaceSetUp, VIEWS, viewReady, pickBridge, releasesStarted } = require(path.join(__dirname, 'ready.cjs'))
+// The names upgrade's record's version (src/main/nameUpgrade.ts NAMES_VERSION; a unit test holds them equal).
+const NAMES_VERSION = 4
 const ps = cmd => execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', cmd], { encoding: 'utf8', timeout: 60_000 }).trim()
 const readConfig = () => { try { return JSON.parse(fs.readFileSync(path.join(PROFILE, 'config.json'), 'utf8')) } catch { return null } }
 
 let app
 let page
-const inv = (channel, ...args) => page.evaluate(([c, a]) => window.combwork.invoke(c, ...a), [channel, args])
+// The preload bridge the step talks to (HI-2645): the new app's window.combwork. Only mark drives the release before
+// (1.0, or an RC from before HI-2588 in scenario 10), so only it may use that release's own bridge.
+const BRIDGES = step === 'mark' ? ['combwork', OLD_BRIDGE] : ['combwork']
+let bridge
+const inv = (channel, ...args) => page.evaluate(([b, c, a]) => window[b].invoke(c, ...a), [bridge, channel, args])
 
 /** Combwork instances already running from the install folder (the installer's --force-run starts one): closed by PID. */
 function closeRunningApp() {
@@ -99,6 +107,9 @@ async function launch(opts = {}) {
   page = await app.firstWindow({ timeout: 90_000 })
   page.on('pageerror', e => { (res.facts.pageErrors ||= []).push(String(e.message).slice(0, 300)) })
   await page.waitForSelector('.app .workbench', { timeout: 90_000 })
+  bridge = pickBridge(BRIDGES, await page.evaluate((names) => names.filter((n) => typeof window[n]?.invoke === 'function'), BRIDGES))
+  res.facts.bridge = bridge
+  if (!bridge) throw new Error(`the window has no preload bridge the ${step} step uses (window.${BRIDGES.join(' or window.')})`)
   res.facts.launchMs = Date.now() - t0
   // Ready once every provider check has finished (as Combwork's e2e lib does).
   await until(async () => Object.values(await inv('provider:info')).every(i => !i.checking), 60_000)
@@ -179,6 +190,26 @@ const windowText = async () => {
 
 const bodyText = () => page.evaluate(() => document.body.innerText)
 const statusWarnings = () => page.$$eval('.statusbar .status-item.warn', els => els.map(e => (e.innerText || e.getAttribute('title') || '').trim()))
+
+/** The project's kept Git options in the kept workspace's project.json, in the folder named (the release before's or .combwork). */
+const keptGitOptions = (tree) => readJson(path.join(KEPT_WS, 'demo', tree, 'project.json'))?.workflow?.kept?.git?.options ?? null
+
+/**
+ * Mark's end: its screenshot, then the release before quit, then the project's Git workflow options as that release
+ * writes them (its merges, its commit message; HI-2598), for the upgrade to convert to Combwork's. Written only once it
+ * has quit (HI-2645): a running app saves its project.json again (the open's own writes), over a write made behind it.
+ */
+async function beforeUpgrade(made) {
+  await shot('before-upgrade')
+  if (!made) return
+  await app.close()
+  app = undefined
+  const pj = path.join(KEPT_WS, 'demo', TREE_BEFORE, 'project.json')
+  const cfg = readJson(pj) ?? {}
+  fs.writeFileSync(pj, JSON.stringify({ ...cfg, workflow: { platform: 'none', preset: null, options: {}, kept: { git: { preset: null, options: { ...OLD_GIT_OPTIONS } } } } }, null, 2) + '\n')
+  const o = keptGitOptions(TREE_BEFORE)
+  check('4.values-written', "Before the upgrade: the project's kept Git options as the release before writes them, written once it has quit", o?.finish === OLD_GIT_OPTIONS.finish && o?.commitMessage === OLD_GIT_OPTIONS.commitMessage, JSON.stringify(readJson(pj)?.workflow ?? null))
+}
 
 const steps = {
   async 'first-run'() {
@@ -331,27 +362,20 @@ const steps = {
     const made = await until(async () => fs.existsSync(path.join(KEPT_WS, TREE_BEFORE, OLD_DB)) && fs.existsSync(path.join(KEPT_WS, 'demo', TREE_BEFORE, 'project.json')), 30_000)
     let card = null
     if (made) card = await inv('tasks:create', { title: KEPT_CARD, project: 'demo', description: `The plan: ${path.join(KEPT_WS, TREE_BEFORE, 'shared', 'plan.md')}` }).catch((e) => ({ error: String(e) }))
-    // Stored values under the old names (HI-2598): the project's Git workflow options as the release before writes them
-    // (its merges, its commit message), for the upgrade to convert to Combwork's.
-    if (made) {
-      const pj = path.join(KEPT_WS, 'demo', TREE_BEFORE, 'project.json')
-      const cfg = readJson(pj) ?? {}
-      fs.writeFileSync(pj, JSON.stringify({ ...cfg, workflow: { platform: 'none', preset: null, options: {}, kept: { git: { preset: null, options: { ...OLD_GIT_OPTIONS } } } } }, null, 2) + '\n')
-    }
     // A skill copy as the release before marks it (HI-2587), for the upgrade to rename its marker.
     fs.mkdirSync(path.join(KEPT_WS, COPY), { recursive: true })
     fs.writeFileSync(path.join(KEPT_WS, COPY, 'SKILL.md'), '---\nname: cw-sandbox-check\n---\n')
     fs.writeFileSync(path.join(KEPT_WS, COPY, OLD_COPY_MARKER), JSON.stringify({ source: 'sandbox', hash: 'h' }) + '\n')
     res.facts.keptWorkspace = { made: !!made, card, tree: TREE_BEFORE, logs: fs.readdirSync(path.join(PROFILE, 'logs')).filter((n) => n.endsWith('.log')) }
     check('4.workspace-made', `Before the upgrade: a workspace with a project and a card, in ${TREE_BEFORE}, its board ${OLD_DB}, the log ${OLD_LOG}`, !!made && typeof card?.number === 'number' && res.facts.keptWorkspace.logs.includes(OLD_LOG), JSON.stringify(res.facts.keptWorkspace))
-    if (FROM_RC) return void (await shot('before-upgrade'))
+    if (FROM_RC) return void (await beforeUpgrade(made))
     // Advanced overrides under the release before's old ids (HI-2518), one at each level: Combwork's own (advanced.json
     // in the profile) and the workspace's own (its workspace.json), for the upgrade to bring back under cw.*.
     const setAdv = (id, value, scope) => inv('advanced:set', id, value, scope).then(() => null, (e) => String(e))
     res.facts.advancedSet = { app: await setAdv(ADV.app.old, ADV.app.value), workspace: made ? await setAdv(ADV.ws.old, ADV.ws.value, 'workspace') : 'no workspace' }
     const advSaved = await until(async () => readJson(path.join(PROFILE, 'advanced.json'))?.values?.[ADV.app.old] === ADV.app.value && readJson(path.join(KEPT_WS, OLD_DIR, 'workspace.json'))?.advanced?.[ADV.ws.old] === ADV.ws.value, 10_000)
     check('4.advanced-saved', `Before the upgrade: ${ADV.app.old} = ${ADV.app.value} in advanced.json and the workspace's own ${ADV.ws.old} = ${ADV.ws.value}`, advSaved, JSON.stringify({ set: res.facts.advancedSet, file: readJson(path.join(PROFILE, 'advanced.json'))?.values, ws: readJson(path.join(KEPT_WS, OLD_DIR, 'workspace.json'))?.advanced }))
-    await shot('before-upgrade')
+    await beforeUpgrade(made)
   },
 
   // Scenario 8 (HI-2460): a Windows notification from the installed app, under its own app ID: Windows records an app
@@ -387,6 +411,13 @@ const steps = {
     ps(`$p = [Environment]::GetEnvironmentVariable('Path', 'User'); if (-not (($p -split ';') -contains '${gitCmd}')) { [Environment]::SetEnvironmentVariable('Path', ((@($p, '${gitCmd}') | Where-Object { $_ }) -join ';'), 'User') }`)
     res.facts.fakeClaude = ps('& C:\\tools\\combwork-tests\\sandbox\\inside\\fake-claude-install.ps1')
     const fakeBin = path.join(process.env.LOCALAPPDATA, 'FakeClaude', 'bin')
+    // Then Claude Code run once, as a new user does after installing it (HI-2646): its first run makes its folder,
+    // %USERPROFILE%\.claude, which Combwork needs before it adds a connection and never makes itself (accounts.ts,
+    // main.accounts.noHome). The fake runs only in a test folder (CLAUDE_CONFIG_DIR), so the folder is made in its place.
+    const claudeHome = path.join(process.env.USERPROFILE, '.claude')
+    const hadHome = fs.existsSync(claudeHome)
+    fs.mkdirSync(claudeHome, { recursive: true })
+    res.facts.claudeFirstRun = { home: claudeHome, there: hadHome }
     // Combwork starts with a user's environment: this script's, less what the checks themselves put in it (the mapped
     // tests folder's path), which no user has. What was left out is recorded.
     const env = {}
@@ -445,6 +476,10 @@ const steps = {
         res.facts[`view ${view.name}`] = String(e.message).slice(0, 300)
       }
     }
+
+    // The account turned on in this workspace, as a user does with its On here switch (Settings → Accounts & Connections;
+    // HI-2646): each workspace chooses which are on, and one added before the workspace was made is on in none.
+    if (account?.id) res.facts.accountOn = await inv('connections:setOn', account.id, true).then(() => true, (e) => String(e))
 
     // An agent, started briefly: its first task is `set`, which the fake runs in the session's shell (fake-shell.jsonl).
     const agent = await inv('agents:add', proj, { provider: 'claude-code' }).catch((e) => ({ error: String(e) }))
@@ -570,8 +605,10 @@ const steps = {
     res.facts.keptCard = card ? { number: card.number, description: card.description } : cards
     check('4.workspace-card', 'Its card is on the board, its path now into .combwork', !!card && card.description === `The plan: ${path.join(KEPT_WS, '.combwork', 'shared', 'plan.md')}`, JSON.stringify(res.facts.keptCard))
     // HI-2598: the stored values converted once: the project's kept Git options, and the card's facts' actors.
-    const keptGit = readJson(path.join(KEPT_WS, 'demo', '.combwork', 'project.json'))?.workflow?.kept?.git?.options ?? null
-    check('4.values-options', "The project's kept Git options say Combwork's (combworkMerges, Combwork's commit message), no old value left", keptGit?.finish === 'combworkMerges' && keptGit?.commitMessage === 'combwork', JSON.stringify(keptGit))
+    // Waited for (HI-2645): the open converts it in its own time, and a read as it is renamed into place reads nothing.
+    const converted = (o) => o?.finish === 'combworkMerges' && o?.commitMessage === 'combwork'
+    const keptGit = (await until(async () => { const o = keptGitOptions('.combwork'); return converted(o) && o }, 15_000)) || keptGitOptions('.combwork')
+    check('4.values-options', "The project's kept Git options say Combwork's (combworkMerges, Combwork's commit message), no old value left", converted(keptGit), JSON.stringify(keptGit ?? readJson(path.join(KEPT_WS, 'demo', '.combwork', 'project.json'))?.workflow ?? null))
     const facts = card ? await inv('tasks:facts', card.number).catch(() => null) : null
     check('4.values-facts', "No fact of the card made before names the old app as its actor", Array.isArray(facts) && !facts.some((x) => x.actor === OLD_ACTOR || x.data?.by === OLD_ACTOR), JSON.stringify(facts?.map((x) => [x.kind, x.actor])))
     // HI-2587: the names upgrade. The board's file and its copies, the log, the workspace's files, the skill copy's marker:
@@ -583,12 +620,14 @@ const steps = {
     check('4.board-backups', "The board's copies in backups take Combwork's names", !res.facts.names.backups.some((n) => n.startsWith(OLD_BACKUP_PREFIX)), JSON.stringify(res.facts.names.backups))
     let log = ''
     try { log = fs.readFileSync(path.join(PROFILE, 'logs', 'combwork.log'), 'utf8') } catch { /* below */ }
-    check('4.log-file', `The log is combwork.log, with the release before's lines in it (its start line and this one's); no ${OLD_LOG} left`, !res.facts.names.logs.includes(OLD_LOG) && new Set([...log.matchAll(OLD_START_LINE)].map((m) => m[1])).size >= 2, JSON.stringify(res.facts.names.logs))
+    // Each release's start line by its name and version (HI-2645): an RC can carry the version of the release before.
+    res.facts.releasesStarted = releasesStarted(log, OLD_START_LINE)
+    check('4.log-file', `The log is combwork.log, with the release before's lines in it (its start line and this one's); no ${OLD_LOG} left`, !res.facts.names.logs.includes(OLD_LOG) && res.facts.releasesStarted.length >= 2, JSON.stringify({ logs: res.facts.names.logs, started: res.facts.releasesStarted }))
     let gitignore = ''
     try { gitignore = fs.readFileSync(path.join(dir, '.gitignore'), 'utf8') } catch { /* below */ }
     check('4.workspace-files', "The workspace's .gitignore is Combwork's, for combwork.db, keeping the names upgrade's record out", /\(added by Combwork, #1017\)/.test(gitignore.split(/\r?\n/)[0]) && /^combwork\.db\r?$/m.test(gitignore) && /^combwork-names\.json\r?$/m.test(gitignore) && !gitignore.split(/\r?\n/).some((l) => l.startsWith(OLD_DB)), gitignore.slice(0, 600))
     check('4.copy-marker', "The project's skill copy has Combwork's marker (.combwork-copy), its content as it was", res.facts.names.copy.includes('.combwork-copy') && !res.facts.names.copy.includes(OLD_COPY_MARKER) && readJson(path.join(KEPT_WS, COPY, '.combwork-copy'))?.hash === 'h', JSON.stringify(res.facts.names.copy))
-    check('4.names-done', 'The names upgrade recorded itself done (.combwork\\combwork-names.json)', readJson(path.join(dir, 'combwork-names.json'))?.version === 3, JSON.stringify(res.facts.names.combwork))
+    check('4.names-done', 'The names upgrade recorded itself done (.combwork\\combwork-names.json)', readJson(path.join(dir, 'combwork-names.json'))?.version === NAMES_VERSION,JSON.stringify(res.facts.names.combwork))
     const oldNames = [...res.facts.names.combwork, ...res.facts.names.logs].filter((n) => n.toLowerCase().startsWith(OLD_NAME.toLowerCase()))
     check('4.no-old-names', "No file under the old names left in the workspace's .combwork or the profile's logs", oldNames.length === 0, JSON.stringify(oldNames))
     if (!FROM_RC) {
@@ -604,7 +643,8 @@ const steps = {
       check('4.advanced-kept', `The advanced overrides come back under cw.*: ${ADV.app.now} = ${ADV.app.value} (advanced.json rewritten, nothing under ${ADV.app.old}) and the workspace's own ${ADV.ws.now} = ${ADV.ws.value}`, !!rewritten && state?.values?.[ADV.app.now] === ADV.app.value && !(ADV.app.old in (state?.values ?? {})) && state?.workspace?.[ADV.ws.now] === ADV.ws.value && !(ADV.ws.old in (state?.workspace ?? {})), JSON.stringify(res.facts.advancedAfter))
       const old = await api(`/v1/settings/${encodeURIComponent(`advanced.${ADV.app.old}`)}`).catch((e) => ({ error: String(e) }))
       res.facts.advancedOldId = old
-      check('4.advanced-old-id', `An agent naming the old id (advanced.${ADV.app.old}) is told the new one`, JSON.stringify(old).includes(`use advanced.${ADV.app.now}`), JSON.stringify(old))
+      // No aliases (SPEC, the cw. ids; HI-2598 dropped HI-2518's "renamed: use …"): the old id is answered as any id that isn't a setting.
+      check('4.advanced-old-id', `An agent naming the old id (advanced.${ADV.app.old}) is told there is no such setting, its value not read`, typeof old?.error === 'string' && old.error.startsWith(`No setting "advanced.${ADV.app.old}"`) && !('value' in (old ?? {})), JSON.stringify(old))
     }
     await shot('after-upgrade-light')
     await theme('dark')

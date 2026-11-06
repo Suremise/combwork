@@ -12,6 +12,11 @@
  * and the workspace (logs apart), the shortcuts, the registry, the agent's environment, the window's text, Copy
  * Diagnostics and the exported board. app.asar is the one exception: its hits are counted and reported, never failed
  * (the upgrade code that knows the 1.0 names lives in it).
+ *
+ * The bundled code's contents aren't searched (HI-2647: Darren, 6 Nov, "check the job, not the tree"). The code is the
+ * repository's source, compiled, and which source may name the old name (only the upgrade code) is the repository's
+ * name guard's job (tests/oldNames.mjs, tests/oldNamesAllow.json). This check's job is what a clean install writes and
+ * shows, so the bundled code's files are named and counted (isBundledCode), never read.
  */
 const fs = require('fs')
 const path = require('path')
@@ -20,7 +25,7 @@ const { nameHits } = require('../oldNameMatch.cjs')
 
 /** Each place searched: its id (the report's check is 9.no-old-name-<id>) and what it is, for the report. */
 const CATEGORIES = [
-  { id: 'install', title: 'the install folder (names, text files and the exes\' version info; app.asar counted apart)' },
+  { id: 'install', title: 'the install folder (names, text files and the exes\' version info; the bundled code\'s contents left to the repo\'s name guard, app.asar counted apart)' },
   { id: 'roaming', title: '%APPDATA%\\Combwork (names and files)' },
   { id: 'local', title: '%LOCALAPPDATA%\\Combwork (names and files)' },
   { id: 'workspace', title: 'the workspace and its git project (names and files, .git/info/exclude, .gitignore, READMEs)' },
@@ -36,6 +41,15 @@ const CATEGORIES = [
 const KEEP = 200
 /** A file read whole up to this size; bigger ones are read in parts. */
 const CHUNK = 8 * 1024 * 1024
+
+/**
+ * The bundled code under the install folder (`rel` from it): the JavaScript electron-vite builds into out/main,
+ * out/preload and out/renderer, as app.asar.unpacked holds it. Its names are searched, its contents aren't: code is the
+ * repository's name guard's (HI-2647). Anything else under app.asar.unpacked (a native module, a resource) is searched
+ * as before.
+ */
+const BUNDLED_CODE = /^resources\/app\.asar\.unpacked\/out\/(?:main|preload|renderer)\/(?:[^/]+\/)*[^/]+\.[cm]?js$/i
+const isBundledCode = (rel) => BUNDLED_CODE.test(String(rel).replace(/\\/g, '/'))
 
 /** The hits in a text: [{ at, match, text }], text the hit's line (shortened around it). */
 function oldNameHits(text) {
@@ -70,11 +84,12 @@ function binaryHits(buf) {
 }
 
 /**
- * A new tally: { [category]: { scanned, count, hits: [{ place, text }], unread } }, app.asar's apart, and what couldn't be
- * read ({ category, place, why }), which fails its place: an unread file or folder could hold a hit.
+ * A new tally: { [category]: { scanned, count, hits: [{ place, text }], unread } }, app.asar's apart, how many of the
+ * bundled code's files were named but not read (code), and what couldn't be read ({ category, place, why }), which fails
+ * its place: an unread file or folder could hold a hit.
  */
 function tally() {
-  return { places: Object.fromEntries(CATEGORIES.map((c) => [c.id, { scanned: 0, count: 0, hits: [], unread: 0 }])), asar: [], skipped: [] }
+  return { places: Object.fromEntries(CATEGORIES.map((c) => [c.id, { scanned: 0, count: 0, hits: [], unread: 0 }])), asar: [], code: 0, skipped: [] }
 }
 
 /** Something in a place that couldn't be read: counted against the place, and kept with why. */
@@ -106,9 +121,11 @@ const isLog = (p) => /\.log(\.\d+)?$/i.test(p) || /(^|[\\/])logs?[\\/]/i.test(p)
  * content, without following links or junctions. Text files always; binary files when binary is 'scan' (the app's own
  * data: its databases), else only named (the install folder's Electron, Chromium and native modules). A log goes under
  * 'logs' whatever the folder. app.asar's hits are counted in t.asar, not failed. `skip(rel)`: true leaves a file's
- * content out (named still), e.g. .git/objects, which is compressed. Returns how many files and folders it went through.
+ * content out (named still), e.g. .git/objects, which is compressed. `code(rel)`: true for the bundled code
+ * (isBundledCode), named and counted in t.code, its content left to the repository's name guard. Returns how many files
+ * and folders it went through.
  */
-function scanTree(t, category, root, { binary = 'skip', skip = () => false } = {}) {
+function scanTree(t, category, root, { binary = 'skip', skip = () => false, code = () => false } = {}) {
   let n = 0
   if (!fs.existsSync(root)) return n
   record(t, category, root, oldNameHits(path.basename(root)))
@@ -137,6 +154,10 @@ function scanTree(t, category, root, { binary = 'skip', skip = () => false } = {
         } catch (err) {
           unread(t, category, full, err.message)
         }
+        continue
+      }
+      if (code(rel.replace(/\\/g, '/'))) {
+        t.code = (t.code || 0) + 1
         continue
       }
       if (skip(rel.replace(/\\/g, '/'))) continue
@@ -228,6 +249,10 @@ function cleanChecks(scan, add) {
   const asar = [].concat(scan?.asar || [])
   const total = asar.reduce((s, a) => s + (a.count || 0), 0)
   add('9.asar-counted', `app.asar's own hits counted, not failed: ${total}`, asar.length > 0, 'no app.asar in the install folder')
+  // The bundled code: named, its contents the repository's name guard's (HI-2647). None found means the build's layout
+  // moved from under isBundledCode, so a gap is never a pass.
+  const code = Number(scan?.code) || 0
+  add('9.code-named', `The bundled code's files named, their contents left to the repository's name guard (tests/oldNames.mjs): ${code}`, code > 0, 'no bundled code found in app.asar.unpacked')
   return { total, files: asar }
 }
 
@@ -253,4 +278,4 @@ function hitsMarkdown(scan) {
   return lines
 }
 
-module.exports = { CATEGORIES, KEEP, oldNameHits, textOf, tally, record, scanText, scanTree, isLog, regEntries, newRegistryHits, cleanChecks, hitsMarkdown }
+module.exports = { CATEGORIES, KEEP, isBundledCode, oldNameHits, textOf, tally, record, scanText, scanTree, isLog, regEntries, newRegistryHits, cleanChecks, hitsMarkdown }
