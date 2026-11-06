@@ -55,12 +55,12 @@ A lane ends its builder's session when its last card merges, so steps written af
 1. **Phases.** Cards merge into the integration branch through lanes, each merge with the merge checks (AGENTS.md, Tests). Each phase ends with its **checks card**, #1449 (P7's) being the pattern:
    - typecheck, lint, `npm test` and the i18n checks;
    - the full fake set (`npm run e2e -- --all --build --record`) and the phase's real suites (`--real`);
-   - `npm run scenarios` against the last baseline when guidance changed, and model trials when it could alter what agents do.
+   - `npm run scenarios` against the last baseline when guidance changed, and, when it could alter what agents do, the release's model trial: 3 to 5 scenarios picked at random (What a release checks).
 
    Failures are carded at once and bisected over the merges since the last full run.
 2. **The baseline install** (#1288): a 1.0 build the user installs and uses day to day, before anything is uploaded. Features from On Hold are then built on top of it for a while.
    - It waits for the last phase's checks card (#1539), the translation review (#1126) and #1582 (the version checks off `fetch()`). Electron's CVE fix (#1503) comes before the RC (#1541), not the baseline (the user, 24 Oct).
-   - **Its checks are lighter than a release's** (the user, 24 Oct): the checks on the integration branch's head, where the last checks card's results stand if the branch hasn't moved since (otherwise run them again), with the model trials as a **smoke run**: Claude Code and Codex each run the key scenarios once, with no repeats, no Haiku and no Copilot. The full trials, the full e2e set and the real tier come before a proper release (What a release checks).
+   - **Its checks are lighter than a release's** (the user, 24 Oct): the checks on the integration branch's head, where the last checks card's results stand if the branch hasn't moved since (otherwise run them again), with the model trials as a release's: 3 to 5 scenarios picked at random, once each (What a release checks). The full e2e set and the real tier come before a proper release.
    - The release notes (below).
    - The version is `1.0.0-rc.<n>` (asked), set before the build: no current-version candidate comes first (that's Step 1, for an uploaded release). (1.0's baselines were named as RCs; a later baseline is a beta: Betas and RCs.) A pre-release version means the updater never offers a 0.9.x release over it, and a later RC or 1.0.0 updates it.
    - `npm run dist -- --kind baseline` (asked), built from the integration branch's head. From a worktree, it copies the installer into the main checkout's `dist` (Notes).
@@ -80,7 +80,7 @@ Before any release that is uploaded, an RC or the release itself, everything run
 
 - the full fake set, and the real tier for every CLI (Steps 4 and 5);
 - the i18n checks, with all text translated in the 7 locales and checked in context (#1126);
-- `npm run scenarios` against the baseline, and the model trials. Their scope is agreed with the user, since they cost tokens;
+- `npm run scenarios` against the baseline, and the model trial: **3 to 5 scenarios picked at random** from the trial set, once each, with no repeats (`npm run scenarios -- --provider <provider> --random 3`, which prints the ids it picked and its seed). The release card names the seed or the ids, so the same pick can be run again (`--random 3 --seed <seed>`, or `--only <ids>`). The full set on every provider is not a release step (the user, 6 Nov: Combwork is used daily on real models, where a failure would be noticed first); it is for guidance-wide changes (AGENTS.md);
 - the Sandbox checks.
 
 A release has **no known gaps**: a card showing that one of the release's features is unfinished joins the release's path before the RC, or the user moves it out of the release.
