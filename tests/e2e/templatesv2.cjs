@@ -133,7 +133,7 @@ const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10
     }, old)
     const wsBefore = JSON.stringify(listed(path.join(ws, '.combwork', 'templates')))
     await sidebar.locator('[aria-label="Import Template…"]').click()
-    check('importing a 0.9 template is refused, saying why', !!(await until(async () => (await page.locator('.toast').allInnerTexts()).some((t) => /Could not import the template[\s\S]*This template is from Combwork 0\.9 and can't be loaded in 1\.0\. Recreate it from your agents with Save as Template\./.test(t)), HUNG_MS)) && JSON.stringify(listed(path.join(ws, '.combwork', 'templates'))) === wsBefore, (await page.locator('.toast').allInnerTexts()).join(' | '))
+    check('importing a 0.9 template is refused, saying why', !!(await until(async () => (await page.locator('.toast').allInnerTexts()).some((t) => /Could not import the template[\s\S]*This template is from Hive 0\.9 and can't be loaded in 1\.0\. Recreate it from your agents with Save as Template\./.test(t)), HUNG_MS)) && JSON.stringify(listed(path.join(ws, '.combwork', 'templates'))) === wsBefore, (await page.locator('.toast').allInnerTexts()).join(' | '))
 
     // --- Team 3×3 into alpha from the view: six agents named from its key, paired, in a grid, none in a worktree.
     const branches = lib.git(alpha, ['branch', '--list'])

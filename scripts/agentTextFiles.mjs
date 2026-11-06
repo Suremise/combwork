@@ -23,4 +23,4 @@ export const isAgentFile = (rel) => AGENT_FILES.some(([re]) => re.test(rel))
  * cw-progress, the Agent API), not one about SQL, the log, a CLI's own text or Copy Diagnostics.
  */
 export const agentReason = (reason) =>
-  !/^\s*(SQL|the log|log|hive\.log|a CLI's|the CLI's|Copy Diagnostics)\b/i.test(reason) && /\b(agents?|agent-facing|agent's|wakes?|Assistant|tools?|inbox|prompts?|guidance|briefs?|lanes?|repl(?:y|ies)|refusals?|doorbells?|cw-progress|Agent API|instructions)\b/i.test(reason)
+  !/^\s*(SQL|the log|log|a CLI's|the CLI's|Copy Diagnostics)\b/i.test(reason) && /\b(agents?|agent-facing|agent's|wakes?|Assistant|tools?|inbox|prompts?|guidance|briefs?|lanes?|repl(?:y|ies)|refusals?|doorbells?|cw-progress|Agent API|instructions)\b/i.test(reason)

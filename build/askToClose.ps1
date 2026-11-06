@@ -13,7 +13,7 @@ param(
   [Parameter(Mandatory = $true)][string]$InstallDir,
   # The running app's profile (HI-2461): Combwork's once a Combwork build has moved it, else Hive's (a 1.0 being replaced).
   [string]$Profile = $(if (Test-Path -LiteralPath (Join-Path $env:APPDATA 'Combwork') -PathType Container) { Join-Path $env:APPDATA 'Combwork' } else { Join-Path $env:APPDATA 'Hive' }),
-  [string]$ExeName = 'Hive.exe',
+  [string]$ExeName = 'Combwork.exe',
   [int]$AckMs = 3000,
   [int]$ExitMs = 30000
 )

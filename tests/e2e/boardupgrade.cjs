@@ -226,7 +226,7 @@ async function themes(dev, name) {
     check('with 0.9 closed, the folders moved to .combwork', fs.existsSync(path.join(ws, '.combwork', 'combwork.db')) && !fs.existsSync(path.join(ws, '.hive')) && fs.existsSync(path.join(alpha, '.combwork', 'project.json')) && !fs.existsSync(path.join(alpha, '.hive')))
     const ask = dialogWith(dev.page, ASK)
     check('the dev build asks before upgrading', !!(await lib.until(async () => (await ask.count()) === 1, HUNG_MS)))
-    check('…saying why, that a 0.9 Combwork can then no longer open it, and that a backup is kept', /Combwork 1\.0 needs to upgrade this workspace's data\. A 0\.9 Combwork can then no longer open it; a backup of the board is kept/.test(await ask.innerText().catch(() => '')), await ask.innerText().catch(() => ''))
+    check('…saying why, that Hive 0.9 can then no longer open it, and that a backup is kept', /Combwork 1\.0 needs to upgrade this workspace's data\. Hive 0\.9 can then no longer open it; a backup of the board is kept/.test(await ask.innerText().catch(() => '')), await ask.innerText().catch(() => ''))
     check("…and to back up first: no going back to 0.9.3 once agents' worktrees become slots (#1441)", /Back up first: there's no going back to 0\.9\.3 once your agents' worktrees become slots\./.test(await ask.innerText().catch(() => '')), await ask.innerText().catch(() => ''))
     await themes(dev, '1-ask')
 

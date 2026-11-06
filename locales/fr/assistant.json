@@ -479,7 +479,7 @@
   "assistant.template.badPairs": "Ses binômes d’auteurs et de relecteurs nomment des agents qu’il n’a pas, ou un agent deux fois.",
   "assistant.template.badRole": "Le rôle de l’agent {name} dans le flux de travail n’est ni builder, ni reviewer, ni either, ni generalist.",
   "assistant.template.badToken": "{name} utilise {token} : le nom d’un agent ne peut contenir que '{key}' (la clé du projet) et '{n}' (son numéro parmi les agents de ce nom).",
-  "assistant.template.from09": "Ce modèle vient de Combwork 0.9 et ne peut pas être chargé dans la 1.0. Recrée-le à partir de tes agents avec « Enregistrer le modèle… ».",
+  "assistant.template.from09": "Ce modèle vient de Hive 0.9 et ne peut pas être chargé dans la 1.0. Recrée-le à partir de tes agents avec « Enregistrer le modèle… ».",
   "assistant.template.longNote": "La note de l’agent {name} dépasse {max, number} caractères.",
   "assistant.template.newer": "Il a été créé par une version plus récente de Combwork : mets Combwork à jour pour l’utiliser.",
   "assistant.template.noAgents": "Il n’a aucun agent.",

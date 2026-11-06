@@ -4761,7 +4761,7 @@ repeating them (#533) [note §8].
   (`solo | pair | team`), `reviewerMode` (`lane | pool`, offered once #1443/#1445 have G17, never written into the
   options) and `pairs` (`{ builder, reviewer }` by name, each agent in one pair, a builder that builds and a reviewer that
   reviews; the editor keeps them while both agents are). A version 1 file is refused, listed and on import: "This
-  template is from Combwork 0.9 and can't be loaded in 1.0. Recreate it from your agents with Save as Template." Save as
+  template is from Hive 0.9 and can't be loaded in 1.0. Recreate it from your agents with Save as Template." Save as
   Template stores each agent's role as it reads (#1430), its note, the pairs from `AgentDef.pairedWith` and the project's
   preset (P4's Pair as Pair). **Loading** creates each agent with `workflowRole`, `role` = the note, and the pairs as
   `AgentDef.pairedWith` both ways (a name; Start Lane fills a builder's reviewer from it, #1443); the plan's `pairs`
@@ -6003,18 +6003,18 @@ typed tables (#1211, v6, the last of its stores: `store_rows` goes with it), eve
 deliveries keep their in-memory store (published after each transaction), the table its durable copy [Darren, 20 Oct,
 #1211].
 - **Before it runs, Combwork asks** ("Upgrade this workspace's board to 1.0? Combwork 1.0 needs to upgrade this workspace's
-  data. A 0.9 Combwork can then no longer open it; a backup of the board is kept, and Help → Restore the 0.9 Board Backup…
+  data. Hive 0.9 can then no longer open it; a backup of the board is kept, and Help → Restore the 0.9 Board Backup…
   puts it back. Back up first: there's no going back to 0.9.3 once your agents' worktrees become slots." [the Assistant
   for Darren, #1207 20 Oct; reworded on #1209, Darren 20 Oct: the cards step drops the cards' documents, which 0.9
   reads; its last sentence since the upgrade is one-way, Darren 22 Oct on #1123]). Until the user agrees, the board opens read-only, as for a newer
-  file (writes refused with "This board is from Combwork 0.9: it is read-only until it is upgraded to 1.0"; what would
+  file (writes refused with "This board is from Hive 0.9: it is read-only until it is upgraded to 1.0"; what would
   change a card is off, saying why in its tooltip: the board's add-card buttons, dragging cards, a card's menu but Open, the
   card dialog's fields, Save, Start…, Archive, Delete, comments and decisions, with the reason as a banner in the dialog
   [#1230]; for a newer file too), with a banner at the top of the window offering **Upgrade…**; **Not Now** holds
   until Combwork starts again. A test copy (unpackaged, `CW_TEST_BOARD_UPGRADE=yes|no`) answers before it is asked
   [#1207]. **Meanwhile nothing that `combwork.db` must record starts** [HR1's #1207 round 1 finding 1]: the whole file is
   read-only, so an agent's or the Assistant's start (every path: a click, Resume All, the Agent API, the Assistant) is
-  refused before anything runs ("This workspace is from Combwork 0.9: upgrade it to 1.0 before starting agents"), and
+  refused before anything runs ("This workspace is from Hive 0.9: upgrade it to 1.0 before starting agents"), and
   reading the workspace's stores moves no old file in (a host's `sessions.json` waits for the upgrade). The workspace
   stays open for reading; the banner says the board is read-only and agents can't start, and New Session and Resume in
   the session view and the agent's menus are off with that as their tooltip [#1230]. The opening's steps that write the
