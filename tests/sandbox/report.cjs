@@ -73,7 +73,7 @@ function overPrevious(n, pre, fromRc = false) {
   if (fromRc) {
     return {
       drivers: {
-        [`${pre}-mark`]: { scenario: n, ids: ['4.settings-saved', '4.workspace-made'], facts: ['version'] },
+        [`${pre}-mark`]: { scenario: n, ids: ['4.settings-saved', '4.workspace-made', '4.values-written'], facts: ['version'] },
         [`${pre}-after`]: { scenario: n, ids: ['4.settings-kept', '4.theme-applied', '4.combwork-runs', '4.workspace-moved', '4.workspace-card', '4.values-options', '4.values-facts', ...NAME_IDS], facts: ['version'] },
         [`${pre}-notify`]: { scenario: n, ids: [`${n}.notification`], facts: ['exe'] }
       },
@@ -82,7 +82,7 @@ function overPrevious(n, pre, fromRc = false) {
   }
   return {
     drivers: {
-      [`${pre}-mark`]: { scenario: n, ids: ['4.settings-saved', '4.login-registered', '4.workspace-made', '4.advanced-saved'], facts: ['version'] },
+      [`${pre}-mark`]: { scenario: n, ids: ['4.settings-saved', '4.login-registered', '4.workspace-made', '4.advanced-saved', '4.values-written'], facts: ['version'] },
       [`${pre}-after`]: { scenario: n, ids: ['4.settings-kept', '4.theme-applied', '4.combwork-runs', '4.local-moved', '4.trust-kept', '4.roaming-moved', '4.record', '4.login-moved', '4.no-fallback', '4.workspace-moved', '4.workspace-card', '4.values-options', '4.values-facts', '4.advanced-kept', '4.advanced-old-id', ...NAME_IDS], facts: ['version'] },
       [`${pre}-notify`]: { scenario: n, ids: [`${n}.notification`], facts: ['exe'] }
     },
