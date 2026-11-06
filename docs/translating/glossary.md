@@ -12,8 +12,7 @@ phrase for it once, in your style page, and use it everywhere.
 
 | Term | Why |
 |---|---|
-| Combwork | The app's name (Hive Desktop, *Hive* for short, until HI-2458). |
-| ~~Hive Assistant~~ | Gone with the rename (HI-2458): the Assistant has no full name in English now. It is *the Assistant*, translated (below). |
+| Combwork | The app's name (since HI-2458). |
 | Claude Code, Codex, GitHub Copilot (Copilot CLI), Claude, Opus, Sonnet, Haiku, GPT | Products and models. |
 | Anthropic, OpenAI, GitHub, Microsoft | Companies. |
 | Windows, PowerShell, Git, Node.js, npm, Electron, Chromium, NSIS | Software names. |
@@ -38,7 +37,7 @@ your style page, and keep to it.
 | **agent** | A coding agent (Claude Code, Codex or Copilot) that Combwork runs in a project, with a name the user gives it. | The most frequent term. Agents' names have no known gender: don't make a verb agree with one. |
 | **provider** | Which CLI an agent runs: Claude Code, Codex or Copilot. | |
 | **session** | One conversation of an agent, from its start to its end; it can be resumed later. | |
-| **the Assistant** | The Assistant, named by its role in running text (*ask the Assistant*). | Translate *Assistant*, and capitalise it if your language allows, so it reads as a name. It is the Assistant's only name (above). |
+| **the Assistant** | The Assistant, named by its role in running text (*ask the Assistant*). | Translate *Assistant*, and capitalise it if your language allows, so it reads as a name. It is the Assistant's only name: its full English name went with the rename (HI-2458). |
 | **persona** | A character the Assistant can take on (its instructions and tone). | |
 | **task board**, **board** | The workspace's list of work, as cards in columns. | |
 | **card** | One piece of work on the board (#12): a title, a description, comments, decisions. | As in a kanban card, not a playing card or a bank card. |

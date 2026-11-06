@@ -88,7 +88,7 @@ English, it says so.
 | agent | agent | Masculine: *l’agent {agent}*. |
 | provider | fournisseur | |
 | session | session | *Starting a session*: *démarrer une session*; signing in is *se connecter* (below). |
-| the Assistant | l’Assistant | Capitalised. Its only name: the full English name *Hive Assistant* went with the rename (HI-2458). |
+| the Assistant | l’Assistant | Capitalised. Its only name: the full English name it had before went with the rename (HI-2458). |
 | persona (now: working mode) | mode (mode de travail) | The Assistant's personas became *modes*; the old *persona* is *personnage*. |
 | task board / board | tableau des tâches / tableau | The *Tasks* tab is *Tâches*. |
 | card | carte | Never *tâche* in running text. |

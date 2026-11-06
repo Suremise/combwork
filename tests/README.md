@@ -15,7 +15,7 @@ would do. Until then, and while a move is unfinished (run it again: it resumes),
 ends by printing the Defender lines that exclude the new folder and drop the old one (PowerShell, as administrator).
 It also converts the scenario benchmarks saved before 1.1 (the baselines and each run's `benchmark.json`) to 1.1's
 names, after the move or run again once the area is moved (`convertBenchmarks.mjs`, HI-2605): the schema
-`hive-benchmark/1` and the call measures `hiveCalls`/`hiveCallErrors` that HI-2591 renamed, nothing else. Performance →
+name and the two call measures that HI-2591 renamed, nothing else. Performance →
 Compare reads only the new names. It refuses while a scenario run is going on, and keeps each original, byte for byte,
 in `benchmark-schema-backup` in the test area: remove it by hand once Compare reads them.
 

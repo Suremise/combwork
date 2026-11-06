@@ -45,7 +45,7 @@ Combwork is MIT-licensed. `THIRD_PARTY_NOTICES.md` is generated from what ships:
 
 ## Developing Combwork from inside Combwork
 
-- `npm run dev` (unpackaged) uses its own profile `%APPDATA%\Combwork-Dev` and Agent API port **47822**, and its title bar says **Combwork Dev**. The installed app uses `%APPDATA%\Combwork` and port 47821. Both can run at once. A 1.0 profile (`Hive-Dev`, `Hive`) is moved once, never used where it is (HI-2594, SPEC §4.3): the installer moves the installed app's, and a dev build's first start moves `Hive-Dev` (it refuses to start while another build holds it).
+- `npm run dev` (unpackaged) uses its own profile `%APPDATA%\Combwork-Dev` and Agent API port **47822**, and its title bar says **Combwork Dev**. The installed app uses `%APPDATA%\Combwork` and port 47821. Both can run at once. A 1.0 profile (its folders under the old name) is moved once, never used where it is (HI-2594, SPEC §4.3): the installer moves the installed app's, and a dev build's first start moves the dev one (it refuses to start while another build holds it).
 - To update an installed copy: `npm run dist`, then quit Combwork, run the installer, reopen and resume the sessions. Leave running the installer to the user.
 - Dev and test builds use the Windows app ID `it.surmise.combwork.dev`; never give them the installed app's `it.surmise.combwork`, or Windows shows Electron's icon and name for the real app.
 - Never kill Combwork processes by name — the installed app hosting this session is also `Combwork.exe` or `electron.exe`. Target processes by command line (e.g. paths containing `out\main` or a test profile).
