@@ -178,7 +178,8 @@ LangString hiveOldNotRemoved 2052 "无法卸载 Hive Desktop，因此未安装 C
     File "/oname=$PLUGINSDIR\legacyUpgrade.ps1" "${CW_BUILD_DIR}\legacyUpgrade.ps1"
     nsExec::ExecToLog '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\legacyUpgrade.ps1" -InstallDir "$INSTDIR" -WorkDir "$PLUGINSDIR"'
     Pop $0
-    DetailPrint "The upgrade from Hive Desktop: $0"
+    ; Every install logs it, a clean one too: it names no old app (HI-2632).
+    DetailPrint "The upgrade from an earlier version: $0"
     ${If} $0 == "5"
       MessageBox MB_OK|MB_ICONSTOP "$(combworkStillRunning)" /SD IDOK
       SetErrorLevel 5
