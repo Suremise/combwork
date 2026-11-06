@@ -81,7 +81,11 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     lib.git(fx.alpha, ['add', 'mine.txt'])
     lib.git(fx.alpha, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'commit', '-qm', 'the user commits'])
     const userCommit = main()
-    // The Git view's actions take the repository lock: done while the check still runs (it waits for go.txt).
+    // The Git view's actions take the repository lock: done while the check still runs (it waits for go.txt). R1's session is
+    // in the project folder, and a turn of its (Combwork typing it the review's events) rightly refuses a branch switch then
+    // (HI-2657): what's tested is the queue not holding it up, so R1 is let finish first.
+    const r1Live = async () => (await h.inv('session:live')).find((s) => same(s.projectPath, fx.alpha) && s.agentId === reviewer.id)
+    check('…R1, in the project folder, is quiet before the Git view acts', !!(await waitHung(async () => lib.agentQuiet(h.port, 'alpha', await r1Live(), reviewer.token))), JSON.stringify((await r1Live())?.status))
     const viaGitView = await h.inv('git:createBranch', fx.alpha, 'scratch').then(() => h.inv('git:switch', fx.alpha, 'main')).then(() => 'ok', (e) => String(e.message ?? e))
     check("…the Git view isn't held up by the queue (a branch made and switched back during the check)", viaGitView === 'ok' && !fs.existsSync(fx.go), viaGitView)
     fs.rmSync(fx.started, { force: true })
