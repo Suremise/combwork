@@ -1,16 +1,16 @@
-// S53, a card loop across the 1.0 upgrade (#1218, SPEC §16.17): a released 0.9 Hive runs a lane on two fake Claude Code
+// S53, a card loop across the 1.0 upgrade (#1218, SPEC §16.17): a released 0.9 build runs a lane on two fake Claude Code
 // agents, a builder and a reviewer, with a card in Review, one in Doing and one in Todo, and closes. The dev build opens
 // the workspace, upgrades its board, and adopts it in the background: the cards in flight get `Adopted` (the Review card
 // an adopted submission too), the Todo card none (from before 1.0), the project its options. The agents resume and the
 // loop carries on as on 0.9: every move is accepted, nothing refused, and every card passes, each finished by the
 // builder's report of its merge before the next starts (HI-1985: a carried-over lane goes on at Done, S40).
-// Since 1.1 the dev build first moves the workspace's .hive folders to .combwork as it opens it (HI-2462), and the 0.9
+// Since 1.1 the dev build first moves the workspace's 1.0 folders to .combwork as it opens it (HI-2462), and the 0.9
 // conversations start fresh, carrying their work, as any launched before the names agents see changed (HI-2463): the
-// 0.9 Hive's tools are still hive_*, served as `hive` (HI-2506).
+// 0.9 build's tools still have their names from before 1.1 (HI-2506).
 //
-// The 0.9 Hive is a packaged 0.9.x build: CW_E2E_V09 (its win-unpacked folder), else the main checkout's
+// The 0.9 build is a packaged 0.9.x one: CW_E2E_V09 (its win-unpacked folder), else the main checkout's
 // dist/win-unpacked when that is 0.9.x; with neither, the suite is skipped. Throwaway profiles, workspace and
-// CLAUDE_CONFIG_DIR. lib.cjs keeps the 0.9 Hive's windows off screen and unfocused (#1253).
+// CLAUDE_CONFIG_DIR. lib.cjs keeps the 0.9 build's windows off screen and unfocused (#1253).
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
@@ -18,6 +18,13 @@ const path = require('path')
 const { DatabaseSync } = require('node:sqlite')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 30000
+// old-name: begin upgradelane-inputs
+/** What a 0.9 build is and keeps: its exe, its name in its errors, its folders, its lane tool. */
+const OLD_EXE = 'Hive.exe'
+const OLD_APP = 'Hive'
+const OLD_DIR = '.hive'
+const OLD_LANE_TOOL = 'hive_lane'
+// old-name: end upgradelane-inputs
 
 const devProfile = path.join(lib.WORK, 'upgradelane-dev')
 const oldProfile = path.join(lib.WORK, 'upgradelane-old')
@@ -25,7 +32,7 @@ const ws = path.join(lib.WORK, 'upgradelane-ws')
 const claudeHome = path.join(lib.WORK, 'upgradelane-claude')
 const spareHome = path.join(lib.WORK, 'upgradelane-claude-spare')
 const alpha = path.join(ws, 'alpha')
-// The board as the dev build keeps it, once it has moved the workspace's .hive to .combwork (HI-2462).
+// The board as the dev build keeps it, once it has moved the workspace's 1.0 folder to .combwork (HI-2462).
 const dbFile = path.join(ws, '.combwork', 'combwork.db')
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -34,22 +41,22 @@ const check = (name, ok, extra = '') => {
 }
 
 /** The 0.9 build to run, or why there is none (as boardupgrade finds it). */
-function hive09() {
+function build09() {
   let dir = process.env.CW_E2E_V09
   if (!dir) {
     const main = /^worktree (.+)$/m.exec(lib.git(lib.ROOT, 'worktree list --porcelain'))?.[1]
     if (!main) return { why: 'no main checkout found (git worktree list)' }
     dir = path.join(main, 'dist', 'win-unpacked')
   }
-  const exe = path.join(dir, 'Hive.exe')
-  if (!fs.existsSync(exe)) return { why: `no Hive 0.9 build at ${dir} (set CW_E2E_V09 to a 0.9.x win-unpacked folder)` }
+  const exe = path.join(dir, OLD_EXE)
+  if (!fs.existsSync(exe)) return { why: `no ${OLD_APP} 0.9 build at ${dir} (set CW_E2E_V09 to a 0.9.x win-unpacked folder)` }
   let version = '?'
   try {
     version = JSON.parse(require('@electron/asar').extractFile(path.join(dir, 'resources', 'app.asar'), 'package.json').toString('utf8')).version
   } catch (e) {
     return { why: `couldn't read the version of ${dir}: ${e.message}` }
   }
-  if (!version.startsWith('0.9.')) return { why: `${dir} is Hive ${version}, not 0.9.x (set CW_E2E_V09 to a 0.9.x win-unpacked folder)` }
+  if (!version.startsWith('0.9.')) return { why: `${dir} is ${OLD_APP} ${version}, not 0.9.x (set CW_E2E_V09 to a 0.9.x win-unpacked folder)` }
   return { exe, version }
 }
 
@@ -73,7 +80,7 @@ function jsonl(name) {
 }
 const kinds = (n) => rows('SELECT kind FROM card_facts WHERE card = ? ORDER BY seq', n).map((r) => r.kind)
 
-/** A copy to drive, the 0.9 Hive or the dev build, with what the loop needs of it. */
+/** A copy to drive, the 0.9 build or the dev build, with what the loop needs of it. */
 function driver(app, page) {
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
@@ -92,9 +99,9 @@ function driver(app, page) {
 }
 
 ;(async () => {
-  const old = hive09()
+  const old = build09()
   if (!old.exe) lib.skip(`environment: ${old.why}`)
-  console.log(`0.9 Hive: ${old.version} (${old.exe})`)
+  console.log(`0.9 build: ${old.version} (${old.exe})`)
   for (const d of [devProfile, oldProfile, ws]) fs.rmSync(d, { recursive: true, force: true })
   lib.gitProject(alpha)
   // Both copies run the fake from the same home (its conversations resume across them); the dev profile's set-up makes a
@@ -116,10 +123,10 @@ function driver(app, page) {
     open.delete(h)
     await h.app.close().catch(() => undefined)
   }
-  // The 0.9 Hive's tool, by its name there (HI-2463 renamed it cw_lane in 1.1).
-  const lane = (body) => `cw hive_lane ${JSON.stringify(body)}`
+  // The 0.9 build's tool, by its name there (HI-2463 renamed it cw_lane in 1.1).
+  const lane = (body) => `cw ${OLD_LANE_TOOL} ${JSON.stringify(body)}`
   try {
-    // 1. The 0.9 Hive runs the loop: c1 built and in Review, c2 in Doing, c3 still in Todo.
+    // 1. The 0.9 build runs the loop: c1 built and in Review, c2 in Doing, c3 still in Todo.
     const oldApp = await _electron.launch({ executablePath: old.exe, args: [], env: lib.combworkEnv({ CW_USER_DATA: oldProfile, ...claude }) })
     const oldPage = await oldApp.firstWindow()
     const o = driver(oldApp, oldPage)
@@ -146,7 +153,7 @@ function driver(app, page) {
     open.add(dev)
     d.page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(dev.inv, d.page, ws)
-    check("the workspace's .hive folders moved to .combwork as it opened (HI-2462)", fs.existsSync(dbFile) && !fs.existsSync(path.join(ws, '.hive')) && fs.existsSync(path.join(alpha, '.combwork', 'project.json')) && !fs.existsSync(path.join(alpha, '.hive')))
+    check("the workspace's 1.0 folders moved to .combwork as it opened (HI-2462)", fs.existsSync(dbFile) && !fs.existsSync(path.join(ws, OLD_DIR)) && fs.existsSync(path.join(alpha, '.combwork', 'project.json')) && !fs.existsSync(path.join(alpha, OLD_DIR)))
     const ask = d.page.locator('.dialog', { hasText: "Upgrade this workspace's board to 1.0?" })
     check('the dev build asks before upgrading', !!(await lib.until(async () => (await ask.count()) === 1, HUNG_MS)))
     await ask.getByRole('button', { name: 'Upgrade', exact: true }).click()

@@ -16,14 +16,14 @@ import { ifAbsent, present } from './fsPresence'
  *   are the project's and every folder the board's `skill_copies` records name (slots, worktrees, copies).
  * - **Skill copies under the old prefix** (`hive-<skill>`, HI-2594): retired in the same folders when provably Combwork's
  *   own and unchanged (retireOldCopies); delivery makes and reads only `cw-` copies.
- * - **git's refs** under Hive's prefix (HI-2593's handoff): `refs/hive/cards/…` and `refs/hive/queue/…` → `refs/cw/…` (moveRefs).
- * - **git's exclude comments** (HI-2575, HI-2580): Hive's comment lines above Combwork's own entries in the repository's
+ * - **git's refs** under the old prefix (HI-2593's handoff): `refs/hive/cards/…` and `refs/hive/queue/…` → `refs/cw/…` (moveRefs).
+ * - **git's exclude comments** (HI-2575, HI-2580): 1.0's comment lines above Combwork's own entries in the repository's
  *   `info/exclude` become Combwork's, whole lines only, and the lines for the old copies' names go (HI-2594); every other
  *   line stays as it was.
  */
 
 /**
- * The refs Combwork keeps in a repository under Hive's prefix (HI-2593's handoff, its design HI-2593/s11): a card's
+ * The refs Combwork keeps in a repository under the old prefix (HI-2593's handoff, its design HI-2593/s11): a card's
  * submission pins (`refs/hive/cards/…`) and the merge queue's test merges (`refs/hive/queue/…`). Each is made again
  * under `refs/cw/` at the same commit, unless one is there already, then the old one is deleted at that commit only:
  * one ref at a time, so a run stopped halfway leaves each ref under one name or both, and the next run finishes it.
@@ -61,7 +61,7 @@ async function moveRefs(root: string): Promise<void> {
 /** The marker's old name, read only here. */
 export const OLD_COPY_MARKER = '.hive-copy'
 
-/** Hive's comment lines in a repository's info/exclude, and Combwork's for each (whole lines, trimmed). */
+/** 1.0's comment lines in a repository's info/exclude, and Combwork's for each (whole lines, trimmed). */
 const OLD_EXCLUDE_COMMENTS: [RegExp, string][] = [
   [/^# Hive project metadata \(added by Hive\)$/, EXCLUDE_COMMENT],
   [/^# Hive's copies of workspace skills\b.*$/, "# Combwork's copies of workspace skills for Codex and Copilot (added by Combwork)"] // i18n-ignore: a line in git's exclude file, which stays English
@@ -75,7 +75,7 @@ const OLD_EXCLUDE_COMMENTS: [RegExp, string][] = [
 const OLD_COPY_EXCLUDES: readonly string[] = ['/.agents/skills/hive-*/', '/.agents/skills/.hive-*/']
 
 /**
- * An info/exclude's text with Hive's comment lines as Combwork's, and the old copies' lines gone; null when it has
+ * An info/exclude's text with 1.0's comment lines as Combwork's, and the old copies' lines gone; null when it has
  * neither. Each line's ending kept.
  */
 export function upgradedExclude(text: string): string | null {

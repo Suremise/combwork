@@ -5,7 +5,7 @@ import { ADVANCED_DEFS } from '../shared/advanced'
 
 /**
  * The names upgrade's maps for stored values (HI-2598, its design HI-2598/s9): what 1.0 and the 1.1 release candidates
- * stored under Hive's names, as each step converts it once. Only the upgrade's steps use these (the board's and the
+ * stored under the old names, as each step converts it once. Only the upgrade's steps use these (the board's and the
  * journal's schema steps, the profile's and the workspace's files): nothing reads an old value while the app runs.
  * Pure, so each step's tests use them as they are.
  */

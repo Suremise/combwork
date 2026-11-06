@@ -1,6 +1,6 @@
 // The fakes' old-release mode (HI-2614, tests/e2e/fake-claude/oldRelease.cjs): only upgradelane's released 0.9 build
-// launches the fake with it on. A current launch refuses the old dialect (HIVE_* variables, the `hive` server, hive_*
-// tools) instead of reading it; in old mode each maps, and the current names still work.
+// launches the fake with it on. A current launch refuses the old dialect (the old release's variables, server and tools)
+// instead of reading it; in old mode each maps, and the current names still work.
 import { createRequire } from 'node:module'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -17,9 +17,15 @@ const old = require('./e2e/fake-claude/oldRelease.cjs') as {
 }
 const bridge = require('./e2e/fake-bridge.cjs') as { parseToolStep: (step: string) => { tool: string; args: unknown } | null }
 
-const OLD_ENV = { HIVE_API_TOKEN_FILE: 'C:\\t.json', HIVE_AGENT: 'b1' }
+// old-name: begin fakeOldRelease-inputs
+/** The old release's prefix for variables, its MCP server's name and a tool of its. */
+const P = 'HIVE_'
+const SERVER = 'hive'
+const TOOL = 'hive_lane'
+// old-name: end fakeOldRelease-inputs
+const OLD_ENV = { [`${P}API_TOKEN_FILE`]: 'C:\\t.json', [`${P}AGENT`]: 'b1' }
 const combwork = { command: 'node', env: {} }
-const hive = { command: 'node', env: {} }
+const oldServer = { command: 'node', env: {} }
 
 describe("the fakes' old-release mode (HI-2614)", () => {
   it('is on only with its flag set to 1', () => {
@@ -29,26 +35,26 @@ describe("the fakes' old-release mode (HI-2614)", () => {
   })
 
   it('current mode: the old dialect is found, never read', () => {
-    expect(old.oldDialectIn(OLD_ENV, {})).toEqual(['HIVE_API_TOKEN_FILE', 'HIVE_AGENT'])
-    expect(old.oldDialectIn({}, { hive })).toEqual(['its MCP server "hive"'])
+    expect(old.oldDialectIn(OLD_ENV, {})).toEqual([`${P}API_TOKEN_FILE`, `${P}AGENT`])
+    expect(old.oldDialectIn({}, { [SERVER]: oldServer })).toEqual([`its MCP server "${SERVER}"`])
     expect(old.oldDialectIn({ CW_AGENT: 'b1' }, { combwork })).toEqual([])
     expect(old.envOf(OLD_ENV, false)).toEqual(OLD_ENV)
-    expect(old.serverOf({ hive }, false)).toBeNull()
-    expect(() => old.toolName('hive_lane', false)).toThrow(/old tool name hive_lane/)
+    expect(old.serverOf({ [SERVER]: oldServer }, false)).toBeNull()
+    expect(() => old.toolName(TOOL, false)).toThrow(new RegExp(`old tool name ${TOOL}`))
   })
 
   it('old mode: each maps, and the current names still work', () => {
     expect(old.envOf(OLD_ENV, true)).toMatchObject({ CW_API_TOKEN_FILE: 'C:\\t.json', CW_AGENT: 'b1' })
-    expect(old.envOf({ HIVE_AGENT: 'old', CW_AGENT: 'now' }, true).CW_AGENT).toBe('now')
-    expect(old.serverOf({ hive }, true)).toBe(hive)
-    expect(old.serverOf({ hive, combwork }, true)).toBe(combwork)
-    expect(old.toolName('hive_lane', true)).toBe('hive_lane')
+    expect(old.envOf({ [`${P}AGENT`]: 'old', CW_AGENT: 'now' }, true).CW_AGENT).toBe('now')
+    expect(old.serverOf({ [SERVER]: oldServer }, true)).toBe(oldServer)
+    expect(old.serverOf({ [SERVER]: oldServer, combwork }, true)).toBe(combwork)
+    expect(old.toolName(TOOL, true)).toBe(TOOL)
     expect(old.toolName('cw_lane', true)).toBe('cw_lane')
   })
 
   it("the bridge's scripted steps: a current tool parses; an old one is refused in a current launch", () => {
     expect(bridge.parseToolStep('cw cw_lane {"action":"next"}')).toEqual({ tool: 'cw_lane', args: { action: 'next' } })
-    expect(() => bridge.parseToolStep('cw hive_lane {"action":"next"}')).toThrow(/old tool name/)
+    expect(() => bridge.parseToolStep(`cw ${TOOL} {"action":"next"}`)).toThrow(/old tool name/)
     expect(bridge.parseToolStep('say hello')).toBeNull()
   })
 

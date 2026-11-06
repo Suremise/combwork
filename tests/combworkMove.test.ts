@@ -1,10 +1,10 @@
-// HI-2462: a workspace's .hive folders move to .combwork as it opens (combworkMove.ts; SPEC §4.1.1; the design is the
+// HI-2462: a workspace's folders under 1.0's name move to .combwork as it opens (combworkMove.ts; SPEC §4.1.1; the design is the
 // card's, HI-2462/s21). Real folders, git and SQLite in throwaway workspaces: a fresh one and one already moved need
 // nothing; a 1.0 workspace moves whole (board, notes, attachments, the Assistant's home, its projects) with its paths
-// rewritten; a folder with both, another tool's .hive and a linked one are left as they are; a held database refuses the
+// rewritten; a folder with both, another tool's folder of that name and a linked one are left as they are; a held database refuses the
 // move before any project changes; a move stopped after a rename or between phases finishes at the next open, once, and
-// a .hive made again meanwhile is left alone; a live process's presence refuses it; a project that comes later moves on
-// its own; git's exclude line and a worktree inside .hive/slots follow; and two processes racing for one workspace move
+// an old folder made again meanwhile is left alone; a live process's presence refuses it; a project that comes later moves on
+// its own; git's exclude line and a worktree inside the old folder's slots follow; and two processes racing for one workspace move
 // it once, the loser writing nothing.
 import { execFileSync, spawn, type ChildProcess } from 'child_process'
 import { createRequire } from 'module'
@@ -15,6 +15,12 @@ import { build } from 'esbuild'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+// old-name: begin combworkMove-inputs
+/** 1.0's folder, board file and exclude line header: the move's input. */
+const OLD_DIR = '.hive'
+const OLD_DB = 'hive.db'
+const OLD_HEADER = '# Hive project metadata (added by Hive)'
+// old-name: end combworkMove-inputs
 
 const told = vi.hoisted(() => ({ toasts: [] as { title: string; body: string }[] }))
 vi.mock('../src/main/events', async (orig) => ({
@@ -45,23 +51,23 @@ function board(file: string, ws: string): void {
   db.exec('CREATE TABLE cards (number INTEGER PRIMARY KEY, title TEXT NOT NULL, description TEXT NOT NULL) STRICT')
   db.exec('CREATE TABLE card_comments (card INTEGER NOT NULL, ord INTEGER NOT NULL, text TEXT, PRIMARY KEY (card, ord)) STRICT')
   db.exec('CREATE TABLE card_context (card INTEGER NOT NULL, ord INTEGER NOT NULL, ref TEXT NOT NULL, PRIMARY KEY (card, ord)) STRICT')
-  db.prepare('INSERT INTO cards VALUES (1, ?, ?)').run('One', `Evidence: ![shot](${ws}\\alpha\\.hive\\attachments\\cards\\1\\shot.png), note ${ws}\\.hive\\shared\\plan.md`)
-  db.prepare('INSERT INTO cards VALUES (2, ?, ?)').run('Two', `Unrelated: ${ws}\\beta-lookalike\\.hive\\x and C:\\other\\.hive\\y`)
-  db.prepare('INSERT INTO card_comments VALUES (1, 0, ?)').run(`See ${ws.replace(/\\/g, '/')}/.hive/assistant/.hive/attachments/a.png`)
-  db.prepare('INSERT INTO card_context VALUES (1, 0, ?)').run('.hive/shared/plan.md#open')
+  db.prepare('INSERT INTO cards VALUES (1, ?, ?)').run('One', `Evidence: ![shot](${ws}\\alpha\\${OLD_DIR}\\attachments\\cards\\1\\shot.png), note ${ws}\\${OLD_DIR}\\shared\\plan.md`)
+  db.prepare('INSERT INTO cards VALUES (2, ?, ?)').run('Two', `Unrelated: ${ws}\\beta-lookalike\\${OLD_DIR}\\x and C:\\other\\${OLD_DIR}\\y`)
+  db.prepare('INSERT INTO card_comments VALUES (1, 0, ?)').run(`See ${ws.replace(/\\/g, '/')}/${OLD_DIR}/assistant/${OLD_DIR}/attachments/a.png`)
+  db.prepare('INSERT INTO card_context VALUES (1, 0, ?)').run(`${OLD_DIR}/shared/plan.md#open`)
   db.close()
 }
 
-/** A workspace as 1.0 left it: its .hive (settings, board, notes, a handover, the Assistant's home) and a project's. */
+/** A workspace as 1.0 left it: its old folder (settings, board, notes, a handover, the Assistant's home) and a project's. */
 function workspace10(): string {
   const ws = join(base, `ws${++n}`)
-  json(join(ws, '.hive', 'workspace.json'), { version: 1 })
-  board(join(ws, '.hive', 'hive.db'), ws)
-  write(join(ws, '.hive', 'shared', 'plan.md'), '# Plan\n')
-  write(join(ws, '.hive', 'shared', 'handovers', 'h.md'), `Logs in ${ws}\\alpha\\.hive\\attachments\\cards\\1\\shot.png\n`)
-  json(join(ws, '.hive', 'assistant', '.hive', 'project.json'), { agents: [{ id: 'assistant' }] })
-  json(join(ws, 'alpha', '.hive', 'project.json'), { id: 'p-alpha', agents: [] })
-  write(join(ws, 'alpha', '.hive', 'attachments', 'cards', '1', 'shot.png'), 'png')
+  json(join(ws, OLD_DIR, 'workspace.json'), { version: 1 })
+  board(join(ws, OLD_DIR, OLD_DB), ws)
+  write(join(ws, OLD_DIR, 'shared', 'plan.md'), '# Plan\n')
+  write(join(ws, OLD_DIR, 'shared', 'handovers', 'h.md'), `Logs in ${ws}\\alpha\\${OLD_DIR}\\attachments\\cards\\1\\shot.png\n`)
+  json(join(ws, OLD_DIR, 'assistant', OLD_DIR, 'project.json'), { agents: [{ id: 'assistant' }] })
+  json(join(ws, 'alpha', OLD_DIR, 'project.json'), { id: 'p-alpha', agents: [] })
+  write(join(ws, 'alpha', OLD_DIR, 'attachments', 'cards', '1', 'shot.png'), 'png')
   write(join(ws, 'alpha', 'src.txt'), 'code')
   return ws
 }
@@ -111,7 +117,7 @@ describe('nothing to move', () => {
     const done = join(base, `done${++n}`)
     json(join(done, '.combwork', 'workspace.json'), {})
     json(join(done, 'alpha', '.combwork', 'project.json'), {})
-    // Its names upgraded too (HI-2587): nothing left of Hive's.
+    // Its names upgraded too (HI-2587): nothing left of 1.0's.
     json(join(done, '.combwork', 'combwork-names.json'), { version: NAMES_VERSION })
     expect(await moveFolders(done)).toEqual({ late: false, moved: 0 })
     expect(existsSync(join(done, MOVE_LOCK_FILE))).toBe(false)
@@ -134,7 +140,7 @@ describe('a 1.0 workspace', () => {
   it('moves whole: board, notes, attachments, the Assistant and its projects, with their paths', async () => {
     const ws = workspace10()
     await openMove(ws)
-    for (const gone of ['.hive', 'alpha\\.hive', '.combwork\\assistant\\.hive']) expect(existsSync(join(ws, gone)), gone).toBe(false)
+    for (const gone of [OLD_DIR, `alpha\\${OLD_DIR}`, `.combwork\\assistant\\${OLD_DIR}`]) expect(existsSync(join(ws, gone)), gone).toBe(false)
     expect(existsSync(join(ws, '.combwork', 'combwork.db'))).toBe(true)
     expect(existsSync(join(ws, '.combwork', 'assistant', '.combwork', 'project.json'))).toBe(true)
     expect(readFileSync(join(ws, 'alpha', '.combwork', 'attachments', 'cards', '1', 'shot.png'), 'utf8')).toBe('png')
@@ -145,53 +151,53 @@ describe('a 1.0 workspace', () => {
     expect(t.c).toBe(`See ${ws.replace(/\\/g, '/')}/.combwork/assistant/.combwork/attachments/a.png`)
     expect(t.ref).toBe('shared:plan.md#open')
     const db = new DatabaseSync(join(ws, '.combwork', 'combwork.db'))
-    expect((db.prepare('SELECT description FROM cards WHERE number = 2').get() as { description: string }).description).toBe(`Unrelated: ${ws}\\beta-lookalike\\.hive\\x and C:\\other\\.hive\\y`)
+    expect((db.prepare('SELECT description FROM cards WHERE number = 2').get() as { description: string }).description).toBe(`Unrelated: ${ws}\\beta-lookalike\\${OLD_DIR}\\x and C:\\other\\${OLD_DIR}\\y`)
     db.close()
     expect(readFileSync(join(ws, '.combwork', 'shared', 'handovers', 'h.md'), 'utf8')).toBe(`Logs in ${ws}\\alpha\\.combwork\\attachments\\cards\\1\\shot.png\n`)
     // The plan is gone; the map and the lock's file stay.
     expect(doneFor(ws)).toBe(true)
     expect(existsSync(join(ws, MOVE_LOCK_FILE))).toBe(true)
     const moves = await movedFolders(ws)
-    expect(moves.map((m) => m.from).sort()).toEqual([join(ws, '.combwork', 'assistant', '.hive'), join(ws, '.hive'), join(ws, '.hive', 'assistant', '.hive'), join(ws, 'alpha', '.hive')].sort())
-    expect(await movedPath(ws, join(ws, 'alpha', '.hive', 'slots', 'HI-1'))).toBe(join(ws, 'alpha', '.combwork', 'slots', 'HI-1'))
+    expect(moves.map((m) => m.from).sort()).toEqual([join(ws, '.combwork', 'assistant', OLD_DIR), join(ws, OLD_DIR), join(ws, OLD_DIR, 'assistant', OLD_DIR), join(ws, 'alpha', OLD_DIR)].sort())
+    expect(await movedPath(ws, join(ws, 'alpha', OLD_DIR, 'slots', 'HI-1'))).toBe(join(ws, 'alpha', '.combwork', 'slots', 'HI-1'))
     // Opened again: nothing more to do.
     expect(await moveFolders(ws)).toEqual({ late: false, moved: 0 })
   })
 })
 
 describe('left as they are', () => {
-  it('a folder with both, another tool\'s .hive and a linked one: unmoved, warned where it matters, not in the map', async () => {
+  it('a folder with both, another tool\'s folder of that name and a linked one: unmoved, warned where it matters, not in the map', async () => {
     const ws = workspace10()
-    // beta has both; gamma has another tool's .hive; delta's .hive is a junction to a folder outside.
-    json(join(ws, 'beta', '.hive', 'project.json'), { id: 'old' })
+    // beta has both; gamma has another tool's folder of that name; delta's is a junction to a folder outside.
+    json(join(ws, 'beta', OLD_DIR, 'project.json'), { id: 'old' })
     json(join(ws, 'beta', '.combwork', 'project.json'), { id: 'new' })
-    write(join(ws, 'gamma', '.hive', 'config.yaml'), 'colonyops: true\n')
+    write(join(ws, 'gamma', OLD_DIR, 'config.yaml'), 'colonyops: true\n')
     const outside = join(base, `outside${++n}`)
     json(join(outside, 'project.json'), { id: 'elsewhere' })
     mkdirSync(join(ws, 'delta'))
-    symlinkSync(outside, join(ws, 'delta', '.hive'), 'junction')
+    symlinkSync(outside, join(ws, 'delta', OLD_DIR), 'junction')
     await openMove(ws)
-    expect(JSON.parse(readFileSync(join(ws, 'beta', '.hive', 'project.json'), 'utf8'))).toEqual({ id: 'old' })
+    expect(JSON.parse(readFileSync(join(ws, 'beta', OLD_DIR, 'project.json'), 'utf8'))).toEqual({ id: 'old' })
     expect(JSON.parse(readFileSync(join(ws, 'beta', '.combwork', 'project.json'), 'utf8'))).toEqual({ id: 'new' })
-    expect(readFileSync(join(ws, 'gamma', '.hive', 'config.yaml'), 'utf8')).toBe('colonyops: true\n')
+    expect(readFileSync(join(ws, 'gamma', OLD_DIR, 'config.yaml'), 'utf8')).toBe('colonyops: true\n')
     expect(existsSync(join(ws, 'gamma', '.combwork'))).toBe(false)
-    expect(existsSync(join(ws, 'delta', '.hive', 'project.json'))).toBe(true)
+    expect(existsSync(join(ws, 'delta', OLD_DIR, 'project.json'))).toBe(true)
     expect(existsSync(join(ws, 'delta', '.combwork'))).toBe(false)
     expect(told.toasts.map((t) => t.title)).toEqual(expect.arrayContaining([expect.stringContaining('beta'), expect.stringContaining('delta')]))
     const froms = (await movedFolders(ws)).map((m) => m.from.toLowerCase())
-    for (const p of ['beta', 'gamma', 'delta']) expect(froms).not.toContain(join(ws, p, '.hive').toLowerCase())
+    for (const p of ['beta', 'gamma', 'delta']) expect(froms).not.toContain(join(ws, p, OLD_DIR).toLowerCase())
   })
 })
 
 describe('refused, nothing lost', () => {
   it('a held database: the workspace is tried first, so no project changes; it moves once released', async () => {
     const ws = workspace10()
-    const held = new DatabaseSync(join(ws, '.hive', 'hive.db'))
+    const held = new DatabaseSync(join(ws, OLD_DIR, OLD_DB))
     held.prepare('SELECT count(*) FROM cards').get()
     try {
       await expect(moveFolders(ws)).rejects.toThrow(/a program has a file in it open/)
-      expect(existsSync(join(ws, '.hive', 'hive.db'))).toBe(true)
-      expect(existsSync(join(ws, 'alpha', '.hive', 'project.json'))).toBe(true)
+      expect(existsSync(join(ws, OLD_DIR, OLD_DB))).toBe(true)
+      expect(existsSync(join(ws, 'alpha', OLD_DIR, 'project.json'))).toBe(true)
       expect(existsSync(join(ws, 'alpha', '.combwork'))).toBe(false)
     } finally {
       held.close()
@@ -205,10 +211,10 @@ describe('refused, nothing lost', () => {
     const ws = workspace10()
     const other = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], { stdio: 'ignore', windowsHide: true })
     try {
-      json(join(ws, '.hive', 'open', 'Combwork-1234.json'), { pid: other.pid, profile: 'Combwork', appVersion: '1.0.0', startedAt: new Date().toISOString(), heartbeat: new Date().toISOString() })
+      json(join(ws, OLD_DIR, 'open', 'Combwork-1234.json'), { pid: other.pid, profile: 'Combwork', appVersion: '1.0.0', startedAt: new Date().toISOString(), heartbeat: new Date().toISOString() })
       await expect(moveFolders(ws)).rejects.toThrow(/open in another Combwork or Hive \(Combwork\)/)
-      expect(existsSync(join(ws, '.hive', 'hive.db'))).toBe(true)
-      expect(existsSync(join(ws, 'alpha', '.hive'))).toBe(true)
+      expect(existsSync(join(ws, OLD_DIR, OLD_DB))).toBe(true)
+      expect(existsSync(join(ws, 'alpha', OLD_DIR))).toBe(true)
     } finally {
       other.kill()
     }
@@ -225,15 +231,15 @@ describe('an interrupted move', () => {
       await expect(openMove(ws)).rejects.toThrow(`stopped at ${at}`)
       delete moveTestHooks.after
       await openMove(ws)
-      expect(existsSync(join(ws, '.hive'))).toBe(false)
-      expect(existsSync(join(ws, 'alpha', '.hive'))).toBe(false)
+      expect(existsSync(join(ws, OLD_DIR))).toBe(false)
+      expect(existsSync(join(ws, 'alpha', OLD_DIR))).toBe(false)
       expect(cardText(ws).d).toContain(`${ws}\\alpha\\.combwork\\attachments`)
       expect(cardText(ws).d).not.toContain('.combwork\\.combwork')
       expect(readFileSync(join(ws, '.combwork', 'shared', 'handovers', 'h.md'), 'utf8')).toContain(`${ws}\\alpha\\.combwork\\`)
       expect(doneFor(ws)).toBe(true)
     })
 
-  it('a .hive made again after our rename is left as it is; the moved folder keeps its mapping and finishes', async () => {
+  it('an old folder made again after our rename is left as it is; the moved folder keeps its mapping and finishes', async () => {
     const ws = workspace10()
     moveTestHooks.after = (step) => {
       if (step === 'renamed:project') throw new Error('stopped')
@@ -241,15 +247,15 @@ describe('an interrupted move', () => {
     await expect(openMove(ws)).rejects.toThrow('stopped')
     delete moveTestHooks.after
     const id = readFileSync(join(ws, 'alpha', '.combwork', MARK_FILE), 'utf8')
-    // An older Hive opened alpha meanwhile and made a .hive of its own.
-    json(join(ws, 'alpha', '.hive', 'project.json'), { id: 'recreated' })
+    // An older release opened alpha meanwhile and made an old folder of its own.
+    json(join(ws, 'alpha', OLD_DIR, 'project.json'), { id: 'recreated' })
     await openMove(ws)
-    expect(JSON.parse(readFileSync(join(ws, 'alpha', '.hive', 'project.json'), 'utf8'))).toEqual({ id: 'recreated' })
-    expect(readdirSync(join(ws, 'alpha', '.hive'))).toEqual(['project.json'])
+    expect(JSON.parse(readFileSync(join(ws, 'alpha', OLD_DIR, 'project.json'), 'utf8'))).toEqual({ id: 'recreated' })
+    expect(readdirSync(join(ws, 'alpha', OLD_DIR))).toEqual(['project.json'])
     expect(readFileSync(join(ws, 'alpha', '.combwork', MARK_FILE), 'utf8')).toBe(id)
     expect(existsSync(join(ws, 'alpha', '.combwork', 'attachments', 'cards', '1', 'shot.png'))).toBe(true)
     expect(cardText(ws).d).toContain(`${ws}\\alpha\\.combwork\\attachments`)
-    expect((await movedFolders(ws)).some((m) => m.from.toLowerCase() === join(ws, 'alpha', '.hive').toLowerCase())).toBe(true)
+    expect((await movedFolders(ws)).some((m) => m.from.toLowerCase() === join(ws, 'alpha', OLD_DIR).toLowerCase())).toBe(true)
   })
 })
 
@@ -261,9 +267,9 @@ describe("HR1's round 1: the map is what the folders show (s65)", () => {
     }
     await expect(openMove(ws)).rejects.toThrow('stopped')
     delete moveTestHooks.after
-    const note = join(ws, 'alpha', '.hive', 'attachments', 'cards', '1', 'shot.png')
+    const note = join(ws, 'alpha', OLD_DIR, 'attachments', 'cards', '1', 'shot.png')
     expect(await movedPath(ws, note)).toBe(join(ws, 'alpha', '.combwork', 'attachments', 'cards', '1', 'shot.png'))
-    expect(await movedPath(ws, join(ws, '.hive', 'shared', 'plan.md'))).toBe(join(ws, '.combwork', 'shared', 'plan.md'))
+    expect(await movedPath(ws, join(ws, OLD_DIR, 'shared', 'plan.md'))).toBe(join(ws, '.combwork', 'shared', 'plan.md'))
     await openMove(ws)
     expect(cardText(ws).d).toContain(`${ws}\\alpha\\.combwork\\attachments`)
   })
@@ -271,13 +277,13 @@ describe("HR1's round 1: the map is what the folders show (s65)", () => {
   for (const at of ['phase:notes', 'phase:cards'])
     it(`a host that appears after ${at}: everything runs again, and its references are rewritten`, async () => {
       const ws = workspace10()
-      write(join(ws, '.hive', 'shared', 'beta.md'), `Beta keeps ${ws}\\beta\\.hive\\attachments\\b.png\n`)
+      write(join(ws, OLD_DIR, 'shared', 'beta.md'), `Beta keeps ${ws}\\beta\\${OLD_DIR}\\attachments\\b.png\n`)
       moveTestHooks.after = (step) => {
         if (step === at) throw new Error('stopped')
       }
       await expect(openMove(ws)).rejects.toThrow('stopped')
       delete moveTestHooks.after
-      json(join(ws, 'beta', '.hive', 'project.json'), { id: 'p-beta' })
+      json(join(ws, 'beta', OLD_DIR, 'project.json'), { id: 'p-beta' })
       await openMove(ws)
       expect(existsSync(join(ws, 'beta', '.combwork', 'project.json'))).toBe(true)
       expect(readFileSync(join(ws, '.combwork', 'shared', 'beta.md'), 'utf8')).toBe(`Beta keeps ${ws}\\beta\\.combwork\\attachments\\b.png\n`)
@@ -286,27 +292,27 @@ describe("HR1's round 1: the map is what the folders show (s65)", () => {
 
   it("a host that appears after the move finished: the hash changes, so the rewrites run again for it", async () => {
     const ws = workspace10()
-    write(join(ws, '.hive', 'shared', 'gamma.md'), `See ${ws}\\gamma\\.hive\\x.md\n`)
+    write(join(ws, OLD_DIR, 'shared', 'gamma.md'), `See ${ws}\\gamma\\${OLD_DIR}\\x.md\n`)
     await openMove(ws)
-    json(join(ws, 'gamma', '.hive', 'project.json'), { id: 'p-gamma' })
+    json(join(ws, 'gamma', OLD_DIR, 'project.json'), { id: 'p-gamma' })
     await openMove(ws)
     expect(readFileSync(join(ws, '.combwork', 'shared', 'gamma.md'), 'utf8')).toBe(`See ${ws}\\gamma\\.combwork\\x.md\n`)
   })
 
-  it("both at the workspace, the Assistant's inner .hive under .combwork: the inner one moves; the old outer tree is never mapped", async () => {
+  it("both at the workspace, the Assistant's inner old folder under .combwork: the inner one moves; the old outer tree is never mapped", async () => {
     const ws = join(base, `bothws${++n}`)
-    json(join(ws, '.hive', 'workspace.json'), { old: true })
-    write(join(ws, '.hive', 'assistant', '.hive', 'project.json'), '{"old":true}')
+    json(join(ws, OLD_DIR, 'workspace.json'), { old: true })
+    write(join(ws, OLD_DIR, 'assistant', OLD_DIR, 'project.json'), '{"old":true}')
     json(join(ws, '.combwork', 'workspace.json'), { version: 1 })
-    json(join(ws, '.combwork', 'assistant', '.hive', 'project.json'), { agents: [] })
+    json(join(ws, '.combwork', 'assistant', OLD_DIR, 'project.json'), { agents: [] })
     await moveFolders(ws)
     expect(existsSync(join(ws, '.combwork', 'assistant', '.combwork', 'project.json'))).toBe(true)
-    expect(readFileSync(join(ws, '.hive', 'assistant', '.hive', 'project.json'), 'utf8')).toBe('{"old":true}')
-    expect(await movedPath(ws, join(ws, '.hive', 'assistant', '.hive', 'x.png'))).toBeNull()
-    expect(await movedPath(ws, join(ws, '.combwork', 'assistant', '.hive', 'x.png'))).toBe(join(ws, '.combwork', 'assistant', '.combwork', 'x.png'))
+    expect(readFileSync(join(ws, OLD_DIR, 'assistant', OLD_DIR, 'project.json'), 'utf8')).toBe('{"old":true}')
+    expect(await movedPath(ws, join(ws, OLD_DIR, 'assistant', OLD_DIR, 'x.png'))).toBeNull()
+    expect(await movedPath(ws, join(ws, '.combwork', 'assistant', OLD_DIR, 'x.png'))).toBe(join(ws, '.combwork', 'assistant', '.combwork', 'x.png'))
   })
 
-  it('a .hive made again after the rename, holding a workspace and a file named like an old plan: byte for byte untouched through recovery and finish', async () => {
+  it('an old folder made again after the rename, holding a workspace and a file named like an old plan: byte for byte untouched through recovery and finish', async () => {
     const ws = workspace10()
     moveTestHooks.after = (step) => {
       if (step === 'renamed:workspace') throw new Error('stopped')
@@ -314,9 +320,9 @@ describe("HR1's round 1: the map is what the folders show (s65)", () => {
     await expect(openMove(ws)).rejects.toThrow('stopped')
     delete moveTestHooks.after
     const files: Record<string, string> = { 'workspace.json': '{"recreated":true}', 'combwork-move.json': '{"id":"theirs"}', 'combwork-move.json.bak': '{"id":"theirs-bak"}', 'combwork-moved.json': '{"theirs":1}' }
-    for (const [f, t] of Object.entries(files)) write(join(ws, '.hive', f), t)
+    for (const [f, t] of Object.entries(files)) write(join(ws, OLD_DIR, f), t)
     await openMove(ws)
-    expect(Object.fromEntries(readdirSync(join(ws, '.hive')).map((f) => [f, readFileSync(join(ws, '.hive', f), 'utf8')]))).toEqual(files)
+    expect(Object.fromEntries(readdirSync(join(ws, OLD_DIR)).map((f) => [f, readFileSync(join(ws, OLD_DIR, f), 'utf8')]))).toEqual(files)
     expect(existsSync(join(ws, 'alpha', '.combwork', 'project.json'))).toBe(true)
     expect(doneFor(ws)).toBe(true)
     expect(told.toasts.some((t) => t.title.includes(ws) && /both/.test(t.title))).toBe(true)
@@ -327,39 +333,39 @@ describe('a project that comes later', () => {
   it('moves on its own into the moved workspace, joining the map', async () => {
     const ws = workspace10()
     await openMove(ws)
-    json(join(ws, 'beta', '.hive', 'project.json'), { id: 'p-beta' })
+    json(join(ws, 'beta', OLD_DIR, 'project.json'), { id: 'p-beta' })
     const r = await moveFolders(ws, { only: join(ws, 'beta') })
     expect(r.moved).toBe(1)
     if (r.late) await finishMove(ws, late(ws))
     expect(existsSync(join(ws, 'beta', '.combwork', 'project.json'))).toBe(true)
-    expect(existsSync(join(ws, 'beta', '.hive'))).toBe(false)
-    expect(await movedPath(ws, join(ws, 'beta', '.hive', 'x'))).toBe(join(ws, 'beta', '.combwork', 'x'))
+    expect(existsSync(join(ws, 'beta', OLD_DIR))).toBe(false)
+    expect(await movedPath(ws, join(ws, 'beta', OLD_DIR, 'x'))).toBe(join(ws, 'beta', '.combwork', 'x'))
   })
 })
 
 describe('before the open', () => {
-  it("dataFolder is .combwork only (HI-2594); the move's own treeOf reads our .hive until it moves, never making a second tree", () => {
+  it("dataFolder is .combwork only (HI-2594); the move's own treeOf reads our old folder until it moves, never making a second tree", () => {
     const ws = workspace10()
     expect(dataFolder(ws)).toBe(join(ws, '.combwork'))
     expect(dataFolder(join(ws, 'alpha'))).toBe(join(ws, 'alpha', '.combwork'))
-    expect(treeOf(ws)).toBe(join(ws, '.hive'))
-    write(join(ws, 'gamma', '.hive', 'x'), '')
+    expect(treeOf(ws)).toBe(join(ws, OLD_DIR))
+    write(join(ws, 'gamma', OLD_DIR, 'x'), '')
     expect(treeOf(join(ws, 'gamma'))).toBe(join(ws, 'gamma', '.combwork'))
     expect(existsSync(join(ws, '.combwork'))).toBe(false)
   })
 })
 
 describe('git', () => {
-  it("Hive's exclude line follows, a user's stays; a worktree in .hive/slots stays registered, its changes intact", async () => {
+  it("1.0's exclude line follows, a user's stays; a worktree in the old folder's slots stays registered, its changes intact", async () => {
     const ws = workspace10()
     const alpha = join(ws, 'alpha')
     git(alpha, 'init', '-q', '-b', 'main')
-    write(join(alpha, '.git', 'info', 'exclude'), '# a user line\nbuild/\n# Hive project metadata (added by Hive)\n/.hive/\n')
+    write(join(alpha, '.git', 'info', 'exclude'), `# a user line\nbuild/\n${OLD_HEADER}\n/${OLD_DIR}/\n`)
     git(alpha, 'add', 'src.txt')
     git(alpha, 'commit', '-q', '-m', 'one')
-    git(alpha, 'worktree', 'add', '-q', '-b', 'card', join(alpha, '.hive', 'slots', 'HI-1'))
-    write(join(alpha, '.hive', 'slots', 'HI-1', 'src.txt'), 'changed')
-    write(join(alpha, '.hive', 'slots', 'HI-1', 'new.txt'), 'untracked')
+    git(alpha, 'worktree', 'add', '-q', '-b', 'card', join(alpha, OLD_DIR, 'slots', 'HI-1'))
+    write(join(alpha, OLD_DIR, 'slots', 'HI-1', 'src.txt'), 'changed')
+    write(join(alpha, OLD_DIR, 'slots', 'HI-1', 'new.txt'), 'untracked')
     await openMove(ws)
     expect(readFileSync(join(alpha, '.git', 'info', 'exclude'), 'utf8')).toBe('# a user line\nbuild/\n# Combwork project metadata (added by Combwork)\n/.combwork/\n')
     const slot = join(alpha, '.combwork', 'slots', 'HI-1')
@@ -416,12 +422,12 @@ m.moveFolders(ws).then((r) => appendFileSync(out, 'moved ' + r.moved + '\\n'), (
     await vi.waitFor(() => expect(readFileSync(out, 'utf8')).toContain('stopped'), WAIT)
     // While it lives, its row holds: this open is refused, nothing changed.
     await expect(moveFolders(ws)).rejects.toThrow(/Another Combwork is moving/)
-    expect(existsSync(join(ws, 'alpha', '.hive'))).toBe(true)
+    expect(existsSync(join(ws, 'alpha', OLD_DIR))).toBe(true)
     child.kill()
     await new Promise((r) => (child.exitCode !== null ? r(undefined) : child.once('exit', () => r(undefined))))
     await openMove(ws)
     expect(existsSync(join(ws, 'alpha', '.combwork', 'project.json'))).toBe(true)
-    expect(existsSync(join(ws, '.hive'))).toBe(false)
+    expect(existsSync(join(ws, OLD_DIR))).toBe(false)
     expect(cardText(ws).d).toContain(`${ws}\\alpha\\.combwork\\attachments`)
     // Every moved folder carries its marker: the dead one's and the taker's.
     for (const d of [join(ws, '.combwork'), join(ws, 'alpha', '.combwork'), join(ws, '.combwork', 'assistant', '.combwork')]) expect(existsSync(join(d, MARK_FILE)), d).toBe(true)
@@ -447,6 +453,6 @@ m.moveFolders(ws).then((r) => appendFileSync(out, 'moved ' + r.moved + '\\n'), (
     const ids = new Set([join(ws, '.combwork'), join(ws, 'alpha', '.combwork'), join(ws, '.combwork', 'assistant', '.combwork')].map((d) => JSON.parse(readFileSync(join(d, MARK_FILE), 'utf8')).id))
     expect(ids.size).toBe(1)
     const moves = await movedFolders(ws)
-    expect(moves.map((m) => m.from).sort()).toEqual([join(ws, '.combwork', 'assistant', '.hive'), join(ws, '.hive'), join(ws, '.hive', 'assistant', '.hive'), join(ws, 'alpha', '.hive')].sort())
+    expect(moves.map((m) => m.from).sort()).toEqual([join(ws, '.combwork', 'assistant', OLD_DIR), join(ws, OLD_DIR), join(ws, OLD_DIR, 'assistant', OLD_DIR), join(ws, 'alpha', OLD_DIR)].sort())
   })
 })

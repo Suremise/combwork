@@ -4,8 +4,8 @@
 // the real services (a card with an attachment, a comment, context and its history; a shared note; a handover; the
 // Assistant's home; a project), its folders then put back under 1.0's name with paths stored as 1.0 stored them, and
 // opened by the real WorkspaceService: the move runs in its open, the cards' rewrite in its late phase. Then the board,
-// the notes and the attachment are there, the stored paths point into .combwork, the history is as it was, and no .hive
-// is left.
+// the notes and the attachment are there, the stored paths point into .combwork, the history is as it was, and no folder
+// under 1.0's name is left.
 import { execFileSync } from 'child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -24,6 +24,20 @@ const store = await import('../src/main/boardStore')
 const att = await import('../src/main/cardAttachments')
 
 const ROOT = join(__dirname, '..')
+// old-name: begin combworkMove10-inputs
+/** 1.0's folder and board file, the move's input. */
+const OLD_DIR = '.hive'
+const OLD_DB = 'hive.db'
+/** The names the names upgrade renamed (HI-2587) as 1.0 had them in the schema's code, and the app's name (HI-2591). */
+const AS_1_0: [RegExp, string][] = [
+  [/\bapp_text\b/g, 'hive_text'],
+  [/\bapp_version\b/g, 'hive_version'],
+  [/\bappVersion\b/g, 'hiveVersion'],
+  [/\bappText\b/g, 'hiveText'],
+  [/combwork\.db/g, OLD_DB]
+]
+const APP_1_0 = 'Hive'
+// old-name: end combworkMove10-inputs
 const user = { kind: 'user' } as const
 const services: ReturnType<typeof createWorkspaceService>[] = []
 afterAll(async () => {
@@ -46,23 +60,21 @@ function atTag(file: string): string | null {
  * Anything else that differs from 1.0.0 still fails.
  */
 const before2587 = (s: string): string =>
-  s
-    .replace(/\r\n/g, '\n')
-    .replace(/,\n  \{\n    \/\/ HI-2587, the names upgrade[\s\S]*?\n  \}\n\]/, '\n]')
-    .replace(/\/\*\*\n \* `schema_version`'s column[\s\S]*?\nexport function renameVersionColumn[\s\S]*?\n\}\n/, '')
-    .replace(/^.*\n.*if \(newer === null\) renameVersionColumn\(writer\)\n/m, '')
-    .replace(/\bapp_text\b/g, 'hive_text')
-    .replace(/\bapp_version\b/g, 'hive_version')
-    .replace(/\bappVersion\b/g, 'hiveVersion')
-    .replace(/\bappText\b/g, 'hiveText')
-    .replace(/combwork\.db/g, 'hive.db')
+  AS_1_0.reduce(
+    (t, [from, to]) => t.replace(from, to),
+    s
+      .replace(/\r\n/g, '\n')
+      .replace(/,\n  \{\n    \/\/ HI-2587, the names upgrade[\s\S]*?\n  \}\n\]/, '\n]')
+      .replace(/\/\*\*\n \* `schema_version`'s column[\s\S]*?\nexport function renameVersionColumn[\s\S]*?\n\}\n/, '')
+      .replace(/^.*\n.*if \(newer === null\) renameVersionColumn\(writer\)\n/m, '')
+  )
 /** Code without its comments and with the folder's name as 1.0 had it: what makes the schema. */
 const code = (s: string): string =>
   before2587(s)
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/^\s*\/\/.*$/gm, '')
-    .replace(/\.combwork/g, '.hive')
-    .replace(/\bCombwork\b/g, 'Hive') // HI-2591: the app's name in its messages and notes, as 1.0 had it
+    .replace(/\.combwork/g, OLD_DIR)
+    .replace(/\bCombwork\b/g, APP_1_0) // HI-2591: the app's name in its messages and notes, as 1.0 had it
     .replace(/\s+/g, ' ')
 /** Every schema module the tag had (all of src/main/schema), and the database layer that runs them. */
 function schemaFiles(): string[] {
@@ -90,7 +102,7 @@ describe("a 1.0.0 workspace opened in this build (HR1's finding 6)", () => {
     for (const f of files) expect(code(readFileSync(join(ROOT, f), 'utf8')), f).toBe(code(atTag(f) ?? ''))
   })
 
-  it('opens with its board, notes, attachment and history, its paths in .combwork, no .hive left', async () => {
+  it('opens with its board, notes, attachment and history, its paths in .combwork, no folder under 1.0\'s name left', async () => {
     // Made by the real services, then put back as 1.0 kept it.
     const ws = join(base, 'ws')
     const alpha = join(ws, 'alpha')
@@ -110,27 +122,27 @@ describe("a 1.0.0 workspace opened in this build (HR1's finding 6)", () => {
     const slot = join(alpha, '.combwork', 'slots', 'HI-1')
     mkdirSync(slot, { recursive: true })
     const sessionId = '00000000-0000-4000-8000-0000000000aa'
-    await inWorkspace(first, () => first.upsertSession(alpha, { id: sessionId, agent: 'claude-code', agentId: 'a-coder', cwd: join(alpha, '.hive', 'slots', 'HI-1'), names: 2, name: 'x', lastActiveAt: '2026-11-01T00:00:00.000Z' }))
+    await inWorkspace(first, () => first.upsertSession(alpha, { id: sessionId, agent: 'claude-code', agentId: 'a-coder', cwd: join(alpha, OLD_DIR, 'slots', 'HI-1'), names: 2, name: 'x', lastActiveAt: '2026-11-01T00:00:00.000Z' }))
     mkdirSync(join(ws, '.combwork', 'shared', 'handovers'), { recursive: true })
     writeFileSync(join(ws, '.combwork', 'shared', 'plan.md'), '# Plan\n')
     await disposeWorkspaceService(first)
     store.closeAllBoards()
-    const old = (p: string): string => p.replace(/\\\.combwork\\/g, '\\.hive\\')
+    const old = (p: string): string => p.replace(/\\\.combwork\\/g, `\\${OLD_DIR}\\`)
     const shot = stored.path
     writeFileSync(join(ws, '.combwork', 'shared', 'handovers', '2026-11-01-evidence.md'), `The screenshot: ${old(shot)}\n`)
     for (const [from, to] of [
-      [join(ws, '.combwork', 'assistant', '.combwork'), join(ws, '.combwork', 'assistant', '.hive')],
-      [join(ws, '.combwork'), join(ws, '.hive')],
-      [join(alpha, '.combwork'), join(alpha, '.hive')]
+      [join(ws, '.combwork', 'assistant', '.combwork'), join(ws, '.combwork', 'assistant', OLD_DIR)],
+      [join(ws, '.combwork'), join(ws, OLD_DIR)],
+      [join(alpha, '.combwork'), join(alpha, OLD_DIR)]
     ])
       if (existsSync(from)) renameSync(from, to)
     // And its board's file under 1.0's name (HI-2587).
-    for (const s of ['', '-wal', '-shm']) if (existsSync(join(ws, '.hive', `combwork.db${s}`))) renameSync(join(ws, '.hive', `combwork.db${s}`), join(ws, '.hive', `hive.db${s}`))
+    for (const s of ['', '-wal', '-shm']) if (existsSync(join(ws, OLD_DIR, `combwork.db${s}`))) renameSync(join(ws, OLD_DIR, `combwork.db${s}`), join(ws, OLD_DIR, `${OLD_DB}${s}`))
     // 1.0 stored the attachment's link by its path, the comment's text and the context reference as written then.
-    const db = new DatabaseSync(join(ws, '.hive', 'hive.db'))
+    const db = new DatabaseSync(join(ws, OLD_DIR, OLD_DB))
     db.prepare('UPDATE cards SET description = ? WHERE number = ?').run(`![shot](${old(shot)})`, card.number)
     db.prepare('UPDATE card_comments SET text = ? WHERE card = ?').run(`See ${old(shot)}`, card.number)
-    db.prepare('UPDATE card_context SET ref = ? WHERE card = ?').run('.hive/shared/plan.md', card.number)
+    db.prepare('UPDATE card_context SET ref = ? WHERE card = ?').run(`${OLD_DIR}/shared/plan.md`, card.number)
     db.close()
 
     // Opened in this build.
@@ -149,7 +161,7 @@ describe("a 1.0.0 workspace opened in this build (HR1's finding 6)", () => {
     expect(files.map(({ id, name, size, sha256 }) => ({ id, name, size, sha256 }))).toEqual(rows.map(({ id, name, size, sha256 }) => ({ id, name, size, sha256 })))
     // The conversation is found by the folder it recorded (its transcript's key, kept as it was), which leads to the slot's new place.
     const rec = await inWorkspace(w, () => w.sessionRecord(alpha, sessionId))
-    expect(rec?.cwd).toBe(join(alpha, '.hive', 'slots', 'HI-1'))
+    expect(rec?.cwd).toBe(join(alpha, OLD_DIR, 'slots', 'HI-1'))
     const { movedPath } = await import('../src/main/combworkMove')
     expect(await movedPath(ws, rec!.cwd!)).toBe(slot)
     expect(existsSync(slot)).toBe(true)
@@ -157,6 +169,6 @@ describe("a 1.0.0 workspace opened in this build (HR1's finding 6)", () => {
     expect(readFileSync(join(ws, '.combwork', 'shared', 'plan.md'), 'utf8')).toBe('# Plan\n')
     expect(readFileSync(join(ws, '.combwork', 'shared', 'handovers', '2026-11-01-evidence.md'), 'utf8')).toBe(`The screenshot: ${shot}\n`)
     expect(JSON.parse(readFileSync(join(alpha, '.combwork', 'project.json'), 'utf8')).agents[0].id).toBe('a-coder')
-    for (const d of [ws, alpha, join(ws, '.combwork', 'assistant')]) expect(readdirSync(d).filter((f) => f === '.hive'), d).toEqual([])
+    for (const d of [ws, alpha, join(ws, '.combwork', 'assistant')]) expect(readdirSync(d).filter((f) => f === OLD_DIR), d).toEqual([])
   })
 })

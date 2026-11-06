@@ -1,8 +1,8 @@
-// HI-2462: a workspace as 1.0 left it (its folders called .hive) opens in Combwork with everything under .combwork
+// HI-2462: a workspace as 1.0 left it (its folders under 1.0's name) opens in Combwork with everything under .combwork
 // (SPEC §4.1.1). The dev build makes a workspace (a project, cards, a shared note, a handover, a card's attachment), then,
-// closed, the workspace is put back as 1.0 kept it: each .combwork renamed .hive (the workspace's, the Assistant's home's
-// inside it, the project's), git's exclude line Hive's 1.0 wrote, and a card and a handover naming files by their old
-// .hive paths. Opened again: no .hive is left, the board's cards, the notes and the attachment are there, the paths in
+// closed, the workspace is put back as 1.0 kept it: each .combwork renamed back to 1.0's name (the workspace's, the Assistant's home's
+// inside it, the project's), git's exclude line as 1.0 wrote it, and a card and a handover naming files by their old
+// paths. Opened again: no old folder is left, the board's cards, the notes and the attachment are there, the paths in
 // the card and the handover point into .combwork, an old link still opens (combwork-img, through the map), the exclude line
 // follows, and the project keeps its agent. Opened once more: nothing moves again. No agents. Dev build, throwaway
 // profile and workspace.
@@ -12,6 +12,12 @@ const path = require('path')
 const { DatabaseSync } = require('node:sqlite')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 20000
+// old-name: begin combworkfolder-inputs
+/** 1.0's folder, board file and exclude line: what the workspace is put back as. */
+const OLD_DIR = '.hive'
+const OLD_DB = 'hive.db'
+const OLD_LINE = '/.hive/'
+// old-name: end combworkfolder-inputs
 
 const userData = path.join(lib.WORK, 'combworkfolder-profile')
 const ws = path.join(lib.WORK, 'combworkfolder-ws')
@@ -22,7 +28,7 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 
-/** Every .hive and .combwork folder under the workspace, as relative paths (three levels: the Assistant's is ws\.x\assistant\.x). */
+/** Every old and .combwork folder under the workspace, as relative paths (three levels: the Assistant's is ws\.x\assistant\.x). */
 function folders() {
   const out = []
   const walk = (dir, depth) => {
@@ -37,7 +43,7 @@ function folders() {
     for (const e of entries) {
       if (!e.isDirectory() || e.name === '.git' || e.name === 'node_modules') continue
       const p = path.join(dir, e.name)
-      if (e.name === '.hive' || e.name === '.combwork') out.push(path.relative(ws, p))
+      if (e.name === OLD_DIR || e.name === '.combwork') out.push(path.relative(ws, p))
       if (depth < 3) walk(p, depth + 1)
     }
   }
@@ -72,45 +78,45 @@ function folders() {
     }
   }
 
-  // As 1.0 left it: .hive folders, its exclude line, and paths into them stored in a card and a handover.
+  // As 1.0 left it: its old folders, its exclude line, and paths into them stored in a card and a handover.
   check("the attachment is kept in the project's folder", !!stored && stored.startsWith(path.join(alpha, '.combwork', 'attachments', 'cards')) && fs.existsSync(stored), String(stored))
   const shot = (dir) => path.join(alpha, dir, path.relative(path.join(alpha, '.combwork'), stored))
   fs.mkdirSync(path.join(ws, '.combwork', 'shared', 'handovers'), { recursive: true })
-  fs.writeFileSync(path.join(ws, '.combwork', 'shared', 'handovers', '2026-11-01-evidence.md'), `# Evidence\n\nThe screenshot: ${shot('.hive')}\n`)
+  fs.writeFileSync(path.join(ws, '.combwork', 'shared', 'handovers', '2026-11-01-evidence.md'), `# Evidence\n\nThe screenshot: ${shot(OLD_DIR)}\n`)
   for (const [from, to] of [
-    [path.join(ws, '.combwork', 'assistant', '.combwork'), path.join(ws, '.combwork', 'assistant', '.hive')],
-    [path.join(ws, '.combwork'), path.join(ws, '.hive')],
-    [path.join(alpha, '.combwork'), path.join(alpha, '.hive')]
+    [path.join(ws, '.combwork', 'assistant', '.combwork'), path.join(ws, '.combwork', 'assistant', OLD_DIR)],
+    [path.join(ws, '.combwork'), path.join(ws, OLD_DIR)],
+    [path.join(alpha, '.combwork'), path.join(alpha, OLD_DIR)]
   ])
     if (fs.existsSync(from)) fs.renameSync(from, to)
   // And the board's file under 1.0's name (HI-2587's names upgrade moves it back).
-  for (const s of ['', '-wal', '-shm']) if (fs.existsSync(path.join(ws, '.hive', `combwork.db${s}`))) fs.renameSync(path.join(ws, '.hive', `combwork.db${s}`), path.join(ws, '.hive', `hive.db${s}`))
+  for (const s of ['', '-wal', '-shm']) if (fs.existsSync(path.join(ws, OLD_DIR, `combwork.db${s}`))) fs.renameSync(path.join(ws, OLD_DIR, `combwork.db${s}`), path.join(ws, OLD_DIR, `${OLD_DB}${s}`))
   // 1.0 had no record of the names upgrade (this build wrote one as it made the workspace).
-  fs.rmSync(path.join(ws, '.hive', 'combwork-names.json'), { force: true })
+  fs.rmSync(path.join(ws, OLD_DIR, 'combwork-names.json'), { force: true })
   const exclude = path.join(alpha, '.git', 'info', 'exclude')
-  fs.writeFileSync(exclude, fs.readFileSync(exclude, 'utf8').replace(/^\/\.combwork\/$/m, '/.hive/'))
+  fs.writeFileSync(exclude, fs.readFileSync(exclude, 'utf8').replace(/^\/\.combwork\/$/m, OLD_LINE))
   {
-    const db = new DatabaseSync(path.join(ws, '.hive', 'hive.db'))
-    db.prepare('UPDATE cards SET description = ? WHERE number = ?').run(`The screenshot: ![shot](${shot('.hive')})`, numbers[0])
+    const db = new DatabaseSync(path.join(ws, OLD_DIR, OLD_DB))
+    db.prepare('UPDATE cards SET description = ? WHERE number = ?').run(`The screenshot: ![shot](${shot(OLD_DIR)})`, numbers[0])
     db.close()
   }
-  check('the workspace is as 1.0 kept it: .hive folders only', folders().join() === ['.hive', path.join('.hive', 'assistant', '.hive'), path.join('alpha', '.hive')].sort().join(), folders().join())
+  check('the workspace is as 1.0 kept it: old folders only', folders().join() === [OLD_DIR, path.join(OLD_DIR, 'assistant', OLD_DIR), path.join('alpha', OLD_DIR)].sort().join(), folders().join())
 
   // Opened in Combwork.
   const { app, page, inv } = await lib.launch({ userData })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws, HUNG_MS)
-    check('every .hive moved to .combwork, none left', folders().join() === ['.combwork', path.join('.combwork', 'assistant', '.combwork'), path.join('alpha', '.combwork')].sort().join(), folders().join())
+    check('every old folder moved to .combwork, none left', folders().join() === ['.combwork', path.join('.combwork', 'assistant', '.combwork'), path.join('alpha', '.combwork')].sort().join(), folders().join())
     const files = fs.readdirSync(path.join(ws, '.combwork'))
-    check("the board's file is combwork.db, nothing of hive.db left, the names upgrade recorded (HI-2587)", files.includes('combwork.db') && !files.some((f) => f.startsWith('hive.db')) && files.includes('combwork-names.json'), files.join())
+    check("the board's file is combwork.db, nothing of the old file left, the names upgrade recorded (HI-2587)", files.includes('combwork.db') && !files.some((f) => f.startsWith(OLD_DB)) && files.includes('combwork-names.json'), files.join())
     const cards = await inv('tasks:list')
     const card = cards.find((c) => c.number === numbers[0])
     check('the board has its cards', numbers.every((n) => cards.some((c) => c.number === n)), cards.map((c) => c.number).join())
     check("the card's link points into .combwork", card?.description === `The screenshot: ![shot](${shot('.combwork')})`, card?.description)
     check('the attachment is there', fs.existsSync(shot('.combwork')))
     const handover = fs.readFileSync(path.join(ws, '.combwork', 'shared', 'handovers', '2026-11-01-evidence.md'), 'utf8')
-    check("the handover's path points into .combwork", handover.includes(shot('.combwork')) && !handover.includes('.hive'), handover)
+    check("the handover's path points into .combwork", handover.includes(shot('.combwork')) && !handover.includes(OLD_DIR), handover)
     const tree = JSON.stringify(await inv('notes:tree'))
     check('the shared notes are there', tree.includes('plan.md') && tree.includes('2026-11-01-evidence.md'), tree.slice(0, 300))
     // A link kept elsewhere by its old path (a transcript, the journal) still opens: through the map.
@@ -121,10 +127,10 @@ function folders() {
       img.addEventListener('error', () => res(0), { once: true })
       img.src = `combwork-img://img/${encodeURIComponent(src)}`
     }), p)
-    const width = await shown(shot('.hive'))
+    const width = await shown(shot(OLD_DIR))
     check('an old link to the attachment still opens', width === 64, String(width))
-    check('…and a path into a .hive that never moved does not', (await shown(path.join(ws, 'nowhere', '.hive', 'attachments', 'x.png'))) === 0)
-    check("git's exclude line follows", /^\/\.combwork\/$/m.test(fs.readFileSync(exclude, 'utf8')) && !/^\/\.hive\/$/m.test(fs.readFileSync(exclude, 'utf8')), fs.readFileSync(exclude, 'utf8'))
+    check('…and a path into an old folder that never moved does not', (await shown(path.join(ws, 'nowhere', OLD_DIR, 'attachments', 'x.png'))) === 0)
+    check("git's exclude line follows", /^\/\.combwork\/$/m.test(fs.readFileSync(exclude, 'utf8')) && !fs.readFileSync(exclude, 'utf8').split(/\r?\n/).includes(OLD_LINE), fs.readFileSync(exclude, 'utf8'))
     const project = JSON.parse(fs.readFileSync(path.join(alpha, '.combwork', 'project.json'), 'utf8'))
     check('the project keeps its agent', (project.agents ?? []).some((a) => a.id === 'a-coder'), JSON.stringify(project.agents))
     check('the move finished: its plan gone, its map kept', !fs.existsSync(path.join(ws, '.combwork', 'combwork-move.json')) && fs.existsSync(path.join(ws, '.combwork', 'combwork-moved.json')))

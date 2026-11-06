@@ -1,5 +1,5 @@
 // Tests only (tests/sandboxChecks.test.ts): a fake windows-sandbox MCP server, so the Sandbox checks' runner is tested
-// without the hive-mcp project or a Sandbox. It answers the tools the runner calls over stdio, in the server's reply
+// without the MCP servers project or a Sandbox. It answers the tools the runner calls over stdio, in the server's reply
 // shapes the runner reads, and records each call in the state file it shares with stub-wsb.cjs (WSB_STUB_STATE):
 //   { sandboxes: [id], calls: [['env', its settings] | ['start', args] | ['run', command] | ['stop', id, 'server'] ...],
 //     fail: { stop: n, guest: [{ match, exit, stdout, stderr }] } }

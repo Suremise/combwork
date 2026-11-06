@@ -1,5 +1,5 @@
 /**
- * The move of Hive's `.hive` folders to `.combwork` (HI-2462, SPEC §4.3): what is shared between main and the tests, with
+ * The move of 1.0's `.hive` folders to `.combwork` (HI-2462, SPEC §4.3): what is shared between main and the tests, with
  * no file system here. A move is one host's folder: `<host>\.hive` → `<host>\.combwork`, recorded only when Combwork
  * really moved it (combworkMove.ts keeps the map in the workspace's `combwork-moved.json`). Paths stored by absolute path
  * into a moved folder are translated through that map and nothing else: a `.hive` Combwork didn't move (another tool's,
@@ -124,14 +124,14 @@ export function movedContextRef(ref: string): string {
 
 /** The comment above the project metadata line Combwork adds to a repository's info/exclude (HI-2575). */
 export const EXCLUDE_COMMENT = '# Combwork project metadata (added by Combwork)' // i18n-ignore: a line in git's exclude file, which stays English
-/** The same comment as Hive wrote it before 1.1: still Combwork's own entry. */
+/** The same comment as 1.0 wrote it before 1.1: still Combwork's own entry. */
 export const LEGACY_EXCLUDE_COMMENT = '# Hive project metadata (added by Hive)' // i18n-ignore: a line in git's exclude file, which stays English
 
 /**
- * An info/exclude file's text with Hive's own line for a moved project's old folder replaced by the new one's (`/proj/.hive/`
- * → `/proj/.combwork/`, or the bare `.hive/` form for a repository's own), only where it follows Hive's comment line,
+ * An info/exclude file's text with 1.0's own line for a moved project's old folder replaced by the new one's (`/proj/.hive/`
+ * → `/proj/.combwork/`, or the bare `.hive/` form for a repository's own), only where it follows 1.0's comment line,
  * and only when `oldGone` (no `.hive` is left there: another tool's, or one made again, keeps its line). A line for the
- * new folder that is already there isn't added twice. Hive's own comment above a replaced line becomes Combwork's
+ * new folder that is already there isn't added twice. 1.0's own comment above a replaced line becomes Combwork's
  * (HI-2575). Every other line stays as it was.
  */
 export function movedExcludeText(text: string, oldLine: string, newLine: string, oldGone: boolean): string {

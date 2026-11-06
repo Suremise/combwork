@@ -1,5 +1,5 @@
 // HI-2587: the names upgrade at a workspace's open (nameUpgrade.ts; the design is the card's, HI-2587/s15 with s20, s23,
-// s26 and s40). Real folders, git and SQLite: a 1.0 workspace (.hive, hive.db) and an RC2 one (.combwork, hive.db) both
+// s26 and s40). Real folders, git and SQLite: a 1.0 workspace (its old folder and board file) and an RC2 one (.combwork, the old board file) both
 // end the same: combwork.db holding every card, the .gitignore, README and MCP definitions in Combwork's names, the skill
 // copies' markers renamed in the project and in a slot the board's records name, git's exclude comments Combwork's, and
 // the record written; the next open takes no lock. A run stopped at each step finishes at the next open; a new workspace
@@ -11,6 +11,13 @@ import { DatabaseSync } from 'node:sqlite'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+
+// old-name: begin nameUpgrade-inputs
+/** 1.0's name, as its folders, files, markers, refs and texts carry it: the upgrade's input. */
+const OLD = 'hive'
+const OLD_NAME = 'Hive'
+const OLD_UPPER = 'HIVE'
+// old-name: end nameUpgrade-inputs
 
 vi.mock('../src/main/events', async (orig) => ({ ...(await orig<object>()), toast: () => undefined }))
 
@@ -30,59 +37,59 @@ const write = (p: string, text: string): void => {
 }
 const git = (cwd: string, ...args: string[]): string => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd, encoding: 'utf8' })
 
-/** A card an older Hive saved in the board's stub. */
-const STUB_CARD = '{"number":7,"title":"Made in an older Hive"}'
+/** A card an older release saved in the board's stub. */
+const STUB_CARD = `{"number":7,"title":"Made in an older ${OLD_NAME}"}`
 
-const OLD_GITIGNORE = "# The task board's database and what moving it from files left (added by Hive, #1017)\nhive.db\nhive.db-*\nbackups/\n"
-const OLD_EXCLUDE = "# Hive project metadata (added by Hive)\n/.combwork/\n# Hive's copies of workspace skills for Codex and Copilot (added by Hive)\n/.agents/skills/cw-*/\n/.agents/skills/.cw-*/\n/.agents/skills/hive-*/\n/.agents/skills/.hive-*/\n"
+const OLD_GITIGNORE = `# The task board's database and what moving it from files left (added by ${OLD_NAME}, #1017)\n${OLD}.db\n${OLD}.db-*\nbackups/\n`
+const OLD_EXCLUDE = `# ${OLD_NAME} project metadata (added by ${OLD_NAME})\n/.combwork/\n# ${OLD_NAME}'s copies of workspace skills for Codex and Copilot (added by ${OLD_NAME})\n/.agents/skills/cw-*/\n/.agents/skills/.cw-*/\n/.agents/skills/${OLD}-*/\n/.agents/skills/.${OLD}-*/\n`
 
 /**
- * A copy Combwork made before HI-2463 (`hive-<skill>`, with the old marker), its marker's hash its content's: provably
+ * A copy Combwork made before HI-2463 (under the old prefix, with the old marker), its marker's hash its content's: provably
  * Combwork's and unchanged (HI-2594). `edited`: changed since, so its content is no longer the hash.
  */
 async function oldCopy(folder: string, skill: string, edited = false): Promise<string> {
-  const dir = join(folder, '.agents', 'skills', `hive-${skill}`)
+  const dir = join(folder, '.agents', 'skills', `${OLD}-${skill}`)
   write(join(dir, 'SKILL.md'), `# ${skill}`)
   const hash = await contentHash(dir)
-  write(join(dir, '.hive-copy'), JSON.stringify({ source: 's', hash }))
+  write(join(dir, `.${OLD}-copy`), JSON.stringify({ source: 's', hash }))
   if (edited) writeFileSync(join(dir, 'SKILL.md'), `# ${skill}, edited`)
   return dir
 }
 
 /**
- * A workspace as 1.0 (`.hive`) or an RC2 (`.combwork`) left it, with its board, a project in git with a skill copy, and a
+ * A workspace as 1.0 (its old folder) or an RC2 (`.combwork`) left it, with its board, a project in git with a skill copy, and a
  * slot; with `copies`, each also holds copies under the old prefix (HI-2594): Combwork's unchanged, one edited since, and
  * a folder of the user's.
  */
 async function withOldCopies(w: { ws: string; alpha: string; slot: string }): Promise<{ gone: string[]; kept: string[] }> {
   const gone = [await oldCopy(w.alpha, 'merge-ready'), await oldCopy(w.slot, 'merge-ready')]
-  const kept = [await oldCopy(w.alpha, 'handover', true), join(w.alpha, '.agents', 'skills', 'hive-mine')]
+  const kept = [await oldCopy(w.alpha, 'handover', true), join(w.alpha, '.agents', 'skills', `${OLD}-mine`)]
   write(join(kept[1], 'SKILL.md'), '# mine')
   return { gone, kept }
 }
 
 function workspace(kind: '1.0' | 'rc2'): { ws: string; alpha: string; slot: string } {
   const ws = join(base, `ws${++n}`)
-  const tree = kind === '1.0' ? '.hive' : '.combwork'
+  const tree = kind === '1.0' ? `.${OLD}` : '.combwork'
   write(join(ws, tree, 'workspace.json'), '{}')
   write(join(ws, tree, '.gitignore'), OLD_GITIGNORE)
-  write(join(ws, tree, 'README.md'), WORKSPACE_README.replace('`combwork.db`', '`hive.db`'))
-  write(join(ws, tree, 'mcp', 'srv.json'), '{"command":"${HIVE_MCP_DIR}/srv/run.cmd"}')
+  write(join(ws, tree, 'README.md'), WORKSPACE_README.replace('`combwork.db`', `\`${OLD}.db\``))
+  write(join(ws, tree, 'mcp', 'srv.json'), `{"command":"\${${OLD_UPPER}_MCP_DIR}/srv/run.cmd"}`)
   const alpha = join(ws, 'alpha')
   write(join(alpha, tree, 'project.json'), '{}')
   git(ws, 'init', '-q', alpha)
-  // A submission's pin and a test merge's ref under Hive's prefix (HI-2593's handoff), at a commit of the project's.
+  // A submission's pin and a test merge's ref under 1.0's prefix (HI-2593's handoff), at a commit of the project's.
   write(join(alpha, 'src.txt'), 'code')
   git(alpha, 'add', 'src.txt')
   git(alpha, 'commit', '-q', '-m', 'one')
-  git(alpha, 'update-ref', 'refs/hive/cards/AL-1/1', 'HEAD')
-  git(alpha, 'update-ref', 'refs/hive/queue/AL-1-e1', 'HEAD')
+  git(alpha, 'update-ref', `refs/${OLD}/cards/AL-1/1`, 'HEAD')
+  git(alpha, 'update-ref', `refs/${OLD}/queue/AL-1-e1`, 'HEAD')
   write(join(alpha, '.git', 'info', 'exclude'), OLD_EXCLUDE)
   write(join(alpha, '.agents', 'skills', 'cw-handover', 'SKILL.md'), '# h')
-  write(join(alpha, '.agents', 'skills', 'cw-handover', '.hive-copy'), '{"source":"s","hash":"h1"}')
+  write(join(alpha, '.agents', 'skills', 'cw-handover', `.${OLD}-copy`), '{"source":"s","hash":"h1"}')
   const slot = join(ws, 'worktrees', 'alpha', 'slot-a')
-  write(join(slot, '.agents', 'skills', 'cw-handover', '.hive-copy'), '{"source":"s","hash":"h2"}')
-  const db = new DatabaseSync(join(ws, tree, 'hive.db'))
+  write(join(slot, '.agents', 'skills', 'cw-handover', `.${OLD}-copy`), '{"source":"s","hash":"h2"}')
+  const db = new DatabaseSync(join(ws, tree, `${OLD}.db`))
   db.exec('PRAGMA journal_mode = WAL')
   db.exec('CREATE TABLE cards (number INTEGER PRIMARY KEY, title TEXT NOT NULL, description TEXT NOT NULL DEFAULT \'\') STRICT')
   // The tables the folder move's card rewrite reads (a 1.0 board's), so its late phases finish.
@@ -90,9 +97,9 @@ function workspace(kind: '1.0' | 'rc2'): { ws: string; alpha: string; slot: stri
   db.exec('CREATE TABLE card_context (card INTEGER NOT NULL, ord INTEGER NOT NULL, ref TEXT NOT NULL, PRIMARY KEY (card, ord)) STRICT')
   db.exec('CREATE TABLE skill_copies (folder TEXT NOT NULL, skill TEXT NOT NULL, project TEXT NOT NULL, revision TEXT NOT NULL, made_at TEXT NOT NULL, PRIMARY KEY (folder, skill)) STRICT')
   db.prepare('INSERT INTO cards (number, title) VALUES (1, ?)').run('One')
-  // The stub 0.9 to 1.0 left for older versions (#1017), with a card an older Hive saved in it (HI-2594).
+  // The stub 0.9 to 1.0 left for older versions (#1017), with a card an older release saved in it (HI-2594).
   write(join(ws, tree, 'tasks', 'board.json'), '{"version":1,"next":2}')
-  write(join(ws, tree, 'tasks', 'README.txt'), 'The task board moved to .hive/hive.db in Hive 0.9 (#1017).\r\n')
+  write(join(ws, tree, 'tasks', 'README.txt'), `The task board moved to .${OLD}/${OLD}.db in ${OLD_NAME} 0.9 (#1017).\r\n`)
   write(join(ws, tree, 'tasks', '7.json'), STUB_CARD)
   db.prepare('INSERT INTO skill_copies VALUES (?, ?, ?, ?, ?)').run(slot, 'handover', 'alpha', 'h2', 'now')
   db.close()
@@ -104,7 +111,7 @@ function expectUpgraded(w: { ws: string; alpha: string; slot: string }): void {
   const db = new DatabaseSync(join(dir, 'combwork.db'), { readOnly: true })
   expect((db.prepare('SELECT title FROM cards').all() as { title: string }[]).map((r) => r.title)).toEqual(['One'])
   db.close()
-  expect(readdirSync(dir).filter((f) => f.startsWith('hive'))).toEqual([])
+  expect(readdirSync(dir).filter((f) => f.startsWith(OLD))).toEqual([])
   // The stub's card set aside, intact, and the stub gone (HI-2594).
   expect(readdirSync(dir).filter((f) => f.startsWith('tasks'))).toEqual(['tasks.set-aside'])
   expect(readFileSync(join(dir, 'tasks.set-aside', '7.json'), 'utf8')).toBe(STUB_CARD)
@@ -113,16 +120,16 @@ function expectUpgraded(w: { ws: string; alpha: string; slot: string }): void {
   expect(readFileSync(join(dir, 'mcp', 'srv.json'), 'utf8')).toBe('{"command":"${CW_MCP_DIR}/srv/run.cmd"}')
   for (const [f, hash] of [[w.alpha, 'h1'], [w.slot, 'h2']]) {
     const copy = join(f, '.agents', 'skills', 'cw-handover')
-    expect(existsSync(join(copy, '.hive-copy'))).toBe(false)
+    expect(existsSync(join(copy, `.${OLD}-copy`))).toBe(false)
     expect(JSON.parse(readFileSync(join(copy, '.combwork-copy'), 'utf8')).hash).toBe(hash)
   }
   const exclude = readFileSync(join(w.alpha, '.git', 'info', 'exclude'), 'utf8')
-  expect(exclude).not.toMatch(/Hive|hive/)
+  expect(exclude).not.toMatch(new RegExp(OLD, 'i'))
   expect(exclude).toContain('# Combwork project metadata (added by Combwork)')
   // The old copies' lines gone (HI-2594), Combwork's own kept.
   expect(exclude.split('\n').filter((l) => l.startsWith('/.agents/'))).toEqual(['/.agents/skills/cw-*/', '/.agents/skills/.cw-*/'])
   const head = git(w.alpha, 'rev-parse', 'HEAD').trim()
-  expect(git(w.alpha, 'for-each-ref', '--format=%(refname) %(objectname)', 'refs/hive', 'refs/cw').trim().split('\n').sort()).toEqual([`refs/cw/cards/AL-1/1 ${head}`, `refs/cw/queue/AL-1-e1 ${head}`])
+  expect(git(w.alpha, 'for-each-ref', '--format=%(refname) %(objectname)', `refs/${OLD}`, 'refs/cw').trim().split('\n').sort()).toEqual([`refs/cw/cards/AL-1/1 ${head}`, `refs/cw/queue/AL-1-e1 ${head}`])
   expect(JSON.parse(readFileSync(join(dir, NAMES_DONE_FILE), 'utf8')).version).toBe(NAMES_VERSION)
 }
 
@@ -207,8 +214,8 @@ describe('the names upgrade at the open', () => {
     const second = git(w.alpha, 'rev-parse', 'HEAD').trim()
     git(w.alpha, 'update-ref', 'refs/cw/cards/AL-1/1', second)
     await open(w.ws)
-    const refs = git(w.alpha, 'for-each-ref', '--format=%(refname) %(objectname)', 'refs/hive', 'refs/cw').trim().split('\n').sort()
-    expect(refs).toEqual([`refs/cw/cards/AL-1/1 ${second}`, `refs/cw/queue/AL-1-e1 ${first}`, `refs/hive/cards/AL-1/1 ${first}`])
+    const refs = git(w.alpha, 'for-each-ref', '--format=%(refname) %(objectname)', `refs/${OLD}`, 'refs/cw').trim().split('\n').sort()
+    expect(refs).toEqual([`refs/cw/cards/AL-1/1 ${second}`, `refs/cw/queue/AL-1-e1 ${first}`, `refs/${OLD}/cards/AL-1/1 ${first}`])
   })
 
   it('a step that fails refuses the open naming it; the next open finishes', async () => {
@@ -263,26 +270,26 @@ describe('the names upgrade at the open', () => {
     await open(w.ws)
     expectUpgraded(w)
     expect(existsSync(join(w.alpha, '.combwork', NAMES_DONE_FILE))).toBe(true)
-    // Copied in from an RC's workspace: its .combwork, an old marker, Hive's exclude comment, an old ref.
+    // Copied in from an RC's workspace: its .combwork, an old marker, 1.0's exclude comment, an old ref.
     const beta = join(w.ws, 'beta')
     write(join(beta, '.combwork', 'project.json'), '{}')
     git(w.ws, 'init', '-q', beta)
     write(join(beta, '.git', 'info', 'exclude'), OLD_EXCLUDE)
-    write(join(beta, '.agents', 'skills', 'cw-handover', '.hive-copy'), '{"source":"s","hash":"b1"}')
+    write(join(beta, '.agents', 'skills', 'cw-handover', `.${OLD}-copy`), '{"source":"s","hash":"b1"}')
     write(join(beta, 'b.txt'), 'b')
     git(beta, 'add', 'b.txt')
     git(beta, 'commit', '-q', '-m', 'b')
-    git(beta, 'update-ref', 'refs/hive/cards/BE-1/1', 'HEAD')
+    git(beta, 'update-ref', `refs/${OLD}/cards/BE-1/1`, 'HEAD')
     expect(await projectNamesDone(beta)).toBe(false)
     // An RC still has the workspace open (its presence marker, a live process): refused, nothing of beta's changed.
     const other = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], { stdio: 'ignore', windowsHide: true })
     const marker = join(w.ws, '.combwork', 'open', 'Combwork-rc2.json')
     try {
-      write(marker, JSON.stringify({ pid: other.pid, profile: 'Combwork', hiveVersion: '1.1.0-rc.2', startedAt: new Date().toISOString(), heartbeat: new Date().toISOString() }))
-      await expect(moveFolders(w.ws, { only: beta })).rejects.toThrow(/open in another Combwork or Hive \(Combwork\)/)
-      expect(existsSync(join(beta, '.agents', 'skills', 'cw-handover', '.hive-copy'))).toBe(true)
+      write(marker, JSON.stringify({ pid: other.pid, profile: 'Combwork', [`${OLD}Version`]: '1.1.0-rc.2', startedAt: new Date().toISOString(), heartbeat: new Date().toISOString() }))
+      await expect(moveFolders(w.ws, { only: beta })).rejects.toThrow(/open in another Combwork\b.*\(Combwork\)/)
+      expect(existsSync(join(beta, '.agents', 'skills', 'cw-handover', `.${OLD}-copy`))).toBe(true)
       expect(readFileSync(join(beta, '.git', 'info', 'exclude'), 'utf8')).toBe(OLD_EXCLUDE)
-      expect(git(beta, 'for-each-ref', '--format=%(refname)', 'refs/hive', 'refs/cw').trim()).toBe('refs/hive/cards/BE-1/1')
+      expect(git(beta, 'for-each-ref', '--format=%(refname)', `refs/${OLD}`, 'refs/cw').trim()).toBe(`refs/${OLD}/cards/BE-1/1`)
       expect(await projectNamesDone(beta)).toBe(false)
     } finally {
       other.kill()
@@ -291,8 +298,8 @@ describe('the names upgrade at the open', () => {
     // Once it has gone: the retry converts it under the lock and records it.
     await moveFolders(w.ws, { only: beta })
     expect(existsSync(join(beta, '.agents', 'skills', 'cw-handover', '.combwork-copy'))).toBe(true)
-    expect(readFileSync(join(beta, '.git', 'info', 'exclude'), 'utf8')).not.toMatch(/Hive/)
-    expect(git(beta, 'for-each-ref', '--format=%(refname)', 'refs/hive', 'refs/cw').trim()).toBe('refs/cw/cards/BE-1/1')
+    expect(readFileSync(join(beta, '.git', 'info', 'exclude'), 'utf8')).not.toMatch(new RegExp(OLD_NAME))
+    expect(git(beta, 'for-each-ref', '--format=%(refname)', `refs/${OLD}`, 'refs/cw').trim()).toBe('refs/cw/cards/BE-1/1')
     expect(await projectNamesDone(beta)).toBe(true)
   })
 
@@ -300,7 +307,7 @@ describe('the names upgrade at the open', () => {
     // A live process with an RC's presence marker in the workspace's .combwork.
     const present = (ws: string) => {
       const other = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], { stdio: 'ignore', windowsHide: true })
-      write(join(ws, '.combwork', 'open', 'Combwork-other.json'), JSON.stringify({ pid: other.pid, profile: 'Combwork', hiveVersion: '1.1.0-rc.2', startedAt: new Date().toISOString(), heartbeat: new Date().toISOString() }))
+      write(join(ws, '.combwork', 'open', 'Combwork-other.json'), JSON.stringify({ pid: other.pid, profile: 'Combwork', [`${OLD}Version`]: '1.1.0-rc.2', startedAt: new Date().toISOString(), heartbeat: new Date().toISOString() }))
       return async () => {
         other.kill()
         await new Promise((r) => (other.exitCode !== null ? r(undefined) : other.once('exit', () => r(undefined))))
@@ -329,7 +336,7 @@ describe('the names upgrade at the open', () => {
       const gone = present(w.ws)
       const before = snapshot(w.ws)
       const beforeRefs = refs(w.alpha)
-      await expect(open(w.ws)).rejects.toThrow(/open in another Combwork or Hive \(Combwork\)/)
+      await expect(open(w.ws)).rejects.toThrow(/open in another Combwork\b.*\(Combwork\)/)
       expect(snapshot(w.ws)).toBe(before)
       expect(refs(w.alpha)).toBe(beforeRefs)
       await gone()
@@ -342,12 +349,12 @@ describe('the names upgrade at the open', () => {
       await open(w.ws)
       const beta = join(w.ws, 'beta')
       write(join(beta, '.combwork', 'project.json'), '{}')
-      write(join(beta, '.agents', 'skills', 'cw-handover', '.hive-copy'), '{"source":"s","hash":"b1"}')
+      write(join(beta, '.agents', 'skills', 'cw-handover', `.${OLD}-copy`), '{"source":"s","hash":"b1"}')
       const gamma = join(w.ws, 'gamma')
       write(join(gamma, '.combwork', 'project.json'), '{}')
       const gone = present(w.ws)
       const before = snapshot(w.ws)
-      for (const p of [beta, gamma]) await expect(moveFolders(w.ws, { only: p })).rejects.toThrow(/open in another Combwork or Hive/)
+      for (const p of [beta, gamma]) await expect(moveFolders(w.ws, { only: p })).rejects.toThrow(/open in another Combwork\b/)
       expect(snapshot(w.ws)).toBe(before)
       expect([await projectNamesDone(beta), await projectNamesDone(gamma)]).toEqual([false, false])
       await gone()
