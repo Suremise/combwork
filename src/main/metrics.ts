@@ -174,10 +174,22 @@ const overflowKey = {
 type Family = keyof PartData
 /**
  * Whether a series counts against its bucket's series cap: those with labels do. Catalog series (a role and a workflow
- * side, at most 10 a part) and those whose labels are all "(other)" (overflowKey's, at most 48 a part) are bounded by
- * what they are keyed by, so they never take the room of a labelled one, however they are recorded, folded or read back.
+ * side: 10 keys) and overflow series (overflowKey's: 30 API, 8 tool and 10 guidance keys) don't: only those exact keys,
+ * so they never take the room of a labelled one, however they are recorded, folded or read back, and stay bounded.
  */
-const counted = (family: Family, key: string): boolean => family !== 'catalog' && !key.startsWith(family === 'api' ? `${OTHER} ${OTHER} ` : `${OTHER} `)
+const UNCOUNTED: Record<Family, Set<string>> = (() => {
+  // Exactly these keys, built from the fixed values they may hold (HI-2628 round 2: a prefix would also take a guidance
+  // key with a dialect, a family of any size).
+  const sides = [...WORKFLOWS, 'unknown']
+  const roles = ['agent', 'assistant']
+  return {
+    api: new Set([...ROLES].flatMap((r) => [...OUTCOMES].map((o) => overflowKey.api(r, o)))),
+    mcp: new Set(roles.flatMap((r) => ['compact', 'detail'].flatMap((m) => ['ok', 'error'].map((o) => overflowKey.mcp(r, m, o))))),
+    guidance: new Set(roles.flatMap((r) => sides.map((w) => overflowKey.guidance(r, w)))),
+    catalog: new Set(roles.flatMap((r) => sides.map((w) => `${r} ${w}`)))
+  }
+})()
+const counted = (family: Family, key: string): boolean => !UNCOUNTED[family].has(key)
 const countedIn = (p: PartData): number => (['api', 'mcp', 'guidance'] as const).reduce((n, f) => n + Object.keys(p[f]).filter((k) => counted(f, k)).length, 0)
 const inSet = (set: Set<string>, v: unknown): string => (typeof v === 'string' && set.has(v) ? v : OTHER)
 /** The longest project label kept as it is; a longer name gets a bounded label of its own (projectLabel). */

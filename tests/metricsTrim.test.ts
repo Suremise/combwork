@@ -7,7 +7,7 @@ import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
-import { metricsSaved } from './storeDocs'
+import { metricsSaved, putMetrics } from './storeDocs'
 
 const lines: string[] = []
 vi.mock('../src/main/logger', async (original) => {
@@ -168,6 +168,32 @@ describe('HI-2628: 30 days kept, trims logged, folds keep their totals', () => {
     await w.open(path)
     r = report()
     expect([total(r), r.dropped]).toEqual([2 * 1440, 0])
+    await disposeWorkspaceService(w)
+  })
+  it('only the exact overflow keys are free of the series cap: unknown-provider guidance with many dialects is capped, recorded or read back', async () => {
+    const { w, path } = await open()
+    const launch = { provider: 'unrecognised-provider', role: 'agent' as const, workflow: 'builder' as const, guidanceBytes: 1, guidanceChars: 1, customBytes: 0, customChars: 0, roleBytes: 0, roleChars: 0, modeBytes: 0, modeChars: 0, skills: 0, skillCatalogBytes: 0, skillBytes: 0, skillsNotDelivered: 0, skillsUnmeasured: 0 }
+    // "(other) agent builder <dialect>": provider "(other)", but not an overflow key (those have no dialect).
+    for (let i = 0; i < 2050; i++) metrics.recordLaunch(metrics.metricsHandle(w), 'alpha', { ...launch, dialect: i.toString(16).padStart(16, '0') })
+    const kept = () => {
+      const r = metrics.queryMetrics(w, { scope: { kind: 'workspace' } })
+      return { series: Object.values(r.projects).reduce((n, p) => n + p.guidance.length, 0), dropped: r.dropped }
+    }
+    expect(kept()).toEqual({ series: saved.series, dropped: 50 })
+    expect(metrics.metricsHandle(w)!.store.buckets[0].series).toBe(saved.series)
+    await w.close()
+    await metrics.flushMetrics()
+    await w.open(path)
+    expect(kept()).toEqual({ series: saved.series, dropped: 50 })
+    // Saved data with more of them than the cap (written by something else): read back capped too.
+    const doc = metricsSaved(path)!
+    const extra = Object.fromEntries(Array.from({ length: 60 }, (_, i) => [`(other) agent builder ${(10_000 + i).toString(16).padStart(16, '0')}`, { ...launch, provider: '(other)', dialect: (10_000 + i).toString(16).padStart(16, '0'), launches: 1 }]))
+    ;(doc.buckets[0] as { projects: Record<string, { guidance: Record<string, unknown> }> }).projects.alpha.guidance = { ...(doc.buckets[0] as { projects: Record<string, { guidance: Record<string, unknown> }> }).projects.alpha.guidance, ...extra }
+    await w.close()
+    await metrics.flushMetrics()
+    await putMetrics(path, doc as never)
+    await w.open(path)
+    expect(kept().series).toBe(saved.series)
     await disposeWorkspaceService(w)
   })
 })
