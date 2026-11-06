@@ -85,7 +85,7 @@ describe("a workspace's settings are never saved before its open has read them (
   it.each(['new', 'existing'] as const)("the setters called before the read change the settings read, keeping the workspace's own (%s workspace)", async (kind) => {
     const { path, own } = workspaceFolder(kind)
     const w = service()
-    const changes: Promise<void>[] = []
+    const changes: Promise<unknown>[] = []
     configTestHooks.beforeSettingsRead = async () => {
       let waits = 0
       let allWait!: () => void
