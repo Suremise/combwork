@@ -538,6 +538,10 @@ test("scenario 9 makes Claude Code's folder, as its first run would, before it a
   assert.ok(made > 0 && at('fs.mkdirSync(claudeHome, { recursive: true })') > made, 'clean makes %USERPROFILE%\\.claude')
   assert.ok(at('fake-claude-install.ps1') < made, 'after installing the fake')
   assert.ok(made < at("inv('connections:add', 'claude-code'"), 'before adding the connection')
+  // Then on in the workspace it opens (On here), before the agent it starts there.
+  const on = at("inv('connections:setOn', account.id, true)")
+  assert.ok(on > at("inv('workspace:open', ws)") && on < at("inv('agents:add', proj"), 'the account is turned on in the new workspace before its agent is added')
+  assert.ok(fs.readFileSync(path.join(root, 'src', 'shared', 'api.ts'), 'utf8').includes("'connections:setOn'"), 'connections:setOn is an IPC channel')
   // The folder is the one Combwork looks for: Claude Code's home without CLAUDE_CONFIG_DIR, which a user's environment hasn't.
   const adapter = fs.readFileSync(path.join(root, 'src', 'main', 'providers', 'claude', 'adapter.ts'), 'utf8')
   assert.ok(adapter.includes("return process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude')"), "Claude Code's home is ~/.claude")

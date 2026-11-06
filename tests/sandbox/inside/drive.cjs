@@ -477,6 +477,10 @@ const steps = {
       }
     }
 
+    // The account turned on in this workspace, as a user does with its On here switch (Settings → Accounts & Connections;
+    // HI-2646): each workspace chooses which are on, and one added before the workspace was made is on in none.
+    if (account?.id) res.facts.accountOn = await inv('connections:setOn', account.id, true).then(() => true, (e) => String(e))
+
     // An agent, started briefly: its first task is `set`, which the fake runs in the session's shell (fake-shell.jsonl).
     const agent = await inv('agents:add', proj, { provider: 'claude-code' }).catch((e) => ({ error: String(e) }))
     res.facts.agent = { id: agent?.id, error: agent?.error }
