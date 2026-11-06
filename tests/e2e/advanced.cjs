@@ -156,8 +156,9 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     const wsFile = path.join(ws, '.combwork', 'workspace.json')
     check("a workspace's own value goes in workspace.json", !!(await lib.until(() => fs.existsSync(wsFile) && JSON.parse(fs.readFileSync(wsFile, 'utf8')).advanced?.['cw.progress.lanesShown'] === 2, HUNG_MS)))
     check('…and not in advanced.json', !('cw.progress.lanesShown' in readFile().values))
-    const state = await inv('advanced:state')
-    check('the window uses it', state.workspace?.['cw.progress.lanesShown'] === 2, JSON.stringify(state.workspace))
+    // The file is written before the settings in memory change (HI-2651, HI-2654): wait for the window's state, not just the file.
+    let state
+    check('the window uses it', !!(await lib.until(async () => (state = await inv('advanced:state')).workspace?.['cw.progress.lanesShown'] === 2, HUNG_MS)), JSON.stringify(state?.workspace))
     check("Settings' own value stays beside it", (await lanes.getByLabel('Combwork: Progress panel: lanes shown', { exact: true }).inputValue()) === '6')
 
     // --- A workspace's own switch (HI-2344): it inherits Settings' value and shows it, takes on and off, and goes back.
@@ -169,7 +170,7 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     await resume.screenshot({ path: path.join(lib.WORK, 'advanced-ws-switch-inherited.png') })
     await resumeOwn.selectOption({ label: 'off' })
     check('…off goes in workspace.json as false', !!(await lib.until(() => wsOwn()['cw.restart.resumeAfterUpdate'] === false, HUNG_MS)), JSON.stringify(wsOwn()))
-    check('…and the window uses it', (await inv('advanced:state')).workspace?.['cw.restart.resumeAfterUpdate'] === false)
+    check('…and the window uses it', !!(await lib.until(async () => (await inv('advanced:state')).workspace?.['cw.restart.resumeAfterUpdate'] === false, HUNG_MS)))
     await resume.screenshot({ path: path.join(lib.WORK, 'advanced-ws-switch-off.png') })
     await resumeOwn.selectOption({ label: 'on' })
     check('…on as true', !!(await lib.until(() => wsOwn()['cw.restart.resumeAfterUpdate'] === true, HUNG_MS)), JSON.stringify(wsOwn()))
