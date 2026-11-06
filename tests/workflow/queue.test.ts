@@ -103,6 +103,17 @@ describe('the merge queue', () => {
     expect(e.wakes.some((w) => w.agent === 'B1' && w.why.includes('merge queue'))).toBe(true)
   })
 
+  it("HI-2617: each merge check is given the target's head as CW_CHECK_BASE, so it can look at what the card adds", async () => {
+    const e = team()
+    await queued(e)
+    const before = mainHead(e)
+    const seen: (Record<string, string> | undefined)[] = []
+    const [o] = await e.queue({ runCheck: async (_n, _c, _f, ctx) => (seen.push(ctx.env), { ok: true, output: '' }) }).drain('main')
+    expect(o).toMatchObject({ outcome: 'integrated' })
+    expect(seen.length).toBeGreaterThan(0)
+    for (const given of seen) expect(given).toEqual({ CW_CHECK_BASE: before })
+  })
+
   it('S7: a hand merge of an approved card is observed → Done (outside); the queue drops the entry; the lane counts it', async () => {
     const e = team()
     const { card, folder } = await queued(e)

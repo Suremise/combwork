@@ -11,6 +11,7 @@
 import { execFileSync, spawnSync } from 'child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'fs'
 import { createRequire } from 'module'
+import { SCOPE_FILES as PRESENCE_SCOPE } from '../presenceChecks.mjs'
 import { join, resolve } from 'path'
 import { pathToFileURL } from 'url'
 
@@ -624,7 +625,7 @@ const FAKE_FIXTURES = ['tests/fixtures/claude-initialize.json', 'tests/fixtures/
  * (src/main/dialects) has its area since card 6b (HI-2443) wired it into sessions. The dialect-only release's rules
  * (scripts/dialectRelease.mjs, HI-2442: release.mjs runs them, tests/dialectRelease.test.ts tests them) are unit-only.
  */
-export const UNIT_ONLY = ['scripts/dialectRelease.mjs', 'vitest.config.ts', '.github/workflows/ci.yml', 'scripts/testWaits.mjs', 'scripts/i18nExtract.mjs', 'scripts/i18nValues.mjs', 'scripts/i18nCheck.mjs', 'scripts/i18nCoverage.mjs', 'scripts/i18nGuard.mjs', 'i18n/allow/', 'scripts/agentTextExtract.mjs', 'scripts/agentTextGuard.mjs', 'scripts/agentTextBoth.mjs', 'scripts/agentTextFiles.mjs', 'agent-text/allow/', 'tests/i18n/', 'tests/workflow/', 'src/shared/workflow/', 'src/shared/platform/', 'src/main/workflow/', 'src/main/platform/']
+export const UNIT_ONLY = ['scripts/dialectRelease.mjs', 'tests/oldNames.mjs', 'tests/oldNamesAllow.json', 'tests/presenceChecks.mjs', 'tests/presenceAllow.json', 'vitest.config.ts', '.github/workflows/ci.yml', 'scripts/testWaits.mjs', 'scripts/i18nExtract.mjs', 'scripts/i18nValues.mjs', 'scripts/i18nCheck.mjs', 'scripts/i18nCoverage.mjs', 'scripts/i18nGuard.mjs', 'i18n/allow/', 'scripts/agentTextExtract.mjs', 'scripts/agentTextGuard.mjs', 'scripts/agentTextBoth.mjs', 'scripts/agentTextFiles.mjs', 'agent-text/allow/', 'tests/i18n/', 'tests/workflow/', 'src/shared/workflow/', 'src/shared/platform/', 'src/main/workflow/', 'src/main/platform/']
 
 /** Whether a file is a unit test (tests/*.test.ts, their helpers and fixtures, UNIT_ONLY): npm test covers it, no e2e suite. */
 export const unitTest = (f) => /^tests\/[^/]+\.ts$/i.test(f) || under(f, UNIT_ONLY) || (/^tests\/fixtures\//i.test(f) && !FAKE_FIXTURES.includes(f))
@@ -728,6 +729,8 @@ export const UNIT_SCANS = [
   // Every source file: no control character (#1040), no mixed line endings (#149).
   { test: 'tests/controlCharacters.test.ts', lines: ['[\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f\\x7f]'] },
   { test: 'tests/lineEndings.test.ts' },
+  // The upgrade's code and the test area's: no existsSync, no handler swallowing an I/O failure (HI-2617).
+  { test: 'tests/presenceChecks.test.ts', paths: [...PRESENCE_SCOPE, 'tests/presenceAllow.json'] },
   // Test tooling and Combwork end processes by identity (#603).
   { test: 'tests/folderProcesses.test.ts', paths: ['tests/', 'scripts/', 'src/'], lines: ['process\\.kill', 'task[k]ill'] },
   // Test tooling starts nothing through the shell (#599).

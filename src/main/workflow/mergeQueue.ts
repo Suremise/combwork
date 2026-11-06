@@ -1404,7 +1404,8 @@ export class MergeQueue {
     const focused = o.focusedTests && o.finish === 'combworkMerges'
     if (!o.mergeChecks.length && !focused) return { kind: 'green' }
     const f = this.cfg.folder
-    const ctx: CheckContext = { card: card.key, number: card.id, revision: result }
+    // CW_CHECK_BASE: the target's head the test merge is made on, so a check can look at what the card adds (HI-2617).
+    const ctx: CheckContext = { card: card.key, number: card.id, revision: result, env: { CW_CHECK_BASE: expected } }
     const manifests = this.cfg.manifests ?? ['package.json', 'package-lock.json']
     const hash = createHash('sha256')
     for (const m of manifests) hash.update(existsSync(join(f, m)) ? readFileSync(join(f, m)) : `-${m}`)

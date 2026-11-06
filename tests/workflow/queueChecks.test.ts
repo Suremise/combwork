@@ -452,13 +452,16 @@ describe('merge checks as Combwork\'s runs (temporary repositories)', () => {
     const r = runner()
     const { card } = await queued(e)
     const q = e.queue({ runCheck: r.runCheck, install: r.install, manifests: [] })
+    const target = mainHead(e)
     const [o] = await q.drain('main')
     expect(o).toMatchObject({ outcome: 'integrated' })
     const result = mainHead(e)
-    // What the check saw: the queue's folder, and no CW_* or ELECTRON_RUN_AS_NODE.
+    // What the check saw: the queue's folder, no session's CW_* or ELECTRON_RUN_AS_NODE, and the target's head it was
+    // tested on, CW_CHECK_BASE (HI-2617).
     const seen = JSON.parse(readFileSync(out, 'utf8')) as { env: Record<string, string>; cwd: string }
     expect(seen.cwd.toLowerCase()).toBe(join(e.home, 'queue').toLowerCase())
-    expect(Object.keys(seen.env).filter((k) => /^cw_|^electron_run_as_node$/i.test(k))).toEqual([])
+    expect(Object.keys(seen.env).filter((k) => /^cw_|^electron_run_as_node$/i.test(k))).toEqual(['CW_CHECK_BASE'])
+    expect(seen.env.CW_CHECK_BASE).toBe(target)
     // Its run, and its CheckRan at the result revision, counted.
     expect(r.started[0]).toMatchObject({ title: `${card.key} · check · ${result.slice(0, 7)}`, card: card.id, revision: result })
     expect(r.finished[0]).toMatchObject({ ok: true, exitCode: 0 })

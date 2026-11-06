@@ -3368,7 +3368,8 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
    fails here (#187). Team's merge checks always install clean.
    **Built [#1349]:** the runner (`queueChecks.ts`) runs each G9 check's configured command (OP-24) one after another
    in the queue's worktree, stopping at the first that isn't green, hidden, with a session command's environment (never
-   `ELECTRON_RUN_AS_NODE` or a session's `CW_*`), and ends its whole tree at a time limit (Advanced
+   `ELECTRON_RUN_AS_NODE` or a session's `CW_*`; one of its own, `CW_CHECK_BASE`: the target's head the test merge is
+   made on, so a check can look at what the card adds, HI-2617), and ends its whole tree at a time limit (Advanced
    `cw.queue.checkMinutes`, 90 minutes). Each check is a progress run of `source: 'combwork'` ("Combwork (merge queue)"),
    titled "AM-12 · typecheck · a3f2c1d", with its output in a bounded log (its first 2 MB and last 64 KB). The queue
    brackets each one and writes `CheckRan` at the **result** revision: green only if it exited 0 **and** counted (§16.13:

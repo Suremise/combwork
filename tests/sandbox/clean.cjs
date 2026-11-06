@@ -38,7 +38,9 @@ const CHUNK = 8 * 1024 * 1024
 function oldNameHits(text) {
   const s = String(text ?? '')
   const out = []
+  // old-name: begin clean-install-detector
   const re = /hive/gi
+  // old-name: end clean-install-detector
   for (let m; (m = re.exec(s)); ) {
     const before = s[m.index - 1] ?? ''
     // Inside a word: lower-case after any letter (archive, chives), or upper-case after an upper-case letter (ARCHIVE).
