@@ -240,6 +240,28 @@ const check = (name, ok, extra = '') => {
   check('the Agent API says why it is stalled', /isn't running/.test(viaApi.body?.stalled ?? ''), JSON.stringify(viaApi.body?.stalled))
   await page.screenshot({ path: path.join(lib.WORK, 'board-stalled.png') })
 
+  // HI-2618: waiting on purpose. Right-click → Mark as Waiting… opens its dialog; the Waiting box says why; saved, the card
+  // says so quietly and nothing calls it stalled (the board, the sidebar, the Agent API). Clear Waiting: stalled again.
+  await tile(1).click({ button: 'right' })
+  await page.locator('.menu .menu-item', { hasText: 'Mark as Waiting…' }).click()
+  const waitBox = page.getByRole('textbox', { name: 'Waiting', exact: true })
+  check('Mark as Waiting… opens the card dialog with its Waiting box', !!(await until(async () => (await waitBox.count()) === 1, 5000)))
+  await waitBox.fill('Held for a quiet window')
+  await page.locator('.dialog').getByRole('button', { name: 'Save' }).click()
+  check('the card says it waits, and why', !!(await until(async () => (await tile(1).locator('.task-waiting', { hasText: 'Held for a quiet window' }).count()) === 1, 5000)), await tile(1).innerText())
+  check('…and is no longer stalled on the board', !!(await until(async () => !((await tile(1).getAttribute('class')) ?? '').includes('stalled') && !/Stalled:/.test(await tile(1).innerText()), 8000)), await tile(1).innerText())
+  check('…nor in the sidebar', !!(await until(async () => (await page.locator('.section-header', { hasText: 'Stalled' }).count()) === 0, 5000)))
+  const waitingApi = (await api('GET', '/v1/tasks/1')).body
+  check('the Agent API says it waits, and nothing of a stall', waitingApi?.stalled === null && waitingApi?.waitingFor?.reason === 'Held for a quiet window' && waitingApi.column === 'doing', JSON.stringify({ stalled: waitingApi?.stalled, waitingFor: waitingApi?.waitingFor }))
+  const waitTip = await lib.hoverTip(page, tile(1).locator('.task-waiting'), (t) => t.startsWith('Waiting: Held for a quiet window (marked by '))
+  check('…its hover says why and who marked it', /^Waiting: Held for a quiet window \(marked by .+\)\. Combwork doesn’t report it as stalled meanwhile\.$/.test(waitTip), waitTip)
+  await page.screenshot({ path: path.join(lib.WORK, 'board-waiting.png') })
+  await page.mouse.move(5, 5)
+  await tile(1).click({ button: 'right' })
+  await page.locator('.menu .menu-item', { hasText: 'Clear Waiting' }).click()
+  check('Clear Waiting: the mark goes, and it is stalled again', !!(await until(async () => (await tile(1).locator('.task-waiting').count()) === 0 && ((await tile(1).getAttribute('class')) ?? '').includes('stalled'), 8000)), await tile(1).innerText())
+  check('…its history says both', JSON.stringify((await card(1)).history.filter((h) => /waiting/i.test(h.what)).map((h) => h.what)) === JSON.stringify(['Waiting: Held for a quiet window', 'No longer waiting']), JSON.stringify((await card(1)).history.slice(-4)))
+
   // More work on a Done card: right-click → Start… on its stopped agent; Doing again, and the prompt says it's back.
   await inv('tasks:update', 1, { column: 'done' })
   await until(async () => (await column('Done').locator('.task-card[data-task="1"]').count()) === 1, 5000)
