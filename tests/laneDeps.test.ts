@@ -29,6 +29,8 @@ const { cardStallIn, laneOrderView, laneNextWaitReason, LANE_NEXT_STALL_MS } = a
 const { lanesNowIn } = await import('../src/main/watches')
 const { laneStatusText } = await import('../src/shared/lanes')
 
+/** The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take. */
+const HUNG_MS = 15_000
 const user = { kind: 'user' } as const
 const wsPath = join(base, 'ws')
 const p = join(wsPath, 'alpha')
@@ -125,7 +127,7 @@ describe("a lane's due card waiting on its dependencies (HI-2618)", () => {
     let release!: () => void
     laneStartsTestHooks.midPass = () => new Promise<void>((r) => (release = r))
     const first = checkLaneStarts(w)
-    await vi.waitFor(() => expect(release).toBeDefined())
+    await vi.waitFor(() => expect(release).toBeDefined(), { timeout: HUNG_MS })
     laneStartsTestHooks.midPass = null
     await move(deps[0], 'done')
     await checkLaneStarts(w)
