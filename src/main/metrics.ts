@@ -1265,7 +1265,7 @@ export function queryMetrics(w: WorkspaceService, q: MetricsQuery): Omit<Metrics
   if (q.scope.kind === 'project') {
     // Projects are folder names, matched as the API matches them (case-insensitively); its drops are its own.
     const part = emptyPart()
-    for (const [name, pt] of Object.entries(sum.projects)) mergePart(sum, part, pt, false)
+    for (const pt of Object.values(sum.projects)) mergePart(sum, part, pt, false)
     // Its own losses, bucket by bucket (each bucket's owners are its own, never capped again by the sum); others' and
     // untracked ones are not this project's to see: only whether some couldn't be attributed.
     let dropped = 0
