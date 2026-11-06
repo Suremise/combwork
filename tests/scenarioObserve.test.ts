@@ -24,10 +24,10 @@ const SKILL_TEXT = (n: string) => `---\nname: ${n}\ndescription: …\n---\n\n# B
 
 describe('skills read', () => {
   it("counts Claude Code's Skill tool, and a read whose result is the skill's own text", () => {
-    const script = "const r = await tools.exec_command({cmd:\"Get-Content -Raw '.agents\\\\skills\\\\hive-review-agent-work\\\\SKILL.md'\"}); text(r)"
+    const script = "const r = await tools.exec_command({cmd:\"Get-Content -Raw '.agents\\\\skills\\\\cw-review-agent-work\\\\SKILL.md'\"}); text(r)"
     const o = observeTranscript(
       [
-        tool('Skill', { skill: 'hive:work-on-card' }, 'Launching skill: hive:work-on-card'),
+        tool('Skill', { skill: 'combwork:work-on-card' }, 'Launching skill: combwork:work-on-card'),
         tool('Script', script, SKILL_TEXT('review-agent-work')),
         tool('Read', { file_path: 'C:\\w\\.combwork\\launch-a\\plugin\\skills\\handover\\SKILL.md' }, `1\t---\n2\tname: handover\n3\tdescription: x`),
         { kind: 'assistant', text: 'Done.' }
@@ -41,11 +41,11 @@ describe('skills read', () => {
   it("doesn't count a write to a skill's path, a mention of it, a failed read, or a read of something else", () => {
     const o = observeTranscript(
       [
-        tool('Write', { file_path: '.agents/skills/hive-work-on-card/SKILL.md', content: SKILL_TEXT('work-on-card') }, 'File created successfully'),
-        tool('Bash', { command: 'echo .agents/skills/hive-work-on-card/SKILL.md' }, '.agents/skills/hive-work-on-card/SKILL.md'),
-        tool('Skill', { skill: 'hive:handover' }, 'Unknown skill', true),
-        tool('Read', { file_path: '.agents/skills/hive-review-agent-work/SKILL.md' }, 'File does not exist.', true),
-        tool('Read', { file_path: '.agents/skills/hive-review-agent-work/SKILL.md' }, 'some other text without its name')
+        tool('Write', { file_path: '.agents/skills/cw-work-on-card/SKILL.md', content: SKILL_TEXT('work-on-card') }, 'File created successfully'),
+        tool('Bash', { command: 'echo .agents/skills/cw-work-on-card/SKILL.md' }, '.agents/skills/cw-work-on-card/SKILL.md'),
+        tool('Skill', { skill: 'combwork:handover' }, 'Unknown skill', true),
+        tool('Read', { file_path: '.agents/skills/cw-review-agent-work/SKILL.md' }, 'File does not exist.', true),
+        tool('Read', { file_path: '.agents/skills/cw-review-agent-work/SKILL.md' }, 'some other text without its name')
       ],
       SKILLS
     )
@@ -57,21 +57,21 @@ describe('skills read', () => {
     const sol = (cmd: string, output: string) =>
       tool('Script', `text(await tools.exec_command({cmd:"${cmd}",max_output_tokens:6000}));`, `Script completed\nWall time 0.5 seconds\nOutput:\n\nWarning: truncated output (original token count: 10719)\nTotal output lines: 2\n\n${JSON.stringify({ chunk_id: '187d35', exit_code: 0, output })}`)
     const crlf = (s: string) => s.replace(/\n/g, '\r\n')
-    const read = observeTranscript([sol('Get-Content .agents/skills/hive-work-on-card/SKILL.md', crlf(SKILL_TEXT('work-on-card')))], SKILLS)
+    const read = observeTranscript([sol('Get-Content .agents/skills/cw-work-on-card/SKILL.md', crlf(SKILL_TEXT('work-on-card')))], SKILLS)
     expect(read.skillsRead).toEqual(['work-on-card'])
     // Combwork's copies since HI-2463 are cw-<name> (HI-2560: a fake Codex's Get-Content of cw-card-loop wasn't counted).
     const cw = observeTranscript([tool('Shell', "Get-Content -Raw 'C:\\w\\alpha\\.agents\\skills\\cw-card-loop\\SKILL.md'", crlf(SKILL_TEXT('card-loop')))], ['card-loop', ...SKILLS])
     expect(cw.skillsRead).toEqual(['card-loop'])
     // Escaped twice (a result nested in another JSON string), and a quoted name, count too.
-    const nested = tool('Script', 'text(await tools.exec_command({cmd:"Get-Content .agents/skills/hive-handover/SKILL.md"}))', JSON.stringify({ result: JSON.stringify({ output: crlf(SKILL_TEXT('"handover"')) }) }))
+    const nested = tool('Script', 'text(await tools.exec_command({cmd:"Get-Content .agents/skills/cw-handover/SKILL.md"}))', JSON.stringify({ result: JSON.stringify({ output: crlf(SKILL_TEXT('"handover"')) }) }))
     expect(observeTranscript([nested], SKILLS).skillsRead).toEqual(['handover'])
 
     const notRead = observeTranscript(
       [
         // The path, echoed back escaped, but no name line.
-        sol('Get-Content .agents/skills/hive-work-on-card/SKILL.md', crlf("Get-Content : Cannot find path '.agents\\skills\\hive-work-on-card\\SKILL.md'\nbecause it does not exist.")),
+        sol('Get-Content .agents/skills/cw-work-on-card/SKILL.md', crlf("Get-Content : Cannot find path '.agents\\skills\\cw-work-on-card\\SKILL.md'\nbecause it does not exist.")),
         // Another skill's text under this skill's path.
-        sol('Get-Content .agents/skills/hive-review-agent-work/SKILL.md', crlf(SKILL_TEXT('handover'))),
+        sol('Get-Content .agents/skills/cw-review-agent-work/SKILL.md', crlf(SKILL_TEXT('handover'))),
         // A skill's name line in a result, but no read of its SKILL.md.
         sol('Get-ChildItem .agents/skills', crlf(SKILL_TEXT('handover')))
       ],
@@ -94,27 +94,27 @@ describe("a skill's reference files read (skillRefsRead)", () => {
     const numbered = BODY.split('\n').map((l, i) => `${String(i + 1).padStart(6)}\t${l}`).join('\n')
     const claude = observe([tool('Read', { file_path: 'C:\\p\\.combwork\\launch-a\\plugin\\skills\\card-loop\\builder.md' }, numbered)], NAMES, REFS)
     expect(claude).toMatchObject({ skillsRead: [], skillRefsRead: ['card-loop/builder.md'] })
-    const copilot = observe([tool('view', { path: '.agents/skills/hive-card-loop/builder.md' }, `1. ${HEAD}\n2.\n3. ## Builder`)], NAMES, REFS)
+    const copilot = observe([tool('view', { path: '.agents/skills/cw-card-loop/builder.md' }, `1. ${HEAD}\n2.\n3. ## Builder`)], NAMES, REFS)
     expect(copilot.skillRefsRead).toEqual(['card-loop/builder.md'])
-    const nested = tool('Script', 'text(await tools.exec_command({cmd:"Get-Content -Raw .agents/skills/hive-card-loop/builder.md"}))', JSON.stringify({ result: JSON.stringify({ output: BODY.replace(/\n/g, '\r\n') }) }))
+    const nested = tool('Script', 'text(await tools.exec_command({cmd:"Get-Content -Raw .agents/skills/cw-card-loop/builder.md"}))', JSON.stringify({ result: JSON.stringify({ output: BODY.replace(/\n/g, '\r\n') }) }))
     expect(observe([nested], NAMES, REFS).skillRefsRead).toEqual(['card-loop/builder.md'])
     // Both read: each counted where it belongs.
-    const both = observe([tool('Skill', { skill: 'hive:card-loop' }, 'Launching skill: hive:card-loop'), tool('Read', { file_path: '.agents/skills/hive-card-loop/builder.md' }, BODY)], NAMES, REFS)
+    const both = observe([tool('Skill', { skill: 'combwork:card-loop' }, 'Launching skill: combwork:card-loop'), tool('Read', { file_path: '.agents/skills/cw-card-loop/builder.md' }, BODY)], NAMES, REFS)
     expect(both).toMatchObject({ skillsRead: ['card-loop'], skillRefsRead: ['card-loop/builder.md'] })
   })
 
   it("doesn't count a listing, a search, a failed read, a write, a mention with other output, SKILL.md, or a call naming two files", () => {
     const o = observe(
       [
-        tool('Bash', { command: 'ls .agents/skills/hive-card-loop/builder.md' }, '.agents/skills/hive-card-loop/builder.md'),
-        tool('PowerShell', { command: 'Get-ChildItem .agents/skills/hive-card-loop' }, `builder.md reviewer.md ${HEAD}`),
-        tool('Grep', { pattern: 'Builder', path: '.agents/skills/hive-card-loop/builder.md' }, HEAD),
-        tool('Bash', { command: 'grep -n Builder .agents/skills/hive-card-loop/builder.md' }, `1:${HEAD}`),
-        tool('Read', { file_path: '.agents/skills/hive-card-loop/builder.md' }, 'File does not exist.', true),
-        tool('Write', { file_path: '.agents/skills/hive-card-loop/builder.md', content: BODY }, 'File created successfully'),
-        tool('Bash', { command: 'cat .agents/skills/hive-card-loop/builder.md' }, 'cat: permission denied'),
-        tool('Read', { file_path: '.agents/skills/hive-card-loop/SKILL.md' }, `---\nname: card-loop\n---\n- [builder.md](builder.md)`),
-        tool('Bash', { command: 'cat .agents/skills/hive-card-loop/builder.md .agents/skills/hive-card-loop/reviewer.md' }, `${HEAD}\n# Card loop: the reviewer`)
+        tool('Bash', { command: 'ls .agents/skills/cw-card-loop/builder.md' }, '.agents/skills/cw-card-loop/builder.md'),
+        tool('PowerShell', { command: 'Get-ChildItem .agents/skills/cw-card-loop' }, `builder.md reviewer.md ${HEAD}`),
+        tool('Grep', { pattern: 'Builder', path: '.agents/skills/cw-card-loop/builder.md' }, HEAD),
+        tool('Bash', { command: 'grep -n Builder .agents/skills/cw-card-loop/builder.md' }, `1:${HEAD}`),
+        tool('Read', { file_path: '.agents/skills/cw-card-loop/builder.md' }, 'File does not exist.', true),
+        tool('Write', { file_path: '.agents/skills/cw-card-loop/builder.md', content: BODY }, 'File created successfully'),
+        tool('Bash', { command: 'cat .agents/skills/cw-card-loop/builder.md' }, 'cat: permission denied'),
+        tool('Read', { file_path: '.agents/skills/cw-card-loop/SKILL.md' }, `---\nname: card-loop\n---\n- [builder.md](builder.md)`),
+        tool('Bash', { command: 'cat .agents/skills/cw-card-loop/builder.md .agents/skills/cw-card-loop/reviewer.md' }, `${HEAD}\n# Card loop: the reviewer`)
       ],
       NAMES,
       REFS
@@ -202,7 +202,7 @@ describe("a Codex code-mode script's calls, as Combwork's parser gives them (HI-
     // HR1's case: a command never run, then text that looks like its output, which the script printed.
     const printed = 'HTTP 200 Scoped card for alpha HTTP 403 only for your own project'
     const code = `if (false) await tools.exec_command({cmd:"pwsh -File scripts/cards.ps1"}); if (false) await tools.exec_command({cmd:"npm test"}); if (false) await tools.mcp__combwork__cw_read_task({number:"AL-1"}); text(${JSON.stringify(printed)}); text("ACCEPT-ZEBRA-42"); text(${JSON.stringify(SKILL_TEXT('work-on-card'))})`
-    const shown = `${code} // .agents/skills/hive-work-on-card/SKILL.md`
+    const shown = `${code} // .agents/skills/cw-work-on-card/SKILL.md`
     const result = `${printed}\nACCEPT-ZEBRA-42\n${SKILL_TEXT('work-on-card')}`
     // Parsed from a rollout that records no calls, and a Script as Combwork gives one whose calls aren't known.
     const unknowns: [string, unknown[]][] = [
@@ -292,18 +292,18 @@ describe("a Codex code-mode script's calls, as Combwork's parser gives them (HI-
 
   it('reads a skill from a command the script ran, never from a patch it wrote; a failed command reads nothing', () => {
     const text = rollout(
-      call('s1', 'text(await tools.exec_command({cmd:"Get-Content .agents/skills/hive-work-on-card/SKILL.md"}))'),
-      shell('exec-1', 'Get-Content .agents/skills/hive-work-on-card/SKILL.md', SKILL_TEXT('work-on-card').replace(/\n/g, '\r\n')),
-      shell('exec-2', 'Get-Content .agents/skills/hive-handover/SKILL.md', SKILL_TEXT('handover'), 1),
-      done({ type: 'FileChange', id: 'exec-3', changes: { 'C:\\w\\.agents\\skills\\hive-review-agent-work\\SKILL.md': { type: 'add', content: SKILL_TEXT('review-agent-work') } }, status: 'completed', stdout: 'Success.', stderr: '' }),
+      call('s1', 'text(await tools.exec_command({cmd:"Get-Content .agents/skills/cw-work-on-card/SKILL.md"}))'),
+      shell('exec-1', 'Get-Content .agents/skills/cw-work-on-card/SKILL.md', SKILL_TEXT('work-on-card').replace(/\n/g, '\r\n')),
+      shell('exec-2', 'Get-Content .agents/skills/cw-handover/SKILL.md', SKILL_TEXT('handover'), 1),
+      done({ type: 'FileChange', id: 'exec-3', changes: { 'C:\\w\\.agents\\skills\\cw-review-agent-work\\SKILL.md': { type: 'add', content: SKILL_TEXT('review-agent-work') } }, status: 'completed', stdout: 'Success.', stderr: '' }),
       output('s1', '')
     )
     const o = observe(text)
     expect(o.skillsRead).toEqual(['work-on-card'])
     expect(o.tools.map((t) => [t.name, t.isError])).toEqual([['Shell', false], ['Shell', true], ['Edit', false]])
-    expect(o.tools[2].input).toContain('*** Add File: C:\\w\\.agents\\skills\\hive-review-agent-work\\SKILL.md')
+    expect(o.tools[2].input).toContain('*** Add File: C:\\w\\.agents\\skills\\cw-review-agent-work\\SKILL.md')
     // The commands as written: what commandsOf and the test-run checks read.
-    expect(helpers.commandsOf(o.tools[0])).toEqual(['Get-Content .agents/skills/hive-work-on-card/SKILL.md'])
+    expect(helpers.commandsOf(o.tools[0])).toEqual(['Get-Content .agents/skills/cw-work-on-card/SKILL.md'])
   })
 
   it('keeps a direct call once, gives a command left running to the script that started it, and leaves other tools as they are', () => {
@@ -1700,7 +1700,7 @@ describe('the fixtures fail when nothing was done', () => {
     const agent = 'a'.repeat(40) + '0123456789abcdef0123'
     const ws = 'f'.repeat(64)
     const known = [{ kind: 'workspace', token: ws }, { kind: 'agent', token: agent }]
-    // The trial's Bash call: `env | grep -i hive`, the token far into its result.
+    // The trial's Bash call: `env | grep -i cw`, the token far into its result.
     const hook = '9'.repeat(24) + 'abcdef'.repeat(4)
     const env = `${'x'.repeat(500)}\nCW_HOOK_TOKEN=${hook}\nCW_API_URL=http://127.0.0.1:47822\nCW_API_TOKEN=${agent}\nCW_RUN_ID=afec06a7b1c2d3e4f5a6b7c8\nCW_API_TOKEN_FILE=C:\\t.json\n`
     const seen = tokenSightings(known, { tools: [{ name: 'Skill', result: 'Launching skill' }, { name: 'Bash', result: env }], scripts: [{ name: 'Script', result: `got ${ws}` }], replies: ['done', `the token is ${agent} and ${ws}`] })
@@ -1761,7 +1761,7 @@ describe('the fixtures fail when nothing was done', () => {
     expect(run(['Bash', JSON.stringify({ command: 'git status --short', description: 'Check the npm test record' })], ['Bash', JSON.stringify({ command: 'node --test "greet.test.js"' })])).toEqual([])
     // The whole suite, however it is run, fails; text that only mentions it (a verdict in a script, a description) doesn't.
     expect(run(['functions.exec_command', JSON.stringify({ cmd: 'npm test' })], ['Bash', 'node --test greet.test.js'])).toEqual([whole])
-    expect(run(['Bash', 'hive-progress --title "Tests" -- npm test'], ['Bash', 'node --test greet.test.js'])).toEqual([whole])
+    expect(run(['Bash', 'cw-progress --title "Tests" -- npm test'], ['Bash', 'node --test greet.test.js'])).toEqual([whole])
     expect(run(['PowerShell', 'node --test'], ['Bash', 'node --test greet.test.js'])).toEqual([whole])
     expect(run(['Script', 'text(await tools.exec_command({cmd:"npm run test"}))'], ['Bash', 'node --test greet.test.js'])).toEqual([whole])
     expect(run(['Script', 'text(await tools.mcp__combwork__cw_update_task({number:1,review:"passed",comment:"Trusted the npm test record"}))'], ['Bash', 'node --test greet.test.js'])).toEqual([])
