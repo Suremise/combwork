@@ -202,6 +202,38 @@ describe('archiving past the cap', () => {
     expect((await archived(w, card)).comments).toEqual([twin, twin, odd])
   })
 
+  it('a save undone by its savepoint while the change commits archives nothing; a retry of the same object archives each once', async () => {
+    const ws = newWorkspace()
+    const w = await open(ws)
+    const card = await cardWith(w, comments(KEPT))
+    const other = await cardWith(w, comments(1))
+    const c = await inWorkspace(w, () => tasks.getTask(card, w))
+    tasks.commentTestSeam.add(c, 'me', 'a')
+    tasks.commentTestSeam.add(c, 'me', 'b')
+    // A batch's card that fails: its savepoint rolls back, the change goes on and commits another card's comment.
+    await inWorkspace(w, () =>
+      store.boardWrite(w, async () => {
+        await store
+          .boardSavepoint(w, async () => {
+            await tasks.commentTestSeam.save(w, c)
+            throw new Error('this card fails')
+          })
+          .catch(() => undefined)
+        const o = await tasks.getTask(other, w)
+        tasks.commentTestSeam.add(o, 'me', 'committed')
+        await tasks.commentTestSeam.save(w, o)
+      })
+    )
+    expect((await inWorkspace(w, () => tasks.getTask(other))).comments.at(-1)!.text).toBe('committed')
+    expect(rows(ws, card)).toEqual([])
+    expect((await inWorkspace(w, () => tasks.getTask(card))).comments[0].text).toBe('c0')
+    // The same object saved again: its evictions archived, each once.
+    await inWorkspace(w, () => store.boardWrite(w, () => tasks.commentTestSeam.save(w, c)))
+    expect(rows(ws, card).map((r) => r.text)).toEqual(['c0', 'c1'])
+    const now = await inWorkspace(w, () => tasks.getTask(card))
+    expect([...texts((await archived(w, card)).comments), ...texts(now.comments)]).toEqual([...texts(comments(KEPT)), 'a', 'b'])
+  })
+
   it('a card read again after a rollback evicts again, archived once', async () => {
     const ws = newWorkspace()
     const w = await open(ws)

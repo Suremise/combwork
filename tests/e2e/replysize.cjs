@@ -422,6 +422,62 @@ const prose = (seed, n) => {
   // A long card's latest feedback without its whole thread; the board a page at a time.
   const newest = JSON.parse(measure('cw_read_task (comments: 2)', tool('cw_read_task', { number: target, comments: 2 })))
   check('comments=2: the description and the newest two, with a count of the rest', newest.description.length > 1000 && newest.comments.length === 2 && newest.commentsOmitted === read.comments.length + 2 - 2 && newest.comments.at(-1).text === 'Done: see the branch.', JSON.stringify({ n: newest.comments?.length, omitted: newest.commentsOmitted }))
+  // A card past the 500 comments it keeps (HI-2641): its oldest archived, counted on its read, read a page at a time
+  // through the route and cw_read_task's archived; past 100 comments a read suggests a split. Deleted after, so the
+  // Todo counts below stay.
+  {
+    const long = (await api('POST', '/v1/tasks', { title: 'A long thread', project: 'alpha' })).body.number
+    const say = async (from, to) => {
+      for (let i = from; i < to; i++) await api('POST', `/v1/tasks/${long}/comments`, { text: `c${i}` })
+    }
+    const readIt = async (q = '') => (await api('GET', `/v1/tasks/${long}${q}`)).body
+    await say(0, 100)
+    const at100 = await readIt()
+    check('100 comments: no split hint, nothing archived', !('hint' in at100) && !('commentsArchived' in at100) && !('commentsMayHaveBeenLost' in at100), JSON.stringify({ hint: at100.hint, archived: at100.commentsArchived }))
+    await say(100, 101)
+    const at101 = await readIt()
+    check('101 comments: a line suggesting a split, naming how many', /^101 comments: .*splitting/.test(at101.hint ?? ''), String(at101.hint))
+    // 620 in all: the card keeps 500, 120 archived.
+    await say(101, 620)
+    const at620 = await readIt()
+    check('620 comments: the card keeps the newest 500, and counts the 120 archived', at620.comments.length === 500 && at620.comments[0].text === 'c120' && at620.commentsArchived === 120 && (at620.hint ?? '').startsWith('620 comments'), JSON.stringify({ n: at620.comments.length, first: at620.comments[0]?.text, archived: at620.commentsArchived, hint: at620.hint }))
+    const narrowed = await readIt('?comments=2&history=false')
+    check('…a narrowed read counts them too', narrowed.comments.length === 2 && narrowed.commentsOmitted === 498 && narrowed.commentsArchived === 120 && (narrowed.hint ?? '').startsWith('620 comments'), JSON.stringify({ n: narrowed.comments.length, omitted: narrowed.commentsOmitted, archived: narrowed.commentsArchived }))
+    const archivePage = async (q) => api('GET', `/v1/tasks/${long}/comments/archived${q}`)
+    const textsOf = (r) => r.body.comments.map((c) => c.text)
+    const first = await archivePage('')
+    check('the archive: 50 by default, oldest first, with the next offset', first.status === 200 && first.body.total === 120 && first.body.offset === 0 && first.body.comments.length === 50 && textsOf(first)[0] === 'c0' && textsOf(first)[49] === 'c49' && first.body.next === 50 && !('id' in first.body.comments[0]), JSON.stringify({ ...first.body, comments: textsOf(first).slice(0, 3) }))
+    const capped = await archivePage('?offset=10&limit=500')
+    check('…at most 100 a page', capped.body.comments.length === 100 && textsOf(capped)[0] === 'c10' && capped.body.next === 110, JSON.stringify({ n: capped.body.comments.length, next: capped.body.next }))
+    const last = await archivePage('?offset=110')
+    check('…the last page has no next', last.body.comments.length === 10 && textsOf(last)[9] === 'c119' && !('next' in last.body), JSON.stringify({ n: last.body.comments.length, next: last.body.next }))
+    const badOffset = await archivePage('?offset=-1')
+    const badLimit = await archivePage('?limit=0')
+    check('…an offset below 0 or a limit below 1 is refused (400)', badOffset.status === 400 && /offset must be a whole number from 0/.test(badOffset.body?.error) && badLimit.status === 400 && /limit must be a whole number from 1/.test(badLimit.body?.error), JSON.stringify({ badOffset, badLimit }))
+    // cw_read_task's archived: the archive's route, from its offset.
+    const viaTool = JSON.parse(measure('cw_read_task (archived)', tool('cw_read_task', { number: long, archived: 0 }), 8000))
+    check('cw_read_task archived: 0 reads the archive from its oldest', viaTool.total === 120 && viaTool.comments.length === 50 && viaTool.comments[0].text === 'c0' && viaTool.next === 50, JSON.stringify({ ...viaTool, comments: viaTool.comments?.slice(0, 2) }))
+    const viaTool2 = JSON.parse(tool('cw_read_task', { number: long, archived: 115 }).text)
+    check('…and from another offset', viaTool2.offset === 115 && viaTool2.comments.map((c) => c.text).join() === 'c115,c116,c117,c118,c119' && !('next' in viaTool2), JSON.stringify(viaTool2))
+    // A card that held 500 before the archive existed (the board step's record, written as the step writes it): it says
+    // older comments may have been dropped, and never how many.
+    const { DatabaseSync } = require('node:sqlite')
+    const meta = (sql, ...a) => {
+      const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })
+      try {
+        db.prepare(sql).run(...a)
+      } finally {
+        db.close()
+      }
+    }
+    meta("INSERT INTO board_meta (key, value) VALUES ('commentsMayHaveBeenLost', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", JSON.stringify([long]))
+    const flagged = await readIt('?comments=1&history=false')
+    const viaRead = JSON.parse(tool('cw_read_task', { number: long, comments: 1 }).text)
+    check('a card that held the cap before the archive: may have lost older comments, said in words, none counted', flagged.commentsMayHaveBeenLost === true && /may have been dropped then, and can't be recovered/.test(flagged.commentsNote ?? '') && viaRead.commentsMayHaveBeenLost === true && flagged.commentsArchived === 120, JSON.stringify({ flag: flagged.commentsMayHaveBeenLost, note: flagged.commentsNote, tool: viaRead.commentsMayHaveBeenLost }))
+    meta("DELETE FROM board_meta WHERE key = 'commentsMayHaveBeenLost'")
+    check('…another card says nothing of it', !('commentsMayHaveBeenLost' in (await api('GET', `/v1/tasks/${target}?history=false`)).body))
+    await inv('tasks:delete', long)
+  }
   // A card with a question waiting for the user (HI-1992): it comes just after the decisions (here after the title), with
   // who asked and when, in the latest comment's form too; with summary, its words cut as a comment's.
   // One of alpha's cards in Doing (the Todo counts below stay), given to the coder.

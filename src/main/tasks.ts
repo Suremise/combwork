@@ -2821,8 +2821,9 @@ function addComment(c: TaskCard, by: string, t: string, appText?: StoredText, id
  * A card's comments evicted past MAX_COMMENTS, waiting for saveCard to archive them (HI-2641), oldest first: several adds
  * before one save add up. Each has a key of its own, given here and never taken from its content, so the archive adds it
  * once however often the card is saved (twice in one change, or again after a change rolled back), and two comments
- * alike in every field stay two. Kept as long as the card object is: never cleared, as a save that rolled back (the
- * change, or a batch's savepoint) has archived nothing.
+ * alike in every field stay two. Kept as long as the card object is, never cleared: the archive skips a key it has, so
+ * keeping them costs a lookup per save, and a save rolled back (the change, or a batch's savepoint) is archived whole by
+ * the object's next save, with no clean-up to keep in step with commits and savepoints.
  */
 const evicted = new WeakMap<TaskCard, Evicted[]>()
 function evict(c: TaskCard, comments: TaskComment[]): void {
