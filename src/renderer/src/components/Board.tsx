@@ -135,6 +135,8 @@ function cardStall(projects: ProjectInfo[], c: TaskCard, lane?: LaneOrderView | 
   // The team paused (HI-2081): its agents parking is what was asked of them, never a stall; once it resumes, each timed
   // stall needs its own wait since then too, as main's check has it.
   if (workspacePaused(get().workspace?.path)) return null
+  // Waiting on purpose (HI-2618), as main's check has it: never a stall while it is marked.
+  if (c.waitingFor && c.column === 'doing') return null
   const resumed = useTeamPause.getState().resumedAt
   const waited = (ms: number): boolean => Date.now() - resumed >= ms
   const { agent } = cardAgent(projects, c)

@@ -161,7 +161,6 @@ const T = {
   'updateTask.arg.addLabels': agentMsg({ id: 'tool.updateTask.arg.addLabels', text: 'Added; others kept.' }),
   'updateTask.arg.removeLabels': agentMsg({ id: 'tool.updateTask.arg.removeLabels', text: 'Taken off; others kept.' }),
   'updateTask.arg.decision': agentMsg({ id: 'tool.updateTask.arg.decision', text: "The user's decision in a sentence, recorded as theirs. Never your own choice. Combwork normally tells the card's agent." }),
-  'updateTask.arg.waitingFor': agentMsg({ id: 'tool.updateTask.arg.waitingFor', text: "Its own card in Doing waits on purpose, and why (a quiet window, an answer from someone): it isn't reported as stalled meanwhile. '' clears it; leaving Doing does too.", note: 'HI-2618: cw_update_task waitingFor.' }),
   'updateTask.arg.kind': agentMsg({ id: 'tool.updateTask.arg.kind', text: "Its kind changed: only with override (the user's reason)." }),
   'updateTask.arg.confirmKind': agentMsg({ id: 'tool.updateTask.arg.confirmKind', text: "Answers an agent's no-code proposal: true no-code, false code. As the user says." }),
   'updateTask.arg.answers': agentMsg({ id: 'tool.updateTask.arg.answers', text: "With decision: the forYou request ids the user's words answer (questions only)." }),
@@ -1128,7 +1127,8 @@ const tools: Tool[] = [
         links: cardsArg(say(T['updateTask.arg.links'])),
         context: contextArg,
         decision: { type: 'string', description: say(T['updateTask.arg.decision']) },
-        waitingFor: { type: 'string', description: say(T['updateTask.arg.waitingFor']) },
+        // HI-2618: its own card in Doing waits on purpose, with why ('' clears it); no description: the tools' budget (replysize).
+        waitingFor: { type: 'string' },
         attachments: attachmentsArg('comment'),
         ...(ASSISTANT
           ? {
