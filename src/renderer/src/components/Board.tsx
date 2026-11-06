@@ -5,8 +5,9 @@ import { gitProblemText } from '@shared/gitTool'
 import { agentRuntime, hooksMissingText } from '@shared/runtime'
 import { LOOP_STEP_WAIT_MINUTES } from '@shared/lanes'
 import { projectInfoPreferences } from '@shared/workflow/preferences'
-import { COLUMN_TEXT, REVIEW_WAIT_STALL_MS, TASK_COLUMNS, applyBoardFold, archiveBatchLabel, archiveBatchText, backgroundTaskMinutes, builderJobOf, cardMatches, newSinceStart, archivedAt, columnColor, columnName, laneOrderWaitReason, loopStepWait, loopStepWaitReason, notWatchingAgent, notWatchingReason, reviewStalled, reviewVerdictWaitReason, reviewWaitReason, reviewWaiter, stallAgentOf, stalledReason, startFailedReason, startWaitingReason, taskOverview, type BoardFoldChange, type LaneOrderView, type ReviewOwed } from '@shared/tasks'
+import { COLUMN_TEXT, REVIEW_WAIT_STALL_MS, TASK_COLUMNS, applyBoardFold, archiveBatchLabel, archiveBatchText, backgroundTaskMinutes, builderJobOf, cardMatches, newSinceStart, archivedAt, columnColor, columnName, laneOrderWaitReason, loopStepWait, loopStepWaitReason, notWatchingAgent, notWatchingReason, reviewStalled, reviewVerdictWaitReason, reviewWaitReason, reviewWaiter, laneReviewOwed, stallAgentOf, stalledReason, startFailedReason, startWaitingReason, taskOverview, type BoardFoldChange, type LaneOrderView, type ReviewOwed } from '@shared/tasks'
 import { agentWorkflowRole, reviewsWork } from '@shared/workflow/roles'
+import { WORKFLOW_ENFORCE, advancedDef, advancedRow } from '@shared/advanced'
 import { isProviderEnabled, providerMessage, providerName } from '@shared/providers'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { call, errorMessage } from '../api'
@@ -148,9 +149,8 @@ function cardStall(projects: ProjectInfo[], c: TaskCard, lane?: LaneOrderView | 
   const { loopers, watchers } = stallAgentsNow(projects)
   const looping = notWatchingReason(c, loopers, tr)
   if (looping) return { text: looping, kind: notWatchingAgent(c, loopers)?.untaken ? 'wake-untaken' : 'not-watching' }
-  // Only the agent owing the review (HI-2636): its lane's reviewer, else a watcher that may review, never a builder only
-  // watching it (the pool's choice is main's; its stall says it).
-  const owed = lane?.reviewer ? reviewerOwed(projects, c, lane.reviewer) : undefined
+  // Only the agent owing the review (HI-2636), never another agent only watching it.
+  const owed = reviewOwedOnBoard(projects, c, lane)
   const reviews = (id: string): boolean => mayReview(projects, c, id)
   const waiting = waited(REVIEW_WAIT_STALL_MS) ? reviewWaitReason(c, watchers, Date.now(), tr, owed, reviews) : null
   if (!waiting) {
@@ -177,11 +177,9 @@ function cardStall(projects: ProjectInfo[], c: TaskCard, lane?: LaneOrderView | 
 /** The card's project's agent, as the window knows it. */
 const projectAgentOf = (projects: ProjectInfo[], c: Pick<TaskCard, 'project'>, id: string): AgentInfo | undefined => projects.find((p) => p.name.toLowerCase() === c.project.toLowerCase())?.agents.find((a) => a.id === id)
 
-/** A lane's reviewer owing a card's review (HI-2636), or null when it isn't one of the project's agents now. */
-function reviewerOwed(projects: ProjectInfo[], c: Pick<TaskCard, 'project'>, id: string): ReviewOwed | null {
-  const a = projectAgentOf(projects, c, id)
-  return a ? { agentId: a.id, name: a.name } : null
-}
+/** Who owes a card's review as the window knows it (HI-2636, laneReviewOwed), with the workflow rules as they are now. */
+const reviewOwedOnBoard = (projects: ProjectInfo[], c: Pick<TaskCard, 'number' | 'project'>, lane: LaneOrderView | null | undefined): ReviewOwed | null | undefined =>
+  laneReviewOwed(c, lane, projects.find((p) => p.name.toLowerCase() === c.project.toLowerCase())?.agents ?? [], advancedRow(advancedDef(WORKFLOW_ENFORCE)!, get().advanced).value === true)
 
 /** Whether an agent of the card's project may review (its workflow role, HI-2636). */
 function mayReview(projects: ProjectInfo[], c: Pick<TaskCard, 'project'>, id: string): boolean {

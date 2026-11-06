@@ -379,6 +379,23 @@ export interface ReviewOwed {
 }
 
 /**
+ * Who owes a card's review as the window knows it (HI-2636), as main's reviewDueOf has it: its lane's reviewer; on a
+ * pool lane's current card, the reviewer the pool gave it (none yet, or another of its cards: nobody, never a watcher);
+ * a card in no lane while workflow rules are on (`rulesOn`), which the pool gives out too, nobody (the window doesn't
+ * know whom: main's stall says it). Undefined (any watcher that may review) only with the rules off. `agents`: the
+ * card's project's agents now; one gone owes nothing.
+ */
+export function laneReviewOwed(card: Pick<TaskCard, 'number'>, lane: LaneOrderView | null | undefined, agents: { id: string; name: string }[], rulesOn: boolean): ReviewOwed | null | undefined {
+  const named = (a: { id: string; name: string } | undefined): ReviewOwed | null => (a ? { agentId: a.id, name: a.name } : null)
+  if (lane?.reviewer) return named(agents.find((a) => a.id === lane.reviewer))
+  if (lane?.poolReviewing) {
+    const { card: current, name } = lane.poolReviewing
+    return current === card.number && name ? named(agents.find((a) => a.name === name)) : null
+  }
+  return rulesOn ? null : undefined
+}
+
+/**
  * The watcher a review's wait stall names (reviewWaitReason): the agent owing the review, when it watches the card; with
  * nobody owing it (null), none; unknown (undefined), another agent than the card's own watching it that may review.
  */
@@ -463,6 +480,11 @@ export interface LaneOrderView {
    * stalled; once none is, its stall counts from when the last of them went Done (`readyAt`).
    */
   due?: { card: number; open: string[]; readyAt: string | null }
+  /**
+   * A lane reviewed by the pool (HI-2636, the window's: LaneInfo.poolReview): its current card, and the reviewer the pool
+   * gave it or that reviews it now, by name (null: nobody yet). The only owner of that card's review the window knows.
+   */
+  poolReviewing?: { card: number | null; name: string | null }
   /** In the lane's order; `movedAt`: when it last came into its column (columnSince), where known. */
   cards: { number: number; column: string; key?: string; movedAt?: string | null }[]
 }

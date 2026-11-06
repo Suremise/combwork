@@ -5,6 +5,8 @@ import { REVIEW_WAIT_STALL_MS, backgroundTaskMinutes, builderJobOf, columnSince,
 import { agentWorkflowRole, reviewsWork } from '../shared/workflow/roles'
 import { poolReviewerOf } from './loopReviewer'
 import { FactStore } from './workflow/factStore'
+import { advanced } from './advanced'
+import { WORKFLOW_ENFORCE } from '../shared/advanced'
 import type { AgentInfo, AgentStart, DueDeps, LaneStatus, ProgressRun, TaskCard } from '../shared/types'
 import { LOOP_STEP_WAIT_MINUTES, laneStatusText } from '../shared/lanes'
 import { forYouOfCards } from './workflow/cardWork'
@@ -320,9 +322,9 @@ export const laneOrderView = (l: { builder: { id: string }; reviewer: { id: stri
 /**
  * Who owes the review of a card waiting in Review, unstarted (HI-2636), for reviewWaitReason: its lane's reviewer; else
  * the reviewer the pool gave its latest submission, with when (its `ReviewerAssigned`, none given up since), and how it is
- * now; else null for a pool lane's card nobody was given yet. Undefined when the card's record says neither (no lane: a
- * loose card, or workflow rules off): then a watcher counts only when its workflow role reviews (`reviews`). None for a
- * card the check can't stall.
+ * now; else null for a card nobody was given yet that the pool gives out (a pool lane's, or one in no lane while workflow
+ * rules are on, HI-2046). Only with the rules off (or its record unreadable) does a watcher count when its workflow role
+ * reviews (`reviews`). None for a card the check can't stall.
  */
 export async function reviewDueOf(ws: WorkspaceService, c: TaskCard, agents = new Map<string, Promise<ReturnType<typeof projectAgents>>>()): Promise<ReviewDue | undefined> {
   if (c.archived || c.column !== 'review' || c.review || c.blocked || !c.project || !ws.path) return undefined
@@ -351,7 +353,9 @@ export async function reviewDueOf(ws: WorkspaceService, c: TaskCard, agents = ne
   const facts = store.facts(c.number)
   const given = poolReviewerOf(facts)
   if (given) return { owed: named(given, facts.findLast((f) => f.kind === 'ReviewerAssigned' && (f.data as { reviewer?: string }).reviewer === given)?.at) }
-  return rec.reviewerPool ? { owed: null } : { reviews }
+  // Nobody given it yet: a pool lane's card, or one in no lane while the rules are on (the pool gives those out too,
+  // HI-2046), owes nobody; only with the rules off may any watcher that reviews count.
+  return rec.reviewerPool || advanced.get<boolean>(WORKFLOW_ENFORCE) ? { owed: null } : { reviews }
 }
 
 /** Who owes a card's review (reviewDueOf): `owed` when its record says (null: nobody yet), else which agents may review. */
