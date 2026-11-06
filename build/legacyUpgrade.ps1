@@ -229,6 +229,8 @@ function Move-Profile([string]$label, [string]$parent, [bool]$withRecord) {
   $to = Join-Path $parent $NewName
   $was = Look $from
   $now = Look $to
+  # A clean install's line names no old folder (HI-2632): only one that is there, or can't be looked at, is named.
+  if ($was -eq 'missing') { Say "${label}: no earlier profile to move"; return }
   if ($was -ne 'folder') { Say "${label}: $from is ${was}: nothing to move"; return }
   if ($now -ne 'missing') { Say "${label}: $to is ${now}: left as it is, $from too"; return }
   if ($withRecord) {

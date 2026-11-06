@@ -111,6 +111,14 @@ describe('the installer upgrades from the 1.0 app (legacyUpgrade.ps1, HI-2460)',
     expect(r.out).toContain('previous installation: none')
     expect(readdirSync(f.appData)).toEqual([])
     expect(readdirSync(f.local)).toEqual([])
+    // A clean install's log names no old app or folder (HI-2632): the script's lines, and the installer's own after it.
+    expect(r.out).toContain('roaming: no earlier profile to move')
+    expect(r.out).toContain('local: no earlier profile to move')
+    expect(r.out).not.toMatch(new RegExp(OLD_PROFILE, 'i'))
+    const nsh = readFileSync(join(__dirname, '..', 'build', 'installer.nsh'), 'utf8')
+    const logged = /nsExec::ExecToLog[^\n]*legacyUpgrade\.ps1[^\n]*\r?\n\s*Pop \$0\r?\n(?:\s*;[^\n]*\r?\n)*\s*(DetailPrint [^\n]*)/.exec(nsh)
+    expect(logged?.[1]).toBeTruthy()
+    expect(logged?.[1]).not.toMatch(new RegExp(OLD_PROFILE, 'i'))
   })
 
   it('moves both folders, the record only in the local one, with HI-2461\'s fields', () => {
@@ -121,6 +129,9 @@ describe('the installer upgrades from the 1.0 app (legacyUpgrade.ps1, HI-2460)',
     expect(r.code, r.out).toBe(0)
     expect(readdirSync(f.appData)).toEqual(['Combwork'])
     expect(readdirSync(f.local)).toEqual(['Combwork'])
+    // A real move is still reported with its folders.
+    expect(r.out).toContain(`roaming: moved ${join(f.appData, OLD_PROFILE)} to ${join(f.appData, 'Combwork')}`)
+    expect(r.out).toContain(`local: moved ${join(f.local, OLD_PROFILE)} to ${join(f.local, 'Combwork')}`)
     expect(readFileSync(join(f.appData, 'Combwork', 'config.json'), 'utf8')).toBe('{"kept":true}')
     expect(existsSync(join(f.appData, 'Combwork', 'profile-move.json'))).toBe(false)
     const rec = record(join(f.local, 'Combwork'))
