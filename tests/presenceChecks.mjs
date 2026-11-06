@@ -55,7 +55,7 @@ function children(node) {
   const out = []
   for (const [k, v] of Object.entries(node)) {
     if (k === 'loc' || k === 'extra' || k.endsWith('Comments')) continue
-    if (Array.isArray(v)) for (const c of v) c && typeof c.type === 'string' && out.push(c)
+    if (Array.isArray(v)) out.push(...v.filter((c) => c && typeof c.type === 'string'))
     else if (v && typeof v.type === 'string') out.push(v)
   }
   return out
