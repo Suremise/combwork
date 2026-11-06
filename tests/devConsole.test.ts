@@ -1,14 +1,15 @@
 import { describe, expect, it, vi } from 'vitest'
 import { join } from 'path'
 import { createContext, runInContext } from 'vm'
-import { ConsoleRing, EVENT_MAX_BYTES, HOOK_FIELDS, RING_MAX_BYTES, TRANSCRIPT_FIELDS, hiveSourceId, jsonBytes, makeEvent, mayRead, parseSourceId, redactPayload, safeWord, sessionSourceId, type ConsoleEvent } from '../src/shared/devConsole'
+import { ConsoleRing, EVENT_MAX_BYTES, HOOK_FIELDS, RING_MAX_BYTES, TRANSCRIPT_FIELDS, combworkSourceId, jsonBytes, makeEvent, mayRead, parseSourceId, redactPayload, safeWord, sessionSourceId, type ConsoleEvent } from '../src/shared/devConsole'
 import { DevConsole, MAX_SOURCES, QUEUE_MAX_EVENTS } from '../src/main/devConsole'
 import { hookSummary, launchEvent, transcriptEvent } from '../src/main/devConsoleWords'
 import { CONSOLE_NOT_CAPTURED, consoleEventsText, consoleSourcesText } from '../src/shared/toolReplies'
+import { say } from '../src/shared/agentText'
 import { SECRET_SAMPLES } from './secretSamples'
 
 // The developer console's capture (#636): bounded rings, kept only while a console watches, each raw event redacted
-// (the sensitive context following everything under it) and paired with what Hive made of it; who may read which
+// (the sensitive context following everything under it) and paired with what Combwork made of it; who may read which
 // source; replies bounded. The paths are only compared, never touched.
 const ws = join('C:\\', 'work')
 const alpha = join(ws, 'alpha')
@@ -233,7 +234,7 @@ describe('DevConsole', () => {
     c.capture([A1], build)
     expect(build).not.toHaveBeenCalled()
     expect(c.stats()).toEqual({ sources: 0, events: 0, textEvents: 0, bytes: 0, subscribers: 0, queued: 0, flightSources: 0, flightEvents: 0, flightBytes: 0 })
-    // Reading (what the hive tools do) starts nothing.
+    // Reading (what the Combwork tools do) starts nothing.
     expect(c.events(A1)).toEqual([])
     expect(c.capturing(A1)).toBe(false)
   })
@@ -440,7 +441,7 @@ describe('DevConsole', () => {
       noSecrets(backlog)
       // The same seqs as the redacted ring: one list, two copies.
       expect(backlog.map((e) => e.seq)).toEqual(c.events(A1).map((e) => e.seq))
-      // A reader (the hive tools), and a window without text, get the redacted ring.
+      // A reader (the Combwork tools), and a window without text, get the redacted ring.
       expect(JSON.stringify(c.events(A1))).not.toContain(MARK)
       expect(JSON.stringify(c.eventsFor('other', A1))).not.toContain(MARK)
       // A new subscription with text gets the kept text back with the rest.
@@ -497,7 +498,7 @@ describe('DevConsole', () => {
 
 describe('mayRead', () => {
   const wsOf = (p: string): string | null => (p.toLowerCase().startsWith(ws.toLowerCase()) ? ws : p.toLowerCase().startsWith(join('C:\\', 'elsewhere').toLowerCase()) ? join('C:\\', 'elsewhere') : null)
-  const assistantHome = sessionSourceId(join(ws, '.hive', 'assistant'), 'assistant')
+  const assistantHome = sessionSourceId(join(ws, '.combwork', 'assistant'), 'assistant')
 
   it('a project agent reads its own session only', () => {
     const me = { kind: 'agent' as const, projectPath: alpha, agentId: 'a1' }
@@ -507,23 +508,23 @@ describe('mayRead', () => {
     expect(mayRead(me, A2, wsOf)).toBe(false)
     expect(mayRead(me, sessionSourceId(beta, 'a1'), wsOf)).toBe(false)
     expect(mayRead(me, assistantHome, wsOf)).toBe(false)
-    expect(mayRead(me, hiveSourceId(ws), wsOf)).toBe(false)
+    expect(mayRead(me, combworkSourceId(ws), wsOf)).toBe(false)
   })
 
-  it("the Assistant reads its workspace's sessions, its own and Hive's events there, and nothing elsewhere", () => {
+  it("the Assistant reads its workspace's sessions, its own and Combwork's events there, and nothing elsewhere", () => {
     const assistant = { kind: 'assistant' as const, workspace: ws.toLowerCase() }
     expect(mayRead(assistant, A1, wsOf)).toBe(true)
     expect(mayRead(assistant, sessionSourceId(beta, 'b1'), wsOf)).toBe(true)
     expect(mayRead(assistant, assistantHome, wsOf)).toBe(true)
-    expect(mayRead(assistant, hiveSourceId(ws), wsOf)).toBe(true)
+    expect(mayRead(assistant, combworkSourceId(ws), wsOf)).toBe(true)
     expect(mayRead(assistant, sessionSourceId(other, 'g1'), wsOf)).toBe(false)
-    expect(mayRead(assistant, hiveSourceId(join('C:\\', 'elsewhere')), wsOf)).toBe(false)
+    expect(mayRead(assistant, combworkSourceId(join('C:\\', 'elsewhere')), wsOf)).toBe(false)
     // A folder in no open workspace.
     expect(mayRead(assistant, sessionSourceId(join('D:\\', 'loose'), 'x'), wsOf)).toBe(false)
   })
 
   it("a malformed source is nobody's", () => {
-    for (const bad of ['', 'session:', 'session:c:\\work\\alpha', 'session:c:\\work\\alpha#', 'hive:', 'other:x']) {
+    for (const bad of ['', 'session:', 'session:c:\\work\\alpha', 'session:c:\\work\\alpha#', 'combwork:', 'other:x']) {
       expect(parseSourceId(bad)).toBeNull()
       expect(mayRead({ kind: 'all' }, bad, wsOf)).toBe(false)
     }
@@ -547,7 +548,7 @@ describe('launches', () => {
 })
 
 describe('summaries', () => {
-  it('a hook: what came in, what Hive took it for, and what it did, in its own words', () => {
+  it('a hook: what came in, what Combwork took it for, and what it did, in its own words', () => {
     expect(hookSummary('PreToolUse', 'Edit', 'toolStart', 'working', [], true)).toBe('PreToolUse (Edit) → toolStart; working; replied')
     expect(hookSummary('Stop', undefined, 'stop', 'finished', ['notifyFinished', 'turnEnded'], false)).toBe('Stop → stop; finished; notifyFinished, turnEnded')
     // A name that isn't an identifier, or is too long, is not quoted.
@@ -555,7 +556,7 @@ describe('summaries', () => {
     expect(safeWord('x'.repeat(65))).toBe('<text: 65 chars>')
   })
 
-  it("a transcript read: its newest records next to what Hive read from them", () => {
+  it("a transcript read: its newest records next to what Combwork read from them", () => {
     const lines = Array.from({ length: 12 }, (_, i) => JSON.stringify({ type: 'event', n: i })).join('\n') + '\nnot json\n'
     const e = transcriptEvent('codex', lines, { modelId: 'gpt-5', planUsage: { provider: 'codex', plan: null, updatedAt: 'x', limits: [{ id: 'five_hour', label: '5-hour', windowMinutes: 300, usedPercent: 41.6, resetsAt: null }] } })
     const raw = e.raw as { records: number; newest: unknown[] }
@@ -580,8 +581,8 @@ describe('replies', () => {
   const source = { label: 'alpha · B1', kind: 'session', select: { agent: 'a-1', project: 'alpha' }, provider: 'claude-code', capturing: true, events: 2 }
 
   it('lists the sources a page at a time, with how to name each', () => {
-    const text = consoleSourcesText({ total: 2, offset: 0, sources: [source, { label: 'Hive', kind: 'hive', select: { source: 'hive' }, capturing: false, events: 0 }] })
-    expect(text).toBe('alpha · B1 (claude-code): captured, 2 events [agent="a-1" project="alpha"]\nHive: not captured [source="hive"]')
+    const text = consoleSourcesText({ total: 2, offset: 0, sources: [source, { label: 'Combwork', kind: 'combwork', select: { source: 'combwork' }, capturing: false, events: 0 }] })
+    expect(text).toBe('alpha · B1 (claude-code): captured, 2 events [agent="a-1" project="alpha"]\nCombwork: not captured [source="combwork"]')
     // A name a display label cuts or masks is still given whole as the argument that reads it.
     const long = 'developer-console-capture-and-recording-contract-fixtures-project'
     expect(consoleSourcesText({ total: 1, offset: 0, sources: [{ ...source, label: long.slice(0, 40), select: { agent: 'a-9', project: long } }] })).toContain(`project="${long}"`)
@@ -596,8 +597,8 @@ describe('replies', () => {
   it('a read: a line per event and how to carry on; nothing captured says so', () => {
     const events = [{ seq: 7, at: '2026-10-12T01:02:03.000Z', kind: 'hook', name: 'Stop', summary: 'Stop → stop; finished' }]
     const text = consoleEventsText({ source, events, older: 4, newest: 7 })
-    expect(text).toBe("alpha · B1:\n#7 01:02:03 hook Stop → stop; finished\n4 earlier not shown.\nNext: since=7. seq=[n] gives an event's raw payload and what Hive made of it.")
-    expect(consoleEventsText({ source: { ...source, capturing: false, events: 0 }, events: [], newest: 0 })).toBe(`alpha · B1: ${CONSOLE_NOT_CAPTURED}`)
+    expect(text).toBe("alpha · B1:\n#7 01:02:03 hook Stop → stop; finished\n4 earlier not shown.\nNext: since=7. seq=[n] gives an event's raw payload and what Combwork made of it.")
+    expect(consoleEventsText({ source: { ...source, capturing: false, events: 0 }, events: [], newest: 0 })).toBe(`alpha · B1: ${say(CONSOLE_NOT_CAPTURED)}`)
     expect(consoleEventsText({ source, events: [], newest: 0 })).toBe('alpha · B1: captured by the open console; no events yet.')
     expect(consoleEventsText({ source, events: [], missing: [3] })).toContain('Not in its buffer now: #3.')
   })

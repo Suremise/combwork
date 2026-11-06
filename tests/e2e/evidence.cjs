@@ -1,16 +1,16 @@
-// What the tests may delete in %LOCALAPPDATA%\hive-test (#253): never what a card that isn't Done cites as evidence,
+// What the tests may delete in %LOCALAPPDATA%\combwork-test (#253): never what a card that isn't Done cites as evidence,
 // and nothing at all while the board can't be read. Every deletion of test output goes through here: the clean-up
 // (clean.mjs), the e2e runner's suite folders and log pruning (run.mjs, logs.mjs), the scenario runner's lane folders,
 // results and baselines (tests/scenarios). Removing never follows a link out (a worktree's node_modules is a junction).
 //
-// A card cites a path under hive-test by writing it (in its title, description or a comment, any slash and case):
+// A card cites a path under combwork-test by writing it (in its title, description or a comment, any slash and case):
 // - the thing itself, ending with at least its folder and name: `e2e\review158-dark.png`, `lanes\0\board\board.png`,
-//   `%LOCALAPPDATA%\hive-test\evidence`;
+//   `%LOCALAPPDATA%\combwork-test\evidence`;
 // - a path inside a folder keeps the folder: `evidence\x.png` keeps `evidence`, `lanes\0\board\board.png` keeps the
 //   suite folder `lanes\0\board` (but not the rest of lane 0);
-// - a folder as a whole keeps everything in it: `hive-test\evidence` (ending there) keeps what is in it, and
+// - a folder as a whole keeps everything in it: `combwork-test\evidence` (ending there) keeps what is in it, and
 //   `lanes\0\board\` keeps that suite's folder. Only folders that hold evidence count, not the areas themselves
-//   (`hive-test`, `e2e`, `e2e\lanes`, a lane `e2e\lanes\0`, `scratch`, the unit tests' `tmp`…), which cards name when they talk about the
+//   (`combwork-test`, `e2e`, `e2e\lanes`, a lane `e2e\lanes\0`, `scratch`, the unit tests' `tmp`…), which cards name when they talk about the
 //   tests: a lane is where runs keep their suites' folders, not evidence, and a card naming one kept every folder every
 //   later run made in it (#285).
 // A name alone isn't a citation: a card listing leftovers to remove names them (`charts-132`), and a folder named like
@@ -23,10 +23,10 @@ const { execFileSync } = require('child_process')
 const runContext = require('./runContext.cjs')
 const { readCitingDocs } = require('./boardRows.cjs')
 
-/** Areas: folders that hold evidence rather than being it (relative to hive-test). Naming one keeps nothing. */
+/** Areas: folders that hold evidence rather than being it (relative to combwork-test). Naming one keeps nothing. */
 const AREAS = new Set(['', 'e2e', 'e2e/lanes', 'e2e/logs', 'e2e/logs/nested', 'scenarios', 'scenarios/lanes', 'scenarios/results', 'scenarios/baselines', 'scratch', 'tmp', 'codex', 'codex/sessions', 'codex/packages', 'codex/cache'])
 /**
- * Whether rel (relative to hive-test, with `/`) is an area: one of AREAS, a lane (`e2e/lanes/0`, `scenarios/lanes/3`), or
+ * Whether rel (relative to combwork-test, with `/`) is an area: one of AREAS, a lane (`e2e/lanes/0`, `scenarios/lanes/3`), or
  * in the Codex test home a year or month of rollouts, a package or its releases, or a cache (#404: cards name the home
  * and its folders when they talk about Codex; a rollout, a day's rollouts or a release cited keeps it).
  */
@@ -34,7 +34,7 @@ const isArea = (rel) => AREAS.has(rel) || /^(?:e2e|scenarios)\/lanes\/\d+$/.test
 
 /**
  * Areas of the temp folder (clearDir, #304): Claude Code's sessions folder and the folders down to a scratchpad
- * (`claude`, `claude/<project>`, `claude/<project>/<session>`, `…/scratchpad`). Naming one keeps nothing, as for hive-test's.
+ * (`claude`, `claude/<project>`, `claude/<project>/<session>`, `…/scratchpad`). Naming one keeps nothing, as for combwork-test's.
  */
 const isTempArea = (rel) => /^claude(?:\/[^/]+(?:\/[^/]+(?:\/scratchpad)?)?)?$/.test(rel)
 
@@ -61,15 +61,15 @@ function mentions(text, part, how = 'either') {
   return false
 }
 
-/** Its tails of at least two parts: ['hive-test','e2e','x'] → 'hive-test/e2e/x', 'e2e/x'. */
+/** Its tails of at least two parts: ['combwork-test','e2e','x'] → 'combwork-test/e2e/x', 'e2e/x'. */
 const tails = (parts) => Array.from({ length: Math.max(0, parts.length - 1) }, (_, k) => parts.slice(k).join('/'))
 
 /**
- * The card citing a path under hive-test (rel: relative to it, e.g. `e2e/lanes/0/board`), or null. children: the names
+ * The card citing a path under combwork-test (rel: relative to it, e.g. `e2e/lanes/0/board`), or null. children: the names
  * in it when it is a folder (so `evidence\x.png` keeps `evidence`; deeper paths keep it too, as `x/…`). label: the
- * root's own name as cards write it (`hive-test`; `temp` for paths in the temp folder, clearDir), whose areas don't count.
+ * root's own name as cards write it (`combwork-test`; `temp` for paths in the temp folder, clearDir), whose areas don't count.
  */
-function citedBy(rel, cards, children = [], label = 'hive-test') {
+function citedBy(rel, cards, children = [], label = 'combwork-test') {
   const own = pathText(rel).split('/').filter(Boolean)
   const parts = [label, ...own]
   const ancestors = []
@@ -91,9 +91,10 @@ function citedBy(rel, cards, children = [], label = 'hive-test') {
 }
 
 /**
- * The workspace's board for the repository at root, found up from its main checkout: its database (.hive\hive.db, Hive 0.9
- * and later, #1017) or, before that, its cards folder (.hive\tasks); null when there is none. A workspace moved to the
- * database keeps a stub tasks folder for older versions: the database is looked for first, so the stub never counts.
+ * The workspace's board for the repository at root, found up from its main checkout: its database (.combwork\combwork.db,
+ * #1017) or, before that, its cards folder (.combwork\tasks); null when there is none. Current names only (HI-2622): a
+ * workspace no 1.1 has opened yet has no board here until it is opened. A workspace moved to the database keeps a stub
+ * tasks folder for older versions: the database is looked for first, so the stub never counts.
  */
 function findBoard(root) {
   let dir
@@ -103,9 +104,9 @@ function findBoard(root) {
     dir = root
   }
   for (;;) {
-    const db = path.join(dir, '.hive', 'hive.db')
+    const db = path.join(dir, '.combwork', 'combwork.db')
     if (fs.existsSync(db)) return db
-    const tasks = path.join(dir, '.hive', 'tasks')
+    const tasks = path.join(dir, '.combwork', 'tasks')
     if (fs.existsSync(path.join(tasks, 'board.json'))) return tasks
     const up = path.dirname(dir)
     if (up === dir) return null
@@ -116,7 +117,7 @@ function findBoard(root) {
 /** A card that may cite evidence: neither Done nor archived, with its words (title, description, comments) as pathText. */
 const citing = (c) => (!c || c.archived || c.column === 'done' ? null : { number: c.number, text: pathText([c.title, c.description, ...(c.comments ?? []).map((m) => m.text)].join('\n')) })
 
-/** The cards from a board's database (read-only; Hive writing meanwhile is fine: WAL), as readCards gives them. */
+/** The cards from a board's database (read-only; Combwork writing meanwhile is fine: WAL), as readCards gives them. */
 function readDbCards(file) {
   let db
   try {
@@ -174,10 +175,10 @@ function readCards(tasksDir) {
  * an older look: a card that cites something a moment before it would go keeps it. snapshot() reads it once, for
  * listing many things (the clean-up's plan), never for deleting.
  */
-function evidence({ tasksDir, cards, testRoot = runContext.TEST_ROOT, label = 'hive-test' } = {}) {
+function evidence({ tasksDir, cards, testRoot = runContext.TEST_ROOT, label = 'combwork-test' } = {}) {
   const load = () => {
     if (cards) return { ok: true, cards }
-    if (!tasksDir) return { ok: false, why: "no board was found (the workspace's .hive\\hive.db or .hive\\tasks, up from this repository's main checkout)" }
+    if (!tasksDir) return { ok: false, why: "no board was found (the workspace's board in .combwork, up from this repository's main checkout)" }
     return readCards(tasksDir)
   }
   /** Rules over one look (get: the cards, read when asked). */
@@ -193,7 +194,7 @@ function evidence({ tasksDir, cards, testRoot = runContext.TEST_ROOT, label = 'h
       const s = get()
       if (!s.ok) return s.why
       const rel = path.relative(testRoot, p)
-      if (rel.startsWith('..') || path.isAbsolute(rel)) return 'outside hive-test'
+      if (rel.startsWith('..') || path.isAbsolute(rel)) return 'outside combwork-test'
       // A folder on the way that is a link (a junction) would carry the deletion somewhere else.
       const link = linkOnTheWay(testRoot, p)
       if (link) return `reached through a link (${link})`
@@ -210,11 +211,11 @@ function evidence({ tasksDir, cards, testRoot = runContext.TEST_ROOT, label = 'h
 }
 
 /**
- * The evidence rules for the repository at root (its workspace's board). HIVE_TEST_NO_BOARD=1 says there is no board
- * whose cards could cite test output (a checkout outside a Hive workspace): then nothing is evidence. Without it, no
+ * The evidence rules for the repository at root (its workspace's board). CW_TEST_NO_BOARD=1 says there is no board
+ * whose cards could cite test output (a checkout outside a Combwork workspace): then nothing is evidence. Without it, no
  * board found means nothing may be deleted, and the runners won't start (#285: copies would pile up run after run).
  */
-const evidenceFor = (root, opts = {}, env = process.env) => (env.HIVE_TEST_NO_BOARD === '1' ? evidence({ cards: [], ...opts }) : evidence({ tasksDir: findBoard(root), ...opts }))
+const evidenceFor = (root, opts = {}, env = process.env) => (env.CW_TEST_NO_BOARD === '1' ? evidence({ cards: [], ...opts }) : evidence({ tasksDir: findBoard(root), ...opts }))
 
 /**
  * The first folder between root and p (root and p themselves not counted) that is a link (a junction or a symlink), or
@@ -315,7 +316,7 @@ function freshFolder(dir, ev, { max = MAX_COPIES, claimed = () => false } = {}) 
       fs.mkdirSync(d, { recursive: true })
       return d
     } catch (e) {
-      // Still in use (a test Hive of a crashed run): take the next.
+      // Still in use (a test Combwork of a crashed run): take the next.
       why = `in use: ${e.code ?? e.message}`
     }
   }
@@ -369,8 +370,8 @@ function within(root, p) {
 /**
  * Empties a folder of your own so a rerun starts clean (#304), from Node: nobody needs a shell delete on a computed path
  * (`rm -rf "$(…)"`, which Claude Code can't check, so it asks, and unattended it denies). Only a probe's or a suite's
- * own folder: inside a Claude Code scratchpad (`<temp>\claude\…\scratchpad\<x>`), a `hive…` folder in the temp folder
- * (or inside one), or inside hive-test's `scratch` or `e2e` (not its lanes or logs, which the runners own). Never one of
+ * own folder: inside a Claude Code scratchpad (`<temp>\claude\…\scratchpad\<x>`), a `cw…` folder in the temp folder
+ * (or inside one), or inside combwork-test's `scratch` or `e2e` (not its lanes or logs, which the runners own). Never one of
  * those areas itself, a CLI test home or a folder holding one (as written or as it really is), anything with a link on
  * its path (the roots and the folders above them included) or a link itself, a file,
  * or evidence (a card that isn't Done cites it or something in it, or the board can't be read). board: { tasksDir } or
@@ -391,15 +392,15 @@ function clearDir(target, { board = {}, temp = os.tmpdir(), testRoot = runContex
   if (inTest !== null) {
     const rel = inTest.split(path.sep).join('/').toLowerCase()
     const own = /^scratch\/[^/]/.test(rel) || (/^e2e\/[^/]/.test(rel) && !/^e2e\/(?:lanes|logs)(?:\/|$)/.test(rel))
-    if (!own || isArea(rel)) throw new Error(`${p} isn't a probe's or a suite's own folder: in hive-test only folders inside scratch, or inside e2e outside its lanes and logs, are cleared.`)
+    if (!own || isArea(rel)) throw new Error(`${p} isn't a probe's or a suite's own folder: in combwork-test only folders inside scratch, or inside e2e outside its lanes and logs, are cleared.`)
     root = testRoot
   } else if (inTemp !== null) {
     const parts = inTemp.split(path.sep)
     const pad = parts.findIndex((x) => x.toLowerCase() === 'scratchpad')
-    const own = (parts[0].toLowerCase() === 'claude' && pad > 0 && pad < parts.length - 1) || /^hive/i.test(parts[0])
-    if (!own) throw new Error(`${p} isn't a probe's folder: in the temp folder only folders inside a Claude Code scratchpad, or hive… folders, are cleared.`)
+    const own = (parts[0].toLowerCase() === 'claude' && pad > 0 && pad < parts.length - 1) || /^cw/i.test(parts[0])
+    if (!own) throw new Error(`${p} isn't a probe's folder: in the temp folder only folders inside a Claude Code scratchpad, or cw… folders, are cleared.`)
     root = temp
-  } else throw new Error(`${p} is outside the temp folder and hive-test: never cleared.`)
+  } else throw new Error(`${p} is outside the temp folder and combwork-test: never cleared.`)
   let st = null
   try {
     st = fs.lstatSync(p)
@@ -408,8 +409,8 @@ function clearDir(target, { board = {}, temp = os.tmpdir(), testRoot = runContex
   }
   if (st?.isSymbolicLink()) throw new Error(`${p} is a link: never cleared.`)
   if (st && !st.isDirectory()) throw new Error(`${p} is a file, not a folder.`)
-  // Judged as the cards write it: `hive-test\…`, or `Temp\…` for the temp folder.
-  const why = st ? evidence({ ...board, testRoot: root, label: root === testRoot ? 'hive-test' : 'temp' }).protects(p) : null
+  // Judged as the cards write it: `combwork-test\…`, or `Temp\…` for the temp folder.
+  const why = st ? evidence({ ...board, testRoot: root, label: root === testRoot ? 'combwork-test' : 'temp' }).protects(p) : null
   if (why) throw new Error(`${p} must stay: ${why}.`)
   for (const name of safeList(p)) removeTree(path.join(p, name))
   fs.mkdirSync(p, { recursive: true })

@@ -61,7 +61,7 @@ describe('tray menu', () => {
     vi.doMock('../src/main/workspace', () => ({ openWorkspaces: () => [a, b] }))
     vi.doMock('../src/main/sessions', () => ({ sessions: { liveStates: () => states, projectStates: () => [] } }))
     vi.doMock('../src/main/branchWatch', () => ({ knownStatus: () => null }))
-    vi.doMock('../src/main/events', () => ({ onHiveEvent: () => undefined, emitTo: (win: unknown, e: { args: unknown[] }) => shown.push([(win as { name: string }).name, ...e.args]) }))
+    vi.doMock('../src/main/events', () => ({ onCombworkEvent: () => undefined, emitTo: (win: unknown, e: { args: unknown[] }) => shown.push([(win as { name: string }).name, ...e.args]) }))
     vi.doMock('../src/main/paths', () => ({ resourcesDir: () => 'C:/res' }))
     vi.doMock('../src/main/updater', () => ({ updateState: () => ({ status: 'idle' }), restartAndInstall: () => undefined }))
     const { createTray } = await import('../src/main/tray')

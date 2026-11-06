@@ -1,6 +1,6 @@
 // Workspace Overview: totals across projects for a period, the table by project, the stacked chart (a tile a day),
 // the board strip and the hidden-project note; in a narrow window the page doesn't scroll sideways (its period buttons
-// wrap, #252) while the table keeps its own scroll, down to a few dozen pixels of page beside the Assistant (#269). Transcripts are Hive backups (.hive/sessions) dated relative to today; no
+// wrap, #252) while the table keeps its own scroll, down to a few dozen pixels of page beside the Assistant (#269). Transcripts are Combwork backups (.combwork/sessions) dated relative to today; no
 // agent is started.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -17,7 +17,7 @@ const day = 86_400_000
 let n = 0
 /** A project with one session: a request on each of the given days ago, with this many output tokens each. */
 function project(name, requests) {
-  const dir = path.join(ws, name, '.hive', 'sessions')
+  const dir = path.join(ws, name, '.combwork', 'sessions')
   fs.mkdirSync(dir, { recursive: true })
   const id = `55555555-aaaa-bbbb-cccc-${String(++n).padStart(12, '0')}`
   const lines = []
@@ -31,7 +31,7 @@ function project(name, requests) {
   }
   fs.writeFileSync(path.join(dir, `${id}.jsonl`), lines.map((l) => JSON.stringify(l)).join('\n') + '\n')
   const at = new Date(last).toISOString()
-  fs.writeFileSync(path.join(ws, name, '.hive', 'sessions.json'), JSON.stringify({ version: 1, sessions: [{ id, agent: 'claude-code', name: `${name} work`, createdAt: at, lastActiveAt: at, archived: false }] }))
+  fs.writeFileSync(path.join(ws, name, '.combwork', 'sessions.json'), JSON.stringify({ version: 1, sessions: [{ id, agent: 'claude-code', name: `${name} work`, createdAt: at, lastActiveAt: at, archived: false }] }))
 }
 // 7 days: alpha 2,410 (today and 3 days ago), beta 2,105 (today); gamma only 20 days ago (5,105).
 project('alpha', [[0, 50], [3, 150]])

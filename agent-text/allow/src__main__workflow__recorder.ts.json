@@ -1,0 +1,6 @@
+{
+  "prose|assign|the project has no options yet (project.json's workflow)": 1,
+  "prose|assign|the project's options can't be used ({})": 1,
+  "prose|assign|the project's options contradict each other ({})": 1,
+  "prose|assign|the project's options couldn't be read ({})": 1
+}

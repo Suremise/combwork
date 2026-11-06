@@ -8,7 +8,7 @@ import { cardRef } from './projectKeys'
 
 /**
  * Why a session can't be resumed, for the Sessions tab's marker and its disabled Resume buttons (the reason is their
- * tooltip), or null when it can. From what Hive already knows: the session (a sub-session, its transcript), its
+ * tooltip), or null when it can. From what Combwork already knows: the session (a sub-session, its transcript), its
  * provider (turned on, installed) and the agents that could run it now.
  */
 export interface ResumeContext {
@@ -22,7 +22,7 @@ export interface ResumeContext {
   runners: readonly { id: string; name: string }[]
   /** Resume may add an agent for it (a session from the project folder, and room for another agent). */
   canAddAgent: boolean
-  /** The Hive Assistant's conversations: its one agent resumes each in the provider it ran in (#506). */
+  /** The Combwork Assistant's conversations: its one agent resumes each in the provider it ran in (#506). */
   assistant?: boolean
   /** The project's folder: a session that recorded it ran there, not in a worktree. */
   projectPath?: string
@@ -47,7 +47,7 @@ export function holdText(h: ResumeHold, agent: string): Text {
     case 'holds':
       return withValues(msg({ id: 'agents.resume.hold.holds', defaultMessage: '{agent} already keeps {slot}. Release that slot to resume this conversation in its own.', description: "Why a conversation can't resume (#1434): its agent ({agent}) already keeps another slot ({slot}: \"slot-a\"), and an agent keeps one at a time." }), { agent, slot: h.slot })
     case 'draining':
-      return withValues(msg({ id: 'agents.resume.hold.draining', defaultMessage: "This conversation's slot ({slot}) is still being handed back from its last session. Try again in a moment.", description: "Why a conversation can't resume just now (#1434): the slot it ran in ({slot}: \"slot-b\") is free, but its last session there is still exiting and Hive hasn't finished taking the slot back. It can be resumed in a moment." }), { slot: h.slot })
+      return withValues(msg({ id: 'agents.resume.hold.draining', defaultMessage: "This conversation's slot ({slot}) is still being handed back from its last session. Try again in a moment.", description: "Why a conversation can't resume just now (#1434): the slot it ran in ({slot}: \"slot-b\") is free, but its last session there is still exiting and Combwork hasn't finished taking the slot back. It can be resumed in a moment." }), { slot: h.slot })
     case 'changed':
       return withValues(msg({ id: 'agents.resume.hold.changed', defaultMessage: "This conversation's slot ({slot}) has changed since it ran, so it can't resume there. Read its transcript, or start fresh with a handover.", description: "Why a conversation can't resume (#1434): the slot it ran in ({slot}: \"slot-b\") is free, but its files or its revision changed since (or it isn't set up)." }), { slot: h.slot })
     case 'gone':
@@ -55,12 +55,12 @@ export function holdText(h: ResumeHold, agent: string): Text {
     case 'reviewer':
       return withValues(msg({ id: 'agents.resume.hold.reviewer', defaultMessage: '{agent} reviews now, and reviewers never run in a slot ({slot}). Read its transcript, or start fresh with a handover.', description: "Why a conversation can't resume (#1434): its agent ({agent}) has the reviewer role now, and reviewers work in the project folder, never in a slot ({slot}: \"slot-b\")." }), { agent, slot: h.slot })
     case 'byHand':
-      return withValues(msg({ id: 'agents.resume.hold.byHand', defaultMessage: 'Its slot ({slot}) is free: Resume takes it for {agent} again. Resume All and startup leave it, so free slots stay for new work.', description: "A conversation's note (#1434): the slot it ran in ({slot}: \"slot-b\") is free and as it left it, so the user's own Resume takes it again for its agent ({agent}); Resume All and Hive's startup don't." }), { agent, slot: h.slot })
+      return withValues(msg({ id: 'agents.resume.hold.byHand', defaultMessage: 'Its slot ({slot}) is free: Resume takes it for {agent} again. Resume All and startup leave it, so free slots stay for new work.', description: "A conversation's note (#1434): the slot it ran in ({slot}: \"slot-b\") is free and as it left it, so the user's own Resume takes it again for its agent ({agent}); Resume All and Combwork's startup don't." }), { agent, slot: h.slot })
   }
 }
 
 /**
- * A hold in plain words, short, for the lists of agents Resume All and Hive's start left (#1434): "its slot is free.
+ * A hold in plain words, short, for the lists of agents Resume All and Combwork's start left (#1434): "its slot is free.
  * Resume it by hand to take it", "its slot now holds AM-14's work", "after AM-14".
  */
 export function holdShort(h: ResumeHold): Text {
@@ -82,7 +82,7 @@ export function resumeBlock(s: Resumable, ctx: ResumeContext): string | null {
   const who = providerName(s.provider)
   if (s.sub) return tr(msg({ id: 'agents.resume.sub', defaultMessage: "A {kind} {cli} ran for another session, not a conversation of its own: it can't be resumed.", description: "Why a session in the Sessions tab can't be resumed: it was a helper run (a {kind}, as the CLI names it: \"subagent\") that the CLI ({cli}) started for another session." }), { kind: s.sub.kind, cli: who })
   if (ctx.live) return tr(msg({ id: 'agents.resume.running', defaultMessage: 'It is running now.', description: "Why a session in the Sessions tab can't be resumed: it is running." }))
-  if (!s.hasTranscript && !s.hasBackup) return tr(msg({ id: 'agents.resume.noTranscript', defaultMessage: 'Neither {cli} nor Hive has its transcript any more, so there is nothing to resume.', description: "Why a session can't be resumed: its conversation's file is gone from the CLI ({cli}) and from Hive's backup." }), { cli: who })
+  if (!s.hasTranscript && !s.hasBackup) return tr(msg({ id: 'agents.resume.noTranscript', defaultMessage: 'Neither {cli} nor Combwork has its transcript any more, so there is nothing to resume.', description: "Why a session can't be resumed: its conversation's file is gone from the CLI ({cli}) and from Combwork's backup." }), { cli: who })
   if (!ctx.providerEnabled) return tr(msg({ id: 'agents.resume.providerOff', defaultMessage: '{cli} is turned off. Turn it on in Settings → Providers to resume it.', description: "Why a session can't be resumed: its CLI ({cli}) is turned off. Settings → Providers is where: use its translated names." }), { cli: who })
   if (ctx.providerInstalled === false) return tr(msg({ id: 'agents.resume.notInstalled', defaultMessage: "{cli} isn't installed. Set it up in Provider Setup to resume it.", description: "Why a session can't be resumed: its CLI ({cli}) isn't installed. Provider Setup is a Help window: use its translated name." }), { cli: who })
   if (ctx.assistant) return null

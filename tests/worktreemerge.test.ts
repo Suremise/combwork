@@ -2,6 +2,7 @@
 // Unreleased merge one after the other with no conflict (merge-tree's check and both kinds of merge), both entries kept.
 // And #1347: a dirty worktree is refused (never committed for it), the merge commit is returned, and a target the
 // project folder hasn't checked out is merged without touching a folder.
+// HI-2422: the branch is merged by its full ref, never a same-named tag.
 import { execFileSync } from 'child_process'
 import { copyFileSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -19,7 +20,7 @@ afterEach(() => {
 })
 
 async function twoBranches(): Promise<{ project: string; a: { path: string; branch: string; base: string }; b: { path: string; branch: string; base: string } }> {
-  root = tempDir('hive-merge-')
+  root = tempDir('cw-merge-')
   const project = join(root, 'project')
   run(root, 'init', '-q', '-b', 'main', project)
   // core.eol: the repo's `* text=auto` (#149) checks text out with the native ending (CRLF on Windows) otherwise.
@@ -28,8 +29,8 @@ async function twoBranches(): Promise<{ project: string; a: { path: string; bran
   writeFileSync(join(project, 'CHANGELOG.md'), CHANGELOG)
   run(project, 'add', '-A')
   run(project, 'commit', '-qm', 'base')
-  const a = { path: join(root, 'wt', 'a'), branch: 'hive/a', base: 'main' }
-  const b = { path: join(root, 'wt', 'b'), branch: 'hive/b', base: 'main' }
+  const a = { path: join(root, 'wt', 'a'), branch: 'cw/a', base: 'main' }
+  const b = { path: join(root, 'wt', 'b'), branch: 'cw/b', base: 'main' }
   for (const [wt, entry] of [[a, '- Entry from A.'], [b, '- Entry from B.']] as const) {
     await createWorktree(project, wt.path, wt.branch, 'main')
     writeFileSync(join(wt.path, 'CHANGELOG.md'), CHANGELOG.replace('- Earlier entry.', `${entry}\n- Earlier entry.`))
@@ -105,6 +106,37 @@ describe('mergeWorktree (#1347)', () => {
     expect(run(project, 'rev-parse', b.branch)).toBe(tipB)
     expect(await mergeWorktree(project, a, { squash: false, message: 'A', target: a.branch.toUpperCase() })).toEqual({ ok: false, error: `${a.branch} can't be merged into itself.` })
   })
+
+  // HI-2422: a tag of the branch's name, at a commit the target already has, made git say "Already up to date" (a
+  // warning, exit 0) and Combwork report the merge done, with the branch's work never merged.
+  for (const squash of [false, true]) {
+    it(`merges the branch, not a same-named tag, into the checked-out target (${squash ? 'squash' : 'merge commit'})`, async () => {
+      const { project, a } = await twoBranches()
+      run(project, 'tag', a.branch, 'refs/heads/main')
+      // A squash keeping the worktree moves its branch too: the check that the worktree is on it reads it past the tag.
+      const r = await mergeWorktree(project, a, { squash, message: 'A', ...(squash ? { moveBranch: true } : {}) })
+      const main = run(project, 'rev-parse', 'refs/heads/main').trim()
+      expect(r).toEqual({ ok: true, mergeCommit: main, ...(squash ? { branchMoved: true } : {}) })
+      expect(readFileSync(join(project, 'CHANGELOG.md'), 'utf8')).toContain('- Entry from A.')
+      expect(run(project, 'log', '-1', '--format=%P', 'refs/heads/main').trim().split(' ')).toHaveLength(squash ? 1 : 2)
+      expect(run(project, 'status', '--porcelain')).toBe('')
+      if (squash) expect(run(project, 'rev-parse', `refs/heads/${a.branch}`).trim()).toBe(main)
+    })
+  }
+
+  // A tag `main` at the branch's own tip: the checked-out branch was read as heads/main (so a merge naming main as its
+  // target was refused as checked out elsewhere), and a bare main for the move would be the tag, where the branch is.
+  for (const target of [undefined, 'main']) {
+    it(`a tag named as the target: the checked-out branch is merged into, and the agent's branch moved to it after a squash (HI-2422, target ${target ?? 'not named'})`, async () => {
+      const { project, a } = await twoBranches()
+      run(project, 'tag', 'main', `refs/heads/${a.branch}`)
+      const r = await mergeWorktree(project, a, { squash: true, message: 'A', moveBranch: true, ...(target ? { target } : {}) })
+      const main = run(project, 'rev-parse', 'refs/heads/main').trim()
+      expect(r).toEqual({ ok: true, mergeCommit: main, branchMoved: true })
+      expect(run(project, 'rev-parse', `refs/heads/${a.branch}`).trim()).toBe(main)
+      expect(readFileSync(join(project, 'CHANGELOG.md'), 'utf8')).toContain('- Entry from A.')
+    })
+  }
 
   it('finds conflicts with a target checked out nowhere, and changes nothing', async () => {
     const { project, a } = await twoBranches()

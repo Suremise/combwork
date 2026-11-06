@@ -1,7 +1,7 @@
 // A project's view out of project.json (HI-1749, Darren's decision): the Session tab's Panes or Tiles, layout and pane
 // placement are this user's UI state (config.ui.projectViews), so a view switch writes no project file, and another program
 // holding project.json can't make it fail; the config is still written at once. A replace that gives up on a held file is
-// in hive.log, with the processes Windows says have it open, those lookups bounded; any IPC failure that isn't Hive's own
+// in combwork.log, with the processes Windows says have it open, those lookups bounded; any IPC failure that isn't Combwork's own
 // refusal is logged too. Each case has a project, workspace and UI state of its own.
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -38,7 +38,7 @@ vi.mock('../src/main/logger', async (original) => {
   }
 })
 
-const base = tempDir('hive-project-view-')
+const base = tempDir('cw-project-view-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace, projectViewKey } = await import('../src/main/workspace')
@@ -65,8 +65,8 @@ beforeEach(async () => {
   // A workspace of its own, its project's file as it was before HI-1749: its view in it.
   const wsPath = join(base, `ws-${++n}`)
   alpha = join(wsPath, 'alpha')
-  file = join(alpha, '.hive', 'project.json')
-  mkdirSync(join(alpha, '.hive'), { recursive: true })
+  file = join(alpha, '.combwork', 'project.json')
+  mkdirSync(join(alpha, '.combwork'), { recursive: true })
   writeFileSync(file, JSON.stringify({ version: 2, id: ID, agents: [], chime: 'on', sessionView: 'tiles', layout: 'columns2', placement: { columns2: [null, null] } }))
   w = createWorkspaceService()
   await w.open(wsPath)
@@ -107,7 +107,7 @@ describe("a project's view (HI-1749)", () => {
     expect(warned.filter((l) => l.includes('replacing'))).toEqual([])
   })
 
-  it('a replace that gives up on a held file is in hive.log, with what had it open', async () => {
+  it('a replace that gives up on a held file is in combwork.log, with what had it open', async () => {
     renameDiagnostics.holders = async () => ['4242 Some Indexer']
     fs.failNext = 1000
     await expect(run(() => w.updateProjectConfig(alpha, { chime: 'off' }))).rejects.toThrow(/EPERM/)

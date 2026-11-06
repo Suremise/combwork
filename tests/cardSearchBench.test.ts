@@ -1,4 +1,4 @@
-// The board's full-text search on a copy of a real board (#1237): HIVE_BOARD_BENCH_DB=<a hive.db> copies it (with its -wal)
+// The board's full-text search on a copy of a real board (#1237): CW_BOARD_BENCH_DB=<a combwork.db> copies it (with its -wal)
 // into tempDir() (the file itself is never opened), upgrades the copy, and prints what the index costs and saves: its
 // size and build time, a search through it against reading every card and matching in memory (as `GET /v1/tasks` would
 // without it) and against the window's filter of cards it already holds, and a card's edit with and without its
@@ -10,8 +10,8 @@ import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const source = process.env.HIVE_BOARD_BENCH_DB
-const base = tempDir('hive-search-bench-')
+const source = process.env.CW_BOARD_BENCH_DB
+const base = tempDir('cw-search-bench-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -36,8 +36,8 @@ const WORDS = ['usage', 'release', 'resume', 'board search', 'the', 'flaky', 'e2
 describe('the full-text search on a real board’s copy', () => {
   it.skipIf(!source)('costs and saves, timed, and finds what the board finds', { timeout: 600_000 }, async () => {
     const ws = join(base, 'ws')
-    mkdirSync(join(ws, '.hive'), { recursive: true })
-    const file = join(ws, '.hive', 'hive.db')
+    mkdirSync(join(ws, '.combwork'), { recursive: true })
+    const file = join(ws, '.combwork', 'combwork.db')
     copyFileSync(source!, file)
     if (existsSync(`${source}-wal`)) copyFileSync(`${source}-wal`, `${file}-wal`)
     store.boardTestHooks.upgradeAnswer = 'yes'
@@ -123,7 +123,7 @@ describe('the full-text search on a real board’s copy', () => {
     const medianSync = (fn: () => number, times = 11): number => Array.from({ length: times }, fn).sort((a, b) => a - b)[Math.floor(times / 2)]
     results[`#${largest} (the longest description) retitled, its trigger kept`] = medianSync(() => retitle(true))
     results['that edit without the trigger'] = medianSync(() => retitle(false))
-    results['a full commentTask through Hive (no trigger: comments aren\'t searched)'] = await median(() => tasks.commentTask(largest, 'A comment', user), 5)
+    results['a full commentTask through Combwork (no trigger: comments aren\'t searched)'] = await median(() => tasks.commentTask(largest, 'A comment', user), 5)
 
     const plan = (writer.prepare(`EXPLAIN QUERY PLAN ${QUERIES['board.search'].sql}`).all(store.searchMatch('usage')) as { detail: string }[]).map((r) => r.detail)
     console.log(`search bench: ${all.length} cards (${live.length} not archived); the cards' searched text ${(textBytes / 1048576).toFixed(1)} MB`)

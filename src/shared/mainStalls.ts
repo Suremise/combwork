@@ -1,6 +1,6 @@
 /**
  * The main process's recent stalls, as the Performance view shows them (HI-1135): what main/mainStalls.ts noted in
- * hive.log as "The main process was busy", kept in memory since Hive started. Every label is a fixed name Hive gives
+ * combwork.log as "The main process was busy", kept in memory since Combwork started. Every label is a fixed name Combwork gives
  * the work (a channel, a route template, a hook's event, a step and its file's own name), never the user's text.
  */
 
@@ -9,7 +9,7 @@ export interface MainStallWork {
   label: string
   /** How many works had this label (the Assistant's review: one line each, not one per call). */
   count: number
-  /** How long they took in all (each the whole work, as hive.log's line says it, not only its overlap with the stall); so far, while running. */
+  /** How long they took in all (each the whole work, as combwork.log's line says it, not only its overlap with the stall); so far, while running. */
   ms: number
   /** Whether one of them was still running. */
   running: boolean
@@ -33,9 +33,9 @@ export interface MainStall {
 export interface MainStalls {
   /** Newest first, at most MAIN_STALLS_KEPT. */
   stalls: MainStall[]
-  /** Every stall since Hive started, listed or not. */
+  /** Every stall since Combwork started, listed or not. */
   total: number
-  /** When Hive started watching (epoch ms). */
+  /** When Combwork started watching (epoch ms). */
   since: number
 }
 

@@ -53,8 +53,8 @@ const codex = (lang) => ({
 const claude = { provider: 'claude-code', found: false, checking: false, path: null, version: null, source: null, latestVersion: null, updateAvailable: false, loggedIn: null, authMethod: null, account: null, rejected: [], readiness: [] }
 
 async function openSetup(app, page, lang = 'en') {
-  const sendEvent = (e) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), e)
-  // Hive has finished looking for the CLIs (launch waits for it): nothing it finds replaces the stand-ins.
+  const sendEvent = (e) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), e)
+  // Combwork has finished looking for the CLIs (launch waits for it): nothing it finds replaces the stand-ins.
   await sendEvent({ type: 'provider-install', provider: 'codex', info: codex(lang) })
   await sendEvent({ type: 'provider-install', provider: 'claude-code', info: claude })
   // A fake clipboard in the page: what a Copy button writes, never the machine's.
@@ -62,7 +62,7 @@ async function openSetup(app, page, lang = 'en') {
     window.__copied = []
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { readText: async () => '', writeText: async (t) => void window.__copied.push(t) } })
   })
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', { type: 'menu-command', command: 'help.agentSetup', args: [] }))
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', { type: 'menu-command', command: 'help.agentSetup', args: [] }))
   const setup = page.locator('.dialog', { has: page.locator('.setup-tab') })
   await lib.until(async () => (await setup.count()) === 1, HUNG_MS)
   return setup
@@ -113,7 +113,7 @@ async function openSetup(app, page, lang = 'en') {
   }
   // In German: the install note is German (#1404), the button's name and Copied are translated; the command is as it is.
   {
-    const { app, page } = await lib.launch({ userData, env: { HIVE_LANG: 'de' }, viewport: { width: 1200, height: 860 } })
+    const { app, page } = await lib.launch({ userData, env: { CW_LANG: 'de' }, viewport: { width: 1200, height: 860 } })
     try {
       const setup = await openSetup(app, page, 'de')
       await setup.locator('.setup-tab', { hasText: 'Claude Code' }).click()

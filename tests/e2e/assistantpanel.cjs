@@ -1,7 +1,7 @@
 // The Assistant panel's watch line and "Done by the Assistant" (#312, #399, #979). The header has the Assistant's state
 // mark (#973: a ring idle, a pulsing dot working, a diamond waiting for you) and no status text. Under it, "Status: …"
 // says what the Assistant is doing: Not running, Idle, Working, Waiting for you (the attention colour), and a card
-// watch's cards as the app's card chips (their column's colour) that open the card, with the watch's end, and Hive's own
+// watch's cards as the app's card chips (their column's colour) that open the card, with the watch's end, and Combwork's own
 // approval cards (stopping a busy agent) as "Waiting for your approval" in the attention colour until answered. At the
 // line's end, once it has done something, "Done by the Assistant (n)" opens the list under it (closed at first): the last
 // 3 of its newest message's changes (#1283: rows of one height, each with Undo), Show all scrolling every one inside the same height (nothing
@@ -40,14 +40,14 @@ const check = (name, ok, extra = '') => {
   // Setting changes among what it does.
   cfg.settings.assistant = { ...cfg.settings.assistant, changeSettings: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47920), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47920), CLAUDE_CONFIG_DIR: claudeHome })
 
   let app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   let page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.appReady(page)
-  // A call that hasn't answered in 60 s fails the suite saying which, and whether the window and Hive's main process
+  // A call that hasn't answered in 60 s fails the suite saying which, and whether the window and Combwork's main process
   // still answer, with a screenshot (#492: once, under two full sets, the suite hung here until the runner's 10 minutes).
   const answers = (p, ms) => Promise.race([p.then(() => 'yes', (e) => `error: ${e.message}`), lib.sleep(ms).then(() => 'no')])
   const watched = (call, what) => {
@@ -55,12 +55,12 @@ const check = (name, ok, extra = '') => {
       const renderer = await answers(page.evaluate(() => 1), 5000)
       const main = await answers(app.evaluate(() => 1), 5000)
       const shot = await answers(page.screenshot({ path: path.join(lib.WORK, 'assistantpanel-unanswered.png') }), 10000)
-      console.log(`FAIL ${what} hasn't answered in 60 s (the window answers: ${renderer}; Hive's main process answers: ${main}; screenshot taken: ${shot})`)
+      console.log(`FAIL ${what} hasn't answered in 60 s (the window answers: ${renderer}; Combwork's main process answers: ${main}; screenshot taken: ${shot})`)
       process.exit(1)
     }, 60000)
     return call.finally(() => clearTimeout(t))
   }
-  let inv = (ch, ...a) => watched(page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a]), `inv ${ch}`)
+  let inv = (ch, ...a) => watched(page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a]), `inv ${ch}`)
   await lib.openWorkspace(inv, page, ws)
   const home = (await inv('workspace:refresh')).assistant.path
   const key = lib.ptyKey(home, 'assistant')
@@ -154,8 +154,8 @@ const check = (name, ok, extra = '') => {
 
   // --- What it did: under the footer, the last 3, Show all scrolls inside the same height.
   // Newest first they are: a card, two setting changes, then three cards, each with Undo (#1283), under their message.
-  const task = (t) => `hive hive_create_task {"project":"alpha","title":"${t}"}`
-  check('it makes six changes in one turn', await say([task('First thing'), task('Second thing'), task('Third thing'), 'skill tune-settings', 'hive hive_update_setting {"id":"sessions.transcriptWarnMB","value":50}', 'hive hive_update_setting {"id":"sessions.transcriptWarnMB","value":60}', task('Sixth thing')].join(' then ')))
+  const task = (t) => `cw cw_create_task {"project":"alpha","title":"${t}"}`
+  check('it makes six changes in one turn', await say([task('First thing'), task('Second thing'), task('Third thing'), 'skill tune-settings', 'cw cw_update_setting {"id":"sessions.transcriptWarnMB","value":50}', 'cw cw_update_setting {"id":"sessions.transcriptWarnMB","value":60}', task('Sixth thing')].join(' then ')))
   const section = panel().locator('.assistant-actions')
   check('six changes: “Done by the Assistant (6)” at the watch line’s end, closed', !!(await lib.until(async () => /Done by the Assistant\s*\(6\)/i.test(await link.innerText().catch(() => '')), HUNG_MS)) && (await link.getAttribute('aria-expanded')) === 'false' && (await section.count()) === 0, await link.innerText().catch(() => ''))
   check('…with the Assistant’s crown', (await link.locator('.assistant-mark').count()) === 1)
@@ -229,16 +229,16 @@ const check = (name, ok, extra = '') => {
   check('…inside its box, nothing clipped', fits)
   await shots('folded')
 
-  // --- Hive's own question its action waits on (stopping a busy agent): waiting for your approval, until answered.
+  // --- Combwork's own question its action waits on (stopping a busy agent): waiting for your approval, until answered.
   // Its task is "work 60", spelled with a JSON escape so the fake Assistant doesn't take it as its own "work 60".
-  check('it adds an agent to alpha', await say('hive hive_add_agent {"project":"alpha","name":"Fixer","prompt":"w\\u006frk 60"}'))
+  check('it adds an agent to alpha', await say('cw cw_add_agent {"project":"alpha","name":"Fixer","prompt":"w\\u006frk 60"}'))
   const alpha = path.join(ws, 'alpha')
   const fixerLive = async () => (await inv('session:live')).find((x) => x.projectPath.toLowerCase() === alpha.toLowerCase() && x.agentName === 'Fixer')
   check('an agent of alpha is busy', !!(await lib.until(async () => (await fixerLive())?.status === 'working', 30000)))
   // Its mark in the workspace section says it works (#979), and its label says who and what.
   const fixerMark = panel().locator('.assistant-project[data-project="alpha"] .assistant-agent')
   check('…its mark in the workspace section is working', !!(await lib.until(async () => (await fixerMark.count()) === 1 && (await fixerMark.getAttribute('data-state')) === 'working' && ((await fixerMark.getAttribute('aria-label')) ?? '').startsWith('Fixer: '), 5000)), await fixerMark.getAttribute('aria-label').catch(() => 'no mark'))
-  const stopping = await type('hive hive_stop_agent {"project":"alpha","agent":"Fixer"}')
+  const stopping = await type('cw cw_stop_agent {"project":"alpha","agent":"Fixer"}')
   const card = panel().locator('.assistant-question', { hasText: 'Stop Fixer in alpha?' })
   check('stopping it asks the user on a card', !!(await lib.until(async () => (await card.count()) === 1, 15000)))
   check('…and the status line says the Assistant waits for your approval', !!(await lib.until(async () => (await statusText()) === 'Status: Waiting for your approval: Stop Fixer in alpha?' && (await tone()) === 'attention', 5000)), `${await statusText()} / ${await tone()}`)
@@ -252,7 +252,7 @@ const check = (name, ok, extra = '') => {
   if (fixer) await inv('session:stop', alpha, fixer.agentId)
 
   // --- A card watch: its cards as chips that open the card, and until when.
-  check('it watches two cards', await say('hive hive_wait_for_tasks {"cards":[1,2],"wake":true,"column":"review","limitMinutes":90}'))
+  check('it watches two cards', await say('cw cw_wait_for_tasks {"cards":[1,2],"wake":true,"column":"review","limitMinutes":90}'))
   // Its cards by key (#1221).
   const [L1, L2] = [await lib.cardLabel(inv, 1), await lib.cardLabel(inv, 2)]
   check('watching: “Status: Waiting for #1 #2 → Review (watch until …)” (chips side by side)', !!(await lib.until(async () => new RegExp(`^Status: Waiting for ${L1} ${L2} → Review \\(watch until \\d{1,2}:\\d{2}( [AP]M)?\\)$`).test(await statusText()) && (await tone()) === 'calm', 15000)), await statusText())
@@ -290,7 +290,7 @@ const check = (name, ok, extra = '') => {
   await lib.until(async () => (await head.getAttribute('aria-expanded')) === 'false', HUNG_MS)
   await page.locator('.assistant-panel > .pane-resizer').dblclick()
 
-  // --- After a restart: still folded (once it has done something again; the list is the running Hive's).
+  // --- After a restart: still folded (once it has done something again; the list is the running Combwork's).
   await inv('session:stop', home, 'assistant')
   await lib.until(async () => !(await live()), 15000)
   await app.close()
@@ -299,7 +299,7 @@ const check = (name, ok, extra = '') => {
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.appReady(page)
-  inv = (ch, ...a) => watched(page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a]), `inv ${ch}`)
+  inv = (ch, ...a) => watched(page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a]), `inv ${ch}`)
   await lib.until(async () => (await panel().count()) === 1, 10000)
   if ((await panel().count()) === 0) {
     await page.evaluate(() => document.activeElement?.blur())
@@ -307,17 +307,17 @@ const check = (name, ok, extra = '') => {
   }
   await lib.until(async () => (await panel().locator('.assistant-header').count()) === 1, 5000)
   await panel().locator('.assistant-header').getByRole('button', { name: /Resume|Start/ }).first().click()
-  check('it adds a card after the restart', await say('hive hive_create_task {"project":"alpha","title":"After the restart"}'))
+  check('it adds a card after the restart', await say('cw cw_create_task {"project":"alpha","title":"After the restart"}'))
   const again = panel().locator('.assistant-done-link')
   check('after a restart, “Done by the Assistant” is still closed', !!(await lib.until(async () => (await again.count()) === 1, 10000)) && (await again.getAttribute('aria-expanded')) === 'false' && (await panel().locator('.assistant-action').count()) === 0)
   await again.press(' ')
   check('Space opens it again', !!(await lib.until(async () => (await again.getAttribute('aria-expanded')) === 'true' && (await panel().locator('.assistant-action').count()) >= 1, HUNG_MS)))
 
   // --- Its mark where the Assistant is listed: its run in the Progress panel (reported with its own token, as
-  // hive-progress would), the Workspace Overview's running row, and the hidden panel's strip.
+  // cw-progress would), the Workspace Overview's running row, and the hidden panel's strip.
   const tokens = path.join(userData, 'assistant-api')
   const token = JSON.parse(fs.readFileSync(path.join(tokens, fs.readdirSync(tokens)[0]), 'utf8')).token
-  const started = await fetch(`http://127.0.0.1:${env.HIVE_API_PORT}/v1/progress`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ title: 'Checking the panel' }) })
+  const started = await fetch(`http://127.0.0.1:${env.CW_API_PORT}/v1/progress`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ title: 'Checking the panel' }) })
   check('the Assistant reports a run', started.status === 200, String(started.status))
   await page.evaluate(() => document.activeElement?.blur())
   await page.keyboard.press('Control+Alt+P')

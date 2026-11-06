@@ -33,7 +33,7 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
 
 ;(async () => {
   for (const d of [userData, ws, ws + '.worktrees', claudeHome, shots]) fs.rmSync(d, { recursive: true, force: true })
-  for (const d of [claudeHome, shots, ...[gita, gitb, plain].map((p) => path.join(p, '.hive'))]) fs.mkdirSync(d, { recursive: true })
+  for (const d of [claudeHome, shots, ...[gita, gitb, plain].map((p) => path.join(p, '.combwork'))]) fs.mkdirSync(d, { recursive: true })
   fs.writeFileSync(path.join(plain, 'notes.md'), '# Notes\n')
   for (const [p, who] of [[gita, 'A'], [gitb, 'B']]) {
     lib.gitProject(p)
@@ -43,9 +43,9 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
   }
   // gita: Team made its own (its target, commands, identity, stage names, loops); gitb: its own target and one command.
   const own = { review: 'agent', noSelfReview: true, preChecks: ['lint', 'unit'], commands: { lint: 'npm run lint', unit: 'npm test' }, target: 'stable-line', identity: { name: 'A Person', email: 'a@example.com' }, stageNames: { review: 'Checking' }, loopRounds: 4 }
-  fs.writeFileSync(path.join(gita, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [{ id: 'a-wa1', name: 'WA-B1', workflowRole: 'builder', provider: 'claude-code' }], workflow: { platform: 'git', preset: 'team', options: own } }))
-  fs.writeFileSync(path.join(gitb, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [], workflow: { platform: 'git', preset: null, options: { target: 'main', commands: { lint: 'pnpm lint' } } } }))
-  fs.writeFileSync(path.join(plain, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'a-wp1', name: 'WP-B1', workflowRole: 'builder', provider: 'claude-code' }] }))
+  fs.writeFileSync(path.join(gita, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [{ id: 'a-wa1', name: 'WA-B1', workflowRole: 'builder', provider: 'claude-code' }], workflow: { platform: 'git', preset: 'team', options: own } }))
+  fs.writeFileSync(path.join(gitb, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [], workflow: { platform: 'git', preset: null, options: { target: 'main', commands: { lint: 'pnpm lint' } } } }))
+  fs.writeFileSync(path.join(plain, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'a-wp1', name: 'WP-B1', workflowRole: 'builder', provider: 'claude-code' }] }))
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws, gita, gitb, plain].map((p) => p.toLowerCase())))
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')
@@ -53,15 +53,15 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
   cfg.settings.providers['claude-code'].executablePath = path.join(__dirname, 'fake-claude', 'fake-claude.cmd')
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never', showTips: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: lib.port(47793), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' }, viewport: { width: 1500, height: 950 } })
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_API_PORT: lib.port(47793), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' }, viewport: { width: 1500, height: 950 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)
     await lib.waitForProvider(inv)
     const text = async (l) => ((await l.innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
     const dialog = page.locator('.dialog').last()
-    const fileOf = (name) => JSON.parse(fs.readFileSync(path.join(ws, '.hive', 'templates', name), 'utf8'))
-    const workflowOf = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'project.json'), 'utf8')).workflow
+    const fileOf = (name) => JSON.parse(fs.readFileSync(path.join(ws, '.combwork', 'templates', name), 'utf8'))
+    const workflowOf = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 'project.json'), 'utf8')).workflow
     const shoot = async (name, target) => {
       for (const theme of ['dark', 'light']) {
         await inv('settings:update', { appearance: { theme } })
@@ -109,7 +109,7 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
     await dialog.locator('input[type="checkbox"]').first().check()
     await shoot('1-save', () => dialog)
     await dialog.getByRole('button', { name: 'Save', exact: true }).click()
-    const teamA = path.join(ws, '.hive', 'templates', 'team-a.json')
+    const teamA = path.join(ws, '.combwork', 'templates', 'team-a.json')
     check('saved: its Git section with the rules, never its target, commands or identity', !!(await until(() => fs.existsSync(teamA))) && JSON.stringify(Object.keys(fileOf('team-a.json').workflow)) === '["git"]' && fileOf('team-a.json').workflow.git.options.review === 'agent' && fileOf('team-a.json').workflow.git.options.identity === true && !/stable-line|npm run lint|npm test|A Person|a@example\.com|"target"|"commands"/.test(JSON.stringify(fileOf('team-a.json').workflow)), JSON.stringify(fileOf('team-a.json').workflow))
     check('…and the notice says it holds the workflow for Git', !!(await until(async () => /It holds this project's workflow for Git\./.test(await text(page.locator('.toast', { hasText: 'Template saved' }))))))
 
@@ -169,7 +169,7 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
     // --- A Git-only template in plain: held until Git, untick to load only the agents; Set Up Git…, then the dialog again.
     await select('gita')
     await saveAs('Git only')
-    await until(() => fs.existsSync(path.join(ws, '.hive', 'templates', 'git-only.json')))
+    await until(() => fs.existsSync(path.join(ws, '.combwork', 'templates', 'git-only.json')), HUNG_MS)
     await select('plain')
     await templatesMenu('Git only')
     const gitOnly = loadDialog('Git only')
@@ -180,10 +180,10 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
     check('…unticked, Load can be clicked: only its agents would load', !!(await until(async () => (await needs.count()) === 0 && (await loadButton(gitOnly).isEnabled()))))
     await gitOnly.locator('[data-workflow-apply]').check()
     await until(async () => (await needs.count()) === 1)
-    const plainAgents = JSON.stringify(JSON.parse(fs.readFileSync(path.join(plain, '.hive', 'project.json'), 'utf8')).agents.map((a) => a.name))
+    const plainAgents = JSON.stringify(JSON.parse(fs.readFileSync(path.join(plain, '.combwork', 'project.json'), 'utf8')).agents.map((a) => a.name))
     await needs.locator('[data-action="template-set-up-git"]').click()
     const preview = page.locator('[data-vc-git-preview]')
-    check("Set Up Git… closes the dialog, nothing loaded, and opens Git's page saying the template waits", !!(await until(async () => (await gitOnly.count()) === 0 && (await preview.count()) === 1 && (await preview.locator('[data-vc-template-pending]').count()) === 1)) && JSON.stringify(JSON.parse(fs.readFileSync(path.join(plain, '.hive', 'project.json'), 'utf8')).agents.map((a) => a.name)) === plainAgents, await text(page.locator('.vc-view')))
+    check("Set Up Git… closes the dialog, nothing loaded, and opens Git's page saying the template waits", !!(await until(async () => (await gitOnly.count()) === 0 && (await preview.count()) === 1 && (await preview.locator('[data-vc-template-pending]').count()) === 1, HUNG_MS)) && JSON.stringify(JSON.parse(fs.readFileSync(path.join(plain, '.combwork', 'project.json'), 'utf8')).agents.map((a) => a.name)) === plainAgents, await text(page.locator('.vc-view')))
     await shoot('5-set-up-git', () => page.locator('.vc-view'))
     await preview.locator('[data-git-init]').click()
     const init = page.locator('.dialog', { hasText: 'Initialise plain as a git repository' })
@@ -211,15 +211,15 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
     await page.locator('.template-editor .template-detail-actions button', { hasText: 'Save Template' }).click()
     check("the editor removes None's section, Git's kept", !!(await until(() => JSON.stringify(Object.keys(fileOf('team-a.json').workflow ?? {})) === '["git"]')), JSON.stringify(fileOf('team-a.json').workflow))
 
-    // --- HR5's round 1, 1: imported with a section Hive can't use: said, and no preset offered in its place.
+    // --- HR5's round 1, 1: imported with a section Combwork can't use: said, and no preset offered in its place.
     await page.locator('.activitybar [aria-label="Projects"]').click()
     await select('gitb')
     // gitb last showed Version Control: its Session tab, for + Add ▾.
     await page.locator('.tabs .tab', { hasText: 'Session' }).first().click()
-    const bad =path.join(lib.WORK, 'templateworkflow-bad.hive-template.json')
+    const bad =path.join(lib.WORK, 'templateworkflow-bad.combwork-template.json')
     fs.writeFileSync(bad, JSON.stringify({ version: 2, name: 'Bad none', savedAt: '', layout: 'auto', suggestedPreset: 'pair', agents: [{ name: 'BD-B1', role: 'builder', provider: 'claude-code' }], workflow: { none: { preset: null, options: { review: 'bogus' } } } }))
     const imported = await inv('templates:import', bad, { scope: 'workspace' })
-    check('imported, its rejected section kept as rejected (never what it held)', !!imported?.imported && JSON.stringify(imported.imported.workflowDropped) === '["none"]' && !/bogus/.test(fs.readFileSync(path.join(ws, '.hive', 'templates', imported.imported.file), 'utf8')), JSON.stringify(imported))
+    check('imported, its rejected section kept as rejected (never what it held)', !!imported?.imported && JSON.stringify(imported.imported.workflowDropped) === '["none"]' && !/bogus/.test(fs.readFileSync(path.join(ws, '.combwork', 'templates', imported.imported.file), 'utf8')), JSON.stringify(imported))
     await templatesMenu('Bad none')
     const badLoad = loadDialog('Bad none')
     check('its Load dialog says the section can’t be used, and offers no preset in its place', !!(await until(async () => (await badLoad.locator('[data-workflow-dropped="none"]').count()) === 1)) && (await badLoad.locator('.dialog-check').count()) === 0, await text(badLoad))
@@ -228,7 +228,7 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
 
     // --- HR5's round 1, 2: the workflow applied is the one shown last. A template edited while its dialog is open: the
     // plan read again (a name changed) shows it, and Load fills that in; changed again after it, the load says so.
-    const roundsFile = path.join(ws, '.hive', 'templates', 'rounds.json')
+    const roundsFile = path.join(ws, '.combwork', 'templates', 'rounds.json')
     const writeRounds = (n) => fs.writeFileSync(roundsFile, JSON.stringify({ version: 2, name: 'Rounds', savedAt: new Date().toISOString(), layout: 'auto', agents: [{ name: 'RD-B1', role: 'builder', provider: 'claude-code' }], workflow: { git: { preset: null, options: { loopRounds: n } } } }))
     writeRounds(6)
     await inv('templates:list', gitb)
@@ -269,7 +269,7 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
     // workflowoptions' late reads); the form's own first read let through, the template's held, Team chosen and used,
     // then the template's answered: it is dropped, and Save… saves Team with gitb's target and command. Last here: the
     // handler stays replaced until the app closes.
-    const lateFile = path.join(ws, '.hive', 'templates', 'late.json')
+    const lateFile = path.join(ws, '.combwork', 'templates', 'late.json')
     fs.writeFileSync(lateFile, JSON.stringify({ version: 2, name: 'Late', savedAt: new Date().toISOString(), layout: 'auto', agents: [{ name: 'LT-B1', role: 'builder', provider: 'claude-code' }], workflow: { git: { preset: null, options: { loopRounds: 7 } } } }))
     await inv('templates:list', gitb)
     await page.evaluate(() => window.dispatchEvent(new Event('focus')))
@@ -319,7 +319,7 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
     const confirmLate = page.locator('.dialog', { hasText: 'Save' }).last()
     await until(async () => (await confirmLate.getByRole('button', { name: 'Save', exact: true }).count()) === 1)
     await confirmLate.getByRole('button', { name: 'Save', exact: true }).click()
-    check("…saved as Team, with gitb's target and command, never Late's rounds", !!(await until(() => workflowOf(gitb)?.preset === 'team' && saved().finish === 'hiveMerges')) && saved().target === 'main' && saved().commands?.lint === 'pnpm lint' && saved().loopRounds !== 7, JSON.stringify(workflowOf(gitb)))
+    check("…saved as Team, with gitb's target and command, never Late's rounds", !!(await until(() => workflowOf(gitb)?.preset === 'team' && saved().finish === 'combworkMerges')) && saved().target === 'main' && saved().commands?.lint === 'pnpm lint' && saved().loopRounds !== 7, JSON.stringify(workflowOf(gitb)))
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {

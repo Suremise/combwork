@@ -1,7 +1,7 @@
-// The tip card and toasts keep out of the way of buttons in their corner: with the Hive Assistant's panel open they sit
+// The tip card and toasts keep out of the way of buttons in their corner: with the Combwork Assistant's panel open they sit
 // left of it, so the panel's ended bar (Resume, New) is never covered; with it hidden, they sit just above the
 // bottom-right agent pane's ended bar. Each button is clicked with the real pointer, after checking it is what lies
-// under its middle. Tips are on in this suite's profile. The agents run the fake Claude Code (fake-claude/). Dev build,
+// under its middle. Tips are on in this suite's profile, finished notices off. The agents run the fake Claude Code (fake-claude/). Dev build,
 // throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -30,15 +30,18 @@ const check = (name, ok, extra = '') => {
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.providers['claude-code'].executablePath = path.join(__dirname, 'fake-claude', 'fake-claude.cmd')
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never', showTips: true }
+  // No "finished" entries: any notification closes a tip showing, a bell-only one too (HI-2424), and the Assistant's
+  // finish (bell-only once its panel is folded) closed it before its corner was measured (HI-2513).
+  cfg.settings.notifications = { ...cfg.settings.notifications, notifyOnFinished: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47899), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47899), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const home = (await inv('workspace:refresh')).assistant.path
   const live = async (p, id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === p.toLowerCase() && s.agentId === id)
@@ -118,6 +121,7 @@ const check = (name, ok, extra = '') => {
   const bar = page.locator('.agent-pane-body .session-ended')
   await until(async () => (await bar.count()) === 1, 10000)
   await lib.sleep(300)
+  check('the tip still shows (no notification closed it)', (await card.count()) === 1, JSON.stringify(await page.evaluate(() => window.__cwBell?.())))
   const b2 = await box(bar)
   const c2 = await box(card)
   check('with the Assistant hidden, the card is in the window corner', c2 && c2.x + c2.width > 1400, JSON.stringify(c2))

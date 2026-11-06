@@ -1,11 +1,11 @@
 name: Feature request
-description: An idea for something Hive could do, or do better.
+description: An idea for something Combwork could do, or do better.
 labels: [enhancement]
 body:
   - type: markdown
     attributes:
       value: |
-        Thank you for the idea. Please check the [open issues](https://github.com/Suremise/hive-desktop/issues) first: someone may have asked for it already.
+        Thank you for the idea. Please check the [open issues](https://github.com/Suremise/combwork/issues) first: someone may have asked for it already.
   - type: textarea
     id: problem
     attributes:
@@ -18,7 +18,7 @@ body:
     id: idea
     attributes:
       label: Your idea
-      description: What you would like Hive to do about it.
+      description: What you would like Combwork to do about it.
     validations:
       required: true
   - type: textarea

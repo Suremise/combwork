@@ -19,7 +19,7 @@ const card = (over: Partial<TaskCard>): TaskCard => ({
   number: 7,
   title: 'A card',
   description: '',
-  project: 'hive',
+  project: 'alpha',
   agent: null,
   column: 'todo',
   order: 1,
@@ -40,16 +40,16 @@ const card = (over: Partial<TaskCard>): TaskCard => ({
 const LOOP = [
   h(0, 'Assistant', 'Created in On Hold'),
   h(1, 'Assistant', 'Moved to the bottom of Todo'),
-  h(10, 'HB5 (hive)', 'Given to HB5'),
-  h(10, 'HB5 (hive)', 'Moved to Doing'),
-  h(40, 'HB5 (hive)', 'Moved to Review'),
-  h(41, 'HR5 (hive)', 'Started reviewing'),
-  h(45, 'HR5 (hive)', 'Review failed'),
-  h(52, 'HB5 (hive)', 'Returned for review, round 2'),
-  h(53, 'HR5 (hive)', 'Started reviewing'),
-  h(56, 'HR5 (hive)', 'Review passed'),
-  h(56, 'HR5 (hive)', 'Moved to Passed'),
-  h(90, 'HB5 (hive)', 'Moved to Done')
+  h(10, 'HB5 (alpha)', 'Given to HB5'),
+  h(10, 'HB5 (alpha)', 'Moved to Doing'),
+  h(40, 'HB5 (alpha)', 'Moved to Review'),
+  h(41, 'HR5 (alpha)', 'Started reviewing'),
+  h(45, 'HR5 (alpha)', 'Review failed'),
+  h(52, 'HB5 (alpha)', 'Returned for review, round 2'),
+  h(53, 'HR5 (alpha)', 'Started reviewing'),
+  h(56, 'HR5 (alpha)', 'Review passed'),
+  h(56, 'HR5 (alpha)', 'Moved to Passed'),
+  h(90, 'HB5 (alpha)', 'Moved to Done')
 ]
 
 describe('holds', () => {
@@ -64,7 +64,7 @@ describe('holds', () => {
 
   it('counts the time between a failed review and the return as nobody’s (a card in Review is not in Doing)', () => {
     // Moved back to Doing to fix, then returned: the builder holds it again for the fix.
-    const history = [...LOOP.slice(0, 7), h(46, 'HB5 (hive)', 'Moved to Doing'), h(52, 'HB5 (hive)', 'Moved to Review; Returned for review, round 2'), h(53, 'HR5 (hive)', 'Started reviewing')]
+    const history = [...LOOP.slice(0, 7), h(46, 'HB5 (alpha)', 'Moved to Doing'), h(52, 'HB5 (alpha)', 'Moved to Review; Returned for review, round 2'), h(53, 'HR5 (alpha)', 'Started reviewing')]
     const held = holdsFromHistory(card({ history, agent: 'a-1', agentName: 'HB5' }))
     expect(held.filter((x) => x.role === 'build').map((x) => [x.from, x.to])).toEqual([
       [iso(10), iso(40)],
@@ -286,7 +286,7 @@ describe('sliceSession', () => {
     expect(sliceSession(slice(t), held(2, 4), DEFAULT_SETTINGS)).toBeNull()
   })
 
-  it('splits a charge between its requests by Hive’s estimate where a card took only some of them, marked ≈', () => {
+  it('splits a charge between its requests by Combwork’s estimate where a card took only some of them, marked ≈', () => {
     const t: UsageTimeline = { step: 1, reports: [3], rows: [[S(0), 100, 0, 0, 0, 1, 0, 0], [S(1), 200, 0, 0, 0, 1, 0, 0]] }
     const first = sliceSession(slice(t), held(0, 0.5), DEFAULT_SETTINGS)!
     expect(first.cost).toBeCloseTo(1, 10)
@@ -336,7 +336,7 @@ describe('cost line', () => {
     // costText's non-breaking spaces, as plain ones.
     const cardCostLine = (c: CardCost): string => plain(costLine(c))
     const part = { ...emptyPart(), inputTokens: 1, outputTokens: 1, requests: 1, cost: 1.84, estimated: true, priced: 2 }
-    const c = { number: 1, title: 't', project: 'hive', column: 'done', rounds: 2, build: part, review: part, total: part, lastHeld: null, unmatched: 0 } satisfies CardCost
+    const c = { number: 1, title: 't', project: 'alpha', column: 'done', rounds: 2, build: part, review: part, total: part, lastHeld: null, unmatched: 0 } satisfies CardCost
     expect(cardCostLine(c)).toBe('cost: ≈ $1.84 · 2 rounds')
     expect(cardCostLine({ ...c, rounds: 0, total: { ...part, priced: 0, unpriced: 1 } })).toBe('cost: Unknown')
     expect(cardCostLine({ ...c, rounds: 1, total: { ...part, estimated: false, unpriced: 1 } })).toBe('cost: $1.84 + ? · 1 round')

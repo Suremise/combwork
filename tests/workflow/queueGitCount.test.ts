@@ -89,6 +89,6 @@ describe("the git a queue step runs for a card (HI-2050)", () => {
       expect(count(/^read-tree -m -u /, 'queue')).toBe(1)
       const swap = card.findIndex((r) => r.line.startsWith('update-ref refs/heads/main '))
       expect(swap).toBeGreaterThan(0)
-      expect(card[swap + 1]?.line).toBe('symbolic-ref -q --short HEAD')
+      expect(card[swap + 1]?.line).toBe('symbolic-ref -q HEAD')
     })
 })

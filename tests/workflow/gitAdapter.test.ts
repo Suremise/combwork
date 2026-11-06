@@ -179,8 +179,8 @@ describe('Git adapter', () => {
     expect(await G.heads(repo, 'gone')).toEqual({ line: 'main', head: main, target: null })
     // A branch with a slash, in a linked worktree (its lines are the project's).
     const wt = join(repo, '..', 'wt')
-    sh(repo, 'worktree', 'add', '-q', '-b', 'hive/card', wt, 'side')
-    expect(await G.heads(wt, 'main')).toEqual({ line: 'hive/card', head: side, target: main })
+    sh(repo, 'worktree', 'add', '-q', '-b', 'cw/card', wt, 'side')
+    expect(await G.heads(wt, 'main')).toEqual({ line: 'cw/card', head: side, target: main })
     // No commit yet: head unknown, as head() says.
     const empty = join(tempDir('git-'), 'e')
     execFileSync('git', ['init', '-q', '-b', 'main', empty])
@@ -190,12 +190,25 @@ describe('Git adapter', () => {
     expect(isUnknown(e.head)).toBe(true)
   })
 
+  it('branch names the branch by its whole ref, though a tag has its name; null detached (HI-2426)', async () => {
+    repo = gitRepo(join(tempDir('git-'), 'r'))
+    branchWith('cw/card', { 'c.txt': 'c\n' })
+    sh(repo, 'tag', 'main')
+    sh(repo, 'tag', 'cw/card', 'main')
+    expect(await G.branch(repo)).toBe('main')
+    sh(repo, 'switch', '-q', 'cw/card')
+    expect(await G.branch(repo)).toBe('cw/card')
+    expect((await G.heads(repo, 'main')).line).toBe('cw/card')
+    sh(repo, 'checkout', '-q', '--detach')
+    expect(await G.branch(repo)).toBeNull()
+  })
+
   it('an answer about fixed commits is asked once in a step (#1376) and kept after it (HI-2115); refs are read again; names and unknowns always asked', async () => {
     repo = gitRepo(join(tempDir('git-'), 'r'))
     const [base, rev] = branchWith('one', { 'one.txt': '1\n' })
     const ancestors = (ran: string[]) => ran.filter((c) => c.startsWith('merge-base --is-ancestor')).length
     const twice = async () => [await G.isAncestor(repo, base, rev), await G.isAncestor(repo, base, rev), await G.mergeBase(repo, base, rev), await G.mergeBase(repo, base, rev), await G.lineHead(repo, 'one'), await G.lineHead(repo, 'one')]
-    // Outside a step: kept once asked, for as long as Hive runs (HI-2115: its own tests are gitStarts.test.ts).
+    // Outside a step: kept once asked, for as long as Combwork runs (HI-2115: its own tests are gitStarts.test.ts).
     const outside = await counted(twice)
     expect(ancestors(outside.ran)).toBe(1)
     G.forgetKeptAnswers()
@@ -234,8 +247,8 @@ describe('Git adapter', () => {
     const [, rev] = branchWith('one', { 'one.txt': '1\n' })
     const main = sh(repo, 'rev-parse', 'main')
     const wt = join(repo, '..', 'wt')
-    sh(repo, 'worktree', 'add', '-q', '-b', 'hive/card', wt, 'one')
-    const read = await counted(() => G.gitStep(async () => [await G.lineHead(repo, 'main'), await G.lineHead(wt, 'main'), await G.lineHead(wt, 'hive/card')]))
+    sh(repo, 'worktree', 'add', '-q', '-b', 'cw/card', wt, 'one')
+    const read = await counted(() => G.gitStep(async () => [await G.lineHead(repo, 'main'), await G.lineHead(wt, 'main'), await G.lineHead(wt, 'cw/card')]))
     expect(read.value).toEqual([main, main, rev])
     expect(read.ran).toEqual([])
     // Moved inside the step: the new head, as git would say (a ref is never kept).
@@ -247,13 +260,13 @@ describe('Git adapter', () => {
     expect(moved).toEqual([rev, main])
     // Packed (no loose file): from packed-refs; a loose ref written after packing wins, as in git.
     sh(repo, 'pack-refs', '--all')
-    const packed = await counted(() => G.lineHead(wt, 'hive/card'))
+    const packed = await counted(() => G.lineHead(wt, 'cw/card'))
     expect(packed).toEqual({ value: rev, ran: [] })
-    sh(repo, 'update-ref', 'refs/heads/hive/card', main)
-    expect(await G.lineHead(wt, 'hive/card')).toBe(main)
-    expect(await G.lineHead(repo, 'hive/card')).toBe(sh(repo, 'rev-parse', 'refs/heads/hive/card'))
+    sh(repo, 'update-ref', 'refs/heads/cw/card', main)
+    expect(await G.lineHead(wt, 'cw/card')).toBe(main)
+    expect(await G.lineHead(repo, 'cw/card')).toBe(sh(repo, 'rev-parse', 'refs/heads/cw/card'))
     // No such line (nor a folder named as a ref's prefix): git says, null.
-    const gone = await counted(async () => [await G.lineHead(repo, 'gone'), await G.lineHead(repo, 'hive')])
+    const gone = await counted(async () => [await G.lineHead(repo, 'gone'), await G.lineHead(repo, 'cw')])
     expect(gone.value).toEqual([null, null])
     expect(gone.ran).toHaveLength(2)
     // A ref file that doesn't name a commit: git's answer, not the file's.
@@ -291,7 +304,7 @@ describe('Git adapter', () => {
     }
     // A symbolic ref naming a linked worktree's own HEAD: git, in that worktree, says its head, not the project's.
     const wt = join(repo, '..', 'wt')
-    sh(repo, 'worktree', 'add', '-q', '-b', 'hive/card', wt, 'one')
+    sh(repo, 'worktree', 'add', '-q', '-b', 'cw/card', wt, 'one')
     sh(wt, 'symbolic-ref', 'refs/heads/alias', 'HEAD')
     const alias = await counted(() => G.lineHead(wt, 'alias'))
     expect(alias.ran).toHaveLength(1)
@@ -370,8 +383,10 @@ describe('identity in one git, as `git config <key>` answers each (HI-2050)', ()
 
   it('set, repeated (the last), one or both missing, empty, a key with no value, a value with a newline', async () => {
     repo = gitRepo(join(tempDir('git-'), 'r'))
+    sh(repo, 'config', 'user.name', 'Demo Test')
+    sh(repo, 'config', 'user.email', 'test@example.invalid')
     await same(repo)
-    expect(await G.identity(repo)).toEqual({ name: 'Hive Test', email: 'test@hive.invalid' })
+    expect(await G.identity(repo)).toEqual({ name: 'Demo Test', email: 'test@example.invalid' })
     sh(repo, 'config', '--add', 'user.name', 'Second Name')
     await same(repo)
     expect(await G.identity(repo)).toMatchObject({ name: 'Second Name' })
@@ -380,7 +395,7 @@ describe('identity in one git, as `git config <key>` answers each (HI-2050)', ()
     sh(repo, 'config', '--unset-all', 'user.email')
     await same(repo)
     sh(repo, 'config', 'user.name', '')
-    sh(repo, 'config', 'user.email', 'e@hive.invalid')
+    sh(repo, 'config', 'user.email', 'e@example.invalid')
     await same(repo)
     // A key with no value, then a value with a newline in it (the config file's own escape).
     const file = configFile(repo)

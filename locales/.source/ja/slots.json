@@ -1,12 +1,12 @@
 {
-  "slots.idleBroker.body": "{names} is Windows' idle Sandbox broker, left by {agent}'s last session in a Hive that has since closed. No Sandbox is running, so releasing the slot is safe: Release Slot… frees it for other work, and the broker is left running.",
+  "slots.idleBroker.body": "{names} is Windows' idle Sandbox broker, left by {agent}'s last session in a Combwork that has since closed. No Sandbox is running, so releasing the slot is safe: Release Slot… frees it for other work, and the broker is left running.",
   "slots.idleBroker.release": "Release Slot…",
   "slots.idleBroker.title": "{slot} is held by {names}",
   "slots.release.changed": "{slot} changed meanwhile: its writer is no longer the one shown. Look again.",
-  "slots.release.live": "{slot}'s writer is still running in this Hive: stop the agent, or end or keep what it left running, first.",
-  "slots.release.notEnded": "Some of the processes listed still run: Windows didn't let Hive end them, so {slot} wasn't released. Try again, or release it without ending them.",
-  "slots.release.otherHive": "{slot} is held by another Hive that is still running (process {pid}): release it there, or quit that Hive first.",
-  "slots.setting.bad": "That isn’t a slot setting Hive has.",
+  "slots.release.live": "{slot}'s writer is still running in this Combwork: stop the agent, or end or keep what it left running, first.",
+  "slots.release.notEnded": "Some of the processes listed still run: Windows didn't let Combwork end them, so {slot} wasn't released. Try again, or release it without ending them.",
+  "slots.release.otherCombwork": "{slot} is held by another Combwork that is still running (process {pid}): release it there, or quit that Combwork first.",
+  "slots.setting.bad": "That isn’t a slot setting Combwork has.",
   "slots.setting.badSize": "The number of review and check copies is a whole number from {min, number} to {max, number}.",
   "slots.setting.badText": "A slot script or list of files is text of at most {max, number} characters."
 }

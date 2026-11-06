@@ -1,5 +1,5 @@
-// The turn ledger in SessionManager (#648): Codex's hooks as it sends them (handleHook, with the reply Hive gave), its
-// rollout in a file, no process. A late tool end after Stop leaves the agent finished; a Stop Hive carried on isn't an
+// The turn ledger in SessionManager (#648): Codex's hooks as it sends them (handleHook, with the reply Combwork gave), its
+// rollout in a file, no process. A late tool end after Stop leaves the agent finished; a Stop Combwork carried on isn't an
 // end; a Stop that never came is made up for by Codex's own record of the turn's end; silence with no sign of an end
 // leaves the state unknown (never idle) until the CLI is heard, its idle prompt shows, or the user marks it idle.
 import { appendFileSync, mkdirSync, statSync, writeFileSync } from 'fs'
@@ -8,7 +8,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-turn-ledger-')
+const base = tempDir('cw-turn-ledger-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -70,9 +70,9 @@ const post = (turn: string, call: string) => ({ hook_event_name: 'PostToolUse', 
 
 describe('the turn ledger in a session', () => {
   beforeAll(async () => {
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    mkdirSync(join(wsPath, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    mkdirSync(join(wsPath, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     vi.spyOn(providerService, 'refresh').mockResolvedValue([])
@@ -80,7 +80,7 @@ describe('the turn ledger in a session', () => {
   })
   afterEach(() => {
     sessions.inboxNotice = null
-    delete process.env.HIVE_TEST_SILENT_MS
+    delete process.env.CW_TEST_SILENT_MS
   })
   afterAll(async () => {
     // What the tests' hooks began ends before their folder goes: a transcript backup still running then failed and logged
@@ -90,7 +90,7 @@ describe('the turn ledger in a session', () => {
     await disposeWorkspaceService(w)
   })
 
-  it("stays finished when a tool's end reaches Hive after its turn's Stop (#642)", async () => {
+  it("stays finished when a tool's end reaches Combwork after its turn's Stop (#642)", async () => {
     const { st } = agent('late')
     await hook(st, { hook_event_name: 'UserPromptSubmit', turn_id: 't1', prompt: 'go' })
     await hook(st, pre('t1', 'exec-1'))
@@ -101,10 +101,10 @@ describe('the turn ledger in a session', () => {
     expect(st.turn).toEqual({ state: 'over', id: 't1' })
   })
 
-  it("isn't over at a Stop Hive answered with a continuation, only at the one it answered with nothing", async () => {
+  it("isn't over at a Stop Combwork answered with a continuation, only at the one it answered with nothing", async () => {
     const { st } = agent('cont')
     let drains = 1
-    sessions.inboxNotice = (_st, at) => (at === 'drain' && drains-- > 0 ? '[Hive] You have mail: call hive_inbox' : null)
+    sessions.inboxNotice = (_st, at) => (at === 'drain' && drains-- > 0 ? '[CW] You have mail: call cw_inbox' : null)
     await hook(st, { hook_event_name: 'UserPromptSubmit', turn_id: 't1', prompt: 'go' })
     await hook(st, { hook_event_name: 'Stop', turn_id: 't1', stop_hook_active: false, last_assistant_message: 'Done' })
     expect(st.status).toBe('working')
@@ -136,7 +136,7 @@ describe('the turn ledger in a session', () => {
   it("after silence with no sign of the turn's end, the state is unknown, not idle, until the user marks it idle", async () => {
     const { st, l } = agent('silent')
     await hook(st, { hook_event_name: 'UserPromptSubmit', turn_id: 't1', prompt: 'go' })
-    process.env.HIVE_TEST_SILENT_MS = '1000'
+    process.env.CW_TEST_SILENT_MS = '1000'
     l.ledger.heard = Date.now() - 5000
     l.turnScreen = codexTurnScreen
     // Its screen visibly at work (a long reply): heard, so not silent.
@@ -152,7 +152,7 @@ describe('the turn ledger in a session', () => {
     await settled(st)
     expect(st.status).toBe('working')
     expect(st.turn).toMatchObject({ state: 'unknown', id: 't1', silentSince: expect.any(String) })
-    // Any hook says more: the turn runs again, as far as Hive knows.
+    // Any hook says more: the turn runs again, as far as Combwork knows.
     await hook(st, { hook_event_name: 'PreToolUse', turn_id: 't1', tool_name: 'Bash', tool_input: { command: 'ls' }, tool_use_id: 'exec-4' })
     await hook(st, post('t1', 'exec-4'))
     expect(st.turn).toEqual({ state: 'running', id: 't1' })
@@ -168,7 +168,7 @@ describe('the turn ledger in a session', () => {
   it('after silence, a CLI idle at its prompt on screen has ended its turn', async () => {
     const { st, l } = agent('screen')
     await hook(st, { hook_event_name: 'UserPromptSubmit', turn_id: 't1', prompt: 'go' })
-    process.env.HIVE_TEST_SILENT_MS = '1000'
+    process.env.CW_TEST_SILENT_MS = '1000'
     l.ledger.heard = Date.now() - 5000
     l.turnScreen = codexTurnScreen
     l.screen = { text: () => '• Done.\n\n  Worked for 5s • 02:29\n\n› Ask Codex to do anything\n\n  ? for shortcuts' }
@@ -179,7 +179,7 @@ describe('the turn ledger in a session', () => {
   })
 
   it('a tool end and the Stop both lost: the screen decides (idle: over; working: running); unreadable, unknown only after the longer silence an open call allows', async () => {
-    process.env.HIVE_TEST_SILENT_MS = '1000'
+    process.env.CW_TEST_SILENT_MS = '1000'
     const lost = async (name: string, screen: string | null): Promise<{ st: State; l: Launch }> => {
       const { st, l } = agent(name)
       await hook(st, { hook_event_name: 'UserPromptSubmit', turn_id: 't1', prompt: 'go' })
@@ -234,7 +234,7 @@ describe('the turn ledger in a session', () => {
     expect(runtimeLabel(st as never)).toBeNull()
   })
 
-  it("holds its composer while Hive types a line, confirms a wake or waits for a line to be taken, and frees it after", async () => {
+  it("holds its composer while Combwork types a line, confirms a wake or waits for a line to be taken, and frees it after", async () => {
     const { st } = agent('composer')
     await hook(st, { hook_event_name: 'UserPromptSubmit', turn_id: 't1', prompt: 'go' })
     await hook(st, { hook_event_name: 'Stop', turn_id: 't1' })
@@ -254,7 +254,7 @@ describe('the turn ledger in a session', () => {
     expect(composer()).toBe('free')
   })
 
-  it("a continuation's tool start that reaches Hive before the CLI has redrawn: the turn goes on from its ids alone", async () => {
+  it("a continuation's tool start that reaches Combwork before the CLI has redrawn: the turn goes on from its ids alone", async () => {
     const { st, l } = agent('redraw')
     // The screen still shows the idle frame throughout: it decides nothing here.
     l.turnScreen = codexTurnScreen
@@ -276,7 +276,7 @@ describe('the turn ledger in a session', () => {
   })
 
   it("a late tool start after the turn's Stop (nothing goes on): working only until a look after the silence finds its screen idle", async () => {
-    process.env.HIVE_TEST_SILENT_MS = '1000'
+    process.env.CW_TEST_SILENT_MS = '1000'
     const { st, l } = agent('latestart')
     l.turnScreen = codexTurnScreen
     l.screen = { text: () => '• Done.\n\n› Ask Codex to do anything' }
@@ -290,7 +290,7 @@ describe('the turn ledger in a session', () => {
     expect([st.status, st.turn?.state]).toEqual(['finished', 'over'])
   })
 
-  it("Copilot: a turn's Stop answered while its prompt still waits in the queue is this turn's, also after Hive's continuation", async () => {
+  it("Copilot: a turn's Stop answered while its prompt still waits in the queue is this turn's, also after Combwork's continuation", async () => {
     const { copilot } = await import('../src/main/providers/copilot/adapter')
     const q = sessions as unknown as { inHookOrder: (key: string, fn: () => Promise<void>) => Promise<void> }
     for (const continued of [false, true]) {
@@ -299,7 +299,7 @@ describe('the turn ledger in a session', () => {
       Object.assign(l, { adapter: Object.assign(Object.create(copilot), { noticeReply: (e: string, text: string) => (e === 'Stop' ? { decision: 'block', reason: text } : null) }) })
       const ev = (type: string, data: Record<string, unknown>, at: number) => JSON.stringify({ type, data, timestamp: new Date(at).toISOString() }) + '\n'
       if (continued) {
-        sessions.inboxNotice = (_st, at) => (at === 'drain' ? '[Hive] You have mail: call hive_inbox' : null)
+        sessions.inboxNotice = (_st, at) => (at === 'drain' ? '[CW] You have mail: call cw_inbox' : null)
         await hook(st, { hook_event_name: 'UserPromptSubmit', prompt: 'go' })
         await hook(st, { hook_event_name: 'Stop' })
         sessions.inboxNotice = null
@@ -311,10 +311,10 @@ describe('the turn ledger in a session', () => {
       const prompt = continued ? null : hook(st, { hook_event_name: 'UserPromptSubmit', prompt: 'quick one' })
       const arrived = Date.now()
       // The turn is short: its Stop is answered (and that hook lost) when the prompt has arrived but isn't handled yet. With
-      // continuations: the answer to Hive's, then the final one's.
+      // continuations: the answer to Combwork's, then the final one's.
       appendFileSync(rollout, continued ? ev('hook.end', { hookType: 'agentStop' }, arrived) + ev('hook.end', { hookType: 'agentStop' }, arrived + 1) : ev('hook.end', { hookType: 'agentStop' }, arrived))
       const reading = run(() => s.readDetails(l, rollout, statSync(rollout).size))
-      // Hive handles the prompt only later than that record (a turn taken as begun when handled would call it earlier).
+      // Combwork handles the prompt only later than that record (a turn taken as begun when handled would call it earlier).
       await vi.waitFor(() => expect(Date.now()).toBeGreaterThan(arrived + 2), { timeout: HUNG_MS })
       release!()
       await held
@@ -326,7 +326,7 @@ describe('the turn ledger in a session', () => {
   })
 
   it('Mark idle after a tool call and a mid-turn compaction whose ends were lost too: no open call or compaction is left behind', async () => {
-    process.env.HIVE_TEST_SILENT_MS = '1000'
+    process.env.CW_TEST_SILENT_MS = '1000'
     const { st, l } = agent('markcompact')
     await hook(st, { hook_event_name: 'UserPromptSubmit', turn_id: 't1', prompt: 'go' })
     await hook(st, pre('t1', 'exec-1'))
@@ -376,7 +376,7 @@ describe('the turn ledger in a session', () => {
       await claude(st, { hook_event_name: 'PostToolUse', prompt_id: 'p2', tool_name: 'Read', tool_input: { file_path: 'a.txt' }, tool_use_id: 'toolu_1' })
       await claude(st, { hook_event_name: 'Stop', prompt_id: 'p2', stop_hook_active: false })
       expect([st.status, st.turn], how).toEqual(['finished', { state: 'over', id: 'p2' }])
-      // With nothing due to wake it, a hook of a turn Hive saw no prompt for is stale.
+      // With nothing due to wake it, a hook of a turn Combwork saw no prompt for is stale.
       await claude(st, { hook_event_name: 'PreToolUse', prompt_id: 'p3', tool_name: 'Read', tool_input: { file_path: 'a.txt' }, tool_use_id: 'toolu_2' })
       expect([st.status, st.turn], how).toEqual(['finished', { state: 'over', id: 'p2' }])
     }
@@ -422,7 +422,7 @@ describe('the turn ledger in a session', () => {
   it('never ends a turn on silence alone: a short silence is left as it is', async () => {
     const { st, l } = agent('short')
     await hook(st, { hook_event_name: 'UserPromptSubmit', turn_id: 't1', prompt: 'go' })
-    process.env.HIVE_TEST_SILENT_MS = '60000'
+    process.env.CW_TEST_SILENT_MS = '60000'
     l.ledger.heard = Date.now() - 5000
     l.turnScreen = codexTurnScreen
     l.screen = { text: () => '› Ask Codex to do anything' }
@@ -431,7 +431,7 @@ describe('the turn ledger in a session', () => {
     expect([st.status, st.turn?.state]).toEqual(['working', 'running'])
   })
 
-  it("a Copilot turn (no turn ids) ends from a Stop answered after it began that Hive never got, not from an earlier turn's", async () => {
+  it("a Copilot turn (no turn ids) ends from a Stop answered after it began that Combwork never got, not from an earlier turn's", async () => {
     const { copilot } = await import('../src/main/providers/copilot/adapter')
     const { st, l, rollout } = agent('copilot')
     Object.assign(l, { adapter: Object.assign(Object.create(copilot), { noticeReply: (e: string, text: string) => (e === 'Stop' ? { decision: 'block', reason: text } : null) }) })
@@ -443,8 +443,8 @@ describe('the turn ledger in a session', () => {
     await run(() => s.readDetails(l, rollout, statSync(rollout).size))
     await settled(st)
     expect([st.status, st.turn?.state]).toEqual(['working', 'running'])
-    // Hive carries it on once (its Stop answered), then its final Stop never reaches Hive.
-    sessions.inboxNotice = (_st, at) => (at === 'drain' ? '[Hive] You have mail: call hive_inbox' : null)
+    // Combwork carries it on once (its Stop answered), then its final Stop never reaches Combwork.
+    sessions.inboxNotice = (_st, at) => (at === 'drain' ? '[CW] You have mail: call cw_inbox' : null)
     await hook(st, { hook_event_name: 'Stop' })
     sessions.inboxNotice = null
     appendFileSync(rollout, ev('hook.end', { hookType: 'agentStop' }, new Date(Date.now() + 5)))

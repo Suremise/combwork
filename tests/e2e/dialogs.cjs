@@ -24,17 +24,17 @@ const check = (name, ok, extra = '') => {
   lib.gitProject(alpha)
   // A session's image, for the Attachments tab's viewer.
   const id = '11111111-aaaa-bbbb-cccc-000000000001'
-  fs.mkdirSync(path.join(alpha, '.hive', 'attachments', id), { recursive: true })
-  fs.writeFileSync(path.join(alpha, '.hive', 'attachments', id, '2026-10-05_10-00-00.png'), lib.samplePng(400, 200))
-  fs.writeFileSync(path.join(alpha, '.hive', 'sessions.json'), JSON.stringify({ version: 1, sessions: [{ id, agent: 'claude-code', name: 'Pictures', createdAt: '', lastActiveAt: '', archived: false }] }))
+  fs.mkdirSync(path.join(alpha, '.combwork', 'attachments', id), { recursive: true })
+  fs.writeFileSync(path.join(alpha, '.combwork', 'attachments', id, '2026-10-05_10-00-00.png'), lib.samplePng(400, 200))
+  fs.writeFileSync(path.join(alpha, '.combwork', 'sessions.json'), JSON.stringify({ version: 1, sessions: [{ id, agent: 'claude-code', name: 'Pictures', createdAt: '', lastActiveAt: '', archived: false }] }))
   const claude = lib.fakeClaude(userData, path.join(lib.WORK, 'dialogs-claude-home'), [alpha])
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47933), ...claude })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47933), ...claude })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1300, height: 820 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('alpha', { exact: true }).first().click()
 

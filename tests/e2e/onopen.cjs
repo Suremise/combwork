@@ -1,11 +1,11 @@
 // HI-1954: a workspace's commands as it opens (design HI-1954/s15, s19, s21). Its open point runs Prep, Server (ticked
 // "The commands after this need it", failing until a flag file exists) and Seed. As the workspace opens the dialog shows
-// them, Hive dimmed behind; Server fails, the dialog leads with Stop here and warns beside Skip; an agent's start is
+// them, Combwork dimmed behind; Server fails, the dialog leads with Stop here and warns beside Skip; an agent's start is
 // refused while the list holds the agents back; Rerun (the flag made) runs it, Seed after it, and the agents are let
 // go. Opened again: Skip it and continue runs Seed; Stop here runs none of the rest; Don't wait while a command runs
 // lets the agents go and the rest run by themselves. A command run by hand from the palette's IPC shows the same
 // dialog, its reason manual. A long command is cut to two lines, whole in its tooltip (HI-2031). Screenshots of the dialog, running and failed, in both themes. Dev build, throwaway profile
-// and workspaces; test copies run the user's commands only with HIVE_TEST_RUN_ON_CLOSE=1 (unpackaged builds).
+// and workspaces; test copies run the user's commands only with CW_TEST_RUN_ON_CLOSE=1 (unpackaged builds).
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -24,7 +24,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-/** A command writing `label`'s marker (its reason filled in by Hive), in `mode` (onclose/command.cjs). */
+/** A command writing `label`'s marker (its reason filled in by Combwork), in `mode` (onclose/command.cjs). */
 const command = (label, mode) => `"${process.execPath}" "${COMMAND}" "${path.join(marks, `${label}.json`)}" ${label} {reason} - ${mode}`
 const mark = (label) => {
   try {
@@ -67,8 +67,8 @@ async function shots(inv, page, name) {
   fs.mkdirSync(marks, { recursive: true })
   for (const w of [ws, other]) lib.gitProject(path.join(w, 'alpha'))
   // The open point, as Settings would have saved it: Prep, Server (needed), Seed.
-  fs.mkdirSync(path.join(ws, '.hive'), { recursive: true })
-  const wsFile = path.join(ws, '.hive', 'workspace.json')
+  fs.mkdirSync(path.join(ws, '.combwork'), { recursive: true })
+  const wsFile = path.join(ws, '.combwork', 'workspace.json')
   fs.writeFileSync(wsFile, JSON.stringify({ version: 1, commands: commandsFor([ids.proj, ids.prep, ids.server, ids.seed]) }))
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')
@@ -77,7 +77,7 @@ async function shots(inv, page, name) {
   cfg.settings.appearance = { ...cfg.settings.appearance, theme: 'dark' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: lib.port(47705), HIVE_TEST_RUN_ON_CLOSE: '1' } })
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_API_PORT: lib.port(47705), CW_TEST_RUN_ON_CLOSE: '1' } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.openWorkspace(inv, page, other)
   const agent = await lib.addAgent(inv, path.join(ws, 'alpha'), { name: 'Builder' }).catch(() => null)
@@ -87,7 +87,7 @@ async function shots(inv, page, name) {
 
   // --- 1. Opening: Prep runs, Server fails; the dialog leads with Stop here, the agents held; Rerun, and they're let go.
   void openWs()
-  check('opening: the dialog shows its commands, Hive dimmed behind', !!(await lib.until(async () => (await anyDialog(page).count()) === 1, HUNG_MS)))
+  check('opening: the dialog shows its commands, Combwork dimmed behind', !!(await lib.until(async () => (await anyDialog(page).count()) === 1, HUNG_MS)))
   check('…Server fails, needed: the dialog says so, with its exit code', !!(await lib.until(async () => (await dialog(page, 'failed').count()) === 1, HUNG_MS)) && /Server.*3/.test((await page.locator('#close-command-title').textContent()) ?? ''))
   check("…its first command had {project:alpha} filled with alpha's folder", mark('proj')?.label?.toLowerCase() === path.join(ws, 'alpha').toLowerCase(), JSON.stringify(mark('proj')))
   check('…Prep ran before Server, its reason open', mark('prep')?.reason === 'open', JSON.stringify(mark('prep')))

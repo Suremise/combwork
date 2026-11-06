@@ -10,8 +10,8 @@ import { msg } from '../shared/i18n'
 
 /** Why a report has no provider usage: the window's text; the Agent API's report and its export get the English (#1104). */
 const NOTE = {
-  scripts: msg({ id: 'performance.providersNote.scripts', defaultMessage: 'Scripts start no sessions, so they have no provider usage.', description: "Performance, under Provider usage with Scripts chosen as whose work: why the table is empty (scripts call Hive's API and run no coding agents)." }),
-  assistant: msg({ id: 'performance.providersNote.assistant', defaultMessage: 'The Assistant’s sessions are the workspace’s, not a project’s.', description: "Performance, under Provider usage for a project with the Hive Assistant chosen as whose work: why the table is empty (the Assistant isn't any project's)." })
+  scripts: msg({ id: 'performance.providersNote.scripts', defaultMessage: 'Scripts start no sessions, so they have no provider usage.', description: "Performance, under Provider usage with Scripts chosen as whose work: why the table is empty (scripts call Combwork's API and run no coding agents)." }),
+  assistant: msg({ id: 'performance.providersNote.assistant', defaultMessage: 'The Assistant’s sessions are the workspace’s, not a project’s.', description: "Performance, under Provider usage for a project with the Combwork Assistant chosen as whose work: why the table is empty (the Assistant isn't any project's)." })
 }
 
 /** Which sessions' usage a report is about: a project's, or the workspace's (all, or its own only), and whose. */
@@ -85,7 +85,8 @@ export async function providerUsage(w: WorkspaceService, f: UsageFilter, from: n
         for (const [model, stops] of Object.entries(u.safeguards ?? {})) {
           if (!(stops > 0)) continue
           s.safeguardStops += stops
-          const project = role === 'assistant' ? 'Hive Assistant' : basename(path) // i18n-ignore: the Agent API's metrics report and its export, in English (mixed audience: the Performance view gets messages with E10a's pattern)
+          // agent-protocol: a name in the metrics report and its export (the Assistant's row)
+          const project = role === 'assistant' ? 'Assistant' : basename(path) // i18n-ignore: the Agent API's metrics report and its export, in English (mixed audience: the Performance view gets messages with E10a's pattern)
           const agent = role === 'assistant' ? 'Assistant' : (it.agentName ?? it.agentId ?? 'unknown agent') // i18n-ignore: the Agent API's metrics report and its export, in English (mixed audience: the Performance view gets messages with E10a's pattern)
           const k = JSON.stringify([project, agent, it.provider, model])
           const g = guards.get(k) ?? { project, agent, provider: it.provider, role, model, stops: 0 }
@@ -116,7 +117,8 @@ export async function providerUsage(w: WorkspaceService, f: UsageFilter, from: n
 export async function metricsReport(w: WorkspaceService, q: MetricsQuery): Promise<MetricsReport> {
   const r = queryMetrics(w, q)
   const usage = await providerUsage(w, { project: r.scope.kind === 'project' ? r.scope.project : null, own: r.filters.own, role: r.filters.role, provider: r.filters.provider }, Date.parse(r.from), Date.parse(r.to))
-  return { ...r, providers: usage.providers, ...(usage.safeguards ? { safeguards: usage.safeguards } : {}), ...(usage.note ? { providersNote: englishText(usage.note), providersNoteText: usage.note } : {}), ...(usage.unreadable ? { providersUnreadable: usage.unreadable, providersHosts: usage.hosts } : {}) }
+  // agent-stored: metricsForAgents says the note for the agent reading the report (servers.ts)
+  return { ...r, providers: usage.providers, ...(usage.safeguards ? { safeguards: usage.safeguards } : {}), ...(usage.note ? { providersNote: englishText(usage.note), providersNoteText: usage.note } : {}), ...(usage.unreadable ? { providersUnreadable: usage.unreadable, providersHosts: usage.hosts } : {}) } // agent-text: providerUsage
 }
 
 /** Safeguard counts with their project and agent names replaced (an export's sanitize). */
@@ -135,8 +137,8 @@ export { METRICS_EXPORT_SCHEMA }
 
 /**
  * A report as an export file (Performance → Export): the report itself, made with the page's filters, with what a
- * reader needs to read it: schema, Hive's version, units, and (also in the report) the filters, what they couldn't
- * narrow, the coverage (when Hive was recording) and what isn't measured. `sanitize`: project names become project-1,
+ * reader needs to read it: schema, Combwork's version, units, and (also in the report) the filters, what they couldn't
+ * narrow, the coverage (when Combwork was recording) and what isn't measured. `sanitize`: project names become project-1,
  * project-2… (the same name the same number) and the workspace's path is left out.
  */
 export function metricsExport(r: MetricsReport, appVersion: string, sanitize: boolean): Record<string, unknown> {
@@ -144,7 +146,8 @@ export function metricsExport(r: MetricsReport, appVersion: string, sanitize: bo
     bytes: 'UTF-8 bytes',
     chars: 'characters as UTF-16 code units (JavaScript string length)', // i18n-ignore: the Agent API's metrics report and its export, in English (mixed audience: the Performance view gets messages with E10a's pattern)
     ms: 'milliseconds, monotonic clock', // i18n-ignore: the Agent API's metrics report and its export, in English (mixed audience: the Performance view gets messages with E10a's pattern)
-    tokens: 'as the provider reported them; Hive estimates none', // i18n-ignore: the Agent API's metrics report and its export, in English (mixed audience: the Performance view gets messages with E10a's pattern)
+    // agent-protocol: the metrics export's fixed definition of a unit, read by scripts
+    tokens: 'as the provider reported them; Combwork estimates none', // i18n-ignore: the Agent API's metrics report and its export, in English (mixed audience: the Performance view gets messages with E10a's pattern)
     costUsd: 'API-equivalent cost in US dollars, reported or estimated (not a bill)' // i18n-ignore: the Agent API's metrics report and its export, in English (mixed audience: the Performance view gets messages with E10a's pattern)
   }
   let report: MetricsReport = r
@@ -164,5 +167,6 @@ export function metricsExport(r: MetricsReport, appVersion: string, sanitize: bo
       ...(r.safeguards ? { safeguards: sanitizeAgents(r.safeguards, alias) } : {})
     }
   }
-  return { schema: METRICS_EXPORT_SCHEMA, app: { name: 'Hive', version: appVersion }, exportedAt: new Date().toISOString(), sanitized: sanitize, units, range: { from: r.from, to: r.to }, filters: r.filters, coverage: r.coverage, report } // i18n-ignore: the Agent API's metrics report and its export, in English (mixed audience: the Performance view gets messages with E10a's pattern)
+  // agent-protocol: the app's name in the metrics export (HI-2463)
+  return { schema: METRICS_EXPORT_SCHEMA, app: { name: 'Combwork', version: appVersion }, exportedAt: new Date().toISOString(), sanitized: sanitize, units, range: { from: r.from, to: r.to }, filters: r.filters, coverage: r.coverage, report } // i18n-ignore: the Agent API's metrics report and its export, in English (mixed audience: the Performance view gets messages with E10a's pattern)
 }

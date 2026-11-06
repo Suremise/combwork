@@ -3,7 +3,7 @@ import { releaseRepoLock, takeRepoLock, type HeldRepoLock, type RepoLockHolder }
 
 /**
  * The repository lock's worker (HI-1680): a thread of its own that runs repoLockCore's takes and releases, so their
- * SQLite steps (its busy wait, and the fsyncs of each commit, 100 ms to seconds on a loaded disk) never hold up Hive's
+ * SQLite steps (its busy wait, and the fsyncs of each commit, 100 ms to seconds on a loaded disk) never hold up Combwork's
  * main process, and with it the keystrokes typed into a pane. The lock is the same: the same row in the same file,
  * taken and released by the same rules (SPEC §16.9.3), only off main's thread. Its process is main's, so its rows name
  * main's pid. It keeps each held lock's connection until main releases it; a lock it doesn't know (it was started again
@@ -11,7 +11,7 @@ import { releaseRepoLock, takeRepoLock, type HeldRepoLock, type RepoLockHolder }
  * slow goes to main to log.
  */
 
-export type LockRequest = { id: number } & ({ type: 'take'; dir: string; profile: string; waitMs: number; noticeAfterMs: number } | { type: 'release'; dir: string; token: string })
+export type LockRequest = { id: number } & ({ type: 'take'; dir: string; profile: string; waitMs: number; noticeAfterMs: number; file?: string } | { type: 'release'; dir: string; token: string; file?: string })
 
 /** A take's answer: the lock's token, or who holds it after the wait. */
 export type TakeAnswer = { token: string } | { timedOut: RepoLockHolder }
@@ -28,10 +28,10 @@ export async function handleRequest(m: LockRequest, post: (r: LockReply) => void
     const h = held.get(m.token)
     held.delete(m.token)
     if (h) h.release()
-    else releaseRepoLock(m.dir, m.token, onSlow)
+    else releaseRepoLock(m.dir, m.token, onSlow, m.file)
     return null
   }
-  const got = await takeRepoLock(m.dir, { profile: m.profile, waitMs: m.waitMs, noticeAfterMs: m.noticeAfterMs, onSlow, onWait: (holder) => post({ id: m.id, waiting: holder }) })
+  const got = await takeRepoLock(m.dir, { profile: m.profile, waitMs: m.waitMs, noticeAfterMs: m.noticeAfterMs, onSlow, onWait: (holder) => post({ id: m.id, waiting: holder }), ...(m.file ? { file: m.file } : {}) })
   if ('timedOut' in got) return { timedOut: got.timedOut }
   held.set(got.held.token, got.held)
   return { token: got.held.token }

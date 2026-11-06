@@ -11,6 +11,7 @@ import { allStopped, mostUrgent, projectAgentStates, projectStateShort, projectS
 import { fmt, msg, tr, tRich } from '@shared/i18n'
 import hexUrl from '../assets/icon.svg'
 import * as actions from '../actions'
+import { freshTip } from '../freshResume'
 import { call, errorMessage } from '../api'
 import { needsConnection, NoConnectionBanner, offeredConnections, useConnections } from '../components/ConnectionChoice'
 import { commandKeybinding, runCommand } from '../commands'
@@ -22,7 +23,7 @@ import { Icon, IconButton, Switch, Tooltip, useContextMenu, useFolds, type MenuE
 import { StateMark } from '../components/StateMark'
 import { ProjectAgentsTable, useAgentsText } from '../components/AgentsTable'
 import { agentProviderOf, notify, projectKey, set, setProjectTab, tileFocusOf, useFocusedAgent, useLanguage, useProjectStarting, useStarting, useStore, startingLabel, type ProjectTab } from '../store'
-import { carriesFiles, cx, formatKeybinding } from '../util'
+import { carriesFiles, cx, formatKeybinding, sessionLabel } from '../util'
 import { AttachmentsTab, FilesTab } from './FilesTab'
 import { VersionControl } from './VersionControl'
 import { MemoryTab, OverviewTab, ProjectMcpTab, ProjectSettingsTab, ProjectSkillsTab } from './ProjectTabs'
@@ -44,7 +45,6 @@ const M = {
   moreSettings: msg({ id: 'project.tabs.moreSettings', defaultMessage: 'Project Settings…', description: "The last item of the project tabs' More ▾ menu, after a separator (HI-1840): opens the project's settings. Keep the …." }),
   moreTip: msg({ id: 'project.tabs.moreTip', defaultMessage: "The project's {tabs}", description: "Tooltip on the project tabs' More ▾ button. {tabs} lists the tabs in its menu, such as Memory, Skills, Templates and MCP." }),
   tabTip: msg({ id: 'project.tabs.tip', defaultMessage: '{tab} ({key})', description: "A project tab's tooltip with its keyboard shortcut. {tab} is the tab's name, {key} the shortcut, such as Alt+4." }),
-  noAccount: msg({ id: 'project.empty.noAccount', defaultMessage: 'No account is on in this workspace — Settings → Accounts & Connections', description: "Warning on the Session tab of a project with no agents (HI-2108): no account (a sign-in or server a coding agent CLI uses) is on in this workspace, so a new agent has no connection to run on. Settings → Accounts & Connections: name it as Settings does." }),
   noCli: msg({ id: 'project.empty.noCli', defaultMessage: 'No account on here has its coding agent CLI installed — Help → Provider Setup', description: "Warning on the Session tab of a project with no agents (HI-2132): accounts are on in this workspace, but none of their CLIs (Claude Code, Codex…) is installed, so a new agent can't run. Help → Provider Setup is the menu item." }),
   providerOff: msg({ id: 'project.empty.providerOff', defaultMessage: '{provider} is turned off — Settings → Providers', description: "Warning on the Session tab when the agent's provider is turned off. Settings → Providers: name it as Settings does." }),
   providerMissing: msg({ id: 'project.empty.providerMissing', defaultMessage: '{provider} is required — Help → Provider Setup', description: "Warning on the Session tab when the agent's CLI isn't installed. Help → Provider Setup is the menu item." }),
@@ -87,11 +87,10 @@ const M = {
   more: msg({ id: 'project.header.more', defaultMessage: 'More actions', description: "Tooltip on the project header's ⋯ button." }),
   explorer: msg({ id: 'project.menu.explorer', defaultMessage: 'Explorer', description: "The project header's ⋯ menu: opens the project folder in File Explorer." }),
   terminal: msg({ id: 'project.menu.terminal', defaultMessage: 'Terminal', description: "The project header's ⋯ menu: opens a terminal in the project folder." }),
-  projectSettings: msg({ id: 'project.menu.settings', defaultMessage: 'Project Settings', description: "The project header's ⋯ menu." }),
   removeProject: msg({ id: 'project.menu.remove', defaultMessage: 'Remove Project…', description: "The project header's ⋯ menu: removes the project from the workspace (asks first)." }),
   restartWhenDone: msg({ id: 'project.banner.restartWhenDone', defaultMessage: 'Restart When Its Turn Is Over', description: "Button on the restart banner of an agent running on another connection than the one chosen now (HI-1755): it ends once its turn is over and carries on, on the new connection." }),
   switchFailed: msg({ id: 'project.banner.switchFailed', defaultMessage: "Couldn't arrange the restart", description: "An error's title: Restart When Its Turn Is Over failed." }),
-  restartNeeded: msg({ id: 'project.banner.restartNeeded', defaultMessage: "Skills, MCP servers or settings changed since {many, select, yes {{agent}'s} other {this}} session started. Restart the session to apply them — the conversation continues.", description: "Banner over a running session whose skills, MCP servers or settings changed. {agent} is the focused agent's name (when there are several)." }),
+  restartNeeded: msg({ id: 'project.banner.restartNeeded', defaultMessage: "Skills, MCP servers, dialects or settings changed since {many, select, yes {{agent}'s} other {this}} session started. Restart the session to apply them — the conversation continues.", description: "Banner over a running session whose skills, MCP servers, dialect files (HI-2444) or settings changed. {agent} is the focused agent's name (when there are several)." }),
   restart: msg({ id: 'project.banner.restart', defaultMessage: 'Restart session', description: 'Button in that banner.' }),
   unmanagedMcp: msg({ id: 'project.banner.unmanagedMcp', defaultMessage: 'This project defines MCP servers that are not in the workspace: <b>{names}</b>. They stay disabled until copied to the workspace.', description: 'Banner of a project with MCP servers of its own. {names} is their names. <b> is bold.' }),
   copyToWorkspace: msg({ id: 'project.banner.copyToWorkspace', defaultMessage: 'Copy to workspace', description: "Button: copies the project's own MCP servers to the workspace." }),
@@ -105,6 +104,12 @@ const bold = (c: React.ReactNode[]): React.ReactNode => <strong>{c}</strong>
 const menuBelow = (el: Element): [number, number] => {
   const r = el.getBoundingClientRect()
   return [r.left, r.bottom + 2]
+}
+
+/** A command's keys as a menu shows them (the user's and the project's overrides applied), or none. */
+function shownKeys(id: string): string | undefined {
+  const kb = commandKeybinding(id)
+  return kb ? formatKeybinding(kb) : undefined
 }
 
 /** A tab's tooltip, with its shortcut (they can be changed, and Tasks has none by default). */
@@ -289,11 +294,11 @@ function SessionEmpty({ project, framed }: { project: ProjectInfo; framed: boole
   const settings = useStore((s) => s.settings)
   const view = useConnections()
   const offered = !focused && view ? offeredConnections(view, settings) : []
-  // With no agent, the connection a new one gets (decision A: the first usable, its CLI installed); none while Hive is
+  // With no agent, the connection a new one gets (decision A: the first usable, its CLI installed); none while Combwork is
   // still looking for a CLI before it.
   const ready = offered.length ? firstReadyConnection(view, settings, cliReadyOf(providers)) : null
   // The focused agent's provider, else the new agent's (its connection's CLI; Automatic's pick where none is usable),
-  // and what Hive found of its CLI.
+  // and what Combwork found of its CLI.
   const provider = (!focused && connectionCli(view, ready?.id)) || agentProviderOf(focused)
   const info = providers[provider]
   const on = isProviderEnabled(settings, provider)
@@ -301,9 +306,10 @@ function SessionEmpty({ project, framed }: { project: ProjectInfo; framed: boole
   const noAccount = !focused && !!view && !offered.length && !view.testHome.length
   // Accounts on here but none on an installed CLI: a new agent can't run.
   const noCli = !!ready && !ready.id && !ready.checking
-  // An agent's own provider by name; with none, what a new agent's connection needs.
+  // An agent's own provider by name; with none, what a new agent's connection needs. No account on here is the banner's
+  // (HI-2650: one off here, Turn On Here; several, Choose in Settings; none, Add an Account), below.
   const warning = noAccount
-    ? tr(M.noAccount)
+    ? null
     : focused
     ? !on
       ? tr(M.providerOff, { provider: providerName(provider) })
@@ -332,7 +338,7 @@ function SessionEmpty({ project, framed }: { project: ProjectInfo; framed: boole
         <>
           <Icon name="debug-disconnect" />
           <span className="grow">{tr(M.sessionEnded)}</span>
-          <button className="btn act-resume solid" disabled={!!startBlocked || !!starting} aria-busy={resuming || undefined} title={startBlocked ?? undefined} onClick={() => void actions.resumeLast(project.path)}>
+          <button className="btn act-resume solid" disabled={!!startBlocked || !!starting} aria-busy={resuming || undefined} title={startBlocked ?? (focused?.resume?.fresh ? freshTip(focused.resume.fresh, sessionLabel(focused.resume, project.name)) : undefined)} onClick={() => void actions.resumeLast(project.path)}>
             <Icon name={resuming ? 'loading' : 'debug-continue'} spin={resuming} /> {resuming ? startingLabel(starting) : tr(M.resume)}
           </button>
           <button className="btn act-start" disabled={!!startBlocked || !!starting} aria-busy={startingNew || undefined} title={startBlocked ?? undefined} onClick={() => void actions.newSession(project.path)}>
@@ -357,6 +363,7 @@ function SessionEmpty({ project, framed }: { project: ProjectInfo; framed: boole
               </span>
             </p>
           )}
+          {noAccount && <NoConnectionBanner where="empty" />}
           <div className="btns">
             <button className="btn act-start solid" disabled={!!startBlocked || !!starting} aria-busy={startingNew || undefined} title={startBlocked ?? undefined} onClick={() => void actions.newSession(project.path)}>
               <Icon name={startingNew ? 'loading' : 'add'} spin={startingNew} /> {startingNew ? startingLabel(starting) : tr(M.newSession)} {newKey && <kbd style={{ marginLeft: 6 }}>{formatKeybinding(newKey)}</kbd>}
@@ -587,19 +594,18 @@ export function ProjectView({ visible }: { visible: boolean }) {
                 ...(runInMenu && running.length ? [{ label: stopTip, icon: 'stop-circle', action: 'stop' as const, onClick: () => void actions.stopAllAgents(project.path) }] : []),
                 ...(activeInMenu ? [{ separator: true as const }] : []),
                 ...(cramped && batch.length ? [...batch, { separator: true as const }] : []),
-                { label: tr(M.explorer), icon: 'folder-opened', onClick: () => void call('project:openInExplorer', project.path) },
-                { label: tr(M.terminal), icon: 'terminal', onClick: () => void call('project:openTerminal', project.path) },
+                // Each with its command's keys, where it has some (HI-2551). Project Settings is under More ▾ on the tabs' row.
+                { label: tr(M.explorer), icon: 'folder-opened', keybinding: shownKeys('project.openExplorer'), onClick: () => void call('project:openInExplorer', project.path) },
+                { label: tr(M.terminal), icon: 'terminal', keybinding: shownKeys('project.openTerminal'), onClick: () => void call('project:openTerminal', project.path) },
                 { separator: true },
-                { label: tr(M.projectSettings), icon: 'settings', onClick: () => setProjectTab(project.path, 'settings') },
-                { separator: true },
-                { label: tr(M.removeProject), icon: 'trash', onClick: () => set({ removeProjectFor: project.path }) }
+                { label: tr(M.removeProject), icon: 'trash', keybinding: shownKeys('project.remove'), onClick: () => set({ removeProjectFor: project.path }) }
               ])
             }
           />
         </div>
       </div>
 
-      {/* Its hooks aren't reaching Hive (#1336): its status may be wrong; a restart with working hooks clears it. */}
+      {/* Its hooks aren't reaching Combwork (#1336): its status may be wrong; a restart with working hooks clears it. */}
       {live?.hooksMissing && (
         <div className="banner warn hooks-missing">
           <Icon name="warning" /> {hooksMissingNote(live, tr)}

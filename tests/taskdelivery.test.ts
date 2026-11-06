@@ -7,7 +7,7 @@ import { claudeInput } from './claudeInputStandIn'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-// What Hive types into agents' terminals, recorded instead (no process runs); onWrite acts as each piece goes in.
+// What Combwork types into agents' terminals, recorded instead (no process runs); onWrite acts as each piece goes in.
 const pty = vi.hoisted(() => ({ typed: [] as string[], onWrite: (_data: string): void => undefined }))
 vi.mock('../src/main/ptyHost', async (original) => ({
   ...(await original<object>()),
@@ -17,7 +17,7 @@ vi.mock('../src/main/ptyHost', async (original) => ({
   }
 }))
 
-const base = tempDir('hive-delivery-')
+const base = tempDir('cw-delivery-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -63,24 +63,24 @@ function withFacts<T extends { status: string }>(state: T): T {
 /** A running agent, idle, as SessionManager keeps one (no process). */
 function idle(agentId: string): { status: string } {
   const state = withFacts({ provider: 'claude', runId: `run-${agentId}`, projectPath: p, agentId, cwd: p, sessionId: '', status: 'ready', startedAt: '', launchSignature: '', unseen: false })
-  // Its input box (claudeInputStandIn, fed what is typed: HI-1979, Hive types into it only once a key of its own shows
+  // Its input box (claudeInputStandIn, fed what is typed: HI-1979, Combwork types into it only once a key of its own shows
   // it empty), bracketed paste off.
   const input = claudeInput({ paste: false })
   input.from(() => pty.typed)
   s.live.set(`${p.toLowerCase()}#${agentId}`, { state, adapter: claudeCode, screen: input.screen, transcriptMtime: '', defaultModel: false, modeTail: '', launchMode: null, configuredMode: null })
   return state
 }
-// Its doorbell (#650: the task's id, never its text, which the agent reads with hive_inbox).
+// Its doorbell (#650: the task's id, never its text, which the agent reads with cw_inbox).
 const prompted = (): boolean => pty.typed.join('').includes('New in your inbox: 1 task')
 const submitted = (): boolean => pty.typed.includes('\r')
-// A write of Backspaces only: how Hive takes back a line it stopped in Claude Code (HI-1974).
+// A write of Backspaces only: how Combwork takes back a line it stopped in Claude Code (HI-1974).
 const backspaces = (d: string): boolean => /^\x7f+$/.test(d)
 
 describe('a Start typed into a running agent', () => {
   beforeAll(async () => {
-    mkdirSync(join(wsPath, '.hive'), { recursive: true })
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: ['d1', 'd2', 'd3', 'd4'].map((id, i) => ({ id, name: `Agent ${i + 1}` })) }))
+    mkdirSync(join(wsPath, '.combwork'), { recursive: true })
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: ['d1', 'd2', 'd3', 'd4'].map((id, i) => ({ id, name: `Agent ${i + 1}` })) }))
     w = createWorkspaceService()
     await w.open(wsPath)
     // The Assistant that starts cards here is running: a task it gives is refused once its session has ended (#645, #649).
@@ -109,7 +109,7 @@ describe('a Start typed into a running agent', () => {
   it('the agent starts work while the input is being cleared: nothing is typed, the card goes back to Review', async () => {
     const st = idle('d1')
     pty.onWrite = (d) => {
-      // As the clear begins (HI-1979: an empty box's is the letter Hive shows and takes back).
+      // As the clear begins (HI-1979: an empty box's is the letter Combwork shows and takes back).
       if (d === '\x15' || d === 'x') st.status = 'working'
     }
     const { error, card } = await startWith('d1', user)
@@ -119,7 +119,7 @@ describe('a Start typed into a running agent', () => {
     expect(card.history.map((h) => h.what).slice(-2)).toEqual(['Moved to Doing', 'Moved to Review'])
   })
 
-  it('the agent starts work while the prompt is typed: it is not sent, and what Hive typed is cleared again', async () => {
+  it('the agent starts work while the prompt is typed: it is not sent, and what Combwork typed is cleared again', async () => {
     const st = idle('d2')
     pty.onWrite = () => {
       if (pty.typed.join('').includes('New in your inbox')) st.status = 'working'
@@ -127,9 +127,9 @@ describe('a Start typed into a running agent', () => {
     const { error, card } = await startWith('d2', user)
     expect(error).toMatch(/is working/)
     expect(submitted()).toBe(false)
-    // Claude Code's Ctrl+U deletes only one wrapped row, so what Hive typed is taken back with a Backspace for each
+    // Claude Code's Ctrl+U deletes only one wrapped row, so what Combwork typed is taken back with a Backspace for each
     // character, eight to a write (HI-1974): never fewer than it typed, and nothing else after them.
-    // The empty input shown so first (HI-1979): the letter Hive types and takes back.
+    // The empty input shown so first (HI-1979): the letter Combwork types and takes back.
     expect(pty.typed.slice(0, 2)).toEqual(['x', '\x7f'])
     const back = pty.typed.findIndex((d, i) => i >= 2 && backspaces(d))
     const typedText = pty.typed.slice(2, back).join('')

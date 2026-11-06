@@ -1,8 +1,8 @@
-import type { HiveBridge } from '../shared/api'
+import type { CombworkBridge } from '../shared/api'
 
 declare global {
   interface Window {
-    hive: HiveBridge
+    combwork: CombworkBridge
   }
 }
 

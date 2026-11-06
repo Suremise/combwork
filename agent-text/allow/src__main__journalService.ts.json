@@ -1,0 +1,9 @@
+{
+  "prose|call|The journal is off: nothing is written and its tools stop working (they leave at your next start). Its entries are kept.": 1,
+  "prose|call|The journal is on again; its tools come with your next start (ask the user to restart you to use them now).": 1,
+  "prose|call|The journal's scope changed: store only {} entries from now on.": 1,
+  "prose|call|The user deleted your journal: it starts again empty. Entries you recalled before are gone.": 1,
+  "prose|error|Keep everyday entries for: a whole number of days from {} to {}. Nothing was changed.": 1,
+  "prose|error|Size cap: no limit, or a whole number of MB from {} to {}. Nothing was changed.": 1,
+  "prose|var|Your journal is off. Suggest to the user once, in a line, that Settings → Assistant → Journal lets you remember decisions and plans across sessions without handovers; Combwork won't ask again.": 1
+}

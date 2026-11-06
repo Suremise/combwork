@@ -1,9 +1,9 @@
 // A project holding .asar files (an Electron app's build output, dist/win-unpacked/resources/app.asar) stays a set of
-// plain files to Hive (#246): Electron's own fs opens an .asar it stats as an archive and keeps it open until the app
+// plain files to Combwork (#246): Electron's own fs opens an .asar it stats as an archive and keeps it open until the app
 // quits, so `npm run dist` couldn't replace it. Storage, the Files tab (listing, watch, find, read), Changes, Attachments and
 // image previews (a path inside an archive is refused; a real folder named art.asar is just a folder, #261) go over a project and an agent's worktree with .asar files in
-// them, then each file is deleted from outside Hive.
-// The workspace watcher still notices projects coming and going and .hive changes. Dev build, throwaway profile and
+// them, then each file is deleted from outside Combwork.
+// The workspace watcher still notices projects coming and going and .combwork changes. Dev build, throwaway profile and
 // workspace.
 // Dev build only (#1580): it starts this checkout's Electron itself, and Tree is a 0.9 worktree agent
 // (agents:testLegacy, refused by a packaged build), whose worktree holds a build.
@@ -36,7 +36,7 @@ const putAsar = (file) => {
   fs.mkdirSync(path.dirname(file), { recursive: true })
   fs.copyFileSync(SAMPLE, file)
 }
-/** Deletes a file from outside Hive, as a build replacing it would: the error's code if Hive holds it. */
+/** Deletes a file from outside Combwork, as a build replacing it would: the error's code if Combwork holds it. */
 const deleteFromOutside = (file) => {
   try {
     fs.rmSync(file)
@@ -61,17 +61,17 @@ const deleteFromOutside = (file) => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47921) })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47921) })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await page.evaluate(() => {
     window.__events = []
-    window.hive.onEvent((e) => window.__events.push(e))
+    window.combwork.onEvent((e) => window.__events.push(e))
   })
 
   // An agent's worktree with a build in it, as Claudio's was.
@@ -97,8 +97,8 @@ const deleteFromOutside = (file) => {
   const found = await inv('files:find', alpha, 'asar')
   // dist is ignored by git, which Find leaves out.
   check('Find files finds bundle.asar as a file', found.some((e) => e.name === 'bundle.asar' && !e.isDir), JSON.stringify(found.map((e) => e.relPath)))
-  const inside = `hive-img://img/${encodeURIComponent(path.join(builtAsar, 'icon.png'))}`
-  // As an <img>, the way the window shows them (its CSP allows hive-img: there, not to fetch).
+  const inside = `combwork-img://img/${encodeURIComponent(path.join(builtAsar, 'icon.png'))}`
+  // As an <img>, the way the window shows them (its CSP allows combwork-img: there, not to fetch).
   const shown = await page.evaluate(
     (u) =>
       new Promise((r) => {
@@ -125,12 +125,24 @@ const deleteFromOutside = (file) => {
           img.addEventListener('error', () => r('refused'))
           img.src = u
         }),
-      `hive-img://img/${encodeURIComponent(file)}`
+      `combwork-img://img/${encodeURIComponent(file)}`
     )
   const artShown = await show(path.join(artDir, 'icon.png'))
   check('an image in a real folder named art.asar shows', artShown === 'loaded 1x1', artShown)
   const plainShown = await show(path.join(alpha, 'plain.png'))
   check('… as does one in an ordinary folder', plainShown === 'loaded 1x1', plainShown)
+  // HI-2588: the scheme's name before 1.1 is renamed outright: neither registered nor allowed.
+  const oldScheme = await page.evaluate(
+    (u) =>
+      new Promise((r) => {
+        const img = new Image()
+        img.addEventListener('load', () => r('loaded'))
+        img.addEventListener('error', () => r('refused'))
+        img.src = u
+      }),
+    `other-img://img/${encodeURIComponent(path.join(alpha, 'plain.png'))}`
+  )
+  check('… and by a scheme that isn\'t combwork-img: it is not shown', oldScheme === 'refused', oldScheme)
   const missingShown = await show(path.join(artDir, 'missing.png'))
   check('… and a missing one is refused', missingShown === 'refused', missingShown)
   const artRead = await inv('file:read', path.join(artDir, 'notes.md')).catch((e) => `error: ${e}`)
@@ -157,10 +169,10 @@ const deleteFromOutside = (file) => {
     ["the worktree's dist", treeAsar]
   ]) {
     const err = deleteFromOutside(file)
-    check(`the .asar in ${name} can be deleted while Hive runs`, !err, err)
+    check(`the .asar in ${name} can be deleted while Combwork runs`, !err, err)
   }
   const artErr = deleteFromOutside(path.join(alpha, 'art.asar', 'icon.png'))
-  check('the image shown from art.asar can be deleted while Hive runs', !artErr, artErr)
+  check('the image shown from art.asar can be deleted while Combwork runs', !artErr, artErr)
   let distGone = null
   try {
     fs.rmSync(path.join(alpha, 'dist'), { recursive: true })
@@ -169,7 +181,7 @@ const deleteFromOutside = (file) => {
   }
   check("… and the project's build folder too, while Files watches the project", !distGone, distGone)
 
-  // The workspace watcher: projects coming and going (the root), and .hive changes.
+  // The workspace watcher: projects coming and going (the root), and .combwork changes.
   const eventsOf = (type) => page.evaluate((t) => window.__events.filter((e) => e.type === t), type)
   const hasProject = (name) => async () => (await eventsOf('workspace-changed')).some((e) => e.workspace?.projects?.some((p) => p.name === name))
   fs.mkdirSync(beta)
@@ -178,9 +190,9 @@ const deleteFromOutside = (file) => {
   fs.rmSync(beta, { recursive: true })
   const gone = await lib.until(async () => (await eventsOf('workspace-changed')).some((e) => e.workspace && !e.workspace.projects.some((p) => p.name === 'beta')), 10000)
   check('… and goes when it is deleted', !!gone)
-  fs.mkdirSync(path.join(ws, '.hive', 'shared'), { recursive: true })
-  fs.writeFileSync(path.join(ws, '.hive', 'shared', 'outside.md'), '# Written outside Hive\n')
-  check('a shared note written outside Hive is noticed', !!(await lib.until(async () => (await eventsOf('notes-changed')).length > 0, 10000)))
+  fs.mkdirSync(path.join(ws, '.combwork', 'shared'), { recursive: true })
+  fs.writeFileSync(path.join(ws, '.combwork', 'shared', 'outside.md'), '# Written outside Combwork\n')
+  check('a shared note written outside Combwork is noticed', !!(await lib.until(async () => (await eventsOf('notes-changed')).length > 0, 10000)))
 
   await page.screenshot({ path: path.join(lib.WORK, 'asarfiles.png') })
   await app.close()

@@ -1,5 +1,5 @@
 // Git itself missing, too old or failing (#346): never read as "not a repository", and never as merged, clean or
-// nothing to lose. Git is hidden from this test process's own PATH (never the machine's), which every git call Hive
+// nothing to lose. Git is hidden from this test process's own PATH (never the machine's), which every git call Combwork
 // makes inherits.
 import { execFileSync } from 'child_process'
 import { createRequire } from 'module'
@@ -11,7 +11,7 @@ import { checkGit, gitExe, gitOnPath, gitProblem, gitTool, realGit, realGitBehin
 import { git, gitStatus } from '../src/main/git'
 import { withLauncherEnv } from '../src/main/gitWorker'
 import { branchStatus, createWorktree, removeCheckedWorktree, worktreeCheck } from '../src/main/worktrees'
-import { ensureHiveExcluded } from '../src/main/hiveVcs'
+import { ensureCombworkExcluded } from '../src/main/combworkVcs'
 import { tempDir, tempRoot } from './tempDir'
 
 const run = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8' })
@@ -34,16 +34,16 @@ function hideGit(): void {
     .join(delimiter)
 }
 
-/** A repository on main with one worktree, `hive/wt`, merged and clean (removable while git runs). */
+/** A repository on main with one worktree, `cw/wt`, merged and clean (removable while git runs). */
 async function project(): Promise<{ p: string; wt: { path: string; branch: string; base: string } }> {
-  root = tempDir('hive-gittool-')
+  root = tempDir('cw-gittool-')
   const p = join(root, 'project')
   run(root, 'init', '-q', '-b', 'main', p)
   for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) run(p, 'config', k, v)
   writeFileSync(join(p, 'a.txt'), 'a\n')
   run(p, 'add', '-A')
   run(p, 'commit', '-qm', 'base')
-  const wt = { path: join(root, 'wt'), branch: 'hive/wt', base: 'main' }
+  const wt = { path: join(root, 'wt'), branch: 'cw/wt', base: 'main' }
   await createWorktree(p, wt.path, wt.branch, 'main')
   return { p, wt }
 }
@@ -57,14 +57,14 @@ describe('git versions', () => {
     expect(compareGitVersions('2.38.0', GIT_MIN)).toBe(0)
   })
 
-  it('below 2.38 is old; below 2.17 nothing of Hive runs, so it is a problem like a missing git', () => {
+  it('below 2.38 is old; below 2.17 nothing of Combwork runs, so it is a problem like a missing git', () => {
     expect(gitStateOf('2.45.1')).toBe('ok')
     expect(gitStateOf('2.37.9')).toBe('old')
     expect(gitUnusable({ state: 'old', version: '2.30.0' })).toBe(false)
     expect(gitUnusable({ state: 'old', version: '2.16.0' })).toBe(true)
     expect(gitUnusable({ state: 'missing' })).toBe(true)
     expect(gitUnusable({ state: 'ok', version: '2.45.0' })).toBe(false)
-    expect(gitProblemText({ state: 'missing' })).toBe("Git isn't installed (or isn't on Hive's PATH)")
+    expect(gitProblemText({ state: 'missing' })).toBe("Git isn't installed (or isn't on Combwork's PATH)")
     expect(gitProblemText({ state: 'old', version: '2.16.0' })).toMatch(/too old/)
     expect(gitProblemText({ state: 'unknown' })).toBeNull()
     expect(gitFixText({ state: 'missing' })).toMatch(/Install Git for Windows/)
@@ -86,15 +86,15 @@ describe('git missing', () => {
   it('is missing, not a failed command: no exit code 1 that reads as "no"', async () => {
     const { p } = await project()
     hideGit()
-    const r = await git(p, ['check-ignore', '-q', '--no-index', '--', '.hive/'])
+    const r = await git(p, ['check-ignore', '-q', '--no-index', '--', '.combwork/'])
     expect(r).toMatchObject({ ok: false, missing: true, code: -1 })
     expect(gitTool().state).toBe('missing')
-    expect(gitProblem()).toBe("Git isn't installed (or isn't on Hive's PATH)")
+    expect(gitProblem()).toBe("Git isn't installed (or isn't on Combwork's PATH)")
     expect((await checkGit()).state).toBe('missing')
   })
 
   it('a missing working folder is not a missing git', async () => {
-    const r = await git(join(tempRoot(), 'hive-gittool-no-such-folder'), ['status'])
+    const r = await git(join(tempRoot(), 'cw-gittool-no-such-folder'), ['status'])
     expect(r.missing).toBeUndefined()
     expect(gitTool().state).not.toBe('missing')
   })
@@ -102,7 +102,7 @@ describe('git missing', () => {
   it('the Changes tab hears git is missing, not that the folder is no repository', async () => {
     const { p } = await project()
     hideGit()
-    expect(await gitStatus(p)).toMatchObject({ isRepo: false, gitProblem: "Git isn't installed (or isn't on Hive's PATH)" })
+    expect(await gitStatus(p)).toMatchObject({ isRepo: false, gitProblem: "Git isn't installed (or isn't on Combwork's PATH)" })
   })
 
   it('never removable, never merged, never clean: the worktree and its branch stay', async () => {
@@ -110,19 +110,19 @@ describe('git missing', () => {
     const check = await worktreeCheck(p, wt)
     expect(check.removable).toBe(true)
     hideGit()
-    expect(await worktreeCheck(p, wt)).toMatchObject({ removable: false, reason: "Git isn't installed (or isn't on Hive's PATH)" })
+    expect(await worktreeCheck(p, wt)).toMatchObject({ removable: false, reason: "Git isn't installed (or isn't on Combwork's PATH)" })
     await expect(branchStatus(p, wt)).rejects.toThrow(/isn't installed/)
     // A check made while git ran, applied once it can't: nothing goes.
     expect((await removeCheckedWorktree(p, wt, check)).deleted).toBe(false)
     expect(existsSync(wt.path)).toBe(true)
     process.env.PATH = PATH
-    expect(run(p, 'branch', '--format=%(refname:short)')).toMatch(/hive\/wt/)
+    expect(run(p, 'branch', '--format=%(refname:short)')).toMatch(/cw\/wt/)
   })
 
-  it('.hive is still excluded by the line Hive writes, marked unconfirmed', async () => {
+  it('.combwork is still excluded by the line Combwork writes, marked unconfirmed', async () => {
     const { p } = await project()
     hideGit()
-    expect(await ensureHiveExcluded(p)).toMatchObject({ excluded: true, unconfirmed: true })
+    expect(await ensureCombworkExcluded(p)).toMatchObject({ excluded: true, unconfirmed: true })
   })
 
   it('a git call that runs again clears it', async () => {
@@ -140,30 +140,30 @@ describe('git missing', () => {
 describe('git failing', () => {
   it('a branch git cannot count is not "nothing to merge"', async () => {
     const { p, wt } = await project()
-    await expect(branchStatus(p, { ...wt, branch: 'hive/gone' })).rejects.toThrow(/Git couldn't check hive\/gone/)
+    await expect(branchStatus(p, { ...wt, branch: 'cw/gone' })).rejects.toThrow(/Git couldn't check cw\/gone/)
   })
 
   it('a worktree whose status fails is not clean, and not removable', async () => {
     const { p, wt } = await project()
     // A damaged index: git status fails there.
     writeFileSync(join(p, '.git', 'worktrees', 'wt', 'index'), 'not an index')
-    await expect(branchStatus(p, wt)).rejects.toThrow(/Git couldn't check hive\/wt/)
+    await expect(branchStatus(p, wt)).rejects.toThrow(/Git couldn't check cw\/wt/)
     const c = await worktreeCheck(p, wt)
     expect(c.removable).toBe(false)
     expect(gitProblem()).toBeNull()
   })
 })
 
-// HI-2137: where PATH's git is Git for Windows' launcher (<root>\cmd\git.exe), Hive starts the real git beneath it
+// HI-2137: where PATH's git is Git for Windows' launcher (<root>\cmd\git.exe), Combwork starts the real git beneath it
 // directly; anything else keeps PATH's git.
-describe('the git Hive starts', () => {
+describe('the git Combwork starts', () => {
   /** A Git for Windows layout: its launcher, and its real git under `mingw` (empty files: only where they are counts). */
   const layouts: string[] = []
   afterEach(() => {
     for (const d of layouts.splice(0)) rmSync(d, { recursive: true, force: true })
   })
   function layout(mingw = 'mingw64'): { root: string; launcher: string; execPath: string; real: string } {
-    const top = tempDir('hive-gitexe-')
+    const top = tempDir('cw-gitexe-')
     layouts.push(top)
     const launcher = join(top, 'cmd', 'git.exe')
     const execPath = join(top, mingw, 'libexec', 'git-core')
@@ -194,7 +194,7 @@ describe('the git Hive starts', () => {
 
   it("the real git's environment is the launcher's (git-wrapper.c): its MSYSTEM, PLINK_PROTOCOL, HOME, and its folders and ~\\bin before PATH", () => {
     const l = { pathFirst: 'C:\\Git\\mingw64\\bin;C:\\Git\\usr\\bin', msystem: 'MINGW64' }
-    const top = tempDir('hive-gitenv-')
+    const top = tempDir('cw-gitenv-')
     layouts.push(top)
     const roaming = join(top, 'roaming')
     const local = join(top, 'local')
@@ -240,7 +240,7 @@ describe('the git Hive starts', () => {
     expect(await realGit(SAID, other.launcher, ask)).toEqual({ exe: 'git' })
   })
 
-  it('this machine: with the launcher first on PATH, Hive starts the real git, and git runs', async () => {
+  it('this machine: with the launcher first on PATH, Combwork starts the real git, and git runs', async () => {
     const execPath = run(process.cwd(), '--exec-path').trim()
     const launcher = join(dirname(dirname(dirname(win32.normalize(execPath)))), 'cmd', 'git.exe')
     if (!existsSync(launcher)) return // Not Git for Windows: nothing of this applies.
@@ -265,7 +265,7 @@ describe('the git Hive starts', () => {
     const env: NodeJS.ProcessEnv = baseEnv()
     for (const k of Object.keys(env)) if (['PATH', 'HOME', 'HOMEDRIVE', 'HOMEPATH', 'USERPROFILE', 'MSYSTEM', 'PLINK_PROTOCOL'].includes(k.toUpperCase())) delete env[k]
     Object.assign(env, { GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1', PATH: `${process.env.SystemRoot}\\System32;${process.env.SystemRoot}`, MSYSTEM: 'MSYS', HOMEDRIVE: roaming.slice(0, 2), HOMEPATH: roaming.slice(2), USERPROFILE: local })
-    const said = (exe: string, e: NodeJS.ProcessEnv): string => execFileSync(exe, ['-c', 'alias.hiveenv=!echo "$MSYSTEM|$HOME|$PLINK_PROTOCOL|$PATH"', 'hiveenv'], { cwd: p, env: e, encoding: 'utf8', windowsHide: true })
+    const said = (exe: string, e: NodeJS.ProcessEnv): string => execFileSync(exe, ['-c', 'alias.cwenv=!echo "$MSYSTEM|$HOME|$PLINK_PROTOCOL|$PATH"', 'cwenv'], { cwd: p, env: e, encoding: 'utf8', windowsHide: true })
     const through = said(launcher, env)
     // The launcher's own MSYSTEM (MINGW64, or UCRT64 on Git for Windows 2.56's UCRT64 build, HI-2400), not the inherited one.
     expect(through.startsWith(`${real.launcherEnv.msystem}|`)).toBe(true)

@@ -1,6 +1,6 @@
 // Generated from locales/en/session.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
-interface HiveMessageValues {
+interface CombworkMessageValues {
   'session.archive.notKept': undefined
   'session.autoCompact.body': { provider: string | number }
   'session.autoCompact.title': { agent: string | number }
@@ -106,6 +106,9 @@ interface HiveMessageValues {
   'session.modeOffer.one': { agent: string | number }
   'session.modeOffer.switch': undefined
   'session.modeOffer.title': { modes: string | number }
+  'session.model.switched': { cli: string | number; running: string | number; launched: string | number }
+  'session.model.switchedTitle': { agent: string | number }
+  'session.movedFresh.body': { n: number }
   'session.newConversation.didntStop': undefined
   'session.newConversation.notRunning': undefined
   'session.newConversation.pending': undefined
@@ -143,6 +146,8 @@ interface HiveMessageValues {
   'session.purge.reading': undefined
   'session.purge.running': undefined
   'session.purge.unread': undefined
+  'session.renamedFresh.body': { n: number }
+  'session.renamedFresh.title': undefined
   'session.restartMode.didntStop': { agent: string | number }
   'session.setup.failed': { code: string | number }
   'session.setup.failedTitle': { project: string | number; agent: string | number }
@@ -177,6 +182,9 @@ interface HiveMessageValues {
   'session.start.slotChanged': { slot: string | number; agent: string | number }
   'session.start.slotSetup': { slot: string | number; agent: string | number }
   'session.start.subSession': { kind: string | number; provider: string | number }
+  'session.start.tempInside': { folder: string | number; inside: string | number }
+  'session.start.tempNotMade': { folder: string | number; why: string | number }
+  'session.start.tempUnset': { folder: string | number }
   'session.start.turnedOff': { provider: string | number; agent: string | number }
   'session.start.worktreeMissing': { agent: string | number; folder: string | number }
   'session.state.countIdle': { n: number }

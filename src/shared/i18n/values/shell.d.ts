@@ -1,6 +1,6 @@
 // Generated from locales/en/shell.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
-interface HiveMessageValues {
+interface CombworkMessageValues {
   'shell.about.blurb': { providers: string | number }
   'shell.about.cli': { version: string | number; source: string | number }
   'shell.about.copied': undefined
@@ -157,6 +157,7 @@ interface HiveMessageValues {
   'shell.command.view.board': undefined
   'shell.command.view.compactSidebar': undefined
   'shell.command.view.devTools': undefined
+  'shell.command.view.dialects': undefined
   'shell.command.view.fullScreen': undefined
   'shell.command.view.mcp': undefined
   'shell.command.view.modes': undefined
@@ -318,6 +319,7 @@ interface HiveMessageValues {
   'shell.search.clear': undefined
   'shell.setup.checkAgain': undefined
   'shell.setup.connections': { n: number; cli: string | number }
+  'shell.setup.connectionsOff': { cli: string | number; n: number; names: string | number }
   'shell.setup.docs': { provider: string | number }
   'shell.setup.done': { what: string | number }
   'shell.setup.found': { provider: string | number; version: string | number; source: string | number }

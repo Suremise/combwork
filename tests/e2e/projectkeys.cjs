@@ -2,8 +2,8 @@
 // in their project and carry their key, and every place a card is named takes its key (any case), an old key after a
 // change, a moved card's key in its old project, or #N: reading and changing a card, blockedBy and before, a batch (a key
 // no card has refused as that card, the rest changed), a reorder, a bounded wait and a progress run's card. A key no
-// card has is 404. Replies name cards by key alone, "AL-1" (HI-1661), the hive tools' too: hive_lane's start, join, list and end, through
-// the real hive MCP server.
+// card has is 404. Replies name cards by key alone, "AL-1" (HI-1661), the Combwork tools' too: cw_lane's start, join, list and end, through
+// the real combwork MCP server.
 // Dev build, throwaway profile and workspace; no CLI is started.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -36,13 +36,13 @@ const check = (name, ok, extra = '') => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     const token = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
     const call = async (method, route, body) => {
@@ -88,16 +88,16 @@ const check = (name, ok, extra = '') => {
     const reordered = await call('POST', '/v1/tasks/reorder', { column: 'todo', cards: ['AL-1', 'AL-2'], reply: 'short' })
     check('a reorder takes keys, and names them in its reply', reordered.status === 200 && JSON.stringify(reordered.body?.top) === JSON.stringify([a1?.number, a2?.number]) && reordered.body?.names?.[String(a1?.number)] === 'AL-1', JSON.stringify(reordered))
     const waited = await call('POST', '/v1/tasks/wait', { cards: ['AL-1'], column: 'todo' })
-    // Already in Todo: it answers at once, with the card, named by key for the hive tools' words.
+    // Already in Todo: it answers at once, with the card, named by key for the Combwork tools' words.
     check('a wait takes a key', waited.status === 200 && [waited.body?.already, ...(waited.body?.changes ?? [])].some((c) => c?.number === a1?.number) && waited.body?.names?.[String(a1?.number)] === 'AL-1', JSON.stringify(waited))
 
-    // --- hive_lane through the real hive MCP server (#1219 round 2, finding 1): its replies name the cards by key.
+    // --- cw_lane through the real combwork MCP server (#1219 round 2, finding 1): its replies name the cards by key.
     const builder = await lib.addAgent(inv, alpha, { name: 'Builder' })
     const reviewer = await lib.addAgent(inv, alpha, { name: 'Reviewer' })
     const tool = (agentId, name, args) => {
-      const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], {
+      const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
         input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) + '\n',
-        env: lib.childEnv({ HIVE_API_URL: API, HIVE_WORKSPACE: ws, HIVE_API_TOKEN_FILE: path.join(userData, 'agent-api.json'), HIVE_PROJECT: 'alpha', HIVE_AGENT_ID: agentId }),
+        env: lib.childEnv({ CW_API_URL: API, CW_WORKSPACE: ws, CW_API_TOKEN_FILE: path.join(userData, 'agent-api.json'), CW_PROJECT: 'alpha', CW_AGENT_ID: agentId }),
         timeout: 60000
       }).toString()
       const r = JSON.parse(out.split('\n')[0]).result
@@ -105,14 +105,14 @@ const check = (name, ok, extra = '') => {
     }
     // By key alone (HI-1661), never with the number beside it.
     const keyed2 = 'AL-2'
-    const started = tool(builder.id, 'hive_lane', { action: 'start', cards: ['AL-2'], name: 'keyed' })
-    check("hive_lane start's reply names its cards by key", !started.isError && started.text.startsWith('Lane started: ') && started.text.includes(keyed2) && !started.text.includes(`#${a2?.number}`), started.text)
-    const joined = tool(reviewer.id, 'hive_lane', { action: 'join', builder: 'Builder' })
+    const started = tool(builder.id, 'cw_lane', { action: 'start', cards: ['AL-2'], name: 'keyed' })
+    check("cw_lane start's reply names its cards by key", !started.isError && started.text.startsWith('Lane started: ') && started.text.includes(keyed2) && !started.text.includes(`#${a2?.number}`), started.text)
+    const joined = tool(reviewer.id, 'cw_lane', { action: 'join', builder: 'Builder' })
     check("…join's", !joined.isError && joined.text.startsWith('Joined the lane: ') && joined.text.includes(keyed2), joined.text)
-    const listed = tool(builder.id, 'hive_lane', { action: 'list' })
+    const listed = tool(builder.id, 'cw_lane', { action: 'list' })
     check("…list's", !listed.isError && listed.text.includes(keyed2), listed.text)
     const laneId = (await call('GET', '/v1/lanes')).body?.[0]?.id
-    const ended = tool(builder.id, 'hive_lane', { action: 'end', lane: laneId, abandoned: true })
+    const ended = tool(builder.id, 'cw_lane', { action: 'end', lane: laneId, abandoned: true })
     check("…and end's", !ended.isError && ended.text.startsWith('Lane abandoned: ') && ended.text.includes(keyed2), ended.text)
 
     // --- A key changed: the cards show it, the old one still finds them.

@@ -136,7 +136,7 @@ async function lanes(ctx) {
   const c = ctx.boardCards
   const name = project.split(/[\\/]/).pop()
   // One, an idle builder outside slots, is given the lane in a new conversation (HI-2232), so a new launch and token. Quiet
-  // first (idle, nothing of Hive's being typed into it or waiting to be), or it would be left as it is mid-turn, or its
+  // first (idle, nothing of Combwork's being typed into it or waiting to be), or it would be left as it is mid-turn, or its
   // new conversation owed until it is free (HI-2252).
   const twoToken = await tokenOf(ctx, two)
   const port = ctx.lib.port(47834)

@@ -2,7 +2,7 @@
 // group's transaction, and every reader of the board giving the same bytes after as before (cards in full and in short,
 // holds, places, Export Board). A step that throws part way leaves the 0.9 file as it was; opening it again runs nothing.
 //
-// HIVE_BOARD_GOLDEN_DB=<a hive.db> runs the same comparison over a copy of that board, made in tempDir() (the file itself
+// CW_BOARD_GOLDEN_DB=<a combwork.db> runs the same comparison over a copy of that board, made in tempDir() (the file itself
 // is never opened; its -wal is copied with it). Timings are tests/boardBench.test.ts's.
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -12,7 +12,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
 import { as09, removeCard, writeCard, writeCardOutside } from './boardDb'
 
-const base = tempDir('hive-cards-step-')
+const base = tempDir('cw-cards-step-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -50,24 +50,24 @@ async function close(w: WS): Promise<void> {
 /** A workspace folder with a project `p`. */
 function workspace(): string {
   const ws = join(base, `ws-${++n}`)
-  mkdirSync(join(ws, 'p', '.hive'), { recursive: true })
-  writeFileSync(join(ws, 'p', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
+  mkdirSync(join(ws, 'p', '.combwork'), { recursive: true })
+  writeFileSync(join(ws, 'p', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
   return ws
 }
 
-/** Documents of every form a 0.9 board can hold: Hive's own, an older Hive's, hand-edited ones. */
+/** Documents of every form a 0.9 board can hold: Combwork's own, an older version's, hand-edited ones. */
 const ODD: Record<number, Record<string, unknown>> = {
-  // Another key order, a field Hive doesn't know, and one named like Object.prototype's.
+  // Another key order, a field Combwork doesn't know, and one named like Object.prototype's.
   901: { title: 'Out of order', number: 901, column: 'todo', project: 'p', agent: null, description: '', order: 3, labels: ['x'], blocked: null, blockedBy: [], links: [], comments: [], history: [], archived: false, createdAt: '2026-01-01T00:00:00.000Z', createdBy: 'You', updatedAt: '2026-01-01T00:00:00.000Z', custom: { deep: [1, 2] }, ['__proto__']: 'kept' },
   // Fields missing or of another type: what tasks.ts' clean reads safely.
   902: { number: 902, title: 42, column: 'nowhere', order: '2', labels: 'not a list', comments: [{ text: 'a comment', by: 'You' }, 'not an entry'], held: [], archived: 1 },
-  // A string with a lone surrogate, and a review not of Hive's form.
+  // A string with a lone surrogate, and a review not of Combwork's form.
   903: { number: 903, title: 'Lone \ud800 surrogate', description: 'tail \udc00', project: 'p', agent: 'a1', review: { agent: 'a2', since: '2026-01-02T00:00:00.000Z' }, column: 'review', order: 1, labels: [], blocked: null, blockedBy: [999], links: [1], comments: [], history: [], archived: false, createdAt: '2026-01-01T00:00:00.000Z', createdBy: 'You', updatedAt: '2026-01-01T00:00:00.000Z' },
-  // Archived, with holds and decisions of Hive's form.
+  // Archived, with holds and decisions of Combwork's form.
   904: { number: 904, title: 'Archived', description: 'd', project: 'p', agent: 'a1', agentName: 'Agent 1', column: 'done', order: 2, labels: ['1.0.0'], blocked: null, blockedBy: [], links: [], comments: [], history: [{ at: '2026-01-01T00:00:00.000Z', by: 'You', what: 'Moved to Done' }], archived: true, decisions: [{ id: 'd1', text: 'Keep it', decidedBy: 'You', recordedBy: 'You', at: '2026-01-01T00:00:00.000Z' }], held: [{ agent: 'a1', name: 'Agent 1', role: 'agent', from: '2026-01-01T00:00:00.000Z', to: '2026-01-02T00:00:00.000Z' }], createdAt: '2026-01-01T00:00:00.000Z', createdBy: 'You', updatedAt: '2026-01-01T00:00:00.000Z', archivedFor: 'done', archivedBatch: 'b1' }
 }
 
-/** A 0.9 board (#1209: its cards as documents): cards made by this Hive, the odd ones, then the file put back as 0.9 left it. */
+/** A 0.9 board (#1209: its cards as documents): cards made by this Combwork, the odd ones, then the file put back as 0.9 left it. */
 async function board09(): Promise<{ ws: string; numbers: number[] }> {
   const ws = workspace()
   const w = await open(ws)
@@ -242,20 +242,20 @@ describe('the cards step (#1209)', () => {
     await close(w)
     const file = store.boardFile(ws)
     const version = versionOf(file)
-    const copies = readdirSync(join(ws, '.hive', 'backups')).sort()
+    const copies = readdirSync(join(ws, '.combwork', 'backups')).sort()
     w = await open(ws)
     const second = await readers(w, numbers, join(base, `export-${n}-2`))
     await close(w)
     expect(versionOf(file)).toBe(version)
-    expect(readdirSync(join(ws, '.hive', 'backups')).sort()).toEqual(copies)
+    expect(readdirSync(join(ws, '.combwork', 'backups')).sort()).toEqual(copies)
     expect(second).toEqual(first)
   })
 
   it('a new workspace takes the step with no cards, and moves its card files straight into the tables', async () => {
     const ws = workspace()
-    mkdirSync(join(ws, '.hive', 'tasks'), { recursive: true })
-    writeFileSync(join(ws, '.hive', 'tasks', '7.json'), JSON.stringify(ODD[901]).replace('"number":901', '"number":7'))
-    writeFileSync(join(ws, '.hive', 'tasks', 'board.json'), JSON.stringify({ version: 1, next: 8 }))
+    mkdirSync(join(ws, '.combwork', 'tasks'), { recursive: true })
+    writeFileSync(join(ws, '.combwork', 'tasks', '7.json'), JSON.stringify(ODD[901]).replace('"number":901', '"number":7'))
+    writeFileSync(join(ws, '.combwork', 'tasks', 'board.json'), JSON.stringify({ version: 1, next: 8 }))
     const w = await open(ws)
     const doc = await inWorkspace(w, () => store.cardDoc(w, 7))
     expect(JSON.stringify(doc)).toBe(JSON.stringify(ODD[901]).replace('"number":901', '"number":7'))
@@ -263,11 +263,11 @@ describe('the cards step (#1209)', () => {
     await close(w)
   })
 
-  const golden = process.env.HIVE_BOARD_GOLDEN_DB
+  const golden = process.env.CW_BOARD_GOLDEN_DB
   it.skipIf(!golden)("a live board's copy: every reader gives the same bytes after the upgrade", { timeout: 600_000 }, async () => {
     const ws = workspace()
     const file = store.boardFile(ws)
-    mkdirSync(join(ws, '.hive'), { recursive: true })
+    mkdirSync(join(ws, '.combwork'), { recursive: true })
     copyFileSync(golden!, file)
     if (existsSync(`${golden}-wal`)) copyFileSync(`${golden}-wal`, `${file}-wal`)
     // Every card number of the copy, read on a connection of its own.
@@ -306,8 +306,8 @@ describe('the board read on one snapshot (#1209 round 1)', () => {
 
   async function board(): Promise<{ ws: string; w: WS; a: number; b: number }> {
     const ws = workspace()
-    mkdirSync(join(ws, 'q', '.hive'), { recursive: true })
-    writeFileSync(join(ws, 'q', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a2', name: 'Agent 2' }] }))
+    mkdirSync(join(ws, 'q', '.combwork'), { recursive: true })
+    writeFileSync(join(ws, 'q', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a2', name: 'Agent 2' }] }))
     const w = await open(ws)
     const [a, b] = await inWorkspace(w, async () => {
       const first = await tasks.createTask({ title: 'Old title', project: 'p', agent: 'a1' }, user)

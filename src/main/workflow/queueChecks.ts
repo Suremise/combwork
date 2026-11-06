@@ -1,11 +1,11 @@
-// The merge queue's checks as Hive's own runs (#1349, SPEC §16.9.1 steps 5 and 8, §16.13): the runner the queue calls
+// The merge queue's checks as Combwork's own runs (#1349, SPEC §16.9.1 steps 5 and 8, §16.13): the runner the queue calls
 // (`QueueConfig.runCheck` and `install`) for its own worktree. Each configured check (G9, its command from the options,
-// OP-24) and each install is a progress run attributed to "Hive (merge queue)", named for the card, the command and the
+// OP-24) and each install is a progress run attributed to "Combwork (merge queue)", named for the card, the command and the
 // result revision ("HI-12 · typecheck · a3f2c1d"), with its output in a bounded log file (Show log).
 //
-// - The environment is a session command's (the app passes `childEnv()`), never Hive's own: no ELECTRON_RUN_AS_NODE and
-//   none of a session's HIVE_* variables (`checkEnv`). Hidden; ended with its whole tree at its time limit (Settings →
-//   Advanced, `hive.queue.checkMinutes`).
+// - The environment is a session command's (the app passes `childEnv()`), never Combwork's own: no ELECTRON_RUN_AS_NODE and
+//   none of a session's CW_* variables (`checkEnv`). Hidden; ended with its whole tree at its time limit (Settings →
+//   Advanced, `cw.queue.checkMinutes`).
 // - Green means proved: the queue brackets each check (`bracketStart`/`bracketEnd`) and writes `CheckRan` at the test
 //   merge's revision, counted only if the folder was at exactly that revision and clean at the start and the end, and
 //   nothing was written to a tracked file and no HEAD reflog entry was made in between. Exit 0 but uncounted isn't green.
@@ -13,7 +13,7 @@
 //   error, or its program not found: `programFound`, before it starts on Windows, where cmd exits 1 for it), one ended
 //   by its time limit, or one killed from outside (a signal, or Windows' interrupt status) is transient; everything
 //   else is red.
-// - The install (S13, #187, `installPlan`) is the project's worktree setup command in its clean form where Hive knows
+// - The install (S13, #187, `installPlan`) is the project's worktree setup command in its clean form where Combwork knows
 //   one (npm install and known flags → npm ci with them; pnpm and yarn's frozen lock file), else as written (its run
 //   says so); `npm ci` for a lock file with no setup command; with neither there is nothing to install, which the next
 //   check's run says once. The folder's node_modules is removed before every install (a link as a link), so a warm
@@ -38,7 +38,7 @@ import type { CheckWhyNot, RunCheck, TransientFailure } from '../../shared/types
 /** Starts a process (the app's recording spawn, #1360; a test's plain one). */
 export type Spawn = (file: string, args: string[], opts: SpawnOptions) => ChildProcess
 
-/** Hive's own progress runs, as the queue's checks report them (the app's ProgressStore, a test's list). */
+/** Combwork's own progress runs, as the queue's checks report them (the app's ProgressStore, a test's list). */
 export interface QueueRuns {
   /** A run started: its id, or null when runs aren't kept (the Progress panel off). */
   /**
@@ -54,11 +54,11 @@ export interface QueueRuns {
 
 /**
  * A project's queue runs in a progress store (the app's Progress panel), none while `on` says runs aren't kept. Its
- * caller is Hive's own: only Hive changes these runs. An install's title is its command line: `titleFromCommand` keeps
+ * caller is Combwork's own: only Combwork changes these runs. An install's title is its command line: `titleFromCommand` keeps
  * it from the Agent API's public form (#620).
  */
 export function progressRuns(store: ProgressStore, on: () => boolean, workspacePath: string, projectPath: string, warn: (e: unknown) => void = () => undefined): QueueRuns {
-  const caller = (r: { noInstall?: boolean; installAsWritten?: boolean } = {}): ProgressCaller => ({ source: 'hive', workspacePath, projectPath, ...(r.noInstall ? { noInstall: true } : {}), ...(r.installAsWritten ? { installAsWritten: true } : {}) })
+  const caller = (r: { noInstall?: boolean; installAsWritten?: boolean } = {}): ProgressCaller => ({ source: 'combwork', workspacePath, projectPath, ...(r.noInstall ? { noInstall: true } : {}), ...(r.installAsWritten ? { installAsWritten: true } : {}) })
   return {
     start: (r) => {
       if (!on()) return null
@@ -86,7 +86,7 @@ export interface QueueChecksDeps {
   /** A session command's environment (the app's `childEnv()`); `checkEnv` takes out what a check must never get. */
   env: () => Record<string, string>
   runs?: QueueRuns
-  /** Where the runs' logs go: Hive's own folder, never the project or the queue's worktree. */
+  /** Where the runs' logs go: Combwork's own folder, never the project or the queue's worktree. */
   logDir: string
   /** The longest a check or install runs (ms). */
   timeoutMs: () => number
@@ -112,12 +112,12 @@ const OUTPUT_CHARS = 8000
 /** Environment variables a check never gets, whatever its base has (compared without case, as Windows does). */
 const NEVER = new Set(['ELECTRON_RUN_AS_NODE', 'ELECTRON_NO_ATTACH_CONSOLE', 'CHROME_CRASHPAD_PIPE_NAME'])
 
-/** A check's environment: its base without Electron's switches and without any HIVE_* variable (a session's identity). */
+/** A check's environment: its base without Electron's switches and without any CW_* variable (a session's identity). */
 export function checkEnv(base: Record<string, string | undefined>): Record<string, string> {
   const out: Record<string, string> = {}
   for (const [k, v] of Object.entries(base)) {
     const K = k.toUpperCase()
-    if (v === undefined || NEVER.has(K) || K.startsWith('HIVE_')) continue
+    if (v === undefined || NEVER.has(K) || K.startsWith('CW_')) continue
     out[k] = v
   }
   return out
@@ -302,12 +302,12 @@ export function programFound(command: string, env: Record<string, string>, cwd: 
   return resolveCommand(word, env, cwd) !== null
 }
 
-/** How the queue installs from scratch: the command, and whether it is a clean form Hive knows. */
+/** How the queue installs from scratch: the command, and whether it is a clean form Combwork knows. */
 export interface InstallPlan {
   command: string
   /**
    * `clean`: the package manager's own clean install (npm ci; pnpm and yarn's frozen lock file). `asWritten`: a setup
-   * command Hive has no clean form of, run as written (its run says so). Either way the folder's node_modules is
+   * command Combwork has no clean form of, run as written (its run says so). Either way the folder's node_modules is
    * removed first.
    */
   how: 'clean' | 'asWritten'
@@ -319,7 +319,7 @@ const COMPOUND = /[&|;<>()^`\r\n]/
 /**
  * The flags a clean install keeps: only those that change what it prints, how it fetches or which scripts run, never
  * where it installs or whether it installs at all (`--dry-run`, `--package-lock-only`, `--prefix`, `-g`, `--help`…).
- * Any other flag makes the setup command one Hive has no clean form of (round 2 of #1349's review).
+ * Any other flag makes the setup command one Combwork has no clean form of (round 2 of #1349's review).
  */
 const CLEAN_FLAGS = /^(?:--(?:no-)?(?:audit|fund|progress|color|update-notifier|optional)|--ignore-scripts|--foreground-scripts|--legacy-peer-deps|--strict-peer-deps|--prefer-offline|--offline|--force|--silent|--quiet|-s|-q|--loglevel=[\w-]+|--cache=\S+|--registry=\S+|--(?:omit|include)=(?:dev|optional|peer)|--network-concurrency=\d+|--(?:no-)?frozen-lockfile)$/
 
@@ -521,7 +521,7 @@ export const execCommand = (o: { spawn: Spawn; platform: NodeJS.Platform; timeou
     try {
       const env = o.env()
       if (!programFound(command, env, folder, o.platform)) {
-        log.write(Buffer.from(`Hive couldn't find the program this command starts: ${command}\n`)) // i18n-ignore: the run's log, beside the command's own output
+        log.write(Buffer.from(`Combwork couldn't find the program this command starts: ${command}\n`)) // i18n-ignore: the run's log, beside the command's own output
         return done({ spawnError: true, notFound: true, exitCode: null, signal: null })
       }
       const sh = shellSpec(command, env, o.platform)
@@ -613,7 +613,7 @@ export function queueChecks(deps: QueueChecksDeps): { runCheck: (name: string, c
   const exec = (command: string, folder: string, log: BoundedLog, own: Record<string, string> = {}): Promise<CheckEnd> => execCommand({ spawn, platform, timeoutMs: deps.timeoutMs(), env: () => ({ ...checkEnv(deps.env()), ...own }) }, command, folder, log)
 
   /**
-   * Runs one command as one of Hive's runs, in the folder. Its run is always finished and its log always closed, also
+   * Runs one command as one of Combwork's runs, in the folder. Its run is always finished and its log always closed, also
    * when the log can't be written (then it is given as no log) or a step before the command fails.
    */
   const run = async (label: string, command: string, folder: string, ctx: CheckContext, opts: { titleFromCommand?: boolean; asWritten?: boolean; before?: () => void } = {}): Promise<CheckResult> => {

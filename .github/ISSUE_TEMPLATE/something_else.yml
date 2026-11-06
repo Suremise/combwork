@@ -5,12 +5,12 @@ body:
     id: what
     attributes:
       label: What it's about
-      description: A question about how to use Hive may already be answered in the [user guide](https://surmise.it/docs/user-guide/).
+      description: A question about how to use Combwork may already be answered in the [user guide](https://surmise.it/docs/user-guide/).
     validations:
       required: true
   - type: input
-    id: hive-version
+    id: combwork-version
     attributes:
-      label: Hive version
-      description: Help → About Hive Desktop shows it, if it matters here.
+      label: Combwork version
+      description: Help → About Combwork shows it, if it matters here.
       placeholder: "0.9.0"

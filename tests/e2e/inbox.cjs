@@ -22,7 +22,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-// Git in the test repositories, waiting out the Hive under test's own git (lib.git, #199).
+// Git in the test repositories, waiting out the Combwork under test's own git (lib.git, #199).
 const git = (cwd, ...a) => lib.git(cwd, a)
 const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `inbox-${name}.png`) })
 
@@ -44,13 +44,13 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `inbox-
   cfg.settings.notifications = { ...cfg.settings.notifications, desktopNotifications: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47891), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47891), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const until = async (fn, ms = 10000) => {
     const t = Date.now()
@@ -59,7 +59,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `inbox-
     return v
   }
   // Focus as the test says, not as Windows allows: Windows doesn't give a background app the focus while another window
-  // has it (focus-stealing protection), so the window's focus is stubbed (as taskbar.cjs does) and the event Hive
+  // has it (focus-stealing protection), so the window's focus is stubbed (as taskbar.cjs does) and the event Combwork
   // listens for is sent with it.
   const setFocus = (focused) =>
     app.evaluate(({ BrowserWindow }, f) => {
@@ -71,7 +71,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `inbox-
       }
       globalThis.__focused = f
       if (f) {
-        // Back from minimised without taking the OS focus (the test copies never do: HIVE_TEST_QUIET).
+        // Back from minimised without taking the OS focus (the test copies never do: CW_TEST_QUIET).
         if (w.isMinimized()) w.showInactive()
         w.emit('focus')
       } else {

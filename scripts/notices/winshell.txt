@@ -1,4 +1,4 @@
 WinShell plug-in for NSIS (WinShell.dll), written by Anders.
 
-Published as freeware at https://nsis.sourceforge.io/WinShell_plug-in, without a licence text. The copy Hive's
+Published as freeware at https://nsis.sourceforge.io/WinShell_plug-in, without a licence text. The copy Combwork's
 installer and uninstaller use is identical to the one published there.

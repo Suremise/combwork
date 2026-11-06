@@ -43,7 +43,7 @@ describe('the i18nshots route (#769)', () => {
   })
 
   it('says what is wrong with a case file rather than skipping its screens', () => {
-    const dir = tempDir('hive-i18nshots-')
+    const dir = tempDir('cw-i18nshots-')
     try {
       writeFileSync(join(dir, 'board.cjs'), "module.exports = { area: 'boards', screens: [{ name: 'card', open: () => null }] }")
       writeFileSync(join(dir, 'files.cjs'), "module.exports = { area: 'files', screens: [{ name: 'Tree View', open: () => null }, { name: 'editor' }, { name: 'editor', open: () => null }] }")
@@ -107,8 +107,8 @@ const report = req('./e2e/layoutReport.cjs') as {
 
 describe("the i18nshots route's text report (#899)", () => {
   it('looks for English left only where the language translates it into other words', () => {
-    const english = { a: 'Not running', b: 'To do', c: 'OK', d: 'Cancel', e: 'Cancel', f: 'Hive', g: '{agent} (removed)', h: '{n, plural, one {# card} other {# cards}}', i: '<b>{name}</b> is ready', j: '{name}', k: 'Hive {version}' }
-    const pl = { a: 'Nie działa', c: 'OK', d: 'Anuluj', e: 'Cancel', f: 'Pszczoła', g: '{agent} (usunięty)', h: '{n, plural, one {# karta} other {# kart}}', i: '<b>{name}</b> jest gotowy', j: '{name}', k: 'Hive {version}', z: 'Hive' }
+    const english = { a: 'Not running', b: 'To do', c: 'OK', d: 'Cancel', e: 'Cancel', f: 'Combwork', g: '{agent} (removed)', h: '{n, plural, one {# card} other {# cards}}', i: '<b>{name}</b> is ready', j: '{name}', k: 'Combwork {version}' }
+    const pl = { a: 'Nie działa', c: 'OK', d: 'Anuluj', e: 'Cancel', f: 'Pszczoła', g: '{agent} (usunięty)', h: '{n, plural, one {# karta} other {# kart}}', i: '<b>{name}</b> jest gotowy', j: '{name}', k: 'Combwork {version}', z: 'Combwork' }
     const left = report.englishLeft(english, pl)
     // b isn't translated (shown in English on purpose), c translates to itself, d's English is also e's translation,
     // and f's English is another message's translation (z): seeing any of them is no sign of a miss.
@@ -131,14 +131,14 @@ describe("the i18nshots route's text report (#899)", () => {
       pl: {
         'board/board': { image: 'pl/board-board-dark.png', issues: [{ kind: 'wraps', text: 'DO ZROBIENIA', where: 'div.col-head > h3', detail: '2 lines' }, { kind: 'english', text: 'Not running', where: 'span' }] },
         'core/window': { image: 'pl/core-window-dark.png', issues: [] },
-        'settings/advanced': { image: 'pl/settings-advanced-dark.png', issues: [{ kind: 'clipped', text: 'hive.showDeveloperFeatures', where: 'div.s-label', px: 14 }] }
+        'settings/advanced': { image: 'pl/settings-advanced-dark.png', issues: [{ kind: 'clipped', text: 'cw.showDeveloperFeatures', where: 'div.s-label', px: 14 }] }
       }
     })
     expect(text.split('\n')).toEqual([
       'pl: 3 screens checked, 2 flagged (1 wraps, 1 english, 1 clipped)',
       '  board/board (pl): wraps "DO ZROBIENIA" [div.col-head > h3, 2 lines] → pl/board-board-dark.png',
       '  board/board (pl): english "Not running" [span] → pl/board-board-dark.png',
-      '  settings/advanced (pl): clipped by 14 px "hive.showDeveloperFeatures" [div.s-label] → pl/settings-advanced-dark.png',
+      '  settings/advanced (pl): clipped by 14 px "cw.showDeveloperFeatures" [div.s-label] → pl/settings-advanced-dark.png',
       ''
     ])
   })

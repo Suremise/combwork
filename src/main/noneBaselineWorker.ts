@@ -60,7 +60,7 @@ export function checkPoint(project: string, excluded: readonly string[], caseles
 /**
  * The worker's requests, one at a time. `hold` and `release` are its tests' barrier: a read held before it starts (so a
  * test can change the world while a start waits on it), or with `after`, read and its answer held (so a test can change
- * a file it has read): nothing in Hive sends them.
+ * a file it has read): nothing in Combwork sends them.
  */
 export function baselineHandler(post: (r: BaselineReply) => void): (m: BaselineRequest) => void {
   let held: 'before' | 'after' | null = null

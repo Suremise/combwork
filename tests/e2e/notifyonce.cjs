@@ -1,12 +1,12 @@
-// One notification system (HI-2320): each event is told exactly once, in one place, and is in the bell. While a Hive
-// window is focused, an agent finishing, an agent waiting for you, and an agent's warning or result (hive_notify) are
-// each one entry: one pop-up, one bell row, no Windows notification. With Hive in the background, the agent's finish and
-// wait are one Windows notification and one quiet bell row, never a pop-up; Hive's own messages (a warning) wait as a
+// One notification system (HI-2320): each event is told exactly once, in one place, and is in the bell. While a Combwork
+// window is focused, an agent finishing, an agent waiting for you, and an agent's warning or result (cw_notify) are
+// each one entry: one pop-up, one bell row, no Windows notification. With Combwork in the background, the agent's finish and
+// wait are one Windows notification and one quiet bell row, never a pop-up; Combwork's own messages (a warning) wait as a
 // pop-up in the window, its clock paused. A focus change while finishes are being collected decides where their group
 // goes. A waiting agent's entry says Answered once it no longer asks, and a newer ask is its own entry, untouched by the
 // older one's answer. The test copy runs quiet and records each entry it tells and each Windows notification it would
-// show (HIVE_TEST_NOTIFY_LOG); the window's focus is stubbed. Fake Claude Code; throwaway profile and workspace.
-// Kinds routed by main alone (plan usage, a lane's notice, a long conversation, an update, Hive closing) are covered by
+// show (CW_TEST_NOTIFY_LOG); the window's focus is stubbed. Fake Claude Code; throwaway profile and workspace.
+// Kinds routed by main alone (plan usage, a lane's notice, a long conversation, an update, Combwork closing) are covered by
 // tests/notify.test.ts, which runs the same table and tell().
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -41,14 +41,14 @@ const check = (name, ok, extra = '') => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_QUIET: '1', HIVE_TEST_NOTIFY_LOG: notifyLog, HIVE_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_QUIET: '1', CW_TEST_NOTIFY_LOG: notifyLog, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1300, height: 800 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     const one = await lib.addAgent(inv, alpha, { name: 'One' })
     const live = async () => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === one.id)
@@ -69,9 +69,9 @@ const check = (name, ok, extra = '') => {
         w.emit(f ? 'focus' : 'blur')
       }, on)
     const log = () => (fs.existsSync(notifyLog) ? fs.readFileSync(notifyLog, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [])
-    const bell = () => page.evaluate(() => window.__hiveBell())
+    const bell = () => page.evaluate(() => window.__cwBell())
     const popupTexts = () => page.locator('.popups .popup').allInnerTexts()
-    /** Everything Hive did for one event, found by its title: entries told, Windows notifications, bell rows, pop-ups. */
+    /** Everything Combwork did for one event, found by its title: entries told, Windows notifications, bell rows, pop-ups. */
     const told = async (title) => {
       const entries = log().filter((e) => e.kind === 'entry' && e.title.includes(title))
       return {
@@ -92,7 +92,7 @@ const check = (name, ok, extra = '') => {
     check('…the pop-up closes after its seconds, the bell keeps it', !!(await lib.until(async () => same(await told(finishTitle), { entries: ['popup'], windows: 0, bell: ['shown'], popups: 0 }), HUNG_MS)))
 
     for (const [level, title, kind] of [['warning', 'Disk nearly full', 'warning'], ['info', 'Build finished', 'result']]) {
-      check(`hive_notify ${level} accepted`, (await notifyApi({ title, level, source: alpha })) === 200)
+      check(`cw_notify ${level} accepted`, (await notifyApi({ title, level, source: alpha })) === 200)
       check(`focused, a ${kind}: one entry, one pop-up, one bell row of its kind, no Windows notification`, !!(await lib.until(async () => same(await told(title), { entries: ['popup'], windows: 0, bell: ['shown'], popups: 1 }), HUNG_MS)) && (await bell()).find((t) => t.title === title)?.kind === kind, JSON.stringify(await told(title)))
     }
 
@@ -109,7 +109,7 @@ const check = (name, ok, extra = '') => {
     await lib.until(async () => (await status()) === 'finished', HUNG_MS)
     await lib.until(async () => (await page.locator('.popups .popup').count()) === 0, HUNG_MS)
 
-    // --- In the background: agents' news is one Windows notification and a quiet bell row; Hive's own warning waits.
+    // --- In the background: agents' news is one Windows notification and a quiet bell row; Combwork's own warning waits.
     await setFocus(false)
     const before = log().filter((e) => e.kind === 'notification').length
     await send('go work 1')
@@ -117,8 +117,8 @@ const check = (name, ok, extra = '') => {
       const t = await told(finishTitle)
       return t.windows === 1 && t.entries.filter((r) => r === 'windows').length === 1 && t.bell.filter((b) => b === 'quiet').length === 1 && t.popups === 0
     }, HUNG_MS)), JSON.stringify(await told(finishTitle)))
-    check('hive_notify warning accepted in the background', (await notifyApi({ title: 'Hooks are quiet', level: 'warning', source: alpha })) === 200)
-    check('…Hive\'s own warning: a pop-up that waits in the window, no Windows notification', !!(await lib.until(async () => same(await told('Hooks are quiet'), { entries: ['popup'], windows: 0, bell: ['shown'], popups: 1 }), HUNG_MS)))
+    check('cw_notify warning accepted in the background', (await notifyApi({ title: 'Hooks are quiet', level: 'warning', source: alpha })) === 200)
+    check('…Combwork\'s own warning: a pop-up that waits in the window, no Windows notification', !!(await lib.until(async () => same(await told('Hooks are quiet'), { entries: ['popup'], windows: 0, bell: ['shown'], popups: 1 }), HUNG_MS)))
     await lib.sleep(3500) // A fixed wait on purpose: longer than its 2 s, to show it does NOT close while the window is in the background.
     check('…still there while the window is in the background', (await told('Hooks are quiet')).popups === 1)
     await setFocus(true)

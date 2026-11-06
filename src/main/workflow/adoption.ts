@@ -7,7 +7,7 @@
 // Only the cards from before 1.0 (board_meta ADOPTION_UPTO, recorded in the upgrade's transaction): a board made by 1.0
 // has none, and a card made since is never marked. Safe to repeat: run at each workspace open until it has finished
 // once (board_meta `adoption`), and right after the upgrade. Each card is checked again inside the board change that
-// writes it, against how it was classified and read: one started, adopted or marked meanwhile (another Hive, a rerun)
+// writes it, against how it was classified and read: one started, adopted or marked meanwhile (another Combwork, a rerun)
 // is left as it is, and one changed meanwhile (moved, given another agent or folder) is classified again from fresh
 // data by another run, its stale reads never written. Nothing moves on the board and nothing is refused (S53).
 
@@ -121,15 +121,15 @@ export async function adoptNow(ws: WorkspaceService): Promise<AdoptionResult | n
       // Where each agent works now, under the board's lock: a card whose agent's folder changed since it was read is read again.
       const now = await ws.projectConfig(folder)
       const store = FactStore.forBoard(ws, { project: name, key: name })
-      // Resolved over the workspace's and Hive's: a project may set only some (#1278).
+      // Resolved over the workspace's and Combwork's: a project may set only some (#1278).
       const resolved = resolvedOf(ws, folder, r.platform, r.cfg)
-      if (resolved.invalid) throw new Error(`the options for ${name} can't be used: ${resolved.invalid}`) // i18n-ignore: a mistake in Hive's code, logged
+      if (resolved.invalid) throw new Error(`the options for ${name} can't be used: ${resolved.invalid}`) // i18n-ignore: a mistake in Combwork's code, logged
       const compiled = compile(resolved.options)
-      if (!compiled.ok) throw new Error(`the upgrade's options for ${name} contradict each other: ${compiled.contradictions.join(', ')}`) // i18n-ignore: a mistake in Hive's code, logged
+      if (!compiled.ok) throw new Error(`the upgrade's options for ${name} contradict each other: ${compiled.contradictions.join(', ')}`) // i18n-ignore: a mistake in Combwork's code, logged
       store.saveRuleset(compiled.ruleset)
       for (const x of reads) {
         const c = adoptionCardNow(ws, x.card.number)
-        // Started, adopted or marked meanwhile (another Hive, a rerun), or gone: not this run's to change.
+        // Started, adopted or marked meanwhile (another Combwork, a rerun), or gone: not this run's to change.
         if (!c || c.facts || c.preWorkflow) continue
         if (c.project !== x.card.project || c.column !== x.card.column || c.archived !== x.card.archived || c.agent !== x.card.agent || placeOf(now, c.agent) !== placeOf(r.cfg, c.agent)) {
           out.changed++
@@ -141,7 +141,7 @@ export async function adoptNow(ws: WorkspaceService): Promise<AdoptionResult | n
           // unless the card's stage was set otherwise meanwhile.
           const move = (to: StageId): void => {
             if (to === card.stage) return
-            tx.append(card.id, { kind: 'Moved', actor: 'hive', source: 'recorded', ruleset: compiled.ruleset.id, data: { from: card.stage, to, cause: 'derived' } }) // i18n-ignore: a fact's kind and codes, not text
+            tx.append(card.id, { kind: 'Moved', actor: 'combwork', source: 'recorded', ruleset: compiled.ruleset.id, data: { from: card.stage, to, cause: 'derived' } }) // i18n-ignore: a fact's kind and codes, not text
             tx.setStage(card.id, to)
           }
           if (writeAdoption(tx, card, compiled.ruleset, x.column, x.at, x.inputs, move)) out.adopted++
@@ -172,7 +172,7 @@ async function projectOptions(ws: WorkspaceService, folder: string, hasLane: boo
   let configured = false
   let made = false
   const cfg = await ws.mutateProjectConfig(folder, (c) => {
-    // Under the lock, from the file as it is now: another Hive (or a rerun) may have written them meanwhile.
+    // Under the lock, from the file as it is now: another Combwork (or a rerun) may have written them meanwhile.
     if (c.workflow) return {}
     if (madeBy1_0(c)) {
       made = true
@@ -193,8 +193,8 @@ async function projectOptions(ws: WorkspaceService, folder: string, hasLane: boo
 const MADE_BY_1_0 = 'madeBy1.0' as const
 
 /**
- * Whether a project was made by 1.0: Hive records its platform as it makes its project.json (§16.3.5, ensureProject),
- * which no Hive before 1.0 did. Its provenance, whatever the board (an upgraded board with no cards included, HR3's
+ * Whether a project was made by 1.0: Combwork records its platform as it makes its project.json (§16.3.5, ensureProject),
+ * which no Combwork before 1.0 did. Its provenance, whatever the board (an upgraded board with no cards included, HR3's
  * #1423 round 1).
  */
 const madeBy1_0 = (c: Pick<ProjectConfig, 'platform'>): boolean => c.platform !== undefined

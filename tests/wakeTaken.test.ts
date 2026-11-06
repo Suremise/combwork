@@ -1,4 +1,4 @@
-// A line Hive types that its CLI doesn't take (#430), with the real SessionManager and the terminal's writes caught:
+// A line Combwork types that its CLI doesn't take (#430), with the real SessionManager and the terminal's writes caught:
 // nothing more is typed over a line still waiting to be taken (typed and not yet taken, or marked not taken), whoever
 // types it; the user's Enter alone doesn't count as taken; only the CLI taking a prompt clears the mark. And a wake's
 // Enter again, when it can't be pressed at once, is pressed once it can, else the line is marked, saying so.
@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { sessions } from '../src/main/sessions'
 import * as pty from '../src/main/ptyHost'
 import { config } from '../src/main/config'
-// The writer of Hive's lines and their confirmation (#649: lineWriter.ts, which the delivery service types with).
+// The writer of Combwork's lines and their confirmation (#649: lineWriter.ts, which the delivery service types with).
 import * as writer from '../src/main/lineWriter'
 
 const project = 'C:/fake-ws/alpha'
@@ -57,7 +57,7 @@ describe('a line still waiting to be taken (#430)', () => {
     // Typed a moment ago (a wake being confirmed): another wake or a task is refused before anything is written.
     const e = running({ typed: { at: Date.now(), prompts: 0 } })
     expect(sessions.lineWaiting(project, id)).toBe(true)
-    await expect(sessions.sendPrompt(project, id, 'SECOND LINE')).rejects.toThrow(/hasn't taken the line Hive typed before/)
+    await expect(sessions.sendPrompt(project, id, 'SECOND LINE')).rejects.toThrow(/hasn't taken the line Combwork typed before/)
     expect(writes).toEqual([])
     // Taken (the CLI reported the prompt): typing goes on.
     e.prompts = 1
@@ -67,14 +67,14 @@ describe('a line still waiting to be taken (#430)', () => {
     // Marked not taken: refused, however long ago it was typed.
     writes.length = 0
     e.typed = { at: Date.now() - 60 * 60_000, prompts: 1 }
-    e.state.untakenLine = { since: new Date().toISOString(), text: '[Hive] #1 is in Review' }
+    e.state.untakenLine = { since: new Date().toISOString(), text: '[CW] #1 is in Review' }
     await expect(sessions.sendPrompt(project, id, 'THIRD')).rejects.toThrow(/hasn't taken/)
     expect(writes).toEqual([])
   })
 
   it("the user's Enter there isn't proof it was taken: the mark stays until its CLI takes a prompt", () => {
     const e = running()
-    e.state.untakenLine = { since: new Date().toISOString(), text: '[Hive] #1 is in Review' }
+    e.state.untakenLine = { since: new Date().toISOString(), text: '[CW] #1 is in Review' }
     sessions.noteUserInput(`session:${key}`, '\r')
     expect(sessions.lineUntaken(project, id)).toBe(true)
   })
@@ -187,7 +187,7 @@ describe("a line whose CLI took it with no prompt seen: what it rang for was rea
     // The window is told of its state (a hand-made state has no provider to show it by).
     const told = vi.spyOn(sessions as unknown as { emitState: (s: unknown) => void }, 'emitState').mockImplementation(() => undefined)
     // Line B rang for mB and is marked; mA, an older line's (taken by a prompt, its delivery read only now), says nothing of B.
-    sessions.lineNotTaken(project, id, 'run1', '[Hive] New in your inbox: 1 card event (#166) (mB).', true, ['mB'])
+    sessions.lineNotTaken(project, id, 'run1', '[CW] New in your inbox: 1 card event (#166) (mB).', true, ['mB'])
     expect(sessions.lineUntaken(project, id)).toBe(true)
     told.mockClear()
     sessions.lineTaken(project, id, 'run1', 'mA', 'mA, which it rang for, was read')
@@ -200,7 +200,7 @@ describe("a line whose CLI took it with no prompt seen: what it rang for was rea
     sessions.lineTaken(project, id, 'run1', 'mB', 'mB, which it rang for, was read')
     expect(sessions.lineUntaken(project, id)).toBe(false)
     expect(sessions.lineWaiting(project, id)).toBe(false)
-    // A line that rang for nothing Hive knows (its mark has no deliveries): no read clears it.
+    // A line that rang for nothing Combwork knows (its mark has no deliveries): no read clears it.
     sessions.lineNotTaken(project, id, 'run1', 'A TASK', true)
     sessions.lineTaken(project, id, 'run1', 'mB', 'mB, which it rang for, was read')
     expect(sessions.lineUntaken(project, id)).toBe(true)
@@ -216,7 +216,7 @@ describe("a line whose CLI took it with no prompt seen: what it rang for was rea
   })
 })
 
-describe("a line of Hive's the user typed into is theirs (#652 round 1 finding 2)", () => {
+describe("a line of Combwork's the user typed into is theirs (#652 round 1 finding 2)", () => {
   const was = config.settings.assistant
   afterEach(() => {
     live.delete(key)
@@ -231,7 +231,7 @@ describe("a line of Hive's the user typed into is theirs (#652 round 1 finding 2
     live.set(key, e)
     return e
   }
-  const BELL = '[Hive] New in your inbox: 1 message (m1). Call hive_inbox to read it, act on it, then ack it.'
+  const BELL = '[CW] New in your inbox: 1 message (m1). Call cw_inbox to read it, act on it, then ack it.'
 
   for (const pause of [15, 0]) {
     it(`edited and left past the typing pause (${pause} s): no Enter again, and nothing more typed until a prompt is sent`, async () => {
@@ -242,7 +242,7 @@ describe("a line of Hive's the user typed into is theirs (#652 round 1 finding 2
       vi.spyOn(pty, 'writePty').mockImplementation((_k, data) => void writes.push(data))
       const marks = vi.spyOn(sessions, 'lineNotTaken').mockImplementation(() => undefined)
       const e = typedAt(t)
-      // The user replaces Hive's line with a draft of their own, and leaves it unsent past the pause.
+      // The user replaces Combwork's line with a draft of their own, and leaves it unsent past the pause.
       sessions.noteUserInput(`session:${key}`, 'my unsent draft')
       vi.setSystemTime(t + 20_000)
       expect(sessions.userMayBeTyping(project, id)).toBe(false)
@@ -252,11 +252,11 @@ describe("a line of Hive's the user typed into is theirs (#652 round 1 finding 2
       expect(writes).toEqual([])
       expect(left).toBe(1)
       expect(marks).not.toHaveBeenCalled()
-      // Not Hive's to send even directly, and nothing is typed over the draft, however long it stands.
+      // Not Combwork's to send even directly, and nothing is typed over the draft, however long it stands.
       expect(sessions.submitAgain(project, id, 'run1')).toBe(false)
       vi.setSystemTime(t + 10 * 60_000)
       expect(sessions.lineWaiting(project, id)).toBe(true)
-      await expect(sessions.sendPrompt(project, id, 'NEXT BELL')).rejects.toThrow(/hasn't taken the line Hive typed before/)
+      await expect(sessions.sendPrompt(project, id, 'NEXT BELL')).rejects.toThrow(/hasn't taken the line Combwork typed before/)
       expect(writes).toEqual([])
       // The user sends it (the CLI's count goes up): typing goes on.
       e.prompts = 1

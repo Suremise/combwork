@@ -1,5 +1,5 @@
 // The Sandbox checks' report (tests/sandbox/report.cjs): which collected facts pass or fail each check, that only full
-// coverage passes, and the Markdown it writes. Moved from the hive-mcp repo with the checks (HI-2298).
+// coverage passes, and the Markdown it writes. Moved here from the old MCP repository with the checks (HI-2298).
 import assert from 'assert'
 import { createRequire } from 'module'
 import { test } from 'vitest'
@@ -11,24 +11,37 @@ type Json = Record<string, any>
 const { evaluate, markdown, verdict, REQUIRED } = require('./sandbox/report.cjs')
 
 const HOME = 'C:\\Users\\WDAGUtilityAccount'
-const lnk = (name: string, folder: string) => ({ name, folder: `${HOME}\\${folder}`, target: `${HOME}\\AppData\\Local\\Programs\\Hive\\Hive.exe` })
+// The build's names (checks.cjs appNames: HI-2458, HI-2460), and the 1.0 release's before it.
+// old-name: begin sandboxReport-inputs
+/** 1.0's product name, and its install folder's and exe's name. */
+const OLD_APP = 'Hive Desktop'
+const OLD_DIR = 'Hive'
+// old-name: end sandboxReport-inputs
+const APP = { productName: 'Combwork', shortcutName: 'Combwork', exeName: 'Combwork' }
+const lnk = (name: string, folder: string, exe = 'Combwork') => ({ name, folder: `${HOME}\\${folder}`, target: `${HOME}\\AppData\\Local\\Programs\\${exe}\\${exe}.exe` })
 const DESKTOP = 'Desktop'
 const START = 'AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs'
+const combwork = { path: `${HOME}\\AppData\\Local\\Programs\\Combwork`, exe: 'Combwork.exe', exists: true, hasExe: true, uninstaller: true, appAsarSha256: 'bbbb' }
 const state = (over: Json = {}): Json => ({
-  uninstallEntries: [{ displayName: 'Hive Desktop 0.6.0' }],
-  installDir: { exists: true, hiveExe: true, uninstaller: true, appAsarSha256: 'bbbb' },
-  profileDir: { exists: true },
-  shortcuts: [lnk('Hive Desktop', DESKTOP), lnk('Hive Desktop', START)],
+  uninstallEntries: [{ displayName: 'Combwork 0.6.0', key: '10a7595a-0e90-558c-b6b6-ae33bdd80748' }],
+  installs: { combwork, old: { exists: false } },
+  installDir: combwork,
+  profiles: { roamingCombwork: { exists: true }, roamingOld: { exists: false }, localCombwork: { exists: true, record: '{"v":1,"from":"x","movedAt":"t","by":"installer"}' }, localOld: { exists: false } },
+  profileDir: { path: `${HOME}\\AppData\\Roaming\\Combwork`, exists: true },
+  shortcuts: [lnk('Combwork', DESKTOP), lnk('Combwork', START)],
+  run: [],
   git: false,
   ...over
 })
+/** The 1.0 app installed, before the upgrade. */
+const oldState = (): Json => state({ uninstallEntries: [{ displayName: `${OLD_APP} 0.4.1` }], shortcuts: [lnk(OLD_APP, DESKTOP, OLD_DIR), lnk(OLD_APP, START, OLD_DIR)], installs: { combwork: { exists: false }, old: { exists: true, hasExe: true, appAsarSha256: 'aaaa' } }, run: [{ name: `electron.app.${OLD_APP}`, command: `"C:\\x\\${OLD_DIR}.exe" --hidden` }] })
 /** A finished driver record with all its required checks passing. */
 const driverOk = (kind: string, key: string): Json => {
   const req = REQUIRED[kind].drivers[key]
-  return { completed: true, checks: req.ids.map((id: string) => ({ id, scenario: Number(id.split('.')[0]), name: `check ${id}`, ok: true })), facts: { version: '0.6.0', gitMissing: true, hive: ['workspace.json'], views: {} } }
+  return { completed: true, checks: req.ids.map((id: string) => ({ id, scenario: Number(id.split('.')[0]), name: `check ${id}`, ok: true })), facts: { version: '0.6.0', exe: 'Combwork.exe', gitMissing: true, workspaceTree: ['workspace.json'], views: {} } }
 }
 const allShots = [...REQUIRED.fresh.shots, ...REQUIRED.upgrade.shots]
-const meta = (over: Json = {}): Json => ({ installer: 'Hive-Setup-0.6.0.exe', installerVersion: '0.6.0', previousVersion: '0.5.1', ran: ['fresh', 'upgrade'], date: 'd', hostBuild: '10.0.26200', minutes: '3.0', shots: allShots, steps: [{ scenario: 1, what: '1. install', ok: true }], ...over })
+const meta = (over: Json = {}): Json => ({ app: APP, installer: 'Combwork-Setup-0.6.0.exe', installerVersion: '0.6.0', previousVersion: '0.5.1', ran: ['fresh', 'upgrade'], date: 'd', hostBuild: '10.0.26200', minutes: '3.0', shots: allShots, steps: [{ scenario: 1, what: '1. install', ok: true }], ...over })
 const good = (): Json => ({
   's1-run': { exitCode: 0, seconds: 10 },
   's1-state': state(),
@@ -38,11 +51,13 @@ const good = (): Json => ({
   's5-run': { exitCode: 0, seconds: 5 },
   's5-state': state({ uninstallEntries: [], installDir: { exists: false }, shortcuts: [] }),
   's4-prev-run': { exitCode: 0, seconds: 10 },
-  's4-prev-state': state({ uninstallEntries: [{ displayName: 'Hive 0.4.1' }], shortcuts: [lnk('Hive', DESKTOP), lnk('Hive', START)], installDir: { exists: true, hiveExe: true, appAsarSha256: 'aaaa' } }),
+  's4-prev-state': oldState(),
   's4-mark': driverOk('upgrade', 's4-mark'),
-  's4-new-run': { exitCode: 0, seconds: 20, hiveRunning: true },
+  's4-prev-started': { pid: 4242, window: true, seconds: 5 },
+  's4-new-run': { exitCode: 0, seconds: 20, installedRunning: true, running: ['combwork'], arguments: '--updated /S --force-run' },
   's4-new-state': state(),
-  's4-after': driverOk('upgrade', 's4-after')
+  's4-after': driverOk('upgrade', 's4-after'),
+  's4-notify': driverOk('upgrade', 's4-notify')
 })
 const failedNames = (r: Json): string[] => r.checks.filter((c: Json) => !c.ok).map((c: Json) => c.name)
 
@@ -52,22 +67,24 @@ test('all facts as expected: every check passes, and the report says so', () => 
   assert.ok(r.checks.length >= 36)
   const md = markdown(r)
   assert.match(md, /\*\*PASSED: all \d+ checks\*\*/)
-  assert.match(md, /## 4\. Upgrade[\s\S]*Shortcuts renamed or kept: only "Hive Desktop".*\(before: Hive \(Desktop\), Hive \(Start menu\)\)/)
+  assert.match(md, new RegExp(String.raw`## 4\. Upgrade[\s\S]*Shortcuts: only "Combwork", starting Combwork\.exe.*\(before: ${OLD_APP} \(Desktop\), ${OLD_APP} \(Start menu\)\)`))
   assert.match(md, /No Git/)
   assert.ok(!/both say/.test(md))
 })
 
 test('each wrong fact fails its check, named in "Failed checks"', () => {
   const f = good()
-  f['s1-state'] = state({ uninstallEntries: [{ displayName: 'Hive Desktop 0.6.0' }, { displayName: 'Hive 0.4.1' }] })
-  f['s4-new-state'] = state({ shortcuts: [lnk('Hive Desktop', DESKTOP), lnk('Hive', START)], installDir: { exists: true, hiveExe: true, appAsarSha256: 'aaaa' } })
-  f['s4-new-run'].hiveRunning = false
+  f['s1-state'] = state({ uninstallEntries: [{ displayName: 'Combwork 0.6.0' }, { displayName: `${OLD_APP} 0.4.1` }] })
+  // The 1.0 app left behind: its entry, a shortcut, its folder, its Launch at login, and its profile folders.
+  f['s4-new-state'] = state({ uninstallEntries: [{ displayName: 'Combwork 0.6.0' }, { displayName: `${OLD_APP} 0.4.1` }], shortcuts: [lnk('Combwork', DESKTOP), lnk(OLD_APP, START, OLD_DIR)], installs: { combwork, old: { exists: true } }, profiles: { roamingCombwork: { exists: false }, roamingOld: { exists: true }, localCombwork: { exists: false }, localOld: { exists: true } }, run: [{ name: `electron.app.${OLD_APP}`, command: `"C:\\x\\${OLD_DIR}.exe"` }] })
+  f['s4-new-run'].installedRunning = false
+  f['s4-new-run'].running = ['old']
   f['s5-state'] = state({ uninstallEntries: [], installDir: { exists: false }, shortcuts: [], profileDir: { exists: false } })
   f.s3.checks[4].ok = false
   f.s3.checks[4].detail = 'not found'
   const r = evaluate(meta(), f)
   const failed = failedNames(r)
-  for (const re of [/One Installed-apps entry: "Hive Desktop 0.6.0"/, /only "Hive Desktop"/, /--force-run starts Hive/, /profile .* is kept/, /check 3\.check-again-finds/, /app code changed/]) {
+  for (const re of [/One Installed-apps entry: "Combwork 0.6.0"/, /none of the 1\.0 app's/, /only "Combwork"/, /--force-run starts Combwork/, /The 1\.0 app no longer runs/, /the 1\.0 app's folder gone/, /profile folders moved/, /installer's record/, /Launch at login removed/, /profile .* is kept/, /check 3\.check-again-finds/]) {
     assert.ok(failed.some(n => re.test(n)), `${re} not among ${JSON.stringify(failed)}`)
   }
   const md = markdown(r)
@@ -88,7 +105,7 @@ test('a driver interrupted after a passing check fails: not finished, and its ot
 
 test('empty driver records fail every required check and fact', () => {
   const f = good()
-  for (const k of ['s1', 's3', 's6', 's4-mark', 's4-after']) f[k] = {}
+  for (const k of ['s1', 's3', 's6', 's4-mark', 's4-after', 's4-notify']) f[k] = {}
   const r = evaluate(meta(), f)
   const failed = failedNames(r)
   const required = [...Object.values(REQUIRED.fresh.drivers as Json), ...Object.values(REQUIRED.upgrade.drivers as Json)].reduce((n: number, d: Json) => n + d.ids.length, 0)
@@ -135,7 +152,7 @@ test('only the scenarios that ran are checked', () => {
 const SAC = { reason: 'Smart App Control in the Sandbox blocks unsigned installers (VerifiedAndReputablePolicyState = 1): sign the installer, or run the checks with --smart-app-control off.' }
 
 test('both kinds not run: NOT RUN with the reason once, no checks, no failure (#611)', () => {
-  const r = evaluate(meta({ shots: [], steps: [], notRun: { fresh: { ...SAC, installer: 'Hive-Setup-0.6.0.exe' }, upgrade: { ...SAC, installer: 'Hive-Setup-0.5.1.exe' } } }), {})
+  const r = evaluate(meta({ shots: [], steps: [], notRun: { fresh: { ...SAC, installer: 'Combwork-Setup-0.6.0.exe' }, upgrade: { ...SAC, installer: 'Combwork-Setup-0.5.1.exe' } } }), {})
   assert.strictEqual(r.failed, 0)
   assert.strictEqual(r.checks.length, 0)
   assert.strictEqual(verdict(r), `NOT RUN: ${SAC.reason}`)
@@ -147,7 +164,7 @@ test('both kinds not run: NOT RUN with the reason once, no checks, no failure (#
 test('one kind not run and the other passing: NOT RUN, saying the other checks passed', () => {
   const f = good()
   for (const k of Object.keys(f)) if (!k.startsWith('s4')) delete f[k]
-  const r = evaluate(meta({ shots: REQUIRED.upgrade.shots, steps: [], notRun: { fresh: { ...SAC, installer: 'Hive-Setup-0.6.0.exe' } } }), f)
+  const r = evaluate(meta({ shots: REQUIRED.upgrade.shots, steps: [], notRun: { fresh: { ...SAC, installer: 'Combwork-Setup-0.6.0.exe' } } }), f)
   assert.strictEqual(r.failed, 0, JSON.stringify(failedNames(r)))
   assert.ok(r.checks.length && r.checks.every((c: Json) => c.scenario === 4))
   assert.strictEqual(verdict(r), `NOT RUN: ${SAC.reason} (not run: fresh; the other ${r.checks.length} checks passed)`)
@@ -157,7 +174,36 @@ test('one kind not run and the other failing: FAILED, naming what was not run', 
   const f = good()
   for (const k of Object.keys(f)) if (!k.startsWith('s4')) delete f[k]
   f['s4-new-run'].exitCode = 2
-  const r = evaluate(meta({ shots: REQUIRED.upgrade.shots, steps: [], notRun: { fresh: { ...SAC, installer: 'Hive-Setup-0.6.0.exe' } } }), f)
+  const r = evaluate(meta({ shots: REQUIRED.upgrade.shots, steps: [], notRun: { fresh: { ...SAC, installer: 'Combwork-Setup-0.6.0.exe' } } }), f)
   assert.ok(r.failed > 0)
   assert.match(verdict(r), /^FAILED: \d+ of \d+ checks; not run: fresh$/)
+})
+
+// Scenario 11 (HI-2602): the profile move the installer couldn't make, made by the app (profile-move.ps1's record).
+const { PROFILE_MOVE_IDS } = require('./sandbox/report.cjs')
+const moveOk = (): Json => ({
+  's11-prev-run': { exitCode: 0, seconds: 9 },
+  's11-profile': { completed: true, checks: PROFILE_MOVE_IDS.map((id: string) => ({ id, name: `check ${id}`, ok: true })), facts: { recordBy: 'installer' } }
+})
+const moveMeta = (over: Json = {}): Json => meta({ ran: ['profile-move'], shots: REQUIRED['profile-move'].shots, steps: [], ...over })
+
+test('the profile move: every check recorded and passing passes, under scenario 11', () => {
+  const r = evaluate(moveMeta(), moveOk())
+  assert.strictEqual(r.failed, 0, JSON.stringify(failedNames(r)))
+  assert.ok(r.checks.length === PROFILE_MOVE_IDS.length + 1 && r.checks.every((c: Json) => c.scenario === 11))
+  assert.match(markdown(r), /## 11\. The profile move the installer couldn't make[\s\S]*\| check 11\.refused \| pass \|/)
+})
+
+test('the profile move: a failing check, a missing one, an unfinished script, a failed install or a missing screenshot fails it', () => {
+  const f = moveOk()
+  f['s11-profile'].checks[2] = { id: '11.refused', name: 'refused', ok: false, detail: "title ''; exit 0" }
+  f['s11-profile'].checks = f['s11-profile'].checks.filter((c: Json) => c.id !== '11.sign-in-once')
+  f['s11-profile'].completed = false
+  f['s11-prev-run'].exitCode = 3
+  const r = evaluate(moveMeta({ shots: ['s11-moved.png', 's11-desktop.jpg'] }), f)
+  const failed = r.checks.filter((c: Json) => !c.ok).map((c: Json) => `${c.scenario}. ${c.name}`)
+  assert.deepStrictEqual(failed.sort(), ['11. The 1.0 app installs (9 s)', '11. Screenshot s11-refused.png collected', '11. profile move check "11.sign-in-once" ran', '11. profile-move.ps1 finished', '11. refused'].sort())
+  assert.match(markdown(r), /- \*\*11\. refused\*\*: title ''; exit 0/)
+  // No record at all: said, never a silent pass.
+  assert.ok(failedNames(evaluate(moveMeta(), {})).includes('s11-profile: result recorded'))
 })

@@ -5,7 +5,8 @@
       "053f431d60a616b7",
       "1a85f53ba82fca85",
       "82c7af80f3668358",
-      "f475c950d778e311"
+      "f475c950d778e311",
+      "0d8e62a58fb0c22d"
     ],
     "card-loop": [
       "7fca2f34d9b1d72a",
@@ -64,7 +65,9 @@
       "1289cc89245ee20e",
       "8166252c0dd6091c",
       "6c2838fb53f21025",
-      "b706867be0d1e21f"
+      "b706867be0d1e21f",
+      "07563718ad7aa495",
+      "9699fd9cb16fb4cf"
     ],
     "coordinate-agents": [
       "148fcb5639058ac2",
@@ -116,10 +119,12 @@
       "e0ee6f8dadfaf2f9",
       "83fa33cc271e548d",
       "e67a6db92725c63c",
-      "7e9438761eb44397"
+      "7e9438761eb44397",
+      "cfae75dda271182b"
     ],
     "generalist": [
-      "f985d471d38d2ad3"
+      "f985d471d38d2ad3",
+      "c6f6437bb076a5c4"
     ],
     "handover": [
       "60ac1268a067e829",
@@ -128,7 +133,8 @@
       "62b5e5908ff9e8ab",
       "2207319c538f3a27",
       "0f2e94d46f92f085",
-      "92bbca927581809d"
+      "92bbca927581809d",
+      "dba2e2a7d827e1c2"
     ],
     "journal": [
       "a5944f6b716d5f3e",
@@ -136,7 +142,8 @@
       "a029628dae30f337",
       "12049ff66579193d",
       "1b95a13e5695d92c",
-      "5330da8d664b833b"
+      "5330da8d664b833b",
+      "e4baf3a5c7dc731d"
     ],
     "licence-audit": [
       "fbeedbd277f91f4c"
@@ -164,12 +171,14 @@
       "df40e3b7660d462f",
       "68265551e3d13ad5",
       "b290d344eac2362b",
-      "df4f56267e90636a"
+      "df4f56267e90636a",
+      "3d779bc7adde05e1"
     ],
     "pick-up": [
       "022c3f69d3c24d7f",
       "82abbbadff06f698",
-      "ccca469fa164f9c7"
+      "ccca469fa164f9c7",
+      "e1fb2e5955578a1f"
     ],
     "review-agent-work": [
       "857a3bd37ac4cc00",
@@ -196,7 +205,9 @@
       "e5034df97e223faa",
       "eef3b804197210df",
       "c3e9cee66dc8af50",
-      "1be4da73a79f9625"
+      "1be4da73a79f9625",
+      "e3233ecca9df1696",
+      "e085e91f7e2f614f"
     ],
     "run-lanes": [
       "b42f313edbb95eca",
@@ -228,25 +239,37 @@
       "40131ab709ef1664",
       "0c9784fe6d51c097",
       "e862cf20fb3efff8",
-      "22c1355165c8396f"
+      "22c1355165c8396f",
+      "83042acbe411f69a"
     ],
     "split-work": [
       "9f3b17bc4a73bdd1",
       "125641bf5c31d814",
       "d90d1b817013a47a",
-      "05199e999b5b370d"
+      "05199e999b5b370d",
+      "8790b2871340b897"
     ],
     "triage-report": [
       "d854ef7b080ac6e2",
       "7ca7cd68a3f66813",
       "7c11bbf9bdbbeddb",
-      "6c6b2f5e55874535"
+      "6c6b2f5e55874535",
+      "a18237b98140ba6c"
     ],
     "tune-settings": [
       "734ef492088145a7",
       "40332ddcbf85451a",
       "fb25c931eab39484",
-      "9ce6f9f5debc7bc1"
+      "9ce6f9f5debc7bc1",
+      "2f5377bba1d15ea6"
+    ],
+    "use-cw-api": [
+      "d306d59457643720",
+      "25c5b8c3a1d0190b",
+      "a66e6adb57744631",
+      "cedf490c660c0381",
+      "ad984abf4993bfc8",
+      "46d8fbb868d76394"
     ],
     "use-hive-api": [
       "c0281b780bf4d213",
@@ -299,14 +322,19 @@
       "eae8d4a5c4a28050",
       "2c1457871b0060d4",
       "375851b1e9796c8e",
-      "c44e97bb6650c59c"
+      "c44e97bb6650c59c",
+      "e4e3c955560eb4b5",
+      "7777f637f09d3a31"
     ],
     "workspace-note": [
       "5ecc6339b89ba668",
       "29f86ff346fbe4c1",
       "1fa474c3748278cb",
       "0e7764cf38d50e70",
-      "95884a487571db7d"
+      "95884a487571db7d",
+      "40ebdd5777270fc0",
+      "9d1e8d77f62d1f6e",
+      "af4c40834e1f56c6"
     ]
   },
   "modes": {
@@ -314,7 +342,8 @@
       "2cd699f6b4a7c3b1",
       "8ab80fcd42401537",
       "6db5d571e5be0c11",
-      "a7666a2664961fbf"
+      "a7666a2664961fbf",
+      "ec0ca6282aa7aaac"
     ],
     "orchestrator": [
       "21ce0d9749e31d4d",
@@ -347,6 +376,35 @@
       "1e0061343258e607",
       "0eb44d8a93d33c57",
       "c14c462f8054a84c"
+    ]
+  },
+  "dialects": {
+    "api/cli": [
+      "c91cf96256abb477"
+    ],
+    "claude-code/Haiku 5.5": [
+      "efeff9955746568b"
+    ],
+    "claude-code/Opus 5.5": [
+      "ac2f0517187a1c41"
+    ],
+    "claude-code/Sonnet 5.5": [
+      "830cc8d0e258971d"
+    ],
+    "claude-code/cli": [
+      "5829bbcaf8718323"
+    ],
+    "codex/GPT-6 Astra": [
+      "8c08bd7fe84e3a9a"
+    ],
+    "codex/GPT-6.1 Sol": [
+      "303ce734fa4effec"
+    ],
+    "codex/cli": [
+      "edf3d9e403f4b689"
+    ],
+    "copilot/cli": [
+      "2a428b5ff9d211fc"
     ]
   }
 }

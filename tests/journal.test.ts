@@ -10,7 +10,7 @@ import { tempDir } from './tempDir'
 import { admitted } from './admitted'
 import { DEFAULT_JOURNAL, isoWeek, journalSettings, weekStart, type JournalSettings } from '../src/shared/journal'
 
-const base = tempDir('hive-journal-')
+const base = tempDir('cw-journal-')
 const j = await import('../src/main/journal')
 
 let n = 0
@@ -19,7 +19,7 @@ const homes: string[] = []
 const dismissals: (() => void)[] = []
 const home = (): string => {
   const ws = join(base, `ws-${++n}`)
-  const h = join(ws, '.hive', 'assistant')
+  const h = join(ws, '.combwork', 'assistant')
   homes.push(h)
   dismissals.push(admitted(ws))
   return h
@@ -47,7 +47,11 @@ describe('the schema', () => {
     j.closeJournal(h)
     const db = new DatabaseSync(j.journalFile(h), { readOnly: true })
     try {
-      expect(db.prepare('SELECT version, name FROM schema_version').all()).toEqual([{ version: 1, name: 'entries' }])
+      expect(db.prepare('SELECT version, name FROM schema_version').all()).toEqual([
+        { version: 1, name: 'entries' },
+        { version: 2, name: 'summary text' },
+        { version: 3, name: 'names: combwork' }
+      ])
       expect((db.prepare('PRAGMA journal_mode').get() as { journal_mode: string }).journal_mode).toBe('wal')
       expect((db.prepare('PRAGMA auto_vacuum').get() as { auto_vacuum: number }).auto_vacuum).toBe(2)
       const names = (db.prepare("SELECT name FROM sqlite_master WHERE type IN ('table', 'index', 'trigger') AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'entries_fts_%' ORDER BY name").all() as { name: string }[]).map((r) => r.name)
@@ -66,6 +70,52 @@ describe('the schema', () => {
     expect(() => write(h, { summary: 'x', links: [{ type: 'entry', ref: '999' }] })).toThrow(/no entry 999/)
     expect(() => write(h, { summary: 'x'.repeat(301) })).toThrow(/longer than 300/)
     expect(j.recall(h, {})).toEqual([])
+  })
+})
+
+// Dialects (HI-2438): a fact Combwork writes keeps its message beside its English, to be said in each reader's dialect.
+describe("a summary's message", () => {
+  const stored = (h: string, id: number): string | null => {
+    j.closeJournal(h)
+    const raw = new DatabaseSync(j.journalFile(h), { readOnly: true })
+    try {
+      return (raw.prepare('SELECT summary_text AS t FROM entries WHERE id = ?').get(id) as { t: string | null }).t
+    } finally {
+      raw.close()
+    }
+  }
+
+  it("is kept with Combwork's facts, none with the Assistant's own entries, and goes once the summary is edited", () => {
+    const h = home()
+    const text = { id: 'finish.journal.done', values: { card: 'AM-1', title: 'Fix it', how: 'queue', byUser: 'no', by: 'combwork' } }
+    const fact = j.writeEntry(h, all, { kind: 'event', summary: 'AM-1 "Fix it" is Done', summaryText: text }, 'combwork')
+    const own = write(h, { summary: 'Darren chose the greeting' })
+    expect(JSON.parse(stored(h, fact)!)).toEqual(text)
+    expect(stored(h, own)).toBeNull()
+    j.updateEntry(h, all, fact, { importance: 3 })
+    expect(JSON.parse(stored(h, fact)!)).toEqual(text)
+    j.updateEntry(h, all, fact, { summary: 'AM-1 is Done, and shipped' })
+    expect(stored(h, fact)).toBeNull()
+  })
+
+  // HI-2451: a journal from before the column (version 1) gains it once opened; its entries read as before, with no message.
+  it('is added to a journal written before it, whose entries still read as they were', () => {
+    const h = home()
+    const old = j.writeEntry(h, all, { kind: 'event', summary: 'AM-2 "Old" is Done', detail: 'finish queue', links: [{ type: 'card', ref: '2' }], tags: ['done'] }, 'combwork')
+    const before = j.readEntry(h, old)
+    j.closeJournal(h)
+    const raw = new DatabaseSync(j.journalFile(h))
+    try {
+      raw.exec('ALTER TABLE entries DROP COLUMN summary_text; DELETE FROM schema_version WHERE version >= 2')
+    } finally {
+      raw.close()
+    }
+    expect(j.readEntry(h, old)).toEqual(before)
+    expect(stored(h, old)).toBeNull()
+    expect(j.recall(h, { query: 'Old' }).map((r) => r.id)).toEqual([old])
+    const text = { id: 'lane.journal.fact', values: { named: 'no', name: '', state: 'started', commit: '', who: 'B1 / R1', cards: 'AM-2' } }
+    const fact = j.writeEntry(h, all, { kind: 'event', summary: 'Lane B1 / R1 started: AM-2', summaryText: text }, 'combwork')
+    expect(JSON.parse(stored(h, fact)!)).toEqual(text)
   })
 })
 
@@ -122,13 +172,13 @@ describe('recall', () => {
   it('gives one-line rows, newest first, at most the limit (10 by default); filters by time, kind, project, link and tag', () => {
     const h = home()
     const ids: number[] = []
-    for (let i = 0; i < 12; i++) ids.push(write(h, { summary: `Entry ${i}`, kind: i % 2 ? 'event' : 'decision', project: i < 6 ? 'hive' : 'website', links: i === 3 ? [{ type: 'card', ref: '#1017' }] : [], tags: i === 4 ? ['SQLite'] : [] }))
+    for (let i = 0; i < 12; i++) ids.push(write(h, { summary: `Entry ${i}`, kind: i % 2 ? 'event' : 'decision', project: i < 6 ? 'alpha' : 'website', links: i === 3 ? [{ type: 'card', ref: '#1017' }] : [], tags: i === 4 ? ['SQLite'] : [] }))
     const rows = j.recall(h, {})
     expect(rows).toHaveLength(10)
     expect(rows[0]).toEqual({ id: ids[11], at: expect.any(String), kind: 'event', project: 'website', summary: 'Entry 11', importance: 1, source: 'assistant', supersededBy: null, hasDetail: false })
     expect(j.recall(h, { limit: 3 }).map((r) => r.id)).toEqual([ids[11], ids[10], ids[9]])
     expect(() => j.recall(h, { limit: 51 })).toThrow(/limit is 1 to 50/)
-    expect(j.recall(h, { kinds: ['event'], project: 'HIVE' }).map((r) => r.summary)).toEqual(['Entry 5', 'Entry 3', 'Entry 1'])
+    expect(j.recall(h, { kinds: ['event'], project: 'ALPHA' }).map((r) => r.summary)).toEqual(['Entry 5', 'Entry 3', 'Entry 1'])
     expect(j.recall(h, { link: { type: 'card', ref: '1017' } }).map((r) => r.id)).toEqual([ids[3]])
     expect(j.recall(h, { tag: 'sqlite' }).map((r) => r.id)).toEqual([ids[4]])
     age(h, ids[0], '2026-01-01T00:00:00.000Z')
@@ -303,10 +353,10 @@ describe('the size cap, as little as it takes (#1031 round 1)', () => {
 describe('deleting the journal', () => {
   const trashDir = join(base, 'trash')
   beforeAll(() => {
-    process.env.HIVE_TEST_TRASH_DIR = trashDir
+    process.env.CW_TEST_TRASH_DIR = trashDir
   })
   afterAll(() => {
-    delete process.env.HIVE_TEST_TRASH_DIR
+    delete process.env.CW_TEST_TRASH_DIR
   })
   it('closes it and moves its files to the Recycle Bin; a new one starts empty', async () => {
     const h = home()

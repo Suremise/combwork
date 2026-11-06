@@ -33,7 +33,7 @@ vi.mock('../../src/main/boardStore', async (original) => ({
   onBoardUpgraded: (fn: (ws: WorkspaceService) => void) => (ctx.upgraded.add(fn), () => ctx.upgraded.delete(fn))
 }))
 vi.mock('../../src/main/workspace', async (original) => ({ ...(await original<typeof import('../../src/main/workspace')>()), openWorkspaces: () => ctx.open }))
-vi.mock('../../src/main/agentProcesses', () => ({ processSupervisor: () => ({}), setHiveIdentity: () => undefined }))
+vi.mock('../../src/main/agentProcesses', () => ({ processSupervisor: () => ({}), setCombworkIdentity: () => undefined }))
 vi.mock('../../src/main/workflow/queueChecksApp', () => ({ appQueueChecks: () => ({ runCheck: async () => ({ ok: true, output: '' }) }) }))
 vi.mock('../../src/main/repoLock', () => ({ withRepoLock: async (_p: string, fn: () => Promise<unknown>) => fn() }))
 vi.mock('../../src/main/workflow/queueRunner', () => {
@@ -43,7 +43,7 @@ vi.mock('../../src/main/workflow/queueRunner', () => {
     queueFolderNeeded: () => true,
     releaseQueueRunners: async () => undefined,
     QueueRunner: {
-      // Held by another Hive while ctx.heldBy says so (#1455); else this Hive's. HI-2079: the first ctx.hostFails runners
+      // Held by another Combwork while ctx.heldBy says so (#1455); else this Combwork's. HI-2079: the first ctx.hostFails runners
       // fail at their first git, as a runner whose git host went does (failed, its writes refused: LeaseLost).
       acquire: async () => {
         const n = ++ctx.acquired
@@ -111,7 +111,7 @@ afterEach(() => {
   setHolderWatch(null)
 })
 
-/** A card approved and queued for main (checked out nowhere), whose advance began and Hive crashed at `hook`. */
+/** A card approved and queued for main (checked out nowhere), whose advance began and Combwork crashed at `hook`. */
 async function begun(hook: 'afterStarted' | 'afterAdvance') {
   const e = (env = setup({ ...preset('git', 'team', { quick: [], tests: [] }), preChecks: [], mergeChecks: [], okBefore: { mode: 'never', labels: [] } }))
   sh(e.project, 'checkout', '-q', '--detach')
@@ -132,7 +132,7 @@ async function begun(hook: 'afterStarted' | 'afterAdvance') {
   return { e, card, ws }
 }
 
-const queueRefs = (e: Env): string[] => sh(e.project, 'for-each-ref', '--format=%(refname)', 'refs/hive/queue/').split(/\r?\n/).filter(Boolean)
+const queueRefs = (e: Env): string[] => sh(e.project, 'for-each-ref', '--format=%(refname)', 'refs/cw/queue/').split(/\r?\n/).filter(Boolean)
 
 describe('the merge queue host (#1348)', () => {
   it('an entry recovered to run again while the rules were off: paused rulesOff, and merged once they are on again', async () => {
@@ -149,7 +149,7 @@ describe('the merge queue host (#1348)', () => {
     expect(queueRefs(e)).toEqual([])
   })
 
-  it('the target moved before Hive ended (S33c): recovery records Integrated and drops the test merge\'s ref', async () => {
+  it('the target moved before Combwork ended (S33c): recovery records Integrated and drops the test merge\'s ref', async () => {
     const { e, card, ws } = await begun('afterAdvance')
     expect(queueRefs(e)).toHaveLength(1)
     await kickQueue(ws, e.project, 'main')
@@ -186,8 +186,8 @@ describe("a runner its git host failed (HI-2079)", () => {
 })
 
 /**
- * A card approved and queued for main (checked out nowhere) while Hive A's runner holds the lease (#1455): A's lease (a
- * process that is there, this test's own), the host's acquire answering "held by Hive-A" until `ctx.heldBy` is null,
+ * A card approved and queued for main (checked out nowhere) while Combwork A's runner holds the lease (#1455): A's lease (a
+ * process that is there, this test's own), the host's acquire answering "held by Combwork-A" until `ctx.heldBy` is null,
  * and a probe whose answers the test gives (`answer`: true for A living, false for gone, or a promise it settles).
  */
 async function heldByA() {
@@ -208,8 +208,8 @@ async function heldByA() {
     return { life, ws: { path: e.home, lifetime: life.signal, worktreesRoot: `${e.home}/worktrees`, emit: () => undefined, projectConfig: async () => ({}) } as unknown as WorkspaceService }
   }
   const at = new Date().toISOString()
-  e.store.takeQueueLease({ target: 'main', lease: 'la', token: 'ta', profile: 'Hive-A', pid: process.pid, started: 1, takenAt: at, renewedAt: at }, null)
-  ctx.heldBy = { profile: 'Hive-A', pid: process.pid, renewedAt: at }
+  e.store.takeQueueLease({ target: 'main', lease: 'la', token: 'ta', profile: 'Combwork-A', pid: process.pid, started: 1, takenAt: at, renewedAt: at }, null)
+  ctx.heldBy = { profile: 'Combwork-A', pid: process.pid, renewedAt: at }
   const probe = { looks: 0, answer: (): boolean | Promise<boolean> => true }
   const watch = (ms: number) => setHolderWatch({ ms, probe: { self: async () => ({ pid: 0, started: 0 }), alive: async () => (probe.looks++, probe.answer()), list: async () => null, end: async () => [] } })
   /** A's process gone: acquire takes the lease here from now on. */
@@ -232,8 +232,8 @@ function deferred<T>() {
 // not as a bare "Test timed out" (HI-2292: a 30 s bound could never report, and the failure's check was unknown).
 const HUNG = { timeout: 15_000, interval: 20 }
 
-describe("another Hive's runner, watched (#1455, S50; HR4's #1358 round 1)", () => {
-  it('watched while it lives, never run here; once its process is gone, this Hive runs the queue and merges', async () => {
+describe("another Combwork's runner, watched (#1455, S50; HR4's #1358 round 1)", () => {
+  it('watched while it lives, never run here; once its process is gone, this Combwork runs the queue and merges', async () => {
     const { e, card, open, probe, watch, aGone } = await heldByA()
     watch(20)
     await kickQueue(open().ws, e.project, 'main')
@@ -241,7 +241,7 @@ describe("another Hive's runner, watched (#1455, S50; HR4's #1358 round 1)", () 
     await vi.waitFor(() => expect(probe.looks).toBeGreaterThanOrEqual(3), HUNG)
     expect(ctx.acquired).toBe(1)
     expect(e.wf.state(card).stage).toBe('merging')
-    // A's process gone (its lease left as it was): this Hive runs the queue, with no other kick, and merges the card.
+    // A's process gone (its lease left as it was): this Combwork runs the queue, with no other kick, and merges the card.
     aGone()
     await vi.waitFor(() => expect(e.wf.state(card).stage).toBe('done'), HUNG)
     expect(ctx.acquired).toBe(2)

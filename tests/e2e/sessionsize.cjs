@@ -1,6 +1,6 @@
 // Transcript sizes in the Sessions tab (#671): every session shows its transcript file's size beside its context, for
 // all three CLIs (Claude Code's projects folder, Codex's rollout, Copilot's events.jsonl); amber past Warn when a
-// transcript is over, with a tooltip suggesting a handover; "—" when the CLI has no file (only Hive's backup); a size
+// transcript is over, with a tooltip suggesting a handover; "—" when the CLI has no file (only Combwork's backup); a size
 // that grew shows when the list opens again. The Assistant's conversations show theirs too, with its own advice. Both
 // themes, and a narrow window. Fixtures only (nothing runs). Dev build, throwaway profile, workspace and CLI homes; quiet.
 const lib = require('./lib.cjs')
@@ -17,7 +17,7 @@ const claudeHome = path.join(lib.WORK, 'sessionsize-claude-home')
 const codexHome = path.join(lib.WORK, 'sessionsize-codex-home')
 const copilotHome = path.join(lib.WORK, 'sessionsize-copilot-home')
 const alpha = path.join(ws, 'alpha')
-const assistantHome = path.join(ws, '.hive', 'assistant')
+const assistantHome = path.join(ws, '.combwork', 'assistant')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -73,18 +73,18 @@ const sizeText = (n) => (n < MB ? `${Math.max(1, Math.round(n / 1024))} KB` : `$
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47830), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, COPILOT_HOME: copilotHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47830), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, COPILOT_HOME: copilotHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1400, height: 850 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     await page.getByText('alpha', { exact: true }).first().click()
 
-    // --- A session of each CLI, one past the limit, and one whose CLI transcript is gone (only Hive's backup).
+    // --- A session of each CLI, one past the limit, and one whose CLI transcript is gone (only Combwork's backup).
     const S = { small: id(1), long: id(2), gone: id(3), codex: id(4), copilot: id(5), assistant: id(6) }
     const files = {
       small: claudeFile(alpha, S.small),
@@ -95,7 +95,7 @@ const sizeText = (n) => (n < MB ? `${Math.max(1, Math.round(n / 1024))} KB` : `$
     }
     write(files.small, claudeLines(S.small, 6, 'A small one', 3000))
     write(files.long, claudeLines(S.long, 5, 'A long one', Math.round(1.4 * MB)))
-    write(path.join(alpha, '.hive', 'sessions', `${S.gone}.jsonl`), claudeLines(S.gone, 3, 'Gone from the CLI'))
+    write(path.join(alpha, '.combwork', 'sessions', `${S.gone}.jsonl`), claudeLines(S.gone, 3, 'Gone from the CLI'))
     write(files.codex, rollout(S.codex, 4, 'A Codex one'))
     write(files.copilot, copilotEvents(S.copilot, 2, 'A Copilot one'))
     write(files.assistant, claudeLines(S.assistant, 7, 'Plan the week', Math.round(1.2 * MB)))
@@ -141,7 +141,7 @@ const sizeText = (n) => (n < MB ? `${Math.max(1, Math.round(n / 1024))} KB` : `$
     const smallTip = await lib.hoverTip(page, size('Small session'), (t) => t.startsWith('Transcript:'))
     check('a small one just says its size', /^Transcript: \d+ KB on disk/.test(smallTip) && !/Hand the work over/.test(smallTip), smallTip)
     const goneTip = await lib.hoverTip(page, size('Gone session'), (t) => /no transcript file/.test(t))
-    check('"—" says why', /Claude Code has no transcript file for this session \(Hive keeps a backup of it\)\./.test(goneTip), goneTip)
+    check('"—" says why', /Claude Code has no transcript file for this session \(Combwork keeps a backup of it\)\./.test(goneTip), goneTip)
 
     // --- Both themes, and a narrow window: the size stays in its row, readable.
     for (const theme of ['dark', 'light']) {
@@ -180,7 +180,7 @@ const sizeText = (n) => (n < MB ? `${Math.max(1, Math.round(n / 1024))} KB` : `$
     check(`a size that grew shows when the list opens again (${grown})`, !!(await lib.until(async () => (await shown('Small session')) === grown, HUNG_MS)), await shown('Small session'))
 
     // --- The Assistant's conversations.
-    await page.locator('.activity-btn[aria-label="Hive Assistant"]').click()
+    await page.locator('.activity-btn[aria-label="Assistant"]').click()
     await lib.until(async () => (await page.locator('.assistant-summary').count()) > 0, HUNG_MS)
     await page.locator('.row', { hasText: 'All Conversations' }).click()
     const conv = page.locator('.sessions-tree .session-row', { hasText: 'Planning the week' })

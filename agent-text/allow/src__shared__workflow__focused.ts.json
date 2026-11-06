@@ -1,0 +1,12 @@
+{
+  "prose|prop:other|a result for a test it wasn't given: {}": 1,
+  "prose|prop:other|and {} more": 1,
+  "prose|prop:other|at most {} tests": 1,
+  "prose|prop:other|its results file is not JSON": 1,
+  "prose|prop:other|its results file is not a list": 1,
+  "prose|prop:other|no result for {}{}": 1,
+  "prose|prop:other|not a test id: {}": 1,
+  "prose|prop:other|tests must be a list": 1,
+  "prose|prop:other|two results for {}": 1,
+  "prose|prop:other|{} is named twice": 1
+}

@@ -1,4 +1,4 @@
-// The headless screen Hive keeps of each session's terminal (TerminalScreen, #1572): whatever a CLI prints, at whatever
+// The headless screen Combwork keeps of each session's terminal (TerminalScreen, #1572): whatever a CLI prints, at whatever
 // size, never stops it, and never throws where nothing can catch it (xterm parses in its own timer).
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -30,7 +30,7 @@ describe("a session's headless screen (#1572)", () => {
   it('takes a redraw after narrowing and shortening at once, then widening back (the attention suite: 69×37, 27×36, 69×37)', async () => {
     const s = screen(69, 37)
     // Two fake Codex agents' screens: prompt lines a little wider than the window (a path), the cursor low on it.
-    await parsed(s, '› C:\\Users\\someone\\AppData\\Local\\hive-test\\e2e\\lanes\\2\\attention-ws.worktrees\\alpha\\copies\r\n'.repeat(6) + '\x1b[33;1H')
+    await parsed(s, '› C:\\Users\\someone\\AppData\\Local\\combwork-test\\e2e\\lanes\\2\\attention-ws.worktrees\\alpha\\copies\r\n'.repeat(6) + '\x1b[33;1H')
     s.resize(27, 36)
     s.resize(69, 37)
     // xterm 6.0 with no scrollback left 36 lines for 37 rows here, and this redraw's last line feed threw in its timer.
@@ -53,7 +53,7 @@ describe("a session's headless screen (#1572)", () => {
     s.resize(26, 38)
     expect(warnings).toEqual([expect.stringContaining('26×38')])
     await vi.waitFor(() => expect(pendingParsed).toBe(true), { timeout: HUNG_MS })
-    // It keeps what Hive reads besides the cells (bracketed paste), and takes what was going to throw.
+    // It keeps what Combwork reads besides the cells (bracketed paste), and takes what was going to throw.
     expect(s.bracketedPaste()).toBe(true)
     await parsed(s, '\x1b[K\x1b[41;1H')
     s.resize(114, 50)

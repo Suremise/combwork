@@ -1,7 +1,7 @@
 // The developer console showing text (#699): with Settings → Advanced → Developer console: show prompt, reply and
 // command text off, the console's live view is redacted and says so, and a recording's text box starts unticked; turned
 // on in Settings, the open console shows an "Unredacted" banner and, from then on, the prompt's text live (and after a
-// pause, filled in with text), never a token in it, and a recording starts with text ticked; the agents' hive_console
+// pause, filled in with text), never a token in it, and a recording starts with text ticked; the agents' cw_console
 // stays redacted meanwhile, and Copy Diagnostics names the setting; turned off, the banner goes and no text stays on
 // screen.
 // Fake Claude Code; dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
@@ -45,14 +45,14 @@ const check = (name, ok, extra = '') => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true, devConsole: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), ...claudeEnv })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), ...claudeEnv })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1400, height: 850 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     await lib.waitForProvider(inv)
     const apiToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
@@ -86,7 +86,7 @@ const check = (name, ok, extra = '') => {
       await dc.locator('.dc-detail .dc-raw').waitFor({ timeout: HUNG_MS })
       return { seq: r.seq, raw: await dc.locator('.dc-detail .dc-raw').textContent() }
     }
-    const ring = () => dc.evaluate((src) => window.hive.invoke('console:snapshot', src, 0), source)
+    const ring = () => dc.evaluate((src) => window.combwork.invoke('console:snapshot', src, 0), source)
     const recordBoxTicked = async () => {
       await dc.locator('.dc-record').click()
       const box = dc.locator('.dc-record-menu input[type="checkbox"]')
@@ -132,12 +132,12 @@ const check = (name, ok, extra = '') => {
     check('resume fills in what came while paused, with its text', held.raw.includes(HELD), held.raw.slice(0, 300))
     check('…and a recording starts with its text box ticked', (await recordBoxTicked()) === true)
 
-    // --- The agents' hive_console stays redacted, and Copy Diagnostics names the setting.
+    // --- The agents' cw_console stays redacted, and Copy Diagnostics names the setting.
     const read = await api(`/v1/console/events?agent=${encodeURIComponent(b1.id)}&project=alpha&seq=${held.seq}`)
     const readText = JSON.stringify(read.body)
-    check("hive_console stays redacted while it's on", read.status === 200 && read.body?.events?.length === 1 && readText.includes('<text:') && !readText.includes(HELD) && !readText.includes(SHOWN), readText.slice(0, 400))
+    check("cw_console stays redacted while it's on", read.status === 200 && read.body?.events?.length === 1 && readText.includes('<text:') && !readText.includes(HELD) && !readText.includes(SHOWN), readText.slice(0, 400))
     const diagnostics = await inv('app:diagnostics', {})
-    check('Copy Diagnostics names the setting', diagnostics.includes('hive.console.showText'), diagnostics.split('\n').find((l) => l.includes('Advanced settings')) ?? '')
+    check('Copy Diagnostics names the setting', diagnostics.includes('cw.console.showText'), diagnostics.split('\n').find((l) => l.includes('Advanced settings')) ?? '')
 
     // --- Off again: the banner goes, and no text stays on screen.
     await toggle.click()

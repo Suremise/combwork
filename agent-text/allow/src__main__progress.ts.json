@@ -1,0 +1,16 @@
+{
+  "prose|error|At most {} runs can be open at once: finish one first": 1,
+  "prose|error|That run already has a total": 1,
+  "prose|error|That run has finished": 2,
+  "prose|error|This workspace already has {} open runs: finish some first": 1,
+  "prose|error|Unknown progress run": 1,
+  "prose|error|ok (true or false) is required": 1,
+  "prose|error|stopped must be true or false": 1,
+  "prose|error|title is required": 1,
+  "prose|error|titleFromCommand must be true or false": 1,
+  "prose|error|{} must be a number": 1,
+  "prose|error|{} must be between {} and {}": 1,
+  "prose|error|{} must be text": 1,
+  "prose|prop:other|Agent": 1,
+  "prose|prop:other|Script": 2
+}

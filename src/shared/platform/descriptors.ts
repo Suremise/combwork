@@ -25,7 +25,7 @@ export const PLATFORMS: Record<PlatformId, PlatformDescriptor> = {
 
 export const hasCapability = (platform: PlatformId, c: Capability): boolean => PLATFORMS[platform].capabilities.includes(c)
 
-/** Whether a value read from a file (project.json's `platform`) names a platform Hive has. */
+/** Whether a value read from a file (project.json's `platform`) names a platform Combwork has. */
 export const isPlatformId = (v: unknown): v is PlatformId => typeof v === 'string' && Object.hasOwn(PLATFORMS, v)
 
 /** A revision as the project's platform shows it. */
@@ -43,15 +43,15 @@ export interface Detection {
   subfolder?: boolean
 }
 
-/** Why the detected platform differs from the project's: what Hive offers to switch to (§16.3.5). */
+/** Why the detected platform differs from the project's: what Combwork offers to switch to (§16.3.5). */
 export interface PlatformOffer {
   offer: PlatformId
   why: 'gitFound' | 'repositoryGone' | 'otherFound'
 }
 
 /**
- * A project's platform (ProjectInfo): the one it uses (recorded when Hive set the project up, never switched
- * silently), its descriptor's capabilities, what detection finds now, and the switch Hive offers when they differ.
+ * A project's platform (ProjectInfo): the one it uses (recorded when Combwork set the project up, never switched
+ * silently), its descriptor's capabilities, what detection finds now, and the switch Combwork offers when they differ.
  */
 export interface ProjectPlatform {
   id: PlatformId
@@ -59,7 +59,7 @@ export interface ProjectPlatform {
   detected: Detection
   offer?: PlatformOffer
   /**
-   * The project.json names no platform Hive has (edited by hand, a later version's): what it holds, as text. The
+   * The project.json names no platform Combwork has (edited by hand, a later version's): what it holds, as text. The
    * project uses what detection finds, offering nothing, until the setting is a platform again.
    */
   invalid?: string

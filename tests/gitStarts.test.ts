@@ -1,5 +1,5 @@
 // Fewer git starts (HI-2115): answers about fixed commits (an ancestor, a merge base, a range's first parents) kept for
-// as long as Hive runs, never while the repository's history can differ under the same ids (shallow, replace refs,
+// as long as Combwork runs, never while the repository's history can differ under the same ids (shallow, replace refs,
 // grafts), never for names or unknown answers, and never across repositories. (The slots' finished-card look, the
 // other cut, is tested in slotCards.test.ts; the Git status item's in gitRepo.test.ts.)
 import { cpSync, mkdirSync, rmSync, writeFileSync } from 'fs'
@@ -305,7 +305,7 @@ describe('"is the change in the target?": a merge kept for its commits, a squash
     expect(r.v).not.toEqual({ method: 'squash', commit: s })
   })
 
-  it('a second reconcile pass over an unchanged Done card, squash-merged outside Hive, starts no git', async () => {
+  it('a second reconcile pass over an unchanged Done card, squash-merged outside Combwork, starts no git', async () => {
     const e = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [], finish: 'agentMerges', review: 'none', noSelfReview: false })
     try {
       const card = e.wf.createCard({ title: 'Squashed' })
@@ -442,7 +442,7 @@ describe('"not found" kept for 30 s from when git said it (HI-2189, the user\'s 
 
   it.each(['approved', 'review'] as const)('a second reconcile pass over an unchanged %s card not merged yet starts no git (the measurement of HI-2189)', async (stage) => {
     vi.useFakeTimers({ toFake: ['Date'] })
-    const e = setup({ ...allOff('git'), review: 'agent', noSelfReview: true, finish: 'hiveMerges', folder: 'slots', target: 'main', okBefore: { mode: 'every', labels: [] } })
+    const e = setup({ ...allOff('git'), review: 'agent', noSelfReview: true, finish: 'combworkMerges', folder: 'slots', target: 'main', okBefore: { mode: 'every', labels: [] } })
     try {
       const card = e.wf.createCard({ title: 'Waiting' })
       moved(await e.wf.start(card.key, B1))

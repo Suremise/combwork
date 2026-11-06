@@ -16,7 +16,7 @@
 }
 
 /* ==========================================================================
-   Hive — theme tokens. Honey orange replaces VS Code blue as the accent.
+   Combwork — theme tokens. Honey orange replaces VS Code blue as the accent.
    ========================================================================== */
 :root,
 [data-theme='dark'] {
@@ -668,6 +668,20 @@ kbd {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* A list row's description kept to one line, its full text on hover (OneLineDesc, HI-2527). */
+.one-line-desc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Its text a Tab stop while cut: the ring goes round the line, as the text runs on past its "…". */
+.one-line-desc:has(:focus-visible) {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+.one-line-desc :focus-visible {
+  outline: none;
+}
 .pane-header .actions {
   margin-left: auto;
   display: flex;
@@ -818,7 +832,7 @@ kbd {
 .row:hover .row-actions {
   display: flex;
 }
-/* A Hive skill's Delivered to agents switch (#1431): always shown, after the hover actions. */
+/* A Combwork skill's Delivered to agents switch (#1431): always shown, after the hover actions. */
 .skill-row .skill-delivered {
   display: flex;
   align-self: center;
@@ -849,7 +863,7 @@ kbd {
   font-weight: 600;
   color: var(--fg-strong);
 }
-/* The project Skills tab (#118): the Hive group folds; one provider's skills, picked from a dropdown. */
+/* The project Skills tab (#118): the Combwork group folds; one provider's skills, picked from a dropdown. */
 .skill-group-toggle {
   cursor: pointer;
   user-select: none;
@@ -1534,7 +1548,7 @@ textarea.input {
 .badge.error { background: rgba(242, 85, 90, 0.16); color: var(--error); }
 .badge.success { background: rgba(78, 201, 107, 0.16); color: var(--success); }
 .badge.signin { background: rgba(180, 140, 255, 0.16); color: var(--signin); }
-/* Who gets a Hive skill (Skills.tsx AudienceBadge): in a row, after the name. */
+/* Who gets a Combwork skill (Skills.tsx AudienceBadge): in a row, after the name. */
 .badge[data-audience] .codicon { font-size: 12px; }
 .badge.audience { margin-left: 4px; vertical-align: 1px; }
 .badge.info { background: rgba(59, 158, 255, 0.14); color: var(--info); }
@@ -1682,24 +1696,24 @@ textarea.input {
  * switches pages never reads as a segmented control picking a value (None · Git) beside it. Never wider than its row; in
  * a short one (`fold`) the tabs not selected fold to their icons, and shorter still the row scrolls.
  */
-.hive-tabs-row {
+.cw-tabs-row {
   position: relative;
   display: flex;
   min-inline-size: 0;
   max-inline-size: 100%;
   align-self: stretch;
 }
-.hive-tabs {
+.cw-tabs {
   display: flex;
   align-items: stretch;
   max-inline-size: 100%;
   overflow-x: auto;
   scrollbar-width: thin;
 }
-.hive-tabs > .tip-wrap {
+.cw-tabs > .tip-wrap {
   flex-shrink: 0;
 }
-.hive-tab {
+.cw-tab {
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -1715,13 +1729,13 @@ textarea.input {
   white-space: nowrap;
   cursor: pointer;
 }
-.hive-tab:hover {
+.cw-tab:hover {
   color: var(--fg-strong);
 }
-.hive-tab.active {
+.cw-tab.active {
   color: var(--fg-strong);
 }
-.hive-tab.active::after {
+.cw-tab.active::after {
   content: '';
   position: absolute;
   inset-inline: 4px;
@@ -1729,32 +1743,32 @@ textarea.input {
   block-size: 2px;
   background: var(--accent);
 }
-.hive-tab:focus-visible {
+.cw-tab:focus-visible {
   outline: 1px solid var(--accent);
   outline-offset: -3px;
 }
-.hive-tab .codicon {
+.cw-tab .codicon {
   font-size: 13px;
   color: inherit;
 }
-.hive-tab-count {
+.cw-tab-count {
   padding: 0 5px;
   border-radius: 8px;
   font-size: 11px;
   background: var(--bg-active);
   color: var(--fg);
 }
-.hive-tab-unsaved {
+.cw-tab-unsaved {
   display: block;
   inline-size: 6px;
   block-size: 6px;
   border-radius: 50%;
   background: var(--accent);
 }
-.hive-tab.icon-only {
+.cw-tab.icon-only {
   padding: 0 8px;
 }
-.hive-tab.icon-only .hive-tab-label {
+.cw-tab.icon-only .cw-tab-label {
   position: absolute;
   inline-size: 1px;
   block-size: 1px;
@@ -1762,25 +1776,25 @@ textarea.input {
   clip-path: inset(50%);
   white-space: nowrap;
 }
-/* A tab's own icon (Hive's mark, a CLI's), the codicons' size; a dimmed tab (a CLI turned off, HI-1839) stays legible. */
-.hive-tab-icon {
+/* A tab's own icon (Combwork's mark, a CLI's), the codicons' size; a dimmed tab (a CLI turned off, HI-1839) stays legible. */
+.cw-tab-icon {
   display: inline-flex;
 }
-.hive-tab-icon > :is(.provider-icon, .tab-hex) {
+.cw-tab-icon > :is(.provider-icon, .tab-hex) {
   inline-size: 13px;
   block-size: 13px;
 }
-.hive-tab.muted:not(:hover) {
+.cw-tab.muted:not(:hover) {
   color: var(--fg-faint);
 }
-.hive-tab.muted .hive-tab-icon {
+.cw-tab.muted .cw-tab-icon {
   opacity: 0.6;
 }
-.hive-tab.muted.active:not(:hover) .hive-tab-label {
+.cw-tab.muted.active:not(:hover) .cw-tab-label {
   color: var(--fg-muted);
 }
 /* A short mark after a tab's name ("off"). */
-.hive-tab-tag {
+.cw-tab-tag {
   padding: 0 5px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -1789,7 +1803,7 @@ textarea.input {
   color: var(--fg-muted);
 }
 /* The tabs with every name, measured to choose between names and icons (Tabs' `fold`). */
-.hive-tabs-measure {
+.cw-tabs-measure {
   position: absolute;
   inset-block-start: 0;
   inset-inline-start: 0;
@@ -1800,7 +1814,7 @@ textarea.input {
   visibility: hidden;
   pointer-events: none;
 }
-.hive-tabs-measure .hive-tab::after {
+.cw-tabs-measure .cw-tab::after {
   content: attr(data-label);
 }
 /* A tab's page not selected stays mounted (its draft kept) but never shows, whatever its own display. */
@@ -1808,19 +1822,19 @@ textarea.input {
   display: none !important;
 }
 /* The tabs' line runs under the whole row, the selected tab's underline on it. */
-.workflow-defaults-tabs > .hive-tabs-row,
-.kb-editor > .hive-tabs-row,
-.advanced-list > .hive-tabs-row,
-.images-page > .hive-tabs-row {
+.workflow-defaults-tabs > .cw-tabs-row,
+.kb-editor > .cw-tabs-row,
+.advanced-list > .cw-tabs-row,
+.images-page > .cw-tabs-row {
   border-block-end: 1px solid var(--border-subtle);
   margin-block-end: 4px;
 }
 /* Keyboard Shortcuts' many categories (HI-1838) wrap onto another line rather than scroll with the last cut off. */
-.hive-tabs.kb-tabs {
+.cw-tabs.kb-tabs {
   flex-wrap: wrap;
   overflow-x: visible;
 }
-/* "From Hive defaults", "From the workspace": a link to that tab of Settings → Version Control (HI-1837). */
+/* "From Combwork defaults", "From the workspace": a link to that tab of Settings → Version Control (HI-1837). */
 .workflow-origin-link {
   padding: 0;
   border: 0;
@@ -2334,7 +2348,7 @@ textarea.input {
     border-top: 1px solid var(--border-subtle);
   }
 }
-/* Cards made by an older Hive, set aside (#1044). */
+/* Cards made by an older version, set aside (#1044). */
 .set-aside-list {
   list-style: none;
   margin: 8px 0 0;
@@ -2488,7 +2502,7 @@ textarea.input {
   margin-right: 4px;
   vertical-align: -2px;
 }
-/* Over the Hive skills (the Skills view's list, and a Hive skill being edited): editing them steers the agents. */
+/* Over the Combwork skills (the Skills view's list, and a Combwork skill being edited): editing them steers the agents. */
 .banner.skills-warning {
   align-items: flex-start;
   gap: 6px;
@@ -3134,7 +3148,7 @@ p.hint {
 }
 /* The code editor's right-click menu (#1102). Monaco draws it in a shadow root hosted beside .monaco-editor, where
    its theme's colour variables don't reach (it showed black text on no surface), and standalone Monaco defines no
-   border width or radius at all. Custom properties do cross into a shadow root, so its host gets Hive's menu look
+   border width or radius at all. Custom properties do cross into a shadow root, so its host gets Combwork's menu look
    (.menu above) here, in both themes. */
 .shadow-root-host {
   --vscode-menu-background: var(--bg-elevated);
@@ -3304,7 +3318,7 @@ p.hint {
 .close-command-warn {
   color: var(--warning);
 }
-/* Settings → When this workspace closes, run / When Hive quits, run (HI-1368). */
+/* Settings → When this workspace closes, run / When Combwork quits, run (HI-1368). */
 .close-command-settings {
   display: flex;
   flex-direction: column;
@@ -3757,7 +3771,7 @@ p.hint {
 
 .popups {
   position: fixed;
-  /* Hive's one place for pop-ups (HI-2320): notifications and the tip, where Settings → Notifications puts them. Clear
+  /* Combwork's one place for pop-ups (HI-2320): notifications and the tip, where Settings → Notifications puts them. Clear
      of the title bar, the activity bar and the status bar; bottom right keeps clear of the Assistant's panel and of a
      bar's buttons (CornerPlacement). Above the page, below menus and dialogs' own layers. */
   z-index: 2500;
@@ -4289,7 +4303,7 @@ p.hint {
 .setting.danger .s-title {
   color: var(--error);
 }
-/* Settings → Advanced's list (#367): about:config style, grouped by Hive and each CLI. */
+/* Settings → Advanced's list (#367): about:config style, grouped by Combwork and each CLI. */
 .advanced-list {
   max-width: 900px;
   margin-top: 8px;
@@ -4757,7 +4771,7 @@ h2.section#unused-worktrees {
 .setup-detail {
   margin: -4px 2px 12px;
 }
-/* The CLI version Hive was tested with (#365). */
+/* The CLI version Combwork was tested with (#365). */
 .setup-tested {
   margin-top: 2px;
   font-size: 12px;
@@ -4797,7 +4811,8 @@ h2.section#unused-worktrees {
 }
 .account-main {
   flex: 1 1 360px;
-  min-width: 220px;
+  /* Never wider than a narrow card (HI-2528: Settings beside both panels in a small window is ~260px). */
+  min-width: min(220px, 100%);
 }
 .account-name {
   font-weight: 600;
@@ -4895,55 +4910,221 @@ h2.section#unused-worktrees {
   align-self: stretch;
   border: 1px solid var(--border);
   border-radius: 6px;
+  container: account-card / inline-size;
 }
 .account-block > .account-row {
   border: 0;
   border-bottom: 1px solid var(--border);
   border-radius: 6px 6px 0 0;
 }
+/* An account's card (HI-2528, Darren's approved mockup v2): the same fields in the same place on every card. */
+.account-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 2px 16px;
+  margin-top: 6px;
+}
+.account-fact {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.account-fact-label {
+  font-size: 11px;
+  color: var(--fg-faint);
+}
+.account-fact-value {
+  overflow-wrap: anywhere;
+}
+.account-fact .account-state {
+  margin-top: 0;
+  flex-wrap: wrap;
+}
+.account-expiry {
+  display: block;
+  font-size: 12px;
+}
+.account-expiry.expired {
+  color: var(--warning);
+}
+.account-off-tag {
+  font-weight: normal;
+  font-size: 11px;
+  padding: 0 6px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  color: var(--fg-muted);
+}
+.account-block.off-here .connection-list {
+  opacity: 0.7;
+}
+/* Its plan limits (HI-2528): a small bar each, its share, and when it resets. */
+.account-usage {
+  display: grid;
+  grid-template-columns: max-content minmax(60px, 160px) max-content minmax(0, 1fr);
+  gap: 3px 10px;
+  align-items: center;
+  margin-top: 6px;
+  font-size: 12px;
+}
+.account-usage-row {
+  display: contents;
+}
+.account-usage-label {
+  color: var(--fg-muted);
+}
+.account-usage-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border-subtle);
+  overflow: hidden;
+}
+.account-usage-bar > i {
+  display: block;
+  height: 100%;
+  background: var(--success);
+}
+.account-usage-bar.high > i {
+  background: var(--warning);
+}
+.account-usage-bar.full > i {
+  background: var(--error);
+}
+.account-usage-pct {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.account-usage-reset {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.account-usage-none {
+  margin-top: 6px;
+  font-size: 12px;
+}
+@container account-card (max-width: 420px) {
+  .account-usage {
+    grid-template-columns: max-content minmax(40px, 1fr) max-content;
+  }
+  .account-usage-reset {
+    grid-column: 1 / -1;
+    margin-top: -2px;
+  }
+}
+/* Its connections, a small table inside the card (HI-2528; Darren 21:40: kept where they are, broken up as a table). */
 .connection-list {
   container: connection-list / inline-size;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 4px 10px 6px 38px;
+  padding: 4px 12px 12px;
+  background: var(--bg-sidebar);
+  border-radius: 0 0 6px 6px;
 }
-/* Each row is its own grid: a users column sized apart from its text keeps the split the same in every row, so the
-   columns line up (HI-2158). It fills to 150px before the fr columns grow, and gives way to 80px in a narrow pane. */
+/* Each row is the same grid, so the columns line up: order, name, tag, five values, who uses it, its buttons. */
 .connection-row {
   display: grid;
-  grid-template-columns: minmax(120px, 1.2fr) minmax(160px, 2fr) minmax(80px, 150px) auto;
-  gap: 10px;
+  grid-template-columns: 44px minmax(84px, 1.2fr) minmax(72px, 1.1fr) minmax(56px, 0.9fr) minmax(54px, 0.6fr) minmax(54px, 0.6fr) minmax(56px, 0.9fr) minmax(44px, 0.6fr) minmax(60px, 0.8fr) 76px;
+  gap: 6px;
   align-items: center;
-  min-height: 26px;
+  min-height: 28px;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 12px;
 }
-/* A list narrower than those minimums (Settings beside the sidebar in a small window, HI-2163): the summary goes under
-   the name, the users column stays 80px, none sized by its text, so the rows stay inside the card and lined up. A
-   narrow window has its own layout (below). */
-@media (min-width: 701px) {
-  @container connection-list (max-width: 439px) {
-    .connection-row {
-      grid-template-columns: minmax(0, 1fr) 80px auto;
-      grid-template-areas: 'name users more' 'summary summary more';
-      row-gap: 0;
-      padding: 2px 0;
-    }
-    .connection-row > .connection-name {
-      grid-area: name;
-    }
-    .connection-row > .connection-summary {
-      grid-area: summary;
-    }
-    .connection-row > .connection-users {
-      grid-area: users;
-    }
-    .connection-row > :last-child {
-      grid-area: more;
-    }
-  }
+.connection-row:last-of-type {
+  border-bottom: 0;
 }
-.connection-row:hover {
+.connection-head {
+  min-height: 24px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg-faint);
+  border-bottom: 1px solid var(--border);
+}
+.connection-row:not(.connection-head):hover {
   background: var(--bg-hover);
+}
+.connection-cell {
+  overflow-wrap: anywhere;
+}
+/* No cell grows past its column (HR1 on HI-2528: a long tag painted over Model). */
+.connection-row > * {
+  min-width: 0;
+}
+.connection-tag-cell .connection-tag {
+  max-width: 100%;
+}
+.connection-tag-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.connection-cell.cli-own {
+  color: var(--fg-faint);
+  font-style: italic;
+}
+/* Each value's column name, for screen readers (the heading row is hidden from them). */
+.connection-cell-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.connection-order,
+.connection-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+}
+.connection-actions {
+  justify-content: flex-end;
+}
+.connection-order .icon-btn {
+  width: 20px;
+}
+.connection-summary {
+  display: none;
+}
+/* A card narrower than the table (Settings beside the sidebar, a small window): each connection on two lines, its name,
+   tag, who uses it and its buttons, then its values in a line. */
+@container connection-list (max-width: 660px) {
+  .connection-head {
+    display: none;
+  }
+  .connection-row {
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    grid-template-areas: 'order name actions' 'order tag tag' 'order summary summary' 'order users users';
+    row-gap: 0;
+    padding: 3px 0;
+  }
+  .connection-row > .connection-order {
+    grid-area: order;
+  }
+  .connection-row > .connection-name {
+    grid-area: name;
+  }
+  .connection-row > .connection-users {
+    grid-area: users;
+    text-align: left;
+  }
+  .connection-row > .connection-actions {
+    grid-area: actions;
+  }
+  .connection-row > .connection-summary {
+    display: block;
+    grid-area: summary;
+  }
+  .connection-row > .connection-cell {
+    display: none;
+  }
+  /* Its tag, when it has one, under its name. */
+  .connection-row > .connection-tag-cell:not(.faint) {
+    display: block;
+    grid-area: tag;
+  }
 }
 .connection-name {
   font-weight: 600;
@@ -4963,6 +5144,22 @@ h2.section#unused-worktrees {
   border: 1px solid var(--border);
   color: var(--fg-muted);
 }
+/* A connection's tag (HI-2530): beside its name, like First, with a tag icon. */
+.connection-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+  font-weight: normal;
+  font-size: 11px;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--fg);
+}
+.connection-tag .codicon {
+  font-size: 11px;
+}
 .connection-summary,
 .connection-users {
   font-size: 12px;
@@ -4975,17 +5172,10 @@ h2.section#unused-worktrees {
   color: var(--warning);
   margin-left: 4px;
 }
+/* More room under it than before (HI-2528, Darren 21:40). */
 .connection-add {
   align-self: flex-start;
-  margin-top: 2px;
-}
-@media (max-width: 700px) {
-  .connection-row {
-    grid-template-columns: 1fr auto;
-  }
-  .connection-users {
-    text-align: left;
-  }
+  margin: 10px 0 2px;
 }
 /* Its handle: drag in the one order of accounts, or Alt+Up/Down. */
 .account-handle {
@@ -5009,6 +5199,15 @@ h2.section#unused-worktrees {
 .account-signin {
   align-self: stretch;
   margin-top: 10px;
+}
+/* In its account's card, under its row (HI-2541): the card's padding, a line from the connections under it. */
+.account-block .account-signin {
+  margin: 0;
+  padding: 8px 10px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.account-block .account-signin > .hint:first-child {
+  margin-top: 0;
 }
 .task-terminal {
   height: 280px;
@@ -5041,7 +5240,8 @@ h2.section#unused-worktrees {
   to { transform: rotate(360deg); }
 }
 .empty-state {
-  padding: 40px;
+  /* HI-2533: its sides give way in a narrow pane (6% of it, 16 px at least), as wide ones keep 40 px. */
+  padding: 40px clamp(16px, 6%, 40px);
   text-align: center;
   color: var(--fg-muted);
 }
@@ -5088,6 +5288,13 @@ h2.section#unused-worktrees {
 /* ---------- Files tab ---------- */
 .split-list.files-list {
   width: 360px;
+}
+/* HI-2533: in a narrow pane (a 900 px window with the sidebar open) the list gives way, leaving 280 px beside it, so the
+   empty state there reads as text, not a thin column (it had 76 px for Files' hint, 116 px for Skills'), while the list
+   keeps room for its names. */
+.split-list:is(.files-list, .skills-list) {
+  min-width: 200px;
+  max-width: calc(100% - 280px);
 }
 .files-filter {
   display: flex;
@@ -6137,7 +6344,7 @@ h2.section#unused-worktrees {
   color: var(--accent-ink);
   border-radius: 2px;
 }
-::highlight(hive-search) {
+::highlight(cw-search) {
   background-color: rgba(245, 158, 11, 0.35);
   color: inherit;
 }
@@ -7452,8 +7659,12 @@ button.agent-place:hover {
   border-radius: 4px;
   font-size: 0.9em;
 }
+/* New Session and Resume wrap, centred, when the pane is narrower than both (HI-2536: German's "Neue Sitzung" and the
+   split "Fortsetzen" made a sideways scrollbar under each pane at 900 px); the split button stays whole. */
 .pane-placeholder .btns {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 8px;
   margin-top: 8px;
 }
@@ -7589,7 +7800,7 @@ button.agent-place:hover {
   font-size: 14px;
   margin-top: 1px;
 }
-/* The Hive Assistant's questions (a card per question, under its header) and its list of actions. */
+/* The Combwork Assistant's questions (a card per question, under its header) and its list of actions. */
 .assistant-questions {
   display: flex;
   flex-direction: column;
@@ -7812,7 +8023,7 @@ button.agent-place:hover {
 .antivirus-folders td:first-child .mono {
   margin-left: 4px;
 }
-/* Hive's exclusions of folders that are gone (#1389): a heading and a table of their own under the workspace's. */
+/* Combwork's exclusions of folders that are gone (#1389): a heading and a table of their own under the workspace's. */
 .antivirus-gone h4 {
   margin: var(--space-3) 0 var(--space-1);
   font-size: inherit;
@@ -8870,7 +9081,7 @@ button.agent-place:hover {
   text-decoration: underline;
 }
 
-/* ---------- Hive updates ---------- */
+/* ---------- Combwork updates ---------- */
 .statusbar .status-item.update-item {
   background: var(--status-raised);
   font-weight: 600;
@@ -9099,7 +9310,7 @@ button.mode-badge.badge:hover {
 .memory-share .codicon { color: var(--info); vertical-align: -2px; }
 .memory-share .btn { margin-top: 6px; display: flex; }
 
-/* ---------- Hive Assistant: the workspace's overseer, in a panel on the right ---------- */
+/* ---------- Combwork Assistant: the workspace's overseer, in a panel on the right ---------- */
 .assistant-panel {
   position: relative;
   display: flex;
@@ -10113,7 +10324,8 @@ body.pane-resizing-v .monaco-editor {
   min-width: 0;
   overflow-wrap: anywhere;
 }
-.task-blocked .task-note-text {
+.task-blocked .task-note-text,
+.task-waiting .task-note-text {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
@@ -10121,6 +10333,7 @@ body.pane-resizing-v .monaco-editor {
   overflow: hidden;
 }
 .task-blocked > .codicon,
+.task-waiting > .codicon,
 .task-stalled > .codicon,
 .task-review > .codicon {
   flex: none;
@@ -10214,6 +10427,10 @@ body.pane-resizing-v .monaco-editor {
 .task-flag.stalled {
   color: var(--warning);
 }
+/* Waiting on purpose (HI-2618): quiet, never an alarm. */
+.task-flag.waiting {
+  color: var(--fg-muted);
+}
 .task-folded-agent {
   display: inline-flex;
   flex: none;
@@ -10242,6 +10459,13 @@ body.pane-resizing-v .monaco-editor {
 .task-blocked {
   font-size: 12px;
   color: var(--error);
+  display: flex;
+  gap: 4px;
+  align-items: flex-start;
+}
+.task-waiting {
+  font-size: 12px;
+  color: var(--fg-muted);
   display: flex;
   gap: 4px;
   align-items: flex-start;
@@ -11154,11 +11378,11 @@ textarea.input.task-blocked-input {
   font: inherit;
   text-decoration: underline;
 }
-/* The Merge dialog on a branch whose card Hive merges (#1357). */
+/* The Merge dialog on a branch whose card Combwork merges (#1357). */
 .merge-queue-note {
   margin-bottom: 8px;
 }
-/* Its Merge, held while Hive merges the card: plainly off, its reason on hover (the disabled button passes the hover to
+/* Its Merge, held while Combwork merges the card: plainly off, its reason on hover (the disabled button passes the hover to
    its tooltip). */
 .btn.merge-held:disabled {
   pointer-events: none;
@@ -11947,7 +12171,7 @@ textarea.input.task-blocked-input {
 .perf-limits summary {
   cursor: pointer;
 }
-/* Performance's own, on the shared day tile: a slot Hive wasn't recording is hatched, so it reads as no data
+/* Performance's own, on the shared day tile: a slot Combwork wasn't recording is hatched, so it reads as no data
    rather than zero; one recorded for part of its time fades towards the axis. */
 .perf-trend .daily-col.unobserved:not(:hover),
 .perf-trend .swatch.unobserved {
@@ -12018,6 +12242,11 @@ textarea.input.task-blocked-input {
 }
 .perf-scenarios td:first-child {
   white-space: nowrap;
+}
+/* A card's name keeps a readable width in a narrow window (HI-2534): the table scrolls in its .table-wrap rather than
+   squeezing the title to a word a line. */
+.table td.perf-name {
+  min-width: 16em;
 }
 .perf-detail-body p {
   margin: 0 0 6px;
@@ -12769,7 +12998,7 @@ button.progress-card-key:hover {
   border-radius: 6px;
   background: var(--bg);
 }
-/* A run's details: what Hive has for it, label and value a row each; long values wrap. */
+/* A run's details: what Combwork has for it, label and value a row each; long values wrap. */
 .progress-details {
   margin-top: 8px;
   padding-top: 8px;
@@ -13934,19 +14163,19 @@ button.progress-lane-retry {
   }
 }
 
-/* .hive isn't kept out of version control (#345): the text takes the room and the buttons wrap under it in a narrow
+/* .combwork isn't kept out of version control (#345): the text takes the room and the buttons wrap under it in a narrow
    pane; one too narrow even for them clips rather than scrolling the page sideways. */
-.hive-vcs-notice {
+.cw-vcs-notice {
   flex-wrap: wrap;
   overflow: hidden;
 }
 /* The text, not the buttons' tooltip wrappers, takes the room (#886: the × took half the banner). */
-.hive-vcs-notice > .hive-vcs-text {
+.cw-vcs-notice > .cw-vcs-text {
   flex: 1 1 14em;
   min-width: 0;
   overflow-wrap: anywhere;
 }
-.page-narrow .hive-vcs-notice {
+.page-narrow .cw-vcs-notice {
   border: 1px solid var(--border-subtle);
   border-radius: 6px;
   margin: 8px 0 12px;
@@ -14006,7 +14235,7 @@ button.progress-lane-retry {
   flex-shrink: 0;
   min-width: 0;
 }
-/* The Version Control tab's header (#1416): None · Git, what Hive finds in the folder, and "Workflow: Git · Team". */
+/* The Version Control tab's header (#1416): None · Git, what Combwork finds in the folder, and "Workflow: Git · Team". */
 /*
  * None · Git, the fact line and the workflow link: one row, the fact line taking the room left and wrapping inside it,
  * so the link stays top right on every page; in a narrow tab the fact line has a row of its own under them.
@@ -14101,7 +14330,7 @@ button.progress-lane-retry {
   flex-wrap: wrap;
   gap: 6px;
 }
-/* The switch Hive offers when it detects another version control (#1419): its sentence, then Switch… and Not Now. */
+/* The switch Combwork offers when it detects another version control (#1419): its sentence, then Switch… and Not Now. */
 .vc-offer {
   display: flex;
   align-items: center;
@@ -14778,4 +15007,224 @@ button.progress-lane-retry {
   flex-direction: column;
   gap: 4px;
   width: 100%;
+}
+
+/* The Dialects view (HI-2444): a file's head (name, actions, banners, tabs), then its texts or its JSON. */
+.dialect-detail {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.dialect-head {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.dialect-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px 4px;
+}
+.dialect-title > .codicon {
+  font-size: 18px;
+  color: var(--accent);
+}
+.dialect-title > div {
+  flex: 1;
+}
+.dialect-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dialect-name .faint {
+  font-weight: normal;
+  font-size: 12px;
+  margin-left: 6px;
+}
+.dialect-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 16px 8px;
+}
+.dialect-refused {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 4px;
+}
+.dialect-refused ul {
+  margin: 0;
+  padding-left: 18px;
+  font-family: var(--font-mono, monospace);
+  overflow-wrap: anywhere;
+}
+.dialect-tabs {
+  margin: 8px 16px;
+  width: max-content;
+}
+.dialect-json {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.dialect-json > :last-child {
+  flex: 1;
+  min-height: 0;
+}
+.dialect-texts {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.dialect-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.dialect-filters select {
+  width: auto;
+}
+.dialect-text-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 0 24px;
+}
+.dialect-area-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 16px;
+  border: 0;
+  background: none;
+  color: var(--fg-strong);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.dialect-area-head:hover {
+  background: var(--bg-hover);
+}
+.dialect-area.outdated .dialect-area-head {
+  color: var(--warning);
+  cursor: default;
+}
+.dialect-text {
+  border-top: 1px solid var(--border-subtle);
+}
+.dialect-text-head {
+  display: grid;
+  grid-template-columns: minmax(160px, 28%) 1fr auto;
+  gap: 12px;
+  align-items: baseline;
+  width: 100%;
+  padding: 6px 16px 6px 34px;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.dialect-text-head:hover {
+  background: var(--bg-hover);
+}
+.dialect-id {
+  font-family: var(--font-mono, monospace);
+  color: var(--fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dialect-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg-strong);
+}
+.dialect-text.expanded .dialect-value {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+/* Inherited from a layer beneath (or the Default): dimmed, with where it comes from. */
+.dialect-text.inherited .dialect-value {
+  color: var(--fg-faint);
+}
+.dialect-source {
+  white-space: nowrap;
+  font-size: 11px;
+}
+.dialect-text.outdated .dialect-source {
+  color: var(--warning);
+}
+.dialect-problem {
+  padding: 0 16px 6px 34px;
+  font-size: 12px;
+  color: var(--warning);
+}
+.dialect-text-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 16px 10px 34px;
+  font-size: 12px;
+}
+.dialect-layers {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 12px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  background: var(--bg-elevated);
+}
+.dialect-layer {
+  display: contents;
+}
+.dialect-layer > :last-child {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.dialect-layer.off > :last-child {
+  text-decoration: line-through;
+  color: var(--fg-faint);
+}
+.dialect-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dialect-edit textarea {
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  resize: vertical;
+}
+.dialect-more {
+  margin: 4px 34px;
+}
+.dialect-row.off .row-name {
+  color: var(--fg-faint);
+  text-decoration: line-through;
+}
+.dialect-users {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--fg-muted);
+  margin-right: 6px;
 }

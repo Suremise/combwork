@@ -27,14 +27,14 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
   fs.mkdirSync(userData, { recursive: true })
   const env = lib.fakeClaude(userData, home, [alpha])
   lib.gitProject(alpha)
-  fs.mkdirSync(path.join(alpha, '.hive'), { recursive: true })
+  fs.mkdirSync(path.join(alpha, '.combwork'), { recursive: true })
   // Three: a connection this machine doesn't have (removed since, or from another machine).
-  fs.writeFileSync(path.join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One' }, { id: 'a-two', name: 'Two' }, { id: 'a-three', name: 'Three', connection: 'a-gone' }] }))
+  fs.writeFileSync(path.join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One' }, { id: 'a-two', name: 'Two' }, { id: 'a-three', name: 'Three', connection: 'a-gone' }] }))
 
-  const { app, page } = await lib.launch({ userData, env: { ...env, HIVE_TEST_CLI_HOME_CONNECTION: '0' }, viewport: { width: 1400, height: 900 } })
+  const { app, page } = await lib.launch({ userData, env: { ...env, CW_TEST_CLI_HOME_CONNECTION: '0' }, viewport: { width: 1400, height: 900 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     const live = async (agentId) => (await inv('session:live')).find((s) => s.agentId === agentId && s.status !== 'stopped') ?? null
     const shots = async (name) => {
@@ -91,13 +91,37 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const running = page.locator(`.running-row .running-connection[data-connection="${c1}"]:not([data-connection-other])`)
     check('the Overview: One runs on Max 1, its own, no ⟳', !!(await lib.until(async () => (await running.count()) === 1, HUNG_MS)))
     await shots('overview')
+
+    // --- HI-2413: One moved to another connection on the account it runs on (Max 1, another model): Settings →
+    // Accounts & Connections counts it, and its button switches it at its safe point, onto that connection.
+    const before = await live('a-one')
+    const sonnet = await inv('connection:add', max1.id, { name: 'Max 1 Sonnet', model: 'sonnet' })
+    await inv('agents:update', alpha, 'a-one', { connection: sonnet.id })
+    await page.keyboard.press('Control+,')
+    await page.locator('.settings-nav').waitFor({ timeout: HUNG_MS })
+    await page.locator('.settings-nav .row[data-section="accounts"]').click()
+    const banner = page.locator('[data-switch-affected]')
+    check('the banner counts One, on another connection of the same account', !!(await lib.until(async () => (await banner.innerText().catch(() => '')).trim().startsWith('1 running agent runs on another connection'), HUNG_MS)), await banner.innerText().catch(() => ''))
+    await banner.getByRole('button', { name: 'Switch Them When Their Turn Is Over' }).click()
+    const switched = await lib.until(async () => {
+      const st = await live('a-one')
+      return st && st.runId !== before.runId && st.launchedConnection?.connection?.id === sonnet.id ? st : null
+    }, HUNG_MS)
+    check('…its button switches One onto Max 1 Sonnet once its turn is over, in the same conversation', !!switched && switched.launchedConnection.id === max1.id && switched.sessionId === before.sessionId, JSON.stringify(switched?.launchedConnection ?? (await live('a-one'))?.launchedConnection))
+    check('…and the banner goes', !!(await lib.until(async () => (await banner.count()) === 0, HUNG_MS)))
+    const again = await inv('connections:switchAffected')
+    check('…its own connection, now: nothing more to switch', !again.some((r) => r.agentId === 'a-one'), JSON.stringify(again))
+    // Back to the project, its tabs shown, as connectiondefaults leaves Settings.
+    await page.keyboard.press('Escape')
+    await page.locator('.project-row', { hasText: 'alpha' }).first().click()
+    await page.locator('.tabs .tab', { hasText: 'Session' }).first().waitFor({ state: 'visible', timeout: HUNG_MS })
     await inv('session:stop', alpha, 'a-one')
     await lib.until(async () => !(await live('a-one')), HUNG_MS)
 
     // --- A template: Two's connection named beside its id. Max 2 removed, then the template loaded into alpha again.
     await inv('connections:move', max1.id, 0)
     await inv('templates:save', alpha, 'workspace', 'Rows', false)
-    const saved = JSON.parse(fs.readFileSync(path.join(ws, '.hive', 'templates', 'rows.json'), 'utf8'))
+    const saved = JSON.parse(fs.readFileSync(path.join(ws, '.combwork', 'templates', 'rows.json'), 'utf8'))
     check('the template is saved without connections (HI-2106)', saved.agents.every((a) => !('connection' in a) && !('connectionName' in a)), JSON.stringify(saved.agents))
     await inv('agents:update', alpha, 'a-two', { connection: null })
     await inv('connections:remove', max2.id)

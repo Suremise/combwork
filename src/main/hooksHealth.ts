@@ -1,24 +1,24 @@
 import { promptKey } from './providers/turns'
 
 /**
- * Whether an agent's hooks are reaching Hive (#1336). Hive has no hooks-free mode (#1285): its hooks are how it knows what
- * an agent does. What can still go wrong is hooks that stop arriving while Hive thinks all is well (a CLI update changed
- * them, a managed policy turned them off, Hive refused their token), which left a wrong status: ready while it worked,
- * a turn never over, lines typed into it that were never confirmed. This reads only what Hive already has, no status of
+ * Whether an agent's hooks are reaching Combwork (#1336). Combwork has no hooks-free mode (#1285): its hooks are how it knows what
+ * an agent does. What can still go wrong is hooks that stop arriving while Combwork thinks all is well (a CLI update changed
+ * them, a managed policy turned them off, Combwork refused their token), which left a wrong status: ready while it worked,
+ * a turn never over, lines typed into it that were never confirmed. This reads only what Combwork already has, no status of
  * its own: the hooks themselves (as the turn ledger takes them) and its screen reading (the ledger's last check). Two
  * signs, each needing time and evidence, never time alone:
  * - its start: a CLI that sends a hook as it starts (capabilities.startHook) sent none within the bound of starting,
  *   with no question at its start in the way (the time a question waits for the user doesn't count);
- * - a prompt: one sent while it was idle (the user's Enter, a line Hive typed, its launch's task) had no hook of a current
+ * - a prompt: one sent while it was idle (the user's Enter, a line Combwork typed, its launch's task) had no hook of a current
  *   turn after it for the bound, while its screen showed it working (it was idle when the prompt went, so that work is
  *   this prompt's), that standing a while too.
  * - a turn its transcript shows (#1371): one the CLI's own records identify (Claude Code's promptId, Codex's turn_id,
  *   Copilot's interactionId), begun by a prompt written since this launch started and taken up by the model, had no hook
- *   for the bound since Hive found it. Its hooks answer it by that same id (prompt_id, turn_id, as the turn ledger reads
+ *   for the bound since Combwork found it. Its hooks answer it by that same id (prompt_id, turn_id, as the turn ledger reads
  *   them), whenever they come, before or after the transcript is written. Copilot's carry none: its prompt hook answers
  *   it by the prompt's text (Copilot records the prompt only once that hook has returned), and any hook that came after
  *   the prompt was recorded (a late hook of the turn before arriving then is taken for it: it errs toward saying
- *   nothing). A quick turn over before Hive's first look at its screen is caught this way, and Copilot too.
+ *   nothing). A quick turn over before Combwork's first look at its screen is caught this way, and Copilot too.
  * A long silent think never counts: its prompt's hook came. An Enter that started nothing (a menu, a local command) is
  * dropped once its screen shows it idle, and a local command has no model work in its transcript. Not covered: a new
  * Codex session's turns while its hooks are missing (with no hook it has no session id, so no rollout to read) until
@@ -26,7 +26,7 @@ import { promptKey } from './providers/turns'
  * isn't certain).
  */
 
-/** How far apart Hive's clock and a transcript record's may be (both this machine's, written a moment apart). */
+/** How far apart Combwork's clock and a transcript record's may be (both this machine's, written a moment apart). */
 export const HOOKS_SKEW_MS = 2_000
 /** How long before a Copilot prompt was recorded its prompt hook may have come (the hook runs first). */
 export const PROMPT_HOOK_WINDOW_MS = 60_000
@@ -55,7 +55,7 @@ export interface HooksWatch {
   join: 'id' | 'time' | null
   /** Turn ids its hooks carried (the latest), and when the last hook came. */
   heard: Set<string>
-  /** Transcript turns worked and not heard yet: when Hive found each worked, and its place in the transcript. */
+  /** Transcript turns worked and not heard yet: when Combwork found each worked, and its place in the transcript. */
   unheard: Map<string, { foundAt: number; seq: number; at: number; prompt?: string }>
   /** With no turn ids ('time'): prompts its prompt hooks carried (by promptKey), and when each came (the latest). */
   prompts: Map<string, number>
@@ -100,7 +100,7 @@ const keep = <T>(set: Set<T> | Map<T, unknown>, max: number): void => {
   while (set.size > max) set.delete(set.keys().next().value!)
 }
 
-/** A hook came, of whatever turn (as it reaches Hive, before its turn in the launch's queue): its start is heard. */
+/** A hook came, of whatever turn (as it reaches Combwork, before its turn in the launch's queue): its start is heard. */
 export function hookSeen(w: HooksWatch, now: number): void {
   w.hooks++
   w.lastHookAt = now
@@ -243,7 +243,7 @@ export interface HooksEvidence {
 
 /**
  * Whether its hooks are missing now: 'start', 'transcript' or 'prompt' (what showed it), else null. `boundMs`: Settings → Advanced
- * (hive.hooks.missingSeconds). It notes what it saw on the way (work begun, a question at the start, an Enter dropped).
+ * (cw.hooks.missingSeconds). It notes what it saw on the way (work begun, a question at the start, an Enter dropped).
  */
 export function hooksMissing(w: HooksWatch, ev: HooksEvidence, now: number, boundMs: number): 'start' | 'prompt' | 'transcript' | null {
   if (ev.startWaits) w.startFrom = now
@@ -288,7 +288,7 @@ export function onHooksHealthChanged(fn: () => void): void {
 }
 
 /**
- * Agents and conversations whose user was told their hooks went missing (#1336, #1369): told once each while Hive runs,
+ * Agents and conversations whose user was told their hooks went missing (#1336, #1369): told once each while Combwork runs,
  * at most `max` remembered. One seen again moves to the newest place, so only conversations no longer missing hooks
  * are forgotten (one forgotten and missing them again is told again).
  */

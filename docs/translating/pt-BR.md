@@ -1,4 +1,4 @@
-# Português (Brasil) (`pt-BR`): style for Hive
+# Português (Brasil) (`pt-BR`): style for Combwork
 
 **Status:** drafted by AI (Claude, October 2026), not yet reviewed by a native speaker. Its entry in
 `src/shared/i18n/languages.ts` says the same (`ai: true` until it is reviewed).
@@ -9,13 +9,13 @@ melhorias são bem-vindas.”
 **Improving it:** every Brazilian Portuguese text is in `locales/pt-BR/<area>.json`, one file per area (settings,
 board, tasks…), next to the English it was made from in `locales/en/<area>.json` (generated from the code: don't edit
 it). Change a text there, run `npm run i18n:check` (it must pass) and `npm run i18n:coverage`, and open a pull request
-on [Suremise/hive-desktop](https://github.com/Suremise/hive-desktop). A screenshot of the screen you changed helps the
-review: start Hive with `--lang=pt-BR` (`npm run dev -- --lang=pt-BR`). To change a term below, change it here first,
+on [Suremise/combwork](https://github.com/Suremise/combwork). A screenshot of the screen you changed helps the
+review: start Combwork with `--lang=pt-BR` (`npm run dev -- --lang=pt-BR`). To change a term below, change it here first,
 in the same pull request, then in every message that uses it. A native speaker's review takes the (IA) mark off.
 
 ## Voice
 
-Hive's English is plain and direct: short sentences, everyday words, *you* for the reader, and it says what happens.
+Combwork's English is plain and direct: short sentences, everyday words, *you* for the reader, and it says what happens.
 Translate the meaning, not the words, and keep the result as short and plain.
 
 - **Addressing the reader:** *você*, as Brazilian software does, with the matching verb forms in instructions
@@ -57,7 +57,7 @@ Translate the meaning, not the words, and keep the result as short and plain.
   {agent}“, „de {name}“. The one exception is a CLI's name (`{provider}`, `{cli}`): Claude Code, Codex and Copilot
   are all masculine in Portuguese, so „do {provider}“, „o {cli}“ are fine.
 - **`select`** keys (`{kind, select, file {…} other {…}}`) are ids: never translate them, only the texts inside.
-- **Lists:** Hive joins lists itself („One, Two e Three“). Never write *e* or *ou* into a message around a list
+- **Lists:** Combwork joins lists itself („One, Two e Three“). Never write *e* or *ou* into a message around a list
   placeholder.
 - **Fragments inserted into other messages** (descriptions say so: „Could not load {what}“, „Closing loses {what}“)
   carry their article so the host sentence reads whole: „Não foi possível carregar {what}“ with „as sessões“,
@@ -74,12 +74,12 @@ Translate the meaning, not the words, and keep the result as short and plain.
 - **Dashes, colons, ellipsis:** the em dash with spaces (` — `) for a break in a sentence, as Brazilian typography
   does; `…` as one character. After a colon, lower case unless a name or a full new sentence follows.
 - **Abbreviations:** „p. ex.“ takes a no-break space (U+00A0) inside; „por exemplo“ is often better.
-- **Numbers, dates, money, durations:** formatted by Hive in Brazilian style (1.234,5; 15/10/2026). Never write them
+- **Numbers, dates, money, durations:** formatted by Combwork in Brazilian style (1.234,5; 15/10/2026). Never write them
   into a message: keep the placeholder and its `number` format.
 
 ## Terms
 
-The words Brazilian Portuguese uses for Hive's terms ([glossary.md](glossary.md), and for the 1.0 workflow terms
+The words Brazilian Portuguese uses for Combwork's terms ([glossary.md](glossary.md), and for the 1.0 workflow terms
 [glossary-1.0.md](../../locales/glossary-1.0.md)). Use them every time. Where a term
 is kept in English, it is as Brazilian developers say it.
 
@@ -90,7 +90,7 @@ is kept in English, it is as Brazilian developers say it.
 | agent | agente (o) | Put the noun before a name (above). |
 | provider | provedor | |
 | session | sessão | |
-| the Assistant | o Assistente | The full name *Hive Assistant* stays in English. |
+| the Assistant | o Assistente | Its only name: the full English name it had before went with the rename (HI-2458). |
 | persona | persona | |
 | task board / board | quadro de tarefas / quadro | |
 | card | cartão (o), cartões | Never *tarefa* for a card; *tarefas* only in *quadro de tarefas* and the *Tasks* tab („Tarefas“). |
@@ -101,8 +101,8 @@ is kept in English, it is as Brazilian developers say it.
 | builder / reviewer | executor / revisor | Roles of agents in a card loop. |
 | card loop / lane / round | ciclo de cartões / raia / rodada | *Raia* as in a kanban swimlane. Never *loop de cartões*. *Start lane…*: „Iniciar raia…“. |
 | merge slot | vez de merge | One merge at a time when an agent merges: „a vez de merge“, „liberar a vez“. |
-| merge queue / test merge / Pause queue / Resume queue | fila de merge / merge de teste / Pausar a fila / Retomar a fila | Hive's queue of approved cards (1.0). |
-| slot / pool / ready (a slot) | slot (o) / grupo / pronto | A slot is a worktree Hive lends to a card or lane; *pool* of slots or of reviewers: „o grupo de revisores“. |
+| merge queue / test merge / Pause queue / Resume queue | fila de merge / merge de teste / Pausar a fila / Retomar a fila | Combwork's queue of approved cards (1.0). |
+| slot / pool / ready (a slot) | slot (o) / grupo / pronto | A slot is a worktree Combwork lends to a card or lane; *pool* of slots or of reviewers: „o grupo de revisores“. |
 | version control / Version Control (the tab) / None | controle de versão / Controle de versão / Nenhum | |
 | workflow / workflow options / rule / old rules | fluxo de trabalho / opções do fluxo de trabalho / regra / regras antigas | |
 | preset (Solo, Pair, Team, Custom) | predefinição (Solo, Dupla, Equipe, Personalizado) | |
@@ -114,9 +114,9 @@ is kept in English, it is as Brazilian developers say it.
 | review copy | cópia de revisão | |
 | approval / Approve / For you | aprovação / Aprovar / Para você | Your OK only. For you asks: Decidir / Testar / Aprovar / Entrar. |
 | refused / override / Move anyway / returned | recusado / exceção / Mover mesmo assim / devolvido | |
-| no-code card / before 1.0 / outside Hive / Work (a card's section) | cartão sem código / anterior à 1.0 / fora do Hive / Trabalho | |
+| no-code card / before 1.0 / outside Combwork / Work (a card's section) | cartão sem código / anterior à 1.0 / fora do Combwork / Trabalho | |
 | deliverables | entregáveis | |
-| inbox / message / wake | caixa de entrada / mensagem / acordar | „O Hive acorda o agente.“ |
+| inbox / message / wake | caixa de entrada / mensagem / acordar | „O Combwork acorda o agente.“ |
 | handover / shared notes | passagem de trabalho (passagem) / notas compartilhadas | |
 | skill / template | skill / modelo | The skill's own name stays (`work-on-card`). |
 | worktree / branch / commit / merge | worktree / branch / commit / merge | As Brazilian git users say them, all masculine („o branch“, „o worktree“, „o remote“; „a tag“). Verbs: „fazer commit“, „fazer merge“, „fazer pull/push/fetch“, „mesclado“ for merged. *detached HEAD*: „HEAD desanexado“. |
@@ -164,7 +164,7 @@ Common UI words, for consistency:
 | shortcut | atalho |
 | Cancel / Close / OK | Cancelar / Fechar / OK |
 | Remove / Delete | Remover / Excluir |
-| Stop (an agent, a run) / Quit (Hive) | Parar / Sair |
+| Stop (an agent, a run) / Quit (Combwork) | Parar / Sair |
 | Resume / Restart | Retomar / Reiniciar |
 | Recycle Bin | Lixeira |
 | Diagnostics | Diagnóstico |
@@ -177,7 +177,7 @@ Common UI words, for consistency:
 | Remove agent… | Remover agente… |
 | {name} has {n, plural, one {# open card} other {# open cards}} | {name} tem {n, plural, =0 {# cartões abertos} one {# cartão aberto} other {# cartões abertos}} |
 | {agent} was removed. Its sessions stay in the Sessions tab. | O agente {agent} foi removido. As sessões continuam na aba Sessões. |
-| Hive was started in {language} (--lang): this setting applies from its next start. | O Hive foi iniciado com --lang {language}: esta configuração vale a partir da próxima inicialização. |
+| Combwork was started in {language} (--lang): this setting applies from its next start. | O Combwork foi iniciado com --lang {language}: esta configuração vale a partir da próxima inicialização. |
 
 ## Checking
 

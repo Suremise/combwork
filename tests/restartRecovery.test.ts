@@ -1,7 +1,7 @@
-// The restart queue's lifecycle (HI-1707, HR3's round 1), with Hive's services stood in for so each race is driven
-// exactly: Hive closing while a resume waits on its slot check; a workspace not ready (not read, or its merge slots not
+// The restart queue's lifecycle (HI-1707, HR3's round 1), with Combwork's services stood in for so each race is driven
+// exactly: Combwork closing while a resume waits on its slot check; a workspace not ready (not read, or its merge slots not
 // recovered); a launch that doesn't stop holding the next back; each workspace's own Resume agents after an update;
-// and the agents recorded as Hive closes even when reading their cards and lanes hangs.
+// and the agents recorded as Combwork closes even when reading their cards and lanes hangs.
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -23,7 +23,7 @@ const h = vi.hoisted(() => ({
   stopEnds: true,
   /** The team of the workspace paused (HI-2081). */
   paused: false,
-  advanced: { 'hive.restart.resumeAfterUpdate': true, 'hive.restart.resumeReadySeconds': 90 } as Record<string, unknown>,
+  advanced: { 'cw.restart.resumeAfterUpdate': true, 'cw.restart.resumeReadySeconds': 90 } as Record<string, unknown>,
   run: 0,
   /** The notices told (HI-2356): each one's offer, its message and its buttons' commands. */
   toasts: [] as { offer?: string; message?: string; commands: string[] }[],
@@ -85,7 +85,7 @@ vi.mock('../src/main/lanes', () => ({ listLanes: async () => [] }))
 vi.mock('../src/main/teamPause', () => ({ pausedFor: () => (h.paused ? { pauseId: 'p1', since: '', by: 'user' } : null) }))
 vi.mock('../src/main/tasks', () => ({ allTasks: () => h.tasks ?? Promise.resolve([]) }))
 vi.mock('../src/main/deliveries', () => ({ createDelivery: async () => null, leaveDelivery: async () => null, roundOf: () => 1 }))
-vi.mock('../src/main/assistantControl', () => ({ assistantHome: (ws: string) => join(ws, '.hive', 'assistant') }))
+vi.mock('../src/main/assistantControl', () => ({ assistantHome: (ws: string) => join(ws, '.combwork', 'assistant') }))
 // The notices' offers (HI-2320), as notify.ts keeps them: resolved once, its buttons dropped while it is open.
 vi.mock('../src/main/notify', () => ({
   resolveOffer: (offer: string, outcome: string) => {
@@ -158,7 +158,7 @@ async function queueSettles(step: () => unknown): Promise<void> {
   )
 }
 /**
- * Hive started again on the record the last run saved: a new run (no launches yet), the workspace opening. Its
+ * Combwork started again on the record the last run saved: a new run (no launches yet), the workspace opening. Its
  * entries are then decided: queued (and the first started), or offered.
  */
 async function relaunch(ws: { path: string }, o: { readyMs?: number } = {}): Promise<void> {
@@ -179,7 +179,7 @@ function takesNote(agentId: string): void {
 }
 
 beforeEach(() => {
-  dir = tempDir('hive-restart-recovery-')
+  dir = tempDir('cw-restart-recovery-')
   Object.assign(h, { lives: [], workspaces: [], hold: null, holdAsked: 0, starts: [], pending: [], tasks: null, stopEnds: true, paused: false, run: 0, toasts: [], openOffers: new Set(), resolved: [], dropped: [], saveHold: null, savesHeld: 0 })
 })
 afterEach(() => {
@@ -193,7 +193,7 @@ afterAll(() => {
 })
 
 describe('the restart queue (HI-1707)', () => {
-  it("Hive closing while a resume waits on its slot check: nothing starts, and the entry stays pending for the next start", async () => {
+  it("Combwork closing while a resume waits on its slot check: nothing starts, and the entry stays pending for the next start", async () => {
     const ws = workspace(join(dir, 'ws'), ['a1'])
     h.workspaces = [ws]
     let release!: () => void
@@ -299,7 +299,7 @@ describe('the restart queue (HI-1707)', () => {
     await m.startRestartRecovery()
     await vi.waitFor(() => expect(m.restartRecord()?.entries[0].state).toBe('offered'), { timeout: HUNG_MS })
     expect(h.starts).toEqual([])
-    // Hive closes for an update with the offer unanswered: the latest close decides how.
+    // Combwork closes for an update with the offer unanswered: the latest close decides how.
     await m.recordClosing('update', { snapshotMs: 1000, tellMs: 50 })
     await m.restartRecordSaved()
     expect(saved()).toMatchObject({ reason: 'update', entries: [expect.objectContaining({ agentId: 'a1', state: 'pending', card: { label: 'HI-1', round: 3 } })] })
@@ -327,7 +327,7 @@ describe('the restart queue (HI-1707)', () => {
     await vi.waitFor(() => expect(h.starts).toEqual(['a1']), { timeout: HUNG_MS })
     takesNote('a1')
     await vi.waitFor(() => expect(m.restartRecord()?.entries[0]?.state ?? 'gone').toMatch(/resumed|gone/), { timeout: HUNG_MS })
-    // Its session ended afterwards: nothing running is recorded as Hive closes, and the resumed entry leaves.
+    // Its session ended afterwards: nothing running is recorded as Combwork closes, and the resumed entry leaves.
     h.lives = []
     await m.recordClosing('update', { snapshotMs: 1000, tellMs: 50 })
     await m.restartRecordSaved()
@@ -346,7 +346,7 @@ describe('the restart queue (HI-1707)', () => {
   })
 
   it("each workspace's own Resume agents after an update: one resumes by itself, the other is offered", async () => {
-    const a = workspace(join(dir, 'ws-a'), ['a1'], { advanced: { 'hive.restart.resumeAfterUpdate': false } })
+    const a = workspace(join(dir, 'ws-a'), ['a1'], { advanced: { 'cw.restart.resumeAfterUpdate': false } })
     const b = workspace(join(dir, 'ws-b'), ['b1'])
     h.workspaces = [a, b]
     await startWith([entry(a.path, 'a1'), entry(b.path, 'b1')])
@@ -443,7 +443,7 @@ describe('the restart queue (HI-1707)', () => {
     })
   })
 
-  it("Hive closing while reading the agents' cards and lanes hangs: every running conversation is still recorded", async () => {
+  it("Combwork closing while reading the agents' cards and lanes hangs: every running conversation is still recorded", async () => {
     const ws = workspace(join(dir, 'ws'), ['a1', 'idle'])
     h.workspaces = [ws]
     await startWith([])

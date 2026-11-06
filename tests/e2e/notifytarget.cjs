@@ -1,4 +1,4 @@
-// A notification an agent or the Assistant sends with a target (HI-1961, hive_notify's `target`) opens what it is about
+// A notification an agent or the Assistant sends with a target (HI-1961, cw_notify's `target`) opens what it is about
 // on click: one naming HB4 shows HB4's pane, one naming a card opens its dialog, from the toast and from its row in the
 // Notifications panel; one naming an agent removed since says so. The Agent API refuses a target naming both, an agent
 // or a card that isn't there, or an agent without its project (a script has no project of its own). Screenshots of
@@ -35,14 +35,14 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
   cfg.settings.notifications = { ...cfg.settings.notifications, desktopNotifications: false, chimeEnabled: false }
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1400, height: 900 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     await inv('project:updateConfig', alpha, { agents: [{ id: 'a-hb4', name: 'HB4', provider: 'claude-code' }, { id: 'a-hr1', name: 'HR1', provider: 'claude-code' }] })
     await inv('workspace:refresh')
@@ -55,7 +55,7 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
     const key = card?.key || (await lib.cardLabel(inv, card?.number))
     check('a card to name', typeof card?.number === 'number', JSON.stringify(card))
     const toast = (opens) => page.locator('.toasts .toast').filter({ has: page.locator(`.toast-open[data-opens="${opens}"]`) }).last()
-    const MESSAGES = { 'HB4 needs an Enter in its pane': "HB4's Claude Code didn't take the wake Hive typed. Click HB4's terminal and press Enter.", 'HR1 is waiting for you': 'HR1 asks whether to rebase onto main.' }
+    const MESSAGES = { 'HB4 needs an Enter in its pane': "HB4's Claude Code didn't take the wake Combwork typed. Click HB4's terminal and press Enter.", 'HR1 is waiting for you': 'HR1 asks whether to rebase onto main.' }
     const notify = (target, title = 'HB4 needs an Enter in its pane') => api('POST', '/v1/notify', { title, message: MESSAGES[title] ?? 'Its review passed: it waits for your OK to merge.', level: 'warning', target })
     // The corner's toasts closed, so a shot of the panel shows the panel alone.
     const closeToasts = async () => {

@@ -4,6 +4,9 @@
 // logged in its own connection's folder); a second window's workspace on its own connection; a connection turned off
 // moves its agent to the default at its next safe point (its turn over, its exit typed once, resumed in the same
 // conversation); a signed-out connection is refused. The footer names the connection. Screenshots in both themes.
+// Nothing is turned on by itself (HI-2650): a connection added is on nowhere, a new workspace starts with none on, and
+// where connections exist but are off here the refusal and the banners say so: one off, Turn On Here (a project with no
+// agents too), which turns it on in this window's workspace only and is kept on reopening; several, Choose in Settings.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -14,7 +17,9 @@ const userData = path.join(lib.WORK, 'connections-profile')
 const home = path.join(lib.WORK, 'connections-claude-home')
 const ws1 = path.join(lib.WORK, 'connections-ws1')
 const ws2 = path.join(lib.WORK, 'connections-ws2')
+const ws3 = path.join(lib.WORK, 'connections-ws3')
 const alpha = path.join(ws1, 'alpha')
+const gamma = path.join(ws1, 'gamma')
 const beta = path.join(ws2, 'beta')
 const accountsRoot = path.join(userData, 'accounts')
 let failed = 0
@@ -27,22 +32,25 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
 const launchedIn = (id) => lines(path.join(accountsRoot, id, 'fake-launches.jsonl'))
 
 ;(async () => {
-  for (const d of [userData, ws1, ws2]) fs.rmSync(d, { recursive: true, force: true })
+  for (const d of [userData, ws1, ws2, ws3]) fs.rmSync(d, { recursive: true, force: true })
+  fs.mkdirSync(ws3, { recursive: true })
   fs.mkdirSync(userData, { recursive: true })
   const env = lib.fakeClaude(userData, home, [alpha, beta])
   for (const [dir, agents] of [
     [alpha, [{ id: 'a-one', name: 'One' }, { id: 'a-two', name: 'Two' }]],
-    [beta, [{ id: 'b-one', name: 'Beta One' }]]
+    [beta, [{ id: 'b-one', name: 'Beta One' }]],
+    // A project with no agents yet (HI-2650): its empty card is where a first agent's connection is offered.
+    [gamma, []]
   ]) {
     lib.gitProject(dir)
-    fs.mkdirSync(path.join(dir, '.hive'), { recursive: true })
-    fs.writeFileSync(path.join(dir, '.hive', 'project.json'), JSON.stringify({ version: 2, agents }))
+    fs.mkdirSync(path.join(dir, '.combwork'), { recursive: true })
+    fs.writeFileSync(path.join(dir, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents }))
   }
 
-  const { app, page } = await lib.launch({ userData, env: { ...env, HIVE_TEST_CLI_HOME_CONNECTION: '0' }, viewport: { width: 1400, height: 900 } })
+  const { app, page } = await lib.launch({ userData, env: { ...env, CW_TEST_CLI_HOME_CONNECTION: '0' }, viewport: { width: 1400, height: 900 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
-    const invOn = (p) => (ch, ...a) => p.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const invOn = (p) => (ch, ...a) => p.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     const inv = invOn(page)
     const failure = (p) => p.then(() => null, (e) => String(e?.message ?? e))
     await lib.openWorkspace(inv, page, ws1)
@@ -69,6 +77,19 @@ const launchedIn = (id) => lines(path.join(accountsRoot, id, 'fake-launches.json
     if ((await page.locator('.assistant-panel').count()) === 0) await page.keyboard.press('Control+Alt+I')
     check("the Assistant asks for a connection too: it can't start without one", !!(await lib.until(async () => /so the Assistant can't start/.test(await page.locator('[data-connection-setup="assistant"]').innerText().catch(() => '')), HUNG_MS)))
     await shots('setup')
+    // In narrow panes (HI-2535: 900 px with the sidebar and the Assistant open), each banner's button goes under its
+    // message rather than squeezing it into a narrow column beside the button.
+    await lib.fitWindow(app, page, { width: 900, height: 860 })
+    const stacked = (where) =>
+      page.locator(`[data-connection-setup="${where}"]`).first().evaluate((b) => {
+        const text = b.querySelector('.wrap-banner-text')
+        const btn = b.querySelector('.wrap-banner-actions .btn')
+        if (!text || !btn) return false
+        return btn.getBoundingClientRect().top >= text.getBoundingClientRect().bottom - 1
+      })
+    for (const where of ['project', 'assistant']) check(`at 900 px the ${where} banner's Add an Account goes under its message (HI-2535)`, !!(await lib.until(() => stacked(where), HUNG_MS)))
+    await shots('setup-narrow')
+    await lib.fitWindow(app, page, { width: 1400, height: 900 })
     await page.keyboard.press('Control+Alt+I')
     await page.keyboard.press('Control+Shift+P')
     await page.locator('.palette input').waitFor({ timeout: HUNG_MS })
@@ -98,7 +119,47 @@ const launchedIn = (id) => lines(path.join(accountsRoot, id, 'fake-launches.json
     }
     const max1 = await connect('Max 1', 'one@example.com')
     check('…the one-time notice goes once a connection is added, for good', !!(await lib.until(async () => (await page.locator('[data-connections-intro]').count()) === 0, HUNG_MS)) && (await inv('connections:list')).intro === undefined)
+
+    // --- Off here, not missing (HI-2650): Max 1, added, is on nowhere; nothing turns it on but the user.
+    const wsJson = (dir) => JSON.parse(fs.readFileSync(path.join(dir, '.combwork', 'workspace.json'), 'utf8'))
+    check('a connection added is on nowhere (HI-2650): this workspace has none on', (wsJson(ws1).connections?.['claude-code']?.on ?? []).length === 0, JSON.stringify(wsJson(ws1).connections))
+    const offRefused = await failure(inv('session:start', alpha, { agentId: 'a-one' }))
+    check("…an agent's start is refused saying Max 1 is off here, never to add one", /account, Max 1, is off in this workspace\. Turn one on with On here/.test(offRefused ?? ''), offRefused ?? 'started')
+    const alphaBanner = page.locator('[data-connection-setup="project"]')
+    await page.getByText('alpha', { exact: true }).first().click({ timeout: HUNG_MS })
+    check("…the project's banner says so and offers Turn On Here", !!(await lib.until(async () => (await alphaBanner.getAttribute('data-off-here').catch(() => null)) === 'one' && /Max 1, your Claude Code account, is off in this workspace/.test(await alphaBanner.innerText()) && (await alphaBanner.locator(`[data-turn-on-here="${max1.id}"]`).count()) === 1, HUNG_MS)), await alphaBanner.innerText().catch(() => ''))
+    // Another workspace, open in its own window, with its own choice: none on (turned on and off there).
+    const p3Next = app.waitForEvent('window')
+    await inv('window:new')
+    const p3 = await p3Next
+    await p3.waitForLoadState('domcontentloaded')
+    await lib.appReady(p3)
+    const inv3 = invOn(p3)
+    await lib.openWorkspace(inv3, p3, ws3)
+    check('a new workspace starts with none on (HI-2650)', (await inv3('connections:list')).workspace['claude-code'] === undefined && wsJson(ws3).connections === undefined, JSON.stringify(wsJson(ws3).connections))
+    await inv3('connections:setOn', max1.id, true)
+    await inv3('connections:setOn', max1.id, false)
+    const ws3Before = JSON.stringify(wsJson(ws3).connections)
+    // The project with no agents: its empty card offers Turn On Here on Max 1.
+    await page.getByText('gamma', { exact: true }).first().click({ timeout: HUNG_MS })
+    const empty = page.locator('.session-empty-card [data-connection-setup="empty"]')
+    check('a project with no agents: its empty card says Max 1 is off here, with Turn On Here', !!(await lib.until(async () => (await empty.getAttribute('data-off-here').catch(() => null)) === 'one' && /Max 1, your Claude Code account, is off in this workspace, so a new agent can't start/.test(await empty.innerText()), HUNG_MS)), await empty.innerText().catch(() => ''))
+    await shots('off-here-empty')
+    await empty.locator(`[data-turn-on-here="${max1.id}"]`).click()
+    check('…Turn On Here turns Max 1 on in this workspace, and only it', !!(await lib.until(async () => JSON.stringify(wsJson(ws1).connections) === JSON.stringify({ 'claude-code': { on: [max1.id] } }), HUNG_MS)), JSON.stringify(wsJson(ws1).connections))
+    check('…the banner goes, and the card is an ordinary empty project', !!(await lib.until(async () => (await page.locator('.session-empty-card [data-connection-setup]').count()) === 0 && (await page.locator('.session-empty-card').count()) === 1, HUNG_MS)))
+    check("…the other window's workspace keeps its own choice", JSON.stringify(wsJson(ws3).connections) === ws3Before && (await inv3('connections:list')).workspace['claude-code']?.on.length === 0, JSON.stringify(wsJson(ws3).connections))
+    await p3.close()
+    // Opened again (another workspace in between), it keeps what is on.
+    await lib.openWorkspace(inv, page, ws3)
+    await lib.openWorkspace(inv, page, ws1)
+    check('…and opened again, this workspace keeps Max 1 on', JSON.stringify((await inv('connections:list')).workspace['claude-code']?.on) === JSON.stringify([max1.id]) && JSON.stringify(wsJson(ws1).connections) === JSON.stringify({ 'claude-code': { on: [max1.id] } }), JSON.stringify(wsJson(ws1).connections))
+    await inv('connections:setOn', max1.id, false)
     const max2 = await connect('Max 2', 'two@example.com')
+    // Two off here: Choose in Settings, naming both.
+    await page.getByText('alpha', { exact: true }).first().click({ timeout: HUNG_MS })
+    check("several off here: the project's banner names them and offers Choose in Settings", !!(await lib.until(async () => (await alphaBanner.getAttribute('data-off-here').catch(() => null)) === 'several' && /Max 1 and Max 2 are off in this workspace/.test(await alphaBanner.innerText()) && (await alphaBanner.locator('[data-open-connections]', { hasText: 'Choose in Settings' }).count()) === 1, HUNG_MS)), await alphaBanner.innerText().catch(() => ''))
+    await shots('off-here-several')
     await inv('connections:setOn', max1.id, true)
     await inv('connections:setOn', max2.id, true)
     check('the first turned on is the default', (await inv('connections:list')).workspace['claude-code']?.default === max1.id)
@@ -107,12 +168,12 @@ const launchedIn = (id) => lines(path.join(accountsRoot, id, 'fake-launches.json
     await inv('agents:update', alpha, 'a-two', { connection: max2.id })
     await inv('session:start', alpha, { agentId: 'a-one' })
     await inv('session:start', alpha, { agentId: 'a-two' })
-    check('One launches on the default connection, Max 1', !!(await lib.until(async () => launchedIn(max1.id).some((l) => l.env.HIVE_AGENT === 'One'), HUNG_MS)))
-    check('…Two on its own, Max 2, at the same time', !!(await lib.until(async () => launchedIn(max2.id).some((l) => l.env.HIVE_AGENT === 'Two'), HUNG_MS)))
+    check('One launches on the default connection, Max 1', !!(await lib.until(async () => launchedIn(max1.id).some((l) => l.env.CW_AGENT === 'One'), HUNG_MS)))
+    check('…Two on its own, Max 2, at the same time', !!(await lib.until(async () => launchedIn(max2.id).some((l) => l.env.CW_AGENT === 'Two'), HUNG_MS)))
     check('…each with its connection’s folder as its home', launchedIn(max1.id).every((l) => l.env.CLAUDE_CONFIG_DIR === path.join(accountsRoot, max1.id)))
     // Its auto memory by its real path (HI-1899): the connection's projects folder is a junction to the CLI home's, and
     // the launch names exactly that project's memory folder there, allowing nothing more.
-    const oneLaunch = launchedIn(max1.id).find((l) => l.env.HIVE_AGENT === 'One')
+    const oneLaunch = launchedIn(max1.id).find((l) => l.env.CW_AGENT === 'One')
     const oneSettings = oneLaunch?.opts['--settings'] ? JSON.parse(fs.readFileSync(oneLaunch.opts['--settings'], 'utf8')) : {}
     const linkedProjects = fs.realpathSync(path.join(accountsRoot, max1.id, 'projects'))
     const memoryDir = path.join(linkedProjects, alpha.replace(/[^a-zA-Z0-9]/g, '-'), 'memory')
@@ -141,11 +202,11 @@ const launchedIn = (id) => lines(path.join(accountsRoot, id, 'fake-launches.json
     await lib.appReady(p2)
     await lib.openWorkspace(invOn(p2), p2, ws2)
     const inv2 = invOn(p2)
-    // A new workspace starts with the top of the order on (Max 1, HI-1875): this one runs on Max 2 alone.
+    // A new workspace starts with none on (HI-2650): this one runs on Max 2 alone.
     await inv2('connections:setOn', max2.id, true)
     await inv2('connections:setOn', max1.id, false)
     await inv2('session:start', beta, { agentId: 'b-one' })
-    check('the second window’s agent runs on its own workspace’s connection, Max 2', !!(await lib.until(async () => launchedIn(max2.id).some((l) => l.env.HIVE_AGENT === 'Beta One'), HUNG_MS)))
+    check('the second window’s agent runs on its own workspace’s connection, Max 2', !!(await lib.until(async () => launchedIn(max2.id).some((l) => l.env.CW_AGENT === 'Beta One'), HUNG_MS)))
     check('…while the first window’s agents keep theirs', (await live('a-one'))?.launchedConnection?.id === max1.id)
     await inv2('session:stop', beta, 'b-one')
     await p2.close()
@@ -167,7 +228,7 @@ const launchedIn = (id) => lines(path.join(accountsRoot, id, 'fake-launches.json
     const order = async () => (await inv('connections:list')).connections.filter((c) => c.provider === 'claude-code').map((c) => c.id)
     const usedHere = async () => (await inv('connections:list')).workspace['claude-code']?.default
     const onHere = async () => (await inv('connections:list')).workspace['claude-code']?.on ?? []
-    const oneLaunches = (id) => launchedIn(id).filter((l) => l.env.HIVE_AGENT === 'One').length
+    const oneLaunches = (id) => launchedIn(id).filter((l) => l.env.CW_AGENT === 'One').length
     const relaunchOne = async () => {
       await inv('session:stop', alpha, 'a-one')
       await lib.until(async () => !(await live('a-one')), HUNG_MS)

@@ -12,8 +12,8 @@ import { MAIN_STALLS_KEPT, type MainStall, type MainStalls, type MainStallWork }
 export { beginWork, stallClock, timedStep } from './stallWork'
 
 /**
- * Notes in hive.log when the main process was busy long enough to be felt (every terminal's typing goes through it), at
- * most once a minute, so pauses can be matched with what Hive was doing (#1109). The delay is Node's event loop delay
+ * Notes in combwork.log when the main process was busy long enough to be felt (every terminal's typing goes through it), at
+ * most once a minute, so pauses can be matched with what Combwork was doing (#1109). The delay is Node's event loop delay
  * (`monitorEventLoopDelay`: its timer, every 20 ms, catches a block wherever it falls), read every half second. A gap
  * that spans the PC's sleep isn't a stall: the warning waits a few seconds, and a suspend or resume during it drops it
  * (one info line instead). The line names the work that overlapped the stall: IPC calls, Agent API requests, hooks and
@@ -34,7 +34,7 @@ const HELD_PER_STALL = 50
 /** How many a warning names (the rest are counted). */
 const NAMED = 5
 
-// Labels from what a request says: only names Hive knows, so nothing a client sends reaches the log.
+// Labels from what a request says: only names Combwork knows, so nothing a client sends reaches the log.
 const HOOK_EVENTS = new Set(['SessionStart', 'SessionEnd', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'PermissionRequest', 'Notification', 'Stop', 'StopFailure', 'SubagentStop', 'Interrupt', 'ErrorOccurred', 'PreCompact', 'PostCompact'])
 const METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])
 /** Agent API requests that wait by design (an event stream, a wait for cards or agents): open for minutes, never a cause. */
@@ -123,7 +123,7 @@ export function stallOf(from: number, to: number, ms: number, cpuMs: number | nu
   return { ms, cpuMs, steps: steps.list, stepsMore: steps.more, work: work.list, workMore: work.more }
 }
 
-/** The stalls kept since Hive started (HI-1135): the last MAIN_STALLS_KEPT, and how many in all. */
+/** The stalls kept since Combwork started (HI-1135): the last MAIN_STALLS_KEPT, and how many in all. */
 const recent: MainStall[] = []
 let stallsSeen = 0
 let watchingSince = Date.now()
@@ -157,7 +157,7 @@ export interface StallDeps {
   defer(fn: () => void, ms: number): void
   warn(line: string): void
   info(line: string): void
-  /** Whether Hive's other threads stopped over [from, to] too (the watchdog's ticks): the whole process paused. */
+  /** Whether Combwork's other threads stopped over [from, to] too (the watchdog's ticks): the whole process paused. */
   pausedAlongside?(from: number, to: number): boolean
   /** Keeps a stall for the Performance view (HI-1135), `end` its end on `now`'s clock: every one, logged or not, but not a pause. */
   record?(stall: Omit<MainStall, 'at'>, end: number): void
@@ -196,7 +196,7 @@ export function stallWatcher(d: StallDeps, t = STALL_TIMING): { tick(): void; po
       d.defer(() => {
         const ms = Math.round(delay)
         if (sleptOver(power, from, now - delay)) return d.info(`The main process was paused for ${ms} ms while the PC slept: not counted as busy`)
-        if (d.pausedAlongside?.(now - delay, now)) return d.info(`The main process was paused for ${ms} ms with the rest of Hive's process (its watchdog thread stopped too: the PC or the process was paused): not counted as busy`)
+        if (d.pausedAlongside?.(now - delay, now)) return d.info(`The main process was paused for ${ms} ms with the rest of Combwork's process (its watchdog thread stopped too: the PC or the process was paused): not counted as busy`)
         const cpuMs = cpuUsed === null ? null : Math.round(Math.min(cpuUsed, delay + t.every))
         // Kept before the log's quiet minute: the view lists the stalls the log leaves out too.
         d.record?.(stallOf(...span, ms, cpuMs, held), now)
@@ -222,14 +222,14 @@ export interface FileWaitDeps {
   slowProbe(): { n: number; start: number; ms: number } | null
   defer(fn: () => void, ms: number): void
   warn(line: string): void
-  /** Whether Hive's other threads stopped over [from, to] too (the watchdog's ticks): the whole process paused. */
+  /** Whether Combwork's other threads stopped over [from, to] too (the watchdog's ticks): the whole process paused. */
   pausedAlongside?(from: number, to: number): boolean
 }
 
 export const FILE_WAIT_TIMING = { every: 1000, settleMs: 3000, quietMs: 60_000 }
 
 /**
- * Notes in hive.log when a file call took long enough to be felt (HI-1702), at most once a minute. Every asynchronous
+ * Notes in combwork.log when a file call took long enough to be felt (HI-1702), at most once a minute. Every asynchronous
  * file call of main's and its worker threads takes one of the pool's threads (threadPool.ts): with them all held by
  * slow calls, the next waits, and a step awaiting many in turn (a window's open, a session listing) takes seconds
  * although no task holds main's thread, so the busy warning above never sees it. The call is the watchdog thread's
@@ -297,9 +297,9 @@ export function watchMainStalls(): void {
   startWatchdog()
   const delays = monitorEventLoopDelay({ resolution: 20 })
   delays.enable()
-  // Tests (unpackaged builds): HIVE_TEST_STALL_QUIET_MS shortens the minute between warnings, so a stall at start
+  // Tests (unpackaged builds): CW_TEST_STALL_QUIET_MS shortens the minute between warnings, so a stall at start
   // doesn't hide the one a suite makes.
-  const quietMs = (!app.isPackaged && Number(process.env.HIVE_TEST_STALL_QUIET_MS)) || STALL_TIMING.quietMs
+  const quietMs = (!app.isPackaged && Number(process.env.CW_TEST_STALL_QUIET_MS)) || STALL_TIMING.quietMs
   const thread = (process as { threadCpuUsage?: () => { user: number; system: number } }).threadCpuUsage
   const watch = stallWatcher({
     now: () => stallClock.mono(),

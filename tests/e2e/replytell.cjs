@@ -1,7 +1,7 @@
 // The user's replies to agents told to the Assistant (#418), on fake Claude Code sessions (fake-claude/): the Assistant
-// watches a card (hive_wait_for_tasks with wake); the user answers the card's agent by typing in its pane, and the
-// Assistant is woken once with the reply's first line. Not for keystrokes without Enter, nor for a line Hive types into
-// the agent, nor with Settings → Assistant → Tell the Assistant when I reply to an agent off. Dev build, throwaway
+// watches a card (cw_wait_for_tasks with wake); the user answers the card's agent by typing in its pane, and the
+// Assistant is woken once with the reply's first line. Not for keystrokes without Enter, nor for a line Combwork types into
+// the agent, nor for a turn its CLI starts by itself after the user's Enter (HI-2410: a background task's end), nor with Settings → Assistant → Tell the Assistant when I reply to an agent off. Dev build, throwaway
 // profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -36,13 +36,13 @@ const check = (name, ok, extra = '') => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const home = (await inv('workspace:refresh')).assistant.path
   const live = async (p, id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === p.toLowerCase() && s.agentId === id)
@@ -52,14 +52,14 @@ const check = (name, ok, extra = '') => {
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(250)
     return v
   }
-  /** What Hive typed into the Assistant to wake it (the fake logs each line from Hive). */
+  /** What Combwork typed into the Assistant to wake it (the fake logs each line from Combwork). */
   const wakes = () => {
     const f = path.join(claudeHome, 'fake-wakes.jsonl')
     return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => w.agent === 'Assistant').map((w) => w.text)
   }
   /**
    * Types into a terminal as the user does; Enter separately when asked. Into the Assistant (its watches), typed again if
-   * a wake of Hive's disturbed it (lib.typeLine, #1560). Into the builder not (#1560's exemption): its typing is the
+   * a wake of Combwork's disturbed it (lib.typeLine, #1560). Into the builder not (#1560's exemption): its typing is the
    * user's reply under test, which a second try would send twice; a pause before its Enter, on purpose: the fake reads
    * a typed line before its Enter, as a CLI does.
    */
@@ -83,13 +83,13 @@ const check = (name, ok, extra = '') => {
   await inv('session:start', home, { agentId: 'assistant' })
   check('both start', !!(await until(async () => (await idle(alpha, builder.id)) && (await idle(home, 'assistant')), HUNG_MS)))
   const watchCard = async () => {
-    await type(home, 'assistant', `hive hive_wait_for_tasks {"cards":[${card}],"column":"review","wake":true}`)
+    await type(home, 'assistant', `cw cw_wait_for_tasks {"cards":[${card}],"column":"review","wake":true}`)
     return until(async () => (await live(home, 'assistant'))?.status === 'watching', 15000)
   }
 
   // The Assistant watches the card; the user types in Builder's pane without sending: nothing.
   check("the Assistant watches the Builder's card", !!(await watchCard()))
-  await type(alpha, builder.id, 'C, the hive', false)
+  await type(alpha, builder.id, 'C, the corner', false)
   await lib.sleep(2500) // A fixed wait on purpose: this checks that keystrokes without Enter tell nothing.
   check('keystrokes without Enter: no wake', wakes().length === 0, JSON.stringify(wakes()))
   // The user sends the answer: one wake, with its first line, naming the agent and the card.
@@ -97,15 +97,15 @@ const check = (name, ok, extra = '') => {
   check('the reply wakes the Assistant', !!(await until(async () => wakes().length >= 1, 20000)))
   await lib.sleep(2000) // A fixed wait on purpose: this checks that a second line does NOT come.
   const w1 = wakes()
-  check('…once, with the reply, the agent and the card', w1.length === 1 && w1[0].startsWith(`[Hive] User replied to Builder on ${named}: "C, the hive cell"`), JSON.stringify(w1))
+  check('…once, with the reply, the agent and the card', w1.length === 1 && w1[0].startsWith(`[CW] User replied to Builder on ${named}: "C, the corner cell"`), JSON.stringify(w1))
   await until(async () => (await idle(home, 'assistant')) && (await idle(alpha, builder.id)), 20000)
 
-  // A line Hive types into Builder (a task the Assistant gives it, then watches its card) isn't the user's.
-  await type(home, 'assistant', `hive hive_prompt_agent {"project":"alpha","agent":"Builder","text":"work 2"} then hive hive_wait_for_tasks {"cards":[${card}],"column":"review","wake":true}`)
+  // A line Combwork types into Builder (a task the Assistant gives it, then watches its card) isn't the user's.
+  await type(home, 'assistant', `cw cw_prompt_agent {"project":"alpha","agent":"Builder","text":"work 2"} then cw cw_wait_for_tasks {"cards":[${card}],"column":"review","wake":true}`)
   check('the Assistant gives Builder a task, then watches its card', !!(await until(async () => (await live(alpha, builder.id))?.status === 'working', 15000)) && !!(await until(async () => (await live(home, 'assistant'))?.status === 'watching', 15000)))
   await until(() => idle(alpha, builder.id), 20000)
-  await lib.sleep(2000) // A fixed wait on purpose: this checks that Hive's own line tells nothing.
-  check("Hive's own typed line: no wake", wakes().length === 1, JSON.stringify(wakes().slice(1)))
+  await lib.sleep(2000) // A fixed wait on purpose: this checks that Combwork's own line tells nothing.
+  check("Combwork's own typed line: no wake", wakes().length === 1, JSON.stringify(wakes().slice(1)))
 
   // Settings → Assistant → Tell the Assistant when I reply to an agent, off: the user's reply tells nothing.
   await inv('settings:update', { assistant: { tellReplies: false } })
@@ -118,18 +118,33 @@ const check = (name, ok, extra = '') => {
   // On again: told, naming the user as Settings → General → Your name says (#426).
   await inv('settings:update', { assistant: { tellReplies: true }, general: { userName: 'Darren' } })
   await type(alpha, builder.id, 'Ship it')
-  check('on again: the next reply is told, by the name in Settings', !!(await until(async () => wakes().length === 2 && wakes()[1].startsWith(`[Hive] Darren replied to Builder on ${named}: "Ship it"`), 20000)), JSON.stringify(wakes().slice(1)))
+  check('on again: the next reply is told, by the name in Settings', !!(await until(async () => wakes().length === 2 && wakes()[1].startsWith(`[CW] Darren replied to Builder on ${named}: "Ship it"`), 20000)), JSON.stringify(wakes().slice(1)))
 
   // #1099: the Assistant watches Builder while Builder is idle (answered at once: no watch starts) and ends its turn.
   // The user's reply to Builder still reaches it within seconds, as a wake of its own.
   await until(async () => (await idle(home, 'assistant')) && (await idle(alpha, builder.id)), HUNG_MS)
-  await type(home, 'assistant', `hive hive_wait_for_agents ${JSON.stringify({ agents: [{ project: 'alpha', agent: 'Builder' }], wake: true })}`)
+  await type(home, 'assistant', `cw cw_wait_for_agents ${JSON.stringify({ agents: [{ project: 'alpha', agent: 'Builder' }], wake: true })}`)
   check('an agent watch on idle Builder is answered at once', !!(await until(async () => (await idle(home, 'assistant')) && (await live(home, 'assistant'))?.status !== 'watching', HUNG_MS)))
   const before = wakes().length
   const t0 = Date.now()
   await type(alpha, builder.id, 'Go ahead and push')
-  const told = await until(() => wakes().slice(before).find((x) => x.startsWith('[Hive] Darren replied to Builder (alpha): "Go ahead and push"')), HUNG_MS)
+  const told = await until(() => wakes().slice(before).find((x) => x.startsWith('[CW] Darren replied to Builder (alpha): "Go ahead and push"')), HUNG_MS)
   check('the reply reaches the Assistant within seconds with no watch of its own (#1099)', !!told && Date.now() - t0 < 15000, JSON.stringify({ wakes: wakes().slice(before), ms: Date.now() - t0 }))
+
+  // HI-2410: a turn Claude Code starts by itself (a background task's end, its prompt hook a <task-notification>) soon
+  // after the user pressed Enter in the pane (answering a dialog, say: no prompt of theirs) isn't the user's reply.
+  await until(() => idle(alpha, builder.id), HUNG_MS)
+  const b0 = wakes().length
+  await type(alpha, builder.id, 'background 8')
+  check("the user's prompt that starts a background task is told", !!(await until(() => wakes().slice(b0).find((x) => x.startsWith('[CW] Darren replied to Builder (alpha): "background 8"')), HUNG_MS)), JSON.stringify(wakes().slice(b0)))
+  // Its turn is over, the task runs on: the user's Enter, with nothing typed, before the task ends.
+  check('Builder waits on its background task', !!(await until(async () => (await live(alpha, builder.id))?.status === 'background', HUNG_MS)), (await live(alpha, builder.id))?.status)
+  await inv('pty:write', lib.ptyKey(alpha, builder.id), '\r')
+  // The task ends: its own turn starts and ends.
+  check("the task's end starts a turn by itself", !!(await until(async () => (await live(alpha, builder.id))?.status === 'working', HUNG_MS)), (await live(alpha, builder.id))?.status)
+  await until(() => idle(alpha, builder.id), HUNG_MS)
+  await lib.sleep(2000) // A fixed wait on purpose: this checks that the task's turn tells nothing.
+  check("the task's own turn isn't told as the user's reply", wakes().length === b0 + 1 && !wakes().some((x) => x.includes('task-notification')), JSON.stringify(wakes().slice(b0)))
 
   await app.close()
   console.log(failed ? `\n${failed} FAILED` : '\nALL PASSED')

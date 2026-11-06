@@ -34,23 +34,27 @@ function code(d: string): string[] {
  * exactly as written: anywhere else, the same text is refused.
  */
 const ALLOWED: Record<string, string[]> = {
-  // The hive-test root is %LOCALAPPDATA%\hive-test, in the temp folder only where LOCALAPPDATA is unset.
+  // The combwork-test root is %LOCALAPPDATA%\combwork-test, in the temp folder only where LOCALAPPDATA is unset.
   // and the temp folder's variables a child gets from the run (the run's own folder, HI-2102).
   'e2e/runContext.cjs': ['const LOCAL = process.env.LOCALAPPDATA || os.tmpdir()', "'PATH', 'PATHEXT', 'SYSTEMROOT', 'SYSTEMDRIVE', 'WINDIR', 'COMSPEC', 'TEMP', 'TMP', 'TMPDIR', 'OS',"],
-  'e2e/build.mjs': ["import { tmpdir } from 'os'", "export const BUILD_LOCKS = join(process.env.LOCALAPPDATA || tmpdir(), 'hive-test', 'build-locks')"],
-  'progressReport.mts': ["import { tmpdir } from 'node:os'", "const timings = (): string => process.env.HIVE_TEST_PROGRESS_TIMINGS || join(process.env.LOCALAPPDATA || tmpdir(), 'hive-test', 'progress-timings.json')"],
+  'testArea.cjs': ['const local = env.LOCALAPPDATA || os.tmpdir()'],
+  'e2e/build.mjs': ["import { tmpdir } from 'os'", "export const BUILD_LOCKS = join(process.env.LOCALAPPDATA || tmpdir(), 'combwork-test', 'build-locks')"],
+  'progressReport.mts': ["import { tmpdir } from 'node:os'", "const timings = (): string => process.env.CW_TEST_PROGRESS_TIMINGS || join(process.env.LOCALAPPDATA || tmpdir(), 'combwork-test', 'progress-timings.json')"],
   // npm run e2e -- --clear-dir: a folder the user names may be in the temp folder (one nothing here made).
   // The focused tests' picker's check (HI-1367) reads a binding naming the temp folder as not the repository's.
   'focusedPick.test.ts': ['if (bound.has(name) || !exprs.every((e) => !/tempDir|tmpdir|mkdtemp/.test(e) && names(e))) continue'],
   'e2e/evidence.cjs': ['function clearDir(target, { board = {}, temp = os.tmpdir(), testRoot = runContext.TEST_ROOT, homes = [runContext.CODEX_HOME, runContext.CLAUDE_TEST_HOME] } = {}) {']
 }
 const OWN = ['tempDir.ts', 'runTemp.mts', 'tempDir.test.ts']
+// Files whose subject is the temp variables Combwork gives agents (HI-2496: Agents' temp folder): TEMP, TMP and TMPDIR are
+// the data they check, never where they put files (those come from tempDir() and lib.WORK).
+const DATA = ['agentTemp.test.ts', 'e2e/agenttemp.cjs']
 
 /** Where these files name the temp folder themselves (os.tmpdir, TEMP or TMP), other than ALLOWED: `file:line` each. */
 function rawTempUses(files: { name: string; text: string }[]): string[] {
   const found: string[] = []
   for (const { name, text } of files) {
-    if (OWN.includes(name)) continue
+    if (OWN.includes(name) || DATA.includes(name)) continue
     text.split(/\r?\n/).forEach((line, i) => {
       if (/^\s*(\/\/|\*|\/\*)/.test(line)) return
       if (!/\btmpdir\b|\benv\s*(\.\s*(TEMP|TMP)\b|\[\s*['"`](TEMP|TMP)['"`])/i.test(line)) return
@@ -77,7 +81,7 @@ describe('temp folders for tests (#448)', () => {
     const fallback = ALLOWED['e2e/runContext.cjs'][0]
     const refused = [
       "const d = mkdtempSync(join(tmpdir(), 'x-'))",
-      "const d = mkdtempSync(join(process.env.LOCALAPPDATA || os.tmpdir(), 'hive-bypass-'))",
+      "const d = mkdtempSync(join(process.env.LOCALAPPDATA || os.tmpdir(), 'cw-bypass-'))",
       "const d = fs.mkdtempSync(path.join(require('os').tmpdir(), 'x-'))",
       "import { tmpdir } from 'os'",
       'const { tmpdir } = await import(\'os\')',
@@ -92,27 +96,27 @@ describe('temp folders for tests (#448)', () => {
     expect(rawTempUses([{ name: 'e2e/runContext.cjs', text: `${fallback}\nconst x = os.tmpdir()\n// os.tmpdir() in a comment` }])).toEqual(['e2e/runContext.cjs:2'])
   })
 
-  it("tempDir makes a new, empty folder by its real path; tempRoot is the run's own folder in hive-test\\tmp (#992, #995)", () => {
-    const a = dir('hive-tempdir-')
-    const b = dir('hive-tempdir-')
+  it("tempDir makes a new, empty folder by its real path; tempRoot is the run's own folder in combwork-test\\tmp (#992, #995)", () => {
+    const a = dir('cw-tempdir-')
+    const b = dir('cw-tempdir-')
     expect(a).not.toBe(b)
     expect(readdirSync(a)).toEqual([])
     expect(realpathSync.native(a)).toBe(a)
     expect(a.startsWith(tempRoot() + sep)).toBe(true)
-    // In the test area, which Hive's Antivirus scanning setting covers, not in %TEMP%; the temp folder only off Windows.
-    const area = join(process.env.LOCALAPPDATA || tmpdir(), 'hive-test', 'tmp')
+    // In the test area, which Combwork's Antivirus scanning setting covers, not in %TEMP%; the temp folder only off Windows.
+    const area = join(process.env.LOCALAPPDATA || tmpdir(), 'combwork-test', 'tmp')
     expect(tempArea).toBe(area)
     expect(dirname(tempRoot())).toBe(realpathSync.native(area))
     expect(basename(tempRoot())).toMatch(/^run-/)
     expect(realpathSync.native(tempRoot())).toBe(tempRoot())
-    // vitest.config.ts makes it the run's temp folder too, so what Vitest, Hive's code and git put in %TEMP% goes there.
+    // vitest.config.ts makes it the run's temp folder too, so what Vitest, Combwork's code and git put in %TEMP% goes there.
     if (process.env.LOCALAPPDATA) expect(tmpdir()).toBe(tempRoot())
   })
 })
 
 describe('other names for a folder (tests/pathAliases.ts)', () => {
   it('shortPath gives the 8.3 name of a long one, the same folder (skipped where the volume makes no short names)', (ctx) => {
-    const long = dir('hive-short-path-with-a-long-name-')
+    const long = dir('cw-short-path-with-a-long-name-')
     const short = shortPath(long)
     if (short === null) return ctx.skip()
     expect(short).toMatch(/~\d/)
@@ -122,19 +126,19 @@ describe('other names for a folder (tests/pathAliases.ts)', () => {
 
   it('shortPath gives null where there is no other name: every part already short, or no such path', () => {
     expect(shortPath(process.env.SystemRoot ?? 'C:\\Windows')).toBeNull()
-    expect(shortPath(join(tempRoot(), 'hive-no-such-folder-448', 'x'))).toBeNull()
+    expect(shortPath(join(tempRoot(), 'cw-no-such-folder-448', 'x'))).toBeNull()
   })
 
   it('shortPath gives null for a missing path under a folder that has a short name (#485: RUNNER~1 on the runner; skipped where the volume makes no short names)', (ctx) => {
-    const long = dir('hive-short-path-parent-with-a-long-name-')
+    const long = dir('cw-short-path-parent-with-a-long-name-')
     if (shortPath(long) === null) return ctx.skip()
-    expect(shortPath(join(long, 'hive-no-such-folder-485'))).toBeNull()
+    expect(shortPath(join(long, 'cw-no-such-folder-485'))).toBeNull()
     expect(shortPath(join(long, 'no-such', 'x'))).toBeNull()
   })
 
   it('junction gives another name for a folder on any machine: a different path, the same folder', () => {
-    const d = dir('hive-junction-')
-    const target = dir('hive-junction-target-')
+    const d = dir('cw-junction-')
+    const target = dir('cw-junction-target-')
     const via = junction(target, join(d, 'via'))
     expect(via.toLowerCase()).not.toBe(target.toLowerCase())
     expect(existsSync(via)).toBe(true)
@@ -150,7 +154,7 @@ describe('git as on the runner (tests/noGlobalGit.ts)', () => {
 
   it('no global config: none read, none can be written, so a commit needs its repository to say who', () => {
     expect(process.env.GIT_CONFIG_GLOBAL).toBe('/dev/null')
-    const d = dir('hive-no-global-git-')
+    const d = dir('cw-no-global-git-')
     expect(git(d, 'config', '--global', '--list')).toMatchObject({ status: 0, out: '' })
     // Nothing a test or an earlier run writes stays for the next.
     expect(git(d, 'config', '--global', 'user.name', 'Left behind').status).not.toBe(0)
@@ -167,14 +171,14 @@ describe('git as on the runner (tests/noGlobalGit.ts)', () => {
 
 describe("the run's own temp folder goes when the run ends (#995)", () => {
   const as = (folder: string, owner: string, fn: () => void): void => {
-    const was = { dir: process.env.HIVE_TEST_RUN_TMP, owner: process.env.HIVE_TEST_RUN_TMP_OWNER }
-    process.env.HIVE_TEST_RUN_TMP = folder
-    process.env.HIVE_TEST_RUN_TMP_OWNER = owner
+    const was = { dir: process.env.CW_TEST_RUN_TMP, owner: process.env.CW_TEST_RUN_TMP_OWNER }
+    process.env.CW_TEST_RUN_TMP = folder
+    process.env.CW_TEST_RUN_TMP_OWNER = owner
     try {
       fn()
     } finally {
-      process.env.HIVE_TEST_RUN_TMP = was.dir
-      process.env.HIVE_TEST_RUN_TMP_OWNER = was.owner
+      process.env.CW_TEST_RUN_TMP = was.dir
+      process.env.CW_TEST_RUN_TMP_OWNER = was.owner
     }
   }
 
@@ -192,10 +196,10 @@ describe("the run's own temp folder goes when the run ends (#995)", () => {
 
   it("is left alone by a run started inside it (another process), and nothing but a run's folder is ever removed", () => {
     // This worker is one: the run's folder is its parent's.
-    expect(process.env.HIVE_TEST_RUN_TMP_OWNER).not.toBe(String(process.pid))
+    expect(process.env.CW_TEST_RUN_TMP_OWNER).not.toBe(String(process.pid))
     expect(endRunTemp()).toBeUndefined()
     expect(existsSync(tempRoot())).toBe(true)
-    const notARun = dir('hive-not-a-run-')
+    const notARun = dir('cw-not-a-run-')
     as(notARun, String(process.pid), () => expect(endRunTemp()).toMatch(/^not a run's folder/))
     expect(existsSync(notARun)).toBe(true)
   })
@@ -217,19 +221,19 @@ describe("a stopped run's temp folder goes at a later run's start, and every run
   const nobody = evidence({ cards: [] })
 
   it("removes runs' folders older than a day whose run has ended, and nothing else", () => {
-    const area = dir('hive-run-area-')
+    const area = dir('cw-run-area-')
     const ended = at(area, 'run-4001-abcdef', DAY + 60_000)
     const live = at(area, 'run-4002-abcdef', 2 * DAY)
     const recent = at(area, 'run-4003-abcdef', DAY - 60_000)
     const beforePids = at(area, 'run-Xy12Zq', 2 * DAY)
-    const other = at(area, 'hive-gitrepo-abcdef', 2 * DAY)
+    const other = at(area, 'cw-gitrepo-abcdef', 2 * DAY)
     const removed = pruneRunTemps((p) => nobody.protects(p), { now, area, isAlive: (pid) => pid === 4002 })
     expect(removed.sort()).toEqual([beforePids, ended].sort())
     expect([ended, live, recent, beforePids, other].map((d) => existsSync(d))).toEqual([false, true, true, false, true])
   })
 
   it('keeps an old run whose files an open card cites, and removes an uncited one beside it', () => {
-    const area = dir('hive-run-area-')
+    const area = dir('cw-run-area-')
     const cited = at(area, 'run-4011-abcdef', 2 * DAY)
     writeFileSync(join(cited, 'failure.txt'), 'x')
     utimesSync(cited, new Date(now - 2 * DAY), new Date(now - 2 * DAY))
@@ -242,7 +246,7 @@ describe("a stopped run's temp folder goes at a later run's start, and every run
   })
 
   it("removes nothing while the board can't be read, or with no board found", () => {
-    const area = dir('hive-run-area-')
+    const area = dir('cw-run-area-')
     const old = at(area, 'run-4021-abcdef', 2 * DAY)
     for (const ev of [evidence({ tasksDir: join(area, 'no-such-board') }), evidence({})]) {
       expect(ev.ok).toBe(false)
@@ -252,7 +256,7 @@ describe("a stopped run's temp folder goes at a later run's start, and every run
   })
 
   it('asks the board just before each removal: a card citing a run after the listing keeps it', () => {
-    const area = dir('hive-run-area-')
+    const area = dir('cw-run-area-')
     const run = at(area, 'run-4031-abcdef', 2 * DAY)
     const cards: { number: number; text: string }[] = []
     const ev = evidence({ cards })
@@ -266,7 +270,7 @@ describe("a stopped run's temp folder goes at a later run's start, and every run
   })
 
   it('gives nothing for an area that is not there', () => {
-    expect(pruneRunTemps((p) => nobody.protects(p), { now, area: join(dir('hive-run-area-'), 'none') })).toEqual([])
+    expect(pruneRunTemps((p) => nobody.protects(p), { now, area: join(dir('cw-run-area-'), 'none') })).toEqual([])
   })
 
   it("the run's folder is the temp folder of what it starts (TEMP, TMP, TMPDIR), in the e2e and scenario runners too", () => {
@@ -294,17 +298,17 @@ describe("a stopped run's temp folder goes at a later run's start, and every run
 // Last in the file: removeTempDirs() takes every folder this file has made.
 describe("each test file's temp folders go when it ends (#995)", () => {
   it('removes every folder tempDir() made, with what was in it, and only those', () => {
-    const a = tempDir('hive-made-')
-    const b = tempDir('hive-made-')
+    const a = tempDir('cw-made-')
+    const b = tempDir('cw-made-')
     mkdirSync(join(b, 'deep', 'er'), { recursive: true })
     writeFileSync(join(b, 'deep', 'er', 'f.txt'), 'x')
-    const other = mkdtempSync(join(tempRoot(), 'hive-not-made-'))
+    const other = mkdtempSync(join(tempRoot(), 'cw-not-made-'))
     try {
       expect(removeTempDirs()).toEqual([])
       expect([existsSync(a), existsSync(b), existsSync(other)]).toEqual([false, false, true])
       // Once removed, a folder isn't removed again, and the helper carries on making them.
       expect(removeTempDirs()).toEqual([])
-      expect(existsSync(tempDir('hive-made-'))).toBe(true)
+      expect(existsSync(tempDir('cw-made-'))).toBe(true)
     } finally {
       rmSync(other, { recursive: true, force: true })
     }

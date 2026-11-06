@@ -47,12 +47,12 @@ export const catalogArgs = (): string[] => ['--acp', ...noAutoUpdateArgs()]
 
 /**
  * Asks the installed Copilot for the account's models: starts it as an ACP server (no prompt, no sign-in, no cost), opens
- * a session in a folder of Hive's, and reads session/new's reply. That session leaves a folder in Copilot's session
- * store with no conversation in it; Hive removes that folder (only it, and only while it holds no events). Null when
+ * a session in a folder of Combwork's, and reads session/new's reply. That session leaves a folder in Copilot's session
+ * store with no conversation in it; Combwork removes that folder (only it, and only while it holds no events). Null when
  * it couldn't be asked or listed nothing (not signed in, or offline).
  */
 export function readCopilotModels(executable: string, env: Record<string, string>, timeoutMs = 30000): Promise<CatalogRead | null> {
-  const dir = join(tmpdir(), 'hive-copilot-models')
+  const dir = join(tmpdir(), 'combwork-copilot-models')
   mkdirSync(dir, { recursive: true })
   const childEnv = copilotEnv(env)
   return new Promise((resolve) => {

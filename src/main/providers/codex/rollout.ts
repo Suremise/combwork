@@ -157,7 +157,12 @@ export function rolloutDetails(text: string): LiveDetails {
       if (u) out.planUsage = u
     } else if (r.type === 'event_msg' && p.type === 'thread_settings_applied') {
       const ts = p.thread_settings ?? {}
-      if (typeof ts.model === 'string') out.modelName = out.modelId = ts.model
+      if (typeof ts.model === 'string') {
+        out.modelName = out.modelId = ts.model
+        // When (HI-2609): a resumed rollout's earlier records aren't this launch's model.
+        if (typeof r.timestamp === 'string') out.modelAt = r.timestamp
+        else delete out.modelAt
+      }
       const effort = ts.collaboration_mode?.settings?.reasoning_effort ?? ts.reasoning_effort
       if (typeof effort === 'string') out.effort = effort
       if (typeof ts.collaboration_mode?.mode === 'string') out.planMode = ts.collaboration_mode.mode === 'plan'
@@ -166,7 +171,11 @@ export function rolloutDetails(text: string): LiveDetails {
     } else if (r.type === 'event_msg' && p.type === 'task_started' && typeof p.collaboration_mode_kind === 'string') {
       out.planMode = p.collaboration_mode_kind === 'plan'
     } else if (r.type === 'turn_context') {
-      if (typeof p.model === 'string') out.modelName = out.modelId = p.model
+      if (typeof p.model === 'string') {
+        out.modelName = out.modelId = p.model
+        if (typeof r.timestamp === 'string') out.modelAt = r.timestamp
+        else delete out.modelAt
+      }
       if (typeof p.effort === 'string') out.effort = p.effort
     }
   }
@@ -431,7 +440,7 @@ export class CodexConversationParser implements ConversationParserLike {
     const calls = (s.tool.calls ??= [])
     calls.push(call)
     if (s.code !== null && !(calls.length === 1 && call.name === 'Edit')) {
-      Object.assign(s.tool, { name: 'Script', input: s.code, summary: firstLine(s.code).slice(0, 200) }) // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
+      Object.assign(s.tool, { name: 'Script', input: s.code, summary: firstLine(s.code).slice(0, 200) }) // i18n-ignore: a tool's name, as agents read it (cw_agent_activity)
       s.code = null
     }
   }
@@ -478,7 +487,7 @@ export class CodexConversationParser implements ConversationParserLike {
           const cmd = Array.isArray(args.command) ? (args.command as string[]).join(' ') : ((args.cmd ?? args.command) as string | undefined)
           const input = shell && typeof cmd === 'string' ? cmd : JSON.stringify(args, null, 2)
           const summary = shell ? firstLine(cmd) : firstLine(Object.values(args).find((v) => typeof v === 'string'))
-          this.tool(String(p.call_id ?? ''), shell ? 'Shell' : name, input, summary.slice(0, 200), ts, shell ? cwdOf(args.workdir) : null) // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
+          this.tool(String(p.call_id ?? ''), shell ? 'Shell' : name, input, summary.slice(0, 200), ts, shell ? cwdOf(args.workdir) : null) // i18n-ignore: a tool's name, as agents read it (cw_agent_activity)
           break
         }
         case 'custom_tool_call': {
@@ -488,8 +497,8 @@ export class CodexConversationParser implements ConversationParserLike {
           const scripted = name === 'exec' ? scriptPatch(input) : null
           const patch = name === 'apply_patch' ? input : scripted
           if (patch !== null) {
-            this.tool(String(p.call_id ?? ''), 'Edit', patch, patchPaths(patch).map((f) => shortPath(f, this.root)).join(', ').slice(0, 200), ts) // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
-          } else this.tool(String(p.call_id ?? ''), name === 'exec' ? 'Script' : name, input, firstLine(input).slice(0, 200), ts) // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
+            this.tool(String(p.call_id ?? ''), 'Edit', patch, patchPaths(patch).map((f) => shortPath(f, this.root)).join(', ').slice(0, 200), ts) // i18n-ignore: a tool's name, as agents read it (cw_agent_activity)
+          } else this.tool(String(p.call_id ?? ''), name === 'exec' ? 'Script' : name, input, firstLine(input).slice(0, 200), ts) // i18n-ignore: a tool's name, as agents read it (cw_agent_activity)
           if (name === 'exec') {
             const script = { tool: this.tools.get(String(p.call_id ?? ''))!, code: scripted !== null ? input : null, start: ts ? Date.parse(ts) : NaN, end: null }
             // A script whatever it is shown as (HR1 on HI-2246: an Edit made of one that never ran its patch is no call).

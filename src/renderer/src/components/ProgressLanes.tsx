@@ -79,13 +79,13 @@ export function LanesSection({ lanes: given, all, width, runs = [], full = false
   // Pulse leaves out a Solo project's lanes unless one runs (#1421); the Lanes tab shows every lane.
   const lanes = full ? given : pulseLanes(given, (p) => stages.get(p.toLowerCase())?.preset)
   // Off, an old rules mark still shows (it is a fact) and says the rules aren't enforced (#1421).
-  const enforced = useAdvancedValue<boolean>('hive.workflow.enforce')
+  const enforced = useAdvancedValue<boolean>('cw.workflow.enforce')
   const [foldedKept, toggle] = usePanelFold(ws ? foldKey(ws) : null)
   const folded = foldedKept && !full
   const key = ws ? rowsKey(ws) : null
   const kept = useStore((s) => (key ? s.panes[key] : undefined))
   // The lanes shown until the edge is dragged: Settings → Advanced's, or the workspace's own (#367).
-  const fallback = useAdvancedValue<number>('hive.progress.lanesShown')
+  const fallback = useAdvancedValue<number>('cw.progress.lanesShown')
   const list = useRef<HTMLDivElement>(null)
   // Measured as the panel changes (a resize, zoom, a merge card, lanes coming and going): a lane's height with its
   // margin, so the list shows whole lanes, and the room the lanes could have: the list and the runs above share the
@@ -449,13 +449,13 @@ export function DockEdge({ paneKey: key, chosen, shown, min, max, pitch, snap = 
   )
 }
 
-const LANE_DRAG = 'application/x-hive-lane'
+const LANE_DRAG = 'application/x-combwork-lane'
 
 const START_LANE = msg({ id: 'board.lanes.start', defaultMessage: 'Start Lane…', description: "A button in the Progress panel's Lanes tab and an item of a lane's menu: opens Start Lane (a builder and a reviewer agent work through cards in turn). Glossary: lane." })
 
-const RETRY_FRESH = msg({ id: 'board.lanes.retryFresh', defaultMessage: 'Retry New Conversation', description: "A button in a lane's header (Progress panel) and an item of its menu (HI-2034): one of the lane's agents was owed a new conversation, and Hive stopped trying to start it (it wasn't free in time, Hive closed while starting it, or its start failed); this tries again, once the agent is free. Glossary: lane, conversation." })
+const RETRY_FRESH = msg({ id: 'board.lanes.retryFresh', defaultMessage: 'Retry New Conversation', description: "A button in a lane's header (Progress panel) and an item of its menu (HI-2034): one of the lane's agents was owed a new conversation, and Combwork stopped trying to start it (it wasn't free in time, Combwork closed while starting it, or its start failed); this tries again, once the agent is free. Glossary: lane, conversation." })
 
-const RETRY_FRESH_SHORT = msg({ id: 'board.lanes.retryFreshShort', defaultMessage: 'Retry {agent}', description: "A lane's header in the Progress panel (HI-2034), after a refresh icon: a button that tries again to start the lane's agent {agent} (an agent's name) in a new conversation, which Hive stopped trying. Short: the panel is narrow; its tooltip says why in full." })
+const RETRY_FRESH_SHORT = msg({ id: 'board.lanes.retryFreshShort', defaultMessage: 'Retry {agent}', description: "A lane's header in the Progress panel (HI-2034), after a refresh icon: a button that tries again to start the lane's agent {agent} (an agent's name) in a new conversation, which Combwork stopped trying. Short: the panel is narrow; its tooltip says why in full." })
 
 /** Whether a lane's agent is owed its new conversation and no more is tried (HI-2034): the row offers Retry. */
 const freshBlocked = (l: Lane): boolean => l.status?.reason === 'startWait' && l.status.why === 'fresh' && !!l.status.freshBlocked && !l.frozen
@@ -577,7 +577,7 @@ function LaneSlotTip({ lane: l }: { lane: Lane }) {
         <strong>{s.name}</strong>{' '}
         {tr(msg({ id: 'board.lanes.slotTip', defaultMessage: '{state, select, preparing {being prepared} other {ready}} · {carried, select, yes {its builder’s own since {since}} other {lent to the lane since {since}}}', description: "A lane's slot in its hover (Progress panel, #1446), after the slot's name (slot-b): whether it is ready or being prepared (its setup or a dependency install), then since when it was lent to the lane, or, for a builder's own worktree kept from before 1.0 (carried), since when it has had it. {since} is a date and time. Keep the select keys." }), { state: s.state, carried: s.carried ? 'yes' : 'no', since: formatDateTime(s.since) })}
       </div>
-      {s.line && <div className="faint">{tr(msg({ id: 'board.lanes.slotLine', defaultMessage: 'On {line}', description: "A lane's slot in its hover (Progress panel, #1446): the branch its current card is built on there follows ({line}, such as hive/HI/HI-12-fix-login: keep it as it is)." }), { line: s.line })}</div>}
+      {s.line && <div className="faint">{tr(msg({ id: 'board.lanes.slotLine', defaultMessage: 'On {line}', description: "A lane's slot in its hover (Progress panel, #1446): the branch its current card is built on there follows ({line}, such as cw/HI/HI-12-fix-login: keep it as it is)." }), { line: s.line })}</div>}
     </div>
   )
 }
@@ -623,14 +623,14 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced, exp
   const segments = fitSegments(cards, max, tr, fmt.list)
   const pair = lanePair(l)
   // Why it waits (#1279, from #1270's status): said in its header instead of just "paused", and in its accessible name.
-  const why = l.status && !l.frozen ? laneWaitText(l.status, (n) => cardLabelOf({ tasks }, n), tr) : null
+  const why = l.status && !l.frozen ? laneWaitText(l.status, (n) => cardLabelOf({ tasks }, n), tr, (items) => fmt.list(items)) : null
   // Its queued list change (HI-2151), under its cards in the Lanes tab (`all`: every lane, to say where a card moves).
   const change = all ? queuedChange(l, all) : null
   const queued = change ? queuedChangeText(change, (n) => cardLabelOf({ tasks }, n), tr, fmt.list) : null
   const word = stateWord(l.state)
   // How long it has waited (HI-1926: since main saw the wait begin), marked past its bound (Settings → Advanced).
-  const youMin = useAdvancedValue<number>('hive.lanes.waitYouMinutes')
-  const reviewerMin = useAdvancedValue<number>('hive.lanes.waitReviewerMinutes')
+  const youMin = useAdvancedValue<number>('cw.lanes.waitYouMinutes')
+  const reviewerMin = useAdvancedValue<number>('cw.lanes.waitReviewerMinutes')
   const wait = why ? laneWaitTime(l.status, Date.now(), youMin, reviewerMin) : null
   const waited = wait ? (l.status?.atLeast ? tr(WAITED_AT_LEAST, { time: durationText(wait.ms, tr) }) : durationText(wait.ms, tr)) : null
   // Its cost on the hover of its top line (#602), read when the hover first shows.
@@ -784,7 +784,7 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced, exp
           </span>
         </div>
       </Tooltip>
-      <div className="lane-bar" role="list" aria-label={unknown ? tr(msg({ id: 'board.lanes.barUnrecorded', defaultMessage: '{pair}: {total, plural, one {# card} other {# cards}}, not recorded', description: "Accessible name of a lane's bar (Progress panel) when the lane ended before Hive recorded where its cards were: the builder / reviewer ({pair}) and how many cards." }), { pair, total }) : tr(msg({ id: 'board.lanes.bar', defaultMessage: '{pair}: {finished} of {total, plural, one {# card} other {# cards}} finished', description: "Accessible name of a lane's bar (Progress panel): the builder / reviewer ({pair}), and how many of its cards are finished (passed or done)." }), { pair, finished, total })}>
+      <div className="lane-bar" role="list" aria-label={unknown ? tr(msg({ id: 'board.lanes.barUnrecorded', defaultMessage: '{pair}: {total, plural, one {# card} other {# cards}}, not recorded', description: "Accessible name of a lane's bar (Progress panel) when the lane ended before Combwork recorded where its cards were: the builder / reviewer ({pair}) and how many cards." }), { pair, total }) : tr(msg({ id: 'board.lanes.bar', defaultMessage: '{pair}: {finished} of {total, plural, one {# card} other {# cards}} finished', description: "Accessible name of a lane's bar (Progress panel): the builder / reviewer ({pair}), and how many of its cards are finished (passed or done)." }), { pair, finished, total })}>
         {segments.map((s) => (
           <Segment key={s.kind === 'card' ? s.number : `${s.kind}-${s.numbers[0]}`} segment={s} work={s.kind === 'card' ? laneSegmentWork(l, badges.get(s.number), s, shortFor(s.number), tr, OVERRIDE_NAMES) : []} marks={s.kind === 'card' ? segmentMarks(l, badges.get(s.number), s, shortFor(s.number), tr, OVERRIDE_NAMES, enforced) : {}} folded={s.kind === 'card' ? null : foldedMarks(l, badges, cards, s.numbers, shortFor, tr, OVERRIDE_NAMES, enforced)} />
         ))}
@@ -854,8 +854,8 @@ function LaneQueue({ lane: l, badges }: { lane: Lane; badges: Map<number, WorkBa
   )
 }
 
-const WAITED_AT_LEAST = msg({ id: 'board.lanes.waitedAtLeast', defaultMessage: '{time}+', description: "How long a lane has waited, in its header (Progress panel), when Hive didn't see its wait begin (it was already waiting when Hive started): at least {time} (4 min, 1 h 5 min)." })
-const WAITED_AT_LEAST_TIP = msg({ id: 'board.lanes.waitedAtLeastTip', defaultMessage: 'It was already waiting when Hive first saw it: it has waited at least this long.', description: "Tooltip of a lane's wait time with a + in its header (Progress panel): Hive didn't see the wait begin." })
+const WAITED_AT_LEAST = msg({ id: 'board.lanes.waitedAtLeast', defaultMessage: '{time}+', description: "How long a lane has waited, in its header (Progress panel), when Combwork didn't see its wait begin (it was already waiting when Combwork started): at least {time} (4 min, 1 h 5 min)." })
+const WAITED_AT_LEAST_TIP = msg({ id: 'board.lanes.waitedAtLeastTip', defaultMessage: 'It was already waiting when Combwork first saw it: it has waited at least this long.', description: "Tooltip of a lane's wait time with a + in its header (Progress panel): Combwork didn't see the wait begin." })
 
 /**
  * One segment: a card (a click opens it), or the finished cards folded together, or the rest of a long lane. `work`:

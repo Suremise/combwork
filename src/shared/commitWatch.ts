@@ -1,4 +1,4 @@
-// A watch on React's commits in test copies of Hive (HI-1387; a suite fails on its commit chain, HI-1865). A render
+// A watch on React's commits in test copies of Combwork (HI-1387; a suite fails on its commit chain, HI-1865). A render
 // loop (a setState per event in a useEffect, #1366) only throws (#185) once React's nested-update limit is passed, and a
 // production build says nothing before then, so a smaller loop went unseen in suites that passed. React DOM reports each
 // commit to a DevTools hook installed before it loads, production builds too: test copies install one
@@ -7,7 +7,7 @@
 // passes to a test copy's window (testQuiet).
 
 /** The window's command-line argument (webPreferences.additionalArguments) that turns the watch on. */
-export const COMMIT_WATCH_ARG = '--hive-commit-watch'
+export const COMMIT_WATCH_ARG = '--cw-commit-watch'
 /** The window a burst is counted in (ms): React's nested-update limit is reached that fast in a loop. */
 export const COMMIT_BURST_WINDOW_MS = 250
 /**
@@ -16,7 +16,7 @@ export const COMMIT_BURST_WINDOW_MS = 250
  */
 export const COMMIT_BURST_LIMIT = 50
 /** The console line's start: `<marker> <n>`, n the largest burst so far. */
-export const COMMIT_BURST_MARKER = '[hive commit burst]' // i18n-ignore: a test copy's console marker, read by the e2e harness
+export const COMMIT_BURST_MARKER = '[combwork commit burst]' // i18n-ignore: a test copy's console marker, read by the e2e harness
 
 /**
  * Counts commits by their times (ms, rising): add(t) returns how many fell within `windowMs` up to t; max is the most
@@ -56,9 +56,9 @@ export function burstOf(text: string): number | null {
  * in a useEffect loops (#1366), however fast or slow, and what React counts toward its own limit. A window's ordinary
  * work, however busy, starts a new chain at each thing from outside.
  */
-export const COMMIT_CHAIN_MARKER = '[hive commit chain]' // i18n-ignore: a test copy's console marker, read by the e2e harness
+export const COMMIT_CHAIN_MARKER = '[combwork commit chain]' // i18n-ignore: a test copy's console marker, read by the e2e harness
 /** The DOM event the preload sends the page as each message or reply from main arrives (the page can't see IPC itself). */
-export const FROM_MAIN_EVENT = 'hive-commit-watch-from-main'
+export const FROM_MAIN_EVENT = 'cw-commit-watch-from-main'
 
 /** Counts commit chains: outside() as anything from outside arrives, commit() at each commit (returns the chain's length). */
 export function chainCounter(): { outside: () => void; commit: () => number; readonly max: number } {

@@ -1,4 +1,4 @@
-// Comparing Hive's costs (#117): scenario benchmarks and Performance exports read as untrusted input
+// Comparing Combwork's costs (#117): scenario benchmarks and Performance exports read as untrusted input
 // (src/shared/benchmark.ts), compared like with like (correctness first: a smaller result that fails, skips checks or
 // fails more calls isn't better; what wasn't measured stays unknown), and kept per scope in the workspace
 // (src/main/benchmarks.ts: bounded, committed before anything is evicted, bound to the workspace each operation started
@@ -77,7 +77,7 @@ describe('scenario benchmarks', () => {
   it('more failures, errors or retries are worse even when every check passes and it is smaller', () => {
     const base = bench('baseline')
     for (const [k, v] of [
-      ['hiveCallErrors', 2],
+      ['combworkCallErrors', 2],
       ['apiFailed', 2],
       ['toolErrors', 1],
       ['apiCancelled', 1],
@@ -185,7 +185,7 @@ describe('scenario benchmarks', () => {
     const c = scenario(compareArtifacts(withUsage(0.01, { reasoning: 0 }), withUsage(0.02, { reasoning: 150, estimated: true })), 'card-detail')
     expect(c.usage!.map((u) => u.key)).toEqual(['inputTokens', 'cacheReadTokens', 'cacheWriteTokens', 'outputTokens', 'reasoningTokens', 'requests', 'costUsd'])
     expect(c.usage!.find((u) => u.key === 'outputTokens')!.delta).toBe(0)
-    expect(c.notes.join(' ')).toMatch(/Hive’s estimates/)
+    expect(c.notes.join(' ')).toMatch(/Combwork’s estimates/)
     expect(scenario(compareArtifacts(withUsage(0.01), withUsage(0.01, { reasoning: 5 })), 'card-detail').usage!.some((u) => u.key === 'reasoningTokens')).toBe(false)
     expect(scenario(compareArtifacts(withUsage(0.01), withUsage(null)), 'card-detail').usage!.some((u) => u.key === 'costUsd')).toBe(false)
     const resumed = scenario(compareArtifacts(withUsage(0.01), withUsage(0.01, { resumed: true })), 'card-detail')
@@ -196,8 +196,8 @@ describe('scenario benchmarks', () => {
 
   it('reads a file as untrusted input: bounds, junk, escapes; a kept file is re-read into a fresh, bounded object', () => {
     expect(parseArtifact('{', WS)).toMatchObject({ error: expect.stringMatching(/JSON/) })
-    expect(parseArtifact('{"schema":"other"}', WS)).toMatchObject({ error: expect.stringMatching(/isn’t a Hive benchmark/) })
-    const big = JSON.stringify({ schema: 'hive-benchmark/1', pad: '日'.repeat(BENCHMARK_LIMITS.fileBytes / 3 + 10) })
+    expect(parseArtifact('{"schema":"other"}', WS)).toMatchObject({ error: expect.stringMatching(/isn’t a Combwork benchmark/) })
+    const big = JSON.stringify({ schema: 'combwork-benchmark/1', pad: '日'.repeat(BENCHMARK_LIMITS.fileBytes / 3 + 10) })
     expect(big.length).toBeLessThan(BENCHMARK_LIMITS.fileBytes)
     expect(parseArtifact(big, WS)).toMatchObject({ error: expect.stringMatching(/over 2 MB/) })
     const b = JSON.parse(fixture('baseline'))
@@ -227,13 +227,13 @@ describe('scenario benchmarks', () => {
   })
 })
 
-/** A Performance export (hive-metrics/1) of a scope, as metrics:export writes it. */
+/** A Performance export (combwork-metrics/1) of a scope, as metrics:export writes it. */
 function exportFile(opts: { scope?: any; sanitized?: boolean; own?: boolean; observedMs?: number; hours?: number; requests?: Record<string, number>; role?: string; dropped?: number; unattributed?: boolean; workspace?: number; brokenApi?: boolean } = {}): string {
   const hours = opts.hours ?? 24
   const to = Date.parse('2026-10-03T12:00:00Z')
   const from = to - hours * 3_600_000
   const api = (n: number) => (opts.brokenApi ? {} : [{ route: '/v1/tasks', method: 'GET', role: 'agent', outcome: 'ok', count: n, totalMs: n, maxMs: 1, histogram: [], requestBytes: 0, responseBytes: n * 100 }])
-  const part = (n: number) => ({ api: api(n), mcp: [{ tool: 'hive_list_tasks', role: 'agent', mode: 'compact', outcome: 'ok', count: n, totalMs: 0, maxMs: 0, histogram: [], chars: n * 50, bytes: n * 50 }], guidance: [{ provider: 'claude-code', role: 'agent', launches: 1, guidanceBytes: 1000, customBytes: 50, roleBytes: 0, modeBytes: 0, skillCatalogBytes: 300 }], catalog: [] })
+  const part = (n: number) => ({ api: api(n), mcp: [{ tool: 'cw_list_tasks', role: 'agent', mode: 'compact', outcome: 'ok', count: n, totalMs: 0, maxMs: 0, histogram: [], chars: n * 50, bytes: n * 50 }], guidance: [{ provider: 'claude-code', role: 'agent', launches: 1, guidanceBytes: 1000, customBytes: 50, roleBytes: 0, modeBytes: 0, skillCatalogBytes: 300 }], catalog: [] })
   const reqs = opts.requests ?? { alpha: 10, beta: 20 }
   const scope = opts.scope ?? { kind: 'workspace' }
   const report = {
@@ -251,7 +251,7 @@ function exportFile(opts: { scope?: any; sanitized?: boolean; own?: boolean; obs
     dropped: opts.dropped ?? 0,
     ...(opts.unattributed ? { lossesUnattributed: true } : {})
   }
-  return JSON.stringify({ schema: 'hive-metrics/1', app: { name: 'Hive', version: '0.3.1' }, exportedAt: new Date(to).toISOString(), sanitized: !!opts.sanitized, report })
+  return JSON.stringify({ schema: 'combwork-metrics/1', app: { name: 'Combwork', version: '0.3.1' }, exportedAt: new Date(to).toISOString(), sanitized: !!opts.sanitized, report })
 }
 
 describe('what Compare says about its measures', () => {
@@ -262,6 +262,13 @@ describe('what Compare says about its measures', () => {
 })
 
 describe('Performance exports', () => {
+  // old-name: begin old-metrics-export
+  it("1.0's export (hive-metrics/1) is refused, saying what it is; a benchmark under another schema id is no Combwork file (HI-2611)", () => {
+    expect(parseArtifact(exportFile({ requests: { alpha: 24 } }).replace('combwork-metrics/1', 'hive-metrics/1'), WS)).toMatchObject({ error: 'It is a Performance export from version 1.0, which Combwork doesn’t import. Export again from Combwork to compare.' })
+  // old-name: end old-metrics-export
+    expect(parseArtifact(fixture('baseline').replace('combwork-benchmark/1', 'other-benchmark/1'), WS)).toMatchObject({ error: expect.stringMatching(/isn’t a Combwork benchmark/) })
+  })
+
   it('compared per hour recorded, with the filters and coverage that make them comparable', () => {
     const a = art(parseArtifact(exportFile({ requests: { alpha: 24 } }), WS))
     const b = art(parseArtifact(exportFile({ requests: { alpha: 48 }, hours: 48 }), WS))
@@ -314,7 +321,7 @@ describe('Performance exports', () => {
     expect(shownText(keptAbout(trial))).toBe('Model trial Claude Code opus (high, auto), fixtures v3, 2 scenarios × 1, source abc1234, spent $1.23')
     setLanguage('pl', polish(), 'pl-PL')
     try {
-      // Hive's name, its description and the reason two can't be compared: Polish, the roles as the Who filter names them.
+      // Combwork's name, its description and the reason two can't be compared: Polish, the roles as the Who filter names them.
       expect(shownText(keptLabel(e))).not.toMatch(/Export/)
       expect(shownText(keptAbout(e))).not.toMatch(/agent|all providers/)
       const reason = compareArtifacts(agents, scripts).reasonsText.map((t) => shownText(t)).join()
@@ -443,7 +450,7 @@ describe('the scenario harness writes what the app reads (tests/scenarios/benchm
       { name: 'b', ok: true },
       { name: 'only a model', ok: null }
     ],
-    measures: measuresOf(report(0), report(2), { hiveCalls: [{ tool: 'hive_read_task', ok: true, args: '{"number":1}' }], skillsRead: ['work-on-card'] }, null),
+    measures: measuresOf(report(0), report(2), { combworkCalls: [{ tool: 'cw_read_task', ok: true, args: '{"number":1}' }], skillsRead: ['work-on-card'] }, null),
     coverage: { recording: true, dropped: 0, partial: [] },
     guidance: { atStart: { revision: 'g1' }, delivered: { guidance: 'g1', skills: { 'work-on-card': 'rev-a' } } },
     metricsOverheadMs: 12,
@@ -498,7 +505,7 @@ describe('the scenario harness writes what the app reads (tests/scenarios/benchm
   })
 
   it('keeps the newest runs in folders of their own; never overwrites a baseline, even saved three times in a second', () => {
-    const dir = tempDir('hive-results-')
+    const dir = tempDir('cw-results-')
     try {
       for (let i = 0; i < 35; i++) mkdirSync(join(dir, `2026-10-${String((i % 28) + 1).padStart(2, '0')}T${String(i).padStart(2, '0')}-00-00-fake`), { recursive: true })
       pruneResults(dir, 30)
@@ -529,7 +536,7 @@ describe('the scenario harness writes what the app reads (tests/scenarios/benchm
 
   it("never prunes a results folder a live runner holds, nor counts it; a dead runner's goes by age (HI-2234)", () => {
     const { resultsHeld, releaseResults } = require_('./scenarios/benchmark.cjs')
-    const dir = tempDir('hive-results-held-')
+    const dir = tempDir('cw-results-held-')
     try {
       // The oldest run is still going (pid 101, alive), as HI-2190's two-hour Codex trials were; then 40 short runs.
       const running = resultsFolder(dir, '2026-10-31T14-27-32-codex', 101)
@@ -559,7 +566,7 @@ describe('the scenario harness writes what the app reads (tests/scenarios/benchm
     const { resultsKind } = require_('./scenarios/benchmark.cjs')
     expect(['fake', 'fake-codex', 'fake-copilot', 'fake-2', 'fake-codex-3'].map((p) => resultsKind(`2026-10-31T14-27-32-${p}`))).toEqual(['fake', 'fake', 'fake', 'fake', 'fake'])
     expect(['codex', 'claude-code', 'copilot', 'codex-2'].map((p) => resultsKind(`2026-10-31T14-27-32-${p}`))).toEqual(['model', 'model', 'model', 'model'])
-    const dir = tempDir('hive-results-kinds-')
+    const dir = tempDir('cw-results-kinds-')
     try {
       const at = (h: number, m: number) => `2026-10-31T${String(h).padStart(2, '0')}-${String(m).padStart(2, '0')}-00`
       // A finished model trial, then 40 fake runs of each fake provider in turn after it.
@@ -586,7 +593,7 @@ describe('the scenario harness writes what the app reads (tests/scenarios/benchm
 
   it('a run whose results folder is removed under it makes it again with everything it had written (HI-2234)', () => {
     const { writeResults, resultsHeld } = require_('./scenarios/benchmark.cjs')
-    const dir = tempDir('hive-results-gone-')
+    const dir = tempDir('cw-results-gone-')
     try {
       const out = resultsFolder(dir, '2026-10-31T14-27-32-codex')
       const written = new Map<string, string>()
@@ -618,7 +625,7 @@ describe('the scenario harness writes what the app reads (tests/scenarios/benchm
 
   it('a results folder removed as the write is made, or during the recovery, is made again; only ENOENT is retried, a bounded number of times (HI-2234)', () => {
     const { writeResults, resultsHeld, WRITE_ATTEMPTS } = require_('./scenarios/benchmark.cjs')
-    const dir = tempDir('hive-results-race-')
+    const dir = tempDir('cw-results-race-')
     try {
       const out = resultsFolder(dir, '2026-10-31T14-27-32-codex')
       writeFileSync(join(out, 'results.json'), 'old')
@@ -671,7 +678,7 @@ describe('the scenario harness writes what the app reads (tests/scenarios/benchm
 })
 
 describe('kept comparisons (main/benchmarks.ts)', async () => {
-  const base = tempDir('hive-bench-')
+  const base = tempDir('cw-bench-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   afterAll(() => rmSync(base, { recursive: true, force: true }))
   const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
@@ -682,7 +689,7 @@ describe('kept comparisons (main/benchmarks.ts)', async () => {
     mkdirSync(join(path, 'alpha'), { recursive: true })
     const w = createWorkspaceService()
     await w.open(path)
-    return { w, path, ctx: () => kept.benchContext(w), dir: join(path, '.hive', 'metrics', 'benchmarks') }
+    return { w, path, ctx: () => kept.benchContext(w), dir: join(path, '.combwork', 'metrics', 'benchmarks') }
   }
   const file = (name: string, textValue: string): string => {
     const f = join(base, `${name}-${++n}.json`)
@@ -770,7 +777,7 @@ describe('kept comparisons (main/benchmarks.ts)', async () => {
     await expect(kept.selectBenchmarks(ctxA, WS, null, null)).rejects.toThrow(/closed or switched/)
     if ('ask' in ask) expect(await kept.importBenchmark(kept.benchContext(A.w), { kind: 'project', project: 'alpha' }, { token: ask.ask.token, useProjectPart: true })).toMatchObject({ error: expect.stringMatching(/no longer waiting/) })
     expect((await kept.listBenchmarks(kept.benchContext(A.w), WS)).entries).toEqual([])
-    expect(existsSync(join(B, '.hive', 'metrics', 'benchmarks'))).toBe(false)
+    expect(existsSync(join(B, '.combwork', 'metrics', 'benchmarks'))).toBe(false)
     // Queued changes whose workspace closes before their turn: refused too.
     const ctxB = kept.benchContext(A.w)
     const first = kept.importBenchmark(ctxB, WS, { path: file('b', fixture('baseline')) })
@@ -841,7 +848,7 @@ describe('kept comparisons (main/benchmarks.ts)', async () => {
     await expect(kept.readBenchmark(ctx(), alpha, own.id)).rejects.toThrow(/missing or damaged/)
     writeFileSync(join(dir, `${own.id}.json`), JSON.stringify({ ...stored, pad: 'x'.repeat(5 * 1024 * 1024) }))
     await expect(kept.readBenchmark(ctx(), alpha, own.id)).rejects.toThrow(/missing or damaged/)
-    const big = file('big', JSON.stringify({ schema: 'hive-benchmark/1', pad: 'x'.repeat(BENCHMARK_LIMITS.fileBytes + 10) }))
+    const big = file('big', JSON.stringify({ schema: 'combwork-benchmark/1', pad: 'x'.repeat(BENCHMARK_LIMITS.fileBytes + 10) }))
     expect(await kept.importBenchmark(ctx(), WS, { path: big })).toMatchObject({ error: expect.stringMatching(/over 2 MB/) })
     await disposeWorkspaceService(w)
   })
@@ -917,7 +924,7 @@ describe('#117 round 2: checks are authoritative; the budget stops on unknown co
 })
 
 describe('kept comparisons: damage and closing mid-change (#117 round 2)', async () => {
-  const base = tempDir('hive-bench2-')
+  const base = tempDir('cw-bench2-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   afterAll(() => rmSync(base, { recursive: true, force: true }))
   const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
@@ -928,7 +935,7 @@ describe('kept comparisons: damage and closing mid-change (#117 round 2)', async
     mkdirSync(join(path, 'alpha'), { recursive: true })
     const w = createWorkspaceService()
     await w.open(path)
-    return { w, path, ctx: () => kept.benchContext(w), dir: join(path, '.hive', 'metrics', 'benchmarks') }
+    return { w, path, ctx: () => kept.benchContext(w), dir: join(path, '.combwork', 'metrics', 'benchmarks') }
   }
   const file = (name: string, textValue: string): string => {
     const f = join(base, `${name}-${++n}.json`)
@@ -1090,13 +1097,13 @@ describe('kept comparisons: damage and closing mid-change (#117 round 2)', async
     expect(existsSync(join(A.dir, `${ids[0]}.json`))).toBe(true)
     expect(readdirSync(A.dir).filter((x) => /^[0-9a-f]{12}\.json$/.test(x)).length).toBe(BENCHMARK_LIMITS.kept)
     expect(readdirSync(A.dir).some((x) => /staged/.test(x))).toBe(false)
-    expect(existsSync(join(B, '.hive', 'metrics', 'benchmarks'))).toBe(false)
+    expect(existsSync(join(B, '.combwork', 'metrics', 'benchmarks'))).toBe(false)
     await disposeWorkspaceService(A.w)
   })
 })
 
 describe('kept comparisons: bounds that hold under failing removals; quarantine by age (#117 round 4)', async () => {
-  const base = tempDir('hive-bench4-')
+  const base = tempDir('cw-bench4-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   afterAll(() => rmSync(base, { recursive: true, force: true }))
   const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
@@ -1107,7 +1114,7 @@ describe('kept comparisons: bounds that hold under failing removals; quarantine 
     mkdirSync(join(path, 'alpha'), { recursive: true })
     const w = createWorkspaceService()
     await w.open(path)
-    return { w, path, ctx: () => kept.benchContext(w), dir: join(path, '.hive', 'metrics', 'benchmarks') }
+    return { w, path, ctx: () => kept.benchContext(w), dir: join(path, '.combwork', 'metrics', 'benchmarks') }
   }
   const entryOf = (r: any) => {
     if (!('entry' in r)) throw new Error(JSON.stringify(r))
@@ -1149,7 +1156,7 @@ describe('kept comparisons: bounds that hold under failing removals; quarantine 
       // Remove the newest at the bound (its unlink fails too: recorded, off the list), then try to import again.
       await expect(kept.removeBenchmark(ctx(), WS, lastAdded.at(-1)!)).rejects.toThrow(/couldn’t be removed yet/)
       await expect(kept.importBenchmark(ctx(), WS, { path: f })).rejects.toThrow(/couldn’t be deleted yet/)
-      // Every index Hive wrote, the reader accepts: never more than the bound, never more than 20 kept.
+      // Every index Combwork wrote, the reader accepts: never more than the bound, never more than 20 kept.
       for (const ix of written) {
         expect(ix.entries.length).toBeLessThanOrEqual(BENCHMARK_LIMITS.kept * 2)
         expect(ix.entries.filter((e: any) => !e.state).length).toBeLessThanOrEqual(BENCHMARK_LIMITS.kept)
@@ -1180,7 +1187,7 @@ describe('kept comparisons: bounds that hold under failing removals; quarantine 
     entryOf(await kept.importBenchmark(ctx(), WS, { path: f }))
     const q = join(dir, 'quarantine')
     mkdirSync(q, { recursive: true })
-    // 100 older quarantined files, with high ids; and one not in Hive's naming (never pruned).
+    // 100 older quarantined files, with high ids; and one not in Combwork's naming (never pruned).
     for (let i = 0; i < 100; i++) writeFileSync(join(q, `2026-01-01T00-${String(Math.floor(i / 60)).padStart(2, '0')}-${String(i % 60).padStart(2, '0')}-000Z-0000-${(0xf00000000000 + i).toString(16)}.json`), '{}')
     writeFileSync(join(q, 'notes.txt'), 'mine')
     // Two new strays in one move, one with the lowest id there is: both kept (in order), the two oldest go.
@@ -1204,7 +1211,7 @@ describe('kept comparisons: bounds that hold under failing removals; quarantine 
 })
 
 describe('kept comparisons: Windows rename retries stop when the workspace goes (#117 round 5)', async () => {
-  const base = tempDir('hive-bench5-')
+  const base = tempDir('cw-bench5-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   afterAll(() => rmSync(base, { recursive: true, force: true }))
   const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
@@ -1215,7 +1222,7 @@ describe('kept comparisons: Windows rename retries stop when the workspace goes 
     mkdirSync(join(path, 'alpha'), { recursive: true })
     const w = createWorkspaceService()
     await w.open(path)
-    return { w, path, ctx: () => kept.benchContext(w), dir: join(path, '.hive', 'metrics', 'benchmarks') }
+    return { w, path, ctx: () => kept.benchContext(w), dir: join(path, '.combwork', 'metrics', 'benchmarks') }
   }
   const entryOf = (r: any) => {
     if (!('entry' in r)) throw new Error(JSON.stringify(r))
@@ -1263,7 +1270,7 @@ describe('kept comparisons: Windows rename retries stop when the workspace goes 
       await A.w.open(B)
       h.release()
       await expect(importing).rejects.toThrow(/closed or switched/)
-      expect(existsSync(join(B, '.hive', 'metrics', 'benchmarks'))).toBe(false)
+      expect(existsSync(join(B, '.combwork', 'metrics', 'benchmarks'))).toBe(false)
       h.restore()
       // Back in A: the unfinished add is rolled back on the first read; only the first comparison is kept.
       await A.w.close()

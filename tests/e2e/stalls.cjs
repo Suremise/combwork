@@ -1,7 +1,7 @@
 // "The main process was busy" (#1109): a gap spanning the PC's sleep (a suspend and resume told by powerMonitor, faked
 // here around a block of the main process) logs an info line, not a warning; an IPC call that holds the main process
-// (HIVE_TEST_BLOCK_IPC) is named in the warning. Main's thread pool has 16 threads, not Node's 4 (HI-1702): with eight held
-// a file call still ends, and with all of them held the slow file call is noted in hive.log, timed off main's thread (main
+// (CW_TEST_BLOCK_IPC) is named in the warning. Main's thread pool has 16 threads, not Node's 4 (HI-1702): with eight held
+// a file call still ends, and with all of them held the slow file call is noted in combwork.log, timed off main's thread (main
 // held with the pool free gives no such line). The blocked call's stall is kept for the Performance view, which lists
 // it with its cause in a throwaway workspace (HI-1135). Dev build, throwaway profile.
 const lib = require('./lib.cjs')
@@ -11,7 +11,7 @@ const path = require('path')
 const HUNG_MS = 20000
 
 const userData = path.join(lib.WORK, 'stalls-profile')
-const logFile = path.join(userData, 'logs', 'hive.log')
+const logFile = path.join(userData, 'logs', 'combwork.log')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -22,8 +22,8 @@ const busyLines = () => lines().filter((l) => l.includes('[main] The main proces
 
 ;(async () => {
   fs.rmSync(userData, { recursive: true, force: true })
-  // A warning a second at most, so one from Hive's own start doesn't hide the suite's.
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_TEST_STALL_QUIET_MS: '1000' } })
+  // A warning a second at most, so one from Combwork's own start doesn't hide the suite's.
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_TEST_STALL_QUIET_MS: '1000' } })
   try {
     // The PC sleeps: suspend, the main process held, resume.
     const before = busyLines().length
@@ -32,7 +32,7 @@ const busyLines = () => lines().filter((l) => l.includes('[main] The main proces
       for (const until = Date.now() + 1500; Date.now() < until; );
       powerMonitor.emit('resume')
     })
-    // This sleep's own line, its 1.5 s: an earlier stall (Hive's start, under load) still being decided when the suspend
+    // This sleep's own line, its 1.5 s: an earlier stall (Combwork's start, under load) still being decided when the suspend
     // is told is taken for the sleep's too, and its line can come first (HI-2317).
     const sleepLine = (l) => Number(/\[INFO\] \[main\] The main process was paused for (\d+) ms while the PC slept: not counted as busy/.exec(l)?.[1] ?? 0) >= 1450
     const slept = await lib.until(() => busyLines().slice(before).find(sleepLine), HUNG_MS)
@@ -42,7 +42,7 @@ const busyLines = () => lines().filter((l) => l.includes('[main] The main proces
     // An IPC call holds the main process: the warning names it.
     const mark = busyLines().length
     await app.evaluate(() => {
-      process.env.HIVE_TEST_BLOCK_IPC = 'app:info=1500*1'
+      process.env.CW_TEST_BLOCK_IPC = 'app:info=1500*1'
     })
     await inv('app:info')
     const warned = await lib.until(() => busyLines().slice(mark).find((l) => /\[WARN\] \[main\] The main process was busy for \d+ ms/.test(l) && l.includes('ipc app:info')), HUNG_MS)
@@ -62,7 +62,7 @@ const busyLines = () => lines().filter((l) => l.includes('[main] The main proces
     const row = table.locator('tbody tr', { hasText: 'ipc app:info' })
     const shown = await lib.until(async () => ((await row.count()) >= 1 ? (await row.first().innerText()).replace(/\s+/g, ' ') : null), HUNG_MS)
     check('the Performance view lists it: its length and the IPC call during it', !!shown && /\b1\.\d s\b/.test(shown) && shown.includes('ipc app:info'), shown ?? (await page.locator('.performance-page:visible').innerText().catch(() => '')).slice(-600))
-    check('…and how many there were since Hive started', /stalls? since Hive started/.test(await page.locator('[data-stalls-count]').innerText().catch(() => '')))
+    check('…and how many there were since Combwork started', /stalls? since Combwork started/.test(await page.locator('[data-stalls-count]').innerText().catch(() => '')))
     await table.scrollIntoViewIfNeeded().catch(() => undefined)
     await page.screenshot({ path: path.join(lib.WORK, 'stalls-performance.png') })
 
@@ -72,7 +72,7 @@ const busyLines = () => lines().filter((l) => l.includes('[main] The main proces
       const req = process.getBuiltinModule('module').createRequire(process.cwd() + '/package.json')
       const ofs = req('original-fs')
       const net = req('net')
-      const name = String.raw`\\.\pipe\hive-stalls-` + process.pid
+      const name = String.raw`\\.\pipe\cw-stalls-` + process.pid
       const socks = []
       const server = net.createServer((s) => socks.push(s))
       await new Promise((r) => server.listen(name, r))
@@ -119,7 +119,7 @@ const busyLines = () => lines().filter((l) => l.includes('[main] The main proces
       // Main's thread held 700 ms with the pool free (HR2's round 1): a busy warning, and no slow file call. The pool
       // held again after it marks the end: any line for main's 700 ms would come before that one's, or be counted in it.
       await app.evaluate(() => {
-        process.env.HIVE_TEST_BLOCK_IPC = 'app:info=700*1'
+        process.env.CW_TEST_BLOCK_IPC = 'app:info=700*1'
       })
       const called = Date.now()
       await inv('app:info')

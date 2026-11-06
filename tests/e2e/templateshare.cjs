@@ -1,4 +1,4 @@
-// Templates view and tab, export and import (#127): the Templates view on the activity bar (next to Skills) lists Hive's
+// Templates view and tab, export and import (#127): the Templates view on the activity bar (after Skills and Dialects, HI-2444) lists Combwork's
 // own (#1436), the workspace's templates and each project's, with a filter; selecting one shows its agents and layout; Rename…,
 // Duplicate… (into another project), Load into Project… (the project chosen, then loading's own confirmation),
 // Export… to a test folder (nothing personal in the file), Import… of that file (where to keep it; a name clash offers
@@ -48,13 +48,13 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47921), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47921), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1700, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await lib.waitForProvider(inv)
   const projectCfg = (p) => lib.projectConfig(userData, p) // with this user's view over it (HI-1749)
@@ -63,15 +63,15 @@ const check = (name, ok, extra = '') => {
   const sidebar = page.locator('.sidebar')
   // The view's main area (a project's Templates tab has a .tab-body of its own).
   const detail = page.locator('.main-area > .tab-body .template-detail')
-  // The templates kept in the workspace and its projects (Hive's own, #1436, aside), and one of them by name.
-  const rowNames = async (where) => (await where.locator('.template-row:not([data-scope="hive"]) .label').allInnerTexts()).map((t) => t.split('\n')[0].trim())
-  const userRow = (where, name) => where.locator(`.template-row:not([data-scope="hive"])[aria-label="${name}"]`)
-  const HIVE_NAMES = ['Solo', 'Pair', 'Pair: one provider', 'Team 3×3', 'Team 6×6', 'Team 6 + pool']
+  // The templates kept in the workspace and its projects (Combwork's own, #1436, aside), and one of them by name.
+  const rowNames = async (where) => (await where.locator('.template-row:not([data-scope="combwork"]) .label').allInnerTexts()).map((t) => t.split('\n')[0].trim())
+  const userRow = (where, name) => where.locator(`.template-row:not([data-scope="combwork"])[aria-label="${name}"]`)
+  const CW_NAMES = ['Solo', 'Pair', 'Pair: one provider', 'Team 3×3', 'Team 6×6', 'Team 6 + pool']
   // (Their headers are upper-case by CSS.)
   const groups = async () => (await sidebar.locator('.template-group .skill-group').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim().toLowerCase())
   const templatesOf = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith('.json')) : [])
-  const wsTemplates = path.join(ws, '.hive', 'templates')
-  const own = (p) => path.join(p, '.hive', 'templates')
+  const wsTemplates = path.join(ws, '.combwork', 'templates')
+  const own = (p) => path.join(p, '.combwork', 'templates')
   // The file dialogs, answered in main (a deleted template goes to the suite's trash folder, #414).
   const saveTo = (file) => app.evaluate(({ dialog: d }, f) => { d.showSaveDialog = async () => ({ canceled: false, filePath: f }) }, file)
   const openFile = (file) => app.evaluate(({ dialog: d }, f) => { d.showOpenDialog = async () => ({ canceled: false, filePaths: [f] }) }, file)
@@ -86,11 +86,11 @@ const check = (name, ok, extra = '') => {
   await lib.addAgent(inv, beta, { name: 'Old' })
   await inv('workspace:refresh')
 
-  // --- The Templates view, next to Skills.
+  // --- The Templates view, after Skills and Dialects (HI-2444).
   const bar = await page.locator('.activitybar .activity-btn').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))
-  check('the Templates icon is next to Skills on the activity bar', bar.indexOf('Templates') === bar.indexOf('Skills') + 1, JSON.stringify(bar))
+  check('the Templates icon follows Skills and Dialects on the activity bar', bar.indexOf('Dialects') === bar.indexOf('Skills') + 1 && bar.indexOf('Templates') === bar.indexOf('Dialects') + 1, JSON.stringify(bar))
   await page.locator('.activitybar [aria-label="Templates"]').click()
-  check("the view lists Hive's own, the workspace's templates, then each project's under its name", !!(await lib.until(async () => JSON.stringify(await groups()) === '["hive 6","workspace 1","alpha 1"]', 5000)) && JSON.stringify(await rowNames(sidebar)) === '["Pair","Solo"]' && JSON.stringify(await sidebar.locator('.template-row[data-scope="hive"]').evaluateAll((l) => l.map((x) => x.getAttribute('aria-label')))) === JSON.stringify(HIVE_NAMES), JSON.stringify([await groups(), await rowNames(sidebar)]))
+  check("the view lists Combwork's own, the workspace's templates, then each project's under its name", !!(await lib.until(async () => JSON.stringify(await groups()) === '["combwork 6","workspace 1","alpha 1"]', 5000)) && JSON.stringify(await rowNames(sidebar)) === '["Pair","Solo"]' && JSON.stringify(await sidebar.locator('.template-row[data-scope="combwork"]').evaluateAll((l) => l.map((x) => x.getAttribute('aria-label')))) === JSON.stringify(CW_NAMES), JSON.stringify([await groups(), await rowNames(sidebar)]))
   await sidebar.locator('select[aria-label="Show templates of"]').selectOption({ label: 'alpha' })
   check('the filter shows one project\'s', !!(await lib.until(async () => JSON.stringify(await rowNames(sidebar)) === '["Solo"]', HUNG_MS)))
   await sidebar.locator('select[aria-label="Show templates of"]').selectOption({ label: 'All templates' })
@@ -111,7 +111,7 @@ const check = (name, ok, extra = '') => {
   await detail.getByRole('button', { name: 'Duplicate…' }).click()
   await dialog.locator('select').selectOption({ label: 'beta (this project only)' })
   await dialog.getByRole('button', { name: 'Duplicate', exact: true }).click()
-  check('Duplicate… copies it into another project', !!(await lib.until(async () => templatesOf(own(beta)).length === 1, 5000)) && !!(await lib.until(async () => JSON.stringify(await groups()) === '["hive 6","workspace 1","alpha 1","beta 1"]', 5000)), JSON.stringify(await groups()))
+  check('Duplicate… copies it into another project', !!(await lib.until(async () => templatesOf(own(beta)).length === 1, 5000)) && !!(await lib.until(async () => JSON.stringify(await groups()) === '["combwork 6","workspace 1","alpha 1","beta 1"]', 5000)), JSON.stringify(await groups()))
 
   // Load into Project…: the project chosen, then the list of who goes and who comes.
   await userRow(sidebar, 'Team').first().click()
@@ -133,7 +133,7 @@ const check = (name, ok, extra = '') => {
   check('Load into Project… replaces that project\'s agents and layout', !!(await lib.until(async () => JSON.stringify(projectCfg(beta).agents.map((a) => a.name)) === '["BBuilder","BReviewer"]' && projectCfg(beta).layout === 'columns2', 10000)), JSON.stringify(projectCfg(beta).agents.map((a) => a.name)))
 
   // Export to a test folder: what the template holds, nothing personal.
-  const exported = path.join(exports_, 'Team.hive-template.json')
+  const exported = path.join(exports_, 'Team.combwork-template.json')
   await saveTo(exported)
   await detail.getByRole('button', { name: 'Export…' }).click()
   check('Export… writes the template file', !!(await lib.until(async () => fs.existsSync(exported), 5000)) && !!(await toast(/Template exported/)))
@@ -167,7 +167,7 @@ const check = (name, ok, extra = '') => {
   await openFile(bad)
   const before = templatesOf(wsTemplates).length + templatesOf(own(alpha)).length + templatesOf(own(beta)).length
   await sidebar.locator('[aria-label="Import Template…"]').click()
-  check('an invalid file is refused, saying why', !!(await toast(/Could not import the template[\s\S]*newer version of Hive/)) && (await page.locator('.dialog').count()) === 0 && templatesOf(wsTemplates).length + templatesOf(own(alpha)).length + templatesOf(own(beta)).length === before)
+  check('an invalid file is refused, saying why', !!(await toast(/Could not import the template[\s\S]*newer version of Combwork/)) && (await page.locator('.dialog').count()) === 0 && templatesOf(wsTemplates).length + templatesOf(own(alpha)).length + templatesOf(own(beta)).length === before)
 
   // Delete Team (2).
   await userRow(sidebar, 'Team (2)').click()
@@ -183,7 +183,7 @@ const check = (name, ok, extra = '') => {
   await tab.waitFor({ timeout: 5000 })
   // Each row's name and the badge saying where it is kept.
   const tabRows = async () => tab.locator('.template-row .label').evaluateAll((els) => els.map((el) => `${el.firstChild.textContent.trim()}: ${el.querySelector('.badge')?.textContent.trim() ?? ''}`))
-  check("the project's tab lists its own, the workspace's and Hive's, each with its scope", !!(await lib.until(async () => JSON.stringify(await tabRows()) === JSON.stringify(['Solo: alpha', 'Team: alpha', 'Team: Workspace', ...HIVE_NAMES.map((n) => `${n}: Hive`)]), 5000)), JSON.stringify(await tabRows()))
+  check("the project's tab lists its own, the workspace's and Combwork's, each with its scope", !!(await lib.until(async () => JSON.stringify(await tabRows()) === JSON.stringify(['Solo: alpha', 'Team: alpha', 'Team: Workspace', ...CW_NAMES.map((n) => `${n}: Combwork`)]), 5000)), JSON.stringify(await tabRows()))
   await userRow(tab, 'Solo').click()
   const tabDetail = page.locator('.split-main .template-detail')
   const ids = JSON.stringify(projectCfg(alpha).agents.map((a) => a.id))
@@ -358,7 +358,7 @@ const check = (name, ok, extra = '') => {
 
   // --- #510 round 2: a slow save. While it runs nothing in the editor can change (so no edit is lost when it ends, and
   // no agent's Save is accepted that isn't saved); then Reload Window and quitting ask about a draft not saved.
-  const slow = (v) => app.evaluate((_e, x) => void (process.env.HIVE_TEST_SLOW_IPC = x), v)
+  const slow = (v) => app.evaluate((_e, x) => void (process.env.CW_TEST_SLOW_IPC = x), v)
   const disabledNow = async () => ({
     name: await editor.locator('#template-name').isDisabled(),
     edit: await editor.locator('[aria-label="Edit Tester…"]').isDisabled(),
@@ -389,7 +389,7 @@ const check = (name, ok, extra = '') => {
     await testerDialog.getByRole('button', { name: 'Save' }).click()
     await lib.until(async () => (await testerDialog.count()) === 0, HUNG_MS)
   }
-  // (Another value: Hive reads the setting again only when it changes.)
+  // (Another value: Combwork reads the setting again only when it changes.)
   await slow('templates:update=2501*1')
   await saveTester('first-save')
   const duringAgentSave = await disabledNow()
@@ -420,7 +420,7 @@ const check = (name, ok, extra = '') => {
     await shot(`quit-asks-${theme}`)
   }
   await quitDialog.getByRole('button', { name: 'Save and quit' }).click()
-  check('…Save and quit saves it, then Hive quits', !!(await q.untilDecided(8000)) && teamNow().name === 'Team at quit', JSON.stringify(teamNow().name))
+  check('…Save and quit saves it, then Combwork quits', !!(await q.untilDecided(8000)) && teamNow().name === 'Team at quit', JSON.stringify(teamNow().name))
   await q.gone(30000)
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')
   process.exit(failed ? 1 : 0)

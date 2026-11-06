@@ -7,17 +7,17 @@ import { recordTestToken } from './testQuiet'
 /**
  * Each launch's own hook token and private folder (#345). The hook server takes a hook call only with the token of the
  * launch it names (`?run=<runId>`), and a launch's token ends with it: a token that leaks can't speak for another
- * session or outlive its own. CLIs that send hooks over HTTP read it from the session's environment (`HIVE_HOOK_TOKEN`);
+ * session or outlive its own. CLIs that send hooks over HTTP read it from the session's environment (`CW_HOOK_TOKEN`);
  * hook commands (curl) read the header from the launch's auth file.
  *
  * The auth file, and whatever else of a launch may hold a secret (Claude Code's settings, with a user's `--settings`
  * and its `env`; its MCP config, with the workspace's servers' own `env` and headers), go in the launch's private
- * folder in Hive's user data, `launches/<runId>`, never in the project: no file Hive generates in a project holds a
- * secret. The folder goes when the launch ends, and all of them when Hive starts.
+ * folder in Combwork's user data, `launches/<runId>`, never in the project: no file Combwork generates in a project holds a
+ * secret. The folder goes when the launch ends, and all of them when Combwork starts.
  */
 
 const tokens = new Map<string, string>()
-/** Every run id this Hive has made a token for (#711): only these are ever named in the log, never what a caller sent. */
+/** Every run id this Combwork has made a token for (#711): only these are ever named in the log, never what a caller sent. */
 const issued = new Set<string>()
 
 function launchesDir(): string {
@@ -26,7 +26,7 @@ function launchesDir(): string {
 
 /** A launch's private folder, outside the project: for its files that may hold secrets. */
 export function launchPrivateDir(runId: string): string {
-  if (!/^[A-Za-z0-9_-]+$/.test(runId)) throw new Error('Not a run id.')
+  if (!/^[A-Za-z0-9_-]+$/.test(runId)) throw new Error('Not a run id.') // agent-protocol: a programming error (its caller's), never an agent's
   return join(launchesDir(), runId)
 }
 
@@ -63,21 +63,25 @@ export function hookTokenMatches(runId: string | null, header: string | undefine
 const refusedTold = new Set<string>()
 
 /**
- * The log line for a hook call refused (#711: a Stop lost under load left no trace on Hive's side), the first time for
- * its run id; null after that, so an ended launch's late hooks don't fill the log. Only a run id this Hive made is
+ * The log line for a hook call refused (#711: a Stop lost under load left no trace on Combwork's side), the first time for
+ * its run id; null after that, so an ended launch's late hooks don't fill the log. Only a run id this Combwork made is
  * named: what an unknown caller sent is never logged (review round 1: the query is anyone's text).
  */
 export function refusedHookNote(runId: string | null): string | null {
   const ours = !!runId && issued.has(runId)
+  // agent-protocol: a key of refusedTold, not wording
   const key = ours ? runId! : runId ? '(not ours)' : '(none)'
   if (refusedTold.has(key) || refusedTold.size >= 200) return null
   refusedTold.add(key)
+  // agent-protocol: combwork.log's line (servers.ts logs it), never an agent's
   if (!runId) return 'Refused a hook call that named no launch'
-  if (!ours) return "Refused a hook call naming a run this Hive didn't start"
+  // agent-protocol: combwork.log's line, as above
+  if (!ours) return "Refused a hook call naming a run this Combwork didn't start"
+  // agent-protocol: combwork.log's line, as above
   return `Refused a hook call for run ${runId}: ${tokens.has(runId!) ? "its token didn't match the launch's" : 'that launch has ended'}`
 }
 
-/** Whether a hook call of the running launch `runId` was refused (#1336: why its hooks don't reach Hive). */
+/** Whether a hook call of the running launch `runId` was refused (#1336: why its hooks don't reach Combwork). */
 export const hooksRefused = (runId: string): boolean => tokens.has(runId) && refusedTold.has(runId)
 
 /** The launch `runId` ended: its token stops working and its private folder goes. */
@@ -86,7 +90,7 @@ export function endHookToken(runId: string): void {
   void rm(launchPrivateDir(runId), { recursive: true, force: true }).catch(() => undefined)
 }
 
-/** At startup: private folders an earlier run of Hive left (its tokens died with it). */
+/** At startup: private folders an earlier run of Combwork left (its tokens died with it). */
 export async function clearHookAuth(): Promise<void> {
   await rm(launchesDir(), { recursive: true, force: true }).catch(() => undefined)
 }

@@ -15,7 +15,7 @@ import { agentFolder } from '../agentPlace'
 
 const M = {
   loading: msg({ id: 'workspace.unusedList.loading', defaultMessage: 'Loading…', description: "The Changes tab's Unused worktrees while git lists them." }),
-  gitProblem: msg({ id: 'workspace.unusedList.gitProblem', defaultMessage: "{problem}, so Hive can't list the unused worktrees.", description: "The Changes tab's Unused worktrees when git can't run ({problem}: what is wrong with git)." }),
+  gitProblem: msg({ id: 'workspace.unusedList.gitProblem', defaultMessage: "{problem}, so Combwork can't list the unused worktrees.", description: "The Changes tab's Unused worktrees when git can't run ({problem}: what is wrong with git)." }),
   none: msg({ id: 'workspace.unusedList.none', defaultMessage: '{project} has no unused worktrees: every worktree belongs to an agent.', description: "The Changes tab's Unused worktrees with none." }),
   mainBranch: msg({ id: 'workspace.unusedList.mainBranch', defaultMessage: 'the main branch', description: "Unused worktrees: what they'd be merged into when git doesn't say which branch. Lower case." }),
   keptTitle: msg({ id: 'workspace.unusedList.keptTitle', defaultMessage: '{name} was kept', description: "A notice: an unused worktree ({name}: its branch or folder) wasn't removed; the reason follows." }),
@@ -34,7 +34,7 @@ const M = {
   anywayMessage: msg({ id: 'workspace.unusedList.anywayMessage', defaultMessage: '{again, select, yes {Nothing was removed: {refused}. As it is now, this} other {This}} deletes {path}{hasBranch, select, yes { and its branch {branch}} other {}}, with work that is nowhere else:', description: 'Confirmation before Remove anyway. What would be lost follows, one a line. {refused}: why the first try was refused.' }),
   anywayDetail: msg({ id: 'workspace.unusedList.anywayDetail', defaultMessage: "It can't be undone. If anything in it changes before you confirm (a file, its branch, its commit), nothing is removed.", description: 'Confirmation before Remove anyway.' }),
   removeAnyway: msg({ id: 'workspace.unusedList.removeAnyway', defaultMessage: 'Remove Anyway', description: "Remove anyway's confirmation: its button." }),
-  changed: msg({ id: 'workspace.unusedList.changed', defaultMessage: 'what it holds changed', description: 'Why Remove anyway removed nothing, when Hive gave no other reason. Lower case: it follows "Nothing was removed:".' }),
+  changed: msg({ id: 'workspace.unusedList.changed', defaultMessage: 'what it holds changed', description: 'Why Remove anyway removed nothing, when Combwork gave no other reason. Lower case: it follows "Nothing was removed:".' }),
   removeAllMerged: msg({ id: 'workspace.unusedList.removeAllMerged', defaultMessage: 'Remove all merged ({count})…', description: "The Changes tab's Unused worktrees: removes every merged, clean one." }),
   detached: msg({ id: 'workspace.unusedList.detached', defaultMessage: '(detached)', description: 'An unused worktree with no branch (a detached HEAD).' }),
   measuring: msg({ id: 'workspace.unusedList.measuring', defaultMessage: 'measuring…', description: "An unused worktree's size while Storage measures it. Lower case." }),

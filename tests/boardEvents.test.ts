@@ -7,12 +7,12 @@ import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import type { HiveEvent, LiveSessionState } from '../src/shared/types'
+import type { CombworkEvent, LiveSessionState } from '../src/shared/types'
 import { tempDir } from './tempDir'
 import { writeCardOutside } from './boardDb'
 import { DatabaseSync } from 'node:sqlite'
 
-const base = tempDir('hive-board-events-')
+const base = tempDir('cw-board-events-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 // Every read of the whole board that recording the running agents' cards makes, counted (the reads themselves unchanged):
@@ -35,7 +35,7 @@ vi.mock('../src/main/tasks', async (importOriginal) => {
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const tasks = await import('../src/main/tasks')
-const { onHiveEvent } = await import('../src/main/events')
+const { onCombworkEvent } = await import('../src/main/events')
 const { coalesced, coalescing } = await import('../src/main/coalesce')
 const { recordLiveCardsSoon } = await import('../src/main/cardSessions')
 const { boardFile } = await import('../src/main/boardStore')
@@ -97,11 +97,11 @@ describe('board events (#1011)', () => {
   const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
 
   beforeAll(async () => {
-    mkdirSync(join(alpha, '.hive'), { recursive: true })
-    writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }, { id: 'a2', name: 'Agent 2' }] }))
+    mkdirSync(join(alpha, '.combwork'), { recursive: true })
+    writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }, { id: 'a2', name: 'Agent 2' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
-    off = onHiveEvent((e: HiveEvent) => {
+    off = onCombworkEvent((e: CombworkEvent) => {
       if (e.type === 'tasks-changed' && e.workspacePath === wsPath) seen.push(Date.now())
     })
   })
@@ -115,7 +115,7 @@ describe('board events (#1011)', () => {
   async function doneCards(n: number): Promise<number[]> {
     const made: number[] = []
     for (let i = 0; i < n; i++) made.push((await run(() => tasks.createTask({ title: `Card ${i}`, project: 'alpha', column: 'done' }, user))).number)
-    // Each was told as it was saved (#1017: Hive's own writes tell the board, no folder watched).
+    // Each was told as it was saved (#1017: Combwork's own writes tell the board, no folder watched).
     expect(seen).toHaveLength(n)
     seen.length = 0
     return made
@@ -216,7 +216,7 @@ describe('board events (#1011)', () => {
     }
   })
 
-  it('a card changed by another process (another copy of Hive, a script) is told, and a burst of them a few times, not once a card', async () => {
+  it('a card changed by another process (another copy of Combwork, a script) is told, and a burst of them a few times, not once a card', async () => {
     const doc = (n: number) => ({ number: n, title: 'From outside', project: 'alpha', column: 'todo', order: n, history: [], comments: [] })
     writeCardOutside(wsPath, 9001, doc(9001))
     // Seen by the board's poll of its file (once a second), within a bound for a slow machine, not a time slept for.

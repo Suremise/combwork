@@ -14,7 +14,7 @@ export interface QueueReturn {
  * A card the merge queue returned to its builder and that waits for it now (HI-1721), as its facts say: queueStateOf's
  * `returned` (the last entry failed, the card back in Doing or Todo, not submitted since). `at`: when it came back;
  * `text`: the return's wake (what came back and what to do next); `builder`: the agent its cycle started with. Null when
- * it isn't one (merged, queued, never queued, a project whose cards Hive doesn't merge, or not readable).
+ * it isn't one (merged, queued, never queued, a project whose cards Combwork doesn't merge, or not readable).
  */
 export function returnIn(wf: Workflow, n: number): QueueReturn | null {
   try {
@@ -41,7 +41,7 @@ export function resubmittedIn(wf: Workflow, n: number, builder: string): string 
     const s = wf.state(card)
     const last = s.entries.at(-1)
     if (s.stage !== 'review' || last?.state !== 'failed' || !last.failure || !s.latest) return null
-    if (wf.rulesetOf(card, s).options.finish !== 'hiveMerges') return null
+    if (wf.rulesetOf(card, s).options.finish !== 'combworkMerges') return null
     const failed = wf.store.facts(n).findLast((f) => f.kind === 'IntegrationFailed')
     if (!failed || s.latest.id < failed.seq || s.verdicts.some((v) => v.seq > failed.seq)) return null
     return resubmittedText(card.key, last.failure, builder)

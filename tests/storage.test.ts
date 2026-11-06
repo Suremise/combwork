@@ -14,12 +14,12 @@ const session = (id: string, patch: Partial<CleanupSession> = {}): CleanupSessio
   lastActiveAt: ago(200),
   running: false,
   inCli: true,
-  backups: [{ path: `P/.hive/archive/${id}.jsonl`, bytes: 1000 }],
+  backups: [{ path: `P/.combwork/archive/${id}.jsonl`, bytes: 1000 }],
   ...patch
 })
 const facts = (sessions: CleanupSession[], folders: string[] = [], live: string[] = []): CleanupFacts => ({
   sessions,
-  attachmentFolders: folders.map((name) => ({ name, path: `P/.hive/attachments/${name}`, bytes: 500 })),
+  attachmentFolders: folders.map((name) => ({ name, path: `P/.combwork/attachments/${name}`, bytes: 500 })),
   liveNames: new Set(live),
   now
 })
@@ -36,7 +36,7 @@ describe('Clean Up', () => {
   it("removes attachments of deleted sessions and of launches that never got an id, never a running one's", () => {
     const f = facts([session('kept')], ['kept', 'deleted-1', 'run-abc', 'run-live', 'live-id'], ['run-live', 'live-id'])
     const items = planCleanup(f, { ...NONE, orphanAttachments: true })
-    expect(items.map((i) => i.path)).toEqual(['P/.hive/attachments/deleted-1', 'P/.hive/attachments/run-abc'])
+    expect(items.map((i) => i.path)).toEqual(['P/.combwork/attachments/deleted-1', 'P/.combwork/attachments/run-abc'])
     expect(items.every((i) => i.kind === 'orphan-attachments')).toBe(true)
   })
 
@@ -47,7 +47,7 @@ describe('Clean Up', () => {
   })
 
   it('lists every copy of a session (an active backup next to the archived one)', () => {
-    const two = session('two', { backups: [{ path: 'P/.hive/sessions/two.jsonl', bytes: 10 }, { path: 'P/.hive/archive/two.jsonl', bytes: 20 }] })
+    const two = session('two', { backups: [{ path: 'P/.combwork/sessions/two.jsonl', bytes: 10 }, { path: 'P/.combwork/archive/two.jsonl', bytes: 20 }] })
     const items = planCleanup(facts([two]), { ...NONE, archivedBackupsDays: 1 })
     expect(items.map((i) => i.bytes)).toEqual([10, 20])
     expect(planCleanup(facts([session('none', { backups: [] })]), { ...NONE, archivedBackupsDays: 1, goneBackups: true })).toEqual([])
@@ -65,8 +65,8 @@ describe('formatSize', () => {
 })
 
 const purgeSession = (id: string, patch: Partial<PurgeSession> = {}): PurgeSession => ({ id, name: `Session ${id}`, running: false, inCli: true, keptUsageBytes: null, ...patch })
-const file = (id: string, name = `${id}.jsonl`, backup = true) => ({ path: `P/.hive/sessions/${name}`, bytes: 100, mtimeMs: 1, id, folder: 'sessions' as const, backup })
-const folder = (name: string, files = ['x.png']) => ({ name, path: `P/.hive/attachments/${name}`, files: files.map((f) => ({ path: `P/.hive/attachments/${name}/${f}`, bytes: 5, mtimeMs: 1 })) })
+const file = (id: string, name = `${id}.jsonl`, backup = true) => ({ path: `P/.combwork/sessions/${name}`, bytes: 100, mtimeMs: 1, id, folder: 'sessions' as const, backup })
+const folder = (name: string, files = ['x.png']) => ({ name, path: `P/.combwork/attachments/${name}`, files: files.map((f) => ({ path: `P/.combwork/attachments/${name}/${f}`, bytes: 5, mtimeMs: 1 })) })
 const purgeFacts = (patch: Partial<PurgeFacts>): PurgeFacts => ({ host: 'P', hostName: 'p', sessions: [], files: [], attachmentFolders: [], deletedUsage: [], liveNames: new Set(), ...patch })
 
 describe('Purge', () => {
@@ -91,7 +91,7 @@ describe('Purge', () => {
     expect([r.items.map((i) => i.sessionId), r.running]).toEqual([['b'], 2])
   })
 
-  it("lists what is left of sessions Hive no longer has, and old usage of deleted ones", () => {
+  it("lists what is left of sessions Combwork no longer has, and old usage of deleted ones", () => {
     const f = purgeFacts({ files: [file('gone')], attachmentFolders: [folder('gone'), folder('run-9')], deletedUsage: [{ id: 'd', name: 'Old', bytes: 9 }] })
     expect(planPurge(f).items.map((i) => i.kind)).toEqual(['leftover-backup', 'orphan-attachments', 'orphan-attachments', 'deleted-usage'])
   })

@@ -9,7 +9,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-lane-briefs-')
+const base = tempDir('cw-lane-briefs-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const tasks = await import('../src/main/tasks')
@@ -44,8 +44,8 @@ describe("a lane's brief kept with the lane, and delivered outside slots (HI-179
   const project = join(wsPath, 'alpha')
   const user = { kind: 'user' } as const
   beforeAll(async () => {
-    mkdirSync(join(project, '.hive'), { recursive: true })
-    writeFileSync(join(project, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }] }))
+    mkdirSync(join(project, '.combwork'), { recursive: true })
+    writeFileSync(join(project, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     lanes.startLanes()
@@ -82,7 +82,7 @@ describe("a lane's brief kept with the lane, and delivered outside slots (HI-179
     expect(await briefOf(l.id)).toMatchObject({ rev: 1 })
     await start([a, b], 'Stay off the renderer.')
     expect(await briefOf(l.id)).toMatchObject({ text: 'Stay off the renderer.', rev: 2 })
-    // Read back from the board by a Hive started again (the workspace closed, then opened by a new service).
+    // Read back from the board by a Combwork started again (the workspace closed, then opened by a new service).
     await disposeWorkspaceService(w)
     w = createWorkspaceService()
     await w.open(wsPath)
@@ -146,8 +146,8 @@ describe("a lane's brief kept with the lane, and delivered outside slots (HI-179
   it("two open workspaces whose folders share a prefix (ws, ws-other): each one's current brief stays valid, found in its own workspace (HR4's round 1)", async () => {
     const otherPath = `${wsPath}-other`
     const otherProject = join(otherPath, 'alpha')
-    mkdirSync(join(otherProject, '.hive'), { recursive: true })
-    writeFileSync(join(otherProject, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }] }))
+    mkdirSync(join(otherProject, '.combwork'), { recursive: true })
+    writeFileSync(join(otherProject, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }] }))
     const other = createWorkspaceService()
     await other.open(otherPath)
     try {

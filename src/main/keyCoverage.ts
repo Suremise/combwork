@@ -6,7 +6,7 @@ import { app, safeStorage } from 'electron'
 import { msg } from '../shared/i18n'
 import { config } from './config'
 import { writeJsonAtomic } from './fsutil'
-import { hiveError } from './hiveError'
+import { combworkError } from './combworkError'
 import { addWindows, fingerprint, maskingState, MOD, setMasking, type MatchSecret, type Window } from './keyMatcher'
 import { createLogger } from './logger'
 
@@ -52,8 +52,8 @@ let stored: Stored | null = null
 let total = 0
 let loading: Promise<void> | null = null
 
-const UNREADABLE = msg({ id: 'main.keys.maskingUnreadable', defaultMessage: "Hive can't check this for API keys: its masking data can't be read. See Settings → Accounts & Connections.", description: "An error: an export, Copy Diagnostics or a recording was refused because the data Hive uses to hide server connections' API keys can't be read. Settings → Accounts & Connections names a section, where it can be reset." })
-const FULL = msg({ id: 'main.keys.maskingFull', defaultMessage: "Hive can't keep masking for another key: it already keeps the most it can. The key wasn't saved.", description: "An error saving a server connection's API key: Hive keeps a fingerprint of every key ever saved (to hide it in logs and exports) and has reached its limit." })
+const UNREADABLE = msg({ id: 'main.keys.maskingUnreadable', defaultMessage: "Combwork can't check this for API keys: its masking data can't be read. See Settings → Accounts & Connections.", description: "An error: an export, Copy Diagnostics or a recording was refused because the data Combwork uses to hide server connections' API keys can't be read. Settings → Accounts & Connections names a section, where it can be reset." })
+const FULL = msg({ id: 'main.keys.maskingFull', defaultMessage: "Combwork can't keep masking for another key: it already keeps the most it can. The key wasn't saved.", description: "An error saving a server connection's API key: Combwork keeps a fingerprint of every key ever saved (to hide it in logs and exports) and has reached its limit." })
 
 function readMarksFile(): Marks {
   try {
@@ -95,7 +95,7 @@ function keysSaved(): boolean {
 const neverKeyed = (m: Marks): boolean => !m.ever && !m.gap && !existsSync(fingerprintsFile()) && !keysSaved()
 
 /**
- * As the main process starts, before ready (HI-1855): hive.log's first lines (the install folder's check) were masked
+ * As the main process starts, before ready (HI-1855): combwork.log's first lines (the install folder's check) were masked
  * strictly in every profile. A profile with no evidence of a key ever saved (config.json read as is: unreadable, it
  * stays strict) masks nothing from here; any other stays strict until startCoverage and loadCoverage, after ready.
  */
@@ -123,10 +123,10 @@ export function loadCoverage(): Promise<void> {
     if (m.ever || m.gap) await writeMarks(m).catch((e) => log.warn(`key masking: its markers couldn't be written: ${(e as Error).message}`))
     if (neverKeyed(m)) return setMasking({ state: 'none', gap: false })
     try {
-      if (!existsSync(fingerprintsFile())) throw new Error('missing') // i18n-ignore: hive.log, in English
-      if (!safeStorage.isEncryptionAvailable()) throw new Error('safeStorage unavailable') // i18n-ignore: hive.log, in English
+      if (!existsSync(fingerprintsFile())) throw new Error('missing') // i18n-ignore: combwork.log, in English
+      if (!safeStorage.isEncryptionAvailable()) throw new Error('safeStorage unavailable') // i18n-ignore: combwork.log, in English
       const file = JSON.parse(await readFile(fingerprintsFile(), 'utf8')) as { blob?: unknown }
-      if (typeof file.blob !== 'string') throw new Error('no blob') // i18n-ignore: hive.log, in English
+      if (typeof file.blob !== 'string') throw new Error('no blob') // i18n-ignore: combwork.log, in English
       const s = JSON.parse(safeStorage.decryptString(Buffer.from(file.blob, 'base64'))) as Stored
       const n = validWindows(s)
       stored = s
@@ -143,14 +143,14 @@ export function loadCoverage(): Promise<void> {
 
 /** The stored fingerprints' window count, checked whole (bounds included); throws when they aren't usable. */
 function validWindows(s: Stored): number {
-  if (!s || typeof s.salt !== 'string' || !Number.isInteger(s.base) || s.base < 2 || s.base >= MOD || !Array.isArray(s.keys)) throw new Error('shape') // i18n-ignore: hive.log, in English
+  if (!s || typeof s.salt !== 'string' || !Number.isInteger(s.base) || s.base < 2 || s.base >= MOD || !Array.isArray(s.keys)) throw new Error('shape') // i18n-ignore: combwork.log, in English
   let n = 0
   for (const k of s.keys) {
-    if (!Array.isArray(k.windows)) throw new Error('shape') // i18n-ignore: hive.log, in English
-    for (const w of k.windows) if (!Array.isArray(w) || typeof w[0] !== 'number' || typeof w[1] !== 'string') throw new Error('shape') // i18n-ignore: hive.log, in English
+    if (!Array.isArray(k.windows)) throw new Error('shape') // i18n-ignore: combwork.log, in English
+    for (const w of k.windows) if (!Array.isArray(w) || typeof w[0] !== 'number' || typeof w[1] !== 'string') throw new Error('shape') // i18n-ignore: combwork.log, in English
     n += k.windows.length
   }
-  if (n > maxWindows) throw new Error('over its bound') // i18n-ignore: hive.log, in English
+  if (n > maxWindows) throw new Error('over its bound') // i18n-ignore: combwork.log, in English
   return n
 }
 
@@ -168,10 +168,10 @@ async function writeStored(s: Stored): Promise<void> {
  */
 export async function addKeyFingerprint(conn: string, key: string): Promise<void> {
   await loadCoverage()
-  if (maskingState().state === 'unavailable') throw hiveError(UNREADABLE, undefined, { kind: 'conflict' })
+  if (maskingState().state === 'unavailable') throw combworkError(UNREADABLE, undefined, { kind: 'conflict' })
   const base = stored ?? newStored()
   const windows = fingerprint(secretOf(base), key)
-  if (total + windows.length > maxWindows) throw hiveError(FULL, undefined, { kind: 'conflict' })
+  if (total + windows.length > maxWindows) throw combworkError(FULL, undefined, { kind: 'conflict' })
   await writeMarks({ ever: true })
   const next: Stored = { ...base, keys: [...base.keys, { at: new Date().toISOString(), conn, windows }] }
   await writeStored(next)
@@ -192,7 +192,7 @@ export async function resetCoverage(keys: { conn: string; key: string }[]): Prom
   const secret = secretOf(s)
   for (const k of keys) s.keys.push({ at: new Date().toISOString(), conn: k.conn, windows: fingerprint(secret, k.key) })
   const n = s.keys.reduce((a, k) => a + k.windows.length, 0)
-  if (n > maxWindows) throw hiveError(FULL, undefined, { kind: 'conflict' })
+  if (n > maxWindows) throw combworkError(FULL, undefined, { kind: 'conflict' })
   await writeMarks({ ever: true, gap: true, gapSince: new Date().toISOString() })
   await writeStored(s)
   stored = s
@@ -205,7 +205,7 @@ export async function resetCoverage(keys: { conn: string; key: string }[]): Prom
 /** Before an export, Copy Diagnostics or a recording is written: refused while the fingerprints can't be read. */
 export async function requireMasking(): Promise<void> {
   await loadCoverage()
-  if (maskingState().state === 'unavailable') throw hiveError(UNREADABLE, undefined, { kind: 'conflict' })
+  if (maskingState().state === 'unavailable') throw combworkError(UNREADABLE, undefined, { kind: 'conflict' })
 }
 
 /** How many windows are kept, all keys together. */

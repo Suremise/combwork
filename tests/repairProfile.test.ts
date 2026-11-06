@@ -1,4 +1,4 @@
-// What Hive's profile keeps by a workspace's folder follows it when the workspace moves (HI-2007, from HI-1968's sweep;
+// What Combwork's profile keeps by a workspace's folder follows it when the workspace moves (HI-2007, from HI-1968's sweep;
 // design HI-2007/s40 and s42): its window's pin (config.json's alwaysOnTop) and its close command's runs
 // (close-commands/ws-<name>-<place>-…). The Assistant's old token file is left as it is. A move is recorded as the
 // moved workspace opens, one record per old folder, and tried at each open and Repair until nothing is left there,
@@ -69,10 +69,10 @@ const ended = (name: string): void => writeFileSync(join(profile, 'close-command
 /** A workspace (with a project, or none), opened and recorded where it is (lastPath), with a pin, two ended runs and a token. */
 async function pinnedWorkspace(root: string, project = true): Promise<{ ws: WS; at: string; runs: string[] }> {
   const at = join(root, 'ws')
-  mkdirSync(join(at, '.hive'), { recursive: true })
+  mkdirSync(join(at, '.combwork'), { recursive: true })
   if (project) {
-    mkdirSync(join(at, 'alpha', '.hive'), { recursive: true })
-    writeFileSync(join(at, 'alpha', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    mkdirSync(join(at, 'alpha', '.combwork'), { recursive: true })
+    writeFileSync(join(at, 'alpha', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
   }
   const ws = createWorkspaceService()
   open.push(ws)
@@ -104,11 +104,11 @@ async function moved(ws: WS, at: string, root: string): Promise<string> {
 /** A copy of the workspace folder at `at` (its settings and project, the original left there) in `root`. */
 function copied(at: string, root: string): string {
   const to = join(root, 'ws')
-  mkdirSync(join(to, '.hive'), { recursive: true })
-  for (const f of readdirSync(join(at, '.hive')).filter((n) => n.endsWith('.json'))) writeFileSync(join(to, '.hive', f), readFileSync(join(at, '.hive', f)))
+  mkdirSync(join(to, '.combwork'), { recursive: true })
+  for (const f of readdirSync(join(at, '.combwork')).filter((n) => n.endsWith('.json'))) writeFileSync(join(to, '.combwork', f), readFileSync(join(at, '.combwork', f)))
   if (existsSync(join(at, 'alpha'))) {
-    mkdirSync(join(to, 'alpha', '.hive'), { recursive: true })
-    writeFileSync(join(to, 'alpha', '.hive', 'project.json'), readFileSync(join(at, 'alpha', '.hive', 'project.json')))
+    mkdirSync(join(to, 'alpha', '.combwork'), { recursive: true })
+    writeFileSync(join(to, 'alpha', '.combwork', 'project.json'), readFileSync(join(at, 'alpha', '.combwork', 'project.json')))
   }
   return to
 }
@@ -250,7 +250,7 @@ describe('what the profile keeps by the workspace folder follows a move (HI-2007
     config.update((c) => {
       c.ui.skillsProvider = { ...c.ui.skillsProvider, [alpha]: 'codex' }
       c.ui.sessionsTree = { ...c.ui.sessionsTree, [alpha]: { 'agent:b1': true } }
-      c.ui.hiveVcsNotice = { ...c.ui.hiveVcsNotice, [alpha]: 'synced' }
+      c.ui.combworkVcsNotice = { ...c.ui.combworkVcsNotice, [alpha]: 'synced' }
       c.ui.assistantFold = { ...c.ui.assistantFold, [`${ws}|${alpha}`]: true }
       c.ui.panes = { ...c.ui.panes, [`assistant-open:${ws}`]: 1, [`progress-lanes-rows:${ws}`]: 7 }
     })
@@ -259,7 +259,7 @@ describe('what the profile keeps by the workspace folder follows a move (HI-2007
     const ws = at.toLowerCase()
     const alpha = join(at, 'alpha').toLowerCase()
     const ui = config.get().ui
-    return [ui.skillsProvider?.[alpha], ui.sessionsTree?.[alpha], ui.hiveVcsNotice?.[alpha], ui.assistantFold?.[`${ws}|${alpha}`], ui.panes?.[`assistant-open:${ws}`], ui.panes?.[`progress-lanes-rows:${ws}`]]
+    return [ui.skillsProvider?.[alpha], ui.sessionsTree?.[alpha], ui.combworkVcsNotice?.[alpha], ui.assistantFold?.[`${ws}|${alpha}`], ui.panes?.[`assistant-open:${ws}`], ui.panes?.[`progress-lanes-rows:${ws}`]]
   }
   const NONE = [undefined, undefined, undefined, undefined, undefined, undefined]
 
@@ -296,8 +296,8 @@ describe('what the profile keeps by the workspace folder follows a move (HI-2007
   async function twoProjects(root: string): Promise<{ ws: WS; at: string }> {
     const at = join(root, 'ws')
     for (const p of ['alpha', 'beta']) {
-      mkdirSync(join(at, p, '.hive'), { recursive: true })
-      writeFileSync(join(at, p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+      mkdirSync(join(at, p, '.combwork'), { recursive: true })
+      writeFileSync(join(at, p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     }
     const ws = createWorkspaceService()
     open.push(ws)
@@ -312,7 +312,7 @@ describe('what the profile keeps by the workspace folder follows a move (HI-2007
   /** Another workspace, at `root\ws`, never opened yet. */
   function emptyWorkspace(root: string): string {
     const at = join(root, 'ws')
-    mkdirSync(join(at, '.hive'), { recursive: true })
+    mkdirSync(join(at, '.combwork'), { recursive: true })
     return at
   }
 
@@ -328,8 +328,8 @@ describe('what the profile keeps by the workspace folder follows a move (HI-2007
     renameSync(join(a, 'alpha'), join(b, 'alpha'))
     await openAt(ws, b)
     const ui = config.get().ui
-    expect([ui.skillsProvider?.[alphaB], ui.sessionsTree?.[alphaB], ui.hiveVcsNotice?.[alphaB], ui.assistantFold?.[`${b.toLowerCase()}|${alphaB}`]]).toEqual(['codex', { 'agent:b2': false }, 'synced', true])
-    expect([ui.skillsProvider?.[alphaA], ui.sessionsTree?.[alphaA], ui.hiveVcsNotice?.[alphaA], ui.assistantFold?.[`${a.toLowerCase()}|${alphaA}`]]).toEqual([undefined, undefined, undefined, undefined])
+    expect([ui.skillsProvider?.[alphaB], ui.sessionsTree?.[alphaB], ui.combworkVcsNotice?.[alphaB], ui.assistantFold?.[`${b.toLowerCase()}|${alphaB}`]]).toEqual(['codex', { 'agent:b2': false }, 'synced', true])
+    expect([ui.skillsProvider?.[alphaA], ui.sessionsTree?.[alphaA], ui.combworkVcsNotice?.[alphaA], ui.assistantFold?.[`${a.toLowerCase()}|${alphaA}`]]).toEqual([undefined, undefined, undefined, undefined])
     // The old workspace's other project and its panes are its own.
     expect(ui.skillsProvider?.[join(a, 'beta').toLowerCase()]).toBe('claude-code')
     expect([ui.panes?.[`assistant-open:${a.toLowerCase()}`], ui.panes?.[`progress-lanes-rows:${a.toLowerCase()}`]]).toEqual([1, 7])
@@ -340,9 +340,9 @@ describe('what the profile keeps by the workspace folder follows a move (HI-2007
   it('a project moved twice (A to B to C) with Repair still to do at B: its views follow from where they went, B (HI-2008, HR2 round 2)', async () => {
     const { ws, at: a } = await twoProjects(join(base, 'hop-a'))
     // An agent's worktree recorded and not there: Repair has work left, so its lastPath stays A.
-    const cfgFile = join(a, 'alpha', '.hive', 'project.json')
+    const cfgFile = join(a, 'alpha', '.combwork', 'project.json')
     const cfg = JSON.parse(readFileSync(cfgFile, 'utf8'))
-    cfg.agents = [{ id: 'b1', name: 'B1', provider: 'claude-code', worktree: { path: join(base, 'hop-gone', 'hb1'), branch: 'hive/hb1', base: 'main' } }]
+    cfg.agents = [{ id: 'b1', name: 'B1', provider: 'claude-code', worktree: { path: join(base, 'hop-gone', 'hb1'), branch: 'cw/hb1', base: 'main' } }]
     writeFileSync(cfgFile, JSON.stringify(cfg))
     const b = emptyWorkspace(join(base, 'hop-b'))
     const c = emptyWorkspace(join(base, 'hop-c'))
@@ -350,7 +350,7 @@ describe('what the profile keeps by the workspace folder follows a move (HI-2007
     renameSync(join(a, 'alpha'), join(b, 'alpha'))
     await openAt(ws, b)
     expect(config.get().ui.skillsProvider?.[alpha(b)]).toBe('codex')
-    const lastPath = (w: string): string | undefined => JSON.parse(readFileSync(join(w, 'alpha', '.hive', 'project.json'), 'utf8')).lastPath
+    const lastPath = (w: string): string | undefined => JSON.parse(readFileSync(join(w, 'alpha', '.combwork', 'project.json'), 'utf8')).lastPath
     expect(lastPath(b)?.toLowerCase()).toBe(alpha(a))
     await ws.close()
     renameSync(join(b, 'alpha'), join(c, 'alpha'))
@@ -365,8 +365,8 @@ describe('what the profile keeps by the workspace folder follows a move (HI-2007
   it('a project copied into another workspace (its folder still there): the original keeps its views (HI-2008, HR2)', async () => {
     const { ws, at: a } = await twoProjects(join(base, 'solo-copy-a'))
     const b = emptyWorkspace(join(base, 'solo-copy-b'))
-    mkdirSync(join(b, 'alpha', '.hive'), { recursive: true })
-    writeFileSync(join(b, 'alpha', '.hive', 'project.json'), readFileSync(join(a, 'alpha', '.hive', 'project.json')))
+    mkdirSync(join(b, 'alpha', '.combwork'), { recursive: true })
+    writeFileSync(join(b, 'alpha', '.combwork', 'project.json'), readFileSync(join(a, 'alpha', '.combwork', 'project.json')))
     await openAt(ws, b)
     const ui = config.get().ui
     expect(ui.skillsProvider?.[join(a, 'alpha').toLowerCase()]).toBe('codex')
@@ -397,7 +397,7 @@ describe('what the profile keeps by the workspace folder follows a move (HI-2007
     renameSync(at, to)
     // As the first run is renamed, a workspace is at the old folder again.
     renames.during = async () => {
-      mkdirSync(join(at, '.hive'), { recursive: true })
+      mkdirSync(join(at, '.combwork'), { recursive: true })
     }
     await openAt(ws, to)
     // The newest went first; the two older ones stay with the workspace back there.

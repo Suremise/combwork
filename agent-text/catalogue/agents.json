@@ -1,0 +1,112 @@
+{
+  "agents.claude.safeguardHelp": {
+    "text": "In its terminal: /feedback reports a false positive, /model switches back, and /config sets whether it switches models by itself when a message is flagged.",
+    "note": "What to do after Claude Code's safety classifier stopped a response (an agent's safeguard note). /feedback, /model and /config are commands: keep them.",
+    "audience": "both"
+  },
+  "agents.codex.safeguardHelp": {
+    "text": "Codex sends a request it flags to another model, or stops the turn. For security work, OpenAI’s Trusted Access for Cyber program lifts that.",
+    "note": "What happens after Codex's safety check flags a request (an agent's safeguard note). Trusted Access for Cyber is the name of OpenAI's program: keep it.",
+    "audience": "both"
+  },
+  "agents.fileLock.ask": {
+    "text": "Ask me",
+    "note": "A file lock mode (Settings, a project's settings): the user approves an edit of a file another agent is editing. Keep it short.",
+    "audience": "both"
+  },
+  "agents.fileLock.askDescription": {
+    "text": "The edit waits for your approval, like a permission prompt.",
+    "note": "What the Ask me file lock mode does.",
+    "audience": "both"
+  },
+  "agents.fileLock.block": {
+    "text": "Block",
+    "note": "A file lock mode (Settings, a project's settings): an agent may not edit a file another agent is editing. Keep it short.",
+    "audience": "both"
+  },
+  "agents.fileLock.blockDescription": {
+    "text": "An agent that tries to edit a file another agent is editing is told to wait or work on something else.",
+    "note": "What the Block file lock mode does.",
+    "audience": "both"
+  },
+  "agents.fileLock.off": {
+    "text": "Off",
+    "note": "A file lock mode (Settings, a project's settings): no locking. Keep it short.",
+    "audience": "both"
+  },
+  "agents.fileLock.offDescription": {
+    "text": "Agents edit freely. Use with care when several agents share the project folder.",
+    "note": "What the Off file lock mode does.",
+    "audience": "both"
+  },
+  "agents.fileLock.warn": {
+    "text": "Warn",
+    "note": "A file lock mode (Settings, a project's settings): the edit goes ahead with a warning to the agent. Keep it short.",
+    "audience": "both"
+  },
+  "agents.fileLock.warnDescription": {
+    "text": "The edit goes ahead, and the agent is told another agent is editing the file.",
+    "note": "What the Warn file lock mode does.",
+    "audience": "both"
+  },
+  "agents.limit.most": {
+    "text": "A project can have up to {most, number} agents.",
+    "note": "Why another agent can't be added to a project: it has as many as Combwork allows ({most}, 24).",
+    "audience": "both"
+  },
+  "agents.limit.workflow": {
+    "text": "This project’s workflow allows {max, plural, one {# agent} other {# agents}}: raise Maximum agents in Version Control → Workflow.",
+    "note": "Why another agent can't be added to a project (HI-2058): its workflow option Maximum agents allows {max} and it has that many. Maximum agents, Version Control and Workflow are names in the window: as translated there.",
+    "audience": "both"
+  },
+  "agents.merge.blocked": {
+    "text": "{why, select, waiting {{agent} is waiting for your answer. Merge once it has finished.} background {{agent} is waiting on background tasks it started. Merge once it has finished.} watching {{agent} is waiting for cards to change (a card watch) and carries on when they do. Merge once it has finished, or cancel its watch first.} signin {{agent} stopped in the middle of a task when its sign-in expired. Sign in again and let it finish first.} other {{agent} is working. Merge once it has finished.}}",
+    "note": "Why a worktree agent's work can't be merged now ({agent}: its name), by what it is doing: answering the user (waiting), waiting on its own background tasks, waiting for cards to change (a card watch), stopped by an expired sign-in, or working (other).",
+    "audience": "both"
+  },
+  "agents.provider.extraArgsDashes": {
+    "text": "Combwork passes the task after \"--\"; remove it from extra arguments. For an option whose value is \"--\", write --option=--.",
+    "note": "Why extra arguments for a CLI are refused: they contain a bare \"--\". Keep \"--\" and --option=-- exactly as they are.",
+    "audience": "both"
+  },
+  "agents.resume.hold.after": {
+    "text": "{agent} is on {kind, select, card {{work}} other {its lane}} in {slot}: resume this after {kind, select, card {{work}} other {its lane}}.",
+    "note": "Why a conversation can't resume now (#1434): its agent ({agent}) builds a card ({work}: \"AM-14\"; kind card) or a lane (kind lane) in another slot ({slot}: \"slot-a\"), and this conversation is in the slot the agent kept: it resumes once that work ends.",
+    "audience": "both"
+  },
+  "agents.resume.hold.byHand": {
+    "text": "Its slot ({slot}) is free: Resume takes it for {agent} again. Resume All and startup leave it, so free slots stay for new work.",
+    "note": "A conversation's note (#1434): the slot it ran in ({slot}: \"slot-b\") is free and as it left it, so the user's own Resume takes it again for its agent ({agent}); Resume All and Combwork's startup don't.",
+    "audience": "both"
+  },
+  "agents.resume.hold.changed": {
+    "text": "This conversation's slot ({slot}) has changed since it ran, so it can't resume there. Read its transcript, or start fresh with a handover.",
+    "note": "Why a conversation can't resume (#1434): the slot it ran in ({slot}: \"slot-b\") is free, but its files or its revision changed since (or it isn't set up).",
+    "audience": "both"
+  },
+  "agents.resume.hold.draining": {
+    "text": "This conversation's slot ({slot}) is still being handed back from its last session. Try again in a moment.",
+    "note": "Why a conversation can't resume just now (#1434): the slot it ran in ({slot}: \"slot-b\") is free, but its last session there is still exiting and Combwork hasn't finished taking the slot back. It can be resumed in a moment.",
+    "audience": "both"
+  },
+  "agents.resume.hold.gone": {
+    "text": "This conversation's slot ({slot}) is gone from disk. Read its transcript, or start fresh with a handover.",
+    "note": "Why a conversation can't resume (#1434): the slot folder it ran in ({slot}: \"slot-b\") no longer exists.",
+    "audience": "both"
+  },
+  "agents.resume.hold.holds": {
+    "text": "{agent} already keeps {slot}. Release that slot to resume this conversation in its own.",
+    "note": "Why a conversation can't resume (#1434): its agent ({agent}) already keeps another slot ({slot}: \"slot-a\"), and an agent keeps one at a time.",
+    "audience": "both"
+  },
+  "agents.resume.hold.reused": {
+    "text": "This conversation's slot ({slot}) now holds {kind, select, card {{work}'s work} other {a lane's work}}. Read its transcript, or start fresh with a handover.",
+    "note": "Why a conversation can't resume (#1434): the slot it ran in ({slot}: \"slot-b\") was lent to other work since: a card's ({work}: \"AM-14\"; kind card) or a lane's (kind lane). Reading its transcript and starting fresh with a handover are what the window offers.",
+    "audience": "both"
+  },
+  "agents.resume.hold.reviewer": {
+    "text": "{agent} reviews now, and reviewers never run in a slot ({slot}). Read its transcript, or start fresh with a handover.",
+    "note": "Why a conversation can't resume (#1434): its agent ({agent}) has the reviewer role now, and reviewers work in the project folder, never in a slot ({slot}: \"slot-b\").",
+    "audience": "both"
+  }
+}

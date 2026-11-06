@@ -1,5 +1,5 @@
 // A skill's reference files (HI-2011): SKILL.md as a contents page linking files beside it. The skill page lists a
-// skill's files only for a skill Hive lists (skills:files), and a link in its preview opens a file of that skill only
+// skill's files only for a skill Combwork lists (skills:files), and a link in its preview opens a file of that skill only
 // when it names one exactly: no traversal, no escape, no path outside the folder.
 import { mkdirSync, rmSync, symlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -8,7 +8,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { skillLinkTarget } from '../src/shared/skillLinks'
 
-const base = tempDir('hive-skill-files-')
+const base = tempDir('cw-skill-files-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -39,8 +39,8 @@ describe("a skill's files for its page (listedSkillFiles)", () => {
   it("lists a listed skill's files (a link inside never followed), and refuses any folder that isn't a listed skill", async () => {
     const ws = join(base, 'ws')
     const project = join(ws, 'alpha')
-    mkdirSync(join(project, '.hive'), { recursive: true })
-    writeFileSync(join(project, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    mkdirSync(join(project, '.combwork'), { recursive: true })
+    writeFileSync(join(project, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     const w = createWorkspaceService()
     await w.open(ws)
     try {
@@ -63,7 +63,7 @@ describe("a skill's files for its page (listedSkillFiles)", () => {
       if (linked) expect(r.files.some((f) => f.startsWith('escape'))).toBe(false)
       // Not a listed skill: the workspace, the skills folder itself, a folder inside a skill, a project folder.
       for (const dir of [ws, w.skillsDir, join(skill, 'escape'), project, join(skill, '..', 'release-steps', '..')])
-        await expect(inWorkspace(w, () => listedSkillFiles(dir))).rejects.toThrow(/isn't a skill Hive lists/)
+        await expect(inWorkspace(w, () => listedSkillFiles(dir))).rejects.toThrow(/isn't a skill Combwork lists/)
     } finally {
       await disposeWorkspaceService(w)
     }

@@ -1,10 +1,11 @@
 // A card's intents over the Agent API (#1267, SPEC §16.8.1), each caller with its own token: a builder and a reviewer
-// (fake Claude Code agents, their own tokens as their hive tools use them) and the Hive Assistant through Settings →
+// (fake Claude Code agents, their own tokens as their Combwork tools use them) and the Combwork Assistant through Settings →
 // Assistant → Control. An agent's plain number is refused naming the card's key alone (S48); start, submit, start
 // review, the reviewer's request (which ends the builder's wait for its verdict, #1272) and a failed verdict move the
-// card by its workflow (the card stays its builder's); the builder can't review its own card; ask the user leaves it
+// card by its workflow (the card stays its builder's); the builder can't review its own card; a second reviewer can't
+// start a review another's running session has in progress, and can once that session stops (HI-2487); ask the user leaves it
 // where it is; missing arguments are 400; the Assistant's intent is refused at Look and advise and runs at Control
-// agents; and an agent's hive tool (hive_start_card) runs the start intent. Dev build, throwaway profile, workspace and
+// agents; and an agent's Combwork tool (cw_start_card) runs the start intent. Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -36,7 +37,7 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
 ;(async () => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
-  lib.gitProject(alpha, { 'a.txt': 'one\n', '.gitignore': '.hive/\n' })
+  lib.gitProject(alpha, { 'a.txt': 'one\n', '.gitignore': '.combwork/\n' })
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws.toLowerCase(), alpha.toLowerCase()]))
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')
@@ -47,42 +48,44 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1300, height: 800 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     await page.getByText('alpha', { exact: true }).first().click()
     // Pair: a reviewer agent, who isn't the builder; everyone in the project folder, committed is done.
     await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'committed', folder: 'project' } })
     const builder = await lib.addAgent(inv, alpha, { name: 'Builder' })
     const reviewer = await lib.addAgent(inv, alpha, { name: 'Reviewer' })
+    // HI-2487: a second reviewer, whose start of a review Reviewer has in progress is refused while Reviewer's session runs.
+    const second = await lib.addAgent(inv, alpha, { name: 'Second Reviewer' })
     const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
-    for (const a of [builder, reviewer]) await inv('session:start', alpha, { agentId: a.id })
-    check('the agents start', !!(await until(async () => (await live(builder.id))?.status === 'ready' && (await live(reviewer.id))?.status === 'ready', HUNG_MS)))
+    for (const a of [builder, reviewer, second]) await inv('session:start', alpha, { agentId: a.id })
+    check('the agents start', !!(await until(async () => (await live(builder.id))?.status === 'ready' && (await live(reviewer.id))?.status === 'ready' && (await live(second.id))?.status === 'ready', HUNG_MS)))
 
-    // Each agent's own token, from its launch (by its session id) as its hive tools read it.
+    // Each agent's own token, from its launch (by its session id) as its Combwork tools read it.
     const launchesFile = path.join(claudeHome, 'fake-launches.jsonl')
     const launches = () => {
       const text = fs.existsSync(launchesFile) ? fs.readFileSync(launchesFile, 'utf8') : ''
       return text.slice(0, text.lastIndexOf('\n') + 1).split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l))
     }
-    /** An agent's hive server as its launch has it (command and environment), or null. */
-    const hiveOf = async (id) => {
+    /** An agent's combwork server as its launch has it (command and environment), or null. */
+    const combworkOf = async (id) => {
       const sessionId = (await live(id))?.sessionId
-      const launch = await until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
-      return launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive : null
+      const launch = await until(() => launches().findLast((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
+      return launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
     }
     const tokenOf = async (id) => {
-      const hive = await hiveOf(id)
-      return hive ? JSON.parse(fs.readFileSync(hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token : null
+      const server = await combworkOf(id)
+      return server ? JSON.parse(fs.readFileSync(server.env.CW_API_TOKEN_FILE, 'utf8')).token : null
     }
-    const tokens = { builder: await tokenOf(builder.id), reviewer: await tokenOf(reviewer.id) }
-    check('each agent has its own token', !!tokens.builder && !!tokens.reviewer && tokens.builder !== tokens.reviewer)
+    const tokens = { builder: await tokenOf(builder.id), reviewer: await tokenOf(reviewer.id), second: await tokenOf(second.id) }
+    check('each agent has its own token', !!tokens.builder && !!tokens.reviewer && !!tokens.second && new Set([tokens.builder, tokens.reviewer, tokens.second]).size === 3)
     const call = async (token, p, body) => {
       const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body ?? {}) })
       return { status: res.status, body: await res.json().catch(() => null) }
@@ -119,6 +122,21 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     check("the builder can't start reviewing its own card (409, review.notAuthor)", own.status === 409 && own.body?.rule === 'review.notAuthor', JSON.stringify(own.body))
     const review = await asReviewer(`/v1/tasks/${ref}/start-review`)
     check('the reviewer starts reviewing: the revision to review', review.status === 200 && review.body?.to === 'review' && !!review.body.data?.revision, JSON.stringify(review.body))
+    // HI-2487: another reviewer's start, while Reviewer's session runs (index.ts's sessions), is refused naming it.
+    const taken = await call(tokens.second, `/v1/tasks/${ref}/start-review`)
+    check("another reviewer can't start the review in progress (409, review.inProgress), naming who has it", taken.status === 409 && taken.body?.rule === 'review.inProgress' && (taken.body.message ?? '').startsWith('Reviewer is reviewing '), JSON.stringify(taken.body))
+    check('…and nothing of it is written', !(await card(n))?.history.some((h) => h.what === 'Started reviewing' && h.by.startsWith('Second Reviewer')), JSON.stringify((await card(n))?.history.slice(-3)))
+    // Reviewer's session stopped: the review is free for the second; it stopped too, Reviewer started again takes it back.
+    const stopped = async (id) => (await inv('session:stop', alpha, id), !!(await until(async () => !(await live(id)) || (await live(id)).status === 'stopped', HUNG_MS)))
+    check("Reviewer's session stops", await stopped(reviewer.id))
+    const freed = await call(tokens.second, `/v1/tasks/${ref}/start-review`)
+    check('…then the second reviewer can start it', freed.status === 200 && freed.body?.to === 'review', JSON.stringify(freed.body))
+    check("the second reviewer's session stops", await stopped(second.id))
+    await inv('session:start', alpha, { agentId: reviewer.id })
+    check('Reviewer starts again', !!(await until(async () => (await live(reviewer.id))?.status === 'ready', HUNG_MS)))
+    tokens.reviewer = await tokenOf(reviewer.id)
+    const back = await asReviewer(`/v1/tasks/${ref}/start-review`)
+    check('…and takes its review back, the second stopped', back.status === 200 && back.body?.to === 'review', JSON.stringify(back.body))
     // The builder waits for its verdict or Passed (#912's case: not comments), from a point taken before the request.
     const mark = await asBuilder('/v1/tasks/wait', { cards: [n], changes: ['verdict', 'column'], column: 'passed', timeoutSeconds: 1 })
     const waiting = asBuilder('/v1/tasks/wait', { cards: [n], changes: ['verdict', 'column'], column: 'passed', timeoutSeconds: 30, since: mark.body?.since })
@@ -192,8 +210,8 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
 
     // An agent asks the Assistant on a card (HI-1866): its comment and a history line, and the Assistant's inbox, whose
     // doorbell its idle session takes. Refused, with nothing written: a plain number, no text, the Assistant itself, and
-    // at Look and advise (it can't act on it). What the Assistant's fake read: it follows Hive's doorbell with
-    // hive_inbox and logs what it read.
+    // at Look and advise (it can't act on it). What the Assistant's fake read: it follows Combwork's doorbell with
+    // cw_inbox and logs what it read.
     const asks = () => {
       const f = path.join(claudeHome, 'fake-wakes.jsonl')
       return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => w.agent === 'Assistant').map((w) => w.text)
@@ -205,26 +223,26 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
     check("…and the Assistant can't ask itself (403)", (await call(assistantToken, `/v1/tasks/${ref}/ask-assistant`, { text: 'Park it.' })).status === 403)
     await inv('settings:update', { assistant: { control: 'look' } })
     const lookAsk = await asBuilder(`/v1/tasks/${ref}/ask-assistant`, { text: 'Park it.' })
-    check('…and at Look and advise it is refused (409), saying to ask the user', lookAsk.status === 409 && /hive_ask_user/.test(JSON.stringify(lookAsk.body)), JSON.stringify(lookAsk.body))
+    check('…and at Look and advise it is refused (409), saying to ask the user', lookAsk.status === 409 && /cw_ask_user/.test(JSON.stringify(lookAsk.body)), JSON.stringify(lookAsk.body))
     check('…with nothing written', !(await card(n))?.comments.some((c) => c.text === 'Park it.'), JSON.stringify((await card(n))?.comments.slice(-2)))
     await inv('settings:update', { assistant: { control: 'agents' } })
     const askedAssistant = await asBuilder(`/v1/tasks/${ref}/ask-assistant`, { text: 'Please put this card On Hold: the user said so.' })
     const askId = askedAssistant.body?.delivery
     check('the builder asks the Assistant: the card and its id in the Assistant\'s inbox', askedAssistant.status === 200 && askedAssistant.body?.card === key && /^m\d+$/.test(askId ?? ''), JSON.stringify(askedAssistant.body))
-    check("…its comment and a line of its history, by the builder", (await card(n))?.comments.at(-1)?.text === 'Please put this card On Hold: the user said so.' && (await card(n))?.history.some((h) => h.what === 'Asked the Hive Assistant: "Please put this card On Hold: the user said so."' && h.by.startsWith('Builder')), JSON.stringify((await card(n))?.history.slice(-2)))
+    check("…its comment and a line of its history, by the builder", (await card(n))?.comments.at(-1)?.text === 'Please put this card On Hold: the user said so.' && (await card(n))?.history.some((h) => h.what === 'Asked the Assistant: "Please put this card On Hold: the user said so."' && h.by.startsWith('Builder')), JSON.stringify((await card(n))?.history.slice(-2)))
     check("…and the Assistant's idle session is woken and reads it, whole, as the builder's request", !!(await until(() => asks().slice(asksBefore).some((t) => t.includes("Builder (alpha) asks you on ") && t.includes('<<<Please put this card On Hold: the user said so.>>>')), HUNG_MS)), JSON.stringify(asks().slice(asksBefore)))
     await inv('session:stop', home, 'assistant')
 
-    // An agent's hive tool: hive_start_card runs the start intent. Called through hive-mcp.js with the builder's own
-    // hive server settings (from its launch), not typed into its pane, where Hive's own wakes may be typed meanwhile.
-    const builderHive = await hiveOf(builder.id)
-    const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], {
-      input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'hive_start_card', arguments: { card: key } } }) + '\n',
-      env: lib.childEnv(builderHive.env),
+    // An agent's Combwork tool: cw_start_card runs the start intent. Called through cw-mcp.js with the builder's own
+    // combwork server settings (from its launch), not typed into its pane, where Combwork's own wakes may be typed meanwhile.
+    const builderCombwork = await combworkOf(builder.id)
+    const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
+      input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'cw_start_card', arguments: { card: key } } }) + '\n',
+      env: lib.childEnv(builderCombwork.env),
       timeout: HUNG_MS
     }).toString()
     const reply = JSON.parse(out.split('\n')[0]).result
-    check('hive_start_card starts it: a line saying where it went', !reply.isError && reply.content[0].text.startsWith(`${key}: todo → active.`), JSON.stringify(reply))
+    check('cw_start_card starts it: a line saying where it went', !reply.isError && reply.content[0].text.startsWith(`${key}: todo → active.`), JSON.stringify(reply))
     check("…and it is in Doing, the builder's", (await card(n))?.column === 'doing' && (await card(n))?.agent === builder.id, JSON.stringify(await card(n)))
 
     await inv('session:stop', alpha)

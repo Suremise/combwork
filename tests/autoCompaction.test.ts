@@ -1,6 +1,6 @@
 // A compaction Claude Code began by itself while its agent was idle (#1115), in SessionManager: Claude Code's hooks as
 // it sends them (handleHook), its transcript in a file, no process. It precomputes a compaction in the background, idle
-// too, sending PreCompact at once and PostCompact only once it uses it: Hive watches it as its own Compact, so the
+// too, sending PreCompact at once and PostCompact only once it uses it: Combwork watches it as its own Compact, so the
 // agent shows "Compacting…" until a compaction more in the transcript (or PostCompact, a prompt, the time limit), never
 // until its next turn.
 import { appendFileSync, mkdirSync, writeFileSync } from 'fs'
@@ -10,7 +10,7 @@ import * as electron from 'electron'
 import { COMPACTING_MESSAGE } from '../src/shared/defaults'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-auto-compaction-')
+const base = tempDir('cw-auto-compaction-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -65,9 +65,9 @@ const preCompact = { hook_event_name: 'PreCompact', trigger: 'auto', custom_inst
 
 describe('a compaction Claude Code began by itself while idle (#1115)', () => {
   beforeAll(async () => {
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    mkdirSync(join(wsPath, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    mkdirSync(join(wsPath, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     vi.spyOn(providerService, 'refresh').mockResolvedValue([])
@@ -94,7 +94,7 @@ describe('a compaction Claude Code began by itself while idle (#1115)', () => {
     expect([st.status, st.statusMessage, l.compacting]).toEqual(['ready', undefined, undefined])
   })
 
-  it('its compaction written while Hive is still reading the transcript ends it: it is no earlier compaction (round 2)', async () => {
+  it('its compaction written while Combwork is still reading the transcript ends it: it is no earlier compaction (round 2)', async () => {
     const { st, l, transcript } = agent('slowread')
     // The first look at the transcript after PreCompact is held until the compaction is recorded.
     let release: () => void = () => {}
@@ -113,7 +113,7 @@ describe('a compaction Claude Code began by itself while idle (#1115)', () => {
     expect([st.status, st.statusMessage, l.compacting]).toEqual(['ready', undefined, undefined])
   })
 
-  it('PostCompact, or a prompt starting a turn, ends the watch as it ends Hive’s own', async () => {
+  it('PostCompact, or a prompt starting a turn, ends the watch as it ends Combwork’s own', async () => {
     const said = agent('post')
     await hook(said.st, preCompact)
     await hook(said.st, { hook_event_name: 'PostCompact', trigger: 'auto', compact_summary: 'x' })

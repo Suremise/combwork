@@ -1,9 +1,9 @@
 // The merge slot (#350): one merge at a time into a project's branch, others in order; never stuck (a hold ends with
-// its launch, after its time, or when the user releases it), and an expiry or a hold Hive closed under is reported.
+// its launch, after its time, or when the user releases it), and an expiry or a hold Combwork closed under is reported.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { HOLD_MS, KEEP_PLACE_MS, MAX_WAIT_MS, MergeSlots, PROGRESS_FRESH_MS, parseSlotRecords, slotBranch, slotCards, type SlotAgent } from '../src/main/mergeSlots'
 
-const P = 'C:\\ws\\hive'
+const P = 'C:\\ws\\alpha'
 const agent = (name: string, runId = `${name}-run`): SlotAgent => ({ projectPath: P, agentId: name.toLowerCase(), agentName: name, runId })
 
 function setup() {
@@ -396,12 +396,12 @@ describe('merge slot', () => {
 
   it('lists a workspace\'s slots, not another folder\'s with a similar name', async () => {
     const { slots, start } = setup()
-    const [a, b] = [agent('A'), { ...agent('B'), projectPath: 'C:\\ws2\\hive' }]
+    const [a, b] = [agent('A'), { ...agent('B'), projectPath: 'C:\\ws2\\alpha' }]
     start(a, b)
     await slots.claim(a, P, 'main', [], 0)
-    await slots.claim(b, 'C:\\ws2\\hive', 'main', [], 0)
+    await slots.claim(b, 'C:\\ws2\\alpha', 'main', [], 0)
     expect(slots.list('C:\\ws').map((s) => s.project)).toEqual([P])
-    expect(slots.list('C:\\WS2').map((s) => s.project)).toEqual(['C:\\ws2\\hive'])
+    expect(slots.list('C:\\WS2').map((s) => s.project)).toEqual(['C:\\ws2\\alpha'])
   })
 
   it('keeps a record of agents\' holds that a restart can read back, ignoring anything malformed', async () => {
@@ -410,7 +410,7 @@ describe('merge slot', () => {
     start(a)
     await slots.claim(a, P, 'main', [3, 4], 0)
     const text = JSON.stringify({ version: 1, holds: [...slots.heldByAgents(), { projectPath: 1 }, null, 'x'] })
-    // A new Hive (a restart): nothing held in memory; the record says who held what.
+    // A new Combwork (a restart): nothing held in memory; the record says who held what.
     const fresh = setup().slots
     expect(fresh.heldByAgents()).toEqual([])
     expect(parseSlotRecords(text)).toEqual([{ projectPath: P, branch: 'main', agentId: 'a', agentName: 'A', runId: 'A-run', cards: [3, 4], since: Date.now(), until: Date.now() + HOLD_MS }])

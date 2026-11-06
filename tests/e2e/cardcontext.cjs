@@ -1,6 +1,6 @@
-// A card's Read first references (#818): doc sections by file and heading, set through the Agent API, the hive tools and
+// A card's Read first references (#818): doc sections by file and heading, set through the Agent API, the Combwork tools and
 // the card dialog, checked (a Markdown file with an optional #slug, never a line number), recorded in the card's
-// history, shown in the dialog as links that open each section in Hive's viewer (Open in Files at its heading), and given
+// history, shown in the dialog as links that open each section in Combwork's viewer (Open in Files at its heading), and given
 // to the agent in its start prompt with each section's size, not the sections themselves. References that don't resolve
 // (#819) are flagged on the card's tile and in its dialog with the closest headings, whether saved so or broken by a
 // change before the start, and named in the prompt. The agent is the fake Claude Code. Pictured in both themes. Dev
@@ -43,14 +43,14 @@ const NOTES = '# Notes\n\n## Open questions\n\nWhich QUESTION-MARKER first?\n'
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1400, height: 900 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     const token = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
     const api = async (method, p, body) => {
@@ -79,14 +79,14 @@ const NOTES = '# Notes\n\n## Open questions\n\nWhich QUESTION-MARKER first?\n'
     check('…the card keeps what it had', JSON.stringify(r.body.context) === JSON.stringify(refs), JSON.stringify(r.body.context))
     r = await api('PATCH', `/v1/tasks/${n}`, { context: [] })
     check('[] clears them, said in its history', r.status === 200 && r.body.context === undefined && r.body.history.some((h) => /Removed the doc sections to read first/.test(JSON.stringify(h))), JSON.stringify(r.body).slice(0, 400))
-    // Through the hive tools, as an agent sets them.
-    const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], {
-      input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'hive_update_task', arguments: { number: n, context: refs } } }) + '\n',
-      env: lib.childEnv({ HIVE_API_URL: `http://127.0.0.1:${PORT}`, HIVE_WORKSPACE: ws, HIVE_API_TOKEN_FILE: lib.tokenFile(token), HIVE_PROJECT: 'alpha' }),
+    // Through the Combwork tools, as an agent sets them.
+    const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
+      input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'cw_update_task', arguments: { number: n, context: refs } } }) + '\n',
+      env: lib.childEnv({ CW_API_URL: `http://127.0.0.1:${PORT}`, CW_WORKSPACE: ws, CW_API_TOKEN_FILE: lib.tokenFile(token), CW_PROJECT: 'alpha' }),
       timeout: 60000
     }).toString()
     const said = JSON.parse(out.split('\n')[0]).result.content[0].text
-    check('hive_update_task sets them, its reply says so', said.includes(`Read first: ${refs.join(', ')}`), said)
+    check('cw_update_task sets them, its reply says so', said.includes(`Read first: ${refs.join(', ')}`), said)
     r = await api('GET', `/v1/tasks/${n}`)
     check('…and the card has them again', JSON.stringify(r.body.context) === JSON.stringify(refs), JSON.stringify(r.body.context))
 
@@ -190,7 +190,7 @@ const NOTES = '# Notes\n\n## Open questions\n\nWhich QUESTION-MARKER first?\n'
       if (!fs.existsSync(dir)) return ''
       return fs.readdirSync(dir, { recursive: true }).filter((f) => String(f).endsWith('.jsonl')).map((f) => fs.readFileSync(path.join(dir, String(f)), 'utf8')).join('\n')
     }
-    const got = await lib.until(() => (/Read these first: docs\/PLAN\.md#setup \(\d+ characters\), shared:plans\/notes\.md#open-questions \(\d+ characters\), docs\/PLAN\.md#release \(\d+ characters\)\. hive_read_section reads each as the card has it \(path: the file; heading: # and the slug after it, none for a whole file; from: \\"project\\"\)/.test(transcript()) ? transcript() : null), HUNG_MS)
+    const got = await lib.until(() => (/Read these first: docs\/PLAN\.md#setup \(\d+ characters\), shared:plans\/notes\.md#open-questions \(\d+ characters\), docs\/PLAN\.md#release \(\d+ characters\)\. cw_read_section reads each as the card has it \(path: the file; heading: # and the slug after it, none for a whole file; from: \\"project\\"\)/.test(transcript()) ? transcript() : null), HUNG_MS)
     check("the start prompt lists them with each section's size, read from the project's copy", !!got, transcript().slice(-800))
     check('…not the sections themselves', !!got && !got.includes('SETUP-MARKER') && !got.includes('QUESTION-MARKER'))
     await inv('session:stop', alpha)
@@ -211,7 +211,7 @@ const NOTES = '# Notes\n\n## Open questions\n\nWhich QUESTION-MARKER first?\n'
       const text = fs.existsSync(launchesFile) ? fs.readFileSync(launchesFile, 'utf8') : ''
       return text.slice(0, text.lastIndexOf('\n') + 1).split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l)).find((l) => l.sessionId === sessionId && l.opts['--mcp-config'])
     }, HUNG_MS)
-    const treeToken = JSON.parse(fs.readFileSync(JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token
+    const treeToken = JSON.parse(fs.readFileSync(JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork.env.CW_API_TOKEN_FILE, 'utf8')).token
     const asTree = async (p) => {
       const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { headers: { Authorization: `Bearer ${treeToken}` } })
       return { status: res.status, body: await res.json().catch(() => null) }
@@ -265,14 +265,14 @@ const NOTES = '# Notes\n\n## Open questions\n\nWhich QUESTION-MARKER first?\n'
     await lib.until(async () => (await inv('session:live')).length === 0, HUNG_MS)
     const n4 = (await api('POST', '/v1/tasks', { title: 'Only broken refs', project: 'alpha', context: ['docs/PLAN.md#setupp'] })).body.number
     await inv('tasks:start', n4, { kind: 'agent', agentId: tree.id })
-    const closestRead = await lib.until(() => (/This reference no longer resolves: docs\/PLAN\.md#setupp \(no such heading; closest: #setup[^)]*\)\. Ask the user which section is meant, or read the closest\. hive_read_section reads the closest as the card has it \(path: the file; heading: # and the slug; from: \\"project\\"\)\./.test(transcript()) ? true : null), HUNG_MS)
+    const closestRead = await lib.until(() => (/This reference no longer resolves: docs\/PLAN\.md#setupp \(no such heading; closest: #setup[^)]*\)\. Ask the user which section is meant, or read the closest\. cw_read_section reads the closest as the card has it \(path: the file; heading: # and the slug; from: \\"project\\"\)\./.test(transcript()) ? true : null), HUNG_MS)
     check('only broken references, a worktree agent: the prompt says to read the closest from the project’s copy', !!closestRead, transcript().slice(-700))
     const tree2 = (await inv('session:live')).find((s) => s.agentId === tree.id)
     const launch2 = await lib.until(() => {
       const text = fs.existsSync(launchesFile) ? fs.readFileSync(launchesFile, 'utf8') : ''
       return text.slice(0, text.lastIndexOf('\n') + 1).split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l)).find((l) => l.sessionId === tree2?.sessionId && l.opts['--mcp-config'])
     }, HUNG_MS)
-    const tree2Token = JSON.parse(fs.readFileSync(JSON.parse(fs.readFileSync(launch2.opts['--mcp-config'], 'utf8')).mcpServers.hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token
+    const tree2Token = JSON.parse(fs.readFileSync(JSON.parse(fs.readFileSync(launch2.opts['--mcp-config'], 'utf8')).mcpServers.combwork.env.CW_API_TOKEN_FILE, 'utf8')).token
     const res = await fetch(`http://127.0.0.1:${PORT}/v1/docs/section?path=docs%2FPLAN.md&heading=%23setup&from=project`, { headers: { Authorization: `Bearer ${tree2Token}` } })
     const closest = await res.json().catch(() => null)
     check('…and that read gives the project’s section, not the worktree’s', res.status === 200 && closest?.content.includes('SETUP-MARKER') && !closest.content.includes('WORKTREE-COPY'), JSON.stringify(closest))

@@ -9,7 +9,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
+import { B1, commit, GIT_HEAVY_MS, moved, R1, setup, sh, type Env } from './harness'
 import { preset, type WorkflowOptions } from '../../src/shared/workflow/options'
 import { gitTree, READ_RETRIES, type QueueConfig, type QueueGitResult } from '../../src/main/workflow/mergeQueue'
 import { git } from '../../src/main/git'
@@ -23,7 +23,7 @@ type Rule = { match: (args: string) => boolean; times: number; native?: string; 
 const fail = vi.hoisted(() => ({ rules: [] as Rule[], calls: [] as string[] }))
 vi.mock('../../src/main/gitWorker', async (orig) => {
   const real = (await orig()) as typeof import('../../src/main/gitWorker')
-  // The command as Hive's code wrote it: GIT_PREFIX (git.ts's options for every command) left out.
+  // The command as Combwork's code wrote it: GIT_PREFIX (git.ts's options for every command) left out.
   const commandOf = (args: string[]): string => args.slice(args.indexOf('core.quotepath=off') + 1).join(' ')
   return {
     ...real,
@@ -141,7 +141,7 @@ afterEach(() => {
   env = null
 })
 
-/** Hive merges, one merge check; the target checked out in the project folder (`checkedOut`) or nowhere. */
+/** Combwork merges, one merge check; the target checked out in the project folder (`checkedOut`) or nowhere. */
 function project(o: Partial<WorkflowOptions> = {}, checkedOut = true): Env {
   const e = (env = setup({ ...preset('git', 'team', { quick: [], tests: [] }), preChecks: [], mergeChecks: ['quick'], commands: { quick: 'quick' }, okBefore: { mode: 'never', labels: [] }, ...o }))
   if (!checkedOut) sh(e.project, 'checkout', '-q', '--detach')
@@ -395,7 +395,7 @@ describe('admitted afresh after the wait, before any new merge or check', () => 
       expect(out).toMatchObject([{ outcome: 'paused', reason: 'rulesOff' }])
     })
 
-    it(`${path}: the lease lost meanwhile (another Hive took it, or this workspace closed): stops, writing nothing`, async () => {
+    it(`${path}: the lease lost meanwhile (another Combwork took it, or this workspace closed): stops, writing nothing`, async () => {
       const e = project()
       let holds = true
       const card = await queued(e)
@@ -434,7 +434,7 @@ describe('after the advance: only the branch is read again', () => {
       expect(count(e, card.id, 'IntegrationStarted')).toBe(1)
       expect(count(e, card.id, 'Integrated')).toBe(1)
       expect(e.store.queuePause('main')).toBeNull()
-      // Hive's merge commit, once (the card's own commit isn't a merge).
+      // Combwork's merge commit, once (the card's own commit isn't a merge).
       expect(sh(e.project, 'log', '--merges', '--format=%s', 'main').split('\n').filter((s) => s.startsWith(`${card.key}:`))).toHaveLength(1)
     })
 
@@ -541,9 +541,12 @@ describe("whether the repository signs, read by a git that couldn't answer (HI-2
     ["strict's update of the card", { strict: true }, 'merge --no-ff --no-edit'],
     ["Rebase and fast-forward's rebase", { style: 'rebase' }, 'rebase --no-rebase-merges']
   ]
+  // GIT_HEAVY_MS (HI-2025's rule) for strict's four, whose card is behind main: a commit, the card brought up to date, and
+  // the signing read again before its merge. 2.8 to 3.1 s alone, 5.4 to 5.8 s beside three spinner workers; the
+  // "ended at a bound" case past 20 s in HI-2453's loaded full run.
   for (const [what, o, next] of callers)
     for (const [how, failed] of notAnswers)
-      it(`${what}, the read by a git that ${how} once: again before it goes on, read again, merged once`, async () => {
+      it(`${what}, the read by a git that ${how} once: again before it goes on, read again, merged once`, o.strict ? { timeout: GIT_HEAVY_MS } : {}, async () => {
         const e = project(o)
         const card = await queued(e)
         if (o.strict || o.style === 'rebase') commit(e.project, { 'other.txt': 'meanwhile\n' }, 'meanwhile')

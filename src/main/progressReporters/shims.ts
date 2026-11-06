@@ -1,43 +1,39 @@
-// The hive-progress command on every session's PATH: a .cmd (cmd, PowerShell) and an extensionless sh script (Git
-// Bash) in Hive's bin folder, each starting hive-progress.js with Hive's own executable as Node. Timings for its
-// estimates are kept beside them, in Hive's data (never in the user's project).
+// The cw-progress command on every session's PATH: a .cmd (cmd, PowerShell) and an extensionless sh script (Git
+// Bash) in Combwork's bin folder, each starting cw-progress.js with Combwork's own executable as Node. Timings for its
+// estimates are kept beside them, in Combwork's data (never in the user's project).
 import { mkdir, readFile, writeFile } from 'original-fs/promises'
 import { join } from 'path'
 
 export interface ShimPaths {
-  /** Hive's executable (run as Node). */
+  /** Combwork's executable (run as Node). */
   exec: string
-  /** hive-progress.js, outside the asar. */
+  /** cw-progress.js, outside the asar. */
   script: string
   /** Where the wrapper keeps its timings. */
   data: string
 }
 
 /**
- * The two shims' contents. ELECTRON_RUN_AS_NODE makes Hive's executable run the script as Node; the caller's own value
- * (usually none) is kept in HIVE_PROGRESS_RUN_AS_NODE, and the wrapper gives the command that one back
- * (wrapper.ts commandEnv), so an Electron app it runs starts as an app.
+ * The shims' contents. ELECTRON_RUN_AS_NODE makes Combwork's executable run the script as Node; the caller's own value
+ * (usually none) is kept in CW_PROGRESS_RUN_AS_NODE, and the wrapper gives the command that one back
+ * (wrapper.ts commandEnv), so an Electron app it runs starts as an app. The names before 1.1 aren't made (HI-2594):
+ * the names upgrade removes them from the folder (nameUpgradeProfile.ts).
  */
-export function shimFiles(p: ShimPaths): Record<'hive-progress.cmd' | 'hive-progress', string> {
+export function shimFiles(p: ShimPaths): Record<'cw-progress.cmd' | 'cw-progress', string> {
   const slash = (s: string): string => s.replace(/\\/g, '/')
   const sq = (s: string): string => `'${s.replace(/'/g, `'\\''`)}'`
-  return {
-    'hive-progress.cmd': [
-      '@echo off',
-      'setlocal',
-      'set "HIVE_PROGRESS_RUN_AS_NODE=%ELECTRON_RUN_AS_NODE%"',
-      'set "ELECTRON_RUN_AS_NODE=1"',
-      `set "HIVE_PROGRESS_DATA=${p.data}"`,
-      `"${p.exec}" "${p.script}" %*`,
-      'exit /b %ERRORLEVEL%',
-      ''
-    ].join('\r\n'),
-    'hive-progress': [
-      '#!/bin/sh',
-      `HIVE_PROGRESS_RUN_AS_NODE="\${ELECTRON_RUN_AS_NODE-}" ELECTRON_RUN_AS_NODE=1 HIVE_PROGRESS_DATA=${sq(slash(p.data))} exec ${sq(slash(p.exec))} ${sq(slash(p.script))} "$@"`,
-      ''
-    ].join('\n')
-  }
+  const cmd = [
+    '@echo off',
+    'setlocal',
+    'set "CW_PROGRESS_RUN_AS_NODE=%ELECTRON_RUN_AS_NODE%"',
+    'set "ELECTRON_RUN_AS_NODE=1"',
+    `set "CW_PROGRESS_DATA=${p.data}"`,
+    `"${p.exec}" "${p.script}" %*`,
+    'exit /b %ERRORLEVEL%',
+    ''
+  ].join('\r\n')
+  const sh = ['#!/bin/sh', `CW_PROGRESS_RUN_AS_NODE="\${ELECTRON_RUN_AS_NODE-}" ELECTRON_RUN_AS_NODE=1 CW_PROGRESS_DATA=${sq(slash(p.data))} exec ${sq(slash(p.exec))} ${sq(slash(p.script))} "$@"`, ''].join('\n')
+  return { 'cw-progress.cmd': cmd, 'cw-progress': sh }
 }
 
 /** Writes the shims into `dir` (only what changed). Resolves to `dir`, or null when they couldn't be written. */

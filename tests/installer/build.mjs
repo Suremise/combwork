@@ -15,13 +15,13 @@ const plugins = join(cache, 'nsis-resources-3.4.1', 'plugins', 'x86-unicode')
 /** The stand-ins: a local build's installer (its real wait, and a 3 s one for the timeout), and a release's. */
 export const VARIANTS = [
   { file: 'local.exe', env: '1', defines: [] },
-  { file: 'local-short.exe', env: '1', defines: ['-DHIVE_INSTALLER_WAIT_MS=3000'] },
+  { file: 'local-short.exe', env: '1', defines: ['-DCW_INSTALLER_WAIT_MS=3000'] },
   { file: 'release.exe', env: '0', defines: [] }
 ]
 
 /** Compiles one variant to `out`: its output and whether it compiled. */
 export function compile(out, v, extra = []) {
-  const r = spawnSync(makensis, ['-WX', '-INPUTCHARSET', 'UTF8', `-DPLUGINS=${plugins}`, `-DOUT=${out}`, ...v.defines, ...extra, join(here, 'harness.nsi')], { encoding: 'utf8', env: { SystemRoot: process.env.SystemRoot ?? String.raw`C:\Windows`, HIVE_LOCAL_BUILD: v.env } })
+  const r = spawnSync(makensis, ['-WX', '-INPUTCHARSET', 'UTF8', `-DPLUGINS=${plugins}`, `-DOUT=${out}`, ...v.defines, ...extra, join(here, 'harness.nsi')], { encoding: 'utf8', env: { SystemRoot: process.env.SystemRoot ?? String.raw`C:\Windows`, CW_LOCAL_BUILD: v.env } })
   return { ok: r.status === 0, output: `${r.stdout ?? ''}${r.stderr ?? ''}` }
 }
 
@@ -31,7 +31,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     process.exit(2)
   }
   const check = process.argv.includes('--check')
-  const dir = check ? mkdtempSync(join(process.env.LOCALAPPDATA ?? '', 'hive-test', 'tmp', 'installer-')) : process.argv[2]
+  const dir = check ? mkdtempSync(join(process.env.LOCALAPPDATA ?? '', 'combwork-test', 'tmp', 'installer-')) : process.argv[2]
   if (!dir) {
     console.error('Usage: node tests/installer/build.mjs <out folder> | --check')
     process.exit(2)

@@ -1,8 +1,8 @@
-// Start New (All) on a project with twelve agents leaves the Hive Assistant's panel alone (#293): its terminal is the same
+// Start New (All) on a project with twelve agents leaves the Combwork Assistant's panel alone (#293): its terminal is the same
 // one before and after (not re-mounted), keeps drawing (no WebGL context lost: Chromium drops the oldest context once a
 // window holds too many, and terminals that ended didn't give theirs back), and the panel and its terminal keep their
 // width. Three batches in a row, as a user starting fresh sessions a few times would; the test keeps every context
-// alive, so only Hive giving them back stops Chromium dropping one. A context lost anyway (the GPU) leaves a terminal
+// alive, so only Combwork giving them back stops Chromium dropping one. A context lost anyway (the GPU) leaves a terminal
 // drawn with the DOM and fitted again, not spilling past its panel. The agents and the Assistant run
 // the fake Claude Code (fake-claude/). Screenshots before and after. Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR; a quiet test copy.
@@ -38,7 +38,7 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47919), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47919), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -49,7 +49,7 @@ const check = (name, ok, extra = '') => {
   })
   await lib.fitWindow(app, page, { width: 1600, height: 950 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const home = (await inv('workspace:refresh')).assistant.path
   const assistantKey = lib.ptyKey(home, 'assistant')
@@ -78,7 +78,7 @@ const check = (name, ok, extra = '') => {
       const host = document.querySelector(`.assistant-panel .terminal-host[data-pty="${CSS.escape(key)}"]`)
       const first = window.__probeFirst
       const screen = host?.querySelector('.xterm-screen')
-      const t = window.__hiveTerminalState?.(key)
+      const t = window.__cwTerminalState?.(key)
       return {
         panel: p ? Math.round(p.getBoundingClientRect().width) : null,
         host: host ? Math.round(host.getBoundingClientRect().width) : null,
@@ -87,11 +87,11 @@ const check = (name, ok, extra = '') => {
         same: !!first && !!host && host === first.host && host.querySelector('.xterm') === first.xterm,
         lost: !!first?.lost,
         webgl: !!host?.querySelector('canvas:not(.xterm-link-layer)') && !host.querySelector('.xterm-rows')?.childElementCount,
-        contexts: window.__hiveWebglCount?.() ?? null
+        contexts: window.__cwWebglCount?.() ?? null
       }
     }, assistantKey)
   // Every WebGL context the window makes is kept here: garbage collection, which used to give back the contexts of
-  // terminals that ended (sooner or later), can't hide one Hive didn't give back itself.
+  // terminals that ended (sooner or later), can't hide one Combwork didn't give back itself.
   await page.evaluate(() => {
     const made = (window.__probeContexts = [])
     const getContext = HTMLCanvasElement.prototype.getContext
@@ -169,7 +169,7 @@ const check = (name, ok, extra = '') => {
   check('its terminal keeps its width and columns', after.host === before.host && after.screen === before.screen && after.cols === before.cols, `${JSON.stringify(before)} → ${JSON.stringify(after)}`)
   check('the terminal fits in its panel', after.screen !== null && after.screen <= after.host, JSON.stringify(after))
 
-  // --- A context lost anyway (the GPU resets, say): xterm gives up on it after 3 s and Hive's terminal draws with the
+  // --- A context lost anyway (the GPU resets, say): xterm gives up on it after 3 s and Combwork's terminal draws with the
   // DOM; it still fits its panel, at the same width, with nothing spilling over.
   await page.evaluate((key) => {
     const host = document.querySelector(`.assistant-panel .terminal-host[data-pty="${CSS.escape(key)}"]`)

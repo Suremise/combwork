@@ -1,4 +1,4 @@
-// The hive project's focused-test picker (HI-1367): `node tests/e2e/affected.mjs --pick`, which Hive's merge queue runs
+// This repository's focused-test picker (HI-1367): `node tests/e2e/affected.mjs --pick`, which Combwork's merge queue runs
 // as the project's focused.pick. Which unit tests and e2e suites a change needs: the e2e suites are affectedSuites'
 // (tests/e2esuites.test.ts checks those), the unit tests a changed test, Vitest's import graph, and UNIT_SCANS for the
 // tests that read the repository rather than import it. These check the table can't drift from the tests, and replay
@@ -104,10 +104,10 @@ describe('UNIT_SCANS: the unit tests that read the repository', () => {
   })
 
   it('an entry selects by its paths, then an added or removed file (adds), a line it checks (lines), or any change', () => {
-    const e = { test: 'tests/x.test.ts', paths: ['src/'], lines: ['HIVE_TEST_'] }
-    expect(scanSelects(e, 'src/main/a.ts', { lines: ['  const day = Number(process.env.HIVE_TEST_DAY_MS)'] })).toBe(true)
+    const e = { test: 'tests/x.test.ts', paths: ['src/'], lines: ['CW_TEST_'] }
+    expect(scanSelects(e, 'src/main/a.ts', { lines: ['  const day = Number(process.env.CW_TEST_DAY_MS)'] })).toBe(true)
     expect(scanSelects(e, 'src/main/a.ts', { lines: ['  const day = 86_400_000'] })).toBe(false)
-    expect(scanSelects(e, 'tests/a.ts', { lines: ['HIVE_TEST_X'] })).toBe(false)
+    expect(scanSelects(e, 'tests/a.ts', { lines: ['CW_TEST_X'] })).toBe(false)
     expect(scanSelects({ test: 'tests/x.test.ts', adds: true }, 'docs/new.md', { moved: true })).toBe(true)
     expect(scanSelects({ test: 'tests/x.test.ts', adds: true }, 'docs/old.md', { moved: false })).toBe(false)
     expect(scanSelects({ test: 'tests/x.test.ts', paths: ['docs/USER_GUIDE.md'] }, 'docs/USER_GUIDE.md')).toBe(true)
@@ -125,12 +125,12 @@ describe('the tests a change needs (pickTests)', () => {
     const paths = ['src/main/diagnostics.ts', 'src/main/fsutil.ts', 'src/main/git.ts', 'src/main/logger.ts', 'src/main/mainStalls.ts', 'src/main/places.ts', 'src/main/providers/conversation.ts', 'src/main/providers/copilot/events.ts', 'src/main/repoLock.ts', 'src/main/usageHistory.ts', 'src/main/walCheckpoint.ts', 'src/main/workerThreads.ts', 'tests/e2e/packaged-workers.cjs', 'tests/e2e/suites.mjs', 'tests/workerImports.test.ts']
     const added = ['src/main/places.ts', 'src/main/workerThreads.ts', 'tests/e2e/packaged-workers.cjs', 'tests/workerImports.test.ts']
     expect(units({ paths, added })).toEqual(expect.arrayContaining(['tests/e2esuites.test.ts', 'tests/workerImports.test.ts']))
-    // Its fsutil.ts and logger.ts are shared by every part of Hive: the whole change needs every test.
+    // Its fsutil.ts and logger.ts are shared by every part of Combwork: the whole change needs every test.
     expect(pick({ paths, added })).toMatchObject({ every: true })
   })
 
   it('HI-1866 (fd860b662): a new src/main file and a changed suite select tests/e2esuites.test.ts', () => {
-    const paths = ['CHANGELOG.md', 'docs/USER_GUIDE.md', 'locales/de/service.json', 'locales/en/service.json', 'resources/skills/card-loop/SKILL.md', 'src/main/assistantAsk.ts', 'src/main/bundledHistory.json', 'src/main/index.ts', 'src/main/mcp/hive-mcp.ts', 'src/shared/toolReplies.ts', 'tests/assistantAsk.test.ts', 'tests/e2e/intents.cjs', 'tests/e2e/replysize.cjs', 'tests/laneWatch.test.ts', 'tests/scenarios/scenarios.cjs']
+    const paths = ['CHANGELOG.md', 'docs/USER_GUIDE.md', 'locales/de/service.json', 'locales/en/service.json', 'resources/skills/card-loop/SKILL.md', 'src/main/assistantAsk.ts', 'src/main/bundledHistory.json', 'src/main/index.ts', 'src/main/mcp/cw-mcp.ts', 'src/shared/toolReplies.ts', 'tests/assistantAsk.test.ts', 'tests/e2e/intents.cjs', 'tests/e2e/replysize.cjs', 'tests/laneWatch.test.ts', 'tests/scenarios/scenarios.cjs']
     const added = ['src/main/assistantAsk.ts', 'tests/assistantAsk.test.ts']
     expect(units({ paths, added })).toEqual(expect.arrayContaining(['tests/e2esuites.test.ts', 'tests/assistantAsk.test.ts', 'tests/laneWatch.test.ts', 'tests/guidance.test.ts', 'tests/tips.test.ts', 'tests/userGuide.test.ts', 'tests/i18n.test.ts', 'tests/bundled.test.ts']))
     // A new file alone, no suite file changed, still selects it (every AREAS path, every tracked file placed).
@@ -155,9 +155,9 @@ describe('the tests a change needs (pickTests)', () => {
     expect(units({ paths, added, vitestRelated: ['tests/codexConnections.test.ts', 'tests/e2e/lib.cjs'] })).not.toContain('tests/e2e/lib.cjs')
   })
 
-  it('a HIVE_TEST_ seam read added to an existing src/main file selects tests/e2esuites.test.ts (git diff -U0 of a real change)', () => {
-    const repo = tempDir('hive-focused-pick-')
-    const git = (...args: string[]): string => execFileSync('git', ['-c', 'core.autocrlf=false', '-c', 'user.name=Hive Test', '-c', 'user.email=test@example.invalid', ...args], { cwd: repo, env: runContext.baseEnv(), encoding: 'utf8' })
+  it('a CW_TEST_ seam read added to an existing src/main file selects tests/e2esuites.test.ts (git diff -U0 of a real change)', () => {
+    const repo = tempDir('cw-focused-pick-')
+    const git = (...args: string[]): string => execFileSync('git', ['-c', 'core.autocrlf=false', '-c', 'user.name=Combwork Test', '-c', 'user.email=test@example.invalid', ...args], { cwd: repo, env: runContext.baseEnv(), encoding: 'utf8' })
     git('init', '-q', '-b', 'main')
     const file = 'src/main/usageHistory.ts'
     const write = (text: string): void => {
@@ -168,9 +168,9 @@ describe('the tests a change needs (pickTests)', () => {
     git('add', '.')
     git('commit', '-q', '-m', 'base')
     const base = git('rev-parse', 'HEAD').trim()
-    write("export const DAY_MS = Number(process.env.HIVE_TEST_DAY_MS) || 86_400_000\n")
+    write("export const DAY_MS = Number(process.env.CW_TEST_DAY_MS) || 86_400_000\n")
     const diffLines = diffLinesOf(git('diff', '--no-ext-diff', '--no-color', '--no-renames', '-U0', base, '--')) as Record<string, string[]>
-    expect(diffLines[file]).toEqual(['export const DAY_MS = 86_400_000', "export const DAY_MS = Number(process.env.HIVE_TEST_DAY_MS) || 86_400_000"])
+    expect(diffLines[file]).toEqual(['export const DAY_MS = 86_400_000', "export const DAY_MS = Number(process.env.CW_TEST_DAY_MS) || 86_400_000"])
     expect(units({ paths: [file], diffLines })).toContain('tests/e2esuites.test.ts')
     // The same file changed without a seam doesn't.
     expect(units({ paths: [file], diffLines: { [file]: ['export const DAY_MS = 86_400_001'] } })).not.toContain('tests/e2esuites.test.ts')
@@ -207,7 +207,7 @@ describe('the tests a change needs (pickTests)', () => {
 })
 
 describe('the picker on the command line (focused.pick)', () => {
-  const run = (input: string, base = 'HEAD') => spawnSync(process.execPath, [join(root, 'tests', 'e2e', 'affected.mjs'), '--pick'], { cwd: root, input, encoding: 'utf8', env: { ...runContext.baseEnv(), HIVE_FOCUSED_BASE: base } })
+  const run = (input: string, base = 'HEAD') => spawnSync(process.execPath, [join(root, 'tests', 'e2e', 'affected.mjs'), '--pick'], { cwd: root, input, encoding: 'utf8', env: { ...runContext.baseEnv(), CW_FOCUSED_BASE: base } })
 
   it('prints {"every":true} alone for a shared file, nothing for no change, and fails for a base that is no commit', () => {
     const every = run('src/main/ipc.ts\r\n')

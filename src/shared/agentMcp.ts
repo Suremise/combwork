@@ -1,9 +1,11 @@
 /**
  * Which of a project's MCP servers an agent gets (#537): all of them (the default, `mcpServers` absent), or only those
  * its settings name (`mcpServers`, saved by templates). Only servers on in the project reach anyone (mcpOnInProject);
- * a name chosen here that isn't one of them reaches nobody. The built-in hive server isn't one of them: every session
+ * a name chosen here that isn't one of them reaches nobody. The built-in combwork server isn't one of them: every session
  * gets it, whatever this says.
  */
+import { isReservedServerName, TOOLS_SERVER } from './assistantTools'
+import { agentMsg, say } from './agentText'
 import type { AgentDef, McpServerInfo, ProjectConfig, WorkspaceConfig } from './types'
 
 /** The names in a list from a config file (a hand-edited file may hold anything). */
@@ -17,7 +19,7 @@ export const MCP_ADDED_MODEL = 3
  * The workspace servers added to a project (HI-2059): the ones that run there. A project converted to HI-2059's model
  * (`mcp.model` 3) has its list as it is; one not yet converted (a write that failed, a hidden project that couldn't be
  * read) keeps #1093's meaning, its own choices that the workspace has on (`legacy`, workspace.json's `mcp.enabled`,
- * frozen at the upgrade). A list Hive can't read adds nothing: never more than ran.
+ * frozen at the upgrade). A list Combwork can't read adds nothing: never more than ran.
  */
 export function mcpAdded(project: Partial<ProjectConfig['mcp']> | null | undefined, legacy: unknown): string[] {
   const own = listed(project?.enabled)
@@ -26,7 +28,7 @@ export function mcpAdded(project: Partial<ProjectConfig['mcp']> | null | undefin
   return own.filter((n) => on.includes(n))
 }
 
-/** The servers added for the Hive Assistant (HI-2059), as a project's (mcpAdded): before its conversion, #1093's meaning. */
+/** The servers added for the Combwork Assistant (HI-2059), as a project's (mcpAdded): before its conversion, #1093's meaning. */
 export function assistantMcpAdded(wsMcp: Partial<WorkspaceConfig['mcp']> | null | undefined): string[] {
   return mcpAdded({ enabled: wsMcp?.assistant, model: wsMcp?.assistantModel }, wsMcp?.enabled)
 }
@@ -62,8 +64,11 @@ export const serverAddedIn = (m: Pick<McpServerInfo, 'def' | 'projects'>, projec
 /** The most servers an agent's choice names. */
 export const AGENT_MCP_MAX = 50
 
-/** A workspace MCP server's name (its .hive/mcp/<name>.json); `hive` is Hive's own. */
-export const isMcpServerName = (name: string): boolean => /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(name) && name !== 'hive'
+/** A workspace MCP server's name (its .combwork/mcp/<name>.json); `combwork` is Combwork's own. */
+/** Why an agent's list of MCP servers was refused (HI-2463: its reserved name said as Combwork's). */
+const NOT_A_SERVER = agentMsg({ id: 'api.agentMcp.notAServer', text: "\"{name}\" isn't an MCP server's name{reserved, select, yes { (the built-in {server} server is always given)} other {}}.", note: "A refusal of an agent's MCP servers: name is what was given; reserved: yes when it is Combwork's own server's name; server: that name (combwork)." })
+
+export const isMcpServerName = (name: string): boolean => /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(name) && !isReservedServerName(name)
 
 /**
  * An agent's choice as saved: undefined for all of the project's servers, else the names (trimmed, each once, in the
@@ -75,7 +80,7 @@ export function cleanMcpServers(raw: unknown): string[] | undefined {
   const out: string[] = []
   for (const v of raw) {
     const name = typeof v === 'string' ? v.trim() : ''
-    if (!isMcpServerName(name)) throw new Error(`"${String(v).slice(0, 70)}" isn't an MCP server's name${name === 'hive' ? ' (the built-in hive server is always given)' : ''}.`)
+    if (!isMcpServerName(name)) throw new Error(say(NOT_A_SERVER, { name: String(v).slice(0, 70), reserved: isReservedServerName(name) ? 'yes' : 'no', server: TOOLS_SERVER }))
     if (!out.includes(name)) out.push(name)
   }
   if (out.length > AGENT_MCP_MAX) throw new Error(`An agent can be given at most ${AGENT_MCP_MAX} MCP servers.`)
@@ -83,7 +88,7 @@ export function cleanMcpServers(raw: unknown): string[] | undefined {
 }
 
 /**
- * Whether an agent gets the project's server `name`. A choice Hive can't read (a hand-edited project.json) gives none:
+ * Whether an agent gets the project's server `name`. A choice Combwork can't read (a hand-edited project.json) gives none:
  * never more than was asked for.
  */
 export function agentGetsMcp(agent: Pick<AgentDef, 'mcpServers'> | null | undefined, name: string): boolean {

@@ -1,7 +1,7 @@
-// Reporting a long run to the Hive that launched the agent (#136's Agent API: POST /v1/progress, PATCH
+// Reporting a long run to the Combwork that launched the agent (#136's Agent API: POST /v1/progress, PATCH
 // /v1/progress/{id}, POST /v1/progress/{id}/finish), and remembering how long runs took, for estimates. Used by the
-// hive-progress wrapper and by Hive's own test runners (tests/progress.mjs). Never fails and never prints: with no
-// Hive, Hive unreachable or a refused call, the run just isn't shown.
+// cw-progress wrapper and by Combwork's own test runners (tests/progress.mjs). Never fails and never prints: with no
+// Combwork, Combwork unreachable or a refused call, the run just isn't shown.
 // Plain Node runs this file directly (tests/e2e/run.mjs, with type stripping): Node built-ins only, and only
 // TypeScript that can be erased (no enums, namespaces or parameter properties).
 import { linkSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
@@ -15,32 +15,32 @@ export interface ProgressTarget {
 }
 
 /**
- * The Hive this process can report to, or null: outside Hive, without the Agent API, turned off with HIVE_PROGRESS=0,
- * or inside a command hive-progress runs (HIVE_PROGRESS_WRAPPED=1), whose run is the wrapper's: a report of its own
- * would be a second row (it prints step lines instead, `wrappedLines`). The token is the agent's own, from the file Hive
- * keeps it in (HIVE_API_TOKEN_FILE), never from HIVE_API_TOKEN (HI-2262: sessions no longer get it).
+ * The Combwork this process can report to, or null: outside Combwork, without the Agent API, turned off with CW_PROGRESS=0,
+ * or inside a command cw-progress runs (CW_PROGRESS_WRAPPED=1), whose run is the wrapper's: a report of its own
+ * would be a second row (it prints step lines instead, `wrappedLines`). The token is the agent's own, from the file Combwork
+ * keeps it in (CW_API_TOKEN_FILE), never from a token variable (HI-2262: sessions no longer get it).
  */
 export function progressTarget(env: Record<string, string | undefined> = process.env): ProgressTarget | null {
-  if (env.HIVE_PROGRESS === '0' || env.HIVE_PROGRESS_WRAPPED === '1') return null
-  const url = env.HIVE_API_URL?.replace(/\/+$/, '')
+  if (env.CW_PROGRESS === '0' || env.CW_PROGRESS_WRAPPED === '1') return null
+  const url = env.CW_API_URL?.replace(/\/+$/, '')
   if (!url) return null
   let token = ''
-  if (env.HIVE_API_TOKEN_FILE) {
+  if (env.CW_API_TOKEN_FILE) {
     try {
-      token = String(JSON.parse(readFileSync(env.HIVE_API_TOKEN_FILE, 'utf8')).token ?? '')
+      token = String(JSON.parse(readFileSync(env.CW_API_TOKEN_FILE, 'utf8')).token ?? '')
     } catch {
       token = ''
     }
   }
-  return token ? { url, token, workspace: env.HIVE_WORKSPACE ?? '' } : null
+  return token ? { url, token, workspace: env.CW_WORKSPACE ?? '' } : null
 }
 
 /**
- * Inside a command hive-progress runs: where a reporter prints its steps as step lines for the wrapper's run (stdout),
+ * Inside a command cw-progress runs: where a reporter prints its steps as step lines for the wrapper's run (stdout),
  * instead of reporting a run of its own. Undefined otherwise.
  */
 export function wrappedLines(env: Record<string, string | undefined> = process.env): ((line: string) => void) | undefined {
-  return env.HIVE_PROGRESS_WRAPPED === '1' && env.HIVE_PROGRESS !== '0' ? (line) => void process.stdout.write(`${line}\n`) : undefined
+  return env.CW_PROGRESS_WRAPPED === '1' && env.CW_PROGRESS !== '0' ? (line) => void process.stdout.write(`${line}\n`) : undefined
 }
 
 // The API's terms (#136): `step` counts the steps finished (0 at the start, `total` at the end) and `stepName` names the
@@ -61,8 +61,8 @@ export interface ProgressStart {
   /** What it waits for before it can begin (#549): no time left is shown meanwhile. */
   waiting?: string
   /**
-   * What it runs for (#1220), as `resolveRun` gave it: `link`, the id Hive gave what it resolved (the checkout before the
-   * command started), and what it names, for a Hive that no longer has the link to resolve it again.
+   * What it runs for (#1220), as `resolveRun` gave it: `link`, the id Combwork gave what it resolved (the checkout before the
+   * command started), and what it names, for a Combwork that no longer has the link to resolve it again.
    */
   link?: string
   card?: string | null
@@ -108,7 +108,7 @@ const count = (n: number | undefined, max: number): number | undefined => (n !==
 /**
  * One run being reported. It starts at once; updates are sent at most every `minIntervalMs` (the latest state wins),
  * in order; finishing drops what's pending and waits for the finish to be sent, at most `finishWaitMs`. With no
- * target, or a start Hive refused, it does nothing.
+ * target, or a start Combwork refused, it does nothing.
  */
 export class ProgressRun {
   private readonly target: ProgressTarget | null
@@ -146,6 +146,7 @@ export class ProgressRun {
     const step = count(start.step, this.maxStep)
     const estimateMs = count(start.estimateMs, MAX_ESTIMATE_MS)
     const body = {
+      // agent-protocol: a run's stored title when it has none, the same for every reader (the window's panel too)
       title: clip(start.title.trim() || 'Run', MAX_TITLE),
       ...(total !== undefined ? { total } : {}),
       ...(step !== undefined ? { step } : {}),
@@ -159,7 +160,7 @@ export class ProgressRun {
       ...(start.link ? { link: start.link } : {}),
       ...(start.check ? { check: start.check } : {}),
       ...(start.folder ? { folder: start.folder } : {}),
-      // Its process (#549): once it is gone without a finish, Hive says the run ended without a report.
+      // Its process (#549): once it is gone without a finish, Combwork says the run ended without a report.
       pid: process.pid
     }
     this.id = target
@@ -168,7 +169,8 @@ export class ProgressRun {
     this.chain = this.id
     this.lines = target ? undefined : opts.lines
     if (this.lines && total !== undefined) this.line(step ?? 0, start.stepName, total)
-    if (this.lines && start.waiting) this.lines(`##hive-progress wait=${clip(start.waiting, MAX_TITLE)}`)
+    // agent-protocol: a step line the wrapper parses (stepLine), never shown
+    if (this.lines && start.waiting) this.lines(`##cw-progress wait=${clip(start.waiting, MAX_TITLE)}`)
   }
 
   /** A step line: `step` counts the steps finished (the API's terms); the line names the one starting, from 1. */
@@ -176,10 +178,11 @@ export class ProgressRun {
     const starting = Math.min(step + 1, this.maxStep)
     if (starting === this.lineStep && name === undefined && total === undefined) return
     this.lineStep = starting
-    this.lines!(`##hive-progress step=${starting}${total !== undefined ? ` total=${total}` : ''}${name ? ` name=${clip(name, MAX_TITLE)}` : ''}`)
+    // agent-protocol: a step line the wrapper parses (stepLine), never shown
+    this.lines!(`##cw-progress step=${starting}${total !== undefined ? ` total=${total}` : ''}${name ? ` name=${clip(name, MAX_TITLE)}` : ''}`)
   }
 
-  /** Whether it is being reported (Hive took the start). */
+  /** Whether it is being reported (Combwork took the start). */
   reporting(): Promise<boolean> {
     return this.id.then((id) => id !== null)
   }
@@ -191,7 +194,8 @@ export class ProgressRun {
       this.maxStep = total
     }
     if (this.lines && !this.finished) {
-      if (u.waiting !== undefined) this.lines(`##hive-progress wait=${clip(u.waiting, MAX_TITLE)}`.trimEnd())
+      // agent-protocol: a step line the wrapper parses (stepLine), never shown
+      if (u.waiting !== undefined) this.lines(`##cw-progress wait=${clip(u.waiting, MAX_TITLE)}`.trimEnd())
       const step = count(u.step, this.maxStep)
       if (step !== undefined || u.stepName !== undefined || total !== undefined) this.line(step ?? Math.max(0, this.lineStep - 1), u.stepName, total)
       return
@@ -230,13 +234,14 @@ export class ProgressRun {
 
   /**
    * Ends the run: ok or not, with an optional summary ("11 passed, 1 failed"), and what else is known: the exit code, a
-   * log or record file. Inside hive-progress the log goes to the wrapper as a line (it reports the finish). Never rejects.
-   * Resolves with Hive's answer (a check run's says how it counted, #1654), or null when there is none in time;
+   * log or record file. Inside cw-progress the log goes to the wrapper as a line (it reports the finish). Never rejects.
+   * Resolves with Combwork's answer (a check run's says how it counted, #1654), or null when there is none in time;
    * `finishedAs` then says how it went. With `retry` (a check's run, HI-1892: its result is what a submit needs), a
    * finish that got no reply is sent once more after `retry` ms: a 409 then says the first one arrived.
    */
   async finish(ok: boolean, summary?: string, finishWaitMs = 3000, more: ProgressFinishMore = {}, retry?: number): Promise<unknown> {
-    if (this.lines && more.logPath && !this.finished) this.lines(`##hive-progress log=${clip(more.logPath, MAX_LOG_PATH)}`)
+    // agent-protocol: a step line the wrapper parses (stepLine), never shown
+    if (this.lines && more.logPath && !this.finished) this.lines(`##cw-progress log=${clip(more.logPath, MAX_LOG_PATH)}`)
     if (!this.target || this.finished) return null
     this.finished = true
     if (this.timer) clearTimeout(this.timer)
@@ -269,8 +274,8 @@ export class ProgressRun {
         return r?.ok ? r.body : null
       })
     let timer: ReturnType<typeof setTimeout> | undefined
-    // Its start may still be waiting for Hive (a quick command's start goes as it ends): what is left of the start's own
-    // time comes first, so a start Hive takes within it is followed by the finish (HR2's round 1), then the finish's.
+    // Its start may still be waiting for Combwork (a quick command's start goes as it ends): what is left of the start's own
+    // time comes first, so a start Combwork takes within it is followed by the finish (HR2's round 1), then the finish's.
     const startLeft = Math.max(0, this.startedAt + this.startTimeoutMs - Date.now())
     const bound = startLeft + (retry !== undefined ? 2 * finishWaitMs + retry : finishWaitMs) + 250
     const answer = await Promise.race([done, new Promise((r) => (timer = setTimeout(() => r(null), bound)))])
@@ -291,7 +296,8 @@ export class ProgressRun {
     try {
       const res = await this.fetchImpl(t.url + path, {
         method,
-        headers: { Authorization: `Bearer ${t.token}`, 'Content-Type': 'application/json', ...(t.workspace ? { 'X-Hive-Workspace': encodeURIComponent(t.workspace) } : {}) },
+        // agent-protocol: HTTP's Authorization header
+        headers: { Authorization: `Bearer ${t.token}`, 'Content-Type': 'application/json', ...(t.workspace ? { 'X-Combwork-Workspace': encodeURIComponent(t.workspace) } : {}) },
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(timeoutMs)
       })
@@ -303,25 +309,25 @@ export class ProgressRun {
 }
 
 /**
- * How a run's finish went (HI-1892): `answered`, Hive took it; `noStart`, Hive never took the run's start (no reply in
+ * How a run's finish went (HI-1892): `answered`, Combwork took it; `noStart`, Combwork never took the run's start (no reply in
  * time), so nothing of it was recorded; `endedBefore`, a finish sent again found the first had arrived (its reply lost);
- * `refused`, Hive answered with an error; `noReply`, no reply to it at all.
+ * `refused`, Combwork answered with an error; `noReply`, no reply to it at all.
  */
 export type FinishOutcome = 'answered' | 'noStart' | 'endedBefore' | 'refused' | 'noReply'
 
-/** What a run is for (#1220): what it names, or nothing for Hive's defaults (the agent's card, the folder's head). */
+/** What a run is for (#1220): what it names, or nothing for Combwork's defaults (the agent's card, the folder's head). */
 export interface RunAsk {
   folder: string
   card?: string
   revision?: string
   check?: string
-  /** Run it in a check copy at the card's revision (#1435, `--isolated`): Hive leases one, or says to wait for one. */
+  /** Run it in a check copy at the card's revision (#1435, `--isolated`): Combwork leases one, or says to wait for one. */
   isolated?: true
   /** The ticket of the copy being leased for it (the last `wait` gave it): asked again with it. */
   ticket?: string
 }
 
-/** What Hive resolved a run to be for: the card's reference, the commits, the check and its configured command. */
+/** What Combwork resolved a run to be for: the card's reference, the commits, the check and its configured command. */
 export interface RunLink {
   /** The id its start passes back, so the run gets what was resolved here. */
   link: string | null
@@ -335,23 +341,23 @@ export interface RunLink {
 }
 
 /**
- * Why Hive gave no answer (HI-1892): `slow`, no reply within the time allowed (it is there, but busy); `refused`, the
- * connection was refused or not allowed (Hive isn't running, or this process may not reach it: a sandbox); `failed`,
- * anything else (an older Hive without the call, an error), with what happened.
+ * Why Combwork gave no answer (HI-1892): `slow`, no reply within the time allowed (it is there, but busy); `refused`, the
+ * connection was refused or not allowed (Combwork isn't running, or this process may not reach it: a sandbox); `failed`,
+ * anything else (an older Combwork without the call, an error), with what happened.
  */
-export type Unreachable = { unreachable: true; why: 'slow' | 'refused' | 'failed'; detail: string }
+export type Unreachable = { unreachable: true; why: 'slow' | 'refused' | 'failed'; detail: string; status?: number | null }
 
 /** Why a call threw: a timeout, a refused or forbidden connection, or something else (its message). */
 function unreachableOf(e: unknown): Unreachable {
   const err = e as { name?: string; message?: string; code?: string; cause?: { code?: string; message?: string } }
-  if (err?.name === 'TimeoutError' || err?.name === 'AbortError') return { unreachable: true, why: 'slow', detail: 'no reply in time' }
+  if (err?.name === 'TimeoutError' || err?.name === 'AbortError') return { unreachable: true, why: 'slow', detail: err.name }
   const code = err?.cause?.code ?? err?.code
   if (code === 'ECONNREFUSED' || code === 'EACCES' || code === 'EPERM') return { unreachable: true, why: 'refused', detail: code }
   return { unreachable: true, why: 'failed', detail: err?.cause?.message ?? err?.message ?? String(e) }
 }
 
 /**
- * Asks Hive what a run is for before its command starts (POST /v1/progress/resolve): `link` when it answered, `refused`
+ * Asks Combwork what a run is for before its command starts (POST /v1/progress/resolve): `link` when it answered, `refused`
  * with its reason (a revision that isn't checked out, an unknown card, a check with no command), or `unreachable` with
  * why (`Unreachable`). `retry` (HI-1892): a slow or failed ask is asked once more after that many ms (never a refused
  * connection: that fails at once).
@@ -368,7 +374,8 @@ async function resolveOnce(target: ProgressTarget, ask: RunAsk, opts: { fetch?: 
   try {
     const res = await fetchImpl(`${target.url}/v1/progress/resolve`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${target.token}`, 'Content-Type': 'application/json', ...(target.workspace ? { 'X-Hive-Workspace': encodeURIComponent(target.workspace) } : {}) },
+      // agent-protocol: HTTP's Authorization header
+      headers: { Authorization: `Bearer ${target.token}`, 'Content-Type': 'application/json', ...(target.workspace ? { 'X-Combwork-Workspace': encodeURIComponent(target.workspace) } : {}) },
       body: JSON.stringify(ask),
       signal: AbortSignal.timeout(opts.timeoutMs ?? 5000)
     })
@@ -392,31 +399,36 @@ async function resolveOnce(target: ProgressTarget, ask: RunAsk, opts: { fetch?: 
     if (res.status === 400 && body && typeof body.error === 'string') return { refused: body.error }
     // An isolated run with no check copy free yet (#1435): what it waits for, to ask again.
     if (res.status === 409 && body && typeof body.wait === 'string') return { wait: body.wait, ...(typeof body.ticket === 'string' && body.ticket ? { ticket: body.ticket } : {}) }
-    return { unreachable: true, why: 'failed', detail: `Hive answered ${res.status ?? 'with an error'}` }
+    // Combwork answered, with no link: its status (null: none), which the wrapper words (HI-2065: no agent text here).
+    return { unreachable: true, why: 'failed', detail: '', status: res.status ?? null }
   } catch (e) {
     return unreachableOf(e)
   }
 }
 
+/** How an isolated run's launcher was put in its copy's job: true, or Combwork's reason, its status, or why it couldn't be reached. */
+export type IsolatedAssign = true | { error: string } | { status: number } | { unreachable: string }
+
 /**
- * Has Hive put an isolated run's launcher (its pid, started between the two clock readings) in its check copy's job
+ * Has Combwork put an isolated run's launcher (its pid, started between the two clock readings) in its check copy's job
  * (#1435, POST /v1/progress/isolated), before the launcher is told to run the command: true once it is; what went wrong
  * otherwise (the launcher is then ended having run nothing).
  */
-export async function assignIsolated(target: ProgressTarget, a: { lease: string; pid: number; after: number; before: number }, opts: { fetch?: Fetch; timeoutMs?: number } = {}): Promise<true | string> {
+export async function assignIsolated(target: ProgressTarget, a: { lease: string; pid: number; after: number; before: number }, opts: { fetch?: Fetch; timeoutMs?: number } = {}): Promise<IsolatedAssign> {
   const fetchImpl = opts.fetch ?? (globalThis.fetch as unknown as Fetch)
   try {
     const res = await fetchImpl(`${target.url}/v1/progress/isolated`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${target.token}`, 'Content-Type': 'application/json', ...(target.workspace ? { 'X-Hive-Workspace': encodeURIComponent(target.workspace) } : {}) },
+      // agent-protocol: HTTP's Authorization header
+      headers: { Authorization: `Bearer ${target.token}`, 'Content-Type': 'application/json', ...(target.workspace ? { 'X-Combwork-Workspace': encodeURIComponent(target.workspace) } : {}) },
       body: JSON.stringify(a),
       signal: AbortSignal.timeout(opts.timeoutMs ?? 15000)
     })
     if (res.ok) return true
     const body = (await res.json().catch(() => null)) as Record<string, unknown> | null
-    return typeof body?.error === 'string' ? body.error : `Hive answered ${res.status}`
+    return typeof body?.error === 'string' ? { error: body.error } : { status: res.status ?? 0 }
   } catch (e) {
-    return `Hive couldn't be reached (${(e as Error).message})`
+    return { unreachable: (e as Error).message }
   }
 }
 

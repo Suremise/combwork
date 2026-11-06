@@ -1,8 +1,8 @@
-// Each card's focused tests (G20, HI-1367; SPEC §16.9.1): a project set to "Hive merges" into `integration`
+// Each card's focused tests (G20, HI-1367; SPEC §16.9.1): a project set to "Combwork merges" into `integration`
 // (queueFixture.cjs) with no G9 checks and G20 on, its picker and runner node scripts outside the repository, steered by
 // a control file; fake Claude Code agents acting by their own tokens. The picker's tests are kept with the submission;
 // the queue runs them once with the jobs Settings → Advanced gives, and merges on green; a failed test returns the card
-// with its output; a skipped one pauses the queue and asks the card's reviewer, whose hive_focused_skip lets it merge; a
+// with its output; a skipped one pauses the queue and asks the card's reviewer, whose cw_focused_skip lets it merge; a
 // picker that fails refuses the submit until the builder names the tests itself.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -43,11 +43,11 @@ function tools() {
   fs.writeFileSync(run, [
     "const fs = require('fs')",
     `const c = JSON.parse(fs.readFileSync(${JSON.stringify(focused)}, 'utf8'))`,
-    "const ids = JSON.parse(fs.readFileSync(process.env.HIVE_FOCUSED_TESTS, 'utf8'))",
-    `fs.writeFileSync(${JSON.stringify(seen)}, JSON.stringify({ ids, jobs: process.env.HIVE_FOCUSED_JOBS }))`,
+    "const ids = JSON.parse(fs.readFileSync(process.env.CW_FOCUSED_TESTS, 'utf8'))",
+    `fs.writeFileSync(${JSON.stringify(seen)}, JSON.stringify({ ids, jobs: process.env.CW_FOCUSED_JOBS }))`,
     "const out = ids.map((t) => ({ test: t, result: (c.results || {})[t] || 'passed', ...((c.results || {})[t] === 'skipped' ? { why: 'usage limit' } : {}) }))",
     "for (const r of out) if (r.result === 'failed') console.error(r.test + ': 2 failing')",
-    'fs.writeFileSync(process.env.HIVE_FOCUSED_RESULTS, JSON.stringify(out))',
+    'fs.writeFileSync(process.env.CW_FOCUSED_RESULTS, JSON.stringify(out))',
     "process.exit(out.some((r) => r.result === 'failed') ? 1 : 0)",
     ''
   ].join('\n'))
@@ -58,7 +58,7 @@ function tools() {
   q.prepare(fx)
   const cmd = tools()
   steerFocused({ pick: [{ test: 'tests/a.test.ts', needs: ['unit'] }, { test: 'board', needs: ['fake'] }] })
-  const h = await q.startHive(fx, { port: PORT })
+  const h = await q.startCombwork(fx, { port: PORT })
   try {
     h.page.on('pageerror', (e) => check('no page errors', false, e.message))
     await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { mergeChecks: [], focusedTests: true, commands: { 'focused.pick': cmd.pick, 'focused.run': cmd.run } }) })

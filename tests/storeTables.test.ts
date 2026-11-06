@@ -1,7 +1,7 @@
-// Lanes, watches and metrics in hive.db's typed tables (#1212): each entry written in columns and read back equal as
+// Lanes, watches and metrics in combwork.db's typed tables (#1212): each entry written in columns and read back equal as
 // JSON, an odd one kept whole, the 1.0 step moving 0.9's store_rows in (order, values, entries no row can hold kept aside),
 // saves that write only what changed and are all or nothing, 0.8's lanes.json moved in once, and a copy of a live board
-// migrated with every lane, watch and metric equal (HIVE_STORE_MIGRATION_DB names its hive.db).
+// migrated with every lane, watch and metric equal (CW_STORE_MIGRATION_DB names its combwork.db).
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it } from 'vitest'
@@ -11,7 +11,7 @@ import { tempDir } from './tempDir'
 import { admitted } from './admitted'
 import { canonical, entryOfRows, moveStores, readEntries, rowsOfEntry, STORES_STEP, TABLE_DEFS, TABLE_STORES, type TableStore } from '../src/main/schema/storeCodec'
 
-const base = tempDir('hive-store-tables-')
+const base = tempDir('cw-store-tables-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 
@@ -28,11 +28,11 @@ let n = 0
 const dismissals: (() => void)[] = []
 const workspace = (): string => {
   const ws = join(base, `ws-${++n}`)
-  mkdirSync(join(ws, '.hive'), { recursive: true })
+  mkdirSync(join(ws, '.combwork'), { recursive: true })
   dismissals.push(admitted(ws))
   return ws
 }
-const files = (ws: string): string[] => readdirSync(join(ws, '.hive')).sort()
+const files = (ws: string): string[] => readdirSync(join(ws, '.combwork')).sort()
 /** Its window closes it: dismissed (#1395), then its board closed, as WorkspaceService.close does; `reopen` opens it again. */
 const closed = (ws: string): void => {
   dismiss(ws)
@@ -53,7 +53,7 @@ afterAll(() => {
 
 const LANE = {
   id: 'lane-1',
-  project: 'hive',
+  project: 'alpha',
   projectId: 'p-abc',
   name: 'P3 D',
   builder: { id: 'a-b6', name: 'HB6' },
@@ -74,7 +74,7 @@ const LANE = {
 }
 const WATCH = {
   id: 'w-1',
-  projectPath: 'D:\\ws\\hive',
+  projectPath: 'D:\\ws\\alpha',
   projectId: 'p-abc',
   agentId: 'a-b6',
   cond: { cards: [1220, 1220, 1212], changes: ['verdict', 'column'], column: 'passed' },
@@ -85,8 +85,8 @@ const WATCH = {
   limitAt: '2026-10-20T20:00:00.000Z',
   waitSeq: 4,
   on: { '1220': 'agent' },
-  watcherName: 'HB6 (hive)',
-  fired: { line: '[Hive] …', at: '2026-10-20T15:00:00.000Z', cards: [1220], delivery: 'm12' }
+  watcherName: 'HB6 (alpha)',
+  fired: { line: '[CW] …', at: '2026-10-20T15:00:00.000Z', cards: [1220], delivery: 'm12' }
 }
 /** A bucket with a project named like Object's own properties, as the store keeps them (maps with no prototype). */
 const bucket = (start: number) => {
@@ -94,8 +94,8 @@ const bucket = (start: number) => {
   const part = (key: string) => ({ api: d({ [key]: { count: 2, ms: [1, 2] } }), mcp: d({}), guidance: d({ claude: { launches: 1 } }), catalog: d({}) })
   const projects = Object.create(null) as Record<string, unknown>
   Object.defineProperty(projects, '__proto__', { value: part('GET /v1/tasks'), enumerable: true, writable: true, configurable: true })
-  projects.hive = part('POST /v1/progress')
-  return { start, span: 'hour', projects, workspace: part('GET /v1/projects'), skills: { scans: { count: 0 }, hits: 1 }, dropped: 2, droppedBy: { hive: 2 }, series: 5 }
+  projects.alpha = part('POST /v1/progress')
+  return { start, span: 'hour', projects, workspace: part('GET /v1/projects'), skills: { scans: { count: 0 }, hits: 1 }, dropped: 2, droppedBy: { alpha: 2 }, series: 5 }
 }
 const roundTrip = (store: TableStore, doc: unknown) => {
   const def = TABLE_DEFS[store]
@@ -122,7 +122,7 @@ describe('entries as rows, and back (#1212)', () => {
   it("a project named __proto__ stays a project's name (no prototype is set), as the store's maps keep it", () => {
     const r = roundTrip('metrics', JSON.parse(JSON.stringify(bucket(0))))
     const projects = (r.back as { projects: Record<string, unknown> }).projects
-    expect(Object.keys(projects).sort()).toEqual(['__proto__', 'hive'])
+    expect(Object.keys(projects).sort()).toEqual(['__proto__', 'alpha'])
     expect(Object.getPrototypeOf(projects)).toBeNull()
   })
 
@@ -137,7 +137,7 @@ describe('entries as rows, and back (#1212)', () => {
       expect(r.whole).toBe(true)
       expect(canonical(r.back)).toBe(canonical(JSON.parse(JSON.stringify(odd))))
     }
-    // A bucket with a family Hive doesn't know, or a project named '' (the workspace's own part).
+    // A bucket with a family Combwork doesn't know, or a project named '' (the workspace's own part).
     for (const odd of [{ ...bucket(0), workspace: { api: {}, mcp: {}, guidance: {}, catalog: {}, later: {} } }, { ...bucket(0), projects: { '': { api: {}, mcp: {}, guidance: {}, catalog: {} } } }]) {
       const plain = JSON.parse(JSON.stringify(odd))
       expect(roundTrip('metrics', plain)).toMatchObject({ whole: true })
@@ -149,7 +149,7 @@ describe('entries as rows, and back (#1212)', () => {
 /** A 0.9 board's file (every step before the 1.0 group) with these store_rows rows and store_meta values. */
 function board09(rows: [string, string, string, number, string][], meta: [string, string, string][] = []): DatabaseSync {
   const file = join(base, `board-09-${++n}.db`)
-  openDb(file, { migrations: board.BOARD_MIGRATIONS.filter((m) => !m.group), hiveVersion: '0.9.3' }).close()
+  openDb(file, { migrations: board.BOARD_MIGRATIONS.filter((m) => !m.group), appVersion: '0.9.3' }).close()
   const db = new DatabaseSync(file)
   db.exec('PRAGMA foreign_keys = ON')
   for (const r of rows) db.prepare('INSERT INTO store_rows (store, scope, key, ord, doc) VALUES (?, ?, ?, ?, ?)').run(...r)
@@ -400,7 +400,7 @@ describe("what saves keep of committed entries is bounded (round 1, finding 2)",
 describe("0.8's lanes.json moved in (from #1018's tests)", () => {
   it('once, in order; the file kept as a backup, as it was; not read again', async () => {
     const ws = workspace()
-    const file = join(ws, '.hive', 'lanes.json')
+    const file = join(ws, '.combwork', 'lanes.json')
     const list = [{ ...LANE, id: 'b' }, { ...LANE, id: 'a' }]
     const text = JSON.stringify({ version: 1, lanes: list })
     writeFileSync(file, text)
@@ -410,14 +410,14 @@ describe("0.8's lanes.json moved in (from #1018's tests)", () => {
     expect(got.docs).toEqual(list)
     expect(JSON.parse(got.meta.get('imported')!)).toMatchObject({ rows: 2, file })
     const backup = files(ws).find((f) => f.startsWith('lanes.json.imported-'))!
-    expect(readFileSync(join(ws, '.hive', backup), 'utf8')).toBe(text)
+    expect(readFileSync(join(ws, '.combwork', backup), 'utf8')).toBe(text)
     await tables.openTable(ws, 'lanes', file, read)
     expect(reads).toBe(1)
   })
 
   it("a file that can't be read now is not marked moved: it stays, and the next open moves it in", async () => {
     const ws = workspace()
-    const file = join(ws, '.hive', 'lanes.json')
+    const file = join(ws, '.combwork', 'lanes.json')
     // A folder where the file is: reading it fails as a file Windows holds open would (not "there is none").
     mkdirSync(file)
     await expect(tables.openTable(ws, 'lanes', file, () => lanes.readLanesFile(file))).rejects.toThrow(/Could not read the lanes/)
@@ -431,17 +431,17 @@ describe("0.8's lanes.json moved in (from #1018's tests)", () => {
 
   it('a damaged lanes file is set aside, kept as it was, and none are moved in', async () => {
     const ws = workspace()
-    const file = join(ws, '.hive', 'lanes.json')
+    const file = join(ws, '.combwork', 'lanes.json')
     writeFileSync(file, '{ not json')
     const got = await tables.openTable(ws, 'lanes', file, () => lanes.readLanesFile(file))
     expect(got.docs).toEqual([])
     const aside = files(ws).find((f) => f.startsWith('lanes.json.damaged-'))!
-    expect(readFileSync(join(ws, '.hive', aside), 'utf8')).toBe('{ not json')
+    expect(readFileSync(join(ws, '.combwork', aside), 'utf8')).toBe('{ not json')
   })
 
   it("every entry moved in has a row of its own, whatever ids the file gives (one another's fallback, the same twice, none)", async () => {
     const ws = workspace()
-    const file = join(ws, '.hive', 'lanes.json')
+    const file = join(ws, '.combwork', 'lanes.json')
     const list = [{ id: '#1', n: 0 }, { n: 1 }, { id: 'a', n: 2 }, { id: 'a', n: 3 }, { id: '#1', n: 4 }, { id: '#3', n: 5 }]
     writeFileSync(file, JSON.stringify({ version: 1, lanes: list }))
     const got = await tables.openTable(ws, 'lanes', file, () => lanes.readLanesFile(file))
@@ -450,8 +450,8 @@ describe("0.8's lanes.json moved in (from #1018's tests)", () => {
   })
 })
 
-const live = process.env.HIVE_STORE_MIGRATION_DB
-describe.skipIf(!live)("a copy of a live board's hive.db (HIVE_STORE_MIGRATION_DB)", () => {
+const live = process.env.CW_STORE_MIGRATION_DB
+describe.skipIf(!live)("a copy of a live board's combwork.db (CW_STORE_MIGRATION_DB)", () => {
   it('migrates with every lane, watch and metric equal as JSON, in order, and their values kept', () => {
     const copy = join(base, `live-${++n}.db`)
     copyFileSync(live!, copy)

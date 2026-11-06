@@ -8,20 +8,20 @@ import { msg, tr, type Msg } from './i18n'
 /** What kind of file an attachment is, as far as a CLI reading it cares. `file` is anything else (a zip, a binary). */
 export type AttachmentKind = 'image' | 'pdf' | 'text' | 'file'
 
-/** Where a session host keeps its attachments: `.hive/attachments/<session id>` (or `run-<launch>` until it has one). */
+/** Where a session host keeps its attachments: `.combwork/attachments/<session id>` (or `run-<launch>` until it has one). */
 export const ATTACHMENTS_DIR = 'attachments'
 /**
- * Cards' attachments (HI-1700): `<host>/.hive/attachments/cards/<card number>`, beside the sessions' folders. Never a
+ * Cards' attachments (HI-1700): `<host>/.combwork/attachments/cards/<card number>`, beside the sessions' folders. Never a
  * session's: the sessions' listings, Clean Up and Purge pass it by (isSessionFolder), so nothing of a session's removes it.
  */
 export const CARD_ATTACHMENTS_DIR = 'cards'
 /** Whether a folder in a host's attachments folder is a session's (any but the cards' folder). */
 export const isSessionFolder = (name: string): boolean => name.toLowerCase() !== CARD_ATTACHMENTS_DIR
 
-/** The folder's name before #387: Hive moves it to ATTACHMENTS_DIR, and old paths into it still lead to the moved files. */
+/** The folder's name before #387: Combwork moves it to ATTACHMENTS_DIR, and old paths into it still lead to the moved files. */
 export const OLD_ATTACHMENTS_DIR = 'images'
 
-/** Above this size Hive asks before attaching a file: a CLI may refuse it, or reading it may fill the agent's context. */
+/** Above this size Combwork asks before attaching a file: a CLI may refuse it, or reading it may fill the agent's context. */
 export const LARGE_ATTACHMENT_BYTES = 20 * 1024 * 1024
 
 export const IMAGE_FILE = /\.(png|jpe?g|gif|webp|bmp)$/i
@@ -68,14 +68,14 @@ export function attachmentLabel(kind: AttachmentKind, reads: readonly Attachment
 }
 
 /**
- * Where a path into a session host's old attachments folder (`<host>\.hive\images\…`) leads now that the folder is
- * `.hive\attachments`: the same path with the folder renamed, or null for a path that isn't in an old folder.
+ * Where a path into a session host's old attachments folder (`<host>\.combwork\images\…`) leads now that the folder is
+ * `.combwork\attachments`: the same path with the folder renamed, or null for a path that isn't in an old folder.
  */
 export function movedAttachmentPath(p: string): string | null {
-  const m = /([\\/])\.hive([\\/])images([\\/])/i.exec(p)
+  const m = /([\\/])\.combwork([\\/])images([\\/])/i.exec(p)
   if (!m) return null
-  return p.slice(0, m.index) + `${m[1]}.hive${m[2]}${ATTACHMENTS_DIR}${m[3]}` + p.slice(m.index + m[0].length)
+  return p.slice(0, m.index) + `${m[1]}.combwork${m[2]}${ATTACHMENTS_DIR}${m[3]}` + p.slice(m.index + m[0].length)
 }
 
 /** Whether a path is already in a session host's attachments folder (or its old one): attached again as it is. */
-export const inAttachmentsFolder = (p: string): boolean => /[\\/]\.hive[\\/](attachments|images)[\\/]/i.test(p)
+export const inAttachmentsFolder = (p: string): boolean => /[\\/]\.combwork[\\/](attachments|images)[\\/]/i.test(p)

@@ -8,7 +8,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { readCard, writeCard } from './boardDb'
 
-const base = tempDir('hive-review-')
+const base = tempDir('cw-review-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -28,8 +28,8 @@ const betaAgent = as('b1', 'Beta', 'beta')
 
 function project(ws: string, name: string, agents: { id: string; name: string }[]): string {
   const p = join(ws, name)
-  mkdirSync(join(p, '.hive'), { recursive: true })
-  writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents }))
+  mkdirSync(join(p, '.combwork'), { recursive: true })
+  writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents }))
   return p
 }
 
@@ -266,7 +266,7 @@ describe('reviewing a card', () => {
     expect(ended).toContain(mine.number)
     const a = await run(() => tasks.getTask(mine.number))
     expect([a.review, a.column, a.agent]).toEqual([undefined, 'review', 'c1'])
-    expect(history(a).at(-1)).toBe('Hive: Review by Reviewer stopped: its session ended')
+    expect(history(a).at(-1)).toBe('Combwork: Review by Reviewer stopped: its session ended')
     expect((await run(() => tasks.getTask(theirs.number))).review?.agent).toBe('t1')
     // Ending again does nothing.
     expect(await run(() => tasks.endReviews('alpha', 'r1', 'its session ended', w))).toEqual([])
@@ -287,7 +287,7 @@ describe('reviewing a card', () => {
     expect(ended).not.toContain(theirs.number)
     const a = await run(() => tasks.getTask(mine.number))
     expect([a.review, a.column, a.agent]).toEqual([undefined, 'review', 'c1'])
-    expect(history(a).at(-1)).toBe('Hive: Review by Reviewer stopped: its session ended')
+    expect(history(a).at(-1)).toBe('Combwork: Review by Reviewer stopped: its session ended')
     expect((await run(() => tasks.getTask(theirs.number))).review?.agent).toBe('t1')
     // A reviewer whose session started between the listing and its card's change keeps its review.
     const started = await done('Started meanwhile')

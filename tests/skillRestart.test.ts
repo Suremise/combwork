@@ -8,7 +8,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-skill-restart-')
+const base = tempDir('cw-skill-restart-')
 process.env.CLAUDE_CONFIG_DIR = join(base, 'claude-home')
 process.env.CODEX_HOME = join(base, 'codex-home')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -18,7 +18,7 @@ const { sessions } = await import('../src/main/sessions')
 
 const wsPath = join(base, 'ws')
 const project = join(wsPath, 'alpha')
-const skills = join(wsPath, '.hive', 'skills')
+const skills = join(wsPath, '.combwork', 'skills')
 const agent = { id: 'a1', name: 'Agent 1', provider: 'claude-code' as const }
 const s = sessions as unknown as { live: Map<string, { state: Record<string, unknown> }> }
 let w: ReturnType<typeof createWorkspaceService>
@@ -59,7 +59,7 @@ async function askedForRestart(): Promise<void> {
   expect(await needsRestart()).toBe(true)
 }
 
-/** One of Hive's skills copied into the workspace's. */
+/** One of Combwork's skills copied into the workspace's. */
 const addSkill = (name: string): void => cpSync(join(resolve('resources/skills'), name), join(skills, name), { recursive: true })
 
 /** A skill a test added, removed, with the refresh its removal's watch scheduled run (none if it wasn't there). */
@@ -77,8 +77,8 @@ async function removedSkill(name: string): Promise<void> {
 
 beforeAll(async () => {
   for (const name of ['handover', 'work-on-card']) cpSync(join(resolve('resources/skills'), name), join(skills, name), { recursive: true })
-  mkdirSync(join(project, '.hive'), { recursive: true })
-  writeFileSync(join(project, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [agent] }))
+  mkdirSync(join(project, '.combwork'), { recursive: true })
+  writeFileSync(join(project, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [agent] }))
   w = createWorkspaceService()
   w.setLiveProvider((p, cfg, scope) => sessions.liveInfo(p, cfg, scope))
   await w.open(wsPath)
@@ -96,9 +96,9 @@ beforeEach(async () => {
 describe('a changed workspace skill asks running agents for a restart (HI-2268)', () => {
   it('an unchanged skill asks for nothing', async () => {
     expect(await needsRestart()).toBe(false)
-    // Something else in .hive changing (a shared note) isn't a skill change.
-    mkdirSync(join(wsPath, '.hive', 'shared'), { recursive: true })
-    writeFileSync(join(wsPath, '.hive', 'shared', 'note.md'), '# A note\n')
+    // Something else in .combwork changing (a shared note) isn't a skill change.
+    mkdirSync(join(wsPath, '.combwork', 'shared'), { recursive: true })
+    writeFileSync(join(wsPath, '.combwork', 'shared', 'note.md'), '# A note\n')
     await w.refreshesSettled()
     expect(await needsRestart()).toBe(false)
   })

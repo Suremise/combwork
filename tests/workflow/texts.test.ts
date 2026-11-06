@@ -1,6 +1,6 @@
 // The workflow core's text in every language (#1264, SPEC §16.8.3): each refusal's three sentences render in each locale
 // with sample values (no placeholder left, no English where a translation exists), the names in their values (a stage,
-// a move, a rule) and what a platform couldn't read shown through their own messages, and Hive's For you requests kept
+// a move, a rule) and what a platform couldn't read shown through their own messages, and Combwork's For you requests kept
 // as data beside their English.
 import { afterEach, describe, expect, it } from 'vitest'
 import { fmt, setLanguage, tr } from '../../src/shared/i18n'
@@ -33,6 +33,9 @@ const SAMPLE: RefusalValues = {
   waiting: 'AM-12/s44',
   step: 'followUp',
   minutes: 12,
+  // review.inProgress (HI-2487): who has the review (an agent, by name; the user's branch: its own test).
+  who: 'agent',
+  reviewer: 'HR2',
   files: 'src/a.ts',
   path: 'node_modules/pad/index.js',
   folder: 'D:\\work\\am',
@@ -57,7 +60,7 @@ const SAMPLE: RefusalValues = {
   rules: 'submit.checksPassed, approval.given',
   key: 'AM-12',
   earlier: 'AM-11',
-  line: 'hive/b1',
+  line: 'cw/b1',
   alias: '#1061',
   what: workflowText(UNREADABLE.head, { where: 'D:\\work\\am' }),
   rule: 'submit.checksPassed',
@@ -100,8 +103,8 @@ describe('the workflow text in every locale', () => {
 
   it("renders a submit.checksPassed refusal recorded before its text took the last run's reason, in every locale (HR1's #1654 round 1)", async () => {
     // A Refused fact's values as they were stored then: no why, files or copy.
-    const before = { card: 'AM-12', check: 'lint', revision: 'a3f2c1d', command: 'hive-progress --check lint --card AM-12' }
-    expect(refusal('submit.checksPassed', before)).toMatchObject({ message: "Review refused: lint hasn't passed on a3f2c1d.", next: 'Run hive-progress --check lint --card AM-12, then submit again.' })
+    const before = { card: 'AM-12', check: 'lint', revision: 'a3f2c1d', command: 'cw-progress --check lint --card AM-12' }
+    expect(refusal('submit.checksPassed', before)).toMatchObject({ message: "Review refused: lint hasn't passed on a3f2c1d.", next: 'Run cw-progress --check lint --card AM-12, then submit again.' })
     for (const code of LOCALES) {
       setLanguage(code, await loadCatalogue(code), code)
       const shown = refusalLines('submit.checksPassed', before, WINDOW)
@@ -109,7 +112,7 @@ describe('the workflow text in every locale', () => {
         expect(line, code).not.toMatch(/[{}]/)
         expect(line, code).toContain('lint')
       }
-      expect(shown.next, code).toContain('hive-progress --check lint --card AM-12')
+      expect(shown.next, code).toContain('cw-progress --check lint --card AM-12')
       // A value it has is kept: the new reason shows.
       expect(refusalLines('submit.checksPassed', { ...before, why: 'changed', files: 'src/a.ts', copy: 'yes' }, WINDOW).message, code).toContain('src/a.ts')
     }
@@ -134,6 +137,27 @@ describe('the workflow text in every locale', () => {
     }
   })
 
+  it("renders both branches of review.inProgress's {who} select in every locale: the user's in each language's words, an agent's by its name (HI-2487, HR1's round 2)", async () => {
+    // runtime.ts's reviewTaken: the user's review is who 'user' with no name; an agent's is who 'agent' with its name.
+    const user = { card: 'AM-12', who: 'user', reviewer: '', submission: 40, minutes: 3 }
+    const agent = { card: 'AM-12', who: 'agent', reviewer: 'HR2', submission: 40, minutes: 3 }
+    expect(refusal('review.inProgress', user)).toMatchObject({ message: "The user is reviewing AM-12's submission 40, and has been for 3 minutes.", next: "Leave it to the user: don't review AM-12 or give it a verdict." })
+    expect(refusal('review.inProgress', agent)).toMatchObject({ message: "HR2 is reviewing AM-12's submission 40, and has been for 3 minutes.", next: "Leave it to HR2: don't review AM-12 or give it a verdict." })
+    for (const code of LOCALES) {
+      setLanguage(code, await loadCatalogue(code), code)
+      const [u, a] = [refusalLines('review.inProgress', user, WINDOW), refusalLines('review.inProgress', agent, WINDOW)]
+      for (const line of [u.message, u.next, a.message, a.next]) {
+        expect(line, code).not.toMatch(/[{}]/)
+        expect(line, code).toContain('AM-12')
+        expect(line, code).not.toMatch(/the user/i)
+      }
+      expect(a.message, code).toContain('HR2')
+      expect(a.next, code).toContain('HR2')
+      expect(u.message, code).not.toContain('HR2')
+      expect(u.message, code).not.toBe(a.message)
+    }
+  })
+
   it('shows the names in a refusal through their messages in the window, and intents as they are to agents', async () => {
     const agents = refusal('move.notFromHere', SAMPLE)
     expect(agents.message).toBe("AM-12 is in Approved: start review isn't possible from there.")
@@ -144,7 +168,7 @@ describe('the workflow text in every locale', () => {
     expect(refusal('move.notFromHere', { ...SAMPLE, moves: '' }).next).toBe('Nothing waits to be done there now.')
     // A start or submit on a card in Done (HI-2227): more work the user asked for takes it back to Doing, a separate
     // follow-up is a new card; any other move refused there (an answer to a closed request) keeps the line above.
-    for (const move of ['start', 'submit']) expect(refusal('move.notFromHere', { ...SAMPLE, stage: 'done', move, moves: '' }).next).toBe("It's finished. More work on it that the user asked for: move it back with hive_update_task (column: doing), then work on it as usual. Separate follow-up work goes on a new card (hive_create_task).")
+    for (const move of ['start', 'submit']) expect(refusal('move.notFromHere', { ...SAMPLE, stage: 'done', move, moves: '' }).next).toBe("It's finished. More work on it that the user asked for: move it back with cw_update_task (column: doing), then work on it as usual. Separate follow-up work goes on a new card (cw_create_task).")
     expect(refusalLines('move.notFromHere', { ...SAMPLE, stage: 'done', move: 'start', moves: '' }, WINDOW).next).toBe("It's finished. More work on it that you ask for takes it back to Doing; separate follow-up work goes on a new card.")
     expect(refusal('move.notFromHere', { ...SAMPLE, stage: 'done', move: 'answer', moves: '' }).next).toBe('Nothing waits to be done there now.')
     const de = await loadCatalogue('de')
@@ -193,7 +217,7 @@ describe("what a platform couldn't read", () => {
     expect(u.what).toBe('the work in site: it has over 20,000 files')
     expect(u.whatText).toEqual({ id: 'workflow.unreadable.deliverables', values: { project: 'site', n: 20000 } })
     const r = refusal('platform.unknown', { card: 'AM-12', what: unknown(UNREADABLE.head, { where: 'D:\\work\\am' }).whatText!, rule: 'submit.checksPassed' })
-    expect(r.message).toBe("AM-12: Hive couldn't read the latest commit in D:\\work\\am, so the rule submit.checksPassed can't be checked.")
+    expect(r.message).toBe("AM-12: Combwork couldn't read the latest commit in D:\\work\\am, so the rule submit.checksPassed can't be checked.")
     const fr = await loadCatalogue('fr')
     setLanguage('fr', fr, 'fr')
     const shown = refusalLines('platform.unknown', r.values, WINDOW)
@@ -215,10 +239,10 @@ describe("what a platform couldn't read", () => {
     const failed = { unknown: { revision: head.what, base: UNREAD_NOTES.noTarget, files: UNREAD_NOTES.noBaseOrHead }, unknownText: { revision: head.whatText! } }
     const lines = (): string[] => [tr(revision, unreadWhy('revision', before, format)), tr(files, unreadWhy('files', before, format)), tr(notRead, unreadWhy('line', before, format)), tr(revision, unreadWhy('revision', failed, format)), tr(notRead, unreadWhy('base', failed, format)), tr(files, unreadWhy('files', failed, format))]
     expect(lines()).toEqual([
-      "No revision recorded: Hive didn't read one when the card went to Review. Its next submission reads it again.",
+      "No revision recorded: Combwork didn't read one when the card went to Review. Its next submission reads it again.",
       'Files not read',
       'Not read when its work started',
-      "Revision not read when it was submitted: Hive couldn't read the latest commit in D:\\work\\am. Its next submission reads it again.",
+      "Revision not read when it was submitted: Combwork couldn't read the latest commit in D:\\work\\am. Its next submission reads it again.",
       'Not read: there was no target branch to start from',
       'Files not read: there was no base or revision to compare'
     ])
@@ -233,7 +257,7 @@ describe("what a platform couldn't read", () => {
     expect(unreadWhy('revision', { unknown: { revision: 'cannot read repository HEAD' }, unknownText: {} }, format)).toEqual({ note: 'other', why: 'cannot read repository HEAD' })
   })
 
-  it("an id this Hive doesn't know (a newer Hive's record) shows as nothing rather than failing", () => {
+  it("an id this Combwork doesn't know (a newer Combwork's record) shows as nothing rather than failing", () => {
     expect(workflowLine({ id: 'workflow.unreadable.fromTheFuture' }, (m) => tr(m))).toBeNull()
     expect(workflowEnglish({ id: 'workflow.unreadable.fromTheFuture' })).toBe('workflow.unreadable.fromTheFuture')
   })

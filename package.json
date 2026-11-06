@@ -1,16 +1,16 @@
 {
-  "name": "hive",
-  "productName": "Hive Desktop",
-  "version": "1.0.0",
-  "description": "Hive Desktop — a streamlined, agent-first desktop workspace for AI-assisted coding.",
+  "name": "combwork",
+  "productName": "Combwork",
+  "version": "1.1.0",
+  "description": "Combwork — a streamlined, agent-first desktop workspace for AI-assisted coding.",
   "main": "./out/main/index.js",
   "author": "Darren Marshall",
   "license": "MIT",
   "private": true,
-  "homepage": "https://github.com/Suremise/hive-desktop",
+  "homepage": "https://github.com/Suremise/combwork",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Suremise/hive-desktop.git"
+    "url": "https://github.com/Suremise/combwork.git"
   },
   "scripts": {
     "dev": "electron-vite dev",
@@ -22,7 +22,8 @@
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "vitest run",
-    "check:repo": "node scripts/i18nGuard.mjs && vitest run tests/agentsmd.test.ts tests/checkRepo.test.ts tests/controlCharacters.test.ts tests/dbWrites.test.ts tests/exitLog.test.ts tests/fakeCopilotApi.test.ts tests/focusedPick.test.ts tests/guidance.test.ts tests/i18n.test.ts tests/i18nFormatting.test.ts tests/legacyWorktreeGate.test.ts tests/licenses.test.ts tests/lineEndings.test.ts tests/modeDescriptions.test.ts tests/networkDecoding.test.ts tests/searchBoxes.test.ts tests/skillDescriptions.test.ts tests/skills.test.ts tests/tempDir.test.ts tests/testQuiet.test.ts tests/tips.test.ts tests/trash.test.ts tests/userGuide.test.ts tests/windowsExits.test.ts && vitest run tests/admission.test.ts tests/bundled.test.ts tests/e2esuites.test.ts tests/folderProcesses.test.ts tests/i18nCatalogues.test.ts -t \"^(the (e2e suite list|suites a change needs|run context|rule's owner)|test tooling ends processes by identity)|bundled skill and mode that ships now|(up to date with|message in) Hive's source|Hive's translations pass\"",
+    "check:names": "node tests/oldNames.mjs",
+    "check:repo": "node scripts/i18nGuard.mjs && node scripts/agentTextGuard.mjs && node scripts/agentTextExtract.mjs --check && node tests/oldNames.mjs --diff && vitest run tests/agentsmd.test.ts tests/checkRepo.test.ts tests/controlCharacters.test.ts tests/dbWrites.test.ts tests/exitLog.test.ts tests/fakeCopilotApi.test.ts tests/focusedPick.test.ts tests/guidance.test.ts tests/i18n.test.ts tests/i18nFormatting.test.ts tests/legacyWorktreeGate.test.ts tests/licenses.test.ts tests/lineEndings.test.ts tests/modeDescriptions.test.ts tests/networkDecoding.test.ts tests/presenceChecks.test.ts tests/searchBoxes.test.ts tests/skillDescriptions.test.ts tests/skills.test.ts tests/tempDir.test.ts tests/testArea.test.ts tests/testQuiet.test.ts tests/tips.test.ts tests/trash.test.ts tests/userGuide.test.ts tests/windowsExits.test.ts && vitest run tests/admission.test.ts tests/bundled.test.ts tests/e2esuites.test.ts tests/folderProcesses.test.ts tests/i18nCatalogues.test.ts -t \"^(the (e2e suite list|suites a change needs|run context|rule's owner)|test tooling ends processes by identity)|bundled skill and mode that ships now|(up to date with|message in) Combwork's source|Combwork's translations pass\"",
     "icons": "node scripts/build-icons.mjs",
     "dist": "node scripts/dist.mjs",
     "dist:dir": "npm run build && electron-builder --win --dir --publish never",
@@ -32,8 +33,11 @@
     "e2e": "node tests/e2e/run.mjs",
     "e2e:concurrency": "node tests/e2e/concurrency.mjs",
     "test:clean": "node tests/e2e/clean.mjs",
+    "test:move-area": "node tests/moveTestArea.mjs",
     "test:waits": "node scripts/testWaits.mjs",
     "sandbox-checks": "node tests/sandbox/checks.cjs",
+    "agent-text:extract": "node scripts/agentTextExtract.mjs",
+    "agent-text:guard": "node scripts/agentTextGuard.mjs",
     "i18n:extract": "node scripts/i18nExtract.mjs",
     "i18n:check": "node scripts/i18nCheck.mjs",
     "i18n:coverage": "node scripts/i18nCoverage.mjs",
@@ -48,6 +52,7 @@
     "chokidar": "^5.0.0",
     "electron-updater": "^6.8.9",
     "fflate": "^0.8.3",
+    "intl-messageformat": "12.1.2",
     "js-yaml": "^4.3.2",
     "marked": "^18.0.14",
     "smol-toml": "^1.9.0",
@@ -67,7 +72,7 @@
     "@xterm/addon-web-links": "^0.12.0",
     "@xterm/addon-webgl": "^0.19.0",
     "@xterm/xterm": "^6.0.0",
-    "dompurify": "^3.4.16",
+    "dompurify": "^3.4.17",
     "electron": "^44.10.0",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
@@ -79,18 +84,18 @@
     "react-dom": "^19.3.0",
     "sharp": "^0.35.5",
     "typescript": "^7.0.2",
-    "vite": "^7.3.6",
-    "vitest": "^5.0.2"
+    "vite": "^7.3.7",
+    "vitest": "^5.0.5"
   },
   "allowScripts": {
     "esbuild@0.25.12": true,
     "esbuild@0.28.2": true,
     "electron-winstaller@5.4.0": true
   },
-  "//overrides": "#1141: monaco-editor 0.57.0 pins dompurify 3.4.15 (two IN_PLACE advisories). The override fixes npm's copy; the renderer build's hive-monaco-dompurify plugin (electron.vite.config.ts) makes Monaco's own bundled copy Hive's dompurify too. Remove both once Monaco pins 3.4.16 or later: tests/monacoDompurify.test.ts fails then.",
+  "//overrides": "#1141: monaco-editor 0.57.0 pins dompurify 3.4.15 (two IN_PLACE advisories). The override fixes npm's copy; the renderer build's cw-monaco-dompurify plugin (electron.vite.config.ts) makes Monaco's own bundled copy Combwork's dompurify too. Remove both once Monaco pins 3.4.17 or later (HI-2421: 3.4.16 has advisories too): tests/monacoDompurify.test.ts fails then.",
   "overrides": {
     "monaco-editor": {
-      "dompurify": "3.4.16"
+      "dompurify": "3.4.17"
     }
   }
 }

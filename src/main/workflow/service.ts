@@ -7,7 +7,7 @@
 //
 // Its options are the project's resolved ones (rulesets.ts: global → workspace → project), read again at each call
 // here; and whether reconciliation acts on what it observes is the Advanced switch "Workflow rules are enforced"
-// (`hive.workflow.enforce`), read at each use: off, Hive is as P3 left it (facts recorded, nothing refused or moved).
+// (`cw.workflow.enforce`), read at each use: off, Combwork is as P3 left it (facts recorded, nothing refused or moved).
 
 import { resolve as resolvePath } from 'path'
 import { projectAgents } from '../../shared/defaults'
@@ -16,7 +16,7 @@ import { FOCUSED_PICK_SECONDS, WORKFLOW_ENFORCE } from '../../shared/advanced'
 import { childEnv } from '../ptyHost'
 import { boardSavepoint, boardWrite } from '../boardStore'
 import { samePlace } from '../fsutil'
-import { hiveError } from '../hiveError'
+import { combworkError } from '../combworkError'
 import { observer } from '../platform/observe'
 import { detect } from '../platform/registry'
 import { isUnknown } from '../platform/types'
@@ -53,7 +53,16 @@ export function setRunsGoing(fn: ((project: string, agent: string) => string[]) 
 export const agentRunsGoing = (project: string, agent: string): string[] => runsGoing?.(project, agent) ?? []
 
 /**
- * What runs a target's queue in this Hive now (queueHost's queueLive: the queue's order, which card reads and refusals
+ * Whether an agent's session runs now (HI-2487: a review it has in progress holds another agent's start of it until it
+ * stops). Given by the app as it starts (sessions are its; none running in unit tests).
+ */
+let agentRunning: ((project: string, agent: string) => boolean) | null = null
+export function setAgentRunning(fn: ((project: string, agent: string) => boolean) | null): void {
+  agentRunning = fn
+}
+
+/**
+ * What runs a target's queue in this Combwork now (queueHost's queueLive: the queue's order, which card reads and refusals
  * give agents, #1354). Given by the app as it starts (none in unit tests: nothing runs a queue here).
  */
 let queueLiveOf: ((ws: WorkspaceService, project: string, target: string) => QueueLive) | null = null
@@ -119,11 +128,11 @@ export async function workflowFor(ws: WorkspaceService, projectPath: string): Pr
   const wsPath = ws.path
   const life = ws.lifetime
   const open = (): boolean => !!wsPath && !life.aborted && ws.lifetime === life && ws.path === wsPath
-  if (!wsPath || !open()) throw hiveError(M.closed, undefined, { kind: 'conflict' })
+  if (!wsPath || !open()) throw combworkError(M.closed, undefined, { kind: 'conflict' })
   const project = projectOf(ws, projectPath)
   if (!project) return null
   const resolved = await resolve(ws, project)
-  if (!open()) throw hiveError(M.closed, undefined, { kind: 'conflict' })
+  if (!open()) throw combworkError(M.closed, undefined, { kind: 'conflict' })
   let byProject = instances.get(ws)
   if (!byProject) instances.set(ws, (byProject = new Map()))
   const key = keyOf(project.path)
@@ -139,7 +148,7 @@ export async function workflowFor(ws: WorkspaceService, projectPath: string): Pr
   inst.wf.none.setExcluded(resolved.options.excluded)
   if (resolved.options.platform === 'none') {
     await syncHashes(inst, project.path)
-    if (!open()) throw hiveError(M.closed, undefined, { kind: 'conflict' })
+    if (!open()) throw combworkError(M.closed, undefined, { kind: 'conflict' })
   }
   return inst.wf
 }
@@ -180,7 +189,7 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
   const alive = (): boolean => !life.aborted && ws.lifetime === life && ws.path === wsPath
   const store = FactStore.forBoard(ws, { project: project.name, key: project.name, projectId: () => ws.projectIdsNow().byPath.get(resolvePath(project.path).toLowerCase()) ?? null })
   return new Workflow({
-    // The project's cards by their keys (#1294: its key now, #1219's; its name for what has no key, and for Hive-Card
+    // The project's cards by their keys (#1294: its key now, #1219's; its name for what has no key, and for card
     // trailers written before, as the adoption's store keyed them).
     store,
     project: project.path,
@@ -194,6 +203,12 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     // Actions run by the actions worker after the commit, never here.
     autoRun: false,
     runsOf: (agent) => runsGoing?.(project.path, agent) ?? [],
+    // HI-2487: the project's agents whose sessions run, who may have a review in progress that another's start waits for.
+    reviewersPresent: async () => {
+      const running = agentRunning
+      if (!running) return new Map()
+      return new Map(projectAgents(await ws.projectConfig(project.path)).filter((a) => running(project.path, a.id)).map((a) => [a.id, a.name]))
+    },
     // G16 (#1481): the file locks seen before an intent are in the cards' records before it reads them.
     locksSettled: () => locksSettled(ws, project.path),
     // #1651: a check run that has finished is in its card's facts before a submit reads them.
@@ -203,7 +218,7 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     // A branch rename Repair recorded and hasn't finished (#1305): its new name, which a card on the old line follows.
     pendingRename: async (line) => (await ws.projectConfig(project.path)).pendingBranchRenames?.find((r) => r.from.toLowerCase() === line.toLowerCase())?.to ?? null,
     // A move Repair hasn't recorded (#1343): the workspace's or the project's last folder isn't where it is now.
-    // Its Git repository gone, or another version control found (#1419, S20): what Hive offers in its place is None.
+    // Its Git repository gone, or another version control found (#1419, S20): what Combwork offers in its place is None.
     repositoryGone: () => detect(project.path).platform !== 'git',
     movePending: async () => {
       const moved = (last: string | undefined, now: string): boolean => !!last && !samePlace(last, now)
@@ -223,7 +238,7 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     // write a part of it undone on its own if it throws (#1265: a batch's other cards, the caller's change, go on). The
     // requests for the user it writes (`notify`) are noted on their cards in it too: their durable notice (#1266).
     locked: (fn) => {
-      if (!alive()) return Promise.reject(hiveError(M.closed, undefined, { kind: 'conflict' }))
+      if (!alive()) return Promise.reject(combworkError(M.closed, undefined, { kind: 'conflict' }))
       return boardWrite(
         ws,
         () =>

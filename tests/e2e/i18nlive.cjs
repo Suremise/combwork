@@ -1,7 +1,7 @@
 // A change of language while the window is open (#795): the command palette, already open, relabels its rows without
 // a keystroke, and Settings → Keyboard Shortcuts keeps its clashes by command, not by label: a language change gives
 // no command a clash with itself, and two commands whose names translate alike still show a real clash. A stopped
-// session's transcript, open, shows Hive's own notices in the new language at once, with its file unchanged (#797).
+// session's transcript, open, shows Combwork's own notices in the new language at once, with its file unchanged (#797).
 // Project Settings opened in another language shows its sections (the list, the heading and its description) and its
 // rows in it, and follows a change of language while it is open (#793, E1's catalogue in lane C's view). A connection's
 // dialog names its permission modes in it, their values the ids, and a running agent's mode menu says what a mode does
@@ -14,11 +14,11 @@ const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 
-// A stopped session of a project, as Hive keeps its backup (compressed, #1110): a prompt, then the user interrupting it.
+// A stopped session of a project, as Combwork keeps its backup (compressed, #1110): a prompt, then the user interrupting it.
 const ws = path.join(lib.WORK, 'i18nlive-ws')
 const proj = path.join(ws, 'demo')
 const SESSION = '33333333-aaaa-bbbb-cccc-000000000003' // synthetic
-const transcript = path.join(proj, '.hive', 'sessions', `${SESSION}.jsonl.gz`)
+const transcript = path.join(proj, '.combwork', 'sessions', `${SESSION}.jsonl.gz`)
 fs.rmSync(ws, { recursive: true, force: true })
 fs.mkdirSync(path.dirname(transcript), { recursive: true })
 fs.writeFileSync(
@@ -32,7 +32,7 @@ fs.writeFileSync(
       .join('\n') + '\n'
   )
 )
-fs.writeFileSync(path.join(proj, '.hive', 'sessions.json'), JSON.stringify({ version: 1, sessions: [{ id: SESSION, agent: 'claude-code', name: 'Interrupted', createdAt: '2026-10-14T10:00:00.000Z', lastActiveAt: '2026-10-14T10:01:00.000Z', archived: false }] }))
+fs.writeFileSync(path.join(proj, '.combwork', 'sessions.json'), JSON.stringify({ version: 1, sessions: [{ id: SESSION, agent: 'claude-code', name: 'Interrupted', createdAt: '2026-10-14T10:00:00.000Z', lastActiveAt: '2026-10-14T10:01:00.000Z', archived: false }] }))
 
 const HUNG_MS = 15000
 let pass = 0
@@ -46,10 +46,10 @@ const check = (name, ok, extra = '') => {
 ;(async () => {
   const { app, page, inv } = await lib.launch({ userData: path.join(lib.WORK, 'i18nlive-profile') })
   try {
-    const command = (id, ...args) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'menu-command', command: id, args })
+    const command = (id, ...args) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'menu-command', command: id, args })
     const base = (await inv('app:info')).language
     /** The window shown in a test language, as main sends a change of language. */
-    const speak = (code, messages) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language: { ...base, code, locale: code, messages } })
+    const speak = (code, messages) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language: { ...base, code, locale: code, messages } })
 
     // The palette, open, in English.
     await command('palette.show')
@@ -80,7 +80,7 @@ const check = (name, ok, extra = '') => {
     await inv('settings:setKeybinding', 'project.goto', null)
     check('and none once the shortcut is taken off again', !!(await lib.until(async () => (await warnings('palette.show')) === 0, HUNG_MS)))
 
-    // A stopped session's transcript, open in English: its notice is Hive's own.
+    // A stopped session's transcript, open in English: its notice is Combwork's own.
     await speak('en', {})
     await lib.openWorkspace(inv, page, ws)
     await page.getByText('demo', { exact: true }).first().click()
@@ -161,7 +161,7 @@ const check = (name, ok, extra = '') => {
     const signedOut = { provider: 'claude-code', runId: 'i18nlive-signin', projectPath: proj, agentId: signer.id, agentName: 'Signer', cwd: proj, sessionId: '', status: 'signin', runtime: { lifecycle: 'signin', maintenance: null, attention: null, composer: 'free' }, startedAt: new Date().toISOString(), launchSignature: '', unseen: false, signIn: { message: 'Login expired · Please run /login', since: new Date().toISOString() } }
     const tipSays = (want) =>
       lib.until(async () => {
-        await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'session-status', state: signedOut })
+        await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'session-status', state: signedOut })
         const tip = await lib.hoverTip(page, tab, (t) => t.includes(want), 3000)
         return tip.includes(want) && tip
       }, HUNG_MS)
@@ -179,7 +179,7 @@ const check = (name, ok, extra = '') => {
     const menuText = async () => (await page.locator('.menu .menu-item').allInnerTexts().catch(() => [])).join(' | ')
     await speak('de', DE_MODES)
     const opened = await lib.until(async () => {
-      await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'session-status', state: running })
+      await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'session-status', state: running })
       if (!(await badge.evaluate((b) => b.classList.contains('live')).catch(() => false))) return false
       if (!(await page.locator('.menu').count())) await badge.click().catch(() => undefined)
       return (await menuText()).includes(DE_MODES['agents.claude.autoDescription'])

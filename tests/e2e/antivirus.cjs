@@ -1,6 +1,6 @@
-// Antivirus scanning of the workspace (#316), on fixtures only: HIVE_TEST_ANTIVIRUS stands in for every PowerShell call
+// Antivirus scanning of the workspace (#316), on fixtures only: CW_TEST_ANTIVIRUS stands in for every PowerShell call
 // (the read-only probe and the elevated add, remove and check, on a simulated exclusion list), and
-// HIVE_TEST_ANTIVIRUS_LOG records them, so this suite never reads or changes the machine's Defender settings. The
+// CW_TEST_ANTIVIRUS_LOG records them, so this suite never reads or changes the machine's Defender settings. The
 // workspace's folders (resolved absolute paths, the worktrees folder only once it exists, the test area for a dev
 // build); Settings → Workspace's status; Add and Remove asking for exactly the folders shown, Add skipping one the
 // user had already excluded and Remove leaving it, a change refused when the folders changed after the user was asked;
@@ -9,7 +9,7 @@
 // when several agents run, again when a worktree agent adds its folder, a reminder after its spacing (a fixture's),
 // never after "Don't ask again"; and a test copy
 // without a fixture refusing to touch Defender. Screenshots in both themes.
-// Dev build only (#1580): HIVE_TEST_ANTIVIRUS (a seam a packaged build ignores) stands in for every scan, and Tree is a
+// Dev build only (#1580): CW_TEST_ANTIVIRUS (a seam a packaged build ignores) stands in for every scan, and Tree is a
 // 0.9 worktree agent (agents:testLegacy, refused by a packaged build), making the worktrees folder.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -47,10 +47,10 @@ const check = (name, ok, extra = '') => {
 
 ;(async () => {
   const root = fs.realpathSync.native((fs.mkdirSync(ws, { recursive: true }), ws))
-  const tests = fs.realpathSync.native(path.join(process.env.LOCALAPPDATA, 'hive-test'))
+  const tests = fs.realpathSync.native(path.join(process.env.LOCALAPPDATA, 'combwork-test'))
   // The user had already excluded the workspace itself (as administrator rights see Defender's list).
   setFixture({ probe: probe(), elevated: { exclusions: [root] } })
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_TEST_ANTIVIRUS: fixture, HIVE_TEST_ANTIVIRUS_LOG: callLog, ...claude }, viewport: { width: 1400, height: 950 } })
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_TEST_ANTIVIRUS: fixture, CW_TEST_ANTIVIRUS_LOG: callLog, ...claude }, viewport: { width: 1400, height: 950 } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.openWorkspace(inv, page, ws)
   const shot = (name) => page.screenshot({ path: path.join(lib.WORK, `antivirus-${name}.png`) })
@@ -81,7 +81,7 @@ const check = (name, ok, extra = '') => {
   setFixture({ probe: probe(), elevated: { exclusions: [root], error: 'Something went wrong', unlisted: true } })
   await add()
   await dialog.locator('.btn.primary').click()
-  check('a failed run that couldn’t read Defender’s list: said, and the folders stay unknown (never “Scanned”)', !!(await lib.until(async () => /refused the change/.test(await panel.innerText()), 5000)) && (await rows.allInnerTexts()).every((t) => /Unknown/.test(t)) && !(await inv('antivirus:status', false)).paths.some((p) => p.addedByHive), await panel.innerText())
+  check('a failed run that couldn’t read Defender’s list: said, and the folders stay unknown (never “Scanned”)', !!(await lib.until(async () => /refused the change/.test(await panel.innerText()), 5000)) && (await rows.allInnerTexts()).every((t) => /Unknown/.test(t)) && !(await inv('antivirus:status', false)).paths.some((p) => p.addedByCombwork), await panel.innerText())
 
   // Defender's list redacted even with administrator rights: which exclusions exist can't be known, so nothing
   // changes; and its "N/A" answer, from Add or from a check, never counts as a list.
@@ -115,14 +115,14 @@ const check = (name, ok, extra = '') => {
   check('…asking Defender only for the one not already excluded', JSON.stringify(changes('add-requested').at(-1)?.paths) === JSON.stringify([tests]), JSON.stringify(changes('add-requested')))
   check('…both shown excluded, as read with administrator rights', !!(await lib.until(async () => /no longer scans this folder/.test(await panel.innerText()) && (await rows.allInnerTexts()).every((t) => /Excluded/.test(t)), 5000)) && /with administrator rights/.test(await panel.innerText()), await panel.innerText())
   s = await inv('antivirus:status', false)
-  check('…only the one Hive added is Hive’s', JSON.stringify(s.paths.map((p) => p.addedByHive)) === JSON.stringify([false, true]) && s.slowed === false, JSON.stringify(s.paths))
+  check('…only the one Combwork added is Combwork’s', JSON.stringify(s.paths.map((p) => p.addedByCombwork)) === JSON.stringify([false, true]) && s.slowed === false, JSON.stringify(s.paths))
   await shot('added-dark')
 
-  // Remove: only what Hive added; the user's own exclusion stays.
-  await panel.getByRole('button', { name: 'Remove Hive’s Exclusions…' }).click()
-  const removeDialog = page.locator('.dialog', { hasText: 'Remove the exclusions Hive added?' })
+  // Remove: only what Combwork added; the user's own exclusion stays.
+  await panel.getByRole('button', { name: 'Remove Combwork’s Exclusions…' }).click()
+  const removeDialog = page.locator('.dialog', { hasText: 'Remove the exclusions Combwork added?' })
   await lib.until(async () => (await removeDialog.count()) === 1, 5000)
-  check('Remove lists only the folder Hive added, on its own line', JSON.stringify(await removeDialog.locator('.dialog-list li').allInnerTexts()) === JSON.stringify([tests]) &&!(await removeDialog.innerText()).split('\n').some((l) => l.trim() === root), await removeDialog.innerText())
+  check('Remove lists only the folder Combwork added, on its own line', JSON.stringify(await removeDialog.locator('.dialog-list li').allInnerTexts()) === JSON.stringify([tests]) &&!(await removeDialog.innerText()).split('\n').some((l) => l.trim() === root), await removeDialog.innerText())
   await removeDialog.locator('.btn.primary').click()
   check('…one elevated call, for it alone', !!(await lib.until(async () => changes('remove').length === 1, 10000)) && JSON.stringify(changes('remove')[0].paths) === JSON.stringify([tests]), JSON.stringify(changes('remove')))
   check('…the user’s exclusion stays: the workspace excluded, the test area scanned again', !!(await lib.until(async () => /Excluded/.test(await rowText(0)) && /Scanned/.test(await rowText(1)), 5000)), await panel.innerText())
@@ -131,11 +131,11 @@ const check = (name, ok, extra = '') => {
   setFixture({ probe: probe(), elevated: { cancelled: true } })
   await add()
   await dialog.locator('.btn.primary').click()
-  check('a declined administrator prompt: nothing changed, and it says so', !!(await lib.until(async () => /prompt was declined/.test(await panel.innerText()), 5000)) && !(await inv('antivirus:status', false)).paths.some((p) => p.addedByHive))
+  check('a declined administrator prompt: nothing changed, and it says so', !!(await lib.until(async () => /prompt was declined/.test(await panel.innerText()), 5000)) && !(await inv('antivirus:status', false)).paths.some((p) => p.addedByCombwork))
   setFixture({ probe: probe(), elevated: { policy: true } })
   await add()
   await dialog.locator('.btn.primary').click()
-  check('a policy keeping local exclusions from applying: said, not counted as added', !!(await lib.until(async () => /organisation/.test(await panel.innerText()), 5000)) && !(await inv('antivirus:status', false)).paths.some((p) => p.addedByHive), await panel.innerText())
+  check('a policy keeping local exclusions from applying: said, not counted as added', !!(await lib.until(async () => /organisation/.test(await panel.innerText()), 5000)) && !(await inv('antivirus:status', false)).paths.some((p) => p.addedByCombwork), await panel.innerText())
 
   // Another antivirus, ReFS and a Dev Drive, not Windows.
   const checkAgain = async () => {
@@ -318,7 +318,7 @@ const check = (name, ok, extra = '') => {
   // A test copy without a fixture never asks Defender, and refuses to change it.
   const callsBefore = calls().length
   await app.evaluate(() => {
-    delete process.env.HIVE_TEST_ANTIVIRUS
+    delete process.env.CW_TEST_ANTIVIRUS
   })
   s = await inv('antivirus:status', true)
   const refused = await inv('antivirus:prepare', 'add').then(() => null, (e) => String(e.message ?? e))

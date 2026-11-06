@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // main/assistantMode.ts with its services stood in for: what the Assistant is told when (#259, #334). A gate holds a
 // mode read or a prompt being typed, so a switch can land in the middle of a resume's check or of a delivery.
 const st = vi.hoisted(() => ({
-  home: 'C:\\ws\\.hive\\assistant',
+  home: 'C:\\ws\\.combwork\\assistant',
   live: null as { runId: string; status: string; sessionId: string } | null,
   saved: 'launch',
   record: undefined as string | undefined,
@@ -12,7 +12,7 @@ const st = vi.hoisted(() => ({
   delivering: false,
   holdRead: null as { id: string; until: Promise<void> } | null,
   holdSend: null as Promise<void> | null,
-  // Holds the next save before it has project.json's lock (still waiting for it, as Hive's file lock retries), once.
+  // Holds the next save before it has project.json's lock (still waiting for it, as Combwork's file lock retries), once.
   holdSave: null as Promise<void> | null,
   lock: Promise.resolve() as Promise<unknown>,
   onStatus: null as ((e: unknown) => void) | null
@@ -20,7 +20,7 @@ const st = vi.hoisted(() => ({
 
 vi.mock('../src/main/logger', () => ({ createLogger: () => ({ info: () => undefined, warn: () => undefined, debug: () => undefined }), userText: (s: string) => s }))
 vi.mock('../src/main/config', () => ({ config: { settings: {} } }))
-vi.mock('../src/main/events', () => ({ onHiveEvent: (fn: (e: unknown) => void) => (st.onStatus = fn) }))
+vi.mock('../src/main/events', () => ({ onCombworkEvent: (fn: (e: unknown) => void) => (st.onStatus = fn) }))
 vi.mock('../src/main/modes', () => ({
   readMode: async (id: string) => {
     if (st.holdRead?.id === id) await st.holdRead.until
@@ -37,13 +37,13 @@ vi.mock('../src/main/workspace', () => {
       get assistantHome() {
         return st.home
       },
-      // As Hive's: one writer at a time, each reading the file inside the lock.
+      // As Combwork's: one writer at a time, each reading the file inside the lock.
       mutateProjectConfig: async (_home: string, fn: (cfg: { agents: { id: string; name: string; mode?: string }[] }) => { agents?: { id: string; mode?: string }[] }) => {
         const hold = st.holdSave
         st.holdSave = null
         if (hold) await hold
         const run = st.lock.then(async () => {
-          const next = fn({ agents: [{ id: 'assistant', name: 'Hive Assistant', mode: st.saved }] })
+          const next = fn({ agents: [{ id: 'assistant', name: 'Combwork Assistant', mode: st.saved }] })
           if (next.agents) st.saved = next.agents[0].mode ?? ''
         })
         st.lock = run.catch(() => undefined)
@@ -59,15 +59,15 @@ vi.mock('../src/main/sessions', () => ({
     onAssistantResumed: () => undefined,
     liveFor: () => st.live,
     userMayBeTyping: () => false,
-    // As Hive's: one prompt at a time, and the guard checked again before Enter.
+    // As Combwork's: one prompt at a time, and the guard checked again before Enter.
     sendPrompt: async (_home: string, _agent: string, text: string, guard: () => void) => {
-      if (st.delivering) throw new Error('Hive is already typing a prompt into this agent; it is busy.')
+      if (st.delivering) throw new Error('Combwork is already typing a prompt into this agent; it is busy.')
       st.delivering = true
       try {
         guard()
         if (st.holdSend) await st.holdSend
         guard()
-        st.told.push(text.replace(/^\[Hive\] Mode: (\w+).*$/, '$1'))
+        st.told.push(text.replace(/^\[CW\] Mode: (\w+).*$/, '$1'))
       } finally {
         st.delivering = false
       }
@@ -83,7 +83,7 @@ vi.mock('../src/main/sessions', () => ({
 // dropped), typed only while it holds, received once typed, and tried again when the Assistant is next idle.
 vi.mock('../src/main/deliveries', async () => {
   const { sessions } = await import('../src/main/sessions')
-  const { onHiveEvent } = await import('../src/main/events')
+  const { onCombworkEvent } = await import('../src/main/events')
   type R = { id: string; source?: string; ref?: string; body: string; forRun?: string; meta?: Record<string, unknown> }
   type Source = { refresh?: (r: R, host: string) => Promise<{ cancel: string } | { body: string } | null>; holds?: (r: R, host: string) => boolean; received?: (r: R, host: string) => void }
   const sources = new Map<string, Source>()
@@ -115,7 +115,7 @@ vi.mock('../src/main/deliveries', async () => {
     src?.received?.(r, host)
     return true
   }
-  onHiveEvent((e: unknown) => {
+  onCombworkEvent((e: unknown) => {
     const ev = e as { type: string; state: { projectPath: string; agentId: string; status: string } }
     if (ev.type === 'session-status' && ['ready', 'finished', 'watching'].includes(ev.state.status)) setTimeout(() => void offerNow(ev.state.projectPath, ev.state.agentId), 500)
   })
@@ -146,7 +146,7 @@ beforeEach(async () => {
   sessions = (await import('../src/main/sessions')).sessions as never
   mod.initAssistantModes()
 })
-/** Hive's status event for the Assistant becoming idle: a waiting message is typed half a second later. */
+/** Combwork's status event for the Assistant becoming idle: a waiting message is typed half a second later. */
 const idleAgain = async (): Promise<void> => {
   st.onStatus?.({ type: 'session-status', state: { agentId: 'assistant', projectPath: st.home, status: 'ready' } })
   await settle(600)

@@ -1,7 +1,7 @@
 // HI-2137: where the test copy's PATH git is Git for Windows' launcher (<root>\cmd\git.exe, as a Start-menu PATH has it,
-// with no other Git folder on PATH), Hive starts the real git beneath it directly: git's trace2 ancestry shows no
+// with no other Git folder on PATH), Combwork starts the real git beneath it directly: git's trace2 ancestry shows no
 // launcher layer (git.exe < electron.exe) for the test copy's own git, and a hook, and an alias through sh run from it,
-// see the launcher's PATH folders first (/mingw64/bin, /usr/bin). Skipped where git isn't Git for Windows. Throwaway
+// see the launcher's PATH folders first (its MinGW folder's bin, such as /mingw64/bin or /ucrt64/bin, then /usr/bin). Skipped where git isn't Git for Windows. Throwaway
 // profile and workspace, quiet; no agent is started.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -29,7 +29,7 @@ function launcherOf() {
 
 /** The run context's PATH for a test copy with Git's launcher folder and no other folder that holds git. */
 function pathWithLauncher(launcher) {
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData })
   const key = Object.keys(env).find((k) => k.toUpperCase() === 'PATH')
   const rest = (env[key] ?? '').split(path.delimiter).filter((d) => d && !['git.exe', 'git.com'].some((g) => fs.existsSync(path.join(d.replace(/^"|"$/g, ''), g))))
   return [path.dirname(launcher), ...rest].join(path.delimiter)
@@ -61,28 +61,29 @@ function traced(before = new Set()) {
   fs.mkdirSync(trace, { recursive: true })
   lib.gitProject(repo)
   // An alias through sh, and a hook (sh) that runs it and says what its PATH starts with.
-  lib.git(repo, ['config', 'alias.hivedirect', '!echo alias-through-sh'])
+  lib.git(repo, ['config', 'alias.cwdirect', '!echo alias-through-sh'])
   const hook = path.join(repo, '.git', 'hooks', 'post-checkout')
-  fs.writeFileSync(hook, `#!/bin/sh\n{ echo "first=$PATH"; echo "sed=$(command -v sed)"; git hivedirect; } > "${hookOut.replace(/\\/g, '/')}"\n`)
+  fs.writeFileSync(hook, `#!/bin/sh\n{ echo "first=$PATH"; echo "sed=$(command -v sed)"; git cwdirect; } > "${hookOut.replace(/\\/g, '/')}"\n`)
   lib.enableProviders(userData)
 
   const { app, page, inv } = await lib.launch({ userData, env: { PATH: pathWithLauncher(found.launcher), GIT_TRACE2_EVENT: trace } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     const tool = await inv('git:tool', true)
-    check('Hive finds git, its path the launcher', tool.state === 'ok' && tool.path?.toLowerCase() === found.launcher.toLowerCase(), JSON.stringify(tool))
+    check('Combwork finds git, its path the launcher', tool.state === 'ok' && tool.path?.toLowerCase() === found.launcher.toLowerCase(), JSON.stringify(tool))
     // Git as checked so far, the check's own (PATH's git, by design) and any started before it found the real one: not counted.
     const before = new Set(fs.readdirSync(trace))
     await lib.openWorkspace(inv, page, ws)
 
-    // --- A hook and an alias through sh, from the real git Hive starts.
-    await inv('git:createBranch', repo, 'hive/direct')
+    // --- A hook and an alias through sh, from the real git Combwork starts.
+    await inv('git:createBranch', repo, 'cw/direct')
     const said = await lib.until(() => (fs.existsSync(hookOut) && fs.readFileSync(hookOut, 'utf8').includes('alias-through-sh') ? fs.readFileSync(hookOut, 'utf8') : null), HUNG_MS)
-    check("Hive's checkout ran the hook, and the hook the alias through sh", !!said, said ?? 'no hook output')
+    check("Combwork's checkout ran the hook, and the hook the alias through sh", !!said, said ?? 'no hook output')
     // Git puts its exec-path first itself; then the launcher's folders, then ~/bin (the real git alone, with no MSYSTEM,
     // would put ~/bin first).
-    check("…the hook's PATH starts as through the launcher: git's exec-path, /mingw64/bin, /usr/bin, ~/bin; sed from /usr/bin", /^first=\/mingw64\/libexec\/git-core:\/mingw64\/bin:\/usr\/bin:[^:]*\/bin(:|$)/m.test(said ?? '') && !/^first=.*:\/mingw64\/bin:.*:\/mingw64\/bin(:|$)/m.test(said ?? '') && /^sed=\/usr\/bin\/sed$/m.test(said ?? ''), said)
-    check('…and it switched the branch', lib.git(repo, ['rev-parse', '--abbrev-ref', 'HEAD']).trim() === 'hive/direct')
+    // The MinGW folder is Git's build's (mingw64, or ucrt64 from Git 2.5x; gitTool.ts's MINGW): the same one throughout.
+    check("…the hook's PATH starts as through the launcher: git's exec-path, its MinGW bin, /usr/bin, ~/bin; sed from /usr/bin", /^first=\/(mingw64|ucrt64|clangarm64|mingw32)\/libexec\/git-core:\/\1\/bin:\/usr\/bin:[^:]*\/bin(:|$)/m.test(said ?? '') && !/^first=.*:\/(mingw64|ucrt64|clangarm64|mingw32)\/bin:.*:\/\1\/bin(:|$)/m.test(said ?? '') && /^sed=\/usr\/bin\/sed$/m.test(said ?? ''), said)
+    check('…and it switched the branch', lib.git(repo, ['rev-parse', '--abbrev-ref', 'HEAD']).trim() === 'cw/direct')
     await inv('git:history', repo)
     await inv('git:status', repo)
 

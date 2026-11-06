@@ -1,13 +1,13 @@
 // A project's review and check copies (#1435, SPEC §16.10.5, §16.13): a small warm pool of detached worktrees in one
 // fixed folder per project (`<Workspace>.worktrees/<Project>/copies/copy-N`, so a reviewer's launch grant never
-// changes), each leased to one reviewer for one submission (#1439) or to one isolated check run (`hive-progress --check
-// <name> --isolated`), reset to the exact revision first. Rows of hive.db (schema/v1_0.ts, COPIES_STEP): at most one
+// changes), each leased to one reviewer for one submission (#1439) or to one isolated check run (`cw-progress --check
+// <name> --isolated`), reset to the exact revision first. Rows of combwork.db (schema/v1_0.ts, COPIES_STEP): at most one
 // lease per copy that isn't freed (a partial unique index).
 //
 // - Leasing (`leaseCopy`) reserves a free copy (the most recently used), or a new one while the pool is under its size
 //   (the larger of 2 and the agents that review plus one, OP-32, or the project's own), with its lease and an operation
 //   in one write. The operation then makes it if new (a detached worktree, the project's copied files, its setup as one
-//   of Hive's runs, credited to the lease's agent: HI-1710), recreates it if gone, resets it to the revision (`git checkout --detach
+//   of Combwork's runs, credited to the lease's agent: HI-1710), recreates it if gone, resets it to the revision (`git checkout --detach
 //   --force`, then `git clean` of what isn't ignored) and installs again when its lock files changed; then the copy is
 //   `leased`. With none free it refuses `noCopy` (the callers' "waiting for a check copy"), or `stillInUse` once a
 //   returning copy has been held back past Settings → Advanced's bound.
@@ -17,8 +17,8 @@
 //   review's holder agent isn't in a turn and has no background tasks (or has stopped; a check's isn't waited for, its
 //   processes all in its job: HI-1764); and a rename of its folder aside and back proves no process has it open. Until
 //   then it stays returning, tried again within seconds of its return (`soon`), then on every lease and refresh.
-// - Restart and crash: a lease whose holder Hive is gone, or (this Hive's) whose run is over, is returned and goes
-//   through the same barrier: a copy is never taken for quiet because Hive restarted. Operations (leasing, removal) own a
+// - Restart and crash: a lease whose holder Combwork is gone, or (this Combwork's) whose run is over, is returned and goes
+//   through the same barrier: a copy is never taken for quiet because Combwork restarted. Operations (leasing, removal) own a
 //   copy as slots' do (slots.ts): token-fenced writes, taken over only once their holder process is gone.
 // - Clean-up (`remove`): never with a lease not freed, an operation or a job, a run or a process in it; copies hold no
 //   work of anyone's (detached, at a revision), so git removes them forced. Copies beyond the size unused for a day go
@@ -31,6 +31,7 @@ import { mkdir } from 'original-fs/promises'
 import { basename, join, resolve } from 'path'
 import { placeMatcher, samePlace } from './fsutil'
 import { git, gitErrorLine } from './git'
+import { agentMsg, inDefaultDialect, say, type AgentMsg, type AgentValues } from '../shared/agentText'
 import { createLogger, userText } from './logger'
 import { deletingIn, folderThere, IDLE_MS, lockHash, OpLost, quiet, releaseDeleteIn, type Holder, type OpHolder, type SlotConn, type SlotOptionsNow, type SlotRunner, type SlotRunEnd } from './slots'
 import { copyIgnored, listWorktrees } from './worktrees'
@@ -39,8 +40,35 @@ const log = createLogger('copies')
 
 /** The folder a project's copies are in, under its worktrees folder: fixed, so a reviewer's grant never changes. */
 export const COPIES_DIR = 'copies'
-/** What a lease's operation taken over from a gone holder leaves as the copy's error. */
-export const INTERRUPTED = 'its reset was interrupted'
+/** What a lease's operation taken over from a gone holder leaves as the copy's error: stored, so said in the Default. */
+export const INTERRUPTED = agentMsg({ id: 'copy.error.interrupted', text: 'its reset was interrupted', note: "A check or review copy's error, kept on the copy, when its reset was taken over from a Combwork that is gone (#1435)." })
+
+/** Text kept on a copy, a lease or a request for any reader (dialects, HI-2065): said in the Default. */
+const sayStored = (m: AgentMsg, values?: AgentValues): string => inDefaultDialect(() => say(m, values))
+
+/** The copies pool's agent text (dialects, HI-2447): refusals, what holds a copy back, and the errors kept on a copy. */
+export const COPY_TEXT = {
+  noCopy: agentMsg({ id: 'copy.refusal.noCopy', text: "no check copy free: the pool's {size} {count, plural, =1 {copy is} other {copies are}} in use", note: "Why no check or review copy was lent (#1435): every copy is in use. {size} is the pool's size as digits; {count} the same number, choosing the plural." }),
+  returned: agentMsg({ id: 'copy.refusal.returned', text: 'its lease of {copy} was returned while the copy was being set up', note: 'Why a copy was not lent: the lease was given back during its setup.' }),
+  stillInUse: agentMsg({ id: 'copy.refusal.stillInUse', text: '{copy} is still in use by {by}', note: 'Why a copy was not lent: the copy is still held. {by} says by what (copy.held.*, a run, an agent).' }),
+  off: agentMsg({ id: 'copy.refusal.off', text: 'review copies are off (Settings → Advanced, Reviewers review in review copies)', note: 'Why a reviewer gets no review copy: the advanced setting is off. Names the setting as the window shows it.' }),
+  setupFailed: agentMsg({ id: 'copy.refusal.setupFailed', text: "{copy}'s setup failed: {error}", note: "Why a copy was not lent: its setup failed. {error} is why (copy.error.*, git's or the command's)." }),
+  closed: agentMsg({ id: 'copy.error.closed', text: 'the workspace closed', note: "Why a copy wasn't set up, or an isolated check's copy wasn't leased: its workspace closed." }),
+  notListed: agentMsg({ id: 'copy.error.notListed', text: 'its folder is there but git does not list it as a worktree', note: "A copy's error: its folder exists but isn't a worktree git knows, so Combwork leaves it alone." }),
+  worktreeAdd: agentMsg({ id: 'copy.error.worktreeAdd', text: 'git worktree add: {error}', note: "A copy's setup error: `git worktree add` failed. {error} is git's first line, else failed." }),
+  checkout: agentMsg({ id: 'copy.error.checkout', text: 'git checkout: {error}', note: "A copy's reset error: `git checkout` of the revision failed. {error} is git's first line, else failed." }),
+  clean: agentMsg({ id: 'copy.error.clean', text: 'git clean: {error}', note: "A copy's reset error: `git clean` failed. {error} is git's first line, else failed." }),
+  setupNotEnded: agentMsg({ id: 'copy.error.setupNotEnded', text: 'processes its setup started could not be ended', note: "A copy's setup error: its setup command ended, but processes it started are still running." }),
+  setupTimedOut: agentMsg({ id: 'copy.error.setupTimedOut', text: 'its setup ran out of time', note: "A copy's setup error: its setup command reached its time limit." }),
+  setupNoStart: agentMsg({ id: 'copy.error.setupNoStart', text: "its setup couldn't start: {command}", note: "A copy's setup error: its setup command couldn't be started. {command} is the command." }),
+  setupExit: agentMsg({ id: 'copy.error.setupExit', text: 'its setup exited with code {code}', note: "A copy's setup error: its setup command failed. {code} is its exit code." }),
+  heldJob: agentMsg({ id: 'copy.held.job', text: "its run's processes ({job})", note: 'What holds a returned copy back from being freed: processes of the run that had it. {job} is their job\'s id. The end of copy.refusal.stillInUse and of "held back by …".' }),
+  heldProcess: agentMsg({ id: 'copy.held.process', text: 'a process with a file or folder open in it', note: 'What holds a copy back from being freed or removed: a process has something open in its folder.' }),
+  notLeased: agentMsg({ id: 'copy.isolated.notLeased', text: 'no check copy could be leased: {error}', note: "cw-progress --isolated's refusal: leasing its check copy failed. {error} is why." }),
+  waitCopy: agentMsg({ id: 'copy.isolated.waitCopy', text: 'a check copy', note: 'What cw-progress --isolated waits for ("waiting for a check copy"): none is free yet.' }),
+  waitSetup: agentMsg({ id: 'copy.isolated.waitSetup', text: 'a check copy to be set up', note: 'What cw-progress --isolated waits for: its check copy is being set up.' })
+}
+const T = COPY_TEXT
 /** The waits before a copy held back as it was returned is tried again (CopyPool.soon): about 16 s in all. */
 export const RETRY_MS = [500, 1000, 2000, 4000, 8000]
 
@@ -75,7 +103,7 @@ export interface CopyLease {
   ref: string | null
   /** The agent holding it (a reviewer, the agent running the check). */
   agent: string | null
-  /** The Hive that leased it: its profile, pid and start. */
+  /** The Combwork that leased it: its profile, pid and start. */
   profile: string
   pid: number
   started: number
@@ -103,15 +131,15 @@ export type CopyHeld = { why: 'run'; by: string } | { why: 'job'; by: string } |
 export function copyRefusalText(r: CopyRefusal): string {
   switch (r.why) {
     case 'noCopy':
-      return `no check copy free: the pool's ${r.size} ${r.size === 1 ? 'copy is' : 'copies are'} in use`
+      return say(T.noCopy, { size: String(r.size), count: r.size })
     case 'returned':
-      return `its lease of ${r.copy} was returned while the copy was being set up`
+      return say(T.returned, { copy: r.copy })
     case 'stillInUse':
-      return `${r.copy} is still in use by ${r.by}`
+      return say(T.stillInUse, { copy: r.copy, by: r.by })
     case 'off':
-      return 'review copies are off (Settings → Advanced, Reviewers review in review copies)'
+      return say(T.off)
     case 'setupFailed':
-      return `${r.copy}'s setup failed: ${r.error}`
+      return say(T.setupFailed, { copy: r.copy, error: r.error })
   }
 }
 
@@ -171,6 +199,7 @@ const leaseOfRow = (r: Row): CopyLease => ({
 })
 
 /** No operation, no job, no lease that isn't freed. */
+// agent-protocol: SQL
 const FREE = 'op IS NULL AND job IS NULL AND NOT EXISTS (SELECT 1 FROM copy_leases l WHERE l.project = copies.project AND l.copy = copies.name AND l.freed_at IS NULL)'
 
 /** What a lease asks for. */
@@ -381,13 +410,13 @@ export interface CopyPoolDeps {
   runner: SlotRunner
   settle: (job: string) => Promise<boolean>
   holder: OpHolder
-  /** This Hive's profile, recorded on its leases. */
+  /** This Combwork's profile, recorded on its leases. */
   profile: string
   /** A Progress run running with its folder in the copy: its title (for "still in use by"), or null. */
   runIn: (folder: string) => string | null
   /** The holder agent in a turn or with background tasks running: its name, or null (idle, stopped, gone). */
   holderBusy: (agent: string) => string | null
-  /** Whether a lease's review or run is over (a check's run ended, its link never started), as this Hive knows; null: can't tell. */
+  /** Whether a lease's review or run is over (a check's run ended, its link never started), as this Combwork knows; null: can't tell. */
   leaseOver: (lease: CopyLease) => boolean | null | Promise<boolean | null>
   /** Settings → Advanced, Reviewers review in review copies. */
   reviewOn: () => boolean
@@ -536,7 +565,7 @@ export class CopyPool {
     }
     try {
       if (this.closed) {
-        if (fresh) return await fail('the workspace closed')
+        if (fresh) return await fail(sayStored(T.closed))
         await this.store.fenced(name, token, (db) => {
           this.store.dropIn(db, lease.id, 'closed')
           this.store.setIn(db, name, copy.state, {}, { op: null })
@@ -548,7 +577,7 @@ export class CopyPool {
       if (!made && !(await this.listed(copy.folder))) {
         await this.store.fenced(name, token, (db) => {
           this.store.dropIn(db, lease.id, 'gone')
-          this.store.setIn(db, name, 'creating', { warmError: 'its folder is there but git does not list it as a worktree' }, { op: null })
+          this.store.setIn(db, name, 'creating', { warmError: sayStored(T.notListed) }, { op: null })
         })
         return 'skip'
       }
@@ -567,24 +596,25 @@ export class CopyPool {
         await mkdir(this.deps.dir, { recursive: true })
         await git(this.deps.project, ['worktree', 'prune'])
         const r = await git(this.deps.project, ['worktree', 'add', '--detach', copy.folder, lease.revision])
-        if (!r.ok) return await fail(`git worktree add: ${gitErrorLine(r.err) || 'failed'}`)
+        if (!r.ok) return await fail(sayStored(T.worktreeAdd, { error: gitErrorLine(r.err) || 'failed' }))
         if (opts.copy.trim()) await copyIgnored(this.deps.project, copy.folder, opts.copy).catch((e) => log.warn(`Could not copy files into ${userText(name)}`, e))
       } else {
         // The exact revision, and nothing else: tracked changes dropped, what isn't ignored removed (dependencies stay).
         const co = await git(copy.folder, ['checkout', '--detach', '--force', lease.revision])
-        if (!co.ok) return await fail(`git checkout: ${gitErrorLine(co.err) || 'failed'}`)
+        if (!co.ok) return await fail(sayStored(T.checkout, { error: gitErrorLine(co.err) || 'failed' }))
         const cl = await git(copy.folder, ['clean', '-fd'])
-        if (!cl.ok) return await fail(`git clean: ${gitErrorLine(cl.err) || 'failed'}`)
+        if (!cl.ok) return await fail(sayStored(T.clean, { error: gitErrorLine(cl.err) || 'failed' }))
       }
       const hash = await lockHash(copy.folder)
       const needed = made || (hash !== null && hash !== copy.installHash)
       let fields: Partial<Pick<Copy, 'revision' | 'installHash' | 'warmError' | 'warmLog'>> = { revision: lease.revision, warmError: null, warmLog: null }
       if (needed) {
+        // agent-protocol: the command run, not wording
         const command = opts.setup.trim() || (hash !== null && existsSync(join(copy.folder, 'package-lock.json')) ? 'npm ci' : '')
         if (command) {
           const end = await this.run(name, token, { slot: name, of: 'copy', holder: lease.agent, what: made ? 'setup' : 'install', command, folder: copy.folder, env: {} })
-          if (!end.settled) return await fail('processes its setup started could not be ended', end.logPath)
-          if (!end.ok) return await fail(end.error ?? (end.timedOut ? 'its setup ran out of time' : end.spawnError ? `its setup couldn't start: ${command}` : `its setup exited with code ${end.exitCode}`), end.logPath)
+          if (!end.settled) return await fail(sayStored(T.setupNotEnded), end.logPath)
+          if (!end.ok) return await fail(end.error ?? (end.timedOut ? sayStored(T.setupTimedOut) : end.spawnError ? sayStored(T.setupNoStart, { command }) : sayStored(T.setupExit, { code: String(end.exitCode) })), end.logPath)
         }
         fields = { ...fields, installHash: hash }
       }
@@ -680,19 +710,19 @@ export class CopyPool {
     const hold = (h: CopyHeld): CopyHeld => (this.held.set(l.id, h), h)
     const run = this.deps.runIn(c.folder)
     if (run) return hold({ why: 'run', by: run })
-    if (l.job && !(await this.deps.settle(l.job))) return hold({ why: 'job', by: `its run's processes (${l.job})` })
+    if (l.job && !(await this.deps.settle(l.job))) return hold({ why: 'job', by: sayStored(T.heldJob, { job: l.job }) })
     if (l.agent && l.kind === 'review') {
       const busy = this.deps.holderBusy(l.agent)
       if (busy) return hold({ why: 'holder', by: busy })
     }
-    if ((await folderThere(c.folder)) && !(await quiet(c.folder))) return hold({ why: 'process', by: 'a process with a file or folder open in it' })
+    if ((await folderThere(c.folder)) && !(await quiet(c.folder))) return hold({ why: 'process', by: sayStored(T.heldProcess) })
     if (await this.store.free(l.id, name)) this.held.delete(l.id)
     return null
   }
 
   /**
    * Brings the rows in step: an operation whose holder is gone taken over (a lease's reset failed: never ready; a
-   * removal looked at again), a copy-level job settled, a lease whose Hive is gone or (this Hive's) whose review or run
+   * removal looked at again), a copy-level job settled, a lease whose Combwork is gone or (this Combwork's) whose review or run
    * is over returned, returning copies tried through the barrier, a free copy whose folder is gone marked gone.
    */
   async refresh(): Promise<void> {
@@ -710,7 +740,7 @@ export class CopyPool {
       if (l.returned) continue
       const mine = l.pid === me.pid && l.started === me.started
       const over = mine ? await this.deps.leaseOver(l) : (await this.deps.holder.alive(l.pid, l.started)) === false
-      if (over === true) await this.store.returnLease(l.id, mine ? 'over' : 'hiveGone')
+      if (over === true) await this.store.returnLease(l.id, mine ? 'over' : 'combworkGone')
     }
     for (const c of this.store.copies()) {
       if (c.state === 'returning') await this.tryFree(c.name)
@@ -747,7 +777,7 @@ export class CopyPool {
           await this.store.fenced(c.name, token, (db) => {
             const l = db.prepare('SELECT id FROM copy_leases WHERE project = ? AND copy = ? AND freed_at IS NULL').get(this.store.project, c.name) as { id: string } | undefined
             if (l) this.store.dropIn(db, l.id, 'interrupted')
-            this.store.setIn(db, c.name, 'creating', { warmError: INTERRUPTED }, { op: null, ...job })
+            this.store.setIn(db, c.name, 'creating', { warmError: sayStored(INTERRUPTED) }, { op: null, ...job })
           })
           return
         }
@@ -778,7 +808,7 @@ export class CopyPool {
         const run = this.deps.runIn(c.folder)
         if (run) return await keep({ why: 'run' as const, by: run })
         if (await folderThere(c.folder)) {
-          if (!(await quiet(c.folder))) return await keep({ why: 'process' as const, by: 'a process with a file or folder open in it' })
+          if (!(await quiet(c.folder))) return await keep({ why: 'process' as const, by: sayStored(T.heldProcess) })
           await this.store.fenced(name, token, () => undefined)
           // A copy holds nobody's work (detached at a revision): its build outputs go with it.
           const r = await git(this.deps.project, ['worktree', 'remove', '--force', c.folder])
@@ -840,7 +870,7 @@ interface Pending<T> {
 
 /** Requests at most at once (the oldest go, a copy of theirs given back). */
 const MAX_REQUESTS = 100
-/** A copy leased for a request nobody asked about for this long is given back (hive-progress gone, or given up). */
+/** A copy leased for a request nobody asked about for this long is given back (cw-progress gone, or given up). */
 export const ABANDON_MS = 60_000
 /** How long the first ask waits for its answer before saying to wait (the rest comes by asking again). */
 export const FIRST_WAIT_MS = 2000
@@ -848,7 +878,7 @@ export const FIRST_WAIT_MS = 2000
 /**
  * Isolated runs' copies leased and set up apart from the Agent API's request that asks for them (HR1's #1435 round 1: a
  * first setup takes minutes, longer than any request may): the first ask starts the lease and answers within
- * FIRST_WAIT_MS, with the copy or `wait` and a ticket; asked again with the ticket (hive-progress asks every 2 s), the
+ * FIRST_WAIT_MS, with the copy or `wait` and a ticket; asked again with the ticket (cw-progress asks every 2 s), the
  * copy once ready. A ticket is its asker's alone and for what it asked (another's, or for something else, starts anew).
  * A copy nobody collects within ABANDON_MS of the last ask is given back (`abandon`, on each look).
  */
@@ -870,7 +900,7 @@ export class IsolatedRequests<T extends { lease: CopyLease }> {
     const known = ticket ? this.pending.get(ticket) : undefined
     let t = known && known.owner === owner && known.asks === asks ? ticket! : null
     if (!t) {
-      if (life?.aborted) return { refused: 'the workspace closed' } // i18n-ignore: hive-progress's words, agent-facing
+      if (life?.aborted) return { refused: say(T.closed) }
       while (this.pending.size >= MAX_REQUESTS) this.drop(this.pending.keys().next().value!)
       const id = `t-${randomBytes(8).toString('hex')}`
       t = id
@@ -883,16 +913,16 @@ export class IsolatedRequests<T extends { lease: CopyLease }> {
       }
       const leasing = lease().then(
         (got) => this.settled(p, got),
-        (e: Error) => this.settled(p, { refused: `no check copy could be leased: ${e.message}` })
+        (e: Error) => this.settled(p, { refused: sayStored(T.notLeased, { error: e.message }) })
       )
       let timer: NodeJS.Timeout | undefined
       await Promise.race([leasing, new Promise<void>((res) => (timer = setTimeout(res, this.firstWaitMs)))])
       clearTimeout(timer)
     }
     const p = this.pending.get(t)
-    if (!p) return { wait: 'a check copy', ticket: '' }
+    if (!p) return { wait: say(T.waitCopy), ticket: '' }
     p.polled = this.now()
-    if (!p.result) return { wait: 'a check copy to be set up', ticket: t }
+    if (!p.result) return { wait: say(T.waitSetup), ticket: t }
     this.pending.delete(t)
     p.unlisten?.()
     // None free yet: the next ask starts anew (no ticket).

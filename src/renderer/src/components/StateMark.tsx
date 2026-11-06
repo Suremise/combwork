@@ -17,7 +17,7 @@ export function StateMark({ state, label, decorative, className }: { state: Agen
  * For tests (the statemarks suite): the four marks with their names, in a box of their own over the window, until the
  * returned function removes it.
  */
-;(window as unknown as { __hiveStateMarks?: () => () => void }).__hiveStateMarks = () => {
+;(window as unknown as { __cwStateMarks?: () => () => void }).__cwStateMarks = () => {
   const box = document.createElement('div')
   box.className = 'state-mark-gallery'
   document.body.appendChild(box)

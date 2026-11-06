@@ -46,7 +46,7 @@ describe("the harness's repository template (HI-2025)", () => {
     sh(a, 'add', 'README.md')
     commit(a, { 'src/new.txt': 'new\n' }, 'a commit in A')
     sh(a, 'branch', 'side')
-    sh(a, 'update-ref', 'refs/hive/marker', 'HEAD')
+    sh(a, 'update-ref', 'refs/cw/marker', 'HEAD')
     writeFileSync(join(a, '.git', 'hooks', 'pre-commit'), '#!/bin/sh\nexit 1\n')
     writeFileSync(join(a, 'src', 'a.txt'), 'edited, uncommitted\n')
     expect(sh(a, 'rev-parse', 'HEAD')).not.toBe(head)
@@ -63,11 +63,11 @@ describe("the harness's repository template (HI-2025)", () => {
 
   it('a copy into a folder that already has files keeps them, untracked, as git init there did', () => {
     const dir = join(tempDir('tpl-into-'), 'repo')
-    const earlier = join(dir, '.hive', 'project.json')
-    mkdirSync(join(dir, '.hive'), { recursive: true })
+    const earlier = join(dir, '.combwork', 'project.json')
+    mkdirSync(join(dir, '.combwork'), { recursive: true })
     writeFileSync(earlier, '{}')
     gitRepo(dir)
     expect(readFileSync(earlier, 'utf8')).toBe('{}')
-    expect(sh(dir, 'status', '--porcelain', '--untracked-files=all')).toBe('?? .hive/project.json')
+    expect(sh(dir, 'status', '--porcelain', '--untracked-files=all')).toBe('?? .combwork/project.json')
   })
 })

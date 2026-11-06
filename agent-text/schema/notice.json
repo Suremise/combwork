@@ -1,0 +1,222 @@
+{
+  "notice.decision.card": {
+    "placeholders": {
+      "card": "plain",
+      "count": "plain",
+      "n": "plural"
+    }
+  },
+  "notice.decision.flag": {
+    "placeholders": {
+      "cards": "plain",
+      "n": "plural"
+    }
+  },
+  "notice.intent.already": {
+    "placeholders": {
+      "card": "plain",
+      "column": "plain"
+    }
+  },
+  "notice.intent.armed": {
+    "placeholders": {
+      "card": "plain",
+      "what": "select",
+      "limit": "plain"
+    }
+  },
+  "notice.intent.ownCovers": {
+    "placeholders": {
+      "card": "plain",
+      "label": "plain"
+    }
+  },
+  "notice.intent.ownStays": {
+    "placeholders": {
+      "label": "plain",
+      "card": "plain"
+    }
+  },
+  "notice.mode.chosen": {
+    "placeholders": {
+      "name": "plain",
+      "summary": "plain"
+    }
+  },
+  "notice.orphan.process": {
+    "placeholders": {
+      "pid": "plain",
+      "known": "select",
+      "command": "plain",
+      "min": "plain"
+    }
+  },
+  "notice.orphan.running": {
+    "placeholders": {
+      "n": "plural",
+      "count": "plain",
+      "list": "plain"
+    }
+  },
+  "notice.outage.after": {
+    "placeholders": {}
+  },
+  "notice.outage.back": {
+    "placeholders": {
+      "dropped": "plain",
+      "back": "plain"
+    }
+  },
+  "notice.outage.clock": {
+    "placeholders": {
+      "time": "plain",
+      "offset": "plain"
+    }
+  },
+  "notice.outage.gaveUp": {
+    "placeholders": {
+      "agent": "plain",
+      "resumes": "plain"
+    }
+  },
+  "notice.outage.resumed": {
+    "placeholders": {
+      "agent": "plain",
+      "dropped": "plain",
+      "back": "plain"
+    }
+  },
+  "notice.outage.timedOut": {
+    "placeholders": {
+      "agent": "plain",
+      "minutes": "plain"
+    }
+  },
+  "notice.parked.background": {
+    "placeholders": {
+      "n": "plain"
+    }
+  },
+  "notice.parked.changed": {
+    "placeholders": {}
+  },
+  "notice.parked.failed": {
+    "placeholders": {
+      "error": "plain"
+    }
+  },
+  "notice.parked.leftover": {
+    "placeholders": {
+      "label": "plain",
+      "pid": "plain"
+    }
+  },
+  "notice.parked.more": {
+    "placeholders": {
+      "n": "plain"
+    }
+  },
+  "notice.parked.noProjects": {
+    "placeholders": {}
+  },
+  "notice.parked.noSlots": {
+    "placeholders": {}
+  },
+  "notice.parked.orphan": {
+    "placeholders": {
+      "label": "plain",
+      "pid": "plain"
+    }
+  },
+  "notice.parked.process": {
+    "placeholders": {
+      "pid": "plain"
+    }
+  },
+  "notice.parked.run": {
+    "placeholders": {
+      "title": "plain",
+      "minutes": "plain"
+    }
+  },
+  "notice.parked.silent": {
+    "placeholders": {
+      "minutes": "plain"
+    }
+  },
+  "notice.parked.state": {
+    "placeholders": {
+      "status": "plain"
+    }
+  },
+  "notice.parked.writer": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "notice.restart.assistant": {
+    "placeholders": {
+      "quit": "select",
+      "versions": "plain",
+      "hasResumed": "select",
+      "resumed": "plain",
+      "hasNot": "select",
+      "not": "plain"
+    }
+  },
+  "notice.restart.restarting": {
+    "placeholders": {}
+  },
+  "notice.restart.resumed": {
+    "placeholders": {
+      "reason": "select",
+      "versions": "plain",
+      "time": "plain",
+      "where": "plain",
+      "watch": "select"
+    }
+  },
+  "notice.restart.where": {
+    "placeholders": {
+      "onCard": "select",
+      "card": "plain",
+      "hasRound": "select",
+      "round": "plain",
+      "inLane": "select",
+      "lane": "plain",
+      "role": "select"
+    }
+  },
+  "notice.retry.after": {
+    "placeholders": {}
+  },
+  "notice.retry.waiting": {
+    "placeholders": {
+      "agent": "plain",
+      "cli": "plain",
+      "minutes": "plain",
+      "why": "select",
+      "status": "plain",
+      "max": "select",
+      "attempt": "plain",
+      "of": "plain"
+    }
+  },
+  "notice.team.noWorkspace": {
+    "placeholders": {}
+  },
+  "notice.team.paused": {
+    "placeholders": {}
+  },
+  "notice.title.details": {
+    "placeholders": {
+      "list": "plain",
+      "n": "plural"
+    }
+  },
+  "notice.title.long": {
+    "placeholders": {
+      "limit": "plain"
+    }
+  }
+}

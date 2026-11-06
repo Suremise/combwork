@@ -3,12 +3,12 @@
 // with --add-dir; Codex's -c override would replace the user's own writable roots: the recorded fixture); start review
 // leasing a copy at the submission's revision, the verdict returning it to returning, a stale pass's confirming review
 // leasing one again, a resubmission's new revision, and a review waiting while every copy is in use, then told once it
-// has one. A real CopyPool on a real hive.db and git repository; conditions, never time.
+// has one. A real CopyPool on a real combwork.db and git repository; conditions, never time.
 import { spawn as nodeSpawn } from 'child_process'
 import { mkdirSync, readFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { admitted } from './admitted'
@@ -16,11 +16,17 @@ import { commit, gitRepo, sh } from './workflow/harness'
 import type { LaunchContext } from '../src/main/providers/types'
 import type { WorkflowRole } from '../src/shared/workflow/roles'
 import type { CopyPool as Pool } from '../src/main/copies'
+import '../src/shared/agentText/asyncScope'
+import { inDialectOf, inDialectScope, setChainResolver, type DialectChain } from '../src/shared/agentText'
+
+// The app's message to a reviewer (tellReviewer) as leaveMessage gets it: its text, and the reviewer's.
+const sent = vi.hoisted(() => [] as { agent: string; text: string }[])
+vi.mock('../src/main/agentMessages', () => ({ leaveMessage: async (_p: string, agent: string, _n: string, _f: unknown, text: string) => (sent.push({ agent, text }), { id: 'm1', fate: 'queued', queued: 1 }) }))
 
 const req = createRequire(import.meta.url)
 const { baseEnv } = req('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
 
-const base = tempDir('hive-review-copies-')
+const base = tempDir('cw-review-copies-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 const homes = { CODEX_HOME: process.env.CODEX_HOME, COPILOT_HOME: process.env.COPILOT_HOME }
 
@@ -32,7 +38,7 @@ const { boardFile, closeBoard, workspaceDb } = await import('../src/main/boardSt
 const { COPIES_DIR, CopyPool, CopyStore, copiesDirOf, grantsCopies } = await import('../src/main/copies')
 const { fileSlotConn } = await import('../src/main/slots')
 const { BoundedLog, execCommand, FILE_IO } = await import('../src/main/workflow/queueChecks')
-const { COPY_WAIT_STALL_MS, copiesInUseText, copyWaitStall, ReviewCopies, reviewCopyText } = await import('../src/main/reviewCopies')
+const { COPY_WAIT_STALL_MS, copiesInUseText, copyWaitStall, ReviewCopies, reviewCopyText, tellReviewer } = await import('../src/main/reviewCopies')
 const { reviewsWork } = await import('../src/shared/workflow/roles')
 const { PROVIDERS } = await import('../src/shared/providers')
 
@@ -56,8 +62,8 @@ function context(over: Partial<LaunchContext> = {}): LaunchContext {
   mkdirSync(cwd, { recursive: true })
   return {
     projectPath: cwd, agentId: 'a-1', executable: 'C:\\bin\\cli.exe', cwd, workspacePath: base, runId: `r-${Math.random()}`, sessionId: '0cb916db-26aa-40f2-86b5-1ba81b225fd2',
-    resume: false, name: '', skills: [], mcpServers: { hive: { command: 'node', args: ['hive-mcp.js'] } }, model: null, effort: null, permissionMode: null, extraArgs: [],
-    hookUrl: 'http://127.0.0.1:5000/hook?run=r1', hookAuthFile: join(base, 'auth.txt'), privateDir: join(base, `private-${Math.random()}`), guidance: 'Hive guidance', allowBackgroundSessions: false, use200kContext: false,
+    resume: false, name: '', skills: [], mcpServers: { combwork: { command: 'node', args: ['cw-mcp.js'] } }, model: null, effort: null, permissionMode: null, extraArgs: [],
+    hookUrl: 'http://127.0.0.1:5000/hook?run=r1', hookAuthFile: join(base, 'auth.txt'), privateDir: join(base, `private-${Math.random()}`), guidance: 'Combwork guidance', allowBackgroundSessions: false, use200kContext: false,
     env: { PATH: 'C:\\Windows' },
     ...over
   }
@@ -85,7 +91,7 @@ describe("the grant of the project's copies folder (extraDirs)", () => {
     expect(copiesDirOf('D:\\Work\\ws.worktrees', 'D:\\Work\\ws\\proj')).toBe(join('D:\\Work\\ws.worktrees', 'proj', COPIES_DIR))
   })
 
-  it('every provider Hive has can be given folders', () => {
+  it('every provider Combwork has can be given folders', () => {
     for (const p of PROVIDERS) expect(p.capabilities.extraDirs, p.id).toBe(true)
   })
 
@@ -100,7 +106,7 @@ describe("the grant of the project's copies folder (extraDirs)", () => {
     expect(args({ extraDirs: [] })).not.toContain('--add-dir')
   })
 
-  it("Claude Code: a session outside its project folder (a slot's) may read its launch plugin, in the project's .hive (HI-2274)", () => {
+  it("Claude Code: a session outside its project folder (a slot's) may read its launch plugin, in the project's .combwork (HI-2274)", () => {
     const args = (o: Partial<LaunchContext>): string[] => claudeCode.buildCommand('C:\\bin\\claude.exe', context(o)).args
     const project = join(base, 'proj')
     const plugin = join(claudeCode.launchDir(project, 'a-1'), 'plugin')
@@ -165,7 +171,7 @@ afterEach(() => {
   for (const c of closers.splice(0)) c()
 })
 
-function world(size = 2): World {
+function world(size = 2, tell?: ConstructorParameters<typeof ReviewCopies>[0]['tell']): World {
   const ws = join(tempDir('review-copies-'), 'ws')
   const project = gitRepo(join(ws, 'project'))
   commit(project, { '.gitignore': 'node_modules/\n', 'a.ts': 'export const a = 1\n' }, 'first')
@@ -191,7 +197,7 @@ function world(size = 2): World {
     },
     settle: async () => true,
     holder: { self: async () => ({ pid: 1, started: 1001 }), alive: async () => true, live: new Set() },
-    profile: 'hive-1',
+    profile: 'profile-1',
     runIn: () => null,
     holderBusy: (agent) => busy.get(agent) ?? null,
     leaseOver: () => null,
@@ -212,10 +218,10 @@ function world(size = 2): World {
   const rc = new ReviewCopies({
     pool: async () => seen,
     review: async (card, agent) => reviews.get(`${card}|${agent}`) ?? { going: false, submission: null, revision: null },
-    tell: async (agent, card, text) => void told.push({ agent: agent.id, card, text }),
+    tell: tell ?? (async (agent, card, text) => void told.push({ agent: agent.id, card, text: text() })),
     note: async (card, text) => void notes.push({ card, id: text.id, ...(text.values ? { values: text.values } : {}) }),
     firstWaitMs: 60_000,
-    off: () => sw.off
+    off: () => (sw.off === null ? null : () => sw.off ?? '')
   })
   closers.push(() => {
     store.conn.close()
@@ -245,7 +251,7 @@ describe('start review leases a copy; the review ends, it is returned', () => {
     expect(head(a.folder)).toBe(submitted)
     expect(head(w.project)).not.toBe(submitted)
     expect(leaseOf(w, 12, R1.id)).toMatchObject({ kind: 'review', revision: submitted, ref: '3', returned: null })
-    expect(reviewCopyText(a)).toBe(`Review in ${a.folder} at ${submitted.slice(0, 12)}: read and run commands there, with it as their working directory; your session stays where it is.`)
+    expect(reviewCopyText(a)).toBe(`Review in ${a.folder} at ${submitted.slice(0, 12)}: read and run commands there. Your session and its shell stay in your own folder, so change into the copy in each command.`)
     expect(w.notes).toEqual([{ card: 12, id: 'tasks.history.reviewCopyLeased', values: { agent: 'R1', copy: 'copy-1', revision: submitted.slice(0, 12) } }])
     const again = await w.rc.start(12, R1)
     expect(again).toEqual(a)
@@ -333,7 +339,7 @@ describe('waiting when none is free', () => {
     expect(reviewCopyText(waiting)).toMatch(/^Waiting for a review copy \(/)
     expect(w.notes.filter((n) => n.id === 'tasks.history.reviewCopyWaiting')).toEqual([{ card: 13, id: 'tasks.history.reviewCopyWaiting', values: { agent: 'R2' } }])
     expect(w.rc.waits()).toEqual([expect.objectContaining({ card: 13, agent: R2.id, name: 'R2', since: expect.any(Number) })])
-    // It says what holds each copy, and when Hive tries again (HI-1764: it was told only "pending").
+    // It says what holds each copy, and when Combwork tries again (HI-1764: it was told only "pending").
     expect(w.rc.waits()[0].why).toMatch(/^the pool's 1 copy is in use; the longest lent, copy-1, for \d+ min \(a review of \S*12\)$/)
     // Asked again meanwhile: still waiting, said on the card once.
     expect((await w.rc.start(13, R2)).is).toBe('waiting')
@@ -412,7 +418,7 @@ describe('waiting when none is free', () => {
   })
 })
 
-// HR5's round 1: off means off. With workflow rules not enforced (or review copies off), Hive records facts and leases
+// HR5's round 1: off means off. With workflow rules not enforced (or review copies off), Combwork records facts and leases
 // nothing; a copy already out is still returned and freed.
 const NOT_ENFORCED = "workflow rules aren't enforced (Settings → Advanced, Workflow rules are enforced)"
 
@@ -471,5 +477,64 @@ describe("switched off (Workflow rules are enforced, Reviewers review in review 
     await w.pool.refresh()
     expect(w.pool.unfreed()).toEqual([])
     expect(w.pool.copies().find((c) => c.name === 'copy-1')?.state).toBe('free')
+  })
+})
+
+// Dialects (HI-2447, HR1's round 1): what a wait says is rendered by whoever reads it, and a later message to a reviewer
+// is said in that reviewer's dialect, wherever it is made (the pools' look runs in the background, in no scope).
+describe("a review copy's text, in its reader's dialect", () => {
+  const chain = (texts: Record<string, string>): DialectChain => ({ texts, files: ['test.json'], hash: 'test' })
+  /** Each session's own texts (by its agent's id); the API and other sessions get the Default. */
+  const dialects = (by: Record<string, Record<string, string>>): void => setChainResolver((s) => (s.kind === 'session' && by[s.session.agentId] ? chain(by[s.session.agentId]) : null))
+  afterEach(() => {
+    setChainResolver(null)
+    sent.length = 0
+  })
+
+  it("keeps why a review waits as data: a lane watch's stall and another start read it in their own dialect", async () => {
+    const w = world(1)
+    const rev = head(w.project)
+    review(w, 12, R1.id, 1, rev)
+    review(w, 13, R2.id, 1, rev)
+    expect((await w.rc.start(12, R1)).is).toBe('ready')
+    dialects({ [R2.id]: { 'copy.inUse.all': 'FIRST CALLER TEXT' } })
+    // Two starts of R2's review at once share one lease attempt: each answer is its own caller's.
+    const [mine, api] = await Promise.all([inDialectOf({ projectPath: w.project, agentId: R2.id }, () => w.rc.start(13, R2)), inDialectScope({ kind: 'api' }, () => w.rc.start(13, R2))])
+    expect(mine).toMatchObject({ is: 'waiting', why: expect.stringMatching(/^FIRST CALLER TEXT; the longest lent, copy-1/) })
+    expect(api).toMatchObject({ is: 'waiting', why: expect.stringMatching(/^the pool's 1 copy is in use; the longest lent, copy-1/) })
+    // Kept, then read: in the Default by a lane watch, in R2's dialect by R2.
+    const since = w.rc.waits()[0].since
+    expect(copyWaitStall({ number: 13, key: 'HI-13', column: 'review' }, w.rc.waits(), since + COPY_WAIT_STALL_MS)).toMatch(/^HI-13's review by R2 has waited 5 min for a review copy: the pool's 1 copy is in use; /)
+    expect(inDialectOf({ projectPath: w.project, agentId: R2.id }, () => w.rc.waits()[0].why)).toMatch(/^FIRST CALLER TEXT; /)
+    expect(inDialectOf({ projectPath: w.project, agentId: R1.id }, () => w.rc.waits()[0].why)).toMatch(/^the pool's 1 copy is in use; /)
+  })
+
+  it("tells a reviewer its copy is ready in the reviewer's dialect, from the pools' look in the background", async () => {
+    const w = world(1, (agent, card, text) => tellReviewer(w.project, agent, card, text))
+    const rev = head(w.project)
+    review(w, 12, R1.id, 1, rev)
+    review(w, 13, R2.id, 1, rev)
+    expect((await w.rc.start(12, R1)).is).toBe('ready')
+    dialects({ [R2.id]: { 'copy.review.ready': 'TARGET READY {folder}' } })
+    expect((await w.rc.start(13, R2)).is).toBe('waiting')
+    stop(w, 12, R1.id)
+    await w.rc.end(12, R1.id, 'verdict')
+    await w.pool.refresh()
+    // No scope open: the look's own.
+    await w.rc.retry()
+    expect(sent).toEqual([{ agent: R2.id, text: expect.stringMatching(/^TARGET READY .*copy-1$/) }])
+  })
+
+  it("tells a reviewer it gets none, with why, in the reviewer's dialect", async () => {
+    const w = world(1, (agent, card, text) => tellReviewer(w.project, agent, card, text))
+    const rev = head(w.project)
+    review(w, 12, R1.id, 1, rev)
+    review(w, 13, R2.id, 1, rev)
+    expect((await w.rc.start(12, R1)).is).toBe('ready')
+    expect((await w.rc.start(13, R2)).is).toBe('waiting')
+    dialects({ [R2.id]: { 'copy.review.none': 'TARGET NONE ({why})' } })
+    w.sw.off = 'switched off'
+    await w.rc.retry()
+    expect(sent).toEqual([{ agent: R2.id, text: '#13: TARGET NONE (switched off)' }])
   })
 })

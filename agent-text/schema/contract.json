@@ -1,0 +1,167 @@
+{
+  "contract.agent.boardRules": {
+    "placeholders": {}
+  },
+  "contract.agent.folder": {
+    "placeholders": {}
+  },
+  "contract.agent.host": {
+    "placeholders": {
+      "hasProject": "select",
+      "project": "plain"
+    }
+  },
+  "contract.agent.scratch": {
+    "placeholders": {}
+  },
+  "contract.agent.stop": {
+    "placeholders": {}
+  },
+  "contract.assistant.control.actWhenAsked": {
+    "placeholders": {}
+  },
+  "contract.assistant.control.agents": {
+    "placeholders": {}
+  },
+  "contract.assistant.control.cannot": {
+    "placeholders": {}
+  },
+  "contract.assistant.control.coordinate": {
+    "placeholders": {}
+  },
+  "contract.assistant.control.look": {
+    "placeholders": {
+      "changeSettings": "select"
+    }
+  },
+  "contract.assistant.control.neverInterrupt": {
+    "placeholders": {}
+  },
+  "contract.assistant.control.projects": {
+    "placeholders": {}
+  },
+  "contract.assistant.control.worktrees": {
+    "placeholders": {}
+  },
+  "contract.assistant.host": {
+    "placeholders": {}
+  },
+  "contract.assistant.settings.change": {
+    "placeholders": {}
+  },
+  "contract.assistant.settings.read": {
+    "placeholders": {}
+  },
+  "contract.assistant.skills": {
+    "placeholders": {
+      "journal": "select"
+    }
+  },
+  "contract.board.head": {
+    "placeholders": {}
+  },
+  "contract.board.missingSkill": {
+    "placeholders": {}
+  },
+  "contract.board.other.handover": {
+    "placeholders": {}
+  },
+  "contract.board.other.mergeReady": {
+    "placeholders": {}
+  },
+  "contract.board.other.pickUp": {
+    "placeholders": {}
+  },
+  "contract.board.other.splitWork": {
+    "placeholders": {}
+  },
+  "contract.board.other.useCombworkApi": {
+    "placeholders": {}
+  },
+  "contract.board.other.workspaceNote": {
+    "placeholders": {}
+  },
+  "contract.board.route.cardLoop": {
+    "placeholders": {}
+  },
+  "contract.board.route.generalist": {
+    "placeholders": {}
+  },
+  "contract.board.route.review": {
+    "placeholders": {
+      "afterWorkOnCard": "select"
+    }
+  },
+  "contract.board.route.workOnCard": {
+    "placeholders": {}
+  },
+  "contract.board.skills": {
+    "placeholders": {
+      "afterRoutes": "select",
+      "list": "plain"
+    }
+  },
+  "contract.docs.outline": {
+    "placeholders": {}
+  },
+  "contract.handover.latest": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "contract.inbox.agent": {
+    "placeholders": {}
+  },
+  "contract.inbox.assistant": {
+    "placeholders": {}
+  },
+  "contract.inbox.rule": {
+    "placeholders": {}
+  },
+  "contract.instructions.starter": {
+    "placeholders": {}
+  },
+  "contract.instructions.starterFor": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
+  "contract.journal.rule": {
+    "placeholders": {}
+  },
+  "contract.journal.scope": {
+    "placeholders": {
+      "hasScope": "select",
+      "scope": "plain"
+    }
+  },
+  "contract.notes.cut": {
+    "placeholders": {
+      "note": "plain"
+    }
+  },
+  "contract.notes.header": {
+    "placeholders": {
+      "note": "plain"
+    }
+  },
+  "contract.progress.onAsk": {
+    "placeholders": {}
+  },
+  "contract.progress.wrap": {
+    "placeholders": {}
+  },
+  "contract.skill.nobody": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "contract.skill.notDelivered": {
+    "placeholders": {}
+  },
+  "contract.skill.tooBig": {
+    "placeholders": {
+      "why": "plain"
+    }
+  }
+}

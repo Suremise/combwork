@@ -43,7 +43,7 @@ describe('i18n:numbers', () => {
 
   it('run on a probe, finds numbers through tr and tRich (its type argument given or not), and calls of a message not known there; formatted numbers and text pass', { timeout: 120_000 }, () => {
     // The copy goes in a temp folder of the test's, never in the repository (it links to its node_modules).
-    const work = tempDir('hive-i18n-numbers-')
+    const work = tempDir('cw-i18n-numbers-')
     const { sites, other, dir } = audit({ extra: { [PROBE]: PROBE_TEXT }, dir: work }) as { sites: Site[]; other: unknown[]; dir: string }
     expect(dir).toBe(work)
     const lines = PROBE_TEXT.split('\n')
@@ -61,8 +61,8 @@ describe('i18n:numbers', () => {
   })
 
   it('removes the junction to the packages before the copy, leaving what it points to', () => {
-    const work = tempDir('hive-i18n-numbers-')
-    const target = tempDir('hive-i18n-numbers-target-')
+    const work = tempDir('cw-i18n-numbers-')
+    const target = tempDir('cw-i18n-numbers-target-')
     writeFileSync(join(target, 'kept.txt'), 'not the copy’s')
     mkdirSync(join(work, 'src'))
     symlinkSync(target, join(work, 'node_modules'), 'junction')
@@ -101,7 +101,7 @@ describe('i18n:numbers', () => {
         "      Type 'number' is not assignable to type 'string'.",
         "src/main/c.ts(9,1): error TS2322: Type 'TextPart' is not assignable to type 'string | Text'.",
         "  Type 'number' is not assignable to type 'string | Text'.",
-        "src/main/d.ts(2,4): error TS2322: Type 'number' is not assignable to type 'string | boolean | Date | HiveDynamicMessage | null | undefined'.",
+        "src/main/d.ts(2,4): error TS2322: Type 'number' is not assignable to type 'string | boolean | Date | CombworkDynamicMessage | null | undefined'.",
         "src/main/e.ts(1,1): error TS2741: Property 'why' is missing in type '{}'."
       ].join('\r\n'),
       'D:\\copy\\run-1'

@@ -1,15 +1,15 @@
-// Dev build only (HI-1842): its archived card comes due within HIVE_TEST_DAY_MS's short day, a test seam a packaged
+// Dev build only (HI-1842): its archived card comes due within CW_TEST_DAY_MS's short day, a test seam a packaged
 // build ignores.
 // Card attachments (HI-1700): an image pasted into a card dialog's comment box is a draft (a chip, a link at the caret,
 // nothing stored), and Post keeps it with the card: shown inline in the comment and in the card's Attachments list, kept
-// in the project's .hive/attachments/cards/<number>, and listed by path in the card's JSON (the Agent API, as
-// hive_read_task reads it). It stays through a move to Doing, archiving and back, and moves with the card to another
+// in the project's .combwork/attachments/cards/<number>, and listed by path in the card's JSON (the Agent API, as
+// cw_read_task reads it). It stays through a move to Doing, archiving and back, and moves with the card to another
 // project. A session's file is copied to a card from the Attachments tab (Attach to a card, the menu a pane's chip uses
 // too). The tab's two tabs (HI-1841): Pane attachments and Card attachments, each its count and its own kind filters,
 // remembered; the card dialog's Show in Attachments opening Card attachments at its card, whatever its filter, without
 // changing the tab remembered; Pane attachments when the cards keep no files yet. Archived cards' attachments cleaned up
 // (HI-1842): Project Settings → Storage's choice, Clean Up Now's list and its removal, open and Done cards kept (NOT RUN on a
-// packaged build: it makes a day short, HIVE_TEST_DAY_MS). Screenshots in both themes. Dev build, throwaway
+// packaged build: it makes a day short, CW_TEST_DAY_MS). Screenshots in both themes. Dev build, throwaway
 // profile and workspace (two plain-folder projects).
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -39,12 +39,12 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
   fs.mkdirSync(shots, { recursive: true })
   for (const p of [alpha, beta]) fs.mkdirSync(p, { recursive: true })
   // A session's pasted file in alpha, for Attach to a card from the Attachments tab.
-  const sessionFile = path.join(alpha, '.hive', 'attachments', 'run-1', '2026-10-26_12-00-00_session-shot.png')
+  const sessionFile = path.join(alpha, '.combwork', 'attachments', 'run-1', '2026-10-26_12-00-00_session-shot.png')
   fs.mkdirSync(path.dirname(sessionFile), { recursive: true })
   fs.writeFileSync(sessionFile, lib.samplePng(48, 32))
   // The fake Claude Code, for the Assistant's session (its token, for a refused change).
   const cenv = lib.fakeClaude(userData, claudeHome, [alpha, beta, ws])
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off', HIVE_TEST_DAY_MS: '300', ...cenv }, viewport: { width: 1400, height: 900 } })
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off', CW_TEST_DAY_MS: '300', ...cenv }, viewport: { width: 1400, height: 900 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await inv('settings:update', { agentApi: { enabled: true } })
@@ -86,7 +86,7 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     })
     check('Post keeps it with the card', !!kept, JSON.stringify(kept))
     const file = kept ? kept[0] : null
-    check("…in the project's .hive/attachments/cards/<number>", !!file && file.path.toLowerCase().startsWith(path.join(alpha, '.hive', 'attachments', 'cards', String(n)).toLowerCase() + path.sep) && fs.existsSync(file.path), file?.path)
+    check("…in the project's .combwork/attachments/cards/<number>", !!file && file.path.toLowerCase().startsWith(path.join(alpha, '.combwork', 'attachments', 'cards', String(n)).toLowerCase() + path.sep) && fs.existsSync(file.path), file?.path)
     const shown = dialog.locator('.task-comment .markdown img')
     check('…shown inline in the comment', !!(await until(async () => (await shown.count()) === 1 && (await shown.evaluate((img) => img.complete && img.naturalWidth > 0)))))
     check("…and listed in the card's Attachments", !!(await until(async () => (await dialog.locator('[data-section="attachments"] .card-attachment').count()) === 1)))
@@ -137,7 +137,7 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     await page.keyboard.press('Escape')
     await until(async () => (await fresh.count()) === 0)
 
-    // --- The card's JSON lists it by path, as hive_read_task reads it, and its comment's link reads as that path.
+    // --- The card's JSON lists it by path, as cw_read_task reads it, and its comment's link reads as that path.
     const token = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
     const get = async () => (await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${n}`, { headers: { Authorization: `Bearer ${token}` } })).json()
     const view = await get()
@@ -152,15 +152,15 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     await inv('tasks:archive', n, false)
     await inv('tasks:update', n, { project: 'beta' })
     const moved = await inv('cards:attachments', n)
-    check('a move to another project takes it along', moved.length === 1 && moved[0].path.toLowerCase().startsWith(path.join(beta, '.hive', 'attachments', 'cards').toLowerCase()) && fs.existsSync(moved[0].path), JSON.stringify(moved.map((x) => x.path)))
-    check('…and the old folder goes', !!(await until(async () => !fs.existsSync(path.join(alpha, '.hive', 'attachments', 'cards', String(n))))))
+    check('a move to another project takes it along', moved.length === 1 && moved[0].path.toLowerCase().startsWith(path.join(beta, '.combwork', 'attachments', 'cards').toLowerCase()) && fs.existsSync(moved[0].path), JSON.stringify(moved.map((x) => x.path)))
+    check('…and the old folder goes', !!(await until(async () => !fs.existsSync(path.join(alpha, '.combwork', 'attachments', 'cards', String(n))), HUNG_MS)))
 
     // --- A session's file copied to a card from the Attachments tab; its tabs (HI-1841).
     const other = await inv('tasks:create', { title: 'Session shot belongs here', project: 'alpha' })
     await page.locator('.activity-btn[aria-label="Projects"]').click()
     await page.locator('.project-row', { hasText: 'alpha' }).first().click()
     await page.keyboard.press('Alt+7')
-    const attachTabs = () => page.locator('.attachment-tabs [role="tab"]').evaluateAll((els) => els.map((e) => ({ id: e.getAttribute('data-tab'), label: e.querySelector('.hive-tab-label').textContent.trim(), count: Number((e.querySelector('.hive-tab-count')?.textContent ?? '-1').replace(/\D/g, '')), selected: e.getAttribute('aria-selected') === 'true' })))
+    const attachTabs = () => page.locator('.attachment-tabs [role="tab"]').evaluateAll((els) => els.map((e) => ({ id: e.getAttribute('data-tab'), label: e.querySelector('.cw-tab-label').textContent.trim(), count: Number((e.querySelector('.cw-tab-count')?.textContent ?? '-1').replace(/\D/g, '')), selected: e.getAttribute('aria-selected') === 'true' })))
     const attachTab = (id) => page.locator(`.attachment-tabs [role="tab"][data-tab="${id}"]`)
     const selectedAttach = async () => (await attachTabs()).find((t) => t.selected)?.id ?? null
     // The session's file in Pane attachments (the card's copy, in Card attachments, has the same name).
@@ -327,7 +327,7 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     const shot = path.join(alpha, 'docs', 'shot.png')
     fs.mkdirSync(path.dirname(shot), { recursive: true })
     fs.writeFileSync(shot, lib.samplePng(32, 32))
-    const staged = () => [alpha, beta, ws].flatMap((h) => { const d = path.join(h, '.hive', 'attachments', 'cards', '.staging'); return fs.existsSync(d) ? fs.readdirSync(d) : [] })
+    const staged = () => [alpha, beta, ws].flatMap((h) => { const d = path.join(h, '.combwork', 'attachments', 'cards', '.staging'); return fs.existsSync(d) ? fs.readdirSync(d) : [] })
     const outside = path.join(ws, '..', 'cardattach-outside')
     const traversal = await post({ title: 'Outside', project: '../cardattach-outside', attachments: [shot] })
     check('a card for a path, not a project, is refused before anything is copied', traversal.status >= 400 && !fs.existsSync(outside) && staged().length === 0, JSON.stringify({ status: traversal.status, outside: fs.existsSync(outside), staged: staged() }))
@@ -344,10 +344,10 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
     const denied = await post({ title: 'Not allowed', project: 'alpha', attachments: [shot] }, asToken)
     check("the Assistant's change refused at Look copies nothing and leaves nothing", denied.status === 403 && staged().length === 0 && (await inv('tasks:list')).length === before, JSON.stringify({ status: denied.status, staged: staged() }))
     await inv('session:stop', assistantHome, 'assistant').catch(() => undefined)
-    if (q.devSeam("archived cards' attachments cleaned up (HI-1842: a day made short, HIVE_TEST_DAY_MS)")) {
+    if (q.devSeam("archived cards' attachments cleaned up (HI-1842: a day made short, CW_TEST_DAY_MS)")) {
       // --- Archived cards' attachments cleaned up (HI-1842): Project Settings → Storage's choice (here 3 days, a day being
-      // HIVE_TEST_DAY_MS long), then Clean Up Now lists the archived card once it is due and sends its files to the suite's
-      // trash, with Hive's comment on it; an open card and a Done card keep theirs. Round 2 (HR5): Move applies the list
+      // CW_TEST_DAY_MS long), then Clean Up Now lists the archived card once it is due and sends its files to the suite's
+      // trash, with Combwork's comment on it; an open card and a Done card keep theirs. Round 2 (HR5): Move applies the list
       // the dialog showed (a plan kept by main), and a file changed on disk while the dialog was open stays, said so.
       // Each its own bytes: a card keeps the same bytes once.
       let shade = 20
@@ -394,7 +394,7 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
       check('…its files go to the Recycle Bin (the suite’s trash), their rows with them', !!(await until(async () => archivedFiles.length === 1 && lib.trashed(path.basename(archivedFiles[0].path)).length === 1 && !fs.existsSync(archivedFiles[0].path) && (await keptOf(archivedCard)).length === 0)), JSON.stringify(archivedFiles))
       check('…but a file changed since the list was made stays, row and all, and the notice says so', !!(await until(async () => JSON.stringify((await keptOf(changedCard)).map((f) => f.name)) === '["changes.png"]' && fs.existsSync(changing.path) && /Moved 2 files .* of 2 archived cards/.test(await page.locator('.toast, .notification').allInnerTexts().then((t) => t.join(' ')).catch(() => '')) && /1 file was left as it is/.test(await page.locator('.toast, .notification').allInnerTexts().then((t) => t.join(' ')).catch(() => '')))), JSON.stringify(await keptOf(changedCard)))
       const cleaned = await readCardJson(archivedCard.number)
-      check("…and Hive's comment on it says how many and which", (cleaned?.comments?.at(-1)?.text ?? '').startsWith("Removed 1 attachment (archived-shot.png): this project removes archived cards' attachments 3 days after archiving") && cleaned.comments.at(-1).by === 'Hive' && cleaned.archived === true, cleaned?.comments?.at(-1)?.text)
+      check("…and Combwork's comment on it says how many and which", (cleaned?.comments?.at(-1)?.text ?? '').startsWith("Removed 1 attachment (archived-shot.png): this project removes archived cards' attachments 3 days after archiving") && cleaned.comments.at(-1).by === 'Combwork' && cleaned.archived === true, cleaned?.comments?.at(-1)?.text)
       check('an open card and a Done card keep theirs', (await keptOf(openCard)).length === 1 && (await keptOf(doneCard)).length === 1 && fs.existsSync((await keptOf(openCard))[0].path))
       await page.screenshot({ path: path.join(shots, 'cardattach-cleanup-storage.png') })
     }

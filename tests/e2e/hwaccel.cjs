@@ -1,6 +1,6 @@
-// Disable hardware acceleration (#676): Settings → Advanced's switch writes advanced.json and offers Restart Hive (gone
-// once it is back as Hive started); Restart Hive quits and starts Hive again (a test copy records the relaunch instead of
-// making it). Started with the setting on, Hive draws without the graphics card: the window knows (AppInfo), Copy
+// Disable hardware acceleration (#676): Settings → Advanced's switch writes advanced.json and offers Restart Combwork (gone
+// once it is back as Combwork started); Restart Combwork quits and starts Combwork again (a test copy records the relaunch instead of
+// making it). Started with the setting on, Combwork draws without the graphics card: the window knows (AppInfo), Copy
 // Diagnostics says so with the GPU feature status, and a session's terminal draws with the DOM renderer, not WebGL.
 // Turned off again, the next start uses WebGL; --disable-gpu turns it off for that start alone. The fake Claude Code
 // runs the session. Dev build, throwaway profile and workspace.
@@ -18,7 +18,7 @@ const ws = path.join(lib.WORK, 'hwaccel-ws')
 const proj = path.join(ws, 'demo')
 const file = path.join(userData, 'advanced.json')
 const relaunchLog = path.join(lib.WORK, 'hwaccel-relaunch.jsonl')
-const ID = 'hive.disableHardwareAcceleration'
+const ID = 'cw.disableHardwareAcceleration'
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -27,16 +27,16 @@ const check = (name, ok, extra = '') => {
 const readFile = () => (fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : { values: {} })
 const relaunches = () => (fs.existsSync(relaunchLog) ? fs.readFileSync(relaunchLog, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [])
 
-/** Starts a copy of Hive on the profile, with `args` after the app's folder. */
+/** Starts a copy of Combwork on the profile, with `args` after the app's folder. */
 async function start(args = []) {
   const claude = lib.fakeClaude(userData, claudeHome, [proj])
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_TEST_RELAUNCH_LOG: relaunchLog, ...claude })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_TEST_RELAUNCH_LOG: relaunchLog, ...claude })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT, ...args], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1300, height: 850 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   return { app, page, inv }
 }
 
@@ -71,7 +71,7 @@ async function stopSession(inv) {
   fs.mkdirSync(proj, { recursive: true })
   fs.mkdirSync(userData, { recursive: true })
 
-  // --- 1. On (the default): the switch, the restart offer, Restart Hive.
+  // --- 1. On (the default): the switch, the restart offer, Restart Combwork.
   {
     const { app, page, inv } = await start()
     try {
@@ -86,17 +86,17 @@ async function stopSession(inv) {
       await row.getByRole('switch').click()
       check('turning it on writes it to advanced.json', !!(await lib.until(() => readFile().values[ID] === true, HUNG_MS)), JSON.stringify(readFile().values))
       const offer = row.locator('[data-note="restart"]')
-      check('…and offers Restart Hive', !!(await lib.until(async () => (await offer.count()) === 1 && /Restart Hive to apply this/.test(await offer.innerText()), HUNG_MS)))
+      check('…and offers Restart Combwork', !!(await lib.until(async () => (await offer.count()) === 1 && /Restart Combwork to apply this/.test(await offer.innerText()), HUNG_MS)))
       await page.screenshot({ path: path.join(lib.WORK, 'hwaccel-1-offer.png') })
-      // Back as Hive started: nothing to restart for.
+      // Back as Combwork started: nothing to restart for.
       await row.getByRole('switch').click()
-      check('turned off again (as Hive started, the default: out of advanced.json), the offer goes', !!(await lib.until(async () => !(ID in readFile().values) && (await offer.count()) === 0, HUNG_MS)), JSON.stringify(readFile().values))
+      check('turned off again (as Combwork started, the default: out of advanced.json), the offer goes', !!(await lib.until(async () => !(ID in readFile().values) && (await offer.count()) === 0, HUNG_MS)), JSON.stringify(readFile().values))
       await row.getByRole('switch').click()
       check('on once more, it is offered again', !!(await lib.until(async () => (await offer.count()) === 1, HUNG_MS)))
       const quitting = await lib.quitWatch(app)
       const clicked = Date.now()
-      await offer.getByRole('button', { name: 'Restart Hive' }).click()
-      check('Restart Hive quits Hive', !!(await quitting.untilDecided(START_MS)) && (await quitting.gone(START_MS)), quitting.timings(clicked))
+      await offer.getByRole('button', { name: 'Restart Combwork' }).click()
+      check('Restart Combwork quits Combwork', !!(await quitting.untilDecided(START_MS)) && (await quitting.gone(START_MS)), quitting.timings(clicked))
       const [made] = relaunches()
       check('…and starts it again, as it was started', relaunches().length === 1 && made.args.includes(lib.ROOT) && !made.args.includes('--disable-gpu'), JSON.stringify(relaunches()))
     } finally {
@@ -121,7 +121,7 @@ async function stopSession(inv) {
       const row = page.locator(`.advanced-row[data-advanced="${ID}"]`)
       check('its switch shows on, with no restart offered', !!(await lib.until(async () => (await row.count()) === 1 && (await row.getByRole('switch').getAttribute('aria-checked')) === 'true', HUNG_MS)) && (await row.locator('[data-note="restart"]').count()) === 0)
       await row.getByRole('switch').click()
-      check('turning it off offers Restart Hive', !!(await lib.until(async () => !(ID in readFile().values) && (await row.locator('[data-note="restart"]').count()) === 1, HUNG_MS)), JSON.stringify(readFile().values))
+      check('turning it off offers Restart Combwork', !!(await lib.until(async () => !(ID in readFile().values) && (await row.locator('[data-note="restart"]').count()) === 1, HUNG_MS)), JSON.stringify(readFile().values))
     } finally {
       await app.close().catch(() => undefined)
     }

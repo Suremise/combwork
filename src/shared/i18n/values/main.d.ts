@@ -1,6 +1,6 @@
 // Generated from locales/en/main.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
-interface HiveMessageValues {
+interface CombworkMessageValues {
   'main.accounts.badTarget': { target: string | number; cli: string | number }
   'main.accounts.checkHeld': { name: string | number; cli: string | number }
   'main.accounts.folderNotUsable': { name: string | number }
@@ -31,6 +31,11 @@ interface HiveMessageValues {
   'main.antivirus.unreadable': undefined
   'main.antivirus.windowsOnly': undefined
   'main.assistantQuestion.answered': undefined
+  'main.assistantQuestion.stop.message': { agent: string | number; state: string | number; hasReason: string; reason: string | number }
+  'main.assistantQuestion.stop.no': undefined
+  'main.assistantQuestion.stop.state': { status: string }
+  'main.assistantQuestion.stop.title': { agent: string | number; project: string | number }
+  'main.assistantQuestion.stop.yes': undefined
   'main.board.damagedBody': { files: string | number; folder: string | number }
   'main.board.damagedTitle': { n: number }
   'main.board.foundBody': { folder: string | number }
@@ -39,6 +44,15 @@ interface HiveMessageValues {
   'main.branchMerge.cardWork': { branch: string | number; card: string | number }
   'main.branchMerge.notBranch': { branch: string | number }
   'main.branchMerge.same': { branch: string | number }
+  'main.combworkMove.bothBody': undefined
+  'main.combworkMove.bothTitle': { folder: string | number }
+  'main.combworkMove.linkBody': undefined
+  'main.combworkMove.linkTitle': { folder: string | number }
+  'main.combworkMove.what.cards': undefined
+  'main.combworkMove.what.excludes': undefined
+  'main.combworkMove.what.folders': undefined
+  'main.combworkMove.what.notes': undefined
+  'main.combworkMove.what.worktrees': undefined
   'main.connections.badMode': { cli: string | number; mode: string | number }
   'main.connections.beingRemoved': { name: string | number }
   'main.connections.choice.missing': { agent: string | number }
@@ -50,6 +64,7 @@ interface HiveMessageValues {
   'main.connections.launch.deleted': { agent: string | number }
   'main.connections.launch.noKey': { name: string | number; agent: string | number }
   'main.connections.launch.none': { cli: string | number; agent: string | number }
+  'main.connections.launch.offHere': { n: number; cli: string | number; names: string | number; agent: string | number }
   'main.connections.launch.offNoDefault': { agent: string | number; name: string | number; cli: string | number }
   'main.connections.launch.otherProvider': { agent: string | number; cli: string | number }
   'main.connections.launch.signedOut': { name: string | number; agent: string | number }
@@ -57,6 +72,7 @@ interface HiveMessageValues {
   'main.connections.nameTaken': { account: string | number; name: string | number }
   'main.connections.noName': undefined
   'main.connections.notFound': undefined
+  'main.connections.tagTooLong': { max: number }
   'main.connections.userIn': { agent: string | number; project: string | number }
   'main.console.noWorkspace': undefined
   'main.console.title': { workspace: string | number }
@@ -218,6 +234,14 @@ interface HiveMessageValues {
   'main.move.watches': { n: number }
   'main.move.workingMoved': { projects: string | number }
   'main.move.workingRenamed': { n: number; projects: string | number }
+  'main.nameUpgrade.boardBothBody': undefined
+  'main.nameUpgrade.boardBothTitle': { folder: string | number }
+  'main.nameUpgrade.boardLeftBody': undefined
+  'main.nameUpgrade.boardLeftTitle': { file: string | number }
+  'main.nameUpgrade.profileTitle': undefined
+  'main.nameUpgrade.what.board': undefined
+  'main.nameUpgrade.what.files': undefined
+  'main.nameUpgrade.what.projects': undefined
   'main.notify.answered': undefined
   'main.notify.sessionEnded': undefined
   'main.outage.gaveUpBody': { n: number }
@@ -251,6 +275,10 @@ interface HiveMessageValues {
   'main.plan.resetsOn': { when: string | number }
   'main.plan.used': { share: number; provider: string | number; window: string; hours: number; label: string | number }
   'main.plan.usedOn': { share: number; window: string; hours: number; label: string | number; connection: string | number }
+  'main.profileMove.refused': { from: string | number; to: string | number; reason: string | number }
+  'main.profileMove.refusedTitle': undefined
+  'main.profileMove.signInBody': { names: string | number; n: number }
+  'main.profileMove.signInTitle': { n: number }
   'main.quit.closed': undefined
   'main.quit.closedBody': { n: number }
   'main.quit.dialogTitle': undefined
@@ -265,9 +293,9 @@ interface HiveMessageValues {
   'main.removal.folder.deleting': undefined
   'main.removal.folder.heldNow': undefined
   'main.removal.folder.home': undefined
+  'main.removal.folder.notCombwork': undefined
   'main.removal.folder.notForgotten': { why: string | number }
   'main.removal.folder.notHeld': { n: number }
-  'main.removal.folder.notHives': undefined
   'main.removal.folder.notTrashed': { path: string | number; why: string | number }
   'main.removal.folder.outsideDelete': undefined
   'main.removal.folderGone': { folder: string | number }
@@ -447,8 +475,13 @@ interface HiveMessageValues {
   'main.update.whatsNew': undefined
   'main.usageMove.blockedBody': { reason: string; to: string | number; share: number; window: string; workspace: string | number; agents: string | number }
   'main.usageMove.blockedTitle': { from: string | number; to: string | number }
+  'main.usageMove.movedAgent': { agent: string | number; by: string; tag: string | number }
   'main.usageMove.movedBody': { from: string | number; share: number; window: string; agents: string | number; to: string | number }
   'main.usageMove.movedTitle': { count: number; from: string | number; to: string | number }
+  'main.viewerTokens.noName': undefined
+  'main.viewerTokens.taken': { name: string | number }
+  'main.viewerTokens.tooLong': { most: number }
+  'main.viewerTokens.tooMany': { most: number }
   'main.window.openLogs': undefined
   'main.window.quit': undefined
   'main.window.reload': undefined

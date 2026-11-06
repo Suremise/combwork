@@ -1,0 +1,97 @@
+{
+  "mcp.catalog.badName": {
+    "placeholders": {}
+  },
+  "mcp.catalog.expired": {
+    "placeholders": {}
+  },
+  "mcp.catalog.folder": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "mcp.catalog.gone": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "mcp.catalog.http": {
+    "placeholders": {
+      "url": "plain",
+      "status": "plain"
+    }
+  },
+  "mcp.catalog.mismatch": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "mcp.catalog.needs": {
+    "placeholders": {
+      "name": "plain",
+      "needs": "plain"
+    }
+  },
+  "mcp.catalog.notInstalled": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "mcp.catalog.redirects": {
+    "placeholders": {
+      "url": "plain"
+    }
+  },
+  "mcp.catalog.scheme": {
+    "placeholders": {
+      "url": "plain"
+    }
+  },
+  "mcp.catalog.sourceTaken": {
+    "placeholders": {}
+  },
+  "mcp.catalog.sourceUrl": {
+    "placeholders": {}
+  },
+  "mcp.catalog.timeout": {
+    "placeholders": {
+      "url": "plain",
+      "seconds": "number"
+    }
+  },
+  "mcp.catalog.tooLarge": {
+    "placeholders": {
+      "url": "plain",
+      "max": "number"
+    }
+  },
+  "mcp.catalog.tooManySources": {
+    "placeholders": {
+      "max": "number"
+    }
+  },
+  "mcp.catalog.workspaceGone": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "mcp.error.cannotClear": {
+    "placeholders": {
+      "project": "plain",
+      "name": "plain"
+    }
+  },
+  "mcp.error.invalidName": {
+    "placeholders": {}
+  },
+  "mcp.error.noProject": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "mcp.error.noServerAdd": {
+    "placeholders": {
+      "name": "plain"
+    }
+  }
+}

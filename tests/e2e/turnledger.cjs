@@ -1,10 +1,10 @@
 // The turn ledger (#648): an agent's status follows its CLI's turns by their ids, so it can't freeze on "working". Acted
 // out with the fake Claude Code (prompt_id, 2.1.296's screen) and the fake Codex (turn_id, its rollout's task_complete):
 // - a final turn with no tool call ends finished;
-// - a tool's PostToolUse that reaches Hive after its turn's Stop leaves it finished (one way #642's agent stayed working);
+// - a tool's PostToolUse that reaches Combwork after its turn's Stop leaves it finished (one way #642's agent stayed working);
 // - a turn another Stop hook carries on works again at its next tool, and ends at its next Stop;
 // - a Stop that never comes: Codex's own record of the turn's end ends it; Claude Code idle at its prompt on screen
-//   (after a silence, HIVE_TEST_SILENT_MS here) ends it;
+//   (after a silence, CW_TEST_SILENT_MS here) ends it;
 // - with no sign of the end at all, the state is unknown (never idle): the pane says how long it has been silent, with
 //   Mark idle, and it takes a task once marked;
 // - Codex waiting to retry after a 429, recorded only in its log database (HI-1972): its pane says so and when it
@@ -18,7 +18,7 @@ const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 20000
-// How long a running turn may be silent before Hive looks for its end on screen or says its state is unknown.
+// How long a running turn may be silent before Combwork looks for its end on screen or says its state is unknown.
 const SILENT_MS = 2000
 
 const userData = path.join(lib.WORK, 'turnledger-profile')
@@ -50,13 +50,13 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: API_PORT, CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, HIVE_TEST_SILENT_MS: String(SILENT_MS) })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: API_PORT, CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, CW_TEST_SILENT_MS: String(SILENT_MS) })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   const until = async (fn, ms) => {
     const t = Date.now()
     let v
@@ -101,7 +101,7 @@ const check = (name, ok, extra = '') => {
     return s?.status === status && (!state || s.turn?.state === state) && s
   }, HUNG_MS)
   const hooksLog = () => fs.readFileSync(path.join(userData, 'logs', 'hooks.log'), 'utf8')
-  const hiveLog = () => fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8')
+  const combworkLog = () => fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8')
   const journal = (a, re) => until(() => fs.existsSync(path.join(userData, 'logs', 'hooks.log')) && hooksLog().split('\n').some((l) => l.includes(`run=${a.runId} `) && re.test(l)), HUNG_MS)
 
   for (const [a, name] of [[claude, 'Claude Code'], [codex, 'Codex']]) {
@@ -123,7 +123,7 @@ const check = (name, ok, extra = '') => {
       return from[0]?.startsWith('working') && from.includes('finished|over') && from
     }, HUNG_MS)
     const ended = since ? since.indexOf('finished|over') : -1
-    check(`${name}: a tool end that reaches Hive after the turn's Stop is old news: it stays finished`, !!after && !!stale && still?.status === 'finished' && ended > 0 && !since.slice(ended).some((s) => s.startsWith('working')), JSON.stringify(seen.get(a.id)))
+    check(`${name}: a tool end that reaches Combwork after the turn's Stop is old news: it stays finished`, !!after && !!stale && still?.status === 'finished' && ended > 0 && !since.slice(ended).some((s) => s.startsWith('working')), JSON.stringify(seen.get(a.id)))
   }
 
   // Claude Code: another Stop hook carries the turn on: working at its next tool, finished at its next Stop.
@@ -134,15 +134,15 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(path.join(claudeHome, 'fake-continue-done-Claude'), '')
   check('and its next Stop ends it', !!(await is(claude, 'finished', 'over')))
 
-  // Codex: its Stop never reaches Hive; its rollout records the turn's end (task_complete).
+  // Codex: its Stop never reaches Combwork; its rollout records the turn's end (task_complete).
   await turn(codex, 'loststop')
   check("Codex: a turn whose Stop is lost ends from Codex's own record of it", !!(await is(codex, 'finished', 'over')))
-  check('the log says so', !!(await until(() => /Codex recorded the end of turn [\w-]+ at .*, and Hive saw no Stop: its turn is over/.test(hiveLog()), HUNG_MS)))
+  check('the log says so', !!(await until(() => /Codex recorded the end of turn [\w-]+ at .*, and Combwork saw no Stop: its turn is over/.test(combworkLog()), HUNG_MS)))
 
   // Claude Code: its Stop is lost and nothing records it; after a silence, its screen shows it idle at its prompt.
   await turn(claude, 'loststop')
   check('Claude Code: a turn whose Stop is lost ends once its screen shows it idle at its prompt', !!(await is(claude, 'finished', 'over')))
-  check('the log says so', !!(await until(() => /Claude Code is idle at its prompt on screen after \d+ (s|min) of silence, and Hive saw no Stop/.test(hiveLog()), HUNG_MS)))
+  check('the log says so', !!(await until(() => /Claude Code is idle at its prompt on screen after \d+ (s|min) of silence, and Combwork saw no Stop/.test(combworkLog()), HUNG_MS)))
 
   // Codex 0.160.0 (no screen check for it): no Stop, nothing recorded. Unknown, never idle; Mark idle.
   await turn(codex, 'silent')
@@ -152,7 +152,7 @@ const check = (name, ok, extra = '') => {
   const label = await until(async () => /^Silent \d+ min · state unknown$/.test((await header.locator('.unknown-state .pane-status').innerText().catch(() => '')).trim()) && header, HUNG_MS)
   check('its pane says how long it has been silent, with Mark idle', !!label && (await header.getByRole('button', { name: 'Mark idle' }).isVisible()))
   await page.screenshot({ path: path.join(lib.WORK, 'turnledger-unknown.png') })
-  check('the log says the state is unknown', !!(await until(() => /silent for \d+ (s|min) with no sign of its turn's end: state unknown \(turn [\w-]+ running/.test(hiveLog()), HUNG_MS)))
+  check('the log says the state is unknown', !!(await until(() => /silent for \d+ (s|min) with no sign of its turn's end: state unknown \(turn [\w-]+ running/.test(combworkLog()), HUNG_MS)))
   await header.getByRole('button', { name: 'Mark idle' }).click()
   check('Mark idle makes it idle', !!(await is(codex, 'ready', 'over')))
   check('and it takes a task', !!(await turn(codex, 'work 1')) && !!(await is(codex, 'finished', 'over')))
@@ -169,12 +169,12 @@ const check = (name, ok, extra = '') => {
   const shown = await until(async () => /^Rate-limited \(429\) · retrying at .+ \(1 of 5\)$/.test((await retryText()).trim()), HUNG_MS)
   check('its pane says it was rate-limited and when it retries, not Working…', !!shown, await retryText())
   await page.screenshot({ path: path.join(lib.WORK, 'turnledger-retrying.png') })
-  check('the log says it waits to retry', !!(await until(() => /Codex is waiting to retry its model request \(429, try 1\/5\) until \d{4}-/.test(hiveLog()), HUNG_MS)))
+  check('the log says it waits to retry', !!(await until(() => /Codex is waiting to retry its model request \(429, try 1\/5\) until \d{4}-/.test(combworkLog()), HUNG_MS)))
   // Its retry goes through: it carries on, and its next hook clears the wait.
   fs.writeFileSync(path.join(codexHome, 'fake-retried-Codex'), '')
   const over = await is(codex, 'finished', 'over')
   check('its retry going through clears it: the turn ends as usual', !!over && !over.retryWait, JSON.stringify(over?.retryWait))
-  // HI-1996: afterwards, the wait is in the launch's tally: hive_agent_activity says how long it waited, with the model and
+  // HI-1996: afterwards, the wait is in the launch's tally: cw_agent_activity says how long it waited, with the model and
   // effort it runs with, and the footer model's hover says it too.
   const activityOf = async (name) => {
     const token = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
@@ -182,7 +182,7 @@ const check = (name, ok, extra = '') => {
     return res.json()
   }
   const act = await activityOf('Codex')
-  check('hive_agent_activity: the wait it had, its model and effort', act.retryWaits?.waits === 1 && act.retryWaits.latest?.status === 429 && act.retryWaits.latest.tries === 1 && !act.retryWaits.latest.ongoing && act.retryWaits.latest.since === waiting.retryWait.since && typeof act.retryWaits.seconds === 'number' && typeof act.model === 'string' && act.model.length > 0 && typeof act.effort === 'string', JSON.stringify({ retryWaits: act.retryWaits, model: act.model, effort: act.effort }))
+  check('cw_agent_activity: the wait it had, its model and effort', act.retryWaits?.waits === 1 && act.retryWaits.latest?.status === 429 && act.retryWaits.latest.tries === 1 && !act.retryWaits.latest.ongoing && act.retryWaits.latest.since === waiting.retryWait.since && typeof act.retryWaits.seconds === 'number' && typeof act.model === 'string' && act.model.length > 0 && typeof act.effort === 'string', JSON.stringify({ retryWaits: act.retryWaits, model: act.model, effort: act.effort }))
   const footTip = await lib.hoverTip(page, page.locator('.agent-pane').filter({ has: header }).locator('.pane-footer-bar .foot-model'), (t) => /This session has waited/.test(t))
   check("the footer model's hover says how long this session waited for retries", /This session has waited (under a minute|\d+ minutes?) in all for Codex to retry rate-limited or failed requests \(1 wait, the latest from .+\): time not spent on its work\./.test(footTip), footTip)
   await page.screenshot({ path: path.join(lib.WORK, 'turnledger-retry-hover.png') })

@@ -22,17 +22,17 @@ import { Icon, IconButton, LoadFailed, StaleNote } from './ui'
 const M = {
   entry: msg({ id: 'project.leftovers.entry', defaultMessage: 'Leftover branches ({n, number})', description: "An entry of the Changes tab's picker: the branches nothing uses now, {n} of them." }),
   heading: msg({ id: 'project.leftovers.heading', defaultMessage: 'Leftover branches', description: "The heading of the Changes tab's page of branches nothing uses now." }),
-  about: msg({ id: 'project.leftovers.about', defaultMessage: 'Branches nothing uses now: not {target} or the default branch, not checked out in a worktree or slot, and no open card’s. A Done or archived card’s branch, an agent’s from before slots, or one of no card. Delete removes only the branch, and Hive checks again first that nothing uses it.', description: "The sentence at the top of the Changes tab's leftover branches. {target} is the branch the project's work merges into." }),
+  about: msg({ id: 'project.leftovers.about', defaultMessage: 'Branches nothing uses now: not {target} or the default branch, not checked out in a worktree or slot, and no open card’s. A Done or archived card’s branch, an agent’s from before slots, or one of no card. Delete removes only the branch, and Combwork checks again first that nothing uses it.', description: "The sentence at the top of the Changes tab's leftover branches. {target} is the branch the project's work merges into." }),
   merged: msg({ id: 'project.leftovers.merged', defaultMessage: 'Merged into {target}', description: "A group of the Changes tab's leftover branches: those whose commits are all in {target}, so deleting them loses nothing." }),
   unmerged: msg({ id: 'project.leftovers.unmerged', defaultMessage: 'Not in {target}', description: "A group of the Changes tab's leftover branches: those with commits {target} hasn't." }),
   ahead: msg({ id: 'project.leftovers.ahead', defaultMessage: '{n, plural, one {# commit not in {target}} other {# commits not in {target}}}', description: "On a leftover branch in the Changes tab: how many of its commits {target} hasn't." }),
-  notCounted: msg({ id: 'project.leftovers.notCounted', defaultMessage: 'commits not in {target}: not counted', description: "On a leftover branch in the Changes tab when Hive didn't count its commits (too many)." }),
+  notCounted: msg({ id: 'project.leftovers.notCounted', defaultMessage: 'commits not in {target}: not counted', description: "On a leftover branch in the Changes tab when Combwork didn't count its commits (too many)." }),
   compare: msg({ id: 'project.leftovers.compare', defaultMessage: 'Compare', description: "A button on a leftover branch in the Changes tab: compares it with the target before deciding." }),
   compareTip: msg({ id: 'project.leftovers.compareTip', defaultMessage: 'Compare {branch} with {target}', description: "Tooltip of a leftover branch's Compare button in the Changes tab." }),
   delete: msg({ id: 'project.leftovers.delete', defaultMessage: 'Delete…', description: "A button on a leftover branch in the Changes tab: deletes it, after a confirmation." }),
   none: msg({ id: 'project.leftovers.none', defaultMessage: 'None here.', description: "Under a group of the Changes tab's leftover branches that has none." }),
   load: msg({ id: 'project.leftovers.load', defaultMessage: 'the branches', description: "What couldn't be read, in an error on the Changes tab's leftover branches." }),
-  refresh: msg({ id: 'project.leftovers.refresh', defaultMessage: 'Read the branches again', description: "A button on the Changes tab's leftover branches: reads them again (a branch changed outside Hive)." }),
+  refresh: msg({ id: 'project.leftovers.refresh', defaultMessage: 'Read the branches again', description: "A button on the Changes tab's leftover branches: reads them again (a branch changed outside Combwork)." }),
   loading: msg({ id: 'project.leftovers.loading', defaultMessage: 'Reading the branches…', description: "While the Changes tab's leftover branches are read." })
 }
 

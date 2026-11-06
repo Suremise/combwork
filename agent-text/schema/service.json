@@ -1,0 +1,840 @@
+{
+  "service.advanced.asIs": {
+    "placeholders": {
+      "problem": "plain"
+    }
+  },
+  "service.advanced.changedOutside": {
+    "placeholders": {}
+  },
+  "service.advanced.fixFirst": {
+    "placeholders": {
+      "problem": "plain"
+    }
+  },
+  "service.advanced.fixOrDelete": {
+    "placeholders": {
+      "problem": "plain"
+    }
+  },
+  "service.advanced.newer": {
+    "placeholders": {
+      "format": "plain",
+      "supported": "plain"
+    }
+  },
+  "service.advanced.notJson": {
+    "placeholders": {
+      "error": "plain"
+    }
+  },
+  "service.advanced.notObject": {
+    "placeholders": {
+      "example": "plain"
+    }
+  },
+  "service.advanced.notValues": {
+    "placeholders": {}
+  },
+  "service.advanced.unknown": {
+    "placeholders": {
+      "id": "plain"
+    }
+  },
+  "service.attachments.badFolder": {
+    "placeholders": {}
+  },
+  "service.attachments.badRecord": {
+    "placeholders": {
+      "file": "plain"
+    }
+  },
+  "service.attachments.notOwn": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "service.benchmarks.allPinned": {
+    "placeholders": {
+      "n": "plain"
+    }
+  },
+  "service.benchmarks.cantRead": {
+    "placeholders": {
+      "error": "plain"
+    }
+  },
+  "service.benchmarks.closed": {
+    "placeholders": {}
+  },
+  "service.benchmarks.damaged": {
+    "placeholders": {}
+  },
+  "service.benchmarks.noSuch": {
+    "placeholders": {}
+  },
+  "service.benchmarks.noSuchHere": {
+    "placeholders": {}
+  },
+  "service.benchmarks.noWorkspace": {
+    "placeholders": {}
+  },
+  "service.benchmarks.notRemoved": {
+    "placeholders": {}
+  },
+  "service.benchmarks.stuck": {
+    "placeholders": {
+      "n": "plural"
+    }
+  },
+  "service.benchmarks.switched": {
+    "placeholders": {}
+  },
+  "service.benchmarks.unwritable": {
+    "placeholders": {}
+  },
+  "service.benchmarks.why": {
+    "placeholders": {
+      "why": "select"
+    }
+  },
+  "service.benchmarks.wrongScope": {
+    "placeholders": {}
+  },
+  "service.cardAttach.moveFailed": {
+    "placeholders": {
+      "project": "plain",
+      "why": "plain"
+    }
+  },
+  "service.cardAttach.moved": {
+    "placeholders": {}
+  },
+  "service.cardAttach.noAttachment": {
+    "placeholders": {}
+  },
+  "service.cardAttach.noCard": {
+    "placeholders": {}
+  },
+  "service.cardAttach.noProject": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "service.cardAttach.refused": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "service.cardAttach.refusedFrom": {
+    "placeholders": {
+      "path": "plain",
+      "caller": "select",
+      "temp": "plain",
+      "more": "select",
+      "folders": "plain"
+    }
+  },
+  "service.cardAttach.tooLarge": {
+    "placeholders": {
+      "name": "plain",
+      "max": "plain"
+    }
+  },
+  "service.cardAttach.tooMuch": {
+    "placeholders": {
+      "files": "number",
+      "total": "plain"
+    }
+  },
+  "service.cardCleanup.stale": {
+    "placeholders": {}
+  },
+  "service.combworkMove.busy": {
+    "placeholders": {
+      "profile": "plain"
+    }
+  },
+  "service.combworkMove.closed": {
+    "placeholders": {}
+  },
+  "service.combworkMove.locked": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "service.combworkMove.otherOpen": {
+    "placeholders": {
+      "profile": "plain"
+    }
+  },
+  "service.combworkMove.phaseFailed": {
+    "placeholders": {
+      "what": "plain",
+      "error": "plain"
+    }
+  },
+  "service.combworkVcs.cantList": {
+    "placeholders": {}
+  },
+  "service.combworkVcs.cantListWhy": {
+    "placeholders": {
+      "problem": "plain"
+    }
+  },
+  "service.combworkVcs.changed": {
+    "placeholders": {}
+  },
+  "service.combworkVcs.exitCode": {
+    "placeholders": {
+      "code": "plain"
+    }
+  },
+  "service.combworkVcs.noRepo": {
+    "placeholders": {}
+  },
+  "service.combworkVcs.rmFailed": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "service.files.badName": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "service.files.exists": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "service.files.existsIn": {
+    "placeholders": {
+      "root": "select",
+      "name": "plain",
+      "folder": "plain"
+    }
+  },
+  "service.files.groupInUse": {
+    "placeholders": {}
+  },
+  "service.files.inUse": {
+    "placeholders": {}
+  },
+  "service.files.insideItself": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "service.files.nameRequired": {
+    "placeholders": {}
+  },
+  "service.files.needsEntry": {
+    "placeholders": {}
+  },
+  "service.files.notAttachment": {
+    "placeholders": {}
+  },
+  "service.files.notKept": {
+    "placeholders": {}
+  },
+  "service.files.outside": {
+    "placeholders": {}
+  },
+  "service.files.throughLink": {
+    "placeholders": {}
+  },
+  "service.fsutil.keptBusy": {
+    "placeholders": {
+      "file": "plain"
+    }
+  },
+  "service.fsutil.keptUnreadable": {
+    "placeholders": {
+      "file": "plain"
+    }
+  },
+  "service.fsutil.notCopied": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "service.git.exitCode": {
+    "placeholders": {
+      "code": "plain"
+    }
+  },
+  "service.git.failed": {
+    "placeholders": {
+      "command": "plain",
+      "why": "plain"
+    }
+  },
+  "service.git.outside": {
+    "placeholders": {}
+  },
+  "service.gitCompare.noBranch": {
+    "placeholders": {
+      "branch": "plain"
+    }
+  },
+  "service.gitRepo.addFailed": {
+    "placeholders": {
+      "remote": "plain",
+      "why": "plain"
+    }
+  },
+  "service.gitRepo.badName": {
+    "placeholders": {
+      "kind": "select",
+      "hasName": "select",
+      "name": "plain"
+    }
+  },
+  "service.gitRepo.chooseRemote": {
+    "placeholders": {}
+  },
+  "service.gitRepo.command": {
+    "placeholders": {
+      "command": "plain",
+      "why": "plain"
+    }
+  },
+  "service.gitRepo.createFailed": {
+    "placeholders": {
+      "name": "plain",
+      "why": "plain"
+    }
+  },
+  "service.gitRepo.detachedPull": {
+    "placeholders": {}
+  },
+  "service.gitRepo.detachedPush": {
+    "placeholders": {}
+  },
+  "service.gitRepo.diverged": {
+    "placeholders": {
+      "branch": "plain",
+      "upstream": "plain",
+      "ahead": "plural",
+      "behind": "number"
+    }
+  },
+  "service.gitRepo.exitCode": {
+    "placeholders": {
+      "code": "plain"
+    }
+  },
+  "service.gitRepo.fetchFailed": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "service.gitRepo.gaveUp": {
+    "placeholders": {
+      "minutes": "plain"
+    }
+  },
+  "service.gitRepo.inWorktree": {
+    "placeholders": {
+      "branch": "plain",
+      "folder": "plain"
+    }
+  },
+  "service.gitRepo.midOperation": {
+    "placeholders": {
+      "state": "plain"
+    }
+  },
+  "service.gitRepo.noBranch": {
+    "placeholders": {
+      "branch": "plain"
+    }
+  },
+  "service.gitRepo.noCommits": {
+    "placeholders": {}
+  },
+  "service.gitRepo.noRemote": {
+    "placeholders": {
+      "remote": "plain"
+    }
+  },
+  "service.gitRepo.noRemotes": {
+    "placeholders": {}
+  },
+  "service.gitRepo.noRemotesFetch": {
+    "placeholders": {}
+  },
+  "service.gitRepo.noTarget": {
+    "placeholders": {
+      "target": "plain"
+    }
+  },
+  "service.gitRepo.noUpstream": {
+    "placeholders": {
+      "branch": "plain"
+    }
+  },
+  "service.gitRepo.notOnRemote": {
+    "placeholders": {
+      "remote": "plain",
+      "branch": "plain"
+    }
+  },
+  "service.gitRepo.notRepo": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "service.gitRepo.nothingToPush": {
+    "placeholders": {}
+  },
+  "service.gitRepo.nothingToTag": {
+    "placeholders": {}
+  },
+  "service.gitRepo.pullFailed": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "service.gitRepo.pushAllRefused": {
+    "placeholders": {
+      "remote": "plain",
+      "n": "plural"
+    }
+  },
+  "service.gitRepo.pushFailed": {
+    "placeholders": {
+      "to": "plain",
+      "why": "plain"
+    }
+  },
+  "service.gitRepo.pushedAll": {
+    "placeholders": {
+      "remote": "plain"
+    }
+  },
+  "service.gitRepo.rejected": {
+    "placeholders": {
+      "to": "plain",
+      "branch": "plain"
+    }
+  },
+  "service.gitRepo.remoteBranchesDeleted": {
+    "placeholders": {
+      "n": "plural",
+      "branches": "plain",
+      "remote": "plain"
+    }
+  },
+  "service.gitRepo.remoteDeleteRefused": {
+    "placeholders": {
+      "remote": "plain",
+      "branches": "plain"
+    }
+  },
+  "service.gitRepo.remoteTaken": {
+    "placeholders": {
+      "remote": "plain"
+    }
+  },
+  "service.gitRepo.remoteTrackingChanged": {
+    "placeholders": {
+      "remote": "plain"
+    }
+  },
+  "service.gitRepo.removeRemoteFailed": {
+    "placeholders": {
+      "remote": "plain",
+      "why": "plain"
+    }
+  },
+  "service.gitRepo.renameRemoteFailed": {
+    "placeholders": {
+      "remote": "plain",
+      "why": "plain"
+    }
+  },
+  "service.gitRepo.setFailed": {
+    "placeholders": {
+      "key": "plain",
+      "why": "plain"
+    }
+  },
+  "service.gitRepo.switchFailed": {
+    "placeholders": {
+      "branch": "plain",
+      "why": "plain"
+    }
+  },
+  "service.gitRepo.tagPushFailed": {
+    "placeholders": {
+      "commit": "plain",
+      "name": "plain",
+      "remote": "plain",
+      "why": "plain"
+    }
+  },
+  "service.gitRepo.update.agentBusy": {
+    "placeholders": {
+      "agent": "plain",
+      "status": "select",
+      "folder": "plain",
+      "branch": "plain"
+    }
+  },
+  "service.gitRepo.update.conflict": {
+    "placeholders": {
+      "how": "select",
+      "branch": "plain",
+      "target": "plain",
+      "files": "plain"
+    }
+  },
+  "service.gitRepo.update.dirty": {
+    "placeholders": {
+      "folder": "plain",
+      "branch": "plain"
+    }
+  },
+  "service.gitRepo.update.failed": {
+    "placeholders": {
+      "branch": "plain",
+      "target": "plain",
+      "why": "plain"
+    }
+  },
+  "service.gitRepo.update.isTarget": {
+    "placeholders": {
+      "branch": "plain"
+    }
+  },
+  "service.gitRepo.update.midOperation": {
+    "placeholders": {
+      "state": "plain",
+      "folder": "plain"
+    }
+  },
+  "service.gitRepo.update.missed": {
+    "placeholders": {
+      "branch": "plain",
+      "target": "plain"
+    }
+  },
+  "service.gitRepo.update.moved": {
+    "placeholders": {
+      "branch": "plain"
+    }
+  },
+  "service.gitRepo.update.noTarget": {
+    "placeholders": {
+      "branch": "plain"
+    }
+  },
+  "service.gitRepo.update.notUndone": {
+    "placeholders": {
+      "branch": "plain",
+      "target": "plain",
+      "folder": "plain",
+      "state": "select",
+      "why": "plain"
+    }
+  },
+  "service.gitRepo.update.notUndoneTemporary": {
+    "placeholders": {
+      "branch": "plain",
+      "target": "plain",
+      "folder": "plain",
+      "why": "plain"
+    }
+  },
+  "service.gitRepo.update.queued": {
+    "placeholders": {
+      "card": "plain",
+      "branch": "plain"
+    }
+  },
+  "service.gitRepo.update.temporaryLeft": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "service.gitRepo.upstreamGone": {
+    "placeholders": {
+      "upstream": "plain"
+    }
+  },
+  "service.gitRepo.urlFailed": {
+    "placeholders": {
+      "remote": "plain",
+      "why": "plain"
+    }
+  },
+  "service.intent.noWorkflow": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "service.intent.queueNotAgents": {
+    "placeholders": {}
+  },
+  "service.keys.closed": {
+    "placeholders": {}
+  },
+  "service.keys.form": {
+    "placeholders": {}
+  },
+  "service.keys.prefix": {
+    "placeholders": {
+      "key": "plain",
+      "other": "plain"
+    }
+  },
+  "service.keys.taken": {
+    "placeholders": {
+      "key": "plain"
+    }
+  },
+  "service.keys.unknownProject": {
+    "placeholders": {}
+  },
+  "service.laneStart.busy": {
+    "placeholders": {
+      "status": "select",
+      "agent": "plain"
+    }
+  },
+  "service.laneStart.done": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "service.laneStart.needsReviewer": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "service.laneStart.noCards": {
+    "placeholders": {}
+  },
+  "service.laneStart.notTheProjects": {
+    "placeholders": {
+      "card": "plain",
+      "project": "plain"
+    }
+  },
+  "service.laneStart.poolEmpty": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "service.laneStart.poolNotOffered": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "service.laneStart.sameAgent": {
+    "placeholders": {}
+  },
+  "service.laneStart.starting": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "service.laneStart.unknownAgent": {
+    "placeholders": {
+      "agent": "plain",
+      "project": "plain"
+    }
+  },
+  "service.lanes.noWorkspace": {
+    "placeholders": {}
+  },
+  "service.lanes.teamPaused": {
+    "placeholders": {}
+  },
+  "service.lanes.unknown": {
+    "placeholders": {
+      "id": "plain"
+    }
+  },
+  "service.metrics.badProvider": {
+    "placeholders": {}
+  },
+  "service.metrics.badRange": {
+    "placeholders": {}
+  },
+  "service.metrics.badRole": {
+    "placeholders": {}
+  },
+  "service.nameUpgrade.boardNotFolded": {
+    "placeholders": {
+      "file": "plain",
+      "log": "plain"
+    }
+  },
+  "service.nameUpgrade.boardOrphan": {
+    "placeholders": {
+      "file": "plain",
+      "old": "plain"
+    }
+  },
+  "service.nameUpgrade.failed": {
+    "placeholders": {
+      "what": "plain",
+      "error": "plain"
+    }
+  },
+  "service.providers.noSetup": {
+    "placeholders": {
+      "cli": "plain"
+    }
+  },
+  "service.providers.notInstalled": {
+    "placeholders": {
+      "cli": "plain"
+    }
+  },
+  "service.providers.retryUnavailable": {
+    "placeholders": {}
+  },
+  "service.providers.signInConnections": {
+    "placeholders": {
+      "cli": "plain"
+    }
+  },
+  "service.providers.stillLooking": {
+    "placeholders": {
+      "cli": "plain"
+    }
+  },
+  "service.providers.stillLookingAll": {
+    "placeholders": {}
+  },
+  "service.providers.stopFirst": {
+    "placeholders": {
+      "cli": "plain"
+    }
+  },
+  "service.slots.notPrepared": {
+    "placeholders": {
+      "slot": "plain",
+      "card": "plain",
+      "why": "plain"
+    }
+  },
+  "service.slots.resumeFailed": {
+    "placeholders": {
+      "agent": "plain",
+      "slot": "plain",
+      "card": "plain",
+      "why": "plain"
+    }
+  },
+  "service.slots.resumeHeld": {
+    "placeholders": {
+      "card": "plain",
+      "agent": "plain",
+      "slot": "plain",
+      "why": "plain"
+    }
+  },
+  "service.transcripts.busy": {
+    "placeholders": {}
+  },
+  "service.transcripts.imageNotKept": {
+    "placeholders": {}
+  },
+  "service.transcripts.noImage": {
+    "placeholders": {}
+  },
+  "service.transcripts.noTool": {
+    "placeholders": {}
+  },
+  "service.transcripts.none": {
+    "placeholders": {}
+  },
+  "service.workflow.changedMeanwhile": {
+    "placeholders": {}
+  },
+  "service.workflow.closed": {
+    "placeholders": {}
+  },
+  "service.workflow.inheritor": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "service.workspace.advancedNotHere": {
+    "placeholders": {
+      "setting": "plain"
+    }
+  },
+  "service.workspace.agentGone": {
+    "placeholders": {}
+  },
+  "service.workspace.badName": {
+    "placeholders": {
+      "chars": "plain"
+    }
+  },
+  "service.workspace.closed": {
+    "placeholders": {}
+  },
+  "service.workspace.connectionGone": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "service.workspace.folderExists": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "service.workspace.holdsOpen": {
+    "placeholders": {
+      "workspace": "plain",
+      "folder": "plain",
+      "name": "plain"
+    }
+  },
+  "service.workspace.insideOpen": {
+    "placeholders": {
+      "folder": "plain",
+      "workspace": "plain"
+    }
+  },
+  "service.workspace.none": {
+    "placeholders": {}
+  },
+  "service.workspace.notFound": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "service.workspace.notProject": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "service.workspace.notRoot": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "service.workspace.openElsewhere": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "service.workspace.stillClosing": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "service.workspace.stillOpening": {
+    "placeholders": {
+      "name": "plain"
+    }
+  }
+}

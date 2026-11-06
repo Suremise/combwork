@@ -1,6 +1,6 @@
-// A batch card change (hive_update_tasks, #417): one call changes many cards with the same fields. Each card goes through
+// A batch card change (cw_update_tasks, #417): one call changes many cards with the same fields. Each card goes through
 // the single call's path under the board's lock and its own card lock, so what is refused and recorded is the same as
-// for one card. The Hive Assistant's turn for a batch (its limit, where a batch is one change however many cards it has,
+// for one card. The Combwork Assistant's turn for a batch (its limit, where a batch is one change however many cards it has,
 // #488; its activity list; what it may still do while a card waits) is tested through taskBatch.assistantBatch, the same
 // code the Agent API's route runs.
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
@@ -11,7 +11,7 @@ import * as electron from 'electron'
 import type { TaskCard } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-task-batch-')
+const base = tempDir('cw-task-batch-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 // The Recycle Bin, for tests: gone.
 ;(electron.shell as unknown as { trashItem: (p: string) => Promise<void> }).trashItem = (p) => rm(p, { recursive: true, force: true })
@@ -32,8 +32,8 @@ const gammaAgent1 = { kind: 'agent', name: 'Agent 1 (gamma)', self: { project: '
 
 function project(ws: string, name: string, agents: { id: string; name: string }[] = []): string {
   const p = join(ws, name)
-  mkdirSync(join(p, '.hive'), { recursive: true })
-  writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents }))
+  mkdirSync(join(p, '.combwork'), { recursive: true })
+  writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents }))
   return p
 }
 
@@ -53,7 +53,7 @@ function setControl(level: 'look' | 'agents' | 'projects'): void {
   config.settings.assistant = { ...config.settings.assistant, control: level } as typeof config.settings.assistant
 }
 
-describe('batch card changes (hive_update_tasks)', () => {
+describe('batch card changes (cw_update_tasks)', () => {
   let w: WS
   const wsPath = join(base, 'ws')
   beforeAll(async () => {
@@ -218,7 +218,7 @@ describe('batch card changes (hive_update_tasks)', () => {
   })
 })
 
-describe("the Hive Assistant's batch (through its change boundary)", () => {
+describe("the Combwork Assistant's batch (through its change boundary)", () => {
   let w: WS
   let wsPath = ''
   let token = ''
@@ -256,7 +256,7 @@ describe("the Hive Assistant's batch (through its change boundary)", () => {
   const singles = (n: number): number => {
     for (let i = 0; i < n; i++) {
       try {
-        control.admit(wsPath, token, 'agents', `activate the project batch (${i + 1})`, { kind: 'activate-project', project: 'batch' })
+        control.admit(wsPath, token, 'agents', [{ id: 'test.what', text: 'activate the project batch ({n})' }, { n: String(i + 1) }], { kind: 'activate-project', project: 'batch' })
       } catch {
         return i
       }
@@ -317,7 +317,7 @@ describe("the Hive Assistant's batch (through its change boundary)", () => {
     expect(items[2].card).not.toBeNull()
     for (const c of [a, done, b]) expect(linesFor(c.number)).toHaveLength(1)
     expect(linesFor(done.number)[0].ok).toBe(false)
-    // The refused card has the kind tried, its number and project, and Hive's own reason for the stream (#763).
+    // The refused card has the kind tried, its number and project, and Combwork's own reason for the stream (#763).
     expect(linesFor(done.number)[0]).toMatchObject({ kind: 'update-tasks', card: done.number, project: 'batch', reason: 'Refused' })
   })
 
@@ -477,12 +477,12 @@ describe('the batch reply', () => {
     expect(text).toContain('Refused, left as they were: #9 (Unknown task #9).')
   })
 
-  it("a card refused by its rules reads as hive_update_task's refusal: its message and rule, the next step, who can change it (HI-2238)", () => {
+  it("a card refused by its rules reads as cw_update_task's refusal: its message and rule, the next step, who can change it (HI-2238)", () => {
     const text = batchText({
       changed: [],
       refused: [
         { number: 9, error: 'Unknown task #9' },
-        { number: 2, error: 'AL-2 would be in Active with nobody on it.', rule: 'move.doingNobody', next: 'Ask the user which they want: nobody on it, an agent on it (agent), or an agent started on it (hive_start_task).', change: 'Set in Version Control.' },
+        { number: 2, error: 'AL-2 would be in Active with nobody on it.', rule: 'move.doingNobody', next: 'Ask the user which they want: nobody on it, an agent on it (agent), or an agent started on it (cw_start_task).', change: 'Set in Version Control.' },
         // A message that doesn't name its card (HR2's round 1): the row names it.
         { number: 3, error: 'a3f2c1d was already reviewed.', rule: 'submit.sameRevisionNote', next: 'Submit it again with a note saying what changed in your answer, or commit a new revision.' },
         // One card's key ending in another's (AL-21 isn't AL-2): named, not taken for the other.
@@ -494,7 +494,7 @@ describe('the batch reply', () => {
       'No card changed.',
       'Refused, left as they were: AL-9 (Unknown task #9).',
       'Refused, left as it was: AL-2 would be in Active with nobody on it. (move.doingNobody)',
-      'Ask the user which they want: nobody on it, an agent on it (agent), or an agent started on it (hive_start_task).',
+      'Ask the user which they want: nobody on it, an agent on it (agent), or an agent started on it (cw_start_task).',
       'Set in Version Control.',
       'Refused, left as it was: AL-3: a3f2c1d was already reviewed. (submit.sameRevisionNote)',
       'Submit it again with a note saying what changed in your answer, or commit a new revision.',

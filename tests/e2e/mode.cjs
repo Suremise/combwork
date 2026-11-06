@@ -15,17 +15,17 @@ let pass = 0, fail = 0
 const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.log(ok ? 'PASS' : 'FAIL', name, extra) }
 ;(async () => {
   lib.enableProviders(userData)
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, ...lib.ownClaudeHome('mode').env })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, ...lib.ownClaudeHome('mode').env })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => console.log('PAGE ERROR', e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
   await page.keyboard.press('Escape')
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   const live = async () => (await inv('session:live')).find((l) => l.projectPath.toLowerCase() === proj.toLowerCase())
-  /** How many times Hive has launched a session's process (its log's spawn lines): to wait for a relaunch. */
-  const launches = () => (fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8').match(/ spawn \W?session:/g) ?? []).length
+  /** How many times Combwork has launched a session's process (its log's spawn lines): to wait for a relaunch. */
+  const launches = () => (fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8').match(/ spawn \W?session:/g) ?? []).length
   const waitMode = async (m, ms = 30000) => { const t = Date.now(); while (Date.now() - t < ms) { if ((await live())?.permissionMode === m) return true; await sleep(200) } return false }
   await inv('workspace:open', ws); await sleep(600)
   await inv('project:updateConfig', proj, { providers: {}, layout: 'single', keybindings: {} })
@@ -47,7 +47,7 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   check('switch to Plan live', r.ok && (await waitMode('plan')), JSON.stringify(r))
   r = await inv('session:setMode', proj, agent.id, 'manual')
   check('switch to Manual live', r.ok && (await waitMode('manual')), JSON.stringify(r))
-  // Shift+Tab typed in the terminal by the user shows up in Hive
+  // Shift+Tab typed in the terminal by the user shows up in Combwork
   await inv('pty:write', lib.ptyKey(proj, agent.id), '\x1b[Z')
   check('Shift+Tab in the terminal is picked up', await waitMode('acceptEdits'), (await live())?.permissionMode)
   check('no restart banner for mode changes', (await page.locator('.banner', { hasText: 'Restart the session' }).count()) === 0)

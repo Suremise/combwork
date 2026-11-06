@@ -15,7 +15,7 @@ import { cx } from '../util'
 import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
 
 /**
- * A workspace (or project) moved to another folder since Hive last opened it (#146): a banner over the main area, and
+ * A workspace (or project) moved to another folder since Combwork last opened it (#146): a banner over the main area, and
  * Repair…, which shows what it will do (worktrees, session folders, Claude Code's conversations and memory, Open
  * Recent), does it on confirmation and says what it did. Main works it all out (workspaceMove.ts).
  */
@@ -31,9 +31,9 @@ const M = {
   projects: msg({ id: 'workspace.move.projects', defaultMessage: '{count, plural, one {The project {name} was moved to another folder.} other {# projects were moved to another folder.}}', description: 'The banner when projects moved.' }),
   pending: msg({ id: 'workspace.move.pending', defaultMessage: 'A worktree of {projects} was made again at a new folder, and not everything has followed it yet.', description: 'The banner when a worktree was made again elsewhere.' }),
   stillPoint: msg({ id: 'workspace.move.stillPoint', defaultMessage: "Agents' worktrees, sessions and conversations still point to the old folder.", description: 'The banner over a moved workspace or project, after what moved.' }),
-  cardsBanner: msg({ id: 'workspace.move.cardsBanner', defaultMessage: '{lines}, which was renamed or moved: the board still lists them under the old name.', description: 'The banner when cards are listed under a project\'s old name ({lines}: "9 cards of hive-website belong to website", several separated by ;).' }),
-  branchesBanner: msg({ id: 'workspace.move.branchesBanner', defaultMessage: "{count, plural, one {An agent's branch is still named after an old folder; Repair renames it.} other {# agents' branches are still named after an old folder; Repair renames them.}}", description: "The banner when agents' git branches are named after where the workspace or project was (hive/<workspace>/<project>/<agent>)." }),
-  profileBanner: msg({ id: 'workspace.move.profileBanner', defaultMessage: "Some of Hive's records of this workspace couldn't follow it from its old folder yet.", description: "The banner when the output Hive keeps of the workspace's close command couldn't all be moved from its old folder's records after a move (HI-2007); Repair… tries again." }),
+  cardsBanner: msg({ id: 'workspace.move.cardsBanner', defaultMessage: '{lines}, which was renamed or moved: the board still lists them under the old name.', description: 'The banner when cards are listed under a project\'s old name ({lines}: "9 cards of demo-website belong to website", several separated by ;).' }),
+  branchesBanner: msg({ id: 'workspace.move.branchesBanner', defaultMessage: "{count, plural, one {An agent's branch is still named after an old folder; Repair renames it.} other {# agents' branches are still named after an old folder; Repair renames them.}}", description: "The banner when agents' git branches are named after where the workspace or project was (cw/<workspace>/<project>/<agent>)." }),
+  profileBanner: msg({ id: 'workspace.move.profileBanner', defaultMessage: "Some of Combwork's records of this workspace couldn't follow it from its old folder yet.", description: "The banner when the output Combwork keeps of the workspace's close command couldn't all be moved from its old folder's records after a move (HI-2007); Repair… tries again." }),
   repair: msg({ id: 'workspace.move.repairButton', defaultMessage: 'Repair…', description: 'The banner over a moved workspace: opens Repair.' }),
   hide: msg({ id: 'workspace.move.hide', defaultMessage: 'Hide for now (Repair Moved Workspace… stays in the command palette)', description: "The banner's close button. Repair Moved Workspace… is the command's name." }),
   undo: msg({ id: 'workspace.move.undo', defaultMessage: 'Undo', description: "Repair's plan: takes back a choice made for a missing worktree." }),
@@ -67,13 +67,13 @@ const TAGS = { b: bold, mono, faint }
 /** A message with markup (<b>, <mono>, <faint>), as React nodes. */
 /** Whose folder a copy is for, in the window's language (#891); a record from before owners were kept says it in English. */
 const ownerText = (f: { of?: string; owner?: MoveOwner }): string =>
-  f.owner ? tr(msg({ id: 'workspace.move.owner', defaultMessage: "{owner, select, project {the project} assistant {the Assistant} other {{agent}'s worktree}}", description: "Repair's plan: whose folder a coding agent's conversations are copied for, put into its lines (\"… for {of}\", workspace.move.copy and copyNone): the project, the Hive Assistant, or an agent's worktree ({agent}: its name). Word it to fit there in your translation of those lines." }), { owner: f.owner.kind, agent: f.owner.kind === 'worktree' ? f.owner.agent : '' }) : (f.of ?? '')
+  f.owner ? tr(msg({ id: 'workspace.move.owner', defaultMessage: "{owner, select, project {the project} assistant {the Assistant} other {{agent}'s worktree}}", description: "Repair's plan: whose folder a coding agent's conversations are copied for, put into its lines (\"… for {of}\", workspace.move.copy and copyNone): the project, the Combwork Assistant, or an agent's worktree ({agent}: its name). Word it to fit there in your translation of those lines." }), { owner: f.owner.kind, agent: f.owner.kind === 'worktree' ? f.owner.agent : '' }) : (f.of ?? '')
 
 const rich = (m: Msg, values: Record<string, string | number>): React.ReactNode[] => Children.toArray(tRich<React.ReactNode>(m, { ...values, ...TAGS }))
 
 /** What was saved under a project's old name (#508): "9 cards", "9 cards and 1 lane". */
 const savedUnder = (m: MoveCards): string => fmt.list([m.cards.length ? tr(M.cards, { count: m.cards.length }) : '', m.lanes ? tr(M.lanes, { count: m.lanes }) : '', m.watches ? tr(M.watches, { count: m.watches }) : ''].filter(Boolean))
-/** "9 cards of hive-website belong to website": what was left under a project's old name (#508). */
+/** "9 cards of demo-website belong to website": what was left under a project's old name (#508). */
 const cardsLine = (m: MoveCards): string => tr(M.cardsLine, { what: savedUnder(m), from: m.from, to: m.to, total: m.cards.length + (m.lanes ?? 0) + (m.watches ?? 0) })
 
 export function MovedBanner() {
@@ -131,7 +131,7 @@ const T = {
   keptFiles: msg({ id: 'workspace.repair.keptFiles', defaultMessage: '{count, plural, one {# file kept} other {# files kept}}', description: "Repair's plan, after the Will do column's copy: files already there with other content, never overwritten (the full list in its tooltip)." }),
   keptTip: msg({ id: 'workspace.repair.keptTip', defaultMessage: "{count, plural, one {# file is} other {# files are}} already in the new folder with other content and won't be overwritten: {files}{more, plural, =0 {} other { and # more}}.", description: "Repair's plan: the tooltip of a coding agent's files left as they are ({files}: up to five names)." }),
   unreadableFiles: msg({ id: 'workspace.repair.unreadableFiles', defaultMessage: "{count, plural, one {# can't be read} other {# can't be read}}", description: "Repair's plan, after the Will do column's copy: files that couldn't be read (Repair tries them again; the list in its tooltip)." }),
-  moveRuns: msg({ id: 'workspace.repair.moveRuns', defaultMessage: 'move here (last try: {why})', description: "Repair's plan, the Will do column of the close command's output (HI-2007): the runs Hive keeps are moved from the old folder's records to the new one's; {why} is the system's message from the last try, which failed." }),
+  moveRuns: msg({ id: 'workspace.repair.moveRuns', defaultMessage: 'move here (last try: {why})', description: "Repair's plan, the Will do column of the close command's output (HI-2007): the runs Combwork keeps are moved from the old folder's records to the new one's; {why} is the system's message from the last try, which failed." }),
   listNew: msg({ id: 'workspace.repair.listNew', defaultMessage: 'list the new folder', description: "Repair's plan, the Will do column of Open Recent: the new folder replaces the old one." }),
   markAgain: msg({ id: 'workspace.repair.markAgain', defaultMessage: 'mark {projects} again', description: "Repair's plan, the Will do column of Working on ({projects}: the projects)." }),
   showFolders: msg({ id: 'workspace.repair.showFolders', defaultMessage: 'Show the folders', description: "Repair's plan: the button that lists a coding agent's folders one by one under its row." }),
@@ -142,12 +142,12 @@ const T = {
   recreateSlot: msg({ id: 'workspace.repair.recreateSlot', defaultMessage: 'Recreate the slot on its branch', description: "Repair's plan, a missing lent slot's button, in full (its tooltip; #1447): make the slot's folder again on its branch, the agent keeping it." }),
   recreateOn: msg({ id: 'workspace.repair.recreateOn', defaultMessage: 'make again on {branch}', description: "Repair's plan, the Will do column: a lent slot's folder made again on its branch ({branch}; #1447)." }),
   releaseShort: msg({ id: 'workspace.repair.releaseShort', defaultMessage: 'Release', description: "Repair's plan, a missing lent slot's compact button (#1447; its tooltip: workspace.repair.releaseSlot)." }),
-  releaseSlot: msg({ id: 'workspace.repair.releaseSlot', defaultMessage: 'Release the slot: it is made again when next lent', description: "Repair's plan, a missing lent slot's button, in full (its tooltip; #1447): its agent gives it up, and Hive makes it again the next time it lends it." }),
+  releaseSlot: msg({ id: 'workspace.repair.releaseSlot', defaultMessage: 'Release the slot: it is made again when next lent', description: "Repair's plan, a missing lent slot's button, in full (its tooltip; #1447): its agent gives it up, and Combwork makes it again the next time it lends it." }),
   release: msg({ id: 'workspace.repair.release', defaultMessage: 'release it', description: "Repair's plan, the Will do column: a missing lent slot is released (#1447)." }),
   forgetShort: msg({ id: 'workspace.repair.forgetShort', defaultMessage: 'Forget', description: "Repair's plan, a missing old reviewer folder's compact button (#1447; its tooltip: workspace.repair.forgetHome)." }),
   forgetHome: msg({ id: 'workspace.repair.forgetHome', defaultMessage: "Forget it: its conversations can be read, but not resumed there", description: "Repair's plan, a missing old reviewer folder's button, in full (its tooltip; #1447)." }),
   forget: msg({ id: 'workspace.repair.forget', defaultMessage: 'forget it', description: "Repair's plan, the Will do column: a missing old reviewer folder is forgotten (#1447)." }),
-  later: msg({ id: 'workspace.repair.later', defaultMessage: 'made again here when next used', description: "Repair's plan, the Will do column: a free slot or review copy wasn't found; Hive makes it again at its new place the next time it's used (#1447)." }),
+  later: msg({ id: 'workspace.repair.later', defaultMessage: 'made again here when next used', description: "Repair's plan, the Will do column: a free slot or review copy wasn't found; Combwork makes it again at its new place the next time it's used (#1447)." }),
   unlinkShort: msg({ id: 'workspace.repair.unlinkShort', defaultMessage: 'Remove link', description: "Repair's plan, a missing worktree's compact button (its tooltip says it in full: workspace.move.unlinkButton)." }),
   sessions: msg({ id: 'workspace.repair.sessions', defaultMessage: 'Sessions', description: "Repair's plan, the What column: the project's session records (each remembers the folder it ran in)." }),
   recent: msg({ id: 'workspace.repair.recent', defaultMessage: 'Open Recent', description: "Repair's plan, the What column: File → Open Recent's entry for the workspace. Use the menu's name as shown." }),
@@ -159,20 +159,20 @@ const T = {
   copy: msg({ id: 'workspace.repair.copy', defaultMessage: '{count, plural, one {copy # file} other {copy # files}}{stays, select, yes {; the old ones stay} other {}}', description: "Repair's plan, the Will do column: files copied to the folder for the new path, the old ones kept." }),
   give: msg({ id: 'workspace.repair.give', defaultMessage: 'give {what}{hasCards, select, yes { ({cards})} other {}} to {to}', description: "Repair's plan, the Will do column of the board's row ({what}: \"9 cards and 1 lane\"; {cards}: their numbers; {to}: the project now)." }),
   defender: msg({ id: 'workspace.repair.defender', defaultMessage: 'Microsoft Defender', description: "Repair's plan: the heading over the rows about Microsoft Defender's exclusions of the old and new folders (#1302). A product name." }),
-  moveExclusion: msg({ id: 'workspace.repair.moveExclusion', defaultMessage: "move Hive's exclusion", description: "Repair's plan, the Will do column of a Defender row: Hive's exclusion of the old folder is removed and the new folder excluded instead." }),
-  leaveExclusion: msg({ id: 'workspace.repair.leaveExclusion', defaultMessage: "leave Hive's exclusion as it is", description: "Repair's plan, the Will do column of a Defender row, when the box to move Hive's exclusions is unticked." }),
-  theirs: msg({ id: 'workspace.repair.theirs', defaultMessage: 'yours: change it in Windows Security', description: "Repair's plan, the Will do column of a Defender row: the old folder's exclusion is the user's own, which Hive never changes. Windows Security is Windows' app: use its name as shown." }),
+  moveExclusion: msg({ id: 'workspace.repair.moveExclusion', defaultMessage: "move Combwork's exclusion", description: "Repair's plan, the Will do column of a Defender row: Combwork's exclusion of the old folder is removed and the new folder excluded instead." }),
+  leaveExclusion: msg({ id: 'workspace.repair.leaveExclusion', defaultMessage: "leave Combwork's exclusion as it is", description: "Repair's plan, the Will do column of a Defender row, when the box to move Combwork's exclusions is unticked." }),
+  theirs: msg({ id: 'workspace.repair.theirs', defaultMessage: 'yours: change it in Windows Security', description: "Repair's plan, the Will do column of a Defender row: the old folder's exclusion is the user's own, which Combwork never changes. Windows Security is Windows' app: use its name as shown." }),
   nothingToDo: msg({ id: 'workspace.repair.nothingToDo', defaultMessage: 'nothing to do', description: "Repair's plan, the Will do column of a Defender row: the new folder is already excluded." }),
-  noneToMove: msg({ id: 'workspace.repair.noneToMove', defaultMessage: "nothing (no exclusion of Hive's)", description: "Repair's plan, the Will do column of a Defender row: no exclusion of Hive's to move, and whether Defender scans the new folder isn't known (its list needs administrator rights)." }),
-  recheck: msg({ id: 'workspace.repair.recheck', defaultMessage: "Repair's administrator prompt reads Defender's list again before it changes anything.", description: "Repair's plan, under the table, after the line saying when Defender's exclusions were last read with administrator rights: moving Hive's exclusions reads them again first." }),
-  scanned: msg({ id: 'workspace.repair.scanned', defaultMessage: 'nothing (Defender scans it)', description: "Repair's plan, the Will do column of a Defender row: no exclusion of Hive's to move, and Defender scans the new folder." }),
-  moveBox: msg({ id: 'workspace.repair.moveBox', defaultMessage: "Move Hive's {count, plural, one {exclusion} other {exclusions}} to the new folders (one administrator prompt)", description: "Repair's plan: a box, ticked when Hive added the old folders' Defender exclusions; Repair then removes those and adds the same for the new folders, in one Windows administrator prompt." }),
-  addLater: msg({ id: 'workspace.repair.addLater', defaultMessage: 'Defender scans the new folders: Settings → Workspace → Antivirus scanning can exclude them.', description: "Repair's plan, under the table, when Hive had no Defender exclusions to move and the new folders are scanned. Use the settings' names as shown." }),
-  theirsNote: msg({ id: 'workspace.repair.theirsNote', defaultMessage: "An exclusion you made of an old folder stays as it is: Hive never changes yours. Change it in Windows Security if you want.", description: "Repair's plan, under the table: the user's own Defender exclusion of an old folder." }),
-  needsAdmin: msg({ id: 'workspace.repair.needsAdmin', defaultMessage: "Defender shows its exclusions only to administrators: these states are what Hive knows. Check them with administrator rights in Settings → Workspace → Antivirus scanning.", description: "Repair's plan, under the table: Defender hides its exclusion list without administrator rights." }),
-  readingDefender: msg({ id: 'workspace.repair.readingDefender', defaultMessage: "Reading Defender's exclusions…", description: "Repair's plan, under the table, while Hive reads Microsoft Defender's state of the old and new folders." }),
+  noneToMove: msg({ id: 'workspace.repair.noneToMove', defaultMessage: "nothing (no exclusion of Combwork's)", description: "Repair's plan, the Will do column of a Defender row: no exclusion of Combwork's to move, and whether Defender scans the new folder isn't known (its list needs administrator rights)." }),
+  recheck: msg({ id: 'workspace.repair.recheck', defaultMessage: "Repair's administrator prompt reads Defender's list again before it changes anything.", description: "Repair's plan, under the table, after the line saying when Defender's exclusions were last read with administrator rights: moving Combwork's exclusions reads them again first." }),
+  scanned: msg({ id: 'workspace.repair.scanned', defaultMessage: 'nothing (Defender scans it)', description: "Repair's plan, the Will do column of a Defender row: no exclusion of Combwork's to move, and Defender scans the new folder." }),
+  moveBox: msg({ id: 'workspace.repair.moveBox', defaultMessage: "Move Combwork's {count, plural, one {exclusion} other {exclusions}} to the new folders (one administrator prompt)", description: "Repair's plan: a box, ticked when Combwork added the old folders' Defender exclusions; Repair then removes those and adds the same for the new folders, in one Windows administrator prompt." }),
+  addLater: msg({ id: 'workspace.repair.addLater', defaultMessage: 'Defender scans the new folders: Settings → Workspace → Antivirus scanning can exclude them.', description: "Repair's plan, under the table, when Combwork had no Defender exclusions to move and the new folders are scanned. Use the settings' names as shown." }),
+  theirsNote: msg({ id: 'workspace.repair.theirsNote', defaultMessage: "An exclusion you made of an old folder stays as it is: Combwork never changes yours. Change it in Windows Security if you want.", description: "Repair's plan, under the table: the user's own Defender exclusion of an old folder." }),
+  needsAdmin: msg({ id: 'workspace.repair.needsAdmin', defaultMessage: "Defender shows its exclusions only to administrators: these states are what Combwork knows. Check them with administrator rights in Settings → Workspace → Antivirus scanning.", description: "Repair's plan, under the table: Defender hides its exclusion list without administrator rights." }),
+  readingDefender: msg({ id: 'workspace.repair.readingDefender', defaultMessage: "Reading Defender's exclusions…", description: "Repair's plan, under the table, while Combwork reads Microsoft Defender's state of the old and new folders." }),
   result: msg({ id: 'workspace.repair.result', defaultMessage: 'Result', description: "Repair's report, a column heading: how each step went (done, a problem and why, or a choice still to make)." }),
-  closeRuns: msg({ id: 'workspace.repair.closeRuns', defaultMessage: "The close command's output", description: "Repair's plan and report, the What column: the output Hive keeps of the workspace's close command (Settings → Workspace → When this workspace closes, run), moved from the old folder's records to the new one's (HI-2007)." }),
+  closeRuns: msg({ id: 'workspace.repair.closeRuns', defaultMessage: "The close command's output", description: "Repair's plan and report, the What column: the output Combwork keeps of the workspace's close command (Settings → Workspace → When this workspace closes, run), moved from the old folder's records to the new one's (HI-2007)." }),
   saved: msg({ id: 'workspace.repair.saved', defaultMessage: 'Handovers and kept comparisons', description: "Repair's report, the What column: handovers and Performance → Compare's kept comparisons saved under a project's earlier name." }),
   sentence: msg({ id: 'workspace.repair.sentence', defaultMessage: '{what}{hasWas, select, yes {: was {was}} other {}}{hasNow, select, yes {, now {now}} other {}}; will {does}', description: "Repair's plan, a row read by a screen reader as one sentence: what it is about, where it was and is (full paths), and what Repair will do. Each part comes from the row's columns." })
 }
@@ -391,7 +391,7 @@ function workspaceRows(plan: MovePlan): ItemRow[] {
 
 /**
  * Defender's rows (#1302), one a kind of folder (the workspace, its worktrees): where it was and is, with whether
- * Defender skips each (as the Antivirus panel words it), and what Repair does about Hive's exclusion: moves it (the box
+ * Defender skips each (as the Antivirus panel words it), and what Repair does about Combwork's exclusion: moves it (the box
  * under the table, ticked), leaves it, or nothing; an exclusion of the user's own is named, never changed.
  */
 function defenderRows(d: AvMovePlan, moving: boolean): ItemRow[] {
@@ -403,7 +403,7 @@ function defenderRows(d: AvMovePlan, moving: boolean): ItemRow[] {
     const now = d.now.find((p) => p.kind === kind)
     if (!was && !now) continue
     const is = (list: string[], p?: AvPath): boolean => !!p && list.some((x) => x.toLowerCase() === p.path.toLowerCase())
-    // Hive's exclusion moves for this kind: its old entry, or one of Hive's removed entries covering the new folder.
+    // Combwork's exclusion moves for this kind: its old entry, or one of Combwork's removed entries covering the new folder.
     const mine = is(d.remove, was) || (!!now && is(d.add, now) && covered(now.path, d.remove))
     const theirs = is(d.theirs, was)
     const does = mine ? tr(moving ? T.moveExclusion : T.leaveExclusion) : theirs ? tr(T.theirs) : now?.state === 'excluded' || now?.state === 'added' ? tr(T.nothingToDo) : now?.state === 'not-excluded' ? tr(T.scanned) : tr(T.noneToMove)
@@ -518,7 +518,7 @@ export function MoveRepairDialog() {
       (d) => {
         if (!live) return
         setDefender(d)
-        // Ticked when Hive made the old folders' exclusions: the one administrator prompt comes with Repair.
+        // Ticked when Combwork made the old folders' exclusions: the one administrator prompt comes with Repair.
         if (d?.scan === 'defender' && d.remove.length) setOpts((o) => (o.defender === undefined ? { ...o, defender: true } : o))
       },
       () => live && setDefender(null)

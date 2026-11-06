@@ -14,7 +14,7 @@ vi.mock('../src/main/events', () => ({ emit: () => undefined, sendPty: () => und
 vi.mock('../src/main/providers', () => ({ allProviders: () => [] }))
 
 // The terminals' processes get the tests' allowlisted environment (runContext.baseEnv, #580), never the shell's the
-// tests were started from (its NODE_OPTIONS, an agent session's HIVE_ variables, a CLI home).
+// tests were started from (its NODE_OPTIONS, an agent session's CW_ variables, a CLI home).
 const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: (parent?: NodeJS.ProcessEnv) => Record<string, string> }
 const env = baseEnv()
 const DEFAULT = { cols: PTY_COLS, rows: PTY_ROWS }
@@ -102,30 +102,30 @@ describe.runIf(process.platform === 'win32')('the output kept from quiet exits',
 })
 
 describe.runIf(process.platform === 'win32')('the environment the terminals get', () => {
-  it("is the allowlist: a shell's NODE_OPTIONS and HIVE_ variables don't reach a terminal's process (#580)", async () => {
+  it("is the allowlist: a shell's NODE_OPTIONS and CW_ variables don't reach a terminal's process (#580)", async () => {
     // A shell that would load a script into every Node it starts, and an agent session's token.
-    const dir = tempDir('hive-ptykept-env-')
+    const dir = tempDir('cw-ptykept-env-')
     const marker = join(dir, 'loaded.txt')
     const script = join(dir, 'marker.cjs')
     writeFileSync(script, `require('fs').writeFileSync(${JSON.stringify(marker)}, 'loaded')\n`)
     // Made from the allowlist and these made-up settings only: nothing of the real shell's own reaches either child
     // (review round 1: its CLI homes and credentials stay out of the control too).
-    const shell: Record<string, string> = { ...baseEnv(), NODE_OPTIONS: `--require ${JSON.stringify(script)}`, HIVE_API_TOKEN: 'leaked-token', CLAUDE_CONFIG_DIR: join(dir, 'claude') }
+    const shell: Record<string, string> = { ...baseEnv(), NODE_OPTIONS: `--require ${JSON.stringify(script)}`, CW_API_TOKEN: 'leaked-token', CLAUDE_CONFIG_DIR: join(dir, 'claude') }
     // The process itself says what it was given.
     const run = (key: string, given: Record<string, string>) =>
       new Promise<string>((resolve) =>
-        spawnPty(key, { file: process.execPath, args: ['-e', 'console.log("ENV " + JSON.stringify([process.env.NODE_OPTIONS ?? null, process.env.HIVE_API_TOKEN ?? null, process.env.CLAUDE_CONFIG_DIR ?? null]))'], cwd: process.cwd(), env: given, quietExit: true, onExit: (_code: number, out: string) => resolve(out) })
+        spawnPty(key, { file: process.execPath, args: ['-e', 'console.log("ENV " + JSON.stringify([process.env.NODE_OPTIONS ?? null, process.env.CW_API_TOKEN ?? null, process.env.CLAUDE_CONFIG_DIR ?? null]))'], cwd: process.cwd(), env: given, quietExit: true, onExit: (_code: number, out: string) => resolve(out) })
       )
     try {
-      // What the tests gave terminals before (the shell, less its HIVE_ variables) carries the shell's NODE_OPTIONS:
+      // What the tests gave terminals before (the shell, less its CW_ variables) carries the shell's NODE_OPTIONS:
       // the script loads, so the check below can see it.
-      const before = Object.fromEntries(Object.entries(shell).filter(([k, v]) => v !== undefined && !k.startsWith('HIVE_'))) as Record<string, string>
+      const before = Object.fromEntries(Object.entries(shell).filter(([k, v]) => v !== undefined && !k.startsWith('CW_'))) as Record<string, string>
       expect(/ENV (\[.*\])/.exec(await run('task:env-before', before))?.[1]).toBe(JSON.stringify([shell.NODE_OPTIONS, null, shell.CLAUDE_CONFIG_DIR]))
       expect(existsSync(marker)).toBe(true)
       rmSync(marker)
       // The allowlist: none of it, and the script never loads.
       const given = baseEnv(shell)
-      expect(Object.keys(given).filter((k) => /^(NODE_OPTIONS|HIVE_|CLAUDE_CONFIG_DIR$)/.test(k))).toEqual([])
+      expect(Object.keys(given).filter((k) => /^(NODE_OPTIONS|CW_|CLAUDE_CONFIG_DIR$)/.test(k))).toEqual([])
       expect(/ENV (\[.*\])/.exec(await run('task:env-check', given))?.[1]).toBe('[null,null,null]')
       expect(existsSync(marker)).toBe(false)
     } finally {

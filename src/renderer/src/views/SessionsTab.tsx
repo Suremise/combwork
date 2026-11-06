@@ -8,6 +8,7 @@ import { buildSessionTree, countText, countsIn, pathTo, sessionKey, sessionsIn, 
 import { holdText, removedAgentNote, resumeBlock, type ResumeContext } from '@shared/sessionResume'
 import { ProviderIcon } from '../components/ProviderIcon'
 import * as actions from '../actions'
+import { freshShort, freshTip } from '../freshResume'
 import { call, errorMessage } from '../api'
 import { PaneResizer, usePaneSize } from '../components/Resizer'
 import { Icon, IconButton, InfoTip, LoadFailed, Markdown, Modal, SearchInput, StaleNote, Tooltip, useContextMenu, type MenuEntry } from '../components/ui'
@@ -30,7 +31,7 @@ import { PurgeDialog } from '../components/Purge'
  * Sessions tab: the project's sessions as a tree on the left (provider → agent → session → the sub-sessions it
  * started, like the Files tree: counts, actions on any branch, keyboard) and a read-only transcript on the right.
  * Search filters the tree across names, dates, providers and transcript text, with each session's matches under it.
- * The Hive Assistant's conversations use it too (`assistant`): its own words, no agent level, its panel instead of an
+ * The Combwork Assistant's conversations use it too (`assistant`): its own words, no agent level, its panel instead of an
  * agent's pane.
  */
 
@@ -48,13 +49,13 @@ const skipKey = (reason: SessionSkipReason): string => (reason === 'in-use' ? 'i
 
 function skipText(reason: SessionSkipReason): string {
   const key = skipKey(reason)
-  return tr(msg({ id: 'sessions.bulk.skipReason', defaultMessage: '{reason, select, live {running} inUse {in use} reading {being read by Hive} open {open in another Hive window} external {started outside Hive} other {failed}}', description: 'Why archiving, unarchiving or deleting passed over a session, in a few words (lower case): it is running, its files are in use, Hive is reading it, another Hive window has it open, it was started outside Hive, or it failed (other).' }), { reason: key })
+  return tr(msg({ id: 'sessions.bulk.skipReason', defaultMessage: '{reason, select, live {running} inUse {in use} reading {being read by Combwork} open {open in another Combwork window} external {started outside Combwork} other {failed}}', description: 'Why archiving, unarchiving or deleting passed over a session, in a few words (lower case): it is running, its files are in use, Combwork is reading it, another Combwork window has it open, it was started outside Combwork, or it failed (other).' }), { reason: key })
 }
 
 /** Why Clean Up left an old session alone before asking main, in a few words (running: as main's skips say it). */
 function cleanupSkipText(reason: CleanupSkip): string {
   if (reason === 'live') return skipText('live')
-  return tr(msg({ id: 'sessions.cleanup.skipReason', defaultMessage: "{reason, select, shown {open here} other {the Assistant's current conversation}}", description: "Why Clean Up passed over an old session, in a few words (lower case): its transcript is open in the Sessions tab, or it is the Hive Assistant's current conversation (other)." }), { reason })
+  return tr(msg({ id: 'sessions.cleanup.skipReason', defaultMessage: "{reason, select, shown {open here} other {the Assistant's current conversation}}", description: "Why Clean Up passed over an old session, in a few words (lower case): its transcript is open in the Sessions tab, or it is the Combwork Assistant's current conversation (other)." }), { reason })
 }
 
 /** "Session" or "Conversation" (the Assistant's) in a few messages' selects. */
@@ -123,7 +124,7 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
   }, [searchKey, searchTry, loadSearch])
 
   // The Assistant's list is its own conversations (and what they started).
-  const shown = useMemo(() => (items ?? []).filter((i) => !assistant || i.source === 'hive' || !!i.sub?.parentId), [items, assistant])
+  const shown = useMemo(() => (items ?? []).filter((i) => !assistant || i.source === 'combwork' || !!i.sub?.parentId), [items, assistant])
   const byId = useMemo(() => new Map((items ?? []).map((i) => [i.id, i])), [items])
   const hitsById = new Map((results ?? []).map((r) => [r.sessionId, r]))
   const low = q.toLowerCase()
@@ -216,25 +217,25 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
   const remove = async (s: SessionListItem): Promise<void> => {
     const who = providerName(s.provider)
     const ok = await confirm({
-      title: tr(msg({ id: 'sessions.delete.title', defaultMessage: '{kind, select, conversation {Delete conversation?} other {Delete session?}}', description: "Title of the confirmation before deleting a session (the Hive Assistant's: a conversation) from Hive." }), { kind }),
-      message: tr(msg({ id: 'sessions.delete.message', defaultMessage: 'Delete "{name}" from Hive?', description: 'The confirmation before deleting a session from Hive: its name ({name}).' }), { name: sessionName(s) }),
+      title: tr(msg({ id: 'sessions.delete.title', defaultMessage: '{kind, select, conversation {Delete conversation?} other {Delete session?}}', description: "Title of the confirmation before deleting a session (the Combwork Assistant's: a conversation) from Combwork." }), { kind }),
+      message: tr(msg({ id: 'sessions.delete.message', defaultMessage: 'Delete "{name}" from Combwork?', description: 'The confirmation before deleting a session from Combwork: its name ({name}).' }), { name: sessionName(s) }),
       detail:
-        s.source === 'hive'
-          ? tr(msg({ id: 'sessions.delete.detailHive', defaultMessage: "Hive's copies of its transcript go to the Recycle Bin and it no longer shows here; what it used stays in the totals. {cli} keeps its own transcript, so {cli}'s own resume list still has it.", description: "What deleting a session Hive started does: Hive's copies go to the Recycle Bin, its usage stays counted, and the CLI ({cli}: \"Claude Code\") keeps its own transcript." }), { cli: who })
-          : tr(msg({ id: 'sessions.delete.detailExternal', defaultMessage: "Hive stops listing it. {cli} keeps its transcript, so {cli}'s own resume list still has it.", description: 'What deleting a session started outside Hive does: Hive stops listing it, and the CLI ({cli}: "Claude Code") keeps its transcript.' }), { cli: who }),
-      confirmLabel: tr(msg({ id: 'sessions.delete.button', defaultMessage: 'Delete', description: 'Button: deletes the session from Hive. Keep it short.' })),
+        s.source === 'combwork'
+          ? tr(msg({ id: 'sessions.delete.detailCombwork', defaultMessage: "Combwork's copies of its transcript go to the Recycle Bin and it no longer shows here; what it used stays in the totals. {cli} keeps its own transcript, so {cli}'s own resume list still has it.", description: "What deleting a session Combwork started does: Combwork's copies go to the Recycle Bin, its usage stays counted, and the CLI ({cli}: \"Claude Code\") keeps its own transcript." }), { cli: who })
+          : tr(msg({ id: 'sessions.delete.detailExternal', defaultMessage: "Combwork stops listing it. {cli} keeps its transcript, so {cli}'s own resume list still has it.", description: 'What deleting a session started outside Combwork does: Combwork stops listing it, and the CLI ({cli}: "Claude Code") keeps its transcript.' }), { cli: who }),
+      confirmLabel: tr(msg({ id: 'sessions.delete.button', defaultMessage: 'Delete', description: 'Button: deletes the session from Combwork. Keep it short.' })),
       danger: true
     })
     if (!ok) return
     const closed = await closeView([s.id])
-    const done = await actions.attempt(tr(msg({ id: 'sessions.delete.failed', defaultMessage: '{kind, select, conversation {Could not delete the conversation} other {Could not delete the session}}', description: "An error's title: deleting a session (the Hive Assistant's: a conversation) failed." }), { kind }), () => call('session:delete', project.path, s.id).then(() => true))
+    const done = await actions.attempt(tr(msg({ id: 'sessions.delete.failed', defaultMessage: '{kind, select, conversation {Could not delete the conversation} other {Could not delete the session}}', description: "An error's title: deleting a session (the Combwork Assistant's: a conversation) failed." }), { kind }), () => call('session:delete', project.path, s.id).then(() => true))
     moving.current = false
     // Still there (it couldn't be deleted): open it again.
     if (!done && closed) setSelectedId(closed)
     reload()
   }
   const archive = async (s: SessionListItem, archived: boolean): Promise<void> => {
-    if (archived && !(await confirm({ title: tr(msg({ id: 'sessions.archive.title', defaultMessage: 'Archive session?', description: 'Title of the confirmation before archiving a session (Sessions tab).' })), message: tr(msg({ id: 'sessions.archive.message', defaultMessage: 'The transcript is preserved in .hive/archive and hidden from this list. You can unarchive it at any time.', description: 'What archiving a session does. .hive/archive is a folder: keep it as it is.' })), confirmLabel: tr(ARCHIVE) }))) return
+    if (archived && !(await confirm({ title: tr(msg({ id: 'sessions.archive.title', defaultMessage: 'Archive session?', description: 'Title of the confirmation before archiving a session (Sessions tab).' })), message: tr(msg({ id: 'sessions.archive.message', defaultMessage: 'The transcript is preserved in .combwork/archive and hidden from this list. You can unarchive it at any time.', description: 'What archiving a session does. .combwork/archive is a folder: keep it as it is.' })), confirmLabel: tr(ARCHIVE) }))) return
     const closed = await closeView([s.id])
     await actions.attempt(tr(msg({ id: 'sessions.archive.failed', defaultMessage: 'Could not archive', description: "An error's title: archiving or unarchiving a session failed." })), () => call('session:archive', project.path, s.id, archived))
     moving.current = false
@@ -260,8 +261,8 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
   // ---- branch actions: everything under a provider, an agent, or a session and its sub-sessions ----
   const branchName = (n: TreeNode): string => (n.kind === 'session' ? `"${sessionName(n.item)}"` : n.kind === 'agent' ? `${n.label} (${providerName(n.provider)})` : n.label)
   const bulkList = (n: TreeNode, action: SessionBulkAction): SessionListItem[] =>
-    // Archiving keeps Hive's copy: only Hive's own sessions have one (a sub-session started outside Hive goes with its session).
-    sessionsIn(n).filter((s) => (action === 'delete' ? true : action === 'archive' ? !s.archived && s.source === 'hive' : !!s.archived))
+    // Archiving keeps Combwork's copy: only Combwork's own sessions have one (a sub-session started outside Combwork goes with its session).
+    sessionsIn(n).filter((s) => (action === 'delete' ? true : action === 'archive' ? !s.archived && s.source === 'combwork' : !!s.archived))
   const runBulk = async (n: TreeNode, action: SessionBulkAction): Promise<void> => {
     const list = bulkList(n, action)
     if (!list.length) return
@@ -275,15 +276,15 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
         action === 'delete'
           ? {
               title: tr(msg({ id: 'sessions.bulk.deleteTitle', defaultMessage: 'Delete {what}?', description: 'Title of the confirmation before deleting many sessions: how many ({what}: "3 sessions and 12 sub-sessions").' }), where),
-              message: tr(msg({ id: 'sessions.bulk.deleteMessage', defaultMessage: 'Delete {what} under {branch} from Hive?', description: 'The confirmation before deleting many sessions ({what}: "3 sessions") under a branch of the Sessions tree ({branch}: a provider, an agent or a session).' }), where),
-              detail: tr(msg({ id: 'sessions.bulk.deleteDetail', defaultMessage: "Hive's copies of their transcripts go to the Recycle Bin (restore them from there) and Hive stops listing them; what they used stays in the totals. Claude Code and Codex keep their own transcripts. {skipNote}", description: 'What deleting many sessions does; then which are passed over ({skipNote}, a sentence).' }), { skipNote }),
+              message: tr(msg({ id: 'sessions.bulk.deleteMessage', defaultMessage: 'Delete {what} under {branch} from Combwork?', description: 'The confirmation before deleting many sessions ({what}: "3 sessions") under a branch of the Sessions tree ({branch}: a provider, an agent or a session).' }), where),
+              detail: tr(msg({ id: 'sessions.bulk.deleteDetail', defaultMessage: "Combwork's copies of their transcripts go to the Recycle Bin (restore them from there) and Combwork stops listing them; what they used stays in the totals. Claude Code and Codex keep their own transcripts. {skipNote}", description: 'What deleting many sessions does; then which are passed over ({skipNote}, a sentence).' }), { skipNote }),
               confirmLabel: tr(msg({ id: 'sessions.bulk.deleteAll', defaultMessage: 'Delete All', description: 'Button: deletes all the sessions listed. Keep it short.' })),
               danger: true
             }
           : {
               title: tr(msg({ id: 'sessions.bulk.archiveTitle', defaultMessage: 'Archive {what}?', description: 'Title of the confirmation before archiving many sessions: how many ({what}: "3 sessions and 12 sub-sessions").' }), where),
               message: tr(msg({ id: 'sessions.bulk.archiveMessage', defaultMessage: 'Archive {what} under {branch}?', description: 'The confirmation before archiving many sessions ({what}: "3 sessions") under a branch of the Sessions tree ({branch}: a provider, an agent or a session).' }), where),
-              detail: tr(msg({ id: 'sessions.bulk.archiveDetail', defaultMessage: 'Their transcripts are kept in .hive/archive and hidden from this list: tick Archived to see them, and unarchive any at any time. {skipNote}', description: 'What archiving many sessions does (.hive/archive is a folder; Archived is a checkbox above the list: use its translation); then which are passed over ({skipNote}, a sentence).' }), { skipNote }),
+              detail: tr(msg({ id: 'sessions.bulk.archiveDetail', defaultMessage: 'Their transcripts are kept in .combwork/archive and hidden from this list: tick Archived to see them, and unarchive any at any time. {skipNote}', description: 'What archiving many sessions does (.combwork/archive is a folder; Archived is a checkbox above the list: use its translation); then which are passed over ({skipNote}, a sentence).' }), { skipNote }),
               confirmLabel: tr(msg({ id: 'sessions.bulk.archiveAll', defaultMessage: 'Archive All', description: 'Button: archives all the sessions listed. Keep it short.' }))
             }
       ))
@@ -291,7 +292,7 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
     // The transcript open here, if it is one of them, closes first (an open one is in use); it opens again if its
     // session was left alone, and the result says when it stays closed.
     const closed = await closeView(list.map((s) => s.id))
-    const r = await actions.attempt(tr(msg({ id: 'sessions.bulk.failed', defaultMessage: '{action, select, archive {Could not archive the {kind, select, conversation {conversations} other {sessions}}} unarchive {Could not unarchive the {kind, select, conversation {conversations} other {sessions}}} other {Could not delete the {kind, select, conversation {conversations} other {sessions}}}}', description: "An error's title: archiving, unarchiving or deleting many sessions (the Hive Assistant's: conversations) failed." }), { action, kind }), () => call('session:bulk', project.path, action, list.map((s) => s.id)))
+    const r = await actions.attempt(tr(msg({ id: 'sessions.bulk.failed', defaultMessage: '{action, select, archive {Could not archive the {kind, select, conversation {conversations} other {sessions}}} unarchive {Could not unarchive the {kind, select, conversation {conversations} other {sessions}}} other {Could not delete the {kind, select, conversation {conversations} other {sessions}}}}', description: "An error's title: archiving, unarchiving or deleting many sessions (the Combwork Assistant's: conversations) failed." }), { action, kind }), () => call('session:bulk', project.path, action, list.map((s) => s.id)))
     moving.current = false
     if (closed && (!r || !r.done.includes(closed))) setSelectedId(closed)
     if (!r) return
@@ -328,19 +329,19 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
     const entries: MenuEntry[] = []
     if (live) {
       const holder = project.agents.find((a) => a.live?.sessionId === s.id)
-      if (holder) entries.push({ label: assistant ? tr(msg({ id: 'sessions.menu.showAssistant', defaultMessage: 'Show the Assistant', description: "Menu item on the Hive Assistant's running conversation: opens its panel." })) : tr(msg({ id: 'sessions.menu.showAgent', defaultMessage: 'Show {agent}', description: "Menu item on a running session: shows the agent running it ({agent}: its name)." }), { agent: holder.name }), icon: 'terminal', onClick: () => (assistant ? setAssistantOpen(true) : revealAgent(project, holder.id)) })
+      if (holder) entries.push({ label: assistant ? tr(msg({ id: 'sessions.menu.showAssistant', defaultMessage: 'Show the Assistant', description: "Menu item on the Combwork Assistant's running conversation: opens its panel." })) : tr(msg({ id: 'sessions.menu.showAgent', defaultMessage: 'Show {agent}', description: "Menu item on a running session: shows the agent running it ({agent}: its name)." }), { agent: holder.name }), icon: 'terminal', onClick: () => (assistant ? setAssistantOpen(true) : revealAgent(project, holder.id)) })
     } else if (!s.archived) {
       // Its agent starting already (#1177).
       const target = actions.resumeTarget(project, s)
       const busy = target ? get().starting[startingKey(project.path, target)] : undefined
-      entries.push({ label: tr(RESUME), icon: 'debug-continue', action: 'resume', disabled: !!block || !!busy, detail: block ?? (busy ? startingLabel(busy) : undefined), onClick: () => void actions.resumeSession(project.path, s) })
+      entries.push({ label: tr(RESUME), icon: 'debug-continue', action: 'resume', disabled: !!block || !!busy, detail: block ?? (busy ? startingLabel(busy) : s.fresh ? freshShort() : undefined), onClick: () => void actions.resumeSession(project.path, s) })
     }
     if (s.source === 'external' && !s.sub) entries.push({ label: tr(ADOPT), icon: 'add', onClick: () => void actions.attempt(tr(ADOPT_FAILED), () => call('session:adopt', project.path, s.id)).then(reload) })
-    if (s.source === 'hive') entries.push({ label: tr(msg({ id: 'sessions.menu.rename', defaultMessage: 'Rename…', description: 'Menu item on a session: renames it.' })), icon: 'tag', keybinding: 'F2', onClick: () => void rename(s) })
+    if (s.source === 'combwork') entries.push({ label: tr(msg({ id: 'sessions.menu.rename', defaultMessage: 'Rename…', description: 'Menu item on a session: renames it.' })), icon: 'tag', keybinding: 'F2', onClick: () => void rename(s) })
     entries.push({ separator: true })
-    if (s.source === 'hive' && !live) entries.push({ label: s.archived ? tr(UNARCHIVE) : tr(ARCHIVE), icon: s.archived ? 'unarchive' : 'archive', onClick: () => void archive(s, !s.archived) })
-    entries.push({ label: tr(msg({ id: 'sessions.menu.delete', defaultMessage: '{kind, select, conversation {Delete Conversation…} other {Delete Session…}}', description: "Menu item on a session (the Hive Assistant's: a conversation): deletes it from Hive, after a confirmation." }), { kind }), icon: 'trash', keybinding: formatKeybinding('Del'), danger: true, disabled: live, onClick: () => void remove(s) }) // i18n-ignore: a key's id, which formatKeybinding names
-    if (s.source === 'hive') entries.push({ label: tr(msg({ id: 'sessions.menu.purge', defaultMessage: "Purge Hive's Files…", description: "Menu item on a session: lists, then removes, everything Hive keeps of it (its backups, attachments, old usage), never the coding agent's own files." })), icon: 'trash', danger: true, disabled: live, onClick: () => setPurging(s) })
+    if (s.source === 'combwork' && !live) entries.push({ label: s.archived ? tr(UNARCHIVE) : tr(ARCHIVE), icon: s.archived ? 'unarchive' : 'archive', onClick: () => void archive(s, !s.archived) })
+    entries.push({ label: tr(msg({ id: 'sessions.menu.delete', defaultMessage: '{kind, select, conversation {Delete Conversation…} other {Delete Session…}}', description: "Menu item on a session (the Combwork Assistant's: a conversation): deletes it from Combwork, after a confirmation." }), { kind }), icon: 'trash', keybinding: formatKeybinding('Del'), danger: true, disabled: live, onClick: () => void remove(s) }) // i18n-ignore: a key's id, which formatKeybinding names
+    if (s.source === 'combwork') entries.push({ label: tr(msg({ id: 'sessions.menu.purge', defaultMessage: "Purge Combwork's Files…", description: "Menu item on a session: lists, then removes, everything Combwork keeps of it (its backups, attachments, old usage), never the coding agent's own files." })), icon: 'trash', danger: true, disabled: live, onClick: () => setPurging(s) })
     if (n.children.length) entries.push({ separator: true }, ...branchEntries(n))
     entries.push({ separator: true }, { label: tr(msg({ id: 'sessions.menu.copyId', defaultMessage: 'Copy Session ID', description: "Menu item on a session: copies its id (the CLI's session id) to the clipboard." })), icon: 'copy', onClick: () => copyText(s.id) })
     return entries
@@ -356,14 +357,14 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
       { label: tr(EXPAND_ALL), icon: 'expand-all', onClick: () => setOpen(keys, true) },
       { label: tr(COLLAPSE_ALL), icon: 'collapse-all', onClick: () => setOpen(keys, false) },
       { separator: true },
-      { label: tr(msg({ id: 'sessions.branch.archive', defaultMessage: '{scope, select, session {Archive with Its Sub-sessions… ({n, number})} other {Archive All… ({n, number})}}', description: 'Menu item on a branch of the Sessions tree (a provider or an agent: All; a session: with the sessions it started): archives the {n} sessions in it.' }), { scope, n: archiving }), icon: 'archive', disabled: !archiving, detail: archiving ? undefined : tr(msg({ id: 'sessions.branch.nothingToArchive', defaultMessage: "Nothing of Hive's to archive here", description: "Why Archive All is greyed out: no session in the branch is Hive's own (only Hive's sessions can be archived)." })), onClick: () => void runBulk(n, 'archive') },
+      { label: tr(msg({ id: 'sessions.branch.archive', defaultMessage: '{scope, select, session {Archive with Its Sub-sessions… ({n, number})} other {Archive All… ({n, number})}}', description: 'Menu item on a branch of the Sessions tree (a provider or an agent: All; a session: with the sessions it started): archives the {n} sessions in it.' }), { scope, n: archiving }), icon: 'archive', disabled: !archiving, detail: archiving ? undefined : tr(msg({ id: 'sessions.branch.nothingToArchive', defaultMessage: "Nothing of Combwork's to archive here", description: "Why Archive All is greyed out: no session in the branch is Combwork's own (only Combwork's sessions can be archived)." })), onClick: () => void runBulk(n, 'archive') },
       ...(unarchiving ? [{ label: tr(msg({ id: 'sessions.branch.unarchive', defaultMessage: '{scope, select, session {Unarchive with Its Sub-sessions ({n, number})} other {Unarchive All ({n, number})}}', description: 'Menu item on a branch of the Sessions tree (a provider or an agent: All; a session: with the sessions it started): unarchives the {n} archived sessions in it.' }), { scope, n: unarchiving }), icon: 'unarchive', onClick: () => void runBulk(n, 'unarchive') }] : []),
-      { label: tr(msg({ id: 'sessions.branch.delete', defaultMessage: '{scope, select, session {Delete with Its Sub-sessions… ({n, number})} other {Delete All… ({n, number})}}', description: 'Menu item on a branch of the Sessions tree (a provider or an agent: All; a session: with the sessions it started): deletes the {n} sessions in it from Hive.' }), { scope, n: deleting }), icon: 'trash', danger: true, disabled: !deleting, onClick: () => void runBulk(n, 'delete') }
+      { label: tr(msg({ id: 'sessions.branch.delete', defaultMessage: '{scope, select, session {Delete with Its Sub-sessions… ({n, number})} other {Delete All… ({n, number})}}', description: 'Menu item on a branch of the Sessions tree (a provider or an agent: All; a session: with the sessions it started): deletes the {n} sessions in it from Combwork.' }), { scope, n: deleting }), icon: 'trash', danger: true, disabled: !deleting, onClick: () => void runBulk(n, 'delete') }
     ]
   }
   const menuFor = (n: TreeNode): MenuEntry[] => (n.kind === 'session' ? sessionMenu(n) : branchEntries(n))
 
-  const theList = tr(msg({ id: 'sessions.list.what', defaultMessage: '{kind, select, conversation {the conversations} other {the sessions}}', description: "What could not be loaded, in \"Could not load …\" (the Sessions tab's list; the Hive Assistant's: conversations). Lower case." }), { kind })
+  const theList = tr(msg({ id: 'sessions.list.what', defaultMessage: '{kind, select, conversation {the conversations} other {the sessions}}', description: "What could not be loaded, in \"Could not load …\" (the Sessions tab's list; the Combwork Assistant's: conversations). Lower case." }), { kind })
   if (!items) return listError ? <LoadFailed what={theList} error={listError} onRetry={reload} /> : <div className="empty-state"><Icon name="loading" spin />{tr(LOADING)}</div>
 
   // The tree's rows as shown: open branches' children, and while searching each session's matches under it.
@@ -411,7 +412,7 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
     } else if (ev.key === 'Enter' && cur) {
       if (node && node.kind !== 'session') toggle(node)
       else activate(cur)
-    } else if (ev.key === 'F2' && node?.kind === 'session' && node.item.source === 'hive') void rename(node.item)
+    } else if (ev.key === 'F2' && node?.kind === 'session' && node.item.source === 'combwork') void rename(node.item)
     else if (ev.key === 'Delete' && node) {
       if (node.kind === 'session') {
         if (!isLive(node.item.id)) void remove(node.item)
@@ -437,17 +438,17 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
       <div className="split-list sessions-list" style={{ width: listWidth }}>
         <PaneResizer paneKey="sessions" />
         <div className="pane-header" style={{ paddingLeft: 14 }}>
-          {tr(msg({ id: 'sessions.list.heading', defaultMessage: '{kind, select, conversation {Conversations} other {Sessions}}', description: "The heading of the Sessions tab's list (the Hive Assistant's: Conversations)." }), { kind })}
+          {tr(msg({ id: 'sessions.list.heading', defaultMessage: '{kind, select, conversation {Conversations} other {Sessions}}', description: "The heading of the Sessions tab's list (the Combwork Assistant's: Conversations)." }), { kind })}
           <InfoTip
             text={
               assistant
-                ? tr(msg({ id: 'sessions.list.infoAssistant', defaultMessage: "Every conversation of this workspace's Hive Assistant, by provider. Select one to read it in full, including what came before each compaction.", description: "The info tip of the Hive Assistant's conversations list. A compaction is when the CLI summarises the conversation to free context." }))
-                : tr(msg({ id: 'sessions.list.info', defaultMessage: "Every session of this project, by provider and agent, with the sessions each one started (such as Codex's guardian reviews) under it. Select one to read its transcript, including what came before each compaction; right-click a branch to archive or delete everything in it. Transcripts a CLI has deleted are read from Hive's backup.", description: "The info tip of the Sessions tab's list. Codex's guardian reviews are sessions Codex starts (keep the name); a compaction is when the CLI summarises the conversation." }))
+                ? tr(msg({ id: 'sessions.list.infoAssistant', defaultMessage: "Every conversation of this workspace's Assistant, by provider. Select one to read it in full, including what came before each compaction.", description: "The info tip of the Combwork Assistant's conversations list. A compaction is when the CLI summarises the conversation to free context." }))
+                : tr(msg({ id: 'sessions.list.info', defaultMessage: "Every session of this project, by provider and agent, with the sessions each one started (such as Codex's guardian reviews) under it. Select one to read its transcript, including what came before each compaction; right-click a branch to archive or delete everything in it. Transcripts a CLI has deleted are read from Combwork's backup.", description: "The info tip of the Sessions tab's list. Codex's guardian reviews are sessions Codex starts (keep the name); a compaction is when the CLI summarises the conversation." }))
             }
           />
           <div className="actions">
-            <IconButton icon="add" title={tr(msg({ id: 'sessions.list.new', defaultMessage: '{kind, select, conversation {New Conversation} other {New Session}}', description: "Tooltip of the Sessions tab's + button: starts a new session (the Hive Assistant's: conversation)." }), { kind })} onClick={newOne} />
-            <IconButton icon="clear-all" action="sessions-cleanup" title={tr(msg({ id: 'sessions.list.cleanUp', defaultMessage: '{kind, select, conversation {Clean Up Old Conversations…} other {Clean Up Old Sessions…}}', description: "Tooltip of the Sessions tab's Clean Up button (the Hive Assistant's: conversations): archives or deletes sessions older than an age, after a dialog." }), { kind })} onClick={() => setCleaningUp(true)} disabled={!shown.length} />
+            <IconButton icon="add" title={tr(msg({ id: 'sessions.list.new', defaultMessage: '{kind, select, conversation {New Conversation} other {New Session}}', description: "Tooltip of the Sessions tab's + button: starts a new session (the Combwork Assistant's: conversation)." }), { kind })} onClick={newOne} />
+            <IconButton icon="clear-all" action="sessions-cleanup" title={tr(msg({ id: 'sessions.list.cleanUp', defaultMessage: '{kind, select, conversation {Clean Up Old Conversations…} other {Clean Up Old Sessions…}}', description: "Tooltip of the Sessions tab's Clean Up button (the Combwork Assistant's: conversations): archives or deletes sessions older than an age, after a dialog." }), { kind })} onClick={() => setCleaningUp(true)} disabled={!shown.length} />
             <IconButton icon="refresh" title={tr(msg({ id: 'sessions.list.refresh', defaultMessage: 'Refresh', description: "Tooltip of the Sessions tab's refresh button: reads the list again." }))} onClick={reload} />
             <IconButton icon="expand-all" title={tr(EXPAND_ALL)} onClick={() => setOpen(branchKeys(tree), true)} />
             <IconButton icon="collapse-all" title={tr(COLLAPSE_ALL)} onClick={() => setOpen(branchKeys(tree), false)} />
@@ -457,7 +458,7 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
           <Icon name="search" />
           <SearchInput
             ref={searchRef}
-            placeholder={tr(msg({ id: 'sessions.search.placeholder', defaultMessage: '{kind, select, conversation {Search conversations: names, dates, transcripts} other {Search sessions: names, dates, transcripts}}', description: "The Sessions tab's search box (the Hive Assistant's: conversations): what it searches." }), { kind })}
+            placeholder={tr(msg({ id: 'sessions.search.placeholder', defaultMessage: '{kind, select, conversation {Search conversations: names, dates, transcripts} other {Search sessions: names, dates, transcripts}}', description: "The Sessions tab's search box (the Combwork Assistant's: conversations): what it searches." }), { kind })}
             value={query}
             onChange={setQuery}
             onKeyDown={(e) => {
@@ -481,7 +482,7 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
           </label>
           {othersLoading && !assistant && (
             <span className="sessions-scope faint" data-loading="others">
-              <Icon name="loading" spin /> {tr(msg({ id: 'sessions.list.othersLoading', defaultMessage: 'Looking for sessions started outside Hive…', description: "Above the Sessions list while it shows Hive's own sessions and is still reading the sessions the CLIs keep for the project's folders (started in a terminal or an editor)." }))}
+              <Icon name="loading" spin /> {tr(msg({ id: 'sessions.list.othersLoading', defaultMessage: 'Looking for sessions started outside Combwork…', description: "Above the Sessions list while it shows Combwork's own sessions and is still reading the sessions the CLIs keep for the project's folders (started in a terminal or an editor)." }))}
             </span>
           )}
           {q && (
@@ -493,7 +494,7 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
               ) : matched === 0 ? (
                 tr(msg({ id: 'sessions.search.none', defaultMessage: 'No matches', description: "Under the Sessions tab's search box: nothing matches." }))
               ) : (
-                tr(msg({ id: 'sessions.search.count', defaultMessage: '{kind, select, conversation {{sessions, plural, one {# conversation} other {# conversations}}} other {{sessions, plural, one {# session} other {# sessions}}}}{hits, plural, =0 {} one { · #{more} match} other { · #{more} matches}}', description: "Under the Sessions tab's search box: how many sessions match (the Hive Assistant's: conversations), then how many matches in their transcripts ({more} is \"+\" when there are more than shown, else empty; none: leave it empty)." }), { kind, sessions: matched, hits: hitCount, more: results.some((r) => r.more) ? '+' : '' })
+                tr(msg({ id: 'sessions.search.count', defaultMessage: '{kind, select, conversation {{sessions, plural, one {# conversation} other {# conversations}}} other {{sessions, plural, one {# session} other {# sessions}}}}{hits, plural, =0 {} one { · #{more} match} other { · #{more} matches}}', description: "Under the Sessions tab's search box: how many sessions match (the Combwork Assistant's: conversations), then how many matches in their transcripts ({more} is \"+\" when there are more than shown, else empty; none: leave it empty)." }), { kind, sessions: matched, hits: hitCount, more: results.some((r) => r.more) ? '+' : '' })
               )}
             </span>
           )}
@@ -503,7 +504,7 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
         {q && searchError && <LoadFailed inline what={tr(msg({ id: 'sessions.search.what', defaultMessage: 'the search results', description: "What could not be loaded, in \"Could not load …\": the Sessions tab's search. Lower case." }))} error={searchError} onRetry={() => setSearchTry((n) => n + 1)} />}
         <div className="pane-body file-tree sessions-tree" tabIndex={0} ref={treeRef} onKeyDown={onKeyDown}>
           {items.length === 0 && !othersLoading && <div className="pane-empty">{tr(NONE_YET, { kind })}</div>}
-          {items.length > 0 && rows.length === 0 && !q && <div className="pane-empty">{tr(msg({ id: 'sessions.list.noneHere', defaultMessage: '{kind, select, conversation {No conversations here: tick Archived to see archived ones.} other {No sessions here: tick Archived to see archived ones.}}', description: "The Sessions list when every session is archived (the Hive Assistant's: conversations). Archived is the checkbox above it: use its translation." }), { kind })}</div>}
+          {items.length > 0 && rows.length === 0 && !q && <div className="pane-empty">{tr(msg({ id: 'sessions.list.noneHere', defaultMessage: '{kind, select, conversation {No conversations here: tick Archived to see archived ones.} other {No sessions here: tick Archived to see archived ones.}}', description: "The Sessions list when every session is archived (the Combwork Assistant's: conversations). Archived is the checkbox above it: use its translation." }), { kind })}</div>}
           {rows.map((r) => {
             if (r.kind === 'hit') {
               return (
@@ -554,7 +555,7 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
                 onContextMenu={onContextMenu}
                 buttons={
                   <>
-                    {s.source === 'hive' && <IconButton icon="tag" title={tr(RENAME)} onClick={() => void rename(s)} />}
+                    {s.source === 'combwork' && <IconButton icon="tag" title={tr(RENAME)} onClick={() => void rename(s)} />}
                     {!isLive(s.id) && <IconButton icon="trash" title={tr(DELETE_ONE, { kind })} onClick={() => void remove(s)} />}
                     <IconButton icon="ellipsis" title={tr(MORE_ACTIONS)} onClick={more} />
                   </>
@@ -583,15 +584,15 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
                     {tr(ADOPT)}
                   </button>
                 )}
-                {selected.source === 'hive' && <IconButton icon="tag" title={tr(RENAME)} onClick={() => void rename(selected)} />}
-                {selected.source === 'hive' && !isLive(selected.id) && (
+                {selected.source === 'combwork' && <IconButton icon="tag" title={tr(RENAME)} onClick={() => void rename(selected)} />}
+                {selected.source === 'combwork' && !isLive(selected.id) && (
                   <IconButton icon={selected.archived ? 'unarchive' : 'archive'} title={selected.archived ? tr(UNARCHIVE) : tr(ARCHIVE)} onClick={() => void archive(selected, !selected.archived)} />
                 )}
                 {!isLive(selected.id) && <IconButton icon="trash" title={tr(DELETE_ONE, { kind })} onClick={() => void remove(selected)} />}
                 {isLive(selected.id) && (() => {
                   const holder = project.agents.find((a) => a.live?.sessionId === selected.id)!
                   return (
-                    <Tooltip content={assistant ? tr(msg({ id: 'sessions.running.assistantTip', defaultMessage: 'The Assistant is running this conversation. Show its panel.', description: "Tooltip of Show over the Hive Assistant's running conversation." })) : tr(msg({ id: 'sessions.running.agentTip', defaultMessage: 'This conversation is running in {agent}. Show its terminal.', description: "Tooltip of Show over a running session's transcript: the agent running it ({agent}: its name)." }), { agent: holder.name })}>
+                    <Tooltip content={assistant ? tr(msg({ id: 'sessions.running.assistantTip', defaultMessage: 'The Assistant is running this conversation. Show its panel.', description: "Tooltip of Show over the Combwork Assistant's running conversation." })) : tr(msg({ id: 'sessions.running.agentTip', defaultMessage: 'This conversation is running in {agent}. Show its terminal.', description: "Tooltip of Show over a running session's transcript: the agent running it ({agent}: its name)." }), { agent: holder.name })}>
                       <button className="btn small" onClick={() => (assistant ? setAssistantOpen(true) : revealAgent(project, holder.id))}>
                         <Icon name="terminal" /> {many ? tr(msg({ id: 'sessions.running.showAgent', defaultMessage: 'Show {agent}', description: "Button over a running session's transcript: shows the agent running it ({agent}: its name)." }), { agent: holder.name }) : tr(msg({ id: 'sessions.running.show', defaultMessage: 'Show', description: "Button over a running session's transcript: shows its agent's terminal (the Assistant's panel). Keep it short." }))}
                       </button>
@@ -626,7 +627,8 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
                   const targetAgent = agents.find((a) => a.id === target) ?? null
                   const targetName = targetAgent?.name
                   // Its slot free and as it left it (#1434): this Resume takes it again, as Resume All doesn't.
-                  const note = (selected.hold?.is === 'byHand' ? shownText(holdText(selected.hold, targetName ?? selected.agentName ?? '')) : null) ?? removedAgentNote(selected, project.agents, targetAgent)
+                  // HI-2540: one that can't continue starts a new conversation, said before Resume is pressed.
+                  const note = (selected.hold?.is === 'byHand' ? shownText(holdText(selected.hold, targetName ?? selected.agentName ?? '')) : null) ?? removedAgentNote(selected, project.agents, targetAgent) ?? (selected.fresh ? freshTip(selected.fresh, sessionName(selected)) : null)
                   if (agents.length < 2) {
                     const button = (
                       <button className="btn small act-resume" disabled={!!resuming || targetStarting} aria-busy={!!resuming || undefined} onClick={() => void actions.resumeSession(project.path, selected)}>
@@ -675,7 +677,7 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
         ) : (
           <div className="empty-state">
             <Icon name="history" />
-            {items.length ? tr(msg({ id: 'sessions.empty.select', defaultMessage: '{kind, select, conversation {Select a conversation to read its transcript.} other {Select a session to read its transcript.}}', description: "The Sessions tab's reading pane with nothing selected (the Hive Assistant's: conversation)." }), { kind }) : tr(NONE_YET, { kind })}
+            {items.length ? tr(msg({ id: 'sessions.empty.select', defaultMessage: '{kind, select, conversation {Select a conversation to read its transcript.} other {Select a session to read its transcript.}}', description: "The Sessions tab's reading pane with nothing selected (the Combwork Assistant's: conversation)." }), { kind }) : tr(NONE_YET, { kind })}
           </div>
         )}
       </div>
@@ -736,7 +738,7 @@ function reportBulk(action: SessionBulkAction, r: SessionBulkResult, name: (id: 
   const reasons = new Map<string, number>()
   for (const s of skipped) reasons.set(s.key, (reasons.get(s.key) ?? 0) + 1)
   const why = fmt.list(
-    [...reasons].map(([k, v]) => tr(msg({ id: 'sessions.bulk.skipCount', defaultMessage: "{reason, select, live {{n, plural, one {# running} other {# running}}} inUse {{n, plural, one {# in use} other {# in use}}} reading {{n, plural, one {# being read by Hive} other {# being read by Hive}}} open {{n, plural, one {# open in another Hive window} other {# open in other Hive windows}}} external {{n, plural, one {# started outside Hive} other {# started outside Hive}}} shown {{n, plural, one {# open here} other {# open here}}} current {{n, plural, one {# current Assistant conversation} other {# current Assistant conversations}}} other {{n, plural, one {# failed} other {# failed}}}}", description: 'How many sessions were passed over for one reason, listed after "n skipped:" ("2 running, 1 in use"). {reason} picks why: running, files in use, Hive is reading it, open in another Hive window, started outside Hive, open in this tab, the Hive Assistant\'s current conversation, or it failed (other).' }), { n: v, reason: k })),
+    [...reasons].map(([k, v]) => tr(msg({ id: 'sessions.bulk.skipCount', defaultMessage: "{reason, select, live {{n, plural, one {# running} other {# running}}} inUse {{n, plural, one {# in use} other {# in use}}} reading {{n, plural, one {# being read by Combwork} other {# being read by Combwork}}} open {{n, plural, one {# open in another Combwork window} other {# open in other Combwork windows}}} external {{n, plural, one {# started outside Combwork} other {# started outside Combwork}}} shown {{n, plural, one {# open here} other {# open here}}} current {{n, plural, one {# current Assistant conversation} other {# current Assistant conversations}}} other {{n, plural, one {# failed} other {# failed}}}}", description: 'How many sessions were passed over for one reason, listed after "n skipped:" ("2 running, 1 in use"). {reason} picks why: running, files in use, Combwork is reading it, open in another Combwork window, started outside Combwork, open in this tab, the Combwork Assistant\'s current conversation, or it failed (other).' }), { n: v, reason: k })),
     'unit'
   )
   const shown = skipped.slice(0, 6).map((s) => `• ${name(s.id)}: ${s.why}${s.message ? ` (${s.message})` : ''}`)
@@ -752,14 +754,14 @@ const UNARCHIVE = msg({ id: 'sessions.common.unarchive', defaultMessage: 'Unarch
 const RESUME = msg({ id: 'sessions.common.resume', defaultMessage: 'Resume', description: 'Button or menu item: resumes a session in its agent. Keep it short.' })
 const RESUME_IN = msg({ id: 'sessions.common.resumeIn', defaultMessage: 'Resume in {agent}', description: 'Button or tooltip: resumes the session in an agent ({agent}: its name).' })
 const RESUME_ELSEWHERE = msg({ id: 'sessions.common.resumeElsewhere', defaultMessage: 'Resume in another agent', description: "Tooltip and accessible name of the Resume button's arrow: choose the agent to resume in." })
-const ADOPT = msg({ id: 'sessions.common.adopt', defaultMessage: 'Adopt', description: 'Button or menu item on a session started outside Hive: lets Hive manage it. Keep it short.' })
-const ADOPT_FAILED = msg({ id: 'sessions.common.adoptFailed', defaultMessage: 'Could not adopt', description: "An error's title: adopting a session started outside Hive failed." })
+const ADOPT = msg({ id: 'sessions.common.adopt', defaultMessage: 'Adopt', description: 'Button or menu item on a session started outside Combwork: lets Combwork manage it. Keep it short.' })
+const ADOPT_FAILED = msg({ id: 'sessions.common.adoptFailed', defaultMessage: 'Could not adopt', description: "An error's title: adopting a session started outside Combwork failed." })
 const EXPAND_ALL = msg({ id: 'sessions.common.expandAll', defaultMessage: 'Expand All', description: 'Menu item or tooltip: opens every branch of the Sessions tree.' })
 const COLLAPSE_ALL = msg({ id: 'sessions.common.collapseAll', defaultMessage: 'Collapse All', description: 'Menu item or tooltip: folds every branch of the Sessions tree.' })
 const MORE_ACTIONS = msg({ id: 'sessions.common.moreActions', defaultMessage: 'More Actions', description: "Tooltip of a row's ⋯ button: opens its menu." })
 const LOADING = msg({ id: 'sessions.common.loading', defaultMessage: 'Loading…', description: 'While the Sessions list or a transcript loads.' })
-const DELETE_ONE = msg({ id: 'sessions.common.delete', defaultMessage: '{kind, select, conversation {Delete conversation} other {Delete session}}', description: "Tooltip of a session's delete button (the Hive Assistant's: conversation)." })
-const NONE_YET = msg({ id: 'sessions.common.noneYet', defaultMessage: '{kind, select, conversation {No conversations yet.} other {No sessions yet.}}', description: "The Sessions tab with no sessions (the Hive Assistant's: conversations)." })
+const DELETE_ONE = msg({ id: 'sessions.common.delete', defaultMessage: '{kind, select, conversation {Delete conversation} other {Delete session}}', description: "Tooltip of a session's delete button (the Combwork Assistant's: conversation)." })
+const NONE_YET = msg({ id: 'sessions.common.noneYet', defaultMessage: '{kind, select, conversation {No conversations yet.} other {No sessions yet.}}', description: "The Sessions tab with no sessions (the Combwork Assistant's: conversations)." })
 
 /** What a search match is in: a message of the transcript, by its kind. */
 const HIT_KIND: Record<TranscriptItem['kind'], Msg> = {
@@ -832,8 +834,8 @@ function TranscriptSize({ s, warnMB, assistant }: { s: SessionListItem; warnMB: 
   const kind: Kind = assistant ? 'conversation' : 'session'
   const tip =
     text === '—'
-      ? tr(msg({ id: 'sessions.size.none', defaultMessage: '{kind, select, conversation {{cli} has no transcript file for this conversation} other {{cli} has no transcript file for this session}}{backup, select, yes { (Hive keeps a backup of it)} other {}}.', description: "Hover of a session's transcript size when the CLI ({cli}) has no file for it; and when Hive has a backup of it, that it does." }), { kind, cli: providerName(s.provider), backup: s.hasBackup ? 'yes' : 'no' })
-      : tr(msg({ id: 'sessions.size.tip', defaultMessage: 'Transcript: {size} on disk{limit, plural, =0 {} other { (flagged over # MB: Settings → Sessions)}}.{long, select, conversation { A long conversation slows down the CLI and Hive, and compacting doesn\'t shrink the file. Start a new conversation (⋯ → New Conversation) to make it short again.} session { A long conversation slows down the CLI and Hive, and compacting doesn\'t shrink the file. Hand the work over to a new conversation (Hand Over to…) to make it short again.} other {}}', description: "Hover of a session's transcript size ({size}: \"6.1 MB\"), the size it is flagged over ({limit} MB, set in Settings → Sessions; 0: leave it empty), and, when it is over (long: the Hive Assistant's conversation or an agent's session), what to do. \"New Conversation\" and \"Hand Over to…\" are commands: use their translations." }), { size: text, limit: warnMB, long: long ? kind : 'no' })
+      ? tr(msg({ id: 'sessions.size.none', defaultMessage: '{kind, select, conversation {{cli} has no transcript file for this conversation} other {{cli} has no transcript file for this session}}{backup, select, yes { (Combwork keeps a backup of it)} other {}}.', description: "Hover of a session's transcript size when the CLI ({cli}) has no file for it; and when Combwork has a backup of it, that it does." }), { kind, cli: providerName(s.provider), backup: s.hasBackup ? 'yes' : 'no' })
+      : tr(msg({ id: 'sessions.size.tip', defaultMessage: 'Transcript: {size} on disk{limit, plural, =0 {} other { (flagged over # MB: Settings → Sessions)}}.{long, select, conversation { A long conversation slows down the CLI and Combwork, and compacting doesn\'t shrink the file. Start a new conversation (⋯ → New Conversation) to make it short again.} session { A long conversation slows down the CLI and Combwork, and compacting doesn\'t shrink the file. Hand the work over to a new conversation (Hand Over to…) to make it short again.} other {}}', description: "Hover of a session's transcript size ({size}: \"6.1 MB\"), the size it is flagged over ({limit} MB, set in Settings → Sessions; 0: leave it empty), and, when it is over (long: the Combwork Assistant's conversation or an agent's session), what to do. \"New Conversation\" and \"Hand Over to…\" are commands: use their translations." }), { size: text, limit: warnMB, long: long ? kind : 'no' })
   return (
     <Tooltip content={tip}>
       <span className={cx('session-row-size', long && 'warn-text')}>{text}</span>
@@ -909,14 +911,14 @@ function SessionRow(props: {
           </Tooltip>
         )}
         {s.source === 'external' && !s.sub && (
-          <Tooltip content={tr(msg({ id: 'sessions.row.externalTip', defaultMessage: 'Started outside Hive (e.g. in VS Code or a terminal). Adopt it to manage it here.', description: 'Hover of the external badge on a session started outside Hive. Adopt is a button: use its translation.' }))}>
-            <span className="badge info">{tr(msg({ id: 'sessions.row.external', defaultMessage: 'external', description: 'A badge on a session started outside Hive. Lower case; keep it short.' }))}</span>
+          <Tooltip content={tr(msg({ id: 'sessions.row.externalTip', defaultMessage: 'Started outside Combwork (e.g. in VS Code or a terminal). Adopt it to manage it here.', description: 'Hover of the external badge on a session started outside Combwork. Adopt is a button: use its translation.' }))}>
+            <span className="badge info">{tr(msg({ id: 'sessions.row.external', defaultMessage: 'external', description: 'A badge on a session started outside Combwork. Lower case; keep it short.' }))}</span>
           </Tooltip>
         )}
         {s.archived && <span className="badge">{tr(msg({ id: 'sessions.row.archived', defaultMessage: 'archived', description: 'A badge on an archived session. Lower case; keep it short.' }))}</span>}
         {!s.hasTranscript && s.hasBackup && (
-          <Tooltip content={tr(msg({ id: 'sessions.row.backupTip', defaultMessage: '{cli} no longer has this transcript; Hive shows and resumes it from its backup.', description: "Hover of the backup badge: the CLI ({cli}) deleted the session's transcript, and Hive uses its own copy." }), { cli: providerName(s.provider) })}>
-            <span className="badge warn">{tr(msg({ id: 'sessions.row.backup', defaultMessage: 'backup', description: "A badge on a session read from Hive's backup (the CLI deleted its own copy). Lower case; keep it short." }))}</span>
+          <Tooltip content={tr(msg({ id: 'sessions.row.backupTip', defaultMessage: '{cli} no longer has this transcript; Combwork shows and resumes it from its backup.', description: "Hover of the backup badge: the CLI ({cli}) deleted the session's transcript, and Combwork uses its own copy." }), { cli: providerName(s.provider) })}>
+            <span className="badge warn">{tr(msg({ id: 'sessions.row.backup', defaultMessage: 'backup', description: "A badge on a session read from Combwork's backup (the CLI deleted its own copy). Lower case; keep it short." }))}</span>
           </Tooltip>
         )}
         <SessionMarker s={s} block={props.block} live={!!live} orphan={props.orphan} />
@@ -982,7 +984,7 @@ function TranscriptView({ project, session, origin, live, jump, query, viewId, m
   const pinned = useRef(jump === null)
   /**
    * A jump placed the view (a search hit, a compaction): only the user's own scrolling follows the end again, not the
-   * scroll events of Hive's own scrolls (#1323: the opening scroll to the end, its event arriving after the jump, pinned
+   * scroll events of Combwork's own scrolls (#1323: the opening scroll to the end, its event arriving after the jump, pinned
    * the view again and the jump was scrolled away).
    */
   const placed = useRef(false)
@@ -1094,7 +1096,7 @@ function TranscriptView({ project, session, origin, live, jump, query, viewId, m
     if (!reg || !H) return
     const root = scroller.current
     if (!query || !root) {
-      reg.delete('hive-search')
+      reg.delete('cw-search')
       return
     }
     const ranges: Range[] = []
@@ -1109,8 +1111,8 @@ function TranscriptView({ project, session, origin, live, jump, query, viewId, m
         ranges.push(r)
       }
     }
-    reg.set('hive-search', new H(...ranges))
-    return () => void reg.delete('hive-search')
+    reg.set('cw-search', new H(...ranges))
+    return () => void reg.delete('cw-search')
   })
 
   const blocks = useMemo(() => (transcript ? toBlocks(transcript.items) : []), [transcript])
@@ -1312,23 +1314,23 @@ const NO_CALLS_OPEN: ReadonlySet<number> = new Set()
 /** A command's exit code, as a badge says it (HI-2240: a Codex script's command). */
 const exitCodeText = (code: number): string => tr(msg({ id: 'sessions.tool.exitCode', defaultMessage: 'exit code {code}', description: "A badge on a command a Codex script ran, in a transcript (HI-2240): the exit code it ended with ({code}: a number such as 0 or 1, shown as it is). Lower case; keep it short." }), { code: String(code) })
 
-/** What kind of call a Codex script's call is, as its line counts it (HI-2240): an MCP server's (by server), or Hive's name for it. */
+/** What kind of call a Codex script's call is, as its line counts it (HI-2240): an MCP server's (by server), or Combwork's name for it. */
 const callKind = (c: TranscriptTool): string => (c.name.includes(' · ') ? `mcp:${c.name.split(' · ')[0]}` : c.name === 'Shell' ? 'command' : c.name === 'Edit' ? 'edit' : c.name === 'view_image' ? 'image' : 'other')
 
 /**
  * A Codex script's calls in a line (HI-2240, Darren's decision): how many of each kind, in the order they first came
- * ("3 hive calls, 1 command, 2 edits"), and how many failed.
+ * ("3 combwork calls, 1 command, 2 edits"), and how many failed.
  */
 function callsSummary(calls: TranscriptTool[]): string {
   const counts = new Map<string, number>()
   for (const c of calls) counts.set(callKind(c), (counts.get(callKind(c)) ?? 0) + 1)
   const parts = [...counts].map(([kind, n]) =>
     kind.startsWith('mcp:')
-      ? tr(msg({ id: 'sessions.tool.scriptMcpCalls', defaultMessage: '{n, plural, one {# {server} call} other {# {server} calls}}', description: "Part of a folded Codex script's line in a transcript (HI-2240), in a list such as \"3 hive calls, 1 command, 2 edits\": how many calls the script made to one MCP server's tools ({server}: the server's name, such as hive, not translated)." }), { n, server: kind.slice(4) })
-      : tr(msg({ id: 'sessions.tool.scriptKindCalls', defaultMessage: '{kind, select, command {{n, plural, one {# command} other {# commands}}} edit {{n, plural, one {# edit} other {# edits}}} image {{n, plural, one {# image view} other {# image views}}} other {{n, plural, one {# other call} other {# other calls}}}}', description: "Part of a folded Codex script's line in a transcript (HI-2240), in a list such as \"3 hive calls, 1 command, 2 edits\": how many calls of one kind the script made. {kind}: shell commands it ran, file edits it made, images it looked at, or (other) any other tool calls." }), { n, kind })
+      ? tr(msg({ id: 'sessions.tool.scriptMcpCalls', defaultMessage: '{n, plural, one {# {server} call} other {# {server} calls}}', description: "Part of a folded Codex script's line in a transcript (HI-2240), in a list such as \"3 combwork calls, 1 command, 2 edits\": how many calls the script made to one MCP server's tools ({server}: the server's name, such as combwork, not translated)." }), { n, server: kind.slice(4) })
+      : tr(msg({ id: 'sessions.tool.scriptKindCalls', defaultMessage: '{kind, select, command {{n, plural, one {# command} other {# commands}}} edit {{n, plural, one {# edit} other {# edits}}} image {{n, plural, one {# image view} other {# image views}}} other {{n, plural, one {# other call} other {# other calls}}}}', description: "Part of a folded Codex script's line in a transcript (HI-2240), in a list such as \"3 combwork calls, 1 command, 2 edits\": how many calls of one kind the script made. {kind}: shell commands it ran, file edits it made, images it looked at, or (other) any other tool calls." }), { n, kind })
   )
   const failed = calls.filter((c) => c.isError).length
-  if (failed) parts.push(tr(msg({ id: 'sessions.tool.scriptFailedCalls', defaultMessage: '{n, plural, one {# failed} other {# failed}}', description: "The last part of a folded Codex script's line in a transcript (HI-2240), after \"3 hive calls, 1 command\": how many of the script's calls failed." }), { n: failed }))
+  if (failed) parts.push(tr(msg({ id: 'sessions.tool.scriptFailedCalls', defaultMessage: '{n, plural, one {# failed} other {# failed}}', description: "The last part of a folded Codex script's line in a transcript (HI-2240), after \"3 combwork calls, 1 command\": how many of the script's calls failed." }), { n: failed }))
   return fmt.list(parts, 'unit')
 }
 
@@ -1401,7 +1403,7 @@ function ToolCall({ id, tool, open, toggle, project, sessionId, onImage, nested 
 }
 
 function OtherItem({ item, open, toggle }: { item: TranscriptItem; open: boolean; toggle: (id: number) => void }) {
-  // Hive's own notices are formatted here, in the language shown (#797): a language change shows them in it at once.
+  // Combwork's own notices are formatted here, in the language shown (#797): a language change shows them in it at once.
   useLanguage()
   if (item.kind === 'compaction') {
     const freed = Math.max(0, item.preTokens - item.postTokens)

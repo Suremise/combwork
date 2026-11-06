@@ -1,0 +1,62 @@
+{
+  "check.link.cardForm": {
+    "text": "card is a card reference such as \"HI-12\" or \"#1061\": a plain number isn't taken (in a shell, quote \"#1061\": an unquoted # starts a comment)",
+    "note": "#1219, SPEC §16.12: a plain number is refused with the forms to use. An unquoted #1061 in a shell is a comment."
+  },
+  "check.link.checkForm": {
+    "text": "check is the name of one of the project's checks, such as \"typecheck\"",
+    "note": "A check name with characters no check has."
+  },
+  "check.link.checkNeedsCard": {
+    "text": "A check runs its project's command for it: name the card too, so Combwork knows the project",
+    "note": "A check named by a caller with no project (a script), and no card."
+  },
+  "check.link.focusedForm": {
+    "text": "A focused test's check is \"focused:<test>\", the test's id as its card lists it",
+    "note": "HI-1367: a focused test's check names a test id its card lists."
+  },
+  "check.link.folder": {
+    "text": "folder is the absolute path of the folder the run runs in",
+    "note": "A request whose folder is missing, not absolute or too long."
+  },
+  "check.link.noCommand": {
+    "text": "{project} has no command configured for the check \"{name}\", so nothing was run. cw-progress --check runs the command the project's options give for that name",
+    "note": "#1220: a check runs the command the project's options give for it. project: its folder name; name: the check."
+  },
+  "check.link.noContentRevision": {
+    "text": "{card} has no revision to compare {named} with: leave revision out",
+    "note": "A card on the None platform (#1233): its revision is its declared paths' hash, and it has none yet. named: the revision asked for."
+  },
+  "check.link.notACommit": {
+    "text": "{named} isn't a commit in {folder}",
+    "note": "named: the revision asked for; folder: where the run runs."
+  },
+  "check.link.notCheckedOut": {
+    "text": "{named} isn't what's checked out here ({head} is): check it out first, or leave revision out",
+    "note": "#1220: a run is checked against what is checked out where it runs. head: that commit, short."
+  },
+  "check.link.notContentRevision": {
+    "text": "{named} isn't {card}'s revision now (its paths hash to {hash}): leave revision out",
+    "note": "A card on the None platform (#1233): its revision is its declared paths' hash. hash: that hash, short."
+  },
+  "check.link.nothingCheckedOut": {
+    "text": "Nothing is checked out in {folder} to compare {named} with: leave revision out",
+    "note": "folder: where the run runs; named: the revision asked for."
+  },
+  "check.link.otherCopy": {
+    "text": "{copy} holds {held}'s revision, not {card}'s: run it there for {held}, or elsewhere for {card}",
+    "note": "#1435: a run in a review or check copy is a check of the copy's lease. copy: the copy's name; held: its lease's card; card: the card the run names."
+  },
+  "check.link.revisionForm": {
+    "text": "revision is a commit (its id, or a name git knows)",
+    "note": "A revision that is empty, too long, starts with \"-\" or has characters git refs never have."
+  },
+  "check.link.revisionNeedsFolder": {
+    "text": "A revision is checked against what is checked out where the run runs: give folder too",
+    "note": "A revision named with no folder."
+  },
+  "check.link.unknownCard": {
+    "text": "Unknown card {card}",
+    "note": "card: the reference as the caller wrote it. Another project's card answers as an unknown one does, so nothing of it shows."
+  }
+}

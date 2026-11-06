@@ -1,9 +1,9 @@
-// Measures what sessions are actually given about Hive, from real launches (with the fake CLIs, so it costs nothing):
-// for each provider and role (project agent, the Assistant at each control level), a short catalog (Hive's own skills)
+// Measures what sessions are actually given about Combwork, from real launches (with the fake CLIs, so it costs nothing):
+// for each provider and role (project agent, the Assistant at each control level), a short catalog (Combwork's own skills)
 // and a long one (40 more skills of the user's), a new session and a resumed one. Counted from the launch itself:
-// - instructions: the hive MCP server's (initialize, with the launch's own environment), and for Codex the developer
+// - instructions: the combwork MCP server's (initialize, with the launch's own environment), and for Codex the developer
 //   instructions on its command line; for the Assistant on Claude Code, its appended system prompt file;
-// - tools: the hive MCP server's tools/list (names, descriptions and schemas), as that launch's server answers it;
+// - tools: the combwork MCP server's tools/list (names, descriptions and schemas), as that launch's server answers it;
 // - skills: each delivered skill's name and description (what the CLI lists; bodies load only when used).
 // Characters and UTF-8 bytes; tokens are estimated at 4 bytes each (no tokenizer is run).
 //
@@ -18,13 +18,13 @@ const bytes = (s) => Buffer.byteLength(s ?? '', 'utf8')
 // The longest a measurement waits for what it is waiting on (the workspace, a turn, a stop): a bound for a hung run.
 const HUNG_MS = 30000
 
-/** The hive MCP server's instructions and tools, started as the launch starts it. */
-function hiveServer(env) {
+/** The combwork MCP server's instructions and tools, started as the launch starts it. */
+function combworkServer(env) {
   return new Promise((resolve, reject) => {
-    const p = spawn(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], { env: lib.childEnv({ ...env, ELECTRON_RUN_AS_NODE: '1' }) })
+    const p = spawn(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { env: lib.childEnv({ ...env, ELECTRON_RUN_AS_NODE: '1' }) })
     let buf = ''
     const got = {}
-    const timer = setTimeout(() => (p.kill(), reject(new Error('hive-mcp did not answer'))), 15000)
+    const timer = setTimeout(() => (p.kill(), reject(new Error('cw-mcp did not answer'))), 15000)
     p.stdout.on('data', (d) => {
       buf += d
       for (let i; (i = buf.indexOf('\n')) >= 0; ) {
@@ -85,14 +85,14 @@ const tomlString = (v) => (v.startsWith('"') ? JSON.parse(v) : v)
       cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
       cfg.settings.assistant = { ...cfg.settings.assistant, provider: assistantProvider }
       fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-      const { app, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: '47931', CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, HIVE_TEST_TIPS: 'off' } })
+      const { app, inv } = await lib.launch({ userData, env: { CW_API_PORT: '47931', CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome, CW_TEST_TIPS: 'off' } })
       try {
         await lib.waitForProvider(inv, 'codex', 60000)
         await inv('workspace:open', ws)
         await lib.until(async () => (await inv('workspace:refresh'))?.projects?.some((p) => p.name === 'alpha'), HUNG_MS)
         if (catalog === 'long') {
           for (let i = 1; i <= 40; i++) {
-            const d = path.join(ws, '.hive', 'skills', `team-skill-${i}`)
+            const d = path.join(ws, '.combwork', 'skills', `team-skill-${i}`)
             fs.mkdirSync(d, { recursive: true })
             fs.writeFileSync(path.join(d, 'SKILL.md'), `---\nname: team-skill-${i}\ndescription: The team's procedure number ${i} for one of its recurring jobs. Use when the user asks for job ${i}.\n---\n\nSteps.\n`)
           }
@@ -120,7 +120,7 @@ const tomlString = (v) => (v.startsWith('"') ? JSON.parse(v) : v)
         const measureClaude = async (role, resumed) => {
           const launch = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).at(-1)
           const session = !resumed ? 'new' : launch.opts['--resume'] === resumed ? 'resumed' : 'resume NOT confirmed'
-          const server = await hiveServer(JSON.parse(mcpConfigs.get(launch.opts['--mcp-config']) ?? fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive.env)
+          const server = await combworkServer(JSON.parse(mcpConfigs.get(launch.opts['--mcp-config']) ?? fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork.env)
           const appended = launch.opts['--append-system-prompt-file'] ? fs.readFileSync(launch.opts['--append-system-prompt-file'], 'utf8') : ''
           const skills = skillMetadata(path.join(launch.opts['--plugin-dir'], 'skills'))
           rows.push({ provider: 'claude-code', role, catalog, session, instructions: bytes(server.instructions) + bytes(appended), tools: bytes(server.tools), skills: bytes(skills.text), skillCount: skills.count })
@@ -130,10 +130,10 @@ const tomlString = (v) => (v.startsWith('"') ? JSON.parse(v) : v)
           const session = !resumed ? 'new' : launch.args[0] === 'resume' && launch.args[1] === resumed ? 'resumed' : 'resume NOT confirmed'
           const arg = (prefix) => launch.args.find((a) => a.startsWith(prefix))?.slice(prefix.length) ?? ''
           const developer = tomlString(arg('developer_instructions='))
-          // The hive server's environment from its -c mcp_servers.hive table.
-          const table = arg('mcp_servers.hive=')
-          const env = Object.fromEntries([...table.matchAll(/(HIVE_\w+|ELECTRON_RUN_AS_NODE)="((?:[^"\\]|\\.)*)"/g)].map((m) => [m[1], JSON.parse(`"${m[2]}"`)]))
-          const server = await hiveServer(env)
+          // The combwork server's environment from its -c mcp_servers.combwork table.
+          const table = arg('mcp_servers.combwork=')
+          const env = Object.fromEntries([...table.matchAll(/(CW_\w+|ELECTRON_RUN_AS_NODE)="((?:[^"\\]|\\.)*)"/g)].map((m) => [m[1], JSON.parse(`"${m[2]}"`)]))
+          const server = await combworkServer(env)
           const skills = skillMetadata(path.join(cwd, '.agents', 'skills'))
           // Codex doesn't show MCP instructions to the model: the developer instructions carry the same text.
           rows.push({ provider: 'codex', role, catalog, session, instructions: bytes(developer), tools: bytes(server.tools), skills: bytes(skills.text), skillCount: skills.count })

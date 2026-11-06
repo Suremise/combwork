@@ -11,7 +11,7 @@ import { commit, gitRepo, sh } from './harness'
 import { allOff } from '../../src/shared/workflow/options'
 import { foldCard, type Fact } from '../../src/shared/workflow/facts'
 
-const base = tempDir('hive-adoption-')
+const base = tempDir('cw-adoption-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../../src/main/workspace')
@@ -48,12 +48,12 @@ async function world(): Promise<{ ws: string; w: WS; wt: string }> {
   const ws = join(base, `ws-${++n}`)
   const p = gitRepo(join(ws, 'p'))
   const wt = join(base, `wt-${n}`)
-  sh(p, 'worktree', 'add', '-q', '-b', 'hive/b1', wt)
+  sh(p, 'worktree', 'add', '-q', '-b', 'cw/b1', wt)
   commit(wt, { 'src/b.txt': 'b1\n' }, 'B1 builds')
-  mkdirSync(join(p, '.hive'), { recursive: true })
-  writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1', worktree: { path: wt, branch: 'hive/b1', base: 'main' } }, { id: 'r1', name: 'R1 (reviewer)' }] }))
-  mkdirSync(join(ws, 'n', '.hive'), { recursive: true })
-  writeFileSync(join(ws, 'n', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
+  mkdirSync(join(p, '.combwork'), { recursive: true })
+  writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1', worktree: { path: wt, branch: 'cw/b1', base: 'main' } }, { id: 'r1', name: 'R1 (reviewer)' }] }))
+  mkdirSync(join(ws, 'n', '.combwork'), { recursive: true })
+  writeFileSync(join(ws, 'n', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
   const w = await open(ws)
   const cards = [
     card(1, 'p', 'todo'),
@@ -90,7 +90,7 @@ function afterSnapshot(w: WS, fn: () => void): void {
     return list(opts)
   }
 }
-/** A card's saved document changed by another Hive (its own connection to the file). */
+/** A card's saved document changed by another Combwork (its own connection to the file). */
 const editOutside = (ws: string, w: WS, num: number, change: Record<string, unknown>): void => writeCardOutside(ws, num, { ...readCard(w, num), ...change })
 
 const factsOf = (w: WS, project: string, num: number): { kind: string; data: Record<string, unknown>; source: string }[] => FactStore.forBoard(w, { project, key: project }).facts(num) as never
@@ -98,7 +98,7 @@ const foldOf = (w: WS, project: string, num: number) => foldCard(FactStore.forBo
 const marked = (w: WS): number[] => store.adoptionCards(w).filter((c) => c.preWorkflow).map((c) => c.number)
 const cardOf = (w: WS, num: number) => store.adoptionCards(w).find((c) => c.number === num)
 const allFacts = (w: WS): number => store.boardRead(w, (db) => (db.prepare('SELECT COUNT(*) AS n FROM card_facts').get() as { n: number }).n)
-const config = (ws: string, project: string): Record<string, unknown> => JSON.parse(readFileSync(join(ws, project, '.hive', 'project.json'), 'utf8'))
+const config = (ws: string, project: string): Record<string, unknown> => JSON.parse(readFileSync(join(ws, project, '.combwork', 'project.json'), 'utf8'))
 const clearDone = (w: WS): Promise<unknown> => store.boardWrite(w, async () => store.boardWriteOp(w, (db) => db.prepare("DELETE FROM board_meta WHERE key = 'adoption'").run()))
 
 describe("the upgrade's adoption (#1218)", () => {
@@ -115,7 +115,7 @@ describe("the upgrade's adoption (#1218)", () => {
     expect(head).not.toBe(mainHead)
     const doing = factsOf(w, 'p', 2)
     expect(doing.map((f) => f.kind)).toEqual(['Adopted'])
-    expect(doing[0]).toMatchObject({ source: 'observed', data: { folder: wt, line: 'hive/b1', base: mainHead, head, target: 'main', builder: 'b1', adoptedFrom: 'doing' } })
+    expect(doing[0]).toMatchObject({ source: 'observed', data: { folder: wt, line: 'cw/b1', base: mainHead, head, target: 'main', builder: 'b1', adoptedFrom: 'doing' } })
     // Review: Adopted, and an adopted Submitted at its head with the change's files.
     const review = factsOf(w, 'p', 3)
     expect(review.map((f) => f.kind)).toEqual(['Adopted', 'Submitted'])
@@ -149,7 +149,7 @@ describe("the upgrade's adoption (#1218)", () => {
   })
 
   it('a Started fact, and an Adopted one from before round 2, keep their base as the head', () => {
-    const started = (kind: 'Started' | 'Adopted'): Fact => ({ card: 1, seq: 1, kind, at, actor: 'hive', source: 'observed', data: { folder: 'project', line: 'main', base: 'b0', target: 'main', builder: 'b1', cardKind: 'code' } }) as unknown as Fact
+    const started = (kind: 'Started' | 'Adopted'): Fact => ({ card: 1, seq: 1, kind, at, actor: 'combwork', source: 'observed', data: { folder: 'project', line: 'main', base: 'b0', target: 'main', builder: 'b1', cardKind: 'code' } }) as unknown as Fact
     expect(foldCard([started('Started')]).head).toBe('b0')
     expect(foldCard([started('Adopted')]).head).toBe('b0')
   })
@@ -158,15 +158,15 @@ describe("the upgrade's adoption (#1218)", () => {
     const { ws, w } = await world()
     await adoptNow(w)
     const facts = allFacts(w)
-    const before = readFileSync(join(ws, 'p', '.hive', 'project.json'), 'utf8')
+    const before = readFileSync(join(ws, 'p', '.combwork', 'project.json'), 'utf8')
     expect(await adoptNow(w)).toBeNull()
     await clearDone(w)
     expect(await adoptNow(w)).toEqual({ adopted: 0, marked: 0, configured: 0, failed: 0, changed: 0 })
     expect(allFacts(w)).toBe(facts)
-    expect(readFileSync(join(ws, 'p', '.hive', 'project.json'), 'utf8')).toBe(before)
+    expect(readFileSync(join(ws, 'p', '.combwork', 'project.json'), 'utf8')).toBe(before)
   })
 
-  it('two at once (another Hive, a start during the upgrade) add each fact once', async () => {
+  it('two at once (another Combwork, a start during the upgrade) add each fact once', async () => {
     const { w } = await world()
     const [a, b] = await Promise.all([adoptNow(w), adoptNow(w)])
     expect(a!.adopted + b!.adopted).toBe(4)
@@ -174,7 +174,7 @@ describe("the upgrade's adoption (#1218)", () => {
     expect(a!.configured + b!.configured).toBe(2)
     for (const c of [2, 3, 4]) expect(factsOf(w, 'p', c).filter((f) => f.kind === 'Adopted')).toHaveLength(1)
     expect(factsOf(w, 'p', 3).filter((f) => f.kind === 'Submitted')).toHaveLength(1)
-    // And the coalesced run (what Hive starts) while another is going: one run.
+    // And the coalesced run (what Combwork starts) while another is going: one run.
     const facts = allFacts(w)
     await clearDone(w)
     await Promise.all([adoptWorkspace(w), adoptWorkspace(w)])
@@ -189,15 +189,15 @@ describe("the upgrade's adoption (#1218)", () => {
     expect(cardOf(w, 11)).toMatchObject({ preWorkflow: false, facts: false })
     // A new board: none of its cards are from before 1.0.
     const fresh = join(base, `ws-${++n}`)
-    mkdirSync(join(fresh, 'q', '.hive'), { recursive: true })
-    writeFileSync(join(fresh, 'q', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    mkdirSync(join(fresh, 'q', '.combwork'), { recursive: true })
+    writeFileSync(join(fresh, 'q', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     const f = await open(fresh)
     await writeCard(f, 1, card(1, 'q', 'doing'))
     expect(await adoptNow(f)).toMatchObject({ adopted: 0, marked: 0 })
     expect(store.adoptionCards(f)).toMatchObject([{ number: 1, facts: false, preWorkflow: false }])
   })
 
-  it('leaves a card another Hive started after its snapshot as it is, its stage and column too', async () => {
+  it('leaves a card another Combwork started after its snapshot as it is, its stage and column too', async () => {
     const { ws, w } = await world()
     afterSnapshot(w, () => {
       const other = FactStore.open(store.boardFile(ws), { project: 'p', key: 'p' })
@@ -235,9 +235,9 @@ describe("the upgrade's adoption (#1218)", () => {
     expect(store.boardValue(w, 'adoption')).not.toBeNull()
   })
 
-  it("a card whose agent's folder changed after it was read is read again, by Hive's run itself", async () => {
+  it("a card whose agent's folder changed after it was read is read again, by Combwork's run itself", async () => {
     const { ws, w } = await world()
-    const file = join(ws, 'p', '.hive', 'project.json')
+    const file = join(ws, 'p', '.combwork', 'project.json')
     sh(join(ws, 'p'), 'branch', 'release')
     afterSnapshot(w, () => {
       const cfg = JSON.parse(readFileSync(file, 'utf8'))
@@ -252,13 +252,13 @@ describe("the upgrade's adoption (#1218)", () => {
 
   it('leaves a card started before it runs, and options already set, as they are', async () => {
     const { ws, w } = await world()
-    // Card 2 started under 1.0 by another Hive before this one adopts it: it has facts, so it isn't adopted.
+    // Card 2 started under 1.0 by another Combwork before this one adopts it: it has facts, so it isn't adopted.
     const other = FactStore.open(store.boardFile(ws), { project: 'p', key: 'p' })
     other.tx((tx) => tx.append(2, { kind: 'Moved', actor: 'user', source: 'recorded', data: { from: 'todo', to: 'active', cause: 'user' } }))
     other.close()
     const own = { platform: 'git', preset: null, options: { ...allOff('git'), review: 'none' } }
     const cfg = config(ws, 'p')
-    writeFileSync(join(ws, 'p', '.hive', 'project.json'), JSON.stringify({ ...cfg, workflow: own }))
+    writeFileSync(join(ws, 'p', '.combwork', 'project.json'), JSON.stringify({ ...cfg, workflow: own }))
     const r = await adoptNow(w)
     expect(config(ws, 'p').workflow).toEqual(own)
     expect(r!.configured).toBe(1)
@@ -283,19 +283,19 @@ describe("the upgrade's adoption (#1218)", () => {
   })
 })
 
-// A copy of the live board (HIVE_STORE_ROUNDTRIP_DB, never the file in place): every card handled, none moved, once.
-describe.runIf(!!process.env.HIVE_STORE_ROUNDTRIP_DB && existsSync(process.env.HIVE_STORE_ROUNDTRIP_DB))('on a copy of a live board (#1218)', () => {
+// A copy of the live board (CW_STORE_ROUNDTRIP_DB, never the file in place): every card handled, none moved, once.
+describe.runIf(!!process.env.CW_STORE_ROUNDTRIP_DB && existsSync(process.env.CW_STORE_ROUNDTRIP_DB))('on a copy of a live board (#1218)', () => {
   it('handles every card once and moves none', async () => {
     const ws = join(base, 'live')
-    mkdirSync(join(ws, '.hive'), { recursive: true })
-    copyFileSync(process.env.HIVE_STORE_ROUNDTRIP_DB!, join(ws, '.hive', 'hive.db'))
+    mkdirSync(join(ws, '.combwork'), { recursive: true })
+    copyFileSync(process.env.CW_STORE_ROUNDTRIP_DB!, join(ws, '.combwork', 'combwork.db'))
     const w = await open(ws)
     if (store.upgradeWaiting(ws)) await inWorkspace(w, () => store.upgradeBoard(w))
     const before = store.adoptionCards(w)
     // Its projects as plain folders (None): their cards in flight are adopted with nothing read.
     for (const p of new Set(before.map((c) => c.project).filter((name) => name && /^[\w.-]+$/.test(name)))) {
-      mkdirSync(join(ws, p, '.hive'), { recursive: true })
-      writeFileSync(join(ws, p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+      mkdirSync(join(ws, p, '.combwork'), { recursive: true })
+      writeFileSync(join(ws, p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     }
     const inFlight = before.filter((c) => !c.archived && ['doing', 'review', 'passed'].includes(c.column) && c.project && existsSync(join(ws, c.project))).length
     const t0 = performance.now()

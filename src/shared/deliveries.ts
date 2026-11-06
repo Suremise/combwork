@@ -1,11 +1,12 @@
 /**
- * Deliveries (#647, plans/2026-10-12-messaging-redesign.md §3.1): everything Hive has for an agent to read is a record
+ * Deliveries (#647, plans/2026-10-12-messaging-redesign.md §3.1): everything Combwork has for an agent to read is a record
  * with an id, its target, kind, sender, card, body and state, saved in its workspace's database (#1018: under its project) and offered
  * by one scheduler (main/deliveries.ts): every way into an agent makes one (#649). The agent collects them with
- * hive_inbox (received) and acknowledges them once it has acted on them (acked). This file is the pure part: the states and their moves, coalescing, the typed line and the
- * inbox's reply. No imports beyond shared files with none of their own: hive-mcp.js runs outside the app bundle.
+ * cw_inbox (received) and acknowledges them once it has acted on them (acked). This file is the pure part: the states and their moves, coalescing, the typed line and the
+ * inbox's reply. No imports beyond shared files with none of their own: cw-mcp.js runs outside the app bundle.
  */
 import type { InboxBrief, InboxSummary } from './types'
+import { agentMsg, say } from './agentText'
 import { inboxNotice } from './doorbell'
 import { cardRef } from './projectKeys'
 
@@ -28,13 +29,13 @@ export const goesAlone = (kind: DeliveryKind): boolean => kind === 'task' || kin
 export type DeliveryNeed = 'idle' | 'free' | 'stalled'
 
 /**
- * queued: waiting to be offered; offered: Hive has told the agent of it (#650: the doorbell typed into its terminal, which
- * names it by id; never its text); received: the agent fetched it with hive_inbox (#645: received is automatic on fetch;
+ * queued: waiting to be offered; offered: Combwork has told the agent of it (#650: the doorbell typed into its terminal, which
+ * names it by id; never its text); received: the agent fetched it with cw_inbox (#645: received is automatic on fetch;
  * #650: the only receipt. Before #650 a line that carried its whole text also made it received once its CLI took it,
  * receivedVia 'typed', which saved records may still say); acked: the agent says it has acted on it. Ended without that: cancelled (by
  * whom), refused (its sender may no longer send it), expired (too old, or its agent is in another conversation now),
  * stale (#652: tied to a card's round, and that card has moved on: passed, out of Doing and Review, or in a new round).
- * uncertain: offered when Hive stopped or its agent's launch ended, before it was received: it may not have reached the
+ * uncertain: offered when Combwork stopped or its agent's launch ended, before it was received: it may not have reached the
  * agent, so it is offered once more, saying it may repeat (`again`), and stays uncertain if that one isn't received.
  */
 export const DELIVERY_STATES = ['queued', 'offered', 'received', 'acked', 'cancelled', 'refused', 'expired', 'uncertain', 'stale'] as const
@@ -43,10 +44,10 @@ export type DeliveryState = (typeof DELIVERY_STATES)[number]
 /**
  * Who a delivery is from. The Assistant's names its workspace and the launch that sent it: its permission is worked out
  * again from those and the settings at every step (never a token or a closure, which can't be saved), and a launch that
- * has ended sends nothing more (#645). Hive's own (board events) and the user's need no more. An agent's (HI-1866: its
+ * has ended sends nothing more (#645). Combwork's own (board events) and the user's need no more. An agent's (HI-1866: its
  * request for the Assistant on a card) names its project and id, so whoever reads it knows which agent asked.
  */
-export type DeliverySender = { kind: 'assistant'; name: string; workspace: string; launch: string } | { kind: 'hive'; name: string } | { kind: 'user'; name: string } | { kind: 'agent'; name: string; project: string; agentId: string }
+export type DeliverySender = { kind: 'assistant'; name: string; workspace: string; launch: string } | { kind: 'combwork'; name: string } | { kind: 'user'; name: string } | { kind: 'agent'; name: string; project: string; agentId: string }
 
 export interface DeliveryRecord {
   /** Short and unique in its project ("m12"): what the agent acks. */
@@ -71,10 +72,10 @@ export interface DeliveryRecord {
   created: string
   expires: string
   offered?: string
-  /** How many times it was offered (again after Hive stopped while offering it). */
+  /** How many times it was offered (again after Combwork stopped while offering it). */
   offers?: number
   received?: string
-  /** How it was received: fetched with hive_inbox ('typed': its line taken by its CLI, before #650 made the inbox the only receipt). */
+  /** How it was received: fetched with cw_inbox ('typed': its line taken by its CLI, before #650 made the inbox the only receipt). */
   receivedVia?: 'inbox' | 'typed'
   /** The launch its offer was typed into (an offer holds only while that launch runs). */
   offerRun?: string
@@ -83,8 +84,16 @@ export interface DeliveryRecord {
   ended?: string
   /** Why it ended, or why it is uncertain. */
   detail?: string
-  /** Why it may repeat (#649: it was offered when Hive stopped or its launch ended): said when it is offered once more. */
+  /** Why it may repeat (#649: it was offered when Combwork stopped or its launch ended): said when it is offered once more. */
   again?: string
+  /**
+   * HI-2463: received, not acked, in the conversation named here, which its agent left for a fresh one (a conversation
+   * from before the rename): each conversation that reads its inbox since is shown it again once (`replayedTo`), its
+   * receipt kept.
+   */
+  carriedFrom?: string
+  /** The conversation (or launch) whose inbox read last showed it again (carriedFrom): each other one is shown it once. */
+  replayedTo?: string
   /**
    * What made it (#649: a watch, a loop wake…), told when it is received or ends, and its key there (`ref`): a live
    * delivery with the same source and ref is that one, never made twice.
@@ -99,7 +108,7 @@ export interface DeliveryRecord {
   forRun?: string
   /**
    * The durable action that made it (`card_actions.id`, SPEC §16.4.5): one delivery per action, never two (the unique
-   * `deliveries.action`), so an action run again (a restart, another Hive) finds it and makes nothing.
+   * `deliveries.action`), so an action run again (a restart, another Combwork) finds it and makes nothing.
    */
   action?: number
 }
@@ -133,7 +142,7 @@ const NEXT: Record<DeliveryState, readonly DeliveryState[]> = {
 export const canMove = (from: DeliveryState, to: DeliveryState): boolean => NEXT[from].includes(to)
 /** Not ended: still for the agent to receive, or (a kind it acks) to ack. */
 export const isLive = (r: Pick<DeliveryRecord, 'state' | 'kind'>): boolean => r.state === 'queued' || r.state === 'offered' || r.state === 'uncertain' || (r.state === 'received' && needsAck(r.kind))
-/** Not received yet: what hive_inbox lists and the pane counts. */
+/** Not received yet: what cw_inbox lists and the pane counts. */
 export const isUnread = (r: Pick<DeliveryRecord, 'state'>): boolean => r.state === 'queued' || r.state === 'offered' || r.state === 'uncertain'
 /** Waiting to be offered: queued, or uncertain and not offered again yet (offered once more, #649). */
 export const isWaiting = (r: Pick<DeliveryRecord, 'state' | 'offers'>): boolean => r.state === 'queued' || (r.state === 'uncertain' && (r.offers ?? 0) < 2)
@@ -175,16 +184,21 @@ export interface InboxItem {
   at: string
 }
 
-/** The unread deliveries as the inbox lists them, oldest first: a card's events in one item, where its first one was. */
+/**
+ * The unread deliveries as the inbox lists them, oldest first: a card's events in one item, where its first one was;
+ * with them, those received in a conversation its agent left for a fresh one (`carriedFrom`, HI-2463), shown again.
+ * Every text is handed out as stored (the names upgrade made Combwork's own from before HI-2463 current, HI-2598).
+ */
 export function inboxItems(records: readonly DeliveryRecord[]): InboxItem[] {
   const out: InboxItem[] = []
   const byCard = new Map<number, { item: InboxItem; events: DeliveryRecord[] }>()
-  for (const r of [...records].filter(isUnread).sort((a, b) => a.seq - b.seq)) {
+  for (const r of [...records].filter((x) => isUnread(x) || x.carriedFrom !== undefined).sort((a, b) => a.seq - b.seq)) {
     if (r.kind === 'card-event' && r.card) {
       const had = byCard.get(r.card)
       if (had) {
         had.item.ids.push(r.id)
         had.events.push(r)
+        // agent-protocol: the senders' join, which this line splits back to find a sender already named
         if (!had.item.from.split(' and ').includes(r.from.name)) had.item.from += ` and ${r.from.name}`
         continue
       }
@@ -195,6 +209,7 @@ export function inboxItems(records: readonly DeliveryRecord[]): InboxItem[] {
     }
     out.push({ ids: [r.id], kind: r.kind, from: r.from.name, ...(r.card ? { card: r.card } : {}), text: r.body, at: r.created })
   }
+  // A card's events quote people's and agents' comments, kept as written.
   for (const { item, events } of byCard.values()) item.text = coalesced(events)
   return out
 }
@@ -208,42 +223,56 @@ export function inboxItems(records: readonly DeliveryRecord[]): InboxItem[] {
 function coalesced(events: readonly DeliveryRecord[]): string {
   if (events.length === 1 && events[0].body) return events[0].body
   const i = events.findLastIndex((r) => r.meta?.queueReturn === true)
-  const counted = `${events.length} ${events.length === 1 ? 'change' : 'changes'}, read the card`
-  if (i < 0 || !events.slice(i + 1).every((r) => r.meta?.commentOnly === true)) return counted
-  return `${events[i].body} (with ${events.length - 1} more ${events.length === 2 ? 'change' : 'changes'}: read the card)`
+  if (i < 0 || !events.slice(i + 1).every((r) => r.meta?.commentOnly === true)) return say(T.counted, { n: events.length, count: String(events.length) })
+  return say(T.withMore, { body: events[i].body, n: events.length - 1, more: String(events.length - 1) })
 }
 
 const idList = (ids: readonly string[]): string => ids.join(', ')
 
+const T = {
+  counted: agentMsg({ id: 'inbox.cardEvents.counted', text: '{n, plural, one {{count} change} other {{count} changes}}, read the card', note: "A card's events in one inbox item, counted (several changes to a watched card since the agent last read its inbox). n and count: how many." }),
+  withMore: agentMsg({ id: 'inbox.cardEvents.withMore', text: '{body} (with {more} more {n, plural, one {change} other {changes}}: read the card)', note: "A card's events in one inbox item, led by the merge queue's return of the card while only comments came after it (HI-2087). body: the return's own line; n and more: how many events came after it." }),
+  again: agentMsg({ id: 'inbox.offer.again', text: '({ids} again: {why}, so {n, plural, one {it} other {they}} may repeat.)', note: 'After the doorbell: deliveries offered again, which the agent may have seen before. ids: their ids ("m12, m14"); why: why each is offered again, joined by "; " (inbox.again.*); n: how many.' }),
+  watchOn: agentMsg({ id: 'inbox.offer.watchOn', text: '(Your watch is still on, {watch}: do what this asks, then end your turn, and Combwork wakes you when it changes.)', note: "After the doorbell, typed into an agent waiting on a watch: its watch carries on. watch: the watch's label, its first letter in lower case (\"waiting on HI-12\")." }),
+  older: agentMsg({ id: 'inbox.read.older', text: 'Received before, not acked yet: {ids}.', note: "In cw_inbox's reply: deliveries the agent read before and has not acked. ids: their ids (\"m12, m14\")." }),
+  nothingNew: agentMsg({ id: 'inbox.read.nothingNew', text: 'Nothing new.', note: "cw_inbox's reply when nothing is unread (before inbox.read.older, if any)." }),
+  newCount: agentMsg({ id: 'inbox.read.newCount', text: '{count} new:', note: "cw_inbox's first line, before one line per item (ids · sender · card: text). count: how many items." }),
+  ackEach: agentMsg({ id: 'inbox.read.ackEach', text: 'Ack each with cw_inbox (ack: its ids) once you have acted on it.', note: "cw_inbox's last line, after what is new." }),
+  acked: agentMsg({ id: 'inbox.ack.acked', text: 'Acked {ids}.', note: "cw_inbox ack's reply: what it acked. ids: their ids (\"m12, m14\")." }),
+  nothingAcked: agentMsg({ id: 'inbox.ack.none', text: 'Nothing acked.', note: "cw_inbox ack's reply when none of the ids was acked." }),
+  notReadBefore: agentMsg({ id: 'inbox.ack.notReadBefore', text: 'Not read before: {ids}, not acked: ack {n, plural, one {it} other {them}} once you have acted on {n, plural, one {it} other {them}}.', note: "In cw_inbox ack's reply with read: true (#1531): ids it was asked to ack that the agent hadn't read, now in the read that follows. ids: their ids; n: how many." }),
+  notReadYet: agentMsg({ id: 'inbox.ack.notReadYet', text: 'Not read yet: {ids}: read {n, plural, one {it} other {them}} with cw_inbox first.', note: "In cw_inbox ack's reply: ids it was asked to ack that the agent hasn't read. ids: their ids; n: how many." }),
+  unknown: agentMsg({ id: 'inbox.ack.unknown', text: 'Not in your inbox: {ids}.', note: "In cw_inbox ack's reply: ids it was asked to ack that aren't the agent's deliveries. ids: those ids." })
+}
+
 /**
  * The line that offers deliveries by typing, one line: the CLI's prompt. The doorbell (#650, plans/2026-10-12-messaging-
- * redesign.md §3.4): Hive's fixed words with counts by kind, cards and ids (shared/doorbell.ts), never what they say,
- * which the agent reads with hive_inbox, labelled with its sender; ids that may repeat say so; and the watch that carries
+ * redesign.md §3.4): Combwork's fixed words with counts by kind, cards and ids (shared/doorbell.ts), never what they say,
+ * which the agent reads with cw_inbox, labelled with its sender; ids that may repeat say so; and the watch that carries
  * on if the agent is watching.
  */
 export function offerLine(records: readonly DeliveryRecord[], watchLabel: string | null): string {
   const sorted = [...records].sort((a, b) => a.seq - b.seq)
   const bell = inboxNotice('doorbell', sorted.map((r) => ({ id: r.id, kind: r.kind, ...(r.card ? { card: r.card } : {}) })))
   const again = sorted.filter((r) => r.again)
-  const repeat = again.length ? ` (${idList(again.map((r) => r.id))} again: ${[...new Set(again.map((r) => r.again))].join('; ')}, so ${again.length === 1 ? 'it' : 'they'} may repeat.)` : ''
-  const tail = watchLabel ? ` (Your watch is still on, ${watchLabel.charAt(0).toLowerCase()}${watchLabel.slice(1)}: do what this asks, then end your turn, and Hive wakes you when it changes.)` : ''
+  const repeat = again.length ? ` ${say(T.again, { ids: idList(again.map((r) => r.id)), why: [...new Set(again.map((r) => r.again))].join('; '), n: again.length })}` : ''
+  const tail = watchLabel ? ` ${say(T.watchOn, { watch: `${watchLabel.charAt(0).toLowerCase()}${watchLabel.slice(1)}` })}` : ''
   return `${bell}${repeat}${tail}`
 }
 
-/** hive_inbox's reply: what is new (now received), and what was received before and isn't acked yet. */
+/** cw_inbox's reply: what is new (now received), and what was received before and isn't acked yet. */
 export function inboxText(items: readonly InboxItem[], unacked: readonly string[]): string {
-  const older = unacked.length ? `Received before, not acked yet: ${idList(unacked)}.` : ''
-  if (!items.length) return `Nothing new.${older ? ` ${older}` : ''}`
+  const older = unacked.length ? say(T.older, { ids: idList(unacked) }) : ''
+  if (!items.length) return `${say(T.nothingNew)}${older ? ` ${older}` : ''}`
   const rows = items.map((i) => `${i.ids.join(',')} · ${i.from}${i.card ? ` · ${cardRef(i.card)}` : ''}: ${i.text}`)
-  return [`${items.length} new:`, ...rows, ...(older ? [older] : []), 'Ack each with hive_inbox (ack: its ids) once you have acted on it.'].join('\n')
+  return [say(T.newCount, { count: String(items.length) }), ...rows, ...(older ? [older] : []), say(T.ackEach)].join('\n')
 }
 
-/** hive_inbox ack's reply; `reading`: with read: true (#1531), the ids not read yet are in the read that follows. */
+/** cw_inbox ack's reply; `reading`: with read: true (#1531), the ids not read yet are in the read that follows. */
 export function ackText(acked: readonly string[], unknown: readonly string[], unread: readonly string[] = [], reading = false): string {
-  const a = acked.length ? `Acked ${idList(acked)}.` : 'Nothing acked.'
-  const it = unread.length === 1 ? 'it' : 'them'
-  const notRead = unread.length ? (reading ? ` Not read before: ${idList(unread)}, not acked: ack ${it} once you have acted on ${it}.` : ` Not read yet: ${idList(unread)}: read ${it} with hive_inbox first.`) : ''
-  return `${a}${notRead}${unknown.length ? ` Not in your inbox: ${idList(unknown)}.` : ''}`
+  const a = acked.length ? say(T.acked, { ids: idList(acked) }) : say(T.nothingAcked)
+  const notRead = unread.length ? ` ${say(reading ? T.notReadBefore : T.notReadYet, { ids: idList(unread), n: unread.length })}` : ''
+  return `${a}${notRead}${unknown.length ? ` ${say(T.unknown, { ids: idList(unknown) })}` : ''}`
 }
 
 const clip = (s: string, n: number): string => {
@@ -261,7 +290,7 @@ export function inboxSummary(records: readonly DeliveryRecord[], now: number, ov
   return unread.length || overdue ? { unread, overdue } : undefined
 }
 
-/** A delivery as the Agent API and hive_agent_activity show it: its state and times, the start of what it says. */
+/** A delivery as the Agent API and cw_agent_activity show it: its state and times, the start of what it says. */
 export interface DeliveryRow {
   id: string
   kind: DeliveryKind
@@ -307,7 +336,7 @@ function readSender(v: unknown): DeliverySender | null {
   if (!str(s.name, 200) || !s.name) return null
   if (s.kind === 'assistant') return str(s.workspace, 1024) && s.workspace && str(s.launch, 200) ? { kind: 'assistant', name: s.name, workspace: s.workspace, launch: s.launch } : null
   if (s.kind === 'agent') return str(s.project, 300) && s.project && str(s.agentId, 128) && s.agentId ? { kind: 'agent', name: s.name, project: s.project, agentId: s.agentId } : null
-  if (s.kind === 'hive' || s.kind === 'user') return { kind: s.kind, name: s.name }
+  if (s.kind === 'combwork' || s.kind === 'user') return { kind: s.kind, name: s.name }
   return null
 }
 
@@ -335,6 +364,8 @@ export function readDelivery(v: unknown): DeliveryRecord | null {
   if (r.agentName !== undefined && !str(r.agentName, 300)) return null
   if (r.offerRun !== undefined && !str(r.offerRun, 200)) return null
   if (r.action !== undefined && !(Number.isInteger(r.action) && (r.action as number) > 0)) return null
+  if (r.carriedFrom !== undefined && !(str(r.carriedFrom, 200) && r.carriedFrom)) return null
+  if (r.replayedTo !== undefined && !(str(r.replayedTo, 200) && r.replayedTo)) return null
   const out: DeliveryRecord = { id: r.id, seq: r.seq as number, agentId: r.agentId, conversation: (r.conversation as string | null) || null, kind: r.kind as DeliveryKind, from, body: r.body, state: r.state as DeliveryState, created: r.created, expires: r.expires }
   if (r.agentName) out.agentName = r.agentName as string
   if (r.card) out.card = r.card as number
@@ -347,6 +378,8 @@ export function readDelivery(v: unknown): DeliveryRecord | null {
   if (r.need) out.need = r.need as 'free' | 'stalled'
   if (r.meta) out.meta = { ...(r.meta as Record<string, string | number | boolean>) }
   if (r.action) out.action = r.action as number
+  if (r.carriedFrom) out.carriedFrom = r.carriedFrom as string
+  if (r.replayedTo) out.replayedTo = r.replayedTo as string
   return out
 }
 

@@ -1,0 +1,374 @@
+{
+  "inbox.ack.acked": {
+    "placeholders": {
+      "ids": "plain"
+    }
+  },
+  "inbox.ack.none": {
+    "placeholders": {}
+  },
+  "inbox.ack.notReadBefore": {
+    "placeholders": {
+      "ids": "plain",
+      "n": "plural"
+    }
+  },
+  "inbox.ack.notReadYet": {
+    "placeholders": {
+      "ids": "plain",
+      "n": "plural"
+    }
+  },
+  "inbox.ack.unknown": {
+    "placeholders": {
+      "ids": "plain"
+    }
+  },
+  "inbox.again.launch": {
+    "placeholders": {}
+  },
+  "inbox.again.restart": {
+    "placeholders": {}
+  },
+  "inbox.again.typing": {
+    "placeholders": {}
+  },
+  "inbox.cardEvents.counted": {
+    "placeholders": {
+      "n": "plural",
+      "count": "plain"
+    }
+  },
+  "inbox.cardEvents.withMore": {
+    "placeholders": {
+      "body": "plain",
+      "more": "plain",
+      "n": "plural"
+    }
+  },
+  "inbox.carried.notice": {
+    "placeholders": {
+      "n": "plural",
+      "ids": "plain"
+    }
+  },
+  "inbox.create.badKey": {
+    "placeholders": {}
+  },
+  "inbox.create.full": {
+    "placeholders": {}
+  },
+  "inbox.create.notSent": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "inbox.create.projectFull": {
+    "placeholders": {
+      "max": "plain"
+    }
+  },
+  "inbox.create.tooLong": {
+    "placeholders": {
+      "length": "plain",
+      "max": "plain"
+    }
+  },
+  "inbox.decisionEnded.agentGone": {
+    "placeholders": {}
+  },
+  "inbox.decisionEnded.nothingNew": {
+    "placeholders": {}
+  },
+  "inbox.decisionEnded.workspaceClosed": {
+    "placeholders": {}
+  },
+  "inbox.ended.cancelledBy": {
+    "placeholders": {
+      "by": "plain"
+    }
+  },
+  "inbox.ended.doorbellLost": {
+    "placeholders": {}
+  },
+  "inbox.ended.notAcked": {
+    "placeholders": {}
+  },
+  "inbox.ended.notWanted": {
+    "placeholders": {}
+  },
+  "inbox.ended.replaced": {
+    "placeholders": {}
+  },
+  "inbox.ended.tooLong": {
+    "placeholders": {}
+  },
+  "inbox.ended.uncertain": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "inbox.ended.uncertainRestart": {
+    "placeholders": {}
+  },
+  "inbox.expired.late": {
+    "placeholders": {}
+  },
+  "inbox.expired.otherConversation": {
+    "placeholders": {}
+  },
+  "inbox.expired.sessionEnded": {
+    "placeholders": {}
+  },
+  "inbox.given.changed": {
+    "placeholders": {}
+  },
+  "inbox.given.notTyped": {
+    "placeholders": {}
+  },
+  "inbox.load.failed": {
+    "placeholders": {
+      "error": "plain"
+    }
+  },
+  "inbox.loopEnded.notDue": {
+    "placeholders": {}
+  },
+  "inbox.loopEnded.otherAgent": {
+    "placeholders": {}
+  },
+  "inbox.loopEnded.projectClosed": {
+    "placeholders": {}
+  },
+  "inbox.loopEnded.unreadable": {
+    "placeholders": {}
+  },
+  "inbox.message.noText": {
+    "placeholders": {}
+  },
+  "inbox.message.notRunning": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "inbox.message.tooLong": {
+    "placeholders": {
+      "max": "plain",
+      "n": "plain"
+    }
+  },
+  "inbox.message.tooMany": {
+    "placeholders": {
+      "agent": "plain",
+      "max": "plain"
+    }
+  },
+  "inbox.noLine.cliAsks": {
+    "placeholders": {}
+  },
+  "inbox.noLine.folder": {
+    "placeholders": {
+      "what": "plain"
+    }
+  },
+  "inbox.noLine.hooksMissing": {
+    "placeholders": {}
+  },
+  "inbox.noLine.inputBlocked": {
+    "placeholders": {}
+  },
+  "inbox.noLine.launchTask": {
+    "placeholders": {}
+  },
+  "inbox.noLine.lineWaiting": {
+    "placeholders": {}
+  },
+  "inbox.noLine.notRunning": {
+    "placeholders": {}
+  },
+  "inbox.noLine.status": {
+    "placeholders": {
+      "status": "plain"
+    }
+  },
+  "inbox.noLine.toolsWaiting": {
+    "placeholders": {}
+  },
+  "inbox.noLine.typing": {
+    "placeholders": {}
+  },
+  "inbox.noLine.userTyping": {
+    "placeholders": {}
+  },
+  "inbox.noLine.wakeFirst": {
+    "placeholders": {}
+  },
+  "inbox.noLine.watching": {
+    "placeholders": {}
+  },
+  "inbox.offer.again": {
+    "placeholders": {
+      "ids": "plain",
+      "why": "plain",
+      "n": "plural"
+    }
+  },
+  "inbox.offer.watchOn": {
+    "placeholders": {
+      "watch": "plain"
+    }
+  },
+  "inbox.read.ackEach": {
+    "placeholders": {}
+  },
+  "inbox.read.newCount": {
+    "placeholders": {
+      "count": "plain"
+    }
+  },
+  "inbox.read.nothingNew": {
+    "placeholders": {}
+  },
+  "inbox.read.older": {
+    "placeholders": {
+      "ids": "plain"
+    }
+  },
+  "inbox.refused.assistantEnded": {
+    "placeholders": {}
+  },
+  "inbox.refused.controlDown": {
+    "placeholders": {}
+  },
+  "inbox.refused.noInbox": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "inbox.relay.check": {
+    "placeholders": {
+      "said": "plain",
+      "asker": "plain"
+    }
+  },
+  "inbox.relay.decision": {
+    "placeholders": {
+      "decision": "plain"
+    }
+  },
+  "inbox.relay.declined": {
+    "placeholders": {
+      "said": "plain"
+    }
+  },
+  "inbox.relay.needed": {
+    "placeholders": {
+      "said": "plain",
+      "asker": "plain",
+      "need": "select",
+      "outcome": "select"
+    }
+  },
+  "inbox.relay.reply": {
+    "placeholders": {
+      "reply": "plain"
+    }
+  },
+  "inbox.relay.replyIsDecision": {
+    "placeholders": {
+      "reply": "plain"
+    }
+  },
+  "inbox.relay.said": {
+    "placeholders": {
+      "outcome": "select",
+      "asker": "plain",
+      "card": "plain",
+      "question": "plain",
+      "wrote": "select",
+      "words": "plain"
+    }
+  },
+  "inbox.renamedNote": {
+    "placeholders": {
+      "server": "plain"
+    }
+  },
+  "inbox.round.noCard": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "inbox.round.notInRound": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "inbox.round.unreadable": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "inbox.save.dbReplaced": {
+    "placeholders": {}
+  },
+  "inbox.save.failed": {
+    "placeholders": {
+      "error": "plain"
+    }
+  },
+  "inbox.save.tooMany": {
+    "placeholders": {}
+  },
+  "inbox.stale.archived": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "inbox.stale.done": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "inbox.stale.gone": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "inbox.stale.left": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "inbox.stale.passed": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "inbox.stale.round": {
+    "placeholders": {
+      "card": "plain",
+      "round": "plain"
+    }
+  },
+  "inbox.watchEnded.cancelled": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "inbox.watchEnded.ended": {
+    "placeholders": {}
+  },
+  "inbox.watchEnded.notSaved": {
+    "placeholders": {}
+  },
+  "inbox.watchEnded.replaced": {
+    "placeholders": {}
+  },
+  "inbox.watchEnded.repliesOff": {
+    "placeholders": {}
+  },
+  "inbox.watchEnded.watchCancelled": {
+    "placeholders": {}
+  }
+}

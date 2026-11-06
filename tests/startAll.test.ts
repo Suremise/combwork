@@ -57,7 +57,7 @@ describe('Start New (All) and Archive and Start New (All)', () => {
     const agents = [
       agent('w', { live: { sessionId: 's1', status: 'working' } }),
       agent('i', { resume: { id: 's2' } }),
-      // Archived meanwhile, or gone from Hive's list: nothing to archive.
+      // Archived meanwhile, or gone from Combwork's list: nothing to archive.
       agent('a', { resume: { id: 's3' } }),
       agent('g', { resume: { id: 'gone' } }),
       agent('n')
@@ -81,7 +81,7 @@ describe('Start New (All) and Archive and Start New (All)', () => {
       agent('m')
     ]
     expect(batchCounts(agents)).toEqual({ stop: 2, resume: 2, startNew: 6, archive: 4 })
-    // Archive's count is the agents its confirmation lists (when Hive keeps their sessions).
+    // Archive's count is the agents its confirmation lists (when Combwork keeps their sessions).
     const sessions = ['s1', 's2', 's3', 's4'].map((id) => ({ id }))
     expect(sessionsToArchive(agents, sessions)).toHaveLength(batchCounts(agents).archive)
     expect(batchCounts([])).toEqual({ stop: 0, resume: 0, startNew: 0, archive: 0 })
@@ -119,14 +119,14 @@ describe("the confirms' table (#572): what happens to each agent, and Remove All
   it('the plain text says every cell the table shows, the card too (a reviewer\'s as such), a line an agent (#572)', () => {
     const columns = [{}, { cell: (t: string) => `card ${t}` }, { cell: (t: string) => `worktree ${t}` }, {}]
     const text = agentRowsText(columns, [
-      { name: 'W', cells: [{ text: 'Working…' }, { text: '#12 Lanes' }, { text: 'hive/w' }, { text: batchOutcome('start', live('working')).text }] },
+      { name: 'W', cells: [{ text: 'Working…' }, { text: '#12 Lanes' }, { text: 'cw/w' }, { text: batchOutcome('start', live('working')).text }] },
       { name: 'R', cells: [{ text: 'Watching' }, { text: 'reviewing #12 Lanes' }, { text: '' }, { text: batchOutcome('start', live('watching')).text }] },
-      { name: 'S', cells: [{ text: 'Not running' }, { text: '' }, { text: removeWorktreeText({ branch: 'hive/s', check: { removable: false, reason: '2 unmerged commits' } }) }, { text: 'Removed' }] }
+      { name: 'S', cells: [{ text: 'Not running' }, { text: '' }, { text: removeWorktreeText({ branch: 'cw/s', check: { removable: false, reason: '2 unmerged commits' } }) }, { text: 'Removed' }] }
     ])
     expect(text.split('\n')).toEqual([
-      '• W — Working… · card #12 Lanes · worktree hive/w · Stopped (will be interrupted), then a new session',
+      '• W — Working… · card #12 Lanes · worktree cw/w · Stopped (will be interrupted), then a new session',
       '• R — Watching · card reviewing #12 Lanes · Stopped (its card loop pauses until it is resumed), then a new session',
-      '• S — Not running · worktree hive/s: always kept (2 unmerged commits) · Removed'
+      '• S — Not running · worktree cw/s: always kept (2 unmerged commits) · Removed'
     ])
   })
 
@@ -135,8 +135,8 @@ describe("the confirms' table (#572): what happens to each agent, and Remove All
   })
 
   it("Remove All's worktree cell says whether the box can delete it (#291)", () => {
-    expect(removeWorktreeText({ branch: 'hive/b1', check: { removable: true } })).toBe('hive/b1: merged and clean')
-    expect(removeWorktreeText({ branch: 'hive/b2', check: { removable: false, reason: '2 commits not merged' } })).toBe('hive/b2: always kept (2 commits not merged)')
-    expect(removeWorktreeText({ branch: 'hive/b3' })).toBe("hive/b3: always kept (couldn't be checked)")
+    expect(removeWorktreeText({ branch: 'cw/b1', check: { removable: true } })).toBe('cw/b1: merged and clean')
+    expect(removeWorktreeText({ branch: 'cw/b2', check: { removable: false, reason: '2 commits not merged' } })).toBe('cw/b2: always kept (2 commits not merged)')
+    expect(removeWorktreeText({ branch: 'cw/b3' })).toBe("cw/b3: always kept (couldn't be checked)")
   })
 })

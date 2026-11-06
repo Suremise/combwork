@@ -1,4 +1,4 @@
-// Who gets each Hive skill, as the Skills UI says it: a skill's audience (metadata.audience in its SKILL.md: project
+// Who gets each Combwork skill, as the Skills UI says it: a skill's audience (metadata.audience in its SKILL.md: project
 // agents by default, the Assistant, or both) on its page and, when it isn't the default, its row, including a
 // deleted bundled skill; the delete and Copy to workspace wording for each audience; the project's Skills tab
 // leaving out (and counting) the Assistant's skills. Checked against what launches select (skills:workspace, the
@@ -22,7 +22,7 @@ const skill = (dir, name, audience) => {
   const meta = audience ? `metadata:\n  audience: ${audience}\n` : ''
   fs.writeFileSync(path.join(dir, name, 'SKILL.md'), `---\nname: ${name}\ndescription: The ${name} skill.\n${meta}---\n\nSteps.\n`)
 }
-// The Hive skills left out of the project tab: the bundled ones for the Assistant, and this suite's weekly-report.
+// The Combwork skills left out of the project tab: the bundled ones for the Assistant, and this suite's weekly-report.
 const bundledDir = path.join(lib.ROOT, 'resources', 'skills')
 const bundledForAssistant = fs.readdirSync(bundledDir).filter((n) => /^\s*audience:\s*assistant\s*$/m.test(fs.readFileSync(path.join(bundledDir, n, 'SKILL.md'), 'utf8')))
 const assistantOnly = bundledForAssistant.length + 1
@@ -41,7 +41,7 @@ const assistantOnly = bundledForAssistant.length + 1
   const { app, page, inv } = await lib.launch({ userData, viewport: { width: 1300, height: 850 } })
   page.on('pageerror', (e) => console.log('FAIL page error', e.message))
   await lib.openWorkspace(inv, page, ws)
-  const skillsDir = path.join(ws, '.hive', 'skills')
+  const skillsDir = path.join(ws, '.combwork', 'skills')
   skill(skillsDir, 'weekly-report', 'assistant')
   skill(skillsDir, 'both-ways', 'all')
   skill(skillsDir, 'plain')
@@ -74,7 +74,7 @@ const assistantOnly = bundledForAssistant.length + 1
   const footer = await page.locator('.sidebar .hint', { hasText: 'Assistant' }).innerText().catch(() => '')
   check('footer: not "every agent", names the Assistant', /project agents/.test(footer) && /Assistant/.test(footer) && !/Every agent/.test(footer), footer)
   const empty = await page.locator('.empty-state').innerText().catch(() => '')
-  check('empty page: says the Assistant skills are the exception', /except those marked for the Hive Assistant/.test(empty), empty)
+  check('empty page: says the Assistant skills are the exception', /except those marked for the Assistant/.test(empty), empty)
 
   // A skill's page: its audience as a badge, with what it means.
   const pageBadge = async (name) => {
@@ -111,12 +111,12 @@ const assistantOnly = bundledForAssistant.length + 1
     return text
   }
   const delWeekly = await deleteDetail('weekly-report')
-  check('delete: an Assistant skill names the Assistant, not every agent', /new sessions of the Hive Assistant no longer get it/.test(delWeekly) && !/every agent/i.test(delWeekly), delWeekly)
+  check('delete: an Assistant skill names the Assistant, not every agent', /new sessions of the Assistant no longer get it/.test(delWeekly) && !/every agent/i.test(delWeekly), delWeekly)
   check("delete: running Claude Code keeps its copy; Codex's shared copy goes", /Claude Code session keeps its own copy until it restarts/.test(delWeekly) && /another Codex session in that folder starts/.test(delWeekly), delWeekly)
   const delPlain = await deleteDetail('plain')
   check('delete: a default skill names the project agents', /new sessions of the project agents no longer get it/.test(delPlain), delPlain)
   const delBoth = await deleteDetail('both-ways')
-  check('delete: a skill for both names both', /the project agents and the Hive Assistant no longer get it/.test(delBoth), delBoth)
+  check('delete: a skill for both names both', /the project agents and the Assistant no longer get it/.test(delBoth), delBoth)
   const delMisspelt = await deleteDetail('misspelt')
   check('delete: a Not given skill says nobody gets it, not that agents lose it', /Nobody gets it now \(its audience is "assitant", not agents, assistant or all\), so no session loses it/.test(delMisspelt) && !/project agents no longer get it/.test(delMisspelt), delMisspelt)
 
@@ -134,9 +134,9 @@ const assistantOnly = bundledForAssistant.length + 1
   check("project tab: the Assistant's skills aren't listed", !has('weekly-report') && !has('coordinate-agents'), tabRows.join(' | '))
   check('project tab: the default and both are', has('plain') && has('both-ways') && has('work-on-card'))
   const note = await page.locator('.assistant-only-note').innerText().catch(() => '')
-  check('project tab: says how many are left out, and why', note.startsWith(`${assistantOnly} Hive skills are for the Hive Assistant only`) && /don't get them/.test(note), note)
-  const agentsGet = (await inv('skills:list', proj)).filter((s) => s.level === 'hive' && s.audience !== 'assistant').length
-  check('project tab: its Hive rows are what project agents are given', tabRows.filter((t) => !/Local|User|Plugin/.test(t)).length >= agentsGet)
+  check('project tab: says how many are left out, and why', note.startsWith(`${assistantOnly} Combwork skills are for the Assistant only`) && /don't get them/.test(note), note)
+  const agentsGet = (await inv('skills:list', proj)).filter((s) => s.level === 'combwork' && s.audience !== 'assistant').length
+  check('project tab: its Combwork rows are what project agents are given', tabRows.filter((t) => !/Local|User|Plugin/.test(t)).length >= agentsGet)
 
   // Copy to workspace: says who gets it now, from its own metadata. The provider's local skills start folded (#118).
   const providerToggle = page.locator('.skill-provider-toggle')
@@ -154,12 +154,12 @@ const assistantOnly = bundledForAssistant.length + 1
   }
   const ca = await copyAndRead('local-assistant')
   check('Copy to workspace tooltip: not "every agent"', /unless its SKILL.md's header sets another audience/.test(ca.tip) && !/every agent in every project gets it/.test(ca.tip), ca.tip)
-  check('copied: an Assistant skill says the Assistant gets it', /The Hive Assistant now gets it as a Hive skill/.test(ca.toast), ca.toast)
+  check('copied: an Assistant skill says the Assistant gets it', /The Assistant now gets it as a Combwork skill/.test(ca.toast), ca.toast)
   const cp = await copyAndRead('local-plain')
-  check('copied: a plain skill says the project agents get it', /The project agents now get it as a Hive skill/.test(cp.toast), cp.toast)
+  check('copied: a plain skill says the project agents get it', /The project agents now get it as a Combwork skill/.test(cp.toast), cp.toast)
   for (const [name, why] of [['local-misspelt', 'its audience is "assitant", not agents, assistant or all'], ['local-empty', 'its audience is empty, not agents, assistant or all']]) {
     const c = await copyAndRead(name)
-    check(`copied: ${name} says nobody gets it yet, and why`, c.toast.includes('but nobody gets it yet') && c.toast.includes(why) && !/now gets? it as a Hive skill/.test(c.toast) && /Claude Code agents here also still load the local copy/.test(c.toast), c.toast)
+    check(`copied: ${name} says nobody gets it yet, and why`, c.toast.includes('but nobody gets it yet') && c.toast.includes(why) && !/now gets? it as a Combwork skill/.test(c.toast) && /Claude Code agents here also still load the local copy/.test(c.toast), c.toast)
   }
   await page.screenshot({ path: path.join(lib.WORK, 'skillaudience-project.png') })
 

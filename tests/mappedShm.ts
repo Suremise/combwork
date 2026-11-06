@@ -1,4 +1,4 @@
-// HI-2199, HI-2200: a Hive that ended without quitting leaves a WAL database's -shm, which another process can still have
+// HI-2199, HI-2200: a Combwork that ended without quitting leaves a WAL database's -shm, which another process can still have
 // mapped. SQLite 3.53's first connection truncates it, which Windows refuses while it is mapped: every open fails with
 // SQLITE_IOERR_TRUNCATE (1546) until it is let go. These make that state for a test, and let it go whatever happens.
 import { existsSync, mkdirSync, writeFileSync } from 'fs'
@@ -45,7 +45,7 @@ export async function whileMapped(dir: string, shm: string, body: (release: () =
   writeFileSync(ps1, [
     'param([string]$File, [string]$Release)',
     "$fs = [System.IO.File]::Open($File, 'Open', 'ReadWrite', 'ReadWrite, Delete')",
-    "$mm = [System.IO.MemoryMappedFiles.MemoryMappedFile]::CreateFromFile($fs, ('hive-test-' + [guid]::NewGuid()), 0, 'ReadWrite', 'None', $true)",
+    "$mm = [System.IO.MemoryMappedFiles.MemoryMappedFile]::CreateFromFile($fs, ('combwork-test-' + [guid]::NewGuid()), 0, 'ReadWrite', 'None', $true)",
     '$view = $mm.CreateViewAccessor()',
     '$fs.Dispose()',
     "[Console]::Out.WriteLine('mapped')",

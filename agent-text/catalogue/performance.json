@@ -1,0 +1,37 @@
+{
+  "performance.compare.partial.dropped": {
+    "text": "{n, plural, one {# measurement dropped} other {# measurements dropped}} (a limit was full)",
+    "note": "What makes a Performance export partial, in \"The baseline is partial: {what}.\". Lower case.",
+    "audience": "both"
+  },
+  "performance.compare.partial.evicted": {
+    "text": "history removed for space in the range",
+    "note": "What makes a Performance export partial, in \"The baseline is partial: {what}.\": recorded history in its time range was removed to make room. Lower case.",
+    "audience": "both"
+  },
+  "performance.compare.partial.invalid": {
+    "text": "some of its measurements weren’t valid, so {keys} {n, plural, one {is} other {are}} unknown",
+    "note": "What makes a Performance export partial, in \"The baseline is partial: {what}.\". {keys} lists measures' field names (requests, responseBytes: keep them); {n} is how many. Lower case.",
+    "audience": "both"
+  },
+  "performance.compare.partial.projectPart": {
+    "text": "one project’s part of a workspace export",
+    "note": "What makes a Performance export partial, in \"The baseline is partial: {what}.\": only one project's part of an export of the whole workspace is compared. Lower case.",
+    "audience": "both"
+  },
+  "performance.compare.partial.unattributed": {
+    "text": "some losses couldn’t be attributed to a project",
+    "note": "What makes a Performance export partial, in \"The baseline is partial: {what}.\": measurements lost that Combwork couldn't say were which project's. Lower case.",
+    "audience": "both"
+  },
+  "performance.providersNote.assistant": {
+    "text": "The Assistant’s sessions are the workspace’s, not a project’s.",
+    "note": "Performance, under Provider usage for a project with the Combwork Assistant chosen as whose work: why the table is empty (the Assistant isn't any project's).",
+    "audience": "both"
+  },
+  "performance.providersNote.scripts": {
+    "text": "Scripts start no sessions, so they have no provider usage.",
+    "note": "Performance, under Provider usage with Scripts chosen as whose work: why the table is empty (scripts call Combwork's API and run no coding agents).",
+    "audience": "both"
+  }
+}

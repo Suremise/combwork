@@ -1,6 +1,6 @@
 // Generated from locales/en/activity.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
-interface HiveMessageValues {
+interface CombworkMessageValues {
   'activity.agents': { n: number }
   'activity.all': undefined
   'activity.block.asked': { other: string; file: string | number; holder: string | number }
@@ -32,6 +32,8 @@ interface HiveMessageValues {
   'activity.liveTip': undefined
   'activity.loadFailed': { error: string | number }
   'activity.loading': undefined
+  'activity.modelSwitch': { launched: string | number; running: string | number }
+  'activity.modelSwitch.tip': undefined
   'activity.noPrompt': undefined
   'activity.notEnded': { why: string; label: string | number }
   'activity.notRunning': undefined

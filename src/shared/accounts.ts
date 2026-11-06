@@ -2,7 +2,7 @@ import type { Account, Connection, ConnectionDefaults, LaunchValues, ProviderId,
 import { permissionLabel, providerDescriptor } from './providers'
 
 /**
- * Hive's accounts (HI-980) and connections (HI-2106): what an account's state is from its two identities, which accounts
+ * Combwork's accounts (HI-980) and connections (HI-2106): what an account's state is from its two identities, which accounts
  * share a login, a workspace's choice of them per provider, and the connections on them that agents choose. Pure, for
  * main and the window alike.
  */
@@ -12,11 +12,12 @@ import { permissionLabel, providerDescriptor } from './providers'
  * (its main repository root) its CLI doesn't trust yet, where Set Up opens; `unknown`, some couldn't be told.
  */
 export interface ConnectionTrust {
-  pending: { project: string; folder: string }[]
+  /** The folders still to trust; `git`: a Git root, which a trusted folder above it never covers (HI-2520). */
+  pending: { project: string; folder: string; git: boolean }[]
   unknown: boolean
   /**
-   * Where Set Up asks the trust question next (HI-1871): the workspace's folder (`workspace`), which covers every
-   * project in it for a CLI whose trust is inherited, else the first pending project's main root.
+   * Where Set Up asks the trust question next (HI-1871): the workspace's folder (`workspace`), which covers the
+   * projects without Git in it for a CLI whose trust is inherited, else the first pending project's main root.
    */
   setUpIn?: { folder: string; project?: string; workspace?: true }
   /** Its answer for the workspace's current projects isn't in yet (HI-1870 round 3): shown as Checking…, never set up. */
@@ -69,13 +70,28 @@ export interface ConnectionUser {
 export type ConnectionRow = Connection & { users: ConnectionUser[]; effortUnusable?: true }
 
 /** A connection's values as a patch sets them (HI-2107): each null or '' leaves it to the CLI. */
-export type ConnectionPatch = { name?: string } & { [K in keyof LaunchValues]?: LaunchValues[K] | null }
+export type ConnectionPatch = { name?: string; tag?: string | null } & { [K in keyof LaunchValues]?: LaunchValues[K] | null }
+
+/** The longest a connection's tag may be (HI-2530): a short label, like its name. */
+export const TAG_MAX = 40
+
+/** A tag as saved (HI-2530): trimmed, inner runs of spaces as one; empty is none. */
+export function cleanTag(tag: string | null | undefined): string | undefined {
+  const t = (tag ?? '').trim().replace(/\s+/g, ' ')
+  return t || undefined
+}
+
+/** Two tags the same for a usage move's matching (HI-2530): both set, equal ignoring case and spacing. */
+export const sameTag = (a: string | null | undefined, b: string | null | undefined): boolean => {
+  const x = cleanTag(a)
+  return !!x && x.toLowerCase() === cleanTag(b)?.toLowerCase()
+}
 
 /** A patch as a caller sent it (IPC, the Agent API), with only its known fields of the right types kept. */
 export function connectionInput(raw: unknown): ConnectionPatch {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
   const out: Record<string, unknown> = {}
-  for (const k of ['name', 'model', 'effort', 'permissionMode', 'extraArgs'] as const) if (typeof r[k] === 'string' || r[k] === null) out[k] = r[k]
+  for (const k of ['name', 'model', 'effort', 'permissionMode', 'extraArgs', 'tag'] as const) if (typeof r[k] === 'string' || r[k] === null) out[k] = r[k]
   if (typeof r.use200kContext === 'boolean' || r.use200kContext === null) out.use200kContext = r.use200kContext
   return out as ConnectionPatch
 }
@@ -87,7 +103,7 @@ export interface ConnectionsView {
   /** `key`: a server connection's key is set (HI-1772), its last 4 characters and when; never the key. */
   /** `setUp` (HI-1870): its CLI's first-run setup done in its folder, as last read; null, can't be told; absent, not read yet. */
   /**
-   * The accounts (HI-2106; Hive's folders only, not the CLI's own homes), as today's screens show them until HI-2107:
+   * The accounts (HI-2106; Combwork's folders only, not the CLI's own homes), as today's screens show them until HI-2107:
    * `defaults`, its base connection's model, effort and context.
    */
   connections: (Account & { defaults?: ConnectionDefaults; defaultsFrom?: 'cli'; signingIn: boolean; folder: string; key?: { last4: string; at: string }; setUp?: boolean | null; trust?: ConnectionTrust })[]
@@ -107,7 +123,7 @@ export interface ConnectionsView {
   masking?: { state: 'none' | 'pending' | 'ready' | 'unavailable'; gap: boolean; gapSince?: string; full: boolean }
   /**
    * Every account in the one order (HI-2107, decision A), the CLI's own homes too (Copilot's sign-in: decision C), by
-   * id; `connections` has Hive's folders only, and `homes` the rest.
+   * id; `connections` has Combwork's folders only, and `homes` the rest.
    */
   order: string[]
   homes: Account[]
@@ -130,7 +146,7 @@ export function connectionsApply<V extends Pick<ConnectionsView, 'providers' | '
 /**
  * An account's state, from `accepted` (who the user took it on as) and `observed` (the latest check), never merged: a
  * check can't clear a change the user hasn't answered.
- * - `missing`: its folder isn't there (or was replaced by something Hive didn't make).
+ * - `missing`: its folder isn't there (or was replaced by something Combwork didn't make).
  * - `unchecked`: never checked yet.
  * - `failed`: the latest check couldn't tell (a timeout, output it couldn't read): never counted as signed out.
  * - `signedOut`: the CLI said it is signed out.
@@ -190,7 +206,7 @@ export function workspaceAccounts(cfg: Pick<WorkspaceConfig, 'connections'> | nu
 
 /**
  * The connection new launches use (HI-1875): the first in the preference order (each CLI's connections in the list's
- * order, Hive-wide) that's on; else none.
+ * order, Combwork-wide) that's on; else none.
  */
 export function firstOn(on: readonly string[], connections: readonly Account[]): string | null {
   return connections.find((a) => on.includes(a.id))?.id ?? null
@@ -280,7 +296,7 @@ export function connectionRef(ref: string, connections: readonly Pick<Account | 
 
 /**
  * What the Agent API shows of a connection (HI-1771), by who asks: never a token, a key, where its login is kept (its
- * folder), its settings or its defaults. `wide` (the user's token, the Hive Assistant): with whether it is on and the
+ * folder), its settings or its defaults. `wide` (the user's token, the Combwork Assistant): with whether it is on and the
  * default in the caller's workspace, and who it is signed in as; a project agent sees the four fields alone, and only
  * for those on in its workspace (connectionsFor).
  */
@@ -294,7 +310,7 @@ export interface ConnectionShownApi {
   on?: boolean
   /** The first in its CLI's order that's on in the caller's workspace: what a provider-only call uses there (HI-1875). */
   default?: boolean
-  /** Its place in its CLI's preference order, from 1 (HI-1875: Hive-wide; 1 wears the Default hint). */
+  /** Its place in its CLI's preference order, from 1 (HI-1875: Combwork-wide; 1 wears the Default hint). */
   order?: number
   email?: string
   plan?: string

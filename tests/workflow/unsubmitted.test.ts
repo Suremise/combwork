@@ -46,8 +46,8 @@ function manyCommits(folder: string, line: string, n: number, trailer?: (i: numb
   let s = ''
   for (let i = 1; i <= n; i++) {
     const key = trailer?.(i)
-    const msg = `step ${i}\n${key ? `\nHive-Card: ${key}\n` : ''}`
-    s += `commit refs/heads/${line}\ncommitter Hive Test <test@hive.invalid> ${1_800_000_000 + i} +0000\ndata ${Buffer.byteLength(msg)}\n${msg}${i === 1 ? `from ${from}\n` : ''}\n`
+    const msg = `step ${i}\n${key ? `\nCombwork-Card: ${key}\n` : ''}`
+    s += `commit refs/heads/${line}\ncommitter Combwork Test <test@example.invalid> ${1_800_000_000 + i} +0000\ndata ${Buffer.byteLength(msg)}\n${msg}${i === 1 ? `from ${from}\n` : ''}\n`
   }
   execFileSync('git', ['fast-import', '--quiet'], { cwd: folder, input: s, stdio: ['pipe', 'pipe', 'pipe'] })
 }
@@ -120,8 +120,8 @@ describe('HI-2245: commits past the submission, in the card folder', () => {
     const before = sh(e.project, 'rev-parse', line)
     renameSync(folder, `${folder}-original`)
     execFileSync('git', ['clone', '-q', '--branch', line, e.project, folder], { stdio: 'pipe' })
-    sh(folder, 'config', 'user.name', 'Hive Test')
-    sh(folder, 'config', 'user.email', 'test@hive.invalid')
+    sh(folder, 'config', 'user.name', 'Combwork Test')
+    sh(folder, 'config', 'user.email', 'test@example.invalid')
     commit(folder, { 'other.txt': 'only in the clone\n' }, 'clone only')
     // The project's line is still the submission: nothing past it in the card's repository.
     expect(sh(e.project, 'rev-parse', line)).toBe(before)
@@ -232,20 +232,20 @@ describe('HI-2245: the watch replies, whole', () => {
   const u = [{ card: 12, count: 2, atLeast: false, since: 'ab30f52' }]
   it('a watch begun: hand over first, then end the turn; no unconditional "End your turn now"', () => {
     const t = taskWaitText({ watching: 'Waiting for #12', limitAt: 'T', unsubmitted: u })
-    expect(t).toBe("Waiting for #12. First hand #12 over: #12's line has 2 commits since its submission (ab30f52); hive_submit with followUp: true, then end your turn: Hive types a line into this session when it changes, or at T if nothing does. Nothing runs meanwhile.")
+    expect(t).toBe("Waiting for #12. First hand #12 over: #12's line has 2 commits since its submission (ab30f52); cw_submit with followUp: true, then end your turn: Combwork types a line into this session when it changes, or at T if nothing does. Nothing runs meanwhile.")
     expect(t).not.toMatch(/End your turn now/)
     // Two cards, one a lower bound.
     expect(taskWaitText({ watching: 'Waiting for #12 or #13', limitAt: 'T', unsubmitted: [...u, { card: 13, count: 100, atLeast: true, since: 'cd12345' }] })).toBe(
-      "Waiting for #12 or #13. First hand them over: #12's line has 2 commits since its submission (ab30f52); #13's line has at least 100 commits since its submission (cd12345); hive_submit each with followUp: true, then end your turn: Hive types a line into this session when it changes, or at T if nothing does. Nothing runs meanwhile."
+      "Waiting for #12 or #13. First hand them over: #12's line has 2 commits since its submission (ab30f52); #13's line has at least 100 commits since its submission (cd12345); cw_submit each with followUp: true, then end your turn: Combwork types a line into this session when it changes, or at T if nothing does. Nothing runs meanwhile."
     )
   })
   it('already: hand over first', () => {
     const already = { number: 12, column: 'review', changes: ['column'], by: null, comment: null }
-    expect(taskWaitText({ already, unsubmitted: [{ ...u[0], count: 1 }] })).toBe("Already: #12 is in Review (column). First hand #12 over: #12's line has 1 commit since its submission (ab30f52); hive_submit with followUp: true.")
+    expect(taskWaitText({ already, unsubmitted: [{ ...u[0], count: 1 }] })).toBe("Already: #12 is in Review (column). First hand #12 over: #12's line has 1 commit since its submission (ab30f52); cw_submit with followUp: true.")
   })
   it('with no fact, the replies are as before', () => {
-    expect(taskWaitText({ watching: 'Waiting for #12', limitAt: 'T' })).toBe('Waiting for #12. End your turn now: Hive types a line into this session when it changes, or at T if nothing does. Nothing runs meanwhile.')
-    expect(taskWaitText({ watching: 'Waiting for #12', limitAt: 'T', unsubmitted: [] })).toBe('Waiting for #12. End your turn now: Hive types a line into this session when it changes, or at T if nothing does. Nothing runs meanwhile.')
+    expect(taskWaitText({ watching: 'Waiting for #12', limitAt: 'T' })).toBe('Waiting for #12. End your turn now: Combwork types a line into this session when it changes, or at T if nothing does. Nothing runs meanwhile.')
+    expect(taskWaitText({ watching: 'Waiting for #12', limitAt: 'T', unsubmitted: [] })).toBe('Waiting for #12. End your turn now: Combwork types a line into this session when it changes, or at T if nothing does. Nothing runs meanwhile.')
     expect(taskWaitText({ already: { number: 12, column: 'review', changes: ['column'], by: null, comment: null } })).toBe('Already: #12 is in Review (column).')
   })
 })

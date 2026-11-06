@@ -9,7 +9,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
 const HUNG_MS = 10000
-const base = tempDir('hive-teamparked-start-')
+const base = tempDir('cw-teamparked-start-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const h = vi.hoisted(() => ({ open: [] as unknown[], installed: 0 }))
@@ -28,9 +28,9 @@ describe("a start reserved before its session exists (HI-2081, HR1's round 3)", 
   /** Starts held part-way through their preparation (reserved, not live yet) until released. */
   const held: (() => void)[] = []
   beforeAll(async () => {
-    mkdirSync(join(alpha, '.hive'), { recursive: true })
+    mkdirSync(join(alpha, '.combwork'), { recursive: true })
     execFileSync('git', ['init', '-q', '-b', 'main', alpha])
-    writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, layout: 'auto', agents: [{ id: 'b1', name: 'B1', provider: 'claude-code' }] }))
+    writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, layout: 'auto', agents: [{ id: 'b1', name: 'B1', provider: 'claude-code' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     h.open = [w]

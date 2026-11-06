@@ -1,4 +1,4 @@
-// Sessions that can't be resumed (#239): each reason, from what Hive knows, shown on a disabled Resume.
+// Sessions that can't be resumed (#239): each reason, from what Combwork knows, shown on a disabled Resume.
 import { describe, expect, it } from 'vitest'
 import { removedAgentNote, resumeBlock, type ResumeContext } from '../src/shared/sessionResume'
 
@@ -18,7 +18,7 @@ describe('resumeBlock', () => {
     expect(resumeBlock(s, { ...ok, live: true })).toMatch(/running/)
   })
   it('no transcript left anywhere; a backup is enough', () => {
-    expect(resumeBlock({ ...s, hasTranscript: false }, ok)).toMatch(/Neither Codex nor Hive has its transcript/)
+    expect(resumeBlock({ ...s, hasTranscript: false }, ok)).toMatch(/Neither Codex nor Combwork has its transcript/)
     expect(resumeBlock({ ...s, hasTranscript: false, hasBackup: true }, ok)).toBeNull()
   })
   it('its provider is turned off, or not installed', () => {

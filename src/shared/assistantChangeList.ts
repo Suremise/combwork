@@ -52,7 +52,7 @@ export function messageGroups(changes: readonly AssistantChangeGroup[], actions:
   const groups = new Map<string, MessageGroup>(changes.map((g) => [g.id, { id: g.id, at: g.at, changes: g.changes, actions: [], lines: [] }]))
   for (const a of actions) {
     if (!a.group) continue
-    const listed = !a.ok || a.kind === 'undo' || a.kind === 'revert-setting'
+    const listed = !a.ok || a.kind === 'undo'
     const g = groups.get(a.group) ?? { id: a.group, at: a.groupAt ?? a.at, changes: [], actions: [], lines: [] }
     if (!listed && !g.changes.length) continue
     ;(listed ? g.actions : g.lines).push(a)
@@ -62,7 +62,7 @@ export function messageGroups(changes: readonly AssistantChangeGroup[], actions:
 }
 
 /**
- * The line the Assistant's panel said a change with, while this window has it (its actions are kept while Hive runs): the
+ * The line the Assistant's panel said a change with, while this window has it (its actions are kept while Combwork runs): the
  * action of its kind in its message recorded nearest the change (just after it, or a setting's just before), the one
  * that made it.
  */

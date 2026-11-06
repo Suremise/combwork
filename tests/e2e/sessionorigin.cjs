@@ -1,5 +1,5 @@
-// The Sessions tab says where each session ran and whose it was: a badge on every Hive session ("Coder · Project
-// folder", "Reviewer · Worktree · hive/reviewer") and "Ran in …" over the selected transcript, as the session recorded.
+// The Sessions tab says where each session ran and whose it was: a badge on every Combwork session ("Coder · Project
+// folder", "Reviewer · Worktree · cw/reviewer") and "Ran in …" over the selected transcript, as the session recorded.
 // A removed agent's sessions say so ("Coder (removed)", or "Removed agent" for records from before names were kept),
 // and never take the name of an agent added later with the same name or worktree. Resume still names the agent that
 // resumes it now, and its menu gives every agent's location. New sessions record their agent's name.
@@ -36,13 +36,13 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47897), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47897), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
   const until = async (fn, ms = 20000) => {
@@ -51,7 +51,7 @@ const check = (name, ok, extra = '') => {
     while (!(v = await fn()) && Date.now() - t < ms) await lib.sleep(300)
     return v
   }
-  /** Starts an agent and has it answer one prompt, so Hive keeps its session. */
+  /** Starts an agent and has it answer one prompt, so Combwork keeps its session. */
   const runOnce = async (id) => {
     await inv('session:start', alpha, { agentId: id })
     await until(async () => ['waiting', 'ready'].includes((await live(id))?.status), HUNG_MS)
@@ -91,7 +91,7 @@ const check = (name, ok, extra = '') => {
   const file = sessionsOf(alpha)
   file.sessions.push(
     { ...base, id: id(1), name: 'Before names', agentId: 'a-0ldname' },
-    { ...base, id: id(2), name: 'Earlier spike', agentId: 'a-5p1ke00', agentName: 'Spike', cwd: reviewer.worktree.path, branch: 'hive/spike' },
+    { ...base, id: id(2), name: 'Earlier spike', agentId: 'a-5p1ke00', agentName: 'Spike', cwd: reviewer.worktree.path, branch: 'cw/spike' },
     { ...base, id: id(3), name: 'Adopted one' },
     { ...base, id: id(4), name: 'Reviewer work', agentId: reviewer.id, agentName: 'Reviewer', cwd: reviewer.worktree.path, branch: reviewer.worktree.branch },
     { ...base, id: id(5), name: 'Put away', agentId: 'a-0ldname', archived: true }
@@ -118,7 +118,7 @@ const check = (name, ok, extra = '') => {
   check('rows load', !!(await until(async () => (await row('Put away').count()) === 1, 10000)))
   check("a removed agent's session keeps its name, not the new Coder's", (await badge('Old Coder work')) === 'Coder (removed) · Project folder', await badge('Old Coder work'))
   check('a record from before names were kept: Removed agent', (await badge('Before names')) === 'Removed agent · Project folder', await badge('Before names'))
-  check("an earlier agent in Reviewer's worktree isn't Reviewer", (await badge('Earlier spike')) === 'Spike (removed) · Worktree · hive/spike', await badge('Earlier spike'))
+  check("an earlier agent in Reviewer's worktree isn't Reviewer", (await badge('Earlier spike')) === 'Spike (removed) · Worktree · cw/spike', await badge('Earlier spike'))
   check('a worktree session of an agent that exists', (await badge('Reviewer work')) === `Reviewer · Worktree · ${reviewer.worktree.branch}`, await badge('Reviewer work'))
   check('an adopted session: not from an agent, its location only', (await badge('Adopted one')) === 'Not from an agent · Project folder', await badge('Adopted one'))
   check('an archived session is labelled too', (await badge('Put away')) === 'Removed agent · Project folder', await badge('Put away'))

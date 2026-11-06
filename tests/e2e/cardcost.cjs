@@ -41,13 +41,13 @@ const plain = (s) => (s ?? '').replace(/ /g, ' ')
   cfg.settings.notifications = { ...cfg.settings.notifications, desktopNotifications: false, chimeEnabled: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('alpha', { exact: true }).first().click()
   await lib.waitForProvider(inv)
@@ -171,6 +171,18 @@ const plain = (s) => (s ?? '').replace(/ /g, ' ')
   // Its title is in a field (innerText leaves it out): the card's own cost line says it is this one.
   check('a row opens its card', !!(await until(async () => (await dialog.count()) === 1 && (await line.count()) === 1 && (await dialog.locator('input').first().inputValue().catch(() => '')) === 'Cost per card', HUNG_MS)))
   await page.keyboard.press('Escape')
+  // At 900 px the card's name keeps a readable width (HI-2534): the table scrolls sideways rather than squeezing the
+  // title to a word a line.
+  await lib.fitWindow(app, page, { width: 900, height: 860 })
+  const titleCell = cardRow.locator('td').first()
+  const titleWidth = async () => (await titleCell.boundingBox())?.width ?? 0
+  check('narrow: the card column keeps its width', !!(await until(async () => (await titleWidth()) >= 180, HUNG_MS)), String(await titleWidth()))
+  for (const theme of ['light', 'dark']) {
+    await inv('settings:update', { appearance: { theme } })
+    await until(async () => (await page.locator(`html[data-theme="${theme}"]`).count()) === 1, HUNG_MS)
+    await cards.scrollIntoViewIfNeeded()
+    await page.screenshot({ path: path.join(shots, `performance-900-${theme}.png`) })
+  }
 
   for (const a of [b, r]) await inv('session:stop', alpha, a.id).catch(() => undefined)
   await app.close()

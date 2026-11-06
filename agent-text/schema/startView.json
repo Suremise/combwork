@@ -1,0 +1,150 @@
+{
+  "startView.agents.none": {
+    "placeholders": {}
+  },
+  "startView.board.count": {
+    "placeholders": {
+      "n": "plain",
+      "column": "plain"
+    }
+  },
+  "startView.board.none": {
+    "placeholders": {}
+  },
+  "startView.column": {
+    "placeholders": {
+      "column": "select"
+    }
+  },
+  "startView.digest": {
+    "placeholders": {
+      "week": "plain"
+    }
+  },
+  "startView.foot": {
+    "placeholders": {}
+  },
+  "startView.head": {
+    "placeholders": {
+      "source": "select",
+      "when": "plain"
+    }
+  },
+  "startView.line.asking": {
+    "placeholders": {
+      "agent": "plain",
+      "project": "plain",
+      "status": "select",
+      "hasAsking": "select",
+      "asking": "plain"
+    }
+  },
+  "startView.line.blocked": {
+    "placeholders": {
+      "card": "plain",
+      "project": "plain",
+      "column": "plain",
+      "hasAgent": "select",
+      "agent": "plain",
+      "reason": "plain"
+    }
+  },
+  "startView.line.card": {
+    "placeholders": {
+      "card": "plain",
+      "column": "plain",
+      "project": "plain",
+      "hasAgent": "select",
+      "agent": "plain",
+      "hasReviewer": "select",
+      "reviewer": "plain",
+      "title": "plain"
+    }
+  },
+  "startView.line.lane": {
+    "placeholders": {
+      "builder": "plain",
+      "hasReviewer": "select",
+      "reviewer": "plain",
+      "project": "plain",
+      "at": "select",
+      "card": "plain",
+      "state": "plain"
+    }
+  },
+  "startView.more.active": {
+    "placeholders": {
+      "n": "plain"
+    }
+  },
+  "startView.more.agents": {
+    "placeholders": {
+      "n": "plain"
+    }
+  },
+  "startView.more.board": {
+    "placeholders": {
+      "n": "plain"
+    }
+  },
+  "startView.more.decisions": {
+    "placeholders": {
+      "n": "plain"
+    }
+  },
+  "startView.more.hold": {
+    "placeholders": {
+      "n": "plain"
+    }
+  },
+  "startView.more.incidents": {
+    "placeholders": {
+      "n": "plain"
+    }
+  },
+  "startView.more.lanes": {
+    "placeholders": {
+      "n": "plain"
+    }
+  },
+  "startView.more.onCards": {
+    "placeholders": {
+      "n": "plain"
+    }
+  },
+  "startView.more.waiting": {
+    "placeholders": {
+      "n": "plain"
+    }
+  },
+  "startView.section.active": {
+    "placeholders": {}
+  },
+  "startView.section.agents": {
+    "placeholders": {}
+  },
+  "startView.section.board": {
+    "placeholders": {}
+  },
+  "startView.section.decisions": {
+    "placeholders": {}
+  },
+  "startView.section.digest": {
+    "placeholders": {}
+  },
+  "startView.section.incidents": {
+    "placeholders": {}
+  },
+  "startView.section.lanes": {
+    "placeholders": {}
+  },
+  "startView.section.onCards": {
+    "placeholders": {}
+  },
+  "startView.section.waiting": {
+    "placeholders": {}
+  },
+  "startView.workspaceCard": {
+    "placeholders": {}
+  }
+}

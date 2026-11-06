@@ -1,8 +1,8 @@
 // A lane's end lets its builder finish (HI-1706, SPEC §16.10.2) on the fake Claude Code, alpha's cards in slots:
-// 1. B1's lane is lent slot-a and B1 starts in it; B1 is mid-turn when the lane ends: its session goes on, and Hive
+// 1. B1's lane is lent slot-a and B1 starts in it; B1 is mid-turn when the lane ends: its session goes on, and Combwork
 //    waits ("waiting: it is in a turn"), its slot still B1's.
 // 2. The turn ends: B1 is told at its Stop (the drain) that the lane is finished, with its card, reads it with
-//    hive_inbox, and its turn ends. Then Hive types /exit, and B1's CLI exits by itself (code 0): no pty kill for it.
+//    cw_inbox, and its turn ends. Then Combwork types /exit, and B1's CLI exits by itself (code 0): no pty kill for it.
 // 3. Only then is slot-a free (no writer, no lease).
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -18,7 +18,7 @@ const home = at('claude-home')
 const alpha = path.join(ws, 'alpha')
 const slotA = path.join(`${ws}.worktrees`, 'alpha', 'slot-a')
 const PORT = Number(lib.port(47796))
-const identity = { name: 'Hive Lane End Test', email: 'laneend@example.com' }
+const identity = { name: 'Combwork Lane End Test', email: 'laneend@example.com' }
 let failed = 0
 const check = (name, ok, extra = '') => {
   lib.checked(ok)
@@ -42,10 +42,10 @@ const transcripts = () => {
 
 ;(async () => {
   for (const d of [userData, ws, `${ws}.worktrees`]) fs.rmSync(d, { recursive: true, force: true })
-  lib.gitProject(alpha, { 'a.txt': 'a\n', '.gitignore': '.hive/\n' })
+  lib.gitProject(alpha, { 'a.txt': 'a\n', '.gitignore': '.combwork/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
   const env = lib.fakeClaude(userData, home, [alpha, ws, slotA])
-  // B1 follows Hive's notices as a model does: hive_inbox, then the ack.
+  // B1 follows Combwork's notices as a model does: cw_inbox, then the ack.
   fs.writeFileSync(path.join(home, 'fake-follow-notices.txt'), '')
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
@@ -54,14 +54,14 @@ const transcripts = () => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off' } })
+  const h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off' } })
   const { page, inv } = h
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.waitForProvider(inv)
     await lib.openWorkspace(inv, page, ws)
     const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 250)
-    const log = () => lib.hiveLogLines(userData)
+    const log = () => lib.combworkLogLines(userData)
     await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'agentMerges', folder: 'slots', target: 'main', style: 'merge', preChecks: [], mergeChecks: [], identity, okBefore: { mode: 'never', labels: [] }, reviewerMode: 'pool', commands: {} } })
     const b1 = await lib.addAgent(inv, alpha, { name: 'B1', workflowRole: 'builder' })
     await lib.addAgent(inv, alpha, { name: 'R1', workflowRole: 'reviewer' })
@@ -82,12 +82,12 @@ const transcripts = () => {
     const since = Math.max(0, log().length - 1) // the last element is the empty one after the final newline
     await inv('lanes:end', lane.lane.id)
     check("the lane's lease ends", !!(await until(() => log().slice(since).some((l) => l.includes(`Lane ${lane.lane.id} ended: its lease`)), HUNG_MS)), log().slice(since).join('\n'))
-    check('…and Hive waits for B1\'s turn, its session still running', !!(await until(() => log().slice(since).some((l) => l.includes("'s end, ") && l.includes('waiting: it is in a turn')), HUNG_MS)) && (await live(b1.id))?.status === 'working', log().slice(since).join('\n'))
+    check('…and Combwork waits for B1\'s turn, its session still running', !!(await until(() => log().slice(since).some((l) => l.includes("'s end, ") && l.includes('waiting: it is in a turn')), HUNG_MS)) && (await live(b1.id))?.status === 'working', log().slice(since).join('\n'))
     check('…slot-a is still B1\'s', (await inv('slots:list', alpha)).find((s) => s.name === 'slot-a')?.writer?.agent === b1.id)
 
-    // --- 2. The turn ends: B1 reads the lane's note at its Stop, then Hive types /exit and B1's CLI exits by itself.
+    // --- 2. The turn ends: B1 reads the lane's note at its Stop, then Combwork types /exit and B1's CLI exits by itself.
     fs.writeFileSync(path.join(home, 'lane-go'), '')
-    check('B1 read that the lane is finished, with its card, with hive_inbox', !!(await until(() => transcripts().includes(`Lane Gentle end is finished: ${key1} not merged`), HUNG_MS)), key1)
+    check('B1 read that the lane is finished, with its card, with cw_inbox', !!(await until(() => transcripts().includes(`Lane Gentle end is finished: ${key1} not merged`), HUNG_MS)), key1)
     check('…its session ended', !!(await until(async () => !(await live(b1.id)), HUNG_MS)))
     const after = log().slice(since)
     const runKey = `#${b1.id}`

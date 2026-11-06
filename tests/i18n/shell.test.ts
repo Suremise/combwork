@@ -34,7 +34,7 @@ describe('commands', () => {
       expect(EN[msgId], msgId).toBeTruthy()
     }
     expect(COMMANDS).not.toMatch(/\blabel: ['"`]/)
-    // The three named by values: a layout, an agent's number, Hive's name.
+    // The three named by values: a layout, an agent's number, Combwork's name.
     for (const id of ['shell.command.layout', 'shell.command.agent.focusN', 'shell.command.help.about']) expect(EN[id], id).toBeTruthy()
   })
 
@@ -74,9 +74,9 @@ describe('the sentences built from parts are whole messages, and read as before 
     expect(say('window', true, 1)).toBe("Closing this window stops this workspace's session.")
     expect(say('allWindows', false, 4, 3)).toBe('Quitting closes all 3 windows and stops 4 running sessions, in every workspace.')
     expect(tr(m('shell.errorBoundary.named'), { view: 'progress' })).toBe("The Progress panel ran into a problem and couldn't be shown.")
-    expect(tr(m('shell.errorBoundary.named'), { view: 'hive' })).toBe("Hive ran into a problem and couldn't be shown.")
+    expect(tr(m('shell.errorBoundary.named'), { view: 'combwork' })).toBe("Combwork ran into a problem and couldn't be shown.")
     expect(tr(m('shell.quit.busy'), { n: 1 })).toBe('An agent is in the middle of something.')
-    expect(tr(m('shell.quit.title'), { how: 'allWindows', windows: 2 })).toBe('Quit Hive and close all 2 windows?')
+    expect(tr(m('shell.quit.title'), { how: 'allWindows', windows: 2 })).toBe('Quit Combwork and close all 2 windows?')
     expect(tr(m('shell.quit.now'), { action: 'saveAndQuit' })).toBe('Save and quit now')
     expect(tr(m('shell.quit.when'), { action: 'quit', working: 2 })).toBe('Quit when agents finish')
     expect(tr(m('shell.quit.windowOnly'), { named: 'yes', workspace: 'ws', others: 1 })).toBe('Meant to close only this window (ws)? Its agents stop, and the other window stays open, as with its X.')
@@ -130,7 +130,7 @@ describe('round 1 of review (#795)', () => {
   })
 
   it('the palette is made again when the language changes', () => {
-    expect(readFileSync(join(ROOT, 'src/renderer/src/components/Overlays.tsx'), 'utf8')).toContain('}, [q, projects, open, mode, shownLanguage, tasks, keys, moved, hiveCommands, wsCommands])')
+    expect(readFileSync(join(ROOT, 'src/renderer/src/components/Overlays.tsx'), 'utf8')).toContain('}, [q, projects, open, mode, shownLanguage, tasks, keys, moved, combworkCommands, wsCommands])')
   })
 
   it("an agent's background tasks are whole sentences with the count, which a language words by the count", () => {

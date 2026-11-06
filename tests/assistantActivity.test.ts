@@ -1,7 +1,7 @@
-// The Hive Assistant's actions say what they were with fields (#763): a kind from a fixed set and its targets, so a
+// The Combwork Assistant's actions say what they were with fields (#763): a kind from a fixed set and its targets, so a
 // viewer such as Apiary follows the Assistant without reading its English line. Every change the Assistant makes names
 // a kind where it is recorded, every kind is made somewhere and documented with an example in AGENT_API.md, and the
-// fields that leave Hive are an allow-list: never a prompt, a message or a setting's value.
+// fields that leave Combwork are an allow-list: never a prompt, a message or a setting's value.
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
@@ -14,8 +14,8 @@ const SOURCES = ['src/main/servers.ts', 'src/main/taskBatch.ts', 'src/main/deliv
 
 describe("the Assistant's activity fields", () => {
   it('keeps only the documented fields, each only when well formed', () => {
-    const a = { kind: 'start-task', card: 741, project: 'amberlight', agent: { id: 'a-1', name: 'AMB1', prompt: 'secret' }, column: 'doing', text: 'secret', brief: 'secret' } as never
-    expect(activityFields(a)).toEqual({ kind: 'start-task', card: 741, project: 'amberlight', agent: { id: 'a-1', name: 'AMB1' }, column: 'doing' })
+    const a = { kind: 'start-task', card: 741, project: 'ambrosia', agent: { id: 'a-1', name: 'AMB1', prompt: 'secret' }, column: 'doing', text: 'secret', brief: 'secret' } as never
+    expect(activityFields(a)).toEqual({ kind: 'start-task', card: 741, project: 'ambrosia', agent: { id: 'a-1', name: 'AMB1' }, column: 'doing' })
     expect(activityFields({ kind: 'reorder-tasks', cards: [3, 'x' as never] })).toEqual({ kind: 'reorder-tasks' })
     expect(activityFields({ kind: 'update-task', card: -1 })).toEqual({ kind: 'update-task' })
     // An unknown kind sends nothing at all.

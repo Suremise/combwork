@@ -1,5 +1,5 @@
-// S50 for the merge queue: one runner across Hives (#1358; #1360's app-level proof, SPEC §16.9.3 The runner). Two test
-// Hives (two profiles, their own Agent API ports) open one test workspace whose project is set to "Hive merges" into
+// S50 for the merge queue: one runner across copies of Combwork (#1358; #1360's app-level proof, SPEC §16.9.3 The runner). Two test
+// copies (two profiles, their own Agent API ports) open one test workspace whose project is set to "Combwork merges" into
 // `integration` (queueFixture.cjs), with a card queued and a slow fake check:
 // - A runs the queue (its check running); B, opened meanwhile, doesn't: its Merges tab says "Run by <A's profile>";
 // - A's main process exits mid-check (no quit handler): B takes the queue over, the check process A recorded is
@@ -49,11 +49,11 @@ const queueFolders = () =>
   q.prepare(fx)
   const fxB = q.otherProfile(fx, 'b')
   const profileA = path.basename(fx.userData)
-  const hives = []
+  const copies = []
   try {
     // --- A opens the workspace, a card is approved and its check starts: A runs the queue.
-    const a = await q.startHive(fx, { port: PORT })
-    hives.push(a)
+    const a = await q.startCombwork(fx, { port: PORT })
+    copies.push(a)
     a.page.on('pageerror', (e) => check('no page errors (A)', false, e.message))
     const reviewer = await q.agent(fx, a, 'R1')
     check('the reviewer has its token', !!reviewer.token)
@@ -67,8 +67,8 @@ const queueFolders = () =>
     check('…in a queue folder of its own, A the runner', !!oldFolder && viewA?.runHere === true && viewA.runBy === profileA, JSON.stringify({ viewA, oldFolder }))
 
     // --- B opens the same workspace: it doesn't run the queue, and says who does.
-    const b = await q.startHive(fxB, { port: await freePort(), keepOptions: true })
-    hives.push(b)
+    const b = await q.startCombwork(fxB, { port: await freePort(), keepOptions: true })
+    copies.push(b)
     b.page.on('pageerror', (e) => check('no page errors (B)', false, e.message))
     await lib.fitWindow(b.app, b.page, { width: 1400, height: 900 })
     const viewB = async () => (await b.inv('queue:list', fx.alpha, 'integration'))[0]
@@ -86,7 +86,7 @@ const queueFolders = () =>
     const aPid = await a.app.evaluate(() => process.pid)
     const launcher = a.app.process()
     await a.app.evaluate(({ app }) => app.exit(1)).catch(() => undefined)
-    hives.shift()
+    copies.shift()
     check("A's main process has exited", !!(await waitHung(() => !alive(aPid))))
     // Its launcher too, once the main process is gone (it has nothing left to close).
     if (launcher.pid !== aPid && alive(launcher.pid)) launcher.kill()
@@ -98,14 +98,14 @@ const queueFolders = () =>
     fs.writeFileSync(fx.go, 'go')
     check('…and the card is merged: Done', !!(await waitHung(async () => (await b.card(one.n))?.column === 'done')), JSON.stringify(await b.kinds(one.n)))
     const integrated = (await b.facts(one.n)).filter((x) => x.kind === 'Integrated')
-    check('…merged once: one Integrated, by Hive, one merge commit on integration', integrated.length === 1 && integrated[0].data.by === 'hive' && integrated[0].data.result === q.head(fx) && lib.git(fx.alpha, ['rev-list', '--merges', '--count', 'main..integration']).trim() === '1', JSON.stringify(integrated))
+    check('…merged once: one Integrated, by Combwork, one merge commit on integration', integrated.length === 1 && integrated[0].data.by === 'combwork' && integrated[0].data.result === q.head(fx) && lib.git(fx.alpha, ['rev-list', '--merges', '--count', 'main..integration']).trim() === '1', JSON.stringify(integrated))
     check("B's Merges tab no longer names another runner", !!(await waitHung(async () => !(await tab.text('integration')).includes('Run by'))), await tab.text('integration'))
     await b.page.mouse.move(5, 5)
     await b.page.screenshot({ path: path.join(fx.shots, 'queuelease-2-taken-over.png') })
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {
-    for (const h of hives) await h.app.close().catch(() => undefined)
+    for (const h of copies) await h.app.close().catch(() => undefined)
   }
   console.log(`screenshots: ${fx.shots}`)
   process.exit(failed ? 1 : 0)

@@ -19,7 +19,7 @@ import { endLeaseJob, queueHost } from '../src/main/workflow/queueJobs'
 import { forgetEnded, LeaseLost, QueueRunner } from '../src/main/workflow/queueRunner'
 import { windowsProbe, type Listed } from '../src/main/workflow/queueProcs'
 import { checkGit, gitExe, gitTool, realGitBehind, setGitToolForTests } from '../src/main/gitTool'
-import { git as hiveGit, withGitRoute } from '../src/main/git'
+import { git as combworkGit, withGitRoute } from '../src/main/git'
 import { gitRepo, put, sh } from './workflow/harness'
 
 const req = createRequire(import.meta.url)
@@ -136,7 +136,7 @@ describe('a git host (HI-2079)', { timeout: 60_000 }, () => {
   it("a command ended by a signal (HI-2042): its name, never code 1; a real exit 1 stays one", async () => {
     // The fixture, in the host only (its environment, not the requests'), ends its first command by SIGTERM.
     const preload = join(__dirname, 'fixtures', 'gitHostSignal.cjs').replace(/\\/g, '/')
-    const { host } = own({ ...baseEnv(), NODE_OPTIONS: `--require "${preload}"`, HIVE_GIT_HOST_TEST_SIGNAL: '1' })
+    const { host } = own({ ...baseEnv(), NODE_OPTIONS: `--require "${preload}"`, CW_GIT_HOST_TEST_SIGNAL: '1' })
     expect(await host.request(node(tempDir('gh-'), 'setInterval(() => {}, 1000)'))).toMatchObject({ code: null, signal: 'SIGTERM' })
     const plain = await host.request(node(tempDir('gh-'), `process.stderr.write('said'); process.exit(1)`))
     expect(plain).toMatchObject({ out: '', err: 'said', code: 1 })
@@ -599,7 +599,7 @@ describe("the runner's git host (HI-2079)", { timeout: 120_000 }, () => {
       beforeHostSend: async () => {
         if (took) return
         took = true
-        // Another Hive takes the lease (as if this one looked dead) and ends its job by name, as its settle does first.
+        // Another Combwork takes the lease (as if this one looked dead) and ends its job by name, as its settle does first.
         const now = w.store.queueLease('main')!
         w.store.takeQueueLease({ ...now, lease: 'successor', token: 'successor', profile: 'B', pid: 1 }, now.token)
         expect(await endLeaseJob(queueHost(), runner.lease)).toBe(true)
@@ -619,7 +619,7 @@ describe("the runner's git host (HI-2079)", { timeout: 120_000 }, () => {
     }
   })
 
-  it('HI-2137: the git Hive starts (gitExe), in the host and through the launcher; one gone, PATH git once more', async () => {
+  it('HI-2137: the git Combwork starts (gitExe), in the host and through the launcher; one gone, PATH git once more', async () => {
     // As checkGit resolves it, from the launcher: before anything is acquired, so nothing is left open where it can't.
     const execPath = win32.normalize(sh(tempDir('qgh-exec-'), '--exec-path'))
     const top = join(execPath, '..', '..', '..')
@@ -637,11 +637,11 @@ describe("the runner's git host (HI-2079)", { timeout: 120_000 }, () => {
       runner = await acquire(w)
       setGitToolForTests({ state: 'ok', version: '2.51.0' }, resolved)
       // The launcher's MSYSTEM and its shell tools, seen by an alias through sh.
-      const alias = ['-c', 'alias.hivemsys=!echo "$MSYSTEM $(command -v sed)"', 'hivemsys']
+      const alias = ['-c', 'alias.cwmsys=!echo "$MSYSTEM $(command -v sed)"', 'cwmsys']
       expect(await runner.git(w.project, alias, 'testMerge', { env })).toMatchObject({ ok: true, out: `${resolved.launcherEnv!.msystem} /usr/bin/sed\n` })
       expect(await runner.git(w.project, ['rev-parse', 'HEAD'], 'testMerge', { env, timeoutMs: 60_000 })).toMatchObject({ ok: true })
       await vi.waitFor(() => expect(started().filter((a) => a.toLowerCase() === real.toLowerCase())).toHaveLength(2), { timeout: 10_000, interval: 50 })
-      // The real git gone (uninstalled, moved): the command runs with PATH's git, which is what Hive starts from then on.
+      // The real git gone (uninstalled, moved): the command runs with PATH's git, which is what Combwork starts from then on.
       const gone = join(tempDir('qgh-gone-'), 'git.exe')
       setGitToolForTests({ state: 'ok', version: '2.51.0' }, { exe: gone })
       // Several at once, in the host and through the launcher: each once more from PATH, whichever found it gone first.
@@ -655,7 +655,7 @@ describe("the runner's git host (HI-2079)", { timeout: 120_000 }, () => {
       // And git() in the queue's route (the host, through gitOutcome), several at once: the same.
       setGitToolForTests({ state: 'ok', version: '2.51.0' }, { exe: gone })
       const held = runner
-      const routed = await withGitRoute((m) => held.gitOutcome(m), () => Promise.all([1, 2, 3].map(() => hiveGit(w.project, ['rev-parse', 'HEAD'], undefined, undefined, { env }))))
+      const routed = await withGitRoute((m) => held.gitOutcome(m), () => Promise.all([1, 2, 3].map(() => combworkGit(w.project, ['rev-parse', 'HEAD'], undefined, undefined, { env }))))
       for (const r of routed) expect(r).toMatchObject({ ok: true })
       expect(gitTool().state).not.toBe('missing')
       // Its check again, settled before the next test.

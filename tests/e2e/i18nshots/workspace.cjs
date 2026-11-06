@@ -1,9 +1,9 @@
 // Screenshot cases for the `workspace` area (#807): the status bar's plan limits tooltip of GitHub issue #1 (hovered,
 // and under the pseudo-locale checked to read wholly translated: every line a message, no English word but the data),
-// the status bar, the Workspace Overview (and its failed refresh), the Documentation view, the built-in hive MCP
+// the status bar, the Workspace Overview (and its failed refresh), the Documentation view, the built-in Combwork MCP
 // server's page, Settings → Workspace (storage, antivirus, hidden projects), a project's Storage and Clean Up, Remove
 // Project, the update dialog and the Changes tab's Unused worktrees. Reached for the i18nshots route (#756's design,
-// section 4) with locale-independent means only: IPC failures (HIVE_TEST_FAIL_IPC), events sent as main sends them,
+// section 4) with locale-independent means only: IPC failures (CW_TEST_FAIL_IPC), events sent as main sends them,
 // command ids and structural hooks (data-plan, data-section, classes, icons), never English text. See
 // tests/e2e/i18nshots.cjs for ctx.
 const fs = require('fs')
@@ -30,11 +30,11 @@ async function cancelDialog(ctx) {
 
 /** Makes calls on an IPC channel fail: the next one (`*1`), or all until failing(ctx, ''): tests/e2e/README.md. */
 const failing = (ctx, calls) => ctx.app.evaluate((_, c) => {
-  process.env.HIVE_TEST_FAIL_IPC = c
+  process.env.CW_TEST_FAIL_IPC = c
 }, calls)
 
-/** Sends the window an event as main does (hive:event). */
-const sendEvent = (ctx, ev) => ctx.app.evaluate(({ BrowserWindow }, e) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', e), ev)
+/** Sends the window an event as main does (cw:event). */
+const sendEvent = (ctx, ev) => ctx.app.evaluate(({ BrowserWindow }, e) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', e), ev)
 
 /** An icon button by its icon (its name is translated), within `scope`. */
 const iconButton = (ctx, scope, icon) => ctx.page.locator(`${scope} .icon-btn`, { has: ctx.page.locator(`.codicon-${icon}`) }).first()
@@ -96,12 +96,12 @@ async function statusBar(ctx) {
 }
 
 /**
- * A session of the Hive Assistant with usage today, as a Hive backup (.hive/sessions in its home), so the Workspace
+ * A session of the Combwork Assistant with usage today, as a Combwork backup (.combwork/sessions in its home), so the Workspace
  * Overview has an Assistant row and chart series (wsoverview seeds projects the same way).
  */
 function seedAssistantUsage(ctx) {
-  const assistant = path.join(ctx.workspace, '.hive', 'assistant')
-  const home = path.join(assistant, '.hive')
+  const assistant = path.join(ctx.workspace, '.combwork', 'assistant')
+  const home = path.join(assistant, '.combwork')
   const id = '77777777-aaaa-bbbb-cccc-000000000807'
   const at = new Date().toISOString()
   fs.mkdirSync(path.join(home, 'sessions'), { recursive: true })
@@ -117,12 +117,12 @@ function seedAssistantUsage(ctx) {
 }
 
 /**
- * The seeded session in the usage history, which the Overview reads (#1106). A record written behind Hive's back reaches
+ * The seeded session in the usage history, which the Overview reads (#1106). A record written behind Combwork's back reaches
  * it when a list of its host's sessions asks for it, as the Assistant's session picker does (the ten-minute sweep
  * otherwise, #1172): listed, then waited for until main counts it.
  */
 async function assistantUsageRecorded(ctx) {
-  await ctx.inv('session:list', path.join(ctx.workspace, '.hive', 'assistant'))
+  await ctx.inv('session:list', path.join(ctx.workspace, '.combwork', 'assistant'))
   const counted = async () => (await ctx.inv('workspace:usage')).assistant.some((s) => s.usage)
   if (!(await ctx.lib.until(counted, ctx.hungMs))) throw new Error("the Assistant's seeded session never reached the usage history")
 }
@@ -189,7 +189,7 @@ async function docs(ctx) {
   return windowShot()
 }
 
-/** The built-in hive MCP server's page: what it is and its tools. */
+/** The built-in combwork MCP server's page: what it is and its tools. */
 async function mcpBuiltIn(ctx) {
   await ctx.command('view.mcp')
   await (await shown(ctx, ctx.page.locator('.sidebar .row.tall', { has: ctx.page.locator('.codicon-hubot') }), 'the built-in server')).first().click()
@@ -205,7 +205,7 @@ async function settingsWorkspace(ctx) {
   return windowShot()
 }
 
-/** A project's Storage (Project Settings): what Hive keeps for it. */
+/** A project's Storage (Project Settings): what Combwork keeps for it. */
 async function projectStorage(ctx) {
   await ctx.command('view.projects')
   await ctx.command('project.tab.settings')

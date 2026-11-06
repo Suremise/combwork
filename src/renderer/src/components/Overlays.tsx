@@ -93,6 +93,15 @@ export function Dialogs() {
     if ((dialog?.kind === 'choice' || dialog?.kind === 'prompt') && dialog.select) setPicked(dialog.select.initial)
   }, [dialog, setActionError])
 
+  // The second box's check and suggestion follow the projects' keys (HI-2653): a New Project dialog opened before the
+  // board's first read landed checks the key typed again once it has, and a suggestion not typed over is made again.
+  const projectKeys = useStore((s) => s.projectKeys)
+  useEffect(() => {
+    if (dialog?.kind === 'prompt' && dialog.second && !secondOwn) setSecond(dialog.second.follow(value))
+    // Only when the keys change: typing in either box already updates the suggestion.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectKeys])
+
   if (!dialog) return null
   const close = (result: boolean | string | null): void => {
     closeDialog()
@@ -332,7 +341,7 @@ export function CommandPalette() {
   const keys = useStore((s) => s.projectKeys)
   const moved = useStore((s) => s.movedCardNames)
   // The user's commands (HI-1954): each one runs by hand from here, as from Settings.
-  const hiveCommands = useStore((s) => s.settings?.commands?.list ?? NO_COMMANDS)
+  const combworkCommands = useStore((s) => s.settings?.commands?.list ?? NO_COMMANDS)
   const wsCommands = useStore((s) => s.workspace?.config.commands?.list ?? NO_COMMANDS)
   // Toggles' states as one string, so their rows' checkmarks follow live changes (pinning the window
   // while the palette is open) without rebuilding the item list; a string keeps the selector stable.
@@ -379,7 +388,7 @@ export function CommandPalette() {
             checked: undefined as (() => boolean) | undefined
           }))
       : []
-    const runItems = mode === 'projects' ? [] : [...wsCommands.map((c) => ({ c, scope: 'workspace' as const })), ...hiveCommands.map((c) => ({ c, scope: 'hive' as const }))].map(({ c, scope }) => ({
+    const runItems = mode === 'projects' ? [] : [...wsCommands.map((c) => ({ c, scope: 'workspace' as const })), ...combworkCommands.map((c) => ({ c, scope: 'combwork' as const }))].map(({ c, scope }) => ({
       id: `run:${scope}:${c.id}`,
       command: undefined as string | undefined,
       label: tr(msg({ id: 'shell.palette.runCommand', defaultMessage: 'Run Command: {name}', description: "One of the user's own commands in the command palette (Settings → Commands, HI-1954): choosing it runs it now. {name} is the command's name." }), { name: c.name }),
@@ -394,7 +403,7 @@ export function CommandPalette() {
       .slice(0, 60)
     // `open`: commands' availability (when()) is read again each time the palette opens; `shownLanguage`: their labels.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, projects, open, mode, shownLanguage, tasks, keys, moved, hiveCommands, wsCommands])
+  }, [q, projects, open, mode, shownLanguage, tasks, keys, moved, combworkCommands, wsCommands])
 
   useEffect(() => {
     listRef.current?.querySelector('.active')?.scrollIntoView({ block: 'nearest' })
@@ -506,10 +515,10 @@ export function AboutDialog() {
   const providers = useStore((s) => s.providers)
   if (!open || !info) return null
   const rows: [string, string][] = [
-    [tr(msg({ id: 'shell.about.version', defaultMessage: 'Version', description: "A row of Help → About: Hive's version." })), info.version],
+    [tr(msg({ id: 'shell.about.version', defaultMessage: 'Version', description: "A row of Help → About: Combwork's version." })), info.version],
     ...PROVIDERS.map((p): [string, string] => {
       const i = providers[p.id]
-      return [p.name, i?.found ? tr(msg({ id: 'shell.about.cli', defaultMessage: 'CLI {version} ({source})', description: "A row of Help → About, a coding agent's: its CLI's version and where Hive found it." }), { version: i.version ?? '', source: installSourceText(i.source, tr) }) : tr(msg({ id: 'shell.about.noCli', defaultMessage: 'CLI not installed', description: "A row of Help → About, a coding agent's, when its CLI isn't installed." }))]
+      return [p.name, i?.found ? tr(msg({ id: 'shell.about.cli', defaultMessage: 'CLI {version} ({source})', description: "A row of Help → About, a coding agent's: its CLI's version and where Combwork found it." }), { version: i.version ?? '', source: installSourceText(i.source, tr) }) : tr(msg({ id: 'shell.about.noCli', defaultMessage: 'CLI not installed', description: "A row of Help → About, a coding agent's, when its CLI isn't installed." }))]
     }),
     // Names of software, the same in every language.
     ['Electron', info.electron], // i18n-ignore: a name
@@ -517,7 +526,7 @@ export function AboutDialog() {
     ['Node.js', info.node],
     ['V8', info.v8],
     ['OS', `${info.platform} ${info.arch}`],
-    [tr(msg({ id: 'shell.about.dataFolder', defaultMessage: 'Data folder', description: "A row of Help → About: the folder of Hive's profile." })), info.userData]
+    [tr(msg({ id: 'shell.about.dataFolder', defaultMessage: 'Data folder', description: "A row of Help → About: the folder of Combwork's profile." })), info.userData]
   ]
   const showDoc = (page: string): void => {
     set({ aboutOpen: false, docsPage: page })
@@ -529,7 +538,7 @@ export function AboutDialog() {
   }
   return (
     <Modal
-      title={tr(msg({ id: 'shell.about.title', defaultMessage: 'About {app}', description: "Help → About's title. {app} is Hive's name." }), { app: APP_NAME })}
+      title={tr(msg({ id: 'shell.about.title', defaultMessage: 'About {app}', description: "Help → About's title. {app} is Combwork's name." }), { app: APP_NAME })}
       onClose={() => set({ aboutOpen: false })}
       footer={
         <>
@@ -551,9 +560,9 @@ export function AboutDialog() {
       <div className="about">
         <img src={iconUrl} alt={APP_NAME} />
         <h1>{APP_NAME}</h1>
-        <div className="version">{tr(msg({ id: 'shell.about.versionLine', defaultMessage: 'Version {version}', description: "Under Hive's name in Help → About." }), { version: info.version })}</div>
+        <div className="version">{tr(msg({ id: 'shell.about.versionLine', defaultMessage: 'Version {version}', description: "Under Combwork's name in Help → About." }), { version: info.version })}</div>
         <p className="muted" style={{ maxWidth: 360, margin: '10px auto 0' }}>
-          {tr(msg({ id: 'shell.about.blurb', defaultMessage: 'An agent-first workspace for AI-assisted coding. Run coding agents such as {providers} across your projects, side by side.', description: 'Help → About: what Hive is. {providers} lists the coding agents (Claude Code, Codex and GitHub Copilot).' }), { providers: fmt.list(PROVIDERS.map((p) => p.name)) })}
+          {tr(msg({ id: 'shell.about.blurb', defaultMessage: 'An agent-first workspace for AI-assisted coding. Run coding agents such as {providers} across your projects, side by side.', description: 'Help → About: what Combwork is. {providers} lists the coding agents (Claude Code, Codex and GitHub Copilot).' }), { providers: fmt.list(PROVIDERS.map((p) => p.name)) })}
         </p>
         <table className="about-table">
           <tbody>
@@ -569,14 +578,14 @@ export function AboutDialog() {
           <UpdateStatusRow />
         </div>
         <p className="about-licence">
-          {tRich(msg({ id: 'shell.about.licence', defaultMessage: 'Open source under the <licence>MIT License</licence>. Includes <notices>third-party software</notices> and <chromium>Chromium</chromium>.', description: "Help → About: Hive's licence. Each tag is a link: to the licence, the notices of the software Hive includes, and Chromium's licences. MIT and Chromium are names: keep them." }), {
+          {tRich(msg({ id: 'shell.about.licence', defaultMessage: 'Open source under the <licence>MIT License</licence>. Includes <notices>third-party software</notices> and <chromium>Chromium</chromium>.', description: "Help → About: Combwork's licence. Each tag is a link: to the licence, the notices of the software Combwork includes, and Chromium's licences. MIT and Chromium are names: keep them." }), {
             licence: linkTo('licence', () => showDoc('license')),
             notices: linkTo('notices', () => showDoc('notices')),
-            chromium: linkTo('chromium', () => void call('app:openChromiumLicenses').then((ok) => ok || notify('info', tr(msg({ id: 'shell.about.noLicences', defaultMessage: 'Licences not found', description: "A notice when Chromium's licence file can't be opened." })), tr(msg({ id: 'shell.about.noLicencesDetail', defaultMessage: 'The Chromium licence file is in the folder Hive is installed in.', description: "More in the notice that Chromium's licence file wasn't found." })))))
+            chromium: linkTo('chromium', () => void call('app:openChromiumLicenses').then((ok) => ok || notify('info', tr(msg({ id: 'shell.about.noLicences', defaultMessage: 'Licences not found', description: "A notice when Chromium's licence file can't be opened." })), tr(msg({ id: 'shell.about.noLicencesDetail', defaultMessage: 'The Chromium licence file is in the folder Combwork is installed in.', description: "More in the notice that Chromium's licence file wasn't found." })))))
           })}
         </p>
         <p className="faint" style={{ fontSize: 11, marginTop: 8 }}>
-          {tr(msg({ id: 'shell.about.legal', defaultMessage: "© 2026 Darren Marshall. {app} is independently developed and isn't affiliated with, endorsed or sponsored by {companies}. {products}; each is installed separately under its maker's terms.", description: "Help → About's small print. {app} is Hive's name; {companies} lists the coding agents' makers (joined with “or”); {products} says whose each agent is, a sentence per agent (shell.about.productOf)." }), { app: APP_NAME, companies: fmt.list([...new Set(PROVIDERS.map((p) => p.company))], 'disjunction'), products: PROVIDERS.map((p) => tr(msg({ id: 'shell.about.productOf', defaultMessage: '{product} is a product of {company}', description: "Help → About's small print, a part per coding agent, joined with semicolons: whose it is." }), { product: p.name, company: p.company })).join('; ') })}
+          {tr(msg({ id: 'shell.about.legal', defaultMessage: "© 2026 Darren Marshall. {app} is independently developed and isn't affiliated with, endorsed or sponsored by {companies}. {products}; each is installed separately under its maker's terms.", description: "Help → About's small print. {app} is Combwork's name; {companies} lists the coding agents' makers (joined with “or”); {products} says whose each agent is, a sentence per agent (shell.about.productOf)." }), { app: APP_NAME, companies: fmt.list([...new Set(PROVIDERS.map((p) => p.company))], 'disjunction'), products: PROVIDERS.map((p) => tr(msg({ id: 'shell.about.productOf', defaultMessage: '{product} is a product of {company}', description: "Help → About's small print, a part per coding agent, joined with semicolons: whose it is." }), { product: p.name, company: p.company })).join('; ') })}
         </p>
       </div>
     </Modal>
@@ -648,7 +657,7 @@ export function DiagnosticsDialog() {
         </>
       }
     >
-      <p className="muted">{tr(msg({ id: 'shell.diagnostics.what', defaultMessage: "For a bug report: Hive's version, your coding agents, counts, the settings that change how Hive behaves and the end of its log. Folders, workspace, project and agent names, and anything that looks like a key or token are taken out. This is exactly what will be copied.", description: 'Copy Diagnostics: what it copies (shown below it).' }))}</p>
+      <p className="muted">{tr(msg({ id: 'shell.diagnostics.what', defaultMessage: "For a bug report: Combwork's version, your coding agents, counts, the settings that change how Combwork behaves and the end of its log. Folders, workspace, project and agent names, and anything that looks like a key or token are taken out. This is exactly what will be copied.", description: 'Copy Diagnostics: what it copies (shown below it).' }))}</p>
       {recording &&
         (recording.includeText ? (
           <p className="muted diagnostics-recording">{tr(msg({ id: 'shell.diagnostics.recordingText', defaultMessage: "The newest developer console recording includes prompt and reply text, so it can't be attached.", description: 'Copy Diagnostics, when the newest developer console recording has text in it.' }))}</p>
@@ -731,16 +740,16 @@ export function ShortcutsDialog() {
 }
 
 /**
- * After Provider Setup's install found the CLI (#472). Installers say to restart the terminal; Hive looked again on the
+ * After Provider Setup's install found the CLI (#472). Installers say to restart the terminal; Combwork looked again on the
  * PATH a new process gets, so neither it nor new agents need a restart. Running agents keep the PATH they started with.
  */
 function installedText(name: string): string {
-  return tr(msg({ id: 'shell.setup.installed', defaultMessage: "{provider} is installed and Hive has found it: agents you start now can use it, without restarting Hive (the installer's advice to restart your terminal is for terminals already open). Agents already running get the new PATH when they restart.", description: "Provider Setup, after an install found the coding agent's CLI. {provider} is its name; PATH is a Windows setting: keep it." }), { provider: name })
+  return tr(msg({ id: 'shell.setup.installed', defaultMessage: "{provider} is installed and Combwork has found it: agents you start now can use it, without restarting Combwork (the installer's advice to restart your terminal is for terminals already open). Agents already running get the new PATH when they restart.", description: "Provider Setup, after an install found the coding agent's CLI. {provider} is its name; PATH is a Windows setting: keep it." }), { provider: name })
 }
 
-/** An install that ended without Hive finding the CLI. */
+/** An install that ended without Combwork finding the CLI. */
 function installNotFoundText(name: string): string {
-  return tr(msg({ id: 'shell.setup.notFound', defaultMessage: "The install ended, but Hive can't find {provider}. If the installer reported an error, it's shown below; if it says it worked, Check again, or set {provider}'s path in Settings → {provider}.", description: "Provider Setup, after an install ended without Hive finding the CLI. {provider} is its name; Check again is the dialog's button." }), { provider: name })
+  return tr(msg({ id: 'shell.setup.notFound', defaultMessage: "The install ended, but Combwork can't find {provider}. If the installer reported an error, it's shown below; if it says it worked, Check again, or set {provider}'s path in Settings → {provider}.", description: "Provider Setup, after an install ended without Combwork finding the CLI. {provider} is its name; Check again is the dialog's button." }), { provider: name })
 }
 
 /**
@@ -759,7 +768,7 @@ function GitSetupRow() {
     return (
       <div className="setup-status setup-git">
         <Icon name="loading" spin />
-        <div>{tr(msg({ id: 'shell.setup.lookingForGit', defaultMessage: 'Looking for Git…', description: 'Provider Setup while Hive looks for git.' }))}</div>
+        <div>{tr(msg({ id: 'shell.setup.lookingForGit', defaultMessage: 'Looking for Git…', description: 'Provider Setup while Combwork looks for git.' }))}</div>
       </div>
     )
   }
@@ -769,19 +778,19 @@ function GitSetupRow() {
         <Icon name="pass-filled" />
         <div className="grow">
           <div>
-            {tRich(msg({ id: 'shell.setup.gitOk', defaultMessage: '<b>Git {version}</b> <muted>— for worktrees, merging and the Version Control tab</muted>', description: 'Provider Setup: the git Hive found. {version} is its version; <b> is bold, <muted> greyed. Git is a name: keep it.' }), { version: git.version ?? '', b: bold, muted })}
+            {tRich(msg({ id: 'shell.setup.gitOk', defaultMessage: '<b>Git {version}</b> <muted>— for worktrees, merging and the Version Control tab</muted>', description: 'Provider Setup: the git Combwork found. {version} is its version; <b> is bold, <muted> greyed. Git is a name: keep it.' }), { version: git.version ?? '', b: bold, muted })}
           </div>
           {git.path && <div className="muted mono" style={{ fontSize: 11 }}>{git.path}</div>}
         </div>
       </div>
     )
   }
-  const title = git.state === 'missing' ? tr(msg({ id: 'shell.setup.gitMissing', defaultMessage: 'Git not found', description: 'Provider Setup when Hive finds no git. Git is a name: keep it.' })) : git.state === 'old' ? tr(msg({ id: 'shell.setup.gitOld', defaultMessage: 'Git {version} is older than {min}', description: 'Provider Setup when the git found is too old. {version} and {min} are version numbers.' }), { version: git.version ?? '', min: GIT_MIN }) : tr(msg({ id: 'shell.setup.gitUnknown', defaultMessage: "Couldn't check Git", description: "Provider Setup when Hive couldn't run git to check it." }))
+  const title = git.state === 'missing' ? tr(msg({ id: 'shell.setup.gitMissing', defaultMessage: 'Git not found', description: 'Provider Setup when Combwork finds no git. Git is a name: keep it.' })) : git.state === 'old' ? tr(msg({ id: 'shell.setup.gitOld', defaultMessage: 'Git {version} is older than {min}', description: 'Provider Setup when the git found is too old. {version} and {min} are version numbers.' }), { version: git.version ?? '', min: GIT_MIN }) : tr(msg({ id: 'shell.setup.gitUnknown', defaultMessage: "Couldn't check Git", description: "Provider Setup when Combwork couldn't run git to check it." }))
   const detail =
     git.state === 'old' && !problem
       ? tr(msg({ id: 'shell.setup.gitOldDetail', defaultMessage: '{why} Update Git for Windows to {min} or later, then Check again.', description: "Provider Setup, under a too old git. {why} says why (in English for now); Git for Windows is a product's name; Check again is the dialog's button." }), { why: gitOldText(git.version!), min: GIT_MIN })
       : git.state === 'unknown'
-        ? tr(msg({ id: 'shell.setup.gitUnknownDetail', defaultMessage: '{error}. Hive needs Git {min} or later for worktrees, merging and the Version Control tab.', description: "Provider Setup when git couldn't be checked. {error} is the error, as given." }), { error: git.error ?? '', min: GIT_MIN })
+        ? tr(msg({ id: 'shell.setup.gitUnknownDetail', defaultMessage: '{error}. Combwork needs Git {min} or later for worktrees, merging and the Version Control tab.', description: "Provider Setup when git couldn't be checked. {error} is the error, as given." }), { error: git.error ?? '', min: GIT_MIN })
         : tr(msg({ id: 'shell.setup.gitProblemDetail', defaultMessage: "{problem}: worktree agents, merging, the Version Control tab's Git sections and the unmerged counts don't work. {fix}", description: 'Provider Setup under a git problem. {problem} and {fix} say what is wrong and what to do (in English for now).' }), { problem: problem ?? '', fix: gitFixText(git) })
   return (
     <div className="setup-status setup-git" data-git={git.state}>
@@ -797,13 +806,13 @@ function GitSetupRow() {
 
 /** Installing, updating, signing in to and setting up each provider's CLI, one tab per provider. */
 /**
- * The CLI version this Hive release was tested with, against the installed one (#365): a quiet tick when they match,
+ * The CLI version this Combwork release was tested with, against the installed one (#365): a quiet tick when they match,
  * else a calm note (a newer CLI usually works; nothing is blocked).
  */
 function TestedLine({ tested, installed }: { tested: TestedCli; installed: string | null }) {
   const note = testedNote(tested)
   return (
-    <div className="setup-tested" data-tested={tested.installed} title={tested.testedAt ? tr(msg({ id: 'shell.setup.testedAt', defaultMessage: "Hive's tests ran against {version} on {date}", description: "Tooltip of Provider Setup's tested-version line. {version} is the CLI's version; {date} when Hive's tests ran." }), { version: tested.version, date: tested.testedAt }) : undefined}>
+    <div className="setup-tested" data-tested={tested.installed} title={tested.testedAt ? tr(msg({ id: 'shell.setup.testedAt', defaultMessage: "Combwork's tests ran against {version} on {date}", description: "Tooltip of Provider Setup's tested-version line. {version} is the CLI's version; {date} when Combwork's tests ran." }), { version: tested.version, date: tested.testedAt }) : undefined}>
       <span className="muted">{testedSummary(tested, installed)}</span>
       {tested.installed === 'same' && <Icon name="check" className="setup-tested-ok" />}
       {note && <div className="hint">{note}</div>}
@@ -863,10 +872,10 @@ export function AgentSetupDialog() {
     const after = next?.[tab]
     if (!kind || !after || after.checking) return
     const left = kind === 'update' ? after.updateAvailable || !!after.updateRetry : (after.readiness ?? []).some((r) => task.issues.includes(r.id))
-    // An install that ended without Hive finding the CLI: its terminal stays, with what to do next.
+    // An install that ended without Combwork finding the CLI: its terminal stays, with what to do next.
     if (left && kind === 'install' && !after.found) setFinished({ ok: false, text: installNotFoundText(p.name) })
     if (left) return
-    // Installers say to restart the terminal (#472): Hive looked again on the PATH a new process gets, so it needn't.
+    // Installers say to restart the terminal (#472): Combwork looked again on the PATH a new process gets, so it needn't.
     const what: Record<ProviderTask, string> = {
       install: installedText(p.name),
       update: tr(msg({ id: 'shell.setup.updated', defaultMessage: '{provider} is up to date.', description: "Provider Setup after an update. {provider} is the coding agent's name." }), { provider: p.name }),
@@ -918,7 +927,7 @@ export function AgentSetupDialog() {
         <div className="banner info" style={{ borderRadius: 6, marginBottom: 10 }}>
           <Icon name="info" />
           <span>
-            {tRich(msg({ id: 'shell.setup.off', defaultMessage: "{provider} is turned off, so Hive doesn't run it. <on>Turn it on</on>", description: 'Provider Setup for a provider that is turned off. {provider} is its name; <on> is a link that turns it on.' }), {
+            {tRich(msg({ id: 'shell.setup.off', defaultMessage: "{provider} is turned off, so Combwork doesn't run it. <on>Turn it on</on>", description: 'Provider Setup for a provider that is turned off. {provider} is its name; <on> is a link that turns it on.' }), {
               provider: p.name,
               on: linkTo('on', () => void call('settings:update', { providers: { [tab]: { enabled: true } } }).then((ns) => set({ settings: ns })))
             })}
@@ -929,7 +938,7 @@ export function AgentSetupDialog() {
       {!info || info.checking ? (
         <div className="setup-status">
           <Icon name="loading" spin />
-          <div>{tr(msg({ id: 'shell.setup.looking', defaultMessage: 'Looking for {provider}…', description: 'Provider Setup while Hive looks for a CLI. {provider} is its name.' }), { provider: p.name })}</div>
+          <div>{tr(msg({ id: 'shell.setup.looking', defaultMessage: 'Looking for {provider}…', description: 'Provider Setup while Combwork looks for a CLI. {provider} is its name.' }), { provider: p.name })}</div>
         </div>
       ) : info.found ? (
         <>
@@ -937,7 +946,7 @@ export function AgentSetupDialog() {
           <Icon name="pass-filled" className="" />
           <div className="grow">
             <div>
-              {tRich(msg({ id: 'shell.setup.found', defaultMessage: '<b>{provider} {version}</b> <muted>— found via {source}</muted>', description: 'Provider Setup: the CLI Hive found. {provider} is its name, {version} its version, {source} where it was found (PATH, an install folder); <b> is bold, <muted> greyed.' }), { provider: p.name, version: info.version ?? '', source: installSourceText(info.source, tr), b: bold, muted })}
+              {tRich(msg({ id: 'shell.setup.found', defaultMessage: '<b>{provider} {version}</b> <muted>— found via {source}</muted>', description: 'Provider Setup: the CLI Combwork found. {provider} is its name, {version} its version, {source} where it was found (PATH, an install folder); <b> is bold, <muted> greyed.' }), { provider: p.name, version: info.version ?? '', source: installSourceText(info.source, tr), b: bold, muted })}
             </div>
             <div className="setup-path muted mono" title={info.path ?? undefined}>
               {info.path}
@@ -994,7 +1003,7 @@ export function AgentSetupDialog() {
             <Icon name="warning" />
             <div className="grow">
               <strong>{tr(msg({ id: 'shell.setup.notInstalled', defaultMessage: '{provider} is not installed', description: "Provider Setup when a CLI isn't installed. {provider} is its name." }), { provider: p.name })}</strong>
-              <div className="muted">{tr(msg({ id: 'shell.setup.notInstalledDetail', defaultMessage: "Hive runs the standalone {provider} command-line tool in each project. It isn't bundled with Hive — install it with {company}'s official installer.", description: 'Provider Setup, under "<provider> is not installed". {provider} is the coding agent\'s name, {company} its maker\'s.' }), { provider: p.name, company: p.company })}</div>
+              <div className="muted">{tr(msg({ id: 'shell.setup.notInstalledDetail', defaultMessage: "Combwork runs the standalone {provider} command-line tool in each project. It isn't bundled with Combwork — install it with {company}'s official installer.", description: 'Provider Setup, under "<provider> is not installed". {provider} is the coding agent\'s name, {company} its maker\'s.' }), { provider: p.name, company: p.company })}</div>
             </div>
             <button className="btn primary" disabled={running} onClick={() => void start('install')}>
               <Icon name="cloud-download" /> {tr(msg({ id: 'shell.setup.install', defaultMessage: 'Install {provider}', description: "Provider Setup's button: installs the CLI. {provider} is its name." }), { provider: p.name })}
@@ -1015,7 +1024,7 @@ export function AgentSetupDialog() {
       )}
       {!!info?.rejected?.length && (
         <p className="hint setup-wrap">
-          <Icon name="info" /> {tRich(msg({ id: 'shell.setup.rejected', defaultMessage: '{n, plural, one {Ignored a copy} other {Ignored copies}} bundled with an editor extension ({path}). Hive only uses the standalone CLI.', description: "Provider Setup when it found a CLI only inside an editor's extension. {n} is how many; {path} is where (one of them)." }), { n: info.rejected.length, path: <CopyableCode key="path" code={info.rejected[0]} /> })}
+          <Icon name="info" /> {tRich(msg({ id: 'shell.setup.rejected', defaultMessage: '{n, plural, one {Ignored a copy} other {Ignored copies}} bundled with an editor extension ({path}). Combwork only uses the standalone CLI.', description: "Provider Setup when it found a CLI only inside an editor's extension. {n} is how many; {path} is where (one of them)." }), { n: info.rejected.length, path: <CopyableCode key="path" code={info.rejected[0]} /> })}
         </p>
       )}
       <GitSetupRow />
@@ -1054,7 +1063,7 @@ const STOPPING: Partial<Record<SessionStatus, Msg>> = {
 }
 
 /**
- * Asks what to do with running sessions and unsaved files when Hive quits. Main waits for
+ * Asks what to do with running sessions and unsaved files when Combwork quits. Main waits for
  * app:quitDecision; unsaved files are saved (or discarded) here first.
  */
 export function QuitDialog() {
@@ -1087,14 +1096,14 @@ export function QuitDialog() {
         setSaving(false)
         // Something couldn't be saved: stay open, so nothing is lost.
         if (r.failed.length) {
-          notify('error', tr(msg({ id: 'shell.quit.saveFailed', defaultMessage: "{n, plural, one {Couldn't save a file, so Hive is still open} other {Couldn't save # files, so Hive is still open}}", description: "An error's title when quitting: unsaved files couldn't be saved, so Hive didn't quit. The reasons are listed under it." }), { n: r.failed.length }), r.failed.map((f) => f.message).join('\n'))
+          notify('error', tr(msg({ id: 'shell.quit.saveFailed', defaultMessage: "{n, plural, one {Couldn't save a file, so Combwork is still open} other {Couldn't save # files, so Combwork is still open}}", description: "An error's title when quitting: unsaved files couldn't be saved, so Combwork didn't quit. The reasons are listed under it." }), { n: r.failed.length }), r.failed.map((f) => f.message).join('\n'))
           set({ quitUnsaved: r.failed.map((f) => f.abs) })
           return
         }
         // Edited while it was saving: those edits are unsaved again, so stay.
         const left = unsavedFiles()
         if (left.length) {
-          notify('warning', tr(msg({ id: 'shell.quit.changedWhileSaving', defaultMessage: 'Some files changed while they were being saved', description: 'A warning when quitting: files were edited while Hive saved them.' })), tr(msg({ id: 'shell.quit.changedWhileSavingDetail', defaultMessage: 'Hive is still open, so your latest edits are kept. Save them, then try again.', description: 'More in the warning that files changed while they were saved.' })))
+          notify('warning', tr(msg({ id: 'shell.quit.changedWhileSaving', defaultMessage: 'Some files changed while they were being saved', description: 'A warning when quitting: files were edited while Combwork saved them.' })), tr(msg({ id: 'shell.quit.changedWhileSavingDetail', defaultMessage: 'Combwork is still open, so your latest edits are kept. Save them, then try again.', description: 'More in the warning that files changed while they were saved.' })))
           set({ quitUnsaved: left.map((f) => f.abs) })
           return
         }
@@ -1140,14 +1149,14 @@ export function QuitDialog() {
   }
   return (
     <Modal
-      title={tr(msg({ id: 'shell.quit.title', defaultMessage: '{how, select, workspace {Close this workspace?} switch {Switch workspace?} window {Close this window?} allWindows {Quit Hive and close all {windows} windows?} other {Quit Hive?}}', description: "The quit dialog's title: closing the workspace, switching it, closing the window, or quitting Hive (with {windows} windows open, 2 or more)." }), { how, windows })}
+      title={tr(msg({ id: 'shell.quit.title', defaultMessage: '{how, select, workspace {Close this workspace?} switch {Switch workspace?} window {Close this window?} allWindows {Quit Combwork and close all {windows} windows?} other {Quit Combwork?}}', description: "The quit dialog's title: closing the workspace, switching it, closing the window, or quitting Combwork (with {windows} windows open, 2 or more)." }), { how, windows })}
       icon={busy || unsaved.length ? 'warning' : 'sign-out'}
       wide={sessions.length > 0}
       onClose={() => void decide('cancel')}
       footer={
         <>
           {sessions.length > 0 && !closing && (
-            <label className="quit-dontask" title={unsaved.length ? tr(msg({ id: 'shell.quit.alwaysAsks', defaultMessage: 'Hive always asks about unsaved files.', description: 'Tooltip of the quit dialog\'s "Don\'t ask again" box while files are unsaved.' })) : undefined}>
+            <label className="quit-dontask" title={unsaved.length ? tr(msg({ id: 'shell.quit.alwaysAsks', defaultMessage: 'Combwork always asks about unsaved files.', description: 'Tooltip of the quit dialog\'s "Don\'t ask again" box while files are unsaved.' })) : undefined}>
               <input type="checkbox" className="checkbox" checked={dontAsk} onChange={(e) => setDontAsk(e.target.checked)} /> {tr(msg({ id: 'shell.quit.dontAsk', defaultMessage: "Don't ask again about sessions", description: 'A box in the quit dialog: next time, quit without asking about running sessions.' }))}
             </label>
           )}
@@ -1155,7 +1164,7 @@ export function QuitDialog() {
             {tr(msg({ id: 'shell.dialog.cancel', defaultMessage: 'Cancel', description: "A dialog's button that closes it without doing anything." }))}
           </button>
           {working > 0 && !closing && (
-            <button className="btn subtle" onClick={() => void decide('wait')} disabled={saving} title={tr(msg({ id: 'shell.quit.whenTip', defaultMessage: 'Hide Hive and quit as soon as no agent is working', description: "Tooltip of the quit dialog's button that quits once the agents finish." }))}>
+            <button className="btn subtle" onClick={() => void decide('wait')} disabled={saving} title={tr(msg({ id: 'shell.quit.whenTip', defaultMessage: 'Hide Combwork and quit as soon as no agent is working', description: "Tooltip of the quit dialog's button that quits once the agents finish." }))}>
               <Icon name="watch" /> {tr(msg({ id: 'shell.quit.when', defaultMessage: '{action, select, saveAndClose {Save and close} closeWorkspace {Close workspace} switchWorkspace {Switch workspace} closeWindow {Close window} saveAndQuit {Save and quit} other {Quit}} when {working, plural, one {the agent finishes} other {agents finish}}', description: "The quit dialog's button: quit once the working agents finish. {action} picks what it does (quit, or save and quit); {working} is how many agents are working." }), { action, working })}
             </button>
           )}
@@ -1214,13 +1223,13 @@ export function QuitDialog() {
   )
 }
 
-/** Shown if the window is opened while Hive waits for agents to finish before quitting. */
+/** Shown if the window is opened while Combwork waits for agents to finish before quitting. */
 export function QuitPendingBanner() {
   const pending = useStore((s) => s.quitPending)
   if (!pending) return null
   return (
     <div className="banner info quit-pending">
-      <Icon name="watch" /> {tr(msg({ id: 'shell.quitPending.text', defaultMessage: '{n, plural, one {Hive will quit when the working agent finishes.} other {Hive will quit when # working agents finish.}}', description: 'A banner while Hive waits for agents to finish before it quits.' }), { n: pending.working })}
+      <Icon name="watch" /> {tr(msg({ id: 'shell.quitPending.text', defaultMessage: '{n, plural, one {Combwork will quit when the working agent finishes.} other {Combwork will quit when # working agents finish.}}', description: 'A banner while Combwork waits for agents to finish before it quits.' }), { n: pending.working })}
       <button className="btn small" onClick={() => void call('app:cancelPendingQuit')}>
         {tr(msg({ id: 'shell.dialog.cancel', defaultMessage: 'Cancel', description: "A dialog's button that closes it without doing anything." }))}
       </button>
@@ -1288,7 +1297,7 @@ export function ProvidersBanner() {
           </span>
           <span className="wrap-banner-actions">
             <button className="btn small primary" onClick={() => set({ setupOpen: p.id })}>
-              {r.action?.label ?? tr(msg({ id: 'shell.providers.setUp', defaultMessage: 'Set up', description: "A provider's banner's button when Hive names no other action: opens Provider Setup." }))}
+              {r.action?.label ?? tr(msg({ id: 'shell.providers.setUp', defaultMessage: 'Set up', description: "A provider's banner's button when Combwork names no other action: opens Provider Setup." }))}
             </button>
           </span>
         </div>

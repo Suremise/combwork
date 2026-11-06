@@ -15,17 +15,17 @@ import { join } from 'path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { connectionRef, connectionsFor, connectionShown, resolveConnection, type ConnectionsView } from '../src/shared/accounts'
-import { cliReadyOf, connectionCli, connectionOf, firstReadyConnection, firstUsableConnection, launchedName, offeredConnections } from '../src/shared/connectionLabel'
+import { cliReadyOf, connectionCli, connectionOf, connectionSwitchDue, firstReadyConnection, firstUsableConnection, launchedName, offeredConnections, offHereChoice } from '../src/shared/connectionLabel'
 import type { Account, LiveSessionState } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-connections-')
+const base = tempDir('cw-connections-')
 const home = join(base, 'claude-home')
 const userHome = join(base, 'user-profile')
-process.env.HIVE_USER_DATA = join(base, 'profile')
+process.env.CW_USER_DATA = join(base, 'profile')
 process.env.CLAUDE_CONFIG_DIR = home
 // No test seam here: the real rule (a test copy's own run context sets it; this file decides per test).
-delete process.env.HIVE_TEST_CLI_HOME_CONNECTION
+delete process.env.CW_TEST_CLI_HOME_CONNECTION
 ;(electron.app as unknown as { getPath: (n: string) => string }).getPath = (n: string) => (n === 'home' ? userHome : join(base, 'profile'))
 
 const accounts = await import('../src/main/accounts')
@@ -34,7 +34,7 @@ const { config } = await import('../src/main/config')
 const { advanced } = await import('../src/main/advanced')
 const { provider } = await import('../src/main/providers')
 const { providerService } = await import('../src/main/providerService')
-const { configTestHooks, createWorkspaceService, disposeWorkspaceService, inWorkspace, setConnectionGuard, setNewWorkspaceExtras } = await import('../src/main/workspace')
+const { configTestHooks, createWorkspaceService, disposeWorkspaceService, inWorkspace, setConnectionGuard } = await import('../src/main/workspace')
 const { runSwitch } = await import('../src/main/connectionSwitch')
 const { authScope, sessions } = await import('../src/main/sessions')
 const moves = await import('../src/main/connectionMoves')
@@ -62,18 +62,18 @@ beforeAll(async () => {
   advanced.load(join(base, 'profile'))
   mkdirSync(join(home, 'projects'), { recursive: true })
   mkdirSync(join(userHome, '.claude'), { recursive: true })
-  mkdirSync(join(wsPath, 'alpha', '.hive'), { recursive: true })
-  writeFileSync(join(wsPath, 'alpha', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One' }] }))
+  mkdirSync(join(wsPath, 'alpha', '.combwork'), { recursive: true })
+  writeFileSync(join(wsPath, 'alpha', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One' }] }))
   // A project templates are loaded into (HI-1769), its agents replaced each time.
-  mkdirSync(join(wsPath, 'gamma', '.hive'), { recursive: true })
-  writeFileSync(join(wsPath, 'gamma', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+  mkdirSync(join(wsPath, 'gamma', '.combwork'), { recursive: true })
+  writeFileSync(join(wsPath, 'gamma', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
   // Projects whose own model, effort and context move onto their agents (HI-1770), each test its own.
   // A project whose agents change connection (HI-1771).
-  mkdirSync(join(wsPath, 'api1', '.hive'), { recursive: true })
-  writeFileSync(join(wsPath, 'api1', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'k', name: 'Api K', provider: 'claude-code', model: 'opus', effort: 'high', use200kContext: true, lastSessionId: 's-1' }] }))
+  mkdirSync(join(wsPath, 'api1', '.combwork'), { recursive: true })
+  writeFileSync(join(wsPath, 'api1', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'k', name: 'Api K', provider: 'claude-code', model: 'opus', effort: 'high', use200kContext: true, lastSessionId: 's-1' }] }))
   for (const name of ['mv1', 'mv2', 'mv3', 'mv4', 'mv5', 'mv6', 'mv7', 'mv8', 'mv9']) {
-    mkdirSync(join(wsPath, name, '.hive'), { recursive: true })
-    writeFileSync(join(wsPath, name, '.hive', 'project.json'), JSON.stringify({ version: 2, providers: { 'claude-code': { model: 'haiku', effort: 'high', permissionMode: 'inherit', extraArgs: '', use200kContext: 'on' }, codex: { model: 'gpt-5', effort: 'low', permissionMode: 'inherit', extraArgs: '', use200kContext: 'inherit' } }, agents: [{ id: 'own', name: `${name} Own`, provider: 'claude-code', model: 'opus', use200kContext: false }, { id: 'none', name: `${name} None`, provider: 'claude-code' }, { id: 'cx', name: `${name} Codex`, provider: 'codex' }] }))
+    mkdirSync(join(wsPath, name, '.combwork'), { recursive: true })
+    writeFileSync(join(wsPath, name, '.combwork', 'project.json'), JSON.stringify({ version: 2, providers: { 'claude-code': { model: 'haiku', effort: 'high', permissionMode: 'inherit', extraArgs: '', use200kContext: 'on' }, codex: { model: 'gpt-5', effort: 'low', permissionMode: 'inherit', extraArgs: '', use200kContext: 'inherit' } }, agents: [{ id: 'own', name: `${name} Own`, provider: 'claude-code', model: 'opus', use200kContext: false }, { id: 'none', name: `${name} None`, provider: 'claude-code' }, { id: 'cx', name: `${name} Codex`, provider: 'codex' }] }))
   }
   config.settings.providers['claude-code'].enabled = true
   providerService.info = ((id: string) => ({ provider: id, found: true, path: 'claude.exe' })) as never
@@ -130,7 +130,7 @@ describe("the Agent API's connection arguments (HI-2108)", () => {
     // No account here to name: says where the user adds one.
     expect(() => refuseOldFields({ model: 'opus' }, undefined)).toThrow(/No account is on in this workspace: the user adds one in Settings → Accounts & Connections/)
   })
-  it("reads hive_connection's values: each '' or null back to the CLI's, a name never empty, context200k on or off", () => {
+  it("reads cw_connection's values: each '' or null back to the CLI's, a name never empty, context200k on or off", () => {
     expect(connectionValuesArg({ name: ' Fast ', model: 'haiku', effort: 'low', mode: 'plan', context200k: 'on', extraArgs: ' --verbose ' })).toEqual({ name: 'Fast', model: 'haiku', effort: 'low', permissionMode: 'plan', use200kContext: true, extraArgs: '--verbose' })
     expect(connectionValuesArg({ model: '', effort: null, context200k: 'off', extraArgs: '' })).toEqual({ model: null, effort: null, use200kContext: null, extraArgs: null })
     expect(connectionValuesArg({})).toEqual({})
@@ -139,7 +139,7 @@ describe("the Agent API's connection arguments (HI-2108)", () => {
   })
 })
 
-describe("hive_connection's change, checked at the moment of it (HI-2108 round 1)", () => {
+describe("cw_connection's change, checked at the moment of it (HI-2108 round 1)", () => {
   /** The Assistant's current launch token for the workspace, from its file (a new one each launch). */
   const tokenNow = (): string => readFileSync(control.assistantTokenFile(wsPath), 'utf8').match(/"token":\s*"([0-9a-f]+)"/)![1]
   const act = { kind: 'add-connection' as const }
@@ -150,14 +150,14 @@ describe("hive_connection's change, checked at the moment of it (HI-2108 round 1
     try {
       await control.newAssistantToken(wsPath)
       // Admitted for its session, which then restarts (a new token) before the change.
-      const stale = control.admit(wsPath, tokenNow(), 'look', 'make a connection', act)
+      const stale = control.admit(wsPath, tokenNow(), 'look', [{ id: 'test.what', text: 'make a connection' }], act)
       await control.newAssistantToken(wsPath)
       const before = structuredClone(accounts.allConnections())
       let made = false
       expect(() => atTheChange(stale, () => ((made = true), accounts.addConnection(a.id, { name: 'Stale' })))).toThrow(/session that asked for this ended/)
       expect([made, accounts.allConnections()]).toEqual([false, before])
       // Change settings turned off meanwhile: refused the same, before the session is even looked at.
-      const current = control.admit(wsPath, tokenNow(), 'look', 'make a connection', act)
+      const current = control.admit(wsPath, tokenNow(), 'look', [{ id: 'test.what', text: 'make a connection' }], act)
       config.settings.assistant.changeSettings = false
       expect(() => atTheChange(current, () => accounts.addConnection(a.id, { name: 'Off' }))).toThrow(/Change settings is off/)
       expect(accounts.allConnections()).toEqual(before)
@@ -191,13 +191,13 @@ describe('which connection a launch uses (resolveConnection)', () => {
 })
 
 describe('the test seam (testHomeSeam)', () => {
-  const env = (o: Record<string, string | undefined>) => ({ HIVE_USER_DATA: 'x', HIVE_TEST_CLI_HOME_CONNECTION: '1', CLAUDE_CONFIG_DIR: home, ...o })
+  const env = (o: Record<string, string | undefined>) => ({ CW_USER_DATA: 'x', CW_TEST_CLI_HOME_CONNECTION: '1', CLAUDE_CONFIG_DIR: home, ...o })
   const user = join(userHome, '.claude')
   it('only for an unpackaged test copy given it and an explicit CLI test home', () => {
     expect(seam.testHomeSeam('CLAUDE_CONFIG_DIR', env({}), false, user)).toBe(true)
     expect(seam.testHomeSeam('CLAUDE_CONFIG_DIR', env({}), true, user)).toBe(false)
-    expect(seam.testHomeSeam('CLAUDE_CONFIG_DIR', env({ HIVE_USER_DATA: undefined }), false, user)).toBe(false)
-    expect(seam.testHomeSeam('CLAUDE_CONFIG_DIR', env({ HIVE_TEST_CLI_HOME_CONNECTION: '0' }), false, user)).toBe(false)
+    expect(seam.testHomeSeam('CLAUDE_CONFIG_DIR', env({ CW_USER_DATA: undefined }), false, user)).toBe(false)
+    expect(seam.testHomeSeam('CLAUDE_CONFIG_DIR', env({ CW_TEST_CLI_HOME_CONNECTION: '0' }), false, user)).toBe(false)
     expect(seam.testHomeSeam('CLAUDE_CONFIG_DIR', env({ CLAUDE_CONFIG_DIR: undefined }), false, user)).toBe(false)
   })
   it('never on the user’s own home, however it is spelt (a junction to it too)', () => {
@@ -215,8 +215,17 @@ describe('a launch on a connection (connectionForLaunch)', () => {
     expect(await outcome(launch())).toMatch(/No Claude Code account is on in this workspace/)
   })
 
+  it('accounts there but all off here: refused saying they are off here, never to add one (HI-2650)', async () => {
+    const a = await signedInConnection('Personal', 'me@example.com')
+    await here(() => accounts.setAccountOn(a.id, false))
+    expect(await outcome(launch())).toBe("Claude Code's account, Personal, is off in this workspace. Turn one on with On here in Settings → Accounts & Connections, then start Builder again.")
+    const b = await signedInConnection('Work', 'work@example.com')
+    await here(() => accounts.setAccountOn(b.id, false))
+    expect(await outcome(launch())).toMatch(/^Claude Code's accounts, Personal and Work, are off in this workspace\./)
+  })
+
   it('with the seam on and none on here, the old launch (null: the CLI test home), and only then', async () => {
-    process.env.HIVE_TEST_CLI_HOME_CONNECTION = '1'
+    process.env.CW_TEST_CLI_HOME_CONNECTION = '1'
     try {
       expect(await launch()).toBeNull()
       const a = await signedInConnection('Personal', 'me@example.com')
@@ -224,7 +233,7 @@ describe('a launch on a connection (connectionForLaunch)', () => {
       expect(c?.id).toBe(a.id)
       c?.release()
     } finally {
-      delete process.env.HIVE_TEST_CLI_HOME_CONNECTION
+      delete process.env.CW_TEST_CLI_HOME_CONNECTION
     }
   })
 
@@ -280,7 +289,7 @@ describe('a launch on a connection (connectionForLaunch)', () => {
     rmSync(join(folder, 'projects'))
     renameSync(folder, `${folder}-real`)
     symlinkSync(home, folder, 'junction')
-    expect(await outcome(launch())).toMatch(/isn't the one Hive made/)
+    expect(await outcome(launch())).toMatch(/isn't the one Combwork made/)
     rmSync(folder)
   })
 
@@ -296,13 +305,13 @@ describe('a launch on a connection (connectionForLaunch)', () => {
     c2.release()
   })
 
-  it("waits for the order's one-time move at start (HI-1875 round 1): no launch and no new workspace on the order from before it", async () => {
+  it("waits for the order's one-time move at start (HI-1875 round 1): no launch on the order from before it; a new workspace starts with none on (HI-2650)", async () => {
     const a = await signedInConnection('Personal', 'me@example.com')
     const b = await signedInConnection('Work', 'work@example.com')
     // The most recently opened workspace's recorded default was Work, though Personal is first in the list.
     const recent = join(base, 'order-recent')
-    mkdirSync(join(recent, '.hive'), { recursive: true })
-    writeFileSync(join(recent, '.hive', 'workspace.json'), JSON.stringify({ version: 1, connections: { 'claude-code': { on: [a.id, b.id], default: b.id } } }))
+    mkdirSync(join(recent, '.combwork'), { recursive: true })
+    writeFileSync(join(recent, '.combwork', 'workspace.json'), JSON.stringify({ version: 1, connections: { 'claude-code': { on: [a.id, b.id], default: b.id } } }))
     const was = config.get().recentWorkspaces
     config.update((c) => {
       c.recentWorkspaces = [recent]
@@ -317,7 +326,7 @@ describe('a launch on a connection (connectionForLaunch)', () => {
     try {
       const ready = accounts.initConnections()
       await vi.waitFor(() => expect(reached).toBe(true), { timeout: HUNG_MS })
-      // Asked for while held: a launch with no connection of its own, and a new workspace's seeding.
+      // Asked for while held: a launch with no connection of its own, and a new workspace made.
       const launched = launch()
       mkdirSync(fresh, { recursive: true })
       w2 = createWorkspaceService()
@@ -329,15 +338,14 @@ describe('a launch on a connection (connectionForLaunch)', () => {
       expect(c.id).toBe(b.id)
       c.release()
       await opened
-      expect(JSON.parse(readFileSync(join(fresh, '.hive', 'workspace.json'), 'utf8')).connections).toEqual({ 'claude-code': { on: [b.id] } })
-      expect(accounts.hiveAccounts().map((x) => x.id)).toEqual([b.id, a.id])
+      // Nothing is turned on by itself (Darren, 6 Nov): the new workspace has no connections on.
+      expect(JSON.parse(readFileSync(join(fresh, '.combwork', 'workspace.json'), 'utf8')).connections).toBeUndefined()
+      expect(accounts.combworkAccounts().map((x) => x.id)).toEqual([b.id, a.id])
     } finally {
       accounts.accountTestHooks.beforeOrderRead = undefined
       release()
       if (w2) await disposeWorkspaceService(w2)
       config.update((c) => void (c.recentWorkspaces = was))
-      // initConnections set new workspaces' seeding (the top of the order on): the later tests' new workspaces start bare.
-      setNewWorkspaceExtras(async () => ({}))
     }
   })
 
@@ -382,7 +390,7 @@ describe('what is read from a connection’s home', () => {
   it('auto memory: every file the Memory tab lists opens and saves, by either path, and nothing else of the CLI’s home (HI-1999)', async () => {
     const a = await signedInConnection('Personal', 'me@example.com')
     const f = accounts.accountFolder(a.id)
-    // The connection's projects is Hive's junction to the CLI home's, where the list reads auto memory from.
+    // The connection's projects is Combwork's junction to the CLI home's, where the list reads auto memory from.
     expect(lstatSync(join(f, 'projects')).isSymbolicLink()).toBe(true)
     const project = join(wsPath, 'alpha')
     const key = encodeProjectPath(realpathSync(project))
@@ -575,7 +583,7 @@ describe('a choice saved while starting: the last look at its own choice, skills
     const b = await signedInConnection('Work', 'work@example.com')
     await here(() => updateAgent(alpha, 'a-one', { connection: a.id }))
     // The project's lock held, so the save of Work waits on it (queued), not yet written.
-    const file = join(alpha, '.hive', 'project.json')
+    const file = join(alpha, '.combwork', 'project.json')
     const lock = deferred()
     const holding = withFileLock(file, () => lock.p)
     const saving = here(() => updateAgent(alpha, 'a-one', { connection: b.id }))
@@ -607,8 +615,8 @@ describe('a choice saved while starting: the last look at its own choice, skills
     const b = await signedInConnection('Work', 'work@example.com')
     await here(() => updateAgent(alpha, 'a-one', { connection: a.id }))
     const ws2Path = join(base, 'ws-others')
-    mkdirSync(join(ws2Path, 'beta', '.hive'), { recursive: true })
-    writeFileSync(join(ws2Path, 'beta', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b-one', name: 'Beta One' }] }))
+    mkdirSync(join(ws2Path, 'beta', '.combwork'), { recursive: true })
+    writeFileSync(join(ws2Path, 'beta', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b-one', name: 'Beta One' }] }))
     const w2 = createWorkspaceService()
     await w2.open(ws2Path)
     try {
@@ -717,6 +725,38 @@ describe('a choice saved while starting: the last look at its own choice, skills
   })
 })
 
+describe('what a banner offers where none is on here (offHereChoice, HI-2650)', () => {
+  const acc = (id: string, cli: Account['provider'] = 'claude-code'): ConnectionsView['connections'][number] => ({ id, provider: cli, name: `Account ${id}`, createdAt: '', signingIn: false, folder: '' })
+  const view = (over: Partial<ConnectionsView> = {}): ConnectionsView => ({ providers: ['claude-code', 'codex'], connections: [], workspace: {}, testHome: [], order: [], homes: [], connectionRows: [], ...over })
+  const all: ReturnType<typeof cliReadyOf> = () => 'yes'
+  it('none at all: add one', () => {
+    expect(offHereChoice(view(), all)).toEqual({ kind: 'none' })
+    expect(offHereChoice(view(), all, 'claude-code')).toEqual({ kind: 'none', cli: 'claude-code' })
+  })
+  it('one off here: Turn On Here on it; on here, it is offered no more', () => {
+    expect(offHereChoice(view({ connections: [acc('a')], order: ['a'] }), all)).toEqual({ kind: 'one', id: 'a', name: 'Account a', cli: 'claude-code' })
+    expect(offHereChoice(view({ connections: [acc('a')], order: ['a'], workspace: { 'claude-code': { on: ['a'], default: 'a' } } }), all)).toEqual({ kind: 'none' })
+  })
+  it('several off here: Choose in Settings, named in the order; one CLI named only when all are its', () => {
+    expect(offHereChoice(view({ connections: [acc('a'), acc('b')], order: ['b', 'a'] }), all)).toEqual({ kind: 'several', names: ['Account b', 'Account a'], cli: 'claude-code' })
+    expect(offHereChoice(view({ connections: [acc('a'), acc('x', 'codex')], order: ['a', 'x'] }), all)).toEqual({ kind: 'several', names: ['Account a', 'Account x'] })
+  })
+  it("one per CLI, one CLI not installed: the installed one's, unless a CLI is asked for", () => {
+    const v = view({ connections: [acc('x', 'codex'), acc('a')], order: ['x', 'a'] })
+    const claudeOnly: ReturnType<typeof cliReadyOf> = (c) => (c === 'claude-code' ? 'yes' : 'no')
+    expect(offHereChoice(v, claudeOnly)).toMatchObject({ kind: 'one', id: 'a' })
+    expect(offHereChoice(v, claudeOnly, 'codex')).toMatchObject({ kind: 'one', id: 'x' })
+    // None installed: all of them.
+    expect(offHereChoice(v, () => 'no')).toMatchObject({ kind: 'several' })
+  })
+  it("never a CLI's own home, a CLI turned off in Settings, or a test copy's CLI on its test home", () => {
+    const cliHome = { ...acc('copilot', 'copilot'), home: 'cli' as const }
+    expect(offHereChoice(view({ connections: [acc('x', 'codex')], providers: ['claude-code'], order: ['x'] }), all)).toEqual({ kind: 'none' })
+    expect(offHereChoice(view({ connections: [acc('a')], testHome: ['claude-code'], order: ['a'] }), all)).toEqual({ kind: 'none' })
+    expect(offHereChoice(view({ homes: [cliHome], providers: ['claude-code', 'copilot'], order: ['copilot'] }), all)).toEqual({ kind: 'none' })
+  })
+})
+
 describe('what an agent row names (connectionOf, HI-1769; HI-2108: connections)', () => {
   const acc = (id: string, cli: Account['provider'] = 'claude-code'): ConnectionsView['connections'][number] => ({ id, provider: cli, name: `Account ${id}`, createdAt: '', signingIn: false, folder: '' })
   const row = (id: string, account: string): ConnectionsView['connectionRows'][number] => ({ id, account, name: `Name ${id}`, users: [] })
@@ -755,6 +795,21 @@ describe('what an agent row names (connectionOf, HI-1769; HI-2108: connections)'
     expect(launchedName(ran('a'))).toEqual({ id: 'a', name: 'Account a' })
     expect(launchedName(on('a', 'a2'))).toEqual({ id: 'a2', name: 'Name a2' })
   })
+  it('HI-2413: Switch Them switches by connection, as ⟳ marks it: another on the same account too; its own chosen again, no change', () => {
+    const on = (account: string, id: string) => ({ ...ran(account), connection: { id, name: `Name ${id}` } })
+    // Runs on a1; a2 (the same account) chosen now: due, as the window's ⟳ says.
+    expect(connectionSwitchDue(on('a', 'a1'), { connection: 'a', connectionId: 'a2' })).toBe(true)
+    expect(connectionOf('a2', 'claude-code', on('a', 'a1'), view())?.other).toBe(true)
+    // a1 chosen again (or another account's connection chosen, then a1 back): nothing to switch.
+    expect(connectionSwitchDue(on('a', 'a1'), { connection: 'a', connectionId: 'a1' })).toBe(false)
+    // Another account: due, as before.
+    expect(connectionSwitchDue(on('a', 'a1'), { connection: 'b', connectionId: 'b1' })).toBe(true)
+    // None usable now (`!<why>`): due, as before.
+    expect(connectionSwitchDue(on('a', 'a1'), { connection: '!none' })).toBe(true)
+    // A launch from before HI-2397 kept only its account: compared by account.
+    expect(connectionSwitchDue(ran('a'), { connection: 'a', connectionId: 'a2' })).toBe(false)
+    expect(connectionSwitchDue(ran('a'), { connection: 'b', connectionId: 'b1' })).toBe(true)
+  })
   it('nothing where connections aren’t shown: a CLI without them (or turned off), no view yet', () => {
     expect(connectionOf('a1', 'claude-code', undefined, view({ providers: [] }))).toBeNull()
     expect(connectionOf('x1', 'codex', undefined, view())).toBeNull()
@@ -781,7 +836,7 @@ describe('what an agent row names (connectionOf, HI-1769; HI-2108: connections)'
 
 describe('an agent’s own connection, checked with the write that saves it (HI-1769)', () => {
   const alpha = join(wsPath, 'alpha')
-  const projectJson = join(alpha, '.hive', 'project.json')
+  const projectJson = join(alpha, '.combwork', 'project.json')
   const agentsOf = async (p: string) => (await w.projectConfig(p)).agents
   const deferred = () => {
     let done!: () => void
@@ -858,7 +913,7 @@ describe('an agent’s own connection, checked with the write that saves it (HI-
 
 describe('templates’ connections (HI-1769; HI-2106: dropped as they are read; HI-2109: chosen when loaded)', () => {
   const gamma = join(wsPath, 'gamma')
-  const tplDir = join(wsPath, '.hive', 'templates')
+  const tplDir = join(wsPath, '.combwork', 'templates')
   /** A template from before HI-2106: T1 on Personal (its id), T2 on a connection this machine never had, T3 on none of its own. */
   function writeTemplate(file: string, personal: string) {
     mkdirSync(tplDir, { recursive: true })
@@ -941,7 +996,7 @@ describe('model, effort and context from the connection (HI-1770)', () => {
     const p = join(wsPath, 'mv1')
     await here(() => moves.ensureMigrated(p))
     const once = await w.projectConfig(p)
-    const file = JSON.parse(readFileSync(join(p, '.hive', 'project.json'), 'utf8'))
+    const file = JSON.parse(readFileSync(join(p, '.combwork', 'project.json'), 'utf8'))
     expect('providers' in file || 'defaultProvider' in file || 'model' in file).toBe(false)
     for (const x of file.agents) expect(Object.keys(x).filter((k) => ['model', 'effort', 'permissionMode', 'use200kContext'].includes(k))).toEqual([])
     // HI-1770's move as its launch would have made it, then the connection with what it launched with.
@@ -987,7 +1042,7 @@ describe('model, effort and context from the connection (HI-1770)', () => {
   it("a launch waits on the migration held on the project's lock, then starts with the agent's connection", async () => {
     await signedInConnection('Personal', 'me@example.com')
     const p = join(wsPath, 'mv3')
-    const file = join(p, '.hive', 'project.json')
+    const file = join(p, '.combwork', 'project.json')
     let release!: () => void
     const held = withFileLock(file, () => new Promise<void>((r) => (release = r)))
     const agent = (await w.projectConfig(p)).agents.find((a) => a.id === 'none')!
@@ -1074,14 +1129,14 @@ describe('model, effort and context from the connection (HI-1770)', () => {
   it("config.json that can't be saved: nothing published, the project's old fields kept and unmarked; the next run migrates", async () => {
     await signedInConnection('Personal', 'me@example.com')
     const p = join(wsPath, 'mv9')
-    const before = readFileSync(join(p, '.hive', 'project.json'), 'utf8')
+    const before = readFileSync(join(p, '.combwork', 'project.json'), 'utf8')
     const save = vi.spyOn(config, 'saveNow').mockResolvedValue(false)
     try {
       expect(await outcome(here(() => moves.ensureMigrated(p)))).toMatch(/config\.json couldn't be saved/)
     } finally {
       save.mockRestore()
     }
-    expect(readFileSync(join(p, '.hive', 'project.json'), 'utf8')).toBe(before)
+    expect(readFileSync(join(p, '.combwork', 'project.json'), 'utf8')).toBe(before)
     expect((await w.projectConfig(p)).migrations?.accounts1).toBeUndefined()
     await here(() => moves.ensureMigrated(p))
     expect(await savedConnection(p, 'none')).toMatchObject({ model: 'haiku', effort: 'high' })
@@ -1159,11 +1214,11 @@ describe('model, effort and context from the connection (HI-1770)', () => {
     expect(here(() => accounts.accountsView()).intro).toBeUndefined()
     // Not for a test copy on its CLI test home (the seam): nothing to set up there.
     config.update((c) => void delete c.ui.connectionsIntroShown)
-    process.env.HIVE_TEST_CLI_HOME_CONNECTION = '1'
+    process.env.CW_TEST_CLI_HOME_CONNECTION = '1'
     try {
       expect(here(() => accounts.accountsView()).intro).toBeUndefined()
     } finally {
-      delete process.env.HIVE_TEST_CLI_HOME_CONNECTION
+      delete process.env.CW_TEST_CLI_HOME_CONNECTION
     }
   })
 })
@@ -1237,7 +1292,7 @@ describe('the Agent API and connections (HI-1771)', () => {
   it('a change of CLI racing a start (by provider alone, and by a connection on another CLI): refused under the lock, the agent unchanged', async () => {
     await signedInConnection('Personal', 'me@example.com')
     const p = join(wsPath, 'api1')
-    const file = join(p, '.hive', 'project.json')
+    const file = join(p, '.combwork', 'project.json')
     const enabled = config.settings.providers.codex.enabled
     config.settings.providers.codex.enabled = true
     try {
@@ -1270,7 +1325,7 @@ describe('the Agent API and connections (HI-1771)', () => {
   it('a change of CLI decided from the agent read before the write: changed meanwhile, refused whole', async () => {
     const p = join(wsPath, 'api1')
     await here(() => moves.ensureMigrated(p))
-    const file = join(p, '.hive', 'project.json')
+    const file = join(p, '.combwork', 'project.json')
     let release!: () => void
     const held = withFileLock(file, () => new Promise<void>((r) => (release = r)))
     const saving = here(() => updateAgent(p, 'k', { provider: 'codex' }))
@@ -1344,20 +1399,20 @@ describe('connections as Settings → Accounts & Connections changes them (HI-21
     const a = await signedInConnection('Personal', 'me@example.com')
     const c = accounts.addConnection(a.id, { name: 'Used' })
     const p = join(wsPath, 'cr1')
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, migrations: { accounts1: { at: '' } }, agents: [{ id: 'u1', name: 'Builder', provider: 'claude-code', connection: c.id }] }))
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, migrations: { accounts1: { at: '' } }, agents: [{ id: 'u1', name: 'Builder', provider: 'claude-code', connection: c.id }] }))
     try {
       await w.refresh()
       expect(accounts.connectionUsers().get(c.id)).toEqual([{ projectPath: expect.any(String), project: 'cr1', agentId: 'u1', agent: 'Builder' }])
       const row = here(() => accounts.accountsView()).connectionRows.find((r) => r.id === c.id)
       expect(row?.users.map((u) => u.agent)).toEqual(['Builder'])
       expect(await outcome(Promise.resolve().then(() => accounts.removeConnection(c.id)))).toMatch(/Still in use, so Used was kept: Builder \(cr1\)/)
-      writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, migrations: { accounts1: { at: '' } }, agents: [] }))
+      writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, migrations: { accounts1: { at: '' } }, agents: [] }))
       await w.refresh()
       await accounts.removeConnection(c.id)
       expect(accounts.getConnection(c.id)).toBeUndefined()
     } finally {
-      writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+      writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     }
     // One order for every CLI (decision A): a Codex account moved above Claude Code's.
     const x = await accounts.addAccount('codex', 'Codex One')
@@ -1369,16 +1424,16 @@ describe('connections as Settings → Accounts & Connections changes them (HI-21
 
   describe("remove reads each project's agents as saved, under the lock their writes take (HR1, round 1)", () => {
     const p = join(wsPath, 'cr2')
-    const file = join(p, '.hive', 'project.json')
+    const file = join(p, '.combwork', 'project.json')
     // Its own project id in every write (HI-2130): one written without it is given one by the workspace's id check (the
     // root watch's, or any projectIds read), which takes this file's lock, a third waiter in the queue these cases count.
     const id = 'p-2130c0ffee02'
     const agentOn = (connection?: string) => ({ version: 2, id, migrations: { accounts1: { at: '' } }, agents: [{ id: 'g1', name: 'Gamma', provider: 'claude-code', ...(connection ? { connection } : {}) }] })
     beforeAll(async () => {
-      mkdirSync(join(p, '.hive'), { recursive: true })
+      mkdirSync(join(p, '.combwork'), { recursive: true })
       writeFileSync(file, JSON.stringify(agentOn()))
       await w.refresh()
-      // As Hive's start sets it (initConnections).
+      // As Combwork's start sets it (initConnections).
       setConnectionGuard(accounts.connectionAssignable)
     })
     afterAll(() => writeFileSync(file, JSON.stringify({ version: 2, id, agents: [] })))
@@ -1450,11 +1505,11 @@ describe('connections as Settings → Accounts & Connections changes them (HI-21
 
   it('extra arguments with a bare "--" are refused before anything is saved; --option=-- is kept (HR1, round 1)', async () => {
     const a = await signedInConnection('Personal', 'me@example.com')
-    expect(await outcome(Promise.resolve().then(() => accounts.addConnection(a.id, { name: 'Dashes', extraArgs: '--verbose -- task' })))).toMatch(/Hive passes the task after "--"/)
+    expect(await outcome(Promise.resolve().then(() => accounts.addConnection(a.id, { name: 'Dashes', extraArgs: '--verbose -- task' })))).toMatch(/Combwork passes the task after "--"/)
     expect(accounts.allConnections().some((c) => c.name === 'Dashes')).toBe(false)
     const first = baseOf(a.id)
     const was = structuredClone(accounts.getConnection(first))
-    expect(await outcome(Promise.resolve().then(() => accounts.updateConnection(first, { extraArgs: '--' })))).toMatch(/Hive passes the task after "--"/)
+    expect(await outcome(Promise.resolve().then(() => accounts.updateConnection(first, { extraArgs: '--' })))).toMatch(/Combwork passes the task after "--"/)
     expect(accounts.getConnection(first)).toEqual(was)
     expect(accounts.updateConnection(first, { extraArgs: '--append-system-prompt=--' }).extraArgs).toBe('--append-system-prompt=--')
   })

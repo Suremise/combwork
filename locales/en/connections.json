@@ -27,6 +27,10 @@
     "defaultMessage": "{name} (its account is off here: its CLI's first usable connection runs it)",
     "description": "A choice of connection that is chosen but on an account turned off in this workspace ({name}: the connection's name) (HI-2108): the agent runs on its CLI's first usable connection instead."
   },
+  "connections.choice.offHereAll": {
+    "defaultMessage": "No account is on in this workspace: {n, plural, one {{names} is off here.} other {{names} are off here.}} Turn one on with On here in Settings → Accounts & Connections.",
+    "description": "Under the choice of connection (HI-2650) when no account is on in this workspace but some exist, all off here. {names}: their names, joined (\"Work and Personal\"); {n}: how many. On here is the switch on each account's row in Settings → Accounts & Connections."
+  },
   "connections.choice.pick": {
     "defaultMessage": "Choose a connection",
     "description": "The first choice of connection when none is chosen yet (HI-2108)."
@@ -48,8 +52,8 @@
     "description": "The one-time connections banner's button: hides it for good."
   },
   "connections.intro.text": {
-    "defaultMessage": "Agents now run on accounts: add one for {clis} in Settings → Accounts & Connections and sign it in there. Hive no longer uses the sign-in of your own terminal, which stays as it is.",
-    "description": "A one-time banner in the main window (HI-1774; HI-2108): coding agents now each run on an account (a sign-in Hive keeps, Settings → Accounts & Connections) and none has been added yet. {clis} names the coding agent CLIs, joined (\"Claude Code and Codex\")."
+    "defaultMessage": "Agents now run on accounts: add one for {clis} in Settings → Accounts & Connections and sign it in there. Combwork no longer uses the sign-in of your own terminal, which stays as it is.",
+    "description": "A one-time banner in the main window (HI-1774; HI-2108): coding agents now each run on an account (a sign-in Combwork keeps, Settings → Accounts & Connections) and none has been added yet. {clis} names the coding agent CLIs, joined (\"Claude Code and Codex\")."
   },
   "connections.mark.anotherMark": {
     "defaultMessage": "Running on another connection than the one chosen",

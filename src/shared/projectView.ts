@@ -1,9 +1,9 @@
 import type { ProjectConfig, ProjectView } from './types'
 
 /**
- * A project's view fields (HI-1749, Darren's decision on it): how this user left its Session tab, kept in Hive's own UI
+ * A project's view fields (HI-1749, Darren's decision on it): how this user left its Session tab, kept in Combwork's own UI
  * state (AppConfig.ui.projectViews), never in project.json, which holds the project's config. A view switch then writes no
- * project file, so nothing holding project.json (another program, a slow write of Hive's own) can make it fail.
+ * project file, so nothing holding project.json (another program, a slow write of Combwork's own) can make it fail.
  */
 export const VIEW_KEYS = ['sessionView', 'layout', 'placement'] as const satisfies readonly (keyof ProjectView)[]
 

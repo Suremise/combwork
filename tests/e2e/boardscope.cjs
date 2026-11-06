@@ -3,7 +3,7 @@
 // the request says about who is calling; other projects' cards answer as if they didn't exist, and a linked one
 // shows as a number. Nor can it read another project's agents' conversations (activity, sessions), where a card
 // started on an agent is its prompt, or type into, hand over, start or stop them (HI-2327). The workspace token (scripts) still sees all of it. The agent is the fake Claude Code;
-// the calls are made with its token as its hive tools would. Dev build, throwaway profile, workspace and
+// the calls are made with its token as its Combwork tools would. Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -11,6 +11,7 @@ const fs = require('fs')
 const path = require('path')
 
 const PORT = Number(lib.port(47907))
+const HUNG_MS = 10000 // The existing stream wait limit, stated explicitly as a bound for a hung run.
 const userData = path.join(lib.WORK, 'boardscope-profile')
 const ws = path.join(lib.WORK, 'boardscope-ws')
 const claudeHome = path.join(lib.WORK, 'boardscope-claude-home')
@@ -42,13 +43,13 @@ const until = async (fn, ms = 10000) => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, allowSessionInput: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1300, height: 800 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('alpha', { exact: true }).first().click()
   const agent = await lib.addAgent(inv, alpha, { name: 'Alfie' })
@@ -62,7 +63,7 @@ const until = async (fn, ms = 10000) => {
   const n = { A1: await make('A1', 'alpha'), B1: await make('B1', 'beta'), A2: await make('A2', 'alpha'), B2: await make('B2', 'beta'), W: await make('W', '') }
   await inv('tasks:update', n.A2, { links: [n.B1] })
 
-  // The agent's token: the one its hive tools read (from --mcp-config), and the one in its environment.
+  // The agent's token: the one its Combwork tools read (from --mcp-config), and the one in its environment.
   // Its own launch line (by its session id), not the file's last: another launch of the fake can be written after it.
   const sessionId = (await live())?.sessionId
   // The fake appends one JSON line per launch: only complete lines (ended by a newline) are read, so a read while the
@@ -78,17 +79,17 @@ const until = async (fn, ms = 10000) => {
       }
     })
   }
-  // How long its launch line may take to appear once Hive shows it ready: generous, for a loaded machine.
+  // How long its launch line may take to appear once Combwork shows it ready: generous, for a loaded machine.
   const LAUNCH_RECORD_MS = 20000
   const launch = await until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), LAUNCH_RECORD_MS)
   const mcpServers = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers : {}
-  check('the agent launched with the hive MCP server', !!mcpServers.hive, JSON.stringify({ sessionId, launch: !!launch, servers: Object.keys(mcpServers), api: await inv('api:info').then((i) => ({ enabled: i.enabled, running: i.running, url: i.url, error: i.error })) }))
-  if (!mcpServers.hive) throw new Error('no hive server in the launch: the rest needs its token')
-  const mcpEnv = mcpServers.hive.env
-  const agentToken = JSON.parse(fs.readFileSync(mcpEnv.HIVE_API_TOKEN_FILE, 'utf8')).token
+  check('the agent launched with the Combwork MCP server', !!mcpServers.combwork, JSON.stringify({ sessionId, launch: !!launch, servers: Object.keys(mcpServers), api: await inv('api:info').then((i) => ({ enabled: i.enabled, running: i.running, url: i.url, error: i.error })) }))
+  if (!mcpServers.combwork) throw new Error('no Combwork MCP server in the launch: the rest needs its token')
+  const mcpEnv = mcpServers.combwork.env
+  const agentToken = JSON.parse(fs.readFileSync(mcpEnv.CW_API_TOKEN_FILE, 'utf8')).token
   const workspaceToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
   check('the agent has a token of its own', !!agentToken && agentToken !== workspaceToken)
-  check("its environment names its token's file, not the token (HI-2262)", launch.token === agentToken && !('HIVE_API_TOKEN' in launch.env) && launch.env.HIVE_API_TOKEN_FILE === mcpEnv.HIVE_API_TOKEN_FILE, JSON.stringify(launch.env))
+  check("its environment names its token's file, not the token (HI-2262)", launch.token === agentToken && !('CW_API_TOKEN' in launch.env) && launch.env.CW_API_TOKEN_FILE === mcpEnv.CW_API_TOKEN_FILE, JSON.stringify(launch.env))
   const call = async (token, method, p, body) => {
     const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
     return { status: res.status, body: await res.json().catch(() => null) }
@@ -160,6 +161,14 @@ const until = async (fn, ms = 10000) => {
   check("another project's latest comment: not found, and nothing of it", r.status === 404 && !JSON.stringify(r.body).includes('BETA'), JSON.stringify(r))
   r = await call(workspaceToken, 'GET', `/v1/tasks/${n.B1}/comments/latest`)
   check('the workspace token reads it', r.status === 200 && r.body.comment?.text === 'BETA SECRET COMMENT', JSON.stringify(r))
+  // A card's archived comments (HI-2641): read as the card is, so another project's is as if it didn't exist.
+  r = await as('GET', `/v1/tasks/${n.B1}/comments/archived`)
+  const none = await as('GET', '/v1/tasks/999/comments/archived')
+  check("another project's comment archive: not found, the same answer as a missing card's", r.status === 404 && r.body?.error === `Unknown task #${n.B1}` && none.status === 404 && none.body?.error === 'Unknown task #999', JSON.stringify({ r, none }))
+  r = await as('GET', `/v1/tasks/${n.A1}/comments/archived`)
+  check('its own card\'s archive: read, empty', r.status === 200 && r.body.total === 0 && r.body.comments.length === 0 && !('next' in r.body), JSON.stringify(r))
+  r = await call(workspaceToken, 'GET', `/v1/tasks/${n.B1}/comments/archived`)
+  check("the workspace token reads beta's", r.status === 200 && r.body.total === 0, JSON.stringify(r))
   r = await as('PATCH', `/v1/tasks/${n.A1}`, { project: 'beta' })
   check('moving its card to another project is refused', r.status === 403, JSON.stringify(r))
   r = await as('GET', `/v1/tasks/${n.A2}`)
@@ -173,7 +182,7 @@ const until = async (fn, ms = 10000) => {
   r = await as('PATCH', `/v1/tasks/${n.A2}`, { before: n.B2 })
   check('placing before another project\'s card is refused', r.status === 400 && /no card/.test(r.body?.error), JSON.stringify(r))
 
-  // --- Its hive tools (the fake's "boardmove") use the same token: its own card moves, beta's doesn't.
+  // --- Its Combwork tools (the fake's "boardmove") use the same token: its own card moves, beta's doesn't.
   const before = fs.existsSync(path.join(claudeHome, 'fake-calls.jsonl')) ? fs.readFileSync(path.join(claudeHome, 'fake-calls.jsonl'), 'utf8').split('\n').filter(Boolean).length : 0
   await inv('pty:write', lib.ptyKey(alpha, agent.id), `boardmove ${n.A2} doing boardmove ${n.B2} doing`)
   await lib.sleep(100)
@@ -181,7 +190,7 @@ const until = async (fn, ms = 10000) => {
   await until(async () => (await live())?.status === 'finished', 15000)
   const calls = fs.readFileSync(path.join(claudeHome, 'fake-calls.jsonl'), 'utf8').split('\n').filter(Boolean).slice(before).map((l) => JSON.parse(l))
   // The fake makes one call per prompt (the first boardmove); a second prompt tries beta's.
-  check("through its hive tools' path: its card moves", calls[0]?.status === 200 && (await inv('tasks:list')).find((c) => c.number === n.A2).column === 'doing', JSON.stringify(calls))
+  check("through its Combwork tools' path: its card moves", calls[0]?.status === 200 && (await inv('tasks:list')).find((c) => c.number === n.A2).column === 'doing', JSON.stringify(calls))
   await inv('pty:write', lib.ptyKey(alpha, agent.id), `boardmove ${n.B2} doing`)
   await lib.sleep(100)
   await inv('pty:write', lib.ptyKey(alpha, agent.id), '\r')
@@ -203,6 +212,8 @@ const until = async (fn, ms = 10000) => {
           if (done) break
           got.text += Buffer.from(value).toString('utf8')
         }
+        // Ended by Combwork (not by stop(), whose abort rejects the read instead).
+        got.done = true
       })
       .catch(() => undefined)
     got.stop = () => ctl.abort()
@@ -264,7 +275,7 @@ const until = async (fn, ms = 10000) => {
   check("…and carries nothing of beta's sessions", !agentStream.text.includes(betaPath) && !agentStream.text.includes('PRIVATE'), agentStream.text.slice(0, 400))
   check("the workspace token's stream has beta's sessions too", scriptStream.text.includes(betaPath) && scriptStream.text.includes(alphaPath), scriptStream.text.slice(0, 200))
 
-  // --- Skills: another project's own skills are its agents' business; the workspace's Hive skills are everyone's.
+  // --- Skills: another project's own skills are its agents' business; the workspace's Combwork skills are everyone's.
   fs.mkdirSync(path.join(beta, '.claude', 'skills', 'beta-secret'), { recursive: true })
   fs.writeFileSync(path.join(beta, '.claude', 'skills', 'beta-secret', 'SKILL.md'), '---\nname: beta-secret\ndescription: PRIVATE beta skill.\n---\n')
   r = await as('GET', '/v1/skills?project=beta')
@@ -272,9 +283,9 @@ const until = async (fn, ms = 10000) => {
   r = await call(workspaceToken, 'GET', '/v1/skills?project=beta')
   check("…the workspace token can, and listings carry no folder paths", r.status === 200 && r.body.some((s) => s.name === 'beta-secret') && !JSON.stringify(r.body).includes(JSON.stringify(ws).slice(1, -1)), JSON.stringify(r).slice(0, 300))
   r = await as('GET', '/v1/skills?project=alpha')
-  check('its own project\'s skills are open to it', r.status === 200 && r.body.some((s) => s.name === 'work-on-card' && s.level === 'hive'), JSON.stringify(r).slice(0, 300))
+  check('its own project\'s skills are open to it', r.status === 200 && r.body.some((s) => s.name === 'work-on-card' && s.level === 'combwork'), JSON.stringify(r).slice(0, 300))
   r = await as('GET', '/v1/status')
-  check('the status says who it is to Hive', r.status === 200 && r.body.caller?.role === 'agent' && r.body.caller.project === 'alpha' && r.body.caller.agent === 'Alfie' && r.body.api?.version >= 2, JSON.stringify(r.body?.caller))
+  check('the status says who it is to Combwork', r.status === 200 && r.body.caller?.role === 'agent' && r.body.caller.project === 'alpha' && r.body.caller.agent === 'Alfie' && r.body.api?.version >= 2, JSON.stringify(r.body?.caller))
 
   // --- Another agent's card in Doing is its work in progress: Alfie can't move it on (409), even taking it in the same
   // change; the workspace token (a script, as the user's board) can.
@@ -299,11 +310,21 @@ const until = async (fn, ms = 10000) => {
   r = await as('POST', `/v1/projects/alpha/stop?agent=${encodeURIComponent(alma.id)}`)
   check('…and stops it', r.status === 200 && !!(await until(async () => !(await almaLive()), 10000)), JSON.stringify(r))
 
-  // --- Once the agent stops, its token stops working.
+  // --- Once the agent stops, its token stops working, and an event stream it opened ends (HI-2416), as a revoked
+  // viewer's does; one with the workspace token stays open.
+  const endsWith = listen(agentToken)
+  const staysOpen = listen(workspaceToken)
+  check('a stream opened with its token before it stops is open', !!(await until(async () => endsWith.status === 200 && endsWith.text.includes(': connected'), HUNG_MS)), `${endsWith.status}`)
+  await until(async () => staysOpen.status === 200, HUNG_MS)
   await inv('session:stop', alpha, agent.id).catch(() => undefined)
   await until(async () => !(await live()), 10000)
   r = await as('GET', '/v1/tasks')
   check('its token ends with it', r.status === 401, JSON.stringify(r))
+  check('…and so does the stream it opened (HI-2416)', !!(await until(async () => endsWith.done, HUNG_MS)), endsWith.text.slice(-200))
+  check("…the workspace token's stream stays open", !staysOpen.done)
+  r = await fetch(`http://127.0.0.1:${PORT}/v1/events`, { headers: { Authorization: `Bearer ${agentToken}` } })
+  check('…and a new stream with its token is refused', r.status === 401, String(r.status))
+  staysOpen.stop()
 
   await app.close()
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')

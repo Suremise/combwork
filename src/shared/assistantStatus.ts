@@ -5,10 +5,10 @@ import { columnName } from './tasks'
 import type { LiveSessionState } from './types'
 
 /**
- * The Assistant panel's status line (#312), from what Hive knows of its session: "Working", "Idle", "Waiting for you",
+ * The Assistant panel's status line (#312), from what Combwork knows of its session: "Working", "Idle", "Waiting for you",
  * "Waiting for #271, #273 → Review (watch until 22:22)". A card watch's cards are kept apart (`cards`, between `text`
  * and `after`) so each can be a chip that opens its card. `tone`: attention when it needs the user, busy while it works,
- * calm while it is idle or waits on cards or tasks, off when it isn't running. `approvals`: the titles of Hive's questions
+ * calm while it is idle or waits on cards or tasks, off when it isn't running. `approvals`: the titles of Combwork's questions
  * its actions wait on (stopping a busy agent…), shown under the line: waiting for the user's answer comes first, over
  * working, idle and a card watch; sign-in and an error keep their words, with it added.
  *
@@ -26,9 +26,9 @@ const CARDS = '\u0001'
 
 const M = {
   notRunning: msg({ id: 'assistant.status.notRunning', defaultMessage: 'Not running', description: "The Assistant panel's status line (after \"Status:\"): its session isn't running." }),
-  approval: msg({ id: 'assistant.status.approval', defaultMessage: 'Waiting for your approval: {title}', description: "The Assistant panel's status line: an action of the Assistant waits for the user's answer to one of Hive's questions ({title}: the question, e.g. \"Stop a busy agent?\")." }),
-  approvals: msg({ id: 'assistant.status.approvals', defaultMessage: '{n, plural, one {Waiting for your approval (# question)} other {Waiting for your approval (# questions)}}', description: "The Assistant panel's status line: its actions wait for the user's answers to {n} of Hive's questions (always two or more)." }),
-  untaken: msg({ id: 'assistant.status.untaken', defaultMessage: "A line Hive typed wasn't taken: press Enter in its terminal", description: "The Assistant panel's status line: a line Hive typed into the Assistant's terminal is still waiting there; the user presses Enter in it." }),
+  approval: msg({ id: 'assistant.status.approval', defaultMessage: 'Waiting for your approval: {title}', description: "The Assistant panel's status line: an action of the Assistant waits for the user's answer to one of Combwork's questions ({title}: the question, e.g. \"Stop a busy agent?\")." }),
+  approvals: msg({ id: 'assistant.status.approvals', defaultMessage: '{n, plural, one {Waiting for your approval (# question)} other {Waiting for your approval (# questions)}}', description: "The Assistant panel's status line: its actions wait for the user's answers to {n} of Combwork's questions (always two or more)." }),
+  untaken: msg({ id: 'assistant.status.untaken', defaultMessage: "A line Combwork typed wasn't taken: press Enter in its terminal", description: "The Assistant panel's status line: a line Combwork typed into the Assistant's terminal is still waiting there; the user presses Enter in it." }),
   waiting: msg({ id: 'assistant.status.waiting', defaultMessage: 'Waiting for you', description: "The Assistant panel's status line: it asks the user something, or a permission." }),
   signin: msg({ id: 'assistant.status.signin', defaultMessage: 'Waiting for you to sign in', description: "The Assistant panel's status line: its CLI needs the user to sign in." }),
   error: msg({ id: 'assistant.status.error', defaultMessage: '{message, select, none {Error} other {Error: {message}}}', description: "The Assistant panel's status line: its CLI failed, with what it said ({message}; none: nothing said, leave the colon out)." }),
@@ -40,7 +40,7 @@ const M = {
   starting: msg({ id: 'assistant.status.starting', defaultMessage: 'Starting…', description: "The Assistant panel's status line: its session is starting." }),
   working: msg({ id: 'assistant.status.working', defaultMessage: 'Working', description: "The Assistant panel's status line: it is working on a turn." }),
   idle: msg({ id: 'assistant.status.idle', defaultMessage: '{n, plural, =0 {Idle} one {Idle · # background task running} other {Idle · # background tasks running}}', description: "The Assistant panel's status line: its turn has ended, with {n} background tasks it started still running (0: none)." }),
-  also: msg({ id: 'assistant.status.also', defaultMessage: '{line} · {also, select, approval {waiting for your approval} other {has a question for you}}', description: "The Assistant panel's status line ({line}: what it is doing) with the user also wanted: one of Hive's questions waits for their answer (approval), or the Assistant asked them something it works on through." })
+  also: msg({ id: 'assistant.status.also', defaultMessage: '{line} · {also, select, approval {waiting for your approval} other {has a question for you}}', description: "The Assistant panel's status line ({line}: what it is doing) with the user also wanted: one of Combwork's questions waits for their answer (approval), or the Assistant asked them something it works on through." })
 }
 
 export function assistantStatusLine(live: Pick<LiveSessionState, 'status' | 'statusMessage' | 'statusText' | 'backgroundTasks' | 'question' | 'watch' | 'untakenLine'> | null | undefined, time: (iso: string) => string, approvals: readonly string[] = []): AssistantStatusLine {
@@ -54,7 +54,7 @@ export function assistantStatusLine(live: Pick<LiveSessionState, 'status' | 'sta
   // A wake it didn't take (#430): the user presses Enter in its terminal.
   if (live.untakenLine) return line(tr(M.untaken), 'attention')
   const n = live.backgroundTasks ?? 0
-  // Hive's own words in the language shown (#847), or the CLI's as they came.
+  // Combwork's own words in the language shown (#847), or the CLI's as they came.
   const said = shownStatusMessage(live)
   const base = ((): AssistantStatusLine => {
     switch (live.status) {

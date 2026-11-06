@@ -1,9 +1,10 @@
 // Generated from locales/en/workspace.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
-interface HiveMessageValues {
+interface CombworkMessageValues {
   'workspace.activity.activity': undefined
   'workspace.activity.assistant': undefined
   'workspace.activity.board': undefined
+  'workspace.activity.dialects': undefined
   'workspace.activity.docs': undefined
   'workspace.activity.forYou': { n: number }
   'workspace.activity.mcp': undefined
@@ -75,9 +76,9 @@ interface HiveMessageValues {
   'workspace.antivirus.realTimeOn': undefined
   'workspace.antivirus.refused': { error: string | number }
   'workspace.antivirus.reminder': { why: string | number }
+  'workspace.antivirus.removeCombwork': undefined
   'workspace.antivirus.removeConfirm': undefined
   'workspace.antivirus.removeDetail': undefined
-  'workspace.antivirus.removeHive': undefined
   'workspace.antivirus.removeMessage': undefined
   'workspace.antivirus.removeTitle': undefined
   'workspace.antivirus.removed': { count: number }
@@ -570,10 +571,10 @@ interface HiveMessageValues {
   'workspace.unused.lostDetached': { count: number }
   'workspace.unused.lostFiles': { count: number; path: string | number }
   'workspace.unused.lostIgnored': undefined
-  'workspace.unused.madeByHive': undefined
+  'workspace.unused.madeByCombwork': undefined
   'workspace.unused.merged': { into: string | number }
   'workspace.unused.notChecked': undefined
-  'workspace.unused.notMadeByHive': undefined
+  'workspace.unused.notMadeByCombwork': undefined
   'workspace.unused.pickMerged': undefined
   'workspace.unused.pickNotChecked': undefined
   'workspace.unused.pickWork': undefined

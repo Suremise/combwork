@@ -1,4 +1,4 @@
-// A folder being changed under its agents (#646, main/folderFence.ts): while a fence is up nothing of Hive's is typed into
+// A folder being changed under its agents (#646, main/folderFence.ts): while a fence is up nothing of Combwork's is typed into
 // an agent working in that folder or inside it (lineWriter, so every delivery), and it is free again once what it guards
 // settles, also when that fails. With the real SessionManager's live state and the line writer; nothing is typed.
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -11,7 +11,7 @@ const id = 'a1'
 const live = (sessions as unknown as { live: Map<string, unknown> }).live
 const key = `${project.toLowerCase()}#${id}`
 
-describe("a folder being changed holds Hive's lines to the agents working in it (#646)", () => {
+describe("a folder being changed holds Combwork's lines to the agents working in it (#646)", () => {
   afterEach(() => live.delete(key))
   const idleIn = (cwd: string): void => {
     live.set(key, { state: { projectPath: project, agentId: id, agentName: 'B1', runId: 'run1', status: 'ready', cwd, runtime: { lifecycle: 'running', maintenance: null, attention: null, composer: 'free' }, turn: { state: 'over' } }, prompts: 0 })
@@ -66,7 +66,7 @@ describe("a folder being changed holds Hive's lines to the agents working in it 
       })
       await started
       let ended = false
-      const confirmed = writer.confirmTaken(project, id, { runId: 'run1', count: 0 }, '[Hive] line').finally(() => (ended = true))
+      const confirmed = writer.confirmTaken(project, id, { runId: 'run1', count: 0 }, '[CW] line').finally(() => (ended = true))
       // Its first window passes with the line not taken; then it waits on the folder, pressing nothing.
       await vi.waitFor(() => expect(writer.confirmsInFlight()).toBe(1), { timeout: 5000 })
       await new Promise<void>((r) => setTimeout(r, 200)) // on purpose: well past its 50 ms window, to see no Enter comes

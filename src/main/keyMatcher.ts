@@ -14,7 +14,7 @@ import { setKeyMasker } from '../shared/redact'
  * whitespace in any of its forms, so none of it can pass. `none` (no key was ever saved): nothing to mask.
  *
  * maskKeys is plugged into shared/redact.ts's maskSecrets (the developer console, its recordings and flight captures,
- * Copy Diagnostics, transcript views) and hive.log's line (logger.ts logLine); the exports mask what they write with it.
+ * Copy Diagnostics, transcript views) and combwork.log's line (logger.ts logLine); the exports mask what they write with it.
  */
 
 export const FRAGMENT = 8
@@ -62,7 +62,7 @@ function topOf(s: MatchSecret): number {
   return p
 }
 
-/** The ways a key is written where Hive may meet it: as it is, JSON-escaped once and twice, URL-encoded. */
+/** The ways a key is written where Combwork may meet it: as it is, JSON-escaped once and twice, URL-encoded. */
 function forms(key: string): string[] {
   const once = JSON.stringify(key).slice(1, -1)
   const twice = JSON.stringify(once).slice(1, -1)

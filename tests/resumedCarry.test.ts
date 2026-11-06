@@ -40,11 +40,11 @@ async function setup(name: string) {
   const wsPath = join(base, name, 'ws')
   const project = join(wsPath, 'alpha')
   gitRepo(project)
-  commit(project, { '.gitignore': '.hive/\n', 'a.txt': 'a\n' }, 'first')
+  commit(project, { '.gitignore': '.combwork/\n', 'a.txt': 'a\n' }, 'first')
   const builder = (id: string) => ({ id, name: id.toUpperCase(), provider: 'claude-code', workflowRole: 'builder' })
-  const write = (id: string): void => writeFileSync(join(project, '.hive', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, id, agents: [builder('b1'), builder('b2')] }))
+  const write = (id: string): void => writeFileSync(join(project, '.combwork', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, id, agents: [builder('b1'), builder('b2')] }))
   const ws: Ws = createWorkspaceService()
-  mkdirSync(join(project, '.hive'), { recursive: true })
+  mkdirSync(join(project, '.combwork'), { recursive: true })
   write('p1')
   await ws.open(wsPath)
   const projectId = (await ws.projectConfig(project)).id ?? 'p1'
@@ -76,7 +76,7 @@ async function setup(name: string) {
     const x = await card('X', 'b1')
     const r = await start(x, 'b1')
     if (!r || !('lease' in r)) throw new Error(`no slot for X: ${JSON.stringify(r)}`)
-    const line = `hive/x-${x}`
+    const line = `cw/x-${x}`
     sh(r.folder, 'switch', '-q', '-c', line)
     commit(r.folder, { 'x.txt': 'x\n' }, 'X: work not merged')
     before?.(r.folder, line)
@@ -183,7 +183,7 @@ describe("a slot B1's Resume took, then B1's lane starts (HB3's sequence)", () =
     // files would change): the slot is the operation's until it ends.
     let open!: (why: string) => void
     const gate = new Promise<string>((res) => (open = res))
-    const prep = t.pool.prepare(b1.carried, { line: 'hive/elsewhere', base: 'main', install: false, ready: () => gate })
+    const prep = t.pool.prepare(b1.carried, { line: 'cw/elsewhere', base: 'main', install: false, ready: () => gate })
     await vi.waitFor(() => expect(t.pool.slots().find((s) => s.name === b1.slot)?.op).toBeTruthy(), { timeout: HUNG_MS })
     const got = await t.lane()
     expect('slot' in got && got.slot).not.toBe(b1.slot)
@@ -217,7 +217,7 @@ describe("the retirement's retry goes with its workspace", () => {
     const b1 = await t.resumedB1()
     let open!: (why: string) => void
     const gate = new Promise<string>((res) => (open = res))
-    const prep = t.pool.prepare(b1.carried, { line: 'hive/elsewhere', base: 'main', install: false, ready: () => gate })
+    const prep = t.pool.prepare(b1.carried, { line: 'cw/elsewhere', base: 'main', install: false, ready: () => gate })
     await vi.waitFor(() => expect(t.pool.slots().find((s) => s.name === b1.slot)?.op).toBeTruthy(), { timeout: HUNG_MS })
     await t.lane()
     expect(retireWaitOf(t.wsPath, t.project)).toEqual({ tries: 1, waiting: true })
@@ -246,7 +246,7 @@ describe("a carried lease's origin (SlotStore.resumedCarry), whatever the timest
     // An adopted worktree: its slot made with its carried lease (carry on a slot the pool hasn't got), the only lease
     // since; an older card's lease under the same name, before the slot was made, doesn't count.
     const folder = join(t.wsPath, '..', 'adopted')
-    sh(t.project, 'worktree', 'add', '-q', '-b', 'hive/hb2', folder)
+    sh(t.project, 'worktree', 'add', '-q', '-b', 'cw/hb2', folder)
     const adopted = (await t.pool.carry('b2', { name: 'hb2', folder }))!
     expect(adopted).toMatchObject({ kind: 'carried', slot: 'hb2' })
     expect(t.store.resumedCarry(adopted)).toBe(false)

@@ -3,7 +3,8 @@
 // agent not running, two columns chosen: shown one at a time there, #1037) stay inside it: nothing of the main area is under the pointer anywhere over
 // the sidebar, the Assistant or Progress, and the empty state's first button can still be reached by scrolling it into
 // view. Assistant on the left and the right, both themes, 100% and 125%. Dev build, throwaway profile and workspace,
-// the fake Claude Code (the Assistant's); quiet.
+// the fake Claude Code (the Assistant's); quiet. Then in German (HI-2536), two stopped agents' panes side by side at
+// 900 px and 1400 px keep New Session and Resume without a sideways scrollbar, wrapping them where they don't fit.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
@@ -25,13 +26,13 @@ const check = (name, ok, extra = '') => {
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
   for (const p of [alpha, beta]) lib.gitProject(p)
   const claude = lib.fakeClaude(userData, path.join(lib.WORK, 'narrowmain-claude-home'), [ws])
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47936), ...claude })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47936), ...claude })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   // beta: one agent, never started, two columns chosen (its second pane empty where there is room for two).
   await lib.addAgent(inv, beta, { name: 'Coder' })
@@ -249,8 +250,47 @@ const check = (name, ok, extra = '') => {
   check('roomy: "No agents yet" is on top, with no empty pane over it', shown.title === 'No agents yet' && shown.onTop && shown.placeholders === 0, JSON.stringify(shown))
   check('…with its explanation', await explanation())
   await page.screenshot({ path: path.join(lib.WORK, 'narrowmain-roomy.png') })
+  // For the German panes below: a second agent for beta, and the Assistant and Progress panels closed, as the window
+  // HI-2536 was found in.
+  await lib.addAgent(inv, beta, { name: 'Reviewer' })
+  await inv('ui:setPane', `assistant-open:${ws.toLowerCase()}`, 0)
+  await inv('ui:setPane', `progress-open:${ws.toLowerCase()}`, 0)
 
   await app.close()
+
+  // German, two stopped agents in two columns (HI-2536): "Neue Sitzung" and the split "Fortsetzen" are wider than
+  // English, and at 900 px their row made a sideways scrollbar under each pane. They wrap instead: no placeholder
+  // scrolls sideways, at 900 px and 1400 px, in both themes.
+  const de = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47936), ...claude, CW_LANG: 'de' }) })
+  try {
+    const dpage = await de.firstWindow()
+    dpage.on('pageerror', (e) => check('German: no page errors', false, e.message))
+    await lib.fitWindow(de, dpage, { width: 900, height: 860 })
+    await lib.appReady(dpage)
+    const dinv = (ch, ...a) => dpage.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
+    await dpage.locator('.project-row', { hasText: 'beta' }).first().click()
+    const placeholders = () =>
+      dpage.evaluate(() =>
+        [...document.querySelectorAll('.pane-placeholder')]
+          .filter((e) => e.checkVisibility({ visibilityProperty: true }) && e.querySelector('.btns'))
+          .map((e) => ({ width: e.clientWidth, sideways: e.scrollWidth - e.clientWidth, label: e.querySelector('.act-start')?.textContent?.trim() ?? '' }))
+      )
+    let seen = []
+    const fits = async () => {
+      seen = await placeholders()
+      return seen.length === 2 && seen.every((x) => x.sideways <= 1 && /Neue Sitzung/.test(x.label))
+    }
+    for (const width of [900, 1400]) {
+      await lib.fitWindow(de, dpage, { width, height: 860 })
+      for (const theme of ['light', 'dark']) {
+        await dinv('settings:update', { appearance: { theme } })
+        check(`German, ${width} px, ${theme}: both stopped agents' panes keep their buttons without a sideways scrollbar`, !!(await lib.until(fits, HUNG_MS, 150)), JSON.stringify(seen))
+        await dpage.screenshot({ path: path.join(lib.WORK, `narrowmain-de-panes-${width}-${theme}.png`) })
+      }
+    }
+  } finally {
+    await de.close()
+  }
   if (failed) console.log(`${failed} failed`)
   process.exit(failed ? 1 : 0)
 })().catch((e) => {

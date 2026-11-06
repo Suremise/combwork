@@ -1,0 +1,8 @@
+{
+  "freshResume.confirm": "Empezar una conversación nueva",
+  "freshResume.detail": "{assistant, select, yes {El Asistente empieza una conversación nueva en su lugar, y la anterior se conserva en sus conversaciones para leerla.} other {{agent} empieza una conversación nueva en su lugar. Continúa el trabajo del agente (su vigilancia, mensajes y tareas), y la conversación anterior se conserva en Sesiones para leerla.}}",
+  "freshResume.message": "{why, select, moved {Esta conversación se ejecutó en una carpeta que se movió a .combwork con su carpeta de datos antigua, así que no puede continuar allí.} other {Esta conversación empezó antes de que Combwork cambiara el nombre de las herramientas que usan los agentes, así que no puede continuar.}}",
+  "freshResume.short": "empieza una conversación nueva",
+  "freshResume.tip": "{why, select, moved {Empieza una conversación nueva: «{session}» se ejecutó en una carpeta que se movió a .combwork con su carpeta de datos antigua, así que no puede continuar} other {Empieza una conversación nueva: «{session}» es de antes de que Combwork cambiara el nombre de las herramientas que usan los agentes, así que no puede continuar}}",
+  "freshResume.title": "¿Empezar una conversación nueva?"
+}

@@ -1,24 +1,24 @@
 // MCP catalogues (HI-545): catalog.json v1 checked as the mcp project's validator checks it; this PC's requirements
 // (met, not met, or not checkable); search and filters. Downloads keep to their source's scheme at every redirect and
 // to one size and time budget; a zip is used only if its size and sha256 match; the cache stays bounded. Install is
-// #550's Add (added nowhere, Hive's provenance kept out of launches); Update keeps the places shown, the user's env
+// #550's Add (added nowhere, Combwork's provenance kept out of launches); Update keeps the places shown, the user's env
 // values too, and writes nothing when the definition or the places changed meanwhile, or a project can't be read; a
 // workspace closed during a download gets nothing. Each case has a workspace of its own; the catalogues are file://.
-import { mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { createHash } from 'crypto'
 import { join } from 'path'
 import { pathToFileURL } from 'url'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { strToU8, zipSync } from 'fflate'
 import * as electron from 'electron'
-import { catalogRowShown, checkRequirements, compareVersions, editionOf, readCatalog, type PcFacts } from '../src/shared/mcpCatalog'
+import { OUR_CATALOG_URL, catalogRowShown, isOurCatalogUrl, sameCatalogSource, checkRequirements, compareVersions, editionOf, readCatalog, type PcFacts } from '../src/shared/mcpCatalog'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-mcp-catalog-')
+const base = tempDir('cw-mcp-catalog-')
 const profile = join(base, 'profile')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => profile
-process.env.HIVE_USER_DATA = profile
-process.env.HIVE_TEST_CLI_HOME_CONNECTION = '1'
+process.env.CW_USER_DATA = profile
+process.env.CW_TEST_CLI_HOME_CONNECTION = '1'
 process.env.CODEX_HOME = join(base, 'codex-home')
 process.env.COPILOT_HOME = join(base, 'copilot-home')
 
@@ -35,8 +35,8 @@ const words = (kind: string, value: string): string => `${kind}:${value}`
 
 describe('catalog.json v1 (HI-545)', () => {
   it('reads a valid catalogue and ignores unknown fields', () => {
-    const c = readCatalog({ schemaVersion: 1, name: 'Suremise/hive-mcp', extra: true, servers: [{ ...entry(), future: 1 }] }, 'https://example.com/catalog.json')
-    expect(c).toMatchObject({ name: 'Suremise/hive-mcp', skipped: 0 })
+    const c = readCatalog({ schemaVersion: 1, name: 'Suremise/combwork-mcp', extra: true, servers: [{ ...entry(), future: 1 }] }, 'https://example.com/catalog.json')
+    expect(c).toMatchObject({ name: 'Suremise/combwork-mcp', skipped: 0 })
     expect(c.servers.map((s) => s.name)).toEqual(['demo'])
     expect('future' in c.servers[0]).toBe(false)
   })
@@ -126,7 +126,7 @@ describe('downloads (HI-545/s17)', () => {
   })
 
   it('holds a file:// download to the same end and time budget (HI-545 round 1)', async () => {
-    const d = tempDir('hive-mcp-catalog-file-')
+    const d = tempDir('cw-mcp-catalog-file-')
     writeFileSync(join(d, 'demo.zip'), 'bytes')
     const url = pathToFileURL(join(d, 'demo.zip')).href
     expect((await catalog.download(url, 'file', 100, 5000))!.bytes.toString()).toBe('bytes')
@@ -151,23 +151,24 @@ describe('downloads (HI-545/s17)', () => {
 
 describe('installing and updating (HI-545)', () => {
   const trashDir = join(base, 'trash')
-  const wasTrash = process.env.HIVE_TEST_TRASH_DIR
+  const wasTrash = process.env.CW_TEST_TRASH_DIR
   let wsPath: string
-  let amber: string
+  let ambrosia: string
   let apiary: string
   let share: string
   let w: ReturnType<typeof createWorkspaceService>
   const run = <T>(fn: () => Promise<T> | T): Promise<T> => inWorkspace(w, async () => fn())
-  const mcpDir = (): string => join(wsPath, '.hive', 'mcp')
-  const projectMcp = (p: string) => JSON.parse(readFileSync(join(p, '.hive', 'project.json'), 'utf8')).mcp
+  const mcpDir = (): string => join(wsPath, '.combwork', 'mcp')
+  const projectMcp = (p: string) => JSON.parse(readFileSync(join(p, '.combwork', 'project.json'), 'utf8')).mcp
   const agent = { id: 'a1', name: 'Builder', provider: 'claude-code' }
   const launched = async (p: string) => run(async () => (await sessions.effective(p, agent as never)).mcpServers)
   const source = (): string => pathToFileURL(join(share, 'catalog.json')).href
 
   /** Publishes demo at `version` to the share: its zip (running `script`, with `env`) and the catalogue listing it. */
-  const publish = (version: string, script = 'server.js', env: Record<string, string> = { DEMO_TOKEN: '${DEMO_TOKEN}' }, o: { folder?: string; size?: number; sha?: string } = {}): void => {
-    const def = { description: 'A demo server', command: 'node', args: [`\${HIVE_MCP_DIR}/demo/${script}`], env }
-    const zip = zipSync({ [`${o.folder ?? 'demo'}/hive-mcp.json`]: strToU8(JSON.stringify(def)), [`${o.folder ?? 'demo'}/${script}`]: strToU8(`// demo ${version}`) })
+  const publish = (version: string, script = 'server.js', env: Record<string, string> = { DEMO_TOKEN: '${DEMO_TOKEN}' }, o: { folder?: string; size?: number; sha?: string; other?: boolean } = {}): void => {
+    // Combwork's names (HI-2503); with other, names Combwork doesn't read (HI-2594).
+    const def = { description: 'A demo server', command: 'node', args: [`\${${o.other ? 'OTHER' : 'CW'}_MCP_DIR}/demo/${script}`], env }
+    const zip = zipSync({ [`${o.folder ?? 'demo'}/${o.other ? 'other' : 'combwork'}-mcp.json`]: strToU8(JSON.stringify(def)), [`${o.folder ?? 'demo'}/${script}`]: strToU8(`// demo ${version}`) })
     writeFileSync(join(share, `demo-${version}.zip`), zip)
     const server = entry({ version, requires: { os: ['windows', 'macos', 'linux'] }, zip: { url: pathToFileURL(join(share, `demo-${version}.zip`)).href, sha256: o.sha ?? sha(zip), size: o.size ?? zip.length } })
     writeFileSync(join(share, 'catalog.json'), JSON.stringify({ schemaVersion: 1, name: 'Test catalogue', servers: [server, entry({ name: 'needs-mac', requires: { os: ['macos'] }, zip: server.zip })] }))
@@ -190,21 +191,21 @@ describe('installing and updating (HI-545)', () => {
   }
 
   beforeAll(() => {
-    process.env.HIVE_TEST_TRASH_DIR = trashDir
+    process.env.CW_TEST_TRASH_DIR = trashDir
   })
   afterAll(() => {
-    if (wasTrash === undefined) delete process.env.HIVE_TEST_TRASH_DIR
-    else process.env.HIVE_TEST_TRASH_DIR = wasTrash
+    if (wasTrash === undefined) delete process.env.CW_TEST_TRASH_DIR
+    else process.env.CW_TEST_TRASH_DIR = wasTrash
   })
   beforeEach(async () => {
-    wsPath = tempDir('hive-mcp-catalog-ws-')
-    share = tempDir('hive-mcp-catalog-share-')
-    amber = join(wsPath, 'amberlight')
+    wsPath = tempDir('cw-mcp-catalog-ws-')
+    share = tempDir('cw-mcp-catalog-share-')
+    ambrosia = join(wsPath, 'ambrosia')
     apiary = join(wsPath, 'apiary')
     mkdirSync(mcpDir(), { recursive: true })
-    for (const p of [amber, apiary]) {
-      mkdirSync(join(p, '.hive'), { recursive: true })
-      writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [agent], mcp: { disabled: [], enabled: [], model: 3 } }))
+    for (const p of [ambrosia, apiary]) {
+      mkdirSync(join(p, '.combwork'), { recursive: true })
+      writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [agent], mcp: { disabled: [], enabled: [], model: 3 } }))
     }
     catalog.testHooks.facts = PC
     publish('1.0.0')
@@ -221,7 +222,7 @@ describe('installing and updating (HI-545)', () => {
     await disposeWorkspaceService(w)
   })
 
-  it('lists a source as a category, with the note for a source Hive doesn\'t check, until noted', async () => {
+  it('lists a source as a category, with the note for a source Combwork doesn\'t check, until noted', async () => {
     const [p] = await pages()
     expect(p).toMatchObject({ name: 'Test catalogue', ours: false, noteDue: true, total: 2, skipped: 0 })
     expect(p.rows.find((r) => r.name === 'needs-mac')!.checks[0].state).toBe('no')
@@ -236,8 +237,8 @@ describe('installing and updating (HI-545)', () => {
     expect(m).toMatchObject({ projects: [], assistant: false })
     expect(readFileSync(join(mcpDir(), 'demo', 'server.js'), 'utf8')).toBe('// demo 1.0.0')
     expect(await row()).toMatchObject({ installed: '1.0.0', update: false })
-    await addTo(amber)
-    const def = (await launched(amber)).demo
+    await addTo(ambrosia)
+    const def = (await launched(ambrosia)).demo
     expect(def?.args?.[0]).toMatch(/demo[\\/]server\.js$/)
     expect('catalog' in (def ?? {})).toBe(false)
   })
@@ -255,32 +256,51 @@ describe('installing and updating (HI-545)', () => {
 
   it('updates keeping the places shown and the user\'s env values, and is offered only for a higher version', async () => {
     await install()
-    await addTo(amber)
+    await addTo(ambrosia)
     // The user's own value for its token.
     const file = join(mcpDir(), 'demo.json')
     writeFileSync(file, JSON.stringify({ ...JSON.parse(readFileSync(file, 'utf8')), env: { DEMO_TOKEN: 'mine' } }, null, 2))
     publish('1.1.0', 'server2.js', { DEMO_TOKEN: '${DEMO_TOKEN}', NEW_KEY: 'x' })
     expect(await row()).toMatchObject({ installed: '1.0.0', update: true })
     const u = await prepareUpdate()
-    expect(u.places).toEqual({ projects: [amber], assistant: false })
+    expect(u.places).toEqual({ projects: [ambrosia], assistant: false })
     expect(await run(() => catalog.updateCatalogServer(u.p.id, u.shown, u.places))).toEqual({})
-    const def = (await launched(amber)).demo
+    const def = (await launched(ambrosia)).demo
     expect(def?.args?.[0]).toMatch(/server2\.js$/)
     expect(def?.env).toEqual({ DEMO_TOKEN: 'mine', NEW_KEY: 'x' })
-    expect(projectMcp(amber).enabled).toEqual(['demo'])
+    expect(projectMcp(ambrosia).enabled).toEqual(['demo'])
     expect(await row()).toMatchObject({ installed: '1.1.0', update: false })
+  })
+
+  it("installs and runs a zip with Combwork's names, updating it from the same folder; a zip with only the old names has no definition (HI-2594)", async () => {
+    await install()
+    await addTo(ambrosia)
+    const folder = join(mcpDir(), 'demo').replace(/\\/g, '/')
+    expect((await launched(ambrosia)).demo?.args?.[0]).toBe(`${folder}/server.js`)
+    publish('1.1.0', 'server2.js')
+    expect(await row()).toMatchObject({ installed: '1.0.0', update: true })
+    const u = await prepareUpdate()
+    expect(await run(() => catalog.updateCatalogServer(u.p.id, u.shown, u.places))).toEqual({})
+    expect(JSON.parse(readFileSync(join(mcpDir(), 'demo.json'), 'utf8')).args).toEqual(['${CW_MCP_DIR}/demo/server2.js'])
+    expect(readdirSync(join(mcpDir(), 'demo'))).toEqual(['server2.js'])
+    expect((await launched(ambrosia)).demo?.args?.[0]).toBe(`${folder}/server2.js`)
+    // other-mcp.json, a name Combwork doesn't read: refused, and nothing written.
+    publish('1.2.0', 'server3.js', undefined, { other: true })
+    await pages()
+    await expect(run(() => catalog.prepareCatalogServer(source(), 'demo'))).rejects.toThrow('No combwork-mcp.json or combwork-mcp.example.json found')
+    expect(readdirSync(join(mcpDir(), 'demo'))).toEqual(['server2.js'])
   })
 
   it('writes nothing when a place is removed or added, or the definition edited, while the update waits; nothing is re-added', async () => {
     await install()
-    await addTo(amber)
+    await addTo(ambrosia)
     publish('1.1.0', 'server2.js')
     await pages()
-    // Removed meanwhile: refused, and amberlight isn't given it back.
+    // Removed meanwhile: refused, and ambrosia isn't given it back.
     let u = await prepareUpdate()
-    await run(() => mcp.removeMcpFrom({ project: amber }, 'demo'))
+    await run(() => mcp.removeMcpFrom({ project: ambrosia }, 'demo'))
     expect((await run(() => catalog.updateCatalogServer(u.p.id, u.shown, u.places))).stale).toContain('Where demo is added changed while the update waited')
-    expect(projectMcp(amber).enabled).toEqual([])
+    expect(projectMcp(ambrosia).enabled).toEqual([])
     expect(readFileSync(join(mcpDir(), 'demo.json'), 'utf8')).toContain('server.js')
     // Added meanwhile: refused, so apiary never runs a definition it wasn't shown.
     u = await prepareUpdate()
@@ -297,16 +317,16 @@ describe('installing and updating (HI-545)', () => {
 
   it("refuses an update while a project's settings are partway through a save, writing nothing", async () => {
     await install()
-    await addTo(amber)
+    await addTo(ambrosia)
     publish('1.1.0', 'server2.js')
     await pages()
     const u = await prepareUpdate()
-    const settings = join(amber, '.hive', 'project.json')
+    const settings = join(ambrosia, '.combwork', 'project.json')
     const saved = readFileSync(settings, 'utf8')
     writeFileSync(settings, '{')
-    await expect(run(() => catalog.updateCatalogServer(u.p.id, u.shown, u.places))).rejects.toThrow("Couldn't read the settings of amberlight")
+    await expect(run(() => catalog.updateCatalogServer(u.p.id, u.shown, u.places))).rejects.toThrow("Couldn't read the settings of ambrosia")
     writeFileSync(settings, saved)
-    expect((await launched(amber)).demo?.args?.[0]).toMatch(/demo[\\/]server\.js$/)
+    expect((await launched(ambrosia)).demo?.args?.[0]).toMatch(/demo[\\/]server\.js$/)
   })
 
   it('gives a workspace closed during the download nothing, and drops what it held', async () => {
@@ -323,7 +343,7 @@ describe('installing and updating (HI-545)', () => {
   it('lists every source, each with its servers, on refresh and in a search after it, and keeps the cache bounded (HI-545 round 1)', async () => {
     const urls: string[] = []
     for (let i = 0; i < 12; i++) {
-      const d = tempDir('hive-mcp-catalog-src-')
+      const d = tempDir('cw-mcp-catalog-src-')
       writeFileSync(join(d, 'catalog.json'), JSON.stringify({ schemaVersion: 1, name: `Source ${i}`, servers: [entry({ description: `The demo of source ${i}` })] }))
       urls.push(pathToFileURL(join(d, 'catalog.json')).href)
     }
@@ -366,7 +386,8 @@ describe('installing and updating (HI-545)', () => {
     await run(() => catalog.installCatalogServer(p.id, 'demo-cat', false))
     const m = (await run(() => mcp.listMcp(true))).find((x) => x.name === 'demo-cat')!
     expect(m.def?.catalog).toMatchObject({ name: 'demo', version: '1.0.0' })
-    expect(m.def?.args?.[0]).toBe('${HIVE_MCP_DIR}/demo-cat/server.js')
+    // The catalogue's ${CW_MCP_DIR} reference, moved to its name.
+    expect(m.def?.args?.[0]).toBe('${CW_MCP_DIR}/demo-cat/server.js')
     expect(readFileSync(join(mcpDir(), 'demo-cat', 'server.js'), 'utf8')).toBe('// demo 1.0.0')
     // The local demo is untouched; the catalogue row is installed (by its provenance), not "name in use".
     expect(JSON.parse(readFileSync(join(mcpDir(), 'demo.json'), 'utf8')).catalog).toBeUndefined()
@@ -376,7 +397,14 @@ describe('installing and updating (HI-545)', () => {
     const u = await prepareUpdate()
     expect(u.p.existing?.name).toBe('demo-cat')
     expect(await run(() => catalog.updateCatalogServer(u.p.id, u.shown, u.places))).toEqual({})
-    expect((await run(() => mcp.listMcp(true))).find((x) => x.name === 'demo-cat')?.def?.args?.[0]).toBe('${HIVE_MCP_DIR}/demo-cat/server2.js')
+    expect((await run(() => mcp.listMcp(true))).find((x) => x.name === 'demo-cat')?.def?.args?.[0]).toBe('${CW_MCP_DIR}/demo-cat/server2.js')
+  })
+
+  it("knows ours by its current address only: another repository's under the same owner (Suremise/demo-mcp) isn't ours (HI-2594)", () => {
+    const other = 'https://github.com/Suremise/demo-mcp/releases/latest/download/catalog.json'
+    expect(isOurCatalogUrl(OUR_CATALOG_URL)).toBe(true)
+    expect(isOurCatalogUrl(other)).toBe(false)
+    expect(sameCatalogSource(other, OUR_CATALOG_URL)).toBe(false)
   })
 
   it("shows a requirement whose probe failed or timed out as not checkable, never as met", async () => {

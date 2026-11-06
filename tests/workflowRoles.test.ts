@@ -10,7 +10,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { as09 } from './boardDb'
 
-const base = tempDir('hive-workflowroles-')
+const base = tempDir('cw-workflowroles-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -97,10 +97,10 @@ describe('its readers (#1430)', () => {
   async function upgraded(agents: { id: string; name: string; role?: string }[]): Promise<Record<string, any>> {
     const ws = join(base, `ws-${++n}`)
     const repo = join(ws, 'p')
-    mkdirSync(join(repo, '.hive'), { recursive: true })
-    mkdirSync(join(ws, '.hive'), { recursive: true })
+    mkdirSync(join(repo, '.combwork'), { recursive: true })
+    mkdirSync(join(ws, '.combwork'), { recursive: true })
     git(repo, 'init', '-q', '-b', 'main')
-    writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents }))
+    writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents }))
     const w0 = createWorkspaceService()
     await w0.open(ws)
     await store.boardWrite(w0, async () => undefined)
@@ -112,7 +112,7 @@ describe('its readers (#1430)', () => {
     opened.push(w)
     await inWorkspace(w, () => store.upgradeBoard(w))
     expect(await adoptNow(w)).toMatchObject({ configured: 1, failed: 0 })
-    return JSON.parse(readFileSync(join(repo, '.hive', 'project.json'), 'utf8'))
+    return JSON.parse(readFileSync(join(repo, '.combwork', 'project.json'), 'utf8'))
   }
 
   it('the upgrade reads HR-named agents as reviewers (a reviewer agent reviews), and writes no role on any agent', async () => {
@@ -127,7 +127,7 @@ describe('its readers (#1430)', () => {
   })
 })
 
-// #1531 (#1346 item 2): hive_project_status's pairs, so the Assistant doesn't guess which agent reviews whose work.
+// #1531 (#1346 item 2): cw_project_status's pairs, so the Assistant doesn't guess which agent reviews whose work.
 describe('builder and reviewer pairs', async () => {
   const { workflowPairs } = await import('../src/shared/workflow/roles')
   const lane = (id: string, builder: string, reviewer: string | null, state = 'active', pool = false) => ({ id, state, builder: { name: builder }, reviewer: reviewer ? { name: reviewer } : null, ...(pool ? { pool } : {}) })
@@ -146,7 +146,7 @@ describe('builder and reviewer pairs', async () => {
     expect(workflowPairs([{ name: 'Solo' }], [])).toEqual([])
   })
 
-  it("a running lane's pair carries its state as hive_lane list says it, the card it is on (HI-2271); pairs by name carry none", async () => {
+  it("a running lane's pair carries its state as cw_lane list says it, the card it is on (HI-2271); pairs by name carry none", async () => {
     const { laneStateText, laneLine } = await import('../src/shared/lanes')
     const card = (number: number, column: string, more: object = {}) => ({ number, title: `Card ${number}`, column, blocked: null, round: 1, reviewing: false, ...more })
     const info = (id: string, builder: string, reviewer: string, state: string, current: number | null, cards: object[], more: object = {}) => ({ id, project: 'alpha', name: null, builder: { id: builder, name: builder }, reviewer: { id: reviewer, name: reviewer }, cards, current, state, pausedOn: null, rounds: 10, waitMinutes: 360, status: null, ...more }) as never

@@ -6,7 +6,7 @@
 // removed worktree kept, + Add ▾ → Add Agent from Template (a taken name numbered), with the mouse, the keyboard and the
 // palette, and the toolbar's controls at narrow widths in both themes,
 // every one reachable, in the order Panes | Tiles, the summary chip, pages, layouts, + Add ▾ (#292), with one page and two. #702: agent names unique across the
-// workspace: Add Agent refuses another project's agent's name, offering one, and shows what hive/ in a branch means; a
+// workspace: Add Agent refuses another project's agent's name, offering one, and shows what cw/ in a branch means; a
 // template's load shows each name in the template beside a box for the agent's new name: a name another project's
 // agent has (or one used twice) is marked and Load template greyed out until it is changed; nothing is filled in. Agents run the fake Claude Code (fake-claude/). Dev build, throwaway profile,
 // workspace and CLAUDE_CONFIG_DIR; a quiet test copy.
@@ -53,13 +53,13 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47886), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47886), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1700, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await lib.waitForProvider(inv)
   const live = async (p, id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === p.toLowerCase() && s.agentId === id)
@@ -103,10 +103,10 @@ const check = (name, ok, extra = '') => {
   await lib.addAgent(inv, alpha, { name: 'Reviewer' })
   await inv('project:updateConfig', alpha, { layout: 'columns3' })
   await inv('workspace:refresh')
-  // With none of the user's yet, Add Agent from Template lists Hive's own (#1436), their agents named from the
+  // With none of the user's yet, Add Agent from Template lists Combwork's own (#1436), their agents named from the
   // project's key (alpha's: AL-B1).
   await lib.addMenuRun(page, 'Add Agent from Template')
-  check("Add Agent from Template with none saved yet lists Hive's own, named from the project's key", !!(await lib.until(async () => (await menuItems()).includes('AL-B1') && (await menuItems()).includes('AL-R6'), HUNG_MS)) && !(await menuItems()).some((n) => n.includes('{key}')), JSON.stringify(await menuItems()))
+  check("Add Agent from Template with none saved yet lists Combwork's own, named from the project's key", !!(await lib.until(async () => (await menuItems()).includes('AL-B1') && (await menuItems()).includes('AL-R6'), HUNG_MS)) && !(await menuItems()).some((n) => n.includes('{key}')), JSON.stringify(await menuItems()))
   // Escape closes the submenu, then + Add ▾'s own.
   await lib.until(async () => (await page.locator('.menu').count()) === 0 || void (await page.keyboard.press('Escape')), HUNG_MS)
   // …and following it works: + Add ▾ → Templates → Save Template…
@@ -116,7 +116,7 @@ const check = (name, ok, extra = '') => {
   await dialog.locator('input[type="checkbox"]').first().check()
   await page.screenshot({ path: path.join(lib.WORK, 'templates-1-save.png') })
   await dialog.getByRole('button', { name: 'Save', exact: true }).click()
-  const file = path.join(ws, '.hive', 'templates', 'pair.json')
+  const file = path.join(ws, '.combwork', 'templates', 'pair.json')
   check('Save Template… keeps the agents, roles and layout for the workspace', !!(await lib.until(async () => fs.existsSync(file), 5000)) && /"role": "builder"/.test(fs.readFileSync(file, 'utf8')) && /"layout": "columns3"/.test(fs.readFileSync(file, 'utf8')))
   check('without sessions, ids or paths', !/lastSessionId|"id"|templates-ws/.test(fs.readFileSync(file, 'utf8')))
   // The same name again: asks before replacing.
@@ -144,10 +144,10 @@ const check = (name, ok, extra = '') => {
   await loadMenu()
   check('Templates ▸ lists the workspace template', (await menuItems()).includes('pair'), JSON.stringify(await menuItems()))
   const shape = await page.evaluate(() => [...document.querySelector('.menu').children].slice(0, 3).map((el) => el.className.split(' ')[0] + ':' + el.textContent.trim()))
-  check("…after Save Template…, a separator and Hive's own (#1436)", shape[0] === 'menu-item:Save Template…' && shape[1] === 'menu-sep:' && shape[2] === "menu-header:Hive's templates", JSON.stringify(shape))
+  check("…after Save Template…, a separator and Combwork's own (#1436)", shape[0] === 'menu-item:Save Template…' && shape[1] === 'menu-sep:' && shape[2] === "menu-header:Combwork's templates", JSON.stringify(shape))
   // (Headers are upper-case by CSS.)
   const headers = (await page.locator('.menu .menu-header').allInnerTexts()).map((h) => h.toLowerCase())
-  check("…Hive's own, then the workspace's", JSON.stringify(headers) === JSON.stringify(["hive's templates", 'workspace templates']), JSON.stringify(headers))
+  check("…Combwork's own, then the workspace's", JSON.stringify(headers) === JSON.stringify(["combwork's templates", 'workspace templates']), JSON.stringify(headers))
   await item('pair').click()
   const blocked = page.locator('.dialog', { hasText: "Can't load" })
   await shown(blocked, 'blocked')
@@ -159,8 +159,8 @@ const check = (name, ok, extra = '') => {
 
   // A CLI it suggests that's off (HI-2109): only a suggestion, so never a refusal (the agents still run and their work is
   // still there here: it's those that refuse it).
-  fs.mkdirSync(path.join(ws, '.hive', 'templates'), { recursive: true })
-  fs.writeFileSync(path.join(ws, '.hive', 'templates', 'codex-pair.json'), JSON.stringify({ version: 2, name: 'Codex pair', savedAt: new Date().toISOString(), layout: 'auto', agents: [{ name: 'Coder', role: 'builder', provider: 'codex' }] }))
+  fs.mkdirSync(path.join(ws, '.combwork', 'templates'), { recursive: true })
+  fs.writeFileSync(path.join(ws, '.combwork', 'templates', 'codex-pair.json'), JSON.stringify({ version: 2, name: 'Codex pair', savedAt: new Date().toISOString(), layout: 'auto', agents: [{ name: 'Coder', role: 'builder', provider: 'codex' }] }))
   await loadMenu()
   await item('Codex pair').click()
   await shown(blocked, 'blocked')
@@ -206,7 +206,7 @@ const check = (name, ok, extra = '') => {
         })
       )
   const created = (d) => d.locator('.template-plan-table tbody tr[data-agent]:not([data-state="removed"])').evaluateAll((rows) => rows.map((r) => r.dataset.agent))
-  check('the warning lists who goes and who comes, in one table: the template\'s agents, then those removed', (await warn.locator('.template-plan-table tbody tr[data-state="removed"]').evaluateAll((l) => l.map((x) => x.dataset.agent))).join() === 'Old,Tree' && (await warn.locator('.template-plan-table tbody tr[data-agent]').evaluateAll((l) => l.map((x) => x.dataset.agent))).join() === 'Builder,Reviewer,Old,Tree' && (await warn.locator('.template-plan-removed, .template-plan h4').count()) === 0 && /^removed\b/.test(await removedLine(warn, 'Old')) && /its worktree and branch hive\/templates-ws\/beta\/tree stay/i.test(await removedLine(warn, 'Tree')) && (await created(warn)).join() === 'Builder,Reviewer' && /^Builder builder$/.test((await cells(warn, 'Builder'))[0]), JSON.stringify([await removedLine(warn, 'Tree'), await created(warn), await cells(warn, 'Builder')]))
+  check('the warning lists who goes and who comes, in one table: the template\'s agents, then those removed', (await warn.locator('.template-plan-table tbody tr[data-state="removed"]').evaluateAll((l) => l.map((x) => x.dataset.agent))).join() === 'Old,Tree' && (await warn.locator('.template-plan-table tbody tr[data-agent]').evaluateAll((l) => l.map((x) => x.dataset.agent))).join() === 'Builder,Reviewer,Old,Tree' && (await warn.locator('.template-plan-removed, .template-plan h4').count()) === 0 && /^removed\b/.test(await removedLine(warn, 'Old')) && /its worktree and branch cw\/templates-ws\/beta\/tree stay/i.test(await removedLine(warn, 'Tree')) && (await created(warn)).join() === 'Builder,Reviewer' && /^Builder builder$/.test((await cells(warn, 'Builder'))[0]), JSON.stringify([await removedLine(warn, 'Tree'), await created(warn), await cells(warn, 'Builder')]))
   // Shown in both themes, each screenshot once the window shows it (a condition, never a fixed wait).
   const themed = async (theme) => {
     await inv('settings:update', { appearance: { theme } })
@@ -237,7 +237,7 @@ const check = (name, ok, extra = '') => {
 
   // The warning gives each new agent's role in the workflow (its note, and the agent it's paired with: #1436), marks the
   // agents a new one of the same name replaces, and gives each new agent's settings. Cancelled: nothing made.
-  fs.writeFileSync(path.join(ws, '.hive', 'templates', 'trees.json'), JSON.stringify({ version: 2, name: 'Trees', savedAt: new Date().toISOString(), layout: 'columns2', agents: [{ name: 'Builder', role: 'builder', provider: 'claude-code', model: 'opus', effort: 'high' }, { name: 'Helper', role: 'reviewer', note: 'checks UI', provider: 'claude-code' }], pairs: [{ builder: 'Builder', reviewer: 'Helper' }] }))
+  fs.writeFileSync(path.join(ws, '.combwork', 'templates', 'trees.json'), JSON.stringify({ version: 2, name: 'Trees', savedAt: new Date().toISOString(), layout: 'columns2', agents: [{ name: 'Builder', role: 'builder', provider: 'claude-code', model: 'opus', effort: 'high' }, { name: 'Helper', role: 'reviewer', note: 'checks UI', provider: 'claude-code' }], pairs: [{ builder: 'Builder', reviewer: 'Helper' }] }))
   await inv('workspace:refresh')
   const branchesBeforeTrees = lib.git(beta, ['branch', '--list'])
   await loadMenu()
@@ -283,11 +283,11 @@ const check = (name, ok, extra = '') => {
   await themed('dark')
   await treesWarn.getByRole('button', { name: 'Cancel' }).click()
   check('cancelled: nothing changed', JSON.stringify(projectCfg(beta).agents.map((a) => a.name)) === '["Builder","Reviewer"]' && lib.git(beta, ['branch', '--list']) === branchesBeforeTrees)
-  fs.rmSync(path.join(ws, '.hive', 'templates', 'trees.json'))
+  fs.rmSync(path.join(ws, '.combwork', 'templates', 'trees.json'))
   // #511: twelve agents, builders and reviewers (as Darren's 6Bx6R): one row each, in the template's order; the table
   // scrolls down in its box and never sideways. Both themes. Cancelled.
   const twelve = ['HB1', 'HB2', 'HB3', 'HR1', 'HR2', 'HR3', 'HB4', 'HB5', 'HB6', 'HR4', 'HR5', 'HR6']
-  fs.writeFileSync(path.join(ws, '.hive', 'templates', 'twelve.json'), JSON.stringify({ version: 2, name: 'Twelve', savedAt: new Date().toISOString(), layout: 'grid', agents: twelve.map((name) => ({ name, role: name.startsWith('HB') ? 'builder' : 'reviewer', provider: 'claude-code' })) }))
+  fs.writeFileSync(path.join(ws, '.combwork', 'templates', 'twelve.json'), JSON.stringify({ version: 2, name: 'Twelve', savedAt: new Date().toISOString(), layout: 'grid', agents: twelve.map((name) => ({ name, role: name.startsWith('HB') ? 'builder' : 'reviewer', provider: 'claude-code' })) }))
   await inv('workspace:refresh')
   await loadMenu()
   await item('Twelve').click()
@@ -304,7 +304,7 @@ const check = (name, ok, extra = '') => {
   }
   await inv('settings:update', { appearance: { theme: 'dark' } })
   await twelveWarn.getByRole('button', { name: 'Cancel' }).click()
-  fs.rmSync(path.join(ws, '.hive', 'templates', 'twelve.json'))
+  fs.rmSync(path.join(ws, '.combwork', 'templates', 'twelve.json'))
 
   // --- + Add ▾ → Add Agent from Template (#975): one agent, the others left alone; Builder's name is taken, so "Builder 2".
   const addButton = strip.locator('.add-menu')
@@ -355,7 +355,7 @@ const check = (name, ok, extra = '') => {
   await lib.until(async () => (await menuItems()).includes('Reviewer'), 5000)
   const first = (await page.locator('.menu .menu-item:not(.disabled)').first().innerText()).split('\n')[0].trim()
   check('→ opens the template agents on the first one', (await active()) === first, `${await active()} / ${first}`)
-  // (Past Hive's own templates' agents first, #1436.)
+  // (Past Combwork's own templates' agents first, #1436.)
   for (let i = 0; i < 80 && (await active()) !== 'Reviewer'; i++) await page.keyboard.press('ArrowDown')
   check('→ opens the template agents, ↓ reaches Reviewer', (await active()) === 'Reviewer', await active())
   await page.keyboard.press('Enter')
@@ -448,8 +448,8 @@ const check = (name, ok, extra = '') => {
   await shown(dialog, 'dialog')
   await dialog.locator('input.input').fill('Alpha trees')
   await dialog.getByRole('button', { name: 'Save', exact: true }).click()
-  const alphaTrees = path.join(alpha, '.hive', 'templates', 'alpha-trees.json')
-  check("alpha's own template saved, its agents' roles and no worktree, path or branch", !!(await lib.until(async () => fs.existsSync(alphaTrees), 5000)) && /"name": "Tree",\s*"role": "builder"/.test(fs.readFileSync(alphaTrees, 'utf8')) && !/worktree|hive\/templates-ws/.test(fs.readFileSync(alphaTrees, 'utf8')))
+  const alphaTrees = path.join(alpha, '.combwork', 'templates', 'alpha-trees.json')
+  check("alpha's own template saved, its agents' roles and no worktree, path or branch", !!(await lib.until(async () => fs.existsSync(alphaTrees), 5000)) && /"name": "Tree",\s*"role": "builder"/.test(fs.readFileSync(alphaTrees, 'utf8')) && !/worktree|cw\/templates-ws/.test(fs.readFileSync(alphaTrees, 'utf8')))
   // alpha's Tree renamed after saving (its worktree stays), so the template's Tree is free in beta; its other two aren't.
   await inv('agents:update', alpha, srcTree.id, { name: 'Alpha tree' })
   const srcCfg = JSON.stringify(projectCfg(alpha).agents.find((a) => a.id === srcTree.id).worktree)

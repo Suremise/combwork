@@ -56,7 +56,7 @@ describe('card links: card numbers in terminal output (#440)', () => {
 })
 
 describe('card links: card keys in terminal output (#1221)', () => {
-  // The board: HI-12 is #40, AM-3 is #7; an old key HX of hive finds HI's cards.
+  // The board: HI-12 is #40, AM-3 is #7; an old key HX of that project finds HI's cards.
   const keys: Record<string, number> = { 'HI-12': 40, 'AM-3': 7, 'HX-12': 40 }
   const keyed = (text: string) => findCardRefs(text, (n) => n === 40, (k) => keys[k] ?? null).map((m) => [text.slice(m.start, m.end), m.number])
 

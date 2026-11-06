@@ -48,7 +48,7 @@ export function ProviderChoice({ value, current, onChange }: { value: ProviderId
   useLanguage()
   const settings = useStore((s) => s.settings)
   const providers = useStore((s) => s.providers)
-  // In Hive's order (HI-2139), the one Automatic picks first among them.
+  // In Combwork's order (HI-2139), the one Automatic picks first among them.
   const shown = PROVIDERS.filter((p) => isProviderEnabled(settings, p.id) || p.id === value || p.id === current)
   if (!shown.length) {
     return (
@@ -148,7 +148,7 @@ export function AddAgentDialog() {
     // Unique across the workspace (#702): numbered past every project's names.
     const everyone = workspaceAgentList(useStore.getState().workspace?.projects)
     let n = agents.length + 1
-    // A name, kept as the agent's (agents and the Agent API read it): English, as Hive names agents everywhere.
+    // A name, kept as the agent's (agents and the Agent API read it): English, as Combwork names agents everywhere.
     const named = (k: number): string => `Agent ${k}` // i18n-ignore: an agent's default name (stored, read by agents)
     while (everyone.some((a) => sameAgentName(a.name, named(n)))) n++
     setName(named(n))
@@ -224,8 +224,8 @@ export function AddAgentDialog() {
       wide
       footer={
         <>
-          <label className="flex muted" style={{ marginRight: 'auto' }} title={noAccount ? noAccountText() : undefined} data-start-now={noAccount ? 'no-account' : undefined}>
-            <input type="checkbox" className="checkbox" checked={startNow && !noAccount} disabled={noAccount} aria-description={noAccount ? noAccountText() : undefined} onChange={(e) => setStartNow(e.target.checked)} /> {tr(msg({ id: 'agents.add.startNow', defaultMessage: 'Start a session now', description: 'Checkbox in the Add Agent dialog: start the new agent at once.' }))}
+          <label className="flex muted" style={{ marginRight: 'auto' }} title={noAccount ? noAccountText(view, providers) : undefined} data-start-now={noAccount ? 'no-account' : undefined}>
+            <input type="checkbox" className="checkbox" checked={startNow && !noAccount} disabled={noAccount} aria-description={noAccount ? noAccountText(view, providers) : undefined} onChange={(e) => setStartNow(e.target.checked)} /> {tr(msg({ id: 'agents.add.startNow', defaultMessage: 'Start a session now', description: 'Checkbox in the Add Agent dialog: start the new agent at once.' }))}
             {noAccount && <span className="faint" data-start-now-why> — {tr(msg({ id: 'agents.add.noAccountStart', defaultMessage: 'No account is on here yet', description: "After Add Agent's \"Start a session now\", greyed out (HI-2127): why it can't start a session: no account (a sign-in or server a coding agent CLI uses) is on in this workspace. The agent can still be added, for later. Short." }))}</span>}
           </label>
           <button className="btn subtle" onClick={close}>
@@ -269,7 +269,7 @@ export function AddAgentDialog() {
         <ConnectionChoice id="add-agent-connection" value={connection} onChange={choose} onNew={setNewOn} />
         {!connection && ready.checking && (
           <div className="hint span2" data-connection-checking>
-            <Icon name="loading" spin /> {tr(msg({ id: 'agents.add.checkingConnection', defaultMessage: 'Finding out which coding agents are installed, to choose the first connection that can run…', description: 'Under the choice of connection in Add Agent (HI-2108) while Hive still looks for the installed coding agent CLIs: the first usable connection is chosen once it knows; Add waits until then.' }))}
+            <Icon name="loading" spin /> {tr(msg({ id: 'agents.add.checkingConnection', defaultMessage: 'Finding out which coding agents are installed, to choose the first connection that can run…', description: 'Under the choice of connection in Add Agent (HI-2108) while Combwork still looks for the installed coding agent CLIs: the first usable connection is chosen once it knows; Add waits until then.' }))}
           </div>
         )}
         <label htmlFor="add-agent-note">{tr(NOTE)}</label>
@@ -285,7 +285,7 @@ export function AddAgentDialog() {
       <McpChoice value={mcp} offered={mcpOffered} where="project" onChange={setMcp} />
       <h3 className="agent-dialog-h">{tr(msg({ id: 'agents.add.where', defaultMessage: 'Where it works', description: 'A heading in the Add Agent dialog, above where the new agent works.' }))}</h3>
       <div className="faint agent-dialog-note" data-where-note>
-        {tr(msg({ id: 'agents.add.whereNote', defaultMessage: "In the project folder. A builder takes one of the project's slots for each card it builds and works there until the card is done; Version Control → Branches & remotes lists them.", description: "The Add Agent dialog, under Where it works: agents have no worktree of their own (1.0); a builder works in a slot (a working folder Hive lends to a card) while it builds a card. Version Control → Branches & remotes: use their translated names. Glossary: slot." }))}
+        {tr(msg({ id: 'agents.add.whereNote', defaultMessage: "In the project folder. A builder takes one of the project's slots for each card it builds and works there until the card is done; Version Control → Branches & remotes lists them.", description: "The Add Agent dialog, under Where it works: agents have no worktree of their own (1.0); a builder works in a slot (a working folder Combwork lends to a card) while it builds a card. Version Control → Branches & remotes: use their translated names. Glossary: slot." }))}
       </div>
       {newOn && (
         <ConnectionDialog
@@ -324,6 +324,48 @@ interface AgentFields {
   mcp: string[] | null
   /** The connection it runs on (HI-2108): its id. A template's agent has none. */
   connection: string
+  /** Its Dialect setting (HI-2444): a file of its CLI's dialects folder, '' for Auto. A template's agent has none. */
+  dialect?: string
+}
+
+const DIALECT = {
+  label: msg({ id: 'agents.dialect.label', defaultMessage: 'Dialect', description: "Agent Settings (HI-2444): the choice of the dialect file that fills the agent's model slot. Glossary: dialect." }),
+  auto: msg({ id: 'agents.dialect.auto', defaultMessage: 'Auto (the file for the model it runs)', description: "Agent Settings' Dialect choice: Combwork picks the model file whose model ID is the one the agent runs. Glossary: dialect." }),
+  model: msg({ id: 'agents.dialect.model', defaultMessage: '{name} (model {model})', description: "Agent Settings' Dialect choice: a model file, {name}, for model ID {model}. Glossary: dialect." }),
+  copy: msg({ id: 'agents.dialect.copy', defaultMessage: '{name} (test copy)', description: "Agent Settings' Dialect choice: a test copy (a dialect file with no model), {name}, for trying wording on one agent. Glossary: test copy." }),
+  missing: msg({ id: 'agents.dialect.missing', defaultMessage: '{path} (not there: Auto is used)', description: "Agent Settings' Dialect choice: the file chosen before is gone, so the agent uses Auto. {path} is its path. Glossary: dialect." }),
+  hint: msg({ id: 'agents.dialect.hint', defaultMessage: "Which dialect file adjusts the wording Combwork gives this agent, over its CLI's and the workspace's. Pick a test copy to try a change on this agent alone.", description: "Under Agent Settings' Dialect choice (HI-2444). Glossary: dialect, test copy." })
+}
+
+/** Agent Settings' Dialect (HI-2444): Auto, or a file of the agent's CLI folder, read from the workspace's dialects. */
+function DialectChoice({ cli, value, onChange }: { cli: ProviderId; value: string; onChange: (v: string) => void }) {
+  const version = useStore((s) => s.dialectsVersion)
+  const [choices, setChoices] = useState<{ path: string; name: string; model?: string }[] | null>(null)
+  useEffect(() => {
+    let live = true
+    call('dialects:choices', cli)
+      .then((c) => live && setChoices(c))
+      .catch(() => live && setChoices([]))
+    return () => {
+      live = false
+    }
+  }, [cli, version])
+  const known = !value || !choices || choices.some((c) => c.path === value)
+  return (
+    <>
+      <label htmlFor="agent-dialect">{tr(DIALECT.label)}</label>
+      <select id="agent-dialect" className="input" data-agent-dialect value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value="">{tr(DIALECT.auto)}</option>
+        {(choices ?? []).map((c) => (
+          <option key={c.path} value={c.path}>
+            {c.model ? tr(DIALECT.model, { name: c.name, model: c.model }) : tr(DIALECT.copy, { name: c.name })}
+          </option>
+        ))}
+        {!known && <option value={value}>{tr(DIALECT.missing, { path: value })}</option>}
+      </select>
+      <div className="hint span2">{tr(DIALECT.hint)}</div>
+    </>
+  )
 }
 
 /**
@@ -380,7 +422,7 @@ function McpChoice({ value, offered, where, onChange }: { value: string[] | null
             ))}
           </div>
         ))}
-      <div className="faint">{tr(msg({ id: 'agents.mcp.noteAdded', defaultMessage: 'The built-in hive server is always given. A server added to the project later reaches it only with All.', description: "Under an agent's MCP servers (Agent Settings). hive is the built-in server's name: keep it. All is the first choice above (\"All of the project's\")." }))}</div>
+      <div className="faint">{tr(msg({ id: 'agents.mcp.noteAdded', defaultMessage: 'The built-in combwork server is always given. A server added to the project later reaches it only with All.', description: "Under an agent's MCP servers (Agent Settings). combwork is the built-in server's name: keep it. All is the first choice above (\"All of the project's\")." }))}</div>
     </div>
   )
 }
@@ -404,6 +446,7 @@ function AgentSettingsModal({
   mcpWhere,
   cliLocked,
   suggestOnly,
+  dialectCli,
   note,
   nameProblem,
   confirmSave,
@@ -419,6 +462,8 @@ function AgentSettingsModal({
   mcpWhere: 'project' | 'workspace'
   cliLocked?: { cli: ProviderId; why: ReactNode }
   suggestOnly?: boolean
+  /** A project's agent: the CLI whose dialect files its Dialect setting offers (HI-2444); none for a template's agent. */
+  dialectCli?: ProviderId
   note?: ReactNode
   nameProblem?: (name: string) => string | null
   confirmSave?: (f: AgentFields) => Promise<boolean>
@@ -486,6 +531,7 @@ function AgentSettingsModal({
         {/* Its connection holds its model, effort, context and mode; its CLI follows from it (HI-2108). */}
         {!suggestOnly && <ConnectionChoice id="agent-connection" value={f.connection} cli={cliLocked?.cli} onChange={(connection) => put({ connection })} onNew={setNewOn} />}
         {!suggestOnly && cliLocked && <div className="hint span2" data-cli-locked>{cliLocked.why}</div>}
+        {dialectCli && <DialectChoice cli={dialectCli} value={f.dialect ?? ''} onChange={(dialect) => put({ dialect })} />}
       </div>
       <WorkflowRoleChoice value={f.workflowRole} onChange={(workflowRole) => put({ workflowRole })} />
       {suggestOnly && (
@@ -530,7 +576,7 @@ export function AgentSettingsDialog() {
   const close = (): void => set({ agentSettingsFor: null })
   const own = legacyOf(agent)
   // Its role as it reads now (the guess, for an agent from before 1.0), stored once the user saves (#1430).
-  const initial: AgentFields = { name: agent.name, role: agent.role ?? '', workflowRole: agentWorkflowRole(agent), provider: current, mcp: agent.mcpServers ? [...agent.mcpServers] : null, connection: agent.connection ?? '' }
+  const initial: AgentFields = { name: agent.name, role: agent.role ?? '', workflowRole: agentWorkflowRole(agent), provider: current, mcp: agent.mcpServers ? [...agent.mcpServers] : null, connection: agent.connection ?? '', dialect: agent.dialect ?? '' }
   return (
     <AgentSettingsModal
       title={tr(msg({ id: 'agents.settings.title', defaultMessage: '{agent} settings', description: 'Title of the Agent Settings dialog. {agent} is the agent.' }), { agent: agent.name })}
@@ -539,6 +585,7 @@ export function AgentSettingsDialog() {
       roles={roleSuggestions(project.agents)}
       mcpProject={project.path}
       mcpWhere="project"
+      dialectCli={current}
       works={
         // Where it works now (#1442): its 0.9 worktree, a slot, carried slot or home, or the project folder.
         own ? (
@@ -565,7 +612,7 @@ export function AgentSettingsDialog() {
         return confirm({
           title: tr(msg({ id: 'agents.switch.title', defaultMessage: 'Switch {agent} to {cli}?', description: "Title of the confirmation before an agent ({agent}) changes provider ({cli}: the new CLI's name)." }), { agent: agent.name, cli: providerDescriptor(cli).name }),
           message: tr(msg({ id: 'agents.switch.message', defaultMessage: "Its conversations stay in the Sessions tab, but {cli} can't resume {was} conversations, so {agent} starts fresh next time.", description: "The confirmation before an agent ({agent}) changes provider: the new CLI ({cli}) can't resume the old one's ({was}) conversations." }), { agent: agent.name, cli: providerDescriptor(cli).name, was: providerDescriptor(current).name }),
-          detail: tr(msg({ id: 'agents.switch.detail', defaultMessage: 'To carry the work over, ask the agent for a handover before switching (Hive MCP: hive_create_handover), then ask the new agent to read it.', description: 'Under the confirmation before an agent changes provider. hive_create_handover is a tool name: keep it.' })),
+          detail: tr(msg({ id: 'agents.switch.detail', defaultMessage: 'To carry the work over, ask the agent for a handover before switching (Combwork MCP: cw_create_handover), then ask the new agent to read it.', description: 'Under the confirmation before an agent changes provider. cw_create_handover is a tool name: keep it.' })),
           confirmLabel: tr(msg({ id: 'agents.switch.confirm', defaultMessage: 'Switch', description: "Button: changes the agent's provider. Keep it short." }))
         })
       }}
@@ -575,7 +622,9 @@ export function AgentSettingsDialog() {
           role: f.role,
           workflowRole: f.workflowRole,
           mcpServers: f.mcp,
-          ...(f.connection !== initial.connection ? { connection: f.connection || null } : {})
+          ...(f.connection !== initial.connection ? { connection: f.connection || null } : {}),
+          // Its Dialect (HI-2444), when changed: '' is Auto. A change of CLI clears it in main unless one is picked here.
+          ...(f.dialect !== initial.dialect ? { dialect: f.dialect || null } : {})
         })
         await actions.refreshWorkspace()
       }}
@@ -639,7 +688,7 @@ export function TemplateAgentDialog() {
 
 /**
  * Hands one agent's work to another, of any provider. Conversations can't move between providers,
- * so the source writes a handover (Hive's hive_create_handover tool) and the target reads it. The agent
+ * so the source writes a handover (Combwork's cw_create_handover tool) and the target reads it. The agent
  * itself can be the target: it carries on in a new conversation (a long transcript made short again).
  */
 export function HandOverDialog() {
@@ -666,7 +715,7 @@ export function HandOverDialog() {
     // A long conversation (from its footer or the notification) most likely wants a new one of its own.
     const ownFirst = !!own && !selfOff && limit > 0 && mb >= limit * 1024 * 1024
     setTo(ownFirst ? target.agentId : (first?.id ?? (own && !selfOff ? target.agentId : '')))
-    // Again when whether it may end its own conversation changes (the window learns of a lane a moment after Hive does).
+    // Again when whether it may end its own conversation changes (the window learns of a lane a moment after Combwork does).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target?.project, target?.agentId, selfOff])
 
@@ -678,7 +727,7 @@ export function HandOverDialog() {
   // Who carries on: the agent itself (self), the chosen one (other), or one not chosen yet (none).
   const who = self ? 'self' : chosen ? 'other' : 'none'
   const names = { from: from.name, other: chosen?.name ?? '', who }
-  const hiveTools = settings?.agentApi.provideHiveMcp !== false
+  const combworkTools = settings?.agentApi.provideCombworkMcp !== false
 
   const go = (): void => {
     if (!chosen) return
@@ -697,7 +746,7 @@ export function HandOverDialog() {
           <button className="btn subtle" onClick={close}>
             {tr(CANCEL)}
           </button>
-          <button className="btn primary" disabled={!chosen || !hiveTools} onClick={go}>
+          <button className="btn primary" disabled={!chosen || !combworkTools} onClick={go}>
             <Icon name="arrow-swap" /> {tr(msg({ id: 'agents.handOver.go', defaultMessage: 'Hand Over', description: "The Continue with… dialog's button: hands the work to the chosen agent." }))}
           </button>
         </>
@@ -706,9 +755,9 @@ export function HandOverDialog() {
       <p style={{ marginTop: 0 }}>
         {tr(msg({ id: 'agents.handOver.intro', defaultMessage: "Another agent picks up the work from a handover. It can use a different provider: the conversation itself stays with {agent}; the handover carries the goal, what's done and the next steps. Or {agent} carries on itself in a new conversation, which keeps a long one from slowing things down.", description: 'At the top of the Continue with… dialog ({agent}: the agent whose work is handed over). A handover is a note an agent writes for the next one.' }), { agent: from.name })}
       </p>
-      {!hiveTools && (
+      {!combworkTools && (
         <div className="banner warn">
-          <Icon name="warning" /> {tr(msg({ id: 'agents.handOver.needsTools', defaultMessage: 'This needs Hive\'s tools in sessions. Turn on "Provide Hive tools to sessions" in Settings → Agent API.', description: "The Continue with… dialog when sessions don't get Hive's tools: the setting to turn on (its name in quotes, and where: use their translated names)." }))}
+          <Icon name="warning" /> {tr(msg({ id: 'agents.handOver.needsTools', defaultMessage: 'This needs Combwork\'s tools in sessions. Turn on "Provide Combwork tools to sessions" in Settings → Agent API.', description: "The Continue with… dialog when sessions don't get Combwork's tools: the setting to turn on (its name in quotes, and where: use their translated names)." }))}
         </div>
       )}
       <div className="choice-list">
@@ -758,7 +807,7 @@ export function HandOverDialog() {
       </label>
       <div className="detail">
         {fromReady
-          ? tr(msg({ id: 'agents.handOver.writes', defaultMessage: "{who, select, self {{from} writes it with Hive's handover tool; {from} continues in a new conversation when it's done.} other {{from} writes it with Hive's handover tool; {other} starts when it's done.} none {{from} writes it with Hive's handover tool; the other agent starts when it's done.}}", description: "Under Ask … to write a handover first: the agent ({from}) writes the handover, then it carries on itself (self), the chosen agent ({other}) starts, or one not chosen yet (none)." }), names)
+          ? tr(msg({ id: 'agents.handOver.writes', defaultMessage: "{who, select, self {{from} writes it with Combwork's handover tool; {from} continues in a new conversation when it's done.} other {{from} writes it with Combwork's handover tool; {other} starts when it's done.} none {{from} writes it with Combwork's handover tool; the other agent starts when it's done.}}", description: "Under Ask … to write a handover first: the agent ({from}) writes the handover, then it carries on itself (self), the chosen agent ({other}) starts, or one not chosen yet (none)." }), names)
           : from.live
             ? tr(msg({ id: 'agents.handOver.busy', defaultMessage: '{who, select, self {{from} is busy, so it continues from the latest handover.} other {{from} is busy, so {other} continues from the latest handover.} none {{from} is busy, so the other agent continues from the latest handover.}}', description: "Under Ask … to write a handover first, when the agent ({from}) is busy: the next one (itself: self; the chosen agent {other}; none chosen yet) carries on from the latest handover." }), names)
             : tr(msg({ id: 'agents.handOver.stopped', defaultMessage: "{who, select, self {{from} isn't running, so a new conversation continues from the latest handover.} other {{from} isn't running, so {other} continues from the latest handover.} none {{from} isn't running, so the other agent continues from the latest handover.}} Resume {from} first to have it write a new one.", description: "Under Ask … to write a handover first, when the agent ({from}) isn't running: the next one (a new conversation of its own: self; the chosen agent {other}; none chosen yet) carries on from the latest handover; Resume (a button) starts it again." }), names)}
@@ -771,8 +820,8 @@ export function HandOverDialog() {
 // Merge
 // ---------------------------------------------------------------------------
 
-const QUEUE_LOOKUP = msg({ id: 'agents.mergeDialog.queueLookup', defaultMessage: 'Checking whether Hive merges this branch’s card through the merge queue…', description: "Why Merge is off for a moment in the Merge dialog: Hive is reading whether its merge queue merges the branch's card. Glossary 2.5: merge queue." })
-const QUEUE_LOOKUP_FAILED = msg({ id: 'agents.mergeDialog.queueLookupFailed', defaultMessage: "Couldn't read whether Hive merges this branch's card through the merge queue, so Merge stays off: {why}", description: "The Merge dialog when Hive couldn't read whether its merge queue merges the branch's card ({why}: the error). Merge is a button: keep it as Hive shows it." })
+const QUEUE_LOOKUP = msg({ id: 'agents.mergeDialog.queueLookup', defaultMessage: 'Checking whether Combwork merges this branch’s card through the merge queue…', description: "Why Merge is off for a moment in the Merge dialog: Combwork is reading whether its merge queue merges the branch's card. Glossary 2.5: merge queue." })
+const QUEUE_LOOKUP_FAILED = msg({ id: 'agents.mergeDialog.queueLookupFailed', defaultMessage: "Couldn't read whether Combwork merges this branch's card through the merge queue, so Merge stays off: {why}", description: "The Merge dialog when Combwork couldn't read whether its merge queue merges the branch's card ({why}: the error). Merge is a button: keep it as Combwork shows it." })
 
 export function MergeDialog() {
   useLanguage()
@@ -797,7 +846,7 @@ export function MergeDialog() {
   const [moveBranch, setMoveBranch] = useState(true)
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<MergeResult | null>(null)
-  /** The card on this branch when Hive merges it (#1357, OP-13): its queue state; Merge waits for Merge anyway. */
+  /** The card on this branch when Combwork merges it (#1357, OP-13): its queue state; Merge waits for Merge anyway. */
   const [queueCard, setQueueCard] = useState<BranchQueueCard | null>(null)
   /** The card whose line the branch is, while it isn't Done (#1450): merged here only after asking. */
   const [lineCard, setLineCard] = useState<MergeBranch['card'] | null>(null)
@@ -840,7 +889,7 @@ export function MergeDialog() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target?.project, target?.agentId, target?.worktree?.path])
 
-  // Whether Hive merges the branch's card, read when the dialog opens and on Retry; only the latest read counts.
+  // Whether Combwork merges the branch's card, read when the dialog opens and on Retry; only the latest read counts.
   useEffect(() => {
     setQueueCard(null)
     setLineCard(null)
@@ -879,8 +928,8 @@ export function MergeDialog() {
   const merge = async (anyway = false): Promise<void> => {
     if (anyway && queueCard) {
       const ok = await confirm({
-        title: tr(msg({ id: 'agents.mergeDialog.anywayTitle', defaultMessage: 'Merge {card} outside the merge queue?', description: "Title of the confirmation before Merge anyway: the card ({card}: its key) is one Hive's merge queue merges. Glossary 2.5: merge queue." }), { card: queueCard.key }),
-        message: tr(msg({ id: 'agents.mergeDialog.anywayMessage', defaultMessage: "Hive merges this card through its queue, after its merge checks pass on the merged result. Merging it here skips them. It is recorded on the card as an override, and the queue takes its entry out once it sees the merge.", description: "The confirmation before Merge anyway in the Merge dialog. Glossary 2.3: merge checks; 2.4: override." })),
+        title: tr(msg({ id: 'agents.mergeDialog.anywayTitle', defaultMessage: 'Merge {card} outside the merge queue?', description: "Title of the confirmation before Merge anyway: the card ({card}: its key) is one Combwork's merge queue merges. Glossary 2.5: merge queue." }), { card: queueCard.key }),
+        message: tr(msg({ id: 'agents.mergeDialog.anywayMessage', defaultMessage: "Combwork merges this card through its queue, after its merge checks pass on the merged result. Merging it here skips them. It is recorded on the card as an override, and the queue takes its entry out once it sees the merge.", description: "The confirmation before Merge anyway in the Merge dialog. Glossary 2.3: merge checks; 2.4: override." })),
         confirmLabel: tr(msg({ id: 'agents.mergeDialog.anywayConfirm', defaultMessage: 'Merge anyway', description: 'The button confirming Merge anyway (a merge outside the merge queue). Keep it short.' })),
         danger: true
       })
@@ -918,7 +967,7 @@ export function MergeDialog() {
       }
     } catch (e) {
       notify('error', tr(msg({ id: 'agents.merged.failed', defaultMessage: 'Could not merge', description: "An error's title: merging a worktree's branch failed." })), errorMessage(e))
-      // Refused for a card Hive merges (the dialog's state out of date): read it again, so the dialog says so.
+      // Refused for a card Combwork merges (the dialog's state out of date): read it again, so the dialog says so.
       setLookups((n) => n + 1)
     }
     setBusy(false)
@@ -942,12 +991,12 @@ export function MergeDialog() {
           </button>
           {!result?.conflicts && queueCard && (
             <button className="btn subtle" data-action="merge-anyway" disabled={busy || !status || !!nothing || status.dirty > 0 || !status.into || !!blocked || slotTaken} onClick={() => void merge(true)}>
-              {tr(msg({ id: 'agents.mergeDialog.anyway', defaultMessage: 'Merge anyway…', description: "A button in the Merge dialog when Hive's merge queue merges the branch's card: merges it here all the same (asks first; recorded as an override)." }))}
+              {tr(msg({ id: 'agents.mergeDialog.anyway', defaultMessage: 'Merge anyway…', description: "A button in the Merge dialog when Combwork's merge queue merges the branch's card: merges it here all the same (asks first; recorded as an override)." }))}
             </button>
           )}
           {!result?.conflicts && (
             <Tooltip content={queueCard ? tr(QUEUE_MERGES, { card: queueCard.key }) : lookup.state === 'pending' ? tr(QUEUE_LOOKUP) : lookup.state === 'failed' ? tr(QUEUE_LOOKUP_FAILED, { why: lookup.error ?? '' }) : null}>
-              {/* While Hive merges the card (or that isn't known yet), Merge is plainly off, Merge anyway the action (the Assistant's #1357 review); its reason on hover. */}
+              {/* While Combwork merges the card (or that isn't known yet), Merge is plainly off, Merge anyway the action (the Assistant's #1357 review); its reason on hover. */}
               <button className={cx('btn', queueCard || lookup.state !== 'done' ? 'merge-held' : 'primary')} data-action="merge" disabled={busy || !status || !!nothing || status.dirty > 0 || !status.into || !!blocked || slotTaken || !!queueCard || lookup.state !== 'done'} onClick={() => void merge()}>
                 <Icon name={busy ? 'loading' : 'git-merge'} spin={busy} /> {tr(MERGE)}
               </button>
@@ -963,7 +1012,7 @@ export function MergeDialog() {
           <Icon name="warning" />
           <span>{tr(QUEUE_LOOKUP_FAILED, { why: lookup.error ?? '' })}</span>
           <button type="button" className="btn small" onClick={() => setLookups((n) => n + 1)}>
-            {tr(msg({ id: 'agents.mergeDialog.queueRetry', defaultMessage: 'Retry', description: "A button in the Merge dialog after Hive couldn't read whether its merge queue merges the branch's card: reads it again." }))}
+            {tr(msg({ id: 'agents.mergeDialog.queueRetry', defaultMessage: 'Retry', description: "A button in the Merge dialog after Combwork couldn't read whether its merge queue merges the branch's card: reads it again." }))}
           </button>
         </div>
       )}
@@ -972,7 +1021,7 @@ export function MergeDialog() {
           <Icon name="warning" />
           <span>
             {readError}
-            {gitProblemText(gitTool) ? ` ${gitFixText(gitTool)}` : ''} {tr(msg({ id: 'agents.mergeDialog.cantRead', defaultMessage: 'Nothing can be merged until Hive can read the branch.', description: "The Merge dialog when git couldn't read the worktree's branch; why comes before it." }))}
+            {gitProblemText(gitTool) ? ` ${gitFixText(gitTool)}` : ''} {tr(msg({ id: 'agents.mergeDialog.cantRead', defaultMessage: 'Nothing can be merged until Combwork can read the branch.', description: "The Merge dialog when git couldn't read the worktree's branch; why comes before it." }))}
           </span>
         </div>
       ) : !status ? (
@@ -982,7 +1031,7 @@ export function MergeDialog() {
       ) : result?.conflicts ? (
         <>
           <div className="banner warn">
-            <Icon name="warning" /> {tr(msg({ id: 'agents.mergeDialog.conflict', defaultMessage: 'Merging would conflict. Nothing was changed.', description: "The Merge dialog after a merge that would conflict: Hive tried it and changed nothing." }))}
+            <Icon name="warning" /> {tr(msg({ id: 'agents.mergeDialog.conflict', defaultMessage: 'Merging would conflict. Nothing was changed.', description: "The Merge dialog after a merge that would conflict: Combwork tried it and changed nothing." }))}
           </div>
           <p>{tr(msg({ id: 'agents.mergeDialog.conflictFiles', defaultMessage: 'These files were changed on both {branch} and {into}:', description: 'Above the files that would conflict: both branches ({branch}, the worktree\'s; {into}, the project folder\'s) changed them.' }), { branch: agent.tree.branch, into: status.into ?? '' })}</p>
           <ul className="conflict-list">
@@ -1044,7 +1093,7 @@ export function MergeDialog() {
           )}
           {status.dirty > 0 && (
             <div className="banner warn" data-testid="merge-uncommitted">
-              <Icon name="warning" /> {tr(msg({ id: 'agents.mergeDialog.uncommitted', defaultMessage: "{files, plural, one {# file in the worktree isn't committed} other {# files in the worktree aren't committed}}, and Hive merges only committed work. Commit or stash {files, plural, one {it} other {them}} in the worktree, then merge.", description: "The Merge dialog when the worktree has uncommitted files ({files}: how many): Merge is off until they are committed or stashed (git stash) in the worktree." }), { files: status.dirty })}
+              <Icon name="warning" /> {tr(msg({ id: 'agents.mergeDialog.uncommitted', defaultMessage: "{files, plural, one {# file in the worktree isn't committed} other {# files in the worktree aren't committed}}, and Combwork merges only committed work. Commit or stash {files, plural, one {it} other {them}} in the worktree, then merge.", description: "The Merge dialog when the worktree has uncommitted files ({files}: how many): Merge is off until they are committed or stashed (git stash) in the worktree." }), { files: status.dirty })}
             </div>
           )}
           <div className="choice-list" data-merge-style={styleRead ? 'read' : 'reading'}>

@@ -39,12 +39,12 @@ describe('cards on slots (#1438)', () => {
     moved(r)
     expect(asked).toEqual([{ card: card.id, builder: 'B1', dry: false, target: 'main' }])
     const s = e.wf.state(card)
-    expect(s.started).toMatchObject({ folder, slot: 'slot-a', lease: 'l-1', line: `hive/AM/${card.key}-fix-the-login`, base: head, target: 'main', builder: 'B1' })
+    expect(s.started).toMatchObject({ folder, slot: 'slot-a', lease: 'l-1', line: `cw/AM/${card.key}-fix-the-login`, base: head, target: 'main', builder: 'B1' })
     expect(e.wf.folderOf(s)).toBe(folder)
     const prep = e.store.pendingActions().find((a) => a.kind === 'prepareSlot')
-    expect(prep?.payload).toEqual({ folder, line: `hive/AM/${card.key}-fix-the-login`, base: head, slot: 'slot-a', lease: 'l-1', upToDate: opts.slotsUpToDate, builder: 'B1' })
+    expect(prep?.payload).toEqual({ folder, line: `cw/AM/${card.key}-fix-the-login`, base: head, slot: 'slot-a', lease: 'l-1', upToDate: opts.slotsUpToDate, builder: 'B1' })
     // The agent's reply says where it continues, and to end its turn.
-    expect((r as { warnings?: string[] }).warnings?.join(' ')).toMatch(/You'll continue in slot-a, on hive\/AM\/.*End your turn now\./)
+    expect((r as { warnings?: string[] }).warnings?.join(' ')).toMatch(/You'll continue in slot-a, on cw\/AM\/.*End your turn now\./)
   })
 
   it('G15 on: the preparation asks for the install', async () => {
@@ -185,10 +185,10 @@ describe('cards on slots (#1438)', () => {
   })
 
   it("names a card's line: lower case ASCII letters, digits and hyphens, at most 40, accents folded", () => {
-    expect(lineName('AM', { key: 'AM-12', title: 'Fix the Login!' })).toBe('hive/AM/AM-12-fix-the-login')
+    expect(lineName('AM', { key: 'AM-12', title: 'Fix the Login!' })).toBe('cw/AM/AM-12-fix-the-login')
     expect(slugOf('Café déjà vu — naïve')).toBe('cafe-deja-vu-naive')
     expect(slugOf('日本語のタイトル')).toBe('')
-    expect(lineName('AM', { key: 'AM-3', title: '日本語' })).toBe('hive/AM/AM-3')
+    expect(lineName('AM', { key: 'AM-3', title: '日本語' })).toBe('cw/AM/AM-3')
     const long = slugOf('A very long title that goes on and on, well past the forty characters a line may have')
     expect(long.length).toBeLessThanOrEqual(40)
     expect(long).toBe('a-very-long-title-that-goes-on-and-on-we')
@@ -214,7 +214,7 @@ describe("a slot card's line before its slot's preparation (#1551)", () => {
     expect(lineFacts(e, card.id)).toEqual([])
     // Its preparation makes the line and records it (slotCards.ts's prepare).
     sh(e.project, 'branch', line, s.started!.base!)
-    await e.wf.write(card, null, 'hive', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line, revision: s.started!.base! }))
+    await e.wf.write(card, null, 'combwork', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line, revision: s.started!.base! }))
     expect(slotPreparationOwed(e.wf, card, e.wf.state(card))).toBe(false)
     await reconcile(e.wf, card)
     expect(lineFacts(e, card.id)).toEqual([])
@@ -231,7 +231,7 @@ describe("a slot card's line before its slot's preparation (#1551)", () => {
     const card = e.wf.createCard({ title: 'Started again' })
     moved(await e.wf.start(card.key, B1))
     const line = e.wf.state(card).started!.line!
-    await e.wf.write(card, null, 'hive', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line, revision: 'r' }))
+    await e.wf.write(card, null, 'combwork', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line, revision: 'r' }))
     expect(slotPreparationOwed(e.wf, card, e.wf.state(card))).toBe(false)
     // Put back, then started again in another slot's lease: the earlier preparation was for the earlier cycle.
     moved(await e.wf.move(card.key, 'todo', 'user'))
@@ -250,8 +250,8 @@ describe("a slot card's line before its slot's preparation (#1551)", () => {
     moved(await e.wf.start(card.key, B1))
     const s = e.wf.state(card)
     const line = s.started!.line!
-    await e.wf.write(card, null, 'hive', (w) => void w.fact('SlotPrepared', { lease, line, revision: s.started!.base! }))
-    // Prepared, then deleted outside Hive before this observer reads it.
+    await e.wf.write(card, null, 'combwork', (w) => void w.fact('SlotPrepared', { lease, line, revision: s.started!.base! }))
+    // Prepared, then deleted outside Combwork before this observer reads it.
     sh(e.project, 'branch', line, s.started!.base!)
     sh(e.project, 'branch', '-D', line)
     let changed = false

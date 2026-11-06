@@ -4,7 +4,7 @@
 // why; the quick add (Ctrl+Alt+Shift+N) adds the agent on Claude Code's. With no account on (HI-2127), Start a session
 // now is unticked and off with its reason beside it, the agent is still added (no session), and the choice's link opens
 // Settings → Accounts & Connections (screenshots in both themes). Then (round 2) both installed, Codex's detection
-// held (HIVE_TEST_SLOW_DETECT): while it is still looked for, Add Agent chooses nothing and Add waits, saying why; an
+// held (CW_TEST_SLOW_DETECT): while it is still looked for, Add Agent chooses nothing and Add waits, saying why; an
 // Add with no connection (the window's call) waits for detection in main; once Codex is found, Codex's connection is
 // chosen and the agent added there. No session is started. The test seam off so the real rule applies.
 const lib = require('./lib.cjs')
@@ -60,12 +60,12 @@ async function settled(env) {
   // Codex isn't on PATH, and its usual places are an empty throwaway user folder.
   const { app, page } = await lib.launch({
     userData,
-    env: { ...env, APPDATA: path.join(fakeUser, 'AppData', 'Roaming'), LOCALAPPDATA: path.join(fakeUser, 'AppData', 'Local'), USERPROFILE: fakeUser, HOME: fakeUser, CODEX_HOME: path.join(fakeUser, 'codex-home'), PATH: [path.dirname(process.execPath), 'C:\\Windows\\System32'].join(';'), HIVE_TEST_CLI_HOME_CONNECTION: '0' },
+    env: { ...env, APPDATA: path.join(fakeUser, 'AppData', 'Roaming'), LOCALAPPDATA: path.join(fakeUser, 'AppData', 'Local'), USERPROFILE: fakeUser, HOME: fakeUser, CODEX_HOME: path.join(fakeUser, 'codex-home'), PATH: [path.dirname(process.execPath), 'C:\\Windows\\System32'].join(';'), CW_TEST_CLI_HOME_CONNECTION: '0' },
     viewport: { width: 1400, height: 900 }
   })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     await inv('connections:setOn', 'a-codex', true)
     await inv('connections:setOn', 'a-claude', true)
@@ -106,6 +106,8 @@ async function settled(env) {
     const start = add.locator('label', { hasText: 'Start a session now' })
     const noAccount = add.locator('[data-no-account]')
     check('no account on here: the choice says so, with a link to Accounts & Connections', !!(await lib.until(async () => (await noAccount.count()) === 1, HUNG_MS)) && (await noAccount.locator('a', { hasText: 'Open Accounts & Connections' }).count()) === 1, await noAccount.innerText().catch(() => ''))
+    // Both added but off here (HI-2650): named as off, the installed CLI's first, never "add one".
+    check('…naming the one off here on an installed CLI (Usable Claude), never "add one"', /No account is on in this workspace: Usable Claude is off here\. Turn one on with On here/.test(await noAccount.innerText()) && !/Add one/.test(await noAccount.innerText()), await noAccount.innerText().catch(() => ''))
     check('…and "Start a session now" is unticked and off, saying why beside it', !!(await lib.until(async () => (await start.locator('input').isDisabled()) && !(await start.locator('input').isChecked()), HUNG_MS)) && (await start.locator('[data-start-now-why]').innerText().catch(() => '')).includes('No account is on here yet') && /No account is on in this workspace/.test((await start.getAttribute('title')) ?? ''), JSON.stringify({ disabled: await start.locator('input').isDisabled(), why: await start.locator('[data-start-now-why]').innerText().catch(() => ''), title: await start.getAttribute('title') }))
     for (const theme of ['dark', 'light']) {
       await inv('settings:update', { appearance: { theme } })
@@ -143,13 +145,13 @@ async function duringDetection(env) {
   fs.mkdirSync(path.join(fakeUser, 'codex-home'), { recursive: true })
   // Held long enough to act while it is pending, and let go by itself: the suite waits for its end, never a time.
   // Launched as providerdetect does, not with lib.launch (which waits for detection to finish).
-  const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.hiveEnv({ HIVE_USER_DATA: userData2, ...env, CODEX_HOME: path.join(fakeUser, 'codex-home'), HIVE_TEST_SLOW_DETECT: 'codex=20000', HIVE_TEST_CLI_HOME_CONNECTION: '0' }) })
+  const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.combworkEnv({ CW_USER_DATA: userData2, ...env, CODEX_HOME: path.join(fakeUser, 'codex-home'), CW_TEST_SLOW_DETECT: 'codex=20000', CW_TEST_CLI_HOME_CONNECTION: '0' }) })
   const page = await app.firstWindow()
   await lib.fitWindow(app, page, { width: 1400, height: 900 })
   await lib.until(() => page.evaluate(() => !!document.querySelector('.app .workbench')).catch(() => false), HUNG_MS)
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     // Both on here again (the first part turned them off at its end).
     await inv('connections:setOn', 'a-codex', true)
@@ -175,7 +177,7 @@ async function duringDetection(env) {
 
     // The window's call with no connection (as quick add's fallback, or a script), made while it is looked for: main
     // waits for detection before choosing, so it goes on Codex's.
-    const viaMain = page.evaluate((p) => window.hive.invoke('agents:add', p, { name: 'Viamain' }), alpha)
+    const viaMain = page.evaluate((p) => window.combwork.invoke('agents:add', p, { name: 'Viamain' }), alpha)
     check('…an add with no connection made then waits for detection (Codex still looked for)', (await codex()).checking === true)
 
     // Once Codex is found: Codex first in the order, chosen; Add enabled.

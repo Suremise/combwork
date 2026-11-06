@@ -10,12 +10,12 @@ import type { CatalogRead } from '../types'
  * Claude Code's models, from the Agent SDK's initialize control request (#125): what its VS Code extension builds its
  * model menu from. It sends no prompt and uses no tokens. The reply is the SDK's protocol, not a documented command,
  * so it is read defensively: only the models are read (never `account` or the other personal fields), unknown fields
- * are ignored, and a model's missing or odd field is left out, so Hive falls back for it. Checked with 2.1.289.
+ * are ignored, and a model's missing or odd field is left out, so Combwork falls back for it. Checked with 2.1.289.
  */
 
 /** The arguments: print mode reading and writing stream-json, nothing saved, no MCP servers started. */
 export const INITIALIZE_ARGS = ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--no-session-persistence', '--strict-mcp-config']
-const REQUEST_ID = 'hive-models'
+const REQUEST_ID = 'combwork-models'
 export const INITIALIZE_REQUEST = JSON.stringify({ type: 'control_request', request_id: REQUEST_ID, request: { subtype: 'initialize' } })
 
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined)
@@ -27,7 +27,7 @@ const statesEffort = (m: Record<string, unknown>): boolean => typeof m.supportsE
 /**
  * A model's effort levels as the reply establishes them (#125, round 2): its valid levels; none ([]) only when that is
  * what it says (supportsEffort false, an empty list, or, in a reply whose models state their levels, neither field: Haiku
- * with 2.1.289); unknown (undefined: Hive falls back) when a field is odd: supportsEffort not a boolean, a list that
+ * with 2.1.289); unknown (undefined: Combwork falls back) when a field is odd: supportsEffort not a boolean, a list that
  * isn't one or holds no valid level, levels with supportsEffort false, or supportsEffort true without levels.
  */
 function effortsOf(m: Record<string, unknown>, replyStates: boolean): string[] | undefined {
@@ -44,7 +44,7 @@ function effortsOf(m: Record<string, unknown>, replyStates: boolean): string[] |
 
 /**
  * Whether a model runs in Auto, as the reply establishes it: supportsAutoMode when a boolean; absent, in a reply whose
- * models state it, no (Haiku with 2.1.289); anything else (a string, a number) unknown, so Hive falls back.
+ * models state it, no (Haiku with 2.1.289); anything else (a string, a number) unknown, so Combwork falls back.
  */
 function autoOf(m: Record<string, unknown>, replyStates: boolean): boolean | undefined {
   if (!replyStates) return undefined
@@ -92,12 +92,12 @@ export function parseClaudeInitialize(reply: unknown): CatalogRead | null {
 }
 
 /**
- * Asks the installed Claude Code for its models: starts it in print mode in a folder of Hive's own, sends initialize,
+ * Asks the installed Claude Code for its models: starts it in print mode in a folder of Combwork's own, sends initialize,
  * and closes it as soon as the reply comes (or after timeoutMs). Null on any failure. env: the sessions' environment
- * (ptyHost childEnv), without Hive's own variables.
+ * (ptyHost childEnv), without Combwork's own variables.
  */
 export function readClaudeModels(executable: string, env: Record<string, string>, timeoutMs = 20_000): Promise<CatalogRead | null> {
-  const cwd = join(tmpdir(), 'hive-claude-models')
+  const cwd = join(tmpdir(), 'combwork-claude-models')
   mkdirSync(cwd, { recursive: true })
   const s = toSpawnable(executable, INITIALIZE_ARGS)
   return new Promise((resolve) => {

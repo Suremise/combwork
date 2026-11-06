@@ -8,7 +8,7 @@ import { tempDir } from './tempDir'
 
 // Two real sessions from the #403 spike (Copilot CLI 1.0.93), scrubbed: paths under C:\work, the system prompt, hook
 // inputs and the CLI's utility-model calls trimmed. REAL ran on Copilot Free (Auto picked mai-code-1.1-flash): three
-// prompts, a hive MCP call and a file created, with credits. STUB ran offline against a scripted model (no credits): a
+// prompts, a call to Combwork's MCP server and a file created, with credits. STUB ran offline against a scripted model (no credits): a
 // command, a question, an exit and a resume, then a permission prompt cancelled by an interrupt.
 // When a new CLI version changes the format, add its sessions here.
 const HOME = join(__dirname, 'fixtures', 'copilot')
@@ -298,7 +298,9 @@ describe('Copilot conversation', () => {
     expect(items[0]).toMatchObject({ kind: 'user', text: 'Reply with only the word OK.', images: [] })
     expect(items[1]).toMatchObject({ kind: 'assistant', text: 'OK' })
     const mcp = items[3].kind === 'tool' ? items[3].tool : null
+    // old-name: begin recorded-copilot-call
     expect(mcp).toMatchObject({ name: 'hive · hive_ping', result: 'pong MARKER-MCP-RESULT', isError: false })
+    // old-name: end recorded-copilot-call
     const write = items[6].kind === 'tool' ? items[6].tool : null
     expect(write).toMatchObject({ name: 'Write', summary: 'hello.txt', isError: false })
     expect(write?.input).toContain('file_text: hi')
@@ -385,7 +387,7 @@ describe('Copilot sessions', () => {
   })
 
   it('leaves out launches that ended before a prompt, and folders that aren’t sessions', async () => {
-    const home = tempDir('hive-copilot-')
+    const home = tempDir('cw-copilot-')
     const session = (id: string, text: string | null): void => {
       mkdirSync(join(home, 'session-state', id), { recursive: true })
       writeFileSync(join(home, 'session-state', id, 'workspace.yaml'), `id: ${id}\ncwd: C:\\work\\p\n`)
@@ -400,7 +402,7 @@ describe('Copilot sessions', () => {
   })
 
   it('keeps a bounded cache of workspace.yaml that sees edits and deletions', async () => {
-    const dir = tempDir('hive-copilot-ws-')
+    const dir = tempDir('cw-copilot-ws-')
     const file = (n: number, name: string): string => {
       const p = join(dir, `${n}.yaml`)
       writeFileSync(p, `id: s${n}\ncwd: C:\\work\\p\nname: ${name}\n`)

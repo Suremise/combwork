@@ -13,11 +13,11 @@ import { existsSync } from 'original-fs'
 import { readFile, stat } from 'original-fs/promises'
 import { msg } from '../shared/i18n/msg'
 import { tr } from '../shared/i18n'
-import { OUR_CATALOG_URL, catalogRowShown, catalogUrlAllowed, checkRequirements, compareVersions, editionOf, readCatalog, type PcFacts, type ReadCatalog } from '../shared/mcpCatalog'
+import { OUR_CATALOG_URL, catalogRowShown, isOurCatalogUrl, sameCatalogSource, catalogUrlAllowed, checkRequirements, compareVersions, editionOf, readCatalog, type PcFacts, type ReadCatalog } from '../shared/mcpCatalog'
 import type { McpCatalogCheck, McpCatalogFilter, McpCatalogPrepared, McpCatalogRow, McpCatalogServer, McpCatalogSettings, McpCatalogSourcePage, McpServerDef, McpShown } from '../shared/types'
 import { advanced } from './advanced'
 import { config } from './config'
-import { hiveError } from './hiveError'
+import { combworkError } from './combworkError'
 import { findSecretWarnings } from './mcpSecrets'
 import { checkShown, inTurn, listMcp, mcpRuns, placesNow, retarget, serverFromZip, validMcpName, writeServerNow } from './mcp'
 import { createLogger, userText } from './logger'
@@ -40,32 +40,32 @@ export const CATALOG_PAGE = 50
 const PREPARED_MAX = 4
 const PREPARED_MS = 10 * 60 * 1000
 
-export const FETCH_SECONDS = 'hive.mcpCatalog.fetchSeconds'
-export const DOWNLOAD_SECONDS = 'hive.mcpCatalog.downloadSeconds'
-export const PROBE_SECONDS = 'hive.mcpCatalog.probeSeconds'
+export const FETCH_SECONDS = 'cw.mcpCatalog.fetchSeconds'
+export const DOWNLOAD_SECONDS = 'cw.mcpCatalog.downloadSeconds'
+export const PROBE_SECONDS = 'cw.mcpCatalog.probeSeconds'
 const seconds = (id: string, fallback: number): number => {
   const v = advanced.get(id)
   return typeof v === 'number' && v > 0 ? v : fallback
 }
 
 const M = {
-  notRead: msg({ id: 'mcp.catalog.notRead', defaultMessage: "Couldn't read this catalogue: {reason}", description: 'An MCP catalogue source in the MCP view (HI-545) that could not be read or is not a catalogue Hive reads. {reason} says why (as the network, the file or the checker said it, in English).' }),
+  notRead: msg({ id: 'mcp.catalog.notRead', defaultMessage: "Couldn't read this catalogue: {reason}", description: 'An MCP catalogue source in the MCP view (HI-545) that could not be read or is not a catalogue Combwork reads. {reason} says why (as the network, the file or the checker said it, in English).' }),
   scheme: msg({ id: 'mcp.catalog.scheme', defaultMessage: '{url} leads to an address this source may not use (only https for an https catalogue).', description: 'An error downloading from an MCP catalogue (HI-545): a redirect led away from https (to http or a file). {url} is where it led.' }),
   redirects: msg({ id: 'mcp.catalog.redirects', defaultMessage: 'Too many redirects downloading {url}.', description: 'An error downloading from an MCP catalogue (HI-545): more than 5 redirects. {url} is the address asked for.' }),
   tooLarge: msg({ id: 'mcp.catalog.tooLarge', defaultMessage: '{url} is larger than its catalogue says ({max, number} bytes at most): not used.', description: 'An error downloading from an MCP catalogue (HI-545): the download went past the size its catalogue gives, or the limit. {url} is the address.' }),
   http: msg({ id: 'mcp.catalog.http', defaultMessage: '{url} answered {status}.', description: 'An error downloading from an MCP catalogue (HI-545): the server answered with an HTTP error {status} (a number such as 404).' }),
   timeout: msg({ id: 'mcp.catalog.timeout', defaultMessage: '{url} took too long (over {seconds, number} s).', description: 'An error downloading from an MCP catalogue (HI-545): no complete answer within the time limit (Settings → Advanced).' }),
-  mismatch: msg({ id: 'mcp.catalog.mismatch', defaultMessage: "{name}'s download doesn't match its catalogue (its size or checksum differ): not installed.", description: 'An error installing a server from an MCP catalogue (HI-545): the zip downloaded is not the one the catalogue describes, so Hive used none of it. {name} is the server.' }),
+  mismatch: msg({ id: 'mcp.catalog.mismatch', defaultMessage: "{name}'s download doesn't match its catalogue (its size or checksum differ): not installed.", description: 'An error installing a server from an MCP catalogue (HI-545): the zip downloaded is not the one the catalogue describes, so Combwork used none of it. {name} is the server.' }),
   folder: msg({ id: 'mcp.catalog.folder', defaultMessage: "{name}'s zip doesn't hold a folder named {name}: not installed.", description: 'An error installing a server from an MCP catalogue (HI-545): the zip is not laid out as catalogues require (one top folder named after the server).' }),
   gone: msg({ id: 'mcp.catalog.gone', defaultMessage: "{name} isn't in its catalogue any more: refresh the list.", description: 'An error installing or updating a server from an MCP catalogue (HI-545): the catalogue read last no longer lists it.' }),
-  needs: msg({ id: 'mcp.catalog.needs', defaultMessage: "{name} can't run on this PC: {needs}.", description: 'An error installing a server from an MCP catalogue (HI-545): a requirement Hive checked is not met. {needs} lists them.' }),
+  needs: msg({ id: 'mcp.catalog.needs', defaultMessage: "{name} can't run on this PC: {needs}.", description: 'An error installing a server from an MCP catalogue (HI-545): a requirement Combwork checked is not met. {needs} lists them.' }),
   expired: msg({ id: 'mcp.catalog.expired', defaultMessage: 'That download has expired: choose Install or Update again.', description: 'An error installing or updating a server from an MCP catalogue (HI-545): the download made for it was dropped (too old, or the window closed).' }),
   workspaceGone: msg({ id: 'mcp.catalog.workspaceGone', defaultMessage: 'The workspace closed before {name} was installed: nothing was written.', description: 'An error installing or updating a server from an MCP catalogue (HI-545): the workspace it was for closed while it downloaded.' }),
-  placesChanged: msg({ id: 'mcp.catalog.placesChanged', defaultMessage: 'Where {name} is added changed while the update waited: look again.', description: "An error updating a server from an MCP catalogue (HI-545): a project (or the Hive Assistant) gained or lost the server after the Update dialog showed where it is added, so nothing was changed." }),
+  placesChanged: msg({ id: 'mcp.catalog.placesChanged', defaultMessage: 'Where {name} is added changed while the update waited: look again.', description: "An error updating a server from an MCP catalogue (HI-545): a project (or the Combwork Assistant) gained or lost the server after the Update dialog showed where it is added, so nothing was changed." }),
   notInstalled: msg({ id: 'mcp.catalog.notInstalled', defaultMessage: "{name} isn't installed from this catalogue: install it instead.", description: 'An error updating a server from an MCP catalogue (HI-545): no server of the name came from it.' }),
   sourceUrl: msg({ id: 'mcp.catalog.sourceUrl', defaultMessage: 'A catalogue is an https:// or file:// address of its catalog.json.', description: 'An error adding an MCP catalogue source (Settings → MCP Catalogues, HI-545): the address is neither.' }),
-  tooManySources: msg({ id: 'mcp.catalog.tooManySources', defaultMessage: 'Hive lists at most {max, number} catalogues of your own: remove one first.', description: 'An error adding an MCP catalogue source (Settings → MCP Catalogues, HI-545): the list is full.' }),
-  refreshAgain: msg({ id: 'mcp.catalog.refreshAgain', defaultMessage: 'Refresh (↻) to list this catalogue again: Hive keeps only so many in memory.', description: "A catalogue source in the MCP view's Catalogue (HI-545) whose list Hive no longer holds (too much in memory): ↻ reads it again." }),
+  tooManySources: msg({ id: 'mcp.catalog.tooManySources', defaultMessage: 'Combwork lists at most {max, number} catalogues of your own: remove one first.', description: 'An error adding an MCP catalogue source (Settings → MCP Catalogues, HI-545): the list is full.' }),
+  refreshAgain: msg({ id: 'mcp.catalog.refreshAgain', defaultMessage: 'Refresh (↻) to list this catalogue again: Combwork keeps only so many in memory.', description: "A catalogue source in the MCP view's Catalogue (HI-545) whose list Combwork no longer holds (too much in memory): ↻ reads it again." }),
   sourceTaken: msg({ id: 'mcp.catalog.sourceTaken', defaultMessage: 'That catalogue is listed already.', description: 'An error adding an MCP catalogue source (HI-545): it is in the list already.' }),
   check: {
     os: msg({ id: 'mcp.catalog.check.os', defaultMessage: 'Runs on {value}', description: "A requirement of a catalogue server (HI-545): the systems it runs on ({value}: windows, macos, linux, as the catalogue names them)." }),
@@ -74,14 +74,14 @@ const M = {
     feature: msg({ id: 'mcp.catalog.check.feature', defaultMessage: '{value} turned on', description: 'A requirement of a catalogue server (HI-545): a Windows optional feature ({value}, its name as Windows gives it, e.g. Windows Sandbox) that must be turned on.' }),
     node: msg({ id: 'mcp.catalog.check.node', defaultMessage: 'Node.js {value} or later', description: 'A requirement of a catalogue server (HI-545): the lowest Node.js version on PATH ({value}).' }),
     docker: msg({ id: 'mcp.catalog.check.docker', defaultMessage: 'Docker', description: 'A requirement of a catalogue server (HI-545): Docker installed.' }),
-    app: msg({ id: 'mcp.catalog.check.app', defaultMessage: '{value}', description: 'A requirement of a catalogue server (HI-545) given in the catalogue\'s own words ({value}, as it is): Hive can\'t check it.' })
+    app: msg({ id: 'mcp.catalog.check.app', defaultMessage: '{value}', description: 'A requirement of a catalogue server (HI-545) given in the catalogue\'s own words ({value}, as it is): Combwork can\'t check it.' })
   }
 }
 
 /** The sources as settings have them: ours first (unless turned off), then the user's that are on. */
 export function catalogSources(): { url: string; ours: boolean; noted: boolean }[] {
   const s: McpCatalogSettings = config.settings.mcpCatalogs ?? { oursOn: true, sources: [] }
-  return [...(s.oursOn ? [{ url: OUR_CATALOG_URL, ours: true, noted: true }] : []), ...s.sources.filter((x) => x.on && x.url !== OUR_CATALOG_URL).map((x) => ({ url: x.url, ours: false, noted: !!x.noted }))]
+  return [...(s.oursOn ? [{ url: OUR_CATALOG_URL, ours: true, noted: true }] : []), ...s.sources.filter((x) => x.on && !isOurCatalogUrl(x.url)).map((x) => ({ url: x.url, ours: false, noted: !!x.noted }))]
 }
 
 /** The sources changed in Settings (HI-545): ours on or off, and the user's own (added, turned on or off, removed, reordered). */
@@ -91,12 +91,12 @@ export function setCatalogSources(next: McpCatalogSettings): McpCatalogSettings 
   const was = config.settings.mcpCatalogs?.sources ?? []
   for (const x of Array.isArray(next?.sources) ? next.sources : []) {
     const url = typeof x?.url === 'string' ? x.url.trim() : ''
-    if (!catalogUrlAllowed(url)) throw hiveError(M.sourceUrl, undefined, { kind: 'invalid' })
-    if (seen.has(url)) throw hiveError(M.sourceTaken, undefined, { kind: 'conflict' })
+    if (!catalogUrlAllowed(url)) throw combworkError(M.sourceUrl, undefined, { kind: 'invalid' })
+    if (seen.has(url)) throw combworkError(M.sourceTaken, undefined, { kind: 'conflict' })
     seen.add(url)
     sources.push({ url, on: x.on !== false, ...(x.noted || was.find((w) => w.url === url)?.noted ? { noted: true } : {}) })
   }
-  if (sources.length > MAX_USER_SOURCES) throw hiveError(M.tooManySources, { max: MAX_USER_SOURCES }, { kind: 'conflict' })
+  if (sources.length > MAX_USER_SOURCES) throw combworkError(M.tooManySources, { max: MAX_USER_SOURCES }, { kind: 'conflict' })
   const saved = { oursOn: next?.oursOn !== false, sources }
   config.update((c) => {
     c.settings.mcpCatalogs = saved
@@ -106,7 +106,7 @@ export function setCatalogSources(next: McpCatalogSettings): McpCatalogSettings 
   return saved
 }
 
-/** The one-time note for a source Hive doesn't check (14 Oct): said, so not again. */
+/** The one-time note for a source Combwork doesn't check (14 Oct): said, so not again. */
 export function noteCatalogSource(url: string): void {
   config.update((c) => {
     const s = c.settings.mcpCatalogs?.sources.find((x) => x.url === url)
@@ -133,25 +133,25 @@ export const testHooks: { fetch?: typeof fetch; probe?: (cmd: string, args: stri
 export async function download(url: string, policy: Policy, max: number, ms: number, signal?: AbortSignal, etag?: string): Promise<{ bytes: Buffer; etag?: string } | null> {
   const timeout = AbortSignal.timeout(ms)
   const stop = signal ? AbortSignal.any([signal, timeout]) : timeout
-  const timedOut = (): Error => hiveError(M.timeout, { url, seconds: Math.round(ms / 1000) })
+  const timedOut = (): Error => combworkError(M.timeout, { url, seconds: Math.round(ms / 1000) })
   if (/^file:/i.test(url)) {
-    if (policy !== 'file') throw hiveError(M.scheme, { url })
+    if (policy !== 'file') throw combworkError(M.scheme, { url })
     // The same budget and the same end as a download: a share that stalls, or a workspace closed, stops it.
     const ended = (): Error => (timeout.aborted ? timedOut() : (signal?.reason instanceof Error ? signal.reason : new Error('aborted'))) // i18n-ignore: an abort's cause, for the log
     if (stop.aborted) throw ended()
     const path = fileURLToPath(url)
     const size = await Promise.race([(testHooks.stat ?? stat)(path).then((s) => s.size), new Promise<never>((_, reject) => stop.addEventListener('abort', () => reject(ended()), { once: true }))])
-    if (size > max) throw hiveError(M.tooLarge, { url, max })
+    if (size > max) throw combworkError(M.tooLarge, { url, max })
     const bytes = await readFile(path, { signal: stop }).catch((e) => {
       throw stop.aborted ? ended() : e
     })
-    if (bytes.length > max) throw hiveError(M.tooLarge, { url, max })
+    if (bytes.length > max) throw combworkError(M.tooLarge, { url, max })
     return { bytes }
   }
   let at = url
   for (let hop = 0; ; hop++) {
-    if (!/^https:\/\//i.test(at)) throw hiveError(M.scheme, { url: at })
-    if (hop > MAX_REDIRECTS) throw hiveError(M.redirects, { url })
+    if (!/^https:\/\//i.test(at)) throw combworkError(M.scheme, { url: at })
+    if (hop > MAX_REDIRECTS) throw combworkError(M.redirects, { url })
     let res: Response
     try {
       res = await (testHooks.fetch ?? fetch)(at, { redirect: 'manual', signal: stop, headers: etag && hop === 0 ? { 'If-None-Match': etag } : {} })
@@ -162,20 +162,20 @@ export async function download(url: string, policy: Policy, max: number, ms: num
     if (res.status >= 300 && res.status < 400 && res.status !== 304) {
       const next = res.headers.get('location')
       await res.body?.cancel().catch(() => undefined)
-      if (!next) throw hiveError(M.http, { url: at, status: res.status })
+      if (!next) throw combworkError(M.http, { url: at, status: res.status })
       at = new URL(next, at).href
       continue
     }
     if (res.status === 304) return null
-    if (!res.ok) throw hiveError(M.http, { url: at, status: res.status })
+    if (!res.ok) throw combworkError(M.http, { url: at, status: res.status })
     const declared = Number(res.headers.get('content-length') ?? 0)
-    if (declared > max) throw hiveError(M.tooLarge, { url, max })
+    if (declared > max) throw combworkError(M.tooLarge, { url, max })
     const chunks: Buffer[] = []
     let got = 0
     try {
       for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {
         got += chunk.length
-        if (got > max) throw hiveError(M.tooLarge, { url, max })
+        if (got > max) throw combworkError(M.tooLarge, { url, max })
         chunks.push(Buffer.from(chunk))
       }
     } catch (e) {
@@ -271,7 +271,7 @@ async function probeFacts(): Promise<PcFacts> {
       (e: NodeJS.ErrnoException) => (e.code === 'ENOENT' ? false : null)
     )
   ])
-  // The features Hive can check without elevation: Windows Sandbox, by its program.
+  // The features Combwork can check without elevation: Windows Sandbox, by its program.
   const features: Record<string, boolean> = os === 'windows' ? { 'Windows Sandbox': existsSync(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsSandbox.exe')) } : {}
   return { os, edition: editionId ? editionOf(editionId) : null, build: build && /^\d+$/.test(build) ? Number(build) : null, features, node, docker }
 }
@@ -282,8 +282,8 @@ const checksOf = (server: McpCatalogServer, pc: PcFacts): McpCatalogCheck[] => c
 // The view: pages of each source's rows, for a search and a filter.
 // ---------------------------------------------------------------------------
 
-/** An installed server from this catalogue entry (its provenance, whatever name it was installed under). */
-const fromEntry = (def: McpServerDef | null | undefined, source: string, name: string): boolean => def?.catalog?.source === source && def.catalog.name === name && typeof def.catalog.version === 'string'
+/** An installed server from this catalogue entry (its provenance, whatever name it was installed under; ours by any of its addresses, HI-2472). */
+const fromEntry = (def: McpServerDef | null | undefined, source: string, name: string): boolean => !!def?.catalog && typeof def.catalog.source === 'string' && sameCatalogSource(def.catalog.source, source) && def.catalog.name === name && typeof def.catalog.version === 'string'
 
 /**
  * Whether a catalogue entry is installed: its version (found by provenance, under any name), `other` when its name is
@@ -342,14 +342,14 @@ const held = new Map<string, Held>()
 /** The catalogue server read last, by source and name, or an error saying to refresh. */
 function listed(source: string, name: string): McpCatalogServer {
   const server = cache.get(source)?.catalog?.servers.find((x) => x.name === name)
-  if (!server || !catalogSources().some((s) => s.url === source)) throw hiveError(M.gone, { name }, { kind: 'notFound' })
+  if (!server || !catalogSources().some((s) => s.url === source)) throw combworkError(M.gone, { name }, { kind: 'notFound' })
   return server
 }
 
 /**
  * Downloads a catalogue server and checks it (its size and sha256 against the catalogue, its zip as #550 unpacks one,
  * one top folder named after it), for the Install or Update dialog to show what it would run. Refused before any
- * download when this PC doesn't meet a requirement Hive checked. Bound to the workspace that asked: held until the user
+ * download when this PC doesn't meet a requirement Combwork checked. Bound to the workspace that asked: held until the user
  * answers, at most 10 minutes, a few at a time.
  */
 export async function prepareCatalogServer(source: string, name: string): Promise<McpCatalogPrepared> {
@@ -357,18 +357,18 @@ export async function prepareCatalogServer(source: string, name: string): Promis
   const ws = currentWorkspace()
   const path = ws.path
   const life = ws.lifetime
-  if (!path || life.aborted) throw hiveError(M.workspaceGone, { name })
+  if (!path || life.aborted) throw combworkError(M.workspaceGone, { name })
   // Read once if it isn't yet (the view reads it first; Install from elsewhere may not have).
   if (!cache.has(source) && catalogSources().some((s) => s.url === source)) await refreshSource(source)
   const server = listed(source, name)
   const unmet = checksOf(server, await (facts ?? (facts = probeFacts()))).filter((c) => c.state === 'no')
-  if (unmet.length) throw hiveError(M.needs, { name, needs: { list: unmet.map((c) => c.label), type: 'conjunction' } }, { kind: 'conflict' })
+  if (unmet.length) throw combworkError(M.needs, { name, needs: { list: unmet.map((c) => c.label), type: 'conjunction' } }, { kind: 'conflict' })
   const got = await download(server.zip.url, policyOf(source), Math.min(server.zip.size, ZIP_MAX_BYTES), seconds(DOWNLOAD_SECONDS, 60) * 1000, life)
-  if (life.aborted) throw hiveError(M.workspaceGone, { name })
+  if (life.aborted) throw combworkError(M.workspaceGone, { name })
   const bytes = got!.bytes
-  if (bytes.length !== server.zip.size || createHash('sha256').update(bytes).digest('hex') !== server.zip.sha256) throw hiveError(M.mismatch, { name })
+  if (bytes.length !== server.zip.size || createHash('sha256').update(bytes).digest('hex') !== server.zip.sha256) throw combworkError(M.mismatch, { name })
   const z = serverFromZip(bytes)
-  if (z.folder !== name) throw hiveError(M.folder, { name })
+  if (z.folder !== name) throw combworkError(M.folder, { name })
   const def: McpServerDef = { ...retarget(z.def, z.folder, name), catalog: { source, name, version: server.version, sha256: server.zip.sha256 } }
   // Installed from this entry already (under any name: an update's), and whether its own name is taken.
   const { existing, nameTaken } = await inWorkspace(ws, async () => {
@@ -376,7 +376,7 @@ export async function prepareCatalogServer(source: string, name: string): Promis
     const m = all.find((x) => fromEntry(x.def, source, name))
     return { existing: m ? { name: m.name, version: m.def!.catalog!.version, def: m.def, revision: m.revision, runs: m.runs, projects: m.projects, assistant: m.assistant } : null, nameTaken: all.some((x) => x.name === name) }
   })
-  if (life.aborted) throw hiveError(M.workspaceGone, { name })
+  if (life.aborted) throw combworkError(M.workspaceGone, { name })
   // An update of one installed under another name: shown, and written, under that name's folder.
   const shown = existing && existing.name !== name ? retarget(def, name, existing.name) : def
   const prepared: McpCatalogPrepared = { id: randomUUID(), source, server, def: shown, runs: mcpRuns(shown), secretWarnings: findSecretWarnings(shown), files: z.files.size, existing, nameTaken }
@@ -392,11 +392,11 @@ function heldFor(id: string): Held {
   const h = held.get(id)
   if (!h || Date.now() - h.at > PREPARED_MS) {
     held.delete(id)
-    throw hiveError(M.expired, undefined, { kind: 'conflict' })
+    throw combworkError(M.expired, undefined, { kind: 'conflict' })
   }
   if (h.life.aborted || h.ws.lifetime !== h.life || h.ws.path !== h.path) {
     held.delete(id)
-    throw hiveError(M.workspaceGone, { name: h.prepared.server.name }, { kind: 'conflict' })
+    throw combworkError(M.workspaceGone, { name: h.prepared.server.name }, { kind: 'conflict' })
   }
   return h
 }
@@ -412,7 +412,7 @@ export function dropPrepared(id: string): void {
  */
 export async function installCatalogServer(id: string, name: string, replace: boolean): Promise<void> {
   const h = heldFor(id)
-  if (!validMcpName(name)) throw hiveError(msg({ id: 'mcp.catalog.badName', defaultMessage: 'Server names may contain letters, numbers, "-" and "_" (max 64 characters). "hive" is reserved.', description: 'An error installing a catalogue server (HI-545) under a name a server can\'t have.' }), undefined, { kind: 'invalid' })
+  if (!validMcpName(name)) throw combworkError(msg({ id: 'mcp.catalog.badName', defaultMessage: 'Server names may contain letters, numbers, "-" and "_" (max 64 characters). "combwork" is reserved.', description: 'An error installing a catalogue server (HI-545) under a name a server can\'t have. Keep combwork as it is (Combwork\'s own server).' }), undefined, { kind: 'invalid' })
   const p = h.prepared
   const def = name === p.server.name ? p.def : { ...retarget(p.def, p.server.name, name) }
   await inTurn(() =>
@@ -455,7 +455,7 @@ export async function updateCatalogServer(id: string, shown: McpShown, places: {
     inWorkspace(h.ws, async () => {
       heldFor(id)
       const now = (await listMcp()).find((m) => m.name === name)
-      if (!now || !fromEntry(now.def, p.source, p.server.name)) throw hiveError(M.notInstalled, { name }, { kind: 'conflict' })
+      if (!now || !fromEntry(now.def, p.source, p.server.name)) throw combworkError(M.notInstalled, { name }, { kind: 'conflict' })
       try {
         await checkShown(name, shown)
       } catch (e) {

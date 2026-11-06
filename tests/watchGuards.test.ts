@@ -1,6 +1,6 @@
 // Guards on an agent's new watch (HI-2197): a plain number that reads as another card's key is refused, naming both,
 // never remapped (2189 was HI-2182's number while HB3's card was HI-2189); a number with no such key, `#N` and keys go
-// on; a card outside the agent's project stays unknown. A watch is refused while Hive is giving the agent a card in a
+// on; a card outside the agent's project stays unknown. A watch is refused while Combwork is giving the agent a card in a
 // slot (its own start), as it would hold that placement off; and a start that leaves its placement due ends the
 // caller's watch.
 import { mkdirSync, writeFileSync } from 'fs'
@@ -12,7 +12,7 @@ import { tempDir } from './tempDir'
 const slot = vi.hoisted(() => ({ due: null as null | { slot: string; lease: string } }))
 vi.mock('../src/main/slotCards', async (orig) => ({ ...(await orig<object>()), placementDue: async () => slot.due }))
 
-const base = tempDir('hive-watchguards-')
+const base = tempDir('cw-watchguards-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -33,8 +33,8 @@ let A = ''
 
 beforeAll(async () => {
   for (const name of ['alpha', 'beta']) {
-    mkdirSync(join(wsPath, name, '.hive'), { recursive: true })
-    writeFileSync(join(wsPath, name, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }] }))
+    mkdirSync(join(wsPath, name, '.combwork'), { recursive: true })
+    writeFileSync(join(wsPath, name, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }] }))
   }
   w = createWorkspaceService()
   await w.open(wsPath)
@@ -83,13 +83,13 @@ describe("an agent's plain number in a watch (HI-2197)", () => {
   })
 })
 
-describe("a watch while Hive is giving the agent a card in a slot (HI-2197)", () => {
+describe("a watch while Combwork is giving the agent a card in a slot (HI-2197)", () => {
   it('refused, naming the card and slot, only while a placement of its own Active card is due', async () => {
     const [key, number] = pCards()[0]
     await run(() => tasks.updateTask(number, { column: 'doing' }, user))
     expect(await run(() => watchWhilePlaced(w, p, 'a1'))).toBeNull()
     slot.due = { slot: 'slot-b', lease: 'l-1' }
-    expect(await run(() => watchWhilePlaced(w, p, 'a1'))).toBe(`Hive is giving you ${key} in slot-b: end your turn with no watch. The card comes to you as a task; a watch now would hold it off.`)
+    expect(await run(() => watchWhilePlaced(w, p, 'a1'))).toBe(`Combwork is giving you ${key} in slot-b: end your turn with no watch. The card comes to you as a task; a watch now would hold it off.`)
     // Another agent has no card coming.
     expect(await run(() => watchWhilePlaced(w, p, 'a2'))).toBeNull()
     await run(() => tasks.updateTask(number, { column: 'todo' }, user))

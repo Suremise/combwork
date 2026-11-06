@@ -39,7 +39,7 @@ const commit = (cwd: string, file: string): void => {
  * with one commit of its own, and the project folder on main.
  */
 async function project(): Promise<{ project: ProjectInfo; slot: string }> {
-  root = tempDir('hive-branchwatch-')
+  root = tempDir('cw-branchwatch-')
   const p = join(root, 'project')
   run(root, 'init', '-q', '-b', 'main', p)
   for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) run(p, 'config', k, v)
@@ -49,7 +49,7 @@ async function project(): Promise<{ project: ProjectInfo; slot: string }> {
   commit(p, 'c.txt')
   run(p, 'checkout', '-q', 'main')
   const slot = join(root, 'slot-a')
-  await createWorktree(p, slot, 'hive/P/P-1-fix', '1.0.0')
+  await createWorktree(p, slot, 'cw/P/P-1-fix', '1.0.0')
   commit(slot, 'fix.txt')
   return { project: { path: p, name: 'project', agents: [] } as unknown as ProjectInfo, slot }
 }
@@ -57,26 +57,26 @@ async function project(): Promise<{ project: ProjectInfo; slot: string }> {
 describe("an agent's line, counted against where it merges (#1627)", () => {
   it("a slot's line with a target: counted against it, not the project folder's branch", async () => {
     const { project: pr, slot } = await project()
-    const st = await lineStatus({ project: pr, worktree: { path: slot, branch: 'hive/P/P-1-fix', base: '1.0.0' }, slot: true, target: '1.0.0' })
+    const st = await lineStatus({ project: pr, worktree: { path: slot, branch: 'cw/P/P-1-fix', base: '1.0.0' }, slot: true, target: '1.0.0' })
     expect(st).toMatchObject({ into: '1.0.0', ahead: 1, dirty: 0 })
   })
 
   it("a slot's line with no target: counted against the default branch, though the project folder has another checked out", async () => {
     const { project: pr, slot } = await project()
     run(pr.path, 'checkout', '-q', '1.0.0')
-    const st = await lineStatus({ project: pr, worktree: { path: slot, branch: 'hive/P/P-1-fix', base: '' }, slot: true })
+    const st = await lineStatus({ project: pr, worktree: { path: slot, branch: 'cw/P/P-1-fix', base: '' }, slot: true })
     // main lacks 1.0.0's two commits and the line's own one.
     expect(st).toMatchObject({ into: 'main', base: 'main', ahead: 3 })
   })
 
   it("a slot's line whose branch isn't made yet: nothing to count, and no error", async () => {
     const { project: pr, slot } = await project()
-    await expect(lineStatus({ project: pr, worktree: { path: slot, branch: 'hive/P/P-2-not-yet', base: '1.0.0' }, slot: true, target: '1.0.0' })).resolves.toBeNull()
+    await expect(lineStatus({ project: pr, worktree: { path: slot, branch: 'cw/P/P-2-not-yet', base: '1.0.0' }, slot: true, target: '1.0.0' })).resolves.toBeNull()
   })
 
   it("a 0.9 worktree's: counted against the project folder's branch, which its Merge… merges into", async () => {
     const { project: pr, slot } = await project()
-    const st = await lineStatus({ project: pr, worktree: { path: slot, branch: 'hive/P/P-1-fix', base: '1.0.0' } })
+    const st = await lineStatus({ project: pr, worktree: { path: slot, branch: 'cw/P/P-1-fix', base: '1.0.0' } })
     expect(st).toMatchObject({ into: 'main', ahead: 3 })
   })
 })
@@ -84,29 +84,29 @@ describe("an agent's line, counted against where it merges (#1627)", () => {
 describe('branches that are gone, and agents that moved to slots (HI-1698)', () => {
   it("an agent's 0.9 branch deleted with its worktree: nothing to count, no error", async () => {
     const { project: pr, slot } = await project()
-    await expect(lineStatus({ project: pr, agentId: 'hb1', worktree: { path: join(root, 'gone'), branch: 'hive/hb1', base: 'main' } })).resolves.toBeNull()
+    await expect(lineStatus({ project: pr, agentId: 'hb1', worktree: { path: join(root, 'gone'), branch: 'cw/hb1', base: 'main' } })).resolves.toBeNull()
     // A slot's line the same.
-    await expect(lineStatus({ project: pr, agentId: 'hb1', worktree: { path: slot, branch: 'hive/hb1', base: '' }, slot: true })).resolves.toBeNull()
+    await expect(lineStatus({ project: pr, agentId: 'hb1', worktree: { path: slot, branch: 'cw/hb1', base: '' }, slot: true })).resolves.toBeNull()
   })
 
   it("a card's line deleted after its merge: nothing to count, no error", async () => {
     const { project: pr, slot } = await project()
     run(slot, 'checkout', '-q', '--detach')
-    run(pr.path, 'branch', '-D', 'hive/P/P-1-fix')
-    await expect(lineStatus({ project: pr, agentId: 'hb2', worktree: { path: slot, branch: 'hive/P/P-1-fix', base: '1.0.0' }, slot: true, target: '1.0.0' })).resolves.toBeNull()
+    run(pr.path, 'branch', '-D', 'cw/P/P-1-fix')
+    await expect(lineStatus({ project: pr, agentId: 'hb2', worktree: { path: slot, branch: 'cw/P/P-1-fix', base: '1.0.0' }, slot: true, target: '1.0.0' })).resolves.toBeNull()
   })
 
   it("a migrated agent's 0.9 worktree, its branch still there, isn't its line any more", async () => {
     const { project: pr, slot } = await project()
     setSlotsMigrated(() => ['hb3'])
-    await expect(lineStatus({ project: pr, agentId: 'hb3', worktree: { path: slot, branch: 'hive/P/P-1-fix', base: 'main' } })).resolves.toBeNull()
+    await expect(lineStatus({ project: pr, agentId: 'hb3', worktree: { path: slot, branch: 'cw/P/P-1-fix', base: 'main' } })).resolves.toBeNull()
     // One not migrated still counts it, as before.
-    expect(await lineStatus({ project: pr, agentId: 'hb9', worktree: { path: slot, branch: 'hive/P/P-1-fix', base: '1.0.0' } })).toMatchObject({ ahead: 3 })
+    expect(await lineStatus({ project: pr, agentId: 'hb9', worktree: { path: slot, branch: 'cw/P/P-1-fix', base: '1.0.0' } })).toMatchObject({ ahead: 3 })
   })
 
   it("a slot's line with no card target counts against the project's target (1.0.0), not main", async () => {
     const { project: pr, slot } = await project()
     projectTarget.value = '1.0.0'
-    expect(await lineStatus({ project: pr, worktree: { path: slot, branch: 'hive/P/P-1-fix', base: '' }, slot: true })).toMatchObject({ into: '1.0.0', ahead: 1 })
+    expect(await lineStatus({ project: pr, worktree: { path: slot, branch: 'cw/P/P-1-fix', base: '' }, slot: true })).toMatchObject({ into: '1.0.0', ahead: 1 })
   })
 })

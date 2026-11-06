@@ -1,5 +1,5 @@
 {
-  "schema": "hive-benchmark/1",
+  "schema": "combwork-benchmark/1",
   "kind": "scenarios",
   "app": {
     "name": "Hive",
@@ -123,8 +123,8 @@
             "skillBytesRead": 0,
             "skillTooLarge": 0,
             "dropped": 0,
-            "hiveCalls": 3,
-            "hiveCallErrors": 0,
+            "combworkCalls": 3,
+            "combworkCallErrors": 0,
             "repeatedCalls": 0,
             "skillsRead": 1,
             "usage": {
@@ -233,8 +233,8 @@
             "skillBytesRead": 0,
             "skillTooLarge": 0,
             "dropped": 0,
-            "hiveCalls": 2,
-            "hiveCallErrors": 0,
+            "combworkCalls": 2,
+            "combworkCallErrors": 0,
             "repeatedCalls": 0,
             "skillsRead": 1,
             "usage": {
@@ -341,8 +341,8 @@
             "skillBytesRead": 0,
             "skillTooLarge": 0,
             "dropped": 0,
-            "hiveCalls": 1,
-            "hiveCallErrors": 0,
+            "combworkCalls": 1,
+            "combworkCallErrors": 0,
             "repeatedCalls": 0,
             "skillsRead": 0,
             "usage": {
@@ -443,8 +443,8 @@
             "skillBytesRead": 0,
             "skillTooLarge": 0,
             "dropped": 0,
-            "hiveCalls": 3,
-            "hiveCallErrors": 0,
+            "combworkCalls": 3,
+            "combworkCallErrors": 0,
             "repeatedCalls": 0,
             "skillsRead": 1,
             "usage": {

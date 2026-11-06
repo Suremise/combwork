@@ -1,0 +1,1018 @@
+{
+  "reply.agent.backgroundTasks": {
+    "text": "{n, plural, one {{n} background task} other {{n} background tasks}}",
+    "note": "How many background tasks an agent runs, in a card row's agent."
+  },
+  "reply.agent.status.background": {
+    "text": "waiting on background tasks",
+    "note": "An agent's status: its turn ended with background tasks running."
+  },
+  "reply.agent.status.idle": {
+    "text": "idle",
+    "note": "An agent's status in a card row or project row: ready or finished."
+  },
+  "reply.agent.status.signin": {
+    "text": "waiting for the user to sign in",
+    "note": "An agent's status: its CLI's sign-in expired."
+  },
+  "reply.agent.status.waiting": {
+    "text": "waiting for the user",
+    "note": "An agent's status: it waits for the user."
+  },
+  "reply.agent.status.watching": {
+    "text": "waiting for cards",
+    "note": "An agent's status: it waits on a card watch."
+  },
+  "reply.agentWatch.cardEnded": {
+    "text": "Your card watch ({watch}) has ended.",
+    "note": "An agent watch met at once ends the card watch before it."
+  },
+  "reply.agentWatch.dropped": {
+    "text": "It replaces your watch on {agents}: pass every agent you're following.",
+    "note": "#1346 item 6: the agents the earlier agent watch followed and this call doesn't."
+  },
+  "reply.agentWatch.droppedEnded": {
+    "text": "Your watch on {agents} has ended: watch again, passing every agent you're following.",
+    "note": "An agent watch met at once ends the earlier one too (#1346 item 6)."
+  },
+  "reply.agentWatch.replaced": {
+    "text": "It replaces your card watch ({watch}).",
+    "note": "An agent watch begun (#416): the card watch it replaced."
+  },
+  "reply.agentWatch.watching": {
+    "text": "{watching}. End your turn now: Combwork types a line into this session when one finishes, waits for the user or stops, or at {limit} if none does. Nothing runs meanwhile.",
+    "note": "An agent watch begun (#416): end the turn, and what wakes it."
+  },
+  "reply.ask.assistant": {
+    "text": "{card}: asked the Assistant ({delivery} in its inbox). Its answer comes to your inbox.",
+    "note": "cw_ask_assistant (HI-1866): the request's id in the Assistant's inbox ({delivery}, m41)."
+  },
+  "reply.ask.assistantNone": {
+    "text": "{card}: your request is on the card, but the Assistant couldn't be given it; the user is told. Ask the user instead (cw_ask_user).",
+    "note": "cw_ask_assistant (HI-1866) when the request couldn't be delivered to the Assistant. {card} is the card's key."
+  },
+  "reply.attachment.bytes": {
+    "text": "{n, number} bytes",
+    "note": "An attachment's size (HI-1751)."
+  },
+  "reply.attachment.file": {
+    "text": "{name}: {kind, select, binary {not text} pdf {a PDF} other {an image}} ({size}). Open it with your own file reading: {path}",
+    "note": "cw_read_attachment (HI-1751) for an image, a PDF or a binary file: its path, for the CLI's own reading."
+  },
+  "reply.attachment.range": {
+    "text": "bytes {from, number}–{to, number} of {size}",
+    "note": "cw_read_attachment: which bytes of the file this page is."
+  },
+  "reply.attachment.text": {
+    "text": "{name} ({where}{hasNext, select, yes {; more from offset {next}} other {}})",
+    "note": "cw_read_attachment: which bytes this is, and the byte offset the next page starts at (to pass back as offset); the text follows as it is."
+  },
+  "reply.batch.changed": {
+    "text": "{n, plural, one {{n} card} other {{n} cards}} changed:",
+    "note": "A batch change (reply: short): how many cards changed, each on a line below."
+  },
+  "reply.batch.none": {
+    "text": "No card changed.",
+    "note": "A batch change in which no card changed."
+  },
+  "reply.batch.refused": {
+    "text": "Refused, left as they were: {list}.",
+    "note": "A batch change: the cards refused, each with why (joined by \"; \")."
+  },
+  "reply.batch.refusedRule": {
+    "text": "Refused, left as it was: {named, select, yes {} other {{ref}: }}{error} ({rule})",
+    "note": "A batch change: a card refused by its rules (HI-2238), named first where its message doesn't name it, then the message and the rule; its next step and who can change it follow on lines of their own."
+  },
+  "reply.card.changed": {
+    "text": "{card} {title}: {what}. Now in {place}{hasProject, select, yes {, {project}} other {}}{hasAgent, select, yes {, {agent}} other {}}.",
+    "note": "A card changed (reply: short): its name and title, what changed (or reply.card.noChange), and where it is now, its project and its agent."
+  },
+  "reply.card.created": {
+    "text": "{card} created in {place}{forProject, select, yes { for {project}} other {}}{givenTo, select, yes {, given to {agent}} other {}}: {title}{changed, select, yes {. {changes}} other {}}",
+    "note": "A new card (reply: short): its name (key and number), where it is, its project and agent, its title and the changes made with it (joined by \"; \")."
+  },
+  "reply.card.noChange": {
+    "text": "No change",
+    "note": "What changed on a card when nothing did, in reply.card.changed."
+  },
+  "reply.card.place": {
+    "text": "{column} ({position} of {of})",
+    "note": "Where a card is now: its column's name and its place in it (an ordinal such as 51st, of how many)."
+  },
+  "reply.checks.hint": {
+    "text": "before review: run one with cw-progress --check <name> --card \"{card}\" {isolated, select, yes {(--isolated: in a check copy at the card's revision; work-on-card)} other {(work-on-card)}}",
+    "note": "A code card's checks before review (HI-2276): how to run one, with <name> left for the agent to fill (a configured name is never quoted into a command, HR1's rounds 1 and 2). {card} is the card's key; isolated: its platform can make a check copy."
+  },
+  "reply.connection.accountBare": {
+    "text": "Account {name} (id {id}), {cli}: no connections{off, select, yes {, off here} other {}}",
+    "note": "cw_connection list: an account with no connections."
+  },
+  "reply.connection.args": {
+    "text": "args {args}",
+    "note": "A connection's extra arguments for its CLI."
+  },
+  "reply.connection.changed": {
+    "text": "{verb, select, Changed {Changed} other {Made}} {name} (id {id}) on {account}: {values}.{verb, select, Changed { Running agents on it take it when restarted.} other {}}",
+    "note": "cw_connection add or update (HI-2108): what it is now."
+  },
+  "reply.connection.cliDefaults": {
+    "text": "the CLI's defaults",
+    "note": "A connection with no values of its own."
+  },
+  "reply.connection.context200k": {
+    "text": "200K",
+    "note": "A connection's value: the 200K context window."
+  },
+  "reply.connection.none": {
+    "text": "No connections: the user adds an account in Settings → Accounts & Connections.",
+    "note": "cw_connection list with none."
+  },
+  "reply.connection.row": {
+    "text": "{name} (id {id}) on {account}, {cli}: {values}{unusable, select, yes {. Not usable here: its account is off} other {}}",
+    "note": "cw_connection list (HI-2108): a connection, its account and CLI, its values, and whether it is usable here."
+  },
+  "reply.connection.tag": {
+    "text": "tag {tag}",
+    "note": "A connection's free-text tag (HI-2530), which a usage move matches by."
+  },
+  "reply.connection.unknownCli": {
+    "text": "unknown CLI",
+    "note": "A connection whose CLI isn't known."
+  },
+  "reply.console.cut": {
+    "text": "[cut]",
+    "note": "A console event's mark: its summary was cut."
+  },
+  "reply.console.gone": {
+    "text": "Not in its buffer now: {events}.",
+    "note": "Events asked for in full that are no longer kept."
+  },
+  "reply.console.more": {
+    "text": "Sources {from}–{to} of {total}: offset={to} for more.",
+    "note": "cw_console sources, one page: which, and the offset for more."
+  },
+  "reply.console.newer": {
+    "text": "{n} more after these.",
+    "note": "A read of events: how many more after these."
+  },
+  "reply.console.next": {
+    "text": "Next: since={newest}. seq=[n] gives an event's raw payload and what Combwork made of it.",
+    "note": "A read of events: the since for the next one, and how to read one in full."
+  },
+  "reply.console.noEvents": {
+    "text": "{label}: captured by the open console; no events{hasNewest, select, yes { after #{newest}} other { yet}}.",
+    "note": "A read with no events (after the one given)."
+  },
+  "reply.console.none": {
+    "text": "No developer console sources you can read.",
+    "note": "cw_console (#636) with no sources."
+  },
+  "reply.console.notCaptured": {
+    "text": "not captured: the developer console isn't open on it (Combwork captures only while the user has it open), so there is nothing to read.",
+    "note": "A read of a source no open console captures: there is nothing to read, and why."
+  },
+  "reply.console.older": {
+    "text": "{n} earlier not shown.",
+    "note": "A read of events: how many earlier ones are not shown."
+  },
+  "reply.console.row": {
+    "text": "{label}{hasProvider, select, yes { ({provider})} other {}}: {capturing, select, yes {captured, {events} events} other {not captured}} [{args}]",
+    "note": "A developer console source: its label, its provider, whether an open console captures it, and the arguments cw_console takes for it."
+  },
+  "reply.doc.noHeadings": {
+    "text": "{path} ({size} characters) has no headings: read it whole.",
+    "note": "cw_doc_outline (#817) for a document with no headings."
+  },
+  "reply.doc.outline": {
+    "text": "{path}: {n} headings, {size} characters. [slug] and size per section (subsections included):",
+    "note": "cw_doc_outline's first line (#817); a line per heading follows, with its slug in brackets."
+  },
+  "reply.doc.outlineMore": {
+    "text": "… {n} more: depth={depth} lists fewer.",
+    "note": "cw_doc_outline cut at 200 headings: how many more, and the depth that lists fewer."
+  },
+  "reply.doc.outlineRead": {
+    "text": "cw_read_section reads one as #<slug>.",
+    "note": "cw_doc_outline's last line."
+  },
+  "reply.doc.section": {
+    "text": "{path}#{slug} ({size, number} characters)",
+    "note": "cw_read_section: where the section is and its size; its text follows as it is."
+  },
+  "reply.doc.sectionLong": {
+    "text": "{head}: long, so here is its text before its subsections, then their outline.",
+    "note": "cw_read_section for a long section: its own text, then its subsections' outline."
+  },
+  "reply.doc.sectionRead": {
+    "text": "cw_read_section reads one of them as #<slug>, or this whole section with full=true.",
+    "note": "cw_read_section's last line for a long section."
+  },
+  "reply.doc.whole": {
+    "text": "{path} ({size, number} characters)",
+    "note": "cw_read_section with no heading (#818): the whole document and its size."
+  },
+  "reply.intent.done": {
+    "text": "done",
+    "note": "An intent's reply when it names no stages (#1267)."
+  },
+  "reply.intent.still": {
+    "text": "still {stage}",
+    "note": "An intent's reply when the card stayed in its stage (#1267). {stage} is the stage's id (active, review…)."
+  },
+  "reply.journal.digest": {
+    "text": "Digest of {of}.",
+    "note": "A journal entry that digests others."
+  },
+  "reply.journal.head": {
+    "text": "#{id} {kind}{hasProject, select, yes { · {project}} other {}}, {at}{byCombwork, select, yes {, by Combwork} other {}}, importance {importance}{changed, select, yes {, changed {updatedAt}} other {}}",
+    "note": "A journal entry in full: its id, kind, project, when, who recorded it, its importance and when it changed."
+  },
+  "reply.journal.links": {
+    "text": "Links: {links}",
+    "note": "A journal entry's links (type and ref)."
+  },
+  "reply.journal.mark.byCombwork": {
+    "text": "by Combwork",
+    "note": "A journal entry's mark: Combwork recorded it."
+  },
+  "reply.journal.mark.detail": {
+    "text": "detail",
+    "note": "A journal entry's mark: it has detail (cw_journal_entry reads it)."
+  },
+  "reply.journal.mark.essential": {
+    "text": "essential",
+    "note": "A journal entry's mark: importance 3."
+  },
+  "reply.journal.mark.important": {
+    "text": "important",
+    "note": "A journal entry's mark: importance 2."
+  },
+  "reply.journal.mark.superseded": {
+    "text": "superseded by #{id}",
+    "note": "A journal entry's mark: the entry that superseded it."
+  },
+  "reply.journal.noMatch": {
+    "text": "No entries match \"{query}\".",
+    "note": "cw_journal_recall with a query nothing matches (#1031)."
+  },
+  "reply.journal.none": {
+    "text": "No entries.",
+    "note": "cw_journal_recall with no entries."
+  },
+  "reply.journal.supersededBy": {
+    "text": "Superseded by #{id}.",
+    "note": "A journal entry superseded by another."
+  },
+  "reply.journal.supersedes": {
+    "text": "Supersedes {ids}.",
+    "note": "The entries a journal entry supersedes."
+  },
+  "reply.journal.tags": {
+    "text": "Tags: {tags}",
+    "note": "A journal entry's tags."
+  },
+  "reply.journal.why": {
+    "text": "Why: {why}",
+    "note": "A journal entry's why."
+  },
+  "reply.list.and": {
+    "text": "{a} and {b}",
+    "note": "Two items, or a list of them joined one by one (\"a and b and c\")."
+  },
+  "reply.list.column": {
+    "text": "{archived, select, yes {Archived, last in {column} ({n}):} other {{column} ({n}, top first):}}",
+    "note": "A column's heading in cw_list_tasks: its name and how many cards it has (top first: a column's order is its priority)."
+  },
+  "reply.list.more": {
+    "text": "{items} and {n} more",
+    "note": "A list cut short: the items shown, and how many more there are."
+  },
+  "reply.list.noArchived": {
+    "text": "No archived cards.",
+    "note": "cw_list_tasks with archived when there are none."
+  },
+  "reply.list.noCards": {
+    "text": "No cards.",
+    "note": "cw_list_tasks when there are none."
+  },
+  "reply.list.none": {
+    "text": "none",
+    "note": "An intent's empty list (start review's files, say)."
+  },
+  "reply.list.or": {
+    "text": "{a} or {b}",
+    "note": "Two choices, or a list of them joined one by one (\"a or b or c\")."
+  },
+  "reply.list.page": {
+    "text": "Cards {from}–{to} of {n}.",
+    "note": "cw_list_tasks from an offset: which cards this page has."
+  },
+  "reply.list.past": {
+    "text": "There are {n} cards: offset {offset} is past the last.",
+    "note": "cw_list_tasks's offset past the last card."
+  },
+  "reply.list.read": {
+    "text": "cw_read_task gives a card in full.",
+    "note": "cw_list_tasks's last line."
+  },
+  "reply.list.rest": {
+    "text": "…and {n} more: offset {next} carries on.",
+    "note": "cw_list_tasks cut at 200 rows: how many more, and the offset that carries on."
+  },
+  "reply.message.inbox": {
+    "text": "it waits in its inbox until it reads it with cw_inbox (the user can Deliver Now)",
+    "note": "cw_message_agent with no carrying-on switch on: the message waits in its inbox."
+  },
+  "reply.message.queued": {
+    "text": "Queued for {who} ({id}{tied}, {status}): {how}; {queued} waiting. cw_agent_activity says when it is received and acked.",
+    "note": "cw_message_agent's reply for a message queued (#1497)."
+  },
+  "reply.message.tells": {
+    "text": "Combwork tells it {ways}",
+    "note": "cw_message_agent (#1497): how Combwork tells the agent of the message (joined with reply.list.or)."
+  },
+  "reply.message.tells.checkpoints": {
+    "text": "at its next tool call",
+    "note": "How Combwork tells an agent of a message (#1432): at its next tool call."
+  },
+  "reply.message.tells.idleWakes": {
+    "text": "once it is idle",
+    "note": "How Combwork tells an agent of a message: once it is idle."
+  },
+  "reply.message.tells.stopContinuation": {
+    "text": "at its turn's end",
+    "note": "How Combwork tells an agent of a message: at its turn's end."
+  },
+  "reply.next.done": {
+    "text": "Done: nothing more on it.",
+    "note": "What comes next on a card (#1530): nothing, it is done."
+  },
+  "reply.next.intents": {
+    "text": "Next on it: {tools}.",
+    "note": "What comes next on a card under its rules (#1530): the intent tools it can take (joined with reply.list.or). An agent follows it rather than infer the step from a column."
+  },
+  "reply.next.merge": {
+    "text": "Next: its builder merges it, then reports the merge (cw_report_merge).",
+    "note": "What comes next on a card (#1530): its builder merges it."
+  },
+  "reply.next.queue": {
+    "text": "Next: Combwork's merge queue merges it.",
+    "note": "What comes next on a card (#1530): Combwork's merge queue merges it."
+  },
+  "reply.next.review": {
+    "text": "Next: a reviewer's verdict.",
+    "note": "What comes next on a card (#1530): it waits for a review."
+  },
+  "reply.next.user": {
+    "text": "Next: the user's OK, asked under For you: wait for it.",
+    "note": "What comes next on a card (#1530): the user's approval, asked under For you."
+  },
+  "reply.note.appended": {
+    "text": "Appended {n, number} characters to {path}{hasRevision, select, yes { (revision {revision})} other {}}.",
+    "note": "A note appended to: how much, and its new revision."
+  },
+  "reply.note.head": {
+    "text": "{path}{hasRevision, select, yes { (revision {revision})} other {}}",
+    "note": "A note or handover read: its path and its revision (for a write's expectedRevision); its text follows as it is."
+  },
+  "reply.note.wrote": {
+    "text": "Wrote {path} ({n, number} characters{hasRevision, select, yes {, revision {revision}} other {}}).",
+    "note": "A note written: how much, and its new revision."
+  },
+  "reply.notes.none": {
+    "text": "No shared notes yet.",
+    "note": "cw_list_shared_notes when there are none."
+  },
+  "reply.notes.read": {
+    "text": "cw_read_shared_note reads one.",
+    "note": "cw_list_shared_notes's last line."
+  },
+  "reply.notify.opens": {
+    "text": "Notification shown; a click opens {opens}.",
+    "note": "cw_notify (HI-1961): what a click on the notification opens (an agent or a card)."
+  },
+  "reply.notify.shown": {
+    "text": "Notification shown.",
+    "note": "cw_notify: the notification was shown."
+  },
+  "reply.progress": {
+    "text": "{title}{steps}{state, select, stopped {, stopped reporting} eta {, about {left} left} other {}}",
+    "note": "An agent's open progress run in a project row: its title (clipped), its steps (\" 4/12\") and the time left, or that it stopped reporting."
+  },
+  "reply.project.agent": {
+    "text": "{name} [{tags}] {state}{hasBackground, select, yes { ({background} background)} other {}}{hasProgress, select, yes { (running {progress})} other {}}",
+    "note": "An agent in a project row: its name, its provider, role and branch, its status (or what it waits for), its background tasks and its progress run."
+  },
+  "reply.project.head": {
+    "text": "{name} ({active, select, yes {on} other {off}}{hasBranch, select, yes {, {branch}} other {}})",
+    "note": "A project row (cw_list_projects): its name (with its workspace when there are several), on or off, and its branch."
+  },
+  "reply.project.noAgents": {
+    "text": "{head}: no agents",
+    "note": "A project row for a project with no agents."
+  },
+  "reply.project.none": {
+    "text": "No projects.",
+    "note": "cw_list_projects when there are none."
+  },
+  "reply.project.read": {
+    "text": "cw_project_status gives one project in full (its agents' ids and sessions, its settings).",
+    "note": "cw_list_projects's last line."
+  },
+  "reply.queue.cancelled": {
+    "text": "{key} cancelled ({reason})",
+    "note": "A recent outcome of the merge queue: cancelled, why."
+  },
+  "reply.queue.empty": {
+    "text": "empty",
+    "note": "A merge queue's state: nothing in it."
+  },
+  "reply.queue.filesMore": {
+    "text": "{files}, {n} more",
+    "note": "A list cut short (files, processes): those shown, and how many more."
+  },
+  "reply.queue.head": {
+    "text": "Merge queue for {target} in {project}: {state}.",
+    "note": "cw_queue list's line for a target's queue."
+  },
+  "reply.queue.how": {
+    "text": "to {purpose}, in the {place, select, project {project folder} other {target's folder}}: {command}",
+    "note": "A merge queue stopped part way (#1351): a command that settles it, what for and where to run it. Joined by \"; \", its first letter made a capital."
+  },
+  "reply.queue.merged": {
+    "text": "{key} merged ({result}{outside, select, yes {, outside Combwork} other {}})",
+    "note": "A recent outcome of the merge queue: merged, at which commit."
+  },
+  "reply.queue.none": {
+    "text": "No merge queue in {project}: no card has been queued, and none is paused.",
+    "note": "cw_queue list with no queue."
+  },
+  "reply.queue.paused": {
+    "text": "paused ({reason}{by, select, user {, by the user} assistant {, by the Assistant} other {}}{hasCard, select, yes {, at {card}} other {}}{hasFiles, select, yes {: {files}} other {}})",
+    "note": "A merge queue's state (#1353): paused, why, by whom, at which card and on which files."
+  },
+  "reply.queue.queued": {
+    "text": "Queued: {entries}{hasMore, select, yes {; {more} more} other {}}.",
+    "note": "The entries waiting in the merge queue, in order."
+  },
+  "reply.queue.recent": {
+    "text": "Recent: {outcomes}.",
+    "note": "The merge queue's latest outcomes, newest first."
+  },
+  "reply.queue.returned": {
+    "text": "{key} returned ({reason}{transient, select, yes {, transient} other {}}{hasFiles, select, yes {: {files}} other {}})",
+    "note": "A recent outcome of the merge queue: returned, why, and its files."
+  },
+  "reply.queue.runBy": {
+    "text": "run by {by}",
+    "note": "A merge queue's state: another Combwork runs it."
+  },
+  "reply.queue.running": {
+    "text": "running",
+    "note": "A merge queue's state: running."
+  },
+  "reply.queue.stillPaused": {
+    "text": "Still paused: its cause is still there. {queue}",
+    "note": "Resume while the cause is still there: the queue as it is now."
+  },
+  "reply.queue.stuck": {
+    "text": "Stopped part way ({phase}): {hasBranch, select, yes {the folder is on {branch}} other {the folder has no branch}}, {target} at {ref} (expected {expected}, result {result}){hasFiles, select, yes {; files {files}} other {}}.",
+    "note": "An advance into the checked-out target left part way (#1351): where it stands; how to settle it follows."
+  },
+  "reply.queue.testing": {
+    "text": "Testing: {key} {title} at {revision}{hasStep, select, yes { ({step})} other {}}.",
+    "note": "The entry the merge queue is testing, and its step."
+  },
+  "reply.read.commentsInvalid": {
+    "text": "comments must be a whole number from 0: \"{raw}\"",
+    "note": "GET /v1/tasks/{n}'s comments= (HI-2412) was not a whole number from 0. {raw} is what was given."
+  },
+  "reply.release.carried": {
+    "text": "{slot}: kept for {agent} (kind carried).",
+    "note": "cw_release_slot list: a slot kept for an agent (kind is what release takes)."
+  },
+  "reply.release.held": {
+    "text": "{slot}: held by {agent}'s ended run {run}, its Combwork {combwork} (kind writer, confirm '{'\"slot\":\"{slot}\",\"run\":\"{run}\"'}').",
+    "note": "cw_release_slot list: a slot held by an ended run, and the confirm release takes (JSON: keep it as it is)."
+  },
+  "reply.release.none": {
+    "text": "Nothing to release in {project}: no slot is kept for an agent, and no ended run holds one.",
+    "note": "cw_release_slot list (#1561) with nothing to release."
+  },
+  "reply.release.processes": {
+    "text": "Its run left running: {processes} (end: true ends them first).",
+    "note": "cw_release_slot list: a held writer's processes still running."
+  },
+  "reply.release.releasedCarried": {
+    "text": "Released {slot} in {project}: no longer kept for {agent}; its folder and branch stay.",
+    "note": "cw_release_slot release of a carried slot."
+  },
+  "reply.release.releasedWriter": {
+    "text": "Released {slot} in {project}: {agent}'s ended run no longer holds it{ended, select, yes {, its listed processes ended first} other {}}.",
+    "note": "cw_release_slot release of a writer's slot."
+  },
+  "reply.release.unknown": {
+    "text": "Combwork doesn't know which of its processes still run.",
+    "note": "cw_release_slot list: a held writer's processes are not known."
+  },
+  "reply.reorder": {
+    "text": "{column} now starts {cards}{more, select, yes {; its other {rest, plural, one {{rest} card} other {{rest} cards}} keep their order below} other {}}.",
+    "note": "A reorder (reply: short): the cards now at the top of the column, and how many others keep their order."
+  },
+  "reply.reorder.laneOrder": {
+    "text": "{cards} {one, select, yes {is} other {are}} on {builder}'s lane ({lane}), which keeps its own order and takes {one, select, yes {it} other {them}} in that order. To change it: cw_lane start with its cards in the new order (applyNow: true to apply it now).",
+    "note": "HI-2267: put back or reordered on the board, a lane's card is still where its lane's own list has it. The Assistant, calling the tools without a skill, reordered the column and was told nothing of it."
+  },
+  "reply.row.after": {
+    "text": "after {cards}",
+    "note": "A card row: the cards it waits for."
+  },
+  "reply.row.agent": {
+    "text": "{name} ({state})",
+    "note": "A card row's agent: its name, its status and background tasks (joined by \", \")."
+  },
+  "reply.row.blocked": {
+    "text": "blocked: {why}",
+    "note": "A card row (cw_list_tasks): why it is blocked."
+  },
+  "reply.row.comments": {
+    "text": "{n, plural, one {{n} comment} other {{n} comments}}",
+    "note": "A card row: how many comments it has."
+  },
+  "reply.row.elsewhere": {
+    "text": "{card} (another project)",
+    "note": "A card row: a card it waits for that is another project's."
+  },
+  "reply.row.reviewing": {
+    "text": "reviewing: {name}{stalled, select, yes { (stalled: {why})} other {}}",
+    "note": "A card row: the agent reviewing it, and why that has stalled if it has."
+  },
+  "reply.row.stalled": {
+    "text": "stalled: {why}",
+    "note": "A card row: why it has stalled."
+  },
+  "reply.row.waiting": {
+    "text": "waiting: {why}",
+    "note": "A card row (cw_list_tasks, HI-2618): the card in Doing waits on purpose, and why (its own words)."
+  },
+  "reply.setting.changed": {
+    "text": "Changed {path}{hasProject, select, yes { in {project}} other {}} ({id}): {old} → {new}. {hasRestart, select, yes {It applies {restart}.} other {It applies now.}} The user can undo it in your panel's list.",
+    "note": "cw_update_setting's reply: what changed, old → new, and when it applies."
+  },
+  "reply.setting.docs": {
+    "text": "User guide: \"{docs}\".",
+    "note": "cw_read_setting: the user guide's section on it."
+  },
+  "reply.setting.head": {
+    "text": "{title} ({id}){hasProject, select, yes { in {project}} other {}}: {value}{isDefault, select, yes { (the default)} other { (default {def})}}",
+    "note": "cw_read_setting's first line: the setting, its project, its value and its default."
+  },
+  "reply.setting.helps": {
+    "text": "When it helps: {helps}",
+    "note": "cw_read_setting: when the setting helps."
+  },
+  "reply.setting.inherit": {
+    "text": "Set to inherit:",
+    "note": "cw_list_settings (HI-1712): those set to inherit come last, under this line."
+  },
+  "reply.setting.more": {
+    "text": "… {n} more: offset {next} carries on.",
+    "note": "cw_list_settings cut at 200: how many more, and the offset that carries on."
+  },
+  "reply.setting.noMatch": {
+    "text": "No setting matches \"{query}\".",
+    "note": "cw_list_settings with a query nothing matches."
+  },
+  "reply.setting.none": {
+    "text": "No settings.",
+    "note": "cw_list_settings with none."
+  },
+  "reply.setting.readOnly": {
+    "text": "Read-only to you: {why}",
+    "note": "cw_read_setting: the Assistant can't change it, and why."
+  },
+  "reply.setting.restart": {
+    "text": "A change applies {restart}.",
+    "note": "cw_read_setting: when a change applies."
+  },
+  "reply.setting.row": {
+    "text": "{id} = {value}{hasDefault, select, yes { (default {def})} other {}}{readOnly, select, yes { [read-only]} other {}}",
+    "note": "A setting in cw_list_settings: its id, its value, its default when it differs, and whether it is read-only to the Assistant."
+  },
+  "reply.setting.same": {
+    "text": "{path}{hasProject, select, yes { ({project})} other {}} was already {value}: nothing changed.",
+    "note": "cw_update_setting when the value was already so."
+  },
+  "reply.setting.shownAs": {
+    "text": "The user sees it as: {shownAs}.",
+    "note": "cw_read_setting (#767): where the user sees it, in the language Combwork shows them."
+  },
+  "reply.setting.where": {
+    "text": "Where: {path}. Takes {takes}.",
+    "note": "cw_read_setting: where the user finds it, and what it takes."
+  },
+  "reply.size.thousands": {
+    "text": "{n}k",
+    "note": "A size in characters, short: 3.2k, 56k. {n} is the thousands, as the code rounds them."
+  },
+  "reply.skill.for": {
+    "text": "for {audience, select, all {agents and the Assistant} assistant {the Assistant} other {agents}}",
+    "note": "Who a Combwork skill is for."
+  },
+  "reply.skill.level.cw": {
+    "text": "Combwork",
+    "note": "Where a skill comes from in cw_list_skills: Combwork's own."
+  },
+  "reply.skill.level.local": {
+    "text": "local",
+    "note": "Where a skill comes from: the project's own."
+  },
+  "reply.skill.level.machine": {
+    "text": "user",
+    "note": "Where a skill comes from: the user's own, on this machine."
+  },
+  "reply.skill.level.plugin": {
+    "text": "plugin",
+    "note": "Where a skill comes from: a plugin."
+  },
+  "reply.skill.line": {
+    "text": "{name} ({where}): {description}",
+    "note": "A skill in cw_list_skills: its name, where it comes from and who it is for, and what it is for."
+  },
+  "reply.skill.noDescription": {
+    "text": "no description",
+    "note": "A skill with no description."
+  },
+  "reply.skill.nobody": {
+    "text": "given to nobody: {problem}",
+    "note": "A Combwork skill nobody gets (its header is broken or its audience unknown), and why."
+  },
+  "reply.skill.none": {
+    "text": "No skills.",
+    "note": "cw_list_skills when there are none."
+  },
+  "reply.slot.free": {
+    "text": "it is free",
+    "note": "Who holds a merge slot: nobody."
+  },
+  "reply.slot.held": {
+    "text": "You hold the merge slot for {branch}{extended, select, yes { (extended)} other {}}, {left} left. Release it once merged.",
+    "note": "A claim of the merge slot: held, and how long is left."
+  },
+  "reply.slot.heldMark": {
+    "text": "{branch} ({held, select, yes {held} other {waiting}})",
+    "note": "A merge slot the agent holds or waits for (#586)."
+  },
+  "reply.slot.left": {
+    "text": "Left the line for the merge slot for {branch}.",
+    "note": "A release while waiting in line."
+  },
+  "reply.slot.lost": {
+    "text": "Your earlier hold on the merge slot for {branch} ended: {why}.",
+    "note": "The merge slot (#350): the agent's earlier hold ended, and why; the reply's own line follows."
+  },
+  "reply.slot.noOther": {
+    "text": "You hold and wait for no other merge slot of this project.",
+    "note": "A release of a slot not held, when the agent has no other."
+  },
+  "reply.slot.notHeld": {
+    "text": "You don't hold the merge slot for {branch} ({holder}).",
+    "note": "A release of a slot the agent doesn't hold, and who does."
+  },
+  "reply.slot.notInLine": {
+    "text": "You aren't in line for the merge slot for {branch} any more: claim it again.",
+    "note": "A claim of the merge slot that lost its place."
+  },
+  "reply.slot.released": {
+    "text": "Released the merge slot for {branch}{hasNext, select, yes {; {next} has it now} other {}}.",
+    "note": "A release of the merge slot, and who has it now."
+  },
+  "reply.slot.status": {
+    "text": "Merge slot for {branch}: {line}{hasWaiting, select, yes {; waiting: {waiting}} other {}}.",
+    "note": "A merge slot's status: who holds it, for how long, and who waits."
+  },
+  "reply.slot.waiting": {
+    "text": "Waiting for the merge slot for {branch}: {position} in line{hasHolder, select, yes {; {holder}} other {}}. Claim again to keep your place.",
+    "note": "A claim of the merge slot: its place in line (an ordinal), and who holds it."
+  },
+  "reply.slot.yours": {
+    "text": "Yours: {slots}; release with its branch.",
+    "note": "A release of a slot not held (#586): the ones the agent does hold or wait for."
+  },
+  "reply.team.cw": {
+    "text": "Combwork",
+    "note": "What still runs that isn't an agent's: Combwork's own."
+  },
+  "reply.team.more": {
+    "text": "…and {n} more.",
+    "note": "cw_team cut at 200 rows."
+  },
+  "reply.team.notPaused": {
+    "text": "The team is not paused.",
+    "note": "cw_team (HI-2081): not paused."
+  },
+  "reply.team.parked": {
+    "text": "The team is paused (by {by}) and parked.",
+    "note": "cw_team: paused and parked."
+  },
+  "reply.team.paused": {
+    "text": "The team is paused (by {by}), not parked yet: {n} still running or unchecked.",
+    "note": "cw_team: paused, not parked yet."
+  },
+  "reply.team.safe": {
+    "text": "Safe to install: {safe, select, yes {yes} other {no}}.",
+    "note": "cw_team: whether it is safe to install an update now."
+  },
+  "reply.team.theUser": {
+    "text": "the user",
+    "note": "Who paused the team, where none is named."
+  },
+  "reply.team.unchecked": {
+    "text": "(can't be checked)",
+    "note": "cw_team: what still runs whose state is unknown."
+  },
+  "reply.template.applied": {
+    "text": "Connections in {project}: {changed}.{restart}{skipped}{undo, select, yes { cw_undo can put them back.} other {}}",
+    "note": "cw_template apply (HI-2109): who got which connection, who to restart, who was skipped."
+  },
+  "reply.template.appliedNone": {
+    "text": "no agent changed (each already on it)",
+    "note": "cw_template apply (HI-2109) that changed no agent."
+  },
+  "reply.template.appliedRestart": {
+    "text": "Running on the old one until restarted: {agents}.",
+    "note": "cw_template apply: agents that keep the old connection until restarted."
+  },
+  "reply.template.appliedSkipped": {
+    "text": "Skipped: {agents}.",
+    "note": "cw_template apply: agents skipped, each with why."
+  },
+  "reply.template.blocked": {
+    "text": "Can't load yet: {why}",
+    "note": "cw_template plan: what stops the load."
+  },
+  "reply.template.loaded": {
+    "text": "Loaded \"{name}\" into {project}: removed {removed}; created {created}{renamed}.{on}{workflow} cw_undo can put the agents and options back.",
+    "note": "cw_template load (HI-1502): what was loaded, names given, and its workflow saved or why not."
+  },
+  "reply.template.noAgents": {
+    "text": "no agents",
+    "note": "A plan or load that removes no agents."
+  },
+  "reply.template.noConnection": {
+    "text": "no connection",
+    "note": "An agent a plan would create with no connection."
+  },
+  "reply.template.none": {
+    "text": "No templates for {project}.",
+    "note": "cw_template list (HI-1502) with none."
+  },
+  "reply.template.on": {
+    "text": "On: {connections}.",
+    "note": "cw_template load: the connections its agents got."
+  },
+  "reply.template.options": {
+    "text": "Connections here: {connections}.",
+    "note": "cw_template plan: the connections the agents can take."
+  },
+  "reply.template.planAgent": {
+    "text": "{name}{renamed, select, yes { ({template})} other {}} {role}{paired, select, yes { with {pairedWith}} other {}} on {connection}",
+    "note": "cw_template plan: an agent it would create, its template's name, its role, who it pairs with and its connection."
+  },
+  "reply.template.planHead": {
+    "text": "\"{name}\" into {project}: removes {remove}; creates {create}.",
+    "note": "cw_template plan (HI-1502): what loading would do."
+  },
+  "reply.template.renamed": {
+    "text": "{template} named {name}",
+    "note": "cw_template load: an agent given another name than its template's."
+  },
+  "reply.template.row": {
+    "text": "{name} (scope {scope}{hasFrom, select, yes {, from {from}} other {}}, file {file}): {agents} agents{hasWorkflow, select, yes {, workflow for {workflow}} other {}}{hasProblem, select, yes {. Can't be used: {problem}} other {}}",
+    "note": "cw_template list: a template, what load needs to name it (scope, from and file), its agents and workflow, and why it can't be used."
+  },
+  "reply.template.taken": {
+    "text": "Taken: {names}.",
+    "note": "cw_template plan: names taken, each with a free one."
+  },
+  "reply.template.takenOne": {
+    "text": "{name} ({project}'s): try \"{suggestion}\"",
+    "note": "A name taken by another project's agent, and a free one."
+  },
+  "reply.template.wf.changes": {
+    "text": "{n} options {will, select, yes {change} other {changed}} ({changes})",
+    "note": "A template's workflow: how many options it changes (or changed), each old → new."
+  },
+  "reply.template.wf.dropped": {
+    "text": "Its workflow ({platforms}) can't be used here.",
+    "note": "A template's workflow that can't apply here."
+  },
+  "reply.template.wf.gitOnly": {
+    "text": "Its workflow is for Git only and this project has no version control.",
+    "note": "A template's workflow that can't apply: Git only."
+  },
+  "reply.template.wf.line": {
+    "text": "{head}{hasMissing, select, yes {; checks with no command here (set them in Version Control): {commands}} other {}}{identityOff, select, yes {; identity stays off (no git identity here)} other {}}.{keep, select, yes { Lanes and cards in flight keep their rules.} other {}}",
+    "note": "A template's workflow in a plan's or a load's reply: what it changes, checks with no command, the identity left off."
+  },
+  "reply.template.wf.noChanges": {
+    "text": "no option changes",
+    "note": "A template's workflow that changes no option."
+  },
+  "reply.template.wf.none": {
+    "text": "it has none for this project",
+    "note": "Why a load's workflow wasn't saved, where none is given."
+  },
+  "reply.template.wf.notSaved": {
+    "text": "Workflow not saved: {why}",
+    "note": "A load's workflow not saved, and why."
+  },
+  "reply.template.wf.plan": {
+    "text": "Workflow ({platform}): {changes}",
+    "note": "A plan's workflow: what it would change."
+  },
+  "reply.template.wf.saved": {
+    "text": "Workflow ({platform}) saved: {changes}",
+    "note": "A load's workflow saved."
+  },
+  "reply.undo.before": {
+    "text": "{name}: undone before.",
+    "note": "cw_undo: this change had been undone before. {name} is its card or what it was."
+  },
+  "reply.undo.field": {
+    "text": "{field} left ({why}{hasError, select, yes {: {error}} other {}})",
+    "note": "cw_undo: a field left as it is, why (reply.undo.skipped.*) and the error if one was given."
+  },
+  "reply.undo.final": {
+    "text": "{name}: can't be undone: {final}",
+    "note": "cw_undo: this change can't be undone, and why."
+  },
+  "reply.undo.group": {
+    "text": "{group} (your message at {at}): {n, plural, one {{n} change} other {{n} changes}}, {left} to undo{hasCards, select, yes {; cards {cards}} other {}}",
+    "note": "A message's line in cw_undo's list (#1282): its group id, when, how many changes and how many are left to undo, and its cards."
+  },
+  "reply.undo.head": {
+    "text": "Undid {done} of {n, plural, one {{n} change} other {{n} changes}} in full.",
+    "note": "cw_undo's reply (#1282): how many changes were undone in full, of how many."
+  },
+  "reply.undo.listMore": {
+    "text": "and {n} more: undo the group to undo them all.",
+    "note": "cw_undo's list of a message's changes, cut at 40: how many more."
+  },
+  "reply.undo.markFinal": {
+    "text": "[can't be undone: {why}]",
+    "note": "A mark after one of the Assistant's changes in cw_undo's list (#1282): it can't be undone, and why."
+  },
+  "reply.undo.markUndone": {
+    "text": "[undone]",
+    "note": "A mark after one of the Assistant's changes in cw_undo's list (#1282): it has been undone."
+  },
+  "reply.undo.more": {
+    "text": "and {n} more left as they were.",
+    "note": "cw_undo's notes, cut at 40: how many more were left."
+  },
+  "reply.undo.none": {
+    "text": "No changes of yours are kept (they are kept 7 days).",
+    "note": "cw_undo's list when none of the Assistant's changes is kept (#1282)."
+  },
+  "reply.undo.noneForGroup": {
+    "text": "No changes of yours are kept for message {group}.",
+    "note": "cw_undo's list for one message (#1282) when none is kept. {group} is the message's group id."
+  },
+  "reply.undo.partial": {
+    "text": "{name}: {putBack, select, yes {{undone} put back; } other {}}{skipped}.",
+    "note": "cw_undo: what of this change was put back, and each field left (reply.undo.field, joined by \", \")."
+  },
+  "reply.undo.skipped.changed": {
+    "text": "changed since",
+    "note": "Why an undo left a field: it changed since the Assistant changed it."
+  },
+  "reply.undo.skipped.ended": {
+    "text": "it has ended",
+    "note": "Why an undo left a field: what it was on has ended."
+  },
+  "reply.undo.skipped.failed": {
+    "text": "refused",
+    "note": "Why an undo left a field: putting it back was refused."
+  },
+  "reply.undo.skipped.gone": {
+    "text": "gone",
+    "note": "Why an undo left a field: what it was on is gone."
+  },
+  "reply.usage.limit": {
+    "text": "{label} {percent}%{hasReset, select, yes { (resets {at}Z)} other {}}",
+    "note": "An account's limit (HI-2195): its share used and when it resets (UTC)."
+  },
+  "reply.usage.line": {
+    "text": "Usage of {account}: {usage}",
+    "note": "cw_connection list's line for an account's usage (joined by \"; \")."
+  },
+  "reply.usage.move": {
+    "text": "moves its agents to {to} at {percent}% of {limit, select, weekly {the weekly limit} fiveHour {the 5-hour limit} other {either limit}}",
+    "note": "An account's usage move (HI-2195): where its agents move, at what share of which limit."
+  },
+  "reply.usage.noFigures": {
+    "text": "no figures yet",
+    "note": "An account with no usage figures yet."
+  },
+  "reply.wait.already": {
+    "text": "Already: {what}.",
+    "note": "A watch whose condition was met already: no watch started."
+  },
+  "reply.wait.alsoAgents": {
+    "text": "{agents} finishing, waiting for the user or stopping",
+    "note": "What else wakes a lane watch: its agents."
+  },
+  "reply.wait.alsoCards": {
+    "text": "a change to {cards}",
+    "note": "What else wakes a lane watch: a change to its cards."
+  },
+  "reply.wait.comment": {
+    "text": "{change}; latest comment by {by}: \"{line}\"",
+    "note": "A watched card's change, with its latest comment's author and first line (cw_read_task with latestComment gives it all)."
+  },
+  "reply.wait.dropped": {
+    "text": "{cards} left it (done or gone).",
+    "note": "A lane watch: cards that left it."
+  },
+  "reply.wait.endTurn": {
+    "text": "End your turn now: Combwork types a line into this session when it changes, or at {limit} if nothing does.",
+    "note": "A card watch begun: end the turn, and what wakes it."
+  },
+  "reply.wait.endTurnThen": {
+    "text": "end your turn: Combwork types a line into this session when it changes, or at {limit} if nothing does.",
+    "note": "HI-2245: after handing a card over first, what to do then."
+  },
+  "reply.wait.ended": {
+    "text": "Your watch ({watch}) has ended.",
+    "note": "HI-2195: a usage watch already met ends the watch before it."
+  },
+  "reply.wait.gone": {
+    "text": "{card} {archived, select, yes {was archived} other {was archived or deleted}}",
+    "note": "A watched card that is gone."
+  },
+  "reply.wait.idle": {
+    "text": "{watching}. {idle} Combwork types a line into this session when it changes, or at {limit} if nothing does.",
+    "note": "HI-2285: a lane's builder watching only its own card with nothing waiting on it carries on rather than end the turn."
+  },
+  "reply.wait.inLanes": {
+    "text": "Warning: {cards} {one, select, yes {is a card} other {are cards}} of the lanes you watch: listed too, {one, select, yes {it wakes} other {they wake}} you on every move. For a lane, pass lanes only.",
+    "note": "A lane watch given cards of its own lanes: they wake the agent on every move."
+  },
+  "reply.wait.keptAgents": {
+    "text": "It kept {agents} from your last lane watch (agents: [] for none).",
+    "note": "A lane watch (HI-1987): the agents beside its lanes it kept from the last lane watch."
+  },
+  "reply.wait.keptCards": {
+    "text": "It kept {cards} from your last lane watch (cards: [] for none).",
+    "note": "A lane watch (#726): the cards beside its lanes it kept from the last lane watch."
+  },
+  "reply.wait.lane": {
+    "text": "{watching}{events}. End your turn now: Combwork types a line into this session on a lane event{hasAlso, select, yes { or {also}} other {}}, or at {limit} if none comes.",
+    "note": "A lane watch begun (#531): what it watches (and its events, when they aren't the default), and what wakes it."
+  },
+  "reply.wait.lanesLeft": {
+    "text": "This replaces your lane watch: {n, plural, one {1 running lane ({lanes}) is} other {{n} running lanes ({lanes}) are}} no longer followed. To follow them as well, watch them with this instead: cw_wait_for_tasks with lanes, and agents or cards.",
+    "note": "HI-1987: a card or agent watch that replaces a lane watch while its lanes run says what it drops, and how to keep them."
+  },
+  "reply.wait.moved": {
+    "text": "{card} is in {column} ({changes}{hasBy, select, yes {, by {by}} other {}})",
+    "note": "A watched card that changed: its column, what changed, and who changed it."
+  },
+  "reply.wait.noChange": {
+    "text": "No change.",
+    "note": "A bounded wait with no change."
+  },
+  "reply.wait.noLonger": {
+    "text": "It no longer watches {cards}.",
+    "note": "A lane watch: the last lane watch's cards it no longer watches."
+  },
+  "reply.wait.notFollowed": {
+    "text": "Not followed, not working now: {agents}.",
+    "note": "A lane watch: agents not followed for not working now, each with its state."
+  },
+  "reply.wait.replaceCards": {
+    "text": "Its cards replace {cards}.",
+    "note": "A lane watch: its cards replace the last lane watch's."
+  },
+  "reply.wait.replaced": {
+    "text": "It replaces your watch ({watch}).",
+    "note": "A watch begun: the watch it replaced."
+  },
+  "reply.wait.since": {
+    "text": "since: {since}",
+    "note": "The since to pass to the next bounded wait (a parameter name: keep it)."
+  },
+  "reply.wait.theLimit": {
+    "text": "the limit",
+    "note": "When a watch ends if nothing comes, where its limit's time isn't known."
+  },
+  "reply.wait.watching": {
+    "text": "{watching}. {step} Nothing runs meanwhile.",
+    "note": "A card watch begun: what it waits for, then what to do (reply.wait.endTurn, or hand a card over first)."
+  },
+  "reply.warning": {
+    "text": "Warning: {warning}",
+    "note": "A warning on a line of its own after a reply (an intent's, a refusal's). {warning} is its text."
+  }
+}

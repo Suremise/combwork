@@ -5,11 +5,11 @@
 // large catalog (docs/ARCHITECTURE.md has the numbers).
 import { appendFileSync, existsSync, mkdirSync, readdirSync, rmSync, symlinkSync, unlinkSync, utimesSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-revisions-')
+const base = tempDir('cw-revisions-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -19,11 +19,27 @@ const { coalesced, revisionOf } = await import('../src/main/revisions')
 const { ContentTooLarge, contentHash, HASH_LIMITS, readDirBounded, readStats, readCapped } = await import('../src/main/fsutil')
 const { skillFiles } = await import('../src/main/skills')
 type WS = ReturnType<typeof createWorkspaceService>
+// base is removed when the file ends by tests/tempCleanup.ts, which retries and reports a folder still held rather than
+// failing the file (HI-2453: an rmSync here, without retries, failed it with EPERM after two tests had timed out).
 
-afterAll(() => rmSync(base, { recursive: true, force: true }))
+/**
+ * fn with HASH_LIMITS' byte limit lowered to 1 MB (HI-2453), as `toobig-bundled` does (#666): the same refusal over a file
+ * just past it, rather than writing 65 MB into the scanned temp folder for each such test.
+ */
+const SMALL_BYTES = 1024 * 1024
+async function smallBytes<T>(fn: () => Promise<T>): Promise<T> {
+  const limits = { ...HASH_LIMITS }
+  Object.assign(HASH_LIMITS, { bytes: SMALL_BYTES })
+  try {
+    return await fn()
+  } finally {
+    Object.assign(HASH_LIMITS, limits)
+  }
+}
+const OVER = SMALL_BYTES + 1024
 
 function addSkill(ws: string, name: string, body = 'Step.\n'.repeat(200)): string {
-  const d = join(ws, '.hive', 'skills', name)
+  const d = join(ws, '.combwork', 'skills', name)
   mkdirSync(join(d, 'refs'), { recursive: true })
   writeFileSync(join(d, 'SKILL.md'), `---\nname: ${name}\ndescription: Skill ${name}\n---\n\n${body}`)
   writeFileSync(join(d, 'refs', 'notes.md'), 'x'.repeat(8000))
@@ -36,7 +52,7 @@ async function open(path: string, extra = 0, bigFile = 0): Promise<WS> {
   await w.open(path)
   await inWorkspace(w, () => syncBundled({ fresh: true }))
   for (let i = 0; i < extra; i++) addSkill(path, `extra-${i}`)
-  if (bigFile) writeFileSync(join(path, '.hive', 'skills', 'extra-0', 'refs', 'big.bin'), Buffer.alloc(bigFile, 1))
+  if (bigFile) writeFileSync(join(path, '.combwork', 'skills', 'extra-0', 'refs', 'big.bin'), Buffer.alloc(bigFile, 1))
   return w
 }
 
@@ -69,7 +85,7 @@ describe('status polls', () => {
     // One skill whose SKILL.md itself is far over the 64 KB a header read takes.
     const longBody = 'Words.\n'.repeat(L.lines)
     addSkill(join(base, 'large'), 'long-body', longBody)
-    const skills = readdirSync(join(base, 'large', '.hive', 'skills')).filter((d) => !d.startsWith('.')).length
+    const skills = readdirSync(join(base, 'large', '.combwork', 'skills')).filter((d) => !d.startsWith('.')).length
     const none = (m: Reads) => ({ files: m.files, bytes: m.bytes, metaBytes: m.metaBytes })
     const first = await measure('small, first', small, 1, 1)
     expect(first.files).toBeGreaterThan(0)
@@ -93,27 +109,27 @@ describe('status polls', () => {
     const ws = join(base, 'headers')
     const w = await open(ws)
     addSkill(ws, 'long-body', 'Words.\n'.repeat(2 * 1024 * 1024))
-    const { hiveSkills } = await import('../src/main/skills')
-    const r = await reads(() => inWorkspace(w, () => hiveSkills()))
+    const { combworkSkills } = await import('../src/main/skills')
+    const r = await reads(() => inWorkspace(w, () => combworkSkills()))
     expect(r.value.find((s) => s.name === 'long-body')?.description).toBe('Skill long-body')
     // The 12 MB skill isn't bundled, so nothing of it is hashed, and only 64 KB of its SKILL.md is read.
     expect(r.metaBytes).toBeLessThan(r.value.length * 64 * 1024 + 1)
-    const again = await reads(() => inWorkspace(w, () => hiveSkills()))
+    const again = await reads(() => inWorkspace(w, () => combworkSkills()))
     expect(again.metaBytes).toBe(0)
     // An edit is read again.
-    appendFileSync(join(ws, '.hive', 'skills', 'long-body', 'SKILL.md'), 'more')
-    const edited = await reads(() => inWorkspace(w, () => hiveSkills()))
+    appendFileSync(join(ws, '.combwork', 'skills', 'long-body', 'SKILL.md'), 'more')
+    const edited = await reads(() => inWorkspace(w, () => combworkSkills()))
     expect(edited.metaBytes).toBe(64 * 1024)
     await disposeWorkspaceService(w)
   })
 
-  // Real file work, not a wait (#596): three workspaces opened with Hive's bundled skills, two with 20 more, and polled:
+  // Real file work, not a wait (#596): three workspaces opened with Combwork's bundled skills, two with 20 more, and polled:
   // about 8,000 file system calls through Node's four I/O threads. Measured: 1 s alone, 2 to 5 s under a full unit run
   // beside other runs, over 20 s under heavier load. So it is bounded by FS_HUNG_MS rather than the suite's 20 s: only a
   // hung read takes a minute.
   const FS_HUNG_MS = 60_000
   it('ten polls at once on a cold workspace read what one poll does', { timeout: FS_HUNG_MS }, async () => {
-    // Hive's shipped skills have one inventory for the whole process (revisions.ts), hashed by its first poll, whichever
+    // Combwork's shipped skills have one inventory for the whole process (revisions.ts), hashed by its first poll, whichever
     // test makes it: polled here first, so the polls compared below read only their own workspaces' skills.
     const warm = await open(join(base, 'cold-warm'))
     await inWorkspace(warm, () => skillRevisions())
@@ -167,7 +183,7 @@ describe('changes', () => {
     const name = (await inWorkspace(w, () => skillRevisions())).find((s) => s.bundled)!.name
     const status = async () => (await inWorkspace(w, () => skillRevisions())).find((s) => s.name === name)!.bundled
     expect(await status()).toBe('same')
-    const f = join(ws, '.hive', 'skills', name, 'SKILL.md')
+    const f = join(ws, '.combwork', 'skills', name, 'SKILL.md')
     appendFileSync(f, '\nMine.\n')
     expect(await status()).toBe('changed')
     const { restoreBundled } = await import('../src/main/bundled')
@@ -197,7 +213,7 @@ describe('workspaces', () => {
   it('hashing for a workspace stops when it closes', async () => {
     const ws = join(base, 'closing')
     const w = await open(ws, 1, 60 * 1024 * 1024)
-    const hashing = inWorkspace(w, () => revisionOf(join(ws, '.hive', 'skills', 'extra-0')))
+    const hashing = inWorkspace(w, () => revisionOf(join(ws, '.combwork', 'skills', 'extra-0')))
     await w.close()
     await expect(hashing).rejects.toThrow('The workspace was closed')
     await disposeWorkspaceService(w)
@@ -262,15 +278,15 @@ describe('limits', () => {
     expect(await contentHash(join(dir, 'crlf', 'cr.md'))).not.toBe(await contentHash(join(dir, 'crlf', 'cr2.md')))
   })
 
-  it('an unchanged too-big skill is never read: cold, warm, ten at once; a change is seen at once', async () => {
+  it('an unchanged too-big skill is never read: cold, warm, ten at once; a change is seen at once', () => smallBytes(async () => {
     const ws = join(base, 'toobig-warm')
     const w = await open(ws)
     const poll = () => inWorkspace(w, () => skillRevisions())
     await poll()
     const d = addSkill(ws, 'huge')
     const big = join(d, 'refs', 'big.bin')
-    writeFileSync(big, Buffer.alloc(65 * 1024 * 1024, 1))
-    const problem = 'too big to check: it is over 64 MB'
+    writeFileSync(big, Buffer.alloc(OVER, 1))
+    const problem = 'too big to check: it is over 1 MB'
     const huge = (v: Awaited<ReturnType<typeof poll>>) => v.find((s) => s.name === 'huge')!
     // Its files' sizes say so: refused before reading, even the first time.
     const cold = await reads(poll)
@@ -292,12 +308,12 @@ describe('limits', () => {
     expect(huge(shrunk.value).problem).toBeUndefined()
     expect((await reads(poll)).bytes).toBe(0)
     // Grown again, then removed.
-    writeFileSync(big, Buffer.alloc(65 * 1024 * 1024, 1))
+    writeFileSync(big, Buffer.alloc(OVER, 1))
     expect(huge((await poll())).problem).toBe(problem)
     rmSync(d, { recursive: true, force: true })
     expect((await poll()).some((s) => s.name === 'huge')).toBe(false)
     await disposeWorkspaceService(w)
-  })
+  }))
 
   it('too many files: each poll is a bounded walk with no file read; closing the workspace forgets what was kept', async () => {
     const ws = join(base, 'toomany')
@@ -309,7 +325,7 @@ describe('limits', () => {
     try {
       const d = addSkill(ws, 'many')
       for (let i = 0; i < 250; i++) writeFileSync(join(d, 'refs', `f${i}.md`), 'x')
-      const path = join(ws, '.hive', 'skills', 'many')
+      const path = join(ws, '.combwork', 'skills', 'many')
       for (let i = 0; i < 2; i++) {
         const r = await reads(() => inWorkspace(w, () => revisionOf(path).catch((e) => e)))
         expect(r.value).toBeInstanceOf(ContentTooLarge)
@@ -320,7 +336,7 @@ describe('limits', () => {
       // A too-big skill kept in one opening of the workspace is checked again in the next (by its sizes: still no read).
       const d2 = addSkill(ws, 'huge')
       writeFileSync(join(d2, 'refs', 'big.bin'), Buffer.alloc(HASH_LIMITS.bytes + 1024, 1))
-      const hugePath = join(ws, '.hive', 'skills', 'huge')
+      const hugePath = join(ws, '.combwork', 'skills', 'huge')
       expect(await inWorkspace(w, () => revisionOf(hugePath).catch((e) => e))).toBeInstanceOf(ContentTooLarge)
       await w.open(ws)
       rmSync(join(d2, 'refs', 'big.bin'))
@@ -339,7 +355,7 @@ describe('limits', () => {
     const limits = { ...HASH_LIMITS }
     Object.assign(HASH_LIMITS, { bytes: 1024 * 1024 })
     try {
-      const big = join(ws, '.hive', 'skills', 'pick-up', 'big.bin')
+      const big = join(ws, '.combwork', 'skills', 'pick-up', 'big.bin')
       writeFileSync(big, Buffer.alloc(HASH_LIMITS.bytes + 1024, 1))
       const pick = (await inWorkspace(w, () => skillRevisions())).find((s) => s.name === 'pick-up')!
       expect([pick.bundled, pick.problem]).toEqual(['changed', 'too big to check: it is over 1 MB'])
@@ -352,14 +368,14 @@ describe('limits', () => {
     }
   })
 
-  it("an over-limit skill shows why it has no revision; a link isn't followed", async () => {
+  it("an over-limit skill shows why it has no revision; a link isn't followed", () => smallBytes(async () => {
     const ws = join(base, 'toobig')
     const w = await open(ws)
     const d = addSkill(ws, 'huge')
-    writeFileSync(join(d, 'refs', 'big.bin'), Buffer.alloc(65 * 1024 * 1024, 1))
+    writeFileSync(join(d, 'refs', 'big.bin'), Buffer.alloc(OVER, 1))
     const huge = (await inWorkspace(w, () => skillRevisions())).find((s) => s.name === 'huge')!
     expect(huge.revision).toBe('')
-    expect(huge.problem).toMatch(/too big to check: it is over 64 MB/)
+    expect(huge.problem).toMatch(/too big to check: it is over 1 MB/)
     rmSync(join(d, 'refs', 'big.bin'))
     try {
       symlinkSync(join(base, 'small'), join(d, 'refs', 'elsewhere'), 'junction')
@@ -370,31 +386,31 @@ describe('limits', () => {
     } finally {
       await disposeWorkspaceService(w)
     }
-  })
+  }))
 
-  it("a launch says a skill over the limits isn't delivered, and delivers the others", async () => {
+  it("a launch says a skill over the limits isn't delivered, and delivers the others", () => smallBytes(async () => {
     const src = join(dir, 'launch')
     const big = join(src, 'big')
     const ok = join(src, 'ok')
     mkdirSync(big, { recursive: true })
     mkdirSync(ok, { recursive: true })
     writeFileSync(join(big, 'SKILL.md'), '---\nname: big\n---\n')
-    writeFileSync(join(big, 'data.bin'), Buffer.alloc(65 * 1024 * 1024, 1))
+    writeFileSync(join(big, 'data.bin'), Buffer.alloc(OVER, 1))
     writeFileSync(join(ok, 'SKILL.md'), '---\nname: ok\n---\n')
     const { syncAgentsSkills } = await import('../src/main/providers/common')
     const out: Record<string, unknown> = await syncAgentsSkills({ cwd: join(dir, 'launch-cwd'), skills: [{ name: 'big', sourcePath: big }, { name: 'ok', sourcePath: ok }] } as never, 'Codex')
-    expect(out.big).toEqual({ revision: null, problem: 'it is too big for Hive to check (it is over 64 MB)', lasting: true })
+    expect(out.big).toEqual({ revision: null, problem: 'it is too big for Combwork to check (it is over 1 MB)', lasting: true })
     expect(out.ok).toEqual({ revision: await contentHash(ok) })
 
     // A skill Codex had a copy of, grown too big: the old copy stays, and is what's reported as delivered.
-    writeFileSync(join(ok, 'data.bin'), Buffer.alloc(65 * 1024 * 1024, 1))
-    const kept = join(dir, 'launch-cwd', '.agents', 'skills', 'hive-ok')
+    writeFileSync(join(ok, 'data.bin'), Buffer.alloc(OVER, 1))
+    const kept = join(dir, 'launch-cwd', '.agents', 'skills', 'cw-ok')
     const again: Record<string, unknown> = await syncAgentsSkills({ cwd: join(dir, 'launch-cwd'), skills: [{ name: 'ok', sourcePath: ok }] } as never, 'Codex')
-    expect(again.ok).toEqual({ revision: await contentHash(kept), problem: 'it is too big for Hive to check (it is over 64 MB), so it kept its old copy', lasting: true })
+    expect(again.ok).toEqual({ revision: await contentHash(kept), problem: 'it is too big for Combwork to check (it is over 1 MB), so it kept its old copy', lasting: true })
     rmSync(join(ok, 'data.bin'))
-  })
+  }))
 
-  it("Claude Code: a skill over the limits isn't copied into the launch, checked before anything is copied", async () => {
+  it("Claude Code: a skill over the limits isn't copied into the launch, checked before anything is copied", () => smallBytes(async () => {
     const { claudeCode } = await import('../src/main/providers/claude/adapter')
     const src = join(dir, 'claude-src')
     const deep = join(src, 'deep')
@@ -403,23 +419,23 @@ describe('limits', () => {
     const big = join(src, 'big')
     mkdirSync(big, { recursive: true })
     writeFileSync(join(big, 'SKILL.md'), '---\nname: big\n---\n')
-    writeFileSync(join(big, 'data.bin'), Buffer.alloc(65 * 1024 * 1024, 1))
+    writeFileSync(join(big, 'data.bin'), Buffer.alloc(OVER, 1))
     const ok = join(src, 'ok')
     mkdirSync(ok, { recursive: true })
     writeFileSync(join(ok, 'SKILL.md'), '---\nname: ok\n---\n')
     const project = join(dir, 'claude-project')
     mkdirSync(project, { recursive: true })
     const before = readStats.bytes
-    const delivered = await claudeCode.prepareLaunch({ projectPath: project, agentId: 'a1', cwd: project, skills: [{ name: 'deep', sourcePath: deep }, { name: 'big', sourcePath: big }, { name: 'ok', sourcePath: ok }], mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=x', env: {}, extraArgs: [], hookAuthFile: 'C:/hive/hook-auth/x.txt', privateDir: `${project}-private` } as never)
-    const skills = join(project, '.hive', 'launch-a1', 'plugin', 'skills')
-    expect(delivered.deep).toEqual({ revision: null, problem: 'it is too big for Hive to check (it has folders more than 12 deep)', lasting: true })
-    expect(delivered.big).toEqual({ revision: null, problem: 'it is too big for Hive to check (it is over 64 MB)', lasting: true })
+    const delivered = await claudeCode.prepareLaunch({ projectPath: project, agentId: 'a1', cwd: project, skills: [{ name: 'deep', sourcePath: deep }, { name: 'big', sourcePath: big }, { name: 'ok', sourcePath: ok }], mcpServers: {}, hookUrl: 'http://127.0.0.1:9/hook?run=x', env: {}, extraArgs: [], hookAuthFile: 'C:/profile/hook-auth/x.txt', privateDir: `${project}-private` } as never)
+    const skills = join(project, '.combwork', 'launch-a1', 'plugin', 'skills')
+    expect(delivered.deep).toEqual({ revision: null, problem: 'it is too big for Combwork to check (it has folders more than 12 deep)', lasting: true })
+    expect(delivered.big).toEqual({ revision: null, problem: 'it is too big for Combwork to check (it is over 1 MB)', lasting: true })
     expect(delivered.ok).toEqual({ revision: await contentHash(join(skills, 'ok')) })
     expect(existsSync(join(skills, 'deep'))).toBe(false)
     expect(existsSync(join(skills, 'big'))).toBe(false)
-    // The big one was read only up to the limit (plus a chunk), once.
-    expect(readStats.bytes - before).toBeLessThan(65 * 1024 * 1024)
-  })
+    // The big one was read only up to the limit (plus a chunk), once: less than its whole file.
+    expect(readStats.bytes - before).toBeLessThan(OVER)
+  }))
 
   it('a huge folder is listed only as far as the limits: entries read, not just entries kept', async () => {
     const huge = join(dir, 'huge')
@@ -453,7 +469,7 @@ describe('limits', () => {
   it("skillFiles lists a folder's files in order, and says when it stopped short", async () => {
     const s = join(dir, 'skill')
     mkdirSync(join(s, 'a', 'b', 'c'), { recursive: true })
-    for (const f of ['SKILL.md', 'z.md', 'a/1.md', 'a/b/2.md', 'a/b/c/3.md', '.hive-copy']) writeFileSync(join(s, f), '')
+    for (const f of ['SKILL.md', 'z.md', 'a/1.md', 'a/b/2.md', 'a/b/c/3.md', '.combwork-copy']) writeFileSync(join(s, f), '')
     expect(await skillFiles(s)).toEqual({ files: ['SKILL.md', 'a/1.md', 'a/b/2.md', 'a/b/c/3.md', 'z.md'], truncated: false })
     expect(await skillFiles(s, { files: 2, entries: 100, depth: 8 })).toEqual({ files: ['SKILL.md', 'a/1.md'], truncated: true })
     expect(await skillFiles(s, { files: 100, entries: 100, depth: 2 })).toEqual({ files: ['SKILL.md', 'a/1.md', 'z.md'], truncated: true })

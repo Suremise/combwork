@@ -1,0 +1,28 @@
+{
+  "performance.compare.partial.dropped": {
+    "placeholders": {
+      "n": "plural"
+    }
+  },
+  "performance.compare.partial.evicted": {
+    "placeholders": {}
+  },
+  "performance.compare.partial.invalid": {
+    "placeholders": {
+      "keys": "plain",
+      "n": "plural"
+    }
+  },
+  "performance.compare.partial.projectPart": {
+    "placeholders": {}
+  },
+  "performance.compare.partial.unattributed": {
+    "placeholders": {}
+  },
+  "performance.providersNote.assistant": {
+    "placeholders": {}
+  },
+  "performance.providersNote.scripts": {
+    "placeholders": {}
+  }
+}

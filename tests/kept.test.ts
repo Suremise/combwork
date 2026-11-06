@@ -2,11 +2,11 @@ import { readdirSync, readFileSync, utimesSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { Worker } from 'worker_threads'
 import { describe, expect, it, vi } from 'vitest'
-import { DAMAGED_AGE_MS, KEPT_BY_STAT_MAX, KeptFileBusy, keptSettleSteps, onCorruptFile, readKeptJson, readKeptJsonByStat, readKeptJsonSync, writeKeptJson, type KeptSample, type KeptSettled } from '../src/main/fsutil'
+import { createKeptJson, DAMAGED_AGE_MS, KEPT_BY_STAT_MAX, KeptFileBusy, keptSettleSteps, onCorruptFile, readKeptJson, readKeptJsonByStat, readKeptJsonSync, writeKeptJson, type KeptSample, type KeptSettled } from '../src/main/fsutil'
 import { tempDir } from './tempDir'
 
 describe('kept files', () => {
-  const dir = tempDir('hive-kept-')
+  const dir = tempDir('cw-kept-')
   const reports: [string, boolean][] = []
   onCorruptFile((file, _aside, restored) => reports.push([file, restored]))
   // Damaged on disk: unchanged for a minute, well past DAMAGED_AGE_MS (#1601).
@@ -20,6 +20,20 @@ describe('kept files', () => {
     await writeKeptJson(f, { n: 1 })
     expect(JSON.parse(readFileSync(`${f}.bak`, 'utf8'))).toEqual({ n: 1 })
     expect(await readKeptJson(f, null)).toEqual({ n: 1 })
+  })
+
+  it('createKeptJson (HI-2542): makes the file where there is none, never replacing one written meanwhile', async () => {
+    const f = join(dir, 'new.json')
+    expect(await createKeptJson(f, { n: 'default' })).toBe(true)
+    expect(JSON.parse(readFileSync(f, 'utf8'))).toEqual({ n: 'default' })
+    expect(JSON.parse(readFileSync(`${f}.bak`, 'utf8'))).toEqual({ n: 'default' })
+    // One written after its absence was checked (a project's own config, copied in) is kept, with its .bak, and no temp file is left.
+    const g = join(dir, 'theirs.json')
+    writeFileSync(g, '{"n":"theirs"}\n')
+    expect(await createKeptJson(g, { n: 'default' })).toBe(false)
+    expect(JSON.parse(readFileSync(g, 'utf8'))).toEqual({ n: 'theirs' })
+    expect(readdirSync(dir).filter((n) => n.startsWith('theirs.json.'))).toEqual([])
+    expect(await readKeptJson(g, null)).toEqual({ n: 'theirs' })
   })
 
   it('sets a damaged file aside and restores the last good copy', async () => {
@@ -68,7 +82,7 @@ describe('kept files', () => {
     expect(await read()).toEqual({ n: 1, list: ['a'] })
     expect(await read(true)).toEqual({ n: 1, list: ['a'] })
     expect(derived).toBe(3)
-    // Hive's own write is read at once.
+    // Combwork's own write is read at once.
     await writeKeptJson(f, { n: 2, list: ['b'] })
     expect(await read()).toEqual({ n: 2, list: ['b'] })
     age(f)
@@ -211,7 +225,7 @@ describe('kept files', () => {
     })
   }
 
-  // #1598: something outside Hive saving in place (truncate, then write) while Hive reads must never look like damage.
+  // #1598: something outside Combwork saving in place (truncate, then write) while Combwork reads must never look like damage.
   for (const sync of [false, true]) {
     it(`never sets aside a file being saved in place while it is read${sync ? ' (sync)' : ''}`, async () => {
       const f = join(dir, `save-${sync ? 'sync' : 'async'}.json`)
@@ -255,9 +269,27 @@ describe('spawn log lines', () => {
   it('hide bearer tokens and shorten long arguments', async () => {
     const { forLog } = await import('../src/main/ptyHost')
     expect(forLog('hooks.Stop=[{command="curl.exe -H \\"Authorization: Bearer 0123456789abcdef0123456789abcdef\\" x"}]')).not.toContain('0123456789abcdef')
-    expect(forLog('HIVE_API_TOKEN=abcdef123456')).toBe('HIVE_API_TOKEN=***')
+    expect(forLog('CW_API_TOKEN=abcdef123456')).toBe('CW_API_TOKEN=***')
     expect(forLog('x'.repeat(1000)).length).toBeLessThan(340)
     expect(forLog('--model')).toBe('--model')
+  })
+
+  it('hide any secret setting, whatever its name or case, never just the ones named for Combwork (HI-2611)', async () => {
+    const { forLog } = await import('../src/main/ptyHost')
+    for (const [given, logged] of [
+      ['CW_API_TOKEN=abcdef123456', 'CW_API_TOKEN=***'],
+      ['GITHUB_TOKEN=ghp_abcdef123456', 'GITHUB_TOKEN=***'],
+      ['OPENAI_API_KEY=sk-abc123', 'OPENAI_API_KEY=***'],
+      ['AWS_SECRET_ACCESS_KEY=abc/123', 'AWS_SECRET_ACCESS_KEY=***'],
+      ['db_password=hunter2', 'db_password=***'],
+      ['--api-key=abc123', '--api-key=***'],
+      ['--token=abc123', '--token=***'],
+      ['x CW_API_TOKEN="two words" y', 'x CW_API_TOKEN=*** y'],
+      ["GH_TOKEN='quoted' z", 'GH_TOKEN=*** z'],
+      ['-c env.MY_SECRET=abc', '-c env.MY_SECRET=***'],
+    ]) expect(forLog(given)).toBe(logged)
+    // What isn't a secret's setting stays as it is.
+    for (const kept of ['--model=sonnet', 'TERM=xterm-256color', 'token', '--max-tokens 100', 'PATH=C:\\bin']) expect(forLog(kept)).toBe(kept)
   })
 })
 
@@ -265,7 +297,7 @@ describe('path guards', () => {
   it("don't let a link inside a folder lead outside it", async () => {
     const { mkdirSync, symlinkSync, writeFileSync: write } = await import('fs')
     const { insideReal } = await import('../src/main/fsutil')
-    const base = tempDir('hive-guard-')
+    const base = tempDir('cw-guard-')
     const ws = join(base, 'ws')
     const outside = join(base, 'outside')
     mkdirSync(join(ws, 'proj'), { recursive: true })

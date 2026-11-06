@@ -32,7 +32,7 @@ const clamp = (n: number, lo: number, hi: number): number => Math.max(lo, Math.m
 /**
  * Keeps the workbench's room worked out as it changes (the window, the zoom, a panel opened, closed or resized): what
  * folds, the Assistant's panel's least width and the work's (`--assistant-min`, `--main-min` on the workbench).
- * `bench`: the workbench once it is rendered (a callback ref's: the window renders it only once Hive is ready).
+ * `bench`: the workbench once it is rendered (a callback ref's: the window renders it only once Combwork is ready).
  * `foldable`: the sidebar shows the Projects list (only it has a rail), not already compact.
  */
 export function useLayoutRoom(bench: HTMLElement | null, foldable: boolean): void {

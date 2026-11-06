@@ -50,21 +50,21 @@ const commit = (dir, file, text, message) => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' })
 
   let app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   let page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 950 })
   await lib.appReady(page)
-  let inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  let inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await inv('project:setActive', notes, true)
   const live = async (p, id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === p.toLowerCase() && s.agentId === id)
   const idle = async (p, id) => ['ready', 'finished'].includes((await live(p, id))?.status)
   const say = async (p, id, text) => {
     await lib.until(() => idle(p, id), HUNG_MS)
-    // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+    // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
     await lib.typeLine(inv, lib.ptyKey(p, id), claudeHome, null, text, { live: () => live(p, id) })
   }
   const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
@@ -166,7 +166,7 @@ const commit = (dir, file, text, message) => {
   const uText = async () => (await uSection.innerText().catch(() => '')).replace(/\s+/g, ' ')
   check('the Work section says the revision and its files weren’t read, with why, not that none changed', !!(await lib.until(async () => { const t = await uText(); return t.includes('Revision not read when it was submitted: ') && t.includes('Its next submission reads it again.') && t.includes('Files not read: ') && !t.includes('No files changed') }, HUNG_MS)), await uText())
   // Why, as the window words it (#1477): what couldn't be read, from the reason kept as data, said once.
-  check('…the revision line names what couldn’t be read once', !!(await lib.until(async () => /Revision not read when it was submitted: Hive couldn't read the latest commit in [^ ]+\. Its next submission reads it again\./.test(await uText()), HUNG_MS)), await uText())
+  check('…the revision line names what couldn’t be read once', !!(await lib.until(async () => /Revision not read when it was submitted: Combwork couldn't read the latest commit in [^ ]+\. Its next submission reads it again\./.test(await uText()), HUNG_MS)), await uText())
   await uSection.scrollIntoViewIfNeeded()
   const shots = async (loc, name) => {
     await page.mouse.move(5, 5)
@@ -185,7 +185,7 @@ const commit = (dir, file, text, message) => {
   check('its work records the revision as not read before the change, in English for agents', nWork?.revisions[0]?.unknown?.revision === 'not read before the change', JSON.stringify(nWork?.revisions[0]))
   const nSection = (await openCard(nobody)).locator('.card-work[data-work="recorded"]')
   const nText = async () => (await nSection.innerText().catch(() => '')).replace(/\s+/g, ' ')
-  check('the Work section says no revision was recorded, and why, once', !!(await lib.until(async () => { const t = await nText(); return t.includes("No revision recorded: Hive didn't read one when the card went to Review. Its next submission reads it again.") && t.includes('Files not read') && !t.includes('not read before the change') }, HUNG_MS)), await nText())
+  check('the Work section says no revision was recorded, and why, once', !!(await lib.until(async () => { const t = await nText(); return t.includes("No revision recorded: Combwork didn't read one when the card went to Review. Its next submission reads it again.") && t.includes('Files not read') && !t.includes('not read before the change') }, HUNG_MS)), await nText())
   await nSection.scrollIntoViewIfNeeded()
   await shots(nSection, 'notread')
 
@@ -193,10 +193,10 @@ const commit = (dir, file, text, message) => {
   const base0 = (await inv('app:info')).language
   const deDir = path.join(lib.ROOT, 'locales', 'de')
   const deMessages = Object.assign({}, ...fs.readdirSync(deDir).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(deDir, f), 'utf8'))))
-  const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language })
+  const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
   await speak({ ...base0, code: 'de', locale: 'de', messages: deMessages })
   const english = /not read|latest commit|no base|no target|Its next submission/
-  check('German: nothing read before the change, said in German', !!(await lib.until(async () => { const t = await nText(); return t.includes('Keine Revision aufgezeichnet: Hive hat keine gelesen, als die Karte nach Review kam.') && t.includes('Dateien nicht gelesen') && !english.test(t) }, HUNG_MS)), await nText())
+  check('German: nothing read before the change, said in German', !!(await lib.until(async () => { const t = await nText(); return t.includes('Keine Revision aufgezeichnet: Combwork hat keine gelesen, als die Karte nach Review kam.') && t.includes('Dateien nicht gelesen') && !english.test(t) }, HUNG_MS)), await nText())
   await shots(nSection, 'notread-de')
   // The board's button has its English name again before the next card opens; then German with its dialog open.
   await speak(base0)
@@ -204,7 +204,7 @@ const commit = (dir, file, text, message) => {
   const uDe = (await openCard(u)).locator('.card-work[data-work="recorded"]')
   await speak({ ...base0, code: 'de', locale: 'de', messages: deMessages })
   const uDeText = async () => (await uDe.innerText().catch(() => '')).replace(/\s+/g, ' ')
-  check('German: what couldn’t be read, in German too', !!(await lib.until(async () => { const t = await uDeText(); return t.includes('Revision beim Einreichen nicht gelesen: Hive konnte den neuesten Commit in ') && !english.test(t) }, HUNG_MS)), await uDeText())
+  check('German: what couldn’t be read, in German too', !!(await lib.until(async () => { const t = await uDeText(); return t.includes('Revision beim Einreichen nicht gelesen: Combwork konnte den neuesten Commit in ') && !english.test(t) }, HUNG_MS)), await uDeText())
   await uDe.scrollIntoViewIfNeeded()
   await shots(uDe, 'unread-de')
   await speak(base0)
@@ -272,7 +272,7 @@ const commit = (dir, file, text, message) => {
   for (const p of [alpha, notes]) await inv('session:stop', p)
   await lib.until(async () => (await inv('session:live')).length === 0, HUNG_MS)
   await app.close()
-  const db = new DatabaseSync(path.join(ws, '.hive', 'hive.db'), { timeout: 5000 })
+  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })
   db.prepare('UPDATE cards SET pre_workflow = 1 WHERE number = ?').run(old)
   db.close()
   app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
@@ -280,7 +280,7 @@ const commit = (dir, file, text, message) => {
     page = await app.firstWindow()
     await lib.fitWindow(app, page, { width: 1500, height: 950 })
     await lib.appReady(page)
-    inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.until(async () => (await inv('workspace:get'))?.path?.toLowerCase() === ws.toLowerCase(), HUNG_MS)
     await showBoard(page)
     await openByTitle(page, old)

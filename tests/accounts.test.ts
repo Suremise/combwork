@@ -1,4 +1,4 @@
-// Hive's accounts (HI-980): the folder and its junction made and checked, removal that never reaches through a link into
+// Combwork's accounts (HI-980): the folder and its junction made and checked, removal that never reaches through a link into
 // the CLI's home (also with links added partway through), accepted and observed identities kept apart, checks queued
 // while one runs, the watches, and a workspace's choice of accounts. All in this file's temp folders: the CLI is never
 // run (its status is faked), nothing signs in, and no real home or accounts folder is touched.
@@ -31,9 +31,9 @@ vi.mock('../src/main/ptyHost', async (importOriginal) => {
   }
 })
 
-const base = tempDir('hive-accounts-')
+const base = tempDir('cw-accounts-')
 const home = join(base, 'claude-home')
-process.env.HIVE_USER_DATA = join(base, 'profile')
+process.env.CW_USER_DATA = join(base, 'profile')
 process.env.CLAUDE_CONFIG_DIR = home
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -116,6 +116,13 @@ describe('what `claude auth status --json` says (the recorded fixture)', () => {
   it('signed out (exit 1, the same JSON): signed out, with no identity', () => {
     expect(parseClaudeAuthStatus(lines[1], FIELDS)).toEqual({ ok: true, loggedIn: false, email: undefined, orgId: undefined, plan: null })
   })
+  it("2.1.318's sign-in expiry, read by its field (HI-2528); a time it can't read, or a CLI without it, is none", () => {
+    const line318 = readFileSync(join(__dirname, 'fixtures', 'advanced', 'auth-status-claude-2.1.318.jsonl'), 'utf8').trim()
+    const withExpiry = { ...FIELDS, loginExpires: 'loginExpiresAt' }
+    expect(parseClaudeAuthStatus(line318, withExpiry)).toEqual({ ok: true, loggedIn: true, email: 'user@example.com', orgId: '00000000-0000-4000-8000-000000000001', plan: 'max', loginExpiresAt: '2026-11-24T12:00:00.000Z' })
+    expect(parseClaudeAuthStatus(lines[0], withExpiry)).not.toHaveProperty('loginExpiresAt')
+    expect(parseClaudeAuthStatus(JSON.stringify({ loggedIn: true, loginExpiresAt: 'soon' }), withExpiry)).not.toHaveProperty('loginExpiresAt')
+  })
   it("anything else is a failed check, never signed out: not JSON, or no signed-in field", () => {
     expect(parseClaudeAuthStatus('Error: something', FIELDS).ok).toBe(false)
     expect(parseClaudeAuthStatus('{"email":"x@y"}', FIELDS).ok).toBe(false)
@@ -151,8 +158,8 @@ describe('an account’s folder and its junction', () => {
 
   it('a rename changes the name only: the id, folder and junction stay', async () => {
     const a = await accounts.addAccount('claude-code', 'Work')
-    accounts.renameAccount(a.id, 'Hive overnight')
-    expect(accounts.getAccount(a.id)).toMatchObject({ id: a.id, name: 'Hive overnight' })
+    accounts.renameAccount(a.id, 'Combwork overnight')
+    expect(accounts.getAccount(a.id)).toMatchObject({ id: a.id, name: 'Combwork overnight' })
     expect(lstatSync(join(folderOf(a), 'projects')).isSymbolicLink()).toBe(true)
   })
 })
@@ -203,12 +210,12 @@ describe('removing an account', () => {
     rmSync(join(folderOf(a), 'projects'))
   })
 
-  it("a link Hive didn't make anywhere inside it: refused before anything is deleted", async () => {
+  it("a link Combwork didn't make anywhere inside it: refused before anything is deleted", async () => {
     const a = await accounts.addAccount('claude-code', 'Linked')
     mkdirSync(join(folderOf(a), 'plugins'), { recursive: true })
     writeFileSync(join(folderOf(a), 'plugins', 'a.txt'), 'a')
     symlinkSync(projects, join(folderOf(a), 'plugins', 'sneaky'), 'junction')
-    expect(await outcome(accounts.removeAccount(a.id))).toMatch(/links Hive didn't make are in it: .*sneaky/)
+    expect(await outcome(accounts.removeAccount(a.id))).toMatch(/links Combwork didn't make are in it: .*sneaky/)
     // Nothing deleted: its own file is still there, and so is everything the link reaches.
     expect(existsSync(join(folderOf(a), 'plugins', 'a.txt'))).toBe(true)
     expect(readFileSync(keep, 'utf8')).toContain('kept')
@@ -402,12 +409,12 @@ describe('removing an account', () => {
     rmSync(join(folderOf(a), 'projects'))
     renameSync(folderOf(a), `${folderOf(a)}-real`)
     symlinkSync(home, folderOf(a), 'junction')
-    expect(await outcome(accounts.signInAccount(a.id))).toMatch(/isn't the one Hive made/)
-    expect(await outcome(accounts.claimAccount(a.id))).toMatch(/isn't the one Hive made/)
+    expect(await outcome(accounts.signInAccount(a.id))).toMatch(/isn't the one Combwork made/)
+    expect(await outcome(accounts.claimAccount(a.id))).toMatch(/isn't the one Combwork made/)
     expect(logins.has(a.id)).toBe(false)
     rmSync(folderOf(a))
     // Missing altogether: the same.
-    expect(await outcome(accounts.signInAccount(a.id))).toMatch(/isn't the one Hive made/)
+    expect(await outcome(accounts.signInAccount(a.id))).toMatch(/isn't the one Combwork made/)
   })
 })
 
@@ -433,7 +440,7 @@ describe("a sign-in connection's Set Up (HI-1826)", () => {
     rmSync(join(folderOf(a), 'projects'))
     renameSync(folderOf(a), `${folderOf(a)}-real`)
     symlinkSync(home, folderOf(a), 'junction')
-    expect(await outcome(accounts.setUpSignInConnection(a.id))).toMatch(/isn't the one Hive made/)
+    expect(await outcome(accounts.setUpSignInConnection(a.id))).toMatch(/isn't the one Combwork made/)
     expect(logins.has(a.id)).toBe(false)
     rmSync(folderOf(a))
     config.update((c) => c.accounts!.push({ id: 'acc-server1', provider: 'claude-code', name: 'Server', kind: 'server' } as Account))
@@ -497,13 +504,20 @@ describe("whether a connection trusts a workspace's folders (HI-1870)", () => {
     return dir
   }
   const t = (root: string | null, short = false) => ({ root, git: true, short })
+  const plainT = (root: string) => ({ root, git: false, short: false })
 
-  it("Claude Code: the recorded entry's folder and its subfolders; not another case, not an 8.3 path (unknown), as 2.1.311 looked them up", async () => {
+  it("Claude Code: the recorded entry's folder and the plain folders inside it; not another case, not an 8.3 path (unknown)", async () => {
     // The recorded entry (C:/work/alpha), and the entry Claude Code writes itself for a subfolder it ran in (false).
     const j = JSON.parse(readFileSync(TRUST, 'utf8'))
     j.projects['C:/work/alpha/child'] = { hasTrustDialogAccepted: false }
     const dir = trustHome('claude', JSON.stringify(j))
-    expect(await trustsOf(dir, [t('C:\\work\\alpha'), t('C:\\work\\alpha\\child'), t('C:\\work\\beta'), t('C:\\WORK\\ALPHA'), t('C:\\work\\alpha', true), t(null)])).toEqual([true, true, false, false, null, null])
+    expect(await trustsOf(dir, [t('C:\\work\\alpha'), plainT('C:\\work\\alpha\\child'), t('C:\\work\\beta'), t('C:\\WORK\\ALPHA'), t('C:\\work\\alpha', true), t(null)])).toEqual([true, true, false, false, null, null])
+  })
+
+  it('Claude Code: a Git root under a trusted folder is not trusted; a plain folder there is (HI-2520, measured with 2.1.316–2.1.318)', async () => {
+    // A real account's layout: D:/Projects/ACME trusted, its repositories cli and apiary never trusted themselves.
+    const dir = trustHome('ancestor', JSON.stringify({ projects: { 'D:/Projects/ACME': { hasTrustDialogAccepted: true }, 'D:/Projects/ACME/acme': { hasTrustDialogAccepted: true }, 'D:/Projects/ACME/scratch': { hasTrustDialogAccepted: false } } }))
+    expect(await trustsOf(dir, [t('D:\\Projects\\ACME\\cli'), t('D:\\Projects\\ACME\\apiary'), t('D:\\Projects\\ACME\\acme'), plainT('D:\\Projects\\ACME\\scratch'), plainT('D:\\Projects\\ACME\\notes\\deep')])).toEqual([false, false, true, true, true])
   })
 
   it("Claude Code: no .claude.json yet is untrusted; one it can't read is unknown", async () => {
@@ -565,23 +579,37 @@ describe("whether a connection trusts a workspace's folders (HI-1870)", () => {
 
 describe("where Set Up asks a CLI's trust question (HI-1871)", () => {
   const ws = 'C:\\work\\ws'
-  const alpha = { project: 'alpha', folder: 'C:\\work\\ws\\alpha' }
-  const beta = { project: 'beta', folder: 'C:\\work\\ws\\beta' }
+  // Plain folders (no Git), which a trusted workspace folder covers.
+  const alpha = { project: 'alpha', folder: 'C:\\work\\ws\\alpha', git: false }
+  const beta = { project: 'beta', folder: 'C:\\work\\ws\\beta', git: false }
+  // Git roots inside the workspace, which it never covers (HI-2520).
+  const cli = { project: 'cli', folder: 'C:\\work\\ws\\cli', git: true }
+  const apiary = { project: 'apiary', folder: 'C:\\work\\ws\\apiary', git: true }
   // A worktree project inside the workspace whose main repository is kept elsewhere: its trust root is outside.
-  const wtProject = { project: 'alpha-wt', folder: 'C:\\repos\\alpha' }
+  const wtProject = { project: 'alpha-wt', folder: 'C:\\repos\\alpha', git: true }
 
-  it('a CLI whose trust is inherited (Claude Code): the workspace folder, once, for the roots inside it', () => {
+  it('a CLI whose trust is inherited (Claude Code): the workspace folder, once, for the plain folders inside it', () => {
     expect(accounts.chooseSetUpTarget(true, ws, [alpha, beta])).toEqual({ folder: ws, workspace: true })
     // The workspace folder covers alpha; the outside root stays pending, asked next.
     expect(accounts.chooseSetUpTarget(true, ws, [wtProject, alpha])).toEqual({ folder: ws, workspace: true })
     // Only an outside root left (a worktree project's main repository elsewhere): that root, never the workspace again.
     expect(accounts.chooseSetUpTarget(true, ws, [wtProject])).toEqual({ folder: 'C:\\repos\\alpha', project: 'alpha-wt' })
     // A folder whose name only starts like the workspace's isn't inside it.
-    expect(accounts.chooseSetUpTarget(true, ws, [{ project: 'x', folder: 'C:\\work\\ws2\\x' }])).toEqual({ folder: 'C:\\work\\ws2\\x', project: 'x' })
+    expect(accounts.chooseSetUpTarget(true, ws, [{ project: 'x', folder: 'C:\\work\\ws2\\x', git: false }])).toEqual({ folder: 'C:\\work\\ws2\\x', project: 'x' })
   })
 
-  it("a CLI whose trust isn't inherited (Codex): each pending root in turn; nothing pending: none", () => {
+  it('Claude Code: Git roots inside the workspace are asked at their own root, never the workspace folder (HI-2520)', () => {
+    // Git roots only: the first, then the next once it's trusted; the workspace folder would cover neither, so never it.
+    expect(accounts.chooseSetUpTarget(true, ws, [cli, apiary])).toEqual({ folder: cli.folder, project: 'cli' })
+    expect(accounts.chooseSetUpTarget(true, ws, [apiary])).toEqual({ folder: apiary.folder, project: 'apiary' })
+    // Mixed: the workspace folder first, for the plain one; once it's trusted, the Git roots left, one at a time.
+    expect(accounts.chooseSetUpTarget(true, ws, [cli, alpha, apiary])).toEqual({ folder: ws, workspace: true })
+    expect(accounts.chooseSetUpTarget(true, ws, [cli, apiary])).toEqual({ folder: cli.folder, project: 'cli' })
+  })
+
+  it("a CLI whose trust isn't inherited (Codex): each pending root in turn, Git or not; nothing pending: none", () => {
     expect(accounts.chooseSetUpTarget(false, ws, [alpha, beta])).toEqual({ folder: alpha.folder, project: 'alpha' })
+    expect(accounts.chooseSetUpTarget(false, ws, [cli, alpha])).toEqual({ folder: cli.folder, project: 'cli' })
     expect(accounts.chooseSetUpTarget(true, ws, [])).toBeUndefined()
   })
 })
@@ -589,7 +617,7 @@ describe("where Set Up asks a CLI's trust question (HI-1871)", () => {
 describe("whether a connection is set up (connectionReadiness, HI-1870)", () => {
   it('anything definitely not done wins, then anything unknown, else done', () => {
     const none = { pending: [], unknown: false }
-    const pending = { pending: [{ project: 'alpha', folder: 'C:\\w\\alpha' }], unknown: false }
+    const pending = { pending: [{ project: 'alpha', folder: 'C:\\w\\alpha', git: false }], unknown: false }
     expect(connectionReadiness({ setUp: true })).toBe('done')
     expect(connectionReadiness({ setUp: true, trust: none })).toBe('done')
     expect(connectionReadiness({ setUp: false, trust: { ...none, unknown: true } })).toBe('needed')
@@ -697,13 +725,13 @@ describe('who an account is signed in as', () => {
   })
 
   it('at a launch, a login rewritten during the check counts with no event seen for it yet (HI-1873)', async () => {
-    // Not on in any workspace, so not watched: no event reaches Hive, as when one is still on its way or queued.
+    // Not on in any workspace, so not watched: no event reaches Combwork, as when one is still on its way or queued.
     const a = await accounts.addAccount('claude-code', 'Unseen')
     writeFileSync(join(folderOf(a), '.credentials.json'), '{"token":"old"}')
     let n = 0
     status.set(folderOf(a), async () => {
       n++
-      // The CLI answered from the old login; the new one is written before its answer reaches Hive.
+      // The CLI answered from the old login; the new one is written before its answer reaches Combwork.
       if (n === 1) writeFileSync(join(folderOf(a), '.credentials.json'), '{"token":"new, and longer"}')
       return { ok: true, loggedIn: true, email: n === 1 ? 'old@example.com' : 'new@example.com', orgId: 'org-1' }
     })
@@ -780,8 +808,8 @@ describe("a workspace's accounts", () => {
     const older = join(base, 'mig-older')
     const none = join(base, 'mig-none')
     const wsJson = (dir: string, connections: unknown): void => {
-      mkdirSync(join(dir, '.hive'), { recursive: true })
-      writeFileSync(join(dir, '.hive', 'workspace.json'), JSON.stringify({ version: 1, connections }))
+      mkdirSync(join(dir, '.combwork'), { recursive: true })
+      writeFileSync(join(dir, '.combwork', 'workspace.json'), JSON.stringify({ version: 1, connections }))
     }
     wsJson(newer, { 'claude-code': { on: [one.id, two.id], default: two.id } })
     wsJson(older, { 'claude-code': { on: [one.id], default: one.id } })
@@ -797,8 +825,6 @@ describe("a workspace's accounts", () => {
       const ids = () => (config.get().accounts ?? []).filter((a) => a.provider === 'claude-code').map((a) => a.id)
       expect(ids()).toEqual([two.id, one.id, three.id])
       expect(config.get().connectionOrderMigrated).toBe(true)
-      // A new workspace starts with the top of the order on.
-      expect(accounts.newWorkspaceAccounts()?.['claude-code']).toEqual({ on: [two.id] })
       // Once only: reordered since, it stays as the user ordered it.
       accounts.moveConnection(three.id, 0)
       await accounts.migrateConnectionOrder()
@@ -846,12 +872,13 @@ describe("a workspace's accounts", () => {
       await disposeWorkspaceService(w)
     })
 
-    it('turning one on saves it in workspace.json, as its default, and remembers it for new workspaces', async () => {
+    it('turning one on saves it in workspace.json, as its default, and nowhere else (HI-2650)', async () => {
       const a = await accounts.addAccount('claude-code', 'Here')
+      // Added, it is on nowhere: nothing is turned on by itself (Darren, 6 Nov).
+      expect(JSON.parse(readFileSync(join(wsPath, '.combwork', 'workspace.json'), 'utf8')).connections?.['claude-code']?.on ?? []).not.toContain(a.id)
       await run(() => accounts.setAccountOn(a.id, true))
-      expect(JSON.parse(readFileSync(join(wsPath, '.hive', 'workspace.json'), 'utf8')).connections).toEqual({ 'claude-code': { on: [a.id] } })
-      expect(config.get().lastUsedConnection?.['claude-code']).toBe(a.id)
-      expect(accounts.newWorkspaceAccounts()).toEqual({ 'claude-code': { on: [a.id] } })
+      expect(JSON.parse(readFileSync(join(wsPath, '.combwork', 'workspace.json'), 'utf8')).connections).toEqual({ 'claude-code': { on: [a.id] } })
+      expect(config.get().lastUsedConnection?.['claude-code']).toBeUndefined()
       await run(() => accounts.setAccountOn(a.id, false))
       expect(run(() => accounts.accountsView()).workspace['claude-code']).toEqual({ on: [], default: null })
     })
@@ -887,16 +914,16 @@ describe("a workspace's accounts", () => {
       let spy: ReturnType<typeof vi.spyOn>
       let a: Account
       const row = () => run(() => accounts.accountsView()).connections.find((c) => c.id === a.id)!
-      // A project's config with one agent, and an id of its own: one written without is given its id by Hive whenever it
+      // A project's config with one agent, and an id of its own: one written without is given its id by Combwork whenever it
       // next reads the ids, in temp files and a .bak beside it, and a folder removed while that lands is found not empty
       // (HI-2060).
       const writeProject = (i: number, agent: { provider: string; connection?: string }): void => {
-        mkdirSync(join(folders[i], '.hive'), { recursive: true })
-        writeFileSync(join(folders[i], '.hive', 'project.json'), JSON.stringify({ version: 2, id: `p-2060000000${i}`, agents: [{ id: `a-${i}`, name: `Agent ${i}`, ...agent }] }))
+        mkdirSync(join(folders[i], '.combwork'), { recursive: true })
+        writeFileSync(join(folders[i], '.combwork', 'project.json'), JSON.stringify({ version: 2, id: `p-2060000000${i}`, agents: [{ id: `a-${i}`, name: `Agent ${i}`, ...agent }] }))
       }
       // Each project with a Claude Code agent of its own (HI-1871: only projects the connection would be used in count).
       const projectsNow = async (n: number): Promise<void> => {
-        // No refresh under way as a folder goes: its ensureProject makes folders in .hive (HI-2060).
+        // No refresh under way as a folder goes: its ensureProject makes folders in .combwork (HI-2060).
         await w.refreshesSettled()
         for (const [i, f] of folders.entries()) {
           if (i >= n) {
@@ -908,7 +935,7 @@ describe("a workspace's accounts", () => {
         const want = names.slice(0, n).join()
         await refreshedTo((info) => info.projects.filter((p) => p.agents.length).map((p) => p.name).sort().join() === want)
       }
-      // The workspace as written: a refresh can hand back the info it had, when Hive wrote a project's config after the
+      // The workspace as written: a refresh can hand back the info it had, when Combwork wrote a project's config after the
       // refresh read it (a new project given its id: #999's guard), with a refresh of its own to follow (HI-1919).
       const refreshedTo = (shows: (info: Awaited<ReturnType<typeof w.refresh>>) => boolean): Promise<void> => vi.waitFor(async () => expect(shows(await w.refresh())).toBe(true), { timeout: HUNG_MS })
       /** alpha's agent's own connection, as the workspace shows it (none: undefined). */
@@ -987,7 +1014,7 @@ describe("a workspace's accounts", () => {
       it("a CLI's reading that asks at another folder (Codex: a worktree project's own entry, HR3) is where Set Up goes", async () => {
         const own = join(base, 'own-entry')
         held[0].answer([{ at: own }, true])
-        await vi.waitFor(() => expect(row().trust?.pending).toEqual([{ project: 'alpha', folder: own }]), { timeout: HUNG_MS })
+        await vi.waitFor(() => expect(row().trust?.pending).toEqual([{ project: 'alpha', folder: own, git: false }]), { timeout: HUNG_MS })
       })
 
       it('while its first read is held: Checking…, never done; refreshes mark it dirty, so one more read, not one each', async () => {
@@ -1008,13 +1035,13 @@ describe("a workspace's accounts", () => {
       })
 
       it('a project added that it already trusts: the windows are told when the answer for the new set is in, though it reads the same (round 3)', async () => {
-        const { onHiveEvent } = await import('../src/main/events')
+        const { onCombworkEvent } = await import('../src/main/events')
         held[0].answer([true])
         await vi.waitFor(() => expect(row().trust).toEqual({ pending: [], unknown: false }), { timeout: HUNG_MS })
         // What a window reloading on each connections-changed would show (it reloads only then), for the events the trust
         // read sends: the login check's own (its folder's watch, any time) would hide a missing one.
         const shown: unknown[] = []
-        const off = onHiveEvent((e) => void (e.type === 'connections-changed' && /\brunTrust\b/.test(new Error().stack ?? '') && shown.push(row().trust)))
+        const off = onCombworkEvent((e) => void (e.type === 'connections-changed' && /\brunTrust\b/.test(new Error().stack ?? '') && shown.push(row().trust)))
         try {
           await projectsNow(2)
           // The window reloads for the new project list: Checking… while it is read.
@@ -1042,9 +1069,9 @@ describe("a workspace's accounts", () => {
         expect(row().trust?.checking).toBe(true)
         held[1].answer([true, false])
         // The Set Up asked against the old set gets the current set's folder.
-        // Claude Code's trust of a folder covers those inside it (HI-1871): Set Up asks once, in the workspace's folder.
+        // Claude Code's trust of a folder covers the plain folders inside it (HI-1871, HI-2520): Set Up asks once, in the workspace's folder.
         expect(await folder).toBe(resolve(wsPath))
-        expect(row().trust).toEqual({ pending: [{ project: 'beta', folder: realpathSync.native(folders[1]) }], unknown: false, setUpIn: { folder: resolve(wsPath), workspace: true } })
+        expect(row().trust).toEqual({ pending: [{ project: 'beta', folder: realpathSync.native(folders[1]), git: false }], unknown: false, setUpIn: { folder: resolve(wsPath), workspace: true } })
         for (let i = 0; i < 5; i++) run(() => accounts.accountsView())
         expect(held).toHaveLength(2)
       })
@@ -1156,9 +1183,12 @@ describe("a workspace's accounts", () => {
       // Fresh, and of the login as it is now: asked again after the rewrite, not the answer read during it.
       expect(await accounts.confirmAccount(a.id)).toMatchObject({ fresh: true, observed: { email: 'else@example.com' } })
       expect(n).toBeGreaterThanOrEqual(2)
-      // Rewritten during every check: never fresh.
+      // Rewritten during every check: never fresh. Each rewrite a length of its own (HI-2505): the stamp is the file's id,
+      // size and write time, never its text, and two rewrites of one size back to back (each check's comes right after the
+      // one before) can share a write time, so a same-size rewrite could leave the stamp as it was.
+      let rewrites = 0
       status.set(folderOf(a), async () => {
-        writeFileSync(join(folderOf(a), '.credentials.json'), `{"token":"${Math.random()}${Date.now()}"}`)
+        writeFileSync(join(folderOf(a), '.credentials.json'), `{"token":"${'x'.repeat(++rewrites)}"}`)
         accounts.accountFolderEvent(a.id, null)
         return { ok: true, loggedIn: true, email: 'moving@example.com', orgId: 'org-1' }
       })

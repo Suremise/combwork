@@ -14,7 +14,7 @@ const ws = path.join(scratch, 'resume-ws')
 for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
 const proj = path.join(ws, 'demo')
 fs.mkdirSync(proj, { recursive: true })
-// Git in the test repository, waiting out the Hive under test's own git (lib.git, #199).
+// Git in the test repository, waiting out the Combwork under test's own git (lib.git, #199).
 const g = (cmd) => lib.git(proj, cmd)
 g('init -q -b main'); g('config user.email test@example.com'); g('config user.name Test')
 fs.writeFileSync(path.join(proj, 'README.md'), '# Demo\n'); g('add -A'); g('commit -q -m init')
@@ -26,13 +26,13 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `resume-${n
 
 ;(async () => {
   const claude = lib.fakeClaude(userData, path.join(scratch, 'resume-claude-home'), [proj])
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, ...claude })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, ...claude })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => console.log('PAGE ERROR', e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   const project = async () => (await inv('workspace:refresh')).projects.find((p) => p.name === 'demo')
   await inv('workspace:open', ws); await sleep(800)
   await inv('project:setActive', proj, true)
@@ -41,12 +41,12 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `resume-${n
   // Old sessions: two of Agent 1's, none of Agent 2's.
   const A1 = await lib.addAgent(inv, proj)
   const A2 = await lib.addAgent(inv, proj)
-  const old = (id, name, at, extra = {}) => ({ id, agent: 'claude-code', name, createdAt: at, lastActiveAt: at, archived: false, ...extra })
-  // In the workspace's database (#1061): Hive has read the project's records.
+  const old = (id, name, at, extra = {}) => ({ id, agent: 'claude-code', name, createdAt: at, lastActiveAt: at, archived: false, names: 2, ...extra })
+  // In the workspace's database (#1061): Combwork has read the project's records.
   putSessions(proj, { version: 1, sessions: [old('11111111-0000-4000-8000-000000000001', 'Older work', '2026-09-20T10:00:00Z', { agentId: A1.id }), old('11111111-0000-4000-8000-000000000002', 'Tray fixes', '2026-09-25T10:00:00Z', { agentId: A1.id })] })
-  // Hive's backups of their transcripts: a session with no transcript anywhere can't be resumed.
+  // Combwork's backups of their transcripts: a session with no transcript anywhere can't be resumed.
   for (const [sid, at] of [['11111111-0000-4000-8000-000000000001', '2026-09-20T10:00:00Z'], ['11111111-0000-4000-8000-000000000002', '2026-09-25T10:00:00Z']]) {
-    const b = path.join(proj, '.hive', 'sessions', `${sid}.jsonl`)
+    const b = path.join(proj, '.combwork', 'sessions', `${sid}.jsonl`)
     fs.mkdirSync(path.dirname(b), { recursive: true })
     fs.writeFileSync(b, JSON.stringify({ type: 'user', sessionId: sid, timestamp: at, message: { role: 'user', content: 'Earlier work' } }) + '\n')
   }
@@ -75,7 +75,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `resume-${n
   check('Agent 1 running', !!a1().live)
 
   // Guard: Agent 2 can't take the conversation Agent 1 has open.
-  const err = await page.evaluate(([folder, id, a2id]) => window.hive.invoke('session:start', folder, { resumeId: id, agentId: a2id }).then(() => 'started', (e) => String(e.message ?? e)), [proj, st.sessionId, A2.id])
+  const err = await page.evaluate(([folder, id, a2id]) => window.combwork.invoke('session:start', folder, { resumeId: id, agentId: a2id }).then(() => 'started', (e) => String(e.message ?? e)), [proj, st.sessionId, A2.id])
   check('guard refuses a conversation open in another agent', /already open in Agent 1/.test(err), err)
   check('Agent 2 still stopped', !(await project()).agents.find((a) => a.id === A2.id).live)
 
@@ -145,10 +145,10 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `resume-${n
   p = await project()
   check('after stop Agent 1 resume is back', !!a1().resume, JSON.stringify(a1().resume))
 
-  // Compressed backups (#1110): an ended session's backup as Hive keeps it (compressing it is in backupCompression.test.ts).
+  // Compressed backups (#1110): an ended session's backup as Combwork keeps it (compressing it is in backupCompression.test.ts).
   const zlib = require('zlib')
   const OLDER = '11111111-0000-4000-8000-000000000001'
-  const plainB = path.join(proj, '.hive', 'sessions', `${OLDER}.jsonl`), gzB = plainB + '.gz'
+  const plainB = path.join(proj, '.combwork', 'sessions', `${OLDER}.jsonl`), gzB = plainB + '.gz'
   const compressed = () => fs.existsSync(gzB) && !fs.existsSync(plainB)
   if (fs.existsSync(plainB)) {
     fs.writeFileSync(gzB, zlib.gzipSync(fs.readFileSync(plainB)))

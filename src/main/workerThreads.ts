@@ -3,7 +3,7 @@ import type { Worker } from 'worker_threads'
 
 /**
  * Whether a script built beside main's (a worker thread's) is there, so its thread can start (HI-1880). original-fs
- * sees an installed Hive's app.asar as one file, so a path inside it never exists to it: every worker ran its work on
+ * sees an installed Combwork's app.asar as one file, so a path inside it never exists to it: every worker ran its work on
  * main's thread instead (the usage history, the WAL checkpoints, the repository lock) or not at all (git's, the log's
  * writer, the stall watchdog). A script in an archive is there when the archive is, as the build put it there; a
  * Worker reads it through Electron's archive support. Elsewhere (a dev build, unit tests: none built) it is looked for,
@@ -19,8 +19,8 @@ export function bundledScriptExists(file: string): boolean {
   }
 }
 
-/** Hive's worker threads, by the names Copy Diagnostics gives them. */
-export type WorkerName = 'usage history' | 'git' | 'repository lock' | 'WAL checkpoints' | 'stall watchdog' | 'log writer' | "Codex's log" | 'None baseline'
+/** Combwork's worker threads, by the names Copy Diagnostics gives them. */
+export type WorkerName = 'folder move' | 'usage history' | 'git' | 'repository lock' | 'WAL checkpoints' | 'stall watchdog' | 'log writer' | "Codex's log" | 'None baseline'
 const NAMES: WorkerName[] = ['usage history', 'git', 'repository lock', 'WAL checkpoints', 'stall watchdog', 'log writer', "Codex's log", 'None baseline'] // i18n-ignore: a worker's name, for Copy Diagnostics' report (English)
 
 type WorkerState = { how: 'started'; running: () => boolean } | { how: 'here' | 'ended'; why: string }

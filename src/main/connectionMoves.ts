@@ -3,10 +3,10 @@ import { existsSync } from 'original-fs'
 import type { AgentDef, Connection, LaunchValues, MovedField, ProjectConfig, ProviderId } from '../shared/types'
 import { type LegacyInputs, type MovedNotice, type AccountStore, migrateAssistant, migrateProject, migrateWorkspaceFile, placeUnplaced, waitsForConnection } from '../shared/connectionDefaults'
 import { autoProviderPending, providerDescriptor } from '../shared/providers'
-import { HIVE_DIR, projectAgents } from '../shared/defaults'
+import { CW_DIR, projectAgents } from '../shared/defaults'
 import { msg, tr } from '../shared/i18n'
 import { config } from './config'
-import { onHiveEvent, toast } from './events'
+import { onCombworkEvent, toast } from './events'
 import { createLogger, userText } from './logger'
 import { accountById, accountHere, effortUsable, getConnection, newConnectionId } from './accounts'
 import { testHomeSeam } from './connectionSeam'
@@ -76,7 +76,7 @@ async function withConnections(write: (plan: (fn: (store: AccountStore) => void)
 async function migrateOne(ws: WorkspaceService, projectPath: string): Promise<void> {
   const assistant = ws.isAssistantHome(projectPath)
   // A project without its project.json yet has nothing to migrate (its first write is a new one's).
-  if (!assistant && !existsSync(join(projectPath, HIVE_DIR, 'project.json'))) return
+  if (!assistant && !existsSync(join(projectPath, CW_DIR, 'project.json'))) return
   const read = await ws.projectConfig(projectPath)
   if (!read.migrations?.accounts1) {
     // Automatic's pick (an agent from before 0.2, the Assistant following Settings) is only known once detection answered.
@@ -247,22 +247,23 @@ export async function dismissMovedNotice(ws: WorkspaceService, keys: string[]): 
   config.update((c) => void (c.ui.connectionsNoticeDismissed = [...new Set([...(c.ui.connectionsNoticeDismissed ?? []), ...add])]))
 }
 
-const MOVE_FAILED = msg({ id: 'main.connections.moveFailed', defaultMessage: "Hive couldn't move {project}'s model settings to its agents", description: "A notice's title (HI-1770): moving a project's own model, effort and context settings onto its agents (connections now hold the defaults) failed; it is tried again at the next start. {project} is the project's name." })
+const MOVE_FAILED = msg({ id: 'main.connections.moveFailed', defaultMessage: "Combwork couldn't move {project}'s model settings to its agents", description: "A notice's title (HI-1770): moving a project's own model, effort and context settings onto its agents (connections now hold the defaults) failed; it is tried again at the next start. {project} is the project's name." })
 
 
-/** Workspaces migrated since Hive started; an account added or turned on looks at them again (agents waiting for one). */
+/** Workspaces migrated since Combwork started; an account added or turned on looks at them again (agents waiting for one). */
 const looked = new Set<string>()
 
-/** The migration's part of Hive's start (index.ts): at each workspace's open, and when accounts change (agents waiting for one). */
+/** The migration's part of Combwork's start (index.ts): at each workspace's open, and when accounts change (agents waiting for one). */
 export function initConnectionMoves(): void {
   const look = (): void => {
     for (const ws of openWorkspaces()) {
-      if (!ws.path || looked.has(ws.path.toLowerCase())) continue
+      // One still reading its settings (HI-2651) would be migrated from the defaults: its open's workspace-changed looks again.
+      if (!ws.path || ws.readingSettings || looked.has(ws.path.toLowerCase())) continue
       looked.add(ws.path.toLowerCase())
       void migrateWorkspace(ws)
     }
   }
-  onHiveEvent((e) => {
+  onCombworkEvent((e) => {
     if (e.type === 'connections-changed' || e.type === 'settings-changed') looked.clear()
     if (e.type === 'workspace-changed' || e.type === 'connections-changed' || e.type === 'settings-changed') look()
   })

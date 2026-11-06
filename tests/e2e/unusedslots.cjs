@@ -1,4 +1,4 @@
-// Unused Worktrees on slots (#1450, SPEC §16.10.2): a test Hive lends a Git project's slots (the test copies' `slots:test`
+// Unused Worktrees on slots (#1450, SPEC §16.10.2): a test Combwork lends a Git project's slots (the test copies' `slots:test`
 // channel, as #1438's card start will) and Version Control → Changes → Unused worktrees lists only those that need the
 // user: a dirty free slot (with Open, which shows its changes), free slots beyond the pool, and a retired home no
 // conversation resumes in (`slots:test` `homes`, until #1441 records real ones); never the slot lent to a card or the one
@@ -25,7 +25,7 @@ const git = (cwd, args) => lib.git(cwd, ['-c', 'user.email=t@t', '-c', 'user.nam
 
 ;(async () => {
   q.prepare(fx)
-  const h = await q.startHive(fx, { port: PORT, keepOptions: true })
+  const h = await q.startCombwork(fx, { port: PORT, keepOptions: true })
   const { page, inv } = h
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -61,7 +61,7 @@ const git = (cwd, args) => lib.git(cwd, ['-c', 'user.email=t@t', '-c', 'user.nam
     check('slot-e is carried for B2', !!(await op({ op: 'carry', agent: b2.id, slot: 'slot-e', folder: e })))
     // A retired home no conversation can resume in.
     const home = path.join(root, 'home-r1')
-    lib.git(fx.alpha, ['worktree', 'add', '-q', '-b', 'hive/r1-old', home])
+    lib.git(fx.alpha, ['worktree', 'add', '-q', '-b', 'cw/r1-old', home])
     fs.writeFileSync(path.join(home, 'notes.txt'), 'review notes\n')
     git(home, ['add', '-A'])
     git(home, ['commit', '-qm', 'Review notes'])

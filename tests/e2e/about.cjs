@@ -5,13 +5,15 @@ const { _electron } = require('playwright-core')
 const fs = require('fs'), path = require('path')
 const scratch = lib.WORK, userData = path.join(scratch, 'about-profile')
 fs.rmSync(userData, { recursive: true, force: true })
-// A log as after an upgrade: a run of 0.3.1 (which didn't mark the user's text) with a card title in it, then a run
-// that marks, with a secret and the home folder in it. Copy Diagnostics takes all three out.
+// A log as after an upgrade: a run of 0.3.1 (before 1.1, read as an older version's: HI-2594) with a card title
+// in it, then a run of Combwork that marks, with a secret and the home folder in it. Copy Diagnostics takes all three out.
 fs.mkdirSync(path.join(userData, 'logs'), { recursive: true })
-fs.writeFileSync(path.join(userData, 'logs', 'hive.log'), [
+fs.writeFileSync(path.join(userData, 'logs', 'combwork.log'), [
+  // old-name: begin old-log-line
   '2026-10-01T09:00:00.000Z [INFO] [main] Hive 0.3.1 starting (Electron 44.5.1)',
+  // old-name: end old-log-line
   '2026-10-01T09:01:00.000Z [INFO] [tasks] #1 created by You: Legacy confidential takeover notes',
-  '2026-10-02T09:00:00.000Z [INFO] [main] Hive 0.3.1 starting (Electron 44.5.1; your text marked)',
+  '2026-10-02T09:00:00.000Z [INFO] [main] Combwork 1.1.0 starting (Electron 44.5.1; your text marked)',
   `2026-10-02T09:00:01.000Z [INFO] [test] token=SECRETVALUE123 at ${path.join(require('os').homedir(), 'x')}`,
   ''
 ].join('\n'))
@@ -23,7 +25,7 @@ const HUNG_MS = 10000
 /** Whether fn() comes true (checked until it does, up to HUNG_MS). */
 const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
 ;(async () => {
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => console.log('PAGE ERROR', e.message))
@@ -39,9 +41,9 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   check('Electron bundles Node 24.22.1 or later (CVE-2026-111497)', atLeast(node, '24.22.1'), node)
   // Setup dialog may show on a fresh profile; close any modal first.
   await page.keyboard.press('Escape'); await sleep(300)
-  await page.evaluate(() => window.hive.invoke('app:info')) // warm
+  await page.evaluate(() => window.combwork.invoke('app:info')) // warm
   await page.keyboard.press('F1')
-  await page.locator('.split-list .row', { hasText: 'About Hive' }).click()
+  await page.locator('.split-list .row', { hasText: 'About Combwork' }).click()
   check('About shows MIT link', await becomes(() => page.locator('.about-licence a', { hasText: 'MIT License' }).isVisible()))
   await page.screenshot({ path: path.join(scratch, 'about-1.png') })
   await page.locator('.about-licence a', { hasText: 'MIT License' }).click()
@@ -63,9 +65,12 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   const preview = dialog.locator('.diagnostics-preview')
   let shown = ''
   for (let i = 0; i < 50 && !/### Log/.test(shown); i++) { await sleep(200); shown = await preview.innerText().catch(() => '') }
-  check('Copy Diagnostics shows a preview', /## Hive diagnostics/.test(shown) && /### Coding agents/.test(shown) && /### Counts/.test(shown) && /### Log \(last 50 lines\)/.test(shown), shown.slice(0, 200))
+  check('Copy Diagnostics shows a preview', /## Combwork diagnostics/.test(shown) && /### Coding agents/.test(shown) && /### Counts/.test(shown) && /### Log \(last 50 lines\)/.test(shown), shown.slice(0, 200))
+  // old-name: begin old-log-label
+  check('headed Combwork, with the running version labelled Combwork', /^## Combwork diagnostics\n\n- \*\*Combwork\*\* \d+\.\d+\.\d+\S* \(/.test(shown) && !/\*\*Hive\*\*/.test(shown), shown.slice(0, 200))
+  // old-name: end old-log-label
   check('with the secret and home folder taken out', !shown.includes('SECRETVALUE123') && shown.includes('token=<redacted>') && !shown.toLowerCase().includes(require('os').homedir().toLowerCase()))
-  check("and the older version's card title", !shown.includes('takeover') && shown.includes('[tasks] <message left out: logged by an older version of Hive>'))
+  check("and the older version's card title", !shown.includes('takeover') && shown.includes('[tasks] <message left out: logged by an older version of Combwork>'))
   await page.screenshot({ path: path.join(scratch, 'about-3-diagnostics.png') })
   await dialog.getByRole('button', { name: 'Copy' }).click()
   check('Copy copies exactly what was shown', await becomes(async () => ((await page.evaluate(() => window.__copied)) || '').trim() === shown.trim()))
@@ -74,7 +79,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
 
   // Review finding: card text and the workspaces opened before stayed in the log. A card in one workspace,
   // then another workspace: neither the card's title nor the first workspace's names may be in the report.
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   const secretWs = path.join(scratch, 'about-ConfidentialWorkspace'), otherWs = path.join(scratch, 'about-OtherWorkspace')
   for (const d of [secretWs, otherWs]) fs.rmSync(d, { recursive: true, force: true })
   lib.gitProject(path.join(secretWs, 'PrivateProject'))
@@ -86,7 +91,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   await openWs(secretWs)
   await inv('tasks:create', { title: 'Confidential customer merger notes', project: 'PrivateProject' })
   await openWs(otherWs)
-  const log = fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8')
+  const log = fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8')
   check('the log has the card and the first workspace', log.includes('Confidential customer merger notes') && log.includes('PrivateProject'))
   const report = await inv('app:diagnostics')
   const reportLog = report.slice(report.indexOf('### Log'))

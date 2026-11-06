@@ -10,7 +10,7 @@ import { cardChange, readCondition, wakeAbout, wakeLine, watchLabel } from '../s
 import type { TaskCard } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-columns-')
+const base = tempDir('cw-columns-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -26,8 +26,8 @@ const reviewer = as('r1', 'Reviewer')
 
 function project(ws: string, name: string, agents: { id: string; name: string }[]): string {
   const p = join(ws, name)
-  mkdirSync(join(p, '.hive'), { recursive: true })
-  writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents }))
+  mkdirSync(join(p, '.combwork'), { recursive: true })
+  writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents }))
   return p
 }
 
@@ -134,24 +134,24 @@ describe('waiting on the new columns', () => {
 
   it("another agent's card in Passed: who passed it, and that Passed isn't merged; in Done (merged), no such note", () => {
     const history = [
-      { at: at(1), by: 'Claude (hive)', what: 'Moved to Review' },
-      { at: at(2), by: 'Codex (hive)', what: 'Review passed' },
-      { at: at(2), by: 'Codex (hive)', what: 'Moved to Passed' }
+      { at: at(1), by: 'Claude (demo)', what: 'Moved to Review' },
+      { at: at(2), by: 'Codex (demo)', what: 'Review passed' },
+      { at: at(2), by: 'Codex (demo)', what: 'Moved to Passed' }
     ]
-    expect(line(card({ agent: 'a1', agentName: 'Claude', column: 'passed', history }))).toMatch(/^\[Hive\] #7 \(Claude's card\) is in Passed: Codex \(hive\) passed it \(Passed isn't merged\)\. /)
-    const merged = [...history, { at: at(3), by: 'Claude (hive)', what: 'Moved to Done' }]
-    expect(line(card({ agent: 'a1', agentName: 'Claude', column: 'done', history: merged }))).toMatch(/^\[Hive\] #7 \(Claude's card\) is in Done: Codex \(hive\) passed it\. /)
+    expect(line(card({ agent: 'a1', agentName: 'Claude', column: 'passed', history }))).toMatch(/^\[CW\] #7 \(Claude's card\) is in Passed: Codex \(demo\) passed it \(Passed isn't merged\)\. /)
+    const merged = [...history, { at: at(3), by: 'Claude (demo)', what: 'Moved to Done' }]
+    expect(line(card({ agent: 'a1', agentName: 'Claude', column: 'done', history: merged }))).toMatch(/^\[CW\] #7 \(Claude's card\) is in Done: Codex \(demo\) passed it\. /)
     // The watcher's own card says nothing of whose it is or of merging.
-    expect(line(card({ agent: 'a2', column: 'passed', history }), 'a2')).toMatch(/^\[Hive\] #7 is in Passed\. /)
+    expect(line(card({ agent: 'a2', column: 'passed', history }), 'a2')).toMatch(/^\[CW\] #7 is in Passed\. /)
   })
 
   it('a card moved On Hold starts a new round: an earlier verdict no longer speaks for it', () => {
     const history = [
-      { at: at(1), by: 'Codex (hive)', what: 'Review passed' },
+      { at: at(1), by: 'Codex (demo)', what: 'Review passed' },
       { at: at(2), by: 'You', what: 'Moved to On Hold' },
       { at: at(3), by: 'You', what: 'Moved to Passed' }
     ]
-    expect(line(card({ agent: 'a1', agentName: 'Claude', column: 'passed', history }))).toMatch(/^\[Hive\] #7 \(Claude's card\) is in Passed \(Passed isn't merged\)\. /)
+    expect(line(card({ agent: 'a1', agentName: 'Claude', column: 'passed', history }))).toMatch(/^\[CW\] #7 \(Claude's card\) is in Passed \(Passed isn't merged\)\. /)
   })
 })
 
@@ -172,7 +172,7 @@ describe('who moves cards to On Hold and Passed', () => {
 
   it('only the user and the Assistant (and the workspace token) park a card: a project agent is refused, moving or creating it there', async () => {
     const c = await run(() => tasks.createTask({ title: 'Park me', project: 'alpha' }, user))
-    await expect(run(() => tasks.updateTask(c.number, { column: 'hold' }, coder))).rejects.toThrow(/Only the user or the Assistant puts cards On Hold\. Where the user has decided to park #\d+, ask the Assistant \(hive_ask_assistant\); otherwise ask the user\./)
+    await expect(run(() => tasks.updateTask(c.number, { column: 'hold' }, coder))).rejects.toThrow(/Only the user or the Assistant puts cards On Hold\. Where the user has decided to park #\d+, ask the Assistant \(cw_ask_assistant\); otherwise ask the user\./)
     await expect(run(() => tasks.updateTask(c.number, { column: 'hold' }, coder))).rejects.toBeInstanceOf(tasks.TaskPermissionError)
     await expect(run(() => tasks.createTask({ title: 'Parked', project: 'alpha', column: 'hold' }, coder))).rejects.toBeInstanceOf(tasks.TaskPermissionError)
     expect((await run(() => tasks.getTask(c.number))).column).toBe('todo')

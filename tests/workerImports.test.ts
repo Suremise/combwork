@@ -1,6 +1,6 @@
-// Hive's worker threads in an installed copy (HI-1880): each finds its script inside app.asar and starts as a thread of
+// Combwork's worker threads in an installed copy (HI-1880): each finds its script inside app.asar and starts as a thread of
 // its own, and none loads Electron, which a worker thread can't (the usage worker reached it through fsutil.ts's
-// logger, so in an installed Hive it would have ended as it started). tests/e2e/packaged-workers.cjs checks the threads
+// logger, so in an installed Combwork it would have ended as it started). tests/e2e/packaged-workers.cjs checks the threads
 // run in a packaged build.
 import { readFileSync, writeFileSync, mkdirSync } from 'fs'
 import { join } from 'path'

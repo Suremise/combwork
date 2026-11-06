@@ -1,4 +1,4 @@
-// Kept files changed by Hive while something else is saving them (#1600): a read-modify-write (project.json, the
+// Kept files changed by Combwork while something else is saving them (#1600): a read-modify-write (project.json, the
 // record of project names, the record of handovers' owners) never writes back the .bak's value read from a file still
 // being saved; it reads again a few times, then refuses, the file left as the other program saves it.
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'fs'
@@ -8,7 +8,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { closeAllBoards } from '../src/main/boardStore'
 
-const base = tempDir('hive-keptchanges-')
+const base = tempDir('cw-keptchanges-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 afterAll(() => {
   closeAllBoards()
@@ -27,8 +27,8 @@ let n = 0
 async function open(): Promise<{ w: ReturnType<typeof createWorkspaceService>; ws: string; alpha: string }> {
   const ws = join(base, `ws-${++n}`)
   const alpha = join(ws, 'alpha')
-  mkdirSync(join(alpha, '.hive'), { recursive: true })
-  writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+  mkdirSync(join(alpha, '.combwork'), { recursive: true })
+  writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
   const w = createWorkspaceService()
   // Closed when the test ends, passed or failed.
   onTestFinished(() => disposeWorkspaceService(w))
@@ -51,7 +51,7 @@ function untouched(file: string, bak: string): void {
 }
 
 describe('a kept file read for a change (#1600)', () => {
-  const dir = tempDir('hive-keptbusy-')
+  const dir = tempDir('cw-keptbusy-')
 
   it('throws KeptFileBusy while it is still being saved; other reads keep its last good copy', async () => {
     const f = join(dir, 'busy.json')
@@ -87,8 +87,8 @@ describe('a kept file read for a change (#1600)', () => {
   })
 
   it('says the file is being saved by something else, as a conflict', () => {
-    const e = new KeptFileBusy('C:\\ws\\.hive\\project.json')
-    expect(e.message).toBe('C:\\ws\\.hive\\project.json is being saved by something else: nothing was changed. Try again in a moment.')
+    const e = new KeptFileBusy('C:\\ws\\.combwork\\project.json')
+    expect(e.message).toBe('C:\\ws\\.combwork\\project.json is being saved by something else: nothing was changed. Try again in a moment.')
     expect(e.kind).toBe('conflict')
   })
 })
@@ -96,7 +96,7 @@ describe('a kept file read for a change (#1600)', () => {
 describe('read-modify-write callers refuse rather than write over a save in progress (#1600)', () => {
   it('mutateProjectConfig: project.json', async () => {
     const { w, alpha } = await open()
-    const file = join(alpha, '.hive', 'project.json')
+    const file = join(alpha, '.combwork', 'project.json')
     await w.updateProjectConfig(alpha, { chime: 'on' })
     const bak = readFileSync(`${file}.bak`, 'utf8')
     saving(file)
@@ -112,7 +112,7 @@ describe('read-modify-write callers refuse rather than write over a save in prog
 
   it('noteNames and noteFormerName: project-names.json', async () => {
     const { w, ws, alpha } = await open()
-    const file = join(ws, '.hive', 'project-names.json')
+    const file = join(ws, '.combwork', 'project-names.json')
     const id = (await w.projectIds()).byPath.get(alpha.toLowerCase())!
     await names.noteNames(w, [{ path: alpha, id, copy: false }])
     expect(existsSync(file)).toBe(true)
@@ -127,12 +127,12 @@ describe('read-modify-write callers refuse rather than write over a save in prog
 
   it('ownHandover (a handover written): handover-owners.json, and no handover left without its owner', async () => {
     const { w, ws } = await open()
-    const file = join(ws, '.hive', 'handover-owners.json')
+    const file = join(ws, '.combwork', 'handover-owners.json')
     await inWorkspace(w, () => notes.createHandover('alpha', 'First', 'x'))
     const bak = readFileSync(`${file}.bak`, 'utf8')
     saving(file)
     // Refused before the handover is written (review round 1): never there for someone to edit, so nothing is taken back.
-    const second = (): string[] => readdirSync(join(ws, '.hive', 'shared', 'handovers')).filter((f) => f.includes('second'))
+    const second = (): string[] => readdirSync(join(ws, '.combwork', 'shared', 'handovers')).filter((f) => f.includes('second'))
     const run = { settled: false }
     // Its outcome as a value at once (no rejection left unhandled while the folder is watched).
     const made = inWorkspace(w, () => notes.createHandover('alpha', 'Second', 'y')).then(

@@ -45,13 +45,13 @@ vi.mock('../src/main/updater', async (orig) => ({ ...(await orig<object>()), res
 const tp = await import('../src/main/teamPause')
 const parked = await import('../src/main/teamParked')
 
-const base = tempDir('hive-teamparked-')
+const base = tempDir('cw-teamparked-')
 let n = 0
 /** A workspace (with alpha's B1, or no project), as the scan reads it. */
 function space(withAgent = false): (typeof h.open)[number] {
   const p = join(base, `ws${++n}`)
-  mkdirSync(join(p, '.hive'), { recursive: true })
-  return { path: p, assistantHome: join(p, '.hive', 'assistant'), lifetime: { aborted: false }, info: () => ({ projects: withAgent ? [{ name: 'alpha', path: join(p, 'alpha'), config: { agents: [{ id: 'b1', name: 'B1' }] } }] : [] }) }
+  mkdirSync(join(p, '.combwork'), { recursive: true })
+  return { path: p, assistantHome: join(p, '.combwork', 'assistant'), lifetime: { aborted: false }, info: () => ({ projects: withAgent ? [{ name: 'alpha', path: join(p, 'alpha'), config: { agents: [{ id: 'b1', name: 'B1' }] } }] : [] }) }
 }
 const ws = (w: (typeof h.open)[number]) => w as never
 

@@ -1,5 +1,5 @@
 // The repository lock across processes (#1347, SPEC §16.9.3): the real core (repoLockCore.ts) in plain Node children,
-// bundled with esbuild, so two processes contend for one repository's lock as two Hives would. Each child takes the
+// bundled with esbuild, so two processes contend for one repository's lock as two Combworks would. Each child takes the
 // lock, writes what happened to its own file (waiting, held, timedout, released) and holds until told to release.
 import { spawn, type ChildProcess } from 'child_process'
 import { createRequire } from 'module'
@@ -12,7 +12,7 @@ import { REPO_LOCK_FILE, repoLockHolder, takeRepoLock } from '../src/main/repoLo
 import { tempDir } from './tempDir'
 
 const ctx = createRequire(import.meta.url)('./e2e/runContext.cjs')
-const tmp = tempDir('hive-repo-lock-')
+const tmp = tempDir('cw-repo-lock-')
 const bundle = join(tmp, 'child.cjs')
 const CHILD = `
 const { appendFileSync, existsSync } = require('fs')
@@ -44,7 +44,7 @@ afterEach(() => {
 
 let n = 0
 /** A repository's common git dir stand-in: the lock only needs a folder. */
-const repoDir = (): string => tempDir(`hive-repo-lock-${++n}-`)
+const repoDir = (): string => tempDir(`cw-repo-lock-${++n}-`)
 
 /** A child taking the lock in dir; `lines()` is what it wrote, `release()` lets it go. */
 function contender(dir: string, profile: string, opts: { barrier?: string; waitMs?: number } = {}) {
@@ -68,14 +68,14 @@ const WAIT = { timeout: 30_000, interval: 25 }
 describe('the repository lock across processes (#1347)', () => {
   it('two processes take it in turn: the second waits, naming the first, until it is released', async () => {
     const dir = repoDir()
-    const a = contender(dir, 'Hive-A')
+    const a = contender(dir, 'Combwork-A')
     await vi.waitFor(() => expect(a.has('held')).toBe(true), WAIT)
-    const b = contender(dir, 'Hive-B')
-    await vi.waitFor(() => expect(b.lines()).toContain('waiting Hive-A'), WAIT)
+    const b = contender(dir, 'Combwork-B')
+    await vi.waitFor(() => expect(b.lines()).toContain('waiting Combwork-A'), WAIT)
     expect(b.has('held')).toBe(false)
     a.release()
     await vi.waitFor(() => expect(b.has('held')).toBe(true), WAIT)
-    expect(repoLockHolder(dir)).toMatchObject({ token: b.token(), profile: 'Hive-B', pid: b.child.pid })
+    expect(repoLockHolder(dir)).toMatchObject({ token: b.token(), profile: 'Combwork-B', pid: b.child.pid })
     b.release()
     await b.exited()
     expect(repoLockHolder(dir)).toBeNull()
@@ -83,7 +83,7 @@ describe('the repository lock across processes (#1347)', () => {
 
   it("a dead holder's row is taken over", async () => {
     const dir = repoDir()
-    const a = contender(dir, 'Hive-A')
+    const a = contender(dir, 'Combwork-A')
     await vi.waitFor(() => expect(a.has('held')).toBe(true), WAIT)
     a.child.kill()
     await a.exited()
@@ -96,7 +96,7 @@ describe('the repository lock across processes (#1347)', () => {
 
   it('a reused pid (the holder running with another start time) counts as dead', async () => {
     const dir = repoDir()
-    const a = contender(dir, 'Hive-A')
+    const a = contender(dir, 'Combwork-A')
     await vi.waitFor(() => expect(a.has('held')).toBe(true), WAIT)
     // Its pid runs, but the row says it started at another time: the process that took it is gone.
     const db = openLockDb(join(dir, REPO_LOCK_FILE), 1000, 'SELECT 1')
@@ -110,19 +110,19 @@ describe('the repository lock across processes (#1347)', () => {
 
   it("two contenders started together on one dead holder's row: exactly one holds it, the other waits", async () => {
     const dir = repoDir()
-    const dead = contender(dir, 'Hive-Dead')
+    const dead = contender(dir, 'Combwork-Dead')
     await vi.waitFor(() => expect(dead.has('held')).toBe(true), WAIT)
     dead.child.kill()
     await dead.exited()
     const barrier = join(tmp, `barrier-${++n}`)
-    const b = contender(dir, 'Hive-B', { barrier })
-    const c = contender(dir, 'Hive-C', { barrier })
+    const b = contender(dir, 'Combwork-B', { barrier })
+    const c = contender(dir, 'Combwork-C', { barrier })
     writeFileSync(barrier, '')
     // Both have looked: one holds, the other waits for it (never for the dead holder).
     await vi.waitFor(() => expect([b, c].filter((x) => x.has('held')).length + [b, c].filter((x) => x.has('waiting')).length).toBe(2), WAIT)
     const [holder, waiter] = b.has('held') ? [b, c] : [c, b]
     expect(waiter.has('held')).toBe(false)
-    expect(waiter.lines()[0]).toBe(`waiting ${holder === b ? 'Hive-B' : 'Hive-C'}`)
+    expect(waiter.lines()[0]).toBe(`waiting ${holder === b ? 'Combwork-B' : 'Combwork-C'}`)
     expect(repoLockHolder(dir)?.token).toBe(holder.token())
     holder.release()
     await vi.waitFor(() => expect(waiter.has('held')).toBe(true), WAIT)
@@ -134,14 +134,14 @@ describe('the repository lock across processes (#1347)', () => {
     const dir = repoDir()
     repoLockHolder(dir)
     const db = openLockDb(join(dir, REPO_LOCK_FILE), 1000, 'SELECT 1')
-    db.prepare("INSERT INTO repo_lock (id, token, pid, process_start, profile, taken_at) VALUES (1, 'old', 99999, 22, 'Hive-Old', '')").run()
+    db.prepare("INSERT INTO repo_lock (id, token, pid, process_start, profile, taken_at) VALUES (1, 'old', 99999, 22, 'Combwork-Old', '')").run()
     db.close()
     // Pid 99999 runs throughout; the process behind it changes (start 22, then 33) once the waiter has judged it live.
     let start = 22
     const asked: number[] = []
     const procs = { alive: () => true, startOf: async (pid: number) => (pid === 99999 ? (asked.push(start), start) : 1) }
     const kept = await takeRepoLock(dir, { profile: 'me', waitMs: 200, pollMs: 10, recheckMs: 0, procs })
-    expect(kept).toMatchObject({ timedOut: { profile: 'Hive-Old' } })
+    expect(kept).toMatchObject({ timedOut: { profile: 'Combwork-Old' } })
     expect(asked.length).toBeGreaterThan(1)
     const got = await takeRepoLock(dir, { profile: 'me', waitMs: 30_000, pollMs: 10, recheckMs: 0, procs, onWait: () => (start = 33) })
     expect('held' in got).toBe(true)
@@ -153,22 +153,22 @@ describe('the repository lock across processes (#1347)', () => {
     const dir = repoDir()
     const got = await takeRepoLock(dir, { profile: 'me', waitMs: 10_000 })
     if (!('held' in got)) throw new Error('not held')
-    // Taken over meanwhile (as a Hive that judged this one dead would): another token in the row.
+    // Taken over meanwhile (as a Combwork that judged this one dead would): another token in the row.
     const db = openLockDb(join(dir, REPO_LOCK_FILE), 1000, 'SELECT 1')
-    db.prepare("UPDATE repo_lock SET token = 'successor', profile = 'Hive-Next'").run()
+    db.prepare("UPDATE repo_lock SET token = 'successor', profile = 'Combwork-Next'").run()
     db.close()
     got.held.release()
-    expect(repoLockHolder(dir)).toMatchObject({ token: 'successor', profile: 'Hive-Next' })
+    expect(repoLockHolder(dir)).toMatchObject({ token: 'successor', profile: 'Combwork-Next' })
   })
 
   it('a live holder that stalls past the wait keeps the lock; the waiter gets who holds it', async () => {
     const dir = repoDir()
-    const a = contender(dir, 'Hive-A')
+    const a = contender(dir, 'Combwork-A')
     await vi.waitFor(() => expect(a.has('held')).toBe(true), WAIT)
     const told: string[] = []
     const got = await takeRepoLock(dir, { profile: 'me', waitMs: 300, pollMs: 25, onWait: (h) => told.push(h.profile) })
-    expect(got).toMatchObject({ timedOut: { profile: 'Hive-A', pid: a.child.pid } })
-    expect(told).toEqual(['Hive-A'])
+    expect(got).toMatchObject({ timedOut: { profile: 'Combwork-A', pid: a.child.pid } })
+    expect(told).toEqual(['Combwork-A'])
     expect(repoLockHolder(dir)?.token).toBe(a.token())
     a.release()
     await a.exited()

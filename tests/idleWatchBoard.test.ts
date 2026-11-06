@@ -1,5 +1,5 @@
-// HI-2285 on the real board (a temp hive.db and repository): the card a lane's builder watches alone, where nothing on it
-// waits on anyone, is the one hive_wait_for_tasks's reply nudges about (idleOwnWatchOf); a question open for the user,
+// HI-2285 on the real board (a temp combwork.db and repository): the card a lane's builder watches alone, where nothing on it
+// waits on anyone, is the one cw_wait_for_tasks's reply nudges about (idleOwnWatchOf); a question open for the user,
 // the card in Review, a watch on more than it, or an agent that isn't the lane's builder: none.
 import { execFileSync } from 'child_process'
 import { mkdirSync, writeFileSync } from 'fs'
@@ -8,7 +8,7 @@ import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-idlewatch-')
+const base = tempDir('cw-idlewatch-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -40,16 +40,16 @@ async function workspace(): Promise<{ w: WS; wt: string }> {
   const ws = join(base, 'ws')
   const repo = join(ws, 'p')
   const wt = join(ws, 'p-card')
-  mkdirSync(join(repo, '.hive'), { recursive: true })
+  mkdirSync(join(repo, '.combwork'), { recursive: true })
   writeFileSync(join(repo, 'a.txt'), 'one\n')
   git(repo, 'init', '-q', '-b', 'main')
   for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) git(repo, 'config', k, v)
-  writeFileSync(join(repo, '.gitignore'), '.hive/\n')
+  writeFileSync(join(repo, '.gitignore'), '.combwork/\n')
   git(repo, 'add', '-A')
   git(repo, 'commit', '-qm', 'initial')
   git(repo, 'worktree', 'add', '-q', '-b', 'card', wt, 'main')
   const agents = [{ id: 'a1', name: 'Builder', worktree: { path: wt, branch: 'card', base: 'main' } }, { id: 'a2', name: 'Reviewer' }]
-  writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents, workflow: { platform: 'git', preset: null, options: { ...allOff('git'), review: 'agent', noSelfReview: true } } }))
+  writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents, workflow: { platform: 'git', preset: null, options: { ...allOff('git'), review: 'agent', noSelfReview: true } } }))
   const w = createWorkspaceService()
   await w.open(ws)
   opened.push(w)

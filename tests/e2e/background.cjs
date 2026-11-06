@@ -1,5 +1,5 @@
 // An agent waiting on a background task it started: shown as background (not finished), waited for by
-// hive_wait_for_agents, refused new tasks, and finished once the task's notification has run its turn. #726: a message
+// cw_wait_for_agents, refused new tasks, and finished once the task's notification has run its turn. #726: a message
 // still reaches it while its own background task runs (a timer it set), within seconds. The agent runs the fake Claude
 // Code (fake-claude/), so nothing signs in or spends tokens. Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR.
@@ -31,17 +31,17 @@ const check = (name, ok, extra = '') => {
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.providers['claude-code'].executablePath = path.join(__dirname, 'fake-claude', 'fake-claude.cmd')
-  cfg.settings.agentApi = { enabled: true, port: Number(PORT), provideHiveMcp: true, allowSessionInput: true }
+  cfg.settings.agentApi = { enabled: true, port: Number(PORT), provideCombworkMcp: true, allowSessionInput: true }
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: PORT, CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: PORT, CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const live = async (p, agentId) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === p.toLowerCase() && s.agentId === agentId)
   // The doorbells Tester's CLI took (the fake records each in fake-wakes.jsonl).

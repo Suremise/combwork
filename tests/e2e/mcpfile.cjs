@@ -20,7 +20,7 @@ const proj = path.join(ws, 'demo')
 const other = path.join(ws, 'other')
 const dump = path.join(lib.WORK, 'mcpfile-dump')
 const home = path.join(lib.WORK, 'mcpfile-claude-home')
-const mcpDir = path.join(ws, '.hive', 'mcp')
+const mcpDir = path.join(ws, '.combwork', 'mcp')
 const shots = path.join(lib.WORK, 'mcpfile-shots')
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -37,8 +37,8 @@ const check = (name, ok, extra = '') => {
   fs.mkdirSync(dump, { recursive: true })
   fs.mkdirSync(shots, { recursive: true })
   fs.writeFileSync(path.join(dump, 'github.json'), JSON.stringify({ description: 'GitHub issues', command: 'npx', args: ['-y', '@modelcontextprotocol/server-github'], env: { GITHUB_TOKEN: '${GITHUB_TOKEN}' } }))
-  const notes = { description: 'Notes', command: 'node', args: ['${HIVE_MCP_DIR}/notes/server.js'], env: { NOTES_DIR: 'C:\\notes' } }
-  fs.writeFileSync(path.join(dump, 'notes.zip'), zipSync({ 'notes/hive-mcp.json': strToU8(JSON.stringify(notes)), 'notes/server.js': strToU8('// notes server') }))
+  const notes = { description: 'Notes', command: 'node', args: ['${CW_MCP_DIR}/notes/server.js'], env: { NOTES_DIR: 'C:\\notes' } }
+  fs.writeFileSync(path.join(dump, 'notes.zip'), zipSync({ 'notes/combwork-mcp.json': strToU8(JSON.stringify(notes)), 'notes/server.js': strToU8('// notes server') }))
   const env = lib.fakeClaude(userData, home, [proj, other])
   const { app, page, inv } = await lib.launch({ userData, env })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -63,7 +63,7 @@ const check = (name, ok, extra = '') => {
 
   // What is added to a project (HI-2059), as project.json has it.
   const projectMcp = (p) => {
-    const f = path.join(p, '.hive', 'project.json')
+    const f = path.join(p, '.combwork', 'project.json')
     return fs.existsSync(f) ? (JSON.parse(fs.readFileSync(f, 'utf8')).mcp ?? {}) : {}
   }
   const where = (name) => row(name).locator('.mcp-where').innerText().catch(() => '')
@@ -96,17 +96,17 @@ const check = (name, ok, extra = '') => {
   check("its view shows what it runs", !!(await lib.until(async () => (await runs.innerText().catch(() => '')).includes('Runs: npx -y @modelcontextprotocol/server-github'), HUNG_MS)))
   await shot('2-json-added')
 
-  // --- A .zip of a server folder: unpacked to .hive/mcp/notes/, its definition from hive-mcp.json; added nowhere.
+  // --- A .zip of a server folder: unpacked to .combwork/mcp/notes/, its definition from cw-mcp.json; added nowhere.
   await pick(path.join(dump, 'notes.zip'))
   await addButton.click()
   await lib.until(async () => (await add.count()) === 1, HUNG_MS)
   const zipSaid = await add.innerText()
-  check('the zip shows what it runs', zipSaid.includes('Runs: node ${HIVE_MCP_DIR}/notes/server.js') && zipSaid.includes('NOTES_DIR (set)'), zipSaid)
+  check('the zip shows what it runs', zipSaid.includes('Runs: node ${CW_MCP_DIR}/notes/server.js') && zipSaid.includes('NOTES_DIR (set)'), zipSaid)
   check('and that its file goes in a folder of its own', /with its file in a folder of its own/.test(zipSaid), zipSaid)
   await add.getByRole('button', { name: 'Add' }).click()
   check('the zip is added', !!(await lib.until(async () => !!(await server('notes')), HUNG_MS)))
   check('added nowhere', !!(await lib.until(async () => (await where('notes')) === 'Not added anywhere', HUNG_MS)) && !(projectMcp(proj).enabled ?? []).includes('notes'), await where('notes'))
-  check("its code is in .hive/mcp/notes", fs.existsSync(path.join(mcpDir, 'notes', 'server.js')))
+  check("its code is in .combwork/mcp/notes", fs.existsSync(path.join(mcpDir, 'notes', 'server.js')))
 
   // --- The same name again: Replace or Choose Another Name; another name moves its folder references.
   await pick(path.join(dump, 'notes.zip'))
@@ -121,8 +121,8 @@ const check = (name, ok, extra = '') => {
   await add.locator('input').fill('notes-2')
   await add.getByRole('button', { name: 'Add' }).click()
   check('it is added under the new name', !!(await lib.until(async () => !!(await server('notes-2')), HUNG_MS)))
-  check('running its own folder', (await server('notes-2'))?.def?.args?.[0] === '${HIVE_MCP_DIR}/notes-2/server.js' && fs.existsSync(path.join(mcpDir, 'notes-2', 'server.js')))
-  check('and the first is untouched', (await server('notes'))?.def?.args?.[0] === '${HIVE_MCP_DIR}/notes/server.js')
+  check('running its own folder', (await server('notes-2'))?.def?.args?.[0] === '${CW_MCP_DIR}/notes-2/server.js' && fs.existsSync(path.join(mcpDir, 'notes-2', 'server.js')))
+  check('and the first is untouched', (await server('notes'))?.def?.args?.[0] === '${CW_MCP_DIR}/notes/server.js')
 
   // --- Add to… asks first, showing what it runs and the projects, ticked where it is added; Save adds and removes.
   const placesDialog = async (name) => {
@@ -157,7 +157,7 @@ const check = (name, ok, extra = '') => {
 
   // --- Search and filter in the MCP view.
   const search = page.locator('.sidebar [data-mcp-search]')
-  const listed = async () => (await page.locator('.pane-body .row .label').allInnerTexts()).map((t) => t.trim()).filter((t) => t !== 'hive')
+  const listed = async () => (await page.locator('.pane-body .row .label').allInnerTexts()).map((t) => t.trim()).filter((t) => t !== 'combwork') // the built-in server (HI-2463)
   await search.fill('note')
   check('searching "note" lists notes and notes-2', !!(await lib.until(async () => JSON.stringify((await listed()).sort()) === '["notes","notes-2"]', HUNG_MS)), JSON.stringify(await listed()))
   await page.locator('.sidebar [data-mcp-filter]').selectOption('nowhere')
@@ -180,7 +180,7 @@ const check = (name, ok, extra = '') => {
   await picker.locator('[data-mcp-search]').fill('2')
   check('…searching finds notes-2', !!(await lib.until(async () => (await picker.locator('.mcp-picker-row').count()) === 1, HUNG_MS)))
   await pickRow('notes-2').click()
-  check('…chosen, it shows what it runs and the folder', !!(await lib.until(async () => (await picker.locator('[data-mcp-runs="notes-2"]').innerText().catch(() => '')).includes('Runs: node ${HIVE_MCP_DIR}/notes-2/server.js'), HUNG_MS)))
+  check('…chosen, it shows what it runs and the folder', !!(await lib.until(async () => (await picker.locator('[data-mcp-runs="notes-2"]').innerText().catch(() => '')).includes('Runs: node ${CW_MCP_DIR}/notes-2/server.js'), HUNG_MS)))
   await themed('7-picker')
   await picker.getByRole('button', { name: 'Add', exact: true }).click()
   check('…Add adds it to other, and only there', !!(await lib.until(async () => (await tabRow('notes-2').count()) === 1, HUNG_MS)) && (projectMcp(other).enabled ?? []).includes('notes-2') && !(projectMcp(proj).enabled ?? []).includes('notes-2'), JSON.stringify([projectMcp(proj), projectMcp(other)]))

@@ -1,23 +1,23 @@
 import { join, relative } from 'path'
 import { lstat, readdir, rm } from 'original-fs/promises'
-import { HIVE_DIR } from '../shared/defaults'
+import { CW_DIR } from '../shared/defaults'
 import { createLogger, userText } from './logger'
 import { trash } from './trash'
 import type { WorkspaceService } from './workspace'
 
 const log = createLogger('leftovers')
 
-/** A temp file of Hive's atomic writes: `<file>.<pid>-<counter>.tmp` (writeTextAtomic, syncCopy) or `<file>.<pid>-<hex>.tmp` (watches, deliveries). */
+/** A temp file of Combwork's atomic writes: `<file>.<pid>-<counter>.tmp` (writeTextAtomic, syncCopy) or `<file>.<pid>-<hex>.tmp` (watches, deliveries). */
 const TEMP = /^(.+)\.\d+-[0-9a-f]+\.tmp$/i
 /** The copy the project-id migration (#508) kept of a record before first changing it. */
 const BEFORE_IDS = /^(.+)\.before-ids\.bak$/i
-/** A temp file older than this can't be a write still under way, in this Hive or another. */
+/** A temp file older than this can't be a write still under way, in this Combwork or another. */
 export const TEMP_AGE_MS = 24 * 60 * 60 * 1000
-/** A migration's copy is kept a week after it was made (an older Hive's workspace, just migrated, keeps it a while). */
+/** A migration's copy is kept a week after it was made (an older version's workspace, just migrated, keeps it a while). */
 export const BAK_AGE_MS = 7 * 24 * 60 * 60 * 1000
 /** What a store's move into the workspace database kept (#1017, #1018): `<name>.imported-<ISO time, ':' and '.' as '-'>`. */
 const IMPORTED = /^(.+)\.imported-(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z$/
-/** Such a backup goes to the Recycle Bin two weeks after the move (#1111): time enough to go back to an older Hive. */
+/** Such a backup goes to the Recycle Bin two weeks after the move (#1111): time enough to go back to an older version. */
 export const IMPORTED_AGE_MS = 14 * 24 * 60 * 60 * 1000
 
 /** What a move's backup was, and when its name says it was made; null for any other name. */
@@ -29,9 +29,9 @@ export function importedBackup(name: string): { base: string; at: number } | nul
 }
 
 /**
- * One of Hive's stores: a folder (relative to a .hive) and the files Hive writes there. Only a temp file of one of those
+ * One of Combwork's stores: a folder (relative to a .combwork) and the files Combwork writes there. Only a temp file of one of those
  * files (`temp`), the migration's copy of one it migrated (`bak`), or the backup kept when one moved into the workspace
- * database (`imported`), is ever removed: the same suffix on anything else (the user's notes, attachments, a folder Hive
+ * database (`imported`), is ever removed: the same suffix on anything else (the user's notes, attachments, a folder Combwork
  * doesn't know) is never taken for one.
  */
 export interface Store {
@@ -41,7 +41,7 @@ export interface Store {
   imported?: RegExp
 }
 
-/** The workspace's .hive: its settings and records, the board, metrics and the Assistant's home. */
+/** The workspace's .combwork: its settings and records, the board, metrics and the Assistant's home. */
 export const WORKSPACE_STORES: Store[] = [
   // The board's card files moved as their folder, `tasks` (#1017).
   { dir: '.', temp: /^(workspace|lanes|watches|project-names|handover-owners|bundled)\.json(\.bak)?$/i, bak: /^(lanes|watches)\.json$/i, imported: /^(tasks|lanes\.json|watches\.json)$/i },
@@ -54,7 +54,7 @@ export const WORKSPACE_STORES: Store[] = [
   { dir: join('assistant', 'archive'), temp: /^[\w-]+\.jsonl(\.gz)?$/i }
 ]
 
-/** A project's .hive: its settings, sessions and deliveries, and its transcript backups. */
+/** A project's .combwork: its settings, sessions and deliveries, and its transcript backups. */
 export const PROJECT_STORES: Store[] = [
   { dir: '.', temp: /^(project|sessions|deliveries|sync)\.json(\.bak)?$/i, imported: /^(sessions|deliveries)\.json$/i },
   { dir: 'sessions', temp: /^[\w-]+\.jsonl(\.gz)?$/i },
@@ -62,11 +62,11 @@ export const PROJECT_STORES: Store[] = [
 ]
 
 /**
- * Whether a store's folder is where it says, inside its .hive: the .hive and every folder down to it a real folder, never
- * a link or junction (which would make a folder outside it look like Hive's store).
+ * Whether a store's folder is where it says, inside its .combwork: the .combwork and every folder down to it a real folder, never
+ * a link or junction (which would make a folder outside it look like Combwork's store).
  */
-async function plainDir(hive: string, dir: string): Promise<boolean> {
-  let at = hive
+async function plainDir(combwork: string, dir: string): Promise<boolean> {
+  let at = combwork
   for (const part of ['', ...dir.split(/[\\/]/).filter((x) => x && x !== '.')]) {
     at = part ? join(at, part) : at
     const st = await lstat(at).catch(() => null)
@@ -84,23 +84,23 @@ export interface Swept {
 }
 
 /**
- * Removes what Hive's writes left in its stores (#1016): temp files of its atomic writes a crash left (older than a day)
- * and the project-id migration's `*.before-ids.bak` copies (older than a week). Each root is a .hive with its stores;
+ * Removes what Combwork's writes left in its stores (#1016): temp files of its atomic writes a crash left (older than a day)
+ * and the project-id migration's `*.before-ids.bak` copies (older than a week). Each root is a .combwork with its stores;
  * only the files each store names are looked at, in that folder only (not its subfolders), and only in a store that is a
- * real folder inside its .hive, never one reached through a link or junction, and never a link to a file. What can't be removed (held
+ * real folder inside its .combwork, never one reached through a link or junction, and never a link to a file. What can't be removed (held
  * open) is left for the next open. Stops when `signal` is aborted, checked again just before each removal.
  * The backups kept when a store moved into the workspace database (#1111: the board's `tasks` folder, metrics.json…) go
  * two weeks after the move, by the time in their name, to the Recycle Bin (`trash`, given for tests), a folder whole.
  */
-export async function sweepLeftovers(roots: { hive: string; stores: Store[] }[], opts: { now?: number; signal?: AbortSignal; trash?: (path: string) => Promise<void> } = {}): Promise<Swept> {
+export async function sweepLeftovers(roots: { combwork: string; stores: Store[] }[], opts: { now?: number; signal?: AbortSignal; trash?: (path: string) => Promise<void> } = {}): Promise<Swept> {
   const now = opts.now ?? Date.now()
   const toBin = opts.trash ?? trash
   const out: Swept = { removed: [], temp: 0, bak: 0, imported: 0 }
   for (const root of roots) {
     for (const store of root.stores) {
       if (opts.signal?.aborted) return out
-      const dir = join(root.hive, store.dir)
-      if (!(await plainDir(root.hive, store.dir))) continue
+      const dir = join(root.combwork, store.dir)
+      if (!(await plainDir(root.combwork, store.dir))) continue
       const names = await readdir(dir).catch(() => [] as string[])
       let temp = 0
       let bak = 0
@@ -141,7 +141,7 @@ export async function sweepLeftovers(roots: { hive: string; stores: Store[] }[],
 }
 
 /**
- * The sweep for a workspace as it opens: its .hive and its projects' (hidden ones too), told in the log once. The
+ * The sweep for a workspace as it opens: its .combwork and its projects' (hidden ones too), told in the log once. The
  * workspace and its lifetime are taken together before anything is awaited: if it closes or the window opens another
  * meanwhile, nothing more is removed, and nothing of the next workspace's is ever looked at.
  */
@@ -154,7 +154,7 @@ export async function sweepWorkspaceLeftovers(ws: WorkspaceService): Promise<Swe
   if (!still()) return null
   const hidden = await ws.listProjectPaths({ hidden: true })
   if (!still()) return null
-  const roots = [{ hive: join(path, HIVE_DIR), stores: WORKSPACE_STORES }, ...[...shown, ...hidden].map((p) => ({ hive: join(p, HIVE_DIR), stores: PROJECT_STORES }))]
+  const roots = [{ combwork: join(path, CW_DIR), stores: WORKSPACE_STORES }, ...[...shown, ...hidden].map((p) => ({ combwork: join(p, CW_DIR), stores: PROJECT_STORES }))]
   const swept = await sweepLeftovers(roots, { signal: life })
   if (swept.temp || swept.bak || swept.imported) {
     const where = swept.removed.map((r) => `${userText(relative(path, r.dir))} (${[r.bak ? `${r.bak} .before-ids.bak` : '', r.temp ? `${r.temp} .tmp` : '', r.imported ? `${r.imported} .imported to the Recycle Bin` : ''].filter(Boolean).join(', ')})`).join('; ')

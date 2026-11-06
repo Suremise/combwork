@@ -1,4 +1,5 @@
-// Cards an older Hive saved after the board moved to its database (#1017's downgrade), set aside, and their review
+// Cards an older version saved after the board moved to its database (#1017's downgrade), set aside by the names upgrade
+// as it retires the board's stub (HI-2594; no version writes the stub since 1.1, HI-2624), and their review
 // (#1044, Darren's decision on #1017: the only way they reach the board): the notice offers Review…, whose dialog lists
 // each card (its old number, whether it is free, who made it, a preview); Add to Board keeps a free old number, gives a
 // taken one the next free number, with a history line by Repair; Discard… asks, then sends the file to the trash. The
@@ -21,7 +22,7 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 
-/** A card file as an older Hive saves it in `.hive/tasks`. */
+/** A card file as an older Combwork saves it in `.combwork/tasks`. */
 const olderCard = (number, fields) =>
   JSON.stringify({ number, title: `Card ${number}`, description: '', project: 'alpha', agent: null, column: 'todo', order: number, labels: [], blocked: null, blockedBy: [], links: [], comments: [], history: [], archived: false, createdAt: '2026-10-05T09:30:00.000Z', createdBy: 'You', updatedAt: '2026-10-05T09:30:00.000Z', ...fields }, null, 2) + '\n'
 
@@ -29,34 +30,43 @@ const olderCard = (number, fields) =>
   for (const d of [userData, ws, other]) fs.rmSync(d, { recursive: true, force: true })
   lib.gitProject(alpha)
   lib.gitProject(path.join(other, 'beta'))
-  fs.mkdirSync(path.join(alpha, '.hive'), { recursive: true })
-  fs.writeFileSync(path.join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-coder', name: 'Coder' }] }))
+  fs.mkdirSync(path.join(alpha, '.combwork'), { recursive: true })
+  fs.writeFileSync(path.join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-coder', name: 'Coder' }] }))
   const { app, page, inv } = await lib.launch({ userData, viewport: { width: 1400, height: 900 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)
-    // The board as 0.9 keeps it: #1 and #2, and the stub an older Hive reads.
+    // The board: #1 and #2. Since 1.1 no stub for older versions is written (HI-2594, SPEC §4.1.1).
     const one = await inv('tasks:create', { title: 'On the board', project: 'alpha' })
     const two = await inv('tasks:create', { title: 'Links to #1', project: 'alpha' })
     await inv('tasks:update', two.number, { links: [one.number] })
-    const stub = path.join(ws, '.hive', 'tasks')
-    check('the stub is there for older versions', fs.existsSync(path.join(stub, 'board.json')))
+    const stub = path.join(ws, '.combwork', 'tasks')
+    check('no stub is written for older versions (HI-2594)', !fs.existsSync(stub))
+    const free = Math.max(...(await inv('tasks:list')).map((c) => c.number)) + 1
 
-    // Another workspace meanwhile; then an older Hive saves three files in the stub: a card with a free number, one
-    // whose number the board has, and a damaged one.
+    // Another workspace meanwhile; then the workspace is put back as 1.0 left it, with the stub 0.9 to 1.0 kept (its
+    // board.json and README) and no record of the names upgrade, and an older version saves three files in the stub: a
+    // card with a free number, one whose number the board has, and a damaged one. The names upgrade at the next open
+    // sets them aside (moveOldStub) and the board's notice says so.
     await lib.openWorkspace(inv, page, other)
-    const free = Number(JSON.parse(fs.readFileSync(path.join(stub, 'board.json'), 'utf8')).next)
-    fs.writeFileSync(path.join(stub, `${free}.json`), olderCard(free, { title: 'Made in the older Hive', description: 'Written **while** the workspace was open in 0.8.\n\nIt has a second paragraph.', labels: ['old'], comments: [{ at: '2026-10-05T09:31:00.000Z', by: 'You', text: 'A comment from then', id: 'c1' }] }))
+    fs.mkdirSync(stub)
+    fs.writeFileSync(path.join(stub, 'board.json'), JSON.stringify({ version: 1, next: free }, null, 2) + '\n')
+    // old-name: begin v09-stub-readme
+    fs.writeFileSync(path.join(stub, 'README.txt'), 'The board is in hive.db since 0.9.\n')
+    // old-name: end v09-stub-readme
+    fs.rmSync(path.join(ws, '.combwork', 'combwork-names.json'), { force: true })
+    fs.writeFileSync(path.join(stub, `${free}.json`), olderCard(free, { title: 'Made in the older Combwork', description: 'Written **while** the workspace was open in 0.8.\n\nIt has a second paragraph.', labels: ['old'], comments: [{ at: '2026-10-05T09:31:00.000Z', by: 'You', text: 'A comment from then', id: 'c1' }] }))
     fs.writeFileSync(path.join(stub, `${one.number}.json`), olderCard(one.number, { title: 'Also made as #1', createdBy: 'Assistant', column: 'review' }))
     fs.writeFileSync(path.join(stub, `${free + 1}.json`), '{ damaged')
     await lib.openWorkspace(inv, page, ws)
+    check('the names upgrade retired the stub', !fs.existsSync(stub), fs.existsSync(stub) ? fs.readdirSync(stub).join() : '')
 
     // The notice, with Review….
-    const toast = page.locator('.toast', { hasText: 'made by an older Hive' })
-    check('a notice says three cards made by an older Hive were found', !!(await lib.until(async () => (await toast.count()) === 1, HUNG_MS)) && /3 cards made by an older Hive/.test(await toast.innerText()), await toast.innerText().catch(() => ''))
+    const toast = page.locator('.toast', { hasText: 'made by an older Combwork' })
+    check('a notice says three cards made by an older Combwork were found', !!(await lib.until(async () => (await toast.count()) === 1, HUNG_MS)) && /3 cards made by an older Combwork/.test(await toast.innerText()), await toast.innerText().catch(() => ''))
     await page.screenshot({ path: path.join(lib.WORK, 'setaside-notice.png') })
     await toast.getByRole('button', { name: 'Review…' }).click()
-    const dialog = page.locator('.dialog', { hasText: 'Cards Made by an Older Hive' })
+    const dialog = page.locator('.dialog', { hasText: 'Cards Made by an Older Combwork' })
     const rows = dialog.locator('.set-aside-card')
     check('Review… lists the three files', !!(await lib.until(async () => (await rows.count()) === 3, HUNG_MS)), String(await rows.count()))
     const row = (file) => dialog.locator(`.set-aside-card[data-file="${file}"]`)
@@ -77,8 +87,8 @@ const olderCard = (number, fields) =>
     check('Add takes it out of the list', !!(await lib.until(async () => (await rows.count()) === 2, HUNG_MS)))
     const added = (await inv('tasks:list')).find((c) => c.number === free)
     const last = added?.history?.at(-1)
-    check('it is on the board under its old number, as it was', added?.title === 'Made in the older Hive' && added.labels.join() === 'old' && added.comments.length === 1, JSON.stringify(added))
-    check('its history says where it came from, by Repair', last?.by === 'Repair' && last.what === `Added from an older Hive, where it was made as #${free}`, JSON.stringify(last))
+    check('it is on the board under its old number, as it was', added?.title === 'Made in the older Combwork' && added.labels.join() === 'old' && added.comments.length === 1, JSON.stringify(added))
+    check('its history says where it came from, by Repair', last?.by === 'Repair' && last.what === `Added from an older Combwork, where it was made as #${free}`, JSON.stringify(last))
 
     // Add the clashing one: the next free number; #1 and the link to it unchanged.
     await row(`${one.number}.json`).getByRole('button', { name: 'Add to Board' }).click()
@@ -105,8 +115,8 @@ const olderCard = (number, fields) =>
     await page.screenshot({ path: path.join(lib.WORK, 'setaside-discard.png') })
     await ask.getByRole('button', { name: 'Discard', exact: true }).click()
     check('…then the list is empty', !!(await lib.until(async () => /No cards are set aside/.test(await dialog.innerText()), HUNG_MS)))
-    check('…and the file is in the trash', !!(await lib.until(async () => lib.trashed(path.join('setaside-ws', '.hive', 'tasks.set-aside', `${free + 1}.json`)).length === 1, HUNG_MS)))
-    check('the set-aside folder is empty', fs.readdirSync(path.join(ws, '.hive', 'tasks.set-aside')).length === 0)
+    check('…and the file is in the trash', !!(await lib.until(async () => lib.trashed(path.join('setaside-ws', '.combwork', 'tasks.set-aside', `${free + 1}.json`)).length === 1, HUNG_MS)))
+    check('the set-aside folder is empty', fs.readdirSync(path.join(ws, '.combwork', 'tasks.set-aside')).length === 0)
     await dialog.getByRole('button', { name: 'Close', exact: true }).click()
     // The toolbar reads the count again as the board changes: the menu, opened again until then, stops offering it.
     const menuWithout = async () => {

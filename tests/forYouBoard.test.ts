@@ -1,5 +1,5 @@
 // For you on the board (#1269, SPEC §16.8.5, §16.11.4): what waits for the user (IPC `tasks:forYou`) and their answers
-// (IPC `tasks:answer`, only the user's), on the real board (a temp hive.db) and temp repositories. The user's review
+// (IPC `tasks:answer`, only the user's), on the real board (a temp combwork.db) and temp repositories. The user's review
 // asked when the card reaches Review, approved through the intent path (the card moves on in the same change); an
 // answer that doesn't fit its request, or to a request answered or retired, refused; a Decide answer's decision
 // recorded on the card (a new generation). At a lane's round limit a failed review given on the board asks the user,
@@ -11,7 +11,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-foryou-')
+const base = tempDir('cw-foryou-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -51,16 +51,16 @@ async function workspace(options: object | null): Promise<{ w: WS; wt: string }>
   const ws = join(base, `ws-${++n}`)
   const repo = join(ws, 'p')
   const wt = join(ws, 'p-card')
-  mkdirSync(join(repo, '.hive'), { recursive: true })
+  mkdirSync(join(repo, '.combwork'), { recursive: true })
   writeFileSync(join(repo, 'a.txt'), 'one\n')
   git(repo, 'init', '-q', '-b', 'main')
   for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) git(repo, 'config', k, v)
-  writeFileSync(join(repo, '.gitignore'), '.hive/\n')
+  writeFileSync(join(repo, '.gitignore'), '.combwork/\n')
   git(repo, 'add', '-A')
   git(repo, 'commit', '-qm', 'initial')
   git(repo, 'worktree', 'add', '-q', '-b', 'card', wt, 'main')
   const agents = [{ id: 'a1', name: 'Builder', worktree: { path: wt, branch: 'card', base: 'main' } }, { id: 'a2', name: 'Reviewer' }]
-  writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents, ...(options ? { workflow: { platform: 'git', preset: null, options } } : {}) }))
+  writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents, ...(options ? { workflow: { platform: 'git', preset: null, options } } : {}) }))
   const w = createWorkspaceService()
   await w.open(ws)
   opened.push(w)
@@ -81,7 +81,7 @@ async function deliveredTo(w: WS, agent: string): Promise<string[]> {
   await loopWakes.settled()
   return (store.workspaceDb(w.path!).reader.prepare("SELECT body FROM deliveries WHERE agent_id = ? AND source = 'loop' ORDER BY seq").all(agent) as { body: string }[]).map((r) => r.body)
 }
-/** What an agent reads with hive_inbox (each delivery made again as it is handed out), once the actions have run. */
+/** What an agent reads with cw_inbox (each delivery made again as it is handed out), once the actions have run. */
 async function inboxOf(w: WS, agent: string) {
   await deliveredTo(w, agent)
   return (await deliveries.readInbox(join(w.path!, 'p'), agent)).items
@@ -153,7 +153,7 @@ describe('For you on the board (#1269)', () => {
     expect(req).toMatchObject({ gate: 'okBefore', kind: 'approve', shown: { id: FOR_YOU.okBefore.id } })
     const approved = await answer(w, card, req.request, { outcome: 'approved', reply: 'Go ahead' })
     expect(forYou(w).count).toBe(0)
-    // HI-2286: a note on Hive's own gate is the user's comment only, never a decision.
+    // HI-2286: a note on Combwork's own gate is the user's comment only, never a decision.
     expect(approved.comments.at(-1)).toMatchObject({ by: 'You', text: 'Go ahead' })
     expect(approved.decisions ?? []).toEqual([])
     const told = await deliveredTo(w, 'a1')
@@ -300,7 +300,7 @@ describe('For you on the board (#1269)', () => {
       underWay()
       return real.apply(this, args)
     })
-    // What another connection (another window's Hive) sees of the card once the action has written its kind.
+    // What another connection (another window's Combwork) sees of the card once the action has written its kind.
     let seenOutside: string | null = null
     const written = FactStore.prototype.updateCard
     const kindSpy = vi.spyOn(FactStore.prototype, 'updateCard').mockImplementation(function (this: unknown, ...args: Parameters<typeof written>) {
@@ -579,12 +579,12 @@ describe("an answer that needs someone other than the card's agent (HI-1734)", a
     expect(after.column).toBe('doing')
     const got = relayed(w)
     expect(got).toHaveLength(1)
-    expect(got[0].body).toBe(`This needs you: the user answered Builder (p)'s question on p-${card}. The question, whole: <<<Nothing to merge: Done?>>>. Their reply, whole: <<<Checks-only card, nothing to merge.>>>. (Both stay on the card: hive_read_task p-${card}.) Builder (p) can't move it to Done by itself. Do it only if the answer agrees, within any conditions it sets, with the answer as the reason (hive_update_task).`)
+    expect(got[0].body).toBe(`This needs you: the user answered Builder (p)'s question on p-${card}. The question, whole: <<<Nothing to merge: Done?>>>. Their reply, whole: <<<Checks-only card, nothing to merge.>>>. (Both stay on the card: cw_read_task p-${card}.) Builder (p) can't move it to Done by itself. Do it only if the answer agrees, within any conditions it sets, with the answer as the reason (cw_update_task).`)
     expect((await inboxOf(w, 'a1')).find((i) => i.kind === 'answer')?.text).toContain('Checks-only card, nothing to merge.')
   })
 
   it("HI-1449: a question with no actions on a card in Passed that its agent doesn't merge, answered with a reply: the Assistant is told its agent can't move it on", async () => {
-    const { w, wt } = await workspace({ ...REVIEWED, finish: 'hiveMerges', target: 'main', folder: 'slots' })
+    const { w, wt } = await workspace({ ...REVIEWED, finish: 'combworkMerges', target: 'main', folder: 'slots' })
     const card = await create(w)
     await update(w, card, { column: 'doing', agent: 'a1' })
     commitIn(wt, 'checks.txt')
@@ -607,7 +607,7 @@ describe("an answer that needs someone other than the card's agent (HI-1734)", a
     const after = await answer(w, card, forYou(w).items[0].request, { outcome: 'answered', reply: 'Yes, skip it.' })
     expect(after.column).toBe('doing')
     expect(facts(w, card).filter((f) => f.kind === 'ReviewSkipSet')).toEqual([])
-    expect(relayed(w).map((r) => r.body)).toEqual([`For you to check: the user answered Builder (p)'s question on p-${card}. The question, whole: <<<May we skip review for this checks-only change?>>>. Their reply, whole: <<<Yes, skip it.>>>. (Both stay on the card: hive_read_task p-${card}.) If it grants a change Builder (p) can't make itself (Done past its rules, no code, skipping its review), make it, within any conditions it sets, with the answer as the reason; otherwise nothing is needed.`])
+    expect(relayed(w).map((r) => r.body)).toEqual([`For you to check: the user answered Builder (p)'s question on p-${card}. The question, whole: <<<May we skip review for this checks-only change?>>>. Their reply, whole: <<<Yes, skip it.>>>. (Both stay on the card: cw_read_task p-${card}.) If it grants a change Builder (p) can't make itself (Done past its rules, no code, skipping its review), make it, within any conditions it sets, with the answer as the reason; otherwise nothing is needed.`])
     expect((await inboxOf(w, 'a1')).find((i) => i.kind === 'answer')?.text).toContain('Yes, skip it.')
   })
 
@@ -632,7 +632,7 @@ describe("an answer that needs someone other than the card's agent (HI-1734)", a
     await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: 'Nothing to merge: Done?', actions: [{ kind: 'done' }] }))
     await answer(w, card, forYou(w).items[0].request, { outcome: 'answered', reply: 'Yes' })
     expect(relayed(w)).toEqual([])
-    await vi.waitFor(async () => expect(await historyOf(w, card)).toContain("Builder (p) can't move this card to Done by itself, and the Hive Assistant couldn't be told of your answer: do it yourself if you agreed to it"), { timeout: 10_000 })
+    await vi.waitFor(async () => expect(await historyOf(w, card)).toContain("Builder (p) can't move this card to Done by itself, and the Assistant couldn't be told of your answer: do it yourself if you agreed to it"), { timeout: 10_000 })
     // Allowed when the answer is given, turned down before the Assistant takes it.
     assistant().control = 'projects'
     await inWorkspace(w, () => wf.askTheUser(`#${card}`, 'agent:a1', { kind: 'decide', text: 'Which database?' }))
@@ -642,7 +642,7 @@ describe("an answer that needs someone other than the card's agent (HI-1734)", a
     // The Assistant reads its inbox: checked as it is handed out, it isn't given, and is cancelled.
     expect((await deliveries.readInbox(w.assistantHome, 'assistant')).items).toEqual([])
     await vi.waitFor(() => expect(relayed(w).map((r) => r.state)).toEqual(['cancelled']), { timeout: 10_000 })
-    await vi.waitFor(async () => expect(await historyOf(w, card)).toContain("The Hive Assistant couldn't be told of your answer to Builder (p)'s question: only Builder (p) has it"), { timeout: 10_000 })
+    await vi.waitFor(async () => expect(await historyOf(w, card)).toContain("The Assistant couldn't be told of your answer to Builder (p)'s question: only Builder (p) has it"), { timeout: 10_000 })
   })
 
   it("a bare Approve or Decline of a no-action, no-proposal question on a Doing card reaches the Assistant too, saying which, with nothing written (HR1's round 1 finding 1)", async () => {
@@ -695,7 +695,7 @@ describe("an answer that needs someone other than the card's agent (HI-1734)", a
     expect(body).toContain(`<<<${question}>>>`)
     expect(body).toContain(`<<<${reply}>>>`)
     expect(body).toContain('Do not move it to Done until I confirm the audit has passed.')
-    expect(body).toContain(`hive_read_task p-${card}`)
+    expect(body).toContain(`cw_read_task p-${card}`)
   })
 
   it('a code card passing review with nothing to merge (its change already in its target) is proposed no code; one with work to merge is not', async () => {

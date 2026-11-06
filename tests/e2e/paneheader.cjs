@@ -18,7 +18,7 @@ const path = require('path')
 const { execFileSync } = require('child_process')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 10000
-// A compaction's hung-run bound: under load the fake took about 60 s to read the long focus Hive typed (#725).
+// A compaction's hung-run bound: under load the fake took about 60 s to read the long focus Combwork typed (#725).
 const COMPACT_HUNG_MS = 180000
 
 const userData = path.join(lib.WORK, 'paneheader-profile')
@@ -31,7 +31,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-// Git in the test repositories, waiting out the Hive under test's own git (lib.git, #199).
+// Git in the test repositories, waiting out the Combwork under test's own git (lib.git, #199).
 const git = (cwd, ...a) => lib.git(cwd, ['-c', 'user.email=t@t', '-c', 'user.name=t', ...a])
 
 /**
@@ -68,7 +68,7 @@ function commits(wt, n) {
   cfg.settings.appearance = { ...cfg.settings.appearance, terminalFontSize: 8 }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47908), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47908), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -76,7 +76,7 @@ function commits(wt, n) {
   let viewport = 1400
   await lib.fitWindow(app, page, { width: viewport, height: HEIGHT })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const until = (fn, ms = HUNG_MS) => lib.until(fn, ms)
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
@@ -92,7 +92,7 @@ function commits(wt, n) {
   const key = lib.ptyKey(alpha, long.id)
   let turns = 0
   // A turn, typed once the fake takes prompts and waited for by its own end (#684, lib.fakePrompts), and over on the
-  // fake's side too: Compact types /compact next, which the fake drops while it still ends the turn (#679: Hive showed it
+  // fake's side too: Compact types /compact next, which the fake drops while it still ends the turn (#679: Combwork showed it
   // compacting, and it never was ready again).
   const prompts = lib.fakePrompts(inv, key, () => live(long.id), { home: claudeHome })
   const turn = async () => {
@@ -146,7 +146,7 @@ function commits(wt, n) {
     check(`${tag}hovered, the name's tooltip has its worktree, branch and base`, full(await tips()), JSON.stringify(await tips()))
     await away()
     await until(async () => (await tips()).length === 0, HUNG_MS)
-    check(`${tag}no worktree text in any header`, (await page.locator('.pane-header-bar').allInnerTexts()).every((t) => !t.includes('hive/')))
+    check(`${tag}no worktree text in any header`, (await page.locator('.pane-header-bar').allInnerTexts()).every((t) => !t.includes('cw/')))
   }
   await worktreeMark('')
 
@@ -353,9 +353,9 @@ function commits(wt, n) {
   await atWidths('', 'paneheader')
 
   // An unknown state (#648), with both shields (an automatic review, #606's safeguard switch), sent to the window as
-  // Hive sends a status: at every width Stop and ⋯ stay whole and the shields give way with the status; Mark idle is
+  // Combwork sends a status: at every width Stop and ⋯ stay whole and the shields give way with the status; Mark idle is
   // beside the status from 300 px, and below only in ⋯ (with the safeguard's note), whose dot then says so.
-  const sendStatus = (state) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'session-status', state })
+  const sendStatus = (state) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'session-status', state })
   const known = await live(long.id)
   await sendStatus({ ...known, status: 'working', turn: { ...known.turn, state: 'unknown', silentSince: new Date(Date.now() - 6 * 60000).toISOString() }, review: 'a long command under review', safeguard: { at: new Date().toISOString(), model: 'claude-fake', tools: [], stops: 1, switched: { from: 'claude-fake', to: 'claude-other', at: new Date().toISOString() } } })
   check('an unknown state shows in the header, with both shields', !!(await until(async () => (await header(long).locator('.unknown-state').count()) === 1 && (await header(long).locator('.review-mark, .safeguard-mark').count()) === 2, HUNG_MS)))
@@ -377,7 +377,7 @@ function commits(wt, n) {
   await header(long).getByRole('button', { name: 'More', exact: true }).click()
   check('…and ⋯ offers Mark idle and says what the safeguard did', !!(await until(async () => (await page.locator('.menu .menu-item', { hasText: 'Mark idle' }).count()) === 1 && (await page.locator('.menu .menu-item', { hasText: 'claude-other' }).count()) === 1, HUNG_MS)), JSON.stringify(await menuItems()))
   await closeMenu()
-  // Back to what Hive knows of it.
+  // Back to what Combwork knows of it.
   await sendStatus(await live(long.id))
   check('the unknown state is gone again', !!(await until(async () => (await header(long).locator('.unknown-state').count()) === 0, HUNG_MS)))
 

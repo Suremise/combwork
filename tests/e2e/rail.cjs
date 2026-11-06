@@ -6,7 +6,7 @@ const fs = require('fs'), path = require('path')
 const scratch = lib.WORK, userData = path.join(scratch, 'rail-profile')
 const ws = path.join(scratch, 'rail-ws')
 for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
-for (const n of ['hive', 'web-dashboard', 'apiServer', 'notes']) fs.mkdirSync(path.join(ws, n), { recursive: true })
+for (const n of ['harbour', 'web-dashboard', 'apiServer', 'notes']) fs.mkdirSync(path.join(ws, n), { recursive: true })
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 let pass = 0, fail = 0
 const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.log(ok ? 'PASS' : 'FAIL', name, extra) }
@@ -16,14 +16,14 @@ const HUNG_MS = 10000
 const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
 ;(async () => {
   lib.enableProviders(userData)
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   await lib.fitWindow(app, page, { width: 1300, height: 800 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await inv('workspace:open', ws); await sleep(800)
-  await inv('project:setActive', path.join(ws, 'hive'), true)
+  await inv('project:setActive', path.join(ws, 'harbour'), true)
   await inv('project:setActive', path.join(ws, 'web-dashboard'), true)
   const sbWidth = () => page.locator('.sidebar').first().evaluate((e) => Math.round(e.getBoundingClientRect().width)).catch(() => -1)
   // The two active projects are listed first once the workspace has them.
@@ -33,7 +33,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   await page.locator('.pane-header .icon-btn[aria-label^="Compact Sidebar"]').first().click()
   check('button compacts', await becomes(async () => (await sbWidth()) === 48 && (await page.locator('.rail').count()) === 1), `(${await sbWidth()})`)
   // Each tile shows its project's key (#1221), given from the folder's name.
-  const keysShown = ['HI', 'WE', 'AP', 'NO']
+  const keysShown = ['HA', 'WE', 'AP', 'NO']
   const labels = await lib.until(async () => { const l = await page.locator('.rail-initials').allTextContents(); return JSON.stringify(l) === JSON.stringify(keysShown) && l }, HUNG_MS) || (await page.locator('.rail-initials').allTextContents())
   check('the tiles show the projects’ keys', JSON.stringify(labels) === JSON.stringify(keysShown), JSON.stringify(labels))
   // 3- and 4-letter keys shrink to fit: the tiles keep their size and the rail its width (#1221). Screenshots of 2, 3
@@ -42,7 +42,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   const sizesBefore = await tileSize()
   await inv('project:setKey', path.join(ws, 'web-dashboard'), 'WEB')
   await inv('project:setKey', path.join(ws, 'apiServer'), 'APIS')
-  const longKeys = ['HI', 'WEB', 'APIS', 'NO']
+  const longKeys = ['HA', 'WEB', 'APIS', 'NO']
   check('a changed key shows on its tile', await becomes(async () => JSON.stringify(await page.locator('.rail-initials').allTextContents()) === JSON.stringify(longKeys)), JSON.stringify(await page.locator('.rail-initials').allTextContents()))
   const fits = await page.locator('.rail-initials').evaluateAll((els) => els.map((e) => ({ text: e.textContent, inside: e.scrollWidth <= e.parentElement.clientWidth, cls: e.className })))
   check('3 and 4 letters fit their tile, smaller', fits.every((f) => f.inside) && /rail-initials-3/.test(fits[1].cls) && /rail-initials-4/.test(fits[2].cls) && !/rail-initials-\d/.test(fits[0].cls), JSON.stringify(fits))
@@ -60,8 +60,8 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   // A tip shows after its delay (ui.tsx): wait for it, not for the delay.
   await page.locator('.rail-project').nth(0).hover()
   const tipText = () => page.locator('.tip').first().textContent({ timeout: 1000 }).catch(() => '').then((t) => t ?? '')
-  const tip = (await lib.until(async () => { const t = await tipText(); return /hive/.test(t) && /No session/.test(t) && t }, HUNG_MS)) || (await tipText())
-  check('tooltip shows name and status', /hive/.test(tip) && /No session/.test(tip), JSON.stringify(tip))
+  const tip = (await lib.until(async () => { const t = await tipText(); return /harbour/.test(t) && /No session/.test(t) && t }, HUNG_MS)) || (await tipText())
+  check('tooltip shows name and status', /harbour/.test(tip) && /No session/.test(tip), JSON.stringify(tip))
   await page.screenshot({ path: path.join(scratch, 'rail-1-tip.png') })
   await page.mouse.move(700, 400)
   await page.locator('.rail-project').nth(0).click({ button: 'right' })
@@ -99,7 +99,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   check('kept after reload', (await sbWidth()) === 48)
 
   // Count badges and status dots stick out of the tiles: fully visible (outline included) inside the scrolling list,
-  // and a badge clear of the dot of the tile above, at the zoom levels Hive offers and with a two-digit count.
+  // and a badge clear of the dot of the tile above, at the zoom levels Combwork offers and with a two-digit count.
   await page.evaluate(() => {
     document.querySelectorAll('.rail-project').forEach((t, i) => {
       const b = document.createElement('span')

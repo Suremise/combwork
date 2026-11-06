@@ -5,15 +5,15 @@
 // - G11 = project folder hides G15 but shows G17, and A shared pool saves there; G1b = 2 with a pool saves;
 // - the setup script set in Slots and copies is the one the next warming run uses (a marker file in the slot), and the
 //   slots list shows the lent slot with its card; the copies' size saves; two fields saved while the first save is slow
-//   (HIVE_TEST_SLOW_IPC) both stay, with another window's change; the setup emptied is "none", and Inherit undoes it;
-// - the copied files inherit Hive's slot default, then the workspace's (set to none in its Workspace defaults, Settings → Version Control), then the
+//   (CW_TEST_SLOW_IPC) both stay, with another window's change; the setup emptied is "none", and Inherit undoes it;
+// - the copied files inherit Combwork's slot default, then the workspace's (set to none in its Workspace defaults, Settings → Version Control), then the
 //   default, each saying where it comes from (HI-1765); Project Settings opens on General, with no slot rows;
 // - a project saved by a P6 build with Pair (G15 stored Off, the one-time step not run yet) reads as Pair, not Custom,
 //   after the next start, with G15 On.
 // Screenshots of the Slots and copies group and the G11/G15/G17 rows, light and dark, in English and German.
 // Dev build, throwaway profile and workspace.
 // Dev build only (#1578): B1's slot is lent through slots:test, and a write is held with a test seam
-// (HIVE_TEST_SLOW_IPC).
+// (CW_TEST_SLOW_IPC).
 const lib = require('./lib.cjs')
 const q = require('./queueFixture.cjs')
 const fs = require('fs')
@@ -30,10 +30,10 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 const until = (fn, ms) => lib.until(fn, ms, 200)
-const projectJson = (p = fx.alpha) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'project.json'), 'utf8'))
-/** Changes the workspace's board from outside Hive, as another process would. */
+const projectJson = (p = fx.alpha) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 'project.json'), 'utf8'))
+/** Changes the workspace's board from outside Combwork, as another process would. */
 function board(sql, ...args) {
-  const db = new DatabaseSync(path.join(fx.ws, '.hive', 'hive.db'), { timeout: 5000 })
+  const db = new DatabaseSync(path.join(fx.ws, '.combwork', 'combwork.db'), { timeout: 5000 })
   try {
     db.prepare(sql).run(...args)
   } finally {
@@ -45,10 +45,10 @@ function board(sql, ...args) {
   q.prepare(fx)
   // A second project, as a P6 build saved Pair (made before the restart below).
   const beta = path.join(fx.ws, 'beta')
-  lib.gitProject(beta, { 'b.txt': 'b\n', '.gitignore': '.hive/\n' })
+  lib.gitProject(beta, { 'b.txt': 'b\n', '.gitignore': '.combwork/\n' })
   lib.git(beta, ['branch', '-M', 'main'])
   const marker = 'setup-marker.txt'
-  let h = await q.startHive(fx, { port: PORT, keepOptions: true })
+  let h = await q.startCombwork(fx, { port: PORT, keepOptions: true })
   let { page, inv, app } = h
   const shot = async (name, target) => {
     while ((await page.locator('.toast').count()) > 0) await page.locator('.toast').first().locator('button').last().click()
@@ -99,7 +99,7 @@ function board(sql, ...args) {
       await saveAll()
       check(`…${id} saved with them`, !!(await until(() => projectJson().workflow?.preset === id && projectJson().workflow.options.slotsUpToDate === true && projectJson().workflow.options.reviewerMode === 'lane', HUNG_MS)), JSON.stringify(projectJson().workflow))
     }
-    check('G11 says what a slot is, and the old "builder’s worktree" line is gone', (await row('folder').innerText()).includes('a slot Hive lends to the card or its lane') && !(await row('folder').innerText()).includes('worktree'), await row('folder').innerText())
+    check('G11 says what a slot is, and the old "builder’s worktree" line is gone', (await row('folder').innerText()).includes('a slot Combwork lends to the card or its lane') && !(await row('folder').innerText()).includes('worktree'), await row('folder').innerText())
     check('G15 and G17 are shown, with slots and a reviewer agent', (await row('slotsUpToDate').count()) === 1 && (await row('reviewerMode').count()) === 1)
     await shot('rows-slots', row('folder'))
 
@@ -145,7 +145,7 @@ function board(sql, ...args) {
     // Two fields changed while the first save is still on its way (HR5's round 1: the second save sent the slots as the
     // window last read them, losing the first): both stay, with the archive script another window set meanwhile.
     await app.evaluate(() => {
-      process.env.HIVE_TEST_SLOW_IPC = 'slots:setSetting=2500*1'
+      process.env.CW_TEST_SLOW_IPC = 'slots:setSetting=2500*1'
     })
     const archiveField = slotsGroup.locator('[data-slot-option="archive"] input')
     const copyField = slotsGroup.locator('[data-slot-option="copy"] textarea')
@@ -156,7 +156,7 @@ function board(sql, ...args) {
     await copyField.blur()
     check('two fields saved at once both stay, with another window’s change', !!(await until(() => projectJson().slots?.archive === 'echo archived' && projectJson().slots?.copy === '.env.test' && projectJson().slots?.setup === 'npm ci --other-window', HUNG_MS)), JSON.stringify(projectJson().slots))
     await app.evaluate(() => {
-      delete process.env.HIVE_TEST_SLOW_IPC
+      delete process.env.CW_TEST_SLOW_IPC
     })
     // Emptied, the setup script is this project's "none" over its setup command from before 1.0; Inherit uses that again.
     await inv('project:updateConfig', fx.alpha, { worktreeSetup: 'npm ci --old' })
@@ -175,17 +175,17 @@ function board(sql, ...args) {
     await slotsGroup.locator('[data-action="inherit-setup"]').click()
     check('…and inherits again', !!(await until(async () => !('setup' in (projectJson().slots ?? {})) && (await setupOrigin.getAttribute('data-origin')) === 'worktreeSetup', HUNG_MS)), JSON.stringify(projectJson().slots))
     // Focused, untouched, Enter (HR5's HI-1765 round 2): the field takes a value set elsewhere, and Enter saves nothing.
-    // The next save is made to fail (HIVE_TEST_FAIL_IPC, once): the probe's own save after it fails only if Enter sent none.
+    // The next save is made to fail (CW_TEST_FAIL_IPC, once): the probe's own save after it fails only if Enter sent none.
     await setupField.focus()
     await inv('slots:setSetting', fx.alpha, 'setup', 'npm ci --elsewhere')
     check('a focused, untouched field takes a value set elsewhere', !!(await until(async () => (await setupField.inputValue()) === 'npm ci --elsewhere', HUNG_MS)), await setupField.inputValue())
     await app.evaluate(() => {
-      process.env.HIVE_TEST_FAIL_IPC = 'slots:setSetting*1'
+      process.env.CW_TEST_FAIL_IPC = 'slots:setSetting*1'
     })
     await setupField.press('Enter')
-    const probe = await page.evaluate((p) => window.hive.invoke('slots:setSetting', p, 'setup', 'npm ci --elsewhere').then(() => 'saved', () => 'failed'), fx.alpha)
+    const probe = await page.evaluate((p) => window.combwork.invoke('slots:setSetting', p, 'setup', 'npm ci --elsewhere').then(() => 'saved', () => 'failed'), fx.alpha)
     await app.evaluate(() => {
-      delete process.env.HIVE_TEST_FAIL_IPC
+      delete process.env.CW_TEST_FAIL_IPC
     })
     check('…and Enter saves nothing', probe === 'failed' && projectJson().slots?.setup === 'npm ci --elsewhere', `${probe} ${JSON.stringify(projectJson().slots)}`)
     // Typed, Enter: saved.
@@ -194,20 +194,20 @@ function board(sql, ...args) {
     check('a typed value is saved with Enter', !!(await until(() => projectJson().slots?.setup === 'npm ci --typed', HUNG_MS)), JSON.stringify(projectJson().slots))
     await slotsGroup.locator('[data-action="inherit-setup"]').click()
     await until(async () => !('setup' in (projectJson().slots ?? {})), HUNG_MS)
-    // The copied files (HI-1765): the project's own back to inherited, from Hive's slot default (Settings → Workflow
-    // defaults), then the workspace's set to none in its Workspace defaults (Settings → Version Control), over Hive's; the project's own none over both.
-    await inv('slots:setLevelDefault', 'global', 'copy', '.env*\nconfig/hive.json')
+    // The copied files (HI-1765): the project's own back to inherited, from Combwork's slot default (Settings → Workflow
+    // defaults), then the workspace's set to none in its Workspace defaults (Settings → Version Control), over Combwork's; the project's own none over both.
+    await inv('slots:setLevelDefault', 'global', 'copy', '.env*\nconfig/app.json')
     const copyOrigin = slotsGroup.locator('[data-slot-option="copy"] .workflow-origin')
     await slotsGroup.locator('[data-action="inherit-copy"]').click()
-    check('the copied files inherit Hive’s slot default, From Hive defaults', !!(await until(async () => !('copy' in (projectJson().slots ?? {})) && (await copyOrigin.getAttribute('data-origin')) === 'global' && (await copyOrigin.innerText()).includes('config/hive.json'), HUNG_MS)), `${JSON.stringify(projectJson().slots)} ${await copyOrigin.innerText().catch(() => '')}`)
+    check('the copied files inherit Combwork’s slot default, From Combwork defaults', !!(await until(async () => !('copy' in (projectJson().slots ?? {})) && (await copyOrigin.getAttribute('data-origin')) === 'global' && (await copyOrigin.innerText()).includes('config/app.json'), HUNG_MS)), `${JSON.stringify(projectJson().slots)} ${await copyOrigin.innerText().catch(() => '')}`)
     await shot('copy-global', slotsGroup.locator('[data-slot-option="copy"]'))
     await page.keyboard.press('Control+,')
     // The workspace's part of Settings → Version Control (HI-1768), its own tab since HI-1837.
     await page.locator('.settings-nav .row', { hasText: 'Version Control' }).first().click()
     await page.locator('[role="tab"][data-setting-tab="workflow.workspaceDefaults"]').click()
     const wsCopy = page.locator('[data-slot-default="copy"][data-level="workspace"]')
-    check('Settings → Version Control’s Workspace defaults have the copied files, inheriting Hive’s', !!(await until(async () => (await wsCopy.locator('.workflow-origin').getAttribute('data-origin').catch(() => '')) === 'global' && (await wsCopy.innerText()).includes('config/hive.json'), HUNG_MS)), await wsCopy.innerText().catch(() => ''))
-    const wsJson = () => JSON.parse(fs.readFileSync(path.join(fx.ws, '.hive', 'workspace.json'), 'utf8'))
+    check('Settings → Version Control’s Workspace defaults have the copied files, inheriting Combwork’s', !!(await until(async () => (await wsCopy.locator('.workflow-origin').getAttribute('data-origin').catch(() => '')) === 'global' && (await wsCopy.innerText()).includes('config/app.json'), HUNG_MS)), await wsCopy.innerText().catch(() => ''))
+    const wsJson = () => JSON.parse(fs.readFileSync(path.join(fx.ws, '.combwork', 'workspace.json'), 'utf8'))
     await wsCopy.locator('[data-action="none-copy"]').click()
     check('…set to none there, saved in workspace.json', !!(await until(async () => wsJson().slotDefaults?.copy === '' && (await wsCopy.locator('.workflow-origin').getAttribute('data-origin')) === 'none', HUNG_MS)), JSON.stringify(wsJson().slotDefaults))
     await shot('copy-workspace-none', wsCopy)
@@ -215,9 +215,9 @@ function board(sql, ...args) {
     await openWorkflow(fx.alpha)
     check('the project then inherits the workspace’s none, From the workspace', !!(await until(async () => (await copyOrigin.getAttribute('data-origin').catch(() => '')) === 'workspace' && (await copyOrigin.innerText()).includes('None'), HUNG_MS)), await copyOrigin.innerText().catch(() => ''))
     await inv('slots:setLevelDefault', 'workspace', 'copy', null)
-    // Hive's level changing tells the window, which reads the project's copied files again (the workspace's now unset).
+    // Combwork's level changing tells the window, which reads the project's copied files again (the workspace's now unset).
     await inv('slots:setLevelDefault', 'global', 'copy', '.env*\nconfig/again.json')
-    check('…and Hive’s again once the workspace’s is unset', !!(await until(async () => (await copyOrigin.getAttribute('data-origin')) === 'global' && (await copyOrigin.innerText()).includes('config/again.json'), HUNG_MS)), await copyOrigin.innerText().catch(() => ''))
+    check('…and Combwork’s again once the workspace’s is unset', !!(await until(async () => (await copyOrigin.getAttribute('data-origin')) === 'global' && (await copyOrigin.innerText()).includes('config/again.json'), HUNG_MS)), await copyOrigin.innerText().catch(() => ''))
     await slotsGroup.locator('[data-action="none-copy"]').click()
     check('…are set to none from there with Set to none', !!(await until(async () => projectJson().slots?.copy === '' && (await copyOrigin.getAttribute('data-origin')) === 'none', HUNG_MS)), JSON.stringify(projectJson().slots))
     await shot('copy-none', slotsGroup)
@@ -241,7 +241,7 @@ function board(sql, ...args) {
     const speak = async (code) => {
       const dir = path.join(lib.ROOT, 'locales', code)
       const messages = code === 'en' ? null : Object.assign({}, ...fs.readdirSync(dir).filter((x) => x.endsWith('.json')).map((x) => JSON.parse(fs.readFileSync(path.join(dir, x), 'utf8'))))
-      await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language: messages ? { ...lang, code, locale: code, messages } : lang })
+      await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language: messages ? { ...lang, code, locale: code, messages } : lang })
       return messages
     }
     await openWorkflow(fx.alpha)
@@ -256,10 +256,10 @@ function board(sql, ...args) {
     const { platform: _p, ...stored } = pairOptions
     // As before P7: no step recorded in the project (the first start settled beta, with nothing to change), nor its mark.
     const { stepsDone: _done, ...cfg } = projectJson(beta)
-    fs.writeFileSync(path.join(beta, '.hive', 'project.json'), JSON.stringify({ ...cfg, workflow: { platform: 'git', preset: 'pair', options: { ...stored, slotsUpToDate: false } } }))
+    fs.writeFileSync(path.join(beta, '.combwork', 'project.json'), JSON.stringify({ ...cfg, workflow: { platform: 'git', preset: 'pair', options: { ...stored, slotsUpToDate: false } } }))
     await h.app.close()
     board("DELETE FROM board_meta WHERE key = 'workflow.slotsUpToDateFromBeforeP7'")
-    h = await q.startHive(fx, { port: PORT, keepOptions: true })
+    h = await q.startCombwork(fx, { port: PORT, keepOptions: true })
     ;({ page, inv, app } = h)
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     check('after the next start, the P6 project’s Pair has G15 On', !!(await until(() => projectJson(beta).workflow.options.slotsUpToDate === true, HUNG_MS)), JSON.stringify(projectJson(beta).workflow))

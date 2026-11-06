@@ -1,12 +1,12 @@
-// Hive's end-to-end suites (tests/e2e/<name>.cjs), for run.mjs, the affected-suite map and their tests.
+// Combwork's end-to-end suites (tests/e2e/<name>.cjs), for run.mjs, the affected-suite map and their tests.
 // needs: claude = starts the real Claude Code; codex = the signed-in test Codex home; packaged = dist/win-unpacked;
 // copilot = the installed Copilot CLI, offline against the scripted stand-in model (fake-copilot-api.cjs: no sign-in, no
 // cost), so it stays in the fake tier (the full set) and is skipped where Copilot isn't installed.
 // claudeHome: 'own' = its Claude Code runs in a home of its own with a made-up API key (no sign-in: the runner asks about none);
 // 'test' = in the signed-in Claude Code test home (CLAUDE_TEST_HOME, never the user's own), for suites that send prompts.
 // Every suite that starts the real Claude Code has one (#368): none runs in the user's ~/.claude (tests/e2esuites.test.ts).
-// noHive (with why): a real suite that runs its CLI without a test copy of Hive, so the run record has no version Hive
-// selected for it: npm run tested-clis requires it to pass, and takes the CLI's version from its suites that start Hive.
+// noCombwork (with why): a real suite that runs its CLI without a test copy of Combwork, so the run record has no version Combwork
+// selected for it: npm run tested-clis requires it to pass, and takes the CLI's version from its suites that start Combwork.
 // Suites that start a real CLI (claude, codex) share it with each other, so they run one at a time, in a lane beside
 // the others; those marked serial (with why) and the installer's run last, alone; every other suite is safe to run
 // beside others (its own profile, folders and Agent API port). Sorted by name, so suites added on different
@@ -27,6 +27,7 @@ export const SUITES = [
   { name: 'agents24' },
   { name: 'agentslots' },
   { name: 'agentstable' },
+  { name: 'agenttemp' },
   { name: 'agentview', needs: ['claude'], claudeHome: 'own' },
   { name: 'agentwatch' },
   { name: 'antivirus' },
@@ -87,19 +88,23 @@ export const SUITES = [
   { name: 'cliquit', needs: ['claude', 'codex'], claudeHome: 'own' },
   { name: 'closewindow' },
   { name: 'codex', needs: ['codex'] },
-  { name: 'codex-appserver', needs: ['codex'], noHive: 'runs codex app-server and its TUI itself (#653)' },
+  { name: 'codex-appserver', needs: ['codex'], noCombwork: 'runs codex app-server and its TUI itself (#653)' },
   { name: 'codex-background', needs: ['codex'] },
   { name: 'codex-extra', needs: ['codex'] },
   { name: 'codex-handover', needs: ['codex'] },
   { name: 'codex-mcpapproval', needs: ['codex'] },
   { name: 'codex-newline', needs: ['codex'] },
   { name: 'codex-setup', needs: ['codex'] },
-  { name: 'codex-storepwsh', needs: ['codex'], noHive: 'runs codex sandbox itself' },
+  { name: 'codex-storepwsh', needs: ['codex'], noCombwork: 'runs codex sandbox itself' },
   { name: 'codexfolder' },
   { name: 'codexnewline' },
+  { name: 'codexnudge' },
   { name: 'codexoverrides', needs: ['codex'] },
-  { name: 'codexownhooks', needs: ['codex'], noHive: "asks codex app-server's hooks/list itself, in a throwaway CODEX_HOME (#1285)" },
+  { name: 'codexownhooks', needs: ['codex'], noCombwork: "asks codex app-server's hooks/list itself, in a throwaway CODEX_HOME (#1285)" },
   { name: 'codexqueued' },
+  { name: 'combworkfolder' },
+  { name: 'combworktools' },
+  { name: 'combworkvcs' },
   { name: 'commitburst' },
   { name: 'compact', needs: ['claude'], claudeHome: 'own' },
   { name: 'connectionapi' },
@@ -126,6 +131,8 @@ export const SUITES = [
   { name: 'defaultprovider' },
   { name: 'deliveries' },
   { name: 'devconsole' },
+  { name: 'dialectlaunch' },
+  { name: 'dialectsview' },
   { name: 'dialogs' },
   { name: 'docsections' },
   { name: 'doingmove' },
@@ -140,6 +147,7 @@ export const SUITES = [
   { name: 'footerfit' },
   { name: 'foryou' },
   { name: 'freshpath' },
+  { name: 'freshresume' },
   { name: 'gitbranchcards' },
   { name: 'gitcleanup' },
   { name: 'gitdirect' },
@@ -151,8 +159,6 @@ export const SUITES = [
   { name: 'handovernotice' },
   { name: 'harnessleftovers' },
   { name: 'hiddenredraw' },
-  { name: 'hivetools' },
-  { name: 'hivevcs' },
   { name: 'hookscopilot', needs: ['copilot'] },
   { name: 'hookshealth' },
   { name: 'hookstranscript' },
@@ -179,6 +185,7 @@ export const SUITES = [
   { name: 'lanebrief' },
   { name: 'laneend' },
   { name: 'lanenotices' },
+  { name: 'laneslotretry' },
   { name: 'lanesslots' },
   { name: 'lanestages' },
   { name: 'lanestart' },
@@ -215,6 +222,7 @@ export const SUITES = [
   { name: 'notifytarget' },
   { name: 'numbers' },
   { name: 'onclose' },
+  { name: 'onelinedesc' },
   { name: 'onopen' },
   { name: 'openguard' },
   { name: 'openspeed' },
@@ -300,6 +308,8 @@ export const SUITES = [
   { name: 'sessiontoolbar' },
   { name: 'sessiontree' },
   { name: 'setaside' },
+  { name: 'settingsleave' },
+  { name: 'settingsnav' },
   { name: 'settingstips' },
   { name: 'setupcopy' },
   { name: 'setuplayout' },
@@ -321,6 +331,7 @@ export const SUITES = [
   { name: 'slotswitches' },
   { name: 'slotupgrade' },
   { name: 'slotwindows' },
+  { name: 'slotwriterhold' },
   { name: 'stagenames' },
   { name: 'stalewatch' },
   { name: 'stalls' },

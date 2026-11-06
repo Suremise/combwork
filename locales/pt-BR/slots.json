@@ -1,12 +1,12 @@
 {
-  "slots.idleBroker.body": "{names} é o broker ocioso da Área Restrita do Windows, deixado pela última sessão do agente {agent} em um Hive que já foi fechado. Nenhuma Área Restrita está em execução, então liberar o slot é seguro: “Liberar slot…” o deixa livre para outro trabalho, e o broker continua em execução.",
+  "slots.idleBroker.body": "{names} é o broker ocioso da Área Restrita do Windows, deixado pela última sessão do agente {agent} em um Combwork que já foi fechado. Nenhuma Área Restrita está em execução, então liberar o slot é seguro: “Liberar slot…” o deixa livre para outro trabalho, e o broker continua em execução.",
   "slots.idleBroker.release": "Liberar slot…",
   "slots.idleBroker.title": "O slot {slot} está retido por {names}",
   "slots.release.changed": "{slot} mudou nesse meio-tempo: quem grava nele não é mais o mostrado. Confira de novo.",
-  "slots.release.live": "Quem grava em {slot} ainda está em execução neste Hive: primeiro pare o agente, ou encerre ou mantenha o que ele deixou em execução.",
-  "slots.release.notEnded": "Alguns dos processos listados ainda estão em execução: o Windows não deixou o Hive encerrá-los, então {slot} não foi liberado. Tente de novo ou libere-o sem encerrá-los.",
-  "slots.release.otherHive": "{slot} está retido por outro Hive que ainda está em execução (processo {pid}): libere-o lá ou feche esse Hive antes.",
-  "slots.setting.bad": "O Hive não tem essa configuração de slot.",
+  "slots.release.live": "Quem grava em {slot} ainda está em execução neste Combwork: primeiro pare o agente, ou encerre ou mantenha o que ele deixou em execução.",
+  "slots.release.notEnded": "Alguns dos processos listados ainda estão em execução: o Windows não deixou o Combwork encerrá-los, então {slot} não foi liberado. Tente de novo ou libere-o sem encerrá-los.",
+  "slots.release.otherCombwork": "{slot} está retido por outro Combwork que ainda está em execução (processo {pid}): libere-o lá ou feche esse Combwork antes.",
+  "slots.setting.bad": "O Combwork não tem essa configuração de slot.",
   "slots.setting.badSize": "O número de cópias de revisão e verificação é um número inteiro de {min, number} a {max, number}.",
   "slots.setting.badText": "Um script de slot ou uma lista de arquivos é um texto de no máximo {max, number} caracteres."
 }

@@ -3,9 +3,9 @@
 // merge queue (in its own folder, at the test merge's result). The shared, pure part is shared/workflow/focused.ts.
 //
 // - The picker is the project's `focused.pick`, run as a check is (cmd's command line, hidden, its environment a check's
-//   with Hive's own variables taken out) with HIVE_FOCUSED_BASE, the change's paths on stdin, its stdout read as the
+//   with Combwork's own variables taken out) with CW_FOCUSED_BASE, the change's paths on stdin, its stdout read as the
 //   selection and its stderr kept apart as diagnostics, both bounded. At its time limit its whole tree is ended.
-// - Its outcome is never "pass by default": a failure, a time-out or output Hive can't read is `unknown`.
+// - Its outcome is never "pass by default": a failure, a time-out or output Combwork can't read is `unknown`.
 
 import { spawn as nodeSpawn, type ChildProcess } from 'child_process'
 import { open } from 'original-fs/promises'
@@ -13,8 +13,14 @@ import { git } from '../git'
 import { endTree, shellSpec } from '../progressReporters/wrapper'
 import { bracketEnd, bracketStart, checkEnv, programFound, type Spawn } from './queueChecks'
 import { FOCUSED_MAX_DIAGNOSTICS, FOCUSED_MAX_OUTPUT, changePaths, parsePick, type FocusedPickState, type FocusedPickWhy, type FocusedTest, type PathChange } from '../../shared/workflow/focused'
+import { agentMsg, say } from '../../shared/agentText'
 
 /** A pick's outcome: the selection, or why there is none, and the picker's diagnostics. */
+/** What the picker's run says (HI-2463: Combwork's name). */
+const FOCUSED_TEXT = {
+  programMissing: agentMsg({ id: 'workflow.focused.programMissing', text: "Combwork couldn't find the program this command starts: {command}", note: "The focused-test picker's diagnostics: its command's program isn't found. command: the command as written." })
+}
+
 export interface PickOutcome {
   state: FocusedPickState
   tests: FocusedTest[]
@@ -117,8 +123,8 @@ export function runPick(deps: PickDeps, command: string, folder: string, base: s
     if (deps.signal?.aborted) return cancel()
     deps.signal?.addEventListener('abort', cancel, { once: true })
     try {
-      const env = { ...checkEnv(deps.env()), HIVE_FOCUSED_BASE: base }
-      if (!programFound(command, env, folder, platform)) return done({ state: 'unknown', tests: [], why: 'failed', diagnostics: `Hive couldn't find the program this command starts: ${command}` }) // i18n-ignore: the picker's diagnostics, agent-facing
+      const env = { ...checkEnv(deps.env()), CW_FOCUSED_BASE: base }
+      if (!programFound(command, env, folder, platform)) return done({ state: 'unknown', tests: [], why: 'failed', diagnostics: say(FOCUSED_TEXT.programMissing, { command }) }) // i18n-ignore: the picker's state (a code) and its diagnostics, agent text
       const sh = shellSpec(command, env, platform)
       child = spawn(sh.file, sh.args, { cwd: folder, env, windowsHide: true, windowsVerbatimArguments: sh.verbatim, stdio: ['pipe', 'pipe', 'pipe'] })
     } catch (e) {
@@ -158,7 +164,7 @@ export function runPick(deps: PickDeps, command: string, folder: string, base: s
  * A submission's pick (G20, HI-1367; HR4's s24): in the card's own folder, under a check's bracket (§16.13), so it counts
  * only for exactly the submitted revision: the folder at `revision` and clean at its start and end, no tracked file
  * written and no HEAD reflog entry made in between. Anything else is `unknown` (moved, dirty, changed), never recorded as
- * chosen. A check copy would need its dependencies installed first: Hive's own picker reads them (vitest).
+ * chosen. A check copy would need its dependencies installed first: Combwork's own picker reads them (vitest).
  */
 export async function pickAtRevision(deps: PickDeps, command: string, folder: string, revision: string, base: string, changes: PathChange[]): Promise<PickOutcome> {
   const start = await bracketStart(folder)
@@ -172,7 +178,7 @@ export async function pickAtRevision(deps: PickDeps, command: string, folder: st
 
 /**
  * A file another process wrote, read only up to `max` bytes (G20's results, HI-1367: a runner's output is never read
- * whole into Hive's main process): its text; null when it isn't there; false when it holds more than `max`, also when
+ * whole into Combwork's main process): its text; null when it isn't there; false when it holds more than `max`, also when
  * it grows past it while read.
  */
 export async function boundedRead(file: string, max: number): Promise<string | null | false> {

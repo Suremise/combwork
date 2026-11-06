@@ -47,10 +47,10 @@ async function hold(file: string): Promise<ChildProcess> {
 const call = (m: Record<string, unknown>): Promise<unknown> => handleRequest({ id: ++id, ...m } as never)
 
 async function setup() {
-  const dir = tempDir('hive-usage-worker-')
-  const file = join(dir, '.hive', 'usage.db')
+  const dir = tempDir('cw-usage-worker-')
+  const file = join(dir, '.combwork', 'usage.db')
   const transcript = join(dir, 'abc.jsonl')
-  await call({ type: 'config', advanced: {}, providers: DEFAULT_SETTINGS.providers, hiveVersion: '9.9.9-test' })
+  await call({ type: 'config', advanced: {}, providers: DEFAULT_SETTINGS.providers, appVersion: '9.9.9-test' })
   const job = (o: Partial<IngestJob> = {}): IngestJob => ({ scope: 'p1', session: 'abc', provider: 'claude-code', agentId: 'a1', path: transcript, holds: [], holdsKey: null, keepState: 'now', ...o })
   const ingest = (o?: Partial<IngestJob>) => call({ type: 'ingest', file, job: job(o) }) as Promise<IngestResult>
   const stored = async (): Promise<StoredSession | undefined> => ((await call({ type: 'sessions', file, scopes: ['p1'] })) as StoredSession[]).find((s) => s.session === 'abc')
@@ -91,7 +91,7 @@ describe('the usage worker', () => {
     const t = await setup()
     writeFileSync(t.transcript, prompt(0) + line(1, 30) + line(2, 30))
     await t.ingest()
-    // The transcript went; Hive's backup has the same requests, written differently (a shorter first line).
+    // The transcript went; Combwork's backup has the same requests, written differently (a shorter first line).
     const backup = join(t.transcript, '..', 'backup.jsonl')
     writeFileSync(backup, line(1, 30) + line(2, 30))
     // As much as recorded: it's now what the session is read from (its state made from the transcript let go).
@@ -118,11 +118,11 @@ describe('the usage worker', () => {
     await t.close()
   })
 
-  it('reads from the start when its state is from another Hive version (and the result is the same)', async () => {
+  it('reads from the start when its state is from another Combwork version (and the result is the same)', async () => {
     const t = await setup()
     writeFileSync(t.transcript, prompt(0) + line(1) + line(2))
     await t.ingest()
-    await call({ type: 'config', advanced: {}, providers: DEFAULT_SETTINGS.providers, hiveVersion: '9.9.10-test' })
+    await call({ type: 'config', advanced: {}, providers: DEFAULT_SETTINGS.providers, appVersion: '9.9.10-test' })
     appendFileSync(t.transcript, line(3))
     expect((await t.ingest()).status).toBe('written')
     expect(await t.output()).toBe(300)
@@ -226,14 +226,14 @@ describe('the usage worker', () => {
     expect((await card(15))!.cost + (await card(16))!.cost).toBeCloseTo(0.5, 9)
     expect((await card(15))!.cost).toBeCloseTo(0.25, 3)
     expect(await share(13, 'h2')).toBe(1)
-    // A request added, still without a report: the old charge, and Hive's estimate for the new request alone.
+    // A request added, still without a report: the old charge, and Combwork's estimate for the new request alone.
     appendFileSync(t.transcript, req('r2', 1_000, 100, T0 + 2000))
     expect((await t.ingest({ holds: [{ card: 13, role: 'build', parts: [[1, [[T0 - 1000, T0 + 5000]]]] }], holdsKey: 'h2' })).status).toBe('written')
     expect(await priced()).toEqual({ cost: expect.closeTo(0.5 + est(1_000, 100), 9), input: 101_000, output: 10_100, requests: 2 })
     // And shared out again once more: the same.
     expect(await share(14, 'h3')).toBe(1)
     expect(await priced()).toEqual({ cost: expect.closeTo(0.5 + est(1_000, 100), 9), input: 101_000, output: 10_100, requests: 2 })
-    // The user's own prices (#436): Hive's estimate for all of it, as for any session.
+    // The user's own prices (#436): Combwork's estimate for all of it, as for any session.
     expect((await priced(own)).cost).toBeCloseTo(est(101_000, 10_100), 9)
     await t.close()
   })
@@ -349,7 +349,7 @@ describe('the usage worker reading a transcript for main', () => {
     writeFileSync(t.transcript, prompt(0) + line(1) + pad + line(2))
     // The session ended: what it used recorded, with its parser's state.
     await t.ingest({ keepState: 'now' })
-    // Hive restarted: nothing read in this run.
+    // Combwork restarted: nothing read in this run.
     await call({ type: 'forgetReads' })
     changeRead(t.transcript)
     appendFileSync(t.transcript, line(3))
@@ -431,7 +431,7 @@ describe('the usage worker reading a transcript for main', () => {
 
   it("a session that ran on a server connection (HI-1772): its CLI's Claude-priced cost report never counted, in the history or a read", async () => {
     const t = await setup()
-    // A server's model (no price of Hive's), with the cost Claude Code reported for it priced as a Claude model.
+    // A server's model (no price of Combwork's), with the cost Claude Code reported for it priced as a Claude model.
     const server = (i: number): string => JSON.stringify({ type: 'assistant', requestId: `r${i}`, timestamp: new Date(T0 + i * 1000).toISOString(), message: { model: 'deepseek-flash', usage: { input_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: 100 } } }) + '\n'
     const report = JSON.stringify({ type: 'cost-state', timestamp: new Date(T0 + 3000).toISOString(), totalCostUSD: 4.2 }) + '\n'
     writeFileSync(t.transcript, prompt(0) + server(1) + server(2) + report)
@@ -532,7 +532,7 @@ describe('the usage worker reading a transcript for main', () => {
     await h.close()
   })
 
-  it("an Ollama cloud model (HI-1773, Darren 27 Oct): a conversation free while local only, then run on a connection with a cloud model: Hive's price for that id, never the CLI's report", async () => {
+  it("an Ollama cloud model (HI-1773, Darren 27 Oct): a conversation free while local only, then run on a connection with a cloud model: Combwork's price for that id, never the CLI's report", async () => {
     const t = await setup()
     // Claude Code's own $5 for it, priced as a Claude model, beside the requests.
     const cloud = (i: number): string => JSON.stringify({ type: 'assistant', requestId: `r${i}`, timestamp: new Date(T0 + i * 1000).toISOString(), message: { model: 'glm-4.6:cloud', usage: { input_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, output_tokens: 100 } } }) + '\n'
@@ -565,7 +565,7 @@ describe('the usage worker reading a transcript for main', () => {
 
 describe('the usage worker as main starts it (HI-1729)', () => {
   it('loads in a worker thread, where Electron has no `app`, and answers a job (since HI-1684 its logger threw there and ended it on every start)', async () => {
-    const base = tempDir('hive-usage-worker-thread-')
+    const base = tempDir('cw-usage-worker-thread-')
     // What `electron` is in a worker of Electron's main process: the npm package's export, a path, with no `app`.
     const stub = join(base, 'electron-in-worker.cjs')
     writeFileSync(stub, "module.exports = 'C:\\\\electron\\\\electron.exe'\n")

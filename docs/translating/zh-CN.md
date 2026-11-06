@@ -1,19 +1,19 @@
-# 简体中文 (`zh-CN`): style for Hive
+# 简体中文 (`zh-CN`): style for Combwork
 
 **Status:** drafted by AI (Claude, October 2026), not yet reviewed by a native speaker. Its entry in
 `src/shared/i18n/languages.ts` says the same (`ai: true` until it is reviewed).
 
 **In the language picker:** 简体中文, marked (AI) while drafted by AI, with the note “由 AI 翻译，欢迎改进。”
 
-**Improving it:** every Chinese message is in `locales/zh-CN/<area>.json`, one file per part of Hive. If a word is
-wrong, stiff or unclear, change it there and open a pull request on GitHub (`Suremise/hive-desktop`):
+**Improving it:** every Chinese message is in `locales/zh-CN/<area>.json`, one file per part of Combwork. If a word is
+wrong, stiff or unclear, change it there and open a pull request on GitHub (`Suremise/combwork`):
 `CONTRIBUTING.md` says how, and a small fix can be made in GitHub's web editor. If you change a term from the table
-below, change it in every message and on this page in the same pull request, so Hive keeps one voice. A native
+below, change it in every message and on this page in the same pull request, so Combwork keeps one voice. A native
 speaker's review takes the (AI) mark off.
 
 ## Voice
 
-Hive's English is plain and direct: short sentences, everyday words, *you* for the reader, and it says what happens.
+Combwork's English is plain and direct: short sentences, everyday words, *you* for the reader, and it says what happens.
 Translate the meaning, not the words, and keep the result as short and plain.
 
 - **Addressing the reader:** 你, not 您, as most current software does. Leave it out where the sentence is clear
@@ -42,7 +42,7 @@ Translate the meaning, not the words, and keep the result as short and plain.
   项, times 次, lines 行. Use the measure word wherever a noun is counted.
 - **Placeholders:** a placeholder that holds a sentence or a status is placed after a colon (：), so it can stand on its
   own.
-- **Lists:** Hive joins lists itself (“One、Two 和 Three”). Never write 和 or 或 into a message around a list
+- **Lists:** Combwork joins lists itself (“One、Two 和 Three”). Never write 和 or 或 into a message around a list
   placeholder.
 
 ## Punctuation and typography
@@ -59,11 +59,11 @@ Translate the meaning, not the words, and keep the result as short and plain.
   A percentage, a degree or a unit stays attached to its number (“42%”).
 - **Apostrophe:** Chinese has none. Before `{`, `}` or `#`, a straight apostrophe starts an ICU quotation: keep the
   English's `'{'` exactly as it is.
-- **Numbers, dates, money, durations:** formatted by Hive in the Chinese way. Never write them into a message.
+- **Numbers, dates, money, durations:** formatted by Combwork in the Chinese way. Never write them into a message.
 
 ## Terms
 
-The words Chinese uses for Hive's terms ([glossary.md](glossary.md)). Use them every time.
+The words Chinese uses for Combwork's terms ([glossary.md](glossary.md)). Use them every time.
 
 | English | 简体中文 | Notes |
 |---|---|---|
@@ -73,7 +73,7 @@ The words Chinese uses for Hive's terms ([glossary.md](glossary.md)). Use them e
 | provider | 提供方 | Claude Code, Codex or Copilot. |
 | session | 会话 | |
 | turn (an agent's: a prompt and its work until it stops) | 回合 | “上一回合”, “回合结束后切换”. Never 本轮 / 一轮 / 轮次, which are a card loop's round. *In turn* / *take turns* (one after another) is 轮流 / 依次. |
-| the Assistant | 助手 | The full name *Hive Assistant* stays in English. |
+| the Assistant | 助手 | Its only name: the full English name it had before went with the rename (HI-2458). |
 | persona / mode (the Assistant's) | 人设 / 模式 | |
 | role (an agent's) | 角色 | |
 | task board / board | 任务看板 / 看板 | The *Tasks* tab is “任务”. |
@@ -86,7 +86,7 @@ The words Chinese uses for Hive's terms ([glossary.md](glossary.md)). Use them e
 | card loop / lane / round | 卡片循环 / 通道 / 轮次 | |
 | merge slot | 合并槽位 | |
 | merge queue / test merge / Pause queue / Resume queue / Remove from queue | 合并队列 / 试合并 / 暂停队列 / 恢复队列 / 移出队列 | |
-| slot / pool / ready (a slot) | 槽位 / 池 / 就绪 | A slot is a working folder Hive lends to a card or lane. |
+| slot / pool / ready (a slot) | 槽位 / 池 / 就绪 | A slot is a working folder Combwork lends to a card or lane. |
 | review copy / check copy | 评审副本 / 检查副本 | |
 | Version Control (the tab) / version control / None | 版本控制 / 版本控制 / 无 | Cite the tab as “版本控制”, an option as “版本控制”→“由谁合并”. |
 | workflow / workflow options / preset / rule / old rules | 工作流程 / 工作流程选项 / 预设 / 规则 / 旧规则 | Presets: 单人、结对、团队、自定义. |
@@ -100,7 +100,7 @@ The words Chinese uses for Hive's terms ([glossary.md](glossary.md)). Use them e
 | For you | 待你处理 | Its kinds: 决定、测试、批准、登录. |
 | refused / returned (by the merge queue) | 已拒绝 / 已退回 | |
 | override / Move anyway | 例外放行 / 仍然移动 | |
-| no-code card / before 1.0 / outside Hive | 无代码卡片 / 1.0 之前 / 在 Hive 之外 | |
+| no-code card / before 1.0 / outside Combwork | 无代码卡片 / 1.0 之前 / 在 Combwork 之外 | |
 | Work (a card's section) | 工作记录 | |
 | inbox / message / wake | 收件箱 / 消息 / 唤醒 | |
 | handover / shared notes | 交接（交接说明） / 共享笔记 | |
@@ -113,7 +113,7 @@ The words Chinese uses for Hive's terms ([glossary.md](glossary.md)). Use them e
 | Workspace Overview | 工作区概览 | |
 | permission mode (Manual, Accept edits, Plan, Auto, Don't ask) | 权限模式（手动、接受编辑、计划、自动、不再询问） | The CLIs' own screens stay in English. |
 | effort / usage / cost / tokens | 推理强度 / 用量 / 费用 / Token | Effort levels: 低、中、高、超高、最高… *API-equivalent cost*: “按 API 价格计的费用”. |
-| banner / notification / tip | 横幅 / 通知 / 提示 | A *notification* is Windows'; a *banner* is inside Hive's window. |
+| banner / notification / tip | 横幅 / 通知 / 提示 | A *notification* is Windows'; a *banner* is inside Combwork's window. |
 | sign in / sign out | 登录 / 退出登录 | |
 | tab / settings | 标签页 / 设置 | |
 | Session tab / Sessions tab | “会话”标签页 / “会话历史”标签页 | Chinese has no plural, so the Sessions tab (past conversations) is 会话历史. |
@@ -121,7 +121,7 @@ The words Chinese uses for Hive's terms ([glossary.md](glossary.md)). Use them e
 | Settings sections | 常规、外观、通知、会话、智能体与工作树、提供方、助手、看板、工作区、键盘快捷键、更新、高级、Agent API | Cited as “设置”→“常规”→“…”. |
 | menus | 文件、编辑、视图、项目、会话、帮助 | |
 | conversation / transcript | 对话 / 会话记录 | |
-| status line (a CLI's) / status bar (Hive's) | 状态行 / 状态栏 | |
+| status line (a CLI's) / status bar (Combwork's) | 状态行 / 状态栏 | |
 | compact / compaction | 压缩 | |
 | prompt / prompt cache | 提示词 / 提示词缓存 | |
 | archive / unarchive | 归档 / 取消归档 | |
@@ -160,7 +160,7 @@ The words Chinese uses for Hive's terms ([glossary.md](glossary.md)). Use them e
 | Remove agent… | 删除智能体… |
 | {name} has {n, plural, one {# open card} other {# open cards}} | {name}：{n, plural, other {# 张未完成的卡片}} |
 | {agent} was removed. Its sessions stay in the Sessions tab. | 已删除智能体 {agent}。它的会话保留在“会话历史”标签页中。 |
-| Hive was started in {language} (--lang): this setting applies from its next start. | Hive 以 {language} 启动（--lang）：此设置将在下次启动时生效。 |
+| Combwork was started in {language} (--lang): this setting applies from its next start. | Combwork 以 {language} 启动（--lang）：此设置将在下次启动时生效。 |
 | Could not load {what}: {error} | 无法加载{what}：{error} |
 
 ## Checking

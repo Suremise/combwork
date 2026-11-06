@@ -10,13 +10,13 @@ import { SECRET_SAMPLES } from './secretSamples'
 // Recording a console source (#638), the service itself: one recording per window, only while the window still wants
 // it (a start overtaken by a close, a stop or a newer start records nothing, whenever it is overtaken); a file each,
 // reserved however many starts come at once; stopping writes what was captured up to then before the end line and
-// nothing after; the newest recording by when it started. Hive's profile folder is a new temp folder of this file's.
+// nothing after; the newest recording by when it started. Combwork's profile folder is a new temp folder of this file's.
 vi.mock('electron', async () => {
   const { tempDir } = await import('./tempDir')
-  const profile = tempDir('hive-recorder-')
+  const profile = tempDir('cw-recorder-')
   return { app: { getPath: () => profile, getVersion: () => '0.7.0-test' } }
 })
-// A file open can be made to fail once (a recordings folder Hive can't write to), and a recording's writes can fail (a
+// A file open can be made to fail once (a recordings folder Combwork can't write to), and a recording's writes can fail (a
 // full disk) or take only part of what they're given, chosen by what is being written.
 const openFails = vi.hoisted(() => ({ next: false }))
 const writeFaults = vi.hoisted(() => ({ rules: [] as { when: (text: string) => boolean; fault: 'enospc' | number; times: number }[] }))
@@ -102,7 +102,7 @@ describe('starting', () => {
     devConsole.capture([A1], hook('Stop'))
     const done = await stopRecording(wc.id, 'stopped')
     const r = lines(info.file)
-    expect(r.header).toMatchObject({ type: 'recording', hive: '0.7.0-test', text: false, clis: [{ provider: 'claude-code', version: '2.1.296', tested: '2.1.296' }] })
+    expect(r.header).toMatchObject({ type: 'recording', combwork: '0.7.0-test', text: false, clis: [{ provider: 'claude-code', version: '2.1.296', tested: '2.1.296' }] })
     expect(r.events.map((e) => e.name)).toEqual(['Stop'])
     expect(r.end).toMatchObject({ events: 1, reason: 'stopped' })
     expect(done).toMatchObject({ recording: false, events: 1, reason: 'stopped' })
@@ -286,7 +286,7 @@ describe('latestRecording', () => {
     // Far in the future, so this test's are the newest in the folder.
     const at = new Date(2099, 0, 2, 3, 4, 5, 6)
     const write = (n: number, text: boolean): void => {
-      const h = { type: 'recording', format: 1, hive: '0.7.0-test', startedAt: new Date(at.getTime() + n).toISOString(), source: { kind: 'session', label: 'x' }, text, clis: [] }
+      const h = { type: 'recording', format: 1, combwork: '0.7.0-test', startedAt: new Date(at.getTime() + n).toISOString(), source: { kind: 'session', label: 'x' }, text, clis: [] }
       writeFileSync(join(dir, recordingName(at, n, 'session')), `${JSON.stringify(h)}\n`)
     }
     write(1, false)

@@ -65,25 +65,25 @@ export function ruleOptions(o: WorkflowOptions): WorkflowOptions {
 }
 
 /** Does any rule need the card's change (so its folder must be clean and its revision ready)? */
-export const needsChange = (o: WorkflowOptions): boolean => o.platform === 'git' && (o.review !== 'none' || o.finish === 'committed' || o.finish === 'hiveMerges' || o.finish === 'agentMerges')
+export const needsChange = (o: WorkflowOptions): boolean => o.platform === 'git' && (o.review !== 'none' || o.finish === 'committed' || o.finish === 'combworkMerges' || o.finish === 'agentMerges')
 
 /**
  * The stages the options produce (§16.5.2), in board order: Review with any review; Approved when something follows a
- * review (Hive merges after it or after your OK, the agent merges, or Not checked after a review); Merging when Hive
+ * review (Combwork merges after it or after your OK, the agent merges, or Not checked after a review); Merging when Combwork
  * merges. stages.ts names them.
  */
 export function producedStages(o: WorkflowOptions): StageId[] {
   const review = o.review !== 'none'
   const git = o.platform === 'git'
   // Approved when a review or your OK before merging (G10) approves the work and something follows it (§16.5.2, decided
-  // on #1417): in Git a merge (Hive's, the agent's, or one Hive doesn't check); in None your OK after the reviewer
+  // on #1417): in Git a merge (Combwork's, the agent's, or one Combwork doesn't check); in None your OK after the reviewer
   // agent's pass (N1).
   const approves = review || o.okBefore.mode !== 'never'
-  const approved = git ? approves && (o.finish === 'hiveMerges' || o.finish === 'agentMerges' || o.finish === 'notChecked') : o.review === 'agentThenYou'
+  const approved = git ? approves && (o.finish === 'combworkMerges' || o.finish === 'agentMerges' || o.finish === 'notChecked') : o.review === 'agentThenYou'
   const out: StageId[] = ['hold', 'todo', 'active']
   if (review) out.push('review')
   if (approved) out.push('approved')
-  if (git && o.finish === 'hiveMerges') out.push('merging')
+  if (git && o.finish === 'combworkMerges') out.push('merging')
   out.push('done')
   return out
 }
@@ -100,13 +100,13 @@ function guardsOf(o: WorkflowOptions): Record<MoveId, GuardId[]> {
   if (o.identity) g.submit.push('submit.identity')
   if (o.preChecks.length) g.submit.push('submit.checksPassed')
   // G20 (HI-1367): each card's focused tests are chosen, or named by its builder, before it goes to review.
-  if (o.focusedTests && o.finish === 'hiveMerges') g.submit.push('submit.focusedChosen')
+  if (o.focusedTests && o.finish === 'combworkMerges') g.submit.push('submit.focusedChosen')
   if (o.stopOwnRuns) g.submit.push('submit.ownRunsStopped')
   // A decision the builder hasn't read holds its submit with any review or a merge step (SPEC §16.5.3, HI-2275): All off
   // and Solo (committed) stay free.
-  if (review || o.finish === 'hiveMerges' || o.finish === 'agentMerges') g.submit.push('submit.decisionsReceived')
+  if (review || o.finish === 'combworkMerges' || o.finish === 'agentMerges') g.submit.push('submit.decisionsReceived')
   // The builder's submit after a queue failure holds the same unread decision (HI-2275).
-  if (o.finish === 'hiveMerges') g.requeue.push('submit.notDuplicate', 'requeue.allowed', ...(review ? (['integrate.approved'] as const) : []), 'submit.decisionsReceived')
+  if (o.finish === 'combworkMerges') g.requeue.push('submit.notDuplicate', 'requeue.allowed', ...(review ? (['integrate.approved'] as const) : []), 'submit.decisionsReceived')
   if (agent) {
     if (o.noSelfReview) g.startReview.push('review.notAuthor')
     g.startReview.push('review.decisionsReceived')
@@ -115,10 +115,10 @@ function guardsOf(o: WorkflowOptions): Record<MoveId, GuardId[]> {
     g.verdict.push('review.decisionsReceived')
   }
   if (review || o.okBefore.mode !== 'never') g.approve.push('approval.given')
-  // G10 holds the report of a merge Hive doesn't check too (#1592): only its containment isn't checked.
+  // G10 holds the report of a merge Combwork doesn't check too (#1592): only its containment isn't checked.
   if ((o.finish === 'agentMerges' || o.finish === 'notChecked') && o.okBefore.mode !== 'never') g.reportMerge.push('approval.given')
   if (o.finish === 'agentMerges') g.reportMerge.push('done.contained')
-  if (o.finish === 'hiveMerges') {
+  if (o.finish === 'combworkMerges') {
     if (review) g.integrate.push('integrate.approved')
     if (o.strict) g.integrate.push('integrate.upToDate')
     if (o.mergeChecks.length || o.focusedTests) g.integrate.push('integrate.checksPassed')
@@ -154,8 +154,8 @@ export function mustCompile(o: WorkflowOptions): Ruleset {
 export type LoadResult = { ok: true; ruleset: Ruleset; readOnly: boolean } | { ok: false; error: 'unknownPiece' | 'malformed'; piece?: string }
 
 /**
- * A stored ruleset, checked before use: every guard must be a piece this Hive has (an unknown id refuses), and one from
- * a newer Hive opens read-only (§16.5.4).
+ * A stored ruleset, checked before use: every guard must be a piece this Combwork has (an unknown id refuses), and one from
+ * a newer Combwork opens read-only (§16.5.4).
  */
 export function loadRuleset(data: unknown): LoadResult {
   const r = data as Partial<Ruleset> | null

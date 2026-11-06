@@ -9,7 +9,7 @@ const ask = { kind: 'approve' as const, gate: 'ask' }
 const own = (gate: string) => ({ kind: 'approve' as const, gate })
 
 describe('a note with Approve (HI-2286)', () => {
-  it("is a decision on an agent's question, a reason where it offers one action, a comment on Hive's own gates", () => {
+  it("is a decision on an agent's question, a reason where it offers one action, a comment on Combwork's own gates", () => {
     expect(approveNote(ask)).toBe('decision')
     expect(approveNote({ gate: 'ask', actions: [{ kind: 'done' }] })).toBe('reason')
     expect(approveNote({ gate: 'ask', actions: [{ kind: 'done' }, { kind: 'noCode' }] })).toBe('decision')

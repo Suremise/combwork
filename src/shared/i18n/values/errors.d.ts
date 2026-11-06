@@ -1,6 +1,6 @@
 // Generated from locales/en/errors.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
-interface HiveMessageValues {
+interface CombworkMessageValues {
   'errors.assistantUndo.gone': undefined
   'errors.assistantUndo.which': undefined
   'errors.changes.notFile': { file: string | number; folder: string | number }
@@ -9,16 +9,24 @@ interface HiveMessageValues {
   'errors.console.notRecording': undefined
   'errors.console.notSource': undefined
   'errors.console.sourcesList': undefined
+  'errors.cw.cantList': undefined
+  'errors.cw.noRepo': undefined
+  'errors.cw.notIgnored': undefined
+  'errors.dialects.notDialect': { path: string | number }
+  'errors.dialects.pickAgain': undefined
   'errors.dialog.addMcp': undefined
   'errors.dialog.addSkill': undefined
   'errors.dialog.createWorkspace': undefined
   'errors.dialog.createWorkspaceTitle': undefined
+  'errors.dialog.dialectFiles': undefined
   'errors.dialog.exportBoard': undefined
   'errors.dialog.exportBoardButton': undefined
+  'errors.dialog.exportDialect': undefined
   'errors.dialog.exportMetrics': undefined
   'errors.dialog.exportTemplate': undefined
   'errors.dialog.exportTranscript': undefined
   'errors.dialog.importBenchmark': undefined
+  'errors.dialog.importDialect': undefined
   'errors.dialog.importTemplate': undefined
   'errors.dialog.locateAgentWorktree': undefined
   'errors.dialog.locateWorktree': { agent: string | number }
@@ -29,9 +37,6 @@ interface HiveMessageValues {
   'errors.dialog.useFolder': undefined
   'errors.file.insideArchive': undefined
   'errors.file.outsideWorkspace': undefined
-  'errors.hive.cantList': undefined
-  'errors.hive.noRepo': undefined
-  'errors.hive.notIgnored': undefined
   'errors.image.not': undefined
   'errors.lane.builderRequired': undefined
   'errors.lane.required': undefined

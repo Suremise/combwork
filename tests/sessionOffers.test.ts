@@ -34,8 +34,8 @@ type Internals = {
 }
 
 describe("a notice's button acts for its own offer only", () => {
-  const ws = tempDir('hive-session-offers-')
-  const home = join(ws, '.hive', 'assistant')
+  const ws = tempDir('cw-session-offers-')
+  const home = join(ws, '.combwork', 'assistant')
   const id = `${home.toLowerCase()}#assistant`
   let sessions: typeof import('../src/main/sessions').sessions
   let s: Internals

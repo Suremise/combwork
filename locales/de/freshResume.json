@@ -1,0 +1,8 @@
+{
+  "freshResume.confirm": "Neue Unterhaltung beginnen",
+  "freshResume.detail": "{assistant, select, yes {Der Assistent beginnt stattdessen eine neue Unterhaltung, und die alte bleibt in seinen Unterhaltungen zum Nachlesen.} other {{agent} beginnt stattdessen eine neue Unterhaltung. Sie setzt die Arbeit des Agenten fort (seine Beobachtung, Nachrichten und Aufgaben), und die alte Unterhaltung bleibt unter Sitzungen zum Nachlesen.}}",
+  "freshResume.message": "{why, select, moved {Diese Unterhaltung lief in einem Ordner, der mit seinem alten Datenordner nach .combwork verschoben wurde, daher kann sie dort nicht weitergehen.} other {Diese Unterhaltung hat begonnen, bevor Combwork die Tools umbenannt hat, die Agenten nutzen, daher kann sie nicht weitergehen.}}",
+  "freshResume.short": "beginnt eine neue Unterhaltung",
+  "freshResume.tip": "{why, select, moved {Beginnt eine neue Unterhaltung: „{session}“ lief in einem Ordner, der mit seinem alten Datenordner nach .combwork verschoben wurde, daher kann sie nicht weitergehen} other {Beginnt eine neue Unterhaltung: „{session}“ stammt aus der Zeit, bevor Combwork die Tools umbenannt hat, die Agenten nutzen, daher kann sie nicht weitergehen}}",
+  "freshResume.title": "Neue Unterhaltung beginnen?"
+}

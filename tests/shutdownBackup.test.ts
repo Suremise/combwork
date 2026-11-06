@@ -24,9 +24,9 @@ const SID = '0f5c2a8e-1111-4222-8333-944455556666'
 const SID2 = '0f5c2a8e-1111-4222-8333-944455557777'
 
 describe('sessions.backupAllNow', () => {
-  async function hive() {
+  async function combwork() {
     vi.resetModules()
-    const profile = tempDir('hive-shutdown-')
+    const profile = tempDir('cw-shutdown-')
     const electron = await import('electron')
     ;(electron.app as unknown as { getPath: () => string }).getPath = () => profile
     const { sessions } = await import('../src/main/sessions')
@@ -36,16 +36,16 @@ describe('sessions.backupAllNow', () => {
     const live = (sessions as unknown as { live: Map<string, unknown> }).live
     const add = (agentId: string, sessionId: string, transcriptPath?: string): void =>
       void live.set(`${project}#${agentId}`, { state: { projectPath: project, agentId, sessionId, status: 'working' }, transcriptPath })
-    const backup = (sessionId: string): string => readFileSync(join(project, '.hive', 'sessions', `${sessionId}.jsonl`), 'utf8')
+    const backup = (sessionId: string): string => readFileSync(join(project, '.combwork', 'sessions', `${sessionId}.jsonl`), 'utf8')
     return { sessions, config, profile, add, backup }
   }
 
   it('backs up each transcript before it returns, without reading it for usage or cost', async () => {
-    const { sessions, profile, add, backup } = await hive()
+    const { sessions, profile, add, backup } = await combwork()
     const t = join(profile, 'one.jsonl')
     writeFileSync(t, '{"a":1}\n')
     add('a1', SID, t)
-    // A transcript Hive hasn't found yet: left out, and counted.
+    // A transcript Combwork hasn't found yet: left out, and counted.
     add('a2', SID2)
     const parse = vi.spyOn(sessions as unknown as { transcriptChanged: () => Promise<void> }, 'transcriptChanged')
     expect(sessions.backupAllNow(2000)).toEqual({ saved: 1, incomplete: 0, skipped: 1, failed: 0 })
@@ -57,7 +57,7 @@ describe('sessions.backupAllNow', () => {
   })
 
   it('counts a failure, and leaves out what is past its time', async () => {
-    const { sessions, profile, add } = await hive()
+    const { sessions, profile, add } = await combwork()
     add('a1', SID, join(profile, 'missing.jsonl'))
     expect(sessions.backupAllNow(2000)).toEqual({ saved: 0, incomplete: 0, skipped: 0, failed: 1 })
     const t = join(profile, 'two.jsonl')
@@ -70,7 +70,7 @@ describe('sessions.backupAllNow', () => {
     afterEach(() => void (slow.ms = 0))
 
     it("stops at its time: a copy it can't finish is incomplete, and the next session isn't tried", async () => {
-      const { sessions, profile, add } = await hive()
+      const { sessions, profile, add } = await combwork()
       for (const [agent, sid] of [['a1', SID], ['a2', SID2]]) {
         const t = join(profile, `${agent}.jsonl`)
         writeFileSync(t, Buffer.alloc(8 * 1024 * 1024, 'x'))
@@ -82,12 +82,12 @@ describe('sessions.backupAllNow', () => {
       // One 1 MB step of 60 ms past the budget, not 16 of them.
       expect(Date.now() - t).toBeLessThan(250)
       // The copy it couldn't finish isn't put in place.
-      expect(existsSync(join(profile, 'alpha', '.hive', 'sessions', `${SID}.jsonl`))).toBe(false)
+      expect(existsSync(join(profile, 'alpha', '.combwork', 'sessions', `${SID}.jsonl`))).toBe(false)
     })
   })
 
   it('does nothing with transcript backups turned off', async () => {
-    const { sessions, config, profile, add } = await hive()
+    const { sessions, config, profile, add } = await combwork()
     const t = join(profile, 'three.jsonl')
     writeFileSync(t, '{}\n')
     add('a1', SID, t)
@@ -109,7 +109,7 @@ describe('power: Windows ending the session', () => {
       sessions: { liveStates: () => [], backupAllNow: (budget: number) => (saves.push(budget), { saved: 1, skipped: 0, failed: 0 }) }
     }))
     vi.doMock('../src/main/config', () => ({ config: { settings: { general: { keepAwake: 'plugged-in' } }, onSettingsChanged: () => undefined } }))
-    vi.doMock('../src/main/events', () => ({ emit: () => undefined, onHiveEvent: () => undefined }))
+    vi.doMock('../src/main/events', () => ({ emit: () => undefined, onCombworkEvent: () => undefined }))
     vi.doMock('../src/main/workspace', () => ({ openWorkspaces: () => [] }))
     vi.doMock('../src/main/logger', () => ({ createLogger: () => ({ info: () => undefined, warn: () => undefined }) }))
     const mod = await import('../src/main/power')

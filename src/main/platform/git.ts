@@ -8,14 +8,14 @@ import { AsyncLocalStorage } from 'async_hooks'
 import { closeSync, copyFileSync, existsSync, openSync, readFileSync, renameSync, statSync, unlinkSync } from 'original-fs'
 import { access } from 'original-fs/promises'
 import { isAbsolute, join, resolve as resolvePath } from 'path'
-import { git, gitRouted } from '../git'
+import { branchOfRef, git, gitRouted } from '../git'
 import { gitExe } from '../gitTool'
 import { plainRepo, refSync } from './repoRefs'
 import type { FileChange } from '../../shared/workflow/facts'
 import { UNREADABLE as U } from '../../shared/workflow/texts'
 import { isUnknown, unknown, withDetail, type Change, type Containment, type Maybe } from './types'
 
-/** A commit as attribution reads it: its id, author email and `Hive-Card` trailers. */
+/** A commit as attribution reads it: its id, author email and `Combwork-Card` trailers. */
 export interface CommitInfo {
   commit: string
   email: string
@@ -78,10 +78,10 @@ const KEPT_MAX = 20_000
 const kept = new Map<string, unknown>()
 
 /**
- * HI-2115: an answer about fixed commits (full ids) that can't change, kept for as long as Hive runs, not only for a
+ * HI-2115: an answer about fixed commits (full ids) that can't change, kept for as long as Combwork runs, not only for a
  * step: whether one is another's ancestor, their merge base, a range's first parents. The reconciler asked them again
  * at every ref change for every card under way (a git each, several a second while lanes build). Unknown answers are
- * asked again. Kept only for a plain repository (`plainRepo`, the one rule of Hive's git caches): otherwise (replace
+ * asked again. Kept only for a plain repository (`plainRepo`, the one rule of Combwork's git caches): otherwise (replace
  * refs, grafts or shallow history can give the same ids other answers; a reftable can hold replacements unseen) nothing
  * is kept or answered from what was, checked before each answer kept is given and again before one is kept (it may
  * have changed while git ran). An answer kept for a plain repository holds whenever it is plain again: its commits are
@@ -234,10 +234,10 @@ export async function head(folder: string): Promise<Maybe<string>> {
   return r.ok ? r.out.trim() : withDetail(unknown(U.head, { where: folder }), r.err)
 }
 
-/** The branch checked out in a folder, or null when HEAD is detached. */
+/** The branch checked out in a folder, or null when HEAD is detached. The full ref, cut: `--short` says heads/x beside a tag x (HI-2426). */
 export async function branch(folder: string): Promise<Maybe<string | null>> {
-  const r = await git(folder, ['symbolic-ref', '-q', '--short', 'HEAD'])
-  if (r.ok) return r.out.trim()
+  const r = await git(folder, ['symbolic-ref', '-q', 'HEAD'])
+  if (r.ok) return branchOfRef(r.out)
   if (r.code === 1) return null
   return withDetail(unknown(U.branch, { folder }), r.err)
 }
@@ -649,11 +649,11 @@ export async function commitIds(repo: string, range: string, max: number): Promi
 }
 
 /**
- * The commits of a range, oldest first, with their author emails and `Hive-Card` trailers. `firstParent`: only the line's
+ * The commits of a range, oldest first, with their author emails and `Combwork-Card` trailers. `firstParent`: only the line's
  * own commits, its merges included but not the commits a merge brought in (HI-2382).
  */
 export async function commits(repo: string, range: string, opts: { firstParent?: boolean } = {}): Promise<Maybe<CommitInfo[]>> {
-  const r = await git(repo, ['log', '--reverse', ...(opts.firstParent ? ['--first-parent'] : []), '--format=%H%x1f%ae%x1f%(trailers:key=Hive-Card,valueonly,separator=%x2C)%x1f%s%x1e', range])
+  const r = await git(repo, ['log', '--reverse', ...(opts.firstParent ? ['--first-parent'] : []), '--format=%H%x1f%ae%x1f%(trailers:key=Combwork-Card,valueonly,separator=%x2C)%x1f%s%x1e', range])
   if (!r.ok) return unknown(U.commitsOf, { range })
   return r.out
     .split('\x1e')
@@ -717,7 +717,7 @@ export async function moveLineLocked(folder: string, to: string, expect: { line:
   if (at && !at.ok) return null
   const index = at ? at.out.trim() : join(gitDir!, 'index')
   const lock = `${index}.lock`
-  const next = `${index}.hive-line`
+  const next = `${index}.cw-line`
   let fd: number | null
   try {
     fd = openSync(lock, 'wx')
@@ -750,7 +750,7 @@ export async function moveLineLocked(folder: string, to: string, expect: { line:
       return (e as Error).message
     }
     // 2. The branch, only from the head checked (compare and swap).
-    const ref = await git(folder, ['update-ref', '-m', 'Hive: up to date after a squash merge', `refs/heads/${expect.line}`, to, expect.head])
+    const ref = await git(folder, ['update-ref', '-m', 'Combwork: up to date after a squash merge', `refs/heads/${expect.line}`, to, expect.head])
     if (!ref.ok) {
       // The branch moved on (not through this worktree's index): its files back as they were, nothing moved.
       if (!(await filesBack())) throw new LineMoveBroken(`the files of ${expect.line} couldn't be put back after its branch moved on`) // i18n-ignore: a log line's reason
@@ -770,7 +770,7 @@ export async function moveLineLocked(folder: string, to: string, expect: { line:
       }
     }
     // Not published: the branch back to the head (only if still where this moved it), the files with it.
-    const back = await git(folder, ['update-ref', '-m', 'Hive: put back, its index not written', `refs/heads/${expect.line}`, expect.head, to])
+    const back = await git(folder, ['update-ref', '-m', 'Combwork: put back, its index not written', `refs/heads/${expect.line}`, expect.head, to])
     if (!back.ok || !(await filesBack())) throw new LineMoveBroken(`${expect.line} was moved to ${to.slice(0, 7)} but its index couldn't be written (${failed?.message}), and it couldn't be put back`) // i18n-ignore: a log line's reason
     return failed?.message ?? 'the index could not be written' // i18n-ignore: a reason, agent- and log-facing
   } finally {

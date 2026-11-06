@@ -1,5 +1,5 @@
 // Gates at boardWrite (#1265, SPEC §16.7, §16.8): the user's and the Assistant's column moves go through the card's
-// workflow runtime, on the real board (a temp hive.db) and temp repositories. The runtime writes the move's facts (one
+// workflow runtime, on the real board (a temp combwork.db) and temp repositories. The runtime writes the move's facts (one
 // owner: the recorder adds none of them), the board's 0.9 fields follow in the same change; a move that skips a rule
 // records one Override (the user's, interim: never asked yet; the Assistant's only with a reason, else refused with a
 // Refused fact and the Agent API's 409). With every option off nothing asks or is refused; with the rules not enforced
@@ -11,7 +11,7 @@ import { afterAll, afterEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-gates-')
+const base = tempDir('cw-gates-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -25,6 +25,7 @@ const { apiErrorReply } = await import('../src/main/servers')
 const { allOff } = await import('../src/shared/workflow/options')
 const { foldCard } = await import('../src/shared/workflow/facts')
 const { workBadges } = await import('../src/main/workflow/cardWork')
+const { GIT_HEAVY_MS } = await import('./workflow/harness')
 
 advanced.load(join(base, 'profile'))
 type WS = ReturnType<typeof createWorkspaceService>
@@ -50,18 +51,18 @@ async function workspace(options: object | null, platform: 'git' | 'none' = 'git
   const ws = join(base, `ws-${++n}`)
   const repo = join(ws, 'p')
   const wt = join(ws, 'p-card')
-  mkdirSync(join(repo, '.hive'), { recursive: true })
+  mkdirSync(join(repo, '.combwork'), { recursive: true })
   writeFileSync(join(repo, 'a.txt'), 'one\n')
   if (platform === 'git') {
     git(repo, 'init', '-q', '-b', 'main')
     for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) git(repo, 'config', k, v)
-    writeFileSync(join(repo, '.gitignore'), '.hive/\n')
+    writeFileSync(join(repo, '.gitignore'), '.combwork/\n')
     git(repo, 'add', '-A')
     git(repo, 'commit', '-qm', 'initial')
     git(repo, 'worktree', 'add', '-q', '-b', 'card', wt, 'main')
   }
   const agents = [{ id: 'a1', name: 'Builder', ...(platform === 'git' ? { worktree: { path: wt, branch: 'card', base: 'main' } } : {}) }, { id: 'a2', name: 'Reviewer' }]
-  writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents, ...(options ? { workflow: { platform, preset: null, options } } : {}) }))
+  writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents, ...(options ? { workflow: { platform, preset: null, options } } : {}) }))
   const w = createWorkspaceService()
   await w.open(ws)
   opened.push(w)
@@ -154,7 +155,7 @@ describe('the user moves cards through the rules (#1265)', () => {
     const card = await create(w)
     await update(w, card, { column: 'doing', agent: 'a1' })
     // Every option off now: a new card moves freely; the started one is still under Pair's rules.
-    writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }, { id: 'a2', name: 'Reviewer' }], workflow: { platform: 'git', preset: null, options: allOff('git') } }))
+    writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }, { id: 'a2', name: 'Reviewer' }], workflow: { platform: 'git', preset: null, options: allOff('git') } }))
     await update(w, card, { column: 'done' })
     expect(facts(w, card).find((f) => f.kind === 'Override')).toMatchObject({ data: { rules: expect.arrayContaining(['integrate.approved']) } })
     const fresh = await create(w, 'New')
@@ -197,7 +198,7 @@ describe('the Assistant moves cards across rules only with a reason (#1265, SPEC
     expect(items[1].error).toMatch(/would be in Active with nobody on it\.$/)
     const one = apiErrorReply(await update(w, b, { column: 'doing' }, assistant).catch((e) => e)).body
     expect(items[1].refused).toEqual({ rule: 'move.doingNobody', next: one.next, ...(one.change ? { change: one.change } : {}) })
-    expect(items[1].refused?.next).toMatch(/override.*\(agent\).*hive_start_task/)
+    expect(items[1].refused?.next).toMatch(/override.*\(agent\).*cw_start_task/)
     expect(items[0].refused).toBeUndefined()
     expect((await inWorkspace(w, () => tasks.getTask(b, w))).column).toBe('todo')
     const nobody = await inWorkspace(w, () => tasks.updateTasks([b], { column: 'doing', override: { reason: 'The user takes it' } }, assistant))
@@ -300,19 +301,20 @@ describe('a move is decided whole, and a refused one leaves nothing (#1265 round
 
 // HR2's round 2: a drag planned from Todo into the shared project folder; G13 for the card's builder, read again at the write.
 describe('planning edges (#1265 round 3)', () => {
-  it('a Todo card starting in the shared project folder (no builder, or one without a worktree) stops after its start: nothing to submit', async () => {
-    for (const agent of [undefined, 'a2']) {
-      const { w } = await workspace(PAIR)
-      const card = await create(w)
-      if (agent) await update(w, card, { agent })
-      const r = await inWorkspace(w, () => tasks.moveTask(card, 'review', { confirm: true }))
-      expect(r).toMatchObject({ moved: { column: 'doing' }, stopped: { rule: 'submit.empty' } })
-      expect(facts(w, card).find((f) => f.kind === 'Started')).toMatchObject({ data: { folder: 'project' } })
-      expect(kinds(w, card)).not.toContain('Submitted')
-    }
+  // HI-2494: each independent case builds a real Git workspace; keep one lifecycle per test instead of two.
+  it.each([['no builder', undefined], ['a builder without a worktree', 'a2']] as const)('a Todo card starting in the shared project folder (%s) stops after its start: nothing to submit', async (_what, agent) => {
+    const { w } = await workspace(PAIR)
+    const card = await create(w)
+    if (agent) await update(w, card, { agent })
+    const r = await inWorkspace(w, () => tasks.moveTask(card, 'review', { confirm: true }))
+    expect(r).toMatchObject({ moved: { column: 'doing' }, stopped: { rule: 'submit.empty' } })
+    expect(facts(w, card).find((f) => f.kind === 'Started')).toMatchObject({ data: { folder: 'project' } })
+    expect(kinds(w, card)).not.toContain('Submitted')
   })
 
-  it("G13: the card's builder's running work counts for the user's, the Assistant's and an agent's submission, read again at the write", async () => {
+  // GIT_HEAVY_MS (HI-2494, HI-2453's policy): 41 real Git commands across setup and the three submission paths;
+  // 97% of its 2.0 s isolated time was Git. It exceeded 20 s in the import-selected run at sustained ~100% CPU.
+  it("G13: the card's builder's running work counts for the user's, the Assistant's and an agent's submission, read again at the write", { timeout: GIT_HEAVY_MS }, async () => {
     const service = await import('../src/main/workflow/service')
     const { w, wt, repo } = await workspace({ ...PAIR, stopOwnRuns: true })
     const commitWork = (file: string): void => {
@@ -486,7 +488,7 @@ describe('drags run the intents they stand for (#1290)', () => {
       await move(w, card, 'done')
       const old = facts(w, card).find((f) => f.kind === 'Started')!.ruleset
       // Review by an agent turned on since.
-      writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', worktree: { path: wt, branch: 'card', base: 'main' } }, { id: 'a2', name: 'Reviewer' }], workflow: { platform: 'git', preset: null, options: PAIR } }))
+      writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', worktree: { path: wt, branch: 'card', base: 'main' } }, { id: 'a2', name: 'Reviewer' }], workflow: { platform: 'git', preset: null, options: PAIR } }))
       if (via) expect(await move(w, card, 'todo')).toMatchObject({ moved: { column: 'todo' } })
       expect(await move(w, card, 'doing')).toMatchObject({ moved: { column: 'doing' } })
       const started = facts(w, card).filter((f) => f.kind === 'Started')
@@ -670,7 +672,7 @@ describe('the Assistant puts a card in Doing with someone on it, or nobody by th
           const body = apiErrorReply(err).body
           expect(body).toMatchObject({ refused: true, rule: 'move.doingNobody', override: 'the user or the Assistant' })
           expect(body.message).toMatch(/would be in Active with nobody on it\.$/)
-          expect(body.next).toMatch(/override.*\(agent\).*hive_start_task/)
+          expect(body.next).toMatch(/override.*\(agent\).*cw_start_task/)
           expect(await column(w, card)).toBe('todo')
         }
         expect(overrides(w, card)).toEqual([])

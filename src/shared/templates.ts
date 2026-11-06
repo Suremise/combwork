@@ -2,28 +2,29 @@
 // agents) or to add one agent from. What a template holds and what it leaves out (sessions, folders and branches, setup
 // state, the Assistant's mode: those belong to the project), checked as untrusted input when read. #127 adds the places
 // to manage them (the Templates view, a project's Templates tab) and sharing them as files (export, import). #1436: the
-// format's version 2 (no worktrees, each agent's role in the workflow, a suggested preset and pairs) and Hive's own.
+// format's version 2 (no worktrees, each agent's role in the workflow, a suggested preset and pairs) and Combwork's own.
 // HI-1910: its workflow, a section per version control (workflow/templateOptions.ts), read through its whitelist.
 import { AGENT_LIMIT_MAX, ROLE_MAX, SESSION_LAYOUTS, projectAgents } from './defaults'
 import { isKnownProvider } from './providers'
 import { cleanMcpServers } from './agentMcp'
 import type { AgentDef, PageLayout, ProviderId } from './types'
 import { msg } from './i18n/msg'
+import { agentMsg, say } from './agentText'
 import { shownText, withValues, type Text } from './advanced'
 import { agentWorkflowRole, buildsWork, isWorkflowRole, reviewsWork, type ReviewerMode, type WorkflowRole } from './workflow/roles'
 import { hasWorkflow, readTemplateWorkflows, TEMPLATE_PLATFORMS, type TemplateWorkflows } from './workflow/templateOptions'
 import type { PlatformId } from './platform/descriptors'
 
-/** The format's version: a template made by a newer Hive (a higher one) is refused rather than half read; 0.9's (1) too (#1436). */
+/** The format's version: a template made by a newer Combwork (a higher one) is refused rather than half read; 0.9's (1) too (#1436). */
 export const TEMPLATE_VERSION = 2
 /** A template's name is at most this long. */
 export const TEMPLATE_NAME_MAX = 60
 /**
- * Where a template is kept: Hive's own (#1436, read-only: shipped with Hive, copied to the workspace or a project to
- * change), for every project of the workspace, or for one project (its .hive, private to it).
+ * Where a template is kept: Combwork's own (#1436, read-only: shipped with Combwork, copied to the workspace or a project to
+ * change), for every project of the workspace, or for one project (its .combwork, private to it).
  */
-export type TemplateScope = 'hive' | 'workspace' | 'project'
-/** The places templates are written to (Hive's own are never changed). */
+export type TemplateScope = 'combwork' | 'workspace' | 'project'
+/** The places templates are written to (Combwork's own are never changed). */
 export const TEMPLATE_SCOPES: readonly TemplateScope[] = ['workspace', 'project']
 /** The preset a template suggests for the project it is loaded into (#1436: offered, never applied silently). */
 export type SuggestedPreset = 'solo' | 'pair' | 'team'
@@ -33,8 +34,8 @@ export interface TemplatePair {
   builder: string
   reviewer: string
 }
-/** An exported template's file name ends so ("Build and review.hive-template.json"). */
-export const TEMPLATE_EXPORT_SUFFIX = '.hive-template.json'
+/** An exported template's file name ends so ("Build and review.combwork-template.json"). */
+export const TEMPLATE_EXPORT_SUFFIX = '.combwork-template.json'
 /** A file to import is at most this big (a template of 24 agents is a few KB). */
 export const TEMPLATE_IMPORT_MAX = 256 * 1024
 /** A template's description (#271, optional) is at most this long. */
@@ -55,11 +56,11 @@ export interface TemplateRef extends TemplateDest {
 /**
  * One agent of a template: its role in the workflow (#1430), its note, its MCP servers and the CLI it suggests; never
  * where it works (#1436: agents aren't pinned to folders) nor what it runs on (HI-2109, decision G: no connection, model,
- * effort, mode or context; those are the connection's, chosen when it is loaded). Its provider may be one this Hive
- * doesn't know (a template from a newer Hive, imported): kept and shown, never used.
+ * effort, mode or context; those are the connection's, chosen when it is loaded). Its provider may be one this Combwork
+ * doesn't know (a template from a newer Combwork, imported): kept and shown, never used.
  */
 export interface TemplateAgent {
-  /** Its name, or a pattern of the project's key (`{key}-B1`: Hive's own templates, #1123 names). */
+  /** Its name, or a pattern of the project's key (`{key}-B1`: Combwork's own templates, #1123 names). */
   name: string
   role: WorkflowRole
   /** What it is for, in the user's words (the agent's note, `AgentDef.role`). */
@@ -113,7 +114,7 @@ export interface TemplateEntry {
   pairs?: TemplatePair[]
   workflow?: TemplateWorkflows
   workflowDropped?: PlatformId[]
-  /** It can't be used (damaged, made by a newer Hive…): why, in English (the log, a refusal's message). */
+  /** It can't be used (damaged, made by a newer Combwork…): why, in English (the log, a refusal's message). */
   problem?: string
   /** Why, as text for the window to show in its language (#870), following a change of language. */
   problemText?: Text
@@ -175,10 +176,10 @@ const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 
 const text = (v: unknown, max: number): v is string => typeof v === 'string' && v.trim().length > 0 && v.length <= max
 // Why a template file can't be used: shown in the Templates view and the dialogs that read one (window text).
 const M = {
-  notTemplate: msg({ id: 'assistant.template.notTemplate', defaultMessage: "It isn't a Hive agent template.", description: "Why a template file can't be used: it isn't one." }),
-  noVersion: msg({ id: 'assistant.template.noVersion', defaultMessage: "It isn't a Hive agent template (no version).", description: "Why a template file can't be used: it has no format version." }),
-  newer: msg({ id: 'assistant.template.newer', defaultMessage: 'It was made by a newer version of Hive: update Hive to use it.', description: "Why a template file can't be used: a newer Hive made it." }),
-  from09: msg({ id: 'assistant.template.from09', defaultMessage: "This template is from Hive 0.9 and can't be loaded in 1.0. Recreate it from your agents with Save as Template.", description: "Why a template file can't be used: Hive 0.9 made it (its agents had worktrees of their own; 1.0's don't). Save as Template is a command: as Hive names it." }),
+  notTemplate: msg({ id: 'assistant.template.notTemplate', defaultMessage: "It isn't a Combwork agent template.", description: "Why a template file can't be used: it isn't one." }),
+  noVersion: msg({ id: 'assistant.template.noVersion', defaultMessage: "It isn't a Combwork agent template (no version).", description: "Why a template file can't be used: it has no format version." }),
+  newer: msg({ id: 'assistant.template.newer', defaultMessage: 'It was made by a newer version of Combwork: update Combwork to use it.', description: "Why a template file can't be used: a newer Combwork made it." }),
+  from09: msg({ id: 'assistant.template.from09', defaultMessage: "This template is from version 0.9 and can't be loaded in 1.0. Recreate it from your agents with Save as Template.", description: "Why a template file can't be used: version 0.9 made it (its agents had worktrees of their own; 1.0's don't). Save as Template is a command: as Combwork names it." }),
   badName: msg({ id: 'assistant.template.badName', defaultMessage: 'Its name is missing or longer than {max} characters.', description: "Why a template file can't be used: the template's name." }),
   noAgents: msg({ id: 'assistant.template.noAgents', defaultMessage: 'It has no agents.', description: "Why a template file can't be used: it holds no agents." }),
   tooManyAny: msg({ id: 'assistant.template.tooMany', defaultMessage: 'It has {count} agents; a project can have up to {max}.', description: "Why a template file can't be used: more agents than any project can have." }),
@@ -186,9 +187,9 @@ const M = {
   sameName: msg({ id: 'assistant.template.sameName', defaultMessage: 'Two agents are called "{name}".', description: "Why a template file can't be used: two agents share a name." }),
   badRole: msg({ id: 'assistant.template.badRole', defaultMessage: "{name}'s role in the workflow isn't builder, reviewer, either or generalist.", description: "Why a template file can't be used: an agent's role in the workflow (glossary: builder, reviewer, either) is none of the three. Keep builder, reviewer and either as they are (the file's values)." }),
   longNote: msg({ id: 'assistant.template.longNote', defaultMessage: 'The note of agent {name} is over {max, number} characters.', description: "Why a template file can't be used: an agent's note (what it is for, in the user's words) is too long. {max} is the limit, a number. A noun before the name (glossary §1 rule 4)." }),
-  badToken: msg({ id: 'assistant.template.badToken', defaultMessage: "{name} uses {token}: an agent’s name may only hold '{key}' (the project’s key) and '{n}' (its number among the agents with that name).", description: "Why a template file can't be used: an agent's name pattern ({name}) holds {token}, a token Hive doesn't know. The quoted '{key}' and '{n}' are shown as {key} and {n}: keep them, with their straight quotes, as they are." }),
+  badToken: msg({ id: 'assistant.template.badToken', defaultMessage: "{name} uses {token}: an agent’s name may only hold '{key}' (the project’s key) and '{n}' (its number among the agents with that name).", description: "Why a template file can't be used: an agent's name pattern ({name}) holds {token}, a token Combwork doesn't know. The quoted '{key}' and '{n}' are shown as {key} and {n}: keep them, with their straight quotes, as they are." }),
   badPairs: msg({ id: 'assistant.template.badPairs', defaultMessage: 'Its pairs of builders and reviewers name agents it doesn’t have, or an agent twice.', description: "Why a template file can't be used: its list of builders paired with reviewers (glossary: builder, reviewer) doesn't match its agents." }),
-  badMcp: msg({ id: 'assistant.template.badMcp', defaultMessage: "{name}'s MCP servers aren't a list Hive can use.", description: "Why a template file can't be used: an agent's list of MCP servers." })
+  badMcp: msg({ id: 'assistant.template.badMcp', defaultMessage: "{name}'s MCP servers aren't a list Combwork can use.", description: "Why a template file can't be used: an agent's list of MCP servers." })
 }
 
 /** Why a template of `count` agents can't be loaded into a project that can have `limit` (#562), as text (#870). */
@@ -196,10 +197,14 @@ const M = {
  * Why the Assistant can't load a template into a project (HI-2001): more agents than its Maximum agents. Only the
  * Assistant's loads keep to it (the user's go past it), so it stays English.
  */
-export const templateLimitText = (count: number, max: number): string =>
-  `It has ${count} agents, and this project's workflow allows ${max} (Maximum agents, the user's team size, in Version Control → Workflow). The user can load it themselves, or raise Maximum agents first.` // i18n-ignore: English for the Assistant (agents read it)
+export const templateLimitText = (count: number, max: number): string => say(TOO_MANY, { count: String(count), max: String(max) })
+const TOO_MANY = agentMsg({
+  id: 'template.load.tooMany',
+  text: "It has {count} agents, and this project's workflow allows {max} (Maximum agents, the user's team size, in Version Control → Workflow). The user can load it themselves, or raise Maximum agents first.",
+  note: "Why the Assistant can't load a template (HI-2001): more agents than the project's Maximum agents, which only the Assistant's loads keep to. {count} and {max} are digits."
+})
 
-/** Why a listed template can't be used, in the language Hive shows now (call it when rendering); undefined when it can be. */
+/** Why a listed template can't be used, in the language Combwork shows now (call it when rendering); undefined when it can be. */
 export const shownProblem = (t: Pick<TemplateEntry, 'problem' | 'problemText'>): string | undefined => (t.problemText ? shownText(t.problemText) : t.problem)
 
 /** Whether readTemplate read a template, rather than why it can't be used. */
@@ -218,7 +223,7 @@ export function readTemplate(raw: unknown): AgentTemplate | Text {
   if (version < TEMPLATE_VERSION) return M.from09
   if (!text(raw.name, TEMPLATE_NAME_MAX)) return withValues(M.badName, { max: TEMPLATE_NAME_MAX })
   if (!Array.isArray(raw.agents) || !raw.agents.length) return M.noAgents
-  // Any template Hive could have saved (#562): whether it fits a project is its load's to say (templateLimitText).
+  // Any template Combwork could have saved (#562): whether it fits a project is its load's to say (templateLimitText).
   if (raw.agents.length > AGENT_LIMIT_MAX) return withValues(M.tooManyAny, { count: raw.agents.length, max: AGENT_LIMIT_MAX })
   const agents: TemplateAgent[] = []
   for (const [i, a] of raw.agents.entries()) {
@@ -228,7 +233,7 @@ export function readTemplate(raw: unknown): AgentTemplate | Text {
     // a number's 2 digits).
     const token = /\{[^}]*\}/.exec(name.replace(NAME_TOKENS, ''))?.[0]
     if (token) return withValues(M.badToken, { name, token })
-    // The CLI it suggests (HI-2109): one this Hive doesn't know is kept (flagged where it is shown) as long as it looks
+    // The CLI it suggests (HI-2109): one this Combwork doesn't know is kept (flagged where it is shown) as long as it looks
     // like one; anything else is no suggestion, never a refusal.
     const provider = isProviderId(a.provider) ? a.provider : undefined
     if (a.role !== undefined && !isWorkflowRole(a.role)) return withValues(M.badRole, { name })
@@ -260,7 +265,7 @@ export function readTemplate(raw: unknown): AgentTemplate | Text {
   const layout: PageLayout = raw.layout === 'auto' || SESSION_LAYOUTS.some((l) => l.value === raw.layout) ? (raw.layout as PageLayout) : 'auto'
   const savedAt = typeof raw.savedAt === 'string' && Number.isFinite(Date.parse(raw.savedAt)) ? raw.savedAt : ''
   // A description that isn't one (not text, or too long) is left out rather than refusing the template; so are a
-  // suggestion and a reviewer mode Hive doesn't know (from a newer Hive): only suggestions.
+  // suggestion and a reviewer mode Combwork doesn't know (from a newer Combwork): only suggestions.
   const description = typeof raw.description === 'string' && raw.description.length <= TEMPLATE_DESCRIPTION_MAX ? raw.description.trim() : ''
   const suggestedPreset = SUGGESTED_PRESETS.find((p) => p === raw.suggestedPreset)
   const reviewerMode = raw.reviewerMode === 'lane' || raw.reviewerMode === 'pool' ? raw.reviewerMode : undefined
@@ -305,16 +310,16 @@ export const pairNames = (agents: readonly Pick<TemplateAgent, 'name' | 'role'>[
 /** Where a pair's agent is among a template's agents (by its numbered name, any case), or -1. */
 export const pairIndex = (agents: readonly Pick<TemplateAgent, 'name' | 'role'>[], name: string): number => pairNames(agents).findIndex((n) => n.toLowerCase() === name.toLowerCase())
 
-/** A provider's id as Hive writes one: known to this Hive or not. */
+/** A provider's id as Combwork writes one: known to this Combwork or not. */
 const isProviderId = (v: unknown): v is string => typeof v === 'string' && /^[a-z][a-z0-9-]{0,39}$/.test(v)
 
-/** The CLIs a template's agents suggest that this Hive doesn't know (each once). */
+/** The CLIs a template's agents suggest that this Combwork doesn't know (each once). */
 export function unknownProviders(agents: readonly TemplateAgent[]): string[] {
   return [...new Set(agents.map((a) => a.provider).filter((p): p is string => !!p && !isKnownProvider(p)))]
 }
 
 /**
- * What an exported file holds: the template as Hive reads it, nothing else (no paths, session ids or user names: none
+ * What an exported file holds: the template as Combwork reads it, nothing else (no paths, session ids or user names: none
  * are in a template, and anything else a file had is dropped when it is read).
  */
 export function exportable(t: AgentTemplate): AgentTemplate {
@@ -356,8 +361,8 @@ export const usesKey = (agents: readonly Pick<TemplateAgent, 'name'>[]): boolean
 export const expandName = (pattern: string, key: string, n: number): string => pattern.replace(NAME_TOKENS, (_m, t: string) => (t === 'key' ? key : String(n)))
 
 /**
- * A template's agent names for a project (#1123 names, #1440): each pattern made with the project's key (`HI-B1` in hive)
- * and the agent's number among the agents of the same pattern, from 1 (in Hive's own, `{key}-B{n}` is every builder:
+ * A template's agent names for a project (#1123 names, #1440): each pattern made with the project's key (`DE-B1` in demo)
+ * and the agent's number among the agents of the same pattern, from 1 (in Combwork's own, `{key}-B{n}` is every builder:
  * its number among its role), so agents of one pattern never share a name. A name without tokens is itself.
  */
 export function templateAgentNames(agents: readonly Pick<TemplateAgent, 'name' | 'role'>[], key: string): string[] {
@@ -390,7 +395,7 @@ export function namePatterns(agents: readonly Pick<TemplateAgent, 'name' | 'role
 /** Whether a project's agent names follow its key (#1440: HI-B1…), so Save Template offers to keep them as patterns. */
 export const namesFollowKey = (names: readonly string[], key: string | null | undefined): boolean => !!key && names.some((n) => new RegExp(`^${key.replace(/[^A-Za-z]/g, '')}-[A-Za-z]+\\d+$`, 'i').test(n))
 
-/** A template's export file name: its name, made safe for a file name ("Build and review.hive-template.json"). */
+/** A template's export file name: its name, made safe for a file name ("Build and review.combwork-template.json"). */
 export function exportFileName(name: string): string {
   return `${name.replace(/[<>:"/\\|?*\x00-\x1f]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/[. ]+$/, '').slice(0, 60) || 'template'}${TEMPLATE_EXPORT_SUFFIX}`
 }
@@ -412,7 +417,7 @@ export function templateFile(name: string, n = 1): string {
   return `${base}${n > 1 ? `-${n}` : ''}.json`
 }
 
-/** A file name Hive could have made: what calls may name (never a path). */
+/** A file name Combwork could have made: what calls may name (never a path). */
 export const isTemplateFile = (file: unknown): file is string => typeof file === 'string' && /^[a-z0-9]+(-[a-z0-9]+)*\.json$/.test(file) && file.length <= 64
 
 /** A name not yet taken (case aside): itself, else "Builder 2", "Builder 3"… */

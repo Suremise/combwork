@@ -11,7 +11,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import type { Fact } from '../src/shared/workflow/facts'
 
-const base = tempDir('hive-run-checks-')
+const base = tempDir('cw-run-checks-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -32,7 +32,7 @@ const git = (cwd: string, ...args: string[]): string => execFileSync('git', args
 
 /** A repository on main with one commit (a.txt), `out/` ignored. */
 function repo(): string {
-  const p = tempDir('hive-run-checks-repo-')
+  const p = tempDir('cw-run-checks-repo-')
   git(p, 'init', '-q', '-b', 'main')
   for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) git(p, 'config', k, v)
   writeFileSync(join(p, 'a.txt'), 'a\n')
@@ -159,7 +159,7 @@ describe('a run as a check on Git (#1222)', () => {
   it("a card on its own line counts only on its line's revision, not on an older checkout elsewhere (HR5's round 1 finding 2)", async () => {
     await watched()
     const a = git(p, 'rev-parse', 'HEAD')
-    const wt = join(tempDir('hive-run-checks-wt-'), 'card')
+    const wt = join(tempDir('cw-run-checks-wt-'), 'card')
     git(p, 'worktree', 'add', '-q', '-b', 'feature', wt)
     const b = commit(wt, 'feature.txt', 'feature\n')
     const facts: Fact[] = [{ seq: 1, card: 7, kind: 'Started', at: '2026-10-20T10:00:00.000Z', actor: 'agent:B1', source: 'recorded', data: { folder: wt, line: 'feature', base: a, target: 'main', builder: 'B1', cardKind: 'code' } }]
@@ -185,7 +185,7 @@ describe('a run as a check on None (#1222)', () => {
   let p: string
   afterEach(() => o?.dispose())
   const folder = async (): Promise<RunFor> => {
-    p = tempDir('hive-run-checks-none-')
+    p = tempDir('cw-run-checks-none-')
     writeFileSync(join(p, 'doc.md'), 'the doc\n')
     writeFileSync(join(p, 'other.md'), 'another\n')
     o = new Observer()
@@ -232,11 +232,11 @@ describe("a run's bracket in the app (#1222)", () => {
   it("writes the run's CheckRan in its card's facts; a run for no card, or with no checkout, has no bracket", async () => {
     const ws = join(base, 'ws')
     const p = join(ws, 'p')
-    mkdirSync(join(p, '.hive'), { recursive: true })
+    mkdirSync(join(p, '.combwork'), { recursive: true })
     git(ws, 'init', '-q', '-b', 'main', p)
     for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) git(p, 'config', k, v)
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }], platform: 'git', workflow: { options: { commands: COMMANDS } } }))
-    writeFileSync(join(p, '.gitignore'), '.hive/\n')
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }], platform: 'git', workflow: { options: { commands: COMMANDS } } }))
+    writeFileSync(join(p, '.gitignore'), '.combwork/\n')
     const head = commit(p, 'a.txt', 'a\n')
     const w = createWorkspaceService()
     await w.open(ws)
@@ -261,11 +261,11 @@ describe("a run's bracket in the app (#1222)", () => {
   it("a finished run's record still being written is waited for by its project's submits, not another project's (#1651)", async () => {
     const ws = join(base, 'ws-settled')
     const p = join(ws, 'p')
-    mkdirSync(join(p, '.hive'), { recursive: true })
+    mkdirSync(join(p, '.combwork'), { recursive: true })
     git(ws, 'init', '-q', '-b', 'main', p)
     for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) git(p, 'config', k, v)
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }], platform: 'git', workflow: { options: { commands: COMMANDS } } }))
-    writeFileSync(join(p, '.gitignore'), '.hive/\n')
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }], platform: 'git', workflow: { options: { commands: COMMANDS } } }))
+    writeFileSync(join(p, '.gitignore'), '.combwork/\n')
     const head = commit(p, 'a.txt', 'a\n')
     const w = createWorkspaceService()
     await w.open(ws)
@@ -273,7 +273,7 @@ describe("a run's bracket in the app (#1222)", () => {
     const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Settled', project: 'p' }, { kind: 'user' }))).number
     const link = { card, revision: head, testedCheckout: head, check: { name: 'typecheck', command: 'npm run typecheck' }, folder: p }
     bracketStarted('run-s1', (await bracketFor(w, link))!)
-    // As the finish route does: the record started, not waited for (hive-progress has exited meanwhile).
+    // As the finish route does: the record started, not waited for (cw-progress has exited meanwhile).
     const recorded = bracketFinished({ id: 'run-s1', finishedAt: Date.now(), state: 'passed', source: 'agent', agentId: 'a1', agentName: 'Agent 1', title: 'typecheck', command: 'npm run typecheck' } as never)
     expect(cardWork(w, card)!.checks).toEqual([])
     await checksSettled(w, join(ws, 'other'))
@@ -287,11 +287,11 @@ describe("a run's bracket in the app (#1222)", () => {
   it('a failed run of a check its card needs before Review says it blocks review; one it needs no more, or that passed, says nothing (#1279)', async () => {
     const ws = join(base, 'ws-blocks')
     const p = join(ws, 'p')
-    mkdirSync(join(p, '.hive'), { recursive: true })
+    mkdirSync(join(p, '.combwork'), { recursive: true })
     git(ws, 'init', '-q', '-b', 'main', p)
     for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) git(p, 'config', k, v)
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }], platform: 'git', workflow: { options: { commands: COMMANDS, preChecks: ['typecheck'] } } }))
-    writeFileSync(join(p, '.gitignore'), '.hive/\n')
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }], platform: 'git', workflow: { options: { commands: COMMANDS, preChecks: ['typecheck'] } } }))
+    writeFileSync(join(p, '.gitignore'), '.combwork/\n')
     const head = commit(p, 'a.txt', 'a\n')
     const w = createWorkspaceService()
     await w.open(ws)
@@ -312,8 +312,8 @@ describe("a run's bracket in the app (#1222)", () => {
   it("None: the options' exclusions and the card's declared paths as they are at the end (HR5's round 1 findings 3 and 4)", async () => {
     const ws = join(base, 'ws-none')
     const p = join(ws, 'n')
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }], platform: 'none', workflow: { options: { commands: COMMANDS, excluded: ['out'] } } }))
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }], platform: 'none', workflow: { options: { commands: COMMANDS, excluded: ['out'] } } }))
     writeFileSync(join(p, 'a.txt'), 'a\n')
     writeFileSync(join(p, 'b.txt'), 'b\n')
     const w = createWorkspaceService()
@@ -347,13 +347,13 @@ describe("a run's bracket in the app (#1222)", () => {
     const ws = join(base, 'ws-run')
     const p = join(ws, 'p')
     const n = join(ws, 'n')
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    mkdirSync(join(n, '.hive'), { recursive: true })
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    mkdirSync(join(n, '.combwork'), { recursive: true })
     git(ws, 'init', '-q', '-b', 'main', p)
     for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) git(p, 'config', k, v)
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }], platform: 'git' }))
-    writeFileSync(join(p, '.gitignore'), '.hive/\n')
-    writeFileSync(join(n, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }], platform: 'none' }))
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }], platform: 'git' }))
+    writeFileSync(join(p, '.gitignore'), '.combwork/\n')
+    writeFileSync(join(n, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }], platform: 'none' }))
     writeFileSync(join(n, 'a.txt'), 'a\n')
     const head = commit(p, 'a.txt', 'a\n')
     const w = createWorkspaceService()

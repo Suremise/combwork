@@ -8,7 +8,7 @@
 
 import { msg, type Msg } from '../i18n/msg'
 import type { Tr } from '../tasks'
-import { englishText, withValues, type Text } from '../advanced'
+import { agentText, englishText, withValues, type Text } from '../advanced'
 import { CATEGORY_STAGE, STAGE_CATEGORY, type Category, type StageId } from './facts'
 
 /** Every stage, in board order (§16.5.2). */
@@ -33,20 +33,20 @@ export const STAGE_TEXT: Record<StageId, Msg> = {
   active: msg({ id: 'workflow.stage.active', defaultMessage: 'Active', description: 'A stage of the board (glossary 2.2: Active, was Doing): cards being worked on.' }),
   review: msg({ id: 'workflow.stage.review', defaultMessage: 'Review', description: 'A stage of the board (glossary 2.2: Review): cards waiting for, or in, review.' }),
   approved: msg({ id: 'workflow.stage.approved', defaultMessage: 'Approved', description: 'A stage of the board (glossary 2.2: Approved, was Passed): cards whose work passed review (or your OK) and isn’t merged yet.' }),
-  merging: msg({ id: 'workflow.stage.merging', defaultMessage: 'Merging', description: "A stage of the board inside Approved (glossary 2.2: Merging): cards in Hive's merge queue." }),
+  merging: msg({ id: 'workflow.stage.merging', defaultMessage: 'Merging', description: "A stage of the board inside Approved (glossary 2.2: Merging): cards in Combwork's merge queue." }),
   done: msg({ id: 'workflow.stage.done', defaultMessage: 'Done', description: 'A stage of the board (glossary 2.2: Done): cards whose work is merged, or accepted.' })
 }
 
 /**
  * A stage's name: the project's own (N5), else its message in the window's language (tr given), else in English. An id
- * this Hive doesn't know (a record from a newer one) is shown as it is.
+ * this Combwork doesn't know (a record from a newer one) is shown as it is.
  */
 export function stageName(id: string, names?: StageNames | null, tr?: Tr): string {
   const own = names?.[id as StageId]
   if (own) return own
   const m = isStageId(id) ? STAGE_TEXT[id] : null
   if (!m) return id
-  return tr ? tr(m) : englishText(m)
+  return tr ? tr(m) : agentText(m)
 }
 
 /** The stages of a ruleset (its `stages`, already in board order), each with its category and name. */
@@ -92,12 +92,13 @@ export const keptStageName = (name: string): string => name.trim()
  * The names that can't be saved (N5): empty, longer than STAGE_NAME_MAX, with a control character, or the same (ignoring
  * case) as another stage's name. Every stage counts, whether the options produce it or not: a stage they no longer produce
  * is still shown while a card is in it (§16.17), and options change. A stage's name is its rename, else its default name
- * in English and, given `tr`, in the language Hive shows (HR2's #1417 round 1: the window shows the translated names).
+ * in English and, given `tr`, in the language Combwork shows (HR2's #1417 round 1: the window shows the translated names).
  */
 export function stageNameProblems(names: StageNames | null | undefined, tr?: Tr): StageNameProblem[] {
   const out: StageNameProblem[] = []
   if (!names) return out
   const fold = (n: string): string => keptStageName(n).toLocaleLowerCase('en')
+  // agent-protocol: the names a stage is matched by (what agents and the user type), not text sent
   const namesOf = (id: StageId): string[] => (names[id] !== undefined ? [fold(names[id]!)] : [fold(englishText(STAGE_TEXT[id])), ...(tr ? [fold(tr(STAGE_TEXT[id]))] : [])])
   const why = (id: StageId, raw: string): StageNameProblem['why'] | null => {
     const name = keptStageName(raw)

@@ -1,4 +1,4 @@
-// The Hive Assistant loads a template through the Agent API (HI-1502, SPEC §16.10.6): alpha (Git) has Ann and Rob, beta
+// The Combwork Assistant loads a template through the Agent API (HI-1502, SPEC §16.10.6): alpha (Git) has Ann and Rob, beta
 // has Bea, plain has no version control. On the fake Claude Code, the Agent API on:
 // 1. A script (the user's token) and a project agent (Bea's) are refused all three routes (403), before any template is
 //    read.
@@ -32,13 +32,13 @@ const check = (name, ok, extra = '') => {
 }
 const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase()
 const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [])
-const cfgOf = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'project.json'), 'utf8'))
+const cfgOf = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 'project.json'), 'utf8'))
 
 ;(async () => {
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
-  lib.gitProject(alpha, { '.gitignore': '.hive/\n' })
+  lib.gitProject(alpha, { '.gitignore': '.combwork/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
-  lib.gitProject(beta, { '.gitignore': '.hive/\n' })
+  lib.gitProject(beta, { '.gitignore': '.combwork/\n' })
   fs.mkdirSync(plain, { recursive: true })
   const env = lib.fakeClaude(userData, home, [alpha, beta, plain, ws])
   const cfgFile = path.join(userData, 'config.json')
@@ -48,7 +48,7 @@ const cfgOf = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'project.j
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off' }, viewport: { width: 1400, height: 900 } })
+  const h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off' }, viewport: { width: 1400, height: 900 } })
   const { app, page, inv } = h
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -66,8 +66,8 @@ const cfgOf = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'project.j
     const tokenOf = async (p, id) => {
       const sessionId = await until(async () => (await live(p, id))?.sessionId, HUNG_MS)
       const launch = await until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
-      const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive : null
-      return hive ? JSON.parse(fs.readFileSync(hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token : null
+      const server = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
+      return server ? JSON.parse(fs.readFileSync(server.env.CW_API_TOKEN_FILE, 'utf8')).token : null
     }
     const list = (p, token) => api('GET', `/v1/projects/${p}/templates`, undefined, token)
     const plan = (p, body, token) => api('POST', `/v1/projects/${p}/templates/plan`, body, token)
@@ -84,7 +84,7 @@ const cfgOf = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'project.j
 
     // --- 1. A script and a project agent are refused, before any template is read.
     for (const [what, r] of [['list', await list('alpha')], ['plan', await plan('alpha', { template: 'team-3x3.json' })], ['load', await load('alpha', { template: 'team-3x3.json' })]]) {
-      check(`a script's ${what} is refused (403), naming the Assistant`, r.status === 403 && /Only the Hive Assistant/.test(r.body?.error ?? ''), JSON.stringify(r))
+      check(`a script's ${what} is refused (403), naming the Assistant`, r.status === 403 && /Only the Assistant/.test(r.body?.error ?? ''), JSON.stringify(r))
     }
     await inv('session:start', beta, { agentId: bea.id })
     const beaToken = await tokenOf(beta, bea.id)
@@ -107,7 +107,7 @@ const cfgOf = (p) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'project.j
     check('the Assistant has its token', !!assistant)
     await inv('settings:update', { assistant: { control: 'look' } })
     const listed = await list('alpha', assistant)
-    check("at Look and advise it lists alpha's templates: Hive's own and the workspace's", listed.status === 200 && listed.body?.templates?.some((t) => t.scope === 'hive' && t.file === 'team-3x3.json' && t.agents === 6) && listed.body.templates.some((t) => t.scope === 'workspace' && t.name === 'Git only' && t.workflow.join() === 'git'), JSON.stringify(listed.body))
+    check("at Look and advise it lists alpha's templates: Combwork's own and the workspace's", listed.status === 200 && listed.body?.templates?.some((t) => t.scope === 'combwork' && t.file === 'team-3x3.json' && t.agents === 6) && listed.body.templates.some((t) => t.scope === 'workspace' && t.name === 'Git only' && t.workflow.join() === 'git'), JSON.stringify(listed.body))
     const looked = await plan('alpha', { template: 'team-3x3.json' }, assistant)
     check('…plans a load', looked.status === 200 && looked.body?.remove?.join() === 'Ann,Rob' && looked.body.create?.length === 6, JSON.stringify(looked.body))
     const lookLoad = await load('alpha', { template: 'team-3x3.json' }, assistant)

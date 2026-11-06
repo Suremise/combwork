@@ -6,7 +6,7 @@ import * as actions from '../actions'
 import { call, errorMessage } from '../api'
 import { set, useStore } from '../store'
 import { cx } from '../util'
-import { Icon, SearchInput } from './ui'
+import { Icon, OneLineDesc, SearchInput } from './ui'
 import { Section } from './Sidebar'
 
 const M = {
@@ -18,13 +18,13 @@ const M = {
   notInstalled: msg({ id: 'mcp.catalog.filterNotInstalled', defaultMessage: 'Not installed', description: "The Catalogue's filter (HI-545): servers not installed yet." }),
   installed: msg({ id: 'mcp.catalog.filterInstalled', defaultMessage: 'Installed', description: "The Catalogue's filter (HI-545): servers installed." }),
   updates: msg({ id: 'mcp.catalog.filterUpdates', defaultMessage: 'Updates available', description: "The Catalogue's filter (HI-545): installed servers with a newer version." }),
-  meets: msg({ id: 'mcp.catalog.filterMeets', defaultMessage: 'Runs on this PC', description: "The Catalogue's filter (HI-545): servers whose requirements this PC meets (or Hive can't check)." }),
+  meets: msg({ id: 'mcp.catalog.filterMeets', defaultMessage: 'Runs on this PC', description: "The Catalogue's filter (HI-545): servers whose requirements this PC meets (or Combwork can't check)." }),
   loading: msg({ id: 'mcp.catalog.loading', defaultMessage: 'Reading the catalogues…', description: "The MCP view's Catalogue while it reads the catalogues (HI-545)." }),
-  none: msg({ id: 'mcp.catalog.none', defaultMessage: 'No catalogues are on. Turn ours on, or add one, in Settings → MCP Catalogues.', description: "The Catalogue (HI-545) with every source off. Settings → MCP Catalogues as Hive names it." }),
+  none: msg({ id: 'mcp.catalog.none', defaultMessage: 'No catalogues are on. Turn ours on, or add one, in Settings → MCP Catalogues.', description: "The Catalogue (HI-545) with every source off. Settings → MCP Catalogues as Combwork names it." }),
   noMatch: msg({ id: 'mcp.catalog.noMatch', defaultMessage: 'No server matches.', description: "A catalogue source in the Catalogue (HI-545) with no server for the search and filter." }),
   more: msg({ id: 'mcp.catalog.more', defaultMessage: 'Show more ({left, number} left)', description: 'A button under a catalogue source (HI-545): loads its next servers. {left} is how many more match.' }),
-  skipped: msg({ id: 'mcp.catalog.skipped', defaultMessage: '{n, plural, one {# entry skipped: not as catalogues give a server} other {# entries skipped: not as catalogues give a server}}', description: 'Under a catalogue source (HI-545): entries Hive left out because they are not valid.' }),
-  unvetted: msg({ id: 'mcp.catalog.unvetted', defaultMessage: "Servers from this source aren't checked by Hive. Look at what one runs before you install it.", description: 'A note under a catalogue source the user added (HI-545), shown once: Hive does not vet its servers.' }),
+  skipped: msg({ id: 'mcp.catalog.skipped', defaultMessage: '{n, plural, one {# entry skipped: not as catalogues give a server} other {# entries skipped: not as catalogues give a server}}', description: 'Under a catalogue source (HI-545): entries Combwork left out because they are not valid.' }),
+  unvetted: msg({ id: 'mcp.catalog.unvetted', defaultMessage: "Servers from this source aren't checked by Combwork. Look at what one runs before you install it.", description: 'A note under a catalogue source the user added (HI-545), shown once: Combwork does not vet its servers.' }),
   badgeInstalled: msg({ id: 'mcp.catalog.badgeInstalled', defaultMessage: 'Installed', description: 'A badge on a catalogue server (HI-545): it is installed.' }),
   badgeOther: msg({ id: 'mcp.catalog.badgeOther', defaultMessage: 'Name in use', description: 'A badge on a catalogue server (HI-545): a server of the same name, not from this catalogue, is installed.' }),
   badgeUpdate: msg({ id: 'mcp.catalog.badgeUpdate', defaultMessage: 'Update to {version}', description: 'A badge on a catalogue server (HI-545): a newer version is available.' }),
@@ -35,12 +35,12 @@ const M = {
   requires: msg({ id: 'mcp.catalog.requires', defaultMessage: 'Requirements', description: "A catalogue server's view (HI-545): the heading of what it needs on this PC." }),
   ok: msg({ id: 'mcp.catalog.ok', defaultMessage: 'Met', description: "A requirement's state in a catalogue server's view (HI-545), for screen readers." }),
   no: msg({ id: 'mcp.catalog.no', defaultMessage: 'Not met', description: "A requirement's state in a catalogue server's view (HI-545), for screen readers." }),
-  unknown: msg({ id: 'mcp.catalog.unknown', defaultMessage: "Hive can't check this: make sure it's there", description: "A requirement's state in a catalogue server's view (HI-545): Hive can't check it on this PC." }),
+  unknown: msg({ id: 'mcp.catalog.unknown', defaultMessage: "Combwork can't check this: make sure it's there", description: "A requirement's state in a catalogue server's view (HI-545): Combwork can't check it on this PC." }),
   homepage: msg({ id: 'mcp.catalog.homepage', defaultMessage: 'Homepage', description: "A catalogue server's view (HI-545): opens its page in the browser." }),
   install: msg({ id: 'mcp.catalog.installAction', defaultMessage: 'Install…', description: "A catalogue server's view (HI-545): downloads, checks and shows it, before installing." }),
   update: msg({ id: 'mcp.catalog.updateAction', defaultMessage: 'Update to {version}…', description: "A catalogue server's view (HI-545): downloads the newer version and shows what changes, before updating." }),
   installedAt: msg({ id: 'mcp.catalog.installedAt', defaultMessage: 'Installed: {version}', description: "A catalogue server's view (HI-545): the version installed." }),
-  cantRun: msg({ id: 'mcp.catalog.cantRun', defaultMessage: "This PC doesn't meet a requirement above, so it can't be installed.", description: "A catalogue server's view (HI-545) when a requirement Hive checked is not met: Install is greyed out." })
+  cantRun: msg({ id: 'mcp.catalog.cantRun', defaultMessage: "This PC doesn't meet a requirement above, so it can't be installed.", description: "A catalogue server's view (HI-545) when a requirement Combwork checked is not met: Install is greyed out." })
 }
 
 const FILTERS: McpCatalogFilter[] = ['all', 'notInstalled', 'installed', 'updates', 'meets']
@@ -87,7 +87,7 @@ export function McpCatalogPanel() {
     )
     return () => clearTimeout(t)
   }, [query, filter, version, ws])
-  // A source Hive doesn't check: its note is said once, then remembered.
+  // A source Combwork doesn't check: its note is said once, then remembered.
   useEffect(() => {
     for (const p of pages ?? []) {
       if (!p.noteDue || noted.current.has(p.url)) continue
@@ -151,9 +151,7 @@ export function McpCatalogPanel() {
                     <div className="label">
                       {r.name} <span className="faint">{r.version}</span>
                     </div>
-                    <div className="desc" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {r.description}
-                    </div>
+                    <OneLineDesc text={r.description} />
                   </div>
                   {b && <span className={cx('badge', b.cls)}>{b.text}</span>}
                 </div>

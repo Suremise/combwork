@@ -1,16 +1,16 @@
 // The first usable connection is never chosen from partial detection, and a resume runs its conversation's own provider
 // (#506). Claude Code (the fake) and Codex (the fake, on its test home: no account) are both turned on. 1. The
-// Assistant starts a conversation: Claude Code (the first usable connection's). 2. Hive restarts with Claude Code's
-// detection held back (HIVE_TEST_SLOW_DETECT) so Codex answers first: the Assistant still offers its Claude Code
+// Assistant starts a conversation: Claude Code (the first usable connection's). 2. Combwork restarts with Claude Code's
+// detection held back (CW_TEST_SLOW_DETECT) so Codex answers first: the Assistant still offers its Claude Code
 // conversation, and resuming it waits for the detection and runs Claude Code. 3. With the Assistant switched to Codex
 // (HI-2108: its CLI is its own, as an agent's, no longer Settings → Assistant's), its Claude Code conversation still
 // resumes in Claude Code (a change never re-points a conversation), asking for no restart. 4. Claude Code held beyond
-// Hive's wait (HIVE_TEST_DETECT_WAIT_MS): a new conversation of the Assistant, switched back to Claude Code, and an
+// Combwork's wait (CW_TEST_DETECT_WAIT_MS): a new conversation of the Assistant, switched back to Claude Code, and an
 // agent added with no connection are refused, not guessed.
 // 5. A Claude Code agent switched to Codex resumes its Claude Code conversation in Claude Code; a new one runs Codex.
 // 6. Claude Code held beyond the wait again: a launch of a known provider waits only for its own CLI, so the Assistant
 // switched to Codex starts a conversation, and the agent resumes its Codex one. 7. The Claude Code conversation with
-// its Hive record gone (one started outside Hive) still resumes in Claude Code, found by its transcript.
+// its Combwork record gone (one started outside Combwork) still resumes in Claude Code, found by its transcript.
 // Throwaway profile, workspace, CLAUDE_CONFIG_DIR and CODEX_HOME; quiet. No real CLI runs.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -42,14 +42,14 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  /** Hive started without lib.launch, whose appReady waits for every provider to be found: what these hold back. */
+  /** Combwork started without lib.launch, whose appReady waits for every provider to be found: what these hold back. */
   const launchHeld = async (more) => {
-    const a = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.hiveEnv({ HIVE_USER_DATA: userData, ...env, ...more }) })
+    const a = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.combworkEnv({ CW_USER_DATA: userData, ...env, ...more }) })
     const p = await a.firstWindow()
     p.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(a, p, { width: 1400, height: 850 })
     await lib.until(() => p.evaluate(() => !!document.querySelector('.app .workbench')).catch(() => false), 30000)
-    return { app: a, page: p, inv: (ch, ...x) => p.evaluate(([c, args]) => window.hive.invoke(c, ...args), [ch, x]) }
+    return { app: a, page: p, inv: (ch, ...x) => p.evaluate(([c, args]) => window.combwork.invoke(c, ...args), [ch, x]) }
   }
   /** The Assistant's CLI changed (HI-2108: it follows its connection; Codex has no account here, so its test home's, decision H), as part 5's agent's. */
   const assistantOn = (cli) => inv('agents:update', home, 'assistant', { provider: cli })
@@ -73,7 +73,7 @@ const check = (name, ok, extra = '') => {
 
   // 2. Restarted with Claude Code's detection held back: Codex answers first.
   const t0 = Date.now()
-  ;({ app, page, inv } = await launchHeld({ HIVE_TEST_SLOW_DETECT: `claude-code=${HOLD_MS}` }))
+  ;({ app, page, inv } = await launchHeld({ CW_TEST_SLOW_DETECT: `claude-code=${HOLD_MS}` }))
   await lib.openWorkspace(inv, page, ws)
   home = (await inv('workspace:refresh')).assistant.path
   const info = async () => inv('provider:info')
@@ -81,7 +81,7 @@ const check = (name, ok, extra = '') => {
     const i = await info()
     return i.codex && !i.codex.checking && i.codex.found && i['claude-code']?.checking && !i['claude-code'].found ? i : null
   }, HOLD_MS - 1000, 100)
-  check('Codex is found while Hive is still looking for Claude Code', !!codexFirst, JSON.stringify(await info()))
+  check('Codex is found while Combwork is still looking for Claude Code', !!codexFirst, JSON.stringify(await info()))
   // Settings → Providers' Default provider, which said "Automatic (checking…)" here, went with HI-2107 (decision A).
   console.log(`(Codex found ${Date.now() - t0} ms after the start; Claude Code is held ${HOLD_MS} ms)`)
   const offered = (await inv('workspace:refresh')).assistant.agents[0]?.resume?.id
@@ -107,17 +107,17 @@ const check = (name, ok, extra = '') => {
   await assistantOn('claude-code')
   await app.close()
 
-  // 4. Claude Code's detection held beyond Hive's wait: nothing is decided from a guess. A new conversation of the
+  // 4. Claude Code's detection held beyond Combwork's wait: nothing is decided from a guess. A new conversation of the
   // Assistant switched back to Claude Code and an agent added with no connection are refused ("still looking"), nothing
   // starts and no agent is added; once Claude Code has answered, both work, with Claude Code.
-  ;({ app, page, inv } = await launchHeld({ HIVE_TEST_SLOW_DETECT: 'claude-code=9000', HIVE_TEST_DETECT_WAIT_MS: '1500' }))
+  ;({ app, page, inv } = await launchHeld({ CW_TEST_SLOW_DETECT: 'claude-code=9000', CW_TEST_DETECT_WAIT_MS: '1500' }))
   await lib.openWorkspace(inv, page, ws)
   home = (await inv('workspace:refresh')).assistant.path
   const refused = await inv('session:start', home, { agentId: 'assistant' }).then(
     (st) => `started ${st.provider}`,
     (e) => String(e.message)
   )
-  check('a new Assistant conversation is refused while Hive is still looking, past its wait', /still looking for/.test(refused), refused)
+  check('a new Assistant conversation is refused while Combwork is still looking, past its wait', /still looking for/.test(refused), refused)
   check('…and nothing starts', !(await live()))
   const alpha = path.join(ws, 'alpha')
   const agentsNow = async () => (await inv('workspace:get')).projects.find((p) => p.name === 'alpha')?.agents ?? []
@@ -167,12 +167,12 @@ const check = (name, ok, extra = '') => {
   await app.close()
 
   // 6. A launch of a known provider waits only for its own CLI, not for another still being looked for.
-  // Its records are in the workspace's database (#1061), changed there while Hive is closed.
+  // Its records are in the workspace's database (#1061), changed there while Combwork is closed.
   const saved = sessionsOf(alpha)
-  check('the Claude Code conversation has a Hive record, to remove', saved.sessions.some((s) => s.id === asid))
+  check('the Claude Code conversation has a Combwork record, to remove', saved.sessions.some((s) => s.id === asid))
   saved.sessions = saved.sessions.filter((s) => s.id !== asid)
   putSessions(alpha, saved)
-  ;({ app, page, inv } = await launchHeld({ HIVE_TEST_SLOW_DETECT: 'claude-code=9000', HIVE_TEST_DETECT_WAIT_MS: '1500' }))
+  ;({ app, page, inv } = await launchHeld({ CW_TEST_SLOW_DETECT: 'claude-code=9000', CW_TEST_DETECT_WAIT_MS: '1500' }))
   await lib.openWorkspace(inv, page, ws)
   home = (await inv('workspace:refresh')).assistant.path
   await lib.waitForProvider(inv, 'codex')
@@ -194,7 +194,7 @@ const check = (name, ok, extra = '') => {
   await lib.until(agentReady, 30000)
   await stopAgent()
 
-  // 7. A conversation Hive has no record of resumes in the provider whose CLI has its transcript.
+  // 7. A conversation Combwork has no record of resumes in the provider whose CLI has its transcript.
   await lib.waitForProvider(inv, 'claude-code', 20000)
   const listed = (await inv('session:list', alpha)).find((s) => s.id === asid)
   check('the Claude Code conversation is listed as external, Claude Code’s', listed?.provider === 'claude-code' && listed?.source === 'external', JSON.stringify({ provider: listed?.provider, source: listed?.source }))

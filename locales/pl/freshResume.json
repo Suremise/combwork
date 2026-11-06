@@ -1,0 +1,8 @@
+{
+  "freshResume.confirm": "Zacznij nową rozmowę",
+  "freshResume.detail": "{assistant, select, yes {Asystent zacznie zamiast tego nową rozmowę, a stara zostanie w jego rozmowach do przeczytania.} other {{agent} zacznie zamiast tego nową rozmowę. Kontynuuje ona pracę agenta (jego obserwację, wiadomości i zadania), a stara rozmowa zostaje w Sesjach do przeczytania.}}",
+  "freshResume.message": "{why, select, moved {Ta rozmowa działała w folderze przeniesionym do .combwork razem ze starym folderem danych, więc nie może być tam kontynuowana.} other {Ta rozmowa zaczęła się, zanim Combwork zmienił nazwy narzędzi, których używają agenci, więc nie może być kontynuowana.}}",
+  "freshResume.short": "zacznie nową rozmowę",
+  "freshResume.tip": "{why, select, moved {Zaczyna nową rozmowę: „{session}” działała w folderze przeniesionym do .combwork razem ze starym folderem danych, więc nie może być kontynuowana} other {Zaczyna nową rozmowę: „{session}” zaczęła się, zanim Combwork zmienił nazwy narzędzi, których używają agenci, więc nie może być kontynuowana}}",
+  "freshResume.title": "Zacząć nową rozmowę?"
+}

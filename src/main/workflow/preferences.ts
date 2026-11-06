@@ -1,4 +1,4 @@
-// A project's card loop and file lock preferences (HI-1766: workflow options, not rules), as they are now: Hive's
+// A project's card loop and file lock preferences (HI-1766: workflow options, not rules), as they are now: Combwork's
 // defaults, then its workspace's, then its own options for the platform in force (shared/workflow/preferences.ts).
 // Every reader takes them from here (wakes, lanes, design checks, stalls, file locks), so they agree.
 import { config } from '../config'
@@ -15,7 +15,7 @@ type PreferenceWorkspace = Pick<WorkspaceService, 'config' | 'info'>
 const log = createLogger('workflow')
 
 /**
- * Hive's own Agents per project from before HI-2001 (advanced.json, kept there for this), moved into its workflow
+ * Combwork's own Agents per project from before HI-2001 (advanced.json, kept there for this), moved into its workflow
  * defaults' Maximum agents for None and Git where they don't set it, then dropped from advanced.json. Once, at startup
  * after both files are read; the window's Workflow defaults show it from then on. The old value goes only once
  * config.json holds the new one on disk (HR3's round 1): a failed save keeps it, and the next start moves it again.
@@ -28,8 +28,8 @@ export async function migrateAgentsPerProject(): Promise<void> {
     const next = withOldDefaults(levels, { maxAgents: old as number })
     if (JSON.stringify(next) !== JSON.stringify(levels ?? {})) {
       config.update((c) => void (c.settings.workflow = next))
-      if (!(await config.saveNow())) return log.warn("Agents per project stays in advanced.json: Hive's settings couldn't be saved with it as Maximum agents")
-      log.info(`Agents per project (${String(old)}) is Maximum agents in Hive's workflow defaults now`)
+      if (!(await config.saveNow())) return log.warn("Agents per project stays in advanced.json: Combwork's settings couldn't be saved with it as Maximum agents")
+      log.info(`Agents per project (${String(old)}) is Maximum agents in Combwork's workflow defaults now`)
     }
   }
   await advanced.dropLegacy(AGENTS_PER_PROJECT).catch((e) => log.warn("Couldn't drop Agents per project from advanced.json", e))

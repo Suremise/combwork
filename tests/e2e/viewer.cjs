@@ -1,9 +1,9 @@
-// Getting Hive ready for Apiary (#620): the discovery file (the API's address, no token) is written on start, cleared
+// Getting Combwork ready for Apiary (#620): the discovery file (the API's address, no token) is written on start, cleared
 // while the Agent API is off and on quit; a viewer token made in Settings → Agent API reads every documented GET route
 // and follows the event stream, and every documented write is refused (403) with nothing changed; the stream sends the
 // new events (progress, merge slots, notices, the Assistant's actions with their kind and targets (#763: a task, a
 // message, cards added, given, moved, batched, ordered, commented and started, a lane started, joined and ended, a
-// project turned on, an agent's settings, refusals with the agent named and Hive's own reason, never the value sent)
+// project turned on, an agent's settings, refusals with the agent named and Combwork's own reason, never the value sent)
 // and the agents it adds) live, without a notice's
 // body, and a project agent's stream only its project's; GET /v1/progress is the Progress panel's runs; nothing private
 // reaches a viewer, on the stream or in GET /v1/progress: not a message queued for a working agent, nor a wrapped
@@ -84,7 +84,7 @@ function stream(token) {
   lib.gitProject(alpha)
   lib.gitProject(beta)
   lib.git(alpha, ['branch', '-M', 'main'])
-  // The workspace too: its Assistant runs in it (.hive\assistant).
+  // The workspace too: its Assistant runs in it (.combwork\assistant).
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase(), beta.toLowerCase(), ws.toLowerCase()]))
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')
@@ -95,13 +95,13 @@ function stream(token) {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true, devConsole: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_NOTIFY_LOG: notifyLog })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_NOTIFY_LOG: notifyLog })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await lib.waitForProvider(inv)
   const apiToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
@@ -112,7 +112,7 @@ function stream(token) {
 
   // --- Discovery: the address, never a token.
   const found = await lib.until(readDiscovery, HUNG_MS)
-  check('the discovery file names the running API', found?.app === 'Hive' && found.url === BASE && found.port === PORT && found.api === API_VERSION && typeof found.pid === 'number', JSON.stringify({ found, API_VERSION }))
+  check('the discovery file names the running API', found?.app === 'Combwork' && found.url === BASE && found.port === PORT && found.api === API_VERSION && typeof found.pid === 'number', JSON.stringify({ found, API_VERSION }))
   const discoveryText = fs.readFileSync(discovery, 'utf8')
   check('…and holds no token', !/token"\s*:/i.test(discoveryText) && !discoveryText.includes(apiToken), discoveryText)
   check('its health check answers', (await fetch(`${found.url}/v1/health`).then((r) => r.json())).ok === true)
@@ -128,7 +128,7 @@ function stream(token) {
   check('…shown in its row, ready to copy', !!(await lib.until(async () => (await row.getByLabel("Apiary's token").inputValue()) === made?.token, HUNG_MS)))
   await page.screenshot({ path: path.join(lib.WORK, 'viewer-settings.png') })
   const kept = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api-viewers.json'), 'utf8'))
-  check("it is kept in Hive's profile, apart from the workspace token", kept.viewers?.[0]?.token === made?.token && !JSON.stringify(kept).includes(apiToken))
+  check("it is kept in Combwork's profile, apart from the workspace token", kept.viewers?.[0]?.token === made?.token && !JSON.stringify(kept).includes(apiToken))
   check('a second one with the same name is refused', await inv('api:createViewer', 'apiary').then(() => false, (e) => /already a viewer token/.test(String(e))))
   const viewer = made.token
   const as = (method, route, body) => api(method, route, body, viewer)
@@ -165,7 +165,7 @@ function stream(token) {
   const documented = (method) => routesIn(docText, method)
   // The routes the reference says are the Assistant's only: the tables after a line saying so.
   const assistantTables = [...docText.matchAll(/^.*the Assistant's only.*\n\n((?:\|.*\n?)+)/gim)].map((m) => m[1]).join('\n')
-  // …and whole sections whose first paragraph says they are (Templates, HI-1502: "The Hive Assistant's alone").
+  // …and whole sections whose first paragraph says they are (Templates, HI-1502: "The Combwork Assistant's alone").
   const assistantSections = docText
     .split(/^(?=#{2,3} )/m)
     .filter((s) => /Assistant's (?:only|alone)/i.test(s.split(/\n\n/)[1] ?? ''))
@@ -250,7 +250,7 @@ function stream(token) {
   const SECRET = 'PRIVATE_SENTINEL_620'
   const leaks = () => viewerStream.events.filter((e) => JSON.stringify(e.data).includes(SECRET) || JSON.stringify(e.data).includes(apiToken))
   await inv('settings:update', { assistant: { control: 'projects' } })
-  await inv('session:start', path.join(ws, '.hive', 'assistant'), { agentId: 'assistant' })
+  await inv('session:start', path.join(ws, '.combwork', 'assistant'), { agentId: 'assistant' })
   check('the Assistant starts', !!(await lib.until(async () => (await inv('session:live')).find((s) => s.agentId === 'assistant')?.status === 'ready', HUNG_MS)))
   const assistantFile = path.join(userData, 'assistant-api', `${createHash('sha256').update(ws.toLowerCase()).digest('hex').slice(0, 16)}.json`)
   const assistantToken = (await lib.until(() => fs.existsSync(assistantFile) && JSON.parse(fs.readFileSync(assistantFile, 'utf8')).token, HUNG_MS)) || ''
@@ -258,7 +258,7 @@ function stream(token) {
   // At work on it once she has read it from her inbox (#650: its doorbell names it; what she reads then is all she has).
   check('…and she works on it', !!(await lib.until(async () => (await live(ann.id))?.status === 'working' && !(await live(ann.id))?.inbox?.unread?.length, HUNG_MS)))
   const queued = await api('POST', '/v1/projects/alpha/agents/Ann/message', { text: `Next, ${SECRET}` }, assistantToken)
-  check('a message for her waits in Hive', queued.status === 200 && queued.body?.typed === false && !!(await lib.until(async () => (await live(ann.id))?.inbox?.unread?.length === 1, HUNG_MS)), JSON.stringify(queued))
+  check('a message for her waits in Combwork', queued.status === 200 && queued.body?.typed === false && !!(await lib.until(async () => (await live(ann.id))?.inbox?.unread?.length === 1, HUNG_MS)), JSON.stringify(queued))
   const waitingFor = await seen(viewerStream, 'session-status', (d) => d.state.agentId === ann.id && d.state.inbox?.unread?.length === 1)
   check('the stream says a message waits, from whom, not what it says', !!waitingFor && waitingFor.data.state.inbox.unread[0].from !== undefined && !('text' in waitingFor.data.state.inbox.unread[0]), JSON.stringify(waitingFor?.data?.state?.inbox))
   const left = await seen(viewerStream, 'assistant-activity', (d) => /Left Ann in alpha a message/.test(d.action.text))
@@ -286,10 +286,10 @@ function stream(token) {
   check('starting a card says the card, its project, the agent and Doing', started.status === 200 && !!(await act((a) => a.kind === 'start-task' && a.card === tour && a.project === 'alpha' && a.agent?.name === 'Starter' && typeof a.agent?.id === 'string' && a.column === 'doing')), shown())
   const refused = await api('POST', '/v1/projects/alpha/agents/Runner/prompt', { text: `Again, ${SECRET}` }, assistantToken)
   check('a refusal has the kind it tried, ok false, its targets', refused.status === 409 && !!(await act((a) => a.kind === 'prompt-agent' && a.ok === false && !!a.error && a.agent?.id === added.body?.agent?.id)), shown())
-  // A refusal whose error quotes what was sent (a setting's value): the stream gets Hive's own reason, the agent named.
+  // A refusal whose error quotes what was sent (a setting's value): the stream gets Combwork's own reason, the agent named.
   const badSetting = await api('PATCH', `/v1/projects/alpha/agents/${ann.id}`, { mcpServers: [`${SECRET}/invalid`] }, assistantToken)
-  check("a refused setting change says why in Hive's words, not with the value sent", badSetting.status === 400 && !!(await act((a) => a.kind === 'update-agent' && a.ok === false && a.error === 'The request was invalid' && a.agent?.id === ann.id)), shown())
-  // The agents Hive knows before a change are named on it, a refusal's too.
+  check("a refused setting change says why in Combwork's words, not with the value sent", badSetting.status === 400 && !!(await act((a) => a.kind === 'update-agent' && a.ok === false && a.error === 'The request was invalid' && a.agent?.id === ann.id)), shown())
+  // The agents Combwork knows before a change are named on it, a refusal's too.
   const desk = (await api('POST', '/v1/tasks', { title: 'Desk work', project: 'alpha', agent: 'Ann' }, assistantToken)).body?.number
   check('a card added for an agent names it', !!(await act((a) => a.kind === 'create-task' && a.card === desk && a.agent?.id === ann.id && a.agent?.name === 'Ann')), shown())
   const loose = (await api('POST', '/v1/tasks', { title: 'Loose card', project: 'alpha' }, assistantToken)).body?.number
@@ -313,7 +313,7 @@ function stream(token) {
   await api('PATCH', `/v1/projects/alpha/agents/${ann.id}`, { workflowRole: 'builder' }, assistantToken)
   check("changing an agent's settings names it", !!(await act((a) => a.kind === 'update-agent' && a.ok && a.agent?.id === ann.id)), shown())
   // An agent added whose start then fails, the error carrying a private value (round 3: a lower-level error can quote
-  // anything): the stream says it in Hive's own words; the Assistant's panel keeps the error.
+  // anything): the stream says it in Combwork's own words; the Assistant's panel keeps the error.
   const LAUNCH_SECRET = 'PRIVATE_LAUNCH_ERROR_763'
   const mainFs = (arg) => app.evaluate((_main, a) => {
     const fsp = process.mainModule.require('original-fs/promises')
@@ -332,18 +332,18 @@ function stream(token) {
     await mainFs(null)
   }
   const failedAdd = await act((a) => a.kind === 'add-agent' && a.agent?.name === 'FailsToStart')
-  check("an agent added whose start failed is said in Hive's words, not with the error", failsToStart?.status === 200 && failedAdd?.data.action.ok === true && failedAdd.data.action.text === "Added FailsToStart to alpha; it didn't start", shown(failedAdd))
+  check("an agent added whose start failed is said in Combwork's words, not with the error", failsToStart?.status === 200 && failedAdd?.data.action.ok === true && failedAdd.data.action.text === "Added FailsToStart to alpha; it didn't start", shown(failedAdd))
   check('…nothing of the error is on the stream', !viewerStream.events.some((e) => JSON.stringify(e.data).includes(LAUNCH_SECRET)))
   check("…and the Assistant's panel keeps it", (await inv('assistant:actions')).some((a) => a.kind === 'add-agent' && a.text.includes(LAUNCH_SECRET)))
   const kinds = viewerStream.events.filter((e) => e.type === 'assistant-activity').map((e) => e.data.action)
   check('every action on the stream has a kind', kinds.length > 0 && kinds.every((a) => typeof a.kind === 'string'), shown())
-  const FIELDS = ['id', 'at', 'text', 'ok', 'error', 'revertOf', 'kind', 'project', 'agent', 'toAgent', 'card', 'cards', 'lane', 'column', 'settingId']
+  const FIELDS = ['id', 'at', 'text', 'ok', 'error', 'kind', 'project', 'agent', 'toAgent', 'card', 'cards', 'lane', 'column', 'settingId']
   check('…and only the documented fields', kinds.every((a) => Object.keys(a).every((k) => FIELDS.includes(k))), shown())
   // Real wrapped commands, as an agent runs them: one with no title of its own, so its command line is its title, longer
   // than a title (120) and a command (200) are kept, the credential early in its arguments (round 2's finding); one with
   // a title of its own.
   const longArgs = `Authorization: Bearer ${apiToken} ${SECRET} ${'z'.repeat(150)}`
-  await inv('session:start', alpha, { agentId: added.body?.agent?.id, prompt: `shell: hive-progress -- cmd /c echo ${longArgs} then shell: hive-progress --title "viewer check" -- cmd /c echo ${SECRET}` })
+  await inv('session:start', alpha, { agentId: added.body?.agent?.id, prompt: `shell: cw-progress -- cmd /c echo ${longArgs} then shell: cw-progress --title "viewer check" -- cmd /c echo ${SECRET}` })
   const runnerRuns = () => inv('progress:list').then((list) => list.filter((r) => r.agentName === 'Runner' && r.state === 'passed'))
   check('the wrapped commands report their runs', !!(await lib.until(async () => (await runnerRuns()).length === 2, HUNG_MS)), JSON.stringify(await runnerRuns()))
   const wrapped = (await runnerRuns()).find((r) => r.title !== 'viewer check')
@@ -378,7 +378,7 @@ function stream(token) {
   check('…turning it on writes it again', !!(await lib.until(() => readDiscovery()?.url === BASE, HUNG_MS)))
   const quit = await lib.quitWatch(app)
   await inv('app:quit').catch(() => undefined)
-  check('Hive quits', !!(await quit.untilDecided(HUNG_MS)))
+  check('Combwork quits', !!(await quit.untilDecided(HUNG_MS)))
   check('…and has cleared the discovery file', !fs.existsSync(discovery), fs.existsSync(discovery) ? fs.readFileSync(discovery, 'utf8') : '')
   await quit.gone(HUNG_MS)
 

@@ -3,7 +3,7 @@ import { msg, tr } from '@shared/i18n'
 
 /**
  * The projects a workspace MCP server is added to, in the MCP view's Add to… dialog (HI-2059): a box per project, ticked
- * where it is added, then one for the Hive Assistant (HI-1472, as a project's), with All and None for the projects (the
+ * where it is added, then one for the Combwork Assistant (HI-1472, as a project's), with All and None for the projects (the
  * Assistant only ever by its own box). `onChange` hears every project's pick (path → added) and the Assistant's.
  * `warnings`: what to know about its definition (a literal secret), shown first, as the dialog's detail would.
  */
@@ -18,7 +18,7 @@ export function McpProjectPicker({ projects, initial, assistant, warnings, onCha
   const said = warnings.map((w) => <p key={w}>{w}</p>)
   const assistantRow = (
     <label className="flex" data-assistant>
-      <input type="checkbox" className="checkbox" checked={forAssistant} onChange={(e) => pick(on, e.target.checked)} /> {tr(msg({ id: 'mcp.enable.assistant', defaultMessage: 'Hive Assistant', description: 'The MCP view’s Add to… dialog: the box that adds the server for the Hive Assistant, after the projects.' }))}
+      <input type="checkbox" className="checkbox" checked={forAssistant} onChange={(e) => pick(on, e.target.checked)} /> {tr(msg({ id: 'mcp.enable.assistant', defaultMessage: 'Assistant', description: 'The MCP view’s Add to… dialog: the box that adds the server for the Combwork Assistant, after the projects.' }))}
     </label>
   )
   return (
@@ -29,10 +29,10 @@ export function McpProjectPicker({ projects, initial, assistant, warnings, onCha
         <strong>{tr(msg({ id: 'mcp.places.projects', defaultMessage: 'Added to', description: 'The MCP view’s Add to… dialog (HI-2059): the label above the projects to tick.' }))}</strong>
         <span style={{ flex: 1 }} />
         <button type="button" className="btn small subtle" onClick={() => pick(projects.map((p) => p.path), forAssistant)}>
-          {tr(msg({ id: 'mcp.enable.all', defaultMessage: 'All projects', description: 'The MCP view’s Add to… dialog: a button that ticks every project (not the Hive Assistant, which has its own box).' }))}
+          {tr(msg({ id: 'mcp.enable.all', defaultMessage: 'All projects', description: 'The MCP view’s Add to… dialog: a button that ticks every project (not the Combwork Assistant, which has its own box).' }))}
         </button>
         <button type="button" className="btn small subtle" onClick={() => pick([], forAssistant)}>
-          {tr(msg({ id: 'mcp.enable.none', defaultMessage: 'No projects', description: 'The MCP view’s Add to… dialog: a button that unticks every project (not the Hive Assistant, which has its own box).' }))}
+          {tr(msg({ id: 'mcp.enable.none', defaultMessage: 'No projects', description: 'The MCP view’s Add to… dialog: a button that unticks every project (not the Combwork Assistant, which has its own box).' }))}
         </button>
       </div>
       <div className="choice-list" role="group" aria-label={tr(msg({ id: 'mcp.places.projectsLabel', defaultMessage: 'Projects to add it to', description: 'Accessible name of the list of projects to tick in the MCP view’s Add to… dialog (HI-2059).' }))}>

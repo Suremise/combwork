@@ -71,8 +71,8 @@ const check = (name, ok, extra = '') => {
     check('Settings → General shows "Close to tray"', !!(await lib.until(async () => (await tray.count()) === 1, HUNG_MS)))
     const icon = tray.locator('.s-title .info-icon')
     check('…with its ⓘ', (await icon.count()) === 1)
-    const tip = await lib.hoverTip(page, icon, (t) => t.includes('closing the window quits Hive'), HUNG_MS)
-    check('…which opens its tip', !!tip && tip.includes('closing the window quits Hive'), JSON.stringify(tip))
+    const tip = await lib.hoverTip(page, icon, (t) => t.includes('closing the window quits Combwork'), HUNG_MS)
+    check('…which opens its tip', !!tip && tip.includes('closing the window quits Combwork'), JSON.stringify(tip))
     await shot('tip')
   } catch (e) {
     check('no exception', false, e?.stack ?? String(e))

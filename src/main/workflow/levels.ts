@@ -1,13 +1,13 @@
-// Workflow defaults at Hive's and the workspace's level (#1422, SPEC §16.6.6): the options each level sets per platform,
+// Workflow defaults at Combwork's and the workspace's level (#1422, SPEC §16.6.6): the options each level sets per platform,
 // edited with the Workflow section's editor in a level mode (Settings → Workflow defaults, Settings → Workspace). A level
-// is resolved on its own (Hive's over the platform's all-off, the workspace's over Hive's) and checked as a project's
-// save is; a save also lists the projects that inherit what changed (Hive's level: every open workspace's), with their
+// is resolved on its own (Combwork's over the platform's all-off, the workspace's over Combwork's) and checked as a project's
+// save is; a save also lists the projects that inherit what changed (Combwork's level: every open workspace's), with their
 // running lanes and cards in flight, and is refused when it would make an inheriting project's options contradict each
 // other, naming the project (§16.6.6's all-off fall-back stays for files edited by hand). A form read before another
 // change is refused, never written over (#1418's base).
 
 import { basename } from 'path'
-import { HiveError } from '../hiveError'
+import { CombworkError } from '../combworkError'
 import { listLanes } from '../lanes'
 import { createLogger } from '../logger'
 import { config } from '../config'
@@ -27,11 +27,11 @@ const PLATFORMS: readonly PlatformId[] = ['git', 'none']
 
 /** Checks a level and a platform from the window or the API. */
 function levelArgs(level: unknown, platform: unknown): { level: WorkflowLevel; platform: PlatformId } {
-  if ((level !== 'global' && level !== 'workspace') || !PLATFORMS.includes(platform as PlatformId)) throw new HiveError({ lines: ['A workflow level is global or workspace, for git or none'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
+  if ((level !== 'global' && level !== 'workspace') || !PLATFORMS.includes(platform as PlatformId)) throw new CombworkError({ lines: ['A workflow level is global or workspace, for git or none'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
   return { level, platform: platform as PlatformId }
 }
 
-/** What each level sets now: Hive's (config) and the workspace's (workspace.json), per platform. */
+/** What each level sets now: Combwork's (config) and the workspace's (workspace.json), per platform. */
 const defaultsOf = (ws: WorkspaceService, level: WorkflowLevel): WorkflowDefaults | undefined => (level === 'global' ? config.settings.workflow : ws.config.workflow)
 
 /** The options a level sets itself for a platform. */
@@ -66,7 +66,7 @@ export function levelForm(ws: WorkspaceService, rawLevel: unknown, rawPlatform: 
   }
 }
 
-/** The workspaces a level reaches: Hive's, every open one; the workspace's, its own. */
+/** The workspaces a level reaches: Combwork's, every open one; the workspace's, its own. */
 const reached = (ws: WorkspaceService, level: WorkflowLevel): WorkspaceService[] => (level === 'global' ? openWorkspaces() : [ws])
 
 /**
@@ -99,7 +99,7 @@ async function inheritors(ws: WorkspaceService, level: WorkflowLevel, platform: 
 function shapeOf(raw: unknown): WorkflowChange {
   const c = raw as Partial<WorkflowChange> | null
   const isOptions = (v: unknown): v is Partial<WorkflowOptions> => !!v && typeof v === 'object' && !Array.isArray(v)
-  if (!c || typeof c !== 'object' || !isOptions(c.options) || (c.base !== undefined && (!c.base || !isOptions(c.base.options)))) throw new HiveError({ lines: ['A workflow change is { preset, options, base? }'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
+  if (!c || typeof c !== 'object' || !isOptions(c.options) || (c.base !== undefined && (!c.base || !isOptions(c.base.options)))) throw new CombworkError({ lines: ['A workflow change is { preset, options, base? }'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
   const options = Object.fromEntries(Object.entries(keptNames(c.options)).filter(([k, v]) => k !== 'platform' && v !== undefined)) as Partial<WorkflowOptions>
   return { preset: null, options, ...(c.base ? { base: { preset: null, options: c.base.options } } : {}) }
 }
@@ -125,7 +125,7 @@ export async function checkLevelChange(ws: WorkspaceService, rawLevel: unknown, 
 
 /**
  * Saves a level's options for a platform: refused with its reasons (its own, and an inheriting project's that would
- * contradict), or as changed meanwhile when the form's base is no longer the level's. Hive's in config, the workspace's
+ * contradict), or as changed meanwhile when the form's base is no longer the level's. Combwork's in config, the workspace's
  * in workspace.json (written in turn, kept with a backup). The inheriting projects' views read again. Returns the form.
  */
 export function setLevelOptions(ws: WorkspaceService, rawLevel: unknown, rawPlatform: unknown, raw: unknown): Promise<WorkflowForm> {
@@ -135,7 +135,7 @@ export function setLevelOptions(ws: WorkspaceService, rawLevel: unknown, rawPlat
   return withRepoLocks(levelRepos(ws, rawLevel), () => workflowWrite(() => saveLevelOptions(ws, rawLevel, rawPlatform, raw)), { quiet: true })
 }
 
-/** The Git projects a level's options reach: the workspace's for its own level, every open workspace's for Hive's. */
+/** The Git projects a level's options reach: the workspace's for its own level, every open workspace's for Combwork's. */
 function levelRepos(ws: WorkspaceService, rawLevel: unknown): string[] {
   const of = (w: WorkspaceService): string[] => (w.info()?.projects ?? []).filter((p) => p.platform?.id === 'git').map((p) => p.path)
   return rawLevel === 'workspace' ? of(ws) : openWorkspaces().flatMap(of)
@@ -149,7 +149,7 @@ async function saveLevelOptions(ws: WorkspaceService, rawLevel: unknown, rawPlat
   const check = await checkLevelChange(ws, level, platform, change)
   if (check.problems.length) throw new WorkflowRefused(check.problems)
   if (level === 'global') {
-    // Hive's config is this process's: checked and written with nothing awaited in between.
+    // Combwork's config is this process's: checked and written with nothing awaited in between.
     if (!sameAsBase()) throw new WorkflowStale()
     config.setWorkflowDefaults(platform, change.options)
   } else {

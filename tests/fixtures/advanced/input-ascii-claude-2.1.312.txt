@@ -35,6 +35,6 @@
 
                                                                                                     ◐ medium · /effort
 ───────────────────────────────────────────────────────────────────────────────────────────────────────────────── demo ─
-> a draft typed and left there, long enough to wrap onto rows of its own hive wake line typed and not sent
+> a draft typed and left there, long enough to wrap onto rows of its own test wake line typed and not sent
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
   ⏸ manual mode on

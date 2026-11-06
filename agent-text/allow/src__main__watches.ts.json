@@ -1,0 +1,19 @@
+{
+  "prose|call|a wake not given": 1,
+  "prose|call|cancelling a wake": 1,
+  "prose|call|checking agent watches": 8,
+  "prose|call|checking lane watches": 2,
+  "prose|call|checking usage watches": 3,
+  "prose|call|checking watches": 10,
+  "prose|call|ending a watch": 1,
+  "prose|call|following wakes": 1,
+  "prose|call|its conversation ended": 1,
+  "prose|call|loading watches": 2,
+  "prose|call|noting on #{} that a watch ended": 5,
+  "prose|call|telling of a watch begun": 1,
+  "prose|call|telling the Assistant the user's reply": 1,
+  "prose|call|waking an agent": 2,
+  "prose|call|watch tick": 1,
+  "prose|call|withdrawing a reply": 1,
+  "prose|call|withdrawing replies": 2
+}

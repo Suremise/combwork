@@ -7,7 +7,7 @@ export const BOARD_UPGRADE_GUIDE = 'upgrading-to-10' // i18n-ignore: a user guid
 
 /**
  * The slug of the heading a link's id names in a document (the Docs view's Learn more), or null when none does for
- * sure: missing, or an id several headings carry. Decided by findHeading, as card references and hive_read_section are.
+ * sure: missing, or an id several headings carry. Decided by findHeading, as card references and cw_read_section are.
  */
 export function guideTarget(md: string, id: string): string | null {
   const found = findHeading(docOutline(md), `#${id}`)

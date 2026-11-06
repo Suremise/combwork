@@ -1,9 +1,9 @@
-// Settling a slot command's job (#1429, HR1's round 2): #1360's recovery protocol for a job on Hive's process supervisor
+// Settling a slot command's job (#1429, HR1's round 2): #1360's recovery protocol for a job on Combwork's process supervisor
 // and its journal (queueJobs.ts), for a slot's setup, install or archive command. Each step only once the one before
 // has succeeded, so a failure or a crash at any point leaves the evidence (the slot's `job`, the journal's parts) for
 // the next try:
-// 1. the job ended by its name (never the supervisor holding it, which may be another Hive's) and seen empty, or gone;
-// 2. its journal sealed: closed to writers for good, so a process a supervisor that outlived its Hive follows can no
+// 1. the job ended by its name (never the supervisor holding it, which may be another Combwork's) and seen empty, or gone;
+// 2. its journal sealed: closed to writers for good, so a process a supervisor that outlived its Combwork follows can no
 //    longer be written down after the read (it ends what it can't write down instead);
 // 3. one read of it (unreadable or damaged: unknown, never empty), then every process it names that still runs (by pid
 //    and start) ended with what it started, and seen gone;

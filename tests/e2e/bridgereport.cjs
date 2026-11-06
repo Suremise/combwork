@@ -1,8 +1,8 @@
-// The hive MCP bridge's metrics reports (POST /v1/metrics/mcp) never hold it up: against a mock Agent API that answers
+// Combwork's MCP bridge's metrics reports (POST /v1/metrics/mcp) never hold it up: against a mock Agent API that answers
 // tool calls but never answers a report, the replies come at once, at most one report is in flight however many calls
 // there are, and once its CLI closes its input the bridge exits within the report's own deadline (3 s) plus a margin,
-// not after one deadline per batch. Uses the built bridge (out/main/hive-mcp.js; npx electron-vite build first) and
-// no Hive app or profile.
+// not after one deadline per batch. Uses the built bridge (out/main/cw-mcp.js; npx electron-vite build first) and
+// no Combwork app or profile.
 const lib = require('./lib.cjs')
 const http = require('http')
 const path = require('path')
@@ -35,12 +35,12 @@ const check = (name, ok, extra = '') => {
   })
   await new Promise((r) => server.listen(0, '127.0.0.1', r))
   const API = `http://127.0.0.1:${server.address().port}`
-  const env = lib.childEnv({ HIVE_API_URL: API, HIVE_API_TOKEN_FILE: lib.tokenFile('test-token'), HIVE_PROJECT: 'alpha' })
+  const env = lib.childEnv({ CW_API_URL: API, CW_API_TOKEN_FILE: lib.tokenFile('test-token'), CW_PROJECT: 'alpha' })
 
   /** Runs the bridge with `calls` tool calls, closes its input once every reply is in, and times its exit from there. */
   const run = (calls) =>
     new Promise((resolve) => {
-      const child = spawn(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], { env, stdio: ['pipe', 'pipe', 'ignore'] })
+      const child = spawn(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { env, stdio: ['pipe', 'pipe', 'ignore'] })
       let out = ''
       let replies = 0
       let closedAt = 0
@@ -54,7 +54,7 @@ const check = (name, ok, extra = '') => {
         }
       })
       child.on('exit', () => resolve({ replies, replyMs: closedAt - started, exitMs: Date.now() - closedAt }))
-      for (let i = 0; i < calls; i++) child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: i + 1, method: 'tools/call', params: { name: 'hive_list_tasks', arguments: {} } }) + '\n')
+      for (let i = 0; i < calls; i++) child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: i + 1, method: 'tools/call', params: { name: 'cw_list_tasks', arguments: {} } }) + '\n')
     })
 
   const one = await run(1)

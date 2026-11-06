@@ -1,6 +1,6 @@
-// #846 (E10b): the `tasks` area, the board's service. Its refusals are HiveErrors: agents (the Agent API, the hive
+// #846 (E10b): the `tasks` area, the board's service. Its refusals are CombworkErrors: agents (the Agent API, the cw_
 // tools) read them in English exactly as before, with the same status, and the window in its language. A card's
-// history keeps its English (`what`: agents read it, Hive's code and the scenarios match it) and stores the line as
+// history keeps its English (`what`: agents read it, Combwork's code and the scenarios match it) and stores the line as
 // data beside it (`whatText`: a message id and values), which the card dialog shows in the window's language; entries
 // from before have only the English, and show it.
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from '../tempDir'
 
-const base = tempDir('hive-i18n-tasks-')
+const base = tempDir('cw-i18n-tasks-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 ;(electron.shell as unknown as { trashItem: (p: string) => Promise<void> }).trashItem = (p) => rm(p, { recursive: true, force: true })
 
@@ -24,7 +24,7 @@ const { ordinal } = await import('../../src/shared/toolReplies')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../../src/main/workspace')
 const tasks = await import('../../src/main/tasks')
 const { agentBusyError, startTask } = await import('../../src/main/taskStart')
-const { shownError, windowError } = await import('../../src/main/hiveError')
+const { shownError, windowError } = await import('../../src/main/combworkError')
 const { apiErrorReply, entryForAgents } = await import('../../src/main/servers')
 type StoredText = import('../../src/shared/types').StoredText
 type TaskCard = import('../../src/shared/types').TaskCard
@@ -63,8 +63,8 @@ const GERMAN: Record<string, string> = {
 
 function project(ws: string, name: string, agents: { id: string; name: string }[] = []): string {
   const p = join(ws, name)
-  mkdirSync(join(p, '.hive'), { recursive: true })
-  writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents }))
+  mkdirSync(join(p, '.combwork'), { recursive: true })
+  writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents }))
   return p
 }
 
@@ -115,13 +115,13 @@ describe('the tasks area', () => {
 
   it('every history line has its message in the table the window reads, and an unknown id or an old entry has none', () => {
     for (const m of Object.values(HISTORY)) expect(storedMessage({ id: m.id })).toBe(m)
-    expect(storedMessage({ id: 'tasks.history.fromANewerHive' })).toBeNull()
+    expect(storedMessage({ id: 'tasks.history.fromANewerCombwork' })).toBeNull()
     expect(storedMessage(undefined)).toBeNull()
   })
 })
 
 describe("a card's history: English as stored, its line as data for the window", () => {
-  it('stores the same English as before, whatever language Hive shows, and the window reads each line in its own', async () => {
+  it('stores the same English as before, whatever language Combwork shows, and the window reads each line in its own', async () => {
     setLanguage('de', GERMAN)
     const other = await run(() => tasks.createTask({ title: 'Other', project: 'alpha', column: 'review' }, user))
     const c = await run(() => tasks.createTask({ title: 'First', project: 'alpha' }, user))
@@ -138,7 +138,7 @@ describe("a card's history: English as stored, its line as data for the window",
     await run(() => tasks.archiveTask(c.number, false))
     await run(() => tasks.noteOnCard(c.number, 'Told Agent 1 of 1 new decision'))
     const history = (await run(() => tasks.getTask(c.number))).history
-    // Exactly the English Hive always wrote (agents read it; doneSince, the loop wakes and the scenarios match it).
+    // Exactly the English Combwork always wrote (agents read it; doneSince, the loop wakes and the scenarios match it).
     expect(history.map((h) => h.what)).toEqual([
       'Created in Todo',
       'Renamed to "Second"',
@@ -162,9 +162,9 @@ describe("a card's history: English as stored, its line as data for the window",
       'Brought back from the archive',
       'Told Agent 1 of 1 new decision'
     ])
-    // The hive tools' short replies confirm the change in the history's English.
+    // The Combwork tools' short replies confirm the change in the history's English.
     expect(said).toEqual(history.slice(1, 9).map((h) => h.what))
-    // Each line Hive's board wrote is also data, which formats back to the same English…
+    // Each line Combwork's board wrote is also data, which formats back to the same English…
     for (const h of history.slice(0, -1)) {
       expect(storedMessage(h.whatText), h.what).not.toBeNull()
       expect(englishOf(h.whatText!), h.what).toBe(h.what)
@@ -208,7 +208,7 @@ describe("a card's history: English as stored, its line as data for the window",
       [storedText(HISTORY.archivedDone, { days: 1 }), 'Archived after 1 day in Done'],
       [storedText(HISTORY.archivedDone, { days: 14 }), 'Archived after 14 days in Done'],
       [storedText(HISTORY.archivedHidden, { project: 'alpha' }), 'Archived: alpha was hidden'],
-      [storedText(HISTORY.archivedRemoved, { project: 'alpha' }), 'Archived: alpha was removed from Hive'],
+      [storedText(HISTORY.archivedRemoved, { project: 'alpha' }), 'Archived: alpha was removed from Combwork'],
       [storedText(HISTORY.restored, { project: 'alpha' }), 'Brought back: alpha was restored'],
       [storedText(HISTORY.imported, { project: 'alpha', was: 31 }), 'Brought back with alpha (it was #31)'],
       [storedText(HISTORY.repaired, { from: 'old', to: 'new' }), 'Project: old → new (renamed or moved)'],
@@ -247,12 +247,12 @@ describe("a card's history: English as stored, its line as data for the window",
     }
   })
 
-  it('a review ended by Hive, and a project rename repaired, are data too', async () => {
+  it('a review ended by Combwork, and a project rename repaired, are data too', async () => {
     const c = await run(() => tasks.createTask({ title: 'Reviewed', project: 'alpha', column: 'review' }, user))
     await run(() => tasks.updateTask(c.number, { review: 'start' }, agent))
     await run(() => tasks.endReviews('alpha', 'a1', 'its session ended'))
     const last = (await run(() => tasks.getTask(c.number))).history.at(-1)!
-    expect(last).toMatchObject({ by: 'Hive', what: 'Review by Agent 1 stopped: its session ended', whatText: { id: 'tasks.history.reviewEnded', values: { agent: 'Agent 1', why: 'sessionEnded' } } })
+    expect(last).toMatchObject({ by: 'Combwork', what: 'Review by Agent 1 stopped: its session ended', whatText: { id: 'tasks.history.reviewEnded', values: { agent: 'Agent 1', why: 'sessionEnded' } } })
   })
 })
 
@@ -271,7 +271,7 @@ describe("the board's refusals: English for agents as before, the window's langu
       [await caught(run(() => tasks.updateTask(todo.number, { blocked: 'x'.repeat(1001) }, user))), 'The blocked reason is too long (at most 1,000 characters).', 400, 'Zu lang.'],
       [await caught(run(() => tasks.createTask({ title: 'x', column: 'nope' as never }, user))), 'Unknown column "nope": hold, todo, doing, review, passed or done.', 400, null],
       [await caught(run(() => tasks.createTask({ title: 'x', column: 'done' }, assistant))), 'Only the user puts cards in Done.', 403, 'Nur der Benutzer legt Karten in Erledigt an.'],
-      [await caught(run(() => tasks.createTask({ title: 'x', column: 'hold' }, agent))), 'Only the user or the Assistant puts cards On Hold. Add it to Todo; where the user has decided to park it, ask the Assistant (hive_ask_assistant), otherwise ask the user.', 403, null],
+      [await caught(run(() => tasks.createTask({ title: 'x', column: 'hold' }, agent))), 'Only the user or the Assistant puts cards On Hold. Add it to Todo; where the user has decided to park it, ask the Assistant (cw_ask_assistant), otherwise ask the user.', 403, null],
       [await caught(run(() => tasks.createTask({ title: 'x', project: 'beta' }, agent))), 'You can add cards only to your project (alpha).', 403, null],
       [await caught(run(() => tasks.createTask({ title: 'x', project: 'gamma' }, user))), 'Unknown project "gamma"', 404, null],
       [await caught(run(() => tasks.createTask({ title: 'x', agent: 'a1' }, user))), 'Choose a project before giving the task to an agent.', 400, 'Choose a project before giving the card to an agent.'],
@@ -294,7 +294,7 @@ describe("the board's refusals: English for agents as before, the window's langu
       [await caught(run(() => tasks.reorderTasks('todo', [], assistant))), 'cards: list the card numbers in the order wanted.', 400, null],
       [await caught(run(() => tasks.updateTask(archived.number, { title: 'x' }, assistant))), `#${archived.number} is archived. Only the user can bring it back.`, 403, null],
       [await caught(run(() => tasks.commentTask(todo.number, ' ', user))), 'The comment is empty.', 400, null],
-      [await caught(run(() => tasks.updateTask(todo.number, { review: 'start' }, user))), "Only an agent of the card's project reviews it, through its own hive tools.", 403, 'Nur ein Agent des Projekts prüft die Karte.'],
+      [await caught(run(() => tasks.updateTask(todo.number, { review: 'start' }, user))), "Only an agent of the card's project reviews it, through its own Combwork tools.", 403, 'Nur ein Agent des Projekts prüft die Karte.'],
       [await caught(run(() => tasks.updateTask(todo.number, { review: 'start' }, agent))), `#${todo.number} is in Todo. A card is reviewed in Review; if it needs more work, that is work on it (move it to doing).`, 400, null],
       [await caught(run(() => tasks.updateTask(todo.number, { review: 'passed' }, agent))), `You aren't reviewing #${todo.number} now: its review ended (the card moved, or your session ended) or never started. Start one with review "start" if it is in Review.`, 400, null],
       [await caught(run(() => tasks.editDecision(todo.number, 'x', 'y', assistant))), "Only the user changes or removes a card's decisions.", 403, null],
@@ -372,7 +372,7 @@ describe("the board's refusals: English for agents as before, the window's langu
   })
 })
 
-describe('lines and a comment Hive writes from outside the board service (#866)', () => {
+describe('lines and a comment Combwork writes from outside the board service (#866)', () => {
   it('stores the English each wrote before, word for word, and the window reads them in its language', () => {
     const cases: [StoredText, string, string][] = [
       [storedText(HISTORY.loopWake, { agent: 'R1', kind: 'review' }), 'Woke R1 to review it (a loop wake)', 'R1 zur Prüfung geweckt (Schleife)'],
@@ -416,7 +416,7 @@ describe('lines and a comment Hive writes from outside the board service (#866)'
     expect(said.values?.help).toEqual({ id: 'agents.claude.safeguardHelp' })
     const since = said.values?.since as string
     expect(shown(said)).toBe(`**Agent 1, nach einem Sicherheitsstopp:** Läuft jetzt auf SONNET statt OPUS (seit ${since}). Im Terminal: /feedback meldet einen Fehlalarm, /model wechselt zurück.`)
-    // A help message this Hive doesn't know (a newer one wrote it): nothing to show, so the window shows the stored English.
+    // A help message this Combwork doesn't know (a newer one wrote it): nothing to show, so the window shows the stored English.
     expect(shown({ ...said, values: { ...said.values, help: { id: 'agents.nope.safeguardHelp' } } })).toBeNull()
   })
 
@@ -453,11 +453,11 @@ describe('lines and a comment Hive writes from outside the board service (#866)'
   it("puts the comment on a card with its English for agents and its data for the window", async () => {
     const c = await run(() => tasks.createTask({ title: 'Guarded', project: 'alpha' }, user))
     const said = safeguardComment({ at: '2026-10-15T15:10:00.000Z', tools: [], stops: 1, switched: { from: 'a', to: 'b', at: '2026-10-15T15:12:00.000Z' } }, 'Agent 1', (m) => m, null)
-    expect(await run(() => tasks.commentAsHive(c.number, said))).toBe(true)
+    expect(await run(() => tasks.commentAsCombwork(c.number, said))).toBe(true)
     const comment = (await run(() => tasks.getTask(c.number))).comments.at(-1)!
     expect(comment.text).toBe(englishOf(said))
     expect(comment.text).toMatch(/^\*\*Agent 1, after a safeguard stop:\*\* A safety classifier stopped a response at \d\d:\d\d\. It now runs on b instead of a \(since \d\d:\d\d\)\.$/)
-    expect(comment.hiveText).toEqual(said)
+    expect(comment.appText).toEqual(said)
   })
 
   it("gives Archive All's reasons for leaving a card in the window's language", async () => {

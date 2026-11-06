@@ -1,0 +1,178 @@
+{
+  "activity.batch.update": {
+    "text": "change {n} {count, plural, one {card} other {cards}} on the board",
+    "note": "What the Assistant's batch of card changes is called (cw_update_tasks), lower case: in a refusal (\"…don't let you {what}\") and its activity line. {n} is the number of cards as digits; {count} the same number, choosing the word."
+  },
+  "activity.reason.conflict": {
+    "text": "Not possible now",
+    "note": "An Assistant action refused with 409, as its public error (#763)."
+  },
+  "activity.reason.failed": {
+    "text": "Failed",
+    "note": "An Assistant action that failed otherwise, as its public error (#763)."
+  },
+  "activity.reason.forbidden": {
+    "text": "Not allowed",
+    "note": "An Assistant action refused with 403, as its public error (#763)."
+  },
+  "activity.reason.invalid": {
+    "text": "The request was invalid",
+    "note": "An Assistant action refused with 400, as its public error (#763): never the error's own text."
+  },
+  "activity.reason.notFound": {
+    "text": "Not found",
+    "note": "An Assistant action refused with 404, as its public error (#763)."
+  },
+  "activity.undo.agentAdded": {
+    "text": "An agent it added stays: remove it in the project's agents if it isn't wanted.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.agentStopped": {
+    "text": "An agent it stopped isn't started again by undo: start it if it should run.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.ask": {
+    "text": "Its question stays under For you: answer or dismiss it there.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.cannot": {
+    "text": "Its request stays under For you: answer or dismiss it there.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.cardPlace": {
+    "text": "The card's place in its column isn't put back.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.cardsOrder": {
+    "text": "The cards' order isn't put back.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.comment": {
+    "text": "A comment stays: undo doesn't take back what was said.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.connectionChanged": {
+    "text": "A connection it changed isn't changed back: edit it in Settings → Accounts & Connections.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.connectionMade": {
+    "text": "A connection it made stays: remove it in Settings → Accounts & Connections if it isn't wanted.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.context": {
+    "text": "The doc sections to read first stay as set.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.decision": {
+    "text": "A decision it recorded stays: only the user changes or removes decisions.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.declarePaths": {
+    "text": "The paths it declared stay with the card.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.freshRetried": {
+    "text": "A lane agent's new conversation tried again isn't stopped by undo: end the lane if it isn't wanted.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.handOver": {
+    "text": "A hand-over can't be undone: the work went to the other agent.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.laneEnded": {
+    "text": "A lane that ended stays ended: start it again if it should go on.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.laneReorderNow": {
+    "text": "A card a lane reorder applied now put back stays in Todo: undo puts back only the lane's order.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.message": {
+    "text": "A message that was sent can't be taken back.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.nothing": {
+    "text": "It changed nothing undo puts back.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.projectClosed": {
+    "text": "A project it closed stays closed: open it again if it is wanted.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.projectMade": {
+    "text": "A project it made stays: remove it from Combwork if it isn't wanted.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.projectOpened": {
+    "text": "A project it opened stays open: close it if it isn't wanted.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.prompt": {
+    "text": "A prompt that was sent can't be taken back.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.putBack": {
+    "text": "Its reason stays as a comment.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.queuePaused": {
+    "text": "A merge queue it paused stays paused: resume it if it should run.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.queueResumed": {
+    "text": "A merge queue it resumed isn't paused again: pause it if it shouldn't run.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.removedFromQueue": {
+    "text": "Taking it out of the merge queue stays in the card's work: it is queued again only by Retry merge or a new approval.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.reportMerge": {
+    "text": "The merge it reported stays in the card's work.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.request": {
+    "text": "Its request to the builder stays as a comment.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.retriedMerge": {
+    "text": "Its Retry merge stays in the card's work.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.slotReleased": {
+    "text": "A slot it released isn't kept or held again: the next work that needs a slot may take it.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.start": {
+    "text": "Its start stays in the card's work: undo moves the card back, it doesn't unstart it.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.startReview": {
+    "text": "The review it started stays in the card's work.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.submit": {
+    "text": "Its submission stays in the card's work.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.teamPaused": {
+    "text": "A team it paused stays paused: resume it if it should go on.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.teamResumed": {
+    "text": "A team it resumed isn't paused again: pause it if it should wait.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.templateCards": {
+    "text": "The cards and lanes of the agents a template replaced stay as the load left them (cards put back, lanes ended): undo doesn't give them back.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.verdict": {
+    "text": "Its verdict stays in the card's work, and its round with it.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
+  "activity.undo.withdrawn": {
+    "text": "Messages it withdrew aren't sent again.",
+    "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  }
+}

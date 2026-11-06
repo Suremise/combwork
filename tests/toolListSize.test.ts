@@ -1,4 +1,4 @@
-// The hive tool list's size as the bridge reports it (HI-2063): its characters, and of them the tools' descriptions and
+// The Combwork tool list's size as the bridge reports it (HI-2063): its characters, and of them the tools' descriptions and
 // their parameters' descriptions, each as the list's JSON has it.
 import { describe, expect, it } from 'vitest'
 import { toolListSize } from '../src/shared/toolListSize'
@@ -9,7 +9,7 @@ describe('the tool list’s size and its parts', () => {
   const DESC = 'Add a card, "quoted"\nover two lines — café 🐝'
   const list = [
     {
-      name: 'hive_create_task',
+      name: 'cw_create_task',
       description: DESC,
       inputSchema: {
         type: 'object',
@@ -22,14 +22,14 @@ describe('the tool list’s size and its parts', () => {
         required: ['description']
       }
     },
-    { name: 'hive_inbox', description: 'What Hive has for you', inputSchema: { type: 'object', properties: {} } },
+    { name: 'cw_inbox', description: 'What Combwork has for you', inputSchema: { type: 'object', properties: {} } },
     { name: 'no_description', inputSchema: { type: 'object' } }
   ]
 
   it('counts descriptions and nested parameter descriptions as the JSON has them, escapes included', () => {
     const size = toolListSize(list)
     expect(size.toolsChars).toBe(JSON.stringify(list).length)
-    expect(size.descriptionChars).toBe(inJson(DESC) + inJson('What Hive has for you'))
+    expect(size.descriptionChars).toBe(inJson(DESC) + inJson('What Combwork has for you'))
     expect(size.paramChars).toBe(['What to do', 'Related cards', 'Its key ("HI-12")', 'Ünïcode\tleaf'].map(inJson).reduce((a, b) => a + b, 0))
     // Escapes count as the JSON has them: \" and \n are two characters each, an emoji two UTF-16 code units.
     expect(inJson(DESC)).toBe(DESC.length + 3)

@@ -93,13 +93,13 @@ export function recordingByRuntime<T>(fn: () => Promise<T>, moved: number | null
 /** The reads made for a card not made yet (tasks.ts' createTask), before its number is taken. */
 const NEW_CARD = 0
 
-/** A fact's actor (§16.4.1): the user, the Assistant, an agent by its id, or Hive itself. */
+/** A fact's actor (§16.4.1): the user, the Assistant, an agent by its id, or Combwork itself. */
 export function actorOf(a: ChangeActor | undefined): Actor {
-  if (!a) return 'hive'
+  if (!a) return 'combwork'
   if (a.kind === 'user') return 'user'
   if (a.kind === 'assistant') return 'assistant'
   if (a.self) return agentActor(a.self.agentId)
-  return a.name === 'Hive' || a.name === 'Repair' ? 'hive' : agentActor(a.name)
+  return a.name === 'Combwork' || a.name === 'Repair' ? 'combwork' : agentActor(a.name)
 }
 
 /** The stage a column stands for (P3: a move is to the column's stage). */
@@ -163,7 +163,7 @@ async function readsFor(ws: WorkspaceService, p: Planned): Promise<Reads> {
   const laneRuleset = p.why === 'start' ? laneRulesetOf(ws, p) : null
   if (laneRuleset) r.ruleset = laneRuleset
   else if (p.why === 'start') {
-    // Resolved over the workspace's and Hive's (#1278: a project may set only some), as the runtime has them.
+    // Resolved over the workspace's and Combwork's (#1278: a project may set only some), as the runtime has them.
     const resolved = cfg.workflow ? resolvedOf(ws, projectPath, cfg.workflow.platform, cfg) : null
     try {
       const c = resolved && !resolved.invalid ? compile(resolved.options) : null
@@ -411,7 +411,7 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
     for (const [id, text] of now) if (!had.has(id) || had.get(id) !== text) decision({ id, text })
     for (const [id, text] of had) if (!now.has(id)) decision({ id, text }, true)
     // A lane reviewer's comment taken as its request to the builder (#1410, tasks.ts' laneReviewerAsks): the runtime's
-    // ReviewerRequest, made on the board (hive_request_builder's own is the runtime's, made there).
+    // ReviewerRequest, made on the board (cw_request_builder's own is the runtime's, made there).
     const asked = moves && history.some((h) => h.whatText?.id === HISTORY.reviewerRequest.id) ? after.comments.find((c) => c.id === comment)?.text : undefined
     const requested = asked !== undefined ? tx.append(n, { kind: 'ReviewerRequest', actor, source: 'recorded', ...ruleset(), data: { text: asked } }).seq : null // i18n-ignore: a fact's kind and codes, not text
     // A builder's comment taken as its reply to the reviewer (HI-2302, tasks.ts' builderReplies): a wake for the reviewer,
@@ -425,10 +425,10 @@ function write(ws: WorkspaceService, ctx: Context | undefined, before: TaskCard 
  * Whether workflow rules are enforced (Settings → Advanced: service.ts' ENFORCE, read here without the service, which
  * reaches back to the board).
  */
-export const rulesEnforced = (): boolean => advanced.get<boolean>('hive.workflow.enforce')
+export const rulesEnforced = (): boolean => advanced.get<boolean>('cw.workflow.enforce')
 
 /**
- * A failed review recorded at the card's round limit (§16.11.4, #1269): Hive asks the user (For you, Decide) as the
+ * A failed review recorded at the card's round limit (§16.11.4, #1269): Combwork asks the user (For you, Decide) as the
  * runtime does (`askAtLimit`), so a loop's verdicts given on the board (before #1268 moves them to the runtime) pause it
  * too. Only for a card in a running lane, while the rules are enforced.
  */
@@ -439,8 +439,9 @@ function roundLimit(tx: Tx, n: number, key: string, ruleset: { ruleset?: string 
   if (!atRoundLimit(s, card.rounds)) return
   // The card's key as the runtime names it (service.ts: its project's name).
   const shown = workflowText(FOR_YOU.roundLimit, { card: key, rounds: s.rounds })
+  // agent-stored: storedForAgents says a request again for each reader (its forYou rows, a lane wake's detail; HI-2464)
   const text = workflowEnglish(shown)
-  const asked = tx.append(n, { kind: 'ApprovalRequested', actor: 'hive', source: 'recorded', ...ruleset, data: { request: `${key}/r${s.lastSeq + 1}`, kind: 'decide', gate: ROUND_LIMIT_GATE, text, requestText: shown, for: 'user', stage: s.stage, generation: s.generation } })
+  const asked = tx.append(n, { kind: 'ApprovalRequested', actor: 'combwork', source: 'recorded', ...ruleset, data: { request: `${key}/r${s.lastSeq + 1}`, kind: 'decide', gate: ROUND_LIMIT_GATE, text, requestText: shown, for: 'user', stage: s.stage, generation: s.generation } })
   tx.action(n, 'notify', { text, shown }, asked.seq)
 }
 
@@ -478,11 +479,11 @@ function loopWakes(tx: Tx, n: number, by: Actor, after: TaskCard, f: { submitted
   }
 }
 
-/** A move's cause (§16.4.2): the user's from the window, an agent's or the Assistant's by its tools or the API, Hive's derived. */
+/** A move's cause (§16.4.2): the user's from the window, an agent's or the Assistant's by its tools or the API, Combwork's derived. */
 function causeOf(a: ChangeActor | undefined): 'intent' | 'user' | 'derived' {
   if (!a) return 'derived'
   if (a.kind === 'user') return 'user'
-  return actorOf(a) === 'hive' ? 'derived' : 'intent'
+  return actorOf(a) === 'combwork' ? 'derived' : 'intent'
 }
 
 /**
@@ -503,7 +504,7 @@ function unknownOf(r: Reads | null, fields: string[]): { platform?: Record<strin
 }
 
 /**
- * What an agent received of a card's decisions (`DecisionsReceived`): the card read in full (hive_read_task), or a line
+ * What an agent received of a card's decisions (`DecisionsReceived`): the card read in full (cw_read_task), or a line
  * telling it of new decisions (a decision delivery) received. Bound to what it was given (HR4's #1216 rounds 1 and 2):
  * `generation` is the card's decision generation read in the same snapshot as the decisions it was given, never one
  * looked up later. Recorded once per generation, in a board change of its own, only while the workspace (and the card's

@@ -4,12 +4,12 @@
 import { describe, expect, it } from 'vitest'
 import { startupReplay } from '../src/renderer/src/startupReplay'
 import { applyTipsChange, EMPTY_TIPS_STATE, type TipsState } from '../src/shared/tips'
-import type { HiveEvent } from '../src/shared/types'
+import type { CombworkEvent } from '../src/shared/types'
 
 /** A window's store, as App.tsx's handleEvent and its startup set it. */
 function windowStore() {
   const store = { tips: EMPTY_TIPS_STATE as TipsState, panes: {} as Record<string, unknown>, settings: 'old' }
-  const handle = (e: HiveEvent): void => {
+  const handle = (e: CombworkEvent): void => {
     if (e.type === 'tips-changed') store.tips = e.tips
     else if (e.type === 'ui-pref-changed') store[e.pref as 'panes'] = { ...store[e.pref as 'panes'], [e.project]: e.value }
     else if (e.type === 'settings-changed') store.settings = 'new'
@@ -24,7 +24,7 @@ describe('a window starting while another changes things', () => {
   it("keeps a tips change that arrived before the older snapshot (the day's tip isn't shown again)", () => {
     const { store, handle } = windowStore()
     const early = startupReplay(handle)
-    const event = { type: 'tips-changed', tips: today } as HiveEvent
+    const event = { type: 'tips-changed', tips: today } as CombworkEvent
     handle(event)
     early.note(event)
     expect(store.tips.shownOn).toBe('2026-10-06')
@@ -37,7 +37,7 @@ describe('a window starting while another changes things', () => {
   it("keeps a project preference that arrived before the snapshot, with the snapshot's others", () => {
     const { store, handle } = windowStore()
     const early = startupReplay(handle)
-    const event = { type: 'ui-pref-changed', pref: 'panes', project: 'alpha', value: { layout: 'columns' } } as unknown as HiveEvent
+    const event = { type: 'ui-pref-changed', pref: 'panes', project: 'alpha', value: { layout: 'columns' } } as unknown as CombworkEvent
     handle(event)
     early.note(event)
     store.panes = { beta: { layout: 'single' } }
@@ -48,13 +48,13 @@ describe('a window starting while another changes things', () => {
   it('replays in order, only those events, only once, and nothing after the snapshot', () => {
     const { store, handle } = windowStore()
     const seen: string[] = []
-    const early = startupReplay<HiveEvent>((e) => {
+    const early = startupReplay<CombworkEvent>((e) => {
       seen.push(e.type)
       handle(e)
     })
-    const first = { type: 'tips-changed', tips: old } as HiveEvent
-    const second = { type: 'tips-changed', tips: today } as HiveEvent
-    for (const e of [first, { type: 'settings-changed' } as HiveEvent, second]) early.note(e)
+    const first = { type: 'tips-changed', tips: old } as CombworkEvent
+    const second = { type: 'tips-changed', tips: today } as CombworkEvent
+    for (const e of [first, { type: 'settings-changed' } as CombworkEvent, second]) early.note(e)
     early.settle()
     expect(seen).toEqual(['tips-changed', 'tips-changed'])
     expect(store.tips.shownOn).toBe('2026-10-06')
@@ -70,9 +70,9 @@ describe('a startup run twice (StrictMode in development: setup, cleanup, setup)
   const today = applyTipsChange(old, { shownOn: '2026-10-06' })
 
   /** App.tsx's startup effect: listen, load the snapshot, apply it unless cleaned up meanwhile, then replay. */
-  function effect(bus: Set<(e: HiveEvent) => void>, w: ReturnType<typeof windowStore>, snapshot: Promise<{ tips: TipsState; panes: Record<string, unknown> }>) {
+  function effect(bus: Set<(e: CombworkEvent) => void>, w: ReturnType<typeof windowStore>, snapshot: Promise<{ tips: TipsState; panes: Record<string, unknown> }>) {
     const early = startupReplay(w.handle)
-    const listener = (e: HiveEvent): void => {
+    const listener = (e: CombworkEvent): void => {
       w.handle(e)
       early.note(e)
     }
@@ -94,7 +94,7 @@ describe('a startup run twice (StrictMode in development: setup, cleanup, setup)
   }
 
   it("the first run finishing last doesn't apply its older snapshot over the second's and a change only the second heard", async () => {
-    const bus = new Set<(e: HiveEvent) => void>()
+    const bus = new Set<(e: CombworkEvent) => void>()
     const w = windowStore()
     let first!: (s: { tips: TipsState; panes: Record<string, unknown> }) => void
     const one = effect(bus, w, new Promise((r) => (first = r)))
@@ -103,8 +103,8 @@ describe('a startup run twice (StrictMode in development: setup, cleanup, setup)
     const two = effect(bus, w, new Promise((r) => (second = r)))
     // Another window shows the day's tip and changes a layout: only the second run listens.
     for (const l of bus) {
-      l({ type: 'tips-changed', tips: today } as HiveEvent)
-      l({ type: 'ui-pref-changed', pref: 'panes', project: 'alpha', value: { layout: 'columns' } } as unknown as HiveEvent)
+      l({ type: 'tips-changed', tips: today } as CombworkEvent)
+      l({ type: 'ui-pref-changed', pref: 'panes', project: 'alpha', value: { layout: 'columns' } } as unknown as CombworkEvent)
     }
     second({ tips: old, panes: { beta: { layout: 'single' } } })
     await two.done
@@ -120,11 +120,11 @@ describe('a startup run twice (StrictMode in development: setup, cleanup, setup)
   it('a stopped run keeps and replays nothing', () => {
     const w = windowStore()
     const seen: string[] = []
-    const early = startupReplay<HiveEvent>((e) => seen.push(e.type))
-    early.note({ type: 'tips-changed', tips: today } as HiveEvent)
+    const early = startupReplay<CombworkEvent>((e) => seen.push(e.type))
+    early.note({ type: 'tips-changed', tips: today } as CombworkEvent)
     expect(early.active()).toBe(true)
     early.stop()
-    early.note({ type: 'tips-changed', tips: today } as HiveEvent)
+    early.note({ type: 'tips-changed', tips: today } as CombworkEvent)
     early.settle()
     expect(early.active()).toBe(false)
     expect(seen).toEqual([])

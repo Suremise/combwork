@@ -39,7 +39,7 @@ export interface GitRepoSummary {
   fetchedAt: number | null
   /**
    * The folder isn't a repository's own top but inside one (a workspace kept in git): that repository's folder. The view
-   * shows it, read-only: Hive changes only a project's own repository.
+   * shows it, read-only: Combwork changes only a project's own repository.
    */
   parentRepo?: string
 }
@@ -84,7 +84,7 @@ export interface BranchUpdatePlan {
   /** The target's commits the branch hasn't, and its own commits the target hasn't. */
   behind: number
   ahead: number
-  /** Where it runs: the folder the branch is checked out in; a temporary one Hive makes when it is checked out nowhere. */
+  /** Where it runs: the folder the branch is checked out in; a temporary one Combwork makes when it is checked out nowhere. */
   where: 'project' | 'slot' | 'worktree' | 'temporary'
   folder: string | null
   slot: string | null
@@ -105,10 +105,10 @@ export type BranchUpdateHow = 'merge' | 'rebase'
 
 /** A remote branch as Branches & remotes groups it (#1642). */
 export interface GitRemoteBranchRow {
-  /** As git names it: nas/hive/hb1. */
+  /** As git names it: nas/cw/hb1. */
   name: string
   remote: string
-  /** On the remote: hive/hb1. */
+  /** On the remote: cw/hb1. */
   branch: string
   sha: string
   date: number
@@ -141,7 +141,7 @@ export interface PushedRef {
 
 /**
  * `git push --porcelain`'s lines, one per ref (`<flag>\t<from>:<to>\t<summary>`): `=` up to date, `!` refused (rejected
- * by the remote, or not a fast-forward: Hive never forces), anything else pushed. Other lines (To …, Done) are skipped.
+ * by the remote, or not a fast-forward: Combwork never forces), anything else pushed. Other lines (To …, Done) are skipped.
  */
 export function parsePushPorcelain(out: string): PushedRef[] {
   const refs: PushedRef[] = []
@@ -162,8 +162,8 @@ export interface GitWorktreeRow {
   path: string
   branch: string | null
   head: string | null
-  /** One of Hive's own (HI-1710): a review copy, or the merge queue's folder. Never an unused worktree, never removed here. */
-  hive?: 'copy' | 'queue'
+  /** One of Combwork's own (HI-1710): a review copy, or the merge queue's folder. Never an unused worktree, never removed here. */
+  combwork?: 'copy' | 'queue'
 }
 
 export interface GitIdentityPart {
@@ -347,7 +347,7 @@ const M = {
   noCommitsYet: msg({ id: 'git.head.noCommits', defaultMessage: 'no commits yet', description: "What the project folder has checked out in a repository with no commit yet. Lower case: also in the status bar." }),
   aheadBehind: msg({ id: 'git.status.aheadBehind', defaultMessage: '↑{ahead, number} ↓{behind, number}', description: 'Status bar and Git → Branches & remotes: how many commits a branch is ahead of the remote branch it tracks (↑, to push) and behind it (↓, to pull), "↑2 ↓0". Keep the arrows and the order.' }),
   upstreamGone: msg({ id: 'git.upstream.gone', defaultMessage: 'upstream gone', description: 'In place of the ahead/behind counts: the remote branch a branch tracked was deleted on the remote.' }),
-  parentRepo: msg({ id: 'git.parentRepo', defaultMessage: "This project is inside the git repository in {folder}, so the Version Control tab only shows it: Hive changes only a project's own repository.", description: "Banner in the Version Control tab of a project whose folder is inside another repository (a workspace kept in git). {folder} is that repository's folder." }),
+  parentRepo: msg({ id: 'git.parentRepo', defaultMessage: "This project is inside the git repository in {folder}, so the Version Control tab only shows it: Combwork changes only a project's own repository.", description: "Banner in the Version Control tab of a project whose folder is inside another repository (a workspace kept in git). {folder} is that repository's folder." }),
   noUpstream: msg({ id: 'git.status.noUpstream', defaultMessage: 'no upstream', description: 'Status bar, after the branch: it tracks no remote branch ("main · no upstream").' }),
   tipOn: msg({ id: 'git.tip.on', defaultMessage: 'On {branch}', description: "First line of the status bar's git tooltip: the branch checked out." }),
   tipDetached: msg({ id: 'git.tip.detached', defaultMessage: 'HEAD is detached at {commit}', description: "First line of the status bar's git tooltip. {commit} is a short commit hash." }),
@@ -357,8 +357,8 @@ const M = {
   tipTracks: msg({ id: 'git.tip.tracks', defaultMessage: 'Tracks {upstream}: {ahead, plural, =0 {nothing} one {# commit} other {# commits}} to push, {behind, plural, =0 {nothing} one {# commit} other {# commits}} to pull.', description: "The status bar's git tooltip. {upstream} is the remote branch, such as origin/main; the counts are as of the last fetch." }),
   tipNoTracking: msg({ id: 'git.tip.noTracking', defaultMessage: 'It tracks no remote branch: Push sets one.', description: "The status bar's git tooltip. Push is the Git tab's button." }),
   tipNoRemotes: msg({ id: 'git.tip.noRemotes', defaultMessage: 'No remotes.', description: "The status bar's git tooltip: the repository has no remote." }),
-  tipFetched: msg({ id: 'git.tip.fetched', defaultMessage: 'As of the last fetch, {when}. Hive never fetches by itself.', description: 'The status bar\'s git tooltip. {when} is how long ago, such as "5m ago".' }),
-  tipNeverFetched: msg({ id: 'git.tip.neverFetched', defaultMessage: 'Never fetched: Hive never fetches by itself.', description: "The status bar's git tooltip, when the repository was never fetched." }),
+  tipFetched: msg({ id: 'git.tip.fetched', defaultMessage: 'As of the last fetch, {when}. Combwork never fetches by itself.', description: 'The status bar\'s git tooltip. {when} is how long ago, such as "5m ago".' }),
+  tipNeverFetched: msg({ id: 'git.tip.neverFetched', defaultMessage: 'Never fetched: Combwork never fetches by itself.', description: "The status bar's git tooltip, when the repository was never fetched." }),
   tipClick: msg({ id: 'git.tip.click', defaultMessage: 'Click for Version Control → Branches & remotes.', description: "Last line of the status bar's git tooltip. Version Control → Branches & remotes is the tab and its section: keep them as they are named there." }),
   identityMissing: msg({ id: 'git.identity.missing', defaultMessage: 'Git has no {missing, select, both {user.name or user.email} name {user.name} other {user.email}} for this repository, so commits fail. Set them here (or in your global git config).', description: 'Warning in Git → Branches & remotes → Commit identity. user.name and user.email are git settings: keep them.' }),
   identityPublic: msg({ id: 'git.identity.public', defaultMessage: "Commits pushed to GitHub show {email} to anyone who reads them. GitHub's no-reply address (…@users.noreply.github.com, in GitHub's email settings) keeps your address private.", description: 'Warning in Git → Branches & remotes → Commit identity. {email} is the address commits are made as.' }),
@@ -604,7 +604,7 @@ export function remoteNameProblemData(name: string): Text | null {
 /** remoteNameProblemData in the language shown (a dialog's check). */
 export const remoteNameProblem = (name: string): string | null => inLanguage(remoteNameProblemData(name))
 
-/** A remote URL Hive passes to git: one line, not an option. */
+/** A remote URL Combwork passes to git: one line, not an option. */
 export function remoteUrlProblemData(url: string): Text | null {
   const u = url.trim()
   if (!u) return M.enterUrl

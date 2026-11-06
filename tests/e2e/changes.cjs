@@ -24,13 +24,13 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(path.join(alpha, 'b.ts'), 'export const b = 2 // BBB\n')
   lib.enableProviders(userData)
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_TEST_SLOW_IPC: 'git:diff=3000*1', HIVE_TEST_FAIL_IPC: 'git:status*1' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_TEST_SLOW_IPC: 'git:diff=3000*1', CW_TEST_FAIL_IPC: 'git:status*1' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 860 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const until = async (fn, ms = 10000) => {
     const t = Date.now()
@@ -61,7 +61,7 @@ const check = (name, ok, extra = '') => {
 
   // Refreshing a.ts fails: its last diff stays, with the error and Retry over it; Retry reads it again.
   await app.evaluate(() => {
-    process.env.HIVE_TEST_FAIL_IPC = 'git:diff*1'
+    process.env.CW_TEST_FAIL_IPC = 'git:diff*1'
   })
   await page.locator('.split-list .pane-header').getByRole('button', { name: 'Refresh' }).click()
   const stale = page.locator('.split-main .banner', { hasText: 'Could not refresh the diff' })

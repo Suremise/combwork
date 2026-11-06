@@ -3,14 +3,14 @@
 // record (`serverRan`) after. A run's markers go with it (its exit, a launch that failed); one whose record couldn't be
 // saved is kept (serverMarks.ts), retried after the host's next record write, dropped with its session, within a strict
 // bound: past 32 ids its host fails closed, a closing workspace's hosts with unsaved ids too, and past 16 such hosts every
-// read does, until Hive restarts. Never evicted back to Claude pricing.
+// read does, until Combwork restarts. Never evicted back to Claude pricing.
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-servermarks-')
+const base = tempDir('cw-servermarks-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -67,7 +67,7 @@ describe('the unsaved markers kept (serverMarks.ts)', () => {
     // Nothing more is kept once every read fails closed.
     m.add('C:/w99/p', 'y')
     expect(m.size()).toEqual({ unsaved: 0, failClosedHosts: 0, everywhere: true })
-    expect(warned.at(-1)).toMatch(/^Every session's usage is read without its CLI's cost reports until Hive restarts/)
+    expect(warned.at(-1)).toMatch(/^Every session's usage is read without its CLI's cost reports until Combwork restarts/)
   })
 })
 
@@ -93,8 +93,8 @@ describe("a run's server markers (sessions.ts)", async () => {
   let k = 0
 
   beforeAll(async () => {
-    mkdirSync(join(alpha, '.hive'), { recursive: true })
-    writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'A1' }, { id: 'a2', name: 'A2' }] }))
+    mkdirSync(join(alpha, '.combwork'), { recursive: true })
+    writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'A1' }, { id: 'a2', name: 'A2' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     // A server's model with the $9 Claude Code reported for it: read with the report, $9; without it, no price (null).
@@ -205,8 +205,8 @@ describe("a run's server markers (sessions.ts)", async () => {
   it('a workspace closing with an unsaved marker: its host fails closed, so its reopening reads it without the report', async () => {
     const ws2 = join(base, 'ws2')
     const beta = join(ws2, 'beta')
-    mkdirSync(join(beta, '.hive'), { recursive: true })
-    writeFileSync(join(beta, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }] }))
+    mkdirSync(join(beta, '.combwork'), { recursive: true })
+    writeFileSync(join(beta, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }] }))
     const other = createWorkspaceService()
     await other.open(ws2)
     vi.spyOn(WorkspaceService.prototype, 'mutateSessions').mockRejectedValue(new Error('disk full'))

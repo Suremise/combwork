@@ -1,4 +1,4 @@
-// A click on a notice with a target (HI-1961: hive_notify's): an agent's pane or a card's dialog in the window that has
+// A click on a notice with a target (HI-1961: cw_notify's): an agent's pane or a card's dialog in the window that has
 // it, a short notice when it is gone by then, and a project another window has handed to that window (notice:action).
 // The real renderer store, main's IPC recorded.
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -7,7 +7,7 @@ import type { ToastTarget, WorkspaceInfo } from '../src/shared/types'
 /** What the window asked main for, in order. */
 const calls: { channel: string; args: unknown[] }[] = []
 ;(globalThis as unknown as { window: unknown }).window = {
-  hive: {
+  combwork: {
     invoke: (channel: string, ...args: unknown[]) => {
       calls.push({ channel, args })
       return Promise.resolve(null)

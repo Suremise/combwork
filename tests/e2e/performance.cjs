@@ -37,35 +37,35 @@ const now = Date.now()
 const hourStart = (t) => Math.floor(t / HOUR) * HOUR
 const bucket = (start, projects, workspace = part()) => ({ start, span: 'hour', projects, workspace, skills: { scans: timed(3, 40), sharedScans: 1, hits: 30, misses: 4, invalidations: 1, tooLarge: 0, files: 40, bytes: 120000, headerBytes: 4000, entries: 60 }, dropped: 0, droppedBy: {} })
 // The last 24 hours: alpha 30 requests (3 failed), beta 12, the workspace's own 5 (scripts); 3 days ago alpha 100 more.
-const MORE_TOOLS = ['hive_list_projects', 'hive_project_status', 'hive_session_usage', 'hive_list_shared_notes', 'hive_read_shared_note', 'hive_write_shared_note', 'hive_read_latest_handover', 'hive_create_handover', 'hive_notify', 'hive_list_providers', 'hive_agent_activity']
+const MORE_TOOLS = ['cw_list_projects', 'cw_project_status', 'cw_session_usage', 'cw_list_shared_notes', 'cw_read_shared_note', 'cw_write_shared_note', 'cw_read_latest_handover', 'cw_create_handover', 'cw_notify', 'cw_list_providers', 'cw_agent_activity']
 const buckets = [
   // …and one request past the histogram's last bound (> 10 s), so latency sorts meet an overflow (#305).
   bucket(hourStart(now - 3 * 24 * HOUR), { alpha: part([apiSeries('/v1/tasks', 'agent', 'ok', 100), apiSeries('/v1/projects', 'agent', 'ok', 1, 20000)], MORE_TOOLS.map((t, i) => mcpSeries(t, 1, 100 + i))) }),
-  bucket(hourStart(now - 5 * HOUR), { alpha: part([apiSeries('/v1/tasks', 'agent', 'ok', 20), apiSeries('/v1/tasks/:n', 'agent', 'server-error', 3, 300)], [mcpSeries('hive_list_tasks', 10, 600), mcpSeries('hive_read_task', 4, 2500)], [launch('claude-code', 2)], [toolList]) }),
-  bucket(hourStart(now - 1 * HOUR), { alpha: part([apiSeries('/v1/tasks', 'agent', 'ok', 7)]), beta: part([apiSeries('/v1/tasks', 'agent', 'ok', 12)], [mcpSeries('hive_list_tasks', 2, 600)], [launch('codex', 1)]) }, part([apiSeries('/v1/tasks', 'api', 'ok', 5)]))
+  bucket(hourStart(now - 5 * HOUR), { alpha: part([apiSeries('/v1/tasks', 'agent', 'ok', 20), apiSeries('/v1/tasks/:n', 'agent', 'server-error', 3, 300)], [mcpSeries('cw_list_tasks', 10, 600), mcpSeries('cw_read_task', 4, 2500)], [launch('claude-code', 2)], [toolList]) }),
+  bucket(hourStart(now - 1 * HOUR), { alpha: part([apiSeries('/v1/tasks', 'agent', 'ok', 7)]), beta: part([apiSeries('/v1/tasks', 'agent', 'ok', 12)], [mcpSeries('cw_list_tasks', 2, 600)], [launch('codex', 1)]) }, part([apiSeries('/v1/tasks', 'api', 'ok', 5)]))
 ]
-fs.mkdirSync(path.join(ws, '.hive', 'metrics'), { recursive: true })
+fs.mkdirSync(path.join(ws, '.combwork', 'metrics'), { recursive: true })
 /** Claude Code sessions in a session host's backups (what Provider usage reads), each a request an hour ago. */
 const sessionsIn = (host, ids) => {
   const at = new Date(now - HOUR).toISOString()
-  fs.mkdirSync(path.join(host, '.hive', 'sessions'), { recursive: true })
+  fs.mkdirSync(path.join(host, '.combwork', 'sessions'), { recursive: true })
   for (const id of ids) {
     const lines = [{ type: 'user', timestamp: at, message: { role: 'user', content: 'Go' } }, { type: 'assistant', requestId: `${id}-r`, timestamp: at, message: { model: 'claude-opus-5-5', content: [{ type: 'text', text: 'Done.' }], usage: { input_tokens: 5, cache_read_input_tokens: 1000, cache_creation_input_tokens: 100, output_tokens: 40 } } }]
-    fs.writeFileSync(path.join(host, '.hive', 'sessions', `${id}.jsonl`), lines.map((l) => JSON.stringify(l)).join('\n') + '\n')
+    fs.writeFileSync(path.join(host, '.combwork', 'sessions', `${id}.jsonl`), lines.map((l) => JSON.stringify(l)).join('\n') + '\n')
   }
-  fs.writeFileSync(path.join(host, '.hive', 'sessions.json'), JSON.stringify({ version: 1, sessions: ids.map((id) => ({ id, agent: 'claude-code', name: id.slice(-4), createdAt: at, lastActiveAt: at, archived: false })) }))
+  fs.writeFileSync(path.join(host, '.combwork', 'sessions.json'), JSON.stringify({ version: 1, sessions: ids.map((id) => ({ id, agent: 'claude-code', name: id.slice(-4), createdAt: at, lastActiveAt: at, archived: false })) }))
 }
 sessionsIn(path.join(ws, 'alpha'), ['66666666-aaaa-bbbb-cccc-000000000001', '66666666-aaaa-bbbb-cccc-000000000002'])
-sessionsIn(path.join(ws, '.hive', 'assistant'), ['66666666-aaaa-bbbb-cccc-000000000003'])
-// One loss Hive couldn't attribute to a project (its bookkeeping was full), in alpha's hour.
+sessionsIn(path.join(ws, '.combwork', 'assistant'), ['66666666-aaaa-bbbb-cccc-000000000003'])
+// One loss Combwork couldn't attribute to a project (its bookkeeping was full), in alpha's hour.
 Object.assign(buckets[1], { dropped: 1, droppedBy: { '\u0000untracked': 1 } })
-// Observed: around the older work, then the last day with a 4-hour gap (Hive closed) 10 to 6 hours ago.
+// Observed: around the older work, then the last day with a 4-hour gap (Combwork closed) 10 to 6 hours ago.
 const observed = [
   [now - 3 * 24 * HOUR - HOUR, now - 3 * 24 * HOUR + 2 * HOUR],
   [now - 26 * HOUR, now - 10 * HOUR],
   [now - 6 * HOUR, now - 60_000]
 ]
-fs.writeFileSync(path.join(ws, '.hive', 'metrics', 'metrics.json'), JSON.stringify({ version: 1, buckets, observed, evictedThrough: now - 5 * 24 * HOUR }))
+fs.writeFileSync(path.join(ws, '.combwork', 'metrics', 'metrics.json'), JSON.stringify({ version: 1, buckets, observed, evictedThrough: now - 5 * 24 * HOUR }))
 
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -103,24 +103,24 @@ const check = (name, ok, extra = '') => {
   check('24 hours by default: the workspace is every project and its own work', !!(await until(async () => (await requests()) === '47', HUNG_MS)), await requests())
   const bars = page.locator('.perf-trend .daily-col')
   check('an hourly trend with every hour of the range', (await bars.count()) === 25, String(await bars.count()))
-  check('the tools table is sorted by characters', (await page.locator('.table-wrap').first().locator('tbody tr td:first-child').allInnerTexts()).join() === 'hive_read_task,hive_list_tasks', (await page.locator('.table-wrap').first().locator('tbody tr td:first-child').allInnerTexts()).join())
+  check('the tools table is sorted by characters', (await page.locator('.table-wrap').first().locator('tbody tr td:first-child').allInnerTexts()).join() === 'cw_read_task,cw_list_tasks', (await page.locator('.table-wrap').first().locator('tbody tr td:first-child').allInnerTexts()).join())
   check('the skill service is shown for the workspace', (await page.locator('h2', { hasText: 'Skill service' }).count()) === 1)
   check('the 24 hours don’t reach history removed for space', !/removed to keep/.test(await page.locator('.perf-coverage').innerText()))
-  check('coverage: how long Hive was recording, and the gap', /Recorded for \d+ h/.test(await page.locator('.perf-coverage').innerText()), await page.locator('.perf-coverage').innerText())
+  check('coverage: how long Combwork was recording, and the gap', /Recorded for \d+ h/.test(await page.locator('.perf-coverage').innerText()), await page.locator('.perf-coverage').innerText())
   check('…the unrecorded hours are hatched in the trend, not shown as zero', (await page.locator('.perf-trend .daily-col.unobserved').count()) >= 3, String(await page.locator('.perf-trend .daily-col.unobserved').count()))
   // Each table sorts by a header, and remembers it (#250): the tools by calls, the routes by failures, launches by count.
   const perfTable = (header) => page.locator('.performance-page:visible .data-table', { has: page.locator('th', { hasText: header }) }).first()
   const firstCells = async (t) => (await t.locator('tbody tr td:first-child').allInnerTexts()).map((x) => x.trim()).join()
   const tools = perfTable('Per call')
   await tools.locator('th button', { hasText: 'Calls' }).click()
-  check('the tools table sorts by Calls, most first', (await firstCells(tools)) === 'hive_list_tasks,hive_read_task', await firstCells(tools))
+  check('the tools table sorts by Calls, most first', (await firstCells(tools)) === 'cw_list_tasks,cw_read_task', await firstCells(tools))
   check('…remembered for the table', !!(await until(async () => (await inv('ui:get'))?.panes?.['table-sort:perf-tools:calls'] === 2, HUNG_MS)), JSON.stringify((await inv('ui:get'))?.panes))
   await page.locator('.activitybar button[aria-label="Projects"]').click()
   await page.locator('.activitybar button[aria-label="Performance"]').click()
-  check('…and still sorted so when the view comes back', !!(await until(async () => (await firstCells(tools)) === 'hive_list_tasks,hive_read_task', HUNG_MS)), await firstCells(tools))
+  check('…and still sorted so when the view comes back', !!(await until(async () => (await firstCells(tools)) === 'cw_list_tasks,cw_read_task', HUNG_MS)), await firstCells(tools))
   await tools.locator('th button', { hasText: 'Calls' }).click()
   await tools.locator('th button', { hasText: 'Calls' }).click()
-  check('…until it goes back to its default (characters), which keeps nothing', (await firstCells(tools)) === 'hive_read_task,hive_list_tasks' && !Object.keys((await inv('ui:get'))?.panes ?? {}).some((k) => k.startsWith('table-sort:perf-tools:')), await firstCells(tools))
+  check('…until it goes back to its default (characters), which keeps nothing', (await firstCells(tools)) === 'cw_read_task,cw_list_tasks' && !Object.keys((await inv('ui:get'))?.panes ?? {}).some((k) => k.startsWith('table-sort:perf-tools:')), await firstCells(tools))
   const routes = perfTable('Route')
   await routes.locator('th button', { hasText: 'Failed' }).click()
   check('the routes table sorts by Failed', /\/v1\/tasks\/:n/.test((await routes.locator('tbody tr').first().innerText()) ?? ''), await routes.locator('tbody tr').first().innerText())
@@ -143,7 +143,7 @@ const check = (name, ok, extra = '') => {
   const guidanceTable = page.locator('.performance-page:visible .table-wrap', { has: page.locator('th', { hasText: 'Core' }) }).filter({ has: page.locator('th', { hasText: 'Workflow role' }) })
   const toolTable = page.locator('.performance-page:visible .table-wrap', { has: page.locator('th', { hasText: 'Descriptions' }) })
   const toolRow = async () => ((await toolTable.locator('tbody tr').allInnerTexts()).join('|')).replace(/\s+/g, ' ')
-  check('the Hive tool list a start, by workflow role, in its parts (HI-2063)', (await toolTable.count()) === 1 && /Builder 2 40 50,000 20,000 8,000 22,000/.test(await toolRow()), await toolRow())
+  check('the Combwork tool list a start, by workflow role, in its parts (HI-2063)', (await toolTable.count()) === 1 && /Builder 2 40 50,000 20,000 8,000 22,000/.test(await toolRow()), await toolRow())
   check('…and each launch’s workflow role (HI-2049)', (await guidanceTable.count()) === 1 && (await guidanceTable.locator('tbody tr', { hasText: 'Builder' }).count()) >= 1, (await page.locator('.table-wrap th').allInnerTexts()).join('|'))
   check('cancelled requests are shown apart from failures', /cancelled/.test(await page.locator('.performance-page:visible .card', { hasText: 'API requests' }).innerText()))
   await shot('wide-dark')
@@ -154,7 +154,7 @@ const check = (name, ok, extra = '') => {
   const toolPaging = async () => ((await tools7.locator('.table-paging').innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
   check('…its tools table pages: thirteen tools, ten a page', /1–10 of 13/.test(await toolPaging()) && (await tools7.locator('tbody tr').count()) === 10, await toolPaging())
   await tools7.locator('input[aria-label="Filter Tool"]').fill('shared_note')
-  check('…and filters by tool', !!(await until(async () => (await firstCells(tools7)).split(',').sort().join() === 'hive_list_shared_notes,hive_read_shared_note,hive_write_shared_note', HUNG_MS)), await firstCells(tools7))
+  check('…and filters by tool', !!(await until(async () => (await firstCells(tools7)).split(',').sort().join() === 'cw_list_shared_notes,cw_read_shared_note,cw_write_shared_note', HUNG_MS)), await firstCells(tools7))
   await tools7.locator('input[aria-label="Filter Tool"]').fill('nothing like a tool')
   check('…no matches: says so', (await tools7.locator('.table-no-match').count()) === 1)
   await tools7.locator('.table-no-match button', { hasText: 'Clear filters' }).click()
@@ -167,7 +167,7 @@ const check = (name, ok, extra = '') => {
   await routes7.locator('th button', { hasText: 'p95' }).click()
   check('…fastest first: it comes last', (await routeOrder()).at(-1) === '/v1/projects', JSON.stringify(await routeOrder()))
   await routes7.locator('th button', { hasText: 'p95' }).click()
-  check('…and says history Hive removed for space is unavailable', /removed to keep the metrics file under its size limit/.test(await page.locator('.perf-coverage').innerText()), await page.locator('.perf-coverage').innerText())
+  check('…and says history Combwork removed for space is unavailable', /removed to keep the performance history under its size limit/.test(await page.locator('.perf-coverage').innerText()), await page.locator('.perf-coverage').innerText())
   await page.locator('.performance-page:visible .segmented button', { hasText: '24 hours' }).click()
   await until(async () => (await requests()) === '47', HUNG_MS)
 
@@ -200,7 +200,7 @@ const check = (name, ok, extra = '') => {
   const who = page.locator('.performance-page:visible .perf-group', { has: page.locator('select[aria-label="Who did the work"]') }).first()
   const byProvider = page.locator('.performance-page:visible .perf-by-provider')
   check('Who frames the cards, chart and tables, not the skill service', (await who.locator('.cards').count()) === 1 && (await who.locator('.perf-trend').count()) === 1 && (await who.locator('h2', { hasText: 'Skill service' }).count()) === 0 && (await page.locator('.performance-page:visible .perf-controls select[aria-label="Who did the work"]').count()) === 0)
-  check('Provider frames only launches and the providers’ usage', (await byProvider.locator('select[aria-label="Provider"]').count()) === 1 && (await byProvider.locator('.cards').count()) === 0 && (await byProvider.locator('h2', { hasText: 'Hive tools' }).count()) === 0 && (await byProvider.locator('h2', { hasText: 'Guidance at launch' }).count()) === 1)
+  check('Provider frames only launches and the providers’ usage', (await byProvider.locator('select[aria-label="Provider"]').count()) === 1 && (await byProvider.locator('.cards').count()) === 0 && (await byProvider.locator('h2', { hasText: 'Combwork tools' }).count()) === 0 && (await byProvider.locator('h2', { hasText: 'Guidance at launch' }).count()) === 1)
   const providerOptions = () => page.locator('select[aria-label="Provider"] option').allInnerTexts()
   const guidanceRows = () => byProvider.locator('.data-table', { has: page.locator('th', { hasText: 'Launches' }) }).locator('tbody tr td:first-child').allInnerTexts()
   check('…offering every provider with data', (await providerOptions()).join() === 'All providers,Claude Code,Codex', (await providerOptions()).join())
@@ -230,7 +230,7 @@ const check = (name, ok, extra = '') => {
 
   // A scope switched while the last query is slow: the late answer for the old scope is never shown.
   await app.evaluate(() => {
-    process.env.HIVE_TEST_SLOW_IPC = 'metrics:query=2500*1'
+    process.env.CW_TEST_SLOW_IPC = 'metrics:query=2500*1'
   })
   await page.locator('.sidebar .row', { hasText: 'alpha' }).click()
   await lib.sleep(300)
@@ -239,7 +239,7 @@ const check = (name, ok, extra = '') => {
   await lib.sleep(3000) // A fixed wait on purpose: the slowed answer for the old choice arrives later, and this checks it doesn't replace the new one.
   check("…and the old scope's late reply doesn't replace it", (await requests()) === '12', await requests())
   await app.evaluate(() => {
-    process.env.HIVE_TEST_SLOW_IPC = ''
+    process.env.CW_TEST_SLOW_IPC = ''
   })
 
   await page.locator('.sidebar .row', { hasText: 'gamma' }).click()
@@ -263,7 +263,7 @@ const check = (name, ok, extra = '') => {
   await page.locator('.sidebar .row', { hasText: 'Whole workspace' }).click()
   await until(async () => (await requests()) === '47', HUNG_MS)
   const plain = (await exported())?.json
-  check('Export saves the report with its schema, version, units, coverage and trend', plain && plain.schema === 'hive-metrics/1' && plain.app.version && plain.units.bytes && plain.coverage.observedMs > 0 && plain.report.trend.length === 25 && 'alpha' in plain.report.projects, JSON.stringify(plain).slice(0, 200))
+  check('Export saves the report with its schema, version, units, coverage and trend', plain && plain.schema === 'combwork-metrics/1' && plain.app.version && plain.units.bytes && plain.coverage.observedMs > 0 && plain.report.trend.length === 25 && 'alpha' in plain.report.projects, JSON.stringify(plain).slice(0, 200))
   const clean = (await exported(['Shift']))?.text
   check('Shift+Export leaves out project names and the workspace path', clean && !/alpha|beta|performance-ws/.test(clean) && JSON.parse(clean).sanitized === true, clean && clean.slice(0, 200))
 
@@ -291,6 +291,22 @@ const check = (name, ok, extra = '') => {
   await lib.sleep(800)
   const overflow = await page.locator('.performance-page:visible').evaluate((el) => el.scrollWidth - el.clientWidth)
   check('narrow: the page itself has no sideways scroll', overflow <= 1, String(overflow))
+  // A route stays on one line (HI-2534): its table scrolls sideways rather than breaking "/v1/tasks/:n" into fragments.
+  let routeLines = []
+  const routesOnOneLine = async () => {
+    routeLines = await perfTable('Route')
+      .locator('tbody td:first-child')
+      .evaluateAll((tds) =>
+        tds.map((td) => {
+          const r = document.createRange()
+          r.selectNodeContents(td)
+          return new Set([...r.getClientRects()].map((x) => Math.round(x.top))).size
+        })
+      )
+      .catch(() => [])
+    return routeLines.length > 0 && routeLines.every((n) => n === 1)
+  }
+  check('narrow: each route is on one line', !!(await until(routesOnOneLine, HUNG_MS)), JSON.stringify(routeLines))
   await shot('narrow-light')
   await inv('settings:update', { appearance: { theme: 'dark' } })
   await lib.sleep(800)

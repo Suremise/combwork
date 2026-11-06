@@ -28,12 +28,12 @@ vi.mock('../src/main/transcriptFiles', async (orig) => {
   }
 })
 
-const base = tempDir('hive-start-import-')
+const base = tempDir('cw-start-import-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 // A test copy on its CLI test home (tests/cliHomes.ts), as an e2e run is: its agents start with no connection (the
 // seam, HI-1755; connections are on for everyone since HI-1774).
-process.env.HIVE_USER_DATA = join(base, 'profile')
-process.env.HIVE_TEST_CLI_HOME_CONNECTION = '1'
+process.env.CW_USER_DATA = join(base, 'profile')
+process.env.CW_TEST_CLI_HOME_CONNECTION = '1'
 ;(electron.shell as unknown as { trashItem: (f: string) => Promise<void> }).trashItem = async (f) => rmSync(f, { force: true })
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -49,7 +49,7 @@ const p = join(wsPath, 'proj')
 let w: ReturnType<typeof createWorkspaceService>
 const at = new Date().toISOString()
 const ids = Array.from({ length: 5 }, (_, i) => `00000000-0000-4000-9000-${String(i + 1).padStart(12, '0')}`)
-const backup = (id: string): string => join(p, '.hive', 'sessions', `${id}.jsonl`)
+const backup = (id: string): string => join(p, '.combwork', 'sessions', `${id}.jsonl`)
 const PAST = 'past the checks'
 
 describe('a start during the usage history import', () => {
@@ -60,9 +60,9 @@ describe('a start during the usage history import', () => {
   let answered = false
 
   beforeAll(async () => {
-    mkdirSync(join(wsPath, '.hive'), { recursive: true })
-    mkdirSync(join(p, '.hive', 'sessions'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'c1', name: 'Agent 1', provider: 'claude-code' }] }))
+    mkdirSync(join(wsPath, '.combwork'), { recursive: true })
+    mkdirSync(join(p, '.combwork', 'sessions'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'c1', name: 'Agent 1', provider: 'claude-code' }] }))
     for (const id of ids) writeFileSync(backup(id), JSON.stringify({ type: 'user', sessionId: id, timestamp: at, message: { role: 'user', content: 'Task' } }) + '\n')
     vi.spyOn(sessions, 'providerTranscript').mockImplementation(async () => null)
     providerService.info = ((id: string) => ({ provider: id, found: true, path: join(base, 'no-cli.exe') })) as never

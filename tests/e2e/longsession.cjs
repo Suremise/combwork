@@ -24,8 +24,8 @@ const check = (name, ok, extra = '') => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(claudeHome, { recursive: true })
   lib.gitProject(alpha)
-  // The handover the new conversation reads (the fake CLI can't write one with Hive's tools).
-  const hdir = path.join(ws, '.hive', 'shared', 'handovers')
+  // The handover the new conversation reads (the fake CLI can't write one with Combwork's tools).
+  const hdir = path.join(ws, '.combwork', 'shared', 'handovers')
   fs.mkdirSync(hdir, { recursive: true })
   fs.writeFileSync(path.join(hdir, '2026-10-01-alpha-long-work.md'), '# Long work\n\n- **Project:** alpha\n\nCarry on with the tests.\n')
   lib.enableProviders(userData)
@@ -36,13 +36,13 @@ const check = (name, ok, extra = '') => {
   cfg.settings.sessions = { ...cfg.settings.sessions, transcriptWarnMB: 1 }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47899), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47899), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
   const until = async (fn, ms = 20000) => {

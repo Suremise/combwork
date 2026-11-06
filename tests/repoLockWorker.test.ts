@@ -14,7 +14,7 @@ import type { LockReply, LockRequest } from '../src/main/repoLockWorker'
 import { useLockWorker, withRepoLock } from '../src/main/repoLock'
 import { tempDir } from './tempDir'
 
-const tmp = tempDir('hive-repo-lock-worker-')
+const tmp = tempDir('cw-repo-lock-worker-')
 const bundle = join(tmp, 'repo-lock-worker.cjs')
 
 beforeAll(async () => {
@@ -26,7 +26,7 @@ afterAll(() => useLockWorker(null))
 let n = 0
 /** A repository of its own, and its common git dir (where the lock's file is). */
 function repo(): { folder: string; dir: string } {
-  const folder = tempDir(`hive-repo-lock-worker-${++n}-`)
+  const folder = tempDir(`cw-repo-lock-worker-${++n}-`)
   execFileSync('git', ['init', '-q', folder], { windowsHide: true })
   return { folder, dir: join(folder, '.git') }
 }
@@ -84,7 +84,7 @@ describe("the repository lock's worker (HI-1680)", () => {
     const first = new Worker(bundle)
     const got = (await ask(first, { id: 1, type: 'take', dir, profile: 'test', waitMs: 10_000, noticeAfterMs: 1000 })) as { token: string }
     await first.terminate()
-    // Its row stays this process's (a live holder to other Hives) until the release by its token.
+    // Its row stays this process's (a live holder to other Combworks) until the release by its token.
     expect(repoLockHolder(dir)?.token).toBe(got.token)
     const second = new Worker(bundle)
     try {

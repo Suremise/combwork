@@ -5,7 +5,7 @@ const CHANGED_ON_DISK = msg({ id: 'actions.drafts.changedOnDisk', defaultMessage
 
 /**
  * Unsaved edits in the editors outside the Files tab (shared notes, skills, instruction and memory files,
- * MCP servers). Like the Files tab's drafts they are kept while Hive is open, so changing view or file
+ * MCP servers). Like the Files tab's drafts they are kept while Combwork is open, so changing view or file
  * doesn't lose them, and quitting, reloading, closing or switching the workspace asks about them.
  */
 export interface EditorDraft {
@@ -57,7 +57,7 @@ const under = (key: string, path: string): boolean => {
 /** Whether there are unsaved edits of this file, or of files in this folder. */
 export const hasEditorDraftsUnder = (path: string): boolean => [...drafts.keys()].some((k) => under(k, path))
 
-/** Drops the drafts of a file, or of the files in a folder, that is gone (deleted, or replaced by Hive's version). */
+/** Drops the drafts of a file, or of the files in a folder, that is gone (deleted, or replaced by Combwork's version). */
 export function clearEditorDraftsUnder(path: string): void {
   let any = false
   for (const k of [...drafts.keys()]) if (under(k, path) && drafts.delete(k)) any = true

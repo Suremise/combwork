@@ -1,0 +1,408 @@
+{
+  "content.mcp.badArgs": {
+    "placeholders": {}
+  },
+  "content.mcp.badCommand": {
+    "placeholders": {}
+  },
+  "content.mcp.badCwd": {
+    "placeholders": {}
+  },
+  "content.mcp.badName": {
+    "placeholders": {}
+  },
+  "content.mcp.badRecord": {
+    "placeholders": {
+      "field": "plain"
+    }
+  },
+  "content.mcp.badUrl": {
+    "placeholders": {}
+  },
+  "content.mcp.changedAdd": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "content.mcp.chooseFile": {
+    "placeholders": {}
+  },
+  "content.mcp.exists": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "content.mcp.jsonLarge": {
+    "placeholders": {
+      "mb": "plain"
+    }
+  },
+  "content.mcp.listNoCommand": {
+    "placeholders": {}
+  },
+  "content.mcp.listNotObject": {
+    "placeholders": {}
+  },
+  "content.mcp.noCommand": {
+    "placeholders": {}
+  },
+  "content.mcp.notJson": {
+    "placeholders": {
+      "file": "plain",
+      "reason": "plain"
+    }
+  },
+  "content.mcp.notObject": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "content.mcp.taken": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "content.mcp.zipFileLarge": {
+    "placeholders": {
+      "mb": "plain"
+    }
+  },
+  "content.mcp.zipLarge": {
+    "placeholders": {
+      "mb": "plain"
+    }
+  },
+  "content.mcp.zipLink": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "content.mcp.zipNoDefinition": {
+    "placeholders": {
+      "files": "plain"
+    }
+  },
+  "content.mcp.zipTooMany": {
+    "placeholders": {
+      "max": "number"
+    }
+  },
+  "content.mcp.zipUnreadable": {
+    "placeholders": {}
+  },
+  "content.mcp.zipUnsafe": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "content.mode.badName": {
+    "placeholders": {}
+  },
+  "content.mode.exists": {
+    "placeholders": {
+      "mode": "plain"
+    }
+  },
+  "content.mode.invalid": {
+    "placeholders": {}
+  },
+  "content.mode.noAssistant": {
+    "placeholders": {}
+  },
+  "content.mode.notBundled": {
+    "placeholders": {
+      "mode": "plain"
+    }
+  },
+  "content.mode.unknown": {
+    "placeholders": {
+      "mode": "plain"
+    }
+  },
+  "content.notes.badName": {
+    "placeholders": {}
+  },
+  "content.notes.closed": {
+    "placeholders": {}
+  },
+  "content.notes.deleteRoot": {
+    "placeholders": {}
+  },
+  "content.notes.exists": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "content.notes.nameRequired": {
+    "placeholders": {}
+  },
+  "content.notes.outside": {
+    "placeholders": {}
+  },
+  "content.skill.audience": {
+    "placeholders": {
+      "kind": "select",
+      "audience": "plain",
+      "type": "plain"
+    }
+  },
+  "content.skill.badName": {
+    "placeholders": {}
+  },
+  "content.skill.cantCopyName": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "content.skill.cantDelete": {
+    "placeholders": {}
+  },
+  "content.skill.chooseFile": {
+    "placeholders": {}
+  },
+  "content.skill.copyExists": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "content.skill.exists": {
+    "placeholders": {
+      "name": "plain",
+      "folder": "plain"
+    }
+  },
+  "content.skill.isCopy": {
+    "placeholders": {}
+  },
+  "content.skill.metadata": {
+    "placeholders": {}
+  },
+  "content.skill.noLocalFolder": {
+    "placeholders": {
+      "cli": "plain"
+    }
+  },
+  "content.skill.noTarget": {
+    "placeholders": {}
+  },
+  "content.skill.notBundled": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "content.skill.notClosed": {
+    "placeholders": {}
+  },
+  "content.skill.notClosedWithin": {
+    "placeholders": {
+      "kb": "plain"
+    }
+  },
+  "content.skill.notFields": {
+    "placeholders": {}
+  },
+  "content.skill.notListed": {
+    "placeholders": {}
+  },
+  "content.skill.notSkill": {
+    "placeholders": {}
+  },
+  "content.skill.yaml": {
+    "placeholders": {
+      "reason": "plain"
+    }
+  },
+  "content.skill.yamlAt": {
+    "placeholders": {
+      "line": "plain",
+      "reason": "plain"
+    }
+  },
+  "content.skill.zipNoSkill": {
+    "placeholders": {}
+  },
+  "content.skill.zipTooLarge": {
+    "placeholders": {
+      "mb": "plain"
+    }
+  },
+  "content.skill.zipTooMany": {
+    "placeholders": {
+      "max": "plain"
+    }
+  },
+  "content.skill.zipUnsafe": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "content.templates.agentGone": {
+    "placeholders": {}
+  },
+  "content.templates.agentsChangedChoose": {
+    "placeholders": {}
+  },
+  "content.templates.cantLoad": {
+    "placeholders": {}
+  },
+  "content.templates.cantUse": {
+    "placeholders": {
+      "name": "plain",
+      "problem": "plain"
+    }
+  },
+  "content.templates.changedSince": {
+    "placeholders": {}
+  },
+  "content.templates.changedWhile": {
+    "placeholders": {}
+  },
+  "content.templates.checkFailed": {
+    "placeholders": {
+      "agent": "plain",
+      "folder": "plain",
+      "error": "plain"
+    }
+  },
+  "content.templates.combworkOnly": {
+    "placeholders": {}
+  },
+  "content.templates.connectionAmbiguous": {
+    "placeholders": {
+      "ref": "plain",
+      "ids": "plain"
+    }
+  },
+  "content.templates.connectionChoices": {
+    "placeholders": {
+      "keys": "plain"
+    }
+  },
+  "content.templates.connectionUnknown": {
+    "placeholders": {
+      "ref": "plain"
+    }
+  },
+  "content.templates.editedMeanwhile": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "content.templates.enterName": {
+    "placeholders": {}
+  },
+  "content.templates.failed": {
+    "placeholders": {
+      "error": "plain"
+    }
+  },
+  "content.templates.gone": {
+    "placeholders": {}
+  },
+  "content.templates.importFrom10": {
+    "placeholders": {}
+  },
+  "content.templates.importNotJson": {
+    "placeholders": {}
+  },
+  "content.templates.importTooLarge": {
+    "placeholders": {
+      "kb": "plain"
+    }
+  },
+  "content.templates.loading": {
+    "placeholders": {}
+  },
+  "content.templates.nameEach": {
+    "placeholders": {}
+  },
+  "content.templates.nameEachTooLong": {
+    "placeholders": {
+      "max": "plain"
+    }
+  },
+  "content.templates.nameTaken": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "content.templates.nameTooLong": {
+    "placeholders": {
+      "max": "plain"
+    }
+  },
+  "content.templates.namesChanged": {
+    "placeholders": {}
+  },
+  "content.templates.noAgents": {
+    "placeholders": {}
+  },
+  "content.templates.noFile": {
+    "placeholders": {}
+  },
+  "content.templates.noKey": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "content.templates.noKeySave": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "content.templates.noWorkspace": {
+    "placeholders": {}
+  },
+  "content.templates.nothing": {
+    "placeholders": {
+      "problem": "plain"
+    }
+  },
+  "content.templates.overMax": {
+    "placeholders": {
+      "count": "number",
+      "max": "plural"
+    }
+  },
+  "content.templates.running": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "content.templates.scope": {
+    "placeholders": {
+      "scope": "plain"
+    }
+  },
+  "content.templates.started": {
+    "placeholders": {}
+  },
+  "content.templates.taken": {
+    "placeholders": {
+      "names": "plain",
+      "count": "plural",
+      "projects": "plain"
+    }
+  },
+  "content.templates.takenNothing": {
+    "placeholders": {
+      "names": "plain",
+      "count": "plural",
+      "projects": "plain"
+    }
+  },
+  "content.templates.twice": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "content.templates.uncommitted": {
+    "placeholders": {
+      "agent": "plain",
+      "folder": "plain"
+    }
+  },
+  "content.templates.unreadable": {
+    "placeholders": {}
+  }
+}

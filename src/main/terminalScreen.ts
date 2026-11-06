@@ -4,7 +4,7 @@ import { createLogger } from './logger'
 const log = createLogger('screen')
 
 /**
- * A session terminal's visible screen, kept in the main process so Hive can read what the CLI shows (its footer)
+ * A session terminal's visible screen, kept in the main process so Combwork can read what the CLI shows (its footer)
  * rather than the raw output: a CLI that redraws only the characters that changed (Claude Code without colours,
  * NO_COLOR) never sends the whole line again. One line of scrollback, so it holds one screen (rows × cols cells) and a
  * line: xterm 6.0's reflow, narrowing and shortening at once, can leave a buffer kept to exactly one screen with fewer
@@ -54,7 +54,7 @@ export class TerminalScreen {
   private rebuild(): void {
     const old = this.term!
     const term = TerminalScreen.create(old.cols, old.rows)
-    // What Hive reads besides the cells: bracketed paste (#597), and which screen the CLI draws on.
+    // What Combwork reads besides the cells: bracketed paste (#597), and which screen the CLI draws on.
     const modes = (old.buffer.active.type === 'alternate' ? '\x1b[?1049h' : '') + (old.modes.bracketedPasteMode ? '\x1b[?2004h' : '')
     if (modes) term.write(modes)
     this.term = term
@@ -78,7 +78,7 @@ export class TerminalScreen {
   }
 
   /**
-   * The visible lines with dim cells blanked (HI-1959): what the user or Hive typed, without a CLI's dim hint where
+   * The visible lines with dim cells blanked (HI-1959): what the user or Combwork typed, without a CLI's dim hint where
    * nothing is typed (Claude Code 2.1.312's empty input shows `Try "how does <filepath> work?"`, dim).
    */
   textWithoutDim(): string {

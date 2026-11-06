@@ -1,0 +1,854 @@
+{
+  "tasks.error.actionGone": {
+    "placeholders": {
+      "action": "select",
+      "card": "plain"
+    }
+  },
+  "tasks.error.addOwnOnly": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "tasks.error.answersNot": {
+    "placeholders": {
+      "why": "select",
+      "request": "plain",
+      "card": "plain"
+    }
+  },
+  "tasks.error.answersNotAgents": {
+    "placeholders": {}
+  },
+  "tasks.error.answersShape": {
+    "placeholders": {
+      "max": "number"
+    }
+  },
+  "tasks.error.archiveNone": {
+    "placeholders": {}
+  },
+  "tasks.error.archiveNumbers": {
+    "placeholders": {}
+  },
+  "tasks.error.archived": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "tasks.error.badAnswer": {
+    "placeholders": {
+      "max": "plain"
+    }
+  },
+  "tasks.error.badKind": {
+    "placeholders": {
+      "kind": "plain"
+    }
+  },
+  "tasks.error.badReviewSkip": {
+    "placeholders": {}
+  },
+  "tasks.error.badReviewSkipNew": {
+    "placeholders": {}
+  },
+  "tasks.error.batchGone": {
+    "placeholders": {}
+  },
+  "tasks.error.beforeArchived": {
+    "placeholders": {
+      "before": "plain",
+      "column": "select",
+      "card": "plain"
+    }
+  },
+  "tasks.error.beforeElsewhere": {
+    "placeholders": {
+      "before": "plain",
+      "other": "select",
+      "column": "select",
+      "card": "plain"
+    }
+  },
+  "tasks.error.beforeItself": {
+    "placeholders": {}
+  },
+  "tasks.error.beforeOrPosition": {
+    "placeholders": {}
+  },
+  "tasks.error.cardsNotNumber": {
+    "placeholders": {
+      "value": "plain"
+    }
+  },
+  "tasks.error.cardsTooMany": {
+    "placeholders": {
+      "max": "number"
+    }
+  },
+  "tasks.error.cardsTwice": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "tasks.error.changeNone": {
+    "placeholders": {}
+  },
+  "tasks.error.contextList": {
+    "placeholders": {}
+  },
+  "tasks.error.contextRef": {
+    "placeholders": {
+      "ref": "plain"
+    }
+  },
+  "tasks.error.decisionEmptied": {
+    "placeholders": {}
+  },
+  "tasks.error.decisionGone": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "tasks.error.decisionsUsers": {
+    "placeholders": {}
+  },
+  "tasks.error.doingNobodyNew": {
+    "placeholders": {}
+  },
+  "tasks.error.emptyComment": {
+    "placeholders": {}
+  },
+  "tasks.error.emptyDecision": {
+    "placeholders": {}
+  },
+  "tasks.error.failedToDoing": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "tasks.error.holdCard": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "tasks.error.holdNew": {
+    "placeholders": {}
+  },
+  "tasks.error.inDoingWith": {
+    "placeholders": {
+      "card": "plain",
+      "active": "plain",
+      "agent": "plain",
+      "stage": "plain",
+      "review": "plain"
+    }
+  },
+  "tasks.error.inDoingWithAnother": {
+    "placeholders": {
+      "card": "plain",
+      "active": "plain",
+      "stage": "plain",
+      "review": "plain"
+    }
+  },
+  "tasks.error.kindNeedsReason": {
+    "placeholders": {}
+  },
+  "tasks.error.kindNotAgents": {
+    "placeholders": {}
+  },
+  "tasks.error.labelFieldList": {
+    "placeholders": {
+      "field": "plain"
+    }
+  },
+  "tasks.error.labelsAddedAndRemoved": {
+    "placeholders": {
+      "labels": "plain"
+    }
+  },
+  "tasks.error.labelsList": {
+    "placeholders": {}
+  },
+  "tasks.error.labelsMixed": {
+    "placeholders": {}
+  },
+  "tasks.error.noCard": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "tasks.error.noKindProposal": {
+    "placeholders": {
+      "card": "plain",
+      "kind": "plain"
+    }
+  },
+  "tasks.error.noWorkspace": {
+    "placeholders": {}
+  },
+  "tasks.error.notReviewing": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "tasks.error.onlyUserArchives": {
+    "placeholders": {}
+  },
+  "tasks.error.onlyUserDone": {
+    "placeholders": {}
+  },
+  "tasks.error.onlyUserOrdersDone": {
+    "placeholders": {}
+  },
+  "tasks.error.onlyUserUnarchives": {
+    "placeholders": {}
+  },
+  "tasks.error.orderArchived": {
+    "placeholders": {
+      "card": "plain",
+      "column": "select"
+    }
+  },
+  "tasks.error.orderChanged": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "tasks.error.orderElsewhere": {
+    "placeholders": {
+      "card": "plain",
+      "other": "select",
+      "column": "select"
+    }
+  },
+  "tasks.error.orderNone": {
+    "placeholders": {}
+  },
+  "tasks.error.overrideNotAgents": {
+    "placeholders": {}
+  },
+  "tasks.error.overrideShape": {
+    "placeholders": {}
+  },
+  "tasks.error.ownCardsOnly": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "tasks.error.projectThenAgent": {
+    "placeholders": {}
+  },
+  "tasks.error.refsList": {
+    "placeholders": {
+      "field": "plain"
+    }
+  },
+  "tasks.error.refsNoCard": {
+    "placeholders": {
+      "field": "plain",
+      "card": "plain"
+    }
+  },
+  "tasks.error.refsNotNumber": {
+    "placeholders": {
+      "field": "plain",
+      "value": "plain"
+    }
+  },
+  "tasks.error.refsSelf": {
+    "placeholders": {
+      "field": "plain"
+    }
+  },
+  "tasks.error.repairNoProject": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "tasks.error.reviewAgentsOnly": {
+    "placeholders": {}
+  },
+  "tasks.error.reviewNotInReview": {
+    "placeholders": {
+      "card": "plain",
+      "column": "select"
+    }
+  },
+  "tasks.error.reviewOnItsOwn": {
+    "placeholders": {}
+  },
+  "tasks.error.reviewSkipInReview": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "tasks.error.reviewSkipNeedsReason": {
+    "placeholders": {}
+  },
+  "tasks.error.reviewSkipNotAgents": {
+    "placeholders": {}
+  },
+  "tasks.error.reviewSkipNothing": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "tasks.error.reviewSkipNothingNew": {
+    "placeholders": {}
+  },
+  "tasks.error.reviewSkipPast": {
+    "placeholders": {
+      "stage": "select",
+      "card": "plain"
+    }
+  },
+  "tasks.error.reviewTaken": {
+    "placeholders": {
+      "agent": "plain",
+      "card": "plain",
+      "since": "plain"
+    }
+  },
+  "tasks.error.setAsideGone": {
+    "placeholders": {}
+  },
+  "tasks.error.staysInProject": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "tasks.error.tooLong": {
+    "placeholders": {
+      "what": "select",
+      "max": "number"
+    }
+  },
+  "tasks.error.tooManyContext": {
+    "placeholders": {
+      "max": "plain"
+    }
+  },
+  "tasks.error.tooManyDecisions": {
+    "placeholders": {
+      "max": "plain"
+    }
+  },
+  "tasks.error.tooManyLabels": {
+    "placeholders": {
+      "max": "plain"
+    }
+  },
+  "tasks.error.unknownAgent": {
+    "placeholders": {
+      "agent": "plain",
+      "project": "plain"
+    }
+  },
+  "tasks.error.unknownColumn": {
+    "placeholders": {
+      "column": "plain",
+      "choices": "plain"
+    }
+  },
+  "tasks.error.unknownPosition": {
+    "placeholders": {
+      "position": "plain"
+    }
+  },
+  "tasks.error.unknownProject": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "tasks.error.unknownReview": {
+    "placeholders": {
+      "review": "plain"
+    }
+  },
+  "tasks.error.verdictNotYours": {
+    "placeholders": {
+      "agent": "plain",
+      "card": "plain"
+    }
+  },
+  "tasks.error.waitingNotActive": {
+    "placeholders": {
+      "card": "plain",
+      "active": "plain"
+    }
+  },
+  "tasks.error.waitingNotYours": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "tasks.error.waitingTooLong": {
+    "placeholders": {
+      "max": "number"
+    }
+  },
+  "tasks.history.answerTold": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "tasks.history.answerUntold": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "tasks.history.answerUntoldNeed": {
+    "placeholders": {
+      "agent": "plain",
+      "action": "select"
+    }
+  },
+  "tasks.history.archived": {
+    "placeholders": {}
+  },
+  "tasks.history.archivedDone": {
+    "placeholders": {
+      "days": "plural"
+    }
+  },
+  "tasks.history.archivedHidden": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "tasks.history.archivedInBatch": {
+    "placeholders": {
+      "n": "number",
+      "label": "plain"
+    }
+  },
+  "tasks.history.archivedRemoved": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "tasks.history.assistantAskUntold": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "tasks.history.assistantAsked": {
+    "placeholders": {
+      "text": "plain"
+    }
+  },
+  "tasks.history.attachmentsCleaned": {
+    "placeholders": {
+      "n": "plural",
+      "names": "plain",
+      "days": "plural"
+    }
+  },
+  "tasks.history.backWithBatch": {
+    "placeholders": {
+      "label": "plain"
+    }
+  },
+  "tasks.history.blocked": {
+    "placeholders": {
+      "reason": "plain"
+    }
+  },
+  "tasks.history.builderReply": {
+    "placeholders": {
+      "text": "plain"
+    }
+  },
+  "tasks.history.closedByDecision": {
+    "placeholders": {
+      "question": "plain"
+    }
+  },
+  "tasks.history.context": {
+    "placeholders": {
+      "refs": "plain"
+    }
+  },
+  "tasks.history.contextRemoved": {
+    "placeholders": {}
+  },
+  "tasks.history.created": {
+    "placeholders": {
+      "column": "select"
+    }
+  },
+  "tasks.history.decision": {
+    "placeholders": {
+      "decision": "plain"
+    }
+  },
+  "tasks.history.decisionChanged": {
+    "placeholders": {
+      "decision": "plain",
+      "was": "plain"
+    }
+  },
+  "tasks.history.decisionRemoved": {
+    "placeholders": {
+      "decision": "plain"
+    }
+  },
+  "tasks.history.decisionsTold": {
+    "placeholders": {
+      "agent": "plain",
+      "count": "plural"
+    }
+  },
+  "tasks.history.dependsOn": {
+    "placeholders": {
+      "cards": "plain"
+    }
+  },
+  "tasks.history.description": {
+    "placeholders": {}
+  },
+  "tasks.history.followUpSubmitted": {
+    "placeholders": {
+      "revision": "plain"
+    }
+  },
+  "tasks.history.fromOlder": {
+    "placeholders": {
+      "was": "plain"
+    }
+  },
+  "tasks.history.given": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "tasks.history.imported": {
+    "placeholders": {
+      "project": "plain",
+      "was": "plain"
+    }
+  },
+  "tasks.history.kind": {
+    "placeholders": {
+      "how": "select",
+      "kind": "select"
+    }
+  },
+  "tasks.history.labels": {
+    "placeholders": {
+      "labels": "plain"
+    }
+  },
+  "tasks.history.labelsAdded": {
+    "placeholders": {
+      "labels": "plain"
+    }
+  },
+  "tasks.history.labelsAddedTakenOff": {
+    "placeholders": {
+      "added": "plain",
+      "removed": "plain"
+    }
+  },
+  "tasks.history.labelsRemoved": {
+    "placeholders": {}
+  },
+  "tasks.history.labelsTakenOff": {
+    "placeholders": {
+      "labels": "plain"
+    }
+  },
+  "tasks.history.linked": {
+    "placeholders": {
+      "cards": "plain"
+    }
+  },
+  "tasks.history.linksRemoved": {
+    "placeholders": {}
+  },
+  "tasks.history.loopStep": {
+    "placeholders": {
+      "step": "select",
+      "text": "plain"
+    }
+  },
+  "tasks.history.loopWake": {
+    "placeholders": {
+      "agent": "plain",
+      "kind": "select"
+    }
+  },
+  "tasks.history.moved": {
+    "placeholders": {
+      "column": "select"
+    }
+  },
+  "tasks.history.movedBefore": {
+    "placeholders": {
+      "column": "select",
+      "before": "plain"
+    }
+  },
+  "tasks.history.movedBeforeIn": {
+    "placeholders": {
+      "before": "plain",
+      "column": "select"
+    }
+  },
+  "tasks.history.movedBottom": {
+    "placeholders": {
+      "column": "select"
+    }
+  },
+  "tasks.history.movedTop": {
+    "placeholders": {
+      "column": "select"
+    }
+  },
+  "tasks.history.noDependencies": {
+    "placeholders": {}
+  },
+  "tasks.history.notWaiting": {
+    "placeholders": {}
+  },
+  "tasks.history.notified": {
+    "placeholders": {
+      "event": "select",
+      "lane": "plain",
+      "hasWhy": "select",
+      "why": "plain"
+    }
+  },
+  "tasks.history.placed": {
+    "placeholders": {
+      "place": "plural",
+      "column": "select"
+    }
+  },
+  "tasks.history.queueReturned": {
+    "placeholders": {
+      "reason": "select",
+      "target": "plain",
+      "check": "plain",
+      "files": "select"
+    }
+  },
+  "tasks.history.renamed": {
+    "placeholders": {
+      "title": "plain"
+    }
+  },
+  "tasks.history.repaired": {
+    "placeholders": {
+      "from": "plain",
+      "to": "plain"
+    }
+  },
+  "tasks.history.requestClosed": {
+    "placeholders": {
+      "why": "select"
+    }
+  },
+  "tasks.history.restored": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "tasks.history.returned": {
+    "placeholders": {
+      "round": "plain"
+    }
+  },
+  "tasks.history.reviewCopyLeased": {
+    "placeholders": {
+      "agent": "plain",
+      "copy": "plain",
+      "revision": "plain"
+    }
+  },
+  "tasks.history.reviewCopyWaiting": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "tasks.history.reviewEnded": {
+    "placeholders": {
+      "agent": "plain",
+      "why": "select"
+    }
+  },
+  "tasks.history.reviewFailed": {
+    "placeholders": {}
+  },
+  "tasks.history.reviewPassed": {
+    "placeholders": {}
+  },
+  "tasks.history.reviewSkip": {
+    "placeholders": {
+      "how": "select"
+    }
+  },
+  "tasks.history.reviewStarted": {
+    "placeholders": {}
+  },
+  "tasks.history.reviewStopped": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "tasks.history.reviewerRequest": {
+    "placeholders": {
+      "text": "plain"
+    }
+  },
+  "tasks.history.safeguardStop": {
+    "placeholders": {
+      "agent": "plain",
+      "stops": "plural",
+      "model": "select",
+      "time": "plain",
+      "to": "plain",
+      "from": "plain",
+      "since": "plain",
+      "state": "select",
+      "hasTools": "select",
+      "tools": "plain",
+      "hasHelp": "select",
+      "help": "plain"
+    }
+  },
+  "tasks.history.stageRepaired": {
+    "placeholders": {
+      "stage": "select"
+    }
+  },
+  "tasks.history.startsWithout": {
+    "placeholders": {
+      "card": "plain",
+      "reason": "plain"
+    }
+  },
+  "tasks.history.takenFrom": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "tasks.history.takenFromAgent": {
+    "placeholders": {}
+  },
+  "tasks.history.takenFromOf": {
+    "placeholders": {
+      "agent": "plain",
+      "project": "plain"
+    }
+  },
+  "tasks.history.takenFromOfWorkspace": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "tasks.history.toProject": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "tasks.history.toWorkspace": {
+    "placeholders": {}
+  },
+  "tasks.history.unarchived": {
+    "placeholders": {}
+  },
+  "tasks.history.unblocked": {
+    "placeholders": {}
+  },
+  "tasks.history.waiting": {
+    "placeholders": {
+      "reason": "plain"
+    }
+  },
+  "tasks.history.watchEnded": {
+    "placeholders": {
+      "watcher": "plain",
+      "why": "select",
+      "agent": "plain"
+    }
+  },
+  "tasks.start.alreadyStarting": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "tasks.start.archived": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "tasks.start.beingGiven": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "tasks.start.changed": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "tasks.start.movedColumn": {
+    "placeholders": {
+      "card": "plain",
+      "column": "select"
+    }
+  },
+  "tasks.start.movedDone": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "tasks.start.movedProject": {
+    "placeholders": {
+      "card": "plain",
+      "project": "plain"
+    }
+  },
+  "tasks.start.movedWorkspace": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "tasks.start.noProject": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "tasks.start.noSlot": {
+    "placeholders": {
+      "card": "plain",
+      "active": "select"
+    }
+  },
+  "tasks.start.notGiven": {
+    "placeholders": {
+      "agent": "plain",
+      "card": "plain",
+      "why": "plain"
+    }
+  },
+  "tasks.start.noteTooLong": {
+    "placeholders": {
+      "max": "number"
+    }
+  },
+  "tasks.start.reassigned": {
+    "placeholders": {
+      "card": "plain",
+      "who": "select"
+    }
+  },
+  "tasks.start.userTyping": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  }
+}

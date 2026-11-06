@@ -1,8 +1,8 @@
 // The preload runs in the window, beside its page (HI-1964): its DOM is said here, not found by chance through a test's import.
 /// <reference lib="dom" />
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron'
-import type { HiveBridge } from '../shared/api'
-import type { HiveEvent } from '../shared/types'
+import type { CombworkBridge } from '../shared/api'
+import type { CombworkEvent } from '../shared/types'
 import { COMMIT_WATCH_ARG, FROM_MAIN_EVENT } from '../shared/commitWatch'
 
 /**
@@ -24,23 +24,23 @@ const noteArrived = (what: string): void => {
   arrived.push({ at, what, n: 1 })
   if (arrived.length > 300) arrived.shift()
 }
-ipcRenderer.on('hive:event', (_: IpcRendererEvent, event: HiveEvent) => noteArrived(`event ${event.type}`)) // i18n-ignore: hive.log, in English
-ipcRenderer.on('pty:data', () => noteArrived('terminal output')) // i18n-ignore: hive.log, in English
-ipcRenderer.on('pty:exit', () => noteArrived('terminal exit')) // i18n-ignore: hive.log, in English
+ipcRenderer.on('cw:event', (_: IpcRendererEvent, event: CombworkEvent) => noteArrived(`event ${event.type}`)) // i18n-ignore: combwork.log, in English
+ipcRenderer.on('pty:data', () => noteArrived('terminal output')) // i18n-ignore: combwork.log, in English
+ipcRenderer.on('pty:exit', () => noteArrived('terminal exit')) // i18n-ignore: combwork.log, in English
 
-const bridge: HiveBridge = {
+const bridge: CombworkBridge = {
   invoke: (channel, ...args) =>
     ipcRenderer.invoke(channel, ...args).then(
-      (r) => (noteArrived(`reply ${channel}`), r), // i18n-ignore: hive.log, in English
+      (r) => (noteArrived(`reply ${channel}`), r), // i18n-ignore: combwork.log, in English
       (e: unknown) => {
-        noteArrived(`reply ${channel} (failed)`) // i18n-ignore: hive.log, in English
+        noteArrived(`reply ${channel} (failed)`) // i18n-ignore: combwork.log, in English
         throw e
       }
     ),
   onEvent(listener) {
-    const handler = (_: IpcRendererEvent, event: HiveEvent): void => listener(event)
-    ipcRenderer.on('hive:event', handler)
-    return () => ipcRenderer.removeListener('hive:event', handler)
+    const handler = (_: IpcRendererEvent, event: CombworkEvent): void => listener(event)
+    ipcRenderer.on('cw:event', handler)
+    return () => ipcRenderer.removeListener('cw:event', handler)
   },
   onPtyData(listener) {
     const handler = (_: IpcRendererEvent, key: string, data: string): void => listener(key, data)
@@ -58,4 +58,4 @@ const bridge: HiveBridge = {
   arrivals: (from, to) => arrived.filter((a) => a.at >= from && a.at <= to).map((a) => (a.n > 1 ? `${a.what} ×${a.n}` : a.what))
 }
 
-contextBridge.exposeInMainWorld('hive', bridge)
+contextBridge.exposeInMainWorld('combwork', bridge)

@@ -1,4 +1,4 @@
-// A card's kind (#1277, SPEC §16.7.3, OP-6/OP-7), on the real board (a temp hive.db): code by default; the user's or
+// A card's kind (#1277, SPEC §16.7.3, OP-6/OP-7), on the real board (a temp combwork.db): code by default; the user's or
 // the Assistant's no-code from the start; a project agent's only proposed (the card stays code, a KindProposed fact)
 // until the user or the Assistant confirms it (KindDecided) or keeps it code; changing it later is an exception to the
 // rules: the user's asked first, the Assistant's with a reason, one Override (card.kind); agents never.
@@ -8,7 +8,7 @@ import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-cardkind-')
+const base = tempDir('cw-cardkind-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -32,8 +32,8 @@ let n = 0
 
 async function workspace(): Promise<WS> {
   const ws = join(base, `ws-${++n}`)
-  mkdirSync(join(ws, 'p', '.hive'), { recursive: true })
-  writeFileSync(join(ws, 'p', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }] }))
+  mkdirSync(join(ws, 'p', '.combwork'), { recursive: true })
+  writeFileSync(join(ws, 'p', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }] }))
   const w = createWorkspaceService()
   await w.open(ws)
   opened.push(w)

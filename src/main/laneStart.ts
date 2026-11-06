@@ -1,15 +1,21 @@
 import { basename, join } from 'path'
 import { projectAgents } from '../shared/defaults'
+import { agentList, agentMsg, inDefaultDialect, inDialectOf, say } from '../shared/agentText'
 import { msg } from '../shared/i18n'
 import { laneBrief, type LaneRole } from '../shared/laneBrief'
+import { laneStartDue, ownOpen } from '../shared/lanes'
 import { cardLabel } from '../shared/projectKeys'
 import type { LaneInfo, LaneStartInfo, LaneStartRequest, LaneStartResult } from '../shared/types'
 import { cancelDeliveries, deliveriesOf, launchWith } from './deliveries'
 import { legacyWorktree, slotsMigrated } from './agentFolders'
-import { lendLane } from './slotCards'
+import { lendLane, placementDue, slotFolderOf } from './slotCards'
+import { containsPlace } from './fsutil'
+import { startTask, START_NOTE_MAX } from './taskStart'
+import { CW_LANE_START } from './tasks'
+import { inWorkspace } from './workspace'
 import { agentWorkflowRole, buildsWork, reviewsWork } from '../shared/workflow/roles'
-import { HiveError, hiveError } from './hiveError'
-import { changeFreshStart, freshStartsNow, holdLaneStart, laneRunsWith, listLanes, oweFreshStart, rawLanes, refuseWhileTeamPaused, retryFreshStarts, setLaneSlotWait, startLane } from './lanes'
+import { CombworkError, combworkError } from './combworkError'
+import { changeFreshStart, freshStartsNow, holdLaneStart, laneNow, laneRunsWith, lanesEnforced, listLanes, oweFreshStart, rawLanes, refuseWhileTeamPaused, retryFreshStarts, setLaneSlotWait, startLane } from './lanes'
 import { createLogger, userText } from './logger'
 import { whyNoLine } from './lineWriter'
 import { sessions } from './sessions'
@@ -50,6 +56,70 @@ const M = {
   starting: msg({ id: 'service.laneStart.starting', defaultMessage: 'The lane of agent {agent} is being started already.', description: 'An error starting a lane from the window: one with the same builder ({agent}) is being started right now. A noun before the name (glossary §1 rule 4).' })
 }
 
+/** What a lane's start says to agents (dialects, HI-2438): its replies, the builder's prompt, and what it stores. */
+const A = {
+  byUser: agentMsg({ id: 'brief.start.byUser', text: 'the user', note: 'Who started a lane from the window, as the lane records it: its brief says "from the user" to the builder. Stored, so the Default\'s.' }),
+  fromUser: agentMsg({ id: 'brief.start.fromUser', text: 'the user', note: "Who a lane's brief is from, as the delivery records it and its agent's inbox names its sender. Stored, so the Default's." }),
+  notGiven: agentMsg({
+    id: 'brief.start.notGiven',
+    text: "{agent}'s brief wasn't given ({state})",
+    note: "Why an agent didn't start on a lane: its brief's delivery ended without being given (state: cancelled, refused, expired or stale). It is the why in brief.record.failedOne."
+  }),
+  retryCancel: agentMsg({ id: 'brief.start.retryCancel', text: 'the retry of its new conversation', note: 'Who cancelled the briefs of a lane agent\'s blocked new conversation, as the delivery records it ("cancelled by …"), as it is tried again. Stored, so the Default\'s.' }),
+  builderPrompt: agentMsg({
+    id: 'brief.start.builderPrompt',
+    text: 'Use card-loop as the builder of lane {lane}: cw_lane next names your card.',
+    note: "HR2's HI-1900 round 1: a running lane updated while its builder isn't running starts it with one line naming its lane, as coordinate-agents had the Assistant do."
+  }),
+  firstWithBrief: agentMsg({
+    id: 'brief.start.firstWithBrief',
+    text: "Combwork started this card for you: it is your lane's first card, and your lane's brief follows. Use card-loop as its builder (cw_lane next names the cards after it).",
+    note: "HI-2558: a lane started over a stopped builder in slots gives it its first card and its brief in one task. The note of the card's start prompt, before the builder's brief (brief.lane.*)."
+  }),
+  builderStarted: agentMsg({ id: 'brief.start.builderStarted', text: "{agent} wasn't running: started it on the lane.", note: "The lane change's reply: the lane's builder wasn't running, so Combwork started it with brief.start.builderPrompt." }),
+  builderFailed: agentMsg({
+    id: 'brief.start.builderFailed',
+    text: "{agent} isn't running and couldn't be started ({error}): start it for the lane to go on.",
+    note: "The lane change's reply: the lane's builder wasn't running, and starting it failed (error: why)."
+  }),
+  byCombwork: agentMsg({
+    id: 'brief.record.byCombwork',
+    text: "{agent} is running, so Combwork left it as it is: Combwork gives it the lane's first card itself once it is free, so don't prompt it.",
+    note: "HI-2029: a running builder, the rules on: Combwork gives it the lane's first card once it is free, so the caller is told not to prompt it (that would race Combwork's start)."
+  }),
+  tell: agentMsg({
+    id: 'brief.record.tell',
+    text: '{agents} {count, plural, one {is running, so Combwork left it as it is: tell it about the lane.} other {are running, so Combwork left them as they are: tell them about the lane.}}',
+    note: 'A running reviewer, or the builder with the rules off: left as they are, for the caller to tell. agents: their names, joined ("a and b").'
+  }),
+  noSlot: agentMsg({
+    id: 'brief.record.noSlot',
+    text: 'No slot is free ({why}): the lane waits for one, and its stopped agents start once it is lent.',
+    note: "#1438: a lane recorded while no slot of the project's is free."
+  }),
+  started: agentMsg({
+    id: 'brief.record.started',
+    text: "Started {agents} with the lane's brief{hasSlot, select, yes {, in {slot}} other {}}.",
+    note: 'The stopped agents started with their brief (agents: their names, joined "a and b"); slot: the slot the builder works in, when the project has slots.'
+  }),
+  fresh: agentMsg({
+    id: 'brief.record.fresh',
+    text: "Gave {agent} the lane in a new conversation (its last stays in its Sessions history): don't prompt it.",
+    note: "HI-2232: an idle agent given the lane in a new conversation: never the caller's to prompt."
+  }),
+  deferred: agentMsg({
+    id: 'brief.record.deferred',
+    text: "{agent} wasn't free: Combwork gives it the lane in a new conversation once it is, so don't prompt it.",
+    note: 'HI-2034: an agent not free yet is owed its new conversation, given once it is free.'
+  }),
+  failedOne: agentMsg({ id: 'brief.record.failedOne', text: "{agent} didn't start ({hasWhy, select, yes {{why}} other {unknown}})", note: 'One agent that failed to start on the lane, with why (unknown when there is none). Joined by "; " into brief.record.failed.' }),
+  failed: agentMsg({
+    id: 'brief.record.failed',
+    text: '{failed}: start {count, plural, one {it} other {them}} yourself.',
+    note: 'failed: each agent that failed to start (brief.record.failedOne), joined by "; ". The lane is recorded: the caller starts them, or ends the lane.'
+  })
+}
+
 /** Builders whose lane is being started (a second Start meanwhile is refused). */
 const starting = new Set<string>()
 
@@ -61,43 +131,43 @@ export async function startLaneFromWindow(ws: WorkspaceService, projectPath: str
   const agents = projectAgents(cfg)
   const agentOf = (id: string) => {
     const a = agents.find((x) => x.id === id)
-    if (!a) throw hiveError(M.unknownAgent, { agent: id, project }, { kind: 'notFound' })
+    if (!a) throw combworkError(M.unknownAgent, { agent: id, project }, { kind: 'notFound' })
     return a
   }
   const builder = agentOf(req.builder)
   const reviewer = req.reviewer && !req.pool ? agentOf(req.reviewer) : null
-  if (reviewer && reviewer.id === builder.id) throw hiveError(M.sameAgent, undefined, { kind: 'invalid' })
-  if (!req.cards.length) throw hiveError(M.noCards, undefined, { kind: 'invalid' })
+  if (reviewer && reviewer.id === builder.id) throw combworkError(M.sameAgent, undefined, { kind: 'invalid' })
+  if (!req.cards.length) throw combworkError(M.noCards, undefined, { kind: 'invalid' })
   const cards: { number: number; key: string; title: string }[] = []
   for (const n of req.cards) {
     // Read in the window's workspace (HI-2288): card numbers overlap between workspaces.
     const c = await getTask(n, ws).catch(() => null)
-    if (!c || c.archived || c.project.toLowerCase() !== project.toLowerCase()) throw hiveError(M.notTheProjects, { card: c ? cardLabel(c) : `#${n}`, project }, { kind: 'invalid' })
-    if (c.column === 'done') throw hiveError(M.done, { card: cardLabel(c) }, { kind: 'conflict' })
+    if (!c || c.archived || c.project.toLowerCase() !== project.toLowerCase()) throw combworkError(M.notTheProjects, { card: c ? cardLabel(c) : `#${n}`, project }, { kind: 'invalid' })
+    if (c.column === 'done') throw combworkError(M.done, { card: cardLabel(c) }, { kind: 'conflict' })
     cards.push({ number: c.number, key: cardLabel(c), title: c.title })
   }
   // What the project's rules ask (none while they are off): a reviewer agent's review needs a reviewer.
   const platform = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.platform?.id
   const options = workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null
-  if (options && !reviewer && !req.pool && (options.review === 'agent' || options.review === 'agentThenYou')) throw hiveError(M.needsReviewer, { project }, { kind: 'invalid' })
+  if (options && !reviewer && !req.pool && (options.review === 'agent' || options.review === 'agentThenYou')) throw combworkError(M.needsReviewer, { project }, { kind: 'invalid' })
   // The pool (#1443): only where the rules have it (with them off, the lane's reviewer is whoever the user names), and
   // only with someone in it besides the builder.
   const pool = req.pool ? poolOf(cfg, options) : null
-  if (req.pool && !pool) throw hiveError(M.poolNotOffered, { project }, { kind: 'invalid' })
-  if (pool && !pool.some((a) => a.id !== builder.id)) throw hiveError(M.poolEmpty, { project }, { kind: 'invalid' })
+  if (req.pool && !pool) throw combworkError(M.poolNotOffered, { project }, { kind: 'invalid' })
+  if (pool && !pool.some((a) => a.id !== builder.id)) throw combworkError(M.poolEmpty, { project }, { kind: 'invalid' })
   const pooled = pool?.filter((a) => a.id !== builder.id).map((a) => a.name) ?? null
   // Both free now, checked before anything is recorded (again by each start below).
   for (const a of [builder, reviewer]) {
     const st = a ? sessions.liveFor(projectPath, a.id) : null
-    if (a && st && BUSY.has(st.status)) throw hiveError(M.busy, { agent: a.name, status: st.status }, { kind: 'conflict' })
+    if (a && st && BUSY.has(st.status)) throw combworkError(M.busy, { agent: a.name, status: st.status }, { kind: 'conflict' })
   }
   const key = `${projectPath.toLowerCase()}|${builder.id}`
-  if (starting.has(key)) throw hiveError(M.starting, { agent: builder.name }, { kind: 'conflict' })
-  // Hive's own start of the lane's card waits for this one to lend its slot and start its agents (HI-2029).
+  if (starting.has(key)) throw combworkError(M.starting, { agent: builder.name }, { kind: 'conflict' })
+  // Combwork's own start of the lane's card waits for this one to lend its slot and start its agents (HI-2029).
   const release = holdLaneStart(ws, project, builder.id)
   starting.add(key)
   try {
-    const recorded = await startLane(ws, { project, builder: builder.id, reviewer: reviewer?.id ?? null, ...(pool ? { pool: true } : {}), cards: cards.map((c) => c.number), name: req.name?.trim() || null, by: 'the user', ...(req.applyNow ? { applyNow: true } : {}) }) // i18n-ignore: who started it, as the lane records it (agents read it)
+    const recorded = await startLane(ws, { project, builder: builder.id, reviewer: reviewer?.id ?? null, ...(pool ? { pool: true } : {}), cards: cards.map((c) => c.number), name: req.name?.trim() || null, by: inDefaultDialect(() => say(A.byUser)), ...(req.applyNow ? { applyNow: true } : {}) })
     const where = await builderWhere(projectPath, builder, options, noCodeOnly(ws, cards.map((c) => c.number)))
     if (where.inSlots) {
       // Its slot, lent before its agents start and kept for the whole lane (§16.10.2). None free: the lane is recorded
@@ -109,7 +179,10 @@ export async function startLaneFromWindow(ws: WorkspaceService, projectPath: str
         return { lane: recorded.lane as LaneInfo, started: [], waitingForSlot: got.waiting }
       }
       const brief = briefFor(recorded.lane.rounds, project, cards, builder, reviewer, pooled, options, where, got.slot, req.note ?? '')
-      return { lane: recorded.lane as LaneInfo, started: await launchAgents(ws, projectPath, recorded.lane.id, builder, reviewer, brief, undefined, undefined, undefined, req.note ?? ''), slot: got.slot }
+      // Its first card and brief in one task where it can be (HI-2558), else the builder launched with its brief.
+      const first = await firstCardWithBrief(ws, projectPath, recorded.lane.id, builder, brief('builder'), got.slot, true)
+      const rest = await launchAgents(ws, projectPath, recorded.lane.id, builder, reviewer, brief, undefined, undefined, undefined, req.note ?? '', first ? 'builder' : undefined)
+      return { lane: recorded.lane as LaneInfo, started: first ? [first, ...rest] : rest, slot: got.slot }
     }
     const brief = briefFor(recorded.lane.rounds, project, cards, builder, reviewer, pooled, options, where, null, req.note ?? '')
     return { lane: recorded.lane as LaneInfo, started: await launchAgents(ws, projectPath, recorded.lane.id, builder, reviewer, brief, undefined, undefined, undefined, req.note ?? '') }
@@ -163,8 +236,8 @@ export async function checkLanePool(ws: WorkspaceService, projectPath: string, b
   const platform = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.platform?.id
   const options = workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null
   const pool = poolOf(cfg, options)
-  if (!pool) throw hiveError(M.poolNotOffered, { project }, { kind: 'invalid' })
-  if (!pool.some((a) => a.id !== builderId)) throw hiveError(M.poolEmpty, { project }, { kind: 'invalid' })
+  if (!pool) throw combworkError(M.poolNotOffered, { project }, { kind: 'invalid' })
+  if (!pool.some((a) => a.id !== builderId)) throw combworkError(M.poolEmpty, { project }, { kind: 'invalid' })
 }
 
 /** What Start Lane… offers for a project (#1443): Pool in its reviewer list, with the pool's agents, where the rules have one. */
@@ -200,20 +273,20 @@ async function laneCards(ws: WorkspaceService, project: string, numbers: readonl
 
 /** A lane brief's delivery identity (#1438): one per lane and role, so a lane's agents are started with it once. */
 const BRIEF = 'lane-brief'
-/** A launch refused because its start is over (Hive quitting): nothing given, nothing failed. */
+/** A launch refused because its start is over (Combwork quitting): nothing given, nothing failed. */
 class LaunchOver extends Error {}
 /** An agent of a lane started only where stopped (`stoppedOnly`) found running at its launch: left as it is. */
 class StartedMeanwhile extends Error {}
 /**
  * An agent that can't be given its new conversation now for a reason that passes by itself (HI-2034): in a turn, or a
- * prompt Hive typed not taken yet, or no line of Hive's free to go in. Its new conversation is owed (the lane's
+ * prompt Combwork typed not taken yet, or no line of Combwork's free to go in. Its new conversation is owed (the lane's
  * `freshStart`), never dropped and never replaced by the old conversation.
  */
 class NotFreeYet extends Error {}
 /** A fresh start's obligation no longer this launch's (HI-2034: the lane ended or changed, retried or cleared meanwhile). */
 class FreshGone extends Error {}
 /** newConversation's refusal for a prompt not taken yet (sessions.ts): it passes, as NotFreeYet does. */
-const notTakenYet = (e: unknown): boolean => e instanceof HiveError && (e.text as { id?: string }).id === 'session.newConversation.pending'
+const notTakenYet = (e: unknown): boolean => e instanceof CombworkError && (e.text as { id?: string }).id === 'session.newConversation.pending'
 /** A delivery that ended without reaching its agent: made again. */
 const NOT_GIVEN: ReadonlySet<string> = new Set(['cancelled', 'refused', 'expired', 'stale'])
 
@@ -221,19 +294,21 @@ const NOT_GIVEN: ReadonlySet<string> = new Set(['cancelled', 'refused', 'expired
  * Starts a lane's builder and reviewer, each in a fresh conversation with its brief: one not running is started with it,
  * an idle one ends its conversation (kept in its Sessions tab) and starts a new one, one busy is refused (the lane stays).
  * An agent whose brief for this lane was already given (`lane-brief`, `<lane>:<role>`: a start cut short by a crash, made
- * again) isn't started again. `over` (Hive quitting, #1628): no agent is started from then on, the ones not started left
+ * again) isn't started again. `over` (Combwork quitting, #1628): no agent is started from then on, the ones not started left
  * out of the result, so the lane's next start (its next pass) starts them. `stoppedOnly` (a lane the Assistant or a
  * script recorded, HI-1934): an agent running, or in `left` (running when the caller looked, so its slot was decided
  * without it, HR6's round 1), is left out and never given a new conversation; one found running at its launch, idle or
  * busy, is left out too, never reported as failed. Except those in `renew` (HI-2232: an idle builder outside slots),
  * launched as Start Lane… launches them: a new conversation, owed if it isn't free at its launch.
  */
-async function launchAgents(ws: WorkspaceService, projectPath: string, laneId: string, builder: AgentDef, reviewer: AgentDef | null, brief: (role: LaneRole) => string, over: () => boolean = () => false, stoppedOnly?: { left: ReadonlySet<string>; renew?: ReadonlySet<string> }, fresh?: FreshLaunch, note = ''): Promise<LaneStartResult['started']> {
+async function launchAgents(ws: WorkspaceService, projectPath: string, laneId: string, builder: AgentDef, reviewer: AgentDef | null, brief: (role: LaneRole) => string, over: () => boolean = () => false, stoppedOnly?: { left: ReadonlySet<string>; renew?: ReadonlySet<string> }, fresh?: FreshLaunch, note = '', skip?: LaneRole): Promise<LaneStartResult['started']> {
   const project = basename(projectPath)
   const started: LaneStartResult['started'] = []
   for (const [a, role] of [[builder, 'builder'], ...(reviewer ? [[reviewer, 'reviewer']] : [])] as [AgentDef, LaneRole][]) {
     // A fresh start owed (HI-2034): only that role, its obligation checked again at the launch.
     if (fresh && fresh.role !== role) continue
+    // Given its brief some other way (HI-2558: the builder's with its first card).
+    if (skip === role) continue
     let how: 'fresh' | 'started' = 'started'
     if (over()) break
     // Left as it is, unless it is to be given its new conversation (HI-2232).
@@ -248,7 +323,7 @@ async function launchAgents(ws: WorkspaceService, projectPath: string, laneId: s
     if (stoppedOnly && leftAlone && (stoppedOnly.left.has(a.id) || sessions.liveFor(projectPath, a.id))) continue
     try {
       // Still the project's agent, read again after the awaits above.
-      if (!projectAgents(await ws.projectConfig(projectPath)).some((x) => x.id === a.id)) throw hiveError(M.unknownAgent, { agent: a.name, project }, { kind: 'notFound' })
+      if (!projectAgents(await ws.projectConfig(projectPath)).some((x) => x.id === a.id)) throw combworkError(M.unknownAgent, { agent: a.name, project }, { kind: 'notFound' })
       const ref = `${laneId}:${role}`
       // Given before (or still on its way under the deliveries' own policy), only: one that ended without being given
       // (its launch failed: cancelled; refused, expired, stale) is made again.
@@ -265,19 +340,19 @@ async function launchAgents(ws: WorkspaceService, projectPath: string, laneId: s
       // Free where it is launched (HR6's #1280 round 1): checked with no await before its conversation is replaced
       // (newConversation's `allowed` runs just before it stops the agent), so one that started work meanwhile keeps
       // it: it is reported as not started, and the lane stays.
-      // In a turn, a prompt not taken yet or a line of Hive's not free to go in (HI-2034): its new conversation is owed;
+      // In a turn, a prompt not taken yet or a line of Combwork's not free to go in (HI-2034): its new conversation is owed;
       // asked to sign in again, refused (that doesn't pass by itself). An owed one's obligation is checked here too, so
       // nothing replaces the conversation once it is gone (the lane ended or changed, a retry, cleared).
       const free = (): void => {
         if (over()) throw new LaunchOver()
         stillOurs()
         const st = sessions.liveFor(projectPath, a.id)
-        if (st?.status === 'signin') throw hiveError(M.busy, { agent: a.name, status: st.status }, { kind: 'conflict' })
+        if (st?.status === 'signin') throw combworkError(M.busy, { agent: a.name, status: st.status }, { kind: 'conflict' })
         if (st && (BUSY.has(st.status) || sessions.agentNow(projectPath, a.id)?.pending || whyNoLine(projectPath, a.id, 'free') !== null)) throw new NotFreeYet(st.status)
       }
       // A renewal's lane gone during the awaits above: no brief made for it.
       if (renewing) stillOurs()
-      const launched = await launchWith(projectPath, { agentId: a.id, agentName: a.name, kind: 'task', from: { kind: 'user', name: 'the user' }, body: brief(role), source: BRIEF, ref }, (line) => { // i18n-ignore: who the brief is from, as agents read it
+      const launched = await launchWith(projectPath, { agentId: a.id, agentName: a.name, kind: 'task', from: { kind: 'user', name: inDefaultDialect(() => say(A.fromUser)) }, body: brief(role), source: BRIEF, ref }, (line) => {
         // Running by now (stoppedOnly), whatever it is doing: left as it is, before the busy check would call it failed.
         if (leftAlone && !over() && sessions.liveFor(projectPath, a.id)) throw new StartedMeanwhile()
         free()
@@ -297,10 +372,10 @@ async function launchAgents(ws: WorkspaceService, projectPath: string, laneId: s
         })
       })
       // Made and then ended without being given (its launch failed after the record was saved): not started.
-      if (launched.record && NOT_GIVEN.has(launched.record.state)) throw new Error(`${a.name}'s brief wasn't given (${launched.record.state})`) // i18n-ignore: an error for the log (the lane waits to be started)
+      if (launched.record && NOT_GIVEN.has(launched.record.state)) throw new Error(say(A.notGiven, { agent: a.name, state: launched.record.state }))
       started.push({ agentId: a.id, name: a.name, role, how })
     } catch (e) {
-      // Over at its launch (Hive quitting): not started, and no failure; the next start starts it.
+      // Over at its launch (Combwork quitting): not started, and no failure; the next start starts it.
       if (e instanceof LaunchOver || over()) break
       // Started by someone else as it was launched (stoppedOnly): left as it is, as a running one is.
       if (e instanceof StartedMeanwhile) continue
@@ -323,6 +398,74 @@ async function launchAgents(ws: WorkspaceService, projectPath: string, laneId: s
   return started
 }
 
+/**
+ * A lane's first card and its builder's brief in one task (HI-2558): with the rules on, in the lane's slot `slot`, its
+ * builder stopped (or, `idleToo`, idle outside that slot: Start Lane…'s renewal, given its new conversation there), the
+ * lane's card due to start (laneStartDue) a code card, Combwork starts it on the builder itself, as laneStarts.ts starts
+ * later ones, with the brief in its start's note. The slot's placement makes the card's line and starts the builder there
+ * once, with the card and the brief together, never the brief first and the card one turn later (the start's "End your
+ * turn now"). Null where it doesn't apply or the start is refused (its rules, the builder busy, the lane changed): the
+ * caller launches the builder with its brief, step by step as before, and the refusal is said to it there. A first card
+ * already started on the builder and still to be placed (a lane start cut short, made again) counts as given.
+ */
+async function firstCardWithBrief(ws: WorkspaceService, projectPath: string, laneId: string, builder: AgentDef, brief: string, slot: string, idleToo: boolean): Promise<LaneStartResult['started'][number] | null> {
+  try {
+    if (!(await lanesEnforced())) return null
+    const view = laneNow(ws, { lane: laneId })
+    if (!view || view.builder.id !== builder.id) return null
+    const st = sessions.liveFor(projectPath, builder.id)
+    const given: LaneStartResult['started'][number] = { agentId: builder.id, name: builder.name, role: 'builder', how: st ? 'fresh' : 'started' }
+    // Started already and its placement still to come: the placement starts it with its card and brief.
+    const open = view.cards.find(ownOpen)
+    if (open && open.column === 'doing' && !st && (await getTask(open.number, ws).catch(() => null))?.agent === builder.id && (await placementDue(ws, projectPath, open.number))) return given
+    const next = laneStartDue(view)
+    if (!next || noCodeOnly(ws, [next.number])) return null
+    if (st && (!idleToo || !IDLE.has(st.status) || containsPlace(await slotFolderOf(ws, projectPath, slot), st.cwd))) return null
+    // Said in the builder's own dialect, as laneStarts.ts says a later card's note.
+    const note = `${inDialectOf({ projectPath, agentId: builder.id }, () => say(A.firstWithBrief))}\n\n${brief}`
+    if (note.length > START_NOTE_MAX) return null
+    await inWorkspace(ws, () =>
+      startTask(next.number, { kind: 'agent', agentId: builder.id }, CW_LANE_START, note, undefined, (now) => {
+        // Still this lane's card due on this builder where the start is written.
+        const v = laneNow(ws, { lane: laneId }, now)
+        if (!v || v.builder.id !== builder.id || laneStartDue(v)?.number !== next.number) throw new Error('its lane changed meanwhile') // i18n-ignore: for the log
+      })
+    )
+    log.info(`Lane ${laneId}: started #${next.number} on ${userText(builder.name)} with its brief, in ${userText(slot)}`)
+    return given
+  } catch (e) {
+    log.info(`Lane ${laneId}: its first card not started with ${userText(builder.name)}'s brief (${userText((e as Error).message)}): its brief given first`)
+    return null
+  }
+}
+
+/**
+ * A lane's first card whose slot couldn't be prepared (slotCards' pass, HI-2558): its builder, stopped and never given
+ * the lane's brief (its brief went with the card, which never reached it), started with its brief now, as the step by
+ * step start would have, so it reads the failure's wake there. Nothing for a builder running, one given its brief before,
+ * or a card that isn't the lane's first still to do.
+ */
+export async function briefAfterFailedPrepare(ws: WorkspaceService, projectPath: string, n: number, builderId: string): Promise<void> {
+  const lane = (await rawLanes(ws)).find((l) => l.state === 'active' && l.builder.id === builderId && l.cards.includes(n))
+  if (!lane || sessions.liveFor(projectPath, builderId)) return
+  if (laneNow(ws, { lane: lane.id })?.cards.find(ownOpen)?.number !== n) return
+  const ref = `${lane.id}:builder`
+  if ((await deliveriesOf(projectPath, builderId)).some((r) => r.source === BRIEF && r.ref === ref && !NOT_GIVEN.has(r.state))) return
+  const cfg = await ws.projectConfig(projectPath)
+  const agents = projectAgents(cfg)
+  const builder = agents.find((a) => a.id === builderId)
+  if (!builder) return
+  const reviewer = lane.reviewer ? (agents.find((a) => a.id === lane.reviewer!.id) ?? null) : null
+  const cards = await laneCards(ws, basename(projectPath), lane.cards)
+  const platform = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.platform?.id
+  const options = workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null
+  const pooled = lane.pool ? (poolOf(cfg, options)?.filter((a) => a.id !== builder.id).map((a) => a.name) ?? []) : null
+  const slot = (await listLanes(ws)).find((l) => l.id === lane.id)?.slot ?? null
+  const brief = briefFor(lane.rounds, basename(projectPath), cards, builder, reviewer, pooled, options, { legacy: null }, slot, lane.slotWait?.note ?? '')
+  const [r] = await launchAgents(ws, projectPath, lane.id, builder, null, brief, undefined, { left: new Set() })
+  log.info(`Lane ${lane.id}: #${n}'s slot wasn't prepared, so ${userText(builder.name)} started with its brief (${r?.how ?? 'left as it is'})`)
+}
+
 /** What `launchRecordedLane` did: the stopped agents started (as Start Lane…'s), the slot lent or waited for, and those running. */
 export interface RecordedLaneLaunch {
   started: LaneStartResult['started']
@@ -331,11 +474,11 @@ export interface RecordedLaneLaunch {
   /** The builder or reviewer running already and left as it is (busy, in slots, or the reviewer), the lane recorded for it; the caller tells it. */
   running: string[]
   /**
-   * The lane's builder's name, and whether Hive gives a running one the lane's first card itself once it is free (the
+   * The lane's builder's name, and whether Combwork gives a running one the lane's first card itself once it is free (the
    * workflow rules on: laneStarts.ts, HI-2029): then the caller tells only the reviewer (HR1: a prompt would race it).
    */
   builder?: string
-  firstCardByHive?: boolean
+  firstCardByCombwork?: boolean
 }
 
 /**
@@ -356,8 +499,8 @@ export async function launchRecordedLane(ws: WorkspaceService, projectPath: stri
   const builder = agents.find((a) => a.id === lane.builder.id)
   const reviewer = lane.reviewer ? (agents.find((a) => a.id === lane.reviewer!.id) ?? null) : null
   if (!builder) return null
-  // Who the reply names, and whether Hive starts a running builder's first card (the rules on, HI-2029).
-  const who = { builder: builder.name, firstCardByHive: workflowEnforced() }
+  // Who the reply names, and whether Combwork starts a running builder's first card (the rules on, HI-2029).
+  const who = { builder: builder.name, firstCardByCombwork: workflowEnforced() }
   const platform = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.platform?.id
   const options = workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null
   // Its cards all no-code (HI-2338): no slot.
@@ -384,7 +527,10 @@ export async function launchRecordedLane(ws: WorkspaceService, projectPath: stri
       return { started: [], waitingForSlot: got.waiting, running, ...who }
     }
     const brief = briefFor(lane.rounds, basename(projectPath), cards, builder, reviewer, pooled, options, where, got.slot, '')
-    const started = await launchAgents(ws, projectPath, laneId, builder, reviewer, brief, undefined, only)
+    // Its stopped builder given its first card and brief in one task where it can be (HI-2558).
+    const first = await firstCardWithBrief(ws, projectPath, laneId, builder, brief('builder'), got.slot, false)
+    const rest = await launchAgents(ws, projectPath, laneId, builder, reviewer, brief, undefined, only, undefined, '', first ? 'builder' : undefined)
+    const started = first ? [first, ...rest] : rest
     log.info(`Lane ${laneId} lent ${userText(got.slot)}: ${started.map((s) => `${userText(s.name)} ${s.how}`).join(', ')}`)
     return { started, slot: got.slot, running: runningOf(started), ...who }
   }
@@ -396,38 +542,38 @@ export async function launchRecordedLane(ws: WorkspaceService, projectPath: stri
 
 /**
  * A running lane the Assistant or a script updated while its builder isn't running (HR2's HI-1900 round 1): its builder
- * started with one line naming its lane, as coordinate-agents had the Assistant do, so the lane goes on (`hive_lane next`
+ * started with one line naming its lane, as coordinate-agents had the Assistant do, so the lane goes on (`cw_lane next`
  * names its card; a card in a slot is placed there as it starts). What happened, for the reply.
  */
 export async function resumeLaneBuilder(projectPath: string, lane: { id: string; builder: { id: string; name: string } }): Promise<string> {
   if (sessions.liveFor(projectPath, lane.builder.id)) return ''
   try {
-    await sessions.start(projectPath, { agentId: lane.builder.id, prompt: `Use card-loop as the builder of lane ${lane.id}: hive_lane next names your card.` }) // i18n-ignore: the builder's prompt (agent-facing)
+    await sessions.start(projectPath, { agentId: lane.builder.id, prompt: inDialectOf({ projectPath, agentId: lane.builder.id }, () => say(A.builderPrompt, { lane: lane.id })) })
     log.info(`Lane ${lane.id}: started its builder ${userText(lane.builder.name)}, who wasn't running`)
-    return `${lane.builder.name} wasn't running: started it on the lane.` // i18n-ignore: the lane start's reply (the Assistant and scripts read it)
+    return say(A.builderStarted, { agent: lane.builder.name })
   } catch (e) {
-    return `${lane.builder.name} isn't running and couldn't be started (${(e as Error).message}): start it for the lane to go on.` // i18n-ignore: the lane start's reply (the Assistant and scripts read it)
+    return say(A.builderFailed, { agent: lane.builder.name, error: (e as Error).message })
   }
 }
 
 /** What `launchRecordedLane` did, for the lane start's reply (agent-facing English: the Assistant and scripts read it). */
 export function recordedLaneNote(l: RecordedLaneLaunch | null): string {
   if (!l) return ''
-  // A running builder, the rules on: Hive gives it the lane's first card once it is free (HI-2029), so the caller is told
-  // not to prompt it (that would race Hive's start); a running reviewer, or the builder with the rules off, it tells.
-  const byHive = l.firstCardByHive && l.builder && l.running.includes(l.builder) ? l.builder : null
-  const tell = l.running.filter((n) => n !== byHive)
+  // A running builder, the rules on: Combwork gives it the lane's first card once it is free (HI-2029), so the caller is told
+  // not to prompt it (that would race Combwork's start); a running reviewer, or the builder with the rules off, it tells.
+  const byCombwork = l.firstCardByCombwork && l.builder && l.running.includes(l.builder) ? l.builder : null
+  const tell = l.running.filter((n) => n !== byCombwork)
   const running = [
-    byHive ? `${byHive} is running, so Hive left it as it is: Hive gives it the lane's first card itself once it is free, so don't prompt it.` : '', // i18n-ignore: the lane start's reply (the Assistant and scripts read it)
-    tell.length ? `${tell.join(' and ')} ${tell.length > 1 ? 'are' : 'is'} running, so Hive left ${tell.length > 1 ? 'them' : 'it'} as ${tell.length > 1 ? 'they are' : 'it is'}: tell ${tell.length > 1 ? 'them' : 'it'} about the lane.` : '' // i18n-ignore: the lane start's reply (the Assistant and scripts read it)
+    byCombwork ? say(A.byCombwork, { agent: byCombwork }) : '',
+    tell.length ? say(A.tell, { agents: agentList(tell), count: tell.length }) : ''
   ].filter(Boolean).join(' ')
-  if (l.waitingForSlot !== undefined) return [`No slot is free (${l.waitingForSlot}): the lane waits for one, and its stopped agents start once it is lent.`, running].filter(Boolean).join(' ') // i18n-ignore: the lane start's reply (the Assistant and scripts read it)
+  if (l.waitingForSlot !== undefined) return [say(A.noSlot, { why: String(l.waitingForSlot) }), running].filter(Boolean).join(' ')
   const ok = l.started.filter((s) => s.how === 'started').map((s) => s.name)
   // An idle builder given the lane in a new conversation (HI-2232), now or once it is free: never the caller's to prompt.
-  const fresh = l.started.filter((s) => s.how === 'fresh').map((s) => `Gave ${s.name} the lane in a new conversation (its last stays in its Sessions history): don't prompt it.`) // i18n-ignore: the lane start's reply (the Assistant and scripts read it)
-  const owed = l.started.filter((s) => s.how === 'deferred').map((s) => `${s.name} wasn't free: Hive gives it the lane in a new conversation once it is, so don't prompt it.`) // i18n-ignore: the lane start's reply (the Assistant and scripts read it)
-  const failed = l.started.filter((s) => s.how === 'failed').map((s) => `${s.name} didn't start (${s.why ?? 'unknown'})`) // i18n-ignore: the lane start's reply (the Assistant and scripts read it)
-  return [ok.length ? `Started ${ok.join(' and ')} with the lane's brief${l.slot ? `, in ${l.slot}` : ''}.` : '', ...fresh, ...owed, failed.length ? `${failed.join('; ')}: start ${failed.length > 1 ? 'them' : 'it'} yourself.` : '', running].filter(Boolean).join(' ')
+  const fresh = l.started.filter((s) => s.how === 'fresh').map((s) => say(A.fresh, { agent: s.name }))
+  const owed = l.started.filter((s) => s.how === 'deferred').map((s) => say(A.deferred, { agent: s.name }))
+  const failed = l.started.filter((s) => s.how === 'failed').map((s) => say(A.failedOne, { agent: s.name, hasWhy: s.why != null ? 'yes' : 'no', why: s.why ?? '' }))
+  return [ok.length ? say(A.started, { agents: agentList(ok), hasSlot: l.slot ? 'yes' : 'no', slot: l.slot ?? '' }) : '', ...fresh, ...owed, failed.length ? say(A.failed, { failed: failed.join('; '), count: failed.length }) : '', running].filter(Boolean).join(' ')
 }
 
 /**
@@ -436,7 +582,7 @@ export function recordedLaneNote(l: RecordedLaneLaunch | null): string {
  * each once, as Start Lane… would have, from the lane as it is now (its builder and reviewer, still the project's
  * agents and the builder still one; its cards; the rules now; the note it was started with). Whether they all started
  * (false: the lane keeps waiting to be started; not running any more: nothing is started, and it is done with).
- * `over` (Hive quitting, #1628), looked at after each await and at each agent's launch: from then on nothing is read
+ * `over` (Combwork quitting, #1628), looked at after each await and at each agent's launch: from then on nothing is read
  * or started, and it is false, the lane left waiting (with its slot lent) for the next start's pass.
  */
 export async function startWaitingLane(ws: WorkspaceService, projectPath: string, laneId: string, slot: string | null, over: () => boolean = () => false): Promise<boolean> {
@@ -456,7 +602,12 @@ export async function startWaitingLane(ws: WorkspaceService, projectPath: string
   const options = workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null
   const pooled = lane.pool ? (poolOf(cfg, options)?.filter((a) => a.id !== builder.id).map((a) => a.name) ?? []) : null
   const brief = briefFor(lane.rounds, basename(projectPath), cards, builder, reviewer, pooled, options, { legacy: null }, slot, lane.slotWait?.note ?? '')
-  const started = await launchAgents(ws, projectPath, laneId, builder, reviewer, brief, over, lane.slotWait?.stoppedOnly === true ? { left: new Set() } : undefined, undefined, lane.slotWait?.note ?? '')
+  const stoppedOnly = lane.slotWait?.stoppedOnly === true
+  // Its first card and brief in one task where it can be (HI-2558): an idle builder too where Start Lane… waited.
+  const first = slot && options && !over() ? await firstCardWithBrief(ws, projectPath, laneId, builder, brief('builder'), slot, !stoppedOnly) : null
+  if (over()) return false
+  const rest = await launchAgents(ws, projectPath, laneId, builder, reviewer, brief, over, stoppedOnly ? { left: new Set() } : undefined, undefined, lane.slotWait?.note ?? '', first ? 'builder' : undefined)
+  const started = first ? [first, ...rest] : rest
   if (over()) return false
   log.info(`Lane ${laneId} got ${slot ? userText(slot) : 'no slot (only no-code cards)'}: ${started.map((s) => `${userText(s.name)} ${s.how}`).join(', ')}`)
   return started.every((s) => s.how !== 'failed')
@@ -475,7 +626,7 @@ interface FreshLaunch {
 /** What launchFresh did: its agent in its new conversation, not free yet, its obligation gone, or no more tried. */
 export type FreshOutcome = 'launched' | 'notFree' | 'gone' | 'blocked'
 
-/** A launch's marker still set (`launching`) as Hive's pass looks: the run id the start task went into ('launching' while it starts). */
+/** A launch's marker still set (`launching`) as Combwork's pass looks: the run id the start task went into ('launching' while it starts). */
 const LAUNCHING_RUN = 'launching'
 
 /**
@@ -563,7 +714,8 @@ export async function launchFresh(ws: WorkspaceService, projectPath: string, lan
  * cancellation that fails fails the Retry, nothing owed again. Then each, still the same blocked obligation under the
  * lanes' lock, is owed again from now (retryFreshStarts). How many.
  */
-export async function retryFreshStart(ws: WorkspaceService, laneId: string): Promise<number> {
+/** `commit`: a revocable caller's authority (HI-2420, the Assistant's guard), checked again in each write it makes. */
+export async function retryFreshStart(ws: WorkspaceService, laneId: string, commit?: () => void): Promise<number> {
   const lane = (await rawLanes(ws)).find((l) => l.id === laneId)
   if (!lane || lane.state !== 'active' || !ws.path) return 0
   const blocked = (lane.freshStart ?? []).filter((f) => f.blocked)
@@ -574,9 +726,9 @@ export async function retryFreshStart(ws: WorkspaceService, laneId: string): Pro
     const earlier = new Set((await deliveriesOf(projectPath, f.agent)).filter((r) => r.source === BRIEF && r.ref === ref).map((r) => r.id))
     // For tests: the cancellation held (a pass running meanwhile finds the obligation still blocked).
     await laneStartTestHooks.retryCancelling?.()
-    if (earlier.size) await cancelDeliveries(projectPath, f.agent, 'the retry of its new conversation', undefined, (r) => earlier.has(r.id)) // i18n-ignore: who cancelled a delivery (agent-facing, the log)
+    if (earlier.size) await cancelDeliveries(projectPath, f.agent, inDefaultDialect(() => say(A.retryCancel)), undefined, (r) => earlier.has(r.id), commit)
   }
-  const retried = await retryFreshStarts(ws, laneId, new Set(blocked.map((f) => f.id)))
+  const retried = await retryFreshStarts(ws, laneId, new Set(blocked.map((f) => f.id)), commit)
   if (retried.length) log.info(`Lane ${laneId}: ${retried.map((f) => f.role).join(' and ')}'s new conversation tried again`)
   return retried.length
 }

@@ -3,7 +3,7 @@ import { resolve } from 'path'
 import type { RecentWorkspace } from '../shared/types'
 import { config } from './config'
 import { emit } from './events'
-import { hiveWindows } from './windows'
+import { combworkWindows } from './windows'
 
 /**
  * The recent workspaces (File → Open Recent, the welcome page; #144). The list itself is config.json's
@@ -13,7 +13,7 @@ import { hiveWindows } from './windows'
 const key = (p: string): string => resolve(p).toLowerCase()
 
 /** The workspaces open in a window now, by key. */
-const openNow = (): Set<string> => new Set(hiveWindows().flatMap((e) => (e.ws.path ? [key(e.ws.path)] : [])))
+const openNow = (): Set<string> => new Set(combworkWindows().flatMap((e) => (e.ws.path ? [key(e.ws.path)] : [])))
 
 /**
  * The list as a window showing `viewing` sees it: each entry with whether its folder is there (checked now; one that

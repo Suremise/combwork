@@ -11,7 +11,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { follow } from './followDoorbell'
 
-const base = tempDir('hive-action-handlers-')
+const base = tempDir('cw-action-handlers-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 mkdirSync(join(base, 'profile'), { recursive: true })
 
@@ -58,15 +58,15 @@ let n = 0
 async function open(cfg: Record<string, unknown> = {}): Promise<{ w: WS; ws: string; alpha: string }> {
   const ws = join(base, `ws-${++n}`)
   const alpha = join(ws, 'alpha')
-  mkdirSync(join(alpha, '.hive'), { recursive: true })
-  writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }], ...cfg }))
+  mkdirSync(join(alpha, '.combwork'), { recursive: true })
+  writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }], ...cfg }))
   const w = createWorkspaceService()
   await w.open(ws)
   opened.push(w)
   return { w, ws, alpha }
 }
 
-/** Stand-in sessions (as loopWakes.test's): each agent running in a status, and what each read from Hive's doorbell. */
+/** Stand-in sessions (as loopWakes.test's): each agent running in a status, and what each read from Combwork's doorbell. */
 function fake(alpha: string, status: Record<string, string> = { b1: 'ready', r1: 'ready' }) {
   const state = { status: new Map(Object.entries(status)), typed: [] as { agent: string; text: string }[], notices: [] as { title: unknown; body: unknown }[] }
   Object.assign(sessions, {
@@ -81,7 +81,10 @@ function fake(alpha: string, status: Record<string, string> = { b1: 'ready', r1:
       state.typed.push({ agent: id, text: await follow(alpha, id, text) })
     },
     watchChanged: () => undefined,
-    notice: (_p: string, title: unknown, body: unknown) => void state.notices.push({ title, body })
+    notice: (p: string, title: unknown, body: unknown) => {
+      // Other tests' workspaces can still finish a lane check after this stand-in is installed (HI-2431).
+      if (p.toLowerCase() === alpha.toLowerCase()) state.notices.push({ title, body })
+    }
   })
   return state
 }
@@ -114,7 +117,7 @@ async function inReview(w: WS): Promise<number> {
 }
 /** The workspace's deliveries a durable action made (its id on them). */
 const madeBy = (ws: string, action: number): number => (store.workspaceDb(ws).reader.prepare('SELECT count(*) AS n FROM deliveries WHERE action = ?').get(action) as { n: number }).n
-/** Writes a fact and a `wake` action for it, as the runtime does (its own connection: another Hive, or before a restart). */
+/** Writes a fact and a `wake` action for it, as the runtime does (its own connection: another Combwork, or before a restart). */
 function runtimeWake(ws: string, card: number, kind: 'ReviewerRequest' | 'Stale', data: Record<string, unknown>, payload: Record<string, unknown>): number {
   const own = FactStore.open(store.boardFile(ws), { project: 'alpha', key: 'alpha' })
   try {
@@ -146,7 +149,7 @@ describe('loop wakes from the facts (#1266)', () => {
     await typedUntil(st, 2)
     expect(st.typed.at(-1)).toMatchObject({ agent: 'b1' })
     // HI-1990: what comes next in its lane, in place of carrying on with the card (the next one is in Doing already).
-    expect(st.typed.at(-1)!.text).toMatch(new RegExp(`^\\[Hive\\] #${c} is in Done.*Your lane's next card, #${next} \\("Work"\\), is under way: carry on with it`))
+    expect(st.typed.at(-1)!.text).toMatch(new RegExp(`^\\[CW\\] #${c} is in Done.*Your lane's next card, #${next} \\("Work"\\), is under way: carry on with it`))
     // Moved back by the user (its builder told) and on again by its own builder: its own change wakes it not.
     st.status.set('b1', 'ready')
     await inWorkspace(w, () => tasks.updateTask(c, { column: 'passed' }, user))
@@ -199,7 +202,7 @@ describe('loop wakes from the facts (#1266)', () => {
     await worker.runActions(w)
     await typedUntil(st, 1)
     expect(st.typed[0]).toMatchObject({ agent: 'b1' })
-    expect(st.typed[0].text).toContain('Hive: "stale: submit again"')
+    expect(st.typed[0].text).toContain('Combwork: "stale: submit again"')
   })
 })
 
@@ -208,13 +211,13 @@ describe("the merge queue's comment on a card it returned (HI-2087)", () => {
   const commentAction = (ws: string, card: number): number => {
     const own = FactStore.open(store.boardFile(ws), { project: 'alpha', key: 'alpha' })
     try {
-      return own.tx((tx) => tx.action(card, 'comment', { text: `alpha-${card} came back from the merge queue: a conflict with main in a.txt. Merge main into your worktree, resolve the conflict, commit and submit again (hive_submit).`, shown: { id: 'tasks.history.queueReturned', values: { reason: 'conflict', target: 'main', check: '', files: 'a.txt' } } }, null))
+      return own.tx((tx) => tx.action(card, 'comment', { text: `alpha-${card} came back from the merge queue: a conflict with main in a.txt. Merge main into your worktree, resolve the conflict, commit and submit again (cw_submit).`, shown: { id: 'tasks.history.queueReturned', values: { reason: 'conflict', target: 'main', check: '', files: 'a.txt' } } }, null))
     } finally {
       own.close()
     }
   }
   const stateOf = (ws: string, id: number): string => (store.workspaceDb(ws).reader.prepare('SELECT state FROM card_actions WHERE id = ?').get(id) as { state: string }).state
-  const hiveComments = async (w: WS, c: number) => (await inWorkspace(w, () => tasks.getTask(c))).comments.filter((x) => x.by === 'Hive')
+  const combworkComments = async (w: WS, c: number) => (await inWorkspace(w, () => tasks.getTask(c))).comments.filter((x) => x.by === 'Combwork')
 
   it('written once on the card, its English and its message; a run again (after a restart) writes nothing more', async () => {
     const { w, ws } = await open()
@@ -223,15 +226,15 @@ describe("the merge queue's comment on a card it returned (HI-2087)", () => {
     await worker.runActions(w)
     await worker.actionsSettled()
     expect(stateOf(ws, id)).toBe('done')
-    const said = await hiveComments(w, c)
+    const said = await combworkComments(w, c)
     expect(said).toHaveLength(1)
-    expect(said[0]).toMatchObject({ id: `action-${id}`, text: expect.stringMatching(/^alpha-\d+ came back from the merge queue: a conflict with main in a\.txt\./), hiveText: { id: 'tasks.history.queueReturned' } })
+    expect(said[0]).toMatchObject({ id: `action-${id}`, text: expect.stringMatching(/^alpha-\d+ came back from the merge queue: a conflict with main in a\.txt\./), appText: { id: 'tasks.history.queueReturned' } })
     // As a restart would find it: pending again, run again. Its comment is there already (its id): none more.
     store.workspaceDb(ws).writer.prepare("UPDATE card_actions SET state = 'pending' WHERE id = ?").run(id)
     await worker.runActions(w)
     await worker.actionsSettled()
     expect(stateOf(ws, id)).toBe('done')
-    expect(await hiveComments(w, c)).toHaveLength(1)
+    expect(await combworkComments(w, c)).toHaveLength(1)
   })
 
   it("a write that fails: the action is recorded failed, never done without its comment; an archived card's is done with none", async () => {
@@ -246,7 +249,7 @@ describe("the merge queue's comment on a card it returned (HI-2087)", () => {
       notices.noticeTestHooks.commentFails = undefined
     }
     expect(stateOf(ws, id)).toBe('failed')
-    expect(await hiveComments(w, failing)).toHaveLength(0)
+    expect(await combworkComments(w, failing)).toHaveLength(0)
     // Archived since: nothing to say it on, done.
     const c = await newCard(w)
     await inWorkspace(w, () => tasks.archiveTask(c, true))
@@ -254,7 +257,7 @@ describe("the merge queue's comment on a card it returned (HI-2087)", () => {
     await worker.runActions(w)
     await worker.actionsSettled()
     expect(stateOf(ws, gone)).toBe('done')
-    expect(await hiveComments(w, c)).toHaveLength(0)
+    expect(await combworkComments(w, c)).toHaveLength(0)
   })
 })
 
@@ -361,7 +364,7 @@ describe("the builder's watch hears its reviewer's request and the user's decisi
     await watches.evaluateWatches(w)
     await typedUntil(st, 1)
     expect(st.typed[0].agent).toBe('b1')
-    expect(st.typed[0].text).toBe(`[Hive] #${c} is in Review (its reviewer asks you something); latest comment by R1 (alpha): "Which commit did you test?". Your card watch has ended: carry on (hive_read_task with latestComment for the comment in full).`)
+    expect(st.typed[0].text).toBe(`[CW] #${c} is in Review (its reviewer asks you something); latest comment by R1 (alpha): "Which commit did you test?". Your card watch has ended: carry on (cw_read_task with latestComment for the comment in full).`)
     // The request's history line, which the watch counted; the runtime's wake ran (left to the watch, or made and
     // dropped as told by it, whichever came first) and typed no second line.
     expect((await inWorkspace(w, () => tasks.getTask(c, w))).history.map((h) => `${h.by}: ${h.what}`)).toContain('R1 (alpha): Asked the builder: "Which commit did you test?"')
@@ -393,7 +396,7 @@ describe("the builder's watch hears its reviewer's request and the user's decisi
     await settled()
     await deliveries.offerAllForTests()
     expect(st.typed).toHaveLength(2)
-    for (const t of st.typed) expect(t.text).toMatch(new RegExp(`^\\[Hive\\] #${c} (\\(B1's card\\) )?is in Review \\(a new decision from the user: read its decisions\\).*Your card watch has ended`))
+    for (const t of st.typed) expect(t.text).toMatch(new RegExp(`^\\[CW\\] #${c} (\\(B1's card\\) )?is in Review \\(a new decision from the user: read its decisions\\).*Your card watch has ended`))
     // A watch for the card to be in Done only doesn't count it: the decision line tells it.
     st.typed.length = 0
     st.status.set('b1', 'watching')
@@ -425,7 +428,7 @@ describe("the builder's watch hears its reviewer's request and the user's decisi
     // What it read (one doorbell can hand it both): the decision line too, not taken as told by the watch.
     const read = () => st.typed.filter((t) => t.agent === 'b1').map((t) => t.text).join(' ')
     await vi.waitFor(async () => {
-      // Idle again (the session's status event, in Hive): its watch's line is made, then the lines are offered.
+      // Idle again (the session's status event, in Combwork): its watch's line is made, then the lines are offered.
       await watches.evaluateWatches(w)
       await deliveries.offerAllForTests()
       if (st.status.get('b1') === 'working') st.status.set('b1', 'ready')
@@ -511,7 +514,7 @@ describe("the builder's watch hears its reviewer's request and the user's decisi
   })
 })
 
-describe('decisions on several cards, and another Hive (#1266 round 2)', () => {
+describe('decisions on several cards, and another Combwork (#1266 round 2)', () => {
   it("decisions on two Review cards for one busy builder: its line tells both (the second's wake carries the first's card on)", async () => {
     const { w, alpha } = await open()
     const st = fake(alpha, { b1: 'working', r1: 'working' })
@@ -530,17 +533,17 @@ describe('decisions on several cards, and another Hive (#1266 round 2)', () => {
     expect(said).toContain(`#${second} has 1 new decision`)
   })
 
-  it("another Hive's delivery, saved after this one read its own, outlives this one's next save", async () => {
+  it("another Combwork's delivery, saved after this one read its own, outlives this one's next save", async () => {
     const { w, ws, alpha } = await open()
     fake(alpha, { b1: 'working', r1: 'working' })
     await inReview(w)
     await settled()
-    const mine = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: { kind: 'hive', name: 'Hive' }, body: 'old local' })
+    const mine = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: { kind: 'combwork', name: 'Combwork' }, body: 'old local' })
     const db = store.workspaceDb(ws).writer
     const row = db.prepare('SELECT * FROM deliveries WHERE id = ?').get(mine.id) as Record<string, unknown>
-    // Another Hive's, with the id this one would give next, and an action's.
+    // Another Combwork's, with the id this one would give next, and an action's.
     const next = `m${mine.seq + 1}`
-    const theirs = { ...row, id: next, seq: mine.seq + 1, body: 'another Hive wake', action: 99999 }
+    const theirs = { ...row, id: next, seq: mine.seq + 1, body: 'another Combwork wake', action: 99999 }
     const { DatabaseSync } = await import('node:sqlite')
     const outside = new DatabaseSync(store.boardFile(ws))
     try {
@@ -548,9 +551,9 @@ describe('decisions on several cards, and another Hive (#1266 round 2)', () => {
     } finally {
       outside.close()
     }
-    const later = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: { kind: 'hive', name: 'Hive' }, body: 'later local' })
+    const later = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: { kind: 'combwork', name: 'Combwork' }, body: 'later local' })
     // Theirs is kept as they saved it; this one's new delivery took the next free id instead of theirs.
-    expect({ ...(db.prepare('SELECT id, body FROM deliveries WHERE action = 99999').get() as object) }).toEqual({ id: next, body: 'another Hive wake' })
+    expect({ ...(db.prepare('SELECT id, body FROM deliveries WHERE action = 99999').get() as object) }).toEqual({ id: next, body: 'another Combwork wake' })
     expect(later.id).not.toBe(next)
     expect({ ...(db.prepare('SELECT body FROM deliveries WHERE host = (SELECT host FROM deliveries WHERE action = 99999) AND id = ?').get(later.id) as object) }).toEqual({ body: 'later local' })
     expect(deliveries.deliveryNow(alpha, later.id)?.body).toBe('later local')
@@ -587,7 +590,7 @@ describe('off switches (#1266)', () => {
 })
 
 describe('notices (#1266, §16.11.4)', () => {
-  /** A notice action written as another Hive's change would (pending), with `attempts` tries already counted. */
+  /** A notice action written as another Combwork's change would (pending), with `attempts` tries already counted. */
   const noticeAction = (ws: string, card: number, kind: string, payload: Record<string, unknown>, attempts = 0): number => {
     const own = FactStore.open(store.boardFile(ws), { project: 'alpha', key: 'alpha' })
     try {
@@ -601,6 +604,22 @@ describe('notices (#1266, §16.11.4)', () => {
   const stateOf = (ws: string, id: number) => ({ ...(store.workspaceDb(ws).reader.prepare('SELECT state, attempts FROM card_actions WHERE id = ?').get(id) as { state: string; attempts: number }) })
   /** What the notices told so far, as one text (their titles and lines). */
   const toldText = (st: { notices: unknown[] }) => JSON.stringify(st.notices)
+
+  it('HI-2431: a late notice from another workspace is not counted for the current project', async () => {
+    const first = await open()
+    const one = await newCard(first.w)
+    const second = await open()
+    const two = await newCard(second.w)
+    await settled()
+    const st = fake(second.alpha)
+    // Earlier tests' workspaces stay open: their actions can finish after fake() changes the session stand-in.
+    noticeAction(first.ws, one, 'notify', { text: 'Earlier workspace' })
+    noticeAction(second.ws, two, 'notify', { text: 'Current project' })
+    await Promise.all([worker.runActions(first.w), worker.runActions(second.w)])
+    expect(st.notices).toHaveLength(1)
+    expect(toldText(st)).toContain('Current project')
+    expect(toldText(st)).not.toContain('Earlier workspace')
+  })
 
   it('a notify action is shown once, however often the actions run at once', async () => {
     const { w, ws, alpha } = await open()
@@ -618,7 +637,7 @@ describe('notices (#1266, §16.11.4)', () => {
     const { w, ws, alpha } = await open()
     const st = fake(alpha)
     const c = await newCard(w)
-    // Its try counted, then Hive ended (or the workspace closed) before it was marked, perhaps before it was shown.
+    // Its try counted, then Combwork ended (or the workspace closed) before it was marked, perhaps before it was shown.
     const once = noticeAction(ws, c, 'notify', { text: 'tried once' }, 1)
     // Tried twice already: it may have been shown twice; never a third time.
     const twice = noticeAction(ws, c, 'notify', { text: 'tried twice' }, 2)
@@ -629,7 +648,7 @@ describe('notices (#1266, §16.11.4)', () => {
     expect(stateOf(ws, twice)).toEqual({ state: 'done', attempts: 2 })
   })
 
-  it("a notify action with Hive's own message (#1264) shows it in the language shown, its English kept beside it", async () => {
+  it("a notify action with Combwork's own message (#1264) shows it in the language shown, its English kept beside it", async () => {
     const { w, ws, alpha } = await open()
     const st = fake(alpha)
     const c = await newCard(w)
@@ -637,7 +656,7 @@ describe('notices (#1266, §16.11.4)', () => {
     await worker.runActions(w)
     expect(st.notices).toHaveLength(1)
     expect(JSON.stringify(st.notices[0].body)).toContain('"shown":"AL-9 is approved: OK to merge?"')
-    expect(JSON.stringify(st.notices[0].body)).toContain('"english":"AL-9 is approved: OK to merge?"')
+    expect(JSON.stringify(st.notices[0].body)).toContain('"agent":"AL-9 is approved: OK to merge?"')
   })
 
   it("a lane's failed review, a card blocked and its merge due are told; a lane already running starts from now; nothing new tells nothing", async () => {
@@ -646,7 +665,7 @@ describe('notices (#1266, §16.11.4)', () => {
     const c = await inReview(w)
     await notices.checkLanesNow(w)
     await settled()
-    // Already running when Hive began following it: nothing of before is told.
+    // Already running when Combwork began following it: nothing of before is told.
     expect(st.notices).toEqual([])
     await inWorkspace(w, () => tasks.updateTask(c, { review: 'failed' }, r1, { comment: 'FAILED' }))
     await inWorkspace(w, () => tasks.updateTask(c, { blocked: 'Waiting for the API key' }, b1))
@@ -679,7 +698,7 @@ describe('notices (#1266, §16.11.4)', () => {
     const st = fake(alpha, { b1: 'working', r1: 'working' })
     const db = () => store.workspaceDb(ws).reader
     const failedNotices = () => (db().prepare("SELECT count(*) AS n FROM card_actions WHERE kind = 'laneNotice' AND payload LIKE '%\"failed\"%'").get() as { n: number }).n
-    // Hive follows the board's lanes from its first look; the lane starts after it (as HI-1626's did on rc.1).
+    // Combwork follows the board's lanes from its first look; the lane starts after it (as HI-1626's did on rc.1).
     await notices.checkLanesNow(w)
     const since = Date.parse((db().prepare("SELECT value FROM board_meta WHERE key = 'lane_notices_since'").get() as { value: string }).value)
     await vi.waitFor(() => expect(Date.now()).toBeGreaterThan(since), HANG)
@@ -760,7 +779,7 @@ describe('notices (#1266, §16.11.4)', () => {
     const c = await inReview(w)
     await notices.checkLanesNow(w)
     await settled()
-    // The failure commits, and Hive stops before it looked at the lanes again.
+    // The failure commits, and Combwork stops before it looked at the lanes again.
     notices.noticeTestHooks.hold = true
     try {
       await inWorkspace(w, () => tasks.updateTask(c, { review: 'failed' }, r1, { comment: 'FAILED' }))
@@ -781,7 +800,7 @@ describe('notices (#1266, §16.11.4)', () => {
     expect(st.notices).toHaveLength(1)
   })
 
-  it('two followers of one board (two Hives) tell an event once', async () => {
+  it('two followers of one board (two Combworks) tell an event once', async () => {
     const { w, ws, alpha } = await open()
     const st = fake(alpha, { b1: 'working', r1: 'working' })
     const c = await inReview(w)
@@ -790,7 +809,7 @@ describe('notices (#1266, §16.11.4)', () => {
     notices.noticeTestHooks.hold = true
     try {
       await inWorkspace(w, () => tasks.updateTask(c, { blocked: 'Which greeting?' }, b1))
-      // Two looks at once, each reading the marks before either writes (as two Hives would; Hive opens a workspace once
+      // Two looks at once, each reading the marks before either writes (as two Combworks would; Combwork opens a workspace once
       // per process): the second's board change finds the marks the first moved on.
       await Promise.all([notices.checkLanesNow(w), notices.checkLanesNow(w)])
     } finally {
@@ -829,7 +848,7 @@ describe('notices (#1266, §16.11.4)', () => {
 })
 
 /**
- * The actions worker as another Hive runs it: the same code, a module of its own (its runs, handlers and lease owner),
+ * The actions worker as another Combwork runs it: the same code, a module of its own (its runs, handlers and lease owner),
  * copied into a temp folder with its imports pointing at this tree's modules, run only when the test asks (as HR1's
  * #1266 probe did).
  */
@@ -840,14 +859,14 @@ async function anotherWorker(): Promise<typeof worker> {
     .replace(/from '(\.\.?\/[^']+)'/g, (_m, rel: string) => `from '${abs(rel)}'`)
     // Runs only when the test asks: no subscription of its own to the board's commits, which would outlive the test.
     .replace(/\nonBoardCommitted\(\(ws\) => \{[\s\S]*$/, '\n')
-  const file = join(tempDir('hive-another-worker-'), 'actionWorker.ts')
+  const file = join(tempDir('cw-another-worker-'), 'actionWorker.ts')
   writeFileSync(file, code)
   return (await import(/* @vite-ignore */ pathToFileURL(file).href)) as typeof worker
 }
 
 // HR1's round 2 probes (#1266): three races between writers, each a regression test.
 describe('writers at once (#1266 round 3)', () => {
-  /** A connection of another process's to the workspace's database (another Hive). */
+  /** A connection of another process's to the workspace's database (another Combwork). */
   async function outside<T>(ws: string, fn: (db: import('node:sqlite').DatabaseSync) => T): Promise<T> {
     const { DatabaseSync } = await import('node:sqlite')
     const db = new DatabaseSync(store.boardFile(ws))
@@ -858,31 +877,31 @@ describe('writers at once (#1266 round 3)', () => {
     }
   }
 
-  it("another Hive's receipt of a delivery this one holds survives this one's next, unrelated save", async () => {
+  it("another Combwork's receipt of a delivery this one holds survives this one's next, unrelated save", async () => {
     const { w, ws, alpha } = await open()
     fake(alpha, { b1: 'working', r1: 'working' })
     await inReview(w)
     await settled()
-    const own = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: { kind: 'hive', name: 'Hive' }, body: 'action wake', action: 99999 })
+    const own = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: { kind: 'combwork', name: 'Combwork' }, body: 'action wake', action: 99999 })
     const at = new Date().toISOString()
     await outside(ws, (db) => db.prepare("UPDATE deliveries SET state = 'received', received = ?, received_via = 'inbox' WHERE id = ?").run(at, own.id))
-    await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: { kind: 'hive', name: 'Hive' }, body: 'unrelated local' })
+    await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: { kind: 'combwork', name: 'Combwork' }, body: 'unrelated local' })
     expect({ ...(store.workspaceDb(ws).reader.prepare('SELECT state, received FROM deliveries WHERE action = 99999').get() as object) }).toEqual({ state: 'received', received: at })
   })
 
-  it("an overlapping change is planned again on the other Hive's: a cancel of a delivery it received meanwhile cancels nothing", async () => {
+  it("an overlapping change is planned again on the other Combwork's: a cancel of a delivery it received meanwhile cancels nothing", async () => {
     const { w, ws, alpha } = await open()
     fake(alpha, { b1: 'working', r1: 'working' })
     await inReview(w)
     await settled()
-    const own = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: { kind: 'hive', name: 'Hive' }, body: 'received elsewhere' })
+    const own = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: { kind: 'combwork', name: 'Combwork' }, body: 'received elsewhere' })
     await outside(ws, (db) => db.prepare("UPDATE deliveries SET state = 'received', received = ?, received_via = 'inbox' WHERE id = ?").run(new Date().toISOString(), own.id))
     // Cancelling: from what this one read (queued), it would cancel it; read again, it was received, and isn't.
     expect(await deliveries.cancelDeliveries(alpha, 'b1', 'a test')).toBe(0)
     expect((store.workspaceDb(ws).reader.prepare('SELECT state FROM deliveries WHERE id = ?').get(own.id) as { state: string }).state).toBe('received')
   })
 
-  it('two independent workers (two Hives) never run a repeatable action at once; one whose Hive ended runs once its lease passes', async () => {
+  it('two independent workers (two Combworks) never run a repeatable action at once; one whose Combwork ended runs once its lease passes', async () => {
     const { w, ws } = await open()
     const c = await newCard(w)
     await settled()
@@ -902,23 +921,23 @@ describe('writers at once (#1266 round 3)', () => {
     try {
       const first = worker.runActions(w)
       await vi.waitFor(() => expect(ran).toBe(1), HANG)
-      // The other Hive finds it leased, and leaves it.
+      // The other Combwork finds it leased, and leaves it.
       await second.runActions(w)
       expect(ran).toBe(1)
       release()
       await first
       expect({ ...(store.workspaceDb(ws).reader.prepare('SELECT state, attempts, lease_owner FROM card_actions WHERE id = ?').get(id) as object) }).toEqual({ state: 'done', attempts: 1, lease_owner: null })
-      // A Hive that took one and ended before its effect (its lease left, no dispatch counted): run once the lease has passed.
+      // A Combwork that took one and ended before its effect (its lease left, no dispatch counted): run once the lease has passed.
       const own2 = FactStore.open(store.boardFile(ws), { project: 'alpha', key: 'alpha' })
       const left = own2.tx((tx) => tx.action(c, 'probeNotice', {}, null))
       own2.close()
-      store.workspaceDb(ws).writer.prepare("UPDATE card_actions SET lease_owner = 'a-hive-that-ended', lease_until = ? WHERE id = ?").run(new Date(Date.now() - 1000).toISOString(), left)
+      store.workspaceDb(ws).writer.prepare("UPDATE card_actions SET lease_owner = 'a-combwork-that-ended', lease_until = ? WHERE id = ?").run(new Date(Date.now() - 1000).toISOString(), left)
       await second.runActions(w)
       expect(ran).toBe(2)
       expect({ ...(store.workspaceDb(ws).reader.prepare('SELECT state, attempts FROM card_actions WHERE id = ?').get(left) as object) }).toEqual({ state: 'done', attempts: 1 })
     } finally {
       release()
-      // The other Hive's handlers go; this one's `probeNotice` stays (no other test writes one), its notices' and wakes' too.
+      // The other Combwork's handlers go; this one's `probeNotice` stays (no other test writes one), its notices' and wakes' too.
       second.clearActionHandlers()
     }
   })
@@ -1037,19 +1056,19 @@ describe('boundaries (#1266 round 4)', () => {
     }
   })
 
-  it("a delivery's record and the base a save checks it against are one read's: another Hive's receipt just after the read is kept", async () => {
+  it("a delivery's record and the base a save checks it against are one read's: another Combwork's receipt just after the read is kept", async () => {
     const { w, ws, alpha } = await open()
     fake(alpha, { b1: 'working', r1: 'working' })
     await inReview(w)
     await settled()
-    const own = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: { kind: 'hive', name: 'Hive' }, body: 'received right after the read' })
+    const own = await deliveries.createDelivery(alpha, { agentId: 'b1', kind: 'card-event', from: { kind: 'combwork', name: 'Combwork' }, body: 'received right after the read' })
     await deliveries.forgetDeliveriesForTests()
     const tables = await import('../src/main/schema/sessionDeliveryTables')
     const real = tables.readDeliveriesWithBases
     let injected = false
     const spy = vi.spyOn(tables, 'readDeliveriesWithBases').mockImplementationOnce((db, host) => {
       const read = real(db, host)
-      // Another Hive receives it the moment after this one read the rows.
+      // Another Combwork receives it the moment after this one read the rows.
       const { DatabaseSync } = require('node:sqlite') as typeof import('node:sqlite')
       const outside = new DatabaseSync(store.boardFile(ws))
       try {
@@ -1114,7 +1133,7 @@ describe('boundaries (#1266 round 4)', () => {
 // HR1's round 4 (#1266): two workspaces' actions with one id are two actions; and the durable notice, a translated
 // line in its card's history, written with the action.
 describe('workspaces apart, and the durable notice (#1266 round 5)', () => {
-  /** A repeatable action of a kind, written as another Hive's change would (pending). */
+  /** A repeatable action of a kind, written as another Combwork's change would (pending). */
   const add = (ws: string, c: number, kind: string, payload: Record<string, unknown> = {}): number => {
     const own = FactStore.open(store.boardFile(ws), { project: 'alpha', key: 'alpha' })
     try {
@@ -1196,10 +1215,10 @@ describe('workspaces apart, and the durable notice (#1266 round 5)', () => {
       await worker.actionsSettled()
       expect(await notesOn(w, c)).toEqual([{ event: 'failed', lane: 'B1 / R1', hasWhy: 'no', why: '' }])
     }, HANG)
-    // In the card's history in the user's language, said by Hive.
+    // In the card's history in the user's language, said by Combwork.
     const line = (await inWorkspace(w, () => tasks.getTask(c, w))).history.find((h) => h.whatText?.id === 'tasks.history.notified')!
-    expect(line).toMatchObject({ by: 'Hive', what: 'Notified you that its review failed' })
-    // The failure resolved since (fixed, passed), and Hive restarted: the notice is still on the card, once.
+    expect(line).toMatchObject({ by: 'Combwork', what: 'Notified you that its review failed' })
+    // The failure resolved since (fixed, passed), and Combwork restarted: the notice is still on the card, once.
     await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
     await inWorkspace(w, () => tasks.updateTask(c, { review: 'start' }, r1))
     await inWorkspace(w, () => tasks.updateTask(c, { review: 'passed', column: 'passed' }, r1, { comment: 'PASSED' }))
@@ -1229,7 +1248,7 @@ describe('workspaces apart, and the durable notice (#1266 round 5)', () => {
     }
     const shown = st.notices.length
     expect(shown).toBe(1)
-    // Its dispatch counted, then Hive ended before its mark: pending again, one try left.
+    // Its dispatch counted, then Combwork ended before its mark: pending again, one try left.
     const id = (store.workspaceDb(ws).reader.prepare("SELECT max(id) AS id FROM card_actions WHERE kind = 'laneNotice'").get() as { id: number }).id
     store.workspaceDb(ws).writer.prepare("UPDATE card_actions SET state = 'pending', attempts = 1, lease_owner = NULL, lease_until = NULL WHERE id = ?").run(id)
     await worker.runActions(w)
@@ -1271,7 +1290,7 @@ describe('workspaces apart, and the durable notice (#1266 round 5)', () => {
     expect(line.what).toBe('Notified you that it needs you: Which greeting should the offline installer show?')
   })
 
-  it("Hive's own request (its message, #1264) is kept as that message within the line, shown in the window's language", async () => {
+  it("Combwork's own request (its message, #1264) is kept as that message within the line, shown in the window's language", async () => {
     const { w, alpha } = await open()
     fake(alpha, { b1: 'working', r1: 'working' })
     const c = await newCard(w)
@@ -1312,9 +1331,9 @@ describe('workspaces apart, and the durable notice (#1266 round 5)', () => {
     const lines = async () => (await inWorkspace(w, () => tasks.getTask(c, w))).history.filter((h) => h.whatText?.id === 'tasks.history.notified')
     expect((await lines()).map((l) => l.whatText!.values!.why)).toEqual(written)
     expect((await lines()).map((l) => l.what)).toEqual([
-      "Notified you that it needs you: Hive couldn't get slot-a ready for AL-1: git checkout failed (test)",
-      "Notified you that it needs you: Hive can't give AL-1 to B1 yet: B1's conversation in slot-a can't resume now (its slot holds other work now). Hive gives it AL-1 once it can.",
-      "Notified you that it needs you: Hive couldn't resume B1's conversation in slot-a for AL-1 (three tries): its CLI couldn't start (test). Resume B1 from Sessions, or start it fresh, and Hive gives it AL-1."
+      "Notified you that it needs you: Combwork couldn't get slot-a ready for AL-1: git checkout failed (test)",
+      "Notified you that it needs you: Combwork can't give AL-1 to B1 yet: B1's conversation in slot-a can't resume now (its slot holds other work now). Combwork gives it AL-1 once it can.",
+      "Notified you that it needs you: Combwork couldn't resume B1's conversation in slot-a for AL-1 (three tries): its CLI couldn't start (test). Resume B1 from Sessions, or start it fresh, and Combwork gives it AL-1."
     ])
     // Shown in the window's language, as its history shows a line (Board.tsx's storedLine): German, from its catalogue.
     const { storedLineText } = await import('../src/shared/taskHistory')
@@ -1326,9 +1345,9 @@ describe('workspaces apart, and the durable notice (#1266 round 5)', () => {
     setLanguage('de', Object.assign({}, ...readdirSync(de).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(readFileSync(join(de, f), 'utf8')))))
     try {
       const german = (await lines()).map((l) => storedLineText(l.whatText, (m, values) => tr(m, values), (id) => providerMessage(id) ?? workflowMessage(id)))
-      expect(german[0]).toContain('Hive konnte slot-a nicht für AL-1 vorbereiten: git checkout failed (test)')
-      expect(german[1]).toContain('Hive kann B1 die Karte AL-1 noch nicht geben')
-      expect(german[2]).toContain('Hive konnte die Unterhaltung von B1 in slot-a für AL-1 nicht fortsetzen (drei Versuche)')
+      expect(german[0]).toContain('Combwork konnte slot-a nicht für AL-1 vorbereiten: git checkout failed (test)')
+      expect(german[1]).toContain('Combwork kann B1 die Karte AL-1 noch nicht geben')
+      expect(german[2]).toContain('Combwork konnte die Unterhaltung von B1 in slot-a für AL-1 nicht fortsetzen (drei Versuche)')
     } finally {
       setLanguage('en', {})
     }
@@ -1354,7 +1373,7 @@ describe('workspaces apart, and the durable notice (#1266 round 5)', () => {
       spy.mockRestore()
     }
     expect(JSON.stringify(st.notices)).toContain('has stalled')
-    // The stall clears (the next look reads it as it is), and Hive restarts: the line is still on the card.
+    // The stall clears (the next look reads it as it is), and Combwork restarts: the line is still on the card.
     await notices.checkLanesNow(w)
     await settled()
     await disposeWorkspaceService(w)
@@ -1368,7 +1387,7 @@ describe('workspaces apart, and the durable notice (#1266 round 5)', () => {
 
 describe("a lane builder whose watch a decision's notice ended, and that ends its turn without another (HI-1693)", () => {
   it("isn't flagged as not watching; the reviewer's verdict reaches it through its loop wake, and only then, its move again, is it flagged when it sits idle", async () => {
-    process.env.HIVE_TEST_LOOP_GRACE_MS = '0'
+    process.env.CW_TEST_LOOP_GRACE_MS = '0'
     const loopCheck = await import('../src/main/loopCheck')
     const { emit } = await import('../src/main/events')
     loopCheck.initLoopCheck()
@@ -1430,8 +1449,8 @@ describe("a lane builder whose watch a decision's notice ended, and that ends it
       await deliveries.offerAllForTests()
       expect(st.typed.filter((t) => t.agent === 'b1')).toHaveLength(2)
     }, HANG)
-    expect(st.typed.filter((t) => t.agent === 'b1')[1].text).toMatch(new RegExp(`^\\[Hive\\] #${c} is in Doing: R1 \\(alpha\\) failed it; latest comment by R1 \\(alpha\\): "Round 1: FAILED`))
-    // Its move now: idle again with no watch, it is flagged, and the user told (in Hive the grace lets the wake land
+    expect(st.typed.filter((t) => t.agent === 'b1')[1].text).toMatch(new RegExp(`^\\[CW\\] #${c} is in Doing: R1 \\(alpha\\) failed it; latest comment by R1 \\(alpha\\): "Round 1: FAILED`))
+    // Its move now: idle again with no watch, it is flagged, and the user told (in Combwork the grace lets the wake land
     // first; here, with none, a check can also flag it in the moment before it is typed).
     await idleChecked('b1')
     await vi.waitFor(() => expect(marked.get('b1')).toEqual([c]), HANG)

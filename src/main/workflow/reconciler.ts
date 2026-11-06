@@ -1,8 +1,8 @@
 // The app's reconciliation (#1217, SPEC §16.4.4): what the watcher sees in a project (a line or a folder's head moved, a
 // write) is reconciled against its cards' facts, and what is true is recorded as observed facts (HeadMoved, Integrated
-// by outside, Stale, CarriedOver, CommitAttributed, MergedInPart, LeftTarget, Gone), deduplicated so two Hives on one
+// by outside, Stale, CarriedOver, CommitAttributed, MergedInPart, LeftTarget, Gone), deduplicated so two Combworks on one
 // workspace write each once (§16.17). With workflow rules enforced (#1263, Settings → Advanced, on by default) it acts
-// on them too: a card integrated outside Hive is Done, a stale pass moves back with its queue entry cancelled and its
+// on them too: a card integrated outside Combwork is Done, a stale pass moves back with its queue entry cancelled and its
 // builder woken, a lane whose cards are all done ends; off, it records only, as P3 did. It works through the project's
 // runtime (service.ts), whose `reconcileActs` is that switch.
 //
@@ -12,7 +12,7 @@
 // workspace's lifetime: once it closes or its window opens another, the run stops and its watch goes.
 
 import { boardReadOnly } from '../boardStore'
-import { onHiveEvent } from '../events'
+import { onCombworkEvent } from '../events'
 import { createLogger } from '../logger'
 import { observer, type Disposable, type ObserveEvent } from '../platform/observe'
 import { openWorkspaces, WorkspaceService } from '../workspace'
@@ -148,7 +148,7 @@ async function reconcileProject(f: Followed): Promise<void> {
   if (!wf || !f.alive()) return
   const cards = wf.store.cards().map((card) => ({ card, s: wf.state(card) }))
   // Done cards are looked at when their target moved: an event's line, or a target whose head isn't the one this
-  // project last checked its Done cards against (HR4's #1217 round 1: a reset while Hive was closed is found at the
+  // project last checked its Done cards against (HR4's #1217 round 1: a reset while Combwork was closed is found at the
   // next open or focus). One read per target, however many Done cards it has.
   const moved = new Set(lines)
   const checked = new Map<string, string>()
@@ -228,10 +228,10 @@ export async function reconcileNow(ws: WorkspaceService, projectPath: string, li
 let stop: (() => void) | null = null
 let lastFocus = 0
 
-/** Starts following the open workspaces' projects for reconciliation (Hive starting). */
+/** Starts following the open workspaces' projects for reconciliation (Combwork starting). */
 export function startReconciling(): void {
   if (stop) return
-  const off = onHiveEvent((e) => {
+  const off = onCombworkEvent((e) => {
     if (e.type === 'workspace-changed') follow()
     else if (e.type === 'window-state' && e.focused && Date.now() - lastFocus > FOCUS_MS) {
       lastFocus = Date.now()
@@ -251,7 +251,7 @@ export function startReconciling(): void {
   }
 }
 
-/** Stops it (Hive quitting; tests). */
+/** Stops it (Combwork quitting; tests). */
 export function stopReconciling(): void {
   stop?.()
   stop = null

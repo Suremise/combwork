@@ -1,4 +1,4 @@
-// The "Permission mode changed" offer (#1234): Hive offers to switch a running agent when its permission mode setting
+// The "Permission mode changed" offer (#1234): Combwork offers to switch a running agent when its permission mode setting
 // changes, never because it restarted. An agent given a task in a new conversation stops and starts again; a refresh
 // landing while the new launch reads its settings once saw a session with no mode yet and offered to switch it into
 // the mode it was already in.
@@ -8,7 +8,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-// The notices Hive raises, recorded (and still sent).
+// The notices Combwork raises, recorded (and still sent).
 const toasts = vi.hoisted(() => ({ titles: [] as string[] }))
 vi.mock('../src/main/events', async (original) => {
   const real = await original<typeof import('../src/main/events')>()
@@ -21,12 +21,12 @@ vi.mock('../src/main/events', async (original) => {
   }
 })
 
-const base = tempDir('hive-modeoffer-')
+const base = tempDir('cw-modeoffer-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 // A test copy on its CLI test home (tests/cliHomes.ts), as an e2e run is: its agents start with no connection (the
 // seam, HI-1755; connections are on for everyone since HI-1774).
-process.env.HIVE_USER_DATA = join(base, 'profile')
-process.env.HIVE_TEST_CLI_HOME_CONNECTION = '1'
+process.env.CW_USER_DATA = join(base, 'profile')
+process.env.CW_TEST_CLI_HOME_CONNECTION = '1'
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const { sessions } = await import('../src/main/sessions')
@@ -35,7 +35,7 @@ const { config } = await import('../src/main/config')
 const accounts = await import('../src/main/accounts')
 
 const wsPath = join(base, 'ws')
-const p = join(wsPath, 'amberlight')
+const p = join(wsPath, 'ambrosia')
 const id = `${p.toLowerCase()}#amb1`
 const s = sessions as unknown as { live: Map<string, { configuredMode?: string | null }>; runs: Map<string, string>; modeOffers: Map<string, unknown>; modeOfferTimer: NodeJS.Timeout | null }
 let w: ReturnType<typeof createWorkspaceService>
@@ -52,9 +52,9 @@ describe('the offer to switch a running agent to a changed permission mode', () 
   const info = providerService.info
   const enabled = config.settings.providers['claude-code'].enabled
   beforeAll(async () => {
-    mkdirSync(join(wsPath, '.hive'), { recursive: true })
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'amb1', name: 'AMB1', provider: 'claude-code', permissionMode: 'auto' }] }))
+    mkdirSync(join(wsPath, '.combwork'), { recursive: true })
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'amb1', name: 'AMB1', provider: 'claude-code', permissionMode: 'auto' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     providerService.info = ((pid: string) => ({ provider: pid, found: true, path: join(base, 'no-cli.exe') })) as never

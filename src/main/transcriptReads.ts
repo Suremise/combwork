@@ -1,5 +1,5 @@
 /**
- * Transcripts Hive is reading right now (the Sessions tab's viewer, a search, an export), by project and session:
+ * Transcripts Combwork is reading right now (the Sessions tab's viewer, a search, an export), by project and session:
  * archiving or deleting a session skips one being read rather than moving its files from under the reader.
  * Entries go when their last read ends, so the map holds only reads in progress.
  */

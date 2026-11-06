@@ -9,7 +9,7 @@
     "react-hooks/rules-of-hooks": "error",
     "react-hooks/exhaustive-deps": "warn",
     "react/react-in-jsx-scope": "off",
-    // Rules written for the React Compiler, which Hive doesn't use.
+    // Rules written for the React Compiler, which Combwork doesn't use.
     "react/set-state-in-effect": "off",
     "react/refs": "off",
     "react/globals": "off",
@@ -29,10 +29,10 @@
   },
   "overrides": [
     {
-      // Electron's fs opens an .asar file as an archive when it is stat-ed or read, and keeps it open until Hive quits:
+      // Electron's fs opens an .asar file as an archive when it is stat-ed or read, and keeps it open until Combwork quits:
       // a project's build output (dist/win-unpacked/resources/app.asar) then can't be deleted or replaced (#246). Main
       // uses original-fs, which treats .asar files as plain files. The scripts that run as plain Node outside the asar
-      // (hive-mcp.js, hive-progress.js) use Node's fs.
+      // (cw-mcp.js, cw-progress.js) use Node's fs.
       "files": ["src/main/**/*.ts", "src/main/**/*.mts"],
       "rules": {
         "no-restricted-imports": ["error", { "paths": [
@@ -49,7 +49,7 @@
       "rules": { "unicorn/require-post-message-target-origin": "off" }
     },
     {
-      "files": ["src/main/mcp/hive-mcp.ts", "src/main/progressReporters/hive-progress.ts", "src/main/progressReporters/wrapper.ts", "src/main/progressReporters/report.mts", "src/main/closeCommand/hive-close-runner.ts", "src/main/closeCommand/runner.ts", "src/main/closeCommand/listRunner.ts"],
+      "files": ["src/main/mcp/cw-mcp.ts", "src/main/progressReporters/cw-progress.ts", "src/main/progressReporters/wrapper.ts", "src/main/progressReporters/report.mts", "src/main/closeCommand/cw-close-runner.ts", "src/main/closeCommand/runner.ts", "src/main/closeCommand/listRunner.ts"],
       "rules": { "no-restricted-imports": "off" }
     }
   ],

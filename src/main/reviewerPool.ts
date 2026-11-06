@@ -4,9 +4,10 @@
 // - **assign**: each pool card in Review whose latest submission nobody reviews (and has fewer passes than G1b asks) is
 //   given to a free agent (shared/workflow/reviewerPool.ts): its role reviews, it holds no open dispatch lease (#1434: an
 //   either agent building in a slot is never taken; one that can't be read counts as held), it is idle, it reviews no
-//   other card of the project (in a lane or not), it didn't build the card, and with G1b = 2 it isn't the submission's
-//   first reviewer. Recorded as `ReviewerAssigned` in a write that checks again, as hive.db has it then, the submission
-//   still waiting and the agent's leases and reviews (another Hive's or connection's change before it is seen there).
+//   other card of the project (in a lane or not; a card waiting on its own open question to the user doesn't count,
+//   HI-2559: it stays its), it didn't build the card, and with G1b = 2 it isn't the submission's
+//   first reviewer. Recorded as `ReviewerAssigned` in a write that checks again, as combwork.db has it then, the submission
+//   still waiting and the agent's leases and reviews (another Combwork's or connection's change before it is seen there).
 // - **tell**: the agent given the card is told, once per assignment (its delivery's identity is the card, the submission, the
 //   agent and its `ReviewerAssigned`): typed into its conversation when it runs, else launched with it, for review (the project folder: #1434's
 //   purpose, with #1439's grant to the review copies). One whose delivery wasn't given is told again at the next pass.
@@ -29,14 +30,14 @@ import { projectAgents } from '../shared/defaults'
 import { running } from '../shared/lanes'
 import { cardRef } from '../shared/projectKeys'
 import type { LiveSessionState } from '../shared/types'
-import { passingReviewers, type CardState, type FactData } from '../shared/workflow/facts'
+import { foldCard, passingReviewers, type CardState, type FactData } from '../shared/workflow/facts'
 import { reviewerAgent } from '../shared/workflow/options'
-import { designReviewer, poolAssignments, preferredReviewer, reviewingNow, submissionReviewers, type PoolAgent, type PoolCard } from '../shared/workflow/reviewerPool'
+import { designReviewer, heldOnUser, poolAssignments, preferredReviewer, reviewingNow, submissionReviewers, type PoolAgent, type PoolCard } from '../shared/workflow/reviewerPool'
 import { agentWorkflowRole, reviewsWork } from '../shared/workflow/roles'
 import { advanced } from './advanced'
 import { boardRead } from './boardStore'
 import { deliveriesOf, deliverNow, launchWith } from './deliveries'
-import { onHiveEvent } from './events'
+import { onCombworkEvent } from './events'
 import { onLanesWritten, rawLanes } from './lanes'
 import { readyFor } from './readiness'
 import { createLogger, userText } from './logger'
@@ -59,7 +60,7 @@ const NOT_GIVEN: ReadonlySet<string> = new Set(['cancelled', 'refused', 'expired
 /**
  * The statuses an agent isn't free in: in a turn, starting, waiting for the user, its background tasks, a sign-in. Not a
  * card watch (HI-2333): a watching session is at its prompt, where the pool's line is typed as into an idle one, and
- * Hive's loop wakes reach it; what it reviews or checks keeps it from the pool by itself (`reviewersNow`).
+ * Combwork's loop wakes reach it; what it reviews or checks keeps it from the pool by itself (`reviewersNow`).
  */
 const BUSY: ReadonlySet<string> = new Set(['working', 'starting', 'waiting', 'background', 'signin'])
 
@@ -103,7 +104,7 @@ function poolCardOf(wf: Workflow, n: number, known: (id: string) => boolean): Pa
   if (s.stage === 'active' && rec.reviewerPool && s.step?.step === 'design') {
     const facts = wf.store.facts(n)
     const { seen, reviewing } = submissionReviewers(facts, s.step.seq, known)
-    return { rec, loose: false, card: n, submission: s.step.seq, submittedAt: s.step.at, design: true, pool: true, builders: s.builders, seen, reviewing, quorum: 1, passes: 0, preferred: preferredReviewer(facts) }
+    return { rec, loose: false, card: n, submission: s.step.seq, submittedAt: s.step.at, design: true, pool: true, builders: s.builders, seen, reviewing, held: heldOnUser(s.requests, reviewing), quorum: 1, passes: 0, preferred: preferredReviewer(facts) }
   }
   if (s.stage !== 'review' || !s.latest) return null
   const r = wf.rulesetOf(rec, s)
@@ -112,7 +113,7 @@ function poolCardOf(wf: Workflow, n: number, known: (id: string) => boolean): Pa
   const sub = s.latest.id
   const { seen, reviewing } = submissionReviewers(facts, sub, known)
   const loose = !rec.lane
-  return { rec, loose, card: n, submission: sub, submittedAt: facts.find((f) => f.seq === sub)?.at ?? '', pool: !!rec.reviewerPool || loose, builders: s.builders, seen, reviewing, quorum: r.options.reviewers, passes: passingReviewers(s).length, preferred: rec.reviewerPool ? preferredReviewer(facts) : null }
+  return { rec, loose, card: n, submission: sub, submittedAt: facts.find((f) => f.seq === sub)?.at ?? '', pool: !!rec.reviewerPool || loose, builders: s.builders, seen, reviewing, held: heldOnUser(s.requests, reviewing), quorum: r.options.reviewers, passes: passingReviewers(s).length, preferred: rec.reviewerPool ? preferredReviewer(facts) : null }
 }
 
 /** Whether a card is still given out as it was when the pass read it: still the pool's, or still loose (held by no running lane). */
@@ -125,7 +126,7 @@ const stillWaits = (s: CardState, c: Pick<PassCard, 'design' | 'submission'>): b
 
 const passes = new Map<string, { again: boolean; done: Promise<void> }>()
 
-/** The project's pass: coalesced, one at a time per project in this Hive (asked again while it runs, it runs once more). */
+/** The project's pass: coalesced, one at a time per project in this Combwork (asked again while it runs, it runs once more). */
 export function settleReviewerPool(ws: WorkspaceService, projectPath: string): Promise<void> {
   const key = `${(ws.path ?? '').toLowerCase()}\n${projectPath.toLowerCase()}`
   const now = passes.get(key)
@@ -176,7 +177,7 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
     if (c?.loose && !c.design) cards.set(n, c)
   }
   if (!cards.size) return
-  // Every agent's dispatch lease as hive.db has it; one that can't be read keeps that agent out (never assumed free).
+  // Every agent's dispatch lease as combwork.db has it; one that can't be read keeps that agent out (never assumed free).
   // Running ones first (HI-2046): a stopped reviewer is started only when no running one is free.
   const pool: PoolAgent[] = agents
     .map((a) => ({ id: a.id, role: agentWorkflowRole(a), leased: wf.store.dispatchLeased(slotProject, a.id) !== false, idle: idle(projectPath, a.id) }))
@@ -184,8 +185,8 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
   for (const a of poolAssignments([...cards.values()], pool, reviewersNow(wf, known))) {
     if (!workflowEnforced() || ws.lifetime.aborted) return
     const c = cards.get(a.card)!
-    const given = await wf.write(c.rec, null, 'hive', (w) => {
-      // In this write, as hive.db has it now (another Hive's or connection's change committed before it is seen): the
+    const given = await wf.write(c.rec, null, 'combwork', (w) => {
+      // In this write, as combwork.db has it now (another Combwork's or connection's change committed before it is seen): the
       // same submission still waiting, and the agent still free of it, of every other card of the project in Review
       // (whatever its lane: none, ended, another's) and of any dispatch lease.
       const s = w.state()
@@ -214,19 +215,24 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
 
 /**
  * Who reviews each of the project's cards in Review now (whatever its lane), or checks a design given out of one in
- * Doing (HI-2310), but `except`: a reviewer on one isn't free for another. Read in a write, it is that write's.
+ * Doing (HI-2310), but `except`: a reviewer on one isn't free for another. Not one whose card waits on its own open
+ * question to the user (HI-2559, `heldOnUser`): the card stays its, and it is free for others meanwhile. Read in a
+ * write, it is that write's.
  */
 function reviewersNow(wf: Workflow, known: (id: string) => boolean, except?: number): Set<string> {
   const out = new Set<string>()
+  const add = (facts: ReturnType<Workflow['store']['facts']>, r: string | null | undefined): void => {
+    if (r && !heldOnUser(foldCard(facts).requests, r)) out.add(r)
+  }
   for (const n of wf.store.cardsAt('review')) {
     if (n === except) continue
-    const r = reviewingNow(wf.store.facts(n), known)?.reviewing
-    if (r) out.add(r)
+    const facts = wf.store.facts(n)
+    add(facts, reviewingNow(facts, known)?.reviewing)
   }
   for (const n of wf.store.cardsAt('active')) {
     if (n === except) continue
-    const r = designReviewer(wf.store.facts(n), known)
-    if (r) out.add(r)
+    const facts = wf.store.facts(n)
+    add(facts, designReviewer(facts, known))
   }
   return out
 }
@@ -234,7 +240,7 @@ function reviewersNow(wf: Workflow, known: (id: string) => boolean, except?: num
 /**
  * Tells a pooled reviewer of the card it was given: once per assignment (a delivery made before for it counts while it
  * was given or is still on its way, and its agent not running is started for it), typed into its conversation when it runs and is idle, else
- * launched with it for review. Checked again first, from the project and hive.db as they are now: an agent gone from
+ * launched with it for review. Checked again first, from the project and combwork.db as they are now: an agent gone from
  * the project, one whose role no longer reviews, or one that took a dispatch lease (an either agent started a card) is
  * released from it (`ReviewerReleased`, in a write that finds it still given and not started) and the pass gives the
  * card again; one busy now, or whose lease can't be read, is told at a later pass.
@@ -279,12 +285,13 @@ async function tell(ws: WorkspaceService, projectPath: string, wf: Workflow, slo
   const followUp = !!(wf.store.facts(c.card).find((f) => f.seq === c.submission)?.data as FactData['Submitted'] | undefined)?.followUp
   const body = withCardNames(ws, () =>
     c.design
-      ? `${cardRef(c.card)}${builder ? ` (${builder}'s card)` : ''}: its builder posted a design for a check (${c.rec.key}/s${c.submission}), which you take from the pool. Read it (the card's latest comment) and answer with hive_loop_step, step ok or gaps, design ${c.rec.key}/s${c.submission}; not a review: no verdict. You're then preferred to review the card when it is submitted.` // i18n-ignore: agent-facing (HI-2310)
+      ? `${cardRef(c.card)}${builder ? ` (${builder}'s card)` : ''}: its builder posted a design for a check (${c.rec.key}/s${c.submission}), which you take from the pool. Read it (the card's latest comment) and answer with cw_loop_step, step ok or gaps, design ${c.rec.key}/s${c.submission}; not a review: no verdict. You're then preferred to review the card when it is submitted.` // i18n-ignore: agent-facing (HI-2310)
       : followUp
-      ? `${cardRef(c.card)}${builder ? ` (${builder}'s card)` : ''}: follow-up submitted for review (submission ${c.submission}), still yours to review. Start your review again (hive_start_review), which takes it and moves your review copy to it; a verdict on the earlier submission is refused.` // i18n-ignore: agent-facing
+      ? `${cardRef(c.card)}${builder ? ` (${builder}'s card)` : ''}: follow-up submitted for review (submission ${c.submission}), still yours to review. Start your review again (cw_start_review), which takes it and moves your review copy to it; a verdict on the earlier submission is refused.` // i18n-ignore: agent-facing
       : `${cardRef(c.card)}${builder ? ` (${builder}'s card)` : ''} is in Review${c.loose ? ', outside a lane: you review it' : ': you review it from the pool'}. Review its latest submission with the review-agent-work skill; your verdict frees you for the next card.` // i18n-ignore: agent-facing (HI-2228: the skill, not its steps, which a model took for the whole review)
   )
-  const nd = { agentId: agent.id, agentName: agent.name, kind: 'card-event' as const, from: { kind: 'hive' as const, name: 'Hive' }, card: c.card, body, source: POOL_REVIEW, ref } // i18n-ignore: who a delivery is from, as agents read it
+  // agent-protocol: who a delivery is from: Combwork's own name (HI-2463)
+  const nd = { agentId: agent.id, agentName: agent.name, kind: 'card-event' as const, from: { kind: 'combwork' as const, name: 'Combwork' }, card: c.card, body, source: POOL_REVIEW, ref } // i18n-ignore: who a delivery is from, as agents read it
   log.info(`Telling ${userText(agent.name)} of #${c.card} ${c.loose ? 'outside a lane' : 'from the pool'} (${st ? 'typed' : 'started'})`)
   const r = st
     ? // As a wake (HI-2333): a reviewer watching a card in its loop takes it, and its watch carries on (`free` would
@@ -340,7 +347,7 @@ function retrySoon(ws: WorkspaceService, projectPath: string): void {
 /** A pool's assignment given up (`ReviewerReleased`) while it is still the submission's and not started; the pass again. */
 async function release(ws: WorkspaceService, projectPath: string, wf: Workflow, c: PassCard, reviewer: string, why: FactData['ReviewerReleased']['why']): Promise<void> {
   const known = (): boolean => true
-  const done = await wf.write(c.rec, null, 'hive', (w) => {
+  const done = await wf.write(c.rec, null, 'combwork', (w) => {
     const s = w.state()
     if (c.design ? !stillWaits(s, c) : s.latest?.id !== c.submission || (s.reviewing[c.submission] ?? []).includes(reviewer)) return false
     if (submissionReviewers(w.tx.facts(c.card), c.submission, known).reviewing !== reviewer) return false
@@ -404,7 +411,7 @@ export function startReviewerPool(): void {
   }
   // An agent's state as the pass reads it, by agent: a status event that changes none of it (a refused line's own, HI-2333) asks no pass.
   const seen = new Map<string, string>()
-  const offEvents = onHiveEvent((e) => {
+  const offEvents = onCombworkEvent((e) => {
     if (e.type === 'tasks-changed' || e.type === 'workspace-changed' || e.type === 'team-pause-changed') later()
     else if (e.type === 'session-status') {
       const key = `${e.state.projectPath.toLowerCase()}#${e.state.agentId}`

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { ACTIVITY_HOURS, activityTabs, buildActivityView, commandText, filetimeMs, keepGoneList, type ActivityAgent, type ActivityCard, type ActivityDetail, type ActivityInput, type ActivityNode, type ActivityNow, type ActivityPart, type ActivityState, type ActivityTabInfo, type ActivityTurns } from '@shared/activity'
 import { agentState, type AgentState } from '@shared/agentState'
+import { modelIdName } from '@shared/models'
 import { cardLabel } from '@shared/projectKeys'
 import { durationText } from '@shared/tasks'
 import type { ProjectInfo, SessionListItem } from '@shared/types'
@@ -32,7 +33,7 @@ export const NO_NOW: ActivityNow = { launches: [], tasks: [] }
  * (#1254, a live update under one frame) reads them from a test copy's window.
  */
 const renders: number[] = []
-;(window as unknown as { __hiveActivityRenders?: number[] }).__hiveActivityRenders = renders
+;(window as unknown as { __cwActivityRenders?: number[] }).__cwActivityRenders = renders
 
 /** What the tab is drawn from: held as it was while the tab is frozen (HI-1743). */
 interface Reads {
@@ -49,7 +50,7 @@ export const markOf = (s: ActivityState): AgentState => (s === 'failed' ? 'stall
 /**
  * A project's Activity tab (#1254, HI-1743): what runs now, a tab per running agent, each its current work as a list:
  * its card in progress as a header, then the turn now (its prompt, the tool call under way, or thinking or writing), its
- * subagents and background tasks, and the processes it started (its own CLI and Hive's tool server only when asked).
+ * subagents and background tasks, and the processes it started (its own CLI and Combwork's tool server only when asked).
  * Nothing past: the card is the history. It opens frozen, a snapshot taken then: Refresh takes a new one, Play goes live
  * (what ended fades out, then leaves), Pause freezes again, and the reads since are counted in the pill. Nothing is read
  * or drawn while it is hidden; live changes are taken in about once a second.
@@ -168,7 +169,7 @@ export function ActivityTab({ project }: { project: ProjectInfo }) {
         const l = a.live
         if (!l) return { id: a.id, name: a.name, live: null }
         const state = agentState(l)
-        return { id: a.id, name: a.name, live: { sessionId: l.sessionId, sessionName: l.sessionName, startedAt: l.startedAt, status: l.status, text: statusText(l), working: state === 'working', waiting: state === 'waiting', failed: state === 'stalled' } }
+        return { id: a.id, name: a.name, live: { sessionId: l.sessionId, sessionName: l.sessionName, startedAt: l.startedAt, status: l.status, text: statusText(l), working: state === 'working', waiting: state === 'waiting', failed: state === 'stalled', ...(l.modelSwitch ? { modelSwitch: { launched: l.modelSwitch.launched, running: l.modelSwitch.running, provider: l.provider } } : {}) } }
       }),
     // Taken in at a tick that saw them change, and when an agent is added or removed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -455,6 +456,15 @@ export function PartView({ project, part: p, many, selected, onSelect, showOwn, 
           </div>
         </div>
       ))}
+      {p.modelSwitch && (
+        // Another model than it was launched with (HI-2609), while that lasts: its footer marks it too.
+        <div className="activity-row act-waiting" data-model-switch="yes" title={tr(M.modelSwitchTip)}>
+          <Icon name="warning" />
+          <div className="activity-row-text">
+            <div className="activity-row-title">{tr(M.modelSwitch, { launched: modelIdName(p.modelSwitch.provider, p.modelSwitch.launched, null), running: modelIdName(p.modelSwitch.provider, p.modelSwitch.running, null) })}</div>
+          </div>
+        </div>
+      )}
       {p.subagents.length > 0 && (
         <>
           <h3 className="activity-group" data-group="subagents">
@@ -544,7 +554,7 @@ function describe(n: ActivityNode): { icon: string; title: string; sub: string; 
       return { icon: 'run-all', title: n.task.description || tr(M.task, { type: n.task.type ?? 'other' }), sub: tr(M.task, { type: n.task.type ?? 'other' }), state: null }
     case 'process': {
       const started = filetimeMs(n.process.created)
-      // The command as given (HI-1743: a cmd /c wrapper as what it runs); a hive-progress run by its title.
+      // The command as given (HI-1743: a cmd /c wrapper as what it runs); a cw-progress run by its title.
       const title = n.process.run ?? commandText(n.process)
       // Left running by its command, its shell gone (HI-2111): said, with how long and its CPU time.
       if (n.process.orphan) return { icon: 'warning', title, sub: tr(M.orphanFor, { pid: n.process.pid, time: ranFor(started), cpu: durationText(n.process.orphan.cpuMs, tr) }), state: null }
@@ -694,12 +704,14 @@ const M = {
   nowHeading: msg({ id: 'activity.nowHeading', defaultMessage: 'Now', description: "A heading in the Activity tab, over what an agent is doing in its turn now: its prompt, then the tool call under way (or thinking, or writing)." }),
   subagentsHeading: msg({ id: 'activity.subagentsHeading', defaultMessage: 'Subagents and background tasks', description: "A heading in the Activity tab, over an agent's subagents and the background tasks it left running (a command, a monitor)." }),
   processesHeading: msg({ id: 'activity.processesHeading', defaultMessage: 'Processes', description: "A heading in the Activity tab, over the processes an agent started (test runs, servers, scripts)." }),
-  showOwn: msg({ id: 'activity.showOwn', defaultMessage: '{n, plural, =0 {Show the agent’s own processes} one {Show the agent’s own process (#)} other {Show the agent’s own processes (#)}}', description: "A checkbox beside the Activity tab's Processes heading: also shows the agent's own processes (its CLI, the terminal hosting it, Hive's tool server for it), hidden by default. {n}: how many are hidden." }),
+  showOwn: msg({ id: 'activity.showOwn', defaultMessage: '{n, plural, =0 {Show the agent’s own processes} one {Show the agent’s own process (#)} other {Show the agent’s own processes (#)}}', description: "A checkbox beside the Activity tab's Processes heading: also shows the agent's own processes (its CLI, the terminal hosting it, Combwork's tool server for it), hidden by default. {n}: how many are hidden." }),
   thinking: msg({ id: 'activity.thinking', defaultMessage: 'Thinking…', description: 'In the Activity tab, what an agent is doing when it works with no tool call under way and nothing written yet in its turn.' }),
   writing: msg({ id: 'activity.writing', defaultMessage: 'Writing…', description: 'In the Activity tab, what an agent is doing when it works with no tool call under way, after it started writing its reply.' }),
-  blockBlocked: msg({ id: 'activity.block.blocked', defaultMessage: '{other, select, yes {Edit blocked: {file} is locked by an agent of another project} other {Edit blocked: {file} is locked by agent {holder}}}', description: "In the Activity tab, under Now: Hive's file lock blocked the agent's edit of a file another agent is editing, while that stands. {file} is the file's path; {holder} the agent editing it." }),
-  blockAsked: msg({ id: 'activity.block.asked', defaultMessage: '{other, select, yes {Edit waiting for your OK: {file} is locked by an agent of another project} other {Edit waiting for your OK: {file} is locked by agent {holder}}}', description: "In the Activity tab, under Now: Hive's file lock (Ask me) holds the agent's edit of a file another agent is editing until the user allows it. {file} is the file's path; {holder} the agent editing it." }),
-  blockFor: msg({ id: 'activity.block.for', defaultMessage: "Hive's file lock · {time}", description: 'The second line of a lock block in the Activity tab: what blocked the edit, and for how long it has stood ({time}, such as "2 min").' }),
+  blockBlocked: msg({ id: 'activity.block.blocked', defaultMessage: '{other, select, yes {Edit blocked: {file} is locked by an agent of another project} other {Edit blocked: {file} is locked by agent {holder}}}', description: "In the Activity tab, under Now: Combwork's file lock blocked the agent's edit of a file another agent is editing, while that stands. {file} is the file's path; {holder} the agent editing it." }),
+  blockAsked: msg({ id: 'activity.block.asked', defaultMessage: '{other, select, yes {Edit waiting for your OK: {file} is locked by an agent of another project} other {Edit waiting for your OK: {file} is locked by agent {holder}}}', description: "In the Activity tab, under Now: Combwork's file lock (Ask me) holds the agent's edit of a file another agent is editing until the user allows it. {file} is the file's path; {holder} the agent editing it." }),
+  modelSwitch: msg({ id: 'activity.modelSwitch', defaultMessage: 'Model changed: {launched} → {running}', description: 'In the Activity tab, under Now (HI-2609): the agent runs another model ({running}) than Combwork started it with ({launched}), its connection\'s. Both are model names ("GPT-6 Astra"); keep the arrow.' }),
+  modelSwitchTip: msg({ id: 'activity.modelSwitch.tip', defaultMessage: "Its coding agent changed model by itself or at a prompt of its own. Shown while it runs the other model; restart the agent to go back to its connection's.", description: 'Tooltip on the "Model changed" row in the Activity tab (HI-2609). Its connection is the account Combwork started the agent on.' }),
+  blockFor: msg({ id: 'activity.block.for', defaultMessage: "Combwork's file lock · {time}", description: 'The second line of a lock block in the Activity tab: what blocked the edit, and for how long it has stood ({time}, such as "2 min").' }),
   blockTip: msg({ id: 'activity.block.tip', defaultMessage: "Shown while the lock stands: it goes once the other agent finishes, the agent tries again or moves on, or its turn ends. Its history is in the agent's ⋯ → Hooks…", description: 'Tooltip on a lock block in the Activity tab. ⋯ → Hooks… is the agent menu item: keep the arrow and the dots.' }),
   notRunning: msg({ id: 'activity.notRunning', defaultMessage: 'Not running', description: "In the Activity tab, under Now, for an agent that isn't running." }),
   role: msg({ id: 'activity.role', defaultMessage: '{role, select, builder {builder} other {reviewer}}', description: "Beside an agent's name in the Activity tab when a card's builder and reviewer are both shown: its role on the card. Lower case." }),
@@ -738,7 +750,7 @@ const M = {
   openSession: msg({ id: 'activity.openSession', defaultMessage: 'Open in Sessions Tab', description: "A button in the Activity tab's details: opens the session's transcript in the Sessions tab." }),
   orphanFor: msg({ id: 'activity.orphanFor', defaultMessage: 'Left running · process {pid} · running {time} · CPU {cpu}', description: "A process node's second line in the Activity tab when the agent's command left it running, the shell that started it gone (HI-2111): its process id ({pid}), how long it has run ({time}: \"12 min\") and the processor time it has used ({cpu}: \"3 min\")." }),
   orphanLabel: msg({ id: 'activity.orphanLabel', defaultMessage: 'Left running', description: "A label in the Activity tab's details (HI-2111): the process was left running by the agent's command." }),
-  orphanFact: msg({ id: 'activity.orphanFact', defaultMessage: 'The process that started it has exited, and it has run for over ten minutes. The agent is told; Hive doesn’t end it.', description: "The value beside Left running in the Activity tab's details (HI-2111): why this process counts as left running." }),
+  orphanFact: msg({ id: 'activity.orphanFact', defaultMessage: 'The process that started it has exited, and it has run for over ten minutes. The agent is told; Combwork doesn’t end it.', description: "The value beside Left running in the Activity tab's details (HI-2111): why this process counts as left running." }),
   cpuLabel: msg({ id: 'activity.cpuLabel', defaultMessage: 'CPU time', description: "A label in the Activity tab's details (HI-2111): the processor time a process has used." }),
   endIt: msg({ id: 'activity.endIt', defaultMessage: 'End It…', description: "A button in the Activity tab's details for a process the agent's command left running (HI-2111): ends it, after a confirmation (…)." }),
   endButton: msg({ id: 'activity.endButton', defaultMessage: 'End Process…', description: "A button in the Activity tab's details: ends this one process of the agent's, after a confirmation (…)." }),

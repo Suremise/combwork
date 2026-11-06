@@ -11,7 +11,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { B1, commit, moved, R1, setup } from './workflow/harness'
 
-const base = tempDir('hive-vcswitch-')
+const base = tempDir('cw-vcswitch-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -45,7 +45,7 @@ const user = { kind: 'user' } as const
 function gitInit(folder: string): void {
   git(folder, 'init', '-q', '-b', 'main')
   for (const [k, v] of [['user.name', 'Pat Builder'], ['user.email', 'pat@example.com'], ['core.autocrlf', 'false']]) git(folder, 'config', k, v)
-  writeFileSync(join(folder, '.gitignore'), '.hive/\n')
+  writeFileSync(join(folder, '.gitignore'), '.combwork/\n')
   git(folder, 'add', '-A')
   git(folder, 'commit', '-qm', 'initial')
 }
@@ -57,13 +57,13 @@ function gitInit(folder: string): void {
 async function workspace(o: { platform: 'git' | 'none'; workflow?: unknown; none?: boolean; subfolder?: boolean }): Promise<{ w: WS; repo: string }> {
   const ws = join(base, `ws-${++n}`)
   const repo = join(ws, 'p')
-  mkdirSync(join(repo, '.hive'), { recursive: true })
-  mkdirSync(join(ws, '.hive'), { recursive: true })
+  mkdirSync(join(repo, '.combwork'), { recursive: true })
+  mkdirSync(join(ws, '.combwork'), { recursive: true })
   if (o.subfolder) {
     writeFileSync(join(repo, 'a.txt'), 'a\n')
     gitInit(ws)
   } else if (!o.none) gitInit(repo)
-  writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: o.platform, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }], ...(o.workflow ? { workflow: o.workflow } : {}) }))
+  writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: o.platform, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }], ...(o.workflow ? { workflow: o.workflow } : {}) }))
   const w = createWorkspaceService()
   await w.open(ws)
   opened.push(w)
@@ -78,11 +78,11 @@ const platformOf = (w: WS, repo: string) => w.info()!.projects.find((p) => p.pat
 
 describe('setKept (#1419)', () => {
   it('keeps the platform left and restores the one chosen, every other field kept', () => {
-    const inGit = { platform: 'git' as const, preset: 'pair' as const, options: { finish: 'hiveMerges' as const }, presetAsked: 'chosen' as const, later: 1 }
+    const inGit = { platform: 'git' as const, preset: 'pair' as const, options: { finish: 'combworkMerges' as const }, presetAsked: 'chosen' as const, later: 1 }
     const none = setKept(inGit as never, 'none')
-    expect(none).toEqual({ platform: 'none', preset: null, options: {}, kept: { git: { preset: 'pair', options: { finish: 'hiveMerges' }, presetAsked: 'chosen' } }, later: 1 })
+    expect(none).toEqual({ platform: 'none', preset: null, options: {}, kept: { git: { preset: 'pair', options: { finish: 'combworkMerges' }, presetAsked: 'chosen' } }, later: 1 })
     const back = setKept({ ...none, preset: 'solo', options: { review: 'none' } }, 'git')
-    expect(back).toEqual({ platform: 'git', preset: 'pair', options: { finish: 'hiveMerges' }, presetAsked: 'chosen', kept: { none: { preset: 'solo', options: { review: 'none' } } }, later: 1 })
+    expect(back).toEqual({ platform: 'git', preset: 'pair', options: { finish: 'combworkMerges' }, presetAsked: 'chosen', kept: { none: { preset: 'solo', options: { review: 'none' } } }, later: 1 })
     // A platform left with nothing of its own isn't kept; the same platform is no change.
     expect(setKept(none, 'git')).toEqual(inGit)
     expect(setKept(inGit as never, 'git')).toBe(inGit)
@@ -147,8 +147,8 @@ describe('switching a project (#1419)', () => {
   it("an options save that waited behind a switch is refused, both platforms' options kept (HR3's round 1, finding 1)", async () => {
     const { platform: _p, ...pair } = preset('git', 'pair')
     const { w, repo } = await workspace({ platform: 'git', workflow: { platform: 'git', preset: 'pair', options: pair, presetAsked: 'chosen' } })
-    // The save reads the project as Git, then waits for its lock while another Hive on this workspace switches it to
-    // None (this Hive's own switch takes its turn after the save: workflowWrite, #1422), as its switch writes it.
+    // The save reads the project as Git, then waits for its lock while another Combwork on this workspace switches it to
+    // None (this Combwork's own switch takes its turn after the save: workflowWrite, #1422), as its switch writes it.
     const mutate = w.mutateProjectConfig.bind(w)
     let first = true
     w.mutateProjectConfig = async (path, fn) => {
@@ -225,12 +225,12 @@ describe('switching a project (#1419)', () => {
 })
 
 describe('OP-29: a project inside a larger repository (#1419)', () => {
-  it("Hive merges and the agent merges need the project's own target", async () => {
+  it("Combwork merges and the agent merges need the project's own target", async () => {
     const { w, repo } = await workspace({ platform: 'git', subfolder: true, workflow: { platform: 'git', preset: null, options: allOff('git') } })
     expect(platformOf(w, repo).detected).toMatchObject({ platform: 'git', subfolder: true })
     const { platform: _p, ...pair } = preset('git', 'pair')
     const merges = { ...pair, target: '' }
-    for (const finish of ['hiveMerges', 'agentMerges'] as const) {
+    for (const finish of ['combworkMerges', 'agentMerges'] as const) {
       const c = await form.checkWorkflowChange(w, repo, { preset: null, options: { ...merges, finish } })
       expect(c.problems).toContainEqual({ kind: 'contradiction', id: 'subfolderTarget' })
     }
@@ -306,7 +306,7 @@ describe('OP-29: a project inside a larger repository (#1419)', () => {
       expect(await e.queue({ subfolder: () => false }).drain('main')).toMatchObject([{ outcome: 'integrated' }])
     })
 
-    it("a target inherited from the workspace's or Hive's defaults pauses it too (HR3's round 1, finding 2)", async () => {
+    it("a target inherited from the workspace's or Combwork's defaults pauses it too (HR3's round 1, finding 2)", async () => {
       const { e, card } = await queued('main', false)
       expect(e.wf.rulesetOf(card).options).not.toHaveProperty('targetOwn')
       expect(await e.queue({ subfolder: () => true }).drain('main')).toMatchObject([{ outcome: 'paused', reason: 'subfolderTarget' }])

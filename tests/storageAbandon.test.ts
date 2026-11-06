@@ -20,14 +20,14 @@ vi.mock('fs/promises', async (original) => {
   }
 })
 
-const base = tempDir('hive-storage-abandon-')
+const base = tempDir('cw-storage-abandon-')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 const DIRS = 40
 /** A project whose agent's worktree has DIRS folders of one 100-byte file each. */
 function project(name: string): { path: string; tree: string } {
   const path = join(base, name)
   const tree = join(base, `${name}-tree`)
-  mkdirSync(join(path, '.hive'), { recursive: true })
+  mkdirSync(join(path, '.combwork'), { recursive: true })
   for (let i = 0; i < DIRS; i++) {
     mkdirSync(join(tree, `d${i}`), { recursive: true })
     writeFileSync(join(tree, `d${i}`, 'f.txt'), 'x'.repeat(100))

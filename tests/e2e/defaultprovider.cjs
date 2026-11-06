@@ -89,7 +89,7 @@ const check = (name, ok, extra = '') => {
   check('nothing was added meanwhile', (await agents()).length === 0, JSON.stringify(await agents()))
   // A project has no default provider of its own any more (HI-2106, decision A): one sent is not kept.
   await inv('project:updateConfig', alpha, { defaultProvider: 'claude-code' })
-  check("…a project's own default isn't kept, and Automatic warns of nothing", !JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'project.json'), 'utf8')).defaultProvider && !!(await lib.until(async () => (await card.locator('[data-provider-warning]').count()) === 0, 10000)))
+  check("…a project's own default isn't kept, and Automatic warns of nothing", !JSON.parse(fs.readFileSync(path.join(alpha, '.combwork', 'project.json'), 'utf8')).defaultProvider && !!(await lib.until(async () => (await card.locator('[data-provider-warning]').count()) === 0, 10000)))
   await app.close()
 
   // --- 2. Claude Code turned on but not installed, Codex installed.
@@ -103,7 +103,7 @@ const check = (name, ok, extra = '') => {
   cfg2.settings.providers.codex.executablePath = path.join(__dirname, 'fake-codex', 'fake-codex.cmd')
   cfg2.settings.general = { ...cfg2.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(path.join(userData2, 'config.json'), JSON.stringify(cfg2, null, 2))
-  const base = lib.hiveEnv({ HIVE_USER_DATA: userData2 })
+  const base = lib.combworkEnv({ CW_USER_DATA: userData2 })
   const pathKey = Object.keys(base).find((k) => k.toUpperCase() === 'PATH')
   const noClaude = (base[pathKey] ?? '')
     .split(path.delimiter)
@@ -116,7 +116,7 @@ const check = (name, ok, extra = '') => {
   await lib.openWorkspace(two.inv, two.page, ws)
   await two.page.getByText('alpha', { exact: true }).first().click()
   await lib.until(async () => (await two.page.locator('.session-empty-card').count()) === 1, 10000)
-  // Hive has looked for the CLIs (launch waited for it): Provider Setup would open at once if it were going to.
+  // Combwork has looked for the CLIs (launch waited for it): Provider Setup would open at once if it were going to.
   await lib.sleep(1000) // on purpose: nothing should appear
   const banners = await two.page.locator('.providers-banner').allInnerTexts()
   check('no banner about Claude Code', !banners.some((b) => b.includes('Claude Code')), JSON.stringify(banners))

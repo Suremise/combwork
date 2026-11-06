@@ -1,4 +1,4 @@
-// The scenarios' wait for Hive's start of a lane's first card (HI-2278, scenarios.cjs laneStartLanded): it has landed
+// The scenarios' wait for Combwork's start of a lane's first card (HI-2278, scenarios.cjs laneStartLanded): it has landed
 // only once the card is in Doing, the builder is past starting, and the start's task delivery is offered (or read) with
 // its doorbell, which names its id, in what the current launch shows. Never on a delivery uncertain or ended, one still
 // queued, one for another card, or one whose line only an earlier launch showed.
@@ -12,7 +12,7 @@ const { helpers } = require('./scenarios/scenarios.cjs') as { helpers: { laneSta
 const { laneStartLanded } = helpers
 
 const N = 3
-const DOORBELL = '› [Hive] New in your inbox: 1 task (AL-3) (m4). Call hive_inbox to read it, act on it, then ack it.'
+const DOORBELL = '› [CW] New in your inbox: 1 task (AL-3) (m4). Call cw_inbox to read it, act on it, then ack it.'
 const task = (state: string, more: Partial<Delivery> = {}): Delivery => ({ id: 'm4', kind: 'task', card: N, state, ...more })
 const seen = (more: Partial<Seen> = {}): Seen => ({ column: 'doing', live: { status: 'ready' }, deliveries: [task('offered')], shown: DOORBELL, ...more })
 

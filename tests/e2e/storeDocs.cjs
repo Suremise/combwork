@@ -1,4 +1,4 @@
-// The workspace's small stores as its database keeps them (#1018: deliveries and sessions in .hive/hive.db's store_rows;
+// The workspace's small stores as its database keeps them (#1018: deliveries and sessions in .combwork/combwork.db's store_rows;
 // #1212: lanes and watches in typed tables), read by the suites that checked their files before: a read-only connection,
 // opened and closed for each read.
 const fs = require('fs')
@@ -35,7 +35,7 @@ function watchOf(w) {
 
 /** A store's entries, in order (what its file's array held); [] while the workspace has no database yet. */
 function storeDocs(ws, store, scope = '') {
-  const file = path.join(ws, '.hive', 'hive.db')
+  const file = path.join(ws, '.combwork', 'combwork.db')
   if (!fs.existsSync(file)) return []
   const db = new DatabaseSync(file, { readOnly: true, timeout: 5000 })
   try {
@@ -55,10 +55,10 @@ function storeDocs(ws, store, scope = '') {
 function deliveriesPlace(host) {
   const h = path.resolve(host)
   const parent = path.dirname(h)
-  if (path.basename(h).toLowerCase() === 'assistant' && path.basename(parent).toLowerCase() === '.hive') return { ws: path.dirname(parent), scope: 'assistant' }
+  if (path.basename(h).toLowerCase() === 'assistant' && path.basename(parent).toLowerCase() === '.combwork') return { ws: path.dirname(parent), scope: 'assistant' }
   let id = null
   try {
-    id = JSON.parse(fs.readFileSync(path.join(h, '.hive', 'project.json'), 'utf8')).id
+    id = JSON.parse(fs.readFileSync(path.join(h, '.combwork', 'project.json'), 'utf8')).id
   } catch {
     // No project.json: kept under the folder's name.
   }
@@ -73,7 +73,7 @@ function deliveriesOf(host) {
 
 /** A value kept beside a store's entries (deliveries' `next`), parsed; undefined when there is none. */
 function storeMeta(ws, store, key, scope = '') {
-  const db = new DatabaseSync(path.join(ws, '.hive', 'hive.db'), { readOnly: true, timeout: 5000 })
+  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { readOnly: true, timeout: 5000 })
   try {
     const r = db.prepare('SELECT value FROM store_meta WHERE store = ? AND scope = ? AND key = ?').get(store, scope, key)
     return r ? JSON.parse(r.value) : undefined
@@ -83,17 +83,17 @@ function storeMeta(ws, store, key, scope = '') {
 }
 
 /**
- * Saves one entry of a store as Hive would (a suite's stand-in for editing its file by hand): in its place if it is
+ * Saves one entry of a store as Combwork would (a suite's stand-in for editing its file by hand): in its place if it is
  * there, else last; `meta` values set beside it (JSON-encoded here). In one transaction.
  */
 function putStoreDoc(ws, store, key, doc, { scope = '', meta = {} } = {}) {
-  const db = new DatabaseSync(path.join(ws, '.hive', 'hive.db'), { timeout: 5000 })
+  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })
   try {
     db.exec('BEGIN IMMEDIATE')
     if (store === 'deliveries' && hasTable(db, 'deliveries')) {
       // Its table (#1211): the delivery's row, by its id.
       const row = codec.deliveryToRow(scope, doc)
-      if (!row) throw new Error(`not a delivery Hive keeps: ${JSON.stringify(doc)}`)
+      if (!row) throw new Error(`not a delivery Combwork keeps: ${JSON.stringify(doc)}`)
       db.prepare('DELETE FROM deliveries WHERE host = ? AND id = ?').run(scope, doc.id)
       codec.insert(db, 'deliveries', row)
       for (const [k, v] of Object.entries(meta)) db.prepare('INSERT INTO store_meta (store, scope, key, value) VALUES (?, ?, ?, ?) ON CONFLICT(store, scope, key) DO UPDATE SET value = excluded.value').run(store, scope, k, JSON.stringify(v))
@@ -114,13 +114,13 @@ function putStoreDoc(ws, store, key, doc, { scope = '', meta = {} } = {}) {
 }
 
 /**
- * A session host's records as Hive keeps them (#1061: rows of the `sessions` store, under its project's id), in the form
+ * A session host's records as Combwork keeps them (#1061: rows of the `sessions` store, under its project's id), in the form
  * its sessions.json had: `{ version, sessions, deleted?, deletedUsage? }`. Empty while there are none (or no database).
  */
 function sessionsOf(host) {
   const p = deliveriesPlace(host)
   const out = { version: 1, sessions: [] }
-  const file = path.join(p.ws, '.hive', 'hive.db')
+  const file = path.join(p.ws, '.combwork', 'combwork.db')
   if (!fs.existsSync(file)) return out
   const db = new DatabaseSync(file, { readOnly: true, timeout: 5000 })
   try {
@@ -153,12 +153,12 @@ function sessionsOf(host) {
 }
 
 /**
- * Replaces a session host's records as Hive would (a suite's stand-in for writing its sessions.json by hand, which Hive
+ * Replaces a session host's records as Combwork would (a suite's stand-in for writing its sessions.json by hand, which Combwork
  * only moves in before it first reads them): `f` in sessions.json's form. In one transaction, marked moved in.
  */
 function putSessions(host, f) {
   const p = deliveriesPlace(host)
-  const db = new DatabaseSync(path.join(p.ws, '.hive', 'hive.db'), { timeout: 5000 })
+  const db = new DatabaseSync(path.join(p.ws, '.combwork', 'combwork.db'), { timeout: 5000 })
   try {
     db.exec('BEGIN IMMEDIATE')
     if (hasTable(db, 'sessions')) {
@@ -166,7 +166,7 @@ function putSessions(host, f) {
       for (const t of ['sessions', 'sessions_deleted', 'sessions_deleted_usage']) db.prepare(`DELETE FROM ${t} WHERE host = ?`).run(p.scope)
       ;(f.sessions ?? []).forEach((rec, i) => {
         const r = codec.sessionToRows(p.scope, i, rec)
-        if (!r) throw new Error(`not a session record Hive keeps: ${JSON.stringify(rec)}`)
+        if (!r) throw new Error(`not a session record Combwork keeps: ${JSON.stringify(rec)}`)
         codec.insert(db, 'sessions', r.row)
         for (const c of r.cards) codec.insert(db, 'session_cards', c)
       })
@@ -194,7 +194,7 @@ function putSessions(host, f) {
 
 /** Takes out what an ended lane kept of its cards (a lane ended before #512 kept it, or its record damaged). */
 function forgetLaneCards(ws, laneId) {
-  const db = new DatabaseSync(path.join(ws, '.hive', 'hive.db'), { timeout: 5000 })
+  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })
   try {
     db.prepare('DELETE FROM lane_frozen WHERE lane = ?').run(laneId)
   } finally {

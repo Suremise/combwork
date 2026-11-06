@@ -183,11 +183,11 @@ describe('workflow scenarios, None', () => {
   })
 
   // #1511 (decided: refuse): a card's paths narrow the deliverables, never widen them.
-  it('#1511: a path under node_modules, .venv, .git or .hive is refused by declare paths and submit; a declared folder leaves its excluded descendants out; paths stored from before are left out of the revision, and said so', async () => {
+  it('#1511: a path under node_modules, .venv, .git or .combwork is refused by declare paths and submit; a declared folder leaves its excluded descendants out; paths stored from before are left out of the revision, and said so', async () => {
     const e = (env = setup({ ...preset('none', 'team'), preChecks: [] }, { files: { 'src/a.md': 'a\n', 'src/node_modules/y.js': 'y\n', 'node_modules/pad/index.js': 'pad\n', '.venv/lib/x.py': 'x\n' } }))
     const card = e.wf.createCard({ title: 'Src', paths: ['src/a.md'] })
     moved(await e.wf.start(card.key, B1))
-    for (const [path, folder] of [['node_modules/pad/index.js', 'node_modules'], ['node_modules', 'node_modules'], ['src/node_modules/y.js', 'node_modules'], ['.venv/lib/x.py', '.venv'], ['.git/config', '.git'], ['.hive/project.json', '.hive']]) {
+    for (const [path, folder] of [['node_modules/pad/index.js', 'node_modules'], ['node_modules', 'node_modules'], ['src/node_modules/y.js', 'node_modules'], ['.venv/lib/x.py', '.venv'], ['.git/config', '.git'], ['.combwork/project.json', '.combwork']]) {
       const r = await e.wf.declarePaths(card.key, B1, ['src/a.md', path])
       expect(isRefusal(r) && r.rule === 'paths.excluded' && r.values).toMatchObject({ path, folder })
       expect(e.wf.store.card(card.id).paths).toEqual(['src/a.md'])
@@ -219,16 +219,16 @@ describe('workflow scenarios, None', () => {
     const dir = tempDir('none-case-')
     expect(new NoneAdapter(dir, ['node_modules', 'Cache'], true).excludedPart('src/NODE_MODULES/x.js')).toBe('NODE_MODULES')
     expect(new NoneAdapter(dir, ['node_modules', 'Cache'], true).excludedPart('cache/x.bin')).toBe('cache')
-    expect(new NoneAdapter(dir, ['node_modules'], true).excludedPart('.HIVE/project.json')).toBe('.HIVE')
+    expect(new NoneAdapter(dir, ['node_modules'], true).excludedPart('.COMBWORK/project.json')).toBe('.COMBWORK')
     expect(new NoneAdapter(dir, ['node_modules'], false).excludedPart('NODE_MODULES/x.js')).toBeNull()
     expect(new NoneAdapter(dir, ['node_modules'], false).excludedPart('node_modules/x.js')).toBe('node_modules')
   })
 
-  it.runIf(process.platform === 'win32')('#1511: on Windows, a case alias of .hive, .git or an excluded folder is refused by both intents, skipped in a folder, left out when stored; a starting manifest from before leaves it out of the change', async () => {
+  it.runIf(process.platform === 'win32')('#1511: on Windows, a case alias of .combwork, .git or an excluded folder is refused by both intents, skipped in a folder, left out when stored; a starting manifest from before leaves it out of the change', async () => {
     const e = (env = setup({ ...preset('none', 'team'), preChecks: [], excluded: ['node_modules', '.venv', 'cache'] }, { files: { 'src/a.md': 'a\n', 'src/Node_Modules/y.js': 'y\n', 'node_modules/pad.js': 'p\n', 'cache/x.bin': 'x\n' } }))
     const card = e.wf.createCard({ title: 'Src', paths: ['src/a.md'] })
     moved(await e.wf.start(card.key, B1))
-    for (const [path, folder] of [['NODE_MODULES/pad.js', 'NODE_MODULES'], ['.HIVE/project.json', '.HIVE'], ['.Git/config', '.Git'], ['.VENV/lib/x.py', '.VENV'], ['Cache/x.bin', 'Cache']]) {
+    for (const [path, folder] of [['NODE_MODULES/pad.js', 'NODE_MODULES'], ['.COMBWORK/project.json', '.COMBWORK'], ['.Git/config', '.Git'], ['.VENV/lib/x.py', '.VENV'], ['Cache/x.bin', 'Cache']]) {
       const r = await e.wf.declarePaths(card.key, B1, ['src/a.md', path])
       expect(isRefusal(r) && r.rule === 'paths.excluded' && r.values).toMatchObject({ path, folder })
       const sub = refusedBy(await e.wf.submit(card.key, B1, { summary: 'x', paths: ['src/a.md', path] }), 'paths.excluded')
@@ -263,7 +263,7 @@ describe('workflow scenarios, None', () => {
     rmSync(join(g.project, '.git'), { recursive: true, force: true })
     expect(offer('git', detect(g.project))).toEqual({ offer: 'none', why: 'repositoryGone' })
     const r = refusedBy(await g.wf.submit(card.key, B1, { summary: 'x' }), 'platform.unknown')
-    expect(r.message).toContain("Hive couldn't read")
+    expect(r.message).toContain("Combwork couldn't read")
     g.close()
     const n = (env = setup({ platform: 'none' }, { files }))
     expect(offer('none', detect(n.project))).toBeNull()
@@ -278,7 +278,7 @@ describe('None: what a submission leaves out of its paths is named (HI-2339)', (
   const warningsOf = (r: unknown): string[] => (r as { warnings?: string[] }).warnings ?? []
   const pairNone = () => (env = setup({ ...preset('none', 'pair'), preChecks: [] }, { files: { 'a.txt': 'a\n' } }))
 
-  it("a later round's new file, and a user's edit: the resubmission's refusal names both, through the Agent API and the hive tools; declared, accepted with the new file only", async () => {
+  it("a later round's new file, and a user's edit: the resubmission's refusal names both, through the Agent API and the Combwork tools; declared, accepted with the new file only", async () => {
     const e = pairNone()
     const card = e.wf.createCard({ title: 'Round two' })
     moved(await e.wf.start(card.key, B1))
@@ -299,7 +299,7 @@ describe('None: what a submission leaves out of its paths is named (HI-2339)', (
     expect(r.warnings![1]).toMatch(/in neither its paths nor what it recorded as its agents' edits: c\.txt\./)
     // Factual, not attributed: the unclaimed file isn't said to be the user's or anyone's.
     expect(r.warnings![1]).not.toMatch(/user|editor|formatter|not by/)
-    // The Agent API's body and the hive tools' text carry them.
+    // The Agent API's body and the Combwork tools' text carry them.
     const body = refusalBody(r)
     expect(body.warnings).toEqual(r.warnings)
     const text = refusedText(body as unknown as Refused)

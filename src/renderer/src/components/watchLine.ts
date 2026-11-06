@@ -6,7 +6,7 @@ import { columnName } from '../../../shared/tasks'
 import type { LiveSessionState, TaskWatchInfo } from '../../../shared/types'
 
 /** A watch as an agent's status words it (HI-1679): watchText's line, its cards by key, in the window's language. */
-export const watchStatus = (w: Pick<TaskWatchInfo, 'cards' | 'column' | 'agents' | 'lanes'>): string => watchText(w, tr, (l) => fmt.list(l, 'unit'))
+export const watchStatus = (w: Pick<TaskWatchInfo, 'cards' | 'column' | 'agents' | 'lanes' | 'laneTitles'>): string => watchText(w, tr, (l) => fmt.list(l, 'unit'))
 
 const WAITING_INTO = msg({ id: 'panes.tiles.waitingInto', defaultMessage: 'Waiting → {column}', description: "An agent's status in the focus view's strip while it waits for its card (named by the chip beside it) to move into a board column ({column})." })
 const WAITING_CARD = msg({ id: 'panes.tiles.waitingCard', defaultMessage: 'Waiting for its card', description: "An agent's status in the focus view's strip while it waits for its card (named by the chip beside it) to change." })

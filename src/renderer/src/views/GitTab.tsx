@@ -3,7 +3,7 @@ import type { ProjectInfo } from '@shared/types'
 import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
 import { GIT_VIEW_GUIDE, HISTORY_COMMITS, folderBusy, gitStatusText, gitStatusTip, headText, type GitFolderAction, type GitHistory, type GitRepoSummary } from '@shared/gitRepo'
 import { gitFixText, gitProblemText } from '@shared/gitTool'
-import type { HiveRequests } from '@shared/api'
+import type { CombworkRequests } from '@shared/api'
 import { call, errorMessage } from '../api'
 import { gitReader, type GitReadState } from '../gitReads'
 import { attempt } from '../actions'
@@ -24,9 +24,9 @@ const faint = (c: React.ReactNode[]): React.ReactNode => <span className="faint"
 /** The words of Changes, History and the shared forms; Branches & remotes has its own (GitBranches.tsx). */
 export const GIT_TEXT = {
   notRepo: msg({ id: 'git.setup.notRepo', defaultMessage: "{project} isn't a git repository", description: "Heading on the Git tab of a project that isn't a git repository. {project} is its name." }),
-  withoutGit: msg({ id: 'git.setup.withoutGit', defaultMessage: 'Without a repository, agents work in the project folder, and Hive has no worktrees or merging for it.', description: "The Version Control tab of a Git project whose folder isn't a git repository." }),
-  howTo: msg({ id: 'git.setup.howTo', defaultMessage: 'To use them, make it a repository: Initialise makes it one on a branch called main, keeps its .hive out of git, and commits its files, so agents can work in worktrees at once. Then add a remote under Branches & remotes to push it.', description: "The Git tab of a project that isn't a git repository. Initialise and Branches & remotes are a button and a section: keep them as they are named there. Keep main (the branch name)." }),
-  cantRead: msg({ id: 'git.problem.cantRead', defaultMessage: "{problem}, so Hive can't read this repository.", description: 'The Git tab when git cannot run. {problem} says why, such as "Git isn\'t installed (or isn\'t on Hive\'s PATH)".' }),
+  withoutGit: msg({ id: 'git.setup.withoutGit', defaultMessage: 'Without a repository, agents work in the project folder, and Combwork has no worktrees or merging for it.', description: "The Version Control tab of a Git project whose folder isn't a git repository." }),
+  howTo: msg({ id: 'git.setup.howTo', defaultMessage: 'To use them, make it a repository: Initialise makes it one on a branch called main, keeps its .combwork out of git, and commits its files, so agents can work in worktrees at once. Then add a remote under Branches & remotes to push it.', description: "The Git tab of a project that isn't a git repository. Initialise and Branches & remotes are a button and a section: keep them as they are named there. Keep main (the branch name)." }),
+  cantRead: msg({ id: 'git.problem.cantRead', defaultMessage: "{problem}, so Combwork can't read this repository.", description: 'The Git tab when git cannot run. {problem} says why, such as "Git isn\'t installed (or isn\'t on Combwork\'s PATH)".' }),
   learnMore: msg({ id: 'git.setup.learnMore', defaultMessage: 'Learn more', description: "Link on the Git tab of a project that isn't a git repository: opens the user guide's Git view section." }),
   agentSetup: msg({ id: 'git.problem.agentSetup', defaultMessage: 'Provider Setup', description: 'Button: opens Provider Setup, which checks git and says how to fix it.' }),
   retry: msg({ id: 'git.retry', defaultMessage: 'Retry', description: 'Button: reads git again.' }),
@@ -77,8 +77,8 @@ export const at = (ms: number | null): string | null => (ms ? timeAgo(new Date(m
  * Reads a Git channel for the project: again when the project's git changes here, its agents work, the window gets
  * focus, or on `reload`; the last answer stays while it does.
  */
-export function useGitRead<C extends 'git:summary' | 'git:info' | 'git:history' | 'git:compareLines' | 'git:compare' | 'git:leftovers'>(channel: C, project: ProjectInfo, args: readonly (string | number | null)[] = NO_ARGS): { data: Awaited<ReturnType<HiveRequests[C]>> | null; error: string | null; loading: boolean; at: number; reload: () => void } {
-  type T = Awaited<ReturnType<HiveRequests[C]>>
+export function useGitRead<C extends 'git:summary' | 'git:info' | 'git:history' | 'git:compareLines' | 'git:compare' | 'git:leftovers'>(channel: C, project: ProjectInfo, args: readonly (string | number | null)[] = NO_ARGS): { data: Awaited<ReturnType<CombworkRequests[C]>> | null; error: string | null; loading: boolean; at: number; reload: () => void } {
+  type T = Awaited<ReturnType<CombworkRequests[C]>>
   const version = useStore((s) => s.gitVersion[project.path] ?? 0)
   const usage = useStore((s) => s.usageVersion[project.path] ?? 0)
   // A read is the project's with its arguments (History's branch and page, #1643): another's answer never shows for it.

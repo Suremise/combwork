@@ -5,8 +5,8 @@ import { join } from 'path'
 import type { MoveOwner, PathDataCopy } from '../../src/shared/types'
 import { tempDir, tempRoot } from '../tempDir'
 
-// #796, the `main` area's services, in the language Hive shows while what agents read stays English: the Agent API's
-// notice titles (grouped finishes, plan usage, Hive closing), before and after a language change; Repair's report of a
+// #796, the `main` area's services, in the language Combwork shows while what agents read stays English: the Agent API's
+// notice titles (grouped finishes, plan usage, Combwork closing), before and after a language change; Repair's report of a
 // copy recorded in one language and shown in another; Initialise Git Repository's reply.
 
 vi.mock('electron', () => ({
@@ -42,7 +42,7 @@ const { setLanguage } = await import('../../src/shared/i18n')
 const { PSEUDO_LANGUAGE } = await import('../../src/shared/i18n/languages')
 const { config } = await import('../../src/main/config')
 const { planNotice, reportPlanUsage } = await import('../../src/main/planUsage')
-const { onHiveEvent } = await import('../../src/main/events')
+const { onCombworkEvent } = await import('../../src/main/events')
 const { closedNotice } = await import('../../src/main/notices')
 const { setNotifyHost, tell } = await import('../../src/main/notify')
 const { apiEventFor } = await import('../../src/main/apiEvents')
@@ -55,7 +55,7 @@ const { initRepo } = await import('../../src/main/gitInit')
 const GERMAN = {
   'main.plan.used': '{share, number, ::percent} Ihres {window, select, hours {{hours, plural, one {#-Stunden-Limits} other {#-Stunden-Limits}}} weekly {Wochenlimits} other {{label}-Limits}} für {provider} verbraucht',
   'main.finished.inProject': '{n} Agenten in {project} fertig',
-  'main.quit.closed': 'Hive wurde geschlossen',
+  'main.quit.closed': 'Combwork wurde geschlossen',
   'main.move.copied':
     "{n, plural, one {{owner, select, project {{host}: {n, number} Datei von {provider} für das Projekt kopiert.} assistant {{host}: {n, number} Datei von {provider} für den Assistenten kopiert.} worktree {{host}: {n, number} Datei von {provider} für das Arbeitsverzeichnis von {agent} kopiert.} other {{host}: {n, number} Datei von {provider} für {of} kopiert.}}} other {{owner, select, project {{host}: {n, number} Dateien von {provider} für das Projekt kopiert.} assistant {{host}: {n, number} Dateien von {provider} für den Assistenten kopiert.} worktree {{host}: {n, number} Dateien von {provider} für das Arbeitsverzeichnis von {agent} kopiert.} other {{host}: {n, number} Dateien von {provider} für {of} kopiert.}}}}"
 }
@@ -68,10 +68,10 @@ describe('notices: in the language shown, their Agent API title in English', () 
   let off: () => void
   beforeEach(() => {
     seen.length = 0
-    off = onHiveEvent((e) => void seen.push(e as never))
+    off = onCombworkEvent((e) => void seen.push(e as never))
     vi.spyOn(config, 'update').mockImplementation((fn: (c: ReturnType<typeof config.get>) => void) => fn(config.get()))
     config.get().planWarnings = {}
-    // Hive in the background: a Windows notification, told to the Agent API's stream.
+    // Combwork in the background: a Windows notification, told to the Agent API's stream.
     setNotifyHost({ focused: () => null, fallback: () => null, workspaceOf: () => null })
   })
   afterEach(() => {
@@ -103,11 +103,11 @@ describe('notices: in the language shown, their Agent API title in English', () 
     expect(titles.map((t) => t.title)).toEqual(['81 % Ihres 2-Stunden-Limits für Codex verbraucht', '81 % Ihres Wochenlimits für Codex verbraucht', '81 % Ihres 2-hour-Limits für Codex verbraucht', '81 % Ihres primary-Limits für Codex verbraucht'])
   })
 
-  it('Hive closing', () => {
+  it('Combwork closing', () => {
     setLanguage('de', GERMAN, 'de-DE')
     const c = closedNotice(2)
     tell({ kind: 'quit', title: c.title, message: c.body, apiTitle: c.apiTitle })
-    expect(told()).toEqual([{ user: 'Hive wurde geschlossen', api: 'Hive has closed' }])
+    expect(told()).toEqual([{ user: 'Combwork wurde geschlossen', api: 'Combwork has closed' }])
   })
 
   it('finishes that came together; one alone keeps its own title', () => {
@@ -159,7 +159,7 @@ describe("Repair's report of a copy: whose it is, kept as data", () => {
 })
 
 describe("Repair's report of a recreate git's prune refused (#1313)", () => {
-  it('names the worktrees git would forget: an agent’s by its name, one Hive has no agent for by its folder', () => {
+  it('names the worktrees git would forget: an agent’s by its name, one Combwork has no agent for by its folder', () => {
     const trees = [
       { agentName: 'Second', from: 'D:\\old\\ws.worktrees\\alpha\\second', to: null },
       { agentName: 'Third', from: 'D:\\old\\ws.worktrees\\alpha\\third', to: 'D:\\new\\ws.worktrees\\alpha\\third' }
@@ -180,23 +180,23 @@ describe("Initialise Git Repository's reply", () => {
   })
 
   it('in the language shown: its steps joined by the language, the first capitalised', { timeout: 60_000 }, async () => {
-    const base = tempDir('hive-i18n-gitinit-')
+    const base = tempDir('cw-i18n-gitinit-')
     const global = join(base, 'global.gitconfig')
     writeFileSync(global, '[user]\n\tname = Global Person\n\temail = global@example.com\n')
     process.env.GIT_CONFIG_GLOBAL = global
     process.env.GIT_CONFIG_NOSYSTEM = '1'
     const p = join(base, 'translated')
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'sessions.json'), '{}\n')
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'sessions.json'), '{}\n')
     writeFileSync(join(p, 'a.txt'), 'a\n')
     projects = [p]
     setLanguage('pl', {
-      'main.gitInit.done': '{steps}. Folder .hive zostaje poza gitem.',
+      'main.gitInit.done': '{steps}. Folder .combwork zostaje poza gitem.',
       'main.gitInit.step.init': 'utworzono repozytorium git na main',
       'main.gitInit.step.commit': '{n, plural, one {zatwierdzono # plik} few {zatwierdzono # pliki} many {zatwierdzono # plików} other {zatwierdzono # pliku}}'
     }, 'pl-PL')
     // The starter .gitignore's step has no translation: English, in the Polish sentence.
-    expect(await initRepo(p, { gitignore: 'minimal' })).toBe('Utworzono repozytorium git na main, added a minimal .gitignore i zatwierdzono 2 pliki. Folder .hive zostaje poza gitem.')
+    expect(await initRepo(p, { gitignore: 'minimal' })).toBe('Utworzono repozytorium git na main, added a minimal .gitignore i zatwierdzono 2 pliki. Folder .combwork zostaje poza gitem.')
     expect(execFileSync('git', ['log', '--format=%s'], { cwd: p, encoding: 'utf8' }).trim()).toBe('Initial commit')
   })
 })

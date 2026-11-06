@@ -12,7 +12,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
 import { as09, editCard } from './boardDb'
 
-const base = tempDir('hive-card-search-')
+const base = tempDir('cw-card-search-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 ;(electron.shell as unknown as { trashItem: (f: string) => Promise<void> }).trashItem = async () => undefined
 
@@ -44,8 +44,8 @@ async function open(ws: string): Promise<WS> {
 function workspace(): string {
   const ws = join(base, `ws-${++n}`)
   for (const p of ['alpha', 'beta']) {
-    mkdirSync(join(ws, p, '.hive'), { recursive: true })
-    writeFileSync(join(ws, p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: p === 'alpha' ? 'Builder Bee' : 'Reviewer Wasp' }] }))
+    mkdirSync(join(ws, p, '.combwork'), { recursive: true })
+    writeFileSync(join(ws, p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: p === 'alpha' ? 'Builder Bee' : 'Reviewer Wasp' }] }))
   }
   return ws
 }
@@ -160,7 +160,7 @@ describe("the board's full-text search", () => {
     // A comment isn't searched, as the board's search doesn't read comments.
     expect(found('zebras')).toEqual([])
     expect((await both(w, 'zebras')).memory).toEqual([])
-    // Moved to another project, by a write that isn't Hive's card edit (a script's, another Hive's).
+    // Moved to another project, by a write that isn't Combwork's card edit (a script's, another Combwork's).
     await editCard(w, made[4], (doc) => ({ ...doc, project: 'beta' }))
     expect(found('beta')).toContain(made[4])
     // Its label taken off, then the card deleted.

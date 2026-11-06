@@ -5,11 +5,12 @@
 //   npm run scenarios -- --provider fake-copilot          # the real Copilot CLI offline against a scripted model: the same
 //   npm run scenarios -- --provider claude-code --model haiku --budget 2      # model trials (opt-in, cost tokens)
 //   npm run scenarios -- --provider codex --model gpt-5.6-luna --only work-on-card,review-card
+//   npm run scenarios -- --dialect "my/Opus 5.5 v2.json" --only work-on-card   # a dialect file in the model slot (HI-2439)
 //   npm run scenarios -- --only work-on-card --signed-out   # the fake signed out: the trial is skipped for the environment
 //   npm run scenarios -- --only work-on-card --signed-out=launch   # its OAuth expired: it exits at launch, skipped too
 //   npm run scenarios -- --only work-on-card --signed-out=late   # signed out, shown only once the prompt is sent: skipped too
 //
-// A trial that Hive shows waiting for a sign-in, or whose CLI says it hit a limit or can't reach its API, is skipped for
+// A trial that Combwork shows waiting for a sign-in, or whose CLI says it hit a limit or can't reach its API, is skipped for
 // the environment at once (no checks failed, no cost), and so are the provider's other trials, said once (#302).
 //
 // More than five scenarios, or --repeat, waits for a test slot (tests/e2e/slots.mjs; --no-wait fails at once instead),
@@ -19,21 +20,21 @@
 // (tests/e2e/lanes.mjs, #707; --no-wait fails at once instead).
 // --budget N (USD, API-equivalent, above 0, default 2) stops a model run once the scenarios so far cost that much, or
 // as soon as a trial reports no cost (the spend can't be checked then; --allow-unknown-cost goes on anyway); --only runs
-// some; --keep leaves each scenario's profile and workspace; --repeat N runs each N times (samples, for spread);
+// some; --random N picks N of them at random, printing its seed (--seed S picks the same again); --keep leaves each scenario's profile and workspace; --repeat N runs each N times (samples, for spread);
 // --save-baseline NAME keeps this run's benchmark as a named baseline (an older one of that name is kept, not
-// overwritten). Results go to %LOCALAPPDATA%\hive-test\scenarios\results (the newest 30 fake runs and, counted apart,
+// overwritten). Results go to %LOCALAPPDATA%\combwork-test\scenarios\results (the newest 30 fake runs and, counted apart,
 // the newest 30 model trials are kept, besides those a card cites and those a run still writes into: runner.json,
 // HI-2234, HI-2236): results.json
-// (every scenario's checks, skills read, hive calls, versions, usage, measures), benchmark.json (hive-benchmark/1: the
+// (every scenario's checks, skills read, Combwork calls, versions, usage, measures), benchmark.json (combwork-benchmark/1: the
 // Performance page compares two) and summary.md; results.json is written as each trial ends (#1457: a run cut short keeps
-// what it had). Run in a Hive agent's session it shows in the Progress panel, a step per trial (--no-progress: not).
+// what it had). Run in a Combwork agent's session it shows in the Progress panel, a step per trial (--no-progress: not).
 // With a fake provider a failed check fails the run (exit 1); model
 // trials only report (models vary). A dev build that isn't from the source as it is now (tests/e2e/build.mjs) is rebuilt
 // first, so a run (and a baseline) never measures other code.
 //
 // Runs at the same time (from different worktrees, or the same one) don't share folders or ports: each run claims a
 // lane, from the same pool as the e2e runner (tests/e2e/lanes.mjs), and keeps its scenarios' profiles and workspaces in
-// %LOCALAPPDATA%\hive-test\scenarios\lanes\<k> (--keep leaves them there) with the lane's first port as their Agent API
+// %LOCALAPPDATA%\combwork-test\scenarios\lanes\<k> (--keep leaves them there) with the lane's first port as their Agent API
 // port (#183, #184). Results and baselines stay shared: Performance → Compare reads them.
 import { createRequire } from 'module'
 import { readFileSync, writeFileSync } from 'fs'
@@ -51,12 +52,12 @@ const require = createRequire(import.meta.url)
 const evidence = require('../e2e/evidence.cjs').evidenceFor(join(import.meta.dirname, '..', '..'))
 const spare = (p) => evidence.protects(p)
 // Without the board nothing a run made could be removed, so copies would pile up (#285): as the e2e runner, it doesn't
-// start (HIVE_TEST_NO_BOARD=1: no board cites test output on this machine).
+// start (CW_TEST_NO_BOARD=1: no board cites test output on this machine).
 if (!evidence.ok) {
-  console.error(`Can't tell what the tests may delete: ${evidence.why}. Fix the board, or set HIVE_TEST_NO_BOARD=1 if no Hive board cites test output on this machine.`)
+  console.error(`Can't tell what the tests may delete: ${evidence.why}. Fix the board, or set CW_TEST_NO_BOARD=1 if no Combwork board cites test output on this machine.`)
   process.exit(2)
 }
-// The run's own temp folder in hive-test\tmp (HI-2102): the test copies of Hive and the CLIs its scenarios start get it
+// The run's own temp folder in combwork-test\tmp (HI-2102): the test copies of Combwork and the CLIs its scenarios start get it
 // as TEMP (e2e/runContext.cjs ALLOW), not %TEMP%. It goes as the runner exits; its start removes what stopped runs
 // left, as the evidence rules allow. Before lib.cjs loads: Playwright, which the harness runs in this process, takes
 // the temp folder for its playwright-artifacts-* folders as it loads.
@@ -67,9 +68,10 @@ process.on('exit', () => {
 })
 const lib = require('../e2e/lib.cjs')
 const runContext = require('../e2e/runContext.cjs')
-const { runScenario, sourceFingerprint, claudeSignedIn, environmentAdvice, CLAUDE_TEST_HOME, PROVIDERS } = require('./harness.cjs')
+const { runScenario, dialectForRun, dialectRecord, sourceFingerprint, claudeSignedIn, environmentAdvice, CLAUDE_TEST_HOME, PROVIDERS } = require('./harness.cjs')
 const { copilotInstalled } = require('../e2e/fake-copilot-api.cjs')
 const { SCENARIOS, FIXTURES_VERSION } = require('./scenarios.cjs')
+const { parseRandom, parseSeed, pickRandom } = require('./randomPick.cjs')
 const { benchmarkOf, pruneResults, saveBaseline, resultsFolder, releaseResults, writeResults, parseBudget, budgetGate, spendText } = require('./benchmark.cjs')
 
 const argv = process.argv.slice(2)
@@ -89,6 +91,14 @@ try {
 }
 const allowUnknownCost = argv.includes('--allow-unknown-cost')
 const only = arg('only', '')?.split(',').filter(Boolean)
+// --random N (HI-2655): N of the scenarios (of --only's, if given) picked at random, seeded (--seed S picks the same again).
+let random = null
+try {
+  random = argv.includes('--random') ? { count: parseRandom(arg('random', '')), seed: parseSeed(arg('seed', '')) } : null
+} catch (e) {
+  console.error(e.message)
+  process.exit(2)
+}
 const keep = argv.includes('--keep')
 const repeats = Math.max(1, Math.min(20, Number(arg('repeat', '1')) || 1))
 const baselineName = arg('save-baseline', '')
@@ -97,6 +107,16 @@ if (!PROVIDERS[provider]) {
   console.error(`Unknown provider "${provider}": fake, fake-codex, fake-copilot, claude-code or codex.`)
   process.exit(2)
 }
+// --dialect <file> (HI-2439): a dialect file in the model slot of every agent of the provider's CLI, its chain recorded
+// in the results. Without it, the shipped files (all empty): the Default, which releases test.
+let dialect = null
+try {
+  dialect = dialectForRun(arg('dialect', ''), provider)
+} catch (e) {
+  console.error(`--dialect: ${e.message}`)
+  process.exit(2)
+}
+if (dialect) console.log(`Dialect ${dialect.path}: ${dialect.overrides} override(s), chain ${dialect.hash || '(the Default)'}${dialect.outdated.length ? `; outdated, falling through: ${dialect.outdated.join(', ')}` : ''}`)
 // The fake Claude Code acting out an expired sign-in: to check that a trial the environment stops is skipped (#302).
 // --signed-out=launch: its OAuth session can't be refreshed, so it exits before its session starts (#577).
 // --signed-out=late: it shows it isn't logged in only once the prompt is sent, which it doesn't take (#1321).
@@ -119,7 +139,9 @@ if (notSignedIn) {
   process.exit(0)
 }
 
-const chosen = SCENARIOS.filter((s) => !only?.length || only.includes(s.id))
+const listed = SCENARIOS.filter((s) => !only?.length || only.includes(s.id))
+const chosen = random ? pickRandom(listed, random.count, random.seed) : listed
+if (random) console.log(`Picked ${chosen.length} of ${listed.length} at random (seed ${random.seed}): ${chosen.map((s) => s.id).join(', ')}. Again: --random ${random.count} --seed ${random.seed}${only?.length ? ` --only ${only.join(',')}` : ''}, or --only ${chosen.map((s) => s.id).join(',')}`)
 // More than a few scenarios (or --repeat) is a heavy run: it waits for a test slot, as the e2e runner's do
 // (tests/e2e/slots.mjs), so runs on this machine don't slow each other until tests time out; a few fake runs in all
 // take the side slot, else a heavy one. A real model's run (a model trial) takes none of those, only a model trial's
@@ -153,12 +175,12 @@ if (pool) {
     await queue.finish(`got ${resource} after ${after}`)
   }
 }
-// What runs inside this run's test Hives (an agent's own test run) has this run's slot as credit, and its parent's
+// What runs inside this run's test Combworks (an agent's own test run) has this run's slot as credit, and its parent's
 // (HI-2070): carried into their sessions (runContext CARRIED), so CPU work inside a model trial still asks for a CPU slot.
 process.env.E2E_RUN_SLOTS = creditFor(pool)
 
 // This run's lane: its own folders and Agent API port, so another run at the same time can't remove, open or answer
-// for this one's test Hive. With every lane taken it waits for one (#707), as for a test slot; --no-wait: fail at once.
+// for this one's test Combwork. With every lane taken it waits for one (#707), as for a test slot; --no-wait: fail at once.
 const laneQueue = slotWaitProgress('scenarios', `npm run scenarios -- ${argv.join(' ')}`.trim(), argv, 'a test lane')
 let laneSaid = ''
 const lane = await waitForLane(runContext.LANES_DIR, {
@@ -262,7 +284,7 @@ const save = (name, data) => {
 const results = []
 let spent = 0
 let unknownCostTrials = 0
-// Models of the trials without a cost (the guard names them: usually Hive has no price for one).
+// Models of the trials without a cost (the guard names them: usually Combwork has no price for one).
 const noCostModels = new Set()
 // A trial the environment stopped (not signed in, a limit, the network: #302): the provider's other trials would meet it
 // too, so they are skipped, said once.
@@ -274,7 +296,7 @@ const metaNow = (complete) => ({
   source: sourceAtStart,
   ...(complete ? {} : { incomplete: `${results.length} of ${trials.length} trials` }),
   guidance: results.find((r) => r.guidance?.atStart)?.guidance.atStart.revision ?? null,
-  provider, model: model ?? '(default)', effort: effort ?? '(default)', mode: PROVIDERS[provider].mode, repeats, budgetUsd: budget, when: new Date().toISOString(), spentUsd: Math.round(spent * 1000) / 1000, unknownCostTrials })
+  provider, model: model ?? '(default)', effort: effort ?? '(default)', mode: PROVIDERS[provider].mode, ...(dialect ? { dialect: dialectRecord(dialect) } : {}), ...(random ? { random: { ...random, picked: chosen.map((s) => s.id) } } : {}), repeats, budgetUsd: budget, when: new Date().toISOString(), spentUsd: Math.round(spent * 1000) / 1000, unknownCostTrials })
 // Each trial's result written as it ends (#1457): a run cut short keeps what it had.
 // Should even that fail (the folder kept going, or another error), the run goes on: what it has stays in memory and the
 // next trial's write tries again; the writes at the end fail the run.
@@ -307,7 +329,7 @@ for (const [i, { sc, sample, name }] of trials.entries()) {
     continue
   }
   process.stdout.write(`${sc.id} (${provider}${repeats > 1 ? `, ${sample}/${repeats}` : ''})… `)
-  const r = await runScenario(sc, provider, { model, effort, keep, workRoot, port: lane.first, evidence, signedOut, timeoutMs: fake ? 60000 : 360000 })
+  const r = await runScenario(sc, provider, { model, effort, dialect, keep, workRoot, port: lane.first, evidence, signedOut, timeoutMs: fake ? 60000 : 360000 })
   r.sample = sample
   if (r.environment) {
     // Not a result of the scenario: no checks, and no cost assumed.
@@ -341,14 +363,14 @@ const appVersion = JSON.parse(readFileSync(join(lib.ROOT, 'package.json'), 'utf8
 const benchmarkFile = join(out, 'benchmark.json')
 save('benchmark.json', JSON.stringify(benchmarkOf(meta, results, appVersion), null, 2))
 if (baselineName) console.log(`Baseline "${baselineName}": ${saveBaseline(join(lib.WORK, '..', 'scenarios', 'baselines'), baselineName, benchmarkFile, spare)}`)
-/** What Hive's own parts cost in the scenario (its measures): tool reply characters, requests, guidance at launch. */
-const hiveCost = (m) => (m ? `${m.toolChars.toLocaleString('en')} chars in ${m.toolCalls} tool calls; ${m.apiRequests} requests; ${(m.coreBytes + m.customBytes + m.roleBytes + m.modeBytes + m.catalogBytes).toLocaleString('en')} B guidance` : 'not measured')
+/** What Combwork's own parts cost in the scenario (its measures): tool reply characters, requests, guidance at launch. */
+const combworkCost = (m) => (m ? `${m.toolChars.toLocaleString('en')} chars in ${m.toolCalls} tool calls; ${m.apiRequests} requests; ${(m.coreBytes + m.customBytes + m.roleBytes + m.modeBytes + m.catalogBytes).toLocaleString('en')} B guidance` : 'not measured')
 const row = (r) => {
   if (r.skipped) return `| ${r.scenario} | skipped: ${r.skipped} | | | | | |`
   const passed = r.checks.filter((c) => c.ok === true).length
   const failed = r.checks.filter((c) => c.ok === false)
   const skipped = r.checks.filter((c) => c.ok === null).length
-  return `| ${r.scenario} | ${r.error ? `error: ${r.error.split('\n')[0]}` : failed.length ? `**${failed.length} failed**: ${failed.map((c) => c.name).join('; ')}` : 'pass'} | ${passed}/${r.checks.length}${skipped ? ` (${skipped} skipped)` : ''} | ${r.observed?.skillsRead.join(', ') || '–'} | ${[...new Set(r.observed?.hiveCalls.map((c) => c.tool) ?? [])].join(', ') || '–'} | ${hiveCost(r.measures)} | ${r.usage?.costUsd != null ? `$${r.usage.costUsd.toFixed(3)}` : '–'}, ${r.seconds}s |`
+  return `| ${r.scenario} | ${r.error ? `error: ${r.error.split('\n')[0]}` : failed.length ? `**${failed.length} failed**: ${failed.map((c) => c.name).join('; ')}` : 'pass'} | ${passed}/${r.checks.length}${skipped ? ` (${skipped} skipped)` : ''} | ${r.observed?.skillsRead.join(', ') || '–'} | ${[...new Set(r.observed?.combworkCalls.map((c) => c.tool) ?? [])].join(', ') || '–'} | ${combworkCost(r.measures)} | ${r.usage?.costUsd != null ? `$${r.usage.costUsd.toFixed(3)}` : '–'}, ${r.seconds}s |`
 }
 const cli = results.find((r) => r.cliVersion)?.cliVersion ?? 'unknown'
 save(
@@ -357,8 +379,10 @@ save(
     `# Scenarios: ${provider}${model ? ` (${model})` : ''}${repeats > 1 ? `, ${repeats} samples each` : ''}`,
     '',
     `Fixtures v${FIXTURES_VERSION}; source ${meta.source.head}${meta.source.dirty ? ` + changes ${meta.source.dirty}` : ''}; guidance ${meta.guidance}; CLI ${cli}; ${meta.when}; spent ${spendText(meta)}.`,
+    ...(random ? ['', `Picked at random: ${random.count} with seed ${random.seed} (again: --random ${random.count} --seed ${random.seed}).`] : []),
+    ...(dialect ? ['', `Dialect: ${dialect.path} (${dialect.overrides} override(s)), chain ${dialect.files.join(' → ')}, hash ${dialect.hash || '(the Default)'}.`] : []),
     '',
-    '| Scenario | Result | Checks | Skills read | Hive tools | Hive’s cost | Provider cost, time |',
+    '| Scenario | Result | Checks | Skills read | Combwork tools | Combwork’s cost | Provider cost, time |',
     '|---|---|---|---|---|---|---|',
     ...results.map(row)
   ].join('\n') + '\n'
@@ -368,7 +392,7 @@ const hardFailures = fake ? results.filter((r) => r.error || r.checks?.some((c) 
 const failedTrials = results.filter((r) => r.error || r.checks?.some((c) => c.ok === false)).length
 await progress.finish(!hardFailures, `${results.length - failedTrials - results.filter((r) => r.skipped).length} ok, ${failedTrials} failed${results.some((r) => r.skipped) ? `, ${results.filter((r) => r.skipped).length} skipped` : ''}`, join(out, 'summary.md'))
 codexLease?.release()
-// What tests left in hive-test that is no longer needed (tests/e2e/clean.mjs), this lane's included: let go first.
+// What tests left in combwork-test that is no longer needed (tests/e2e/clean.mjs), this lane's included: let go first.
 lane.release()
 await autoClean({ root: lib.ROOT, ev: evidence })
 process.exit(hardFailures ? 1 : 0)

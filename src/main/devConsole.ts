@@ -1,14 +1,14 @@
 import { msg } from '../shared/i18n'
-import { hiveError } from './hiveError'
-import { ConsoleRing, hiveSourceId, makeEvent, sessionSourceId, type CapturedEvent, type ConsoleEvent } from '../shared/devConsole'
+import { combworkError } from './combworkError'
+import { ConsoleRing, combworkSourceId, makeEvent, sessionSourceId, type CapturedEvent, type ConsoleEvent } from '../shared/devConsole'
 
 /**
  * The developer console's capture (#636): rings of events per source, kept only while the console is open on them
  * (#366 decision 4). A source is captured from its first subscriber to its last: before and after, `capture()` returns
- * at once without building its event, and no ring is kept, so a Hive with no console open does no work and holds no
+ * at once without building its event, and no ring is kept, so a Combwork with no console open does no work and holds no
  * memory for it.
  *
- * Subscribers are the console's windows (and, with #638, their recordings). Readers (agents' and the Assistant's hive
+ * Subscribers are the console's windows (and, with #638, their recordings). Readers (agents' and the Assistant's Combwork
  * tools) subscribe to nothing: they read what an open console is capturing, and are told when it isn't. Every event is
  * redacted as it is kept (shared/devConsole.ts); a subscriber that opted into text (the user's own recording, or a window
  * while Settings → Advanced → Developer console: show text is on, #699) is sent a second copy with text kept, and only it.
@@ -67,7 +67,7 @@ export class DevConsole {
     return this.rings.has(source) || !!this.flight?.(source)
   }
 
-  /** The sources being captured whose ids start so ("hive:" for every workspace's Hive events). */
+  /** The sources being captured whose ids start so ("combwork:" for every workspace's Combwork events). */
   capturedLike(prefix: string): string[] {
     return [...this.rings.keys()].filter((s) => s.startsWith(prefix))
   }
@@ -140,7 +140,7 @@ export class DevConsole {
   subscribe(id: string, sources: string[], opts: ConsoleSubscription = {}): Map<string, ConsoleEvent[]> {
     const wanted = new Set(sources.slice(0, MAX_SOURCES))
     const old = this.subs.get(id)
-    if (!old && this.subs.size >= MAX_SUBSCRIBERS) throw hiveError(msg({ id: 'console.tooMany', defaultMessage: 'Too many developer consoles open at once', description: 'An error opening a developer console window or starting a recording: Hive already watches for as many as it allows. Closing one helps.' }))
+    if (!old && this.subs.size >= MAX_SUBSCRIBERS) throw combworkError(msg({ id: 'console.tooMany', defaultMessage: 'Too many developer consoles open at once', description: 'An error opening a developer console window or starting a recording: Combwork already watches for as many as it allows. Closing one helps.' }))
     if (old?.includeText) for (const s of old.sources) this.untext(s)
     // A new subscription starts with nothing waiting: what was queued for the old one (its sources, its opt-in to text) is
     // never sent to this one. It gets the rings' redacted events below instead.
@@ -311,7 +311,7 @@ export class DevConsole {
   }
 }
 
-/** Hive's console. */
+/** Combwork's console. */
 export const devConsole = new DevConsole()
 
-export { hiveSourceId, sessionSourceId }
+export { combworkSourceId, sessionSourceId }

@@ -1,4 +1,4 @@
-# Polski (`pl`): style for Hive
+# Polski (`pl`): style for Combwork
 
 **Status:** drafted by AI (Claude, October 2026), not yet reviewed by a native speaker. Its entry in
 `src/shared/i18n/languages.ts` says the same (`ai: true` until it is reviewed).
@@ -6,15 +6,15 @@
 **In the language picker:** Polski, marked (AI) while drafted by AI, with the note „Przetłumaczone przez AI, poprawki
 mile widziane.”
 
-**Improving it:** every Polish message is in `locales/pl/<area>.json`, one file per part of Hive. If a word is wrong,
-stiff or unclear, change it there and open a pull request on GitHub (`Suremise/hive-desktop`): `CONTRIBUTING.md` says
+**Improving it:** every Polish message is in `locales/pl/<area>.json`, one file per part of Combwork. If a word is wrong,
+stiff or unclear, change it there and open a pull request on GitHub (`Suremise/combwork`): `CONTRIBUTING.md` says
 how, and a small fix can be made in GitHub's web editor. If you change a term from the table below, change it in every
-message and on this page in the same pull request, so Hive keeps one voice. A native speaker's review takes the (AI)
+message and on this page in the same pull request, so Combwork keeps one voice. A native speaker's review takes the (AI)
 mark off.
 
 ## Voice
 
-Hive's English is plain and direct: short sentences, everyday words, *you* for the reader, and it says what happens.
+Combwork's English is plain and direct: short sentences, everyday words, *you* for the reader, and it says what happens.
 Translate the meaning, not the words, and keep the result as short and plain.
 
 - **Addressing the reader:** the informal *ty*, as most Polish software does today: „Zapisz zmiany”, „Możesz…”,
@@ -22,8 +22,8 @@ Translate the meaning, not the words, and keep the result as short and plain.
   capitalised, as in a letter: *Ty, Ci, Cię, Twój, Twoje* („odpowiadać Ci w Twoim języku”). Leave them out where the
   verb already says it (Polish rarely needs „Ty”).
 - **Tone:** friendly and direct, never bureaucratic. Avoid office phrasing („dokonaj zapisu”, „w celu”, „przedmiotowy”),
-  nominal chains („przeprowadzenie usunięcia”) and passive voice where an active verb works. Write „Hive usuwa…”,
-  not „Zostaje usunięty przez Hive…”.
+  nominal chains („przeprowadzenie usunięcia”) and passive voice where an active verb works. Write „Combwork usuwa…”,
+  not „Zostaje usunięty przez Combwork…”.
 - **Sentence length:** Polish runs about a fifth longer than English. Split a long English sentence rather than
   stacking subordinate clauses with „który”. In tight places (buttons, badges, column headings, status bar) choose the
   shortest natural word.
@@ -33,7 +33,7 @@ Translate the meaning, not the words, and keep the result as short and plain.
 - **Buttons and menu commands:** the imperative, second person singular: „Zapisz”, „Usuń”, „Anuluj”, „Otwórz”,
   „Dodaj agenta…”. The same form everywhere, including menu items and the command palette.
 - **Capitalisation:** sentence case everywhere: only the first word and names take a capital („Dodaj nowego agenta”,
-  „Ustawienia agenta”). Don't copy the English Title Case. Names stay as they are (Hive, Claude Code, Hive Assistant).
+  „Ustawienia agenta”). Don't copy the English Title Case. Names stay as they are (Combwork, Claude Code, Assistant).
 - **A trailing `…`** stays, with no space before it: „Usuń agenta…”.
 - **Column headings:** Wstrzymane, Do zrobienia, Aktywne, Recenzja, Zatwierdzone, Gotowe (and the stage Scalanie inside
   Zatwierdzone). Before 1.0 the Active column was „W toku”; it is „Aktywne” now (a Polish user's feedback, #1104).
@@ -56,12 +56,12 @@ Translate the meaning, not the words, and keep the result as short and plain.
 - **Counting agents:** *agent* is a masculine personal noun, so 2–4 take the genitive plural, like 5 and more:
   `{n, plural, one {# agent} few {# agentów} many {# agentów} other {# agenta}}`, with a singular verb
   („3 agentów pracuje”).
-- **Hive as a subject:** Hive is an app, and Polish treats app names as masculine („program Hive”): „Hive nie mógł
-  sprawdzić…”, „Hive przeniósł…”, always masculine. Hive isn't inflected, so where a sentence needs it in another case
-  („Hive nie udało się”), rephrase: „Nie udało się…”.
+- **Combwork as a subject:** Combwork is an app, and Polish treats app names as masculine („program Combwork”): „Combwork nie mógł
+  sprawdzić…”, „Combwork przeniósł…”, always masculine. Combwork isn't inflected, so where a sentence needs it in another case
+  („Combwork nie udało się”), rephrase: „Nie udało się…”.
 - **„Could not load {what}”:** the frames are „Nie udało się wczytać {what}” and „Nie udało się odświeżyć {what}”, so
   every `{what}` they take is in the genitive („szablonów”, „historii”, „gałęzi i zdalnych repozytoriów”).
-- **Lists:** Hive joins lists itself („One, Two i Three”). Never write „i” or „lub” into a message around a list
+- **Lists:** Combwork joins lists itself („One, Two i Three”). Never write „i” or „lub” into a message around a list
   placeholder.
 - **Numbers before nouns:** with `{n, number}` inside a sentence, keep the noun's form in the plural branches, never
   after a bare number outside a plural.
@@ -69,18 +69,18 @@ Translate the meaning, not the words, and keep the result as short and plain.
 ## Punctuation and typography
 
 - **Quotation marks:** „…” (U+201E and U+201D); inside them, »…«. They need no escaping in JSON, unlike `"`.
-- **Apostrophe:** Polish rarely needs one. Where it does (a foreign name: „Hive’a” is avoided, see Terms), write ’.
+- **Apostrophe:** Polish rarely needs one. Where it does (a foreign name: „Combwork’a” is avoided, see Terms), write ’.
   Before `{`, `}` or `#`, a straight apostrophe starts an ICU quotation: keep the English's `'{'` exactly as it is.
-- **Spaces:** none before `:`, `;`, `?`, `!`. A space before and after a dash: „Hive – aplikacja…”, with an en dash
+- **Spaces:** none before `:`, `;`, `?`, `!`. A space before and after a dash: „Combwork – aplikacja…”, with an en dash
   (–), not a hyphen.
 - **Colons:** after a colon, lower case unless a name or a full sentence follows that would start with a capital in
   English too.
-- **Numbers, dates, money, durations:** formatted by Hive in the Polish way (1 234,5; 15.10.2026). Never write them
+- **Numbers, dates, money, durations:** formatted by Combwork in the Polish way (1 234,5; 15.10.2026). Never write them
   into a message.
 
 ## Terms
 
-The words Polish uses for Hive's terms ([glossary.md](glossary.md)). Use them every time.
+The words Polish uses for Combwork's terms ([glossary.md](glossary.md)). Use them every time.
 
 | English | Polski | Notes |
 |---|---|---|
@@ -89,7 +89,7 @@ The words Polish uses for Hive's terms ([glossary.md](glossary.md)). Use them ev
 | agent | agent | *agenta, agentowi, agenci, agentów*. |
 | provider | dostawca | Claude Code, Codex or Copilot. |
 | session | sesja | |
-| the Assistant | Asystent | Capitalised, as a name: „zapytaj Asystenta”. The full name *Hive Assistant* stays in English. |
+| the Assistant | Asystent | Capitalised, as a name: „zapytaj Asystenta”. Its only name: the full English name it had before went with the rename (HI-2458). |
 | persona | persona | *persony*. |
 | task board / board | tablica zadań / tablica | The *Tasks* tab is the „Zadania” tab („zakładka Zadania”). |
 | card | karta | Feminine: „karta jest zablokowana”, „karta utknęła”. Never „zadanie” for a card in running text. |
@@ -117,7 +117,7 @@ The words Polish uses for Hive's terms ([glossary.md](glossary.md)). Use them ev
 | review copy | kopia do recenzji | |
 | refused / returned (a card) | odrzucono / zwrócona | „Karta {card} zwrócona wykonawcy {builder}”. |
 | override / Move anyway | wyjątek / Przenieś mimo to | |
-| no-code card / before 1.0 / outside Hive | karta bez kodu / sprzed 1.0 / poza Hive | |
+| no-code card / before 1.0 / outside Combwork | karta bez kodu / sprzed 1.0 / poza Combwork | |
 | work (a card's Work section) | praca (sekcja Praca) | |
 | deliverables | rezultaty | |
 | inbox / message / wake | skrzynka odbiorcza / wiadomość / wybudzenie (wybudzić) | |
@@ -128,21 +128,21 @@ The words Polish uses for Hive's terms ([glossary.md](glossary.md)). Use them ev
 | Workspace Overview | Przegląd obszaru roboczego | |
 | permission mode (Manual, Accept edits, Plan, Auto, Don't ask) | tryb uprawnień (Ręczny, Akceptuj edycje, Plan, Auto, Bez pytania) | The CLIs' own screens stay in English. |
 | effort / usage / cost / tokens | wysiłek / użycie / koszt / tokeny | Effort levels: niski, średni, wysoki, bardzo wysoki, maksymalny. *API-equivalent cost*: „koszt według cen API”. |
-| banner / notification / tip | baner / powiadomienie / wskazówka | A *notification* is Windows'; a *banner* is inside Hive's window. |
+| banner / notification / tip | baner / powiadomienie / wskazówka | A *notification* is Windows'; a *banner* is inside Combwork's window. |
 | sign in | zaloguj się / zalogowany | *sign out*: wyloguj się. |
 | tab | zakładka | Never „karta”, which is a card: „w zakładce Sesje”. |
 | settings | ustawienia | |
 | file / folder | plik / folder | |
 | terminal | terminal | |
 | conversation / transcript | rozmowa / transkrypcja | |
-| Hive (inflected) | Hive | Not inflected: „w Hive”, „okno Hive”, „ustawienia Hive”. |
+| Combwork (inflected) | Combwork | Not inflected: „w Combwork”, „okno Combwork”, „ustawienia Combwork”. |
 | uncommitted (changes, files) | bez commita | „# pliki bez commita”, „zmiany bez commita”. Never „niezatwierdzone”, which reads as the Approved column; and to commit is „zrób commit”, never „zatwierdź”, which is Approve. |
 | staged / unstage | w indeksie / usuń z indeksu | |
 | fetch / pull / push | pobierz / ściągnij / wypchnij | |
 | check out (a branch) | wybierz (gałąź wybrana w folderze projektu) | |
 | detached HEAD | odłączony HEAD | |
 | hook | hook (hooki) | |
-| status line (a CLI's) / status bar (Hive's) | linia statusu / pasek stanu | |
+| status line (a CLI's) / status bar (Combwork's) | linia statusu / pasek stanu | |
 | compact / compaction | kompaktuj / kompaktowanie | |
 | prompt | prompt (prompty, promptów) | |
 | cache (prompt cache) | pamięć podręczna in sentences, cache in short figures | |
@@ -170,7 +170,7 @@ The words Polish uses for Hive's terms ([glossary.md](glossary.md)). Use them ev
 | Remove agent… | Usuń agenta… |
 | {name} has {n, plural, one {# open card} other {# open cards}} | {name}: {n, plural, one {# otwarta karta} few {# otwarte karty} many {# otwartych kart} other {# otwartej karty}} |
 | {agent} was removed. Its sessions stay in the Sessions tab. | Usunięto agenta {agent}. Jego sesje zostają w zakładce Sesje. |
-| Hive was started in {language} (--lang): this setting applies from its next start. | Hive uruchomiono z językiem {language} (--lang): to ustawienie zadziała od następnego uruchomienia. |
+| Combwork was started in {language} (--lang): this setting applies from its next start. | Combwork uruchomiono z językiem {language} (--lang): to ustawienie zadziała od następnego uruchomienia. |
 
 The example with `{name}` shows the usual way round agreement with a name: a colon instead of „ma”, which would be
 fine here, but the same shape also fits verbs that would agree with a gender.

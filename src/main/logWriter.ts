@@ -2,7 +2,7 @@ import { appendFileSync, existsSync, renameSync, statSync } from 'original-fs'
 import { parentPort, workerData } from 'worker_threads'
 
 /**
- * The log's writer thread (HI-1730): hive.log's and hooks.log's lines, appended to their files here, never on main.
+ * The log's writer thread (HI-1730): combwork.log's and hooks.log's lines, appended to their files here, never on main.
  * Darren's log had main held 2–8 s with no CPU while a System Restore point froze writes to C:, where the logs are: the
  * next line, written at once on main (appendFileSync), waited out the freeze. Here only this thread waits. Batches come
  * in order and are written in order, each rotated as before (a file past its size bound becomes `.1.log`).

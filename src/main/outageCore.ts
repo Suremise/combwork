@@ -1,17 +1,23 @@
 import { request as httpRequest } from 'http'
 import { request as httpsRequest } from 'https'
 import { OUTAGE_NOT_CONNECTION, outagePatternId } from '../shared/advanced'
+import { agentMsg, inDialectOf, say } from '../shared/agentText'
 import type { ProviderId } from '../shared/types'
 import { createLogger, userText } from './logger'
 
 /**
- * The wait for a dropped connection (HI-1612), without Hive's services (outageResume.ts gives it them): which failed
+ * The wait for a dropped connection (HI-1612), without Combwork's services (outageResume.ts gives it them): which failed
  * turns it is for, the checks backing off, the resume, and when it gives up.
  */
 const log = createLogger('outage')
 
+const T = {
+  back: agentMsg({ id: 'notice.outage.back', text: 'The connection dropped at {dropped} and came back at {back}: check what was cut off, rerun it, and carry on.', note: "HI-1612: the note an agent's conversation is given once its dropped connection is back. dropped, back: times of day (notice.outage.clock)." }),
+  clock: agentMsg({ id: 'notice.outage.clock', text: '{time} (UTC{offset})', note: 'HI-1612: a time of day as the connection notices give it: 24-hour, local (time: "11:47"), with its offset from UTC (offset: "+01:00").' })
+}
+
 /**
- * Whether a failed turn's words are a dropped connection of its CLI's: its CLI's pattern finds them, and Hive's for
+ * Whether a failed turn's words are a dropped connection of its CLI's: its CLI's pattern finds them, and Combwork's for
  * what is never one (a usage limit, a sign-in, "overloaded") doesn't. `pattern` gives an advanced pattern by its id.
  */
 export function connectionDropped(provider: ProviderId, words: string, pattern: (id: string) => RegExp): boolean {
@@ -37,7 +43,7 @@ export interface OutageAgent {
 /** How a wait ended. */
 export type OutageEnd = { kind: 'resumed'; droppedAt: number; backAt: number } | { kind: 'gaveUp'; resumes: number } | { kind: 'timedOut'; minutes: number } | { kind: 'cancelled' }
 
-/** What the wait needs of Hive: the settings, the network, the agent's status, its note and the notices. */
+/** What the wait needs of Combwork: the settings, the network, the agent's status, its note and the notices. */
 export interface OutageHost {
   on(): boolean
   /** Whether this failed turn's words are a connection error of its CLI's. */
@@ -59,9 +65,9 @@ export interface OutageHost {
   resumesPerHour(): number
 }
 
-/** The note an agent's conversation is given once its connection is back (agent-facing, English). */
+/** The note an agent's conversation is given once its connection is back (agent-facing: said in its dialect). */
 export function resumeNote(droppedAt: number, backAt: number): string {
-  return `The connection dropped at ${clock(droppedAt)} and came back at ${clock(backAt)}: check what was cut off, rerun it, and carry on.` // i18n-ignore: typed to the agent (agent-facing text stays English)
+  return say(T.back, { dropped: clock(droppedAt), back: clock(backAt) })
 }
 
 /** A time of day as agents read it: 24-hour, local, with its offset ("11:47 (UTC+01:00)"). */
@@ -70,7 +76,7 @@ export function clock(at: number): string {
   const two = (n: number): string => String(n).padStart(2, '0')
   const off = -d.getTimezoneOffset()
   const sign = off < 0 ? '-' : '+'
-  return `${two(d.getHours())}:${two(d.getMinutes())} (UTC${sign}${two(Math.floor(Math.abs(off) / 60))}:${two(Math.abs(off) % 60)})`
+  return say(T.clock, { time: `${two(d.getHours())}:${two(d.getMinutes())}`, offset: `${sign}${two(Math.floor(Math.abs(off) / 60))}:${two(Math.abs(off) % 60)}` })
 }
 
 /** The wait before check `n` (0 first): the first's, doubling, at most the most's. */
@@ -103,7 +109,7 @@ export class OutageResume {
     this.resumes.set(a.key, recent)
     if (recent.length >= this.host.resumesPerHour()) {
       // The resumes are kept: until the hour since them has passed, another drop gives up again, never a fourth resume.
-      log.warn(`${userText(a.projectPath)} · ${a.agentId}: its connection dropped again after ${recent.length} resumes in an hour; Hive stops resuming it`)
+      log.warn(`${userText(a.projectPath)} · ${a.agentId}: its connection dropped again after ${recent.length} resumes in an hour; Combwork stops resuming it`)
       this.host.ended(a, { kind: 'gaveUp', resumes: recent.length })
       return
     }
@@ -152,7 +158,7 @@ export class OutageResume {
 
   private timedOut(w: Waiting): void {
     this.stop(w)
-    log.warn(`${userText(w.agent.projectPath)} · ${w.agent.agentId}: the connection didn't come back within the wait; Hive stops waiting`)
+    log.warn(`${userText(w.agent.projectPath)} · ${w.agent.agentId}: the connection didn't come back within the wait; Combwork stops waiting`)
     this.host.ended(w.agent, { kind: 'timedOut', minutes: Math.round(this.host.waitMs() / 60_000) })
   }
 
@@ -170,7 +176,8 @@ export class OutageResume {
     w.checks++
     if (up) {
       this.stop(w)
-      const given = await this.host.resume(w.agent, resumeNote(w.droppedAt, now)).catch((e) => {
+      const note = inDialectOf({ projectPath: w.agent.projectPath, agentId: w.agent.agentId }, () => resumeNote(w.droppedAt, now))
+      const given = await this.host.resume(w.agent, note).catch((e) => {
         log.warn('resuming an agent after the connection came back', e)
         return false
       })
@@ -207,7 +214,7 @@ export function reachable(url: string, timeoutMs = REACH_TIMEOUT_MS): Promise<bo
   const one = (family: 4 | 6): Promise<boolean> =>
     new Promise((resolve) => {
       const send = target.protocol === 'https:' ? httpsRequest : httpRequest
-      const req = send(target, { method: 'HEAD', family, timeout: timeoutMs, headers: { 'User-Agent': 'Hive' } }, (res) => { // i18n-ignore: an HTTP header the API host reads
+      const req = send(target, { method: 'HEAD', family, timeout: timeoutMs, headers: { 'User-Agent': 'Combwork' } }, (res) => { // i18n-ignore: an HTTP header the API host reads
         res.resume()
         resolve(true)
         req.destroy()

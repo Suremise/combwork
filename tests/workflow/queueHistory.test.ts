@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { B1, commit, moved, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
 import { entryTook, pauseLogged, pauseLogKey, pushesSettled, type PushSettled } from '../../src/main/workflow/queueLogs'
-import { HIVE_RUNS } from '../../src/main/progress'
+import { CW_RUNS } from '../../src/main/progress'
 import { QUEUE_LOG_MAX, type QueuePauseLogged } from '../../src/shared/workflow/queue'
 import type { Fact, FactData, FactKind } from '../../src/shared/workflow/facts'
 
@@ -15,7 +15,7 @@ afterEach(() => {
   env = null
 })
 
-/** Pair (Hive merges) with one merge check, no review: a submitted card goes straight into the queue. */
+/** Pair (Combwork merges) with one merge check, no review: a submitted card goes straight into the queue. */
 function pairWithCheck(): Env {
   const e = (env = setup({ ...preset('git', 'pair'), review: 'none', noSelfReview: false, preChecks: [], mergeChecks: ['quick'], commands: { quick: 'npm run quick' } }))
   sh(e.project, 'checkout', '-q', '--detach')
@@ -41,7 +41,7 @@ describe("the queue's time taken over an entry (HI-1924)", () => {
     expect((await e.queue().drain('main')).map((o) => o.outcome)).toEqual(['integrated'])
     const facts = recent(e)(a.id)
     const entry = entryOf(facts)
-    const check = facts.find((f) => f.kind === 'CheckRan' && (f.data as FactData['CheckRan']).by === HIVE_RUNS)!
+    const check = facts.find((f) => f.kind === 'CheckRan' && (f.data as FactData['CheckRan']).by === CW_RUNS)!
     expect((check.data as FactData['CheckRan']).entry).toBe(entry)
     const end = facts.find((f) => f.kind === 'Integrated')!
     expect(entryTook(facts, entry)).toBe(Date.parse(end.at) - (Date.parse(check.at) - (check.data as FactData['CheckRan']).durationMs))
@@ -79,9 +79,9 @@ describe("the queue's time taken over an entry (HI-1924)", () => {
 /** Facts as a card's store gives them, in order, a second apart (`at` in seconds from T0). */
 const T0 = Date.parse('2026-10-28T09:00:00.000Z')
 function factsOf(list: [FactKind, number, Record<string, unknown>][]): Fact[] {
-  return list.map(([kind, s, data], i) => ({ seq: i + 1, card: 1, kind, at: new Date(T0 + s * 1000).toISOString(), actor: { kind: 'hive' }, source: 'recorded', data }) as unknown as Fact)
+  return list.map(([kind, s, data], i) => ({ seq: i + 1, card: 1, kind, at: new Date(T0 + s * 1000).toISOString(), actor: 'combwork', source: 'recorded', data }) as unknown as Fact)
 }
-const check = (entry: string | undefined, durationS: number) => ({ name: 'quick', command: 'q', revision: 'r', tested: 'r', result: 'passed', run: 'x', durationMs: durationS * 1000, by: HIVE_RUNS, counted: true, ...(entry ? { entry } : {}) })
+const check = (entry: string | undefined, durationS: number) => ({ name: 'quick', command: 'q', revision: 'r', tested: 'r', result: 'passed', run: 'x', durationMs: durationS * 1000, by: CW_RUNS, counted: true, ...(entry ? { entry } : {}) })
 
 describe('entryTook from facts alone (HI-1924)', () => {
   it('two targets at once: each entry counts only the checks naming it', () => {
@@ -156,10 +156,10 @@ describe("a queue's pause log (HI-1924)", () => {
     expect(log[0].at).toBe(at(QUEUE_LOG_MAX + 4))
   })
 
-  it("is written in the store's pause writes: Pause queue, Hive's own pause kept in its place, a clear by reason, Resume", () => {
+  it("is written in the store's pause writes: Pause queue, Combwork's own pause kept in its place, a clear by reason, Resume", () => {
     const e = pairWithCheck()
     expect(e.store.setQueuePause('main', { reason: 'user', card: '', by: 'user' })).toBe(true)
-    // Hive's own pause never replaces one saved meanwhile, and logs nothing.
+    // Combwork's own pause never replaces one saved meanwhile, and logs nothing.
     expect(e.store.setQueuePause('main', { reason: 'pushFailed', card: 'HI-1' }, true)).toBe(false)
     expect(e.store.queuePauseLog('main').map((p) => [p.reason, !!p.ended])).toEqual([['user', false]])
     e.store.setQueuePause('main', null)

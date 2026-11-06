@@ -54,10 +54,10 @@ const check = (name, ok, extra = '') => {
   await importFile(path.join(FIX, 'smaller-wrong.json'))
   check('two imports: the newest is the run, the one before it the baseline', !!(await until(async () => (await page.locator(`${pageSel} .perf-scenarios`).count()) === 1, HUNG_MS)))
   check('comparable: the same scenarios, provider and setup', (await page.locator(`${pageSel} .banner.success`, { hasText: 'Comparable' }).count()) === 1)
-  // The Hive context column's tip names the Assistant's working mode as the Performance page does (#358).
-  await page.locator(`${pageSel} .perf-scenarios th`, { hasText: 'Hive context' }).first().locator('.info-icon').hover()
+  // The Combwork context column's tip names the Assistant's working mode as the Performance page does (#358).
+  await page.locator(`${pageSel} .perf-scenarios th`, { hasText: 'Combwork context' }).first().locator('.info-icon').hover()
   const tipText = async () => (await page.locator('.tip:visible').allInnerTexts()).join(' ')
-  check('the Hive context tip says the Assistant’s role and mode, not persona', !!(await until(async () => (await tipText()).includes('the Assistant’s role and mode'), 5000)) && !/persona/i.test(await tipText()), await tipText())
+  check('the Combwork context tip says the Assistant’s role and mode, not persona', !!(await until(async () => (await tipText()).includes('the Assistant’s role and mode'), 5000)) && !/persona/i.test(await tipText()), await tipText())
   await page.mouse.move(0, 0)
   check('a smaller reply that broke a scenario is "smaller but failing"', (await statusOf('card-detail')) === 'Smaller but failing', await statusOf('card-detail'))
   check('…and leads the table', (await page.locator(`${pageSel} .perf-scenarios tbody tr`).first().innerText()).includes('card-detail'))
@@ -98,12 +98,12 @@ const check = (name, ok, extra = '') => {
 
   // A pair switched while a slow read is out: the new pair is what shows.
   await app.evaluate(() => {
-    process.env.HIVE_TEST_SLOW_IPC = 'benchmarks:read=2000*2'
+    process.env.CW_TEST_SLOW_IPC = 'benchmarks:read=2000*2'
   })
   await page.locator(`${pageSel} select[aria-label="Run"]`).selectOption({ label: 'fake, fixtures v5 (smaller but wrong)' })
   await lib.sleep(200)
   await app.evaluate(() => {
-    process.env.HIVE_TEST_SLOW_IPC = ''
+    process.env.CW_TEST_SLOW_IPC = ''
   })
   await page.locator(`${pageSel} select[aria-label="Run"]`).selectOption({ label: 'fake, fixtures v5 (smaller replies)' })
   await lib.sleep(3000) // A fixed wait on purpose: the slowed answer for the old choice arrives later, and this checks it doesn't replace the new one.
@@ -124,8 +124,8 @@ const check = (name, ok, extra = '') => {
     // The Assistant's launch and its tool list: no workflow role (HI-2049).
     const guidance = [{ provider: 'claude-code', role: 'assistant', workflow: 'none', launches: 1, guidanceBytes: 4000, customBytes: 0, roleBytes: 500, modeBytes: 300, skillCatalogBytes: 200 }]
     const catalog = [{ role: 'assistant', workflow: 'none', starts: 1, tools: 40, toolsBytes: 20100, toolsChars: 20000, charStarts: 1 }]
-    const workspace = { api: [{ route: '/v1/tasks', method: 'GET', role: 'api', outcome: 'ok', count: requests, requestBytes: requests * 10, responseBytes: requests * 100 }], mcp: [{ tool: 'hive_list_tasks', role: 'assistant', mode: 'compact', outcome: 'ok', count: 2, chars }], guidance, catalog }
-    fs.writeFileSync(file, JSON.stringify({ schema: 'hive-metrics/1', app: { version: '0.0.0' }, exportedAt: to, report: { scope: { kind: 'workspace' }, from, to, filters: { own: true }, coverage: { observedMs: 3_600_000, rangeMs: 86_400_000 }, projects: {}, workspace } }))
+    const workspace = { api: [{ route: '/v1/tasks', method: 'GET', role: 'api', outcome: 'ok', count: requests, requestBytes: requests * 10, responseBytes: requests * 100 }], mcp: [{ tool: 'cw_list_tasks', role: 'assistant', mode: 'compact', outcome: 'ok', count: 2, chars }], guidance, catalog }
+    fs.writeFileSync(file, JSON.stringify({ schema: 'combwork-metrics/1', app: { version: '0.0.0' }, exportedAt: to, report: { scope: { kind: 'workspace' }, from, to, filters: { own: true }, coverage: { observedMs: 3_600_000, rangeMs: 86_400_000 }, projects: {}, workspace } }))
     return file
   }
   await importFile(ownExport(path.join(lib.WORK, 'perfcompare-own-before.json'), 10, 1000, 30))

@@ -1,7 +1,7 @@
 // An adopted worktree handed over to its agent's first card under slots (#1441, SPEC §16.10.8): only when its carried
 // lease is kept for nothing (no lane or card in flight from the upgrade), its folder is clean and its head is in the
 // target; then, in one write, the carried lease ends (`handedOff`), the card's lease begins on the same slot and the
-// conversations bound to it go on under the new lease. A failure in that write leaves all of it as it was; two Hives
+// conversations bound to it go on under the new lease. A failure in that write leaves all of it as it was; two Combworks
 // handing over at once, one wins; asked again (a restart), the start finds the card's lease. The workspace, its board, the
 // pool and git are real; the rules are on; no session is started.
 import { mkdirSync, writeFileSync } from 'fs'
@@ -44,9 +44,9 @@ let store: InstanceType<typeof SlotStore>
  * with no worktree (the pool's size is the builders': room for one slot beside the four adopted).
  */
 function writeProject(): void {
-  const agent = (id: string) => ({ id, name: id.toUpperCase(), provider: 'claude-code', workflowRole: 'builder', worktree: { path: wt(`h${id}`), branch: `hive/h${id}`, base: 'main' } })
+  const agent = (id: string) => ({ id, name: id.toUpperCase(), provider: 'claude-code', workflowRole: 'builder', worktree: { path: wt(`h${id}`), branch: `cw/h${id}`, base: 'main' } })
   const b5 = { id: 'b5', name: 'B5', provider: 'claude-code', workflowRole: 'builder' }
-  writeFileSync(join(project, '.hive', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, id: projectId, agents: [...['b1', 'b2', 'b3', 'b4'].map(agent), b5] }))
+  writeFileSync(join(project, '.combwork', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, id: projectId, agents: [...['b1', 'b2', 'b3', 'b4'].map(agent), b5] }))
 }
 const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(ws, fn)
 const open = (agent: string) => store.openLeases().find((l) => l.agent === agent) ?? null
@@ -57,9 +57,9 @@ let card2 = 0
 
 beforeAll(async () => {
   gitRepo(project)
-  commit(project, { '.gitignore': '.hive/\n', 'a.txt': 'a\n' }, 'first')
-  for (const a of ['b1', 'b2', 'b3', 'b4']) sh(project, 'worktree', 'add', '-q', '-b', `hive/h${a}`, wt(`h${a}`))
-  mkdirSync(join(project, '.hive'), { recursive: true })
+  commit(project, { '.gitignore': '.combwork/\n', 'a.txt': 'a\n' }, 'first')
+  for (const a of ['b1', 'b2', 'b3', 'b4']) sh(project, 'worktree', 'add', '-q', '-b', `cw/h${a}`, wt(`h${a}`))
+  mkdirSync(join(project, '.combwork'), { recursive: true })
   writeProject()
   await ws.open(wsPath)
   projectId = (await ws.projectConfig(project)).id ?? 'p1'
@@ -105,7 +105,7 @@ describe("an adopted worktree handed over to its agent's first card (#1441)", ()
     // Its head not in the target: not handed over; once merged, it can be (a dry start changes nothing).
     commit(wt('hb1'), { 'b.txt': 'b\n' }, 'unmerged work')
     expect(await start(card1, 'b1', true).then((r) => (r && 'slot' in r ? r.slot : null))).not.toBe('hb1')
-    sh(project, 'merge', '-q', '--ff-only', 'hive/hb1')
+    sh(project, 'merge', '-q', '--ff-only', 'cw/hb1')
     expect(await start(card1, 'b1', true).then((r) => (r && 'slot' in r ? r.slot : null))).toBe('hb1')
     expect(open('b1')?.kind).toBe('carried')
 
@@ -155,7 +155,7 @@ describe("an adopted worktree handed over to its agent's first card (#1441)", ()
     expect(resumeHold(facts, folderAgent({ id: 'b4', name: 'B4', workflowRole: 'builder' } as never), s4)).toMatchObject({ is: 'after', card: card4 })
   })
 
-  it('two Hives handing over the same carried lease at once: one wins, the other gets nothing', async () => {
+  it('two Combworks handing over the same carried lease at once: one wins, the other gets nothing', async () => {
     const carried = open('b3')!
     expect(carried.kind).toBe('carried')
     const card3 = (await run(() => tasks.createTask({ title: "B3's", project: 'alpha', agent: 'b3' }, { kind: 'user' }))).number

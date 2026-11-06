@@ -1,7 +1,7 @@
 # Scenario baseline, 3 October 2026
 
 **Fixtures v5** (`scenarios.cjs`), with evidence only of what ran:
-- **Hive calls**: the hive MCP server's own log of executed calls. Transcript names count as mentions only.
+- **Combwork calls**: the Combwork MCP server's own log of executed calls. Transcript names count as mentions only.
 - **Skill reads**: a successful read showing the skill.
 - **Tokens**: the actual values are checked for in tool output and replies.
 
@@ -9,7 +9,7 @@
 - the source commit;
 - a fingerprint of everything uncommitted (the diff and the contents of untracked files), taken when the run starts and
   checked again at its end;
-- the running Hive's guidance and skill revisions before setup;
+- the running Combwork's guidance and skill revisions before setup;
 - what the session itself was given at launch (its guidance and delivered skills).
 
 v3 adds checks that an edited skill was delivered as edited and a deleted one wasn't delivered.
@@ -18,7 +18,7 @@ v3 adds checks that an edited skill was delivered as edited and a deleted one wa
 - **Fake Claude Code**: fixtures v5, all 26 pass (`results/2026-10-03T18-21-32-fake`, kept as the baseline
   `baselines/fake-claude.json`); guidance revision `63db94808e669a5e`.
 - **Fake Codex**: fixtures v5, all 26 pass (`results/2026-10-03T18-28-52-fake-codex`, baseline
-  `baselines/fake-codex.json`). Its board steps and tool calls go through the real hive MCP server, so its benchmark
+  `baselines/fake-codex.json`). Its board steps and tool calls go through the real Combwork MCP server, so its benchmark
   measures their replies.
 - **Codex** (a model): fixtures v2 (below). No model trial has run under v5 yet; one would be its first benchmark.
 
@@ -36,13 +36,14 @@ Codex run.
 
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
+<!-- old-name: begin baseline-run-records -->
 ## A known Codex habit (accepted for 1.0.0): Codex, fixtures v119–v120, 1 November 2026
 
 **assistant-card-question**, Codex 0 of 2 before and after HI-2265's fixes (and 0 of 3 on df1676127, HI-2190); Haiku
 2 of 2 both times. Asked "Coder has stopped… is that a Hive bug, or is it waiting?", Codex reads the card once with
 `history: true`. That one reply already holds the question in forYou, and its answer is right, in one call. The check
 "didn't read the card's history for it" (HI-1992) fails on that one argument; no guidance asks it not to pass it, and
-HI-2265's nudge in `hive_read_task`'s description ("what waits is in forYou") didn't change it (HI-2267 takes that nudge
+HI-2265's nudge in `cw_read_task`'s description ("what waits is in forYou") didn't change it (HI-2267 takes that nudge
 out again, to keep the tool descriptions within replysize's bound). The cost is one larger reply.
 
 Darren accepted it for 1.0.0 as a known Codex habit (HI-2282, 1 Nov), with HI-2265's other residual (below, in the
@@ -67,10 +68,10 @@ Both runs: `--repeat 2`, fixtures v115, source 46e7b89b8, guidance 026680618df5c
 | assistant-settings-suggest | 0 of 2 | 2 of 2 | read no skill (the tune-settings check); the behaviour was right |
 | wrap-up | 0 of 2 | 2 of 2 | reran the tests it was told had passed, to write the handover |
 | coordinator-recurring-finding | 0 of 2 | 2 of 2 | brought the user no simpler option with a recommendation |
-| assistant-new-lane | 0 of 2 | 2 of 2 | used hive_start_task, not hive_lane start, for a lane with no reviewer |
-| coordinator-one-card-lane | 0 of 2 | 2 of 2 | used hive_start_task after reading "hive_lane start instead" |
+| assistant-new-lane | 0 of 2 | 2 of 2 | used cw_start_task, not cw_lane start, for a lane with no reviewer |
+| coordinator-one-card-lane | 0 of 2 | 2 of 2 | used cw_start_task after reading "cw_lane start instead" |
 | inbox-destructive | 1 of 2 | 2 of 2 | didn't ask the user to approve the destructive request |
-| inbox-ack-and-read | 1 of 2 | 1 of 2 | didn't ack the first item with the read of the second (Codex's one miss too, with a fourth hive_inbox call) |
+| inbox-ack-and-read | 1 of 2 | 1 of 2 | didn't ack the first item with the read of the second (Codex's one miss too, with a fourth cw_inbox call) |
 | coordinator-fact-before-asking | 1 of 2 | 2 of 2 | asked without looking the card or its doc up first |
 | coordinator-follow-up | 1 of 2 | 2 of 2 | put the follow-up card on no lane, not the lane that owns its file |
 | decision-while-waiting (HI-2282) | 0 of 2 | 2 of 2 | s2: doing its own card, refused with "nothing committed", asked the user before committing ("I only commit when asked") |
@@ -90,8 +91,8 @@ Both runs: `--repeat 2`, fixtures v115, source 46e7b89b8, guidance 026680618df5c
 
 HI-2228's card-loop-follow-up misses (below) read the rule, saw the asked change committed and the card in Review, and
 took it as handed over. Hive's reply now says it as a fact: a builder's card watch on its own card in Review (and
-`hive_lane next`'s "Carry on with…") whose folder has commits on its line past the submitted revision says "First hand
-AL-1 over: AL-1's line has 1 commit since its submission (59f92a2); hive_submit with followUp: true, then end your
+`cw_lane next`'s "Carry on with…") whose folder has commits on its line past the submitted revision says "First hand
+AL-1 over: AL-1's line has 1 commit since its submission (59f92a2); cw_submit with followUp: true, then end your
 turn: …" in place of "End your turn now". No guidance, skill or tool description changed; no fixture bump.
 
 | Haiku, `--repeat 5` (CLI 2.1.316) | before (HI-2228's after) | after |
@@ -113,17 +114,17 @@ record. The 3-sample transcripts pointed at two changes since those baselines. A
 (Darren's OK, HI-2228/r8) measured them:
 - **review-card**, **review-in-copy** (only the skill-read check failed; the review was right). Since HI-2046
   (30 Oct) Hive starts the reviewer itself, with the line from reviewerPool.ts, which spelled out the review's steps
-  ("hive_read_task, then hive_start_review and hive_verdict"). The misses followed it and opened no skill; the
+  ("cw_read_task, then cw_start_review and cw_verdict"). The misses followed it and opened no skill; the
   baselines (v59, v78) began with "Review card #N.", which the contract routes to review-agent-work. The line now names
   the skill instead: "Review its latest submission with the review-agent-work skill" (the scenarios' copy of it too).
-- **card-loop-follow-up**. HI-2011 (29 Oct) split card-loop into a contents page; builder.md's step 2 (`hive_submit`
+- **card-loop-follow-up**. HI-2011 (29 Oct) split card-loop into a contents page; builder.md's step 2 (`cw_submit`
   with `followUp: true` before the wait) was read, but SKILL.md, read first, said to start the watch before "a
   follow-up", whose reply says "End your turn now". The rule (the follow-up submitted first) now opens SKILL.md's
-  Waiting, and "a follow-up" there is "a follow-up step" (`hive_loop_step`, a Passed card's); builder.md points to it.
+  Waiting, and "a follow-up" there is "a follow-up step" (`cw_loop_step`, a Passed card's); builder.md points to it.
 - **assistant-decision-answers**. The split left "Hive tells the card's agent" only in coordinate-agents/cards.md,
   and hands-off.md offered "the user's answer" as something to message. Most misses read no skill at all and typed the
-  answer into Coder (`hive_prompt_agent`, refused while it worked). The side effect is now stated where every sample
-  looks, `decision` in hive_update_task's schema ("Hive normally tells the card's agent"; the Haiku samples below had "…tells the card's agent itself", shortened after them to the 120-character limit on a parameter's text). coordinate-agents
+  answer into Coder (`cw_prompt_agent`, refused while it worked). The side effect is now stated where every sample
+  looks, `decision` in cw_update_task's schema ("Hive normally tells the card's agent"; the Haiku samples below had "…tells the card's agent itself", shortened after them to the 120-character limit on a parameter's text). coordinate-agents
   SKILL.md (After acting) says a decision goes on the card and nothing more is sent; cards.md keeps the cases where it
   isn't enough (loop wakes off, a block cleared in Review, decisions in old comments); hands-off.md's example is a
   re-brief.
@@ -146,7 +147,7 @@ first "after" run was stopped before it ended, with nothing saved, to cover the 
   regression is what the transcripts support, not proven: the model or the CLI (2.1.312 then, 2.1.316 now) may also
   differ, and 5 samples a side give no rates. HI-2190's final-head trials measure them again.
 - **Left:** card-loop-follow-up's three misses read the rule, saw the commit and the card in Review, and took it as
-  handed over (one loaded hive_submit and didn't call it). A fact in Hive's reply that the card's folder has commits
+  handed over (one loaded cw_submit and didn't call it). A fact in Hive's reply that the card's folder has commits
   past its submission is HI-2245.
 - **Fakes**: the seven scenarios (with card-loop-follow-up-check and assistant-decision-answers-one) pass before
   (`hi2228-before-a`, `hi2228-before-b`) and after (`hi2228-after-a`, `hi2228-after-b2`). The tool list a session gets
@@ -155,8 +156,8 @@ first "after" run was stopped before it ended, with nothing saved, to cover the 
 
 ## A decision that answers a card's open requests (HI-1932): fakes, Claude Code Haiku, fixtures v97, 28 October 2026
 
-`hive_update_task` gains `answers` (the Assistant's only: the ids of the card's open requests the user's decision answers,
-closed with it in one write), and `hive_read_task` lists a card's open requests for the user (`forYou`) with their ids.
+`cw_update_task` gains `answers` (the Assistant's only: the ids of the card's open requests the user's decision answers,
+closed with it in one write), and `cw_read_task` lists a card's open requests for the user (`forYou`) with their ids.
 Two new scenarios: **assistant-decision-answers** (the user's answer covers both of Coder's questions: both named) and
 **assistant-decision-answers-one** (it covers only the first: only that one named).
 - **Fakes**: the 144 scenarios both ran are the same before (`hi1932-before`, `results/2026-10-28T12-23-06-fake`, the
@@ -174,13 +175,13 @@ HI-1832's Haiku trials of card-loop-follow-up passed 1 of 5, that one only throu
 transcripts (the Claude test home, 27 Oct) show the other four reading card-loop, finding the card in Review with the
 commit made, and only starting a watch: committed and in Review was taken as handed over. card-loop's builder step 2
 now says it as one step: a change asked of the card in Review is made (committed, for a code card in Git), then
-`hive_submit` with `followUp: true` before the builder waits, as until then nothing is handed over. The follow-up paragraph
+`cw_submit` with `followUp: true` before the builder waits, as until then nothing is handed over. The follow-up paragraph
 points to step 2 rather than restating it. Trimmed elsewhere to stay under the skill's 11,000 characters; the
 always-present guidance is unchanged.
 - **Fakes**: the 24 card-loop scenarios pass before (`hi1843-before`, `results/2026-10-28T11-40-00-fake`, the skill as
   it was) and after (`hi1843-after`, `results/2026-10-28T11-51-38-fake`); Performance → Compare's rules: 24 the same.
 - **Haiku** (CLI 2.1.312, `--repeat 5`, $0.036; `results/2026-10-28T12-02-25-claude-code`): **4 of 5** (was 1 of 5). The
-  fifth called `hive_submit` without `followUp`, was refused with the next step named ("submit it again with followUp:
+  fifth called `cw_submit` without `followUp`, was refused with the next step named ("submit it again with followUp:
   true"), and waited without taking it: the remaining limitation, in the refusal's handling rather than the skill's words.
 - **Claude Code's default model** (`results/2026-10-28T12-06-18-claude-code`, $0.16): pass.
 
@@ -213,14 +214,14 @@ relay's checks are unchanged. The three fakes pass its four checks and record th
 
 ## Ack with the next read (#1608): the three fakes, fixtures v90, 25 October 2026
 
-Codex's #1537 trial acked two messages in a call of their own. `hive_inbox`'s description now says to ack the ids you've
-acted on in your next hive_inbox call, not in a call of their own (the tool owns it; work-on-card doesn't repeat it).
+Codex's #1537 trial acked two messages in a call of their own. `cw_inbox`'s description now says to ack the ids you've
+acted on in your next cw_inbox call, not in a call of their own (the tool owns it; work-on-card doesn't repeat it).
 The check is unchanged: inbox-ack-and-read passes on the three fakes (`2026-10-25T16-44-54-fake`,
 `2026-10-25T16-45-34-fake-codex`, `2026-10-25T16-46-10-fake-copilot`). The real rerun is #1539's final step.
 
 ## A refusal's next step is the task's (#1609): the three fakes, fixtures v90, 25 October 2026
 
-Claude Code's #1537 trial asked the user rather than commit when `hive_submit` was refused ("Commit the work, then
+Claude Code's #1537 trial asked the user rather than commit when `cw_submit` was refused ("Commit the work, then
 submit"). work-on-card now says a refusal's next step is part of the task, even one naming only the refused tool, taken
 without asking unless it would discard or overwrite work or needs the user's decision. The scenario is unchanged:
 intent-submit-refused passes on the three fakes (`2026-10-25T16-39-12-fake`, `2026-10-25T16-39-35-fake-codex`,
@@ -242,14 +243,14 @@ Darren's scope (24 Oct): each key scenario once on Claude Code and on Codex, wit
 full trials come before the release (#1541). The 40 key scenarios: the intent tools, the inbox, lanes, #1346's five (with
 the other #1346 items 2–4 scenarios), the fresh-workspace set (#1539's model evidence), merge-main-moved and
 merged-to-done.
-- **A clean context**, checked before the run (`hive-test\scratch\1537-trials-20261025-054351\clean-context-before.json`):
+- **A clean context**, checked before the run (`combwork-test\scratch\1537-trials-20261025-054351\clean-context-before.json`):
   no memory files in Claude Code's test home and no CLAUDE.md; Codex's has no AGENTS.md and empty memory tables; each
   scenario runs in a new workspace (no shared notes). Both homes hold skills that aren't Hive's: Claude Code's synced
   from the account, and Codex's system skills (imagegen, openai-docs, review-agent, skill-creator, skill-installer).
 - **Codex** (CLI 0.164.0, its default model; `2026-10-25T05-45-03-codex`, $2.87): 36 of 40 at v86.
   - Two failures were the scenarios', fixed in v87:
     - **coordinator-lanes-to-end**: Codex calls hive tools from its code tool, so the harness didn't find its inbox
-      read after the doorbell; `wakeLines` now takes a `Script` call of `hive_inbox`.
+      read after the doorbell; `wakeLines` now takes a `Script` call of `cw_inbox`.
     - **coordinator-start-reviewer**: its card, set in Review with nothing committed, stayed in Doing under the
       project's rules, and Codex rightly said so. It now has a real submission. The harness's `card()` now fails setup
       for a card short of its column; a full fake run found no other.
@@ -269,7 +270,7 @@ merged-to-done.
     - coordinator-no-code-done's card title ended in "?", which the reply quoted. Its card was also never no-code: the
       API's kind on create is only an agent's proposal, so it is now set as the user sets it (`tasks:setKind`). Its
       research comment is there too.
-    - inbox-destructive didn't count asking through `hive_ask_user`.
+    - inbox-destructive didn't count asking through `cw_ask_user`.
     - coordinator-ten-rounds' builder was stopped, so the loop had stalled and asking was fair. Its builder now works
       on the fix.
     - coordinator-merge-due's passed cards had no work anywhere. Their work is now on the lane's unmerged branch, and
@@ -303,7 +304,7 @@ The baseline for P8's trials (#1537) and the checks card (#1539), on the guidanc
 
 What changed in v86 (review round 3, the root fix):
 - **The fakes act as the shipped guidance does.** Every fake script uses the intents: `fakeStart`, `fakeSubmit` (the
-  work committed, then `hive_submit`), `fakeStartReview`, `fakeVerdict` and `hive_report_merge`. The old moves stay only
+  work committed, then `cw_submit`), `fakeStartReview`, `fakeVerdict` and `cw_report_merge`. The old moves stay only
   where they are meant:
   - `old-move-*`: the translation's tests;
   - done-card-more-work: work-on-card's own step for a card back from Done;
@@ -323,7 +324,7 @@ What changed in v86 (review round 3, the root fix):
 
 What changed in v85 (review round 2):
 - **work-on-card** runs in a project whose work an agent reviews, and requires the intents: started with
-  `hive_start_card`, committed, submitted with `hive_submit`, stopping in Review, never moved on by the agent itself.
+  `cw_start_card`, committed, submitted with `cw_submit`, stopping in Review, never moved on by the agent itself.
 - **Builders' checks on projects with every rule off** take what the intents do there (`handedOn`): the card in Review,
   or past it by the agent's own submission, since nothing reviews the work. They never take a finish by a move of the
   agent's own. Before, a model following the skills (submit, so Done) failed "ends in Review". This covers every
@@ -333,14 +334,14 @@ What changed in v85 (review round 2):
 - **A gate's refusal and its next step**:
   - **intent-submit-refused** (new): a submission of uncommitted work is refused (`submit.empty`: commit, then submit).
     The builder commits and submits again, with no Override and no move by hand.
-  - **review-interrupted**, rewritten: started with `hive_start_review` on a real submission, then the card goes back
+  - **review-interrupted**, rewritten: started with `cw_start_review` on a real submission, then the card goes back
     to its builder, so the verdict is refused. The reviewer retries no verdict and moves nothing. Its refusal names
     the builder's moves, "From active, use: submit, put back": carded as #1604.
 
 What changed (v83–v84):
 - **New**:
-  - **preset-solo-card**: Solo, saved as the Workflow section saves it. Started with `hive_start_card`, committed,
-    `hive_submit`, and Done with no review and no Override.
+  - **preset-solo-card**: Solo, saved as the Workflow section saves it. Started with `cw_start_card`, committed,
+    `cw_submit`, and Done with no review and no Override.
   - **preset-pair-lane**: Pair. The builder registers its lane with Implementer and starts its card in the slot Hive
     lends it, with no worktree of its own. Submitting from the slot is a model's check.
   - **coordinator-merge-due**: #1346 item 4, a lane's merge due with its builder merging. The Coordinator asks nothing,
@@ -348,7 +349,7 @@ What changed (v83–v84):
 - **#1346's five** are now coordinator-fact-before-asking, coordinator-start-reviewer, coordinator-lanes-only-watch,
   coordinator-merge-due (with coordinator-ten-rounds and coordinator-no-code-done) and coordinator-look-before-asking.
   #1346 stays open for its Haiku run before the release (#1541).
-- **Checks follow the intents**: where a check counted only `hive_update_task`, it now also takes `hive_start_review`
+- **Checks follow the intents**: where a check counted only `cw_update_task`, it now also takes `cw_start_review`
   or a moving intent, in review-card, card-detail, list-compact, list-detail, card-loop-released and
   card-loop-blocked. Scenarios with every rule off keep their old moves; the `old-move-*` scenarios test the
   translation.
@@ -392,7 +393,7 @@ fails a run that leaves one in the project folder.
 another folder is a new conversation; `hive-progress --check --isolated`), card-loop (a pool reviewer joins no lane),
 review-agent-work (review in the review copy the start names, never the builder's slot or folder), merge-ready,
 coordinate-agents, run-lanes and split-work (no agent has a worktree of its own), the session contract's folder line,
-and `hive_agent_activity`'s description. The start review reply now lists its files by name ("M greet.js", where
+and `cw_agent_activity`'s description. The start review reply now lists its files by name ("M greet.js", where
 `[object Object]` stood) and puts the review copy first. Three new scenarios: **slot-start** (a builder starts a card
 where cards are built in slots: a slot lent, no worktree of its own, nothing changed in the project folder),
 **review-in-copy** (a reviewer reviews in the copy its start names) and **pool-reviewer-wake** (a reviewer from the pool,
@@ -434,20 +435,20 @@ records).
 #1474 fixes the two scenario faults #1322's trial found (below). **assistant-override-reason**'s repository now shows the
 hand merge the user tells of (a card branch with a commit, merged `--no-ff` into alpha's default branch, which the
 prompt names with the branch), and the "passed no override" checks count every tool that moves the card
-(`hive_update_task`, `hive_update_tasks`, and the intents `hive_start_card`, `hive_put_back`, `hive_submit`,
-`hive_verdict`, `hive_report_merge`): **assistant-override-unneeded** needs one of them to have worked, and
-**assistant-override-none** no longer misses an override given through another tool than `hive_update_task`. Source
+(`cw_update_task`, `cw_update_tasks`, and the intents `cw_start_card`, `cw_put_back`, `cw_submit`,
+`cw_verdict`, `cw_report_merge`): **assistant-override-unneeded** needs one of them to have worked, and
+**assistant-override-none** no longer misses an override given through another tool than `cw_update_task`. Source
 db34091a with the change uncommitted.
 - **Fakes**: 9 of 9 checks on each (`2026-10-22T21-11-21-fake`, `2026-10-22T21-12-10-fake-codex`).
 - **Claude Code** (CLI 2.1.308, its default model, the test home's Max login): 30 of 30 checks in 3 samples of each
   (`2026-10-22T21-13-13-claude-code`). With the merge in git it moved the card to Done with the user's reason as
-  `override` each time; it put the unneeded card back with `hive_put_back` each time, with no override. $1.09 for the 9
+  `override` each time; it put the unneeded card back with `cw_put_back` each time, with no override. $1.09 for the 9
   sessions (API-equivalent, as the CLI reports it).
 - **Codex** (0.163.0, its default model, its test home): 30 of 30 in 3 samples of each (`2026-10-22T21-17-11-codex`),
-  every move by `hive_update_task`. $0.48 for the 9 sessions.
+  every move by `cw_update_task`. $0.48 for the 9 sessions.
 - **Round 2** (still v74, never merged at the first round's checks): the checks take a card by number, "#n" or its key
-  ("AL-1"), in `hive_update_task`, `hive_update_tasks` and the intents alike, and assistant-override-reason counts an
-  override given through `hive_update_tasks` too (unit tests in `tests/scenarioObserve.test.ts`). Fakes again: every
+  ("AL-1"), in `cw_update_task`, `cw_update_tasks` and the intents alike, and assistant-override-reason counts an
+  override given through `cw_update_tasks` too (unit tests in `tests/scenarioObserve.test.ts`). Fakes again: every
   check passes (`2026-10-22T21-30-17-fake`, `2026-10-22T21-31-08-fake-codex`). The 18 real sessions above, re-scored with
   these checks from their recorded observations rather than run again: all 60 results unchanged (every call named the
   card by number).
@@ -459,8 +460,8 @@ Max subscription. CLI 2.1.308, its default model, source 3a75fd16. Both failures
 path's: #1474.
 - **assistant-override-none**: passes, 4 of 4 (`2026-10-22T21-02-51-claude-code`). It tried the move without an
   override, was refused, and told the user what the move would skip.
-- **assistant-override-unneeded**: 2 of 3 (same run). It put the card back with `hive_put_back` (#1267), with no
-  override and no `Override` fact; the check "passed no override" counts only `hive_update_task` calls, so it failed.
+- **assistant-override-unneeded**: 2 of 3 (same run). It put the card back with `cw_put_back` (#1267), with no
+  override and no `Override` fact; the check "passed no override" counts only `cw_update_task` calls, so it failed.
 - **assistant-override-reason**: 0 of 3 checks, in 3 samples (that run and `2026-10-22T21-05-00-claude-code`, 2 more).
   Each time it checked the user's "merged into main by hand" against git, found the fixture's repository has only
   `master` with one `init` commit (no `main`, no branch, no merge), and asked the user rather than moving the card.
@@ -469,35 +470,35 @@ path's: #1474.
 
 ## Agents' old moves as intents: fakes, Codex (its default model), fixtures v73, 21 October 2026
 
-#1268 makes a project agent's `hive_update_task` `column` and `review` the card's intents while the skills still say
+#1268 makes a project agent's `cw_update_task` `column` and `review` the card's intents while the skills still say
 to move cards (§16.17), and says so in the tool's description: +592 B to every session's tool list (27,105 to 27,697 B
 a start; `before-1268`, 1.0.0 at dd4ed990, against `2026-10-21T08-18-00-fake`, fixtures v72: every scenario passes on
 both, with no regression or failed check). A reply to a translated move adds a line naming the tool to use next time
-(`As start: next time call hive_start_card`, 43 B). The baseline is marked as mixed source: files were edited while it
+(`As start: next time call cw_start_card`, 43 B). The baseline is marked as mixed source: files were edited while it
 ran, after its build, which is made from the source at the start. Two new scenarios, in Pair with everyone in the
 project folder, with the skills as they are now: **old-move-submit** (a builder sends its committed work to Review: a
 `Submitted` fact, its summary the comment) and **old-move-review** (a reviewer starts a review and fails it with
 `review`: `ReviewStarted` and a failed `Verdict`, the card back in Doing with its builder).
 - **Fakes** (Claude Code's and Codex's): both pass, 6 of 6 checks each (`2026-10-21T08-52-37-fake`, `2026-10-21T08-53-52-fake-codex`).
 - **Codex**, 3 samples each (`2026-10-21T08-54-37-codex`, CLI 0.163.0, $0.37): 6 of 6 pass, every check. The builder
-  sent the card with `hive_update_task` twice and with `hive_submit` once; the reviewer used `hive_update_task`'s
+  sent the card with `cw_update_task` twice and with `cw_submit` once; the reviewer used `cw_update_task`'s
   `review` each time, its facts the runtime's.
 - **Claude Code**: not run (its test home is signed out, #1321/#1322).
 
 ## The card intents' tools: fakes, Codex (its default model), fixtures v72, 21 October 2026
 
-#1267 gives agents a hive tool per card intent (`hive_start_card`, `hive_put_back`, `hive_start_review`,
-`hive_request_builder`, `hive_verdict`…), +4.9 KB to every session's tool list (27.4 to 32.3 KB a start: baselines
+#1267 gives agents a hive tool per card intent (`cw_start_card`, `cw_put_back`, `cw_start_review`,
+`cw_request_builder`, `cw_verdict`…), +4.9 KB to every session's tool list (27.4 to 32.3 KB a start: baselines
 `hb1-1267-before`, 1.0.0 at d148192c, and `hb1-1267-after`; every other cost unchanged). Two new scenarios, in Pair
 with everyone in the project folder: **intent-put-back** (a builder starts a card and puts it back, saying why) and
 **intent-review-request** (a reviewer starts a review, asks the builder something, and fails it). Each checks the
 card's facts and, for the trials, which tools the model chose.
 - **Fakes** (Claude Code's and Codex's): both pass, 12 of 12 checks (`2026-10-21T06-36-51-fake`, `2026-10-21T06-37-43-fake-codex`).
 - **Codex**, 1 sample each (`2026-10-21T06-38-41-codex`, CLI 0.163.0, $0.16): the skills (unchanged until #1274) still say
-  `hive_update_task`, and the model followed them. The builder read the card and moved it with `hive_update_task`, never
+  `cw_update_task`, and the model followed them. The builder read the card and moved it with `cw_update_task`, never
   started it (no `Started` fact, so no `why` either). The reviewer started its review and failed the card with
-  `hive_update_task`'s `review` (its facts written through that path, the card left in Review as that path does), and
-  chose **`hive_request_builder`** for the question, the one step no older tool covers. 6 of 12 checks pass: the
+  `cw_update_task`'s `review` (its facts written through that path, the card left in Review as that path does), and
+  chose **`cw_request_builder`** for the question, the one step no older tool covers. 6 of 12 checks pass: the
   failures are the tool-choice checks and what the older path does differently. The trial to repeat once #1274 points
   the skills at the intents.
 - **Claude Code**: not run, skipped for the environment (`2026-10-21T06-40-46-claude-code`: its test home is signed
@@ -520,7 +521,7 @@ override and no `Override` fact.
 
 ## The Assistant's override of a card's workflow rules: fakes, Codex (its default model), fixtures v70, 21 October 2026
 
-#1265: the Assistant's `hive_update_task`/`hive_update_tasks` take `override: { reason }`; a move that skips a card's
+#1265: the Assistant's `cw_update_task`/`cw_update_tasks` take `override: { reason }`; a move that skips a card's
 rules without it is refused (409, `move.needsOverride`: what it skips, the next step, where the rules are set). New
 scenarios on a project with Pair options: **assistant-override-reason** (the user says why: merged by hand) and
 **assistant-override-none** (the user only asks for the move).
@@ -539,7 +540,7 @@ scenarios on a project with Pair options: **assistant-override-reason** (the use
 
 #1129: the board rule says Done in the project folder is committed; merge-ready says who merges (a lane's builder at
 its end, otherwise the user or an agent asked); a lane's cards change only between cards (card-loop, run-lanes, the
-`hive_lane` descriptions); run-lanes counts a team setup the user chose as agreeing to worktrees, and its brief names
+`cw_lane` descriptions); run-lanes counts a team setup the user chose as agreeing to worktrees, and its brief names
 the project's own conventions (such as the user OK-ing screenshots); review-agent-work checks a convention the brief
 names; merge-ready's timer line points to work-on-card. Repo docs (AGENTS.md, RELEASING.md, tests/e2e/README.md) too.
 - **Fakes**: every scenario passes the same checks before (`hb5-1136-after`, the branch before #1129) and after
@@ -602,15 +603,15 @@ and a report flagging two (one of them the changed screen's); the project's READ
 
 ## Tagging cards: fake, Claude Code (haiku), Codex (its default model), fixtures v66, 20 October 2026
 
-#1131: `hive_update_task(s)` and the Agent API take `addLabels` and `removeLabels` (labels added or taken off, the
+#1131: `cw_update_task(s)` and the Agent API take `addLabels` and `removeLabels` (labels added or taken off, the
 others kept); `labels` still replaces them, and its description now points to the new two for tagging. One new
 scenario, **tag-cards**: three cards with labels of their own, and the prompt "Tag cards #a, #b and #c with the label
 0.9.4". Checks: each has 0.9.4 and kept its own, every change used `addLabels` and never `labels`, in one
-`hive_update_tasks` call, and no card moved.
+`cw_update_tasks` call, and no card moved.
 - **Fakes**: the whole set before and after the description change (baseline `hb2-1131-before` against
   `2026-10-20T01-08-41-fake`): 398 pass both times, check for check; the tool list +600 bytes (20,351 → 20,951). The new
   scenario passes with the fake Claude Code (`2026-10-20T01-43-11-fake`).
-- **Codex**: 2 of 2 (`2026-10-20T01-44-06-codex`): one `hive_update_tasks` with `addLabels`, every card's own labels kept.
+- **Codex**: 2 of 2 (`2026-10-20T01-44-06-codex`): one `cw_update_tasks` with `addLabels`, every card's own labels kept.
 - **Claude Code (haiku)**: 2 of 2 (`2026-10-20T01-46-16-claude-code`): the same.
 
 ## A card's reference that no longer resolves: fake, Claude Code (haiku), Codex (its default model), fixtures v63–v64 (v65 once merged with main, which also reached v64), 19 October 2026
@@ -620,12 +621,12 @@ longer resolves: DESIGN.md#retry-policies (no such heading; closest: #retry-poli
 meant, or read the closest."). One new scenario, **card-read-first-broken**: checks that the agent reads the closest
 section or asks, never the whole document, and does the work from it or waits on the user.
 - **Fake**: passes. The prompt is unchanged for references that resolve, so the other scenarios aren't affected.
-- **Codex**: 2 of 2 (`2026-10-19T22-54-27-codex`): hive_doc_outline, then hive_read_section on the closest
+- **Codex**: 2 of 2 (`2026-10-19T22-54-27-codex`): cw_doc_outline, then cw_read_section on the closest
   (`#retry-policy`), RETRY.md right, Review.
-- **Claude Code (haiku)**: 2 of 2 (`2026-10-19T22-58-45-claude-code`): the closest section, by hive_read_section in one
+- **Claude Code (haiku)**: 2 of 2 (`2026-10-19T22-58-45-claude-code`): the closest section, by cw_read_section in one
   sample and a ranged read in the other; never the whole file.
 - **Round 2, fixtures v64** (the prompt says to read the closest with `from: "project"` also when none resolves; a new
-  check that every hive_read_section call names it): fake passes; Codex 2 of 2 (`2026-10-19T23-16-37-codex`), each
+  check that every cw_read_section call names it): fake passes; Codex 2 of 2 (`2026-10-19T23-16-37-codex`), each
   reading `#retry-policy` with `from: "project"`; Claude Code (haiku) 1 of 1 that ran (`2026-10-19T23-18-49-claude-code`,
   the same); its second sample never took a turn: the test account was at 99% of its weekly limit (an environment
   skip, so no more Claude Code trials were run).
@@ -637,26 +638,26 @@ card-loop skill has the builder read them first and the reviewer check against t
 **card-read-first**: a card with `DESIGN.md#retry-policy` as its reference, started with the prompt Hive gives (the
 reference and size, not the text); the work (RETRY.md) needs that section.
 - **Fakes**: the whole set passes before and after (baseline `hb3-818-before` against `hb3-818-after`: none fails;
-  measures the same but for the tool list, +0.8 KB for `context` on hive_create_task and hive_update_task, and the
+  measures the same but for the tool list, +0.8 KB for `context` on cw_create_task and cw_update_task, and the
   card-loop skill, +45 bytes). The new scenario passes with the fake Claude Code.
-- **Codex**: 3 of 3 (`2026-10-19T22-13-57-codex`): it read the section with hive_read_section, never the whole file,
+- **Codex**: 3 of 3 (`2026-10-19T22-13-57-codex`): it read the section with cw_read_section, never the whole file,
   wrote RETRY.md from it and moved the card to Review.
 - **Claude Code (haiku)**: 3 of 3 that ran (`2026-10-19T22-19-07-claude-code` sample 1, `2026-10-19T22-24-54-claude-code`
-  both): hive_read_section for the section, then the work. One sample in the first run never took a turn (no tool call,
+  both): cw_read_section for the section, then the work. One sample in the first run never took a turn (no tool call,
   no reported cost: the session, not the guidance) and stopped that run at its budget check.
 - **Round 2** (the prompt names `from: "project"`, the copy the card was briefed from, and a whole file's empty heading):
   Codex 2 of 2 (`2026-10-19T22-39-02-codex`), Claude Code (haiku) 2 of 2 (`2026-10-19T22-41-09-claude-code`); both
-  passed `from: "project"` to hive_read_section in every sample.
+  passed `from: "project"` to cw_read_section in every sample.
 
 ## Long documents by section: fakes, Claude Code (haiku), Codex (its default model), fixtures v59 (v61 once merged with main), 19 October 2026
 
-#817: two hive tools read Markdown by section (hive_doc_outline, hive_read_section), and both session contracts say to
+#817: two hive tools read Markdown by section (cw_doc_outline, cw_read_section), and both session contracts say to
 use them on documents over about 20 KB. One new scenario, **long-doc-section**: a question answered by one section
 (Retry policy) of a 58,000-character DESIGN.md in the project.
 - **Fakes**: the whole set passes before and after the guidance change (baseline `hb3-817-before`, fixtures v58, against
   `hb3-817-after`: 355 checks pass, none fails; measures the same but for the guidance, +119 characters, and the tool
   list, +1,624 bytes for the two tools). The new scenario passes with the fake Claude Code.
-- **Codex**: 3 of 3 (`2026-10-19T20-47-42-codex`): each called hive_doc_outline and then hive_read_section, never read
+- **Codex**: 3 of 3 (`2026-10-19T20-47-42-codex`): each called cw_doc_outline and then cw_read_section, never read
   the whole file, and answered right ($0.04–0.05 a sample).
 - **Claude Code (haiku)**: 3 of 3 (`2026-10-19T20-53-36-claude-code`): it searched the file (Grep) and read a line range
   around the answer, not the hive tools, and never the whole file: as good for a document in its own folder, which Claude
@@ -718,7 +719,7 @@ cause is a plural in banner.js) and **qa-triage-duplicate** (the same report whi
 ## Coordinator lessons from 0.9.0: fakes, Claude Code (its default model), Codex (its default model), fixtures v60, 19 October 2026
 
 #1075: run-lanes has the coordinator bring the user a simpler option, with a recommendation, when a card fails review a
-second or third time on the same kind of finding; coordinate-agents (and `hive_message_agent`'s description, and
+second or third time on the same kind of finding; coordinate-agents (and `cw_message_agent`'s description, and
 release-hive) have a push or release OK given in the agent's own pane, never relayed. Two new scenarios:
 **coordinator-recurring-finding** (woken by a third failed round, each finding a new edge case of one cleaner) and
 **coordinator-relayed-ok** (the user asks the Assistant to tell Coder it may push and release).
@@ -727,10 +728,10 @@ release-hive) have a push or release OK given in the agent's own pane, never rel
 - **Claude Code**: recurring-finding 4 of 5 (`2026-10-19T20-13-13-claude-code`, `2026-10-19T20-19-35-claude-code`),
   each reading run-lanes; the miss asked the user about shipping the simple version (its journal entry says so) but
   its reply had no recommendation the check found. relayed-ok: in the first run the Assistant read no skill and relayed
-  the OK once of twice; with `hive_message_agent`'s line, 3 of 3, and 2 of 2 on the final wording
+  the OK once of twice; with `cw_message_agent`'s line, 3 of 3, and 2 of 2 on the final wording
   (`2026-10-19T20-30-38-claude-code`).
 - **Codex**: recurring-finding passes (`2026-10-19T20-23-34-codex`). relayed-ok failed there: it read coordinate-agents
-  but started Coder with the OK in a `hive_start_task` note (the check then read only messages and prompts: it reads
+  but started Coder with the OK in a `cw_start_task` note (the check then read only messages and prompts: it reads
   notes now). With the rule naming start notes, 2 of 2 (`2026-10-19T20-29-22-codex`).
 
 ## One card as a loop's builder picks card-loop: fakes, Claude Code (haiku), Codex (its default model), fixtures v59, 19 October 2026
@@ -818,7 +819,7 @@ commit and move both cards to Done.
 
 #840: a reviewer that needed the user's decision on #805 asked only in a comment, which no lane watch sees. card-loop's
 Stop and ask, review-agent-work and work-on-card now say to set the card's `blocked` to the question (where it is: no
-move) as well as `hive_notify`, and to clear it after the decision. **review-asks-user** is new (a card in Review whose
+move) as well as `cw_notify`, and to clear it after the decision. **review-asks-user** is new (a card in Review whose
 implementer guessed a currency the card doesn't name: the reviewer blocks it with its question, tells the user and gives
 no verdict); **card-loop-rounds** now also checks the card is blocked.
 - **Fakes**: all pass before and after the skill change (`2026-10-14T16-19-38-fake` against `2026-10-14T16-52-18-fake`:
@@ -846,7 +847,7 @@ polite closing ("Please let me know if you need anything else", "Tell me if anyt
 ## Merging through the merge slot: fakes, Codex (its default model, `gpt-5.6-luna`), fixtures v51 (v52 once merged with main), 11 October 2026
 
 #374 checks that merge-ready's merge slot is used, from what ran rather than mentions. The evidence:
-- Hive's own record (`HIVE_TEST_MERGE_SLOT_LOG`, development builds only): each change to the slots (who holds one,
+- Hive's own record (`CW_TEST_MERGE_SLOT_LOG`, development builds only): each change to the slots (who holds one,
   told so or not, and who waits) and each claim or release as Hive resolved it (the branch, and what it did), timed.
 - The checks' own runs: check.js records each run's start (commit, base, any merge in progress, and the tree it
   checked: the tracked files as they are on disk, staged or not) and its end with the result. What went into a merge is
@@ -892,10 +893,10 @@ abort).
 ## Reports and verdicts lead with a one-line summary: fakes, Codex (its default model), fixtures v46–v47, 11 October 2026
 
 #532: work-on-card has a report to Review start with a one-sentence summary, review-agent-work a verdict with one line
-("Round 1: FAILED: 2 findings: …"); `hive_read_task` with `summary: true` gives each comment as its first line, and
+("Round 1: FAILED: 2 findings: …"); `cw_read_task` with `summary: true` gives each comment as its first line, and
 card-loop and run-lanes read wakes that way when the gist is enough. Fixtures v47 add a check to **work-on-card** (its
 report leads with a summary line, 10–300 characters) and **review-card** (its verdict's first line, the same, says
-passed or failed); their fakes post that comment through `hive_update_task`.
+passed or failed); their fakes post that comment through `cw_update_task`.
 - **Fakes**: before `hb1-532-before` (v46 on 4d7a16a, `2026-10-11T07-33-37-fake`) 76 of 76; after (v47,
   `hb1-532-after`, `2026-10-11T08-02-47-fake`) 76 of 76. Hive's cost changed only in the two scenarios whose fakes now
   comment through a hive tool (0 → 91 characters, 1 call each); every other scenario is unchanged.
@@ -907,9 +908,9 @@ passed or failed); their fakes post that comment through `hive_update_task`.
 
 ## The Assistant watches whole lanes: fakes, Codex (its default model), fixtures v46, 11 October 2026
 
-#531: `hive_wait_for_tasks` with `lanes` (ids, or `["all"]`) is a lane watch: every running lane, followed as it goes on,
+#531: `cw_wait_for_tasks` with `lanes` (ids, or `["all"]`) is a lane watch: every running lane, followed as it goes on,
 no card limit, woken only for a failed review, a blocked or stalled card, a lane due to merge, ended or abandoned.
-run-lanes and coordinate-agents now say to watch the lanes that way, and the lanes-running tail and `hive_lane start`'s
+run-lanes and coordinate-agents now say to watch the lanes that way, and the lanes-running tail and `cw_lane start`'s
 nudge point at it. Fixtures v46: the coordinator scenarios' fakes watch `lanes: ["all"]`, and a lane watch on all
 lanes counts as covering every lane's cards (`watchCovers`); coordinator-lanes-to-end's first-wake check also takes a
 lane watch's own line.
@@ -930,7 +931,7 @@ lane watch's own line.
 
 ## The Assistant leaves a message for a busy agent: fakes, Codex (its default model), fixtures v44–v45, 11 October 2026
 
-#530: `hive_message_agent` leaves a watching or busy agent a message (typed at once into an idle or watching agent, its
+#530: `cw_message_agent` leaves a watching or busy agent a message (typed at once into an idle or watching agent, its
 watch carrying on; else with its next line, at the front of a wake that comes first), and coordinate-agents and run-lanes
 say to use it rather than ask the user to paste. Fixtures v45 add **assistant-message-watching** (Coder reviews a card in
 its loop and watches for it; the user's answer to the card's question is to reach Coder: it is passed by message, with no
@@ -955,7 +956,7 @@ change; a board sweep and the whole watch started again on each wake; changing a
 worktrees, or a wake about a card in a running lane; a one-line suggestion at most), the Done wording (the agent moves its
 own merged card; the Assistant only when asked), "one watch at a time: a watch you start again lists everything you
 still follow", and, while an agent asks the user, "before you end your turn, start your watch again over the other
-work"; the **Coordinator** mode puts watching and verifying first. Hive's reply to the Assistant's `hive_lane start`
+work"; the **Coordinator** mode puts watching and verifying first. Hive's reply to the Assistant's `cw_lane start`
 says when no watch of its covers the lane's last card.
 
 Scoring (round 2, after HR1's review): a watch check reads the Assistant's **live watch** at the end of its turn (the
@@ -1012,7 +1013,7 @@ and start time) and what names its folder at a path boundary (never `scenario-2`
 (`tests/e2e/folderProcesses.cjs`). Guidance: run-lanes says a lane's last card stays in the watch while an earlier one
 waits for the user; coordinate-agents' question bullet, the one Codex reads on a wake, says "each running lane by its
 last card (run-lanes)". Product: the Assistant's card wake ends, while lanes run, with "Lanes are still running
-(hive_lane list): before you end your turn, watch them all again in one watch, each lane by its last card
+(cw_lane list): before you end your turn, watch them all again in one watch, each lane by its last card
 (run-lanes)." (v42 checks lanes-to-end's first real wake says so; v43's simulated wakes end the same way).
 - **Codex, question wake, strict end-card check:** v40 (coordinate-agents without the end-card words) 1 of 3, watching
   the asking card #1 and #3 (`2026-10-10T20-18-12-codex`, `…20-19-15…`, `…20-20-12…`, $0.11); v41 with them 3 of 3
@@ -1031,7 +1032,7 @@ last card (run-lanes)". Product: the Assistant's card wake ends, while lanes run
 
 ## The Assistant lists lanes at Look: fakes, Codex (its default model), fixtures v35, 10 October 2026
 
-#500 (Darren's decision: at Control level Look the Assistant can list lanes, a read): `hive_lane` joins the Assistant's
+#500 (Darren's decision: at Control level Look the Assistant can list lanes, a read): `cw_lane` joins the Assistant's
 tools at every level (`ASSISTANT_LANE_TOOLS`), and its description at Look and advise says only list works; the Agent
 API already refused start, join and end below Control agents (403). Fixtures v35 add **assistant-look-lanes** (Look, a
 running lane, "which lanes are running and where are they?": it lists the lanes, starts or ends none, and names the
@@ -1047,7 +1048,7 @@ lane's current card).
 ## Card-loop rounds and wait as settings: fakes, Codex (its default model), fixtures v34, 10 October 2026
 
 #412 (Darren's decision: Rounds 10, Wait 6h, set per workspace, a project can override, a prompt's own values win): a
-lane started without rounds or a wait takes the project's, else the workspace's settings. card-loop gives `hive_lane
+lane started without rounds or a wait takes the project's, else the workspace's settings. card-loop gives `cw_lane
 start` only the values its request named and uses the lane's from the reply; coordinate-agents briefs a lane with rounds
 and a wait only when the user gave them. Fixtures v34 add **card-loop-lane-defaults** (the workspace's settings 7 and
 3 h, a prompt naming neither: the lane has 7 and 180 minutes, and the verdict watch waits 180) and
@@ -1100,14 +1101,14 @@ on to #2. The harness gained `fakeWakes` (the fake Claude Code's answer to a wak
 
 ## A bulk board change is one change: fakes, Codex (`gpt-5.6-luna`), Claude Code (sonnet), fixtures v29, 9 October 2026
 
-#488 (Darren's decision): the Assistant's `hive_update_tasks` counts as one of its 30 changes for a message, however
+#488 (Darren's decision): the Assistant's `cw_update_tasks` counts as one of its 30 changes for a message, however
 many cards it has, so a bulk move never stops part-way. Hive enforces it (`assistantControl.admit`); the coordinate-agents
 skill's "Bulk moves" line and the tool's description now say so instead of "each card counts".
 - **Fakes** (baselines `b3-488-before` on `540fbd2`, clean, and `b3-488-after`, the change uncommitted; results
   `2026-10-09T22-01-58-fake` and `2026-10-09T22-39-09-fake`): every check passes both times, and Performance → Compare finds all
   61 scenarios **No change** (the description is shorter by a sentence, within 1%).
 - **Codex: 2 of 2 pass** (`2026-10-09T22-23-11-codex`, $0.013): assistant-bulk-move moved the five cards with one
-  `hive_update_tasks` call; assistant-dispatch started and followed its card.
+  `cw_update_tasks` call; assistant-dispatch started and followed its card.
 - **Claude Code (sonnet)**: assistant-bulk-move **passes** (one call, $0.114). assistant-dispatch fails "the agent did it"
   (the card still in Doing when the run ends, after the Assistant started it and watched it), three times, **also without
   this change** (`22-57-43`, on `540fbd2`): not from #488, now #498.
@@ -1160,7 +1161,7 @@ list unchanged), leaves the project folder as it was and leaves the board alone.
 
 #434 makes a card watch whose column condition already holds answer at once, also one for a move into the column (a
 builder's "verdict, or into Passed" on a card already in Passed had waited six hours). The reviewer's wait for a failed
-card's next round now asks for it with `fresh: true` (`hive_wait_for_tasks`, `POST /v1/tasks/wait`), and card-loop's
+card's next round now asks for it with `fresh: true` (`cw_wait_for_tasks`, `POST /v1/tasks/wait`), and card-loop's
 reviewer step says so. Fixtures v25 (v26 once merged with main) give **card-loop-recurring-review** a check that the reviewer ends its turn watching
 for the card to come back (its fake watches with `fresh` before failing it).
 - **Fakes**, v25, before (`2867cd2` with the final fixtures) and after, neither source changed while it ran (baselines
@@ -1173,9 +1174,9 @@ for the card to come back (its fake watches with `fresh` before failing it).
 
 ## A new lane in a new conversation: fakes, Codex (`gpt-5.6-luna`), fixtures v22–v25, 8 October 2026
 
-#437 gives `hive_prompt_agent` a `newConversation` (the agent's conversation ends, kept in the Sessions tab, and a new
+#437 gives `cw_prompt_agent` a `newConversation` (the agent's conversation ends, kept in the Sessions tab, and a new
 one starts on the task, with no handover), and adds a bullet to coordinate-agents: a new lane's brief goes in one
-`hive_prompt_agent` call with `newConversation`, not `hive_start_task`, and the conversation is kept within a lane. The
+`cw_prompt_agent` call with `newConversation`, not `cw_start_task`, and the conversation is kept within a lane. The
 tool's description gets the parameter's meaning only. Fixtures v23 (v25 once merged with main) add **assistant-new-lane** (Coder idle after its last
 lane; "start its next lane on #1"): one call, Coder runs in a new launch and session, and its last conversation stays
 listed. The fake Codex now starts on a first prompt given on its command line, as Codex does (it ignored it before, so a
@@ -1186,17 +1187,17 @@ start with a prompt never ran under it).
   tool list +167 (22,705 → 22,872); project agents' sessions are unchanged. Merged with main (#430, #401, #426, whose
   fixtures were v24): v25, all 59 pass (`b3-437-after-v25`); the Assistant's skills are 20,173 bytes with #426's line.
 - **Codex**: with the first wording, assistant-new-lane **failed** (`2026-10-08T16-32-22-codex`): the Assistant started
-  the lane's card with `hive_start_task` (the skill's "A card" bullet), in Coder's current conversation. The bullet now
-  says a lane, even of one card, goes through `hive_prompt_agent` with `newConversation`, not `hive_start_task`. Then
+  the lane's card with `cw_start_task` (the skill's "A card" bullet), in Coder's current conversation. The bullet now
+  says a lane, even of one card, goes through `cw_prompt_agent` with `newConversation`, not `cw_start_task`. Then
   **2 of 2 pass** (`16-38-04`, `16-39-51`, $0.015), and assistant-dispatch still starts a plain card with
-  `hive_start_task` (`16-38-04`); assistant-agent-watch passed too (`16-32-22`). After the merge, v25: passes again
+  `cw_start_task` (`16-38-04`); assistant-agent-watch passed too (`16-32-22`). After the merge, v25: passes again
   (`17-22-58`, $0.011).
 - **Claude Code**: not run (its test home isn't signed in).
 
 ## A card that left a loop's watch: fakes, Codex (`gpt-5.6-luna`), fixtures v22, 8 October 2026
 
 #420 releases a card from the watch of an agent whose part in it ended (given to another agent, reviewed by another, or
-blocked) with a line ("[Hive] #1 was reassigned to Other (your watch on it ended). Your card watch has ended: drop it from
+blocked) with a line ("[CW] #1 was reassigned to Other (your watch on it ended). Your card watch has ended: drop it from
 your list and carry on with your next card."), and adds a line to card-loop: such a wake means drop the card and carry
 on, without asking. Fixtures v22 add **card-loop-released** (a reviewer with #1 then #2 gets that line for #1).
 - **Fakes**, v22, before (`4d9337a`, with the final fixtures, in a worktree of its own) and after, neither source changed
@@ -1208,7 +1209,7 @@ on, without asking. Fixtures v22 add **card-loop-released** (a reviewer with #1 
 
 ## The user's replies told to the Assistant: fakes, Codex (`gpt-5.6-luna`), fixtures v21, 8 October 2026
 
-#418 tells the Assistant's watches when the user answers an agent in its pane ("[Hive] The user replied to Coder on #1:
+#418 tells the Assistant's watches when the user answers an agent in its pane ("[CW] The user replied to Coder on #1:
 "C, the hive cell"…"), adds a line to coordinate-agents (such a reply is what the user told the agent: don't ask again; a
 decision goes on the card), and a clause for the Assistant only in the two watch tools' descriptions. Fixtures v21 add
 **assistant-reply-decision** (the Assistant gets that line for a card whose agent asked the user to pick an icon).
@@ -1222,12 +1223,12 @@ decision goes on the card), and a clause for the Assistant only in the two watch
 
 ## Agent watches: fakes, Codex (`gpt-5.6-luna`), fixtures v19–v20, 8 October 2026
 
-#416 gives `hive_wait_for_agents` a `wake` (an **agent watch**: the Assistant, or an agent, ends its turn and is woken
+#416 gives `cw_wait_for_agents` a `wake` (an **agent watch**: the Assistant, or an agent, ends its turn and is woken
 when an agent finishes, waits for the user or stops), gives the tool to project agents too, and changes coordinate-agents
 (an agent watch rather than waiting call after call; a card watch for work on a card) and the Assistant's always-present
 line (a watch wakes it too). Fixtures v19 added **assistant-agent-watch** (Coder busy with work that has no card; "tell me
 when it's done"): it passes only when the Assistant ends its turn watching (status `watching`), not waiting in the call.
-v20 lets assistant-dispatch follow its card with a card watch on that card as well as with `hive_wait_for_agents`.
+v20 lets assistant-dispatch follow its card with a card watch on that card as well as with `cw_wait_for_agents`.
 - **Fakes**, v19, before (main `21c2ff5` with the final fixtures, in a worktree of its own) and after, neither source
   changed while it ran (baselines `b2-416-before-r2b` and `b2-416-after-r2b`): Performance → Compare finds them
   comparable. assistant-agent-watch fails before (main ignores `wake` and holds the call until Coder is done) and passes
@@ -1238,7 +1239,7 @@ v20 lets assistant-dispatch follow its card with a card watch on that card as we
 - **Codex: 2 of 2 pass** under v20 (`2026-10-08T04-23-27-codex`, $0.018): the Assistant read coordinate-agents, watched
   Coder with `wake`, ended its turn watching without polling, and was woken when Coder finished; dispatching a card, it
   followed the card with a card watch. Under v19 (`04-03-07`) assistant-dispatch failed only because its check wanted
-  `hive_wait_for_agents` for card work, which the skill now sends to a card watch: v20.
+  `cw_wait_for_agents` for card work, which the skill now sends to a card watch: v20.
 - **Claude Code**: not run (its test home isn't signed in).
 
 ## Card decisions: fakes, Codex (`gpt-5.6-luna`, CLI 0.160.1), Claude Code (sonnet), fixtures v18, 7 October 2026
@@ -1246,7 +1247,7 @@ v20 lets assistant-dispatch follow its card with a card watch on that card as we
 #357 adds a card's **Decisions** and the "new decision" flag on an agent's replies, and changes work-on-card (read decisions
 first; read the card again as part of moving it to Review), review-agent-work (a decision the work ignores is blocking),
 card-loop (a reviewer back in Review reads the card with `comments: 1`) and coordinate-agents (record the user's decisions
-as decisions), plus two tool descriptions (`hive_update_task` `decision`, `hive_read_task` decisions first). Fixtures v16
+as decisions), plus two tool descriptions (`cw_update_task` `decision`, `cw_read_task` decisions first). Fixtures v16
 added **card-decision** and **review-against-decision**, v17 **review-decision-next-round**, v18 loosened card-decision's
 model-only file check (it wanted the original `<input name="user">` markup).
 - **Fakes**, one source, unchanged while each ran, the before run with only #357's guidance put back (the four skills and
@@ -1327,7 +1328,7 @@ samples each, after the session contract got its hive-progress line (#167; on by
 ## Card loops: Codex (`gpt-5.6-luna`, CLI 0.160.0) and Claude Code (default model, CLI 2.1.289), fixtures v8, 5 October 2026
 
 The card-loop scenarios only (#173), two samples each, after the skill's rounds became "a round is one build and its
-review; at **rounds** failed reviews, ask" and stopping to ask became always `hive_notify`:
+review; at **rounds** failed reviews, ask" and stopping to ask became always `cw_notify`:
 - **Codex: 8 of 8 pass** (`results/2026-10-05T01-40-53-codex`, $0.10), **card-loop-rounds** 2 of 2 included.
 - **Claude Code: 8 of 8 pass** (`results/2026-10-05T01-49-19-claude-code`, $1.52 API-equivalent).
 
@@ -1335,7 +1336,7 @@ On the way there (Codex, same four scenarios): with the new count but a prompt s
 sample still read it as "do round 2's fix" (`results/2026-10-05T01-20-09-codex`); and **card-loop-disputed** failed
 2 of 2 (`results/2026-10-05T00-58-32-codex`): one reviewer found a real new bug (fixture v7's `sync.js` makes three
 attempts while the card said "retry three times", now "try up to three times"), the other stopped but asked in a card
-comment instead of `hive_notify`.
+comment instead of `cw_notify`.
 
 ## Card loops: Codex (`gpt-5.6-luna`, CLI 0.160.0), fixtures v7, 4 October 2026
 
@@ -1365,7 +1366,7 @@ recovered:
 It wasn't re-run just to refresh them (no paid re-run for a provenance-only change). The next Codex run records both,
 and checks v3's delivery checks. That run included:
 - **raw-api**: the script ran, listed alpha's card, was refused for beta, and printed no token;
-- **assistant-dispatch**: `hive_start_task` worked, then `hive_wait_for_agents`, and the agent finished the card;
+- **assistant-dispatch**: `cw_start_task` worked, then `cw_wait_for_agents`, and the agent finished the card;
 - the three new cases: **pick-up-named**, **done-card-more-work** and **progress-log**.
 
 Under fixtures v1, two Codex runs failed and passed when repeated:
@@ -1374,7 +1375,7 @@ Under fixtures v1, two Codex runs failed and passed when repeated:
 
 ## Claude Code: not yet run under fixtures v2
 
-The trials now run Claude Code only in its own test home (`%LOCALAPPDATA%\hive-test\claude`, never the user's
+The trials now run Claude Code only in its own test home (`%LOCALAPPDATA%\combwork-test\claude`, never the user's
 `~/.claude`). That home isn't signed in yet, so `--provider claude-code` prints a skip. Signing in is a one-time step
 by hand (README.md).
 
@@ -1399,7 +1400,7 @@ baseline. They're kept below only for what they showed:
 - **Board rules**: now separate short lines in the session contract. "Fix or continue" routes to work-on-card.
 - **handover skill**: test results the user gives count, so they aren't re-run.
 - **split-work description**: also triggers on "how to split work between agents".
-- **`hive_start_agent`**: says to use `hive_start_task` for a card.
+- **`cw_start_agent`**: says to use `cw_start_task` for a card.
 - **#107**: whether Hive should refuse an agent finishing a card another agent has in Doing (a product decision).
 
 **Harness** (each with unit tests):
@@ -1445,3 +1446,4 @@ From real launches (`node tests/scenarios/measure.cjs`, with the fake CLIs; sour
 - **A resumed session measures the same as a new one.**
 - **The user's own skills reach project agents only**: the long catalog doesn't change the Assistant's size.
 - **The tool schemas are the largest fixed part.**
+<!-- old-name: end baseline-run-records -->

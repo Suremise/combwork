@@ -1,5 +1,5 @@
 // 24 agents at once (#562), on fake Claude Code agents: this workspace's Maximum agents (HI-2001) raised to 24, its 24 agents
-// added and all started (a 25th refused); 23 of them each reporting a run through hive-progress, which the Progress
+// added and all started (a 25th refused); 23 of them each reporting a run through cw-progress, which the Progress
 // panel lists (the folded strip's bars and "+N" counting them all), while the 24th watches every working agent (more
 // than the 20 a watch took before), woken when they finish; Settings → Advanced's note on what more agents cost,
 // measuring the 24 running agents' memory. Screenshots of the session, the panel and the note. Dev build, throwaway
@@ -42,14 +42,14 @@ const check = (name, ok, extra = '') => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1600, height: 900 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     const apiToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
     const api = async (method, route, body) => {
@@ -65,7 +65,7 @@ const check = (name, ok, extra = '') => {
     }
     /** Types a prompt into an agent (as the user does), Enter included. */
     const say = async (id, text) => {
-      // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+      // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
       await lib.typeLine(inv, lib.ptyKey(crowd, id), claudeHome, null, text, { live: () => live(id) })
     }
     const openRuns = async () => (await inv('progress:list')).filter((r) => r.finishedAt === null && r.projectPath?.toLowerCase() === crowd.toLowerCase())
@@ -82,10 +82,10 @@ const check = (name, ok, extra = '') => {
     check('all 24 start', !!ready, JSON.stringify((await lives()).map((s) => s.status)))
     await page.screenshot({ path: path.join(lib.WORK, 'agents24-1-running.png') })
 
-    // --- 23 of them each report a run through hive-progress; the 24th watches them all.
+    // --- 23 of them each report a run through cw-progress; the 24th watches them all.
     const workers = agents.slice(0, N - 1)
     const watcher = agents[N - 1]
-    for (const [i, a] of workers.entries()) await say(a.id, `shell: hive-progress --title "Run ${i + 1}" -- node "${holder}" "${release}"`)
+    for (const [i, a] of workers.entries()) await say(a.id, `shell: cw-progress --title "Run ${i + 1}" -- node "${holder}" "${release}"`)
     check('23 runs open in the Progress panel, one per agent', !!(await until(async () => (await openRuns()).length === N - 1, HUNG_MS)), String((await openRuns()).length))
     const runs = await openRuns()
     check('…each its own agent', new Set(runs.map((r) => r.agentName)).size === N - 1, runs.map((r) => r.agentName).join(','))
@@ -101,7 +101,7 @@ const check = (name, ok, extra = '') => {
     await page.screenshot({ path: path.join(lib.WORK, 'agents24-2-progress.png') })
 
     // Every working agent, no names: 23 (a watch took at most 20 before #562).
-    await say(watcher.id, `hive hive_wait_for_agents ${JSON.stringify({ wake: true })}`)
+    await say(watcher.id, `cw cw_wait_for_agents ${JSON.stringify({ wake: true })}`)
     check('the 24th watches every working agent', !!(await until(async () => (await live(watcher.id))?.status === 'watching', HUNG_MS)), (await live(watcher.id))?.status)
     const status = (await api('GET', '/v1/projects/crowd')).body?.agents?.find((a) => a.name === `W${N}`)
     check('…all 23 of them', status?.watching?.agents?.length === N - 1, JSON.stringify(status?.watching))
@@ -121,7 +121,7 @@ const check = (name, ok, extra = '') => {
 
     // --- The runs end: the watcher is woken, the agents' turns end and the panel's runs finish.
     fs.writeFileSync(release, '')
-    check('the watcher is woken as they finish', !!(await until(async () => wakes(`W${N}`).some((w) => /^\[Hive\] .*W\d+.* finished/.test(w)), 120000)), JSON.stringify(wakes(`W${N}`)))
+    check('the watcher is woken as they finish', !!(await until(async () => wakes(`W${N}`).some((w) => /^\[CW\] .*W\d+.* finished/.test(w)), 120000)), JSON.stringify(wakes(`W${N}`)))
     check('no run is left open', !!(await until(async () => (await openRuns()).length === 0, 120000)), String((await openRuns()).length))
     check('every worker is idle again', !!(await until(async () => (await lives()).filter((s) => ['ready', 'finished'].includes(s.status)).length >= N - 1, 120000)))
   } finally {

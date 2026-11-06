@@ -1,0 +1,113 @@
+{
+  "stall.agent.notRunning": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "stall.agent.removed": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "stall.agent.removedUnnamed": {
+    "placeholders": {}
+  },
+  "stall.doing.noAgent": {
+    "placeholders": {}
+  },
+  "stall.doing.startFailed": {
+    "placeholders": {
+      "agent": "plain",
+      "why": "plain"
+    }
+  },
+  "stall.doing.startWaiting": {
+    "placeholders": {
+      "agent": "plain",
+      "why": "plain"
+    }
+  },
+  "stall.duration.hours": {
+    "placeholders": {
+      "hours": "plain"
+    }
+  },
+  "stall.duration.hoursMinutes": {
+    "placeholders": {
+      "hours": "plain",
+      "minutes": "plain"
+    }
+  },
+  "stall.duration.minutes": {
+    "placeholders": {
+      "minutes": "plain"
+    }
+  },
+  "stall.lane.orderWait": {
+    "placeholders": {
+      "reviewer": "plain",
+      "other": "plain",
+      "card": "plain",
+      "builder": "plain",
+      "waited": "plain"
+    }
+  },
+  "stall.laneNext.depsDone": {
+    "placeholders": {
+      "card": "plain",
+      "minutes": "plain",
+      "doing": "plain"
+    }
+  },
+  "stall.loop.designWait": {
+    "placeholders": {
+      "builder": "plain",
+      "card": "plain",
+      "waited": "plain"
+    }
+  },
+  "stall.loop.followUpWait": {
+    "placeholders": {
+      "builder": "plain",
+      "card": "plain",
+      "waited": "plain"
+    }
+  },
+  "stall.loop.notWatching": {
+    "placeholders": {
+      "agent": "plain",
+      "card": "plain"
+    }
+  },
+  "stall.loop.wakeUntaken": {
+    "placeholders": {
+      "agent": "plain",
+      "card": "plain"
+    }
+  },
+  "stall.review.given": {
+    "placeholders": {
+      "card": "plain",
+      "agent": "plain",
+      "given": "plain",
+      "state": "select",
+      "waited": "plain"
+    }
+  },
+  "stall.review.noVerdict": {
+    "placeholders": {
+      "agent": "plain",
+      "card": "plain",
+      "waited": "plain"
+    }
+  },
+  "stall.review.wait": {
+    "placeholders": {
+      "agent": "plain",
+      "card": "plain",
+      "state": "select",
+      "silentMinutes": "plain",
+      "waited": "plain"
+    }
+  }
+}

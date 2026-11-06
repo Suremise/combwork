@@ -1,4 +1,4 @@
-// Undo for the Hive Assistant's changes (#1282, SPEC §16.14): each change it makes is recorded, as it is made, with what
+// Undo for the Combwork Assistant's changes (#1282, SPEC §16.14): each change it makes is recorded, as it is made, with what
 // it replaced, grouped by the user's message, kept 7 days across restarts; undo puts back what is still as it left it and
 // says what someone changed since, never overwriting it. Through the same code the Agent API runs: assistantBatch for a
 // batch (as POST /v1/tasks/batch), recordingChanges around a single change (as assistantChange), and the routes' own
@@ -8,8 +8,9 @@ import { join } from 'path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { editCard } from './boardDb'
 
-const base = tempDir('hive-assistant-undo-')
+const base = tempDir('cw-assistant-undo-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 mkdirSync(join(base, 'profile'), { recursive: true })
 
@@ -48,11 +49,11 @@ const onModel = async (id: string, model: string): Promise<string> => {
 }
 
 beforeAll(async () => {
-  mkdirSync(join(alpha, '.hive'), { recursive: true })
-  writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'A1' }, { id: 'r1', name: 'R1' }] }))
+  mkdirSync(join(alpha, '.combwork'), { recursive: true })
+  writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'A1' }, { id: 'r1', name: 'R1' }] }))
   // Another project, for a card moved to it (round 3).
-  mkdirSync(join(wsPath, 'beta', '.hive'), { recursive: true })
-  writeFileSync(join(wsPath, 'beta', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }] }))
+  mkdirSync(join(wsPath, 'beta', '.combwork'), { recursive: true })
+  writeFileSync(join(wsPath, 'beta', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }] }))
   advanced.load(join(base, 'profile'))
   // No version control chosen: the board's moves are plain (the rules' own undo, an override, is the runtime's to test).
   await advanced.set(ENFORCE, false)
@@ -144,6 +145,52 @@ describe("the Assistant's changes, recorded and undone (#1282)", () => {
     expect(await card(c.number)).toMatchObject({ title: 'Mine', description: '', blocked: null, links: [], agent: null, column: 'todo' })
   })
 
+  it("a card's waiting mark (HI-2618, HR1's round 1): set, changed or cleared by the Assistant, put back whole; a move out of Doing that cleared it, put back with the move", async () => {
+    const c = await make('Held for a window')
+    await run(() => tasks.updateTask(c.number, { column: 'doing', agent: 'a1' }, user))
+    // Set: undone, the card is no longer waiting.
+    let group = newMessage()
+    await asAssistant(`hold #${c.number}`, () => tasks.updateTask(c.number, { waitingFor: 'Waiting for the quiet window' }, assistant))
+    let [change] = groupOf(group)!.changes
+    expect(change.fields).toEqual(['waitingFor'])
+    let [r] = await userUndo(w, { change: change.id })
+    expect(r.undone).toEqual(['waitingFor'])
+    expect((await card(c.number)).waitingFor).toBeUndefined()
+    // The user's own mark, changed by the Assistant and then cleared: each undone puts back the mark as it was, who and when.
+    await run(() => tasks.updateTask(c.number, { waitingFor: 'Darren holds it' }, user))
+    const mine = (await card(c.number)).waitingFor!
+    group = newMessage()
+    await asAssistant(`reword #${c.number}'s hold`, () => tasks.updateTask(c.number, { waitingFor: 'The Assistant holds it' }, assistant))
+    ;[change] = groupOf(group)!.changes
+    ;[r] = await userUndo(w, { change: change.id })
+    expect(r.undone).toEqual(['waitingFor'])
+    expect((await card(c.number)).waitingFor).toEqual(mine)
+    group = newMessage()
+    await asAssistant(`release #${c.number}`, () => tasks.updateTask(c.number, { waitingFor: null }, assistant))
+    ;[change] = groupOf(group)!.changes
+    ;[r] = await userUndo(w, { change: change.id })
+    expect((await card(c.number)).waitingFor).toEqual(mine)
+    // Moved to Todo by the Assistant, which clears it: undone, back in Doing and waiting as it was.
+    group = newMessage()
+    await asAssistant(`put #${c.number} back`, () => tasks.updateTask(c.number, { column: 'todo' }, assistant))
+    ;[change] = groupOf(group)!.changes
+    expect(change.fields).toEqual(expect.arrayContaining(['column', 'waitingFor']))
+    expect((await card(c.number)).waitingFor).toBeUndefined()
+    ;[r] = await userUndo(w, { change: change.id })
+    expect(r.undone).toEqual(expect.arrayContaining(['column', 'waitingFor']))
+    const back = await card(c.number)
+    expect(back.column).toBe('doing')
+    expect(back.waitingFor).toEqual(mine)
+    // Changed since by the user: undo leaves it, and says so.
+    group = newMessage()
+    await asAssistant(`release #${c.number} again`, () => tasks.updateTask(c.number, { waitingFor: '' }, assistant))
+    ;[change] = groupOf(group)!.changes
+    await run(() => tasks.updateTask(c.number, { waitingFor: 'Mine again' }, user))
+    ;[r] = await userUndo(w, { change: change.id })
+    expect(r.skipped).toEqual([{ field: 'waitingFor', why: 'changed' }])
+    expect((await card(c.number)).waitingFor?.reason).toBe('Mine again')
+  })
+
   it('a card it made is archived; one someone else has changed since is left, and said', async () => {
     const group = newMessage()
     const made = await asAssistant('add the task "Its own" to the board', () => tasks.createTask({ title: 'Its own', project: 'alpha' }, assistant), 'create-task')
@@ -210,7 +257,7 @@ describe("the Assistant's changes, recorded and undone (#1282)", () => {
     expect(projectAgents(await w.projectConfig(alpha)).find((x) => x.id === 'a1')!.name).toBe('A1')
   })
 
-  it('a Hive setting: set back while still as it set it; changed since, left', async () => {
+  it('a Combwork setting: set back while still as it set it; changed since, left', async () => {
     const e = entryOf('sessions.confirmStop')
     const record = async () => {
       const group = newMessage()
@@ -441,9 +488,36 @@ describe('undo checks at the write (#1282 round 1)', async () => {
     await lanes.endLane(w, lane.lane.id, { abandoned: true })
   })
 
+  // HI-2481: the retired Revert tests now exercise the panel's Undo path.
+  it.each([true, false])('Undo of a price edit restores overrides, preserving removed models (reset: %s)', async (reset) => {
+    const was = structuredClone(config.settings.providers)
+    const own = { 'custom-model': { input: 1, cachedInput: 0.1, output: 5 } }
+    const e = entryOf('claude-code.prices')
+    try {
+      config.setProviderPrices('claude-code', own, ['old-removed'])
+      const group = newMessage()
+      await asAssistant('change the prices', async () => {
+        const r = await applySetting(e, reset ? null : {}, null)
+        await changes.noteChange(w, { kind: 'setting', target: e.id, fields: [
+          { field: 'value', old: r.old, new: r.new },
+          ...(r.removed ? [{ field: 'removed', old: r.removed.old, new: r.removed.new }] : [])
+        ] })
+      }, 'setting')
+      expect(config.settings.providers['claude-code'].prices).toEqual({})
+      expect(tools.removedPrices('claude-code')).toEqual(reset ? [] : ['old-removed'])
+      const [r] = await userUndo(w, { group })
+      expect(r.skipped).toEqual([])
+      expect(r.undone.sort()).toEqual(reset ? ['removed', 'value'] : ['value'])
+      expect(config.settings.providers['claude-code'].prices).toEqual(own)
+      expect(tools.removedPrices('claude-code')).toEqual(['old-removed'])
+    } finally {
+      config.settings.providers = was
+    }
+  })
+
   it("a price table's removed models the user changed since are kept; its prices still go back", async () => {
     const e = entryOf('claude-code.prices')
-    config.setProviderPrices('claude-code', {}, ['old-removed'])
+    config.setProviderPrices('claude-code', { 'custom-model': { input: 1, cachedInput: 0.1, output: 5 } }, ['old-removed'])
     const group = newMessage()
     await asAssistant(
       'reset the prices',
@@ -457,6 +531,8 @@ describe('undo checks at the write (#1282 round 1)', async () => {
     const [r] = await userUndo(w, { group })
     expect(tools.removedPrices('claude-code')).toEqual(['user-removed'])
     expect(r.skipped).toContainEqual({ field: 'removed', why: 'changed' })
+    expect(r.undone).toEqual(['value'])
+    expect(config.settings.providers['claude-code'].prices).toEqual({ 'custom-model': { input: 1, cachedInput: 0.1, output: 5 } })
     config.setProviderPrices('claude-code', null as never, [])
   })
 
@@ -514,6 +590,17 @@ describe('undo checks at the write (#1282 round 1)', async () => {
     expect(listed.some((x) => /comment/.test(x.final ?? ''))).toBe(true)
     const results = await userUndo(w, { group })
     expect(results.every((r) => !!r.final && !r.undone.length)).toBe(true)
+  })
+
+  it('a comment on a card already at its 500 comments is final too (HI-2642): the count stays, the oldest archived', async () => {
+    const c = await make('At the cap')
+    await editCard(w, c.number, (d) => void (d.comments = Array.from({ length: 500 }, (_, i) => ({ at: new Date(Date.UTC(2026, 0, 1, 0, 0, i)).toISOString(), by: 'someone', text: `c${i}`, id: `id${i}` }))))
+    const group = newMessage()
+    await asAssistant('comment on it', () => tasks.commentTask(c.number, 'Noted at the cap.', assistant), 'comment-task')
+    expect((await card(c.number)).comments).toHaveLength(500)
+    const listed = groupOf(group)!.changes
+    expect(listed.map((x) => x.kind)).toEqual(['final'])
+    expect(listed[0].final).toMatch(/comment/)
   })
 })
 

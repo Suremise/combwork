@@ -6,10 +6,10 @@ import { join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
-import type { HiveEvent } from '../src/shared/types'
+import type { CombworkEvent } from '../src/shared/types'
 import type { ForYouSummary } from '../src/shared/workflow/workView'
 
-const base = tempDir('hive-card-work-')
+const base = tempDir('cw-card-work-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -18,7 +18,7 @@ const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const { FactStore } = await import('../src/main/workflow/factStore')
 const { cardWork, factRow, forgetBadges, forgetForYou, forYou, workBadges } = await import('../src/main/workflow/cardWork')
-const { onHiveEvent } = await import('../src/main/events')
+const { onCombworkEvent } = await import('../src/main/events')
 const { revisionShort } = await import('../src/shared/platform/descriptors')
 
 const user = { kind: 'user' } as const
@@ -32,15 +32,15 @@ afterAll(async () => {
 
 async function workspace(): Promise<WS> {
   const ws = join(base, `ws-${++n}`)
-  mkdirSync(join(ws, 'p', '.hive'), { recursive: true })
-  writeFileSync(join(ws, 'p', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
+  mkdirSync(join(ws, 'p', '.combwork'), { recursive: true })
+  writeFileSync(join(ws, 'p', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
   const w = createWorkspaceService()
   await w.open(ws)
   opened.push(w)
   return w
 }
 
-const started = { folder: 'project', line: 'hive/b1', base: 'base0000aaaa', target: 'main', builder: 'B1', cardKind: 'code' as const }
+const started = { folder: 'project', line: 'cw/b1', base: 'base0000aaaa', target: 'main', builder: 'B1', cardKind: 'code' as const }
 const submitted = (revision: string, marker = 'Did it') => ({ revision, base: 'base0000aaaa', head: revision, key: null, files: [{ path: 'a.ts', status: 'M' }], round: 1, generation: 0, sameRevision: false, summary: marker })
 
 /** A card of project p, with a start, a submission and the stage Review, written in one board change. */
@@ -62,7 +62,7 @@ describe("a card's work from the board (#1223)", () => {
     const w = await workspace()
     const card = await cardWithWork(w, 'Worked')
     const v = cardWork(w, card)!
-    expect(v).toMatchObject({ card, stage: 'review', line: 'hive/b1', base: 'base0000aaaa', target: 'main', builder: 'B1' })
+    expect(v).toMatchObject({ card, stage: 'review', line: 'cw/b1', base: 'base0000aaaa', target: 'main', builder: 'B1' })
     expect(v.revisions).toMatchObject([{ revision: 'rev1111aaaa', round: 1, by: 'B1' }])
     const bare = (await inWorkspace(w, () => tasks.createTask({ title: 'Bare', project: 'p', column: 'doing' }, user))).number
     expect(cardWork(w, bare)).toMatchObject({ card: bare, stage: 'active', preWorkflow: false, revisions: [] })
@@ -210,12 +210,12 @@ describe("a card's work from the board (#1223)", () => {
   it('tells the window once a fact is written in a board change (tasks-changed after it commits)', async () => {
     const w = await workspace()
     const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Observed', project: 'p' }, user))).number
-    const seen: HiveEvent[] = []
-    const off = onHiveEvent((e) => e.type === 'tasks-changed' && seen.push(e))
+    const seen: CombworkEvent[] = []
+    const off = onCombworkEvent((e) => e.type === 'tasks-changed' && seen.push(e))
     try {
       const facts = FactStore.forBoard(w, { project: 'p', key: 'P' })
       await store.boardWrite(w, async () => {
-        facts.tx((tx) => tx.appendObserved(card, { kind: 'HeadMoved', actor: 'outside', source: 'observed', dedupe: 'prev:0', data: { line: 'hive/b1', from: null, to: 'rev1' } }))
+        facts.tx((tx) => tx.appendObserved(card, { kind: 'HeadMoved', actor: 'outside', source: 'observed', dedupe: 'prev:0', data: { line: 'cw/b1', from: null, to: 'rev1' } }))
         expect(seen).toEqual([])
       })
       expect(seen).toHaveLength(1)
@@ -226,11 +226,11 @@ describe("a card's work from the board (#1223)", () => {
 
   it("gives each fact a short row, revisions as the project's platform shows them", () => {
     const short = (id: string): string => revisionShort('git', id)
-    const row = (kind: string, data: unknown, actor = 'hive') => factRow({ seq: 3, card: 1, kind, at: '2026-10-20T10:00:00.000Z', actor, source: 'recorded', data } as never, short)
+    const row = (kind: string, data: unknown, actor = 'combwork') => factRow({ seq: 3, card: 1, kind, at: '2026-10-20T10:00:00.000Z', actor, source: 'recorded', data } as never, short)
     expect(row('Submitted', submitted('0123456789abcdef'), 'agent:B1')).toEqual({ seq: 3, kind: 'Submitted', at: '2026-10-20T10:00:00.000Z', actor: 'agent:B1', what: '0123456, round 1, 1 file' })
     expect(row('Verdict', { reviewer: 'R1', submission: 2, revision: 'fedcba9876', pass: false, round: 1, generation: 0, comment: 'c' }).what).toBe('failed by R1, submission 2 (fedcba9), round 1')
     expect(row('CheckRan', { name: 'unit', command: 'npm test', revision: 'abcdef12345', tested: 'abcdef12345', result: 'passed', run: 'r', durationMs: 1, by: 'B1', counted: false, whyNot: 'dirty' }).what).toBe('unit passed on abcdef1, not counted (dirty)')
-    expect(row('Integrated', { revision: 'abcdef12345', target: 'main', result: '99999999aa', method: 'merge', by: 'hive' }).what).toBe('abcdef1 into main as 9999999 (merge, by hive)')
+    expect(row('Integrated', { revision: 'abcdef12345', target: 'main', result: '99999999aa', method: 'merge', by: 'combwork' }).what).toBe('abcdef1 into main as 9999999 (merge, by combwork)')
     expect(row('Moved', { from: 'review', to: 'approved', cause: 'intent' }).what).toBe('review to approved (intent)')
     expect(row('Accepted', { revision: 'abcdef12345' }).what).toBe('abcdef1')
     expect(row('Accepted', { submission: 4 }).what).toBe('submission 4')

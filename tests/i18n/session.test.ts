@@ -4,12 +4,12 @@ import { join, resolve } from 'path'
 import * as electron from 'electron'
 import { tempDir } from '../tempDir'
 
-// #847 (E10c): sessions in the window's language, English for agents. Errors are HiveErrors (English message, the
-// window's text through IPC); Hive's own statuses are text beside the English statusMessage (statusText), as is the
-// merge slot's note (mergeSlotText) and Hive's sign-in message (signIn.messageText); notices are formatted twice: the
+// #847 (E10c): sessions in the window's language, English for agents. Errors are CombworkErrors (English message, the
+// window's text through IPC); Combwork's own statuses are text beside the English statusMessage (statusText), as is the
+// merge slot's note (mergeSlotText) and Combwork's sign-in message (signIn.messageText); notices are formatted twice: the
 // user's title and the Agent API stream's English one.
 
-const base = tempDir('hive-i18n-session-')
+const base = tempDir('cw-i18n-session-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { setLanguage } = await import('../../src/shared/i18n')
@@ -19,8 +19,8 @@ const { COMPACTING_TEXT, runtimeLabel, shownMergeSlot, shownStatusMessage } = aw
 const { finishedApiTitle } = await import('../../src/shared/bursts')
 const { waitingNote, holdingNote } = await import('../../src/shared/mergeSlot')
 const { applyStep, hookStep, SAFEGUARD_IDLE_MESSAGE, SAFEGUARD_IDLE_TEXT } = await import('../../src/main/hookStatus')
-const { HiveError, shownError } = await import('../../src/main/hiveError')
-const { onHiveEvent } = await import('../../src/main/events')
+const { CombworkError, shownError } = await import('../../src/main/combworkError')
+const { onCombworkEvent } = await import('../../src/main/events')
 const { apiEventFor } = await import('../../src/main/apiEvents')
 const { noteUntracked, trackingProblem } = await import('../../src/main/agentProcesses')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../../src/main/workspace')
@@ -49,9 +49,9 @@ const GERMAN = {
   'session.signIn.one': '{agent} muss sich bei {provider} anmelden',
   'session.signIn.expired': 'Die Anmeldung von {provider} ist abgelaufen. {help}',
   'agents.codex.signInHelp': 'Melde dich erneut an: Hilfe → Agent-Einrichtung → Codex → Anmelden.',
-  'session.tracker.title': 'Hive kann die Prozesse der Agenten nicht verfolgen',
+  'session.tracker.title': 'Combwork kann die Prozesse der Agenten nicht verfolgen',
   'session.tracker.body': '{reason}. {detail} Hilfe → Diagnose kopieren sagt warum.',
-  'session.tracker.stopped': 'Hives Prozessverfolgung wurde beendet ({why})',
+  'session.tracker.stopped': 'Die Prozessverfolgung von Combwork wurde beendet ({why})',
   'session.tracker.lost': '{launches, plural, =0 {Was Agenten starten, wird bis zu ihrem Neustart nicht verfolgt.} one {Was der laufende Agent startet, wird bis zu seinem Neustart nicht verfolgt.} other {Was die # laufenden Agenten starten, wird bis zu ihrem Neustart nicht verfolgt.}}'
 }
 
@@ -73,10 +73,10 @@ function live(agentId: string, name: string): Record<string, unknown> {
 }
 
 beforeAll(async () => {
-  for (const p of [alpha, empty]) mkdirSync(join(p, '.hive'), { recursive: true })
-  mkdirSync(join(wsPath, '.hive'), { recursive: true })
-  writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'B1', provider: 'claude-code' }, { id: 'a2', name: 'R1', provider: 'claude-code' }] }))
-  writeFileSync(join(empty, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+  for (const p of [alpha, empty]) mkdirSync(join(p, '.combwork'), { recursive: true })
+  mkdirSync(join(wsPath, '.combwork'), { recursive: true })
+  writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'B1', provider: 'claude-code' }, { id: 'a2', name: 'R1', provider: 'claude-code' }] }))
+  writeFileSync(join(empty, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
   w = createWorkspaceService()
   await w.open(wsPath)
 })
@@ -107,8 +107,8 @@ describe('the session area', () => {
       ['session.start.args', { problem: 'Bad.', connection: 'Max 1' }, 'Bad. Fix it in its connection, Max 1, in Settings → Accounts & Connections.'],
       ['session.error.stopFirst', { action: 'unarchive' }, 'Stop the session before you unarchive it.'],
       ['session.handOver.didntStop', { agent: 'B1', handover: 'handovers/x.md' }, 'B1 didn\'t stop. Stop it, then start it and ask it to read the handover "handovers/x.md".'],
-      ['session.leftovers.notEnded', { n: 1 }, "1 process is still running: Windows didn't let Hive end it. It stays listed in the ⋯ menu on the agent's pane, to try again or keep."],
-      ['session.leftovers.notEnded', { n: 3 }, "3 processes are still running: Windows didn't let Hive end them. They stay listed in the ⋯ menu on the agent's pane, to try again or keep."],
+      ['session.leftovers.notEnded', { n: 1 }, "1 process is still running: Windows didn't let Combwork end it. It stays listed in the ⋯ menu on the agent's pane, to try again or keep."],
+      ['session.leftovers.notEnded', { n: 3 }, "3 processes are still running: Windows didn't let Combwork end them. They stay listed in the ⋯ menu on the agent's pane, to try again or keep."],
       ['session.status.tasksDropped', { minutes: 60 }, 'Stopped counting its background tasks after 60 minutes'],
       ['session.status.safeguardAsksTools', { provider: 'Claude Code', tools: 'Bash, Edit' }, 'A safety classifier stopped a response: Claude Code asks what to do (its last tool calls: Bash, Edit)'],
       ['session.signIn.notSignedIn', { provider: 'Codex' }, "Codex isn't signed in."],
@@ -120,7 +120,7 @@ describe('the session area', () => {
     ]
     setLanguage('de', GERMAN, 'de-DE')
     for (const [id, values, english] of before) expect(englishText(values ? withValues(M(id), values) : M(id)), id).toBe(english)
-    // Statuses Hive compares by their English.
+    // Statuses Combwork compares by their English.
     expect(englishText(COMPACTING_TEXT)).toBe(COMPACTING_MESSAGE)
     expect(SAFEGUARD_IDLE_MESSAGE).toBe('Idle after a safeguard stop: give it a nudge')
     expect(englishText(SAFEGUARD_IDLE_TEXT)).toBe(SAFEGUARD_IDLE_MESSAGE)
@@ -131,9 +131,9 @@ describe('errors: English for agents, the window gets its language', () => {
   it('a refused action, from the session manager', async () => {
     setLanguage('de', GERMAN, 'de-DE')
     const e = await run(() => sessions.soleAgent(empty)).catch((x: unknown) => x)
-    expect(e).toBeInstanceOf(HiveError)
+    expect(e).toBeInstanceOf(CombworkError)
     expect((e as Error).message).toBe('This project has no agents yet. Add one first.')
-    expect((e as InstanceType<typeof HiveError>).kind).toBe('conflict')
+    expect((e as InstanceType<typeof CombworkError>).kind).toBe('conflict')
     expect(shownError(e)).toBe('Dieses Projekt hat noch keine Agenten. Füge zuerst einen hinzu.')
     const none = await run(() => sessions.compact(alpha, undefined, 'a1')).catch((x: unknown) => x)
     expect((none as Error).message).toBe('No session is running for this agent.')
@@ -153,7 +153,7 @@ describe('errors: English for agents, the window gets its language', () => {
   })
 })
 
-describe("statuses: Hive's words as text beside the English", () => {
+describe("statuses: Combwork's words as text beside the English", () => {
   const input = (status: string, statusMessage?: string) =>
     ({ status, statusMessage, askedAtStart: false, compacting: null, backgroundWakes: false, tasks: 0, attention: 'hooks', reviewed: false, titleAsks: false, open: [], waitingOn: null, question: false, reviewing: false, safeguardPrompt: false }) as never
 
@@ -169,7 +169,7 @@ describe("statuses: Hive's words as text beside the English", () => {
     expect(st.statusText).toBeUndefined()
   })
 
-  it("a CLI's own words stay as they came, with no text; a safeguard prompt is Hive's, in the window's language", () => {
+  it("a CLI's own words stay as they came, with no text; a safeguard prompt is Combwork's, in the window's language", () => {
     setLanguage('de', GERMAN, 'de-DE')
     const st: { status: string; statusMessage?: string; statusText?: unknown } = { status: 'working' }
     applyStep(st as never, hookStep({ kind: 'ask', ask: { kind: 'permission', blocking: true, message: 'Claude needs your permission to use Bash' } } as never, input('working')))
@@ -210,7 +210,7 @@ describe('notices: the user in their language, the Agent API in English', () => 
   const seen: { type: string; notice?: { title: string; body: string }; toast?: { title: string; message?: string } }[] = []
   let off: () => void
   beforeAll(() => {
-    off = onHiveEvent((e) => void seen.push(e as never))
+    off = onCombworkEvent((e) => void seen.push(e as never))
   })
   afterAll(() => off())
 
@@ -218,7 +218,7 @@ describe('notices: the user in their language, the Agent API in English', () => 
     setLanguage('de', GERMAN, 'de-DE')
     live('a2', 'R1')
     seen.length = 0
-    // Hive in the background: a Windows notification, told to the Agent API's stream.
+    // Combwork in the background: a Windows notification, told to the Agent API's stream.
     await run(() => sessions.notifyNotWatching(alpha, 'a2', [12, 13]))
     const e = seen.find((x) => x.type === 'notice')!
     expect(e.notice!.title).toBe('alpha · R1 beobachtet #12, #13 nicht')
@@ -257,8 +257,8 @@ describe('notices: the user in their language, the Agent API in English', () => 
     seen.length = 0
     noteUntracked(withValues(M('session.tracker.stopped'), { why: 'exit 1' }), withValues(M('session.tracker.lost'), { launches: 2 }))
     const t = seen.find((x) => x.type === 'toast')!.toast!
-    expect(t.title).toBe('Hive kann die Prozesse der Agenten nicht verfolgen')
-    expect(t.message).toBe('Hives Prozessverfolgung wurde beendet (exit 1). Was die 2 laufenden Agenten starten, wird bis zu ihrem Neustart nicht verfolgt. Hilfe → Diagnose kopieren sagt warum.')
+    expect(t.title).toBe('Combwork kann die Prozesse der Agenten nicht verfolgen')
+    expect(t.message).toBe('Die Prozessverfolgung von Combwork wurde beendet (exit 1). Was die 2 laufenden Agenten starten, wird bis zu ihrem Neustart nicht verfolgt. Hilfe → Diagnose kopieren sagt warum.')
     // Diagnostics reads the tracker's problem in English (none here: the tracker never failed in this run).
     expect(trackingProblem()).toBeNull()
   })

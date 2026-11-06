@@ -2,7 +2,7 @@
 // - window A's alpha: Builder runs a lane (two cards) and watches its first card. Pause the Team: the lane shows it is
 //   paused for the team, Builder is told once to park, Start Lane is refused, and a comment on its card wakes it with
 //   nothing (its watch's wake held) until the team resumes, when the wake is typed once;
-// - Builder's run (hive-progress, held open) keeps the team unparked, named; once it ends, All parked; Install Now with no
+// - Builder's run (cw-progress, held open) keeps the team unparked, named; once it ends, All parked; Install Now with no
 //   update ready installs nothing;
 // - window B's workspace is paused by the user's pause too; its Assistant's token reads its own team only, with A as one
 //   line, and its pause or resume never touches A; a project agent and a script are refused;
@@ -31,7 +31,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const PARK_LINE = '[Hive] The team is pausing for an update.'
+const PARK_LINE = '[CW] The team is pausing for an update.'
 // The processes fake agents leave running ("linger"), by their identity (pid and start time), ended at the end in any case.
 const lingerFile = path.join(claudeHome, 'fake-linger.jsonl')
 const lingering = () => (fs.existsSync(lingerFile) ? fs.readFileSync(lingerFile, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l).pid) : [])
@@ -56,7 +56,7 @@ const alive = (pid) => ids.has(pid) && lib.stillSame([ids.get(pid)]).length === 
   const holder = path.join(claudeHome, 'hold.cjs')
   fs.writeFileSync(holder, "const fs = require('fs'); const f = process.argv[2]; setInterval(() => fs.existsSync(f) && process.exit(0), 200); setTimeout(() => process.exit(0), 180000)\n")
 
-  const h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off' } })
+  const h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off' } })
   const { app, page, inv } = h
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -74,7 +74,7 @@ const alive = (pid) => ids.has(pid) && lib.stillSame([ids.get(pid)]).length === 
     const workspaceToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
     const api = async (token, method, p, body) => {
       // Two workspaces open: a workspace token names its own (an Assistant's token is its workspace's anyway).
-      const res = await fetch(`${API}${p}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(token === workspaceToken ? { 'X-Hive-Workspace': path.basename(wsA) } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) })
+      const res = await fetch(`${API}${p}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(token === workspaceToken ? { 'X-Combwork-Workspace': path.basename(wsA) } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) })
       return { status: res.status, body: await res.json().catch(() => null) }
     }
     const deliveries = async (agent) => {
@@ -90,11 +90,11 @@ const alive = (pid) => ids.has(pid) && lib.stillSame([ids.get(pid)]).length === 
     check('Builder starts', !!(await until(() => idle(alpha, builder.id), HUNG_MS)))
     const c1 = (await inv('tasks:create', { title: 'Greeting says Hi', project: 'alpha', agent: builder.id, column: 'doing' })).number
     const c2 = (await inv('tasks:create', { title: 'Greeting trims', project: 'alpha', agent: builder.id })).number
-    await say(alpha, builder.id, `hive hive_lane ${JSON.stringify({ action: 'start', cards: [c1, c2], reviewer: 'Reviewer', name: 'greetings' })}`)
+    await say(alpha, builder.id, `cw cw_lane ${JSON.stringify({ action: 'start', cards: [c1, c2], reviewer: 'Reviewer', name: 'greetings' })}`)
     const lane = async () => (await inv('lanes:list')).find((l) => l.builder.id === builder.id && l.state !== 'ended')
     check("Builder's lane runs", !!(await until(async () => (await lane())?.state === 'active', HUNG_MS)), JSON.stringify(await lane()))
     await until(() => idle(alpha, builder.id), HUNG_MS)
-    await say(alpha, builder.id, `hive hive_wait_for_tasks ${JSON.stringify({ cards: [c1], changes: ['comment'], wake: true, limitMinutes: 60 })}`)
+    await say(alpha, builder.id, `cw cw_wait_for_tasks ${JSON.stringify({ cards: [c1], changes: ['comment'], wake: true, limitMinutes: 60 })}`)
     check('Builder watches its card', !!(await until(async () => (await live(alpha, builder.id))?.status === 'watching', HUNG_MS)))
 
     // --- Window B, another workspace (opened before the pause: the user's pause covers it).
@@ -103,7 +103,7 @@ const alive = (pid) => ids.has(pid) && lib.stillSame([ids.get(pid)]).length === 
     const pageB = await next
     await pageB.waitForLoadState('domcontentloaded')
     await lib.appReady(pageB)
-    const invB = (ch, ...a) => pageB.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const invB = (ch, ...a) => pageB.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await invB('workspace:open', wsB)
     await until(async () => (await invB('workspace:get'))?.path?.toLowerCase() === wsB.toLowerCase(), HUNG_MS)
 
@@ -125,7 +125,7 @@ const alive = (pid) => ids.has(pid) && lib.stillSame([ids.get(pid)]).length === 
 
     // --- What still runs: Builder's run keeps the team unparked; once it ends, All parked.
     await until(() => idle(alpha, builder.id), HUNG_MS)
-    await say(alpha, builder.id, `shell: hive-progress --title "probe run" -- node "${holder}" "${release}"`)
+    await say(alpha, builder.id, `shell: cw-progress --title "probe run" -- node "${holder}" "${release}"`)
     const named = async () => (await inv('team:state')).workspaces.find((w) => w.workspacePath.toLowerCase() === wsA.toLowerCase())?.items ?? []
     check('the run keeps the team unparked, named', !!(await until(async () => (await named()).some((i) => i.kind === 'run' && i.label === 'probe run'), HUNG_MS)), JSON.stringify(await named()))
     check('…not All parked', (await inv('team:state')).allParked === false)

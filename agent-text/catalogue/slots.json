@@ -1,0 +1,37 @@
+{
+  "slots.release.changed": {
+    "text": "{slot} changed meanwhile: its writer is no longer the one shown. Look again.",
+    "note": "Release Slot… refused: the slot ({slot}, such as slot-b) was released or taken by another run while the question was open.",
+    "audience": "both"
+  },
+  "slots.release.live": {
+    "text": "{slot}'s writer is still running in this Combwork: stop the agent, or end or keep what it left running, first.",
+    "note": "Release Slot… refused: the session writing in the slot ({slot}) still runs in this Combwork, or Combwork still follows the processes it left running (End or Keep Running in the agent's ⋯ menu settles them).",
+    "audience": "both"
+  },
+  "slots.release.notEnded": {
+    "text": "Some of the processes listed still run: Windows didn't let Combwork end them, so {slot} wasn't released. Try again, or release it without ending them.",
+    "note": "Release Slot… with \"End these processes first\": ending the listed processes failed (Windows refused), so the slot ({slot}) was left as it was.",
+    "audience": "both"
+  },
+  "slots.release.otherCombwork": {
+    "text": "{slot} is held by another Combwork that is still running (process {pid}): release it there, or quit that Combwork first.",
+    "note": "Release Slot… refused: another running copy of Combwork (its process id {pid}) holds the slot ({slot}).",
+    "audience": "both"
+  },
+  "slots.setting.bad": {
+    "text": "That isn’t a slot setting Combwork has.",
+    "note": "An error: a request to change a setting of “Slots and copies” named one that doesn’t exist.",
+    "audience": "both"
+  },
+  "slots.setting.badSize": {
+    "text": "The number of review and check copies is a whole number from {min, number} to {max, number}.",
+    "note": "An error: the number of review and check copies given isn’t a whole number from 1 to 32. {min} and {max} are the limits (1 and 32).",
+    "audience": "both"
+  },
+  "slots.setting.badText": {
+    "text": "A slot script or list of files is text of at most {max, number} characters.",
+    "note": "An error: a slot script or list of copied files given isn’t text, or is too long. {max} is the limit (4,000).",
+    "audience": "both"
+  }
+}

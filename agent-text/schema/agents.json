@@ -1,0 +1,99 @@
+{
+  "agents.claude.safeguardHelp": {
+    "placeholders": {}
+  },
+  "agents.codex.safeguardHelp": {
+    "placeholders": {}
+  },
+  "agents.fileLock.ask": {
+    "placeholders": {}
+  },
+  "agents.fileLock.askDescription": {
+    "placeholders": {}
+  },
+  "agents.fileLock.block": {
+    "placeholders": {}
+  },
+  "agents.fileLock.blockDescription": {
+    "placeholders": {}
+  },
+  "agents.fileLock.off": {
+    "placeholders": {}
+  },
+  "agents.fileLock.offDescription": {
+    "placeholders": {}
+  },
+  "agents.fileLock.warn": {
+    "placeholders": {}
+  },
+  "agents.fileLock.warnDescription": {
+    "placeholders": {}
+  },
+  "agents.limit.most": {
+    "placeholders": {
+      "most": "number"
+    }
+  },
+  "agents.limit.workflow": {
+    "placeholders": {
+      "max": "plural"
+    }
+  },
+  "agents.merge.blocked": {
+    "placeholders": {
+      "why": "select",
+      "agent": "plain"
+    }
+  },
+  "agents.provider.extraArgsDashes": {
+    "placeholders": {}
+  },
+  "agents.resume.hold.after": {
+    "placeholders": {
+      "agent": "plain",
+      "kind": "select",
+      "work": "plain",
+      "slot": "plain"
+    }
+  },
+  "agents.resume.hold.byHand": {
+    "placeholders": {
+      "slot": "plain",
+      "agent": "plain"
+    }
+  },
+  "agents.resume.hold.changed": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "agents.resume.hold.draining": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "agents.resume.hold.gone": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "agents.resume.hold.holds": {
+    "placeholders": {
+      "agent": "plain",
+      "slot": "plain"
+    }
+  },
+  "agents.resume.hold.reused": {
+    "placeholders": {
+      "slot": "plain",
+      "kind": "select",
+      "work": "plain"
+    }
+  },
+  "agents.resume.hold.reviewer": {
+    "placeholders": {
+      "agent": "plain",
+      "slot": "plain"
+    }
+  }
+}

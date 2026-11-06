@@ -1,18 +1,18 @@
 import { randomBytes } from 'crypto'
 import { basename } from 'path'
-import type { Account, AgentDef, PlanLimit, UsageMoveRecord, UsageMoveRule } from '../shared/types'
+import type { Account, AgentDef, PlanLimit, ProviderId, UsageMoveRecord, UsageMoveRule } from '../shared/types'
 import { USAGE_MOVES, englishText } from '../shared/advanced'
 import { accountOnIn, resolveAgentConnection } from '../shared/accounts'
 import { projectAgents } from '../shared/defaults'
 import { fmt, msg, tr, type Msg } from '../shared/i18n'
 import { agentProvider } from '../shared/providers'
-import { limitDue, limitKind, liveRecords, matchConnection, movedOffWithinPeriod, periodRecord, ruleLimits, samePeriod, sameRule, targetProblem, USAGE_MOVE_TRIES, type UsageMoveProblem } from '../shared/usageMoves'
+import { limitDue, limitKind, liveRecords, matchConnection, type MatchedBy, movedOffWithinPeriod, periodRecord, ruleLimits, samePeriod, sameRule, targetProblem, USAGE_MOVE_TRIES, type UsageMoveProblem } from '../shared/usageMoves'
 import { advanced } from './advanced'
-import { accountById, allAccounts, allConnections, getConnection, onConnectionSignedIn } from './accounts'
+import { accountById, allAccounts, allConnections, firstUsableAccount, getConnection, onConnectionSignedIn } from './accounts'
 import { choiceCount, onManualChoice } from './agentChoice'
 import { coalesced } from './coalesce'
 import { config } from './config'
-import { onHiveEvent } from './events'
+import { onCombworkEvent } from './events'
 import { createLogger, userText } from './logger'
 import { tell } from './notify'
 import { connectionLoginNow } from './planUsage'
@@ -23,7 +23,10 @@ import { inWorkspace, openWorkspaces, workspaceOf, type WorkspaceService } from 
  * Usage moves (HI-2195, SPEC §11.2; the design is HI-2195's s7 as revised by s9, s11 and s13): an account's rule moves its
  * agents to another account's connections once one of its limits reaches a share.
  *
- * - It moves project agents, never the Hive Assistant (its connection is the user's own choice, Settings → Assistant).
+ * - It moves project agents and, by the same rule and only between its turns, the Assistant (HI-2530, Darren: "Assistant
+ *   -> Assistant"; before, never: its connection was the user's own choice, Settings → Assistant).
+ * - Each goes to the target's connection with the same tag as the one it is on, else the same name, else the target's
+ *   first (matchConnection), and the notice says which rule matched each.
  * - It fires once per limit and reset period (`config.usageMoves`, kept until the reset passes): agents it handled (moved,
  *   kept on the user's own choice, or given up after failed writes) aren't looked at again in that period, so a manual
  *   return holds and nothing moves back after a reset.
@@ -50,7 +53,18 @@ interface Pending {
   firing: string
   rule: UsageMoveRule
   to: string
+  /** Which rule matched its connection on the target (HI-2530), for the notice; `tag`, the tag it matched by. */
+  by: MatchedBy
+  tag?: string
   saved: string | undefined
+  /** Its own CLI as saved when queued (unset: it inherits one); checked again under the lock. */
+  savedProvider: ProviderId | undefined
+  /**
+   * The CLI written with its connection (HR3's round 1 on HI-2530): set only for an Assistant that inherits its CLI (no
+   * provider and no connection, so it launches on the first usable account's). Once it names a connection, sessions.ts
+   * reads its CLI from `provider` (else Settings' automatic one), so the move pins the CLI it was moved by.
+   */
+  pin?: ProviderId
   count: number
   /** Its switch ended or it was dropped (HR1's round 1): never written after, however long its write waited for the lock. */
   over?: boolean
@@ -61,6 +75,16 @@ const pending = new Map<string, Pending>()
 function agentKey(ws: WorkspaceService, projectPath: string, projectId: string | undefined, agentId: string): string {
   const project = ws.isAssistantHome(projectPath) ? `assistant:${(ws.path ?? '').toLowerCase()}` : (projectId ?? projectPath.toLowerCase())
   return `${project}/${agentId}`
+}
+
+/**
+ * The CLI an agent launches with, as sessions.ts works it out (HR3 on HI-2530): its own; but an Assistant that names
+ * neither a CLI nor a connection yet (a new workspace's, HI-2108) launches on the first usable account's CLI here, so it
+ * is that CLI's rules that move it, never another's.
+ */
+function launchCli(ws: WorkspaceService, projectPath: string, a: Pick<AgentDef, 'provider' | 'connection'>): ProviderId {
+  if (ws.isAssistantHome(projectPath) && !a.provider && !a.connection) return firstUsableAccount(ws.config)?.provider ?? agentProvider(a, config.settings)
+  return agentProvider(a, config.settings)
 }
 
 const records = (): Record<string, Record<string, UsageMoveRecord>> => config.get().usageMoves ?? {}
@@ -83,28 +107,34 @@ function changeRecord(account: string, limit: string, firing: string, fn: (r: Us
 const MOVED_TITLE = msg({
   id: 'main.usageMove.movedTitle',
   defaultMessage: '{count, plural, one {# agent moves} other {# agents move}} from {from} to {to}',
-  description: "A notice's title (HI-2195): an account ({from}, the user's name for it in Settings → Accounts & Connections) reached the share of its plan's usage limit its rule sets, so Hive moves its agents to another account ({to})."
+  description: "A notice's title (HI-2195): an account ({from}, the user's name for it in Settings → Accounts & Connections) reached the share of its plan's usage limit its rule sets, so Combwork moves its agents to another account ({to})."
 })
 const MOVED_BODY = msg({
   id: 'main.usageMove.movedBody',
-  defaultMessage: "{from} has used {share, number, ::percent} of its {window, select, weekly {weekly limit} other {5-hour limit}}. {agents}: each moves to the matching connection on {to} and resumes its conversation there, a working agent once its turn ends. Hive doesn't move them back: to move one back, choose its connection in Agent Settings.",
-  description: "A notice's text (HI-2195), under the title saying agents move from one account to another. {from} and {to} are accounts' names, {share} how much of the limit is used (\"98%\"), {agents} the agents' names joined into a list. The limit is the weekly one or the 5-hour one. Agent Settings names a dialog."
+  defaultMessage: "{from} has used {share, number, ::percent} of its {window, select, weekly {weekly limit} other {5-hour limit}}. {agents}: each moves to the matching connection on {to} and resumes its conversation there, a working agent once its turn ends. Combwork doesn't move them back: to move one back, choose its connection in Agent Settings.",
+  description: "A notice's text (HI-2195), under the title saying agents move from one account to another. {from} and {to} are accounts' names, {share} how much of the limit is used (\"98%\"), {agents} the agents (the Assistant among them when it moves), each with how its connection was matched, joined into a list. The limit is the weekly one or the 5-hour one. Agent Settings names a dialog."
+})
+const MOVED_AGENT = msg({
+  id: 'main.usageMove.movedAgent',
+  defaultMessage: '{agent} ({by, select, tag {by tag {tag}} name {by name} other {to its first connection}})',
+  description: "One agent in a usage move's notice (HI-2530), listed with the others: its name ({agent}; the Assistant's when it moves) and how its connection on the other account was chosen: the one with the same tag ({tag}, a free-text label the user gave both connections, such as \"Builders\"), the one with the same name, or, with neither, the account's first connection."
 })
 const BLOCKED_TITLE = msg({
   id: 'main.usageMove.blockedTitle',
-  defaultMessage: "Hive can't move {from}'s agents to {to}",
+  defaultMessage: "Combwork can't move {from}'s agents to {to}",
   description: "A notice's title (HI-2195): an account ({from}) reached the share of its usage limit its rule sets, but its agents can't move to the account the rule names ({to}); the text says why."
 })
 const BLOCKED_BODY = msg({
   id: 'main.usageMove.blockedBody',
   defaultMessage:
-    "{reason, select, missing {That account is gone, or isn't for the same CLI: choose another in Settings → Accounts & Connections.} signedOut {{to} is signed out: sign it in, and they move then.} noConnections {{to} has no connections: add one, and they move then.} full {{to} has also used {share, number, ::percent} of its {window, select, weekly {weekly limit} other {5-hour limit}}, so they stay where they are.} off {{to} isn't on in {workspace}: turn it on in Settings → Accounts & Connections, and they move then.} other {Their connection couldn't be saved: {agents}. Hive stops trying until the limit resets.}}",
+    "{reason, select, missing {That account is gone, or isn't for the same CLI: choose another in Settings → Accounts & Connections.} signedOut {{to} is signed out: sign it in, and they move then.} noConnections {{to} has no connections: add one, and they move then.} full {{to} has also used {share, number, ::percent} of its {window, select, weekly {weekly limit} other {5-hour limit}}, so they stay where they are.} off {{to} isn't on in {workspace}: turn it on in Settings → Accounts & Connections, and they move then.} other {Their connection couldn't be saved: {agents}. Combwork stops trying until the limit resets.}}",
   description: "Why an account's agents can't move to another (HI-2195), under the title saying so. {to} is the account they should move to, {workspace} a workspace's name, {share} a share of a usage limit (\"98%\"), {agents} agents' names joined into a list. The limit is the weekly one or the 5-hour one. Settings → Accounts & Connections names a section."
 })
 
 /** Tells a notice as plan usage's are (planUsage.ts, HI-2320): once, a pop-up or a Windows notification. */
 function notify(level: 'warning' | 'error' | 'info', title: Msg, body: Msg, values: Record<string, string | number>): void {
-  tell({ kind: 'usage', level, title: tr(title, values), message: tr(body, values), apiTitle: englishText({ m: title, values }) })
+  // agent-stored: agentField says the events stream's title again in each caller's dialect, from apiTitleText (apiEvents.ts, HI-2465)
+  tell({ kind: 'usage', level, title: tr(title, values), message: tr(body, values), apiTitle: englishText({ m: title, values }), apiTitleText: { m: title, values } })
 }
 
 const windowOf = (l: Pick<PlanLimit, 'windowMinutes'>): 'weekly' | 'fiveHour' => limitKind(l) ?? 'fiveHour'
@@ -162,11 +192,11 @@ async function commit(m: Pending): Promise<boolean> {
     return false
   }
   try {
-    await m.ws.updateAgent(m.projectPath, m.agentId, { connection: m.to }, (current) => {
+    await m.ws.updateAgent(m.projectPath, m.agentId, { connection: m.to, ...(m.pin ? { provider: m.pin } : {}) }, (current) => {
       // Everything again under the lock (HR1's round 1): a stop, a drop, the switch off or the rule or target changed
       // while this write waited for the lock writes nothing.
       if (!stillHolds(m)) throw new NoLongerHolds()
-      if (choiceCount(m.projectPath, m.agentId) !== m.count || current.connection !== m.saved) throw new KeptByUser()
+      if (choiceCount(m.projectPath, m.agentId) !== m.count || current.connection !== m.saved || (current.provider || undefined) !== m.savedProvider) throw new KeptByUser()
       const now = resolveAgentConnection(m.ws.config, acc.provider, current.connection, allAccounts(), allConnections())
       if (!now.ok || now.account.id !== acc.id) throw new KeptByUser()
     })
@@ -195,7 +225,7 @@ async function commit(m: Pending): Promise<boolean> {
     r.handled[key] = 'moved'
     if (r.tries) delete r.tries[key]
   })
-  log.info(`${userText(m.name)}: moved by ${userText(acc.name)}'s usage move to ${userText(getConnection(m.to)?.name ?? m.to)}`)
+  log.info(`${userText(m.name)}: moved by ${userText(acc.name)}'s usage move to ${userText(getConnection(m.to)?.name ?? m.to)} (by ${m.by})`)
   return true
 }
 
@@ -211,15 +241,16 @@ async function fire(acc: Account, rule: UsageMoveRule, l: PlanLimit, now: number
   const target = accountById(rule.to)!
   const movedNames: string[] = []
   for (const ws of openWorkspaces()) {
-    // Never the Hive Assistant (Darren, 30 Oct: "Set you manually"): its connection is the user's, in Settings → Assistant.
-    const hosts = await ws.listProjectPaths().catch(() => [] as string[])
+    // The Assistant too (HI-2530, Darren 4 Nov: "Assistant -> Assistant"), as an agent of its home: moved only between its
+    // turns (switchAtSafePoint), once per period, never back. Before HI-2530 it never moved.
+    const hosts = [...(await ws.listProjectPaths().catch(() => [] as string[])), ...(ws.path ? [ws.assistantHome] : [])]
     for (const projectPath of hosts) {
       const pc = await ws.projectConfig(projectPath).catch(() => null)
       if (!pc || !ws.path) continue
       for (const a of projectAgents(pc)) {
         const key = agentKey(ws, projectPath, pc.id, a.id)
         if (records()[acc.id]?.[l.id]?.handled[key] || pending.has(key)) continue
-        if (agentProvider(a, config.settings) !== acc.provider) continue
+        if (launchCli(ws, projectPath, a) !== acc.provider) continue
         const choice = resolveAgentConnection(ws.config, acc.provider, a.connection, allAccounts(), allConnections())
         if (!choice.ok || choice.account.id !== acc.id) continue
         if (!accountOnIn(ws.config, target, allAccounts())) {
@@ -228,9 +259,9 @@ async function fire(acc: Account, rule: UsageMoveRule, l: PlanLimit, now: number
         }
         // HR1: no rule moves an agent back onto an account a rule moved it off in a period not reset yet.
         if (movedOffWithinPeriod(key, target.id, records(), now)) continue
-        const to = matchConnection(choice.connection.name, target.id, allConnections())
-        if (!to) continue
-        const m: Pending = { ws, projectPath, agentId: a.id, name: a.name, account: acc.id, limit: l.id, firing: rec.firing, rule: { ...rule }, to: to.id, saved: a.connection ?? undefined, count: choiceCount(projectPath, a.id) }
+        const match = matchConnection(choice.connection, target.id, allConnections())
+        if (!match) continue
+        const m: Pending = { ws, projectPath, agentId: a.id, name: a.name, account: acc.id, limit: l.id, firing: rec.firing, rule: { ...rule }, to: match.connection.id, by: match.by, ...(match.by === 'tag' && match.connection.tag ? { tag: match.connection.tag } : {}), saved: a.connection ?? undefined, savedProvider: a.provider || undefined, ...(ws.isAssistantHome(projectPath) && !a.provider && !a.connection ? { pin: acc.provider } : {}), count: choiceCount(projectPath, a.id) }
         keys.set(m, key)
         pending.set(key, m)
         const r = inWorkspace(ws, () =>
@@ -242,10 +273,11 @@ async function fire(acc: Account, rule: UsageMoveRule, l: PlanLimit, now: number
             }
           })
         )
+        const named = tr(MOVED_AGENT, { agent: a.name, by: m.by, tag: m.tag ?? '' })
         if (r === 'notRunning') {
           pending.delete(key)
-          if (await commit(m)) movedNames.push(a.name)
-        } else movedNames.push(a.name)
+          if (await commit(m)) movedNames.push(named)
+        } else movedNames.push(named)
       }
     }
   }
@@ -296,7 +328,7 @@ function manualChoice(projectPath: string, before: AgentDef): void {
     changeRecord(m.account, m.limit, m.firing, (r) => (r.handled[key] = 'kept'))
     sessions.dropUsageMove(m.projectPath, m.agentId, 'the user chose its connection') // i18n-ignore: for the log
   }
-  const cli = agentProvider(before, config.settings)
+  const cli = launchCli(ws, projectPath, before)
   const choice = resolveAgentConnection(ws.config, cli, before.connection, allAccounts(), allConnections())
   if (!choice.ok) return
   const now = Date.now()
@@ -305,9 +337,9 @@ function manualChoice(projectPath: string, before: AgentDef): void {
   for (const [limit, r] of Object.entries(records()[choice.account.id] ?? {})) if (!r.handled[key] && Date.parse(r.resetsAt) > now) changeRecord(choice.account.id, limit, r.firing, (x) => (x.handled[key] = 'kept'))
 }
 
-/** Usage moves' part of Hive's start (index.ts): they follow usage reports, accounts, workspaces and the Advanced switch. */
+/** Usage moves' part of Combwork's start (index.ts): they follow usage reports, accounts, workspaces and the Advanced switch. */
 export function initUsageMoves(): void {
-  onHiveEvent((e) => {
+  onCombworkEvent((e) => {
     if (e.type === 'connections-changed' || e.type === 'advanced-changed' || e.type === 'settings-changed' || e.type === 'workspace-changed') revalidate()
     if ((e.type === 'plan-usage' && e.connection) || e.type === 'connections-changed' || e.type === 'advanced-changed' || e.type === 'workspace-changed') void lookAtUsageMoves()
   })

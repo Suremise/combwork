@@ -1,7 +1,7 @@
-// Copies: wait for one to be free (hive.copies.quietWaitMinutes, #1563, tests/workflow/README.md's P7 table) in the app:
+// Copies: wait for one to be free (cw.copies.quietWaitMinutes, #1563, tests/workflow/README.md's P7 table) in the app:
 // a pool of one review copy, fake Claude Code agents (B1 builds two cards in the project folder; R1 and R2 review), the
 // wait set to its least, 1 minute:
-// - R1 reviews A in copy-1 and gives its verdict while still working (a turn held open, sent once the turn Hive's reviewer
+// - R1 reviews A in copy-1 and gives its verdict while still working (a turn held open, sent once the turn Combwork's reviewer
 //   pool typed A into has ended, HI-2046): copy-1 is returned but held back (returning) while R1 is busy;
 // - R2's start review on B waits for a copy ("the pool's 1 copy is in use; copy-1, returned 0 min ago, is held back by
 //   R1 (working)", HI-1764) while the copy is within the wait;
@@ -37,7 +37,7 @@ const lines = (file) => {
 
 ;(async () => {
   for (const d of [userData, ws, `${ws}.worktrees`]) fs.rmSync(d, { recursive: true, force: true })
-  lib.gitProject(alpha, { 'a.ts': 'export const a = 1\n', '.gitignore': '.hive/\n' })
+  lib.gitProject(alpha, { 'a.ts': 'export const a = 1\n', '.gitignore': '.combwork/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
   const env = lib.fakeClaude(userData, home, [ws, alpha])
   const cfgFile = path.join(userData, 'config.json')
@@ -47,7 +47,7 @@ const lines = (file) => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off' } })
+  const h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off' } })
   const { app, page, inv } = h
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -55,7 +55,7 @@ const lines = (file) => {
     await lib.openWorkspace(inv, page, ws)
     await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, folder: 'project' } })
     await inv('slots:setSetting', alpha, 'copiesSize', 1)
-    await inv('advanced:set', 'hive.copies.quietWaitMinutes', 1)
+    await inv('advanced:set', 'cw.copies.quietWaitMinutes', 1)
     const b1 = await lib.addAgent(inv, alpha, { name: 'B1', workflowRole: 'builder' })
     const r1 = await lib.addAgent(inv, alpha, { name: 'R1', workflowRole: 'reviewer' })
     const r2 = await lib.addAgent(inv, alpha, { name: 'R2', workflowRole: 'reviewer' })
@@ -65,8 +65,8 @@ const lines = (file) => {
     const token = async (id) => {
       const sessionId = (await live(id))?.sessionId
       const l = await until(() => lines(path.join(home, 'fake-launches.jsonl')).findLast((x) => x.sessionId === sessionId && x.opts['--mcp-config']), HUNG_MS)
-      const hive = JSON.parse(fs.readFileSync(l.opts['--mcp-config'], 'utf8')).mcpServers.hive
-      return JSON.parse(fs.readFileSync(hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token
+      const server = JSON.parse(fs.readFileSync(l.opts['--mcp-config'], 'utf8')).mcpServers.combwork
+      return JSON.parse(fs.readFileSync(server.env.CW_API_TOKEN_FILE, 'utf8')).token
     }
     const call = async (t, method, p, body) => {
       const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { method, headers: { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
@@ -84,7 +84,7 @@ const lines = (file) => {
       const key = (await card(n)).key
       const s = await call(tb1, 'POST', `/v1/tasks/${encodeURIComponent(key)}/start`)
       fs.writeFileSync(path.join(alpha, 'a.ts'), `export const a = ${v}\n`)
-      gitIn(alpha, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qam', title, '-m', `Hive-Card: ${key}`)
+      gitIn(alpha, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qam', title, '-m', `Combwork-Card: ${key}`)
       const sub = await call(tb1, 'POST', `/v1/tasks/${encodeURIComponent(key)}/submit`, { summary: `${title}: ready`, revision: gitIn(alpha, 'rev-parse', 'HEAD') })
       check(`B1 builds and submits ${key}`, s.status === 200 && sub.status === 200 && !!(await until(async () => (await card(n))?.column === 'review', HUNG_MS)), JSON.stringify({ s: s.body, sub: sub.body }))
       cards.push(n)
@@ -94,7 +94,7 @@ const lines = (file) => {
     // --- R1 reviews A in copy-1; its verdict while it works returns the copy, held back.
     const ra = await call(tr1, 'PATCH', `/v1/tasks/${a}`, { review: 'start', reply: 'short' })
     check("R1's start review leases copy-1", ra.status === 200 && !!(await until(async () => (await copy1())?.state === 'leased' && (await copy1())?.lease?.agent === r1.id, HUNG_MS)), JSON.stringify({ ra: ra.body, copies: await copies() }))
-    // HI-2175: Hive's reviewer pool gives each card in Review outside a lane to an idle reviewer and types it in (HI-2046),
+    // HI-2175: Combwork's reviewer pool gives each card in Review outside a lane to an idle reviewer and types it in (HI-2046),
     // a turn of R1's own: the held-open turn is a new one, sent once that has ended, never that turn taken for it.
     const idle = await until(async () => ['ready', 'finished'].includes((await live(r1.id))?.status), HUNG_MS)
     const before = (await live(r1.id))?.turn?.id ?? null

@@ -1,0 +1,8 @@
+{
+  "prose|error|The workspace was closed while its metrics were read": 1,
+  "prose|prop:other|API-equivalent cost in US dollars, reported or estimated (not a bill)": 1,
+  "prose|prop:other|characters as UTF-16 code units (JavaScript string length)": 1,
+  "prose|prop:other|milliseconds, monotonic clock": 1,
+  "prose|var|Assistant": 1,
+  "prose|var|unknown agent": 1
+}

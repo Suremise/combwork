@@ -1,0 +1,122 @@
+{
+  "startView.agents.none": {
+    "text": "none",
+    "note": "The Agents running section when no agent runs."
+  },
+  "startView.board.count": {
+    "text": "{n} {column}",
+    "note": "A project's cards in one column, in the Board section. column: its name."
+  },
+  "startView.board.none": {
+    "text": "no open cards",
+    "note": "A project with no cards in Doing, Review, Passed or Todo."
+  },
+  "startView.column": {
+    "text": "{column, select, todo {Todo} doing {Doing} review {Review} passed {Passed} hold {On hold} done {Done} other {{column}}}",
+    "note": "A column's name in the view's lines. column: its id."
+  },
+  "startView.digest": {
+    "text": "{week} has entries but no digest: write one (kind digest, digestOf \"{week}\"; the journal skill).",
+    "note": "A week with journal entries but no digest. week: \"2026-W41\"."
+  },
+  "startView.foot": {
+    "text": "More with cw_journal_recall (small first; cw_journal_entry for one in full): the journal skill says how.",
+    "note": "The state view's last line (#1032): the view is a snapshot within a budget, and recall is how to get more."
+  },
+  "startView.head": {
+    "text": "Where things stand, {source, select, compact {after a compaction} resume {on resuming} other {at session start}} ({when} UTC): a snapshot from the board, lanes, agents and your journal. Check the live state before acting on it.",
+    "note": "The state view's first line, after the fixed \"[CW] \" (#1032). source: compact, resume or start (Claude Code's SessionStart source; clear and startup are a start). when: the time, \"2026-10-18 12:00\"."
+  },
+  "startView.line.asking": {
+    "text": "{agent} ({project}) {status, select, signin {needs signing in} other {waits for the user}}{hasAsking, select, yes {: {asking}} other {}}",
+    "note": "An agent waiting on the user. status: signin when it needs signing in. asking: what it asks (hasAsking: yes when known), cut short."
+  },
+  "startView.line.blocked": {
+    "text": "{card} ({project}, {column}{hasAgent, select, yes {, {agent}} other {}}) blocked: {reason}",
+    "note": "A blocked card waiting on the user. reason: the card's blocked reason, cut short."
+  },
+  "startView.line.card": {
+    "text": "{card} {column} · {project}{hasAgent, select, yes { · {agent}} other {}}{hasReviewer, select, yes {, reviewed by {reviewer}} other {}}: {title}",
+    "note": "A card in Doing or Review. card: its key or number; column: its name; agent, reviewer: names (hasAgent, hasReviewer: yes when there is one); title: its title, cut short."
+  },
+  "startView.line.lane": {
+    "text": "{builder}{hasReviewer, select, yes {/{reviewer}} other {}} ({project}): {at, select, paused {paused on {card}} card {on {card}, {state}} other {{state}}}",
+    "note": "A running lane. at: paused (paused on card), card (working on card) or other; state: the lane's state (active, waiting…)."
+  },
+  "startView.more.active": {
+    "text": "{n} more: cw_list_tasks",
+    "note": "In place of the section's lines that don't fit. n: how many."
+  },
+  "startView.more.agents": {
+    "text": "{n} more: cw_list_projects",
+    "note": "In place of the section's lines that don't fit. n: how many."
+  },
+  "startView.more.board": {
+    "text": "{n} more: cw_list_tasks",
+    "note": "In place of the section's lines that don't fit. n: how many."
+  },
+  "startView.more.decisions": {
+    "text": "{n} more: cw_journal_recall kinds decision, plan",
+    "note": "In place of the section's lines that don't fit. n: how many."
+  },
+  "startView.more.hold": {
+    "text": "{n} more On Hold: cw_list_tasks column hold",
+    "note": "In place of the Waiting on the user lines that don't fit, when all of them are On Hold cards (#1078). n: how many."
+  },
+  "startView.more.incidents": {
+    "text": "{n} more: cw_journal_recall kinds incident",
+    "note": "In place of the section's lines that don't fit. n: how many."
+  },
+  "startView.more.lanes": {
+    "text": "{n} more: cw_lane list",
+    "note": "In place of the section's lines that don't fit. n: how many."
+  },
+  "startView.more.onCards": {
+    "text": "{n} more: cw_journal_recall with link card",
+    "note": "In place of the section's lines that don't fit. n: how many."
+  },
+  "startView.more.waiting": {
+    "text": "{n} more: cw_list_tasks and cw_list_projects",
+    "note": "In place of the Waiting on the user lines that don't fit (#1078). n: how many."
+  },
+  "startView.section.active": {
+    "text": "Cards in Doing and Review:",
+    "note": "A section's title: the cards in hand."
+  },
+  "startView.section.agents": {
+    "text": "Agents running:",
+    "note": "A section's title: running agents, by project."
+  },
+  "startView.section.board": {
+    "text": "Board:",
+    "note": "A section's title: each project's open cards per column."
+  },
+  "startView.section.decisions": {
+    "text": "Journal: recent decisions and plans:",
+    "note": "A section's title: the journal's recent decision and plan entries."
+  },
+  "startView.section.digest": {
+    "text": "Weekly digest:",
+    "note": "A section's title: a week the journal has no digest of."
+  },
+  "startView.section.incidents": {
+    "text": "Journal: recent incidents:",
+    "note": "A section's title: the journal's recent incidents."
+  },
+  "startView.section.lanes": {
+    "text": "Lanes running:",
+    "note": "A section's title."
+  },
+  "startView.section.onCards": {
+    "text": "Journal: on the cards in hand:",
+    "note": "A section's title: journal entries linked to the cards in Doing or Review."
+  },
+  "startView.section.waiting": {
+    "text": "Waiting on the user:",
+    "note": "A section's title: blocked cards and agents asking the user."
+  },
+  "startView.workspaceCard": {
+    "text": "(workspace)",
+    "note": "In place of a project's name, for a card of the workspace's own (no project)."
+  }
+}

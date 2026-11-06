@@ -1,18 +1,18 @@
 {
   "commands.migrated.close": {
     "defaultMessage": "Close command",
-    "description": "The name Hive gives the command the user had in Settings → Workspace → When this workspace closes, run, as it becomes one of the workspace's named commands (HI-1954). The user can rename it."
+    "description": "The name Combwork gives the command the user had in Settings → Workspace → When this workspace closes, run, as it becomes one of the workspace's named commands (HI-1954). The user can rename it."
   },
   "commands.migrated.quit": {
     "defaultMessage": "Quit command",
-    "description": "The name Hive gives the command the user had in Settings → General → When Hive quits, run, as it becomes one of Hive's named commands (HI-1954). The user can rename it."
+    "description": "The name Combwork gives the command the user had in Settings → General → When Combwork quits, run, as it becomes one of Combwork's named commands (HI-1954). The user can rename it."
   },
   "commands.run.gone": {
     "defaultMessage": "That command is no longer there.",
     "description": "An error: the user ran one of their commands by hand (Settings → Commands, or the command palette), but it was deleted meanwhile."
   },
   "commands.run.testCopy": {
-    "defaultMessage": "This is a test copy of Hive: it doesn't run your commands.",
-    "description": "An error in a test copy of Hive (one the developers' tests start): it never runs the user's own commands."
+    "defaultMessage": "This is a test copy of Combwork: it doesn't run your commands.",
+    "description": "An error in a test copy of Combwork (one the developers' tests start): it never runs the user's own commands."
   }
 }

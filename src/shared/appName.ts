@@ -1,18 +1,19 @@
 /**
- * The app's names (#443). "Hive Desktop" is the name where it stands alone or names a version: the window title, About,
- * the status bar's version, the tray, the installer and shortcuts (package.json's productName). In sentences and in
- * what agents see ("Hive couldn't…", the hive tools, the Agent API's app), the short name "Hive" stays.
+ * The app's displayed name (HI-2458, after #443's first name): the window title, About, the status bar's version,
+ * the tray, the installer and shortcuts (package.json's productName), and the window's sentences ("Combwork couldn't…").
+ * Only what the user sees: what agents see (the Combwork tools, the doorbell, guidance, the Agent API) still says Combwork until
+ * HI-2463, and the app ID, exe and folders move on HI-2460, HI-2461 and HI-2462.
  */
-export const APP_NAME = 'Hive Desktop'
+export const APP_NAME = 'Combwork'
 
 /** The name of a dev or test build (unpackaged): its title bar, status bar and Windows app ID say it. */
-export const DEV_APP_NAME = 'Hive Desktop Dev'
+export const DEV_APP_NAME = 'Combwork Dev'
 
 /** The name to show for this build. */
 export const appName = (packaged: boolean): string => (packaged ? APP_NAME : DEV_APP_NAME)
 
 /**
- * The profile folder in %APPDATA%: the names from before the rename, kept so nothing users stored moves. Electron
- * would take productName ("Hive Desktop") for it, so main sets it explicitly.
+ * The profile folder, in %APPDATA% and %LOCALAPPDATA% (HI-2461): Combwork's. Electron would take productName for it, so
+ * main sets it explicitly.
  */
-export const profileFolder = (packaged: boolean): string => (packaged ? 'Hive' : 'Hive-Dev')
+export const profileFolder = (packaged: boolean): string => (packaged ? 'Combwork' : 'Combwork-Dev')

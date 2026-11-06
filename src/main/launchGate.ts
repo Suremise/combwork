@@ -3,40 +3,40 @@ import { createServer, type Server, type Socket } from 'net'
 import { join } from 'path'
 
 /**
- * A terminal's command started only once Hive has put its process in the launch's job (#507), so that nothing it
+ * A terminal's command started only once Combwork has put its process in the launch's job (#507), so that nothing it
  * starts can escape the job by starting before it was there.
  *
  * node-pty gives no way to start a process suspended, and on Windows it knows the process's id only once it runs. So
  * the terminal runs a gate first: a hidden PowerShell (a console program on every Windows, so it shares the terminal's
- * console, which Electron's own executable doesn't) that connects to a pipe made for this launch and waits for Hive's
- * word; meanwhile Hive puts the gate in the job. Then the gate starts the real command (in the job from its first
+ * console, which Electron's own executable doesn't) that connects to a pipe made for this launch and waits for Combwork's
+ * word; meanwhile Combwork puts the gate in the job. Then the gate starts the real command (in the job from its first
  * instruction, as is everything it starts) with the same command line node-pty would have given it, on the same
  * console, and ends with its exit code. The command and its arguments reach the gate in variables of its environment,
  * removed before the command starts, so nothing is quoted twice. The gate uses no cmdlet: PowerShell loads no module.
- * The gate starts the command only on Hive's explicit `go`: Hive refusing (`stop <why>`), the pipe failing or closing
- * without a word, all end the gate with that reason, and the command never runs. Hive says `go` only when its caller
+ * The gate starts the command only on Combwork's explicit `go`: Combwork refusing (`stop <why>`), the pipe failing or closing
+ * without a word, all end the gate with that reason, and the command never runs. Combwork says `go` only when its caller
  * says so (ptyHost's track: the process is in the job).
  */
 
 export const POWERSHELL = join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
 
-/** How long the gate waits to connect to its pipe (Hive made it before the terminal started). */
+/** How long the gate waits to connect to its pipe (Combwork made it before the terminal started). */
 const CONNECT_MS = 30_000
 
 const GATE_SCRIPT = `
-$pipe = $env:HIVE_GATE_PIPE; $file = $env:HIVE_GATE_FILE; $argline = $env:HIVE_GATE_ARGS
-foreach ($n in @('HIVE_GATE_PIPE', 'HIVE_GATE_FILE', 'HIVE_GATE_ARGS')) { [Environment]::SetEnvironmentVariable($n, $null) }
+$pipe = $env:CW_GATE_PIPE; $file = $env:CW_GATE_FILE; $argline = $env:CW_GATE_ARGS
+foreach ($n in @('CW_GATE_PIPE', 'CW_GATE_FILE', 'CW_GATE_ARGS')) { [Environment]::SetEnvironmentVariable($n, $null) }
 $word = $null
-$why = 'Hive gave no word to start it'
+$why = 'Combwork gave no word to start it'
 try {
   $c = [System.IO.Pipes.NamedPipeClientStream]::new('.', $pipe, [System.IO.Pipes.PipeDirection]::InOut)
   $c.Connect(${CONNECT_MS})
   $word = [System.IO.StreamReader]::new($c).ReadLine()
   $c.Dispose()
-} catch { $why = "its connection to Hive failed ($($_.Exception.InnerException.Message))" }
+} catch { $why = "its connection to Combwork failed ($($_.Exception.InnerException.Message))" }
 if ($word -ne 'go') {
   if ($word -and $word.StartsWith('stop ')) { $why = $word.Substring(5) }
-  [Console]::Error.WriteLine("Error: Hive didn't start $([System.IO.Path]::GetFileName($file)): $why")
+  [Console]::Error.WriteLine("Error: Combwork didn't start $([System.IO.Path]::GetFileName($file)): $why")
   exit 1
 }
 $s = [System.Diagnostics.ProcessStartInfo]::new($file, $argline)
@@ -93,7 +93,7 @@ export interface LaunchGate {
 
 /** A gate for this command (Windows): listening on its pipe until the gate has had its word. */
 export function launchGate(file: string, args: string[] | string, env: Record<string, string>): LaunchGate {
-  const name = `hive-gate-${randomBytes(16).toString('hex')}`
+  const name = `combwork-gate-${randomBytes(16).toString('hex')}`
   let socket: Socket | null = null
   let said: string | null = null
   let server: Server | null = createServer((s) => {
@@ -114,7 +114,7 @@ export function launchGate(file: string, args: string[] | string, env: Record<st
   return {
     file: POWERSHELL,
     args: GATE_ARGS,
-    env: { ...env, HIVE_GATE_PIPE: name, HIVE_GATE_FILE: file, HIVE_GATE_ARGS: typeof args === 'string' ? args : commandLineOf(args) },
+    env: { ...env, CW_GATE_PIPE: name, CW_GATE_FILE: file, CW_GATE_ARGS: typeof args === 'string' ? args : commandLineOf(args) },
     open(word) {
       void word
         .catch((e: unknown): GateWord => ({ go: false, reason: e instanceof Error ? e.message : String(e) }))

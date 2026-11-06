@@ -1,7 +1,7 @@
 // Screenshot cases for the `files` area (#803): the Files tab (its tree, details, file views, menu and delete dialog),
 // the Attachments tab and its viewer, the notes when a search, a load or a refresh fails, and DocEditor (the Memory
 // tab's editor), reached for the i18nshots route (#756's design, section 4) with locale-independent means only: files
-// written to the project, IPC failures (HIVE_TEST_FAIL_IPC), command ids and structural hooks (data-rel, data-kind,
+// written to the project, IPC failures (CW_TEST_FAIL_IPC), command ids and structural hooks (data-rel, data-kind,
 // data-action, classes), never English text. See tests/e2e/i18nshots.cjs for ctx.
 const fs = require('fs')
 const path = require('path')
@@ -48,7 +48,7 @@ function seedFiles(ctx) {
 
 /** A session's attachments: a picture, a PDF, a text file and one of another kind. */
 function seedAttachments(ctx) {
-  const dir = path.join(ctx.project, '.hive', 'attachments', ATTACHMENT_SESSION)
+  const dir = path.join(ctx.project, '.combwork', 'attachments', ATTACHMENT_SESSION)
   if (fs.existsSync(dir)) return
   fs.mkdirSync(dir, { recursive: true })
   fs.writeFileSync(path.join(dir, '2026-10-14_09-30-00_screenshot.png'), ctx.lib.samplePng())
@@ -96,7 +96,7 @@ async function filesBinary(ctx) {
  * builds read it as it changes: tests/e2e/README.md).
  */
 const failing = (ctx, calls) => ctx.app.evaluate((_, c) => {
-  process.env.HIVE_TEST_FAIL_IPC = c
+  process.env.CW_TEST_FAIL_IPC = c
 }, calls)
 const failNext = (ctx, channel) => failing(ctx, `${channel}*1`)
 

@@ -2,8 +2,10 @@ import { basename, dirname, join, resolve } from 'path'
 import { writeFile } from 'original-fs/promises'
 import { randomBytes } from 'crypto'
 import { app } from 'electron'
+import { agentMsg, inDialectOf, say } from '../shared/agentText'
 import { ASSISTANT_AGENT_ID } from '../shared/assistant'
-import { HIVE_DIR } from '../shared/defaults'
+import { NOTICE_PREFIX } from '../shared/doorbell'
+import { CW_DIR } from '../shared/defaults'
 import {
   DELIVERY_BODY_MAX_CHARS,
   DELIVERY_EXPIRY_HOURS,
@@ -33,7 +35,7 @@ import { INBOX_SWITCH_ID, inboxSwitchOn, type InboxSwitch } from '../shared/inbo
 import { advanced } from './advanced'
 import * as assistant from './assistantControl'
 import { config } from './config'
-import { onHiveEvent } from './events'
+import { onCombworkEvent } from './events'
 import { placeKey, readCapped, readJson, realPath, renameRetrying, withFileLock } from './fsutil'
 import { openTable, readStore, saveTable, storeValue } from './storeRows'
 import { boardLock, dbGenerationAt, onDbReplaced, upgradeWaiting, withLeasedDb, workspaceDb } from './boardStore'
@@ -53,27 +55,27 @@ import { cardRef } from '../shared/projectKeys'
 import { scopeOfHost, withCardNames } from './projectKeys'
 
 /**
- * The delivery service (#647, plans/2026-10-12-messaging-redesign.md §3.1). Everything Hive has for an agent to read is a
- * delivery record (shared/deliveries.ts), saved in its session host's .hive/deliveries.json (a project's, or the
- * Assistant's home's) with atomic writes, and restored when Hive starts. Every way into an agent makes one (#649): a
+ * The delivery service (#647, plans/2026-10-12-messaging-redesign.md §3.1). Everything Combwork has for an agent to read is a
+ * delivery record (shared/deliveries.ts), saved in its session host's .combwork/deliveries.json (a project's, or the
+ * Assistant's home's) with atomic writes, and restored when Combwork starts. Every way into an agent makes one (#649): a
  * message, a task, a watch's or a loop's wake, the user's decisions, a mode notice, a lock's go-ahead, the carry-on after
- * a sign-in, a handover. This service alone offers them, to an idle agent by typing the doorbell (#650: Hive's fixed
+ * a sign-in, a handover. This service alone offers them, to an idle agent by typing the doorbell (#650: Combwork's fixed
  * words with counts and ids, shared/doorbell.ts, through lineWriter.typeLine); a busy one is told in its hooks' replies
  * instead (inboxNotices.ts). Producers neither type nor keep their own cursors.
  *
  * **Receipts.** A typed doorbell makes what it names offered. It is received only when the agent fetches it with
- * hive_inbox (#650: the doorbell carries no text, so its CLI taking the line is no receipt); never because it was typed.
+ * cw_inbox (#650: the doorbell carries no text, so its CLI taking the line is no receipt); never because it was typed.
  * A card event or a control notice is done then; a message, a task, a handover or the user's answer waits for the agent's
- * ack (hive_inbox), and one not acked OVERDUE_MINUTES after it was made is overdue. A doorbell its CLI took whose agent is
+ * ack (cw_inbox), and one not acked OVERDUE_MINUTES after it was made is overdue. A doorbell its CLI took whose agent is
  * idle again without having read it rings once more (#650: its turn's Stop drain asked it first), never a third time; it
- * stays offered, unread in the pane, until it is read. One offered when Hive stopped, or when its agent's launch ended
+ * stays offered, unread in the pane, until it is read. One offered when Combwork stopped, or when its agent's launch ended
  * before it was read, is uncertain: it may not have reached the agent, so it is offered once more, saying it may repeat,
  * and stays uncertain (shown) if that one isn't received either.
  *
  * **No inbox** (Darren's decision on #650): an agent that can't read an inbox (`readsInbox`: a project agent while the
- * Agent API or its hive server is off) is given no delivery, and its bodies are never typed instead: each is refused with
+ * Agent API or its combwork server is off) is given no delivery, and its bodies are never typed instead: each is refused with
  * the reason its sender sees (`noInbox`: made, NoInbox; one already waiting, refused when next looked at). Only the
- * user's own action, a task they give it from Hive (Start), is typed as their input, as their typing in its pane is: no
+ * user's own action, a task they give it from Combwork (Start), is typed as their input, as their typing in its pane is: no
  * delivery, no receipt.
  *
  * **Sources.** What made a delivery (`source`: a watch, a loop wake…) registers itself here: it can make its line again
@@ -106,8 +108,8 @@ import { scopeOfHost, withCardNames } from './projectKeys'
  * return; no check after the save. A line typed into the agent is checked again by its writer before each key with the
  * same check (`offerHolds`); one that no longer holds gets no Enter. Once typed, the doorbell is never cleared or
  * withdrawn (#652): it names ids, never what they say, so an Enter again for one that no longer holds gives the agent
- * nothing (hive_inbox checks each delivery as it reads it). One the user typed into before its CLI took it is theirs:
- * never submitted by Hive, what it named waits again, and nothing more is typed there until a prompt is sent
+ * nothing (cw_inbox checks each delivery as it reads it). One the user typed into before its CLI took it is theirs:
+ * never submitted by Combwork, what it named waits again, and nothing more is typed there until a prompt is sent
  * (sessions.leaveToUser).
  */
 
@@ -120,7 +122,7 @@ const KEEP_ENDED_MS = 7 * 24 * 60 * 60_000
 const KEEP_RECEIVED_MS = 7 * 24 * 60 * 60_000
 /** The most deliveries a host keeps live; more are refused when made. */
 export const MAX_LIVE_PER_HOST = 500
-/** The most Hive reads back from a deliveries file; what it writes stays within fileBudget, half of it. */
+/** The most Combwork reads back from a deliveries file; what it writes stays within fileBudget, half of it. */
 const MAX_FILE_BYTES = 8 * 1024 * 1024
 let fileBudget = 4 * 1024 * 1024
 /** Room kept for each live delivery to grow to its end (its times, receipt, a reason it ended). */
@@ -130,18 +132,66 @@ export const setFileBudgetForTests = (bytes: number): void => {
   fileBudget = bytes
 }
 
-/** How long until a delivery is overdue: OVERDUE_MINUTES, or an unpackaged test build's (HIVE_TEST_DELIVERY_OVERDUE_MS). */
+/** How long until a delivery is overdue: OVERDUE_MINUTES, or an unpackaged test build's (CW_TEST_DELIVERY_OVERDUE_MS). */
 export const overdueMs = (): number => {
-  const t = !app.isPackaged ? Number(process.env.HIVE_TEST_DELIVERY_OVERDUE_MS) : NaN
+  const t = !app.isPackaged ? Number(process.env.CW_TEST_DELIVERY_OVERDUE_MS) : NaN
   return Number.isFinite(t) && t > 0 ? t : OVERDUE_MINUTES * 60_000
 }
 
 /** The run a delivery made for a launch is offered into until that launch has started (launchWith). */
 const LAUNCHING = 'launching'
 
-/** Why a delivery may repeat when it is offered once more (#649). */
-const AGAIN_RESTART = 'Hive restarted while offering it'
-const AGAIN_LAUNCH = 'its session ended or restarted before it was read'
+/**
+ * What Combwork says of a delivery (agent text, HI-2437): why it may repeat when it is offered once more (#649, said to its
+ * agent with the doorbell), why it ended or went back (its `detail`, which its sender reads), and why one isn't made.
+ */
+const T = {
+  carried: agentMsg({
+    id: 'inbox.carried.notice',
+    text: 'Your earlier conversation read {n, plural, one {a message} other {# messages}} it never acked ({ids}). cw_inbox shows {n, plural, one {it} other {them}} again now: act on {n, plural, one {it} other {them}}, then ack {n, plural, one {it} other {them}}.',
+    note: 'HI-2463: a conversation from before the rename started fresh; what the earlier one had received and not acked is shown again in the new one. After "[CW] ". n: how many; ids: their delivery ids ("m3, m7").'
+  }),
+  againRestart: agentMsg({ id: 'inbox.again.restart', text: 'Combwork restarted while offering it', note: 'Why a delivery may repeat (#649), after the doorbell (inbox.offer.again): Combwork stopped while it was being offered.' }),
+  againLaunch: agentMsg({ id: 'inbox.again.launch', text: 'its session ended or restarted before it was read', note: 'Why a delivery may repeat (#649), after the doorbell (inbox.offer.again), and in why it is uncertain (inbox.ended.uncertain).' }),
+  uncertainRestart: agentMsg({ id: 'inbox.ended.uncertainRestart', text: 'may not have reached it: Combwork stopped while offering it', note: "Why a delivery is uncertain (#649), as its sender reads it: Combwork stopped while it was being offered; it is offered once more." }),
+  uncertain: agentMsg({ id: 'inbox.ended.uncertain', text: 'may not have reached it: {why}', note: 'Why a delivery is uncertain (#649), as its sender reads it; it is offered once more. why: inbox.again.launch.' }),
+  notAcked: agentMsg({ id: 'inbox.ended.notAcked', text: 'received, never acked', note: 'Why a delivery expired, as its sender reads it: its agent read it and never acked it.' }),
+  replaced: agentMsg({ id: 'inbox.ended.replaced', text: 'replaced by a newer one', note: "Why a delivery was cancelled, as its sender reads it: an action's newer delivery replaced it." }),
+  cancelledBy: agentMsg({ id: 'inbox.ended.cancelledBy', text: 'cancelled by {by}', note: 'Why a delivery was cancelled, as its sender reads it. by: who cancelled it (the user, an agent by name).' }),
+  tooLongAgain: agentMsg({ id: 'inbox.ended.tooLong', text: 'cancelled: made again, it was too long to keep', note: 'Why a delivery was cancelled, as its sender reads it: made again from its source just before it was given, it was too long (#649).' }),
+  notWanted: agentMsg({ id: 'inbox.ended.notWanted', text: 'cancelled: no longer wanted', note: 'Why a delivery was cancelled, as its sender reads it: what made it (its producer) no longer wants it given (#649).' }),
+  doorbellLost: agentMsg({ id: 'inbox.ended.doorbellLost', text: 'its doorbell was lost before its CLI took it', note: 'Why a delivery waits again, as its sender reads it: the line typed into its agent was lost before its CLI took it; it rings once more.' }),
+  controlDown: agentMsg({ id: 'inbox.refused.controlDown', text: 'the user turned Settings → Assistant → Control down', note: "Why a delivery the Assistant left was refused, as its sender reads it: Control no longer lets it message agents." }),
+  assistantEnded: agentMsg({ id: 'inbox.refused.assistantEnded', text: "the Assistant's session that left it ended", note: 'Why a delivery the Assistant left was refused, as its sender reads it.' }),
+  noInbox: agentMsg({ id: 'inbox.refused.noInbox', text: '{name} has no inbox: turn on the Agent API', note: "Why an agent that can't read an inbox is given no delivery (#650's decision), as its sender sees it. name: the agent's name." }),
+  late: agentMsg({ id: 'inbox.expired.late', text: 'not received in time', note: 'Why a delivery expired, as its sender reads it: not read before its expiry.' }),
+  runEnded: agentMsg({ id: 'inbox.expired.sessionEnded', text: 'the session it was for has ended', note: 'Why a delivery for one launch of its agent expired, as its sender reads it.' }),
+  otherConversation: agentMsg({ id: 'inbox.expired.otherConversation', text: 'its agent is in another conversation now', note: "Why a delivery for one conversation of its agent expired, as its sender reads it." }),
+  staleGone: agentMsg({ id: 'inbox.stale.gone', text: '{card} is gone', note: "Why a delivery tied to a card's round is stale (#652), as its sender reads it. card: the card (HI-12)." }),
+  staleArchived: agentMsg({ id: 'inbox.stale.archived', text: '{card} was archived', note: "Why a delivery tied to a card's round is stale (#652). card: the card (HI-12)." }),
+  stalePassed: agentMsg({ id: 'inbox.stale.passed', text: '{card} passed review', note: "Why a delivery tied to a card's round is stale (#652). card: the card (HI-12)." }),
+  staleDone: agentMsg({ id: 'inbox.stale.done', text: '{card} is done', note: "Why a delivery tied to a card's round is stale (#652). card: the card (HI-12)." }),
+  staleLeft: agentMsg({ id: 'inbox.stale.left', text: '{card} left Doing and Review', note: "Why a delivery tied to a card's round is stale (#652). card: the card (HI-12)." }),
+  staleRound: agentMsg({ id: 'inbox.stale.round', text: '{card} is in round {round} now', note: "Why a delivery tied to a card's round is stale (#652): the card has moved to a later round. card: the card (HI-12); round: its round now." }),
+  roundUnread: agentMsg({ id: 'inbox.round.unreadable', text: "Combwork couldn't read {card} now.", note: "Why a message tied to a card's round (#652) isn't made: the card can't be read now (its workspace closed). card: the card (HI-12)." }),
+  roundNoCard: agentMsg({ id: 'inbox.round.noCard', text: 'There is no card {card}.', note: "Why a message tied to a card's round (#652) isn't made. card: the card asked for (HI-12)." }),
+  roundStale: agentMsg({ id: 'inbox.round.notInRound', text: '{why}: a message tied to its round needs it in Doing or Review.', note: "Why a message tied to a card's round (#652) isn't made. why: why the card has no round under way (inbox.stale.*)." }),
+  notSent: agentMsg({ id: 'inbox.create.notSent', text: 'Not sent: {why}.', note: 'Why a delivery the Assistant left is refused when it is made. why: inbox.refused.controlDown or .assistantEnded.' }),
+  tooLong: agentMsg({ id: 'inbox.create.tooLong', text: 'It is too long to give an agent ({length} characters, at most {max}).', note: "Why a delivery isn't made: its text is too long. length: its length; max: the most a delivery holds." }),
+  badKey: agentMsg({ id: 'inbox.create.badKey', text: 'Not a delivery Combwork can keep: its source or key is too long.', note: "Why a delivery isn't made: what names its producer is too long to keep." }),
+  projectFull: agentMsg({ id: 'inbox.create.projectFull', text: 'This project already has {max} deliveries waiting or not acked, the most Combwork keeps.', note: "Why a delivery isn't made: its project has as many live deliveries as Combwork keeps. max: that many." }),
+  full: agentMsg({ id: 'inbox.create.full', text: "This project's deliveries are full (what waits for its agents and isn't acked): wait until they are received and acked, or cancel some.", note: "Why a delivery isn't made: its project's deliveries are full (the file's budget)." }),
+  notSaved: agentMsg({ id: 'inbox.save.failed', text: "Combwork couldn't save the deliveries ({error}): nothing changed.", note: 'Why a change to deliveries (a message, a read, an ack, a cancel) failed. error: why the save failed (inbox.save.tooMany, .dbReplaced, or a system error).' }),
+  tooMany: agentMsg({ id: 'inbox.save.tooMany', text: 'too many deliveries to keep in this project', note: "Why the deliveries couldn't be saved, in inbox.save.failed." }),
+  dbReplaced: agentMsg({ id: 'inbox.save.dbReplaced', text: "the workspace's database was replaced since these deliveries were read", note: "Why the deliveries couldn't be saved, in inbox.save.failed: an upgrade or a restore replaced the database." }),
+  readFailed: agentMsg({ id: 'inbox.load.failed', text: 'Could not read the deliveries ({error})', note: "Why a project's deliveries couldn't be read, from its file from before #1018. error: the system's error." }),
+  changed: agentMsg({ id: 'inbox.given.changed', text: 'what it was for changed meanwhile', note: "Why a delivery wanted now (a task, a handover's step) wasn't given: its caller no longer wants it." }),
+  notTyped: agentMsg({ id: 'inbox.given.notTyped', text: 'Combwork could not type it', note: "Why a delivery wanted now (a task, a handover's step) wasn't given, when nothing more is known." })
+}
+
+/** A delivery wanted now that wasn't given: its detail's opening, which deliverNow takes off again to say why. */
+// agent-protocol: a fixed opening deliverNow strips from the detail (NotGiven says only why)
+const NOT_GIVEN = 'not given: '
 
 interface Store {
   host: string
@@ -178,7 +228,7 @@ interface Store {
   gen: number
   /**
    * Each delivery's row as this store last read or wrote it (#1266): a save changes only what its transaction changed,
-   * and only from these, so another Hive's receipt, ack or cancel since is never overwritten (saveDeliveryChanges).
+   * and only from these, so another Combwork's receipt, ack or cancel since is never overwritten (saveDeliveryChanges).
    */
   base: Map<string, string>
 }
@@ -191,7 +241,26 @@ interface Draft {
   dirty: boolean
   /** What to do once it is published (log lines, the Assistant's activity list, sources told): nothing for a plan that isn't. */
   after: (() => void)[]
+  /**
+   * A revocable caller's authority (HI-2420, the Assistant's guard), set by the plan: checked again in the save's own
+   * transaction, after every await of the save, so one revoked meanwhile saves nothing.
+   */
+  commit?: () => void
+  /** What `commit` threw in the save: given to the caller as it is (the Assistant's refusal), never as NotSaved. */
+  refused?: unknown
+  /**
+   * A producer's receipt for the delivery this plan makes (HI-2618, createDeliveryOnce): checked and written in the save's
+   * own transaction, so a delivery with that key is made once, whatever happened to its row since.
+   */
+  once?: { key: string; at: string }
 }
+
+/** A delivery receipt's key in `store_meta` (HI-2618): `once:` and the producer's key. */
+const ONCE = 'once:'
+/** How long a receipt is kept (HI-2618): its producer never retries an obligation older than this (ONCE_RETRY_MS). */
+export const ONCE_KEEP_MS = 30 * 24 * 60 * 60_000
+/** A save finding its plan's receipt already written (HI-2618): that delivery was made, so nothing is saved. */
+class OnceTaken extends Error {}
 
 const stores = new Map<string, Store>()
 const loading = new Map<string, Promise<Store>>()
@@ -206,27 +275,27 @@ const loadingKeys = new Map<string, string>()
 type HostPlace = { host: string; workspace: string; scope: string; key: string }
 const keyOf = (host: string): string => host.toLowerCase()
 /** A host's deliveries file before #1018: moved into its workspace's database the first time, then kept as a backup. */
-const fileOf = (host: string): string => join(host, HIVE_DIR, 'deliveries.json')
+const fileOf = (host: string): string => join(host, CW_DIR, 'deliveries.json')
 
 /**
  * Where a host's deliveries are kept (#1018): its workspace's database (a project's workspace is its parent folder; the
- * Assistant's home is the workspace's `.hive/assistant`), under the project's stable id (#508), so they follow a rename
+ * Assistant's home is the workspace's `.combwork/assistant`), under the project's stable id (#508), so they follow a rename
  * as its folder's file did; the Assistant's under `assistant`, and a folder with no id yet under its name.
  */
 async function hostPlace(host: string): Promise<{ workspace: string; scope: string }> {
   const h = resolve(host)
   const parent = dirname(h)
-  if (basename(h).toLowerCase() === 'assistant' && basename(parent).toLowerCase() === HIVE_DIR) return { workspace: dirname(parent), scope: 'assistant' }
+  if (basename(h).toLowerCase() === 'assistant' && basename(parent).toLowerCase() === CW_DIR) return { workspace: dirname(parent), scope: 'assistant' }
   const ws = workspaceFor(h)
   const known = ws ? (await ws.projectIds().catch(() => null))?.byPath.get(h.toLowerCase()) : undefined
-  const saved = known ?? (await readJson<{ id?: unknown } | null>(join(h, HIVE_DIR, 'project.json'), null))?.id
+  const saved = known ?? (await readJson<{ id?: unknown } | null>(join(h, CW_DIR, 'project.json'), null))?.id
   return { workspace: parent, scope: typeof saved === 'string' && saved ? saved : `folder:${basename(h).toLowerCase()}` }
 }
 /** The workspace a host's deliveries are kept in (hostPlace's, without its scope). */
 function hostWorkspace(host: string): string {
   const h = resolve(host)
   const parent = dirname(h)
-  return basename(h).toLowerCase() === 'assistant' && basename(parent).toLowerCase() === HIVE_DIR ? dirname(parent) : parent
+  return basename(h).toLowerCase() === 'assistant' && basename(parent).toLowerCase() === CW_DIR ? dirname(parent) : parent
 }
 /** A host's workspace's real location, as the host's path enters here (recorded by what it starts: #1395). */
 const workspaceKeyOf = (host: string): string => placeKey(hostWorkspace(host))
@@ -238,7 +307,7 @@ const hostFenced = (host: string): Error | null => (isAdmitted(stores.get(keyOf(
 const hostClosed = (host: string): boolean => !!hostFenced(host)
 const nowIso = (): string => new Date().toISOString()
 
-/** Hive couldn't save a change, so it wasn't made. */
+/** Combwork couldn't save a change, so it wasn't made. */
 export class NotSaved extends Error {}
 /** A delivery refused because too many of its kind wait already for its agent (NewDelivery.maxWaiting). */
 export class TooManyWaiting extends Error {}
@@ -247,7 +316,7 @@ export class DeliveriesFull extends Error {}
 /** A delivery wanted now (deliverNow) that couldn't be given: why. It was cancelled. */
 export class NotGiven extends Error {}
 
-/** How a delivery is given out: typed as an offer, or handed out by a read (hive_inbox; the notices counting what it would give). */
+/** How a delivery is given out: typed as an offer, or handed out by a read (cw_inbox; the notices counting what it would give). */
 export type HandOut = 'offer' | 'read'
 
 /**
@@ -308,7 +377,7 @@ export async function waitingForRun(host: string, agentId: string, run: string, 
   return waitingForRunNow(host, agentId, run, conversation)
 }
 
-/** waitingForRun from what this Hive has read now, with nothing awaited (the host's deliveries loaded, else none). */
+/** waitingForRun from what this Combwork has read now, with nothing awaited (the host's deliveries loaded, else none). */
 export function waitingForRunNow(host: string, agentId: string, run: string, conversation: string | null): DeliveryRecord[] {
   const now = clock()
   return (stores.get(keyOf(host))?.records ?? []).filter((r) => r.agentId === agentId && (r.state === 'queued' || r.state === 'offered' || r.state === 'uncertain') && Date.parse(r.expires) > now && (!r.conversation || !conversation || r.conversation === conversation) && (!r.forRun || r.forRun === run))
@@ -355,13 +424,15 @@ function transactAfter<P, T>(store: Store, read: () => Promise<P>, plan: (d: Dra
       try {
         await save(store, d)
       } catch (e) {
-        // Another Hive changed a row this plan changed, since this store read it (#1266): nothing was saved. The host's
+        // Another Combwork changed a row this plan changed, since this store read it (#1266): nothing was saved. The host's
         // deliveries are read again and the plan made again on them (its receipt, ack or cancel kept), a few times at most.
         if (e instanceof StaleDeliveries && tries < STALE_TRIES) {
           await reread(store)
           continue
         }
-        throw new NotSaved(`Hive couldn't save the deliveries (${(e as Error).message}): nothing changed.`, { cause: e })
+        // The caller's authority refused it (HI-2420): its own refusal, nothing saved.
+        if (d.refused !== undefined) throw d.refused
+        throw new NotSaved(say(T.notSaved, { error: (e as Error).message }), { cause: e })
       }
       const was = new Set(store.records)
       store.records = d.records
@@ -377,10 +448,10 @@ function transactAfter<P, T>(store: Store, read: () => Promise<P>, plan: (d: Dra
   }).finally(() => running--)
 }
 
-/** How many times a transaction is planned and saved, at most, while another Hive keeps changing what it changes. */
+/** How many times a transaction is planned and saved, at most, while another Combwork keeps changing what it changes. */
 const STALE_TRIES = 4
 
-/** A host's deliveries read again from its workspace's database (another Hive saved since): what the store has is replaced. */
+/** A host's deliveries read again from its workspace's database (another Combwork saved since): what the store has is replaced. */
 async function reread(store: Store): Promise<void> {
   const read = await readSaved(store.place)
   store.records = read.records
@@ -424,7 +495,7 @@ function transactSoon(store: Store, what: string, plan: (d: Draft) => unknown): 
 
 /**
  * A host's deliveries, loaded once and restored: each one not received yet checked again (refused, expired), and one
- * offered when Hive stopped uncertain (it may not have reached its agent: offered once more, #649).
+ * offered when Combwork stopped uncertain (it may not have reached its agent: offered once more, #649).
  */
 export function load(host: string): Promise<Store> {
   const k = keyOf(host)
@@ -448,7 +519,7 @@ export function load(host: string): Promise<Store> {
       const store: Store = { host, place, records: read.records, next: read.next, invalid: read.invalid, lock: Promise.resolve(), offering: new Set(), confirming: new Map(), rungAgain: new Set(), launches: new Map(), hooks: new Map(), gen, base: read.base }
       // Restored before anything else sees it (a second load waits for this one).
       await transact(store, (d) => {
-        for (const r of [...d.records]) if (r.state === 'offered') set(store, d, r, 'uncertain', 'may not have reached it: Hive stopped while offering it', undefined, { again: AGAIN_RESTART })
+        for (const r of [...d.records]) if (r.state === 'offered') set(store, d, r, 'uncertain', say(T.uncertainRestart), undefined, { again: inDialectOf({ projectPath: store.host, agentId: r.agentId }, () => say(T.againRestart)) })
         recheck(store, d)
       }).catch((e) => log.warn('restoring deliveries', e))
       if (stores.has(k)) return stores.get(k)!
@@ -462,7 +533,7 @@ export function load(host: string): Promise<Store> {
       if (!isAdmitted(key)) return store
       stores.set(k, store)
       showAll(store)
-      // A card that moved on while Hive was closed: what was tied to its round is stale now (#652).
+      // A card that moved on while Combwork was closed: what was tied to its round is stale now (#652).
       if (store.records.some((r) => r.round && isUnread(r))) sweepStale()
       return store
     }
@@ -495,7 +566,7 @@ async function readSaved(place: HostPlace): Promise<{ records: DeliveryRecord[];
     // In their own table since 1.0 (#1211), deliveries.json moved in the first time (its next id and entries kept aside with it).
     await openTable(place.workspace, 'deliveries', place.scope, file, () => readFileOf(place.host), DELIVERIES_TABLE)
     // The rows, their bases and the values beside them, read in one read transaction (one snapshot, #1266 round 3): a
-    // record and its base are the same row's, never two reads another Hive committed between.
+    // record and its base are the same row's, never two reads another Combwork committed between.
     const db = workspaceDb(place.workspace).reader
     db.exec('BEGIN')
     try {
@@ -539,7 +610,7 @@ const DELIVERIES_TABLE = {
 }
 
 /**
- * A host's deliveries.json from before #1018, read to move it in: null when there is none. One too big to be Hive's, or
+ * A host's deliveries.json from before #1018, read to move it in: null when there is none. One too big to be Combwork's, or
  * damaged, is set aside (renamed, never overwritten) and nothing is moved in.
  */
 async function readFileOf(host: string): Promise<{ deliveries: unknown[]; next: unknown; invalid: unknown[] } | null> {
@@ -549,7 +620,7 @@ async function readFileOf(host: string): Promise<{ deliveries: unknown[]; next: 
     got = await readCapped(file, MAX_FILE_BYTES)
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null
-    throw new Error(`Could not read the deliveries (${(e as Error).message})`, { cause: e })
+    throw new Error(say(T.readFailed, { error: (e as Error).message }), { cause: e })
   }
   let data: { next?: unknown; deliveries?: unknown; invalid?: unknown } | null = null
   try {
@@ -558,7 +629,7 @@ async function readFileOf(host: string): Promise<{ deliveries: unknown[]; next: 
     data = null
   }
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
-    // Not Hive's (too big, or damaged): set aside, never overwritten, and started again.
+    // Not Combwork's (too big, or damaged): set aside, never overwritten, and started again.
     const to = `${file}.${got.more ? 'too-big' : 'damaged'}-${Date.now()}`
     await renameRetrying(file, to)
     log.warn(`The deliveries file was ${got.more ? 'too big' : 'damaged'}: set aside as ${userText(to)}`)
@@ -572,7 +643,7 @@ const fileText = (d: Pick<Draft, 'records' | 'next' | 'invalid'>): string => JSO
 
 /**
  * Whether a draft fits the file's budget, with room for each live delivery to grow to its end (times, a reason): what
- * Hive writes stays well under what it reads back (MAX_FILE_BYTES), so a file it wrote is never set aside as too big.
+ * Combwork writes stays well under what it reads back (MAX_FILE_BYTES), so a file it wrote is never set aside as too big.
  */
 const fits = (d: Draft): boolean => Buffer.byteLength(fileText(d)) + d.records.filter(isLive).length * GROWTH_PER_LIVE <= fileBudget
 
@@ -610,15 +681,22 @@ async function save(store: Store, d: Draft): Promise<void> {
   }
   // What is written is what reads back (#649): one check, readDelivery's, for saving and restoring alike; a record it
   // wouldn't read back fails the save (nothing changes), never a delivery lost on the next start.
-  for (const r of d.records) if (!readDelivery(JSON.parse(JSON.stringify(r)))) throw new Error(`delivery ${r.id} isn't one Hive could read back`)
+  // agent-protocol: a mistake in Combwork's code (a record it made that doesn't read back), for the log and its bug report
+  for (const r of d.records) if (!readDelivery(JSON.parse(JSON.stringify(r)))) throw new Error(`delivery ${r.id} isn't one Combwork could read back`)
   const text = fileText(d)
-  if (Buffer.byteLength(text) > MAX_FILE_BYTES) throw new Error('too many deliveries to keep in this project')
+  if (Buffer.byteLength(text) > MAX_FILE_BYTES) throw new Error(say(T.tooMany))
   // Read from a database since replaced (the upgrade to 1.0, a restore): never saved over what the file has now.
   const guard = (): void => {
-    if (store.gen !== dbGenerationAt(store.place.key)) throw new Error("the workspace's database was replaced since these deliveries were read") // i18n-ignore: a save refused for the log; the transaction's NotSaved says it
+    if (store.gen !== dbGenerationAt(store.place.key)) throw new Error(say(T.dbReplaced))
+    try {
+      d.commit?.()
+    } catch (e) {
+      d.refused = e
+      throw e
+    }
   }
   // Only what this transaction changed (#1211's rows), the next id and the entries kept aside beside them, in one
-  // transaction, against the rows as they are committed (#1266): a row another Hive changed since this store read it
+  // transaction, against the rows as they are committed (#1266): a row another Combwork changed since this store read it
   // fails the save (StaleDeliveries: planned again on the rows as they are), its rows saved since are never touched, and
   // a new delivery whose id it took takes the next free one (made here, before it is published).
   const was = new Map(store.records.map((r) => [r.id, r]))
@@ -626,7 +704,22 @@ async function save(store: Store, d: Draft): Promise<void> {
   const changed = d.records.filter((r) => was.get(r.id) !== r) as unknown as Record<string, unknown>[]
   const removed = [...was.keys()].filter((id) => !now.has(id))
   let saved: ReturnType<typeof saveDeliveryChanges> = { written: new Map(), renamed: new Map() }
-  await saveTable(store.place.workspace, 'deliveries', store.place.scope, (db) => void (saved = saveDeliveryChanges(db, store.place.scope, { put: changed, removed, base: store.base })), { next: JSON.stringify(d.next), invalid: d.invalid.length ? JSON.stringify(d.invalid) : null }, guard)
+  const once = d.once
+  await saveTable(
+    store.place.workspace,
+    'deliveries',
+    store.place.scope,
+    (db) => {
+      // Its receipt (HI-2618), read in this transaction against what is committed: one there means its delivery was made
+      // (by another pass, another Combwork, or before a restart), and nothing of this plan is saved.
+      if (once && storeValue(db, 'deliveries', store.place.scope, ONCE + once.key) !== null) throw new OnceTaken(once.key)
+      saved = saveDeliveryChanges(db, store.place.scope, { put: changed, removed, base: store.base })
+      // Receipts past their keeping go (their producers no longer retry them).
+      db.prepare("DELETE FROM store_meta WHERE store = 'deliveries' AND scope = ? AND substr(key, 1, 5) = ? AND json_extract(value, '$.at') < ?").run(store.place.scope, ONCE, new Date(Date.now() - ONCE_KEEP_MS).toISOString()) // agent-protocol: SQL
+    },
+    { next: JSON.stringify(d.next), invalid: d.invalid.length ? JSON.stringify(d.invalid) : null, ...(once ? { [ONCE + once.key]: JSON.stringify({ at: once.at }) } : {}) },
+    guard
+  )
   for (const r of d.records) {
     const to = saved.renamed.get(r.id)
     if (!to) continue
@@ -644,7 +737,7 @@ async function save(store: Store, d: Draft): Promise<void> {
 /** Ended deliveries beyond what is kept (per agent, by age) go; received ones never acked expire after a week. */
 function prune(store: Store, d: Draft): void {
   const now = Date.now()
-  for (const r of [...d.records]) if (r.state === 'received' && needsAck(r.kind) && now - Date.parse(r.received ?? r.created) > KEEP_RECEIVED_MS) set(store, d, r, 'expired', 'received, never acked')
+  for (const r of [...d.records]) if (r.state === 'received' && needsAck(r.kind) && now - Date.parse(r.received ?? r.created) > KEEP_RECEIVED_MS) set(store, d, r, 'expired', say(T.notAcked))
   const ended = new Map<string, DeliveryRecord[]>()
   for (const r of d.records) if (!isLive(r)) ended.set(r.agentId, [...(ended.get(r.agentId) ?? []), r])
   const drop = new Set<DeliveryRecord>()
@@ -692,10 +785,11 @@ function set(store: Store, d: Draft, r: DeliveryRecord, to: DeliveryState, detai
   put(d, r, out)
   if ((to === 'refused' || to === 'stale') && r.from.kind === 'assistant') {
     const ws = r.from.workspace
+    // agent-protocol: the Assistant's activity list in its panel (the window's, in English), not text for an agent
     d.after.push(() => assistant.record(ws, { kind: 'message-agent', project: basename(store.host), agent: { id: r.agentId, name: r.agentName ?? r.agentId }, ...(r.card ? { card: r.card } : {}) }, `A message for ${r.agentName ?? r.agentId} (${r.id}) was ${to === 'stale' ? 'dropped as stale' : 'refused'}`, detail ?? 'its sender may no longer send it', { reason: to === 'stale' ? 'Dropped as stale' : 'Refused' }))
   }
   if (to === 'refused' || to === 'expired' || to === 'cancelled' || to === 'uncertain' || to === 'stale') d.after.push(() => log.info(`Delivery ${r.id} for ${userText(r.agentName ?? r.agentId)} ${to}${detail ? `: ${userText(detail)}` : ''}`))
-  // Its receipt and ack (HI-2036: only "queued" was logged, so a message read through hive_inbox at once read as queued
+  // Its receipt and ack (HI-2036: only "queued" was logged, so a message read through cw_inbox at once read as queued
   // for hours): once each, as saved (a move not allowed, a read or ack again, returned above; one not saved never runs
   // its `after`), with how it was received. Never its text.
   if (to === 'received' || to === 'acked') d.after.push(() => log.info(`Delivery ${r.id} for ${userText(r.agentName ?? r.agentId)} ${to}${out.receivedVia && (to === 'received' || !r.received) ? ` (${out.receivedVia})` : ''}`))
@@ -704,7 +798,7 @@ function set(store: Store, d: Draft, r: DeliveryRecord, to: DeliveryState, detai
   // taken, so its mark goes, in the launch it was offered into; a mark of another line's stays (round 1 finding).
   if ((to === 'received' || to === 'acked') && r.state === 'offered' && r.offerRun) {
     const run = r.offerRun
-    d.after.push(() => sessions.lineTaken(store.host, r.agentId, run, r.id, `${r.id}, which it rang for, was read`)) // i18n-ignore: for the log
+    d.after.push(() => sessions.lineTaken(store.host, r.agentId, run, r.id, `${r.id}, which it rang for, was read`)) // agent-protocol: for the log
   }
   else if (to === 'refused' || to === 'expired' || to === 'cancelled' || to === 'stale') tell(store, d, out, 'ended')
   return true
@@ -722,15 +816,15 @@ export const setClockForTests = (fn: (() => number) | null): void => {
 /** Why this sender may no longer send what it left (null: it may). Asked at every step: before it is offered, before each piece and Enter. */
 let senderRefusal = (from: DeliverySender): string | null => {
   if (from.kind !== 'assistant') return null
-  if (!assistant.allows('agents')) return 'the user turned Settings → Assistant → Control down'
-  if (sessions.liveFor(assistant.assistantHome(from.workspace), ASSISTANT_AGENT_ID)?.runId !== from.launch) return "the Assistant's session that left it ended"
+  if (!assistant.allows('agents')) return say(T.controlDown)
+  if (sessions.liveFor(assistant.assistantHome(from.workspace), ASSISTANT_AGENT_ID)?.runId !== from.launch) return say(T.assistantEnded)
   return null
 }
 /**
- * Whether an agent can read its inbox (#650): the Assistant always (its own tools); a project agent through its hive
- * tools, which it has only while the Agent API and the built-in hive server are on.
+ * Whether an agent can read its inbox (#650): the Assistant always (its own tools); a project agent through its Combwork
+ * tools, which it has only while the Agent API and the built-in combwork server are on.
  */
-let readsInbox = (_host: string, agentId: string): boolean => agentId === ASSISTANT_AGENT_ID || (config.settings.agentApi.enabled && config.settings.agentApi.provideHiveMcp)
+let readsInbox = (_host: string, agentId: string): boolean => agentId === ASSISTANT_AGENT_ID || (config.settings.agentApi.enabled && config.settings.agentApi.provideCombworkMcp)
 export const agentReadsInbox = (host: string, agentId: string): boolean => readsInbox(host, agentId)
 
 /**
@@ -744,7 +838,7 @@ export async function inboxSwitch(host: string, which: InboxSwitch): Promise<boo
 
 /**
  * The host's project config, for its own switches (own null: none, as the Assistant's home, or it can't be read), and
- * whether Hive has written it since (`changed`, asked as a line is typed: a project.json changed by hand isn't seen).
+ * whether Combwork has written it since (`changed`, asked as a line is typed: a project.json changed by hand isn't seen).
  */
 export interface InboxProject {
   own: Partial<ProjectConfig> | null
@@ -763,12 +857,12 @@ export const setInboxProjectForTests = (fn: ((host: string) => Promise<InboxProj
   inboxProject = fn ?? ownProject
 }
 /** Why an agent that can't read an inbox is given no delivery (#650's decision), as its sender sees it. */
-const noInbox = (name: string): string => `${name} has no inbox: turn on the Agent API`
+const noInbox = (name: string): string => say(T.noInbox, { name })
 /** A delivery refused because its agent can't read an inbox: the message says so, and what to do. */
 export class NoInbox extends Error {}
 /** For tests: whether agents can read their inbox (null: as the settings say). */
 export const setReadsInboxForTests = (fn: ((host: string, agentId: string) => boolean) | null): void => {
-  readsInbox = fn ?? ((_host, agentId) => agentId === ASSISTANT_AGENT_ID || (config.settings.agentApi.enabled && config.settings.agentApi.provideHiveMcp))
+  readsInbox = fn ?? ((_host, agentId) => agentId === ASSISTANT_AGENT_ID || (config.settings.agentApi.enabled && config.settings.agentApi.provideCombworkMcp))
 }
 /** For tests: how a sender's permission is worked out. */
 export const setSenderCheckForTests = (fn: (from: DeliverySender) => string | null): void => {
@@ -782,10 +876,10 @@ function whyNot(store: Store, r: DeliveryRecord): { to: 'refused' | 'expired'; w
   // Its agent can't read an inbox (the Agent API turned off since it was made): refused, never typed instead.
   if (!readsInbox(store.host, r.agentId)) return { to: 'refused', why: noInbox(r.agentName ?? r.agentId) }
   // Held by its team's pause (HI-2081): its time stands still while it is held, and is moved on at the resume.
-  if (Date.parse(r.expires) <= clock() && !pauseHeld(store, r)) return { to: 'expired', why: 'not received in time' }
+  if (Date.parse(r.expires) <= clock() && !pauseHeld(store, r)) return { to: 'expired', why: say(T.late) }
   const live = sessions.liveFor(store.host, r.agentId)
-  if (r.forRun && live?.runId !== r.forRun) return { to: 'expired', why: 'the session it was for has ended' }
-  if (r.conversation && live?.sessionId && live.sessionId !== r.conversation) return { to: 'expired', why: 'its agent is in another conversation now' }
+  if (r.forRun && live?.runId !== r.forRun) return { to: 'expired', why: say(T.runEnded) }
+  if (r.conversation && live?.sessionId && live.sessionId !== r.conversation) return { to: 'expired', why: say(T.otherConversation) }
   return null
 }
 
@@ -803,7 +897,7 @@ function recheck(store: Store, d: Draft, agentId?: string): void {
       // The launch it went into: as saved, or (a launch's save that failed) as followed in memory.
       const run = store.launches.get(r.id) ?? r.offerRun
       if (base && now && now.runId === base.runId && run === base.runId && now.count > base.count) {
-        // Its doorbell was taken: received only once it is read (hive_inbox), or ended now if it may no longer be given
+        // Its doorbell was taken: received only once it is read (cw_inbox), or ended now if it may no longer be given
         // (#652: the doorbell isn't withdrawn, so this is where it ends). Its agent idle again without reading it (its
         // turn ended, the Stop drain's notice let pass), it rings once more.
         const no = whyNot(store, r)
@@ -818,7 +912,7 @@ function recheck(store: Store, d: Draft, agentId?: string): void {
       // (load) finds one left like that, and makes it uncertain.
       if (run === LAUNCHING) continue
       if (run && sessions.liveFor(store.host, r.agentId)?.runId !== run) {
-        set(store, d, r, 'uncertain', `may not have reached it: ${AGAIN_LAUNCH}`, undefined, { again: AGAIN_LAUNCH })
+        set(store, d, r, 'uncertain', say(T.uncertain, { why: say(T.againLaunch) }), undefined, { again: inDialectOf({ projectPath: store.host, agentId: r.agentId }, () => say(T.againLaunch)) })
         continue
       }
     }
@@ -863,7 +957,7 @@ export interface NewDelivery {
   need?: DeliveryNeed
   /** Only for this launch of its agent (a mode notice, a lock's go-ahead): it expires when that launch ends. */
   forRun?: string
-  /** Why it may repeat (one Hive may have given before: a watch read back from before #649 being typed). */
+  /** Why it may repeat (one Combwork may have given before: a watch read back from before #649 being typed). */
   again?: string
   /** Offered by a launch about to start (launchWith only). */
   launching?: true
@@ -876,7 +970,7 @@ export interface NewDelivery {
 
 /**
  * Whether a durable action has made its delivery (SPEC §16.4.5): one of a host's loaded here, or a row of its workspace's
- * database with the action's id (another Hive's, or one from before a restart). That row (unique per action) is the
+ * database with the action's id (another Combwork's, or one from before a restart). That row (unique per action) is the
  * record that it was delivered: an action run again finds it and makes nothing.
  */
 export function actionDelivered(host: string, action: number): boolean {
@@ -886,7 +980,7 @@ export function actionDelivered(host: string, action: number): boolean {
   const mine = (s: Store): boolean => s.place.workspace.toLowerCase() === resolve(ws.path!).toLowerCase()
   if ([...stores.values()].some((s) => mine(s) && s.records.some((r) => r.action === action))) return true
   try {
-    return !!workspaceDb(ws.path).reader.prepare('SELECT 1 FROM deliveries WHERE action = ?').get(action) // i18n-ignore: SQL
+    return !!workspaceDb(ws.path).reader.prepare('SELECT 1 FROM deliveries WHERE action = ?').get(action) // agent-protocol: SQL
   } catch {
     // A board waiting for its upgrade has no deliveries table: none made.
     return false
@@ -905,14 +999,14 @@ export async function createDelivery(host: string, nd: NewDelivery, hooks?: Deli
   const store = await load(host)
   const r = await transact(store, (d) => {
     const why = senderRefusal(nd.from)
-    if (why) throw new Error(`Not sent: ${why}.`)
+    if (why) throw new Error(say(T.notSent, { why }))
     // An action's delivery already made (two runs of it at once here): that one.
     const made = nd.action ? d.records.find((x) => x.action === nd.action) : undefined
     if (made) return made
     let had = nd.source && nd.ref !== undefined ? d.records.find((x) => x.source === nd.source && x.ref === nd.ref && x.agentId === nd.agentId && isWaiting(x)) : undefined
     // An action's own delivery: the one waiting is replaced by a new one (each action keeps its own row).
     if (had && nd.action && nd.replace) {
-      set(store, d, had, 'cancelled', 'replaced by a newer one')
+      set(store, d, had, 'cancelled', say(T.replaced))
       had = undefined
     }
     if (had) {
@@ -931,11 +1025,60 @@ export async function createDelivery(host: string, nd: NewDelivery, hooks?: Deli
   return r
 }
 
+/**
+ * Makes a delivery at most once for a producer's key (HI-2618), saved before this returns: its receipt (`once`) is
+ * written in the same transaction as its row, and a receipt already there makes nothing, however that delivery has fared
+ * since (received, acked, pruned). One of the same source and ref still live is that one (a retry after a crash between
+ * its making and its producer's own record of it). `made`: whether this call made it; `record`: it, the live one, or
+ * null when it was made earlier and isn't live now. Its other checks and refusals are createDelivery's.
+ */
+export async function createDeliveryOnce(host: string, nd: NewDelivery & { once: string }): Promise<{ record: DeliveryRecord | null; made: boolean }> {
+  if (nd.once.length > 300) throw new Error(say(T.badKey))
+  const { meta, agentName } = checkedNew(host, nd)
+  const store = await load(host)
+  try {
+    const out = await transact(store, (d) => {
+      const why = senderRefusal(nd.from)
+      if (why) throw new Error(say(T.notSent, { why }))
+      const live = nd.source && nd.ref !== undefined ? d.records.find((x) => x.source === nd.source && x.ref === nd.ref && x.agentId === nd.agentId && isLive(x)) : undefined
+      if (live) return { record: live, made: false }
+      const rec = addNew(d, nd, meta, agentName)
+      d.once = { key: nd.once, at: nowIso() }
+      d.after.push(() => log.info(`Delivery ${rec.id} (${rec.kind}) for ${userText(nd.agentName ?? nd.agentId)} queued, once (${userText(nd.once)})`))
+      return { record: rec as DeliveryRecord | null, made: true }
+    })
+    show(store, nd.agentId)
+    return out
+  } catch (e) {
+    if (e instanceof NotSaved && e.cause instanceof OnceTaken) return { record: null, made: false }
+    throw e
+  }
+}
+
+/**
+ * Drops a host's delivery receipts whose key starts with `prefix` (HI-2618), all but `keep`: its producer can no longer
+ * retry them (an episode its lane has left). Saved before this returns.
+ */
+export async function dropDeliveryReceipts(host: string, prefix: string, keep?: string): Promise<void> {
+  const store = await load(host)
+  await locked(store, () =>
+    saveTable(store.place.workspace, 'deliveries', store.place.scope, (db) => {
+      db.prepare("DELETE FROM store_meta WHERE store = 'deliveries' AND scope = ? AND substr(key, 1, ?) = ? AND key <> ?").run(store.place.scope, ONCE.length + prefix.length, ONCE + prefix, ONCE + (keep ?? '')) // agent-protocol: SQL
+    })
+  )
+}
+
+/** Whether a host's delivery receipt for `key` is saved (HI-2618), read from its workspace's database. For tests. */
+export async function deliveryReceiptForTests(host: string, key: string): Promise<boolean> {
+  const store = await load(host)
+  return storeValue(workspaceDb(store.place.workspace).reader, 'deliveries', store.place.scope, ONCE + key) !== null
+}
+
 /** A new delivery's checks before anything is read: refused (an Error) as createDelivery says; its meta and name as kept. */
 function checkedNew(host: string, nd: NewDelivery): { meta: DeliveryRecord['meta']; agentName: string | undefined } {
   // Only what reads back is saved (readDelivery's limits): a longer text is refused here, never lost on a restart.
-  if (nd.body.length > DELIVERY_BODY_MAX_CHARS) throw new Error(`It is too long to give an agent (${nd.body.length} characters, at most ${DELIVERY_BODY_MAX_CHARS}).`)
-  if ((nd.ref?.length ?? 0) > 300 || (nd.source?.length ?? 0) > 40) throw new Error('Not a delivery Hive can keep: its source or key is too long.')
+  if (nd.body.length > DELIVERY_BODY_MAX_CHARS) throw new Error(say(T.tooLong, { length: String(nd.body.length), max: String(DELIVERY_BODY_MAX_CHARS) }))
+  if ((nd.ref?.length ?? 0) > 300 || (nd.source?.length ?? 0) > 40) throw new Error(say(T.badKey))
   const meta = nd.meta && Object.fromEntries(Object.entries(nd.meta).slice(0, 20).map(([k, v]) => [k.slice(0, 40), typeof v === 'string' ? v.slice(0, 500) : v]))
   const agentName = nd.agentName?.slice(0, 300)
   // An agent that can't read an inbox is given none (#650's decision): refused now, with the reason its sender sees.
@@ -945,8 +1088,9 @@ function checkedNew(host: string, nd: NewDelivery): { meta: DeliveryRecord['meta
 
 /** A new delivery added to a draft, within its limits (how many wait, how many are live, the file's budget), or refused. */
 function addNew(d: Draft, nd: NewDelivery, meta: DeliveryRecord['meta'], agentName: string | undefined): DeliveryRecord {
+  // agent-protocol: for the log; its caller says it in its own words (agentMessages.ts)
   if (nd.maxWaiting !== undefined && d.records.filter((x) => x.agentId === nd.agentId && x.kind === nd.kind && isWaiting(x)).length >= nd.maxWaiting) throw new TooManyWaiting(`${nd.maxWaiting} already wait`)
-  if (d.records.filter(isLive).length >= MAX_LIVE_PER_HOST) throw new DeliveriesFull(`This project already has ${MAX_LIVE_PER_HOST} deliveries waiting or not acked, the most Hive keeps.`)
+  if (d.records.filter(isLive).length >= MAX_LIVE_PER_HOST) throw new DeliveriesFull(say(T.projectFull, { max: String(MAX_LIVE_PER_HOST) }))
   const seq = d.next++
   const rec: DeliveryRecord = {
     id: `m${seq}`,
@@ -973,7 +1117,7 @@ function addNew(d: Draft, nd: NewDelivery, meta: DeliveryRecord['meta'], agentNa
   d.records.push(rec)
   d.dirty = true
   // Within the file's budget (ended ones' history makes room first), or not made at all.
-  if (!makeRoom(d)) throw new DeliveriesFull("This project's deliveries are full (what waits for its agents and isn't acked): wait until they are received and acked, or cancel some.")
+  if (!makeRoom(d)) throw new DeliveriesFull(say(T.full))
   return rec
 }
 
@@ -985,7 +1129,7 @@ export const setInLeaveForTests = (fn: (() => Promise<void> | void) | null): voi
 
 /**
  * A delivery left for an agent of a host whose workspace no window may hold now (#1395: the Assistant told of an
- * unexpected close Hive finds as it starts, for each workspace of the last run): made as createDelivery makes one while
+ * unexpected close Combwork finds as it starts, for each workspace of the last run): made as createDelivery makes one while
  * a window holds it. Else one read and one write, in one transaction, on a lease's connection under the board's lock (the
  * deliveries moved in first, as a load does, on that connection), with the saves' row checks: published nowhere and kept
  * by nobody (no store, no load under way), so its workspace's next open loads it. The workspace isn't admitted for it.
@@ -994,7 +1138,7 @@ export const setInLeaveForTests = (fn: (() => Promise<void> | void) | null): voi
  * replace, action, launch or hooks). Null: nothing saved, the workspace's upgrade to 1.0 waiting.
  */
 export async function leaveDelivery(host: string, nd: NewDelivery): Promise<DeliveryRecord | null> {
-  if (nd.replace || nd.action || nd.launching) throw new Error('A delivery left this way is a new one only') // i18n-ignore: a mistake in Hive's code, never shown
+  if (nd.replace || nd.action || nd.launching) throw new Error('A delivery left this way is a new one only') // agent-protocol: a mistake in Combwork's code, never shown
   // The host where it really is now, and its workspace's place, recorded as it enters, before anything is awaited: a
   // junction removed or pointed elsewhere meanwhile redirects neither the write nor its reconciliation (#1395).
   const real = realPath(host)
@@ -1012,7 +1156,7 @@ export async function leaveDelivery(host: string, nd: NewDelivery): Promise<Deli
  * workspace, by whatever spelling, and loaded it). A host's deliveries are one (workspace place, scope): its real
  * location and its scope, never the spelling a store is kept under. Each load under way of that workspace is awaited (its
  * scope known once it resolves; one starting after the write reads it anyway), then every store of that identity read
- * again from what is committed, under its lock (after its transactions before, as a save that found another Hive's change
+ * again from what is committed, under its lock (after its transactions before, as a save that found another Combwork's change
  * does: reread; what it holds in memory alone, offers and confirmations, is kept), and its agents shown what waits. A
  * store of another scope, or another workspace, isn't touched.
  */
@@ -1045,7 +1189,7 @@ function leftOnLease(host: string, place: HostPlace, nd: NewDelivery, meta: Deli
         const saved = saveDeliveryChanges(w, place.scope, { put: [rec as unknown as Record<string, unknown>], removed: read.records.filter((r) => !now.has(r.id)).map((r) => r.id), base: read.base })
         const to = saved.renamed.get(rec.id)
         if (to) Object.assign(rec, to)
-        const value = w.prepare("INSERT INTO store_meta (store, scope, key, value) VALUES ('deliveries', ?, ?, ?) ON CONFLICT(store, scope, key) DO UPDATE SET value = excluded.value") // i18n-ignore: SQL
+        const value = w.prepare("INSERT INTO store_meta (store, scope, key, value) VALUES ('deliveries', ?, ?, ?) ON CONFLICT(store, scope, key) DO UPDATE SET value = excluded.value") // agent-protocol: SQL
         value.run(place.scope, 'next', JSON.stringify(Math.max(d.next, rec.seq + 1)))
         log.info(`Delivery ${rec.id} (${rec.kind}) for ${userText(nd.agentName ?? nd.agentId)} left for when its workspace opens`)
         return rec
@@ -1079,7 +1223,7 @@ export async function deliveryView(host: string, agentId: string, limit: number,
 
 /**
  * Whether a delivery can still be cancelled: not read yet (#650: a doorbell names it without its text, so until the agent
- * reads it, it can be taken back; one being typed stops, and hive_inbox no longer gives it).
+ * reads it, it can be taken back; one being typed stops, and cw_inbox no longer gives it).
  */
 const cancellable = (r: DeliveryRecord): boolean => isUnread(r)
 
@@ -1091,16 +1235,20 @@ function taken(store: Store, r: DeliveryRecord): boolean {
 }
 
 /**
- * Cancels an agent's deliveries not read yet (one being typed now stops; its hive_inbox no longer lists them), all of
+ * Cancels an agent's deliveries not read yet (one being typed now stops; its cw_inbox no longer lists them), all of
  * them or those of `kinds` (or those `match` picks); by: who cancelled. How many.
  */
-export async function cancelDeliveries(host: string, agentId: string, by: string, kinds?: readonly DeliveryKind[], match?: (r: DeliveryRecord) => boolean): Promise<number> {
+export async function cancelDeliveries(host: string, agentId: string, by: string, kinds?: readonly DeliveryKind[], match?: (r: DeliveryRecord) => boolean, commit?: () => void): Promise<number> {
   const store = await load(host)
   const n = await transact(store, (d) => {
+    // A revocable caller's authority (HI-2420, the Assistant's guard): checked in the plan, and again in the save's own
+    // transaction after its awaits (Draft.commit; set again on a stale save's new plan), so a refusal cancels nothing.
+    commit?.()
+    d.commit = commit
     let count = 0
     for (const r of [...d.records]) {
       if (r.agentId !== agentId || (kinds && !kinds.includes(r.kind)) || (match && !match(r))) continue
-      if (cancellable(r) && set(store, d, r, 'cancelled', `cancelled by ${by}`)) count++
+      if (cancellable(r) && set(store, d, r, 'cancelled', say(T.cancelledBy, { by }))) count++
     }
     return count
   })
@@ -1128,7 +1276,7 @@ export async function cancelFromSource(host: string, source: string, ref: string
 }
 
 /**
- * hive_inbox for an agent: its deliveries not received yet (a card's events coalesced), now received; and those received
+ * cw_inbox for an agent: its deliveries not received yet (a card's events coalesced), now received; and those received
  * before and not acked (of the kinds it acks). What may no longer be given out is refused or expired instead, checked in
  * the same transaction.
  */
@@ -1136,6 +1284,11 @@ export async function readInbox(host: string, agentId: string): Promise<{ items:
   const store = await load(host)
   const given: DeliveryRecord[] = []
   let unacked: string[] | null = null
+  // The conversation reading (what a carried delivery is shown again to once: replayedTo), or its launch while its CLI
+  // hasn't named the conversation yet.
+  const live = sessions.liveFor(host, agentId)
+  // agent-protocol: a key stored with a delivery, never shown
+  const reader = live?.sessionId || (live?.runId ? `run:${live.runId}` : 'none')
   // An offered one its agent was rung for that this read didn't give (what it was made from changed again while it was
   // made again for the read: a loop wake's roles, a decision line's board) is tried again, a few times at most (#650);
   // so is one made again for this read that its source no longer held at the hand-out (HI-1687: its card changed meanwhile).
@@ -1155,10 +1308,15 @@ export async function readInbox(host: string, agentId: string): Promise<{ items:
           const may = gate(d)
           const mine = d.records.filter((x) => x.agentId === agentId)
           const give = mine.filter((x) => may(x) && !held.has(x.id))
-          const before = mine.filter((x) => x.state === 'received' && needsAck(x.kind)).map((x) => x.id)
+          // HI-2463: what the agent's earlier conversation received and didn't ack, shown again once to each conversation
+          // that reads it since (still received, never acked for it), while its source still holds it: keyed to the
+          // reading conversation (the Assistant's shape, HR1's round 2), so each later fresh one is shown it by itself.
+          const replay = mine.filter((x) => x.state === 'received' && x.carriedFrom !== undefined && x.replayedTo !== reader && sourceHolds(store, x, 'read'))
+          const before = mine.filter((x) => x.state === 'received' && needsAck(x.kind) && !replay.includes(x)).map((x) => x.id)
           for (const x of give) set(store, d, x, 'received', undefined, 'inbox')
+          for (const x of replay) put(d, x, { ...x, replayedTo: reader })
           const refused = (x: DeliveryRecord): boolean => isUnread(x) && !give.includes(x) && !held.has(x.id) && !sourceHolds(store, x, 'read')
-          return { give, before, missed: mine.some((x) => (x.state === 'offered' && !give.includes(x)) || refused(x)) }
+          return { give: [...give, ...replay], before, missed: mine.some((x) => (x.state === 'offered' && !give.includes(x)) || refused(x)) }
         },
         overtaken
       )
@@ -1174,11 +1332,11 @@ export async function readInbox(host: string, agentId: string): Promise<{ items:
     if (!r.missed) break
   }
   show(store, agentId)
-  return { items: inboxItems(given), unacked: unacked ?? [] }
+  return { items: inDialectOf({ projectPath: host, agentId }, () => inboxItems(given)), unacked: unacked ?? [] }
 }
 
 /**
- * hive_inbox ack: marks an agent's deliveries acked, once it has read them (#650: a doorbell names them by id, so an id
+ * cw_inbox ack: marks an agent's deliveries acked, once it has read them (#650: a doorbell names them by id, so an id
  * alone is no sign of reading; one not read yet is `unread`, nothing changes, and the agent reads it first). Ids that
  * aren't its own, or don't exist, are unknown (nothing said of them). Acked again: still acked.
  */
@@ -1206,7 +1364,7 @@ export async function ackDeliveries(host: string, agentId: string, ids: readonly
 }
 
 /**
- * hive_inbox's combined form (#1531, opt-in: ack with read): the ack first, by ackDeliveries' own rules (an id not read
+ * cw_inbox's combined form (#1531, opt-in: ack with read): the ack first, by ackDeliveries' own rules (an id not read
  * yet is `unread` and stays as it is; another agent's is `unknown`), then the read. What the read gives is received, never
  * acked: nothing is acked by being read, so an item listed here is acked by a later call, after acting on it.
  */
@@ -1227,7 +1385,7 @@ function applyFresh(store: Store, d: Draft, fresh: Map<string, Fresh>, by: HandO
     if (!r || !isUnread(r)) continue
     if ('cancel' in f) set(store, d, r, 'cancelled', f.cancel)
     else if (r.state === 'offered' && eligible(store, r, by)) continue
-    else if (f.body.length > DELIVERY_BODY_MAX_CHARS) set(store, d, r, 'cancelled', 'cancelled: made again, it was too long to keep')
+    else if (f.body.length > DELIVERY_BODY_MAX_CHARS) set(store, d, r, 'cancelled', say(T.tooLongAgain))
     else if (f.body !== r.body || (f.meta && JSON.stringify(f.meta) !== JSON.stringify(r.meta))) put(d, r, { ...r, body: f.body, ...(f.meta ? { meta: f.meta } : {}) })
   }
 }
@@ -1240,7 +1398,7 @@ function applyFresh(store: Store, d: Draft, fresh: Map<string, Fresh>, by: HandO
 const eligible = (store: Store, r: DeliveryRecord, by: HandOut = 'offer'): boolean => !whyNot(store, r) && sourceHolds(store, r, by) && producerHolds(store, r) && !pauseHeld(store, r)
 
 /**
- * The team's pause admission (HI-2081, HR1's s10 check): one of Hive's own wakes or hand-outs (`pauseHolds`: a loop or
+ * The team's pause admission (HI-2081, HR1's s10 check): one of Combwork's own wakes or hand-outs (`pauseHolds`: a loop or
  * watch wake, a pool review; never the user's answer) for a project agent whose workspace is paused. Apart from its
  * validity (whyNot, its source's refresh and holds, which still end what is stale): held, it stays as it is, unread, and
  * isn't offered, typed (each key and Enter: whyOfferFails), read, counted for a notice or acked until the team resumes.
@@ -1262,7 +1420,7 @@ const sourceHolds = (store: Store, r: DeliveryRecord, by: HandOut): boolean => (
 const producerHolds = (store: Store, r: DeliveryRecord): boolean => (r.state === 'offered' && taken(store, r)) || store.hooks.get(r.id)?.holds?.() !== false
 
 /**
- * The one gate every hand-out goes through (#649): an offer (and so the typing), hive_inbox's read and an ack of something
+ * The one gate every hand-out goes through (#649): an offer (and so the typing), cw_inbox's read and an ack of something
  * unread all ask it, so typing and pulling never disagree. Each delivery is made again from its source first (`refresh`:
  * its text as it is now, or cancelled when no longer due; what its source keeps for its receipt prepared), and one its
  * producer no longer wants is cancelled. Applied in the caller's transaction, it says of each whether it may be given out
@@ -1270,7 +1428,7 @@ const producerHolds = (store: Store, r: DeliveryRecord): boolean => (r.state ===
  */
 async function mayGive(store: Store, records: readonly DeliveryRecord[], by: HandOut = 'offer'): Promise<(d: Draft) => (r: DeliveryRecord) => boolean> {
   const fresh = await refreshAll(store, records)
-  for (const r of records) if (!fresh.has(r.id) && !producerHolds(store, r)) fresh.set(r.id, { cancel: 'cancelled: no longer wanted' })
+  for (const r of records) if (!fresh.has(r.id) && !producerHolds(store, r)) fresh.set(r.id, { cancel: say(T.notWanted) })
   return (d) => {
     applyFresh(store, d, fresh, by)
     return (r) => isUnread(r) && eligible(store, r, by)
@@ -1296,16 +1454,16 @@ export const roundOf = (card: TaskCard): number => reviewRounds(card).failures +
  * it is still relevant: the card in Doing or Review, in that round.
  */
 export function staleWhy(card: TaskCard | null, n: number, round: number): string | null {
-  if (!card) return `${cardRef(n)} is gone`
-  if (card.archived) return `${cardRef(n)} was archived`
-  if (card.column === 'passed') return `${cardRef(n)} passed review`
-  if (card.column === 'done') return `${cardRef(n)} is done`
-  if (card.column !== 'doing' && card.column !== 'review') return `${cardRef(n)} left Doing and Review`
+  if (!card) return say(T.staleGone, { card: cardRef(n) })
+  if (card.archived) return say(T.staleArchived, { card: cardRef(n) })
+  if (card.column === 'passed') return say(T.stalePassed, { card: cardRef(n) })
+  if (card.column === 'done') return say(T.staleDone, { card: cardRef(n) })
+  if (card.column !== 'doing' && card.column !== 'review') return say(T.staleLeft, { card: cardRef(n) })
   const now = roundOf(card)
-  return now > round ? `${cardRef(n)} is in round ${now} now` : null
+  return now > round ? say(T.staleRound, { card: cardRef(n), round: String(now) }) : null
 }
 
-/** A card as the board has it now (null: it is gone; undefined: Hive can't tell, its workspace closed or the card unreadable). */
+/** A card as the board has it now (null: it is gone; undefined: Combwork can't tell, its workspace closed or the card unreadable). */
 async function boardCard(host: string, n: number): Promise<TaskCard | null | undefined> {
   const ws = workspaceFor(host)
   if (!ws?.path) return undefined
@@ -1324,11 +1482,11 @@ export const setCardReaderForTests = (fn: ((host: string, n: number) => Promise<
  */
 export async function roundNow(host: string, n: number): Promise<number> {
   const card = await cardNow(host, n)
-  if (card === undefined) throw new Error(`Hive couldn't read ${cardRef(n)} now.`)
-  if (!card) throw new Error(`There is no card ${cardRef(n)}.`)
+  if (card === undefined) throw new Error(say(T.roundUnread, { card: cardRef(n) }))
+  if (!card) throw new Error(say(T.roundNoCard, { card: cardRef(n) }))
   const round = roundOf(card)
   const why = staleWhy(card, n, round)
-  if (why) throw new Error(`${why}: a message tied to its round needs it in Doing or Review.`)
+  if (why) throw new Error(say(T.roundStale, { why }))
   return round
 }
 
@@ -1350,7 +1508,7 @@ async function staleOf(host: string, records: readonly DeliveryRecord[]): Promis
 
 /** Board changes seen (tasks-changed): a relevance read one has overtaken is read again, or not acted on (Relevance). */
 let boardChanges = 0
-onHiveEvent((e) => {
+onCombworkEvent((e) => {
   if (e.type === 'tasks-changed') boardChanges++
 })
 
@@ -1453,7 +1611,7 @@ function planOffer(store: Store, d: Draft, items: readonly DeliveryRecord[], tar
   const now = items.map((r) => byId(d.records, r.id)).filter((r): r is DeliveryRecord => !!r && isWaiting(r) && !whyNot(store, r))
   if (!now.length) return null
   // A watching agent is told its watch carries on, unless the line is its own watch's wake (whose receipt ends it).
-  const line = withCardNames(workspaceFor(store.host), () => offerLine(now, now.some((r) => r.source === 'watch') ? null : label), scopeOfHost(store.host))
+  const line = withCardNames(workspaceFor(store.host), () => inDialectOf({ projectPath: store.host, agentId: now[0].agentId }, () => offerLine(now, now.some((r) => r.source === 'watch') ? null : label)), scopeOfHost(store.host))
   const was = new Map(now.map((r) => [r.id, r]))
   for (const r of now) set(store, d, r, 'offered', undefined, undefined, { offerRun: target.runId })
   return { ids: now.map((r) => r.id), was, line, runId: target.runId, sessionId: target.sessionId, need: needOf(now) }
@@ -1479,16 +1637,16 @@ function offerHolds(store: Store, o: Offer, records: readonly DeliveryRecord[] =
  */
 function whyOfferFails(store: Store, o: Offer): string | null {
   const live = sessions.liveFor(store.host, o.ids.length ? (byId(store.records, o.ids[0])?.agentId ?? '') : '')
-  if (!live || live.runId !== o.runId) return 'its launch changed'
-  if (o.sessionId && live.sessionId && live.sessionId !== o.sessionId) return 'its conversation changed'
+  if (!live || live.runId !== o.runId) return 'its launch changed' // agent-protocol: for the log (#1504: why an offer was put off)
+  if (o.sessionId && live.sessionId && live.sessionId !== o.sessionId) return 'its conversation changed' // agent-protocol: for the log (#1504: why an offer was put off)
   for (const id of o.ids) {
     const r = byId(store.records, id)
-    if (r?.state !== 'offered' || r.offerRun !== o.runId) return `${id} is no longer offered by it (${r?.state ?? 'gone'})`
+    if (r?.state !== 'offered' || r.offerRun !== o.runId) return `${id} is no longer offered by it (${r?.state ?? 'gone'})` // agent-protocol: for the log (#1504: why an offer was put off)
     const not = whyNot(store, r)
-    if (not) return `${id} may no longer be given out (${not})`
-    if (!sourceHolds(store, r, 'offer')) return `${id} is no longer wanted by its source (${r.source})`
-    if (!producerHolds(store, r)) return `${id} is no longer wanted by its producer`
-    if (pauseHeld(store, r)) return `${id} is held while the team is paused`
+    if (not) return `${id} may no longer be given out (${not})` // agent-protocol: for the log (#1504: why an offer was put off)
+    if (!sourceHolds(store, r, 'offer')) return `${id} is no longer wanted by its source (${r.source})` // agent-protocol: for the log (#1504: why an offer was put off)
+    if (!producerHolds(store, r)) return `${id} is no longer wanted by its producer` // agent-protocol: for the log (#1504: why an offer was put off)
+    if (pauseHeld(store, r)) return `${id} is held while the team is paused` // agent-protocol: for the log (#1504: why an offer was put off)
   }
   return null
 }
@@ -1511,7 +1669,7 @@ function unoffer(store: Store, o: Offer): Promise<void> {
 
 /** The launch the line was typed into ended (or another began) before its CLI took it: what it carried is uncertain now. */
 function lost(store: Store): void {
-  transactSoon(store, 'checking deliveries', (d) => recheck(store, d))
+  transactSoon(store, 'checking deliveries', (d) => recheck(store, d)) // agent-protocol: for the log
 }
 
 /** While the confirmation checks its CLI took the line: until then a cancel can still end it (and no Enter comes). */
@@ -1527,7 +1685,8 @@ async function refreshAll(store: Store, items: readonly DeliveryRecord[]): Promi
     if (!fn) continue
     try {
       // Its line names cards by key, its host's workspace's (#1219).
-      const got = await withCardNames(workspaceFor(store.host), () => fn(r, store.host), scopeOfHost(store.host))
+      // Said in the dialect of the agent it is for (HI-2437).
+      const got = await inDialectOf({ projectPath: store.host, agentId: r.agentId }, () => withCardNames(workspaceFor(store.host), () => fn(r, store.host), scopeOfHost(store.host)))
       if (got) out.set(r.id, got)
     } catch (e) {
       log.warn(`making delivery ${r.id} again`, e)
@@ -1556,7 +1715,7 @@ export function offerNow(host: string, agentId: string, only?: string, asked = f
   return run
 }
 
-/** How many moments Deliver Now waits for another line of Hive's that has its agent (RETRY_MS each). */
+/** How many moments Deliver Now waits for another line of Combwork's that has its agent (RETRY_MS each). */
 const ASKED_TRIES = 10
 
 /** How many times an offer overtaken before its first key (what it was made from changed as it was planned) is made again at once. */
@@ -1568,13 +1727,13 @@ async function offerOnce(host: string, agentId: string, only?: string, tries = 1
   if (!st) return false
   // What may no longer be given out (its sender's permission gone, too old, another conversation) ends now, not later.
   if (store.records.some((r) => r.agentId === agentId && isUnread(r) && whyNot(store, r))) await transact(store, (d) => recheck(store, d, agentId)).catch((e) => log.warn('checking deliveries', e))
-  // Idle wakes off (#1432): no doorbell for what waits, of any kind; it stays in the inbox, unread, for hive_inbox, the
+  // Idle wakes off (#1432): no doorbell for what waits, of any kind; it stays in the inbox, unread, for cw_inbox, the
   // agent's hooks (if their switches are on) or Deliver now. A task given now isn't a wake.
   if (!only && !asked && !(await inboxSwitch(host, 'idleWakes'))) return false
   let items = pickOffer(store, store.records, agentId, only)
   if (!items.length) return false
   if (!canTypeLine(host, agentId, needOf(items))) {
-    // Deliver Now (#1432) while another line of Hive's has the agent (being typed, or a watch's being made): it waits
+    // Deliver Now (#1432) while another line of Combwork's has the agent (being typed, or a watch's being made): it waits
     // for that one, a moment at a time, rather than being lost; anything else that stops it is logged.
     if (asked && lineBusy(host, agentId) && tries < ASKED_TRIES) {
       await new Promise((r) => setTimeout(r, RETRY_MS))
@@ -1585,11 +1744,11 @@ async function offerOnce(host: string, agentId: string, only?: string, tries = 1
     if (sessions.userMayBeTyping(host, agentId)) retrySoon(host, agentId)
     return false
   }
-  // Through the one gate (as hive_inbox is): each made again from things as they are now; what may not be given out
+  // Through the one gate (as cw_inbox is): each made again from things as they are now; what may not be given out
   // isn't offered.
   const gate = await mayGive(store, items)
   const label = st.status === 'watching' && st.watch ? st.watch.label : null
-  // Saved as offered before the first key (checked as it is planned), and checked again before each key: if Hive stops
+  // Saved as offered before the first key (checked as it is planned), and checked again before each key: if Combwork stops
   // in between it is uncertain, never "delivered". Not saved, or no longer to be given out: nothing is typed.
   let offer: Offer | null
   try {
@@ -1623,7 +1782,7 @@ async function offerOnce(host: string, agentId: string, only?: string, tries = 1
   const o = offer
   // Idle wakes turned off while it was made (#1432 round 1: a refresh, the relevance read and the save all wait): read
   // again once it is ready to type (Settings' and the project's own, read now), and before each key as it is typed
-  // (Settings' as it is then; the project's own as read here, unless Hive has written it since). Not typed: put back,
+  // (Settings' as it is then; the project's own as read here, unless Combwork has written it since). Not typed: put back,
   // still unread.
   const wake = !only && !asked
   const project = wake ? await inboxProject(host) : null
@@ -1639,7 +1798,7 @@ async function offerOnce(host: string, agentId: string, only?: string, tries = 1
   // Why the line was put off as it was typed, when the offer stopped holding (#1504: Deliver Now gave up silently).
   let putOff: string | null = null
   const wanted = (): boolean => {
-    const why = whyOfferFails(store, o) ?? (o.ids.every((id) => store.offering.has(id)) ? null : 'its offer was ended') ?? (!wake || wakesOn() ? null : 'idle wakes were turned off')
+    const why = whyOfferFails(store, o) ?? (o.ids.every((id) => store.offering.has(id)) ? null : 'its offer was ended') ?? (!wake || wakesOn() ? null : 'idle wakes were turned off') // agent-protocol: for the log (#1504: why an offer was put off)
     if (why) putOff ??= why
     return !why
   }
@@ -1736,15 +1895,15 @@ export async function deliverNow(host: string, nd: NewDelivery, holds?: () => bo
       // Put off because its folder began changing meanwhile: held until that is done, then typed.
       if (!(await heldByFolder())) break
     }
-    throw new NotGiven(whyNoLine(host, nd.agentId, nd.need ?? 'idle') ?? (holds && !holds() ? 'what it was for changed meanwhile' : 'Hive could not type it'))
+    throw new NotGiven(whyNoLine(host, nd.agentId, nd.need ?? 'idle') ?? (holds && !holds() ? say(T.changed) : say(T.notTyped)))
   }
   /**
-   * Waits while the agent's hive tools are connecting (#865 round 3: a task given in the second after it became ready):
-   * held, not refused, until they connect or the bound passes (sessions.hiveToolsSettled). Whether it waited.
+   * Waits while the agent's Combwork tools are connecting (#865 round 3: a task given in the second after it became ready):
+   * held, not refused, until they connect or the bound passes (sessions.combworkToolsSettled). Whether it waited.
    */
   const heldByTools = async (): Promise<boolean> => {
-    if (!sessions.hiveToolsWaiting(host, nd.agentId) || !readyFor(sessions.liveFor(host, nd.agentId), nd.need ?? 'idle')) return false
-    await sessions.hiveToolsSettled(host, nd.agentId)
+    if (!sessions.combworkToolsWaiting(host, nd.agentId) || !readyFor(sessions.liveFor(host, nd.agentId), nd.need ?? 'idle')) return false
+    await sessions.combworkToolsSettled(host, nd.agentId)
     return true
   }
   const rec = await createDelivery(host, nd, { ...hooks, ...(holds ? { holds } : {}) })
@@ -1752,12 +1911,12 @@ export async function deliverNow(host: string, nd: NewDelivery, holds?: () => bo
   let why: string | null = null
   try {
     // Another try for the agent may be running (the tick's): once it is done, this one's own. A wait for its folder
-    // (#646) or its hive tools (#865) is no try: given at once after it, or cancelled as before if it can't be then.
+    // (#646) or its Combwork tools (#865) is no try: given at once after it, or cancelled as before if it can't be then.
     for (let i = 0; i < 3; ) {
       const now = deliveryNow(host, rec.id)
       if (!now || !isWaiting(now)) break
       if ((await heldByFolder()) || (await heldByTools())) continue
-      why = whyNoLine(host, nd.agentId, nd.need ?? 'idle') ?? (holds && !holds() ? 'what it was for changed meanwhile' : null)
+      why = whyNoLine(host, nd.agentId, nd.need ?? 'idle') ?? (holds && !holds() ? say(T.changed) : null)
       if (why) break
       if (await offerNow(host, nd.agentId, rec.id)) break
       if (await heldByFolder()) continue
@@ -1766,10 +1925,10 @@ export async function deliverNow(host: string, nd: NewDelivery, holds?: () => bo
   } finally {
     const now = deliveryNow(host, rec.id)
     if (now && isWaiting(now)) {
-      why ??= whyNoLine(host, nd.agentId, nd.need ?? 'idle') ?? 'Hive could not type it'
+      why ??= whyNoLine(host, nd.agentId, nd.need ?? 'idle') ?? say(T.notTyped)
       await transact(store, (d) => {
         const r = byId(d.records, rec.id)
-        if (r && isWaiting(r)) set(store, d, r, 'cancelled', `not given: ${why}`)
+        if (r && isWaiting(r)) set(store, d, r, 'cancelled', NOT_GIVEN + why)
       }).catch(() => undefined)
       show(store, nd.agentId)
     }
@@ -1777,7 +1936,7 @@ export async function deliverNow(host: string, nd: NewDelivery, holds?: () => bo
   const out = deliveryNow(host, rec.id) ?? rec
   if (out.state === 'cancelled' || out.state === 'refused' || out.state === 'expired') {
     store.hooks.delete(rec.id)
-    throw new NotGiven(out.detail?.replace(/^not given: /, '') ?? why ?? out.state)
+    throw new NotGiven((out.detail?.startsWith(NOT_GIVEN) ? out.detail.slice(NOT_GIVEN.length) : out.detail) ?? why ?? out.state)
   }
   return out
 }
@@ -1785,7 +1944,7 @@ export async function deliverNow(host: string, nd: NewDelivery, holds?: () => bo
 /**
  * Makes a delivery that a launch carries (#649: the task an agent is started with, its prompt on the command line):
  * `start` launches the agent with its doorbell (#650: its id, never its text), and it is offered into that launch,
- * received once the agent reads it with hive_inbox. `start` failing cancels it, and the error stands.
+ * received once the agent reads it with cw_inbox. `start` failing cancels it, and the error stands.
  */
 export async function launchWith<T extends { runId: string }>(host: string, nd: NewDelivery, start: (line: string) => Promise<T>, hooks?: DeliveryHooks): Promise<{ record: DeliveryRecord | null; launched: T }> {
   // The user's own task for an agent that can't read an inbox (#650's decision): its launch's prompt, as their input,
@@ -1799,12 +1958,12 @@ export async function launchWith<T extends { runId: string }>(host: string, nd: 
   store.offering.add(rec.id)
   let run: T
   try {
-    run = await start(withCardNames(workspaceFor(store.host), () => offerLine([rec], null), scopeOfHost(store.host)))
+    run = await start(withCardNames(workspaceFor(store.host), () => inDialectOf({ projectPath: store.host, agentId: nd.agentId }, () => offerLine([rec], null)), scopeOfHost(store.host)))
   } catch (e) {
     store.offering.delete(rec.id)
     await transact(store, (d) => {
       const r = byId(d.records, rec.id)
-      if (r?.state === 'offered' && r.offerRun === LAUNCHING) set(store, d, r, 'cancelled', `not given: ${(e as Error).message}`)
+      if (r?.state === 'offered' && r.offerRun === LAUNCHING) set(store, d, r, 'cancelled', NOT_GIVEN + (e as Error).message)
     }).catch((err) => log.warn("cancelling a launch's task", err))
     show(store, nd.agentId)
     throw e
@@ -1845,7 +2004,7 @@ export async function followAgent(host: string, agentId: string): Promise<void> 
 /** Follows each loaded host's deliveries (received, uncertain, ended), offers what waits, and refreshes the panes (overdue). */
 function tick(): void {
   for (const store of stores.values()) {
-    if (store.records.some((r) => isUnread(r) && (whyNot(store, r) || r.state === 'offered'))) transactSoon(store, 'checking deliveries', (d) => recheck(store, d))
+    if (store.records.some((r) => isUnread(r) && (whyNot(store, r) || r.state === 'offered'))) transactSoon(store, 'checking deliveries', (d) => recheck(store, d)) // agent-protocol: for the log
     const agents = new Set(store.records.filter(isLive).map((r) => r.agentId))
     for (const a of agents) {
       show(store, a)
@@ -1865,7 +2024,7 @@ async function ringLostLine(host: string, agentId: string, runId: string, ids: r
     for (const id of ids) {
       const r = byId(d.records, id)
       const run = r ? (store.launches.get(r.id) ?? r.offerRun) : null
-      if (r && r.agentId === agentId && r.state === 'offered' && !store.offering.has(r.id) && run === runId) set(store, d, r, 'queued', 'its doorbell was lost before its CLI took it')
+      if (r && r.agentId === agentId && r.state === 'offered' && !store.offering.has(r.id) && run === runId) set(store, d, r, 'queued', say(T.doorbellLost))
     }
   })
   show(store, agentId)
@@ -1879,7 +2038,7 @@ export function initDeliveries(): void {
   started = true
   followWorkspaceCloses()
   sessions.lineLost = (host, agentId, runId, ids) => void ringLostLine(host, agentId, runId, ids).catch((e) => log.warn('ringing a lost line again', e))
-  onHiveEvent((e) => {
+  onCombworkEvent((e) => {
     if (e.type === 'workspace-changed') {
       // Restored as a workspace opens: its projects' and its Assistant's (refusals shown, panes filled in).
       const hosts = [...(e.workspace?.projects ?? []).map((p) => p.path), ...(e.workspace?.assistant ? [e.workspace.assistant.path] : [])]
@@ -1898,7 +2057,7 @@ export function initDeliveries(): void {
     void load(projectPath)
       .then((store) => {
         // A doorbell let pass, a launch ended: what was offered rings once more, or is uncertain.
-        if (store.records.some((r) => r.agentId === agentId && r.state === 'offered')) transactSoon(store, 'checking deliveries', (d) => recheck(store, d, agentId))
+        if (store.records.some((r) => r.agentId === agentId && r.state === 'offered')) transactSoon(store, 'checking deliveries', (d) => recheck(store, d, agentId)) // agent-protocol: for the log
         show(store, agentId)
         // Idle for a message or a card event (watching, or its turn over while its own background tasks run, #726) too.
         if (readyFor(e.state, 'stalled') || readyFor(e.state) || status === 'watching') setTimeout(() => void offerNow(projectPath, agentId).catch((err) => log.warn('offering deliveries', err)), 500).unref?.()
@@ -1907,7 +2066,7 @@ export function initDeliveries(): void {
   })
   // A team resuming (HI-2081): what its pause held has its time moved on by how long it was held (never expired for the
   // pause: a weekend's still resumes), then each source's refresh decides from things as they are now, and it is offered.
-  onHiveEvent((e) => {
+  onCombworkEvent((e) => {
     if (e.type === 'team-pause-changed' && !e.pause && e.was) void rebaseHeld(e.workspacePath, e.was.since).catch((err) => log.warn('offering what the team pause held', err))
   })
   // The user's pause after typing, a line taken, overdue: nothing tells of those, so they are looked at now and then.
@@ -1940,9 +2099,50 @@ export async function rebaseHeld(workspacePath: string, since: string): Promise<
   }
 }
 
+/**
+ * An agent's conversation carried on in a new one (HI-2463: one launched before the rename starts fresh): what is still
+ * for it there (live, for that conversation) is for whichever conversation it has next, so nothing waiting expires as
+ * "another conversation". How many.
+ */
+export async function carryConversation(host: string, agentId: string, from: string): Promise<number> {
+  const store = await load(host)
+  const { n, replay, name } = await transact(store, (d) => {
+    let count = 0
+    const ids: string[] = []
+    let agentName: string | undefined
+    for (const r of [...d.records]) {
+      if (r.agentId !== agentId || !isLive(r)) continue
+      // Received, not acked (HR1's round 1): the old conversation read it, the new one never did. Whatever conversation it
+      // was bound to (an agent runs one at a time, so the one it left received it), it is shown again on the new one's
+      // next inbox read, its receipt kept (carriedFrom; never acked for it).
+      if (r.state === 'received') {
+        // Shown once to each conversation that reads it (`replayedTo`, read in readInbox): a later fresh one (the old
+        // conversation resumed again) is shown it again by itself, so the marker isn't touched here.
+        put(d, r, { ...r, conversation: null, carriedFrom: from })
+        ids.push(r.id)
+        agentName ??= r.agentName
+        count++
+      } else if (r.conversation === from) {
+        put(d, r, { ...r, conversation: null })
+        count++
+      }
+    }
+    return { n: count, replay: ids, name: agentName }
+  })
+  if (n) show(store, agentId)
+  // The doorbell rings for what is unread: a notice of its own says what is shown again, so the new conversation reads it.
+  if (replay.length)
+    await createDelivery(host, { agentId, ...(name ? { agentName: name } : {}), conversation: null, kind: 'control', from: CARRIED_SENDER, body: `${NOTICE_PREFIX}${say(T.carried, { n: replay.length, ids: replay.join(', ') })}`, source: 'carried', ref: from }).catch((e) => log.warn(`Could not tell ${userText(agentId)} of the messages its earlier conversation hadn't acked`, e))
+  return n
+}
+
+/** Who tells a fresh conversation what its earlier one received and didn't ack: Combwork itself. */
+// agent-protocol: the product's name, as a delivery's sender
+const CARRIED_SENDER = { kind: 'combwork', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
+
 // The workspace's database replaced (#1207 round 2: the upgrade to 1.0, a restore): its hosts' deliveries, read from the
 // file before, go from memory (a save begun from them is refused by their generation). The next use of a host (an agent's
-// status, the workspace opening) reads it again from the file as it is then, with what another Hive saved meanwhile;
+// status, the workspace opening) reads it again from the file as it is then, with what another Combwork saved meanwhile;
 // nothing reads it for a workspace closed meanwhile, which would open its database again (#1207 round 3). While the upgrade
 // waited no agent could start, so none waits for an offer.
 onDbReplaced((_path, place) => {
@@ -1950,7 +2150,7 @@ onDbReplaced((_path, place) => {
 })
 
 // A window closes its workspace (#1391): its hosts' deliveries go from memory, so the tick no longer rechecks them, which
-// leased its closed hive.db at each change. They stay in the database and are restored when a window opens it again. A
+// leased its closed combwork.db at each change. They stay in the database and are restored when a window opens it again. A
 // save already under way holds its store and lease, and finishes. By real location (`placeKey`), as the fence tells
 // workspaces apart: a host loaded through a junction or an 8.3 name to the folder is the same workspace's. Followed from
 // initDeliveries (once).
@@ -1980,7 +2180,8 @@ sessions.deliveries = {
   },
   now: (host, nd, holds) => deliverNow(host, nd, holds),
   launch: (host, nd, start) => launchWith(host, nd, start),
-  cancel: cancelFromSource
+  cancel: cancelFromSource,
+  carry: carryConversation
 }
 
 /** For tests: every loaded host's agents offered now (what the tick does), awaited. */
@@ -2001,7 +2202,7 @@ export async function settledForTests(): Promise<void> {
 export async function loadsForTests(): Promise<void> {
   while (loading.size) await Promise.allSettled([...loading.values()])
 }
-/** For tests: forgets every host in memory, as a restart of Hive does (transactions finish first); what is on disk stays. */
+/** For tests: forgets every host in memory, as a restart of Combwork does (transactions finish first); what is on disk stays. */
 /** For tests: a host's deliveries as saved (#1018: its workspace's database), with what is kept beside them. */
 export async function savedForTests(host: string): Promise<{ next: number | undefined; deliveries: DeliveryRecord[]; invalid?: unknown[] }> {
   const place = await hostPlace(host)

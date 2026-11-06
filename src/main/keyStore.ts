@@ -5,12 +5,12 @@ import { app, safeStorage } from 'electron'
 import { msg } from '../shared/i18n'
 import { emit } from './events'
 import { writeJsonAtomic } from './fsutil'
-import { hiveError } from './hiveError'
+import { combworkError } from './combworkError'
 import { addKeyFingerprint, resetCoverage } from './keyCoverage'
 import { createLogger } from './logger'
 
 /**
- * Server connections' keys (HI-1772), the only place Hive keeps one: `connection-keys.json` in Hive's profile, each key
+ * Server connections' keys (HI-1772), the only place Combwork keeps one: `connection-keys.json` in Combwork's profile, each key
  * encrypted with Electron's safeStorage (DPAPI on Windows, bound to the user), beside what isn't secret (its version,
  * the origin it was saved for, its last 4 characters). This file is the only record of a key: config.json names none,
  * so restoring config from its backup can't bring one back. Each change is one atomic write, with no .bak (a backup would
@@ -63,7 +63,7 @@ async function read(): Promise<Store> {
   }
   try {
     const parsed = JSON.parse(text) as unknown
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('not an object') // i18n-ignore: hive.log, in English
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('not an object') // i18n-ignore: combwork.log, in English
     const out: Store = {}
     for (const [id, e] of Object.entries(parsed as Record<string, Partial<Entry>>)) {
       if (e && typeof e.blob === 'string' && typeof e.origin === 'string' && typeof e.v === 'string' && typeof e.last4 === 'string') out[id] = { v: e.v, origin: e.origin, last4: e.last4, at: String(e.at ?? ''), blob: e.blob }
@@ -99,11 +99,11 @@ export function keyInfo(id: string): KeyInfo | undefined {
   return known.get(id)
 }
 
-const UNSAFE = msg({ id: 'main.keys.unsafe', defaultMessage: "Hive can't store a key safely on this system, so it wasn't saved.", description: "An error saving a server connection's API key (Settings → Accounts & Connections): Windows' protection for stored secrets isn't available, and Hive won't keep a key in plain text." })
+const UNSAFE = msg({ id: 'main.keys.unsafe', defaultMessage: "Combwork can't store a key safely on this system, so it wasn't saved.", description: "An error saving a server connection's API key (Settings → Accounts & Connections): Windows' protection for stored secrets isn't available, and Combwork won't keep a key in plain text." })
 
 /** Whether a key can be stored encrypted: never in plain text (safeStorage's `basic_text` backend, off Windows). */
 function assertSafe(): void {
-  if (!safeStorage.isEncryptionAvailable() || safeStorage.getSelectedStorageBackend?.() === 'basic_text') throw hiveError(UNSAFE, undefined, { kind: 'conflict' })
+  if (!safeStorage.isEncryptionAvailable() || safeStorage.getSelectedStorageBackend?.() === 'basic_text') throw combworkError(UNSAFE, undefined, { kind: 'conflict' })
 }
 
 /** Saves a connection's key for an origin (Save, Replace): one write, its version moved on. Returns what the view shows. */

@@ -33,7 +33,7 @@ describe('the tips as messages', () => {
       }
   })
 
-  it('a shortcut is {key} with its command in `key`, a command Hive has; no old {key:…} is left', () => {
+  it('a shortcut is {key} with its command in `key`, a command Combwork has; no old {key:…} is left', () => {
     let keyed = 0
     for (const tip of TIPS) {
       const text = asMsg(tip.text).defaultMessage
@@ -61,7 +61,7 @@ describe('the tips as messages', () => {
     }
     expect(shown('assistant-compact')).toContain('past 500,000 tokens by default')
     expect(shown('card-cost').replace(/[\u00a0\u202f]/g, ' ')).toContain('"cost: ≈ $1.84 · 2 rounds"')
-    expect(shown('date-format')).toContain('Hive shows dates as 2026-10-04 and times as 14:05.')
+    expect(shown('date-format')).toContain('Combwork shows dates as 2026-10-04 and times as 14:05.')
     expect(shown('loop-defaults')).toContain('(10 rounds and 6 hours to start with)')
     expect(shown('session-cleanup')).toContain('more than 24 hours, 7 days or 30 days ago')
     expect(shown('git-view')).toContain('The status bar shows "main · origin · ↑2 ↓0": click it')

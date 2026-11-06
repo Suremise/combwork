@@ -1,5 +1,5 @@
 // Tests only (tests/sandboxChecks.test.ts): a fake windows-sandbox MCP server, so the Sandbox checks' runner is tested
-// without the hive-mcp project or a Sandbox. It answers the tools the runner calls over stdio, in the server's reply
+// without the MCP servers project or a Sandbox. It answers the tools the runner calls over stdio, in the server's reply
 // shapes the runner reads, and records each call in the state file it shares with stub-wsb.cjs (WSB_STUB_STATE):
 //   { sandboxes: [id], calls: [['env', its settings] | ['start', args] | ['run', command] | ['stop', id, 'server'] ...],
 //     fail: { stop: n, guest: [{ match, exit, stdout, stderr }] } }
@@ -38,7 +38,7 @@ const tools = {
     current = crypto.randomUUID()
     // What the runner gave it: its settings, and one variable of the shell's that it mustn't pass on.
     const env = n => process.env[n] ?? null
-    s.calls.push(['env', { WSB_SANDBOX_ROOT: env('WSB_SANDBOX_ROOT'), WSB_TOOL_DIRS: env('WSB_TOOL_DIRS'), WSB_MCP_ENABLED: env('WSB_MCP_ENABLED'), WSB_ALLOWED_ROOTS: env('WSB_ALLOWED_ROOTS'), HIVE_API_TOKEN: env('HIVE_API_TOKEN') }])
+    s.calls.push(['env', { WSB_SANDBOX_ROOT: env('WSB_SANDBOX_ROOT'), WSB_TOOL_DIRS: env('WSB_TOOL_DIRS'), WSB_MCP_ENABLED: env('WSB_MCP_ENABLED'), WSB_ALLOWED_ROOTS: env('WSB_ALLOWED_ROOTS'), CW_API_TOKEN: env('CW_API_TOKEN') }])
     s.calls.push(['start', args])
     s.sandboxes.push(current)
     write(s)

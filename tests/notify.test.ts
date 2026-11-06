@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { kindOfLevel, keepPopups, MAX_POPUPS, notifyRoute, popupMs, popupRole, staysUntilHandled, toldWhenAway, type NotifyKind } from '../src/shared/notify'
 import { DEFAULT_SETTINGS } from '../src/shared/defaults'
-import type { HiveEvent } from '../src/shared/types'
+import type { CombworkEvent } from '../src/shared/types'
 
 const KINDS: NotifyKind[] = ['needsYou', 'finished', 'work', 'usage', 'warning', 'result', 'transcript', 'update', 'quit', 'tip']
 const on = { ...DEFAULT_SETTINGS.notifications }
@@ -14,16 +14,16 @@ const lookingAt = (workspacePath: string, projectPath: string | null) => ({ work
 const route = (n: Partial<typeof on>, kind: NotifyKind, focused: ReturnType<typeof lookingAt> | null, f: { workspacePath: string | null; projectPath: string | null } = from) => notifyRoute({ ...on, ...n }, kind, focused, f).route
 
 describe('the routing table (notifyRoute): each kind, one place', () => {
-  it('a Hive window focused: every kind pops up in it, but Hive has closed (its windows are closing)', () => {
+  it('a Combwork window focused: every kind pops up in it, but Combwork has closed (its windows are closing)', () => {
     for (const kind of KINDS) expect(route({}, kind, lookingAt(wsA, null)), kind).toBe(kind === 'quit' ? 'none' : 'popup')
   })
 
-  it('no Hive window focused: agents, lanes, plan usage and Hive closing go to Windows notifications; Hive\'s own messages wait in their window', () => {
+  it('no Combwork window focused: agents, lanes, plan usage and Combwork closing go to Windows notifications; Combwork\'s own messages wait in their window', () => {
     for (const kind of KINDS) expect(route({}, kind, null), kind).toBe(toldWhenAway(kind) ? 'windows' : 'popup')
     expect(KINDS.filter(toldWhenAway)).toEqual(['needsYou', 'finished', 'work', 'usage', 'quit'])
   })
 
-  it('the master switch off: nothing for the agent kinds, plan usage and Hive closing, focused or not; Hive\'s own messages still pop up', () => {
+  it('the master switch off: nothing for the agent kinds, plan usage and Combwork closing, focused or not; Combwork\'s own messages still pop up', () => {
     for (const focused of [null, lookingAt(wsA, null)]) {
       for (const kind of KINDS) expect(route({ desktopNotifications: false }, kind, focused), kind).toBe(toldWhenAway(kind) ? 'none' : kind === 'quit' ? 'none' : 'popup')
     }
@@ -48,7 +48,7 @@ describe('the routing table (notifyRoute): each kind, one place', () => {
     expect(route({ bannerScope: 'project' }, 'work', sameWsOtherProject)).toBe('bell')
     expect(route({ bannerScope: 'project' }, 'needsYou', sameProject)).toBe('popup')
     for (const kind of ['needsYou', 'finished', 'work'] as const) expect(route({ bannerScope: 'none' }, kind, sameProject), kind).toBe('bell')
-    // The scope is about agents: Hive's own messages, and one about no project, pop up whatever it says.
+    // The scope is about agents: Combwork's own messages, and one about no project, pop up whatever it says.
     for (const bannerScope of ['workspace', 'project', 'none'] as const) {
       expect(route({ bannerScope }, 'warning', other), bannerScope).toBe('popup')
       expect(route({ bannerScope }, 'usage', other, nowhere), bannerScope).toBe('popup')
@@ -64,13 +64,13 @@ describe('the routing table (notifyRoute): each kind, one place', () => {
 
   it('says why, for the log', () => {
     const s = { ...on, bannerScope: 'workspace' as const }
-    expect(notifyRoute(s, 'finished', null, from)).toEqual({ route: 'windows', why: 'no Hive window focused' })
+    expect(notifyRoute(s, 'finished', null, from)).toEqual({ route: 'windows', why: 'no Combwork window focused' })
     expect(notifyRoute(s, 'finished', lookingAt('C:\\Work\\B', null), from)).toEqual({ route: 'bell', why: "pop-up scope: another workspace's" })
     expect(notifyRoute(s, 'finished', lookingAt('c:\\work\\a', null), from)).toEqual({ route: 'popup', why: 'pop-up scope: workspace' })
-    expect(notifyRoute(s, 'warning', null, nowhere)).toEqual({ route: 'popup', why: 'no Hive window focused: waits in its window' })
+    expect(notifyRoute(s, 'warning', null, nowhere)).toEqual({ route: 'popup', why: 'no Combwork window focused: waits in its window' })
   })
 
-  it("a message by its level: warning and error are Hive's warnings, info and success its results", () => {
+  it("a message by its level: warning and error are Combwork's warnings, info and success its results", () => {
     expect(['info', 'success', 'warning', 'error'].map((l) => kindOfLevel(l as never))).toEqual(['result', 'result', 'warning', 'warning'])
   })
 })
@@ -122,8 +122,8 @@ describe('one pop-up system: stacking, timing, roles', () => {
 
 // main/notify.ts: one entry per event, one owner, offers resolved by their own key.
 describe('tell(): one entry, one window', () => {
-  const sent = new Map<number, HiveEvent[]>()
-  const win = (id: number, focusedNow = false) => ({ id, focusedNow, isDestroyed: () => false, webContents: { id, send: (_c: string, e: HiveEvent) => sent.set(id, [...(sent.get(id) ?? []), e]) } })
+  const sent = new Map<number, CombworkEvent[]>()
+  const win = (id: number, focusedNow = false) => ({ id, focusedNow, isDestroyed: () => false, webContents: { id, send: (_c: string, e: CombworkEvent) => sent.set(id, [...(sent.get(id) ?? []), e]) } })
   const A = win(1)
   const B = win(2)
   let focused: ReturnType<typeof win> | null = null
@@ -177,7 +177,7 @@ describe('tell(): one entry, one window', () => {
     await running
     expect(toasts(B).map((t) => t.title)).toEqual(['Copied to workspace', 'Platform changed'])
     expect(toasts(A).map((t) => t.title)).toEqual(['beta needs your input'])
-    // No request: Hive's own message goes to the window in use.
+    // No request: Combwork's own message goes to the window in use.
     notify.tell({ kind: 'warning', title: 'Background warning' })
     expect(toasts(A).map((t) => t.title)).toEqual(['beta needs your input', 'Background warning'])
   })
@@ -191,7 +191,7 @@ describe('tell(): one entry, one window', () => {
     expect(toasts(A)[0].target).toEqual({ kind: 'project', projectPath: 'C:\\Work\\B\\beta', project: 'beta' })
   })
 
-  it("none focused: an agent's finish is a Windows notification with a quiet row in its own workspace's window; Hive's warning waits there as a pop-up", () => {
+  it("none focused: an agent's finish is a Windows notification with a quiet row in its own workspace's window; Combwork's warning waits there as a pop-up", () => {
     const f = notify.tell({ kind: 'finished', title: 'beta · Two finished', projectPath: 'C:\\Work\\B\\beta' })
     expect(f.route).toBe('windows')
     expect(toasts(B).map((x) => [x.title, x.quiet ?? false])).toEqual([['beta · Two finished', true]])
@@ -201,11 +201,11 @@ describe('tell(): one entry, one window', () => {
     expect(toasts(A)).toEqual([])
   })
 
-  it("Hive has closed: never in a window; nothing while you look at Hive", () => {
-    expect(notify.tell({ kind: 'quit', title: 'Hive has closed' }).route).toBe('windows')
+  it("Combwork has closed: never in a window; nothing while you look at Combwork", () => {
+    expect(notify.tell({ kind: 'quit', title: 'Combwork has closed' }).route).toBe('windows')
     expect(toasts(A)).toEqual([])
     focused = A
-    expect(notify.tell({ kind: 'quit', title: 'Hive has closed' }).route).toBe('none')
+    expect(notify.tell({ kind: 'quit', title: 'Combwork has closed' }).route).toBe('none')
     expect(toasts(A)).toEqual([])
   })
 
@@ -219,7 +219,7 @@ describe('tell(): one entry, one window', () => {
   it("an offer resolves its own entries only: an old one's completion never clears a newer offer for the same agent", () => {
     focused = A
     const resolved: { ids: string[]; outcome: string }[] = []
-    const off = (async () => (await import('../src/main/events')).onHiveEvent((e) => e.type === 'toast-resolved' && void resolved.push({ ids: e.ids, outcome: e.outcome })))()
+    const off = (async () => (await import('../src/main/events')).onCombworkEvent((e) => e.type === 'toast-resolved' && void resolved.push({ ids: e.ids, outcome: e.outcome })))()
     return off.then((stop) => {
       const oldOffer = notify.askOffer('C:\\Work\\A\\alpha', 'a1')
       const old = notify.tell({ kind: 'needsYou', title: 'old ask', projectPath: 'C:\\Work\\A\\alpha', agentId: 'a1', offer: oldOffer })

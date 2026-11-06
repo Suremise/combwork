@@ -15,7 +15,7 @@ import { testQuiet } from './testQuiet'
 import { installedCopy, runningIdentity } from './buildIdentity'
 import { installDecision, updateDecision, type BuildIdentity } from '../shared/updates'
 import { RELEASES_REPO } from '../shared/defaults'
-import { HiveGitHubProvider } from './updateFeed'
+import { CombworkGitHubProvider } from './updateFeed'
 
 const log = createLogger('updates')
 
@@ -24,9 +24,9 @@ const CHECK_INTERVAL = 6 * 60 * 60 * 1000
 
 /**
  * The resources folder whose build identity and app are read (#1647): this build's own, or in an unpackaged test build
- * with a test feed the one HIVE_TEST_RESOURCES names (a stand-in installed copy).
+ * with a test feed the one CW_TEST_RESOURCES names (a stand-in installed copy).
  */
-const resourcesDir = (): string => (!app.isPackaged && process.env.HIVE_UPDATE_FEED && process.env.HIVE_TEST_RESOURCES ? process.env.HIVE_TEST_RESOURCES : process.resourcesPath)
+const resourcesDir = (): string => (!app.isPackaged && process.env.CW_UPDATE_FEED && process.env.CW_TEST_RESOURCES ? process.env.CW_TEST_RESOURCES : process.resourcesPath)
 /** What this build is (#1647): a local build is never replaced by a release of its own version. */
 let running: BuildIdentity = { version: app.getVersion(), commit: null, local: false }
 const localOf = (b: BuildIdentity): UpdateState['local'] => (b.local ? { commit: b.commit } : undefined)
@@ -35,7 +35,7 @@ let offered: string | null = null
 
 let state: UpdateState = { status: 'idle', current: app.getVersion() }
 let timer: ReturnType<typeof setInterval> | null = null
-/** The first automatic check, 30 s after Hive starts: cancelled when automatic checks are turned off before it (HI-2324). */
+/** The first automatic check, 30 s after Combwork starts: cancelled when automatic checks are turned off before it (HI-2324). */
 let firstCheck: ReturnType<typeof setTimeout> | null = null
 /** An automatic check (the first one, the 6-hourly one), which runs only while automatic checks are on (HI-2324). */
 const autoCheck = (): void => {
@@ -60,27 +60,27 @@ export function updateState(): UpdateState {
 /**
  * Updates come from GitHub Releases (electron-updater reads latest.yml there and checks the
  * installer's SHA-512). Development builds never update, except in tests, which point
- * HIVE_UPDATE_FEED at a local server.
+ * CW_UPDATE_FEED at a local server.
  */
-const testFeed = (): string | undefined => (app.isPackaged ? undefined : process.env.HIVE_UPDATE_FEED)
-/** The test download cache's folder in %LOCALAPPDATA%: hive-test-updater, or the one HIVE_UPDATE_CACHE names (an e2e lane's). */
+const testFeed = (): string | undefined => (app.isPackaged ? undefined : process.env.CW_UPDATE_FEED)
+/** The test download cache's folder in %LOCALAPPDATA%: combwork-test-updater, or the one CW_UPDATE_CACHE names (an e2e lane's). */
 const testCache = (): string => {
-  const name = process.env.HIVE_UPDATE_CACHE ?? ''
-  return /^hive-test-updater-[\w-]+$/.test(name) ? name : 'hive-test-updater'
+  const name = process.env.CW_UPDATE_CACHE ?? ''
+  return /^combwork-test-updater-[\w-]+$/.test(name) ? name : 'combwork-test-updater'
 }
 
 /**
- * A packaged Hive a test started (HIVE_TEST_QUIET=1, testQuiet: the packaged suites, the Sandbox checks) never checks
+ * A packaged Combwork a test started (CW_TEST_QUIET=1, testQuiet: the packaged suites, the Sandbox checks) never checks
  * GitHub for updates (#1332): each check fetches the release's latest.yml, which counts as a download there. The
  * installed app is never started with it.
  */
 const packagedTestCopy = (): boolean => app.isPackaged && testQuiet()
 
 function enabledReason(): string | null {
-  if (packagedTestCopy()) return tr(msg({ id: 'main.update.testCopy', defaultMessage: "A test copy of Hive doesn't check for updates.", description: 'Settings → Updates in a copy of Hive started by its tests, which never checks for updates.' }))
+  if (packagedTestCopy()) return tr(msg({ id: 'main.update.testCopy', defaultMessage: "A test copy of Combwork doesn't check for updates.", description: 'Settings → Updates in a copy of Combwork started by its tests, which never checks for updates.' }))
   if (app.isPackaged) return null
   if (testFeed()) return null
-  return tr(msg({ id: 'main.update.devBuild', defaultMessage: 'Updates are checked by the installed app, not development builds.', description: 'Settings → Updates in a development build of Hive, which never updates.' }))
+  return tr(msg({ id: 'main.update.devBuild', defaultMessage: 'Updates are checked by the installed app, not development builds.', description: 'Settings → Updates in a development build of Combwork, which never updates.' }))
 }
 
 function applySettings(): void {
@@ -88,7 +88,7 @@ function applySettings(): void {
   // Downloads are started here rather than by electron-updater, so skipped versions and the
   // "download automatically" setting are honoured.
   autoUpdater.autoDownload = false
-  // Hive installs on its own quit (installsOnQuit, at the end of index.ts' quit flow), only once the copy on disk is read
+  // Combwork installs on its own quit (installsOnQuit, at the end of index.ts' quit flow), only once the copy on disk is read
   // and older (#1647): electron-updater's own install on quit never runs.
   autoUpdater.autoInstallOnAppQuit = false
   autoUpdater.allowPrerelease = s.prerelease
@@ -111,7 +111,7 @@ function notesOf(info: UpdateInfo): string | undefined {
 
 function friendlyError(e: unknown): string {
   const said = String((e as Error)?.message ?? e)
-  if (/\b404\b|not found|no published versions|unable to find latest version|cannot find latest\.yml/i.test(said)) return tr(msg({ id: 'main.update.noRelease', defaultMessage: 'No release of Hive has been published yet.', description: 'Why checking for updates found none.' }))
+  if (/\b404\b|not found|no published versions|unable to find latest version|cannot find latest\.yml/i.test(said)) return tr(msg({ id: 'main.update.noRelease', defaultMessage: 'No release of Combwork has been published yet.', description: 'Why checking for updates found none.' }))
   if (/ENOTFOUND|ETIMEDOUT|ECONNREFUSED|ECONNRESET|EAI_AGAIN|net::ERR_/i.test(said)) return tr(msg({ id: 'main.update.offline', defaultMessage: "Couldn't reach GitHub to check for updates. Check your internet connection.", description: 'Why checking for updates failed. GitHub is a name.' }))
   if (/sha512|checksum/i.test(said)) return tr(msg({ id: 'main.update.checksum', defaultMessage: 'The downloaded update did not match its checksum and was discarded.', description: 'Why a downloaded update was thrown away.' }))
   return said.split('\n')[0].slice(0, 300)
@@ -148,8 +148,8 @@ export async function check(manual: boolean): Promise<UpdateState> {
         offered = same
         toast(
           'info',
-          tr(msg({ id: 'main.update.sameVersion', defaultMessage: 'A published {app} {version} is available', description: "A notice: the user runs a local build (one they built themselves) of a version, and a published release of the same version exists. {app} is Hive's name." }), { app: APP_NAME, version: same }),
-          tr(msg({ id: 'main.update.sameVersionBody', defaultMessage: "You're running a local build of {version}{hasCommit, select, yes { ({commit})} other {}}. Hive doesn't install a release of the same version over it.", description: "The notice that a published release has the same version as the user's local build. {commit} is the commit it was built from." }), { version: same, hasCommit: running.commit ? 'yes' : 'no', commit: running.commit?.slice(0, 7) ?? '' }),
+          tr(msg({ id: 'main.update.sameVersion', defaultMessage: 'A published {app} {version} is available', description: "A notice: the user runs a local build (one they built themselves) of a version, and a published release of the same version exists. {app} is Combwork's name." }), { app: APP_NAME, version: same }),
+          tr(msg({ id: 'main.update.sameVersionBody', defaultMessage: "You're running a local build of {version}{hasCommit, select, yes { ({commit})} other {}}. Combwork doesn't install a release of the same version over it.", description: "The notice that a published release has the same version as the user's local build. {commit} is the commit it was built from." }), { version: same, hasCommit: running.commit ? 'yes' : 'no', commit: running.commit?.slice(0, 7) ?? '' }),
           [{ label: tr(msg({ id: 'main.update.openReleasePage', defaultMessage: 'Open Release Page', description: "The notice's button: opens that release's page on GitHub in the browser (it doesn't install anything)." })), command: 'update.releaseNotes', args: [same] }]
         )
       }
@@ -209,29 +209,35 @@ export function restartAndInstall(version?: string): void {
     return
   }
   if (!mayInstall()) {
-    toast('warning', tr(msg({ id: 'main.update.notInstalled', defaultMessage: "{app} {version} wasn't installed", description: "A notice: the user chose Restart and Update, and Hive didn't install the downloaded update. {app} is Hive's name." }), { app: APP_NAME, version: state.version ?? '' }), notInstalledText())
+    toast('warning', tr(msg({ id: 'main.update.notInstalled', defaultMessage: "{app} {version} wasn't installed", description: "A notice: the user chose Restart and Update, and Combwork didn't install the downloaded update. {app} is Combwork's name." }), { app: APP_NAME, version: state.version ?? '' }), notInstalledText())
     return
   }
-  if (version !== undefined) resolveOffer(`update:${version}`, tr(OUTCOME.installing))
+  // Its notice keeps its button until the quit goes ahead (HI-2425): the quit may still ask, and Cancel leaves Combwork
+  // and the offer as they were. markInstalling() says Installing once it does.
   restartForUpdate()
+}
+
+/** The quit is going ahead and installs the update (HI-2425): its notice says so in place of Restart and Update. */
+export function markInstalling(): void {
+  if (state.status === 'ready' && state.version) resolveOffer(`update:${state.version}`, tr(OUTCOME.installing))
 }
 
 /** Why a downloaded update isn't installed, for the notice. */
 function notInstalledText(): string {
   return state.notInstalled === 'unreadable'
-    ? tr(msg({ id: 'main.update.notInstalledUnreadable', defaultMessage: "Hive couldn't read the copy installed on this computer, so it didn't replace it. Try again once any other Hive installer has finished.", description: 'Why Hive did not install a downloaded update: it could not read the installed copy (another installer may be replacing it).' }))
-    : tr(msg({ id: 'main.update.notInstalledNotNewer', defaultMessage: 'The copy installed on this computer is the same version or newer (a local build, say).', description: 'Why Hive did not install a downloaded update: what is installed is not older than it.' }))
+    ? tr(msg({ id: 'main.update.notInstalledUnreadable', defaultMessage: "Combwork couldn't read the copy installed on this computer, so it didn't replace it. Try again once any other Combwork installer has finished.", description: 'Why Combwork did not install a downloaded update: it could not read the installed copy (another installer may be replacing it).' }))
+    : tr(msg({ id: 'main.update.notInstalledNotNewer', defaultMessage: 'The copy installed on this computer is the same version or newer (a local build, say).', description: 'Why Combwork did not install a downloaded update: what is installed is not older than it.' }))
 }
 
-/** Whether Hive's quit installs the downloaded update: Install is automatic, and it may be installed now (mayInstall). */
+/** Whether Combwork's quit installs the downloaded update: Install is automatic, and it may be installed now (mayInstall). */
 export function installsOnQuit(): boolean {
   return state.status === 'ready' && config.settings.updates.install === 'auto' && mayInstall()
 }
 
 /**
  * Called at the very end of quitting (index.ts' quit flow, so never for a quit the user cancelled): Restart and Update
- * (`restart`) installs and opens Hive again; Install automatically, without. Checked again first (mayInstall): the copy
- * on disk read now, and Hive quits without installing when it may not.
+ * (`restart`) installs and opens Combwork again; Install automatically, without. Checked again first (mayInstall): the copy
+ * on disk read now, and Combwork quits without installing when it may not.
  */
 export function installNow(restart = true): void {
   if (!mayInstall()) {
@@ -255,15 +261,15 @@ export function initUpdater(opts: { restart: () => void }): void {
 
   const feed = testFeed()
   if (feed) {
-    // Tests: a generic feed, with its own download cache so the installed Hive's is never touched.
+    // Tests: a generic feed, with its own download cache so the installed Combwork's is never touched.
     const file = join(app.getPath('userData'), 'test-app-update.yml')
     writeFileSync(file, `provider: generic\nurl: ${feed}\nupdaterCacheDirName: ${testCache()}\n`) // i18n-ignore: a file's content, not text
     autoUpdater.updateConfigPath = file
     autoUpdater.forceDevUpdateConfig = true
   } else if (app.isPackaged) {
-    // GitHub's releases through Hive's provider (HI-2311): with pre-releases on, a pre-release install is offered the
+    // GitHub's releases through Combwork's provider (HI-2311): with pre-releases on, a pre-release install is offered the
     // newest version newer by semver (beta, RC or release), not only a later one of its own pre-release name.
-    autoUpdater.setFeedURL({ provider: 'custom', updateProvider: HiveGitHubProvider, ...RELEASES_REPO })
+    autoUpdater.setFeedURL({ provider: 'custom', updateProvider: CombworkGitHubProvider, ...RELEASES_REPO })
   }
 
   autoUpdater.on('update-available', (info: UpdateInfo) => {
@@ -297,9 +303,9 @@ export function initUpdater(opts: { restart: () => void }): void {
     const auto = config.settings.updates.install === 'auto'
     toast(
       'info',
-      tr(msg({ id: 'main.update.ready', defaultMessage: '{app} {version} is ready', description: "A notice: an update was downloaded. {app} is Hive's name, {version} the new version." }), { app: APP_NAME, version: info.version }),
-      auto ? tr(msg({ id: 'main.update.readyAuto', defaultMessage: 'It installs when you quit Hive, or restart now.', description: 'The notice that an update is ready, with updates installed automatically.' })) : tr(msg({ id: 'main.update.readyManual', defaultMessage: 'Restart Hive to install it.', description: 'The notice that an update is ready, with updates installed manually.' })),
-      [{ label: tr(msg({ id: 'main.update.restart', defaultMessage: 'Restart and Update', description: "The notice's button: restarts Hive and installs the update." })), command: 'update.install', args: [info.version] }],
+      tr(msg({ id: 'main.update.ready', defaultMessage: '{app} {version} is ready', description: "A notice: an update was downloaded. {app} is Combwork's name, {version} the new version." }), { app: APP_NAME, version: info.version }),
+      auto ? tr(msg({ id: 'main.update.readyAuto', defaultMessage: 'It installs when you quit Combwork, or restart now.', description: 'The notice that an update is ready, with updates installed automatically.' })) : tr(msg({ id: 'main.update.readyManual', defaultMessage: 'Restart Combwork to install it.', description: 'The notice that an update is ready, with updates installed manually.' })),
+      [{ label: tr(msg({ id: 'main.update.restart', defaultMessage: 'Restart and Update', description: "The notice's button: restarts Combwork and installs the update." })), command: 'update.install', args: [info.version] }],
       undefined,
       undefined,
       // Its offer (HI-2320): this version, while it is the one ready.
@@ -315,13 +321,13 @@ export function initUpdater(opts: { restart: () => void }): void {
   })
 
   const reason = enabledReason()
-  if (packagedTestCopy()) log.info('A test copy (HIVE_TEST_QUIET=1): no update checks, automatic or manual')
+  if (packagedTestCopy()) log.info('A test copy (CW_TEST_QUIET=1): no update checks, automatic or manual')
   if (reason) set({ status: 'disabled', error: reason }, true)
   else if (config.settings.updates.checkAutomatically) {
     firstCheck = setTimeout(() => {
       firstCheck = null
       autoCheck()
-    }, Number(process.env.HIVE_UPDATE_DELAY) || FIRST_CHECK_DELAY)
+    }, Number(process.env.CW_UPDATE_DELAY) || FIRST_CHECK_DELAY)
   }
 
   noticeUpdated()
@@ -340,7 +346,7 @@ function noticeUpdated(): void {
   if (!last || last === current || !app.isPackaged) return
   setTimeout(
     () =>
-      toast('success', tr(msg({ id: 'main.update.updated', defaultMessage: '{app} updated to {version}', description: 'A notice after Hive was updated. {app} is its name, {version} the new version.' }), { app: APP_NAME, version: current }), tr(msg({ id: 'main.update.updatedBody', defaultMessage: 'See what changed in this version.', description: 'The notice after Hive was updated.' })), [
+      toast('success', tr(msg({ id: 'main.update.updated', defaultMessage: '{app} updated to {version}', description: 'A notice after Combwork was updated. {app} is its name, {version} the new version.' }), { app: APP_NAME, version: current }), tr(msg({ id: 'main.update.updatedBody', defaultMessage: 'See what changed in this version.', description: 'The notice after Combwork was updated.' })), [
         { label: tr(msg({ id: 'main.update.whatsNew', defaultMessage: "What's New", description: "The notice's button: opens the release notes." })), command: 'update.releaseNotes', args: [current] }
       ]),
     4000

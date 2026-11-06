@@ -32,7 +32,7 @@ const check = (name, ok, extra = '') => {
   lib.gitProject(alpha)
   lib.gitProject(beta)
   lib.fakeClaude(userData, claudeHome, [alpha, beta])
-  const { app, page, inv } = await lib.launch({ userData, env: { CLAUDE_CONFIG_DIR: claudeHome, HIVE_API_PORT: lib.port(47836) }, viewport: { width: 1500, height: 900 } })
+  const { app, page, inv } = await lib.launch({ userData, env: { CLAUDE_CONFIG_DIR: claudeHome, CW_API_PORT: lib.port(47836) }, viewport: { width: 1500, height: 900 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)
@@ -151,7 +151,7 @@ const check = (name, ok, extra = '') => {
     // Faster than the saves (each held 700 ms): → then ← at once ends on Panes, and → → → on Tiles: the latest choice
     // wins, shown at once, focused and saved, whatever was still saving.
     await app.evaluate(() => {
-      process.env.HIVE_TEST_SLOW_IPC = 'project:updateConfig=700'
+      process.env.CW_TEST_SLOW_IPC = 'project:updateConfig=700'
     })
     // While its saves run the toggle is busy (aria-busy); the views saved meanwhile are recorded as they change, so a case
     // ends only once its saves are done and shows what was written, in order.
@@ -180,13 +180,13 @@ const check = (name, ok, extra = '') => {
     check('…and once saved: Tiles chosen, focused and shown', (await radios()) === 'panes:false:-1 tiles:true:0:focused' && (await page.locator('.agent-tiles').count()) === 1, await radios())
     // A save that fails: the choice goes back to the saved view, and a notice says it couldn't change.
     await app.evaluate(() => {
-      delete process.env.HIVE_TEST_SLOW_IPC
-      process.env.HIVE_TEST_FAIL_IPC = 'project:updateConfig*1'
+      delete process.env.CW_TEST_SLOW_IPC
+      process.env.CW_TEST_FAIL_IPC = 'project:updateConfig*1'
     })
     await page.keyboard.press('Home')
     check('a failed save: back to Tiles (what is saved), focused, with a notice', !!(await lib.until(async () => (await radios()) === 'panes:false:-1 tiles:true:0:focused', HUNG_MS)) && projectCfg(alpha).sessionView === 'tiles' && !!(await lib.until(async () => (await page.locator('.toast', { hasText: 'Could not change the view' }).count()) > 0, HUNG_MS)), `${await radios()} ${projectCfg(alpha).sessionView}`)
     await app.evaluate(() => {
-      delete process.env.HIVE_TEST_FAIL_IPC
+      delete process.env.CW_TEST_FAIL_IPC
     })
     await page.locator('.view-switch [data-view="panes"]').click()
     await lib.until(async () => projectCfg(alpha).sessionView === 'panes' && (await page.locator('.agent-tiles').count()) === 0, HUNG_MS)
@@ -216,7 +216,7 @@ const check = (name, ok, extra = '') => {
     // It folds further: + Add to its +, then Panes | Tiles to their icons (their names on hover and for screen readers),
     // then the chip's counts are cut (five agents' "1 waiting · 1 working · 3 idle" go that far); nothing of it is past
     // its edge or cut inside a button. Widened, all comes back.
-    const toggleProgress = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', { type: 'menu-command', command: 'progress.toggle', args: [] }))
+    const toggleProgress = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', { type: 'menu-command', command: 'progress.toggle', args: [] }))
     const toolbar = () => page.evaluate(() => {
       const bar = document.querySelector('.session-toolbar')
       const right = bar.getBoundingClientRect().right

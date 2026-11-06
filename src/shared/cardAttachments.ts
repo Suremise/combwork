@@ -3,7 +3,7 @@
 // the card dialog (not stored yet) is `attachment:draft-<k>` until Save or Post stores it.
 import type { AttachmentKind } from './attachments'
 
-/** A file kept with a card, as Hive lists it. */
+/** A file kept with a card, as Combwork lists it. */
 export interface CardAttachment {
   id: string
   card: number

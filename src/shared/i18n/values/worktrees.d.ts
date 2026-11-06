@@ -1,6 +1,6 @@
 // Generated from locales/en/worktrees.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
-interface HiveMessageValues {
+interface CombworkMessageValues {
   'worktrees.agent.badPlacement': undefined
   'worktrees.agent.badWorkflowRole': undefined
   'worktrees.agent.chooseMove': undefined

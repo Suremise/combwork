@@ -1,5 +1,5 @@
 /**
- * A small stdio MCP client for the windows-sandbox server (the hive-mcp project's), as any MCP client uses it: the Sandbox
+ * A small stdio MCP client for the windows-sandbox server (the workspace's MCP servers project's), as any MCP client uses it: the Sandbox
  * checks start the server's server.js with Node and call its tools. Nothing of the server is imported. Node built-ins only.
  *   const srv = server(serverJs, env, { roots }); const r = await srv.call('sandbox_start', { ... }); await srv.close()
  */
@@ -48,7 +48,7 @@ function server(serverJs, env, { roots } = {}) {
     if (m.error) throw new Error(m.error.message)
     return { text: m.result.content.filter(c => c.type === 'text').map(c => c.text).join('\n'), isError: !!m.result.isError, content: m.result.content }
   }
-  void request('initialize', { protocolVersion: '2025-06-18', capabilities: roots ? { roots: { listChanged: false } } : {}, clientInfo: { name: 'hive-sandbox-checks', version: '1.0.0' } })
+  void request('initialize', { protocolVersion: '2025-06-18', capabilities: roots ? { roots: { listChanged: false } } : {}, clientInfo: { name: 'combwork-sandbox-checks', version: '1.0.0' } })
     .then(() => { if (!exited) write({ method: 'notifications/initialized' }) })
   return { child, call, request, exit, close: () => { child.stdin.end(); return exit } }
 }

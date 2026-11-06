@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { unmergedWork } from '../src/shared/defaults'
 
-const st = (ahead: number, dirty: number, into: string | null = 'main') => ({ branch: 'hive/two', base: 'develop', into, ahead, dirty })
+const st = (ahead: number, dirty: number, into: string | null = 'main') => ({ branch: 'cw/two', base: 'develop', into, ahead, dirty })
 
 describe('unmergedWork', () => {
   it('counts commits, and says what else there is', () => {

@@ -1,19 +1,20 @@
 import { basename, dirname, join, resolve as resolvePath } from 'path'
-import type { HiveEvent, LiveSessionState, ProgressRun } from '../shared/types'
+import type { CombworkEvent, LiveSessionState, ProgressRun } from '../shared/types'
 import { activityFields, publicReason } from '../shared/assistantActivity'
 import { cardRefText } from '../shared/progress'
+import { agentField } from '../shared/advanced'
 
 /**
- * What the Agent API's event stream (`GET /v1/events`) sends of Hive's events, and to whom (#620). Pure, so it is unit
+ * What the Agent API's event stream (`GET /v1/events`) sends of Combwork's events, and to whom (#620). Pure, so it is unit
  * tested. An event not listed here is the windows' own (toasts, settings, focus…) and never sent.
  *
  * Every payload is built field by field from an allowlist, never passed through, so a field added to an event later
- * stays inside Hive until it is added here. Nothing private goes out, to any token: no prompt, message, question or
+ * stays inside Combwork until it is added here. Nothing private goes out, to any token: no prompt, message, question or
  * reply text, no terminal or CLI output, no command line, no notice body, no setting's value. The workspace token and
  * viewer tokens get every event; a project agent's token (`agent`) only its own project's session, notice, progress,
- * merge-slot and agent events, and none of the Hive Assistant's actions.
+ * merge-slot and agent events, and none of the Combwork Assistant's actions.
  */
-export const API_EVENTS = ['session-status', 'session-exit', 'workspace-changed', 'notes-changed', 'skills-changed', 'tasks-changed', 'lanes-changed', 'lane-ended', 'queue-changed', 'progress-changed', 'merge-slots-changed', 'notice', 'notice-resolved', 'assistant-activity', 'agent-added'] as const satisfies readonly HiveEvent['type'][]
+export const API_EVENTS = ['session-status', 'session-exit', 'workspace-changed', 'notes-changed', 'skills-changed', 'tasks-changed', 'lanes-changed', 'lane-ended', 'queue-changed', 'progress-changed', 'merge-slots-changed', 'notice', 'notice-resolved', 'assistant-activity', 'agent-added'] as const satisfies readonly CombworkEvent['type'][]
 
 /** A project agent's scope: its workspace and project. */
 export interface StreamScope {
@@ -28,8 +29,8 @@ const defined = (o: Record<string, unknown>): Record<string, unknown> => Object.
 
 /**
  * An agent's live state as the stream gives it: what it is doing and how it is set up, never what it was told or said.
- * Left out: its status message (the CLI's own words), a question's, a review's and a sign-in's text, the line Hive typed
- * that it hasn't taken, the messages queued for it (only who from and when), and Hive's internal launch details.
+ * Left out: its status message (the CLI's own words), a question's, a review's and a sign-in's text, the line Combwork typed
+ * that it hasn't taken, the messages queued for it (only who from and when), and Combwork's internal launch details.
  */
 export function publicSessionState(s: LiveSessionState): Record<string, unknown> {
   return defined({
@@ -45,9 +46,9 @@ export function publicSessionState(s: LiveSessionState): Record<string, unknown>
     statusSince: s.statusSince,
     startedAt: s.startedAt,
     unseen: s.unseen,
-    // Hive's own words: "Waiting for the merge slot (B4 is merging #305)".
+    // Combwork's own words: "Waiting for the merge slot (B4 is merging #305)".
     mergeSlot: s.mergeSlot,
-    // Hive's own words too ("Waiting for #12 → Review"), with the cards, agents or lanes it waits on.
+    // Combwork's own words too ("Waiting for #12 → Review"), with the cards, agents or lanes it waits on.
     watch: s.watch && defined({ cards: s.watch.cards, agents: s.watch.agents, lanes: s.watch.lanes, column: s.watch.column, changes: s.watch.changes, label: s.watch.label, since: s.watch.since, limitAt: s.watch.limitAt }),
     notWatching: s.notWatching,
     question: s.question && { since: s.question.since },
@@ -71,14 +72,14 @@ export function publicSessionState(s: LiveSessionState): Record<string, unknown>
   })
 }
 
-/** What a run whose title was made from its command line is called outside Hive (Darren's rule for #620). */
+/** What a run whose title was made from its command line is called outside Combwork (Darren's rule for #620). */
 export const COMMAND_TITLE = 'a command'
 
 /**
  * A progress run as the API gives it (GET /v1/progress and `progress-changed`): who runs what, how far, how long. Left
  * out: the command line (its arguments can hold a token or a prompt), the step's name, what it waits for, the summary
- * (a reporter's own text, which can quote output) and the log's path. Its title leaves Hive only when it was given on
- * purpose (hive-progress --title, a reporter's or script's own); one made from the command line never does, nor any
+ * (a reporter's own text, which can quote output) and the log's path. Its title leaves Combwork only when it was given on
+ * purpose (cw-progress --title, a reporter's or script's own); one made from the command line never does, nor any
  * part of it: the run is "a command", with `titleFromCommand: true`.
  */
 export function publicRun(r: ProgressRun): Record<string, unknown> {
@@ -118,8 +119,8 @@ export function publicRun(r: ProgressRun): Record<string, unknown> {
 }
 
 /**
- * Whether a run's title was made from its command line: its reporter says so (hive-progress without --title), or, for a
- * run that doesn't (an older hive-progress, a run kept from before this), the title begins as its command line does.
+ * Whether a run's title was made from its command line: its reporter says so (cw-progress without --title), or, for a
+ * run that doesn't (an older cw-progress, a run kept from before this), the title begins as its command line does.
  * The title and the command are each cut to their own length, so they are compared as far as both go, never whole.
  */
 function titleFromCommand(r: ProgressRun): boolean {
@@ -132,7 +133,7 @@ function titleFromCommand(r: ProgressRun): boolean {
 }
 
 /** The payload an event-stream client gets for `event`, or null when it gets nothing. `agent`: null for the workspace and viewer tokens. */
-export function apiEventFor(event: HiveEvent, agent: StreamScope | null): Record<string, unknown> | null {
+export function apiEventFor(event: CombworkEvent, agent: StreamScope | null): Record<string, unknown> | null {
   const own = (projectPath: string | null): boolean => !agent || (projectPath !== null && same(projectPath, agent.projectPath))
   const ownWorkspace = (workspacePath: string): boolean => !agent || same(workspacePath, agent.workspace)
   switch (event.type) {
@@ -180,11 +181,12 @@ export function apiEventFor(event: HiveEvent, agent: StreamScope | null): Record
             waiting: s.waiting.map((w) => ({ agentId: w.agentId, name: w.name, cards: w.cards, since: w.since }))
           }))
       }
-    // What Hive told the user, without its body (an agent's last reply, its question), its title in English.
+    // What Combwork told the user, without its body (an agent's last reply, its question), its title in English.
     case 'notice': {
       const n = event.notice
       if (!own(n.projectPath)) return null
-      return { type: event.type, notice: { id: n.id, kind: n.kind, title: n.apiTitle ?? n.title, projectPath: n.projectPath, ...(n.agentId ? { agentId: n.agentId } : {}) } }
+      // Its title in the client's dialect (HI-2465: broadcast says each client's line in its scope), else its English.
+      return { type: event.type, notice: { id: n.id, kind: n.kind, title: agentField(n.apiTitle ?? n.title, n.apiTitleText), projectPath: n.projectPath, ...(n.agentId ? { agentId: n.agentId } : {}) } }
     }
     case 'notice-resolved':
     case 'agent-added':
@@ -194,10 +196,10 @@ export function apiEventFor(event: HiveEvent, agent: StreamScope | null): Record
     case 'assistant-activity': {
       if (agent) return null
       const a = event.action
-      // Its home is <workspace>\.hive\assistant.
+      // Its home is <workspace>\.combwork\assistant.
       const workspacePath = dirname(dirname(event.projectPath))
-      // A refusal's reason in Hive's own words (#763), never its error's text, which can quote what was sent.
-      return { type: event.type, workspacePath, action: { id: a.id, at: a.at, text: a.brief ?? a.text, ok: a.ok, ...(a.ok ? {} : { error: a.reason ?? publicReason(undefined) }), ...(a.revertOf ? { revertOf: a.revertOf } : {}), ...activityFields(a) } }
+      // A refusal's reason in Combwork's own words (#763), never its error's text, which can quote what was sent.
+      return { type: event.type, workspacePath, action: { id: a.id, at: a.at, text: a.brief ?? a.text, ok: a.ok, ...(a.ok ? {} : { error: a.reason ?? publicReason(undefined) }), ...activityFields(a) } }
     }
     default:
       return null

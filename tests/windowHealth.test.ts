@@ -1,4 +1,4 @@
-// A window's health in hive.log (HI-1775): where it was and its long tasks, in a line's words; what the page sends is
+// A window's health in combwork.log (HI-1775): where it was and its long tasks, in a line's words; what the page sends is
 // bounded and checked; main writes a long-task line at most every ten seconds a window, counting the rest in the next.
 import { describe, expect, it, vi } from 'vitest'
 import { cleanTasks, cleanWhere, MAX_SCRIPTS, MAX_TASKS, taskText, whereText, type LongTask } from '../src/shared/windowHealth'
@@ -13,7 +13,7 @@ const { noteLongTasks } = await import('../src/main/rendererWatch')
 const where = { view: 'board', project: 'alpha', tab: null, dialog: 'Card HI-12: a title', panels: ['assistant'] }
 const task = (ms: number, scripts: string[] = [], during: string[] = []): LongTask => ({ at: 1, ms, kind: scripts.length ? 'frame' : 'task', scripts, during })
 
-describe("a window's health in hive.log (HI-1775)", () => {
+describe("a window's health in combwork.log (HI-1775)", () => {
   it("names where it was, the user's own text wrapped, and what ran in a long task", () => {
     expect(whereText(where, (s) => `<${s}>`)).toBe('view board, project <alpha>, dialog <Card HI-12: a title>, panels assistant')
     expect(whereText({ view: 'projects', project: 'alpha', tab: 'sessions', dialog: null, panels: [] }, (s) => s)).toBe('view projects, project alpha, tab sessions')

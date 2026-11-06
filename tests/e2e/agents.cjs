@@ -18,10 +18,10 @@ const setupDir = path.join(scratch, 'agents setup')
 for (const d of [userData, ws, wtRoot, setupDir]) fs.rmSync(d, { recursive: true, force: true })
 fs.mkdirSync(setupDir, { recursive: true })
 const setupScript = path.join(setupDir, 'setup.cjs')
-fs.writeFileSync(setupScript, "console.log('HIVE-SETUP-RAN ' + JSON.stringify(process.argv.slice(2)))\n")
+fs.writeFileSync(setupScript, "console.log('CW-SETUP-RAN ' + JSON.stringify(process.argv.slice(2)))\n")
 const proj = path.join(ws, 'demo')
 fs.mkdirSync(proj, { recursive: true })
-// Git in the test repository, waiting out the Hive under test's own git (lib.git, #199).
+// Git in the test repository, waiting out the Combwork under test's own git (lib.git, #199).
 const g = (cmd, cwd = proj) => lib.git(cwd, cmd)
 g('init -q -b main')
 g('config user.email test@example.com')
@@ -39,15 +39,15 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
 const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n}.png`) })
 
 ;(async () => {
-  // The fake trusts the project and the worktree Hive makes for the Reviewer below.
+  // The fake trusts the project and the worktree Combwork makes for the Reviewer below.
   const claude = lib.fakeClaude(userData, path.join(scratch, 'agents-claude-home'), [proj, path.join(wtRoot, 'demo', 'reviewer')])
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, ...claude })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, ...claude })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => console.log('PAGE ERROR', e.message))
   await lib.fitWindow(app, page, { width: 1600, height: 950 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   const project = async () => (await inv('workspace:refresh')).projects.find((p) => p.name === 'demo')
   await inv('workspace:open', ws); await sleep(800)
   await page.getByText('demo', { exact: true }).first().click(); await sleep(500)
@@ -63,14 +63,14 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   const a2 = await inv('agents:add', proj, { location: 'project' })
   check('Agent 2 added', a2.name === 'Agent 2' && !a2.worktree, JSON.stringify(a2))
   const a3 = await inv('agents:testLegacy', proj, { location: 'new-worktree', name: 'Reviewer', model: 'sonnet' })
-  check('worktree agent added', !!a3.worktree && a3.worktree.branch === 'hive/agents-ws/demo/reviewer', JSON.stringify(a3.worktree))
+  check('worktree agent added', !!a3.worktree && a3.worktree.branch === 'cw/agents-ws/demo/reviewer', JSON.stringify(a3.worktree))
   const wtPath = a3.worktree.path
   check('worktree next to the workspace', path.resolve(wtPath).toLowerCase() === path.resolve(wtRoot, 'demo', 'reviewer').toLowerCase(), wtPath)
   check('.env copied into worktree', fs.existsSync(path.join(wtPath, '.env')))
-  check('branch exists', g('branch --list hive/agents-ws/demo/reviewer').includes('hive/agents-ws/demo/reviewer'))
+  check('branch exists', g('branch --list cw/agents-ws/demo/reviewer').includes('cw/agents-ws/demo/reviewer'))
   check('needs setup', a3.needsSetup === true)
   const gi = await inv('agents:gitInfo', proj)
-  check('gitInfo lists the worktree as used', gi.worktrees.some((w) => w.used && w.branch === 'hive/agents-ws/demo/reviewer'), JSON.stringify(gi.worktrees))
+  check('gitInfo lists the worktree as used', gi.worktrees.some((w) => w.used && w.branch === 'cw/agents-ws/demo/reviewer'), JSON.stringify(gi.worktrees))
   let p = await project()
   check('project has 3 agents', p.agents.length === 3, p.agents.map((a) => a.name).join(','))
   const dup = await inv('agents:add', proj, { location: 'project', name: 'agent 2' }).then(() => 'ok', (e) => e.message)
@@ -83,12 +83,12 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   // The worktree's setup command runs first, in the agent's terminal.
   const buf3 = (await lib.until(async () => {
     const b = await inv('pty:buffer', `session:${proj.toLowerCase()}#${a3.id}`)
-    return b.includes('HIVE-SETUP-RAN') ? b : null
+    return b.includes('CW-SETUP-RAN') ? b : null
   }, 20000)) ?? (await inv('pty:buffer', `session:${proj.toLowerCase()}#${a3.id}`))
-  check('setup command ran in the agent terminal', buf3.includes('HIVE-SETUP-RAN'))
+  check('setup command ran in the agent terminal', buf3.includes('CW-SETUP-RAN'))
   // Its quoted path with a space and its quoted argument reached the program as typed (#1454).
   const flat3 = lib.plainText(buf3).replace(/[ ]+/g, '')
-  check('setup command with a quoted path ran as typed', flat3.includes('HIVE-SETUP-RAN["twowords"]'), flat3.slice(flat3.indexOf('HIVE-SETUP-RAN'), flat3.indexOf('HIVE-SETUP-RAN') + 60))
+  check('setup command with a quoted path ran as typed', flat3.includes('CW-SETUP-RAN["twowords"]'), flat3.slice(flat3.indexOf('CW-SETUP-RAN'), flat3.indexOf('CW-SETUP-RAN') + 60))
   await lib.acceptClaudeTrust(inv, proj, a3.id, 25000)
   // Both sessions up (past starting: the CLI's SessionStart arrived).
   const up = (ids) => lib.until(async () => {
@@ -102,9 +102,9 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   check('worktree session runs in the worktree', l3 && path.resolve(l3.cwd).toLowerCase() === path.resolve(wtPath).toLowerCase(), l3?.cwd)
   p = await project()
   check('setup cleared', !p.agents.find((a) => a.id === a3.id).needsSetup)
-  check('launch folders per agent', fs.existsSync(path.join(proj, '.hive', `launch-${a1.id}`, 'plugin')) && fs.existsSync(path.join(proj, '.hive', `launch-${a3.id}`, 'plugin')))
-  // Settings and MCP config in each launch's private folder, in Hive's user data, not the project (#345).
-  check("each launch's settings outside the project", fs.existsSync(path.join(lib.launchDir(userData, l1.runId), 'settings.json')) && fs.existsSync(path.join(lib.launchDir(userData, l3.runId), 'settings.json')) && !fs.existsSync(path.join(proj, '.hive', `launch-${a1.id}`, 'settings.json')))
+  check('launch folders per agent', fs.existsSync(path.join(proj, '.combwork', `launch-${a1.id}`, 'plugin')) && fs.existsSync(path.join(proj, '.combwork', `launch-${a3.id}`, 'plugin')))
+  // Settings and MCP config in each launch's private folder, in Combwork's user data, not the project (#345).
+  check("each launch's settings outside the project", fs.existsSync(path.join(lib.launchDir(userData, l1.runId), 'settings.json')) && fs.existsSync(path.join(lib.launchDir(userData, l3.runId), 'settings.json')) && !fs.existsSync(path.join(proj, '.combwork', `launch-${a1.id}`, 'settings.json')))
   const argsOk = fs.readFileSync(path.join(lib.launchDir(userData, l3.runId), 'settings.json'), 'utf8').includes('PreToolUse')
   check('PreToolUse hook registered', argsOk)
 
@@ -144,10 +144,10 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   const [h1, h2] = [hooks[l1.sessionId], hooks[l2.sessionId]]
   check("another launch's token is refused", (await post({ url: h1.url, token: h2.token }, { session_id: l1.sessionId, hook_event_name: 'Notification' })).status === 401)
   check('a call naming no launch is refused', (await post({ url: h1.url.replace(/\?.*/, ''), token: h1.token }, { session_id: l1.sessionId, hook_event_name: 'Notification' })).status === 401)
-  // Hive's log says so, once each (#711): a hook a CLI sent but Hive refused leaves a trace on Hive's side.
-  const hiveLog = () => fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8')
-  const refusedLines = () => hiveLog().split('\n').filter((x) => x.includes('Refused a hook call'))
-  check("Hive's log tells of each refused hook call, and why", !!(await lib.until(() => refusedLines().some((x) => x.includes(`run ${l1.runId}: its token didn't match`)) && refusedLines().some((x) => x.includes('named no launch')), 10000)), refusedLines().join(' | '))
+  // Combwork's log says so, once each (#711): a hook a CLI sent but Combwork refused leaves a trace on Combwork's side.
+  const combworkLog = () => fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8')
+  const refusedLines = () => combworkLog().split('\n').filter((x) => x.includes('Refused a hook call'))
+  check("Combwork's log tells of each refused hook call, and why", !!(await lib.until(() => refusedLines().some((x) => x.includes(`run ${l1.runId}: its token didn't match`)) && refusedLines().some((x) => x.includes('named no launch')), 10000)), refusedLines().join(' | '))
   const file = path.join(proj, 'app.txt')
   const pre = (sid, f = file, tool = 'Edit') => hook({ session_id: sid, hook_event_name: 'PreToolUse', tool_name: tool, tool_input: { file_path: f }, cwd: proj })
   let r = await pre(l1.sessionId)
@@ -182,7 +182,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   await shot(page, '5-locks')
 
   // --- A new conversation started in the CLI (/clear, /new): its first prompt carries another session id
-  // for the same launch, and Hive moves the agent to it.
+  // for the same launch, and Combwork moves the agent to it.
   const before = (await inv('session:live')).find((l) => l.agentId === a1.id).sessionId
   const newId = '33333333-4444-4555-8666-777777777777'
   await post(hooks[before], { session_id: newId, hook_event_name: 'UserPromptSubmit', cwd: proj })
@@ -206,7 +206,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   check('Changes tab shows worktree files', await page.getByText('review.md').count() > 0)
   await shot(page, '6-changes')
   const list = await inv('session:list', proj)
-  check('worktree session recorded with cwd', list.some((s) => s.agentId === a3.id && s.cwd && s.branch === 'hive/agents-ws/demo/reviewer'), JSON.stringify(list.map((s) => [s.agentId, s.branch])))
+  check('worktree session recorded with cwd', list.some((s) => s.agentId === a3.id && s.cwd && s.branch === 'cw/agents-ws/demo/reviewer'), JSON.stringify(list.map((s) => [s.agentId, s.branch])))
   const bs = await inv('agents:branchStatus', proj, a3.id)
   check('branch status', bs.ahead === 1 && bs.dirty === 1 && bs.into === 'main', JSON.stringify(bs))
   // Conflict: change README.md on main too
@@ -232,7 +232,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   check('squash merge ok and cleaned up', merged.ok && merged.cleanedUp, JSON.stringify(merged))
   check('merge commit on main', g('log -1 --format=%s').trim() === 'Reviewer work' && fs.existsSync(path.join(proj, 'review.md')))
   check('worktree removed', !fs.existsSync(wtPath))
-  check('branch deleted', !g('branch --list hive/agents-ws/demo/reviewer').includes('hive/agents-ws/demo/reviewer'))
+  check('branch deleted', !g('branch --list cw/agents-ws/demo/reviewer').includes('cw/agents-ws/demo/reviewer'))
   p = await project()
   check('agent removed', p.agents.length === 2)
 

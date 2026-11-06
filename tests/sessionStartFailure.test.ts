@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-startfailure-')
+const base = tempDir('cw-startfailure-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -38,9 +38,9 @@ describe("a start's failure (HI-1976)", () => {
   const original = s.startReserved
   const backup = s.backup
   beforeAll(async () => {
-    mkdirSync(join(wsPath, '.hive'), { recursive: true })
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }] }))
+    mkdirSync(join(wsPath, '.combwork'), { recursive: true })
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
   })

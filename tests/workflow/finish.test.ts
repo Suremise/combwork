@@ -63,7 +63,7 @@ describe('every route into Done records one finish', () => {
   })
 
   it('the merge queue: queue, the merge verified', async () => {
-    const e = (env = setup({ ...pairOpts, finish: 'hiveMerges', target: 'main' }))
+    const e = (env = setup({ ...pairOpts, finish: 'combworkMerges', target: 'main' }))
     const a = await passed(e, 'A', 'a.txt')
     await e.queue().drain('main')
     const s = e.wf.state(a)
@@ -107,7 +107,7 @@ describe("each route's consequences (HR2's round 1 finding 2)", () => {
   // Each route's Done for a reviewed card: its finish, then the consequences the runtime owns, each once: the builder's
   // Done wake (the queue's route too, which no board write records), the requests step, the lane step.
   const routes: { name: string; opts: Partial<typeof pairOpts>; done: (e: Env, key: string) => Promise<void>; how: string }[] = [
-    { name: 'the merge queue', opts: { finish: 'hiveMerges' }, done: async (e) => void (await e.queue().drain('main')), how: 'queue' },
+    { name: 'the merge queue', opts: { finish: 'combworkMerges' }, done: async (e) => void (await e.queue().drain('main')), how: 'queue' },
     {
       name: 'a checked merge report',
       opts: { finish: 'agentMerges' },
@@ -200,9 +200,9 @@ describe('a finish’s steps', () => {
     const a = await passed(e, 'A', 'a.txt')
     moved(await e.wf.move(a.key, 'done', 'user', { confirm: true, reason: 'r' }))
     const f = e.wf.state(a).finished!.seq
-    // A slot question, as the slot pass asks it: Hive's own gate, so it stays until the slot is clean.
-    expect(await e.wf.askSlotDirty(a, f, { slot: 'slot-a', line: 'hive/x', target: 'main' })).toBe(true)
-    expect(await e.wf.askSlotDirty(a, f, { slot: 'slot-a', line: 'hive/x', target: 'main' })).toBe(false)
+    // A slot question, as the slot pass asks it: Combwork's own gate, so it stays until the slot is clean.
+    expect(await e.wf.askSlotDirty(a, f, { slot: 'slot-a', line: 'cw/x', target: 'main' })).toBe(true)
+    expect(await e.wf.askSlotDirty(a, f, { slot: 'slot-a', line: 'cw/x', target: 'main' })).toBe(false)
     expect(await e.wf.finishStep(a, f, 'requests')).toBe('done')
     expect(e.wf.state(a).requests.map((r) => r.gate)).toEqual(['slotDirty'])
     // Only the finish it was asked for closes it.

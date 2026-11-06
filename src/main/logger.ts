@@ -1,7 +1,8 @@
 import { app } from 'electron'
-import { mkdirSync } from 'original-fs'
+import { mkdirSync, renameSync } from 'original-fs'
 import { basename, join } from 'path'
 import { isMainThread, Worker } from 'worker_threads'
+import { present } from './fsPresence'
 import { maskKeys } from './keyMatcher'
 import { appendLog, BUSY, LOG_STATE_SLOTS, STOP, WRITTEN, type LogBatch } from './logWriter'
 import { noteStep, stallClock } from './stallWork'
@@ -16,15 +17,50 @@ export function logsDir(): string {
   return join(app.getPath('userData'), 'logs')
 }
 
+/** The app's own log, `combwork.log` (HI-2587: named after the old name before), kept to MAX_BYTES and one older copy. */
+export const LOG_FILE = 'combwork.log'
+
+let logsMoved = false
+
 function file(name: string): string {
   let f = logFiles.get(name)
   if (!f) {
     const dir = logsDir()
     mkdirSync(dir, { recursive: true })
+    // Before the first line (HI-2587): the old log's files take the new name, once (moveOldLogs).
+    let left: string[] = []
+    if (!logsMoved) {
+      logsMoved = true
+      left = moveOldLogs(dir)
+    }
     f = join(dir, name)
     logFiles.set(name, f)
+    // Said once the log has its file (HI-2612): after the line being written, never inside its write.
+    if (left.length) queueMicrotask(() => write('warn', 'logger', `The log's old files were left under their old names for the next start: ${left.join('; ')}`)) // i18n-ignore: a line in the app's own log, which stays English
   }
   return f
+}
+
+/**
+ * The log's files from before 1.1 renamed (HI-2587, the names upgrade, nameUpgrade.ts): its two files (the log and its older copy)
+ * take `combwork.log` and `combwork.1.log`, each only while its new name isn't there. One that can't be renamed (held by another
+ * program), whose new name is there already, or either of which can't be looked at (access denied: never taken for
+ * absent, HI-2612, so a current log is never renamed over), stays where it is, never read: Help → Open Logs Folder shows
+ * it, and the next start tries again. Never throws (a log mustn't): what it left for a reason other than a taken name,
+ * each with its error's code, for the log's first lines.
+ */
+export function moveOldLogs(dir: string): string[] {
+  const left: string[] = []
+  // old-name: begin old-logs
+  for (const [from, to] of [['hive.log', LOG_FILE], ['hive.1.log', LOG_FILE.replace(/\.log$/, '.1.log')]]) {
+  // old-name: end old-logs
+    try {
+      if (present(join(dir, from)) && !present(join(dir, to))) renameSync(join(dir, from), join(dir, to))
+    } catch (e) {
+      left.push(`${from} (${(e as NodeJS.ErrnoException | null)?.code ?? 'error'})`)
+    }
+  }
+  return left
 }
 
 /** A log write this slow, made here, is noted as a step (HI-1692), so a stall it caused names it. */
@@ -68,14 +104,14 @@ function writerThread(): Worker | null {
     here = true
     return null
   }
-  // Tests (unpackaged builds): HIVE_TEST_LOG_DIRECT=1 writes here, as before; HIVE_TEST_SLOW_LOG_MS holds each write.
-  if ((unpackaged() && process.env.HIVE_TEST_LOG_DIRECT === '1' && !forTests) || !bundledScriptExists(script)) {
-    workerHere('log writer', bundledScriptExists(script) ? 'HIVE_TEST_LOG_DIRECT' : "its script isn't there") // i18n-ignore: Copy Diagnostics' report, in English
+  // Tests (unpackaged builds): CW_TEST_LOG_DIRECT=1 writes here, as before; CW_TEST_SLOW_LOG_MS holds each write.
+  if ((unpackaged() && process.env.CW_TEST_LOG_DIRECT === '1' && !forTests) || !bundledScriptExists(script)) {
+    workerHere('log writer', bundledScriptExists(script) ? 'CW_TEST_LOG_DIRECT' : "its script isn't there") // i18n-ignore: Copy Diagnostics' report, in English
     here = true
     return null
   }
   try {
-    const slowMs = forTests?.slowMs ?? ((unpackaged() && Number(process.env.HIVE_TEST_SLOW_LOG_MS)) || 0)
+    const slowMs = forTests?.slowMs ?? ((unpackaged() && Number(process.env.CW_TEST_SLOW_LOG_MS)) || 0)
     const w = new Worker(script, { workerData: { state: shared.buffer, slowMs } })
     workerStarted('log writer', w) // i18n-ignore: a worker's name, for Copy Diagnostics' report (English)
     w.on('message', (n: number) => {
@@ -87,7 +123,7 @@ function writerThread(): Worker | null {
       // Nothing writes there now: what it hadn't written is written here, and every line after.
       Atomics.store(shared, BUSY, 0)
       flushLogs()
-      appendHere(file('hive.log'), `${new Date().toISOString()} [WARN] [logger] The log's writer thread ended: lines are written on the main thread from now\n`) // i18n-ignore: a line of hive.log
+      appendHere(file(LOG_FILE), `${new Date().toISOString()} [WARN] [logger] The log's writer thread ended: lines are written on the main thread from now\n`) // i18n-ignore: a line of combwork.log
     }
     w.on('error', gone)
     w.on('exit', gone)
@@ -125,16 +161,16 @@ function append(name: string, line: string): void {
 function appendHere(f: string, line: string): void {
   const start = stallClock.mono()
   // Tests (unpackaged builds): the same held disk as the writer's, to compare the two.
-  const slowMs = unpackaged() && !forTests ? Number(process.env.HIVE_TEST_SLOW_LOG_MS) || 0 : 0
+  const slowMs = unpackaged() && !forTests ? Number(process.env.CW_TEST_SLOW_LOG_MS) || 0 : 0
   if (slowMs > 0) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, slowMs)
   appendLog(f, line, MAX_BYTES)
   if (stallClock.mono() - start >= SLOW_WRITE_MS) noteStep(`log write ${basename(f)}`, start)
 }
 
-/** The lines dropped meanwhile, said in hive.log as the next line there. */
+/** The lines dropped meanwhile, said in combwork.log as the next line there. */
 function droppedLine(): string | null {
   if (!dropped) return null
-  const line = `${new Date().toISOString()} [WARN] [logger] ${dropped} log line(s) weren't written: the logs' drive held writes up for too long\n` // i18n-ignore: a line of hive.log
+  const line = `${new Date().toISOString()} [WARN] [logger] ${dropped} log line(s) weren't written: the logs' drive held writes up for too long\n` // i18n-ignore: a line of combwork.log
   dropped = 0
   return line
 }
@@ -146,7 +182,7 @@ function post(): void {
   if (!w || here) return
   const note = droppedLine()
   if (note) {
-    const f = file('hive.log')
+    const f = file(LOG_FILE)
     queued.set(f, [note, ...(queued.get(f) ?? [])])
   }
   for (const [f, lines] of queued) {
@@ -177,7 +213,7 @@ export function flushLogs(): void {
   for (const b of sent.splice(0)) if (b.seq > written) appendLog(b.file, b.text, b.maxBytes)
   sentBytes = 0
   const note = droppedLine()
-  if (note) appendLog(file('hive.log'), note, MAX_BYTES)
+  if (note) appendLog(file(LOG_FILE), note, MAX_BYTES)
   for (const [f, lines] of queued) appendLog(f, lines.join(''), MAX_BYTES)
   queued.clear()
   queuedBytes = 0
@@ -221,8 +257,8 @@ function consoleFailed(where: 'stdout' | 'stderr', e: unknown): void {
   toConsole = false
   if (closed && !wasOn) return
   const at = new Date().toISOString()
-  if (closed) append('hive.log', `${at} [INFO] [logger] The console's ${where} is closed (${code}): log lines go to this file only from now\n`) // i18n-ignore: a line of hive.log
-  else append('hive.log', `${at} [ERROR] [logger] The console's ${where} failed, so log lines go to this file only from now: ${e instanceof Error ? (e.stack ?? e.message) : safeJson(e)}\n`) // i18n-ignore: a line of hive.log
+  if (closed) append(LOG_FILE, `${at} [INFO] [logger] The console's ${where} is closed (${code}): log lines go to this file only from now\n`) // i18n-ignore: a line of combwork.log
+  else append(LOG_FILE, `${at} [ERROR] [logger] The console's ${where} failed, so log lines go to this file only from now: ${e instanceof Error ? (e.stack ?? e.message) : safeJson(e)}\n`) // i18n-ignore: a line of combwork.log
 }
 if (toConsole) {
   process.stdout?.on?.('error', (e: unknown) => consoleFailed('stdout', e))
@@ -230,12 +266,12 @@ if (toConsole) {
 }
 
 /**
- * A line of hive.log as written: its data serialised, then a server connection's key in use masked in it (HI-1772), in
+ * A line of combwork.log as written: its data serialised, then a server connection's key in use masked in it (HI-1772), in
  * any form the serialising wrote it (keyMatcher.ts's forms), before the log or the console get it.
  */
 export function logLine(level: Level, scope: string, message: string, extra?: unknown): string {
   const detail = extra instanceof Error ? ` ${extra.stack ?? extra.message}` : extra !== undefined ? ` ${safeJson(extra)}` : ''
-  // Its time, level and scope are Hive's own; strict masking (keyMatcher.ts) is for what follows them.
+  // Its time, level and scope are Combwork's own; strict masking (keyMatcher.ts) is for what follows them.
   return `${new Date().toISOString()} [${level.toUpperCase()}] [${scope}] ${maskKeys(`${message}${detail}`)}\n`
 }
 
@@ -250,13 +286,13 @@ function write(level: Level, scope: string, message: string, extra?: unknown): v
       consoleFailed(where, e)
     }
   }
-  append('hive.log', line)
+  append(LOG_FILE, line)
 }
 
 /**
  * A line of the hook journal (logs/hooks.log, #648): each hook an agent's CLI sent, with its launch, ids and receive
  * order, and the status before and after, so a status that went wrong can be traced afterwards (#642's couldn't be).
- * Apart from hive.log, which it would crowd out. Ids, event names and statuses only: never the user's text.
+ * Apart from combwork.log, which it would crowd out. Ids, event names and statuses only: never the user's text.
  */
 export function hookJournal(line: string): void {
   append('hooks.log', `${new Date().toISOString()} ${line}\n`)
@@ -278,7 +314,7 @@ export function userText(text: unknown): string {
   return `\u2068${String(text).replace(/[\u2068\u2069\r\n]/g, ' ')}\u2069`
 }
 
-/** Flags whose values are Hive's own choices (ids, models, modes), never the user's text. */
+/** Flags whose values are Combwork's own choices (ids, models, modes), never the user's text. */
 const PLAIN_VALUE_FLAGS = new Set(['--session-id', '--resume', 'resume', '--model', '-m', '--effort', '--permission-mode', '-s', '--sandbox', '-a', '--ask-for-approval', '--allowedTools'])
 
 /**

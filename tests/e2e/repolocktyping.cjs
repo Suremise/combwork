@@ -1,6 +1,6 @@
 // Typing while the repository lock is taken (HI-1680): a keystroke into a pane goes through main, so a lock step that
 // holds main's thread (its SQLite busy wait, its commits' fsyncs) delayed what the user typed. The lock's steps now
-// run in a worker of their own. Here a project's lock file is held by another connection (as another Hive's commit
+// run in a worker of their own. Here a project's lock file is held by another connection (as another Combwork's commit
 // holds it), so each take of a burst of Git view switches waits in SQLite's busy wait (a second) and fails, while
 // letters are typed into a fake Claude Code's pane: main's longest stall (a timer in main) and each letter's echo stay
 // well under that second. A burst of switches with the lock free, the line updater's kind of burst, is timed too, for
@@ -62,7 +62,7 @@ const check = (name, ok, extra = '') => {
   // Typed letters, each timed from its key to its echo on the agent's input line.
   let typed = ''
   const echoes = []
-  const lines = () => page.evaluate((k) => window.__hiveTerminalLines(k) ?? [], key)
+  const lines = () => page.evaluate((k) => window.__cwTerminalLines(k) ?? [], key)
   async function typeOne() {
     const ch = String.fromCharCode(97 + (typed.length % 26))
     const want = typed + ch
@@ -103,7 +103,7 @@ const check = (name, ok, extra = '') => {
   console.log(`burst with the lock free: ${BURST} takes in ${free.ms} ms; main's longest stall ${free.gap} ms; slowest echo ${free.echo} ms of ${free.letters} letters`)
 
   // The lock file held by another connection: each take waits in SQLite's busy wait, then fails, nothing changed.
-  const other = new DatabaseSync(path.join(beta, '.git', 'hive-merge.lock'))
+  const other = new DatabaseSync(path.join(beta, '.git', 'cw-merge.lock'))
   other.exec('BEGIN IMMEDIATE')
   let held
   try {

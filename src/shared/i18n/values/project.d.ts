@@ -1,6 +1,6 @@
 // Generated from locales/en/project.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
-interface HiveMessageValues {
+interface CombworkMessageValues {
   'project.agents.add': undefined
   'project.agents.chooseConnections': undefined
   'project.agents.merge': undefined
@@ -12,15 +12,21 @@ interface HiveMessageValues {
   'project.agents.turnedOff': { provider: string | number }
   'project.apply.new': { live: string }
   'project.banner.change': undefined
+  'project.banner.chooseInSettings': undefined
   'project.banner.connectionSetup': { cli: string | number }
   'project.banner.connectionSetupAdd': undefined
   'project.banner.copyToWorkspace': undefined
   'project.banner.dangerous': { modes: string | number; count: number }
   'project.banner.dangerousMode': { agent: string | number; mode: string | number }
+  'project.banner.noAccountEmpty': undefined
+  'project.banner.offHereOne': { where: string; name: string | number; cli: string | number }
+  'project.banner.offHereSeveral': { where: string; names: string | number }
   'project.banner.restart': undefined
   'project.banner.restartNeeded': { many: string; agent: string | number }
   'project.banner.restartWhenDone': undefined
   'project.banner.switchFailed': undefined
+  'project.banner.turnOnFailed': { name: string | number }
+  'project.banner.turnOnHere': undefined
   'project.banner.unmanagedMcp': { names: string | number }
   'project.card.asReported': undefined
   'project.card.cache': undefined
@@ -176,7 +182,6 @@ interface HiveMessageValues {
   'project.empty.allSessions': undefined
   'project.empty.markActive': undefined
   'project.empty.markWorking': undefined
-  'project.empty.noAccount': undefined
   'project.empty.noAgents': undefined
   'project.empty.noCli': undefined
   'project.empty.noSession': undefined
@@ -242,13 +247,13 @@ interface HiveMessageValues {
   'project.loading': undefined
   'project.mcp.addServer': undefined
   'project.mcp.builtIn': undefined
+  'project.mcp.combworkDesc': undefined
   'project.mcp.copy': undefined
   'project.mcp.definedByProject': undefined
   'project.mcp.givenAll': undefined
   'project.mcp.givenNone': undefined
   'project.mcp.givenTo': { agents: string | number }
   'project.mcp.headingAdded': undefined
-  'project.mcp.hiveDesc': undefined
   'project.mcp.invalid': undefined
   'project.mcp.manage': undefined
   'project.mcp.noneAdded': undefined
@@ -282,7 +287,6 @@ interface HiveMessageValues {
   'project.memory.updated': { files: string | number }
   'project.menu.explorer': undefined
   'project.menu.remove': undefined
-  'project.menu.settings': undefined
   'project.menu.terminal': undefined
   'project.meta.lastActivity': undefined
   'project.meta.lastPrompt': undefined
@@ -335,7 +339,7 @@ interface HiveMessageValues {
   'project.settings.offLower': undefined
   'project.settings.on': undefined
   'project.settings.onLower': undefined
-  'project.settings.openHive': undefined
+  'project.settings.openCombwork': undefined
   'project.settings.overrides': undefined
   'project.settings.reset': undefined
   'project.settings.resetButton': undefined
@@ -346,14 +350,14 @@ interface HiveMessageValues {
   'project.settings.warnOver': undefined
   'project.skills.addLocal': { provider: string | number }
   'project.skills.assistantOnly': { count: number }
+  'project.skills.cw': undefined
   'project.skills.delete': undefined
   'project.skills.deliveredNote': undefined
   'project.skills.editInWorkspace': undefined
   'project.skills.heading': undefined
-  'project.skills.hive': undefined
   'project.skills.local': undefined
   'project.skills.newLocal': { provider: string | number }
-  'project.skills.noHive': undefined
+  'project.skills.noCombwork': undefined
   'project.skills.noneLocal': undefined
   'project.skills.noneUser': undefined
   'project.skills.plugins': undefined

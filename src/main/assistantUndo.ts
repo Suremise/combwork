@@ -1,6 +1,6 @@
 import { join } from 'path'
 import { projectAgents } from '../shared/defaults'
-import type { AgentDef, AgentPatch, AssistantUndoResult, LaneInfo, PageLayout, ProjectConfig, TaskCard, TaskPatch, WorkflowForm } from '../shared/types'
+import type { AgentDef, AgentPatch, AssistantUndoResult, LaneInfo, PageLayout, ProjectConfig, TaskCard, TaskPatch, TaskWaiting, WorkflowForm } from '../shared/types'
 import { AGENT_FIELDS, CARD_FIELDS, CONNECTION_ID, cardValue, markUndone, notRecording, PROVIDER_DEPENDENTS, recordedChanges, REVIEW, reviewOf, sameValue, type CardField, type FieldChange, type RecordedChange, type Value } from './assistantChanges'
 import * as assistant from './assistantControl'
 import { boardWrite } from './boardStore'
@@ -16,7 +16,7 @@ import { setWorkflowOptions, workflowForm, WorkflowStale } from './workflow/opti
 import { inWorkspace, workspaceOf, type WorkspaceService } from './workspace'
 
 /**
- * Undo for the Hive Assistant's changes (#1282, SPEC §16.14), from what assistantChanges.ts recorded: one change, or every
+ * Undo for the Combwork Assistant's changes (#1282, SPEC §16.14), from what assistantChanges.ts recorded: one change, or every
  * change of a message of the user's, newest first.
  *
  * The invariant (round 3): undo writes a value only if, at the write and under the target's own lock, the current value
@@ -201,7 +201,7 @@ function historyAfter(card: TaskCard, id: string | undefined): TaskCard['history
 }
 
 /**
- * A card: one it made is archived while its history goes no further than the change left it (Hive's own notes aside),
+ * A card: one it made is archived while its history goes no further than the change left it (Combwork's own notes aside),
  * checked under the board's lock. Its fields go back in one board transaction: a project move back first (only while the
  * card's agent and review are as the move left them: a later assignment or review is never cleared), then its agent, each
  * checked under the card's lock; both or neither. A column move back only while the card's review is as the change left it.
@@ -214,7 +214,7 @@ async function undoCard(ws: WorkspaceService, c: RecordedChange, by: UndoBy, gua
   if (c.fields.includes('created')) {
     const check = (now: TaskCard): void => {
       const since = historyAfter(now, c.target)
-      if (!since || since.some((h) => h.by !== 'Hive')) throw new ChangedSince(['created'])
+      if (!since || since.some((h) => h.by !== 'Combwork')) throw new ChangedSince(['created'])
       guard?.()
     }
     try {
@@ -278,6 +278,10 @@ function setCardField(patch: TaskPatch, field: CardField, v: Value): void {
       break
     case 'blocked':
       patch.blocked = (v as string | null) ?? ''
+      break
+    // Its waiting mark as it was (HI-2618): whole, who marked it and when kept; none clears it.
+    case 'waitingFor':
+      patch.waitingFor = v ? (v as unknown as TaskWaiting) : null
       break
     case 'agent':
       patch.agent = (v as string | null) ?? ''
@@ -533,7 +537,7 @@ async function undoAgent(ws: WorkspaceService, c: RecordedChange, guard: Guard):
 }
 
 /**
- * A Hive setting: its value set back through the same checked change, refused at the moment of the change if it changed
+ * A Combwork setting: its value set back through the same checked change, refused at the moment of the change if it changed
  * since; a provider's removed models with it only while they too are as the change left them (else the value alone is
  * tried again, under the same checks). The guard is checked inside the change on every attempt: the Assistant's control
  * and launch, and for its own undo Change settings, whose refusal stops the undo.

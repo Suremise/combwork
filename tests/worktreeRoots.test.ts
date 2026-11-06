@@ -12,7 +12,7 @@ import type { ProjectConfig } from '../src/shared/types'
 import { tempDir } from './tempDir'
 import { legacyWorktree } from '../src/shared/agentFolders'
 
-const base = tempDir('hive-worktreeroots-')
+const base = tempDir('cw-worktreeroots-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -28,12 +28,12 @@ describe("agents' worktrees follow the newest config read, in whatever order rea
   const alpha = () => join(wsPath, 'alpha')
   const gamma = () => join(wsPath, 'gamma')
   const tree = (name: string) => join(trees, name)
-  const withTree = (path: string) => ({ version: 2, layout: 'auto', agents: [{ id: 'a1', name: 'B1', provider: 'claude-code', worktree: { path, branch: 'hive/b1', base: 'main' } }] })
+  const withTree = (path: string) => ({ version: 2, layout: 'auto', agents: [{ id: 'a1', name: 'B1', provider: 'claude-code', worktree: { path, branch: 'cw/b1', base: 'main' } }] })
   const project = (ws: string, name: string, worktree: string) => {
-    mkdirSync(join(ws, name, '.hive'), { recursive: true })
-    writeFileSync(join(ws, name, '.hive', 'project.json'), JSON.stringify(withTree(worktree)))
+    mkdirSync(join(ws, name, '.combwork'), { recursive: true })
+    writeFileSync(join(ws, name, '.combwork', 'project.json'), JSON.stringify(withTree(worktree)))
   }
-  const moveTo = (name: string) => (c: ProjectConfig) => ({ agents: c.agents.map((a) => ({ ...a, worktree: { path: tree(name), branch: 'hive/b1', base: 'main' } })) })
+  const moveTo = (name: string) => (c: ProjectConfig) => ({ agents: c.agents.map((a) => ({ ...a, worktree: { path: tree(name), branch: 'cw/b1', base: 'main' } })) })
   const routed = (path: string) => ({ project: w.projectForRoot(path), owned: w.ownsRoot(join(path, 'src').toLowerCase()), allowed: (() => { try { w.assertRoot(path); return true } catch { return false } })() })
   const current = (owner: string) => ({ project: owner, owned: true, allowed: true })
   const unknown = { project: null, owned: false, allowed: false }
@@ -61,8 +61,8 @@ describe("agents' worktrees follow the newest config read, in whatever order rea
   }
 
   beforeEach(async () => {
-    wsPath = tempDir('hive-worktreeroots-ws-')
-    trees = tempDir('hive-worktreeroots-trees-')
+    wsPath = tempDir('cw-worktreeroots-ws-')
+    trees = tempDir('cw-worktreeroots-trees-')
     project(wsPath, 'alpha', tree('old'))
     project(wsPath, 'gamma', tree('gamma'))
     w = createWorkspaceService()
@@ -97,7 +97,7 @@ describe("agents' worktrees follow the newest config read, in whatever order rea
     try {
       const first = older(() => w.projectInfo(alpha()))
       await hold.held()
-      writeFileSync(join(alpha(), '.hive', 'project.json'), JSON.stringify(withTree(tree('new'))))
+      writeFileSync(join(alpha(), '.combwork', 'project.json'), JSON.stringify(withTree(tree('new'))))
       expect(legacyWorktree((await run(() => w.projectInfo(alpha()))).agents[0])?.path).toBe(tree('new'))
       hold.release()
       // What it read is from before: it says so to its caller, and routes nothing.
@@ -130,7 +130,7 @@ describe("agents' worktrees follow the newest config read, in whatever order rea
   })
 
   it("a refresh of a workspace switched meanwhile records none of its worktrees in the next one, read or yet to read", async () => {
-    const next = tempDir('hive-worktreeroots-next-')
+    const next = tempDir('cw-worktreeroots-next-')
     project(next, 'delta', tree('delta'))
     const hold = holdOlderRead(alpha())
     let first: Promise<unknown> = Promise.resolve()

@@ -17,7 +17,7 @@ vi.mock('../src/main/slotCards', async (orig) => ({
   expectStartPrompt: () => (prompt: string | null) => void slot.offered.push(prompt)
 }))
 
-const base = tempDir('hive-startslot-')
+const base = tempDir('cw-startslot-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -41,9 +41,9 @@ const launched: { agentId: string; prompt?: string }[] = []
 describe("a Start of a card started before in a slot, its builder stopped (HI-1953)", () => {
   const original = s.start
   beforeAll(async () => {
-    mkdirSync(join(wsPath, '.hive'), { recursive: true })
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }] }))
+    mkdirSync(join(wsPath, '.combwork'), { recursive: true })
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     // The Assistant that starts cards here is running: a task it gives is refused once its session has ended (#645, #649).
@@ -71,7 +71,7 @@ describe("a Start of a card started before in a slot, its builder stopped (HI-19
     expect([r.card.column, r.card.agent]).toEqual(['doing', 'b1'])
     expect(slot.asked).toBe(1)
     expect(launched).toHaveLength(1)
-    expect(launched[0].prompt).toMatch(new RegExp(`^\\[Hive\\] New in your inbox: 1 task \\(#${c.number}\\)`))
+    expect(launched[0].prompt).toMatch(new RegExp(`^\\[CW\\] New in your inbox: 1 task \\(#${c.number}\\)`))
     const task = await lastTask()
     expect(task?.card).toBe(c.number)
     expect(task?.body).toMatch(/It was in Review and is back in Doing for more work\.\n\nRun the model trials now\.$/)

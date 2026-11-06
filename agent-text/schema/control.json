@@ -1,0 +1,32 @@
+{
+  "control.level.agents": {
+    "placeholders": {}
+  },
+  "control.level.look": {
+    "placeholders": {}
+  },
+  "control.level.projects": {
+    "placeholders": {}
+  },
+  "control.notAllowed": {
+    "placeholders": {}
+  },
+  "control.notAllowedReason": {
+    "placeholders": {}
+  },
+  "control.refused": {
+    "placeholders": {
+      "level": "plain",
+      "what": "plain"
+    }
+  },
+  "control.sessionEnded": {
+    "placeholders": {}
+  },
+  "control.tokenNote": {
+    "placeholders": {}
+  },
+  "control.turnedDown": {
+    "placeholders": {}
+  }
+}

@@ -26,13 +26,13 @@ import { cardsWait } from './watchLine'
 
 /**
  * The Session tab's Tiles view (#976; #975's toggle switches to it): a tile per agent, 12 to a page, in the order Settings
- * → Sessions → Tile order chooses, so a whole team fits on one screen. A tile shows what Hive already has (the state, the
+ * → Sessions → Tile order chooses, so a whole team fits on one screen. A tile shows what Combwork already has (the state, the
  * status, the card, a progress run, the start of the latest reply, badges for background tasks and warnings): no CLI is
  * asked anything, and no terminal is drawn for it. Clicking one (or Enter) opens its focus view: the agent's live pane
  * large, the other agents in a strip beside it; Esc (outside the terminal), Back to Tiles or the Tiles toggle go back.
  * ProjectView places the pane (the agents' area beside the strip); the toolbar above shows the pages (TilePager).
  * In the panes' order, a tile is dragged like a pane header (#993): onto another tile the two swap, onto a page button it
- * goes to that page's end; its menu and Move Agent Left/Right move it from the keyboard. By urgency, the order is Hive's.
+ * goes to that page's end; its menu and Move Agent Left/Right move it from the keyboard. By urgency, the order is Combwork's.
  */
 export function AgentTiles({ project }: { project: ProjectInfo }) {
   useLanguage()
@@ -316,7 +316,7 @@ function Tile({ project, a, state, tabStop, movable, onFocus, onMenu }: { projec
       <TileBadges
         badges={[
           ...(ctxOver ? [{ icon: 'warning', warn: true, text: tr(msg({ id: 'panes.tiles.context', defaultMessage: 'Context {tokens}', description: 'A warning badge on an agent\'s tile: its context is past the Compact threshold ({tokens}: "210K").' }), { tokens: formatTokens(usage?.contextTokens ?? 0) }) }] : []),
-          ...(longTranscript ? [{ icon: 'warning', warn: true, text: tr(msg({ id: 'panes.tiles.transcript', defaultMessage: 'Transcript {size}', description: 'A warning badge on an agent\'s tile: its transcript is past the size Hive flags ({size}: "24 MB").' }), { size: formatSize(live!.transcriptBytes!) }) }] : []),
+          ...(longTranscript ? [{ icon: 'warning', warn: true, text: tr(msg({ id: 'panes.tiles.transcript', defaultMessage: 'Transcript {size}', description: 'A warning badge on an agent\'s tile: its transcript is past the size Combwork flags ({size}: "24 MB").' }), { size: formatSize(live!.transcriptBytes!) }) }] : []),
           ...(tasksRunning > 0 ? [{ icon: 'server-process', warn: false, text: tr(msg({ id: 'panes.tiles.background', defaultMessage: '{n, plural, one {# background task} other {# background tasks}}', description: "A badge on an agent's tile: background tasks it started that still run." }), { n: tasksRunning }) }] : [])
         ]}
       />
@@ -582,7 +582,7 @@ function TileStrip({ project, focus }: { project: ProjectInfo; focus: string }) 
 }
 
 /** A strip row dragged (#1053): the strip's own, so the panes and page buttons don't take it. */
-const STRIP_DRAG = 'application/x-hive-strip-agent'
+const STRIP_DRAG = 'application/x-combwork-strip-agent'
 
 /** What a movable row of the strip needs (#1053): its drag state and handlers, and its menu. */
 interface StripDrag {

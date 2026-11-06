@@ -1,0 +1,12 @@
+{
+  "prose|return|only watching": 1,
+  "prose|return|only watching it": 2,
+  "prose|return|{} came back from the merge queue {} min ago; {} is {}, not fixing it.": 1,
+  "prose|return|{} is the lane's first card: the lane started {} min ago, and {}": 1,
+  "prose|return|{} is the lane's next card: {} went Done {} min ago, and {}": 1,
+  "prose|return|{}'s builder replied to {} {} min ago; {} is {}, with no verdict or answer since.": 1,
+  "prose|return|{}'s pass is for {} but its line is at {}; {} is {}, not submitting it.": 1,
+  "prose|var|is idle": 1,
+  "prose|var|is only watching": 1,
+  "prose|var|{} {} without starting it.": 1
+}

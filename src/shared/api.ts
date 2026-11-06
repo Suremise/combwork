@@ -1,5 +1,6 @@
 import type { CardAttachment, CardAttachmentGroup, CardDrafts } from './cardAttachments'
 import type { CardCleanupItem } from './cardCleanup'
+import type { DialectCatalogue, DialectFile, DialectFileView, DialectRefusal, DialectRow, DialectUsage } from './dialects'
 import type { ActivityCardAgent, ActivityDetail, ActivityNow, ActivityTurns, EndProcessResult } from './activity'
 import type { SessionHooks } from './hooks'
 import type { AgentLeftovers } from './agentProcesses'
@@ -23,7 +24,7 @@ import type {
   ArchiveResult,
   CloseCommandRun,
   CommandRef,
-  CommandsHive,
+  CommandsCombwork,
   CommandsWorkspace,
   UnarchiveResult,
   BoardFold,
@@ -74,8 +75,9 @@ import type {
   GitDiff,
   HiddenProject,
   GitStatus,
-  HiveEvent,
+  CombworkEvent,
   LiveSessionState,
+  StartedSession,
   McpFileServer,
   McpShown,
   McpPlacesResult,
@@ -169,30 +171,30 @@ export type SettingsPatch = DeepPartial<AppSettings>
 
 /**
  * Every request the renderer can make of the main process.
- * The preload bridge exposes these as `window.hive.invoke(channel, ...args)`.
+ * The preload bridge exposes these as `window.combwork.invoke(channel, ...args)`.
  */
-export interface HiveRequests {
+export interface CombworkRequests {
   'app:info': () => AppInfo
   /** The plan usage each provider last reported (e.g. 5-hour and weekly limits), by provider. */
   'app:planUsage': () => Record<ProviderId, PlanUsage>
   'app:connectionPlanUsage': () => Record<string, PlanUsage>
   'app:quit': () => void
-  /** Restarts Hive: quits as app:quit does (asking about running agents), then starts it again (#676). */
+  /** Restarts Combwork: quits as app:quit does (asking about running agents), then starts it again (#676). */
   'app:restart': () => void
   'app:quitDecision': (choice: QuitChoice, dontAskAgain: boolean) => void
   'app:cancelPendingQuit': () => void
   /** This window's close command (HI-1368), for a window that reloads while its panel is up; null: none. */
   'closeCommand:state': () => CloseCommandRun | null
-  /** The panel's Don't wait: Hive stops waiting for this window's close command and goes on; the command carries on. */
+  /** The panel's Don't wait: Combwork stops waiting for this window's close command and goes on; the command carries on. */
   'closeCommand:dontWait': (id: string) => void
-  /** The panel's Close, on a failed close command: Hive goes on. */
+  /** The panel's Close, on a failed close command: Combwork goes on. */
   'closeCommand:dismiss': (id: string) => void
   /** The panel's choice on a failed command (HI-1954), for that step's attempt only: a stale or repeated one does nothing. */
   'closeCommand:control': (id: string, action: 'rerun' | 'skip' | 'stop', step: number, attempt: number) => void
   /** Settings → Commands at the workspace's level (HI-1954): its commands and its open and close points, saved in workspace.json; returns them as saved. Only the user's window sets them. */
   'commands:setWorkspace': (workspacePath: string, commands: CommandsWorkspace) => CommandsWorkspace
-  /** Settings → Commands at Hive's level (HI-1954): Hive's commands and When Hive quits, run; returns them as saved. */
-  'commands:setHive': (commands: CommandsHive) => CommandsHive
+  /** Settings → Commands at Combwork's level (HI-1954): Combwork's commands and When Combwork quits, run; returns them as saved. */
+  'commands:setCombwork': (commands: CommandsCombwork) => CommandsCombwork
   /** Runs one command by hand in this window (HI-1954): its panel, as a point's, with one step. */
   'commands:run': (ref: CommandRef) => void
   /** Current quit state, for a window that reloads while a quit dialog or pending quit is open. */
@@ -206,11 +208,11 @@ export interface HiveRequests {
   'app:diagnostics': (opts?: { recording?: boolean }) => string
   /** How many working agents keep the PC awake now (0: none, or the setting doesn't). */
   'app:keepAwake': () => number
-  /** The notice that Hive closed unexpectedly (#984): resumes the agents that were running, once; main tells the result. */
+  /** The notice that Combwork closed unexpectedly (#984): resumes the agents that were running, once; main tells the result. */
   'app:resumeAfterClose': () => { resumed: number; failed: number }
   /** The unexpected-close notice's Stop Them (#987): how many processes the agents had started were stopped. */
   'app:stopLeftAfterClose': () => number
-  /** The notice offering to resume the agents that were working when Hive closed (HI-1707): queues them; how many. */
+  /** The notice offering to resume the agents that were working when Combwork closed (HI-1707): queues them; how many. */
   'app:resumeRestart': () => number
   /** That notice's Dismiss: none resumed, and the offer isn't made again; how many it offered. */
   'app:dismissRestart': () => number
@@ -240,9 +242,9 @@ export interface HiveRequests {
   'window:minimize': () => void
   'window:toggleMaximize': () => void
   'window:close': () => void
-  /** How many Hive windows are open. */
+  /** How many Combwork windows are open. */
   'window:count': () => number
-  /** Opens another Hive window (the welcome page), like VS Code's New Window. */
+  /** Opens another Combwork window (the welcome page), like VS Code's New Window. */
   'window:new': () => void
   'window:toggleDevTools': () => void
   'window:zoom': (direction: 'in' | 'out' | 'reset') => void
@@ -251,9 +253,9 @@ export interface HiveRequests {
   'window:setTitleBarColors': (color: string, symbolColor: string) => void
   /** How many backdrops (dialogs, nested or not, the command palette) are up in this window: dims the window buttons to match. */
   'window:setBackdrops': (count: number) => void
-  /** Where this window is (its view, project, tab, dialog, panels), as it changes: what its long-task and hang lines in hive.log name (HI-1775). */
+  /** Where this window is (its view, project, tab, dialog, panels), as it changes: what its long-task and hang lines in combwork.log name (HI-1775). */
   'window:where': (where: WindowWhere) => void
-  /** The page's long tasks just ended, and where it was: logged in hive.log, rate-limited (HI-1775). */
+  /** The page's long tasks just ended, and where it was: logged in combwork.log, rate-limited (HI-1775). */
   'window:longTasks': (tasks: LongTask[], where: WindowWhere) => void
   /** The taskbar button's badge: a PNG (base64) drawn at `scale`, or none at 0. */
   'window:setBadge': (count: number, png: string | null, scale: number) => void
@@ -278,7 +280,7 @@ export interface HiveRequests {
   /** Replaces a provider's price overrides (USD per million tokens, by model id). */
   /** Replaces a provider's price overrides, and (when given) which shipped prices are removed from its table. */
   'settings:setProviderPrices': (provider: ProviderId, prices: Record<string, ModelPrice>, removed?: string[]) => AppSettings
-  /** Replaces a provider's fallback list of models or effort levels (#125); null goes back to Hive's defaults. */
+  /** Replaces a provider's fallback list of models or effort levels (#125); null goes back to Combwork's defaults. */
   'settings:setProviderFallback': (provider: ProviderId, kind: 'models' | 'efforts', list: (FallbackModel | EffortOption)[] | null) => AppSettings
   /** Sets (string), removes (null) or resets to the default (undefined) one command's shortcut. */
   'settings:setKeybinding': (commandId: string, key: string | null | undefined) => AppSettings
@@ -316,7 +318,7 @@ export interface HiveRequests {
   'metrics:query': (q: MetricsQuery) => MetricsReport
   /** Clears the workspace's performance metrics. */
   'metrics:reset': () => void
-  /** The main process's recent stalls since Hive started, newest first (HI-1135, mainStalls.ts): Hive's, not a workspace's. */
+  /** The main process's recent stalls since Combwork started, newest first (HI-1135, mainStalls.ts): Combwork's, not a workspace's. */
   'performance:stalls': () => MainStalls
   /** Saves a report as a JSON file (a save dialog): the path, or null if cancelled. `sanitize` replaces project names. */
   'metrics:export': (q: MetricsQuery, sanitize: boolean) => string | null
@@ -399,7 +401,7 @@ export interface HiveRequests {
   'workflow:presetsNotice': () => { path: string; name: string }[] | null
   /** The presets notice was answered (Choose… or Not now): it isn't shown again in this workspace. */
   'workflow:presetsNoticeSaid': () => void
-  /** A level's workflow defaults for a platform as the editor shows them (#1422: Hive's, or the open workspace's). */
+  /** A level's workflow defaults for a platform as the editor shows them (#1422: Combwork's, or the open workspace's). */
   'workflow:levelForm': (level: WorkflowLevel, platform: PlatformId) => WorkflowForm
   /** What saving a level's defaults would do: its problems, what changes, and the projects inheriting it (#1422). */
   'workflow:levelCheck': (level: WorkflowLevel, platform: PlatformId, change: WorkflowChange) => WorkflowLevelCheck
@@ -407,7 +409,7 @@ export interface HiveRequests {
   'workflow:setLevel': (level: WorkflowLevel, platform: PlatformId, change: WorkflowChange) => WorkflowForm
   /**
    * The project's merge queues (#1353, SPEC §16.9.3): one target's, or every target's it has queued for or paused, or has
-   * cards in flight under Hive merges into, or its current options have Hive merge into (#1356: the panel decides which
+   * cards in flight under Combwork merges into, or its current options have Combwork merge into (#1356: the panel decides which
    * show). Each change comes as a `queue-changed` event.
    */
   'queue:list': (projectPath: string, target?: string) => QueueView[]
@@ -415,9 +417,9 @@ export interface HiveRequests {
   'slots:list': (projectPath: string) => SlotView[]
   /** One setting of the Version Control tab's Slots and copies (#1445): set, or with null removed, under the project's lock. */
   'slots:setSetting': (projectPath: string, key: 'setup' | 'archive' | 'copy' | 'copiesSize', value: string | number | null) => { slots: SlotOptions; copies: { size?: number } }
-  /** A project's copied files as they inherit (HI-1765: its own, its workspace's, Hive's, the default), and where they come from. */
+  /** A project's copied files as they inherit (HI-1765: its own, its workspace's, Combwork's, the default), and where they come from. */
   'slots:copyOf': (projectPath: string) => { value: string; origin: SlotOptionOrigin }
-  /** Hive's or the workspace's slot defaults (HI-1765: Settings → Workflow defaults, Git), with what each inherits. */
+  /** Combwork's or the workspace's slot defaults (HI-1765: Settings → Workflow defaults, Git), with what each inherits. */
   'slots:levelForm': (level: WorkflowLevel) => SlotLevelForm
   /** Sets one of a level's slot defaults (an empty string: none), or with null removes it, so it inherits. */
   'slots:setLevelDefault': (level: WorkflowLevel, key: 'copy', value: string | null) => SlotLevelForm
@@ -425,7 +427,7 @@ export interface HiveRequests {
   'slots:releaseCarried': (projectPath: string, agentId: string) => boolean
   /** A slot's writer as Release Slot… shows it (#1506): its holder, whether its run is live, what is listed of its processes. Null: none. */
   'slots:heldWriter': (projectPath: string, slot: string) => HeldWriter | null
-  /** Release Slot… on a held writer (#1506): `end` ends its listed processes first; refused while its Hive or run lives, or it changed. */
+  /** Release Slot… on a held writer (#1506): `end` ends its listed processes first; refused while its Combwork or run lives, or it changed. */
   'slots:releaseWriter': (projectPath: string, slot: string, run: string, end: boolean) => void
   /** The project's review and check copies (#1435, SPEC §16.10.5), each with its lease not freed. */
   'copies:list': (projectPath: string) => CopyView[]
@@ -433,40 +435,40 @@ export interface HiveRequests {
   'slots:test': (projectPath: string, op: SlotTestOp) => unknown
   /** A target's queue history (#1357, the Git tab's Merge queue section): its latest 50 outcomes, newest first. */
   'queue:history': (projectPath: string, target: string) => QueueRecent[]
-  /** The card an agent's worktree branch is for, when Hive merges it (#1357, the Merge dialog), and where it stands in the queue. */
+  /** The card an agent's worktree branch is for, when Combwork merges it (#1357, the Merge dialog), and where it stands in the queue. */
   /** The user saw these returned entries of a target's queue (#1356, the Progress panel): they leave its card. */
   'queue:seen': (projectPath: string, target: string, entries: string[]) => void
   /** Pause queue (the user's): the target's queue stops before its next entry; saved. A queue paused already keeps its pause. */
   'queue:pause': (projectPath: string, target: string) => QueueView
-  /** Resume: clears the pause once its cause, where Hive can see it, is gone (`resumed`); else the queue is paused again, saying why. */
+  /** Resume: clears the pause once its cause, where Combwork can see it, is gone (`resumed`); else the queue is paused again, saying why. */
   'queue:resume': (projectPath: string, target: string) => QueueResumed
   /** Remove from queue (the user's override): the card back to Approved, never merged; refused once its merge has begun. */
   'queue:remove': (n: number, reason?: string) => TaskCard
   /** Retry merge (the user's override): requeues a returned card's unchanged revision, once. */
   'queue:retry': (n: number, reason?: string) => TaskCard
-  /** Adds the project's .hive to its git repository's info/exclude (#345); refuses where no git repository holds it. */
-  'project:excludeHive': (projectPath: string) => WorkspaceInfo
-  /** The files under the project's .hive git tracks (#364), for the confirmation before untracking them. */
-  'project:hiveTracked': (projectPath: string) => string[]
+  /** Adds the project's .combwork to its git repository's info/exclude (#345); refuses where no git repository holds it. */
+  'project:excludeCombwork': (projectPath: string) => WorkspaceInfo
+  /** The files under the project's .combwork git tracks (#364), for the confirmation before untracking them. */
+  'project:combworkTracked': (projectPath: string) => string[]
   /** `git rm --cached` of exactly the files confirmed (#364), refused if git tracks others now: their removal staged, the files left on disk. */
-  'project:untrackHive': (projectPath: string, files: string[]) => WorkspaceInfo
+  'project:untrackCombwork': (projectPath: string, files: string[]) => WorkspaceInfo
   'project:openInExplorer': (projectPath: string) => void
   'project:openTerminal': (projectPath: string) => void
   /** What hiding, removing or deleting the project would touch (Project → Remove Project…). */
   'project:removalInfo': (projectPath: string) => ProjectRemovalInfo
-  /** Hides it, removes it from Hive (packing its workspace files into its folder) or deletes it (to the Recycle Bin). */
+  /** Hides it, removes it from Combwork (packing its workspace files into its folder) or deletes it (to the Recycle Bin). */
   'project:remove': (projectPath: string, how: ProjectRemoval) => { warnings: string[] }
-  /** Projects hidden or removed from Hive, and whether each folder is still in the workspace. */
+  /** Projects hidden or removed from Combwork, and whether each folder is still in the workspace. */
   'project:hidden': () => (HiddenProject & { present: boolean })[]
   'project:restore': (name: string) => { handovers: number; cards: number }
   /** Stops listing a hidden or removed project whose folder is gone. */
   'project:forget': (name: string) => void
-  /** A folder holding what Remove from Hive packed: keep (unpack into this workspace) or discard it. */
+  /** A folder holding what Remove from Combwork packed: keep (unpack into this workspace) or discard it. */
   'project:takeRemovedData': (projectPath: string, keep: boolean) => { handovers: number; cards: number }
 
   /** The board's state (#1207): read-only and why, and the copy kept from before its upgrade to 1.0. */
   'board:state': () => BoardState
-  /** Upgrades the board to 1.0, the user having said yes (refused while another Hive has the workspace open). */
+  /** Upgrades the board to 1.0, the user having said yes (refused while another Combwork has the workspace open). */
   'board:upgrade': () => { backup: string | null }
   /** Help → Restore the 0.9 Board Backup…: the 1.0 board copied aside, the 0.9 copy put back. */
   'board:restore09': () => { saved: string; restored: string }
@@ -489,7 +491,7 @@ export interface HiveRequests {
   'journal:deleteEntry': (id: number) => boolean
   'journal:forgetPreview': (filter: JournalFilter) => JournalForgetPreview
   'journal:forget': (filter: JournalFilter, token: string) => JournalForgetResult
-  /** Cards an older Hive saved, set aside for review (#1044): listed, added to the board, discarded (by file name). */
+  /** Cards an older version saved, set aside for review (#1044): listed, added to the board, discarded (by file name). */
   'tasks:setAside': () => SetAsideCard[]
   'tasks:addSetAside': (file: string) => TaskCard
   'tasks:discardSetAside': (file: string) => void
@@ -545,10 +547,10 @@ export interface HiveRequests {
   /** Every live card's badges from its work (#1223), in number order; archived cards aren't read. */
   'tasks:workBadges': () => WorkBadge[]
 
-  /** own: Hive's own sessions alone, for a view that shows them before the others (HI-1681). */
+  /** own: Combwork's own sessions alone, for a view that shows them before the others (HI-1681). */
   'session:list': (projectPath: string, opts?: { own?: boolean }) => SessionListItem[]
   /** agentId: without one, the project's only agent. skipSetup starts the agent even though the worktree's setup command hasn't succeeded. */
-  'session:start': (projectPath: string, opts: { resumeId?: string; name?: string; agentId?: string; skipSetup?: boolean; auto?: boolean }) => LiveSessionState
+  'session:start': (projectPath: string, opts: { resumeId?: string; name?: string; agentId?: string; skipSetup?: boolean; auto?: boolean; freshAsked?: boolean }) => StartedSession
   /** Stops the CLI's background job holding a conversation, then resumes it in the agent. */
   'session:stopBackgroundAndResume': (projectPath: string, agentId: string, jobId: string, sessionId: string, offer?: string) => void
   'session:stop': (projectPath: string, agentId?: string) => void
@@ -568,13 +570,13 @@ export interface HiveRequests {
   'session:retryInput': (projectPath: string, agentId: string, since: string) => 'clear' | 'blocked' | 'gone' | 'busy'
   'session:archive': (projectPath: string, sessionId: string, archived: boolean) => void
   'session:rename': (projectPath: string, sessionId: string, name: string) => void
-  /** Deletes a session that isn't running from Hive (its record and backups; the CLI's transcript stays). */
+  /** Deletes a session that isn't running from Combwork (its record and backups; the CLI's transcript stays). */
   'session:delete': (projectPath: string, sessionId: string) => void
   /** Archives, unarchives or deletes several sessions (a branch of the Sessions tab), each all or nothing; skips those in use. */
   'session:bulk': (projectPath: string, action: SessionBulkAction, sessionIds: string[]) => SessionBulkResult
   /** Deleted sessions' usage (list items with deleted: true), which totals still count. */
   'session:keptUsage': (projectPath: string) => SessionListItem[]
-  /** What Hive keeps for a project or the Assistant (Project Settings → Storage); the last result unless refresh. `request` lets storage:abandon end the call. */
+  /** What Combwork keeps for a project or the Assistant (Project Settings → Storage); the last result unless refresh. `request` lets storage:abandon end the call. */
   'storage:project': (projectPath: string, refresh?: boolean, request?: string) => ProjectStorage
   /** Every project's storage and the Assistant's, biggest first (Settings → Workspace); `request` as for storage:project. */
   'storage:workspace': (refresh?: boolean, request?: string) => WorkspaceStorage
@@ -598,7 +600,7 @@ export interface HiveRequests {
   'storage:cardCleanupPreview': (projectPath: string) => { plan: string | null; items: CardCleanupItem[]; more: boolean }
   /** Applies a kept plan (Clean Up Now's Move): only its files still as they were, each card checked again; an expired or used plan is refused. */
   'storage:cardCleanup': (projectPath: string, plan: string) => { cards: number; files: number; bytes: number; left: number; stopped?: boolean }
-  /** What Purge… (#1138) would remove of Hive's for a session, a project or the window's workspace: every file and record, with its size. */
+  /** What Purge… (#1138) would remove of Combwork's for a session, a project or the window's workspace: every file and record, with its size. */
   'storage:purgePreview': (target: PurgeTarget) => PurgePreview
   /** Removes what a preview (its id) listed, those of its keys given, to the Recycle Bin or permanently, skipping what changed since. */
   'storage:purge': (previewId: string, listed: string[], permanent: boolean) => PurgeResult
@@ -606,7 +608,7 @@ export interface HiveRequests {
   'session:clearUsageCache': () => void
   'session:adopt': (projectPath: string, sessionId: string) => void
   'session:usage': (projectPath: string, sessionId: string) => SessionUsage | null
-  /** An agent's hooks for its Hooks dialog (HI-982): what its launch has and what Hive received; null when it isn't running. */
+  /** An agent's hooks for its Hooks dialog (HI-982): what its launch has and what Combwork received; null when it isn't running. */
   'session:hooks': (projectPath: string, agentId: string) => SessionHooks | null
   /** The window showed these agents' panes (all of the project's agents when none are named). */
   'session:markSeen': (projectPath: string, agentIds?: string[]) => void
@@ -631,11 +633,11 @@ export interface HiveRequests {
   /** Switches running agents whose settings now say a different mode (after "Switch now"). */
   /** `offer`: from Switch Now's notice (HI-2320), which then says what happened. */
   'session:applyModes': (offer?: string) => { switched: string[]; skipped: string[] }
-  /** Saves the clipboard image into .hive/attachments/<sessionId> and gives its path; null if the clipboard has no image. */
+  /** Saves the clipboard image into .combwork/attachments/<sessionId> and gives its path; null if the clipboard has no image. */
   'session:pasteImage': (projectPath: string, agentId?: string) => string | null
   /** How each file would be attached to the agent's session (#387): copied or by path, its size and kind. Nothing changes. */
   'session:planAttach': (projectPath: string, sources: string[], agentId?: string) => AttachmentPlan[]
-  /** Attaches files to the agent's running session: copies those planAttach says into .hive/attachments/<sessionId>; the paths to paste. */
+  /** Attaches files to the agent's running session: copies those planAttach says into .combwork/attachments/<sessionId>; the paths to paste. */
   'session:attach': (projectPath: string, sources: string[], agentId?: string) => Attached[]
 
   /** Adds an agent to the project (the user's: up to 24, past Maximum agents, #562, HI-2001), creating its worktree if asked, or reusing one (#456: `reuse` says how). */
@@ -645,7 +647,7 @@ export interface HiveRequests {
   /** What more agents would cost (#562): the memory the running agents take now (null: can't be told) and the computer's. */
   'agents:memory': () => { running: { agents: number; bytes: number } | null; total: number; free: number }
   /** Changing provider clears the agent's model, effort and mode, and its session to resume (conversations can't move between providers). */
-  /** Changes an agent's name and settings; for the Hive Assistant's home, its settings for this workspace (mode too). */
+  /** Changes an agent's name and settings; for the Combwork Assistant's home, its settings for this workspace (mode too). */
   'agents:update': (projectPath: string, agentId: string, patch: AgentPatch) => AgentDef
   /**
    * Removes an agent (its session must be stopped). deleteWorktree also removes its worktree and branch; 'merged-clean'
@@ -667,7 +669,7 @@ export interface HiveRequests {
   'agents:swap': (projectPath: string, agentId: string, otherId: string) => string[]
   /** Saves where the panes are in one layout (#762): its cells page after page, an agent's id or null; returns them as saved. */
   'agents:place': (projectPath: string, layout: SessionLayout, cells: (string | null)[]) => (string | null)[]
-  /** Agent templates (#126): Hive's own (#1436), the workspace's and the project's. */
+  /** Agent templates (#126): Combwork's own (#1436), the workspace's and the project's. */
   'templates:list': (projectPath: string) => TemplateEntry[]
   /** Saves the project's agents and layout; a name already there is replaced only with `overwrite` (else `exists`). */
   /** `usePatterns` (#1440): the project's key in its agents' names kept as a pattern (`HI-B1` as `{key}-B{n}`). */
@@ -686,7 +688,7 @@ export interface HiveRequests {
   'templates:connectionsPlan': (projectPath: string) => ConnectionsPlan
   /** Choose Connections…: the project's agents given the connections answered, nothing else changed; `expected`: their ids as shown (else refused). */
   'templates:applyConnections': (projectPath: string, connections: ConnectionAnswers, expected: string[]) => ConnectionsApplied
-  /** Every template of the workspace (#127, the Templates view): Hive's own (#1436), the workspace's, then each project's. */
+  /** Every template of the workspace (#127, the Templates view): Combwork's own (#1436), the workspace's, then each project's. */
   'templates:all': () => TemplateEntry[]
   /** Renames a template where it is kept (another of that name there refuses it). */
   'templates:rename': (ref: TemplateRef, name: string) => TemplateEntry
@@ -694,7 +696,7 @@ export interface HiveRequests {
   'templates:update': (ref: TemplateRef, edited: Pick<AgentTemplate, 'name' | 'description' | 'layout' | 'agents' | 'pairs' | 'workflow'>, savedAt: string | null) => TemplateEntry
   /** Copies a template into the workspace or a project; a name taken there gets a number ("Pair (2)"). */
   'templates:duplicate': (ref: TemplateRef, to: TemplateDest) => TemplateEntry
-  /** Deletes a template (to the Recycle Bin); Hive's own can't be (#1436). */
+  /** Deletes a template (to the Recycle Bin); Combwork's own can't be (#1436). */
   'templates:delete': (ref: TemplateRef) => void
   /** Exports a template to a file the user chooses (a save dialog); its path, or null if cancelled. */
   'templates:export': (ref: TemplateRef) => string | null
@@ -723,12 +725,12 @@ export interface HiveRequests {
   'worktrees:mergeBranches': (projectPath: string) => MergeBranchList
   /** What a branch holds that the target doesn't. */
   'worktrees:branchMergeStatus': (projectPath: string, branch: string, target: string) => AgentBranchStatus
-  /** The card a branch is: the one Hive's merge queue merges (Merge anyway), and the card whose line it is while not Done. */
+  /** The card a branch is: the one Combwork's merge queue merges (Merge anyway), and the card whose line it is while not Done. */
   'worktrees:branchCards': (projectPath: string, branch: string) => { queue: BranchQueueCard | null; line: { number: number; key: string; title: string } | null }
   /** Merges a branch into a target; `card`: confirmed for that unfinished card's line; `outsideQueue` as agents:merge's. */
   'worktrees:mergeBranch': (projectPath: string, branch: string, opts: { target: string; squash: boolean; message: string; card?: number; outsideQueue?: { card: number; reason: string } }) => MergeResult
   /**
-   * `outsideQueue`: merged anyway, though Hive merges the card on this branch (#1357): an override on it, with the reason.
+   * `outsideQueue`: merged anyway, though Combwork merges the card on this branch (#1357): an override on it, with the reason.
    * `card`: confirmed for that unfinished card's line (#1450); every merge route refuses one without it.
    */
   'agents:merge': (projectPath: string, agentId: string, opts: { squash: boolean; message: string; cleanup: boolean; moveBranch?: boolean; card?: number; outsideQueue?: { card: number; reason: string } }) => MergeResult
@@ -773,35 +775,69 @@ export interface HiveRequests {
   'pty:clipboardRefused': (key: string, reason: Osc52Refusal) => void
 
   'skills:list': (projectPath?: string) => SkillInfo[]
-  /** The workspace's Hive skills, with the bundled skills it doesn't have (bundled: 'missing'). */
+  /** The workspace's Combwork skills, with the bundled skills it doesn't have (bundled: 'missing'). */
   'skills:workspace': () => SkillInfo[]
   'skills:create': (name: string, description: string, targets: SkillTarget[]) => SkillInfo
   /** Chooses a .md or .zip to add as a skill; returns it with a suggested name, or null if cancelled. */
   'skills:pickFile': () => { path: string; name: string } | null
   'skills:addFromFile': (file: string, name: string, targets: SkillTarget[]) => SkillInfo
-  /** Moves a Hive or local skill to the Recycle Bin. */
+  /** Moves a Combwork or local skill to the Recycle Bin. */
   'skills:delete': (skillPath: string) => void
-  /** Puts back a bundled skill as this version of Hive ships it. */
+  /** Puts back a bundled skill as this version of Combwork ships it. */
   'skills:restoreBundled': (name: string) => SkillInfo
   'skills:copyToWorkspace': (skillPath: string) => SkillInfo
-  /** A Hive skill delivered to agents or not (#1431, Skills → Delivered to agents): in the workspace (no project), or one project's. */
+  /** A Combwork skill delivered to agents or not (#1431, Skills → Delivered to agents): in the workspace (no project), or one project's. */
   'skills:setDelivered': (projectPath: string | null, name: string, on: boolean) => void
   'skills:openFolder': () => void
   /** A listed skill's files (HI-2011), relative with "/", SKILL.md among them; `projectPath`: its project's tab. */
   'skills:files': (skillPath: string, projectPath?: string) => { files: string[]; truncated: boolean }
 
-  /** The workspace's servers, each with where it is added (HI-2059: the projects and the Hive Assistant). */
+  // The Dialects view (HI-2444), in the window's workspace; paths are a dialect file's in .combwork/dialects ("claude-code/Opus 5.5.json").
+  /** Every agent text a dialect can override (the Default beneath every file), by area: read once. */
+  'dialects:catalogue': () => DialectCatalogue
+  /** The workspace's dialect files: the Workspace file, each CLI's folder, the API's. */
+  'dialects:list': () => DialectRow[]
+  /** A file with the layers beneath it; null when it isn't there. */
+  'dialects:file': (path: string) => DialectFileView | null
+  /** Which running sessions speak which files, and whose chain moved ("restart to apply"): the view's only. */
+  'dialects:usage': () => DialectUsage[]
+  /** Saves a file (the form's draft, or the JSON tab's text), checked; `base`: the text on disk the draft started from. */
+  'dialects:save': (path: string, draft: { file: DialectFile } | { raw: string }, base: string) => DialectRefusal | null
+  'dialects:setOn': (path: string, on: boolean) => void
+  /**
+   * A new file in a CLI's folder under a label (HI-2523): empty (New Model File), or `from`'s texts (Duplicate). With a
+   * model ('' for none: a test copy) it claims it, and `from` in the reply is the file that had it (now a test copy).
+   */
+  'dialects:create': (folder: string, label: string, model: string, from: string | null) => { path: string; from: string | null } | DialectRefusal
+  /** Set Model (HI-2523): moves the model's claim onto one of the user's model files or test copies; the file that had it becomes a test copy. */
+  'dialects:promote': (path: string, model: string) => { from: string | null } | DialectRefusal
+  /** The model IDs agents of this CLI have run in the workspace, newest first (HI-2523: the model field's suggestions). */
+  'dialects:models': (cli: string) => string[]
+  /** Puts back a shipped file as this Combwork ships it. */
+  'dialects:revert': (path: string) => void
+  /** Moves a file the user made to the Recycle Bin (the Workspace, CLI and shipped files are refused). */
+  'dialects:delete': (path: string) => DialectRefusal | null
+  /** Chooses a file to import: an opaque token for this window and workspace, and its suggested label; null if cancelled. */
+  'dialects:pickImport': () => { token: string; label: string } | null
+  /** Imports the picked file into a folder under a label: as a test copy when its model is taken (or can't be there). */
+  'dialects:import': (token: string, folder: string, label: string) => { path: string; testCopy: boolean } | DialectRefusal
+  /** Writes a file as it is where the user chooses; the path written, or null if cancelled. */
+  'dialects:export': (path: string) => string | null
+  /** The files an agent of this CLI can pick (Agent Settings → Dialect): its folder's model files and test copies. */
+  'dialects:choices': (cli: string) => { path: string; name: string; model?: string }[]
+
+  /** The workspace's servers, each with where it is added (HI-2059: the projects and the Combwork Assistant). */
   'mcp:list': () => McpServerInfo[]
   /**
-   * Adds a server to a project (its path) or the Hive Assistant (`assistant`), HI-2059. `expected` is the server the user
+   * Adds a server to a project (its path) or the Combwork Assistant (`assistant`), HI-2059. `expected` is the server the user
    * was shown: refused if it has been replaced or edited since.
    */
   'mcp:add': (target: string, name: string, expected: McpShown) => void
-  /** Removes a server from a project (its path) or the Hive Assistant (`assistant`), HI-2059. */
+  /** Removes a server from a project (its path) or the Combwork Assistant (`assistant`), HI-2059. */
   'mcp:remove': (target: string, name: string) => void
   /**
    * Add to… (the MCP view, HI-2059): added to the projects ticked (path → true) and removed from the others listed, and
-   * for the Hive Assistant as `assistant` says; `expected` as for mcp:add. Says what changed where, and what failed.
+   * for the Combwork Assistant as `assistant` says; `expected` as for mcp:add. Says what changed where, and what failed.
    */
   'mcp:places': (name: string, expected: McpShown | undefined, projects: Record<string, boolean>, assistant?: boolean) => McpPlacesResult
   'mcp:create': (name: string) => McpServerInfo
@@ -828,7 +864,7 @@ export interface HiveRequests {
    * catalogues and this PC again (the view opening, ↻); `source` and `offset`: that source's next page.
    */
   'mcp:catalog': (opts: { query?: string; filter?: McpCatalogFilter; source?: string; offset?: number; refresh?: boolean }) => McpCatalogSourcePage[]
-  /** The one-time note for a source Hive doesn't check was shown (HI-545). */
+  /** The one-time note for a source Combwork doesn't check was shown (HI-545). */
   'mcp:catalogNoted': (url: string) => void
   /** Downloads and checks a catalogue server for Install or Update (HI-545): what it would run, held for the answer. */
   'mcp:catalogPrepare': (source: string, name: string) => McpCatalogPrepared
@@ -847,20 +883,18 @@ export interface HiveRequests {
   'notes:delete': (path: string) => void
   'notes:rename': (path: string, newName: string) => string
 
-  /** The Hive Assistant's modes: the workspace's, then Hive's that it doesn't have (bundled: 'missing'). */
-  /** The Hive Assistant's actions in this window's workspace, oldest first, and the questions it waits on. */
+  /** The Combwork Assistant's modes: the workspace's, then Combwork's that it doesn't have (bundled: 'missing'). */
+  /** The Combwork Assistant's actions in this window's workspace, oldest first, and the questions it waits on. */
   'assistant:actions': () => AssistantAction[]
   'assistant:questions': () => AssistantQuestion[]
   'assistant:answer': (id: string, yes: boolean) => void
   /** A question of the Assistant's, its panel hidden in this window (HI-2320): told once as a notification that needs you; whether it was told now. */
   'assistant:tellQuestion': (id: string) => boolean
-  /** Revert on a setting the Assistant changed (its activity list): sets it back, and lists that too (#186). */
-  'assistant:revertSetting': (actionId: string) => void
   /** The Assistant's changes kept for undo (#1282), by the user's message they came from, newest first (7 days). */
   'assistant:changes': () => AssistantChangeGroup[]
   /** The user undoes one of the Assistant's changes, or a message's: what each put back, and what it left and why. */
   'assistant:undo': (sel: { change?: string; group?: string }) => AssistantUndoResult[]
-  /** Switches this workspace's Assistant to a mode (a file in .hive/modes): told at once if it runs, else when it starts (#259). */
+  /** Switches this workspace's Assistant to a mode (a file in .combwork/modes): told at once if it runs, else when it starts (#259). */
   'assistant:switchMode': (modeId: string, save?: boolean) => 'told' | 'later' | 'saved'
   /** This window's workspace's merge slots: those held or waited for (#350). */
   'mergeSlots:list': () => MergeSlotInfo[]
@@ -908,7 +942,7 @@ export interface HiveRequests {
   'progress:showLog': (id: string) => void
   /** Opens this window's developer console (#637), or brings it forward; refused unless Show developer features is on. */
   'console:open': () => void
-  /** The developer console's sources in this window's workspace (#636): its agents, its Assistant and Hive itself. */
+  /** The developer console's sources in this window's workspace (#636): its agents, its Assistant and Combwork itself. */
   'console:sources': () => ConsoleSource[]
   /** The developer console's options (#699): `showText`, Settings → Advanced → Developer console: show text. Changes come as `console-options`. */
   'console:options': () => { showText: boolean }
@@ -921,16 +955,16 @@ export interface HiveRequests {
   /** A watched source's events after `since` (a seq), oldest first (with text as `console:subscribe` says). */
   'console:snapshot': (source: string, since?: number) => ConsoleEvent[]
   /**
-   * Records a source this window may read to a file in Hive's console-recordings folder (#638), from now until stopped,
+   * Records a source this window may read to a file in Combwork's console-recordings folder (#638), from now until stopped,
    * the window closes or leaves its workspace: redacted, or with prompt and reply text when `includeText` (secrets stay
    * masked). Replaces this window's recording; progress comes as `console-recording`.
    */
   'console:record': (source: string, opts?: { includeText?: boolean }) => ConsoleRecordingInfo
   /** Stops this window's recording; null if it wasn't recording. */
   'console:stopRecording': () => ConsoleRecordingInfo | null
-  /** This window's recording going on, and the newest one in Hive's folder (Copy Diagnostics offers it). */
+  /** This window's recording going on, and the newest one in Combwork's folder (Copy Diagnostics offers it). */
   'console:recordings': () => { active: ConsoleRecordingInfo | null; latest: ConsoleRecordingInfo | null }
-  /** Shows one of Hive's recordings (by its file name) in its folder. */
+  /** Shows one of Combwork's recordings (by its file name) in its folder. */
   'console:showRecording': (name: string) => void
   /** The flight recorder's captures (#698), newest first: each one's trigger, agent and when. */
   'console:captures': () => ConsoleRecordingInfo[]
@@ -938,7 +972,7 @@ export interface HiveRequests {
   'modes:create': (name: string) => ModeInfo
   /** Moves the mode's file to the Recycle Bin. */
   'modes:delete': (id: string) => void
-  /** Puts back one of Hive's modes as this version ships it (the workspace's copy goes to the Recycle Bin). */
+  /** Puts back one of Combwork's modes as this version ships it (the workspace's copy goes to the Recycle Bin). */
   'modes:restore': (id: string) => ModeInfo
 
   'file:read': (path: string) => string
@@ -1028,7 +1062,7 @@ export interface HiveRequests {
   'git:createTag': (projectPath: string, name: string, message: string, pushTo?: string) => string
   /** This repository's own user.name and user.email; empty removes it (the global one applies). */
   'git:setIdentity': (projectPath: string, name: string, email: string) => string
-  /** Initialise repository (#701): whether it can be done, and what the dialog asks; then git init on main, .hive excluded first, a starter .gitignore, the first commit. */
+  /** Initialise repository (#701): whether it can be done, and what the dialog asks; then git init on main, .combwork excluded first, a starter .gitignore, the first commit. */
   'git:initCheck': (projectPath: string) => GitInitCheck
   'git:init': (projectPath: string, opts: GitInitOptions) => string
 
@@ -1043,7 +1077,7 @@ export interface HiveRequests {
   /** Stops every running agent of a provider (turning it off). */
   'provider:stopAgents': (provider: ProviderId) => void
 
-  /** Hive's accounts (HI-980) and this window's workspace's choice of them; `check`: each checked again (Settings shown). */
+  /** Combwork's accounts (HI-980) and this window's workspace's choice of them; `check`: each checked again (Settings shown). */
   'connections:list': (check?: boolean) => ConnectionsView
   /** Adds an account (its folder and junctions made); returns it, for its Sign in. */
   'connections:add': (provider: ProviderId, name: string) => Account
@@ -1107,11 +1141,11 @@ export interface HiveRequests {
   'api:revokeViewer': (id: string) => AgentApiInfo
 }
 
-export type HiveChannel = keyof HiveRequests
+export type CombworkChannel = keyof CombworkRequests
 
-export interface HiveBridge {
-  invoke<C extends HiveChannel>(channel: C, ...args: Parameters<HiveRequests[C]>): Promise<ReturnType<HiveRequests[C]>>
-  onEvent(listener: (event: HiveEvent) => void): () => void
+export interface CombworkBridge {
+  invoke<C extends CombworkChannel>(channel: C, ...args: Parameters<CombworkRequests[C]>): Promise<ReturnType<CombworkRequests[C]>>
+  onEvent(listener: (event: CombworkEvent) => void): () => void
   onPtyData(listener: (key: string, data: string) => void): () => void
   onPtyExit(listener: (key: string, code: number) => void): () => void
   /** Full path of a file dropped from Explorer. */

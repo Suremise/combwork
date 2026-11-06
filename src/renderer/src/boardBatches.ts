@@ -78,7 +78,7 @@ export const EXPORT_BOARD = msg({ id: 'board.export.command', defaultMessage: 'E
 
 /**
  * Exports the board to JSON files (#1017): a folder the user picks gets a new folder with a file for each card, as the
- * cards were kept before 0.9 (an older Hive reads them), and says where.
+ * cards were kept before 0.9 (an older version reads them), and says where.
  */
 export async function exportBoard(): Promise<void> {
   try {

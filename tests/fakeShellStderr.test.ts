@@ -22,7 +22,7 @@ describe("the fake's shell standard error file", () => {
       expect(at.endsWith(file)).toBe(true)
       // Written as the fake writes it, and read back as a suite reads it.
       writeFileSync(at, '')
-      writeFileSync(at, 'hive-progress: waiting for a check copy\n', { flag: 'a' })
+      writeFileSync(at, 'cw-progress: waiting for a check copy\n', { flag: 'a' })
       expect(readFileSync(shellStderrFile(home, name), 'utf8')).toContain('waiting for a check copy')
     }
   })

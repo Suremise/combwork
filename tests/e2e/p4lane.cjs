@@ -1,17 +1,17 @@
 // S54, P4's RC scenario end to end (#1287, SPEC §16.18, §16.19.1), as 1.0 builds it (#1573: §16.10's slots, no worktree
 // agents): "Pair (the agent merges)", the Assistant off, on fake Claude Code agents acting by their own tokens (their
-// hive tools' calls), B1 added in the project folder. The project's options are set through Version Control → Workflow
-// (#1278); a lane is started from the board (#1280), lent a slot that B1 then works in. Card 1: the builder starts it
-// on its line in the slot (the next card's start refused meanwhile: one card at a time), commits, runs the quick check
-// through hive-progress --check (counted), submits; the reviewer starts its review and passes it; the builder merges
+// Combwork tools' calls), B1 added in the project folder. The project's options are set through Version Control → Workflow
+// (#1278); a lane is started from the board (#1280), lent a slot that B1 then works in. Card 1: Combwork starts it with
+// the lane's brief (HI-2558), and the builder's own start of it finds it on its line in the slot (the next card's start refused meanwhile: one card at a time), commits, runs the quick check
+// through cw-progress --check (counted), submits; the reviewer starts its review and passes it; the builder merges
 // it (a merge commit) and reports the merge, which done.contained checks: Done, and only then does the next card start,
 // on a line of its own from main (card 1's, merged, deleted). Cards 2 and 3 are squash-merged in a row: card 3 starts
 // while B1 is busy and its slot is left as it is until B1 is quiet, then its line is made from main; each card's change
 // is only its own and no branch is moved (LineMoved is a 0.9 worktree's, §16.19.2). Card 4 is squash-merged after a
 // commit made past its approval: card 5 starts on its own line, and card 4's line, holding work that isn't in main, is
 // kept (looked at once card 5, merged, has its line deleted after card 6 starts: a pass that deleted it had looked at
-// card 4's first). Each check's run through hive-progress --check is counted. A screenshot at each stage, once the window shows
-// it. Dev build (or HIVE_EXE), throwaway profile, workspace and CLAUDE_CONFIG_DIR.
+// card 4's first). Each check's run through cw-progress --check is counted. A screenshot at each stage, once the window shows
+// it. Dev build (or CW_EXE), throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -41,7 +41,7 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
   // Every read of the agents' input recorded, for typeLine.
   lib.logFakeInput(claudeHome)
   // A quick check from the project's scripts, as the preset offers it: `typecheck`, which passes.
-  lib.gitProject(alpha, { 'a.ts': 'export const a = 1\n', 'package.json': JSON.stringify({ name: 'alpha', scripts: { typecheck: 'node -e "process.exit(0)"' } }), '.gitignore': '.hive/\n' })
+  lib.gitProject(alpha, { 'a.ts': 'export const a = 1\n', 'package.json': JSON.stringify({ name: 'alpha', scripts: { typecheck: 'node -e "process.exit(0)"' } }), '.gitignore': '.combwork/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')
@@ -52,13 +52,13 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   // The Assistant off (S54): a test copy never starts it.
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  // The dev build, or the packaged Hive HIVE_EXE names (S54 on the upgraded build in the Sandbox checks, #1337).
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' } })
+  // The dev build, or the packaged Combwork CW_EXE names (S54 on the upgraded build in the Sandbox checks, #1337).
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)
     await page.getByText('alpha', { exact: true }).first().click()
-    const projectJson = () => JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'project.json'), 'utf8'))
+    const projectJson = () => JSON.parse(fs.readFileSync(path.join(alpha, '.combwork', 'project.json'), 'utf8'))
 
     // --- Pair (the agent merges) through Version Control → Workflow (#1278).
     await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
@@ -79,7 +79,7 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
     const b1 = await lib.addAgent(inv, alpha, { name: 'B1' })
     const r1 = await lib.addAgent(inv, alpha, { name: 'R1' })
     // The fake trusts the folders it is told of (its trust prompt never shows): the project's slots too, as B1 works in
-    // the lane's (one left at the prompt is never quiet, so Hive would never prepare its next card's line).
+    // the lane's (one left at the prompt is never quiet, so Combwork would never prepare its next card's line).
     const slotRoot = path.join(`${ws}.worktrees`, 'alpha')
     fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws, alpha, ...'abcdefgh'.split('').map((x) => path.join(slotRoot, `slot-${x}`))].map((d) => d.toLowerCase())))
     check('B1 is a builder in the project folder (no worktree of its own)', !b1.worktree, JSON.stringify(b1))
@@ -120,7 +120,7 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
     // B1 is started again in the lane's slot (a new conversation, a launch with its own token): read once it runs there.
     check("both agents run, B1 in the lane's slot", !!(await until(async () => (await idleIn(b1.id, lent)) && (await idleIn(r1.id)), HUNG_MS)), JSON.stringify(await live(b1.id)))
 
-    // The agents' own tokens, from their launches, as their hive tools read them (progressgates').
+    // The agents' own tokens, from their launches, as their Combwork tools read them (progressgates').
     const launchesFile = path.join(claudeHome, 'fake-launches.jsonl')
     const launches = () => {
       const text = fs.existsSync(launchesFile) ? fs.readFileSync(launchesFile, 'utf8') : ''
@@ -129,8 +129,8 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
     const tokenOf = async (id) => {
       const sessionId = (await until(async () => (await live(id))?.sessionId, HUNG_MS))
       const launch = await until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
-      const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive : null
-      return hive ? JSON.parse(fs.readFileSync(hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token : null
+      const server = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
+      return server ? JSON.parse(fs.readFileSync(server.env.CW_API_TOKEN_FILE, 'utf8')).token : null
     }
     const tokens = { b1: await tokenOf(b1.id), r1: await tokenOf(r1.id) }
     check('each agent has its own token', !!tokens.b1 && !!tokens.r1)
@@ -139,7 +139,7 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
       const res = await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${encodeURIComponent(`#${n}`)}/${name}`, { method: 'POST', headers: { Authorization: `Bearer ${tokens[who]}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       return { status: res.status, body: await res.json().catch(() => null) }
     }
-    // The builder's shell (the fake's "shell:" step), as hive-progress runs in its session.
+    // The builder's shell (the fake's "shell:" step), as cw-progress runs in its session.
     const shells = () => {
       const f = path.join(claudeHome, 'fake-shell.jsonl')
       return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []
@@ -150,9 +150,9 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
       const f = path.join(claudeHome, 'fake-wakes.jsonl')
       return (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((w) => w.agent === agent)
     }
-    // A line typed into B1 (typeLine): Hive may type a wake into it at the same moment (a verdict's, a line moved's), and
+    // A line typed into B1 (typeLine): Combwork may type a wake into it at the same moment (a verdict's, a line moved's), and
     // the line is typed again when the wake disturbed it or B1 dropped it.
-    // Each try waits for B1 idle with its inbox quiet (HI-1918: idle between Hive's own turns isn't enough).
+    // Each try waits for B1 idle with its inbox quiet (HI-1918: idle between Combwork's own turns isn't enough).
     const typeTo = (text, taken) => lib.typeLine(inv, lib.ptyKey(alpha, b1.id), claudeHome, 'B1', text, { ready: async () => lib.agentQuiet(PORT, 'alpha', await live(b1.id), tokens.b1), strict: true, ...(taken ? { taken } : { live: () => live(b1.id) }), hungMs: 60000 })
     const shell = async (cmd) => {
       const before = shells().length
@@ -163,11 +163,11 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
       if (!ran) throw new Error(`B1 didn't run "${cmd}" (its line wasn't taken)`)
       return ran
     }
-    /** The quick check through hive-progress on the card's revision now: true once a new counted CheckRan is on the card. */
+    /** The quick check through cw-progress on the card's revision now: true once a new counted CheckRan is on the card. */
     const counted = (f) => f.kind === 'CheckRan' && f.data?.counted === true
     const quickCheck = async (n) => {
       const before = (await facts(n)).filter(counted).length
-      await shell(`hive-progress --check typecheck --card ${await keyOf(n)}`)
+      await shell(`cw-progress --check typecheck --card ${await keyOf(n)}`)
       return !!(await until(async () => (await facts(n)).filter(counted).length > before, HUNG_MS))
     }
     const commit = (file) => {
@@ -181,7 +181,7 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
     /** A card built in B1's worktree (one commit, `file`), its quick check counted, submitted, reviewed and passed. */
     const build = async (n, file) => {
       const rev = commit(file)
-      check(`${await keyOf(n)}'s quick check through hive-progress --check is counted`, await quickCheck(n))
+      check(`${await keyOf(n)}'s quick check through cw-progress --check is counted`, await quickCheck(n))
       const sub = await intent('b1', n, 'submit', { summary: `${file} ready` })
       check(`${await keyOf(n)} submitted: Review`, sub.status === 200 && (await card(n)).column === 'review', JSON.stringify(sub.body))
       check(`${await keyOf(n)}'s change is only its own work`, (await submittedFiles(n)) === JSON.stringify([file]), await submittedFiles(n))
@@ -191,7 +191,7 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
       return rev
     }
     /**
-     * The builder reports a card's merge: Done, its merge checked (Integrated). Hive may have seen the merge in main
+     * The builder reports a card's merge: Done, its merge checked (Integrated). Combwork may have seen the merge in main
      * first (reconciliation, S7): then the card is Done already and the report has nothing left to do.
      */
     const reportMerge = async (n) => {
@@ -206,7 +206,7 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
     }
     /**
      * A card's start, and its Started fact's base and line. Started, it is built in the folder the start names (`wt`, the
-     * lane's slot) on its line (`line`) once Hive has made it there (`made: false` skips that wait).
+     * lane's slot) on its line (`line`) once Combwork has made it there (`made: false` skips that wait).
      */
     const start = async (n, { made = true } = {}) => {
       const s = await intent('b1', n, 'start')
@@ -231,7 +231,9 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
       check(`the window shows the stage before ${name}.png`, !!(await until(async () => (await top.count()) === 1 && (await ready()), HUNG_MS)), await topText())
       await page.screenshot({ path: path.join(shots, `${name}.png`) })
     }
-    await shoot('1-lane-started', async () => (await onBoard('Todo', c1)) && /B1 \/ R1/.test(await topText()))
+    // Card 1 arrives with the lane's brief (HI-2558): Combwork starts it on B1 as the lane starts, never the brief first.
+    check('card 1 is started by Combwork as the lane starts (HI-2558)', !!(await until(async () => (await kinds(c1)).includes('Started') && (await card(c1)).column === 'doing', HUNG_MS)), JSON.stringify(await kinds(c1)))
+    await shoot('1-lane-started', async () => (await onBoard('Active', c1)) && (await onBoard('Todo', c2)) && /B1 \/ R1/.test(await topText()))
 
     // --- Card 1: built on its line in the slot, checked, submitted, reviewed and passed; merged (a merge commit) and reported.
     const main0 = git(alpha, 'rev-parse', 'main')

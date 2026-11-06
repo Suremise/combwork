@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest'
 import type { AgentInfo, WorkspaceInfo } from '../src/shared/types'
 import { stallAgentOf } from '../src/shared/tasks'
 
-;(globalThis as unknown as { window: unknown }).window = { hive: { invoke: async () => null, on: () => () => {} }, addEventListener: () => {}, matchMedia: () => ({ matches: false, addEventListener: () => {} }) }
+;(globalThis as unknown as { window: unknown }).window = { combwork: { invoke: async () => null, on: () => () => {} }, addEventListener: () => {}, matchMedia: () => ({ matches: false, addEventListener: () => {} }) }
 // The renderer's module, typed here by what the test uses: the main process's typecheck doesn't follow renderer code.
 interface RendererStore {
   get: () => { workspace: WorkspaceInfo }
@@ -77,9 +77,9 @@ describe("an agent's start told to the window (HI-1977)", () => {
     store.set({ workspace: read(base) })
     store.agentStartChanged('D:\\ws\\alpha', 'b1', { starting: true }, base + 1)
     const starting = read(base + 1, { starting: true })
-    store.agentStartChanged('D:\\ws\\alpha', 'b1', { failed: "Hive couldn't get slot-a ready: busy" }, base + 2)
+    store.agentStartChanged('D:\\ws\\alpha', 'b1', { failed: "Combwork couldn't get slot-a ready: busy" }, base + 2)
     store.showWorkspace(starting, false)
-    expect(markOf()).toEqual({ name: 'B1', running: false, failed: "Hive couldn't get slot-a ready: busy", waiting: null })
+    expect(markOf()).toEqual({ name: 'B1', running: false, failed: "Combwork couldn't get slot-a ready: busy", waiting: null })
     // Cleared (a hold run out, told as a change): an older read that had it starting doesn't bring it back.
     store.agentStartChanged('D:\\ws\\alpha', 'b1', null, base + 3)
     store.showWorkspace(starting, false)

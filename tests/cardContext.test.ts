@@ -10,7 +10,7 @@ import { parseDocRef, splitDocRefs } from '../src/shared/docRefs'
 import { taskPrompt } from '../src/shared/tasks'
 import type { TaskCard } from '../src/shared/types'
 
-const base = tempDir('hive-cardcontext-')
+const base = tempDir('cw-cardcontext-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -38,11 +38,11 @@ describe("a card's context", () => {
   let w: ReturnType<typeof createWorkspaceService>
   let alpha = ''
   beforeEach(async () => {
-    const ws = tempDir('hive-cardcontext-ws-')
+    const ws = tempDir('cw-cardcontext-ws-')
     alpha = join(ws, 'alpha')
-    mkdirSync(join(alpha, '.hive'), { recursive: true })
+    mkdirSync(join(alpha, '.combwork'), { recursive: true })
     mkdirSync(join(alpha, 'docs'), { recursive: true })
-    writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     writeFileSync(join(alpha, 'docs', 'PLAN.md'), PLAN)
     w = createWorkspaceService()
     await w.open(ws)
@@ -104,11 +104,11 @@ describe('references that no longer resolve (#819)', () => {
   let w: ReturnType<typeof createWorkspaceService>
   let alpha = ''
   beforeEach(async () => {
-    const ws = tempDir('hive-cardcontext-819-')
+    const ws = tempDir('cw-cardcontext-819-')
     alpha = join(ws, 'alpha')
-    mkdirSync(join(alpha, '.hive'), { recursive: true })
+    mkdirSync(join(alpha, '.combwork'), { recursive: true })
     mkdirSync(join(alpha, 'docs'), { recursive: true })
-    writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     writeFileSync(join(alpha, 'docs', 'PLAN.md'), PLAN)
     w = createWorkspaceService()
     await w.open(ws)
@@ -180,8 +180,8 @@ describe('references that no longer resolve (#819)', () => {
   })
 
   it("a start's check made before the list changed is never saved over it (edited, cleared, or the card moved)", async () => {
-    mkdirSync(join(alpha, '..', 'beta', '.hive'), { recursive: true })
-    writeFileSync(join(alpha, '..', 'beta', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    mkdirSync(join(alpha, '..', 'beta', '.combwork'), { recursive: true })
+    writeFileSync(join(alpha, '..', 'beta', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     await w.refresh()
     const c = await run(() => tasks.createTask({ title: 'T', project: 'alpha', context: ['docs/PLAN.md#gone'] }, user))
     // The start checked this list (it doesn't resolve)…
@@ -210,7 +210,7 @@ describe('the start prompt', () => {
   const card = { number: 7, title: 'Fix it', description: 'The details.', blockedBy: [], comments: [], context: ['docs/PLAN.md#setup', 'shared:plans/notes.md'] } as unknown as TaskCard
   it('lists the references with their sizes, and how to read them, not their text', () => {
     expect(taskPrompt(card, true, { context: [{ ref: 'docs/PLAN.md#setup', size: 840 }, { ref: 'shared:plans/notes.md', size: 12_400 }] })).toBe(
-      'Work on task #7 from the Hive task board: Fix it\n\nThe details.\n\nRead these first: docs/PLAN.md#setup (840 characters), shared:plans/notes.md (12k characters). hive_read_section reads each as the card has it (path: the file; heading: # and the slug after it, none for a whole file; from: "project").\n\nUse the work-on-card skill.'
+      'Work on task #7 from the Combwork task board: Fix it\n\nThe details.\n\nRead these first: docs/PLAN.md#setup (840 characters), shared:plans/notes.md (12k characters). cw_read_section reads each as the card has it (path: the file; heading: # and the slug after it, none for a whole file; from: "project").\n\nUse the work-on-card skill.'
     )
   })
   it('names what no longer resolves, why and the closest, never silently nothing (#819)', () => {
@@ -221,11 +221,11 @@ describe('the start prompt', () => {
     expect(all).not.toContain('Read these first')
     expect(all).toContain('These references no longer resolve: a.md#x (several headings have its text; they are: #x, #x-1); b.md (no such file).')
     // With none resolving, how to read the closest still says the project's copy (#819 round 2).
-    expect(all).toContain('hive_read_section reads the closest as the card has it (path: the file; heading: # and the slug; from: "project").')
-    expect(text).toContain('hive_read_section reads each as the card has it')
+    expect(all).toContain('cw_read_section reads the closest as the card has it (path: the file; heading: # and the slug; from: "project").')
+    expect(text).toContain('cw_read_section reads each as the card has it')
   })
-  it("without Hive's tools, or with no sizes worked out, the references alone; none, no line", () => {
-    expect(taskPrompt(card, false)).toBe("Work on task #7 from the Hive task board: Fix it\n\nThe details.\n\nRead these sections of the project's docs first: docs/PLAN.md#setup, shared:plans/notes.md.")
+  it("without Combwork's tools, or with no sizes worked out, the references alone; none, no line", () => {
+    expect(taskPrompt(card, false)).toBe("Work on task #7 from the Combwork task board: Fix it\n\nThe details.\n\nRead these sections of the project's docs first: docs/PLAN.md#setup, shared:plans/notes.md.")
     expect(taskPrompt({ ...card, context: undefined }, true)).not.toContain('Read these first')
   })
 })

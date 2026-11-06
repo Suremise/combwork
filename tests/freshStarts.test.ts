@@ -1,7 +1,7 @@
 // Fresh starts at natural breaks (#1437; shared/freshStarts.ts and main/freshStarts.ts): who Start Fresh (Idle Agents)
 // starts fresh and why not, checked again just before the stop (busy, or a lease taken, after the plan); whether a
 // project's work has finished; the nudge once per quiet spell (two triggers or two watchers at once: one notice; another
-// Hive or a restart: none until an agent was busy), a completion seen while the work was finishing told once it is
+// Combwork or a restart: none until an agent was busy), a completion seen while the work was finishing told once it is
 // quiet, only when the work has finished (a card in Review: none), and the switch, Settings' and a project's own. Real
 // workspace, board and event handler; the agents' sessions, and Start Fresh's stop and start, are stand-ins.
 import { mkdirSync, rmSync, writeFileSync } from 'fs'
@@ -10,7 +10,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { freshWhy, workFinished, type FreshNow } from '../src/shared/freshStarts'
-import type { HiveEvent } from '../src/shared/types'
+import type { CombworkEvent } from '../src/shared/types'
 
 /** A bound for a hung run (the waits are for conditions). */
 const HUNG_MS = 15_000
@@ -45,7 +45,7 @@ describe('who starts fresh (freshWhy)', () => {
 })
 
 describe('Start Fresh and the nudge (main/freshStarts.ts)', async () => {
-  const base = tempDir('hive-freshstarts-')
+  const base = tempDir('cw-freshstarts-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   afterAll(() => rmSync(base, { recursive: true, force: true }))
   const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -63,8 +63,8 @@ describe('Start Fresh and the nudge (main/freshStarts.ts)', async () => {
   const open = async (own?: 'on' | 'off') => {
     const path = join(base, `ws-${++n}`)
     const alpha = join(path, 'alpha')
-    mkdirSync(join(alpha, '.hive'), { recursive: true })
-    writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, ...(own ? { suggestFreshStart: own } : {}), agents: [{ id: 'a1', name: 'Builder' }, { id: 'a2', name: 'Reviewer' }, { id: 'a3', name: 'Idle' }] }))
+    mkdirSync(join(alpha, '.combwork'), { recursive: true })
+    writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, ...(own ? { suggestFreshStart: own } : {}), agents: [{ id: 'a1', name: 'Builder' }, { id: 'a2', name: 'Reviewer' }, { id: 'a3', name: 'Idle' }] }))
     const w = createWorkspaceService()
     await w.open(path)
     const states = new Map<string, FreshNow | null>([
@@ -135,7 +135,7 @@ describe('Start Fresh and the nudge (main/freshStarts.ts)', async () => {
   })
 
   // The races of the nudge's lifecycle (#1437 round 3's design): one gated test each.
-  const status = (alpha: string, agentId: string, st: string): void => tellListeners({ type: 'session-status', state: { projectPath: alpha, agentId, status: st } } as unknown as HiveEvent)
+  const status = (alpha: string, agentId: string, st: string): void => tellListeners({ type: 'session-status', state: { projectPath: alpha, agentId, status: st } } as unknown as CombworkEvent)
   const markOf = (w: Awaited<ReturnType<typeof open>>['w'], project: string) => boardRead(w, (db) => db.prepare('SELECT value FROM board_meta WHERE key = ?').get(`fresh_nudge:${project}`) as { value: string } | undefined)
   /** Waits for the reset of a project's spell (coalesced) to have run, however it ended. */
   const resetRun = (alpha: string) => vi.waitFor(() => expect(coalescing(`freshSpell:${alpha.toLowerCase()}`)).toBe(false), { timeout: HUNG_MS })
@@ -181,7 +181,7 @@ describe('Start Fresh and the nudge (main/freshStarts.ts)', async () => {
       }
     })
 
-  it("race 3: a restart in the spell (this Hive's memory gone, the mark on the board): no repeat until an agent is busy", async () => {
+  it("race 3: a restart in the spell (this Combwork's memory gone, the mark on the board): no repeat until an agent is busy", async () => {
     fresh.resetFreshNudgesForTests()
     fresh.startFreshNudges()
     const { w, alpha, told } = await open()
@@ -192,7 +192,7 @@ describe('Start Fresh and the nudge (main/freshStarts.ts)', async () => {
     await disposeWorkspaceService(w)
   })
 
-  it('race 4: another Hive marks the spell after this one saw none: its next busy moment ends it, and the next completion is told', async () => {
+  it('race 4: another Combwork marks the spell after this one saw none: its next busy moment ends it, and the next completion is told', async () => {
     fresh.resetFreshNudgesForTests()
     fresh.startFreshNudges()
     const { w, alpha, told } = await open()
@@ -200,7 +200,7 @@ describe('Start Fresh and the nudge (main/freshStarts.ts)', async () => {
     // Busy here with no mark: nothing to remove.
     status(alpha, 'a1', 'working')
     await resetRun(alpha)
-    // The other Hive tells it (its own write on the board).
+    // The other Combwork tells it (its own write on the board).
     await boardWrite(w, async () => boardWriteOp(w, (db) => void db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?)').run(`fresh_nudge:${project}`, JSON.stringify({ trigger: 'lane:other' }))))
     expect(await fresh.considerNudge(w, alpha, 'card:1')).toBe(false)
     // Busy here again: that spell ends; the next completion is told here.
@@ -270,17 +270,17 @@ describe('Start Fresh and the nudge (main/freshStarts.ts)', async () => {
     await boardWrite(w, async () => boardWriteOp(w, (db) => void db.exec(`CREATE TRIGGER refuse_${op} BEFORE ${op} ON board_meta WHEN ${op === 'DELETE' ? 'old' : 'new'}.key LIKE 'fresh_nudge:%' BEGIN SELECT RAISE(ABORT, 'refused'); END`)))
     return () => boardWrite(w, async () => boardWriteOp(w, (db) => void db.exec(`DROP TRIGGER refuse_${op}`)))
   }
-  /** A second, independent copy of the service (its own pending completions and duties), on the same board and sessions: another Hive. */
+  /** A second, independent copy of the service (its own pending completions and duties), on the same board and sessions: another Combwork. */
   // @ts-expect-error: the same module, loaded again as another instance
   const other: typeof fresh = await import('../src/main/freshStarts?watcher=b')
 
-  it('race 6: another Hive (its own state) replaces the mark while this one is late to end it: its mark stays, told once each', async () => {
+  it('race 6: another Combwork (its own state) replaces the mark while this one is late to end it: its mark stays, told once each', async () => {
     fresh.resetFreshNudgesForTests()
     other.resetFreshNudgesForTests()
     fresh.startFreshNudges()
     const { w, alpha, told } = await open()
     try {
-      // No mark at this Hive's busy moment: no duty; the other Hive's mark, made after, stays.
+      // No mark at this Combwork's busy moment: no duty; the other Combwork's mark, made after, stays.
       status(alpha, 'a1', 'working')
       await resetRun(alpha)
       expect(await other.considerNudge(w, alpha, 'card:b1')).toBe(true)
@@ -288,7 +288,7 @@ describe('Start Fresh and the nudge (main/freshStarts.ts)', async () => {
       expect(await fresh.considerNudge(w, alpha, 'card:a1')).toBe(false)
       expect(markOf(w, 'alpha')!.value).toBe(y1)
       expect(told).toHaveLength(1)
-      // Mark X here; a busy moment here, its reset held. The other Hive's own busy moment, then its claim: X replaced by Y.
+      // Mark X here; a busy moment here, its reset held. The other Combwork's own busy moment, then its claim: X replaced by Y.
       other.agentBusy(alpha)
       await vi.waitFor(() => expect(markOf(w, 'alpha')).toBeUndefined(), { timeout: HUNG_MS })
       expect(await fresh.considerNudge(w, alpha, 'card:a2')).toBe(true)
@@ -297,13 +297,13 @@ describe('Start Fresh and the nudge (main/freshStarts.ts)', async () => {
       status(alpha, 'a1', 'working')
       expect(held.reached()).toBe(true)
       // (its duty is X; its claim removes X and makes Y. Its own reset would too, but in this test the two copies share
-      // one coalescing key, so it waits behind this Hive's held one.)
+      // one coalescing key, so it waits behind this Combwork's held one.)
       other.agentBusy(alpha)
       expect(await other.considerNudge(w, alpha, 'card:b2')).toBe(true)
       const y = markOf(w, 'alpha')!.value
       expect(y).not.toBe(x)
       expect(told).toHaveLength(3)
-      // This Hive's late reset: X is gone, Y stays; this Hive's next completion is in Y's spell.
+      // This Combwork's late reset: X is gone, Y stays; this Combwork's next completion is in Y's spell.
       held.release()
       await resetRun(alpha)
       expect(markOf(w, 'alpha')!.value).toBe(y)

@@ -26,7 +26,7 @@ const card = (number: number, column: TaskColumn, history: string[] = [], extra:
   number,
   title: `Card ${number}`,
   description: '',
-  project: 'hive',
+  project: 'alpha',
   agent: null,
   column,
   order: 0,
@@ -206,8 +206,8 @@ describe("an ended lane's segments (#512)", () => {
   })
 
   it("says when the lane kept no record of a card, never where the board has it now", () => {
-    expect(frozenSegment(lc(11, 'unrecorded'))).toEqual({ kind: 'card', number: 11, name: '#11', state: 'unrecorded', failed: false, round: null, label: '#11 Card 11 · not recorded: the lane ended before Hive kept where its cards were', notes: [] })
-    expect(frozenSegment(lc(12, 'unrecorded', { title: '' })).label).toBe('#12 · not recorded: the lane ended before Hive kept where its cards were')
+    expect(frozenSegment(lc(11, 'unrecorded'))).toEqual({ kind: 'card', number: 11, name: '#11', state: 'unrecorded', failed: false, round: null, label: '#11 Card 11 · not recorded: the lane ended before Combwork kept where its cards were', notes: [] })
+    expect(frozenSegment(lc(12, 'unrecorded', { title: '' })).label).toBe('#12 · not recorded: the lane ended before Combwork kept where its cards were')
     // Not finished, not worked: such a lane has no current card to show.
     expect(laneSummary([frozenSegment(lc(11, 'unrecorded'))])).toMatchObject({ finished: 0, total: 1 })
   })
@@ -423,7 +423,7 @@ describe("a segment's hover: what the card's facts say (#1225)", () => {
     const o = { by: 'user' as const, move: 'active→done', rules: ['integrate.approved', 'done.contained'], reason: ' Merged by hand ', at: '' }
     expect(workNotes(badge({ revision: null, override: o }), 'done', null, short, tr, names)).toEqual(['You moved it past its rules: Review and approval before merging + done.contained. Reason: Merged by hand'])
     expect(workNotes(badge({ revision: null, override: { ...o, by: 'assistant', reason: '' } }), 'done', null, short, tr, names)).toEqual(['The Assistant moved it past its rules: Review and approval before merging + done.contained. No reason given.'])
-    // Without the window's names (hive-mcp): no line.
+    // Without the window's names (cw-mcp): no line.
     expect(workNotes(badge({ revision: null, override: o }), 'done', null, short, tr)).toEqual([])
   })
 
@@ -433,8 +433,8 @@ describe("a segment's hover: what the card's facts say (#1225)", () => {
 
   it('a refused request (#1279): its reason and next step as the agent got them, the card named as the window names it; repeats counted after', () => {
     // Each a whole sentence on a line of its own (HI-1585), the repeats on one after them.
-    expect(workNotes(badge({ refused }), 'review', null, short, tr, names, 'AL-7')).toEqual(['AL-7: nothing committed to review.', "Commit the card's work, then submit for review again; if you were asked only to submit it (not to do the card), ask the user before committing. A card that needs no change is no-code: ask for that with hive_ask_user (action noCode).", 'Under review: a3f2c1d'])
-    expect(workNotes(badge({ refused: { ...refused, times: 3 } }), 'doing', null, short, tr, names, 'AL-7').slice(0, 3)).toEqual(['AL-7: nothing committed to review.', "Commit the card's work, then submit for review again; if you were asked only to submit it (not to do the card), ask the user before committing. A card that needs no change is no-code: ask for that with hive_ask_user (action noCode).", 'Refused 3 times in a row.'])
+    expect(workNotes(badge({ refused }), 'review', null, short, tr, names, 'AL-7')).toEqual(['AL-7: nothing committed to review.', "Commit the card's work, then submit for review again; if you were asked only to submit it (not to do the card), ask the user before committing. A card that needs no change is no-code: ask for that with cw_ask_user (action noCode).", 'Under review: a3f2c1d'])
+    expect(workNotes(badge({ refused: { ...refused, times: 3 } }), 'doing', null, short, tr, names, 'AL-7').slice(0, 3)).toEqual(['AL-7: nothing committed to review.', "Commit the card's work, then submit for review again; if you were asked only to submit it (not to do the card), ask the user before committing. A card that needs no change is no-code: ask for that with cw_ask_user (action noCode).", 'Refused 3 times in a row.'])
     // A rule's names in the window's words (move.notFromHere names the stage and the moves).
     expect(workNotes(badge({ revision: null, refused: { move: 'submit', rule: 'move.notFromHere', values: { card: 'alpha-7', stage: 'todo', move: 'submit', moves: 'start' }, at: '', times: 1 } }), 'todo', null, short, tr, names, 'AL-7')[0]).toMatch(/^AL-7 /)
   })
@@ -445,7 +445,7 @@ describe("a segment's hover: what the card's facts say (#1225)", () => {
     // An agent's refusal says which next step fits its folder (HI-2227): uncommitted changes to commit, or none (no-code).
     const agent = { ...window, forUser: false }
     expect(refusalLines('submit.empty', { card: 'AL-7', changes: 'yes' }, agent).next).toBe("Commit the card's work, then submit for review again; if you were asked only to submit it (not to do the card), ask the user before committing.")
-    expect(refusalLines('submit.empty', { card: 'AL-7', changes: 'none' }, agent).next).toMatch(/^Its folder has no changes either\. .*no-code: ask for that with hive_ask_user \(action noCode\), or hive_ask_assistant where it's already decided\./)
+    expect(refusalLines('submit.empty', { card: 'AL-7', changes: 'none' }, agent).next).toMatch(/^Its folder has no changes either\. .*no-code: ask for that with cw_ask_user \(action noCode\), or cw_ask_assistant where it's already decided\./)
     expect(refusalLines('submit.unchanged', { card: 'AL-7' }, window).message).toBe("AL-7: its files haven't changed since it started.")
   })
 
@@ -462,7 +462,7 @@ describe("a segment's hover: what the card's facts say (#1225)", () => {
     const seg = { kind: 'card', number: 7, name: 'AL-7', state: 'passed', failed: false, round: 1, label: 'AL-7 x · Passed', notes: [] } as CardSegment
     const o = { by: 'user' as const, move: 'active→done', rules: ['done.contained'], reason: '', at: '' }
     const b = badge({ refused, stalePass: { approved: 'a3f2c1d9e8', current: 'b71e09a4cc' }, override: o })
-    expect(segmentMarks({ frozen: null }, b, seg, short, tr, names)).toEqual({ refused: 'AL-7: nothing committed to review. Commit the card\'s work, then submit for review again; if you were asked only to submit it (not to do the card), ask the user before committing. A card that needs no change is no-code: ask for that with hive_ask_user (action noCode).', stale: 'Pass was for a3f2c1d; now at b71e09a', override: 'You moved it past its rules: done.contained. No reason given.' })
+    expect(segmentMarks({ frozen: null }, b, seg, short, tr, names)).toEqual({ refused: 'AL-7: nothing committed to review. Commit the card\'s work, then submit for review again; if you were asked only to submit it (not to do the card), ask the user before committing. A card that needs no change is no-code: ask for that with cw_ask_user (action noCode).', stale: 'Pass was for a3f2c1d; now at b71e09a', override: 'You moved it past its rules: done.contained. No reason given.' })
     expect(segmentMarks({ frozen: null }, badge(), seg, short, tr, names)).toEqual({})
     // Done, a stale pass no longer matters: no stale mark or line.
     expect(segmentMarks({ frozen: null }, b, { ...seg, state: 'done' }, short, tr, names)).not.toHaveProperty('stale')
@@ -485,7 +485,7 @@ describe("a segment's hover: what the card's facts say (#1225)", () => {
     ])
     const marks = foldedMarks({ frozen: null }, badges, segs, [1, 2, 27], () => short, tr, names)
     expect(marks).toEqual({
-      refused: ['AL-27: AL-27: nothing committed to review. Commit the card\'s work, then submit for review again; if you were asked only to submit it (not to do the card), ask the user before committing. A card that needs no change is no-code: ask for that with hive_ask_user (action noCode).'],
+      refused: ['AL-27: AL-27: nothing committed to review. Commit the card\'s work, then submit for review again; if you were asked only to submit it (not to do the card), ask the user before committing. A card that needs no change is no-code: ask for that with cw_ask_user (action noCode).'],
       stale: ['AL-2: Pass was for a3f2c1d; now at b71e09a'],
       override: ['AL-1: You moved it past its rules: done.contained. Reason: Merged by hand'],
       oldRules: []
@@ -507,6 +507,21 @@ describe("a segment's hover: what the card's facts say (#1225)", () => {
     expect(laneWaitText({ reason: 'hold', card: 3 }, name, tr)).toBe('HI-3 is On Hold')
     // #1438's and #1435's, and #1446's slot being prepared.
     expect(laneWaitText({ reason: 'slot', card: null }, name, tr)).toBe('waiting for a slot')
+    // HI-2466: its only free slot held, and by what.
+    expect(laneWaitText({ reason: 'slot', card: 12, slot: 'slot-a', held: 'session', agent: 'CB1' }, name, tr)).toBe('waiting for slot-a: CB1’s session is still in it')
+    expect(laneWaitText({ reason: 'slot', card: 12, slot: 'slot-a', held: 'process' }, name, tr)).toBe('waiting for slot-a: a process still has a file or folder in it open')
+    // HI-2467: Windows Sandbox's broker seen working in it; its idleness said only when known.
+    expect(laneWaitText({ reason: 'slot', card: 12, slot: 'slot-a', held: 'broker', broker: 'WindowsSandboxServer', idle: true }, name, tr)).toBe('waiting for slot-a: a process still has a file or folder in it open: Windows Sandbox’s broker (WindowsSandboxServer) is working in it, with no Sandbox running')
+    expect(laneWaitText({ reason: 'slot', card: 12, slot: 'slot-a', held: 'broker', broker: 'WindowsSandboxServer' }, name, tr)).toBe('waiting for slot-a: a process still has a file or folder in it open: Windows Sandbox’s broker (WindowsSandboxServer) is working in it')
+    // HI-2468: a running builder's start refused for its slot held: the slot and what holds it; else as before.
+    const refusedStart = { reason: 'startWait' as const, card: 12, why: 'refused' as const, agent: 'B1' }
+    expect(laneWaitText({ ...refusedStart, slot: 'slot-a', held: 'session', heldBy: 'CB1' }, name, tr)).toBe('HI-12 waits to start: its start was refused for now, slot-a still in use (CB1’s session is still in it), and Combwork tries again')
+    expect(laneWaitText({ ...refusedStart, slot: 'slot-a', held: 'process' }, name, tr)).toBe('HI-12 waits to start: its start was refused for now, slot-a still in use (a process still has a file or folder in it open), and Combwork tries again')
+    expect(laneWaitText({ ...refusedStart, slot: 'slot-a', held: 'broker', broker: 'WindowsSandboxServer', idle: false }, name, tr)).toBe('HI-12 waits to start: its start was refused for now, slot-a still in use (a process still has a file or folder in it open: Windows Sandbox’s broker (WindowsSandboxServer) is working in it, with a Sandbox running), and Combwork tries again')
+    expect(laneWaitText({ ...refusedStart, slot: 'slot-a', held: 'left', heldBy: 'B1', program: 'node' }, name, tr)).toBe('HI-12 waits to start: its start was refused for now, slot-a still in use (B1’s last run left node running in it), and Combwork tries again')
+    expect(laneWaitText({ ...refusedStart, slot: 'slot-a', held: 'left', heldBy: 'B1', program: 'node', more: 1 }, name, tr)).toBe('HI-12 waits to start: its start was refused for now, slot-a still in use (B1’s last run left node and 1 more running in it), and Combwork tries again')
+    expect(laneWaitText({ ...refusedStart, slot: 'slot-a', held: 'lastRun', heldBy: 'B1' }, name, tr)).toBe('HI-12 waits to start: its start was refused for now, slot-a still in use (B1’s last run there isn’t known to have ended), and Combwork tries again')
+    expect(laneWaitText(refusedStart, name, tr)).toBe('HI-12 waits to start: its start was refused for now, and Combwork tries again')
     expect(laneWaitText({ reason: 'checkCopy', card: 12 }, name, tr)).toBe('waiting for a check copy for HI-12')
     expect(laneWaitText({ reason: 'preparing', card: 12, slot: 'slot-b' }, name, tr)).toBe('waiting: preparing slot-b')
   })
@@ -533,7 +548,7 @@ describe("a segment's hover: what the card's facts say (#1225)", () => {
 })
 
 describe('stages in a lane (#1421): names over the categories, the divider, the legend, Solo, old rules', () => {
-  // A Pair project where Hive merges: Review, Approved and Merging (Merging inside Approved).
+  // A Pair project where Combwork merges: Review, Approved and Merging (Merging inside Approved).
   const pairStages = { stages: mustCompile(preset('git', 'pair')).stages, names: {} }
   const solo = { stages: mustCompile(preset('git', 'solo')).stages, names: {} }
   const withBadge = (stage: WorkBadge['stage']) => ({ stage })
@@ -636,7 +651,7 @@ describe('stages in a lane (#1421): names over the categories, the divider, the 
 })
 
 describe("old rules keep their stages (HR4's #1421 round 1): the options now produce others", () => {
-  // The project switched to Solo (no review, nothing merging); a lane and its cards still under Pair (Hive merges).
+  // The project switched to Solo (no review, nothing merging); a lane and its cards still under Pair (Combwork merges).
   const pair = mustCompile(preset('git', 'pair')).stages.map((s) => s.id)
   const soloNow = { stages: mustCompile(preset('git', 'solo')).stages, names: { approved: 'Ready' } }
 
@@ -683,8 +698,8 @@ describe('refusals name the user as you in the window, as the user to agents (HI
     expect(r.next).toBe("Move it anyway only with the user's reason. One they gave with their request is enough (\"I merged it by hand\", say): move it again with override and that reason, in their words. With none, tell them which rules this skips and ask for theirs.")
     expect(r.change).toBe('These rules are set in Version Control, where the user can change them.')
     expect(refusal('loop.followUpChecked', { card: 'AL-1' }).next).toBe("Wait for the reviewer's ok or gaps; if none comes, ask the user.")
-    expect(refusal('lane.lineBehind', { card: 'AL-2', line: 'hive/AL-2', target: 'main', earlier: 'AL-1' }).next).toBe('Leave it as it is: Hive brings hive/AL-2 up to date with main once you are idle, or asks the user, and tells you when AL-2 can start.')
-    expect(refusal('merge.hiveMerges', { card: 'AL-1', target: 'main', queue: 'paused', waits: 'answer' }).next).toBe('It is in the merge queue for main, which is paused until the user answers in For you: wait for Done, or for it to come back.')
+    expect(refusal('lane.lineBehind', { card: 'AL-2', line: 'cw/AL-2', target: 'main', earlier: 'AL-1' }).next).toBe('Leave it as it is: Combwork brings cw/AL-2 up to date with main once you are idle, or asks the user, and tells you when AL-2 can start.')
+    expect(refusal('merge.combworkMerges', { card: 'AL-1', target: 'main', queue: 'paused', waits: 'answer' }).next).toBe('It is in the merge queue for main, which is paused until the user answers in For you: wait for Done, or for it to come back.')
     expect(refusal('platform.unknown', { card: 'AL-1', offer: 'repositoryGone' }).next).toMatch(/^The project's Git repository is gone: ask the user to restore it/)
   })
 
@@ -695,7 +710,7 @@ describe('refusals name the user as you in the window, as the user to agents (HI
       expect(l.change).toBe('These rules are set in Version Control, where you can change them.')
     }
     expect(refusalLines('loop.followUpChecked', { card: 'AL-1' }, inCard).next).toBe("The agent waits for the reviewer's ok or gaps; if none comes, it asks you.")
-    expect(refusalLines('merge.hiveMerges', { card: 'AL-1', target: 'main', queue: 'paused', waits: 'fix' }, inCard).next).toBe('It is in the merge queue for main, which is paused until you fix what stopped it and resume it; it moves to Done once merged, or comes back.')
+    expect(refusalLines('merge.combworkMerges', { card: 'AL-1', target: 'main', queue: 'paused', waits: 'fix' }, inCard).next).toBe('It is in the merge queue for main, which is paused until you fix what stopped it and resume it; it moves to Done once merged, or comes back.')
     expect(refusalLines('platform.unknown', { card: 'AL-1', offer: 'repositoryGone' }, inCard).next).toMatch(/^The project's Git repository is gone: restore it, or switch the project to None/)
   })
 
@@ -727,7 +742,7 @@ describe("a lane's wait and its cards' times (HI-1926)", () => {
     // No longer waiting: none; a wait with no card (a slot) is stamped too.
     expect(stampWait(a, null, T + MIN, true)).toBeUndefined()
     expect(stampWait(undefined, { reason: 'slot', card: null }, T, true)).toMatchObject({ since: T, observed: true })
-    // The first listing (Hive just started, or the workspace opened): not seen to begin, so at least that long.
+    // The first listing (Combwork just started, or the workspace opened): not seen to begin, so at least that long.
     expect(stampWait(undefined, reviewer, T, false)).toMatchObject({ since: T, observed: false })
   })
 

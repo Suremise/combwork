@@ -1,7 +1,7 @@
 // A project's view out of project.json (HI-1749): with the project's project.json held open by another program (a
 // PowerShell holding it without delete sharing, as an editor or an indexer can, so replacing it fails with EPERM), the
 // Session tab's Panes | Tiles switch still works and says no error, writing no project file; a change of the project's
-// config fails as before, and hive.log says so (the IPC call's failure, the replace that gave up with its tries and time,
+// config fails as before, and combwork.log says so (the IPC call's failure, the replace that gave up with its tries and time,
 // and the process that had the file open). Let go, the config change is written, without the view in it; the view
 // switched is still the project's after a restart. Dev build, throwaway profile and workspace.
 const lib = require('./lib.cjs')
@@ -14,8 +14,8 @@ const HUNG_MS = 30000
 const userData = path.join(lib.WORK, 'projectview-profile')
 const ws = path.join(lib.WORK, 'projectview-ws')
 const alpha = path.join(ws, 'alpha')
-const file = path.join(alpha, '.hive', 'project.json')
-const logFile = path.join(userData, 'logs', 'hive.log')
+const file = path.join(alpha, '.combwork', 'project.json')
+const logFile = path.join(userData, 'logs', 'combwork.log')
 const release = path.join(lib.WORK, 'projectview-release')
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -59,14 +59,14 @@ function holdFile() {
     check('…and no "Could not change the view"', (await error.count()) === 0)
     check('…project.json not written', fs.readFileSync(file, 'utf8') === before)
 
-    // A change of the config can't be written meanwhile: it fails, and hive.log says why and what held the file.
+    // A change of the config can't be written meanwhile: it fails, and combwork.log says why and what held the file.
     const refused = await inv('project:updateConfig', alpha, { chime: 'on' }).then(() => null, (e) => String(e.message ?? e))
     check('a config change while it is held fails with EPERM', /EPERM/.test(refused ?? ''), refused ?? 'it was written')
     const since = () => logText().slice(mark)
-    check('hive.log: the IPC call failed, with its code', !!(await lib.until(() => /\[WARN\] \[ipc\] ipc project:updateConfig failed: .*EPERM.* \(EPERM\)/.test(since()), HUNG_MS)), since().split('\n').filter((l) => /\[ipc\]|\[files\]/.test(l)).join(' | '))
-    check('hive.log: the replace that gave up, with its tries and time', /\[WARN\] \[files\] replacing .*project\.json.* failed with EPERM after 21 tries over \d+ ms: another process had it open/.test(since()))
+    check('combwork.log: the IPC call failed, with its code', !!(await lib.until(() => /\[WARN\] \[ipc\] ipc project:updateConfig failed: .*EPERM.* \(EPERM\)/.test(since()), HUNG_MS)), since().split('\n').filter((l) => /\[ipc\]|\[files\]/.test(l)).join(' | '))
+    check('combwork.log: the replace that gave up, with its tries and time', /\[WARN\] \[files\] replacing .*project\.json.* failed with EPERM after 21 tries over \d+ ms: another process had it open/.test(since()))
     const named = await lib.until(() => /\[WARN\] \[files\] .*project\.json.* was open in (.*)/.exec(since())?.[1], HUNG_MS)
-    check('hive.log: what had it open, as Windows says', !!named && named.includes(String(hold.ps.pid)) && /PowerShell/i.test(named), named ?? 'no line')
+    check('combwork.log: what had it open, as Windows says', !!named && named.includes(String(hold.ps.pid)) && /PowerShell/i.test(named), named ?? 'no line')
     if (named) console.log(`  was open in ${named}`)
 
     // --- Let go: the config change is written, without the view in it.

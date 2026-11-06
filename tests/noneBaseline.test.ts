@@ -20,7 +20,7 @@ import { tempDir } from './tempDir'
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 30_000
 
-const tmp = tempDir('hive-none-baseline-')
+const tmp = tempDir('cw-none-baseline-')
 const bundle = join(tmp, 'none-baseline-worker.cjs')
 
 beforeAll(async () => {
@@ -31,7 +31,7 @@ afterAll(() => void useBaselineWorker(null))
 let n = 0
 /** A project of `files` files (each `size` bytes) under assets/, and a node_modules file left out. */
 function project(files: number, size = 16): string {
-  const root = tempDir(`hive-none-baseline-${++n}-`)
+  const root = tempDir(`cw-none-baseline-${++n}-`)
   for (let i = 0; i < files; i++) {
     const d = join(root, 'assets', String(i % 20))
     mkdirSync(d, { recursive: true })
@@ -139,7 +139,7 @@ describe("a None project's whole-project read in its worker (HI-2340)", () => {
 
   it("a read's failure and a worker's end are logged as the user's text: Copy Diagnostics leaves the file's name out (HR3's round 1)", () => {
     const T = '2026-11-02T12:00:00.000Z [WARN] [noneBaseline]'
-    const lines = [`${T} Hive 1.0.0 starting (${MARKED_LOG})`, `${T} ${failedLine('D:\\Work\\notes', "ENOENT: no such file or directory, open 'D:\\Work\\notes\\private-salary-review.txt'")}`, `${T} ${endedLine("EACCES: permission denied, scandir 'D:\\Work\\notes\\medical'")}`]
+    const lines = [`${T} Combwork 1.1.0 starting (${MARKED_LOG})`, `${T} ${failedLine('D:\\Work\\notes', "ENOENT: no such file or directory, open 'D:\\Work\\notes\\private-salary-review.txt'")}`, `${T} ${endedLine("EACCES: permission denied, scandir 'D:\\Work\\notes\\medical'")}`]
     const out = redactLog(lines.join('\n'), { home: 'C:\\Users\\someone', folders: [], names: [] } satisfies RedactContext)
     expect(out).not.toMatch(/private-salary-review|medical|Work\\notes/)
     expect(out).toContain("the None baseline's worker ended")

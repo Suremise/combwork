@@ -1,0 +1,126 @@
+{
+  "template.apply.gone": {
+    "text": "it was removed meanwhile",
+    "note": "Why Choose Connections skipped an agent: it was removed meanwhile."
+  },
+  "template.apply.running": {
+    "text": "it runs, and that connection is another CLI's: stop it first",
+    "note": "Why Choose Connections skipped an agent: a connection of another CLI can't apply while it runs."
+  },
+  "template.connections.ambiguous": {
+    "text": "connections: several are called \"{ref}\": name one by its id ({ids}).",
+    "note": "An answer in connections names several connections usable here. {ids} lists their ids."
+  },
+  "template.connections.bad": {
+    "text": "connections: {keys} {count, plural, =1 {is} other {are}} not \"*\", a role ({roles}) or one of its agents: {agents}.",
+    "note": "Keys in connections that are none of what it takes. {count} is how many, choosing the verb."
+  },
+  "template.connections.both": {
+    "text": "connections: \"{first}\" and \"{key}\" both name agent {place} ({agent}): give it one connection.",
+    "note": "Two keys in connections name the same agent."
+  },
+  "template.connections.none": {
+    "text": "none",
+    "note": "No connection is usable here: the end of template.connections.required."
+  },
+  "template.connections.notObject": {
+    "text": "connections is an object: \"*\", a role ({roles}), or an agent's place (\"1\") or name → a connection's id or name.",
+    "note": "A load's or Choose Connections' connections isn't an object (HI-2109). {roles} lists the roles."
+  },
+  "template.connections.notText": {
+    "text": "connections.{key} is not a connection's id or name.",
+    "note": "An answer in connections isn't text."
+  },
+  "template.connections.range": {
+    "text": "connections: {key} is out of range: there are {count} agents ({agents}).",
+    "note": "A place in connections is beyond the agents. {count} is digits."
+  },
+  "template.connections.required": {
+    "text": "connections is required: \"*\", a role ({roles}), or an agent's place (\"1\") or name → a connection's id or name. Its agents: {agents}. Usable here: {usable}.",
+    "note": "Choose Connections was given no answer. {usable} lists the connections it can use, or template.connections.none."
+  },
+  "template.connections.several": {
+    "text": "connections: \"{key}\" is {count} of its agents: name each by its place ({choices}).",
+    "note": "A key in connections is several agents' name. {count} is digits."
+  },
+  "template.connections.unknown": {
+    "text": "connections: no connection \"{ref}\" can be used here (options lists those that can).",
+    "note": "An answer in connections names no connection usable here."
+  },
+  "template.find.from": {
+    "text": "from is a project name",
+    "note": "A template call's from isn't text."
+  },
+  "template.find.none": {
+    "text": "No template \"{template}\"{scoped, select, yes { in the {scope} scope} other {}}{fromProject, select, yes { kept in {from}} other {}}: list gives them.",
+    "note": "No template has that file or name, in the scope or project named, if any."
+  },
+  "template.find.required": {
+    "text": "template is required: its file or name, as list gives them",
+    "note": "A template call named none."
+  },
+  "template.find.scope": {
+    "text": "scope is combwork, workspace or project",
+    "note": "A template call's scope isn't one of the three. They are the argument's values."
+  },
+  "template.find.several": {
+    "text": "Several templates are called \"{template}\": name one by scope and file ({choices}).",
+    "note": "More than one template has that name: never one picked for the caller. {choices} lists each as \"scope: file\"."
+  },
+  "template.find.unusable": {
+    "text": "\"{name}\" can't be used: {problem}",
+    "note": "The template named can't be read or used. {problem} is why."
+  },
+  "template.load.needsGit": {
+    "text": "Its workflow is for Git and this project has no version control: set up Git in the project's Version Control first (that is the user's choice), or load with workflow: false for its agents alone.",
+    "note": "Why a template's workflow can't be loaded (HI-1910): Combwork never sets up Git for the Assistant."
+  },
+  "template.load.notYet": {
+    "text": "The template can't be loaded yet: {blocked}",
+    "note": "A load refused: {blocked} is each reason, joined by spaces."
+  },
+  "template.load.optionsChanged": {
+    "text": "its options changed meanwhile, so they weren't saved: set them in the project's Version Control",
+    "note": "Why a loaded template's workflow wasn't saved: the project's options changed while it loaded."
+  },
+  "template.load.tooMany": {
+    "text": "It has {count} agents, and this project's workflow allows {max} (Maximum agents, the user's team size, in Version Control → Workflow). The user can load it themselves, or raise Maximum agents first.",
+    "note": "Why the Assistant can't load a template (HI-2001): more agents than the project's Maximum agents, which only the Assistant's loads keep to. {count} and {max} are digits."
+  },
+  "template.load.workflowCant": {
+    "text": "Its workflow can't be saved here: {problems}",
+    "note": "A load refused: the template's workflow doesn't fit this project. {problems} is each reason."
+  },
+  "template.names.both": {
+    "text": "names: \"{first}\" and \"{key}\" both name agent {place} ({agent}): give it one name.",
+    "note": "Two keys in a load's names name the same agent."
+  },
+  "template.names.none": {
+    "text": "names: no agent \"{key}\" in the template. Its agents: {keys}.",
+    "note": "A key in a load's names names no agent."
+  },
+  "template.names.notObject": {
+    "text": "names is an object: an agent's place or name → its new name. Its agents: {keys}.",
+    "note": "A load's names isn't an object. {keys} lists its agents as \"place (name)\"."
+  },
+  "template.names.notText": {
+    "text": "names.{key} is not text: give each agent's new name as a string.",
+    "note": "A new name in a load's names isn't text."
+  },
+  "template.names.range": {
+    "text": "names: {key} is out of range: the template has {count} agents ({keys}).",
+    "note": "A place in a load's names is beyond the template's agents. {count} is digits."
+  },
+  "template.names.several": {
+    "text": "names: \"{key}\" is {count} of its agents: name each by its place or name ({choices}).",
+    "note": "A key in a load's names is several agents' name. {count} is digits."
+  },
+  "template.taken.one": {
+    "text": "\"{name}\" is {project}'s agent: try \"{suggestion}\"",
+    "note": "A name a load would give is another project's agent's, with a free one to give instead. Joined by \"; \" into template.taken.refused."
+  },
+  "template.taken.refused": {
+    "text": "{taken}. Agent names are unique across the workspace: give each a free name in names. Nothing was changed.",
+    "note": "A load refused for names taken in other projects. {taken} is template.taken.one for each."
+  }
+}

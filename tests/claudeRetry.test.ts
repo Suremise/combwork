@@ -48,7 +48,7 @@ describe("Claude Code's retry wait from its transcript (HI-1973)", () => {
   })
 
   it("reads only the transcript's end, and ignores the line it cut into", async () => {
-    const dir = tempDir('hive-claude-retry-')
+    const dir = tempDir('cw-claude-retry-')
     const file = join(dir, 'session.jsonl')
     // An early try, then over RETRY_TAIL_BYTES of other lines, then the turn's last two tries.
     const filler = JSON.stringify({ type: 'user', message: { content: 'x'.repeat(1000) } })

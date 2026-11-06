@@ -11,7 +11,7 @@ import { attributeFolder } from '../src/main/workflow/reconcile'
 import { compile, loadRuleset } from '../src/shared/workflow/compile'
 import { agentActor } from '../src/shared/workflow/facts'
 import { allOff, contradictions, preset, reviewerModeOf, takesOption, type WorkflowOptions } from '../src/shared/workflow/options'
-import { designReviewer, openDesign, poolAssignments, preferredReviewer, submissionReviewers, type PoolAgent, type PoolCard } from '../src/shared/workflow/reviewerPool'
+import { designReviewer, heldOnUser, openDesign, poolAssignments, preferredReviewer, reviewingNow, reviewsInProgress, submissionReviewers, type PoolAgent, type PoolCard } from '../src/shared/workflow/reviewerPool'
 import type { LaneRecord } from '../src/shared/lanes'
 import type { AgentDef } from '../src/shared/types'
 
@@ -42,8 +42,23 @@ const state = vi.hoisted(() => ({
   onRefused: null as null | ((agentId: string) => void),
   calls: [] as string[],
   /** Awaited as a stopped agent's launch prepares, before its `allowed` (HI-2046: a change landing meanwhile). */
-  beforeSpawn: null as null | (() => void | Promise<void>)
+  beforeSpawn: null as null | (() => void | Promise<void>),
+  /** The timer suite drives this board's changes explicitly; its stand-alone fact store also triggers the DB poll. */
+  manualBoard: null as string | null
 }))
+
+vi.mock('../src/main/events', async (orig) => {
+  const actual = await orig<typeof import('../src/main/events')>()
+  return {
+    ...actual,
+    emit: (event: Parameters<typeof actual.emit>[0]) => {
+      // HI-2455: the harness writes facts on another connection, unlike the app's board-owned runtime. Its poll is
+      // an extra board change, not a retry. Only the clock suite supplies those changes itself (without a path).
+      if (event.type === 'tasks-changed' && event.workspacePath === state.manualBoard) return
+      actual.emit(event)
+    }
+  }
+})
 
 vi.mock('../src/main/workflow/service', async (orig) => ({ ...(await orig<object>()), workflowEnforced: () => state.enforced, agentRunsGoing: (_p: string, a: string) => (state.runs.has(a) ? [{}] : []), workflowFor: async () => state.wf }))
 vi.mock('../src/main/workflow/lineUpdates', async (orig) => ({ ...(await orig<object>()), agentBusy: (_p: string, a: string) => state.busy.has(a) || state.pending.has(a) }))
@@ -100,7 +115,7 @@ afterEach(() => {
   lives.clear()
   env?.close()
   env = null
-  Object.assign(state, { enforced: true, wf: null, lanes: [], busy: new Set(), running: new Set(), status: new Map(), background: new Set(), runs: new Set(), pending: new Set(), hooksMissing: new Set(), deliveries: [], next: [], refuse: new Set(), onRefused: null, calls: [], beforeSpawn: null })
+  Object.assign(state, { enforced: true, wf: null, lanes: [], busy: new Set(), running: new Set(), status: new Map(), background: new Set(), runs: new Set(), pending: new Set(), hooksMissing: new Set(), deliveries: [], next: [], refuse: new Set(), onRefused: null, calls: [], beforeSpawn: null, manualBoard: null })
   // Nothing armed by this test outlives it (HI-2360).
   expect(poolTestHooks.retriesPending()).toBe(0)
 })
@@ -136,7 +151,7 @@ function lane(e: Env, id: string, cards: number[], builder: string, reviewer: st
   state.lanes.push({ id, project: 'project', name: null, builder: { id: builder, name: builder }, reviewer: reviewer ? { id: reviewer, name: reviewer } : null, cards, rounds: 10, waitMinutes: 360, state: 'active', startedBy: 'the user', startedAt: t, updatedAt: t, endedAt: null, mergeCommit: null, ...(reviewer ? {} : { pool: true as const }) })
 }
 
-/** Runs SQL on the workspace's hive.db on a connection of its own, as another Hive (or the slots' own writes) would. */
+/** Runs SQL on the workspace's combwork.db on a connection of its own, as another Combwork (or the slots' own writes) would. */
 function onDb<T>(e: Env, fn: (db: DatabaseSync) => T): T {
   const db = new DatabaseSync(boardFile(e.home))
   try {
@@ -148,7 +163,7 @@ function onDb<T>(e: Env, fn: (db: DatabaseSync) => T): T {
 }
 
 let slotNo = 0
-/** An agent's dispatch lease of the project's slots (a lane's), taken or ended, in hive.db's slot tables as #1429 keeps them. */
+/** An agent's dispatch lease of the project's slots (a lane's), taken or ended, in combwork.db's slot tables as #1429 keeps them. */
 function lease(e: Env, agent: string, open: boolean): void {
   onDb(e, (db) => {
     const at = new Date().toISOString()
@@ -179,7 +194,7 @@ function withBoundary(e: Env, before: () => void | Promise<void>): unknown {
 async function submitted(e: Env, card: { id: number; key: string; title: string }, by = B1): Promise<void> {
   if (e.options.folder === 'slots') {
     const slot = join(tempDir('slot-'), 'slot')
-    sh(e.project, 'worktree', 'add', '-q', '-b', `hive/am/am-${card.id}`, slot, 'main')
+    sh(e.project, 'worktree', 'add', '-q', '-b', `cw/am/am-${card.id}`, slot, 'main')
     e.wf.cfg.slotFor = async () => ({ slot: 'slot', folder: slot, lease: `l-${card.id}`, fresh: true })
     moved(await e.wf.start(card.key, by))
     commit(slot, { [`${card.id}.txt`]: `${card.title}\n` }, card.title)
@@ -196,8 +211,8 @@ const pass = (e: Env, agents?: AgentDef[]): Promise<void> => settleReviewerPool(
 /** The wakes and pool asks a submission left to run (the harness doesn't run them: autoRun off). */
 const pending = (e: Env): { kind: string; agent?: unknown }[] => e.store.pendingActions().map((a) => ({ kind: a.kind, agent: a.payload.agent }))
 
-/** Pair's options with these, made to hold together: Hive merges in slots, Committed is done in the project folder. */
-const optionsFor = (reviewers: 1 | 2, reviewerMode: 'lane' | 'pool', folder: 'slots' | 'project'): WorkflowOptions => ({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [], target: 'main', reviewers, reviewerMode, folder, slotsUpToDate: folder === 'slots', finish: folder === 'slots' ? 'hiveMerges' : 'committed', identity: null, stopOwnRuns: false })
+/** Pair's options with these, made to hold together: Combwork merges in slots, Committed is done in the project folder. */
+const optionsFor = (reviewers: 1 | 2, reviewerMode: 'lane' | 'pool', folder: 'slots' | 'project'): WorkflowOptions => ({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [], target: 'main', reviewers, reviewerMode, folder, slotsUpToDate: folder === 'slots', finish: folder === 'slots' ? 'combworkMerges' : 'committed', identity: null, stopOwnRuns: false })
 
 describe('the option G17 (#1443)', () => {
   it('is reviewerMode, lane or pool: one per lane in every Git preset, none for None', () => {
@@ -279,6 +294,17 @@ describe("the pool's choice (#1443)", () => {
     expect(submissionReviewers([f(6, 'ReviewerAssigned', 'R1'), f(7, 'ReviewStarted', 'R1'), f(8, 'Verdict', 'R1')], 5, known)).toEqual({ seen: ['R1'], reviewing: null })
     // An earlier submission's, or an agent removed since, doesn't hold the card.
     expect(submissionReviewers([f(3, 'ReviewerAssigned', 'R1', 2), f(6, 'ReviewerAssigned', 'gone')], 5, known)).toEqual({ seen: ['gone'], reviewing: null })
+  })
+
+  it("a submission's reviews in progress (HI-2487): started with no verdict, by an agent still here, oldest first and since its first start", () => {
+    const f = (seq: number, kind: string, reviewer: string, at: string, submission = 5) => ({ seq, kind, at, data: { reviewer, submission } })
+    const here = (id: string) => id !== 'gone'
+    const facts = [f(6, 'ReviewerAssigned', 'R1', 't6'), f(7, 'ReviewStarted', 'R1', 't7'), f(8, 'ReviewStarted', 'R2', 't8'), f(9, 'ReviewStarted', 'R1', 't9'), f(10, 'ReviewStarted', 'gone', 't10'), f(11, 'ReviewStarted', 'user', 't11'), f(12, 'ReviewStarted', 'R3', 't12', 4)]
+    // The user's counts, always present (HR1's round 1: a review the user took is the user's until its verdict).
+    expect(reviewsInProgress(facts, 5, here)).toEqual([{ reviewer: 'R1', since: 't7' }, { reviewer: 'R2', since: 't8' }, { reviewer: 'user', since: 't11' }])
+    // A verdict ends its reviewer's; one only given (not started) isn't in progress.
+    expect(reviewsInProgress([...facts, f(13, 'Verdict', 'R1', 't13'), f(14, 'Verdict', 'user', 't14')], 5, here)).toEqual([{ reviewer: 'R2', since: 't8' }])
+    expect(reviewsInProgress([f(6, 'ReviewerAssigned', 'R1', 't6')], 5, here)).toEqual([])
   })
 })
 
@@ -683,7 +709,7 @@ describe('a card in Review outside a lane (HI-2046): given to a free reviewer by
 describe("a pool lane's design step (HI-2310): given out by the pool, its answerer preferred for the review", { timeout: 60_000 }, () => {
   const card = (n: number, at: string, o: Partial<PoolCard> = {}): PoolCard => ({ card: n, submission: 1, submittedAt: at, pool: true, builders: ['B1'], seen: [], reviewing: null, quorum: 1, passes: 0, ...o })
   const agent = (id: string, o: Partial<PoolAgent> = {}): PoolAgent => ({ id, role: 'reviewer', leased: false, idle: true, ...o })
-  const f = (seq: number, kind: string, data: Record<string, unknown>, actor = 'hive') => ({ seq, kind, at: `t${seq}`, actor, data })
+  const f = (seq: number, kind: string, data: Record<string, unknown>, actor = 'combwork') => ({ seq, kind, at: `t${seq}`, actor, data })
 
   it('in its turn, oldest first, a card takes its preferred reviewer if free and allowed; busy or not allowed, the next free one', () => {
     // R1 listed last: the younger card still gets it, the older one the first free.
@@ -743,7 +769,7 @@ describe("a pool lane's design step (HI-2310): given out by the pool, its answer
     await pass(e)
     expect(designReviewer(e.store.facts(a.id), () => true)).toBe('R2')
     expect(state.calls).toEqual(['typed to R2'])
-    expect(state.deliveries.at(-1)?.body).toMatch(new RegExp(`posted a design for a check \\(${id}\\).*hive_loop_step`))
+    expect(state.deliveries.at(-1)?.body).toMatch(new RegExp(`posted a design for a check \\(${id}\\).*cw_loop_step`))
     // Checking the design, R2 isn't free for a card in Review meanwhile.
     const other = e.wf.createCard({ title: 'Other' })
     lane(e, 'L2', [other.id], 'B2', null)
@@ -815,6 +841,93 @@ describe("a pool lane's design step (HI-2310): given out by the pool, its answer
     const b = e.wf.createCard({ title: 'No reviewer' })
     moved(await e.wf.start(b.key, B1))
     refusedBy(await e.wf.loopStep(b.key, B1, 'design', 'The plan', { waitMinutes: 30, reviewer: async () => null }), 'loop.noReviewer')
+  })
+})
+
+describe("a reviewer whose card waits on its own question to the user is free for the pool's other cards (HI-2559)", { timeout: 60_000 }, () => {
+  const card = (n: number, at: string, o: Partial<PoolCard> = {}): PoolCard => ({ card: n, submission: 1, submittedAt: at, pool: true, builders: ['B1'], seen: [], reviewing: null, quorum: 1, passes: 0, ...o })
+  const agent = (id: string, o: Partial<PoolAgent> = {}): PoolAgent => ({ id, role: 'reviewer', leased: false, idle: true, ...o })
+
+  it("the choice: a held card's reviewer is free for others, and the held card is given to nobody else", () => {
+    expect(poolAssignments([card(1, 'a', { reviewing: 'R1', held: true }), card(2, 'b', { builders: ['B2'] })], [agent('R1'), agent('R2')])).toEqual([{ card: 2, submission: 1, reviewer: 'R1' }])
+    // Not held: R1 is busy with card 1, so card 2 waits for another.
+    expect(poolAssignments([card(1, 'a', { reviewing: 'R1' }), card(2, 'b', { builders: ['B2'] })], [agent('R1')])).toEqual([])
+  })
+
+  it("held only by an open request its reviewer asked: not another asker's, an asker-less one, or none", () => {
+    expect(heldOnUser([{ asker: 'R1' }], 'R1')).toBe(true)
+    expect(heldOnUser([{ asker: 'B1' }, {}], 'R1')).toBe(false)
+    expect(heldOnUser([], 'R1')).toBe(false)
+    expect(heldOnUser([{ asker: 'R1' }], null)).toBe(false)
+    expect(heldOnUser([{ asker: 'user' }], 'user')).toBe(false)
+  })
+
+  /** One pooled reviewer R1, two pool lanes: A (B1's) in Review, R1 reviewing it; B (B2's) started. */
+  async function twoLanes() {
+    const e = (env = setup({ ...optionsFor(1, 'pool', 'project'), platform: 'git' }, { autoRun: false }))
+    state.wf = e.wf
+    state.running = new Set(['R1'])
+    const agents = AGENTS.filter((x) => x.id !== 'R2')
+    const a = e.wf.createCard({ title: 'Held A' })
+    const b = e.wf.createCard({ title: 'Waiting B' })
+    lane(e, 'LA', [a.id], 'B1', null)
+    lane(e, 'LB', [b.id], 'B2', null)
+    await submitted(e, a, B1)
+    await pass(e, agents)
+    expect(assignedTo(e, a.id)).toEqual(['R1'])
+    moved(await e.wf.startReview(a.key, R1))
+    moved(await e.wf.start(b.key, B2))
+    const design = async () => {
+      const posted = await e.wf.loopStep(b.key, B2, 'design', 'The plan', { waitMinutes: 30, reviewer: async () => designReviewer(e.store.facts(b.id), () => true) })
+      moved(posted)
+      return (posted as { data?: Record<string, unknown> }).data?.design as string
+    }
+    const designsOf = () => e.store.facts(b.id).filter((f) => f.kind === 'ReviewerAssigned' && (f.data as { design?: boolean }).design).map((f) => (f.data as { reviewer: string }).reviewer)
+    const toldR1 = (re: RegExp) => state.deliveries.filter((d) => d.agentId === 'R1' && re.test(d.body))
+    return { e, a, b, agents, design, designsOf, toldR1 }
+  }
+
+  it("A held on R1's open question: B's design, then B's submission, go to R1, each told once; A stays R1's throughout", async () => {
+    const { e, a, b, agents, design, designsOf, toldR1 } = await twoLanes()
+    const asked = await e.wf.askTheUser(a.key, R1, { kind: 'decide', text: 'Do you accept the bounded "not reproduced" conclusion?' })
+    moved(asked)
+    const id = await design()
+    await pass(e, agents)
+    await pass(e, agents)
+    expect(designsOf()).toEqual(['R1'])
+    expect(toldR1(new RegExp(`posted a design for a check \\(${id}\\)`))).toHaveLength(1)
+    moved(await e.wf.loopStep(b.key, R1, 'ok', 'Fine', { waitMinutes: 30, design: id, reviewer: async () => designReviewer(e.store.facts(b.id), () => true) }))
+    commit(e.project, { [`${b.id}.txt`]: 'built\n' }, 'Built', { trailer: b.key })
+    await attributeFolder(e.wf)
+    moved(await e.wf.submit(b.key, B2, { summary: 'Built' }))
+    await pass(e, agents)
+    await pass(e, agents)
+    expect(assignedTo(e, b.id)).toEqual(['R1', 'R1'])
+    expect(toldR1(new RegExp(`^#${b.id}\\b.*is in Review: you review it from the pool`))).toHaveLength(1)
+    // A's question is still open, and A is still R1's: never released or given again.
+    expect(e.wf.state(e.store.card(a.id)).requests.map((r) => r.asker)).toEqual(['R1'])
+    expect(reviewingNow(e.store.facts(a.id), () => true)?.reviewing).toBe('R1')
+    expect(assignedTo(e, a.id)).toEqual(['R1'])
+    expect(e.store.facts(a.id).some((f) => f.kind === 'ReviewerReleased')).toBe(false)
+    expect(toldR1(new RegExp(`^#${a.id}\\b`)).filter((d) => d.state !== 'cancelled')).toHaveLength(1)
+  })
+
+  it("controls: a question the builder asked on A, or R1's question answered, leaves R1 busy with A, and B's design waits", async () => {
+    const { e, a, agents, design, designsOf } = await twoLanes()
+    // R1's own question, answered: no longer open, so it holds nothing.
+    moved(await e.wf.askTheUser(a.key, R1, { kind: 'decide', text: "The reviewer's question" }))
+    for (const r of e.wf.state(e.store.card(a.id)).requests) moved(await e.wf.answer(a.key, r.request, 'answered', { note: 'Yes' }))
+    expect(e.wf.state(e.store.card(a.id)).requests).toEqual([])
+    // The builder's question on A, still open: not R1's, so it holds nothing either.
+    moved(await e.wf.askTheUser(a.key, B1, { kind: 'decide', text: "The builder's question" }))
+    await design()
+    await pass(e, agents)
+    expect(designsOf()).toEqual([])
+    expect(state.deliveries.filter((d) => d.agentId === 'R1' && /posted a design/.test(d.body))).toEqual([])
+    // R1 asks again, still open: held, so the waiting design goes to it.
+    moved(await e.wf.askTheUser(a.key, R1, { kind: 'decide', text: "The reviewer's question, again" }))
+    await pass(e, agents)
+    expect(designsOf()).toEqual(['R1'])
   })
 })
 
@@ -1038,7 +1151,11 @@ describe("a refused pool line's retry through the pool's events (HI-2343)", { ti
 
   /** A pool card submitted with R1 watching and its line refused until told otherwise, the pool started and given it once. */
   const refusedOnce = async (agents: AgentDef[] = ONE) => {
+    // Own the board poll's clock too (HI-2455): setup opens it, so installing timers afterward leaves that event source
+    // on real time. A loaded test must not gain board events while only its fake retry clock advances.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
     const e = (env = setup({ ...optionsFor(1, 'pool', 'project'), platform: 'git' }, { autoRun: false }))
+    state.manualBoard = e.home
     state.wf = e.wf
     state.running = new Set(['R1'])
     state.status.set('R1', 'watching')
@@ -1049,7 +1166,6 @@ describe("a refused pool line's retry through the pool's events (HI-2343)", { ti
       status(e, a)
     }
     poolTestHooks.retryMs = RETRY
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
     open(e, e.home, agents)
     startReviewerPool()
     // R1's status as the pool first sees it (an agent's events start with its session), before anything is owed.

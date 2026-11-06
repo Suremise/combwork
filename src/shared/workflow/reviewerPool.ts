@@ -28,6 +28,11 @@ export interface PoolCard {
   seen: string[]
   /** Who reviews this submission now (given or started it, no verdict yet): the card waits for it, and it isn't free. */
   reviewing: string | null
+  /**
+   * Its reviewer waits on its own open question to the user about it (HI-2559, `heldOnUser`): the card stays its, given
+   * to nobody else, but doesn't keep it from the pool's other cards meanwhile.
+   */
+  held?: boolean
   /** G1b: distinct reviewers who must pass it, and how many have. */
   quorum: number
   passes: number
@@ -54,11 +59,12 @@ export interface PoolAssignment {
  * its quorum), oldest submission first, given to the first free agent that reviews, isn't its builder and hasn't seen
  * this submission. Free: its role reviews (reviewer or either), no open dispatch lease, idle, and not reviewing another
  * card (one of `cards`, or of `reviewing`: whoever reviews any other card of the project, or checks a design of one, in
- * a lane or not). In its turn a card takes its preferred reviewer (HI-2310) if still free and allowed, else the next
- * free one; a card no free agent can take doesn't hold up the cards after it.
+ * a lane or not; a card held on its reviewer's own question to the user doesn't count, HI-2559). In its turn a card
+ * takes its preferred reviewer (HI-2310) if still free and allowed, else the next free one; a card no free agent can
+ * take doesn't hold up the cards after it.
  */
 export function poolAssignments(cards: readonly PoolCard[], agents: readonly PoolAgent[], reviewing: Iterable<string> = []): PoolAssignment[] {
-  const busy = new Set([...reviewing, ...cards.map((c) => c.reviewing).filter((r): r is string => !!r)])
+  const busy = new Set([...reviewing, ...cards.filter((c) => !c.held).map((c) => c.reviewing).filter((r): r is string => !!r)])
   const free = agents.filter((a) => reviewsWork(a.role) && !a.leased && a.idle && !busy.has(a.id))
   const waiting = cards.filter((c) => c.pool && !c.reviewing && c.passes < c.quorum).sort((a, b) => a.submittedAt.localeCompare(b.submittedAt) || a.card - b.card)
   const allowed = (c: PoolCard, a: PoolAgent): boolean => !c.builders.includes(a.id) && !c.seen.includes(a.id)
@@ -75,6 +81,15 @@ export function poolAssignments(cards: readonly PoolCard[], agents: readonly Poo
 }
 
 type FactLike = { kind: string; seq: number; at?: string; actor?: string; data: unknown }
+
+/**
+ * Whether a card waits on its reviewer's own question to the user (HI-2559): one of its open requests (`CardState.requests`,
+ * For you) was asked by that reviewer. Then the reviewer isn't busy with it for the pool: the card waits on the user, not
+ * on it. A question someone else asked, or one answered or closed (gone from the open requests), holds nothing.
+ */
+export function heldOnUser(requests: readonly { asker?: string }[], reviewer: string | null): boolean {
+  return !!reviewer && reviewer !== 'user' && requests.some((r) => r.asker === reviewer)
+}
 
 /**
  * A card's design step waiting for its check (HI-2310), as the card's fold has it (`CardState.step`): the newest
@@ -127,6 +142,24 @@ export function submissionReviewers(facts: readonly { kind: string; seq: number;
   }
   const reviewing = on.filter((r) => !judged.has(r) && (r === 'user' || known(r))).at(-1) ?? null
   return { seen: [...new Set([...on, ...judged])], reviewing }
+}
+
+/**
+ * The reviews of a submission in progress (HI-2487): each reviewer that started it (`ReviewStarted`) and has given it no
+ * verdict since, with when it started, oldest first: the user's (HR1's round 1: a review the user took is the user's
+ * until its verdict), and an agent's among `present` (one of the project's agents with its session running). A start
+ * again (a follow-up's, its own) keeps its first time.
+ */
+export function reviewsInProgress(facts: readonly { kind: string; seq: number; at?: string; data: unknown }[], submission: number, present: (id: string) => boolean): { reviewer: string; since: string }[] {
+  const on = new Map<string, string>()
+  for (const f of facts) {
+    if (f.seq <= submission) continue
+    const d = f.data as { reviewer?: unknown; submission?: unknown }
+    if (d.submission !== submission || typeof d.reviewer !== 'string') continue
+    if (f.kind === 'ReviewStarted' && !on.has(d.reviewer)) on.set(d.reviewer, f.at ?? '')
+    else if (f.kind === 'Verdict' || f.kind === 'ReviewerReleased') on.delete(d.reviewer)
+  }
+  return [...on].filter(([r]) => r === 'user' || present(r)).map(([reviewer, since]) => ({ reviewer, since }))
 }
 
 /** Who reviews a card now: its latest submission's reviewer with no verdict yet (submissionReviewers), else null. */

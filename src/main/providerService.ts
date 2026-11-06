@@ -7,7 +7,7 @@ import { shownInstallInfo, toSpawnable, withoutAccountEnv, withServerEnv } from 
 import { allProviders, provider } from './providers'
 import type { KeySteps, UpdateRetry } from './providers/types'
 import { msg, onLanguageChange, tr } from '../shared/i18n'
-import { hiveError } from './hiveError'
+import { combworkError } from './combworkError'
 import { config } from './config'
 import { advanced } from './advanced'
 import { noteCliFolder, refreshPath } from './freshPath'
@@ -19,18 +19,18 @@ import { KeyGate } from './taskKeys'
 import { KeysStopped, PickNotFound, typeKeySteps } from './keySteps'
 import { compareTested, noteSelectedCli, testedVersion } from './testedClis'
 
-/** How long a key waits for a busy CLI before Hive stops typing a setup task's keys. */
+/** How long a key waits for a busy CLI before Combwork stops typing a setup task's keys. */
 const BUSY_SECONDS = 30
-/** Why Hive stopped typing into a setup task (KeysStopped's reason, English for the log), and how the window says it (#850). */
+/** Why Combwork stopped typing into a setup task (KeysStopped's reason, English for the log), and how the window says it (#850). */
 const STOPPED = { closed: 'its terminal closed', busy: `it stayed busy for ${BUSY_SECONDS} seconds` } // i18n-ignore: the log's words; the toast says them with STOPPED_TEXT
 const STOPPED_TEXT = {
-  closed: msg({ id: 'service.providers.stoppedClosed', defaultMessage: 'its terminal closed', description: "Why Hive stopped typing a coding agent CLI's setup keys: its terminal closed. A clause, lower case (it follows \"as\")." }),
-  busy: msg({ id: 'service.providers.stoppedBusy', defaultMessage: '{seconds, plural, one {it stayed busy for # second} other {it stayed busy for # seconds}}', description: "Why Hive stopped typing a coding agent CLI's setup keys: it stayed busy for {seconds} seconds. A clause, lower case (it follows \"as\")." })
+  closed: msg({ id: 'service.providers.stoppedClosed', defaultMessage: 'its terminal closed', description: "Why Combwork stopped typing a coding agent CLI's setup keys: its terminal closed. A clause, lower case (it follows \"as\")." }),
+  busy: msg({ id: 'service.providers.stoppedBusy', defaultMessage: '{seconds, plural, one {it stayed busy for # second} other {it stayed busy for # seconds}}', description: "Why Combwork stopped typing a coding agent CLI's setup keys: it stayed busy for {seconds} seconds. A clause, lower case (it follows \"as\")." })
 }
 const stoppedText = (why: string): string => (why === STOPPED.closed ? tr(STOPPED_TEXT.closed) : why === STOPPED.busy ? tr(STOPPED_TEXT.busy, { seconds: BUSY_SECONDS }) : why)
 
 /** A CLI task's name in the window (its toasts): "Codex install", "Claude Code sign-in". */
-const TASK = msg({ id: 'service.providers.task', defaultMessage: '{task, select, install {{cli} install} update {{cli} update} login {{cli} sign-in} other {{cli} setup}}', description: "A coding agent CLI's task Hive runs in a terminal, as its notifications name it: {cli} is the CLI (\"Codex\"), {task} which task (install, update, sign-in, or another setup)." })
+const TASK = msg({ id: 'service.providers.task', defaultMessage: '{task, select, install {{cli} install} update {{cli} update} login {{cli} sign-in} other {{cli} setup}}', description: "A coding agent CLI's task Combwork runs in a terminal, as its notifications name it: {cli} is the CLI (\"Codex\"), {task} which task (install, update, sign-in, or another setup)." })
 
 const log = createLogger('providers')
 /** How many models' default efforts are kept per provider (observeDefaultEffort). */
@@ -71,7 +71,7 @@ class ProviderService {
     return Object.fromEntries([...this.infos].map(([id, info]) => [id, shownInstallInfo(info)]))
   }
 
-  /** The language Hive shows changed (#797): the windows are sent each provider's install info in it. */
+  /** The language Combwork shows changed (#797): the windows are sent each provider's install info in it. */
   relabel(): void {
     for (const [id, info] of this.infos) emit({ type: 'provider-install', provider: id, info: shownInstallInfo(info) })
   }
@@ -157,12 +157,12 @@ class ProviderService {
 
   /**
    * How long a launch or a new agent waits for detection before it is refused (detected, settle). Tests only (unpackaged
-   * builds): HIVE_TEST_DETECT_WAIT_MS shortens it.
+   * builds): CW_TEST_DETECT_WAIT_MS shortens it.
    */
-  detectWaitMs = (!app.isPackaged && Number(process.env.HIVE_TEST_DETECT_WAIT_MS)) || 20_000
+  detectWaitMs = (!app.isPackaged && Number(process.env.CW_TEST_DETECT_WAIT_MS)) || 20_000
 
   /**
-   * Waits until Hive knows (#506): with no `id`, Automatic's provider (every turned-on provider has answered, found or
+   * Waits until Combwork knows (#506): with no `id`, Automatic's provider (every turned-on provider has answered, found or
    * missing); with `id`, only that provider's CLI (turned on or not), so a launch of a known provider never waits for
    * another. True once known; false when it still isn't after detectWaitMs (a CLI that never answers doesn't hold a
    * launch for ever), and then nothing may be decided from a guess.
@@ -187,15 +187,15 @@ class ProviderService {
     })
   }
 
-  /** detected(), refusing when Hive is still looking: what calls it would otherwise commit to a guess (#506). */
+  /** detected(), refusing when Combwork is still looking: what calls it would otherwise commit to a guess (#506). */
   async settle(id?: ProviderId): Promise<void> {
     if (await this.detected(id)) return
-    if (!id) throw hiveError(msg({ id: 'service.providers.stillLookingAll', defaultMessage: 'Hive is still looking for the coding agent CLIs. Try again in a moment.', description: "An error: Hive hasn't finished finding the coding agent CLIs installed (it does when it starts), so it can't choose one yet." }), undefined, { kind: 'conflict' })
-    throw hiveError(msg({ id: 'service.providers.stillLooking', defaultMessage: 'Hive is still looking for {cli}. Try again in a moment.', description: "An error: Hive hasn't finished finding the coding agent CLI {cli} (\"Codex\"), so it can't use it yet." }), { cli: provider(id).descriptor.name }, { kind: 'conflict' })
+    if (!id) throw combworkError(msg({ id: 'service.providers.stillLookingAll', defaultMessage: 'Combwork is still looking for the coding agent CLIs. Try again in a moment.', description: "An error: Combwork hasn't finished finding the coding agent CLIs installed (it does when it starts), so it can't choose one yet." }), undefined, { kind: 'conflict' })
+    throw combworkError(msg({ id: 'service.providers.stillLooking', defaultMessage: 'Combwork is still looking for {cli}. Try again in a moment.', description: "An error: Combwork hasn't finished finding the coding agent CLI {cli} (\"Codex\"), so it can't use it yet." }), { cli: provider(id).descriptor.name }, { kind: 'conflict' })
   }
 
   /**
-   * Refreshes one provider, or all of them. Latest versions are only looked up for enabled providers. First Hive's
+   * Refreshes one provider, or all of them. Latest versions are only looked up for enabled providers. First Combwork's
    * PATH gets the folders installers have added since it started (#472), so a CLI just installed is found.
    */
   async refresh(id?: ProviderId, checkLatest?: boolean): Promise<AgentInstallInfo[]> {
@@ -217,18 +217,18 @@ class ProviderService {
     const latestWanted = checkLatest ?? (isProviderEnabled(config.settings, id) && providerSettings(config.settings, id).checkUpdatesOnLaunch)
     let next: AgentInstallInfo
     try {
-      // Tests only (unpackaged builds): HIVE_TEST_SLOW_DETECT="claude-code=6000" holds that provider's detection (#506).
-      const slow = app.isPackaged ? 0 : Number((process.env.HIVE_TEST_SLOW_DETECT ?? '').split(',').find((x) => x.startsWith(`${id}=`))?.slice(id.length + 1) ?? 0)
+      // Tests only (unpackaged builds): CW_TEST_SLOW_DETECT="claude-code=6000" holds that provider's detection (#506).
+      const slow = app.isPackaged ? 0 : Number((process.env.CW_TEST_SLOW_DETECT ?? '').split(',').find((x) => x.startsWith(`${id}=`))?.slice(id.length + 1) ?? 0)
       if (slow > 0) await new Promise((r) => setTimeout(r, slow))
       const found = await adapter.locate()
-      // Its folder on the PATH of what Hive starts, so its sessions and terminals find the CLI Provider Setup found (#1103).
+      // Its folder on the PATH of what Combwork starts, so its sessions and terminals find the CLI Provider Setup found (#1103).
       if (this.refreshes.get(id) === run) noteCliFolder(id, found.path)
       // Found is known before its version, models and sign-in are: Automatic's pick needs only that (#506).
       if (found.path && this.refreshes.get(id) === run && !this.info(id).found) this.set(id, { ...this.info(id), found: true, path: found.path })
       const latest = latestWanted ? await adapter.latestVersion() : prev.latestVersion
       // The version this release was tested with, against the installed one (#365).
       const tested = await testedVersion(id)
-      // The CLI's own models and what each can do, so new models show without a Hive update (#125). If it can't say,
+      // The CLI's own models and what each can do, so new models show without a Combwork update (#125). If it can't say,
       // its last good answer for this version, else none (the pickers then use the fallbacks in Settings).
       const read = found.path && adapter.listModels ? await adapter.listModels(found.path, childEnv()).catch(() => null) : null
       let catalog: ModelCatalog | null = null
@@ -313,10 +313,10 @@ class ProviderService {
         // stays open for the user to do it.
         if (e instanceof PickNotFound) {
           log.warn(`${label}: couldn't find ${e.what}`)
-          toast('warning', tr(msg({ id: 'service.providers.pickNotFound', defaultMessage: "{task}: Hive couldn't find {item}. Do it in the terminal, or update Hive.", description: "A notification: Hive types the keys of a coding agent CLI's task ({task}: \"Codex setup\") into its terminal, and couldn't find the menu item {item} (the CLI's own words) on its screen." }), { task: shown(), item: e.what }))
+          toast('warning', tr(msg({ id: 'service.providers.pickNotFound', defaultMessage: "{task}: Combwork couldn't find {item}. Do it in the terminal, or update Combwork.", description: "A notification: Combwork types the keys of a coding agent CLI's task ({task}: \"Codex setup\") into its terminal, and couldn't find the menu item {item} (the CLI's own words) on its screen." }), { task: shown(), item: e.what }))
         } else if (e instanceof KeysStopped) {
           log.warn(`${label}: stopped typing: ${e.why}`)
-          if (hasPty(key)) toast('warning', tr(msg({ id: 'service.providers.keysStopped', defaultMessage: '{task}: Hive stopped typing into it, as {why}. Finish it in the terminal.', description: "A notification: Hive stopped typing the keys of a coding agent CLI's task ({task}: \"Codex setup\") into its terminal; {why} says why (a clause: \"its terminal closed\")." }), { task: shown(), why: stoppedText(e.why) }))
+          if (hasPty(key)) toast('warning', tr(msg({ id: 'service.providers.keysStopped', defaultMessage: '{task}: Combwork stopped typing into it, as {why}. Finish it in the terminal.', description: "A notification: Combwork stopped typing the keys of a coding agent CLI's task ({task}: \"Codex setup\") into its terminal; {why} says why (a clause: \"its terminal closed\")." }), { task: shown(), why: stoppedText(e.why) }))
         } else throw e
       } finally {
         gate?.dispose()
@@ -357,14 +357,14 @@ class ProviderService {
   }
 
   /**
-   * Signs an account's folder in (HI-980): the CLI's own login in a terminal of Hive's, with the folder as its home
+   * Signs an account's folder in (HI-980): the CLI's own login in a terminal of Combwork's, with the folder as its home
    * (`env`), and nothing typed into it: the user signs in through the CLI's flow. One per account: a second start gets
    * the open one's key. `onExit` once it ends. The CLI's own sign-in state isn't changed by it (that is ~/.claude's).
    */
   runAccountLogin(id: ProviderId, accountId: string, env: Record<string, string>, onExit: (code: number) => void, setUp?: { env: Record<string, string>; cwd: string }): string {
     const adapter = provider(id)
     const info = this.info(id)
-    if (!info.path) throw hiveError(msg({ id: 'service.providers.notInstalled', defaultMessage: '{cli} is not installed.', description: 'An error running a coding agent CLI\'s task (update, sign-in, setup): the CLI {cli} ("Codex") is not installed.' }), { cli: adapter.descriptor.name }, { kind: 'conflict' })
+    if (!info.path) throw combworkError(msg({ id: 'service.providers.notInstalled', defaultMessage: '{cli} is not installed.', description: 'An error running a coding agent CLI\'s task (update, sign-in, setup): the CLI {cli} ("Codex") is not installed.' }), { cli: adapter.descriptor.name }, { kind: 'conflict' })
     const key = `task:${id}:login:${accountId}`
     if (hasPty(key)) return key
     // The connection's own sign-in where the CLI has one (HI-1757), without the variables it would read as a login. A
@@ -389,11 +389,11 @@ class ProviderService {
       const cmd = adapter.installCommand()
       return this.runTask(id, task, cmd.file, cmd.args, `${name} install`, undefined, shown) // i18n-ignore: the task's name in the log
     }
-    if (!info.path) throw hiveError(msg({ id: 'service.providers.notInstalled', defaultMessage: '{cli} is not installed.', description: 'An error running a coding agent CLI\'s task (update, sign-in, setup): the CLI {cli} ("Codex") is not installed.' }), { cli: name }, { kind: 'conflict' })
+    if (!info.path) throw combworkError(msg({ id: 'service.providers.notInstalled', defaultMessage: '{cli} is not installed.', description: 'An error running a coding agent CLI\'s task (update, sign-in, setup): the CLI {cli} ("Codex") is not installed.' }), { cli: name }, { kind: 'conflict' })
     if (task === 'update') {
-      if (this.liveSessionCount(id) > 0) throw hiveError(msg({ id: 'service.providers.stopFirst', defaultMessage: 'Stop all running {cli} agents before updating it.', description: 'An error updating the coding agent CLI {cli} ("Codex") while agents run it.' }), { cli: name }, { kind: 'conflict' })
+      if (this.liveSessionCount(id) > 0) throw combworkError(msg({ id: 'service.providers.stopFirst', defaultMessage: 'Stop all running {cli} agents before updating it.', description: 'An error updating the coding agent CLI {cli} ("Codex") while agents run it.' }), { cli: name }, { kind: 'conflict' })
       const pending = this.updateRetries.get(id)
-      if (retryUpdate && (!pending || pending.path !== info.path || pending.version !== info.version)) throw hiveError(msg({ id: 'service.providers.retryUnavailable', defaultMessage: 'This update retry is no longer available. Check again, then try Update.', description: 'Provider Setup error when a user tries to retry an update whose failure is no longer current. Check again and Update are buttons.' }), undefined, { kind: 'conflict' })
+      if (retryUpdate && (!pending || pending.path !== info.path || pending.version !== info.version)) throw combworkError(msg({ id: 'service.providers.retryUnavailable', defaultMessage: 'This update retry is no longer available. Check again, then try Update.', description: 'Provider Setup error when a user tries to retry an update whose failure is no longer current. Check again and Update are buttons.' }), undefined, { kind: 'conflict' })
       if (hasPty(`task:${id}:${task}`)) return `task:${id}:${task}`
       const cmd = retryUpdate ? pending!.retry.command : adapter.updateCommand(info.path)
       const key = this.runTask(id, task, cmd.file, cmd.args, `${name} update`, undefined, shown, (code) => { // i18n-ignore: the task's name in the log
@@ -407,11 +407,11 @@ class ProviderService {
     }
     if (task === 'login') {
       // Signed in per connection (HI-1755): its sign-in is Settings → Accounts & Connections', never ~/.claude's.
-      if (connectionsManaged(id)) throw hiveError(msg({ id: 'service.providers.signInConnections', defaultMessage: '{cli} signs in per account: sign in from Settings → Accounts & Connections.', description: 'An error: Provider Setup was asked to sign a coding agent CLI ({cli}: "Claude Code") in, but its logins are accounts (Settings → Accounts & Connections names a section).' }), { cli: name }, { kind: 'conflict' })
+      if (connectionsManaged(id)) throw combworkError(msg({ id: 'service.providers.signInConnections', defaultMessage: '{cli} signs in per account: sign in from Settings → Accounts & Connections.', description: 'An error: Provider Setup was asked to sign a coding agent CLI ({cli}: "Claude Code") in, but its logins are accounts (Settings → Accounts & Connections names a section).' }), { cli: name }, { kind: 'conflict' })
       const cmd = adapter.loginCommand(info.path)
       return this.runTask(id, task, cmd.file, cmd.args, `${name} sign-in`, undefined, shown) // i18n-ignore: the task's name in the log
     }
-    if (!adapter.setupCommand) throw hiveError(msg({ id: 'service.providers.noSetup', defaultMessage: '{cli} has no setup task.', description: 'An error: the coding agent CLI {cli} ("Codex") has no setup task for Hive to run.' }), { cli: name }, { kind: 'invalid' })
+    if (!adapter.setupCommand) throw combworkError(msg({ id: 'service.providers.noSetup', defaultMessage: '{cli} has no setup task.', description: 'An error: the coding agent CLI {cli} ("Codex") has no setup task for Combwork to run.' }), { cli: name }, { kind: 'invalid' })
     const cmd = adapter.setupCommand(info.path)
     return this.runTask(id, task, cmd.file, cmd.args, `${name} setup`, cmd.keys ? { keys: cmd.keys, ready: cmd.readyPattern, busyTitle: cmd.busyTitle, busyScreen: cmd.busyScreen, done: cmd.done } : undefined, shown)
   }

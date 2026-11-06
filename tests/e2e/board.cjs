@@ -1,4 +1,4 @@
-// The task board: cards added in the Board view and through the Agent API (as an agent's hive tools would), Done kept
+// The task board: cards added in the Board view and through the Agent API (as an agent's Combwork tools would), Done kept
 // for the user, dragging between columns, column colours (Settings → Board), Start on a new agent (the fake Claude Code gets the card as its prompt),
 // a project's Tasks tab, archiving; and Project → Remove Project… (Hide, restored from Settings → Workspace, and
 // Delete). Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR. Delete sends a small test folder to the
@@ -40,17 +40,17 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   // The board's own moves, as before 1.0's rules (#1275): its project has every rule off, where Review isn't a stage, so
   // with the rules enforced the board refuses it (boardgates covers that); turned off, every column is a plain move.
-  await inv('advanced:set', 'hive.workflow.enforce', false)
+  await inv('advanced:set', 'cw.workflow.enforce', false)
   const until = async (fn, ms = 20000) => {
     const t = Date.now()
     let v
@@ -227,7 +227,7 @@ const check = (name, ok, extra = '') => {
   check('the card is in Doing, given to the agent', c1b.column === 'doing' && c1b.agent === agent.id, JSON.stringify({ column: c1b.column, agent: c1b.agent }))
   const tr = fs.readdirSync(path.join(claudeHome, 'projects'), { recursive: true }).filter((f) => String(f).endsWith('.jsonl'))
   const text = tr.map((f) => fs.readFileSync(path.join(claudeHome, 'projects', String(f)), 'utf8')).join('\n')
-  check('the agent got the card as its prompt, named by key alone (#1219, HI-1661)', /Work on task [A-Z]{2,4}-1 from the Hive task board: Add a greeting/.test(text) && text.includes('hello()'), text.slice(0, 200))
+  check('the agent got the card as its prompt, named by key alone (#1219, HI-1661)', /Work on task [A-Z]{2,4}-1 from the Combwork task board: Add a greeting/.test(text) && text.includes('hello()'), text.slice(0, 200))
   check('its tile shows the agent finished', !!(await until(async () => ((await tile(1).getAttribute('class')) ?? '').includes('finished') && /Finished/.test(await tile(1).innerText()), 8000)), await tile(1).innerText())
   await page.screenshot({ path: path.join(lib.WORK, 'board.png') })
 
@@ -239,6 +239,28 @@ const check = (name, ok, extra = '') => {
   const viaApi = await api('GET', '/v1/tasks/1')
   check('the Agent API says why it is stalled', /isn't running/.test(viaApi.body?.stalled ?? ''), JSON.stringify(viaApi.body?.stalled))
   await page.screenshot({ path: path.join(lib.WORK, 'board-stalled.png') })
+
+  // HI-2618: waiting on purpose. Right-click → Mark as Waiting… opens its dialog; the Waiting box says why; saved, the card
+  // says so quietly and nothing calls it stalled (the board, the sidebar, the Agent API). Clear Waiting: stalled again.
+  await tile(1).click({ button: 'right' })
+  await page.locator('.menu .menu-item', { hasText: 'Mark as Waiting…' }).click()
+  const waitBox = page.getByRole('textbox', { name: 'Waiting', exact: true })
+  check('Mark as Waiting… opens the card dialog with its Waiting box', !!(await until(async () => (await waitBox.count()) === 1, 5000)))
+  await waitBox.fill('Held for a quiet window')
+  await page.locator('.dialog').getByRole('button', { name: 'Save' }).click()
+  check('the card says it waits, and why', !!(await until(async () => (await tile(1).locator('.task-waiting', { hasText: 'Held for a quiet window' }).count()) === 1, 5000)), await tile(1).innerText())
+  check('…and is no longer stalled on the board', !!(await until(async () => !((await tile(1).getAttribute('class')) ?? '').includes('stalled') && !/Stalled:/.test(await tile(1).innerText()), 8000)), await tile(1).innerText())
+  check('…nor in the sidebar', !!(await until(async () => (await page.locator('.section-header', { hasText: 'Stalled' }).count()) === 0, 5000)))
+  const waitingApi = (await api('GET', '/v1/tasks/1')).body
+  check('the Agent API says it waits, and nothing of a stall', waitingApi?.stalled === null && waitingApi?.waitingFor?.reason === 'Held for a quiet window' && waitingApi.column === 'doing', JSON.stringify({ stalled: waitingApi?.stalled, waitingFor: waitingApi?.waitingFor }))
+  const waitTip = await lib.hoverTip(page, tile(1).locator('.task-waiting'), (t) => t.startsWith('Waiting: Held for a quiet window (marked by '))
+  check('…its hover says why and who marked it', /^Waiting: Held for a quiet window \(marked by .+\)\. Combwork doesn’t report it as stalled meanwhile\.$/.test(waitTip), waitTip)
+  await page.screenshot({ path: path.join(lib.WORK, 'board-waiting.png') })
+  await page.mouse.move(5, 5)
+  await tile(1).click({ button: 'right' })
+  await page.locator('.menu .menu-item', { hasText: 'Clear Waiting' }).click()
+  check('Clear Waiting: the mark goes, and it is stalled again', !!(await until(async () => (await tile(1).locator('.task-waiting').count()) === 0 && ((await tile(1).getAttribute('class')) ?? '').includes('stalled'), 8000)), await tile(1).innerText())
+  check('…its history says both', JSON.stringify((await card(1)).history.filter((h) => /waiting/i.test(h.what)).map((h) => h.what)) === JSON.stringify(['Waiting: Held for a quiet window', 'No longer waiting']), JSON.stringify((await card(1)).history.slice(-4)))
 
   // More work on a Done card: right-click → Start… on its stopped agent; Doing again, and the prompt says it's back.
   await inv('tasks:update', 1, { column: 'done' })
@@ -324,7 +346,7 @@ const check = (name, ok, extra = '') => {
   // three lines, all of it on hover and in the card's dialog (a field that wraps, where Enter adds no line break); a long
   // label ends in "…"; nothing on the card reaches past its edge, in both themes.
   const HASH = 'CC70E25605DD72A71E72C689318'.repeat(5).slice(0, 120)
-  const reason = `DOCS ACCEPTED at ${HASH}, record in C:\\Users\\Someone\\AppData\\Local\\hive-test\\e2e\\logs\\run-20261007-123453\\progress\\progress-shots\\light-recent-all.png`
+  const reason = `DOCS ACCEPTED at ${HASH}, record in C:\\Users\\Someone\\AppData\\Local\\combwork-test\\e2e\\logs\\run-20261007-123453\\progress\\progress-shots\\light-recent-all.png`
   const long = await inv('tasks:create', { title: 'Docs accepted', project: '', labels: [`label-${HASH.slice(0, 60)}`, 'ui'] })
   await inv('tasks:update', long.number, { blocked: reason })
   await until(async () => (await tile(long.number).locator('.task-blocked').count()) === 1, 5000)
@@ -446,7 +468,7 @@ const check = (name, ok, extra = '') => {
   // An agent with a long name on its own worktree (#1316): Remove Project's table shows its name and branch whole.
   const longName = 'ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEF'
   await inv('agents:testLegacy', path.join(ws, 'delta'), { location: 'new-worktree', name: longName })
-  const longBranch = JSON.parse(fs.readFileSync(path.join(ws, 'delta', '.hive', 'project.json'), 'utf8')).agents.find((a) => a.name === longName)?.worktree?.branch
+  const longBranch = JSON.parse(fs.readFileSync(path.join(ws, 'delta', '.combwork', 'project.json'), 'utf8')).agents.find((a) => a.name === longName)?.worktree?.branch
   let d = await removeVia('delta', 'Hide')
   // What it touches is a table (#1316): a thing and what happens to it, for the choice made; the folder by its name, its
   // full path behind it (on hover, and copied whole). Each choice shown in both themes, then back to Hide.
@@ -459,7 +481,7 @@ const check = (name, ok, extra = '') => {
   }
   // Every cell's content fits it: a long name or branch wraps inside itself, never cut (only the folder's short name is).
   const cellsFit = () => d.locator('.removal-list tbody td').evaluateAll((tds) => tds.length > 0 && tds.every((td) => td.scrollWidth <= td.clientWidth + 1))
-  for (const [choice, happens] of [['Hide', 'stays, hidden from Hive'], ['Remove from Hive', 'stays where it is'], ['Delete', 'to the Recycle Bin']]) {
+  for (const [choice, happens] of [['Hide', 'stays, hidden from Combwork'], ['Remove from Combwork', 'stays where it is'], ['Delete', 'to the Recycle Bin']]) {
     await d.locator('label.choice').filter({ has: page.getByText(choice, { exact: true }) }).click()
     check(`…${choice}: the folder ${happens}`, !!(await until(async () => (await folderRow())[1] === happens, HUNG_MS)), JSON.stringify(await touched()))
     check(`…${choice}: the long agent's worktree whole, its name and branch, every cell fitting`, !!longBranch && (await touched()).some((cells) => cells[0] === `${longName} (${longBranch})`) && !!(await until(cellsFit, HUNG_MS)), JSON.stringify({ longBranch, rows: await touched() }))
@@ -472,7 +494,7 @@ const check = (name, ok, extra = '') => {
   await d.locator('label.choice').filter({ has: page.getByText('Hide', { exact: true }) }).click()
   await d.locator('.dialog-footer .btn', { hasText: 'Hide' }).click()
   const names = async () => (await inv('workspace:get')).projects.map((p) => p.name)
-  check('Hide takes the project out of Hive', !!(await until(async () => !(await names()).includes('delta'), 8000)))
+  check('Hide takes the project out of Combwork', !!(await until(async () => !(await names()).includes('delta'), 8000)))
   check('its folder stays', fs.existsSync(path.join(ws, 'delta')))
   const deltaCards = (await cards()).filter((c) => c.project === 'delta')
   // Evidence for #548: missing (a read that failed) or there but not archived (Hide missed it).
@@ -500,11 +522,11 @@ const check = (name, ok, extra = '') => {
   await d.locator('input.input').fill('gamma')
   await del.click()
   check('Delete moves the folder to the Recycle Bin', !!(await until(async () => !fs.existsSync(path.join(ws, 'gamma')), 10000)))
-  // A test copy's Recycle Bin is the suite's own trash folder (#414): the folder arrived there, whole. Hive notes the
+  // A test copy's Recycle Bin is the suite's own trash folder (#414): the folder arrived there, whole. Combwork notes the
   // move in trash.jsonl just after it, so wait for the note (#441).
   const arrived = () => lib.trashed(path.join(ws, 'gamma')).find((e) => e.from.toLowerCase() === path.join(ws, 'gamma').toLowerCase() && fs.existsSync(e.to))
   check("…which in a test copy is the suite's own trash folder, not the user's Recycle Bin", !!(await until(async () => arrived(), 5000)), JSON.stringify(lib.trashed()))
-  check('and Hive forgets it', !!(await until(async () => !(await names()).includes('gamma'), 8000)))
+  check('and Combwork forgets it', !!(await until(async () => !(await names()).includes('gamma'), 8000)))
 
   await app.close()
   process.exit(failed ? 1 : 0)

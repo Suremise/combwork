@@ -8,7 +8,7 @@
 //   couldn't start, is made again by the next pass; one uncertain is left to the deliveries' own policy (its agent
 //   started where it is offered, nothing made again);
 // - a card's cycle read from its facts;
-// - Hive quitting (#1628): a pass running is waited for (bounded) before the boards close, goes on to no next step, and
+// - Combwork quitting (#1628): a pass running is waited for (bounded) before the boards close, goes on to no next step, and
 //   a failure as they close is no warning; no pass starts after, and the next start's do.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { B1, commit, moved, setup, sh, type Env } from './workflow/harness'
@@ -19,7 +19,7 @@ import { withRepoLock } from '../src/main/repoLock'
 import type { Fact } from '../src/shared/workflow/facts'
 import { DatabaseSync } from 'node:sqlite'
 import { boardFile } from '../src/main/boardStore'
-import { readFileSync, rmSync, writeFileSync } from 'fs'
+import { closeSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'fs'
 
 /** The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take. */
 const HUNG_MS = 30_000
@@ -28,7 +28,7 @@ const HUNG_MS = 30_000
 const state = vi.hoisted(() => ({
   enforced: true,
   afterList: null as null | (() => void),
-  /** After git's `update-ref -d` has run: throws to stand for Hive ending right there. */
+  /** After git's `update-ref -d` has run: throws to stand for Combwork ending right there. */
   afterRemove: null as null | (() => void),
   /** Git's `update-ref <ref> <head> ''` (putting a branch back) refused. */
   restoreFails: false,
@@ -67,10 +67,10 @@ const state = vi.hoisted(() => ({
   busy: null as string | null,
   /** When the pause after the user typed in its builder's pane ends (sessions.userQuietAt), or null. */
   quietAt: null as number | null,
-  /** What listens for Hive being done with an agent's line (lineWriter.onLineFreed). */
+  /** What listens for Combwork being done with an agent's line (lineWriter.onLineFreed). */
   lineFreed: new Set<(projectPath: string, agentId: string) => void>(),
   /**
-   * Its builder freed right after the pass's look, before the wait listens (HR3's round 2): 'line', Hive's line done
+   * Its builder freed right after the pass's look, before the wait listens (HR3's round 2): 'line', Combwork's line done
    * with (its notice told then, to whoever listens); 'quiet', the user's pause over (nothing told).
    */
   freeAfterLook: null as null | { how: 'line' | 'quiet'; project: string },
@@ -78,7 +78,9 @@ const state = vi.hoisted(() => ({
   held: null as string | null,
   heldLooks: 0,
   /** Freed just after the pass's look (HR1's round 1): before its wait listens, with no event to come. */
-  freeAfterHeldLook: false
+  freeAfterHeldLook: false,
+  /** Folders sessions run in (sessions.liveStates' cwd, HI-2466). */
+  sessionsIn: [] as string[]
 }))
 vi.mock('../src/main/agentFolders', async (orig) => ({
   ...(await orig<object>()),
@@ -173,29 +175,31 @@ vi.mock('../src/main/logger', async (orig) => {
 vi.mock('../src/main/advanced', async (orig) => {
   const actual = await orig<typeof import('../src/main/advanced')>()
   const advanced = Object.create(actual.advanced) as typeof actual.advanced
-  advanced.get = ((id: string, ...rest: unknown[]) => (id === 'hive.slots.deleteMergedLines' ? state.deleteOn : (actual.advanced.get as (...a: unknown[]) => unknown)(id, ...rest))) as typeof advanced.get
+  advanced.get = ((id: string, ...rest: unknown[]) => (id === 'cw.slots.deleteMergedLines' ? state.deleteOn : (actual.advanced.get as (...a: unknown[]) => unknown)(id, ...rest))) as typeof advanced.get
   return { ...actual, advanced }
 })
 vi.mock('../src/main/sessions', async (orig) => {
   const actual = await orig<typeof import('../src/main/sessions')>()
   const stub = {
     liveFor: () => (state.live ? { ...state.live, status: 'ready' } : null),
+    // The sessions running, where they run (HI-2466: one in a lane's held slot holds it).
+    liveStates: () => state.sessionsIn.map((cwd) => ({ cwd, agentId: 'b9', agentName: 'B9', status: 'working' })),
     // The pause after the user typed in its builder's pane, while it holds (HI-2191): when it ends.
     userQuietAt: () => state.quietAt,
-    hiveToolsWaiting: () => false,
+    combworkToolsWaiting: () => false,
     agentNow: () => (state.live ? { status: 'ready', pending: false, backgroundTasks: 0 } : null),
     // No run writes in a slot here (HI-1762's takeover of the slot an agent's own run still writes in finds none).
     runNow: () => null,
-    hiveMcp: () => null,
+    combworkMcp: () => null,
     start: async (_p: string, o: { prompt?: string; resumeId?: string }) => {
       const name = `${o.resumeId ? `resume ${o.resumeId}` : 'start'}${o.prompt ? ' with the card' : ''}`
       const how = state.starts.shift()
       state.calls.push(how ? `${name} (${how})` : name)
       if (how === 'fails') throw new Error("its conversation couldn't resume (test)")
       if (how === 'busy') {
-        const { HiveError } = await vi.importActual<typeof import('../src/main/hiveError')>('../src/main/hiveError')
+        const { CombworkError } = await vi.importActual<typeof import('../src/main/combworkError')>('../src/main/combworkError')
         const text = 'slot-a still has another session in it (test)'
-        throw new HiveError({ shown: text, english: text }, { kind: 'conflict' })
+        throw new CombworkError({ shown: text, agent: text }, { kind: 'conflict' })
       }
       if (how === 'lost') {
         // Another start of it (the restart queue, Resume All) won: it runs there now, and this one is refused.
@@ -254,7 +258,7 @@ const { gitTestHooks } = await import('../src/main/git')
 const { observer } = await import('../src/main/platform/observe')
 const { withWriteFence } = await import('../src/main/workflow/factStore')
 const { LeaseLost } = await import('../src/main/workflow/queueRunner')
-const { cycleIn, deleteMergedLine, expectStartPrompt, finishedSlot, finishedSlots, laneSlotIn, place, placementDue, placementTracksForTests, quitSlotCards, settleSlotCards, startSlotCards, stopSlotCards, unsettledDeletions } = await import('../src/main/slotCards')
+const { cycleIn, deleteMergedLine, expectStartPrompt, finishedSlot, finishedSlots, heldRetryOf, laneSlotHeld, laneSlotIn, place, placementDue, placementTracksForTests, quitSlotCards, settleSlotCards, startSlotCards, stopSlotCards, unsettledDeletions } = await import('../src/main/slotCards')
 const { resetAgentStartsForTests, startBegun, startNow } = await import('../src/main/agentStarts')
 
 let env: Env | null = null
@@ -262,7 +266,7 @@ afterEach(() => {
   env?.close()
   env = null
   resetAgentStartsForTests()
-  Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, slot: '', deliveries: [], next: [], calls: [], wf: null, deleteOn: true, lanes: null, waitingLooks: 0, waiting: [], noCode: [], pool: {}, logged: [], conv: { is: 'none' }, starts: [], resuming: false, convFails: false, busy: null, quietAt: null, freeAfterLook: null, held: null, heldLooks: 0, freeAfterHeldLook: false })
+  Object.assign(state, { enforced: true, afterList: null, afterRemove: null, restoreFails: false, live: null, slot: '', deliveries: [], next: [], calls: [], wf: null, deleteOn: true, lanes: null, waitingLooks: 0, waiting: [], noCode: [], pool: {}, logged: [], conv: { is: 'none' }, starts: [], resuming: false, convFails: false, busy: null, quietAt: null, freeAfterLook: null, held: null, heldLooks: 0, freeAfterHeldLook: false, sessionsIn: [] })
 })
 
 /**
@@ -297,10 +301,10 @@ const hasLine = (e: Env, line: string): boolean => {
   }
 }
 
-/** Hive ending right after the ref's removal: the deletion's call ends there (as the process would), its intent kept. */
+/** Combwork ending right after the ref's removal: the deletion's call ends there (as the process would), its intent kept. */
 const crashAfterRemove = (): void => {
   state.afterRemove = () => {
-    throw new Error('Hive ended (test)')
+    throw new Error('Combwork ended (test)')
   }
 }
 
@@ -331,7 +335,7 @@ describe("a Done card's merged line (#1438)", { timeout: 60_000 }, () => {
     expect(e.kinds(n)).toContain('LineDeleteUndone')
   })
 
-  it("Hive ending right after the ref's removal, a checkout having come in: the next pass puts the branch back at its head, the checkout kept", async () => {
+  it("Combwork ending right after the ref's removal, a checkout having come in: the next pass puts the branch back at its head, the checkout kept", async () => {
     const { e, n, line, slot } = await doneInSlot('Crashed with a checkout')
     sh(slot, 'switch', '-q', '--detach')
     const head = sh(e.project, 'rev-parse', line)
@@ -339,7 +343,7 @@ describe("a Done card's merged line (#1438)", { timeout: 60_000 }, () => {
     state.afterList = () => void sh(e.project, 'worktree', 'add', '-q', other, line)
     crashAfterRemove()
     expect(await deleteMergedLine({} as never, e.project, e.wf, n)).toBe(false)
-    // As Hive left it: the ref gone, the checkout's HEAD naming it, the intent recorded.
+    // As Combwork left it: the ref gone, the checkout's HEAD naming it, the intent recorded.
     expect(hasLine(e, line)).toBe(false)
     expect(sh(other, 'symbolic-ref', 'HEAD')).toBe(`refs/heads/${line}`)
     expect(e.kinds(n).filter((k) => k.startsWith('Line'))).toEqual(['LineDeleting'])
@@ -351,7 +355,7 @@ describe("a Done card's merged line (#1438)", { timeout: 60_000 }, () => {
     expect(e.kinds(n).filter((k) => k.startsWith('Line'))).toEqual(['LineDeleting', 'LineDeleteUndone'])
   })
 
-  it("Hive ending right after the ref's removal, nothing checking it out: the next pass records it deleted", async () => {
+  it("Combwork ending right after the ref's removal, nothing checking it out: the next pass records it deleted", async () => {
     const { e, n, line, slot } = await doneInSlot('Crashed alone')
     sh(slot, 'switch', '-q', '--detach')
     crashAfterRemove()
@@ -757,7 +761,7 @@ describe("a begun deletion settled by the project's pass, whatever the switches 
   it('found whatever the card has done since (started again), and never settled twice', async () => {
     const { e, n, line, head, ws } = await cutShort('Started again')
     // A later cycle of the card: the begun deletion isn't in its current cycle any more, and is still found.
-    await e.wf.write(e.store.card(n), null, 'hive', (w) => void w.fact('Started', { folder: 'project', line: 'main', base: head, target: 'main', builder: 'B1', cardKind: 'code' }))
+    await e.wf.write(e.store.card(n), null, 'combwork', (w) => void w.fact('Started', { folder: 'project', line: 'main', base: head, target: 'main', builder: 'B1', cardKind: 'code' }))
     expect(cycleIn(e.store.facts(n))).toBeNull()
     await settleSlotCards(ws, e.project)
     expect(sh(e.project, 'rev-parse', line)).toBe(head)
@@ -786,7 +790,7 @@ describe("a builder's placement in its slot (#1438, HR1's round 2)", { timeout: 
     const slot = join(tempDir('slot-'), 'slot-a')
     e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: slot, lease: 'l-1', fresh: true })
     moved(await e.wf.start(card.key, B1))
-    await e.wf.write(card, null, 'hive', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line: 'hive/AM/x', revision: 'r' }))
+    await e.wf.write(card, null, 'combwork', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line: 'cw/AM/x', revision: 'r' }))
     const cycle = cycleIn(e.store.facts(card.id))!
     const ws = { path: e.home, lifetime: { aborted: false }, projectConfig: async () => ({ agents: [{ id: 'B1', name: 'B1' }] }) } as never
     return { e, n: card.id, slot, cycle, ws }
@@ -861,8 +865,8 @@ describe("a builder's placement in its slot (#1438, HR1's round 2)", { timeout: 
       await givenOnce(e, n, placing)
     })
 
-    it("Hive already typing a line into it: woken when that line is done with, with no status change", async () => {
-      const { e, n, placing, said } = await waiting('Hive is already typing a line into it')
+    it("Combwork already typing a line into it: woken when that line is done with, with no status change", async () => {
+      const { e, n, placing, said } = await waiting('Combwork is already typing a line into it')
       await nothingYet(e, n, said)
       state.busy = null
       for (const fn of [...state.lineFreed]) fn(e.project, 'B1')
@@ -872,7 +876,7 @@ describe("a builder's placement in its slot (#1438, HR1's round 2)", { timeout: 
     it.each(['line', 'quiet'] as const)("freed between the pass's look and the wait's listening (%s): not lost, given at once (HR3's round 2)", async (how) => {
       const { e, n, slot, cycle, ws } = await prepared()
       state.live = { cwd: slot, sessionId: 's1' }
-      state.busy = how === 'line' ? 'Hive is already typing a line into it' : 'the user has just typed in its terminal and may still be writing there'
+      state.busy = how === 'line' ? 'Combwork is already typing a line into it' : 'the user has just typed in its terminal and may still be writing there'
       state.freeAfterLook = { how, project: e.project }
       await givenOnce(e, n, place(ws, e.project, e.wf, n, cycle, lease))
     })
@@ -920,7 +924,7 @@ describe("a Start's prompt goes to the slot's placement only while one is due (H
     const card = e.wf.createCard({ title: 'Back for more' })
     e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: join(tempDir('slot-'), 'slot-a'), lease: 'l-1', fresh: true })
     moved(await e.wf.start(card.key, B1))
-    await e.wf.write(card, null, 'hive', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line: 'hive/AM/x', revision: 'r' }))
+    await e.wf.write(card, null, 'combwork', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line: 'cw/AM/x', revision: 'r' }))
     const ws = { path: e.home, lifetime: { aborted: false }, projectConfig: async () => ({ agents: [{ id: 'B1', name: 'B1' }] }) } as never
     return { e, n: card.id, cycle: cycleIn(e.store.facts(card.id))!, ws }
   }
@@ -936,7 +940,7 @@ describe("a Start's prompt goes to the slot's placement only while one is due (H
     await place(ws, e.project, e.wf, n, cycle, lease)
     expect(await placementDue(ws, e.project, n)).toBeNull()
     const card = e.store.card(n)
-    await e.wf.write(card, null, 'hive', (w) => void w.move('review', 'intent'))
+    await e.wf.write(card, null, 'combwork', (w) => void w.move('review', 'intent'))
     // A Start names its agent (taskStart's move gives it): never a move into Active for nobody (HI-2062).
     moved(await e.wf.move(n, 'active', 'assistant', { builder: 'B1' }))
     expect(e.wf.state(e.store.card(n)).stage).toBe('active')
@@ -969,7 +973,7 @@ describe("a slot that couldn't be prepared (HI-1796)", { timeout: 60_000 }, () =
     await settleSlotCards(ws, e.project)
     const notices = () => e.store.pendingActions().filter((a) => a.kind === 'notify')
     await vi.waitFor(() => expect(notices()).toHaveLength(1), { timeout: HUNG_MS })
-    await vi.waitFor(() => expect(startNow(e.project, 'B1')).toEqual({ starting: false, failed: "Hive couldn't get slot-a ready: git checkout failed (test)", waiting: null }), { timeout: HUNG_MS })
+    await vi.waitFor(() => expect(startNow(e.project, 'B1')).toEqual({ starting: false, failed: "Combwork couldn't get slot-a ready: git checkout failed (test)", waiting: null }), { timeout: HUNG_MS })
     const shown = notices()[0].payload.shown as { id: string; values: Record<string, string> }
     expect(shown).toEqual({ id: 'service.slots.notPrepared', values: { slot: 'slot-a', card: card.key, why: 'git checkout failed (test)' } })
     // A message the workflow knows: what the card's history line and the window resolve it by.
@@ -991,7 +995,7 @@ describe("a placement owed at a restart resumes its builder's conversation (HI-1
     state.slot = slot
     e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: slot, lease: 'l-1', fresh: true })
     moved(await e.wf.start(card.key, B1))
-    await e.wf.write(card, null, 'hive', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line: 'hive/AM/x', revision: 'r' }))
+    await e.wf.write(card, null, 'combwork', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line: 'cw/AM/x', revision: 'r' }))
     const ws = { path: e.home, lifetime: { aborted: false }, projectConfig: async () => ({ agents: [{ id: 'B1', name: 'B1' }] }) } as never
     return { e, n: card.id, key: card.key, slot, cycle: cycleIn(e.store.facts(card.id))!, ws }
   }
@@ -1117,11 +1121,16 @@ describe("a placement owed at a restart resumes its builder's conversation (HI-1
     const placing = place(ws, e.project, e.wf, n, cycle, lease)
     await vi.waitFor(() => expect(notices(e)).toHaveLength(1), { timeout: HUNG_MS })
     expect(notices(e)[0]).toMatch(/can't give AM-\d+ to B1 yet: its conversation in slot-a can't resume now \(slot-a still has another session in it \(test\)\)/)
+    // HI-2454: a mock start is recorded before its awaited error import rejects. Wait for launchWith to cancel
+    // each refused launch's delivery before sending another status; the call alone can precede the next wait.
+    const refused = () => state.deliveries.filter((delivery) => delivery.state === 'cancelled').length
     // Each look refused again: still a wait, not told again, never given up on.
     for (const tries of [2, 3]) {
+      await vi.waitFor(() => expect(refused()).toBe(tries - 1), { timeout: HUNG_MS })
       status()
       await vi.waitFor(() => expect(state.calls).toHaveLength(tries), { timeout: HUNG_MS })
     }
+    await vi.waitFor(() => expect(refused()).toBe(3), { timeout: HUNG_MS })
     expect(notices(e)).toHaveLength(1)
     // The slot ready: the next look resumes it.
     status()
@@ -1285,7 +1294,7 @@ describe("a placement owed at a restart resumes its builder's conversation (HI-1
       moved(await e.wf.putBack(key, B1, { why: 'again' }))
       e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: state.slot, lease: 'l-2', fresh: true })
       moved(await e.wf.start(key, B1))
-      await e.wf.write(e.store.card(n)!, null, 'hive', (w) => void w.fact('SlotPrepared', { lease: 'l-2', line: 'hive/AM/x', revision: 'r' }))
+      await e.wf.write(e.store.card(n)!, null, 'combwork', (w) => void w.fact('SlotPrepared', { lease: 'l-2', line: 'cw/AM/x', revision: 'r' }))
       const again = cycleIn(e.store.facts(n))!
       const lease2 = { ...(lease as object), id: 'l-2' } as never
       // One failure on the new cycle is its first, not the old one's third: no cutoff, no notice.
@@ -1307,7 +1316,7 @@ describe("a lane's brief in every placement of its cards (HI-1795)", { timeout: 
     state.slot = slot
     e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: slot, lease: 'l-1', fresh: true })
     moved(await e.wf.start(card.key, B1))
-    await e.wf.write(card, null, 'hive', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line: 'hive/AM/x', revision: 'r' }))
+    await e.wf.write(card, null, 'combwork', (w) => void w.fact('SlotPrepared', { lease: 'l-1', line: 'cw/AM/x', revision: 'r' }))
     lane.text = brief
     const ws = { path: e.home, lifetime: { aborted: false }, projectConfig: async () => ({ agents: [{ id: 'B1', name: 'B1' }] }) } as never
     return { e, n: card.id, key: card.key, slot, cycle: cycleIn(e.store.facts(card.id))!, ws }
@@ -1333,7 +1342,7 @@ describe("a lane's brief in every placement of its cards (HI-1795)", { timeout: 
       await place(ws, e.project, e.wf, n, cycle, laneLease)
       expect(e.store.facts(n).filter((f) => f.kind === 'BuilderPlaced').map((f) => (f.data as { how: string }).how)).toEqual([how])
       expect(bodies()).toHaveLength(1)
-      expect(bodies()[0]).toMatch(/^Work on task AM-\d+ from the Hive task board: /)
+      expect(bodies()[0]).toMatch(/^Work on task AM-\d+ from the Combwork task board: /)
       expect(bodies()[0]).toMatch(BRIEF)
     })
   }
@@ -1404,8 +1413,8 @@ describe("a lane's brief in every placement of its cards (HI-1795)", { timeout: 
   })
 })
 
-describe('Hive quitting (#1628)', { timeout: 60_000 }, () => {
-  // Each test quits: started again after it, as the next Hive's start does, so the other tests' passes run.
+describe('Combwork quitting (#1628)', { timeout: 60_000 }, () => {
+  // Each test quits: started again after it, as the next Combwork's start does, so the other tests' passes run.
   afterEach(() => {
     startSlotCards()
     stopSlotCards()
@@ -1450,7 +1459,7 @@ describe('Hive quitting (#1628)', { timeout: 60_000 }, () => {
     expect(state.waitingLooks).toBe(1)
   })
 
-  it("a pass whose boards close under it as Hive quits says so in the log, not as a warning", async () => {
+  it("a pass whose boards close under it as Combwork quits says so in the log, not as a warning", async () => {
     const { pass, go } = await heldPass()
     const quitting = quitSlotCards(HUNG_MS)
     go(new Error('No workspace is open'))
@@ -1460,7 +1469,7 @@ describe('Hive quitting (#1628)', { timeout: 60_000 }, () => {
     expect(state.logged.some((l) => l.startsWith('info settling the slots of') && l.includes('cut short by quitting'))).toBe(true)
   })
 
-  it("a lane waiting for a slot whose lend is under way as Hive quits isn't started: it keeps the slot and its wait for the next start", async () => {
+  it("a lane waiting for a slot whose lend is under way as Combwork quits isn't started: it keeps the slot and its wait for the next start", async () => {
     const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
     state.wf = e.wf
     state.waiting = [{ id: 'lane-1', project: 'project', builder: { id: 'b1', name: 'B1' }, slotWait: { since: '2026-10-25T00:00:00.000Z' } }]
@@ -1528,13 +1537,178 @@ describe('Hive quitting (#1628)', { timeout: 60_000 }, () => {
     expect(state.calls).toEqual(['start lane lane-b with no slot', 'lane lane-b waits no more'])
   })
 
+  it("HI-2466: a lane whose only free slot is held keeps what holds it for its status and is looked at again with no lend while it is held; once it isn't, it is lent and started", async () => {
+    const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
+    state.wf = e.wf
+    state.waiting = [{ id: 'lane-1', project: 'project', builder: { id: 'b1', name: 'B1' }, cards: [7], slotWait: { since: '2026-10-25T00:00:00.000Z' } }]
+    const folder = join(tempDir('held-slot-'), 'slot-a')
+    mkdirSync(folder, { recursive: true })
+    const slot = { name: 'slot-a', folder, state: 'ready', op: null, job: null, writer: null, warmError: null }
+    let lends = 0
+    let refusal: unknown = { why: 'busy', slot: 'slot-a', held: 'process' }
+    state.pool = {
+      leaseOf: () => null,
+      leasesOf: () => [],
+      slots: () => [slot],
+      size: async () => 1,
+      openLease: () => null,
+      lend: async () => (lends++, refusal ? { ok: false, refusal } : { ok: true, lease: { id: 'l-9', slot: 'slot-a' }, slot }),
+    }
+    const life = new AbortController()
+    const ws = { path: e.home, lifetime: life.signal, info: () => ({ projects: [{ name: 'project', path: e.project }] }), projectConfig: async () => ({ agents: [] }) } as never
+    try {
+      // The lend refused: a process holds slot-a. Kept for its status, and a pass asked for later.
+      await settleSlotCards(ws, e.project)
+      expect(lends).toBe(1)
+      expect(laneSlotHeld(e.home, 'lane-1')).toEqual({ slot: 'slot-a', held: 'process' })
+      expect(heldRetryOf(e.home, e.project)).toEqual({ tries: 1, waiting: true })
+      // Looked at again while a file in it is open: still held, and no lend tried (no lease written each time).
+      const fd = openSync(join(folder, 'held.txt'), 'w')
+      try {
+        await settleSlotCards(ws, e.project)
+      } finally {
+        closeSync(fd)
+      }
+      expect(lends).toBe(1)
+      expect(laneSlotHeld(e.home, 'lane-1')).toEqual({ slot: 'slot-a', held: 'process' })
+      // A session in it holds it too: said with its agent's name.
+      state.sessionsIn = [join(folder, 'sub')]
+      await settleSlotCards(ws, e.project)
+      expect(lends).toBe(1)
+      expect(laneSlotHeld(e.home, 'lane-1')).toEqual({ slot: 'slot-a', held: 'session', agent: 'B9' })
+      expect(state.calls).toEqual([])
+      // Nothing holds it any more: lent, the lane started, its hold forgotten.
+      state.sessionsIn = []
+      refusal = null
+      await settleSlotCards(ws, e.project)
+      expect(lends).toBe(2)
+      expect(state.calls).toEqual(['start lane lane-1', 'lane lane-1 waits no more'])
+      expect(laneSlotHeld(e.home, 'lane-1')).toBeNull()
+    } finally {
+      life.abort()
+    }
+    expect(heldRetryOf(e.home, e.project)).toBeNull()
+  })
+
+  it.each(['close', 'remove project', 'stop'] as const)('HI-2469: %s forgets a still-held lane and its retry, with other live workspaces preserved', async (action) => {
+    const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
+    state.wf = e.wf
+    state.waiting = [{ id: 'lane-1', project: 'project', builder: { id: 'b1', name: 'B1' }, cards: [7], slotWait: { since: '2026-10-25T00:00:00.000Z' } }]
+    state.pool = {
+      leaseOf: () => null,
+      leasesOf: () => [],
+      lend: async () => ({ ok: false, refusal: { why: 'busy', slot: 'slot-a', held: 'process' } })
+    }
+    const life = new AbortController()
+    const otherLife = new AbortController()
+    let projects = [{ name: 'project', path: e.project }]
+    const ws = { path: e.home, lifetime: life.signal, info: () => ({ projects }), projectConfig: async () => ({ agents: [] }) } as never
+    const otherPath = `${e.home}-other`
+    const other = { path: otherPath, lifetime: otherLife.signal, info: () => ({ projects: [{ name: 'project', path: e.project }] }), projectConfig: async () => ({ agents: [] }) } as never
+    startSlotCards()
+    try {
+      await settleSlotCards(ws, e.project)
+      await settleSlotCards(other, e.project)
+      for (const path of [e.home, otherPath]) {
+        expect(laneSlotHeld(path, 'lane-1')).toEqual({ slot: 'slot-a', held: 'process' })
+        expect(heldRetryOf(path, e.project)).toEqual({ tries: 1, waiting: true })
+      }
+      if (action === 'close') life.abort()
+      else if (action === 'remove project') {
+        projects = []
+        tellListeners({ type: 'workspace-changed', workspace: null })
+      } else stopSlotCards()
+      expect(laneSlotHeld(e.home, 'lane-1')).toBeNull()
+      expect(heldRetryOf(e.home, e.project)).toBeNull()
+      if (action === 'stop') {
+        expect(laneSlotHeld(otherPath, 'lane-1')).toBeNull()
+        expect(heldRetryOf(otherPath, e.project)).toBeNull()
+      } else {
+        expect(laneSlotHeld(otherPath, 'lane-1')).toEqual({ slot: 'slot-a', held: 'process' })
+        expect(heldRetryOf(otherPath, e.project)).toEqual({ tries: 1, waiting: true })
+      }
+      expect(state.calls).toEqual([])
+    } finally {
+      life.abort()
+      otherLife.abort()
+      stopSlotCards()
+    }
+  })
+
+  it.each(['close', 'stop'] as const)('HI-2469: a lend finishing after %s cannot restore cached status or its retry', async (action) => {
+    const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
+    state.wf = e.wf
+    state.waiting = [{ id: 'lane-1', project: 'project', builder: { id: 'b1', name: 'B1' }, cards: [7], slotWait: { since: '2026-10-25T00:00:00.000Z' } }]
+    let release!: () => void
+    const held = new Promise<void>((resolve) => (release = resolve))
+    const lend = vi.fn(async () => {
+      await held
+      return { ok: false, refusal: { why: 'busy', slot: 'slot-a', held: 'process' } }
+    })
+    state.pool = { leaseOf: () => null, leasesOf: () => [], lend }
+    const life = new AbortController()
+    const ws = { path: e.home, lifetime: life.signal, info: () => ({ projects: [{ name: 'project', path: e.project }] }), projectConfig: async () => ({ agents: [] }) } as never
+    const pass = settleSlotCards(ws, e.project)
+    try {
+      await vi.waitFor(() => expect(lend).toHaveBeenCalledOnce(), { timeout: HUNG_MS })
+      if (action === 'close') life.abort()
+      else stopSlotCards()
+      release()
+      await pass
+      expect(laneSlotHeld(e.home, 'lane-1')).toBeNull()
+      expect(heldRetryOf(e.home, e.project)).toBeNull()
+    } finally {
+      release()
+      await pass
+      life.abort()
+    }
+  })
+
+  it('HI-2469: a pass paused before waiting lanes cannot restore held status or a retry after stop', async () => {
+    const e = (env = setup({ platform: 'git', review: 'none', finish: 'agentMerges', folder: 'slots', target: 'main' }, { autoRun: false }))
+    state.wf = e.wf
+    state.waiting = [{ id: 'lane-1', project: 'project', builder: { id: 'b1', name: 'B1' }, cards: [7], slotWait: { since: '2026-10-25T00:00:00.000Z' } }]
+    let release!: () => void
+    const held = new Promise<void>((resolve) => (release = resolve))
+    const lanes = vi.fn(async () => {
+      await held
+      return []
+    })
+    state.lanes = lanes
+    const lend = vi.fn(async () => ({ ok: false, refusal: { why: 'busy', slot: 'slot-a', held: 'process' } }))
+    state.pool = { leaseOf: () => null, leasesOf: () => [], slots: () => [], lend }
+    const life = new AbortController()
+    const ws = { path: e.home, lifetime: life.signal, info: () => ({ projects: [{ name: 'project', path: e.project }] }), projectConfig: async () => ({ agents: [] }) } as never
+    startSlotCards()
+    const pass = settleSlotCards(ws, e.project)
+    try {
+      await vi.waitFor(() => expect(lanes).toHaveBeenCalledOnce(), { timeout: HUNG_MS })
+      // A coalesced request must not admit the old pass again under the stopped service's generation.
+      expect(settleSlotCards(ws, e.project)).toBe(pass)
+      stopSlotCards()
+      release()
+      await pass
+      expect(laneSlotHeld(e.home, 'lane-1')).toBeNull()
+      expect(heldRetryOf(e.home, e.project)).toBeNull()
+      expect(lend).not.toHaveBeenCalled()
+      expect(state.waitingLooks).toBe(0)
+      expect(lanes).toHaveBeenCalledOnce()
+      expect(state.logged.filter((l) => l.startsWith('warn'))).toEqual([])
+    } finally {
+      release()
+      await pass
+      life.abort()
+      stopSlotCards()
+    }
+  })
+
   it('a pass that never ends holds the quit only for its bound', async () => {
     const { go } = await heldPass()
     await quitSlotCards(10)
     go()
   })
 
-  it('quitNow quiets the slots before the sessions stop and waits for them before Hive quits, the boards closing after (index.ts)', () => {
+  it('quitNow quiets the slots before the sessions stop and waits for them before Combwork quits, the boards closing after (index.ts)', () => {
     const src = readFileSync(join(__dirname, '..', 'src', 'main', 'index.ts'), 'utf8')
     const body = src.slice(src.indexOf('async function quitNow('), src.indexOf('function relaunch('))
     const at = (s: string): number => {
@@ -1554,12 +1728,12 @@ describe('Hive quitting (#1628)', { timeout: 60_000 }, () => {
 })
 
 describe("a card's cycle in a slot (#1438)", () => {
-  const f = (seq: number, kind: string, data: object): Fact => ({ seq, card: 1, kind, at: '', actor: 'hive', source: 'recorded', data }) as unknown as Fact
-  const started = (seq: number, lease: string) => f(seq, 'Started', { folder: 'F', line: 'hive/AM/AM-1-x', base: 'b', target: 'main', builder: 'B1', cardKind: 'code', slot: 'slot-a', lease })
+  const f = (seq: number, kind: string, data: object): Fact => ({ seq, card: 1, kind, at: '', actor: 'combwork', source: 'recorded', data }) as unknown as Fact
+  const started = (seq: number, lease: string) => f(seq, 'Started', { folder: 'F', line: 'cw/AM/AM-1-x', base: 'b', target: 'main', builder: 'B1', cardKind: 'code', slot: 'slot-a', lease })
 
   it("is its last start's, with what was done for it since; a start outside slots has none", () => {
     expect(cycleIn([f(1, 'Started', { folder: 'project', line: 'main', base: 'b', target: 'main', builder: 'B1', cardKind: 'code' })])).toBeNull()
-    const facts = [started(1, 'l-1'), f(2, 'SlotPrepared', { lease: 'l-1', line: 'hive/AM/AM-1-x', revision: 'r' }), f(3, 'PlacementClaimed', { lease: 'l-1', pid: 5, started: 6 }), f(4, 'BuilderPlaced', { lease: 'l-1', delivery: 'm1', how: 'typed' })]
+    const facts = [started(1, 'l-1'), f(2, 'SlotPrepared', { lease: 'l-1', line: 'cw/AM/AM-1-x', revision: 'r' }), f(3, 'PlacementClaimed', { lease: 'l-1', pid: 5, started: 6 }), f(4, 'BuilderPlaced', { lease: 'l-1', delivery: 'm1', how: 'typed' })]
     expect(cycleIn(facts)).toMatchObject({ seq: 1, prepared: { revision: 'r' }, claimed: { pid: 5, seq: 3 }, placed: true, deleted: false, deleting: null })
     // Put back and started again (the same lease, or another): a new cycle owes all of it again.
     expect(cycleIn([...facts, started(5, 'l-1')])).toMatchObject({ seq: 5, prepared: null, claimed: null, placed: false })
@@ -1572,15 +1746,15 @@ describe("a card's cycle in a slot (#1438)", () => {
   })
 
   it("follows Repair's move and its line's rename since its start, as the card's state does (HI-1791); a later start's own folder and line", () => {
-    const at = (folder: string, seq: number, lease = 'l-1') => f(seq, 'Started', { folder, line: 'hive/AM/AM-1-x', base: 'b', target: 'main', builder: 'B1', cardKind: 'code', slot: 'slot-a', lease })
+    const at = (folder: string, seq: number, lease = 'l-1') => f(seq, 'Started', { folder, line: 'cw/AM/AM-1-x', base: 'b', target: 'main', builder: 'B1', cardKind: 'code', slot: 'slot-a', lease })
     const before = 'C:\\before\\ws.worktrees\\alpha\\slot-a'
     const after = 'C:\\after\\ws.worktrees\\alpha\\slot-a'
-    const afterMove = [at(before, 1), f(2, 'FolderMoved', { from: before.toUpperCase(), to: after, why: 'repair' }), f(3, 'LineRenamed', { from: 'HIVE/AM/AM-1-x', to: 'hive/AM/AM-1-y', why: 'repair' })]
-    expect(cycleIn(afterMove)?.started).toMatchObject({ folder: after, line: 'hive/AM/AM-1-y', slot: 'slot-a', lease: 'l-1' })
+    const afterMove = [at(before, 1), f(2, 'FolderMoved', { from: before.toUpperCase(), to: after, why: 'repair' }), f(3, 'LineRenamed', { from: 'CW/AM/AM-1-x', to: 'cw/AM/AM-1-y', why: 'repair' })]
+    expect(cycleIn(afterMove)?.started).toMatchObject({ folder: after, line: 'cw/AM/AM-1-y', slot: 'slot-a', lease: 'l-1' })
     // Another folder's move, or another line's rename, isn't its own.
-    expect(cycleIn([at(before, 1), f(2, 'FolderMoved', { from: 'C:\\elsewhere', to: after, why: 'repair' }), f(3, 'LineRenamed', { from: 'hive/AM/AM-2-z', to: 'hive/AM/AM-2-w', why: 'repair' })])?.started).toMatchObject({ folder: before, line: 'hive/AM/AM-1-x' })
+    expect(cycleIn([at(before, 1), f(2, 'FolderMoved', { from: 'C:\\elsewhere', to: after, why: 'repair' }), f(3, 'LineRenamed', { from: 'cw/AM/AM-2-z', to: 'cw/AM/AM-2-w', why: 'repair' })])?.started).toMatchObject({ folder: before, line: 'cw/AM/AM-1-x' })
     // A move before its start was the last cycle's: its start names where it is.
-    expect(cycleIn([...afterMove, at(after, 4, 'l-2')])?.started).toMatchObject({ folder: after, line: 'hive/AM/AM-1-x', lease: 'l-2' })
+    expect(cycleIn([...afterMove, at(after, 4, 'l-2')])?.started).toMatchObject({ folder: after, line: 'cw/AM/AM-1-x', lease: 'l-2' })
   })
 })
 
@@ -1605,8 +1779,8 @@ describe("a lane's slot in the Progress panel (#1446)", () => {
       // alpha's own carried slot is its slot, with the line of the card last started under that lease.
       slot('alpha-id', 'hb1')
       lease('l-alpha', 'alpha-id', 'hb1', 'carried', 'b1')
-      db.prepare("INSERT INTO card_facts (card, seq, kind, at, actor, source, data) VALUES (?, 99, 'Started', ?, 'hive', 'recorded', ?)").run(card.id, at, JSON.stringify({ lease: 'l-alpha', line: 'hive/AM/AM-1-own-line' }))
-      expect(laneSlotIn(db, 'alpha-id', alphaLane)).toEqual({ name: 'hb1', carried: true, line: 'hive/AM/AM-1-own-line', state: 'ready', since: at })
+      db.prepare("INSERT INTO card_facts (card, seq, kind, at, actor, source, data) VALUES (?, 99, 'Started', ?, 'combwork', 'recorded', ?)").run(card.id, at, JSON.stringify({ lease: 'l-alpha', line: 'cw/AM/AM-1-own-line' }))
+      expect(laneSlotIn(db, 'alpha-id', alphaLane)).toEqual({ name: 'hb1', carried: true, line: 'cw/AM/AM-1-own-line', state: 'ready', since: at })
       // A slot lent to the lane wins over the carried one; one being made reads as being prepared.
       slot('alpha-id', 'slot-a', 'creating')
       lease('l-lane', 'alpha-id', 'slot-a', 'lane', 'b2', 'lane-a')

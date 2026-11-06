@@ -1,14 +1,24 @@
 import { basename } from 'path'
-import { HISTORY } from '../shared/taskHistory'
 import { workStartedAt } from '../shared/tasks'
 import type { TaskCard } from '../shared/types'
-import { onHiveEvent } from './events'
+import { onCombworkEvent } from './events'
 import { liveDecisionCards } from './tasks'
 import type { WorkspaceService } from './workspace'
 import { cardRef } from '../shared/projectKeys'
+import { historyBlocked, historyWholeVerdict } from '../shared/watch'
+import { NOTICE_PREFIX } from '../shared/doorbell'
+import { agentMsg, say } from '../shared/agentText'
+
+const T = {
+  card: agentMsg({ id: 'notice.decision.card', text: '{card} has {count} new {n, plural, one {decision} other {decisions}}', note: '#357, #401: a card in a line about new decisions (a reply\'s flag, a decision wake), joined by ", ". card: its key ("HI-12"); count and n: how many.' }),
+  flag: agentMsg({ id: 'notice.decision.flag', text: '{cards} since you last read {n, plural, one {it} other {them}}: read {n, plural, one {the card} other {each card}} (cw_read_task) at your next checkpoint.', note: '#357: the flag after "[CW] " in a cw_ tool\'s reply, when decisions were recorded or changed on the agent\'s cards since it last read them. cards: each card\'s decisions (notice.decision.card); n: how many cards.' })
+}
+
+/** "HI-12 has 2 new decisions": a card in a line about new decisions (here and decisionWakes.ts). */
+export const cardDecisions = (n: number, count: number): string => say(T.card, { card: cardRef(n), count: String(count), n: count })
 
 /**
- * The "new decision" flag (#357): a hive tool's reply to an agent working on a card (in Doing, its agent), asking the
+ * The "new decision" flag (#357): a Combwork tool's reply to an agent working on a card (in Doing, its agent), asking the
  * user about one (blocked, its agent) or reviewing one says when a decision was recorded or changed on it since the agent last read the card in full, or since its work
  * (or review) began. Only a flag: the skills say when to act on it (at the next checkpoint). Reads are kept in memory;
  * after a restart the start of the work is the baseline.
@@ -18,7 +28,7 @@ import { cardRef } from '../shared/projectKeys'
 const reads = new Map<string, Map<number, number>>()
 const keyOf = (agent: { projectPath: string; agentId: string }): string => `${agent.projectPath.toLowerCase()}#${agent.agentId}`
 
-/** The agent read the card in full (hive_read_task): what it saw isn't new any more. */
+/** The agent read the card in full (cw_read_task): what it saw isn't new any more. */
 export function noteCardRead(agent: { projectPath: string; agentId: string }, n: number, at = Date.now()): void {
   const key = keyOf(agent)
   const m = reads.get(key) ?? new Map<number, number>()
@@ -41,7 +51,7 @@ let listening = false
 function board(ws: WorkspaceService): Promise<{ cards: TaskCard[]; generations: Map<number, number> }> {
   if (!listening) {
     listening = true
-    onHiveEvent((e) => {
+    onCombworkEvent((e) => {
       if (e.type !== 'tasks-changed') return
       changes++
       boards.delete(e.workspacePath.toLowerCase())
@@ -65,10 +75,10 @@ function board(ws: WorkspaceService): Promise<{ cards: TaskCard[]; generations: 
 }
 
 /** A review verdict this agent gave on the card (its name on the board), the latest: when it last finished reviewing it. */
-const lastVerdict = (c: TaskCard, self: string): number => Date.parse(c.history.findLast((h) => h.by === self && /^Review (passed|failed)$/.test(h.what))?.at ?? '') || 0
+const lastVerdict = (c: TaskCard, self: string): number => Date.parse(c.history.findLast((h) => h.by === self && historyWholeVerdict(h))?.at ?? '') || 0
 
 /** When the card was last blocked (ms), or 0. */
-const blockedAt = (c: TaskCard): number => Date.parse(c.history.findLast((h) => h.whatText?.id === HISTORY.blocked.id || h.what.startsWith('Blocked: '))?.at ?? '') || 0
+const blockedAt = (c: TaskCard): number => Date.parse(c.history.findLast((h) => historyBlocked(h))?.at ?? '') || 0
 
 /**
  * Where an agent's view of a card's decisions starts (ms), or null when the card isn't one of its: a card it works on (in
@@ -130,8 +140,8 @@ export const lastCardRead = (agent: { projectPath: string; agentId: string }, n:
 /** The line for a reply, or null when nothing is new. */
 export function noticeText(cards: Map<number, number>): string | null {
   if (!cards.size) return null
-  const parts = [...cards].map(([n, k]) => `${cardRef(n)} has ${k} new decision${k === 1 ? '' : 's'}`)
-  return `[Hive] ${parts.join(', ')} since you last read ${parts.length === 1 ? 'it' : 'them'}: read ${parts.length === 1 ? 'the card' : 'each card'} (hive_read_task) at your next checkpoint.`
+  const parts = [...cards].map(([n, k]) => cardDecisions(n, k))
+  return NOTICE_PREFIX + say(T.flag, { cards: parts.join(', '), n: parts.length })
 }
 
 /** The flag for an agent's reply, or null (newDecisions as a line). */

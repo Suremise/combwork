@@ -1,9 +1,9 @@
-// The e2e harness ends the test copies of Hive it started (HI-1453: one outlived its suite by 12 h, its runner gone, and
+// The e2e harness ends the test copies of Combwork it started (HI-1453: one outlived its suite by 12 h, its runner gone, and
 // held its lane's port, so no later runner took that lane). It ends only what it recorded starting, as the process it
 // recorded (pid and start time); what only looks like a copy is listed, never ended. Real test copies of the dev build,
 // quiet, in throwaway profiles; nothing ended by name, nothing outside this suite's folder:
 // 1. A suite killed mid-run: Playwright starts Electron through `cmd.exe /c`, the pid it gives is that shell's, and
-//    Hive's main process, the shell's child, isn't in the suite's job: the shell ends with the killed suite while the
+//    Combwork's main process, the shell's child, isn't in the suite's job: the shell ends with the killed suite while the
 //    copy runs on (how one ran 12 h). lib.cjs records the main process; what the runner does once a suite has ended
 //    (folderProcesses.cjs endCopies on its folder) ends it, by that record (its profile is outside the suite's folder).
 // 2. The next run's start (leftCopies.mjs endLeftCopies, as run.mjs calls it before taking a lane), in a pool of lane
@@ -31,7 +31,7 @@ const running = (id) => lib.stillSame([id]).length === 1
 const gone = (list) => lib.until(() => list.every((id) => !running(id)), HUNG_MS, 250)
 
 /**
- * A suite (a node of its own, with its runner's environment: `work` its folder) that starts a test copy of Hive through
+ * A suite (a node of its own, with its runner's environment: `work` its folder) that starts a test copy of Combwork through
  * lib.launch, waits for lib.cjs's record of it, and is then killed mid-run (its node only, as a runner's TaskStop or a
  * crash ends it). { shell: the identity of Playwright's process (the shell), copy: the main process's identity, out },
  * both taken while the suite still runs, so its handle to the shell keeps that pid the shell's.
@@ -42,7 +42,7 @@ async function killedSuite(work, profile) {
 ;(async () => {
   const h = await lib.launch({ userData: ${JSON.stringify(profile)} })
   const main = await h.app.evaluate(() => process.pid)
-  const file = path.join(lib.WORK, '.hive-copies.jsonl')
+  const file = path.join(lib.WORK, '.cw-copies.jsonl')
   await lib.until(() => fs.existsSync(file) && fs.readFileSync(file, 'utf8').includes('"pid":' + main), 60000, 250)
   console.log('COPY ' + h.app.process().pid + ' ' + main)
   setInterval(() => {}, 1000)
@@ -63,14 +63,14 @@ async function killedSuite(work, profile) {
   return { shell, copy, out }
 }
 
-/** A test copy of Hive started outside Playwright, detached, its identity once it is up (it has written its log). */
+/** A test copy of Combwork started outside Playwright, detached, its identity once it is up (it has written its log). */
 async function detachedCopy(profile) {
   fs.mkdirSync(profile, { recursive: true })
-  const child = spawn(lib.ELECTRON, [lib.ROOT, `--hive-test-profile=${profile}`], { cwd: lib.ROOT, env: lib.hiveEnv({ HIVE_USER_DATA: profile }), detached: true, stdio: 'ignore', windowsHide: true })
+  const child = spawn(lib.ELECTRON, [lib.ROOT, `--combwork-test-profile=${profile}`], { cwd: lib.ROOT, env: lib.combworkEnv({ CW_USER_DATA: profile }), detached: true, stdio: 'ignore', windowsHide: true })
   child.unref()
   const id = lib.identify([child.pid])[0] ?? null
   if (id) ids.push(id)
-  await lib.until(() => fs.existsSync(path.join(profile, 'logs', 'hive.log')), HUNG_MS, 250)
+  await lib.until(() => fs.existsSync(path.join(profile, 'logs', 'combwork.log')), HUNG_MS, 250)
   return id
 }
 
@@ -79,9 +79,9 @@ async function detachedCopy(profile) {
     // --- 1. A suite killed mid-run, then the runner's step once it has ended.
     const suite = path.join(lib.WORK, 'killed-suite')
     const one = await killedSuite(suite, path.join(lib.WORK, 'killed-suite-profile'))
-    check('a suite starts its test copy of Hive', !!one.copy, one.out.slice(-2000))
-    check("…Playwright's pid is a shell's, Hive's main process its child", !!one.copy && !!one.shell && one.shell.pid !== one.copy.pid)
-    check("…lib.cjs records the main process, by pid and start time, in the suite's folder", !!one.copy && fs.readFileSync(path.join(suite, '.hive-copies.jsonl'), 'utf8').includes(`"started":${one.copy.started}`))
+    check('a suite starts its test copy of Combwork', !!one.copy, one.out.slice(-2000))
+    check("…Playwright's pid is a shell's, Combwork's main process its child", !!one.copy && !!one.shell && one.shell.pid !== one.copy.pid)
+    check("…lib.cjs records the main process, by pid and start time, in the suite's folder", !!one.copy && fs.readFileSync(path.join(suite, '.cw-copies.jsonl'), 'utf8').includes(`"started":${one.copy.started}`))
     // The shell ends with the suite's job, after the suite's node: waited for, by its identity.
     const shellGone = !!one.shell && !!(await gone([one.shell]))
     check('…the copy outlives its killed suite', !!one.copy && shellGone && running(one.copy), JSON.stringify({ ...one, shellGone }))

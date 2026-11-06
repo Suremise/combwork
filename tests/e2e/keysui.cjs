@@ -1,5 +1,6 @@
 // Project keys in the window (#1221): New Project… suggests a key from the name as it is typed and checks the one typed
-// (its form, another project's key, one beginning another's), each with its reason, and creates the project with it;
+// (its form, another project's key, one beginning another's), each with its reason, and creates the project with it; a
+// key typed before the window has the projects' keys is checked once it has them (HI-2653: the reads held);
 // Project Settings changes it, saying the old one stays, and lists the old key after; the board's search and the command
 // palette find cards by key (any case), by a project's key alone (AM-) and by the old key; Depends on takes a key. Both
 // themes' screenshots of the dialog and the settings row. Dev build, throwaway profile and workspace; no CLI is started.
@@ -20,24 +21,36 @@ const check = (name, ok, extra = '') => {
 
 ;(async () => {
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
-  lib.gitProject(path.join(ws, 'hive'))
+  lib.gitProject(path.join(ws, 'hilltop'))
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1400, height: 900 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
+    // The window's reads of the projects' keys are held until released (HI-2653): under a full set's load the New Project
+    // dialog opened before the board's first read had them, and checked the key typed against none.
+    await app.evaluate(({ ipcMain }) => {
+      const handlers = ipcMain._invokeHandlers
+      const h = handlers.get('project:keys')
+      globalThis.__keysHold = { on: true, held: [] }
+      handlers.set('project:keys', (...x) => (globalThis.__keysHold.on ? new Promise((r) => globalThis.__keysHold.held.push(() => r(h(...x)))) : h(...x)))
+    })
+    const heldKeyReads = () => app.evaluate(() => globalThis.__keysHold.held.length)
+    const releaseKeys = () => app.evaluate(() => {
+      globalThis.__keysHold.on = false
+      for (const r of globalThis.__keysHold.held.splice(0)) r()
+    })
     await lib.openWorkspace(inv, page, ws)
     const keyOf = async (name) => (await inv('project:keys')).find((k) => path.basename(k.projectPath) === name) ?? null
-    check('the workspace’s project has its key (hive: HI)', !!(await lib.until(async () => (await keyOf('hive'))?.key === 'HI', HUNG_MS)), JSON.stringify(await inv('project:keys')))
     const themes = async (name, target) => {
       for (const theme of ['dark', 'light']) {
         await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
@@ -67,6 +80,12 @@ const check = (name, ok, extra = '') => {
     const textOf = (loc) => loc.innerText({ timeout: 500 }).catch(() => '')
     await name.fill('web-app')
     check('the key follows the name typed: a suggestion, saying how its cards will be named', !!(await lib.until(async () => (await key.inputValue()) === 'WE' && /WE-1, WE-2/.test(await textOf(hint)), HUNG_MS)), await boxes())
+    // A key typed while the window hasn't the keys yet is checked once it has them, with nothing typed again (HI-2653).
+    await key.fill('hi')
+    const heldBefore = !!(await lib.until(async () => (await heldKeyReads()) > 0, HUNG_MS))
+    await releaseKeys()
+    check('the workspace’s project has its key (hilltop: HI)', !!(await lib.until(async () => (await keyOf('hilltop'))?.key === 'HI', HUNG_MS)), JSON.stringify(await inv('project:keys')))
+    check('a key typed before the projects’ keys were read is checked once they are: another project’s key', heldBefore && !!(await lib.until(async () => /HI is another project’s key/.test(await textOf(error)) && (await key.getAttribute('aria-invalid')) === 'true', HUNG_MS)), `held reads seen: ${heldBefore}, ${await boxes()}`)
     for (const [typed, why, what] of [
       ['hi', /HI is another project’s key/, "another project's key"],
       ['HIV', /HIV and HI, another project’s key, begin alike/, 'one beginning another'],
@@ -89,11 +108,14 @@ const check = (name, ok, extra = '') => {
     await themes('newproject', dialog)
     await dialog.getByRole('button', { name: 'Create', exact: true }).click()
     check('Create makes the project with the key chosen', !!(await lib.until(async () => (await keyOf('web-app'))?.key === 'WB', HUNG_MS)), JSON.stringify(await keyOf('web-app')))
+    // The window's Create is done once it says so: it then shows the new project's Version Control, after main has it
+    // (HI-2653: under load that came after the Task Board click below, and the board was never shown).
+    check('…and the window says it is created', !!(await lib.until(async () => (await page.locator('.toast', { hasText: 'Project "web-app" created' }).count()) === 1, HUNG_MS)))
 
     // --- Cards by key on the board.
     const c1 = await inv('tasks:create', { title: 'Login form', project: 'web-app' })
     const c2 = await inv('tasks:create', { title: 'Sign-up form', project: 'web-app' })
-    const h1 = await inv('tasks:create', { title: 'Hive card', project: 'hive' })
+    const h1 = await inv('tasks:create', { title: 'Hilltop card', project: 'hilltop' })
     check('cards are named by their project’s key', c1.key === 'WB-1' && c2.key === 'WB-2' && h1.key === 'HI-1', JSON.stringify([c1.key, c2.key, h1.key]))
     await page.getByRole('button', { name: 'Task Board' }).click()
     const tile = (n) => page.locator(`.task-card[data-task="${n}"]`)
@@ -168,9 +190,9 @@ const check = (name, ok, extra = '') => {
 
     // --- A card moved to another project keeps its names in the one it left (round 1, finding 1): WBA-1 and WB-1 (its
     // project's old key) still find it in the search, the palette and Depends on, and link in a comment.
-    await inv('tasks:update', c1.number, { project: 'hive' })
+    await inv('tasks:update', c1.number, { project: 'hilltop' })
     const movedKey = await lib.until(async () => { const k = (await inv('tasks:list')).find((c) => c.number === c1.number)?.key; return k && k.startsWith('HI-') && k }, HUNG_MS)
-    check('a card moved to hive takes its next number there', /^HI-\d+$/.test(movedKey ?? ''), movedKey)
+    check('a card moved to hilltop takes its next number there', /^HI-\d+$/.test(movedKey ?? ''), movedKey)
     await page.getByRole('button', { name: 'Task Board' }).click()
     check('the board’s search finds a moved card by its name in the project it left', await finds('wba-1', [c1.number]), JSON.stringify(await shown()))
     check('…and by its project’s old key too', await finds('WB-1', [c1.number]), JSON.stringify(await shown()))
@@ -209,7 +231,7 @@ const check = (name, ok, extra = '') => {
   // fitting their place. The texts are read from the locales, so a changed translation needs no change here.
   for (const lang of ['de', 'pl']) {
     const T = (area, id, values = {}) => Object.entries(values).reduce((t, [k, v]) => t.replace(`{${k}}`, v), JSON.parse(fs.readFileSync(path.join(lib.ROOT, 'locales', lang, `${area}.json`), 'utf8'))[id])
-    const appL = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_TEST_TIPS: 'off', HIVE_LANG: lang }) })
+    const appL = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.combworkEnv({ CW_USER_DATA: userData, CW_TEST_TIPS: 'off', CW_LANG: lang }) })
     try {
       const page = await appL.firstWindow()
       await lib.fitWindow(appL, page, { width: 1400, height: 900 })

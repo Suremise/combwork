@@ -42,7 +42,7 @@ vi.mock('fs', async (importOriginal) => {
 
 let dir = ''
 beforeEach(async () => {
-  dir = tempDir('hive-synccopy-')
+  dir = tempDir('cw-synccopy-')
 })
 afterEach(async () => {
   await rm(dir, { recursive: true, force: true })
@@ -95,7 +95,7 @@ describe('syncCopy', () => {
     expect((await readFile(dest)).equals(await readFile(src))).toBe(true)
   })
 
-  // A CLI appends to its transcript while Hive copies it whole (its first backup): no append may fail. Windows'
+  // A CLI appends to its transcript while Combwork copies it whole (its first backup): no append may fail. Windows'
   // CopyFile doesn't share writes, and a fake Claude Code died of the EBUSY (#1041).
   it("doesn't stop another process appending to the source during a whole copy", async () => {
     const src = join(dir, 'w.jsonl')

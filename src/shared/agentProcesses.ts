@@ -8,43 +8,43 @@ export interface AgentProcess {
   name: string
   /** What it runs, short: the executable without .exe and its arguments, paths cut to their last part (node serve.js --port 8080). */
   label: string
-  /** When it started (a Windows FILETIME, as text): with its pid, which process it is, kept across Hive's restart (#614). */
+  /** When it started (a Windows FILETIME, as text): with its pid, which process it is, kept across Combwork's restart (#614). */
   created?: string
   /** The process that started it, by id (#1008): a test run's tree is told as one. */
   parent?: number
-  /** A hive-progress run's title, on the hive-progress process itself (#1008): what the run is, as the agent named it. */
+  /** A cw-progress run's title, on the cw-progress process itself (#1008): what the run is, as the agent named it. */
   run?: string
 }
 
 /**
- * The title of a hive-progress run (#1008), from its process's command line (Hive's executable running hive-progress.js
+ * The title of a cw-progress run (#1008), from its process's command line (Combwork's executable running cw-progress.js
  * --title "<title>" -- <command>): its --title, else the command it runs. Undefined for any other process.
  */
 export function progressRunTitle(commandLine: string): string | undefined {
   const args = splitCommandLine(commandLine)
-  const at = args.findIndex((a) => /(^|[\\/])hive-progress\.js$/i.test(a))
+  const at = args.findIndex((a) => /(^|[\\/])cw-progress\.js$/i.test(a))
   if (at < 0) return undefined
   const rest = args.slice(at + 1)
   const dash = rest.indexOf('--')
   const flag = rest.indexOf('--title')
   const title = flag >= 0 && (dash < 0 || flag < dash) ? rest[flag + 1]?.trim() : ''
   const command = (dash >= 0 ? rest.slice(dash + 1) : rest).map((a) => lastPart(a)).join(' ').trim()
-  const named = (title || command || 'hive-progress').replace(/\s+/g, ' ')
+  const named = (title || command || 'cw-progress').replace(/\s+/g, ' ')
   return named.length > MAX_LABEL ? `${named.slice(0, MAX_LABEL - 1)}…` : named
 }
 
-/** A hive-progress run among processes (#1008): its own process (root, the one with `run`) and all it started that are listed. */
+/** A cw-progress run among processes (#1008): its own process (root, the one with `run`) and all it started that are listed. */
 export interface ProgressRunGroup {
   title: string
   root: AgentProcess
-  /** What its whole tree is under: the shell that ran it through the hive-progress command (cmd /c "hive-progress …"), else root. */
+  /** What its whole tree is under: the shell that ran it through the cw-progress command (cmd /c "cw-progress …"), else root. */
   top: AgentProcess
   processes: AgentProcess[]
 }
 
 /**
- * The processes in their hive-progress runs (#1008): each run's process with everything below it in the list, and the
- * shell above it that ran the hive-progress command, by parent, each started after its parent (so a parent id a later
+ * The processes in their cw-progress runs (#1008): each run's process with everything below it in the list, and the
+ * shell above it that ran the cw-progress command, by parent, each started after its parent (so a parent id a later
  * process took is never followed); the rest apart.
  */
 export function groupProgressRuns(processes: readonly AgentProcess[]): { runs: ProgressRunGroup[]; rest: AgentProcess[] } {
@@ -54,7 +54,7 @@ export function groupProgressRuns(processes: readonly AgentProcess[]): { runs: P
     const up = p.parent ? byPid.get(p.parent) : undefined
     return up && up !== p && started(up) <= started(p) ? up : undefined
   }
-  /** The hive-progress process p is under (itself included), if any. */
+  /** The cw-progress process p is under (itself included), if any. */
   const runOf = (p: AgentProcess): AgentProcess | undefined => {
     const seen = new Set<number>()
     for (let at: AgentProcess | undefined = p; at && !seen.has(at.pid); at = parentOf(at)) {
@@ -63,12 +63,12 @@ export function groupProgressRuns(processes: readonly AgentProcess[]): { runs: P
     }
     return undefined
   }
-  // The shells that ran a run's process through the hive-progress command: the run's too, the topmost its tree's top.
+  // The shells that ran a run's process through the cw-progress command: the run's too, the topmost its tree's top.
   const shellOf = new Map<number, AgentProcess>()
   const tops = new Map<number, AgentProcess>()
   for (const r of processes.filter((p) => p.run)) {
     let top = r
-    for (let s = parentOf(r); s && !s.run && /\bhive-progress\b/i.test(s.label) && !shellOf.has(s.pid); s = parentOf(s)) {
+    for (let s = parentOf(r); s && !s.run && /\bcw-progress\b/i.test(s.label) && !shellOf.has(s.pid); s = parentOf(s)) {
       shellOf.set(s.pid, r)
       top = s
     }
@@ -90,7 +90,7 @@ export function groupProgressRuns(processes: readonly AgentProcess[]): { runs: P
 }
 
 /**
- * Of the processes still running, those in hive-progress runs and the rest (#1008), the runs found among all that were
+ * Of the processes still running, those in cw-progress runs and the rest (#1008), the runs found among all that were
  * kept (running holds the same processes, as id and start time): a run whose own process has ended, with what it started
  * still running, is still that run. Each run lists only its processes still running; runs with none are left out.
  */
@@ -170,7 +170,7 @@ export const processCount = (n: number, tr?: Tr): string =>
 /** A list joined as a language joins it (fmt.list's shape): passed in with tr, as this module can't load the i18n runtime. */
 export type ListWords = (items: readonly string[], type?: 'conjunction' | 'unit') => string
 
-/** Lists in Hive's English, as the Agent API and agents read them: "A, B and C". */
+/** Lists in Combwork's English, as the Agent API and agents read them: "A, B and C". */
 const englishList: ListWords = (items, type = 'conjunction') => new Intl.ListFormat('en-GB', { type, style: type === 'unit' ? 'short' : 'long' }).format(items)
 
 /**
@@ -185,6 +185,6 @@ export function leftoversSummary(l: Pick<AgentLeftovers, 'processes' | 'more'>, 
   const labels = shown.map(([label, n]) => (n < 2 ? label : tr ? tr(msg({ id: 'session.leftovers.times', defaultMessage: '{n, number} × {label}', description: 'A process an agent left running, in a list of them, when several run the same command: how many, and the command ({label}: "tail -f capture.log").' }), { n, label }) : `${n} × ${label}`)) // i18n-ignore: English for agents and the Agent API (the window passes tr)
   const list = words?.list ?? englishList
   if (extra <= 0) return list(labels, 'unit')
-  const more = tr ? tr(msg({ id: 'session.leftovers.more', defaultMessage: '{n, plural, one {# more process} other {# more processes}}', description: 'The last item of a list of the processes an agent left running, after the first few: how many more there are. Hive joins it to the list ("node serve.js, 2 × tail -f capture.log and 3 more processes").' }), { n: extra }) : `${extra} more ${extra === 1 ? 'process' : 'processes'}` // i18n-ignore: English for agents and the Agent API (the window passes tr)
+  const more = tr ? tr(msg({ id: 'session.leftovers.more', defaultMessage: '{n, plural, one {# more process} other {# more processes}}', description: 'The last item of a list of the processes an agent left running, after the first few: how many more there are. Combwork joins it to the list ("node serve.js, 2 × tail -f capture.log and 3 more processes").' }), { n: extra }) : `${extra} more ${extra === 1 ? 'process' : 'processes'}` // i18n-ignore: English for agents and the Agent API (the window passes tr)
   return list([...labels, more])
 }

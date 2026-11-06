@@ -8,7 +8,7 @@ import { CODEX_DESCRIPTOR } from './codex'
 import { COPILOT_DESCRIPTOR } from './copilot'
 
 /**
- * Providers: the coding-agent CLIs Hive can run (Claude Code, Codex, GitHub Copilot). Everything the UI and the shared
+ * Providers: the coding-agent CLIs Combwork can run (Claude Code, Codex, GitHub Copilot). Everything the UI and the shared
  * settings logic need to know about one lives in its descriptor, so a new provider needs a descriptor
  * here and an adapter in src/main/providers — nothing else checks which provider an agent uses.
  */
@@ -47,11 +47,11 @@ export interface ModeOption {
   danger?: boolean
   /** The CLI's own automatic reviewer, not the user, answers its permission requests (Codex's Approve for me). */
   reviewed?: boolean
-  /** Where the CLI's own screen names the mode differently, why: shown with Hive's mode badge while a session runs in it. */
+  /** Where the CLI's own screen names the mode differently, why: shown with Combwork's mode badge while a session runs in it. */
   cliNote?: string
   /** A shorter name for the mode badge, where the label is long ("CLI's own"). */
   short?: string
-  /** The CLI's own setting (cliOwnMode.ts): Hive passes no mode, switches none live, and the Assistant isn't offered it. */
+  /** The CLI's own setting (cliOwnMode.ts): Combwork passes no mode, switches none live, and the Assistant isn't offered it. */
   cliOwn?: boolean
 }
 
@@ -73,7 +73,7 @@ export interface ModelGroup {
 }
 
 export interface ProviderCapabilities {
-  /** Hive chooses the session id at launch (Claude Code); otherwise the provider reports it once started. */
+  /** Combwork chooses the session id at launch (Claude Code); otherwise the provider reports it once started. */
   fixedSessionId: boolean
   /** How a running session changes permission mode: cycling a key (Claude's Shift+Tab), a menu, or not at all. */
   liveModeSwitch: 'cycle' | 'menu' | 'none'
@@ -92,7 +92,7 @@ export interface ProviderCapabilities {
   contextLimit: boolean
   /**
    * How far below the context window the CLI compacts by itself, in tokens (Claude Code: the output it keeps room for,
-   * 20K, and a 13K buffer: about 167K on a 200K window); null when Hive doesn't know.
+   * 20K, and a 13K buffer: about 167K on a 200K window); null when Combwork doesn't know.
    */
   autoCompactReserve: number | null
   /** A pasted image path is attached as an image. */
@@ -103,11 +103,11 @@ export interface ProviderCapabilities {
    * with its tools). Checked against the installed CLIs in test homes (fixtures in tests/fixtures/attachments).
    */
   attachments: AttachmentKind[]
-  /** Hooks can hand an edit to the CLI's own approval prompt (the "Ask me" file lock). Without it, Hive asks the user itself. */
+  /** Hooks can hand an edit to the CLI's own approval prompt (the "Ask me" file lock). Without it, Combwork asks the user itself. */
   lockAsk: boolean
   /**
    * The CLI can move a session into its own background service (Claude Code's agent view, opened with ← on an
-   * empty prompt), where Hive can no longer see or stop it. Hive turns that off unless allowBackgroundSessions.
+   * empty prompt), where Combwork can no longer see or stop it. Combwork turns that off unless allowBackgroundSessions.
    */
   backgroundSessions: boolean
   /**
@@ -118,7 +118,7 @@ export interface ProviderCapabilities {
   backgroundWakes: boolean
   /**
    * The CLI sends a hook as it starts, before any prompt (Claude Code's SessionStart; Codex's and Copilot's come with the
-   * first prompt): none within a while of its start means its hooks aren't reaching Hive (#1336).
+   * first prompt): none within a while of its start means its hooks aren't reaching Combwork (#1336).
    */
   startHook?: boolean
   /**
@@ -128,31 +128,37 @@ export interface ProviderCapabilities {
    */
   failureEndsTurn?: boolean
   /**
+   * The CLI's model aliases (HI-2523): words it takes in place of a model ID and resolves itself ("opus", Copilot's
+   * "auto"), compared without case or a "[…]" suffix. One its catalogue doesn't resolve leaves a launch's model unknown
+   * for dialects; any other word is a model ID of its own ("gemma"). The catalogue's own aliases count too.
+   */
+  modelAliases?: readonly string[]
+  /**
    * The CLI draws a full-screen interface that a resize while it starts can leave drawn at the wrong width, until the
-   * next resize (Copilot, #486): Hive gives it a size refresh, as resizing the window by hand would, once it has
-   * started (its first status), again once it is ready, and after Hive switches its mode live.
+   * next resize (Copilot, #486): Combwork gives it a size refresh, as resizing the window by hand would, once it has
+   * started (its first status), again once it is ready, and after Combwork switches its mode live.
    */
   startupSizeRefresh: boolean
   /**
-   * The CLI reads a bracketed paste as text however its input arrives (#597), so Hive's typed prompts go in as one
+   * The CLI reads a bracketed paste as text however its input arrives (#597), so Combwork's typed prompts go in as one
    * while its terminal has bracketed paste on. Typed in pieces, a prompt that reaches a busy Claude Code in one read
-   * with Hive's Ctrl+U or Enter is taken as a paste with those keys in it, and isn't sent by Enter or by Enter again.
+   * with Combwork's Ctrl+U or Enter is taken as a paste with those keys in it, and isn't sent by Enter or by Enter again.
    */
   bracketedPaste: boolean
   /**
-   * Hive presses Enter after a line it typed only once the CLI has drawn that line (#600), at most a few seconds. A
+   * Combwork presses Enter after a line it typed only once the CLI has drawn that line (#600), at most a few seconds. A
    * Codex busy for a moment reads the line and its Enter in one go, takes them as a paste burst and drops the Enter
    * (typed or bracketed alike: 0.163); Enter again sends it. Drawn, the line is in its prompt, and the Enter sends it.
    */
   enterOnceDrawn: boolean
   /**
    * Its input box's Ctrl+U deletes only the row the cursor is on of a line wrapped onto several, not the whole line
-   * (HI-1974: Claude Code 2.1.312; Codex and Copilot clear the line). Hive then presses it once for each row a prompt it
+   * (HI-1974: Claude Code 2.1.312; Codex and Copilot clear the line). Combwork then presses it once for each row a prompt it
    * stopped part-way took, or the rest stays in the input and goes with the next prompt. Absent: it clears the line.
    */
   ctrlUClearsRow?: boolean
   /**
-   * The keys its input box takes as a new line rather than a send (HI-1327), which Hive may press for a line break in a
+   * The keys its input box takes as a new line rather than a send (HI-1327), which Combwork may press for a line break in a
    * prompt it types when prompts go as typed: the one it presses is the adapter's `typedNewline()` (an Advanced choice).
    * Absent: a CLI whose prompts go in as a bracketed paste, or none known, and line breaks typed become spaces.
    */
@@ -163,11 +169,11 @@ export interface ProviderCapabilities {
    */
   extraDirs: boolean
   /**
-   * The CLI keeps its login in a home folder given at launch (HI-980: Claude Code's CLAUDE_CONFIG_DIR), so Hive can keep
+   * The CLI keeps its login in a home folder given at launch (HI-980: Claude Code's CLAUDE_CONFIG_DIR), so Combwork can keep
    * an account per folder: `homeEnv` names the variable, `shared` the home's folders each account's folder links to by a
    * junction (the adapter's accountSharedTarget says where), `userHome` the CLI's own home in the user's folder
    * (`.claude`), which a test home is never (the test seam), and `orgs` whether its sign-in names an organisation, which
-   * an identity then needs to be taken on (false: its email alone, HI-1757). Absent: the CLI has no accounts in Hive.
+   * an identity then needs to be taken on (false: its email alone, HI-1757). Absent: the CLI has no accounts in Combwork.
    */
   /**
    * `setUp` (HI-1870): what the CLI's one-time first-run setup on a connection is, said above its Set Up terminal and on
@@ -180,8 +186,10 @@ export interface ProviderCapabilities {
     orgs: boolean
     setUp: Msg
     /**
-     * HI-1871: the CLI's trust of a folder covers the folders inside it (measured: Claude Code 2.1.311), so Set Up asks
-     * it once, in the workspace's folder, for every project there. Absent: once per project (Codex: its main root).
+     * HI-1871: the CLI's trust of a folder covers the folders inside it that aren't Git repositories (HI-2520, measured:
+     * Claude Code 2.1.316–2.1.318; a repository asks unless its own root is trusted), so Set Up asks it once, in the
+     * workspace's folder, for every such project there, then at each Git root. Absent: once per project (Codex: its
+     * main root).
      */
     trustInherits?: true
     server?: ServerCaps
@@ -192,7 +200,7 @@ export interface ProviderCapabilities {
  * How the CLI reaches a server of the user's (HI-1772: a server connection), when it can: the variables it reads, set
  * for that launch only. `keylessToken` is a value that isn't secret, set as the key for a local server with none (the
  * CLI otherwise asks for its login: the probe on HI-1772); `presets` fill Add Connection's form. Absent: the CLI has no
- * server connections in Hive.
+ * server connections in Combwork.
  */
 export interface ServerCaps {
   baseUrlEnv: string
@@ -279,24 +287,24 @@ export interface ProviderDescriptor {
   /** A line that makes instructionsFile include the shared AGENTS.md, for CLIs that don't read AGENTS.md themselves. */
   instructionsImport?: string
   /**
-   * The Hive Assistant's default mode: the one where the CLI approves safe actions itself (as agents default to),
+   * The Combwork Assistant's default mode: the one where the CLI approves safe actions itself (as agents default to),
    * so it rarely asks. Not a plan mode, which blocks the MCP tools the Assistant works with.
    */
   assistantMode: PermissionMode
   /**
    * A warning for a mode the CLI may not run with a model (it then runs another), or null. A warning, not a
-   * rule: which models support a mode is the CLI's to decide and can change, and Hive shows the mode it runs in.
+   * rule: which models support a mode is the CLI's to decide and can change, and Combwork shows the mode it runs in.
    * `known` is what the CLI reported about the model (models.ts modelCaps), which replaces any guess.
    */
   modeCaveat?: (mode: PermissionMode, model: string, known?: ModeCaveatFacts, tr?: Tr) => string | null
   /** Provider Setup: how the installer works and which accounts can sign in. */
   installNote: string
-  /** Provider Setup, when only an editor extension's copy was found: why Hive doesn't use it. */
+  /** Provider Setup, when only an editor extension's copy was found: why Combwork doesn't use it. */
   extensionNote: string
   /** How to sign in again once its sign-in has expired, while agents wait (the needs sign-in status, #309). */
   signInHelp: string
   /**
-   * What to do about a safeguard stop or the model fallback after one (#606), shown with the note; null when Hive can't
+   * What to do about a safeguard stop or the model fallback after one (#606), shown with the note; null when Combwork can't
    * detect them for this CLI (its transcript has no such record, shared/safeguards.ts): "not detected".
    */
   safeguardHelp: string | null
@@ -309,14 +317,14 @@ export interface ProviderDescriptor {
 
 export const DEFAULT_PROVIDER: ProviderId = CLAUDE_CODE
 
-/** Every provider Hive knows, in display order. */
+/** Every provider Combwork knows, in display order. */
 export const PROVIDERS: ProviderDescriptor[] = [CLAUDE_DESCRIPTOR, CODEX_DESCRIPTOR, COPILOT_DESCRIPTOR]
 
 const UNKNOWN: ProviderDescriptor = {
   ...CLAUDE_DESCRIPTOR,
   id: 'unknown',
-  name: 'Unknown provider', // i18n-ignore: a stand-in name for a provider id Hive doesn't know (agents read names as they are)
-  assistant: 'Agent', // i18n-ignore: a stand-in name for a provider id Hive doesn't know
+  name: 'Unknown provider', // i18n-ignore: a stand-in name for a provider id Combwork doesn't know (agents read names as they are)
+  assistant: 'Agent', // i18n-ignore: a stand-in name for a provider id Combwork doesn't know
   company: '',
   cliName: '',
   icon: 'question',
@@ -328,17 +336,17 @@ const UNKNOWN: ProviderDescriptor = {
   extensionNote: ''
 }
 
-/** Where a provider's CLI compacts by itself on a context window, in tokens; null when Hive doesn't know (no window, or no rule). */
+/** Where a provider's CLI compacts by itself on a context window, in tokens; null when Combwork doesn't know (no window, or no rule). */
 export function autoCompactAt(id: ProviderId | null | undefined, window: number | null | undefined): number | null {
   const reserve = PROVIDERS.find((p) => p.id === id)?.capabilities.autoCompactReserve ?? null
   return reserve !== null && window && window > reserve ? window - reserve : null
 }
 
 /**
- * Where the CLI compacts by itself, in words (#242). The figure is Hive's estimate from the provider's rule (the window
+ * Where the CLI compacts by itself, in words (#242). The figure is Combwork's estimate from the provider's rule (the window
  * less what it keeps free), said to be the default unless the launch's settings said otherwise (`auto`, read at launch:
  * a window set somewhere, which also caps it, a percentage bringing it earlier, or auto-compaction off). Without `auto`
- * (a session not running now), the settings weren't read: it says they can change it. Null when Hive has no rule.
+ * (a session not running now), the settings weren't read: it says they can change it. Null when Combwork has no rule.
  */
 export function autoCompactLine(provider: ProviderId, contextWindow: number | null, auto?: AutoCompactSetting | null, tr?: Tr): string | null {
   const name = providerDescriptor(provider).name
@@ -355,7 +363,7 @@ export function autoCompactLine(provider: ProviderId, contextWindow: number | nu
     if (auto) return tr(msg({ id: 'agents.provider.compactDefaultFor', defaultMessage: '{provider} compacts by itself at about {at, number}, its default for this window{why, select, none {} other { ({why})}}{estimate, select, none {} other { ({estimate})}}', description: "A context tooltip: where the CLI ({provider}) compacts its conversation by itself, in tokens ({at}), its default for the model's window ({why}: what brings it earlier, in a settings file's words, none: leave that branch empty; {estimate}: why the figure is an estimate, none: leave it empty)." }), values)
     return tr(msg({ id: 'agents.provider.compactDefault', defaultMessage: '{provider} compacts by itself at about {at, number} by default (its settings can change this)', description: "A context tooltip for a session that isn't running: where the CLI ({provider}) compacts its conversation by itself by default, in tokens ({at})." }), values)
   }
-  // A settings file Hive couldn't be sure of makes any answer an estimate (#333); a default always is one (#273).
+  // A settings file Combwork couldn't be sure of makes any answer an estimate (#333); a default always is one (#273).
   const est = auto?.estimate ? ` (${auto.estimate})` : ''
   if (auto?.window === 'off') return `${name} doesn't compact by itself: auto-compaction is off (${auto.source})${est}` // i18n-ignore: English without tr (its callers in other areas pass tr once converted)
   if (at === null || !window) return null
@@ -389,11 +397,12 @@ export function contextLines(u: { provider: ProviderId; contextTokens: number; c
   return lines
 }
 
-/** A message of a provider's own text (`text`) by its id, or null: a comment Hive wrote on a card names one (#866). */
+/** A message of a provider's own text (`text`) by its id, or null: a comment Combwork wrote on a card names one (#866). */
+// agent-text: CLAUDE_DESCRIPTOR.text.safeguardHelp, CODEX_DESCRIPTOR.text.safeguardHelp (a CLI's sentences stored by id in a card comment, said when read)
 export const providerMessage = (id: string): Msg | null => PROVIDERS.flatMap((p) => Object.values(p.text ?? {})).find((m): m is Msg => !!m && m.id === id) ?? null
 
 export function providerDescriptor(id: ProviderId | null | undefined): ProviderDescriptor {
-  return PROVIDERS.find((p) => p.id === (id || DEFAULT_PROVIDER)) ?? { ...UNKNOWN, id: id ?? 'unknown', name: id ?? 'Unknown provider' } // i18n-ignore: a stand-in name for a provider id Hive doesn't know
+  return PROVIDERS.find((p) => p.id === (id || DEFAULT_PROVIDER)) ?? { ...UNKNOWN, id: id ?? 'unknown', name: id ?? 'Unknown provider' } // i18n-ignore: a stand-in name for a provider id Combwork doesn't know
 }
 
 /**
@@ -449,13 +458,13 @@ export function isProviderEnabled(settings: Pick<AppSettings, 'providers'> | nul
   return isKnownProvider(id) && !!settings?.providers?.[id]?.enabled
 }
 
-/** The providers turned on, in Hive's order (PROVIDERS': HI-2139, no order of the user's). */
+/** The providers turned on, in Combwork's order (PROVIDERS': HI-2139, no order of the user's). */
 export function enabledProviders(settings: Pick<AppSettings, 'providers'> | null | undefined): ProviderDescriptor[] {
   return PROVIDERS.filter((p) => isProviderEnabled(settings, p.id))
 }
 
 /**
- * A 0.9 default provider left to Hive (#474), as `settings.defaultProvider` keeps it: only the migration reads that
+ * A 0.9 default provider left to the app (#474), as `settings.defaultProvider` keeps it: only the migration reads that
  * setting (decision A, HI-2132). Automatic's pick lives on as autoProvider, the last resort for an agent with no CLI.
  */
 export const AUTO_PROVIDER = 'auto'
@@ -467,7 +476,7 @@ export function isDefaultProviderValue(v: unknown): v is ProviderId {
 
 /**
  * Whether a provider's CLI was found, as this process last heard: main's providerService and the window's store each
- * set it when they start (setInstalledCheck), so every caller resolves Automatic the same way. null while Hive is still
+ * set it when they start (setInstalledCheck), so every caller resolves Automatic the same way. null while Combwork is still
  * looking for it (at start, until its detection has answered).
  */
 let installedCheck: (id: ProviderId) => boolean | null = () => null
@@ -480,11 +489,11 @@ export function setInstalledCheck(fn: (id: ProviderId) => boolean | null): void 
 export const installedAsHeard = (id: ProviderId): boolean | null => installedCheck(id)
 
 /**
- * Automatic's provider, in Hive's order (HI-2139): the first turned on and installed, else the first turned on, else
+ * Automatic's provider, in Combwork's order (HI-2139): the first turned on and installed, else the first turned on, else
  * Claude Code. Never from
  * partial detection (#506): until every turned-on provider has answered (autoProviderPending), this is only a guess for
  * display, the first turned-on provider not known to be missing (never Codex because it answered before Claude Code).
- * What commits to it (a launch, a new agent) waits for detection, and is refused if Hive is still looking.
+ * What commits to it (a launch, a new agent) waits for detection, and is refused if Combwork is still looking.
  */
 export function autoProvider(settings: Pick<AppSettings, 'providers'> | null | undefined): ProviderId {
   const on = enabledProviders(settings)
@@ -497,7 +506,7 @@ export function autoProviderPending(settings: Pick<AppSettings, 'providers'> | n
 }
 
 /**
- * The providers Hive's install and setup warnings are about (#474): every agent's own, and what a new agent gets
+ * The providers Combwork's install and setup warnings are about (#474): every agent's own, and what a new agent gets
  * (decision A: `first`, the CLI of the first usable connection, when there is one). A provider that is only turned on
  * isn't in use: its CLI being missing is no one's problem until something uses it.
  */
@@ -512,9 +521,9 @@ export function providersInUse(
 }
 
 /**
- * Which providers' problems Hive shows (the banner, the status bar, Provider Setup opening by itself): when none of the
+ * Which providers' problems Combwork shows (the banner, the status bar, Provider Setup opening by itself): when none of the
  * providers turned on is installed, that alone (`noneInstalled`: one warning, not one per CLI); else those turned on and
- * in use (providersInUse). `info` is what Hive found. While it is still looking for one not found yet (at start),
+ * in use (providersInUse). `info` is what Combwork found. While it is still looking for one not found yet (at start),
  * nothing: Automatic's pick isn't known until then.
  */
 export function providerWarnings(
@@ -554,14 +563,14 @@ export function modeCaveat(provider: ProviderId, mode: PermissionMode | '' | nul
   return mode && model ? (providerDescriptor(provider).modeCaveat?.(mode, model, known, tr) ?? null) : null
 }
 
-/** Where Hive finds a CLI (AgentInstallInfo.source, as the adapters name it) in the window's words; PATH, npm and WinGet are names (#885). */
+/** Where Combwork finds a CLI (AgentInstallInfo.source, as the adapters name it) in the window's words; PATH, npm and WinGet are names (#885). */
 const INSTALL_SOURCES: Record<string, Msg> = {
-  settings: msg({ id: 'agents.installSource.settings', defaultMessage: 'Settings', description: "Where Hive found a coding agent's CLI: the path set in Settings (the provider's page). Shown as \"found via Settings\" (Provider Setup), in Help → About and in Settings." }),
-  'native install': msg({ id: 'agents.installSource.native', defaultMessage: 'native install', description: "Where Hive found a coding agent's CLI: the folder its native installer puts it in. Shown as \"found via native install\" (Provider Setup), in Help → About and in Settings." }),
-  'standalone install': msg({ id: 'agents.installSource.standalone', defaultMessage: 'standalone install', description: "Where Hive found a coding agent's CLI: the folder its standalone installer puts it in. Shown as \"found via standalone install\" (Provider Setup), in Help → About and in Settings." })
+  settings: msg({ id: 'agents.installSource.settings', defaultMessage: 'Settings', description: "Where Combwork found a coding agent's CLI: the path set in Settings (the provider's page). Shown as \"found via Settings\" (Provider Setup), in Help → About and in Settings." }),
+  'native install': msg({ id: 'agents.installSource.native', defaultMessage: 'native install', description: "Where Combwork found a coding agent's CLI: the folder its native installer puts it in. Shown as \"found via native install\" (Provider Setup), in Help → About and in Settings." }),
+  'standalone install': msg({ id: 'agents.installSource.standalone', defaultMessage: 'standalone install', description: "Where Combwork found a coding agent's CLI: the folder its standalone installer puts it in. Shown as \"found via standalone install\" (Provider Setup), in Help → About and in Settings." })
 }
 
-/** Where Hive found a CLI, as the window shows it: its source's words, else the source as it is (a name: PATH, npm, WinGet). */
+/** Where Combwork found a CLI, as the window shows it: its source's words, else the source as it is (a name: PATH, npm, WinGet). */
 export function installSourceText(source: string | null | undefined, tr: Tr): string {
   const m = source ? INSTALL_SOURCES[source] : undefined
   return m ? tr(m) : (source ?? '')
@@ -603,7 +612,7 @@ export function labelList(labels: string[], and = 'and'): string {
 }
 
 /**
- * The modes a picker offers: the provider's, without the dangerous one unless it is enabled. The Hive Assistant's
+ * The modes a picker offers: the provider's, without the dangerous one unless it is enabled. The Combwork Assistant's
  * (`assistant`) never include the CLI's own setting (#1284): Control relies on knowing the mode it runs in.
  */
 export function offeredModes(provider: ProviderId, settings: Pick<AppSettings, 'providers'> | null | undefined, assistant = false): ModeOption[] {
@@ -612,7 +621,7 @@ export function offeredModes(provider: ProviderId, settings: Pick<AppSettings, '
 
 /**
  * Whether a running session can switch to a mode without a restart: the provider's rule (canSwitchLive), never to or
- * from the CLI's own setting (#1284), where Hive doesn't know the mode the session started in.
+ * from the CLI's own setting (#1284), where Combwork doesn't know the mode the session started in.
  */
 export function canSwitchModeLive(provider: ProviderId | ProviderDescriptor, target: PermissionMode, current: PermissionMode | undefined, launched: PermissionMode | null | undefined): boolean {
   const d = typeof provider === 'string' ? providerDescriptor(provider) : provider
@@ -642,14 +651,14 @@ export function splitArgs(input: string): string[] {
 }
 
 /**
- * Why extra arguments can't be used, or null: a bare "--" (#523, Darren's decision). Hive passes an agent's first task
- * after a "--" of its own, so one of the user's would either end the options early or be read as the task; Hive doesn't
+ * Why extra arguments can't be used, or null: a bare "--" (#523, Darren's decision). Combwork passes an agent's first task
+ * after a "--" of its own, so one of the user's would either end the options early or be read as the task; Combwork doesn't
  * guess which it meant. An option whose value is "--" is written with "=".
  */
 export function extraArgsProblem(input: string | string[], tr?: Tr): string | null {
   if (!(typeof input === 'string' ? splitArgs(input) : input).includes('--')) return null
-  if (tr) return tr(msg({ id: 'agents.provider.extraArgsDashes', defaultMessage: 'Hive passes the task after "--"; remove it from extra arguments. For an option whose value is "--", write --option=--.', description: 'Why extra arguments for a CLI are refused: they contain a bare "--". Keep "--" and --option=-- exactly as they are.' }))
-  return 'Hive passes the task after "--"; remove it from extra arguments. For an option whose value is "--", write --option=--.' // i18n-ignore: English without tr (main's errors: their area converts them)
+  if (tr) return tr(msg({ id: 'agents.provider.extraArgsDashes', defaultMessage: 'Combwork passes the task after "--"; remove it from extra arguments. For an option whose value is "--", write --option=--.', description: 'Why extra arguments for a CLI are refused: they contain a bare "--". Keep "--" and --option=-- exactly as they are.' }))
+  return 'Combwork passes the task after "--"; remove it from extra arguments. For an option whose value is "--", write --option=--.' // i18n-ignore: English without tr (main's errors: their area converts them)
 }
 
 /**

@@ -9,7 +9,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-handoverlink-')
+const base = tempDir('cw-handoverlink-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace, workspace } = await import('../src/main/workspace')
@@ -20,7 +20,7 @@ type Internals = {
   live: Map<string, Live>
   recordSession: (projectPath: string, agent: { id: string; name: string }, l: Live) => Promise<void>
   deliveries: unknown
-  hiveMcp: unknown
+  combworkMcp: unknown
 }
 const internals = sessions as unknown as Internals
 
@@ -31,9 +31,9 @@ describe('a handover links the conversations it joins, whenever the target names
   let w: ReturnType<typeof createWorkspaceService>
   const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
   const key = (agentId: string) => `${proj.toLowerCase()}#${agentId}`
-  // The session's record as Hive keeps it (#1061: in the workspace's database).
+  // The session's record as Combwork keeps it (#1061: in the workspace's database).
   const linkOf = async (id: string): Promise<string | undefined> => (await run(() => workspace.sessionsFile(proj))).sessions.find((s) => s.id === id)?.handedOverFrom
-  // A launch of `agentId` as Hive keeps it: Codex's, its session not named yet.
+  // A launch of `agentId` as Combwork keeps it: Codex's, its session not named yet.
   const launch = (agentId: string, runId: string, handedOverFrom?: string): Live => {
     const l: Live = { state: { runId, sessionId: '', projectPath: proj, agentId, provider: 'codex', cwd: proj, startedAt: new Date().toISOString(), status: 'ready' }, name: 'Session', adapter: { descriptor: { capabilities: { fixedSessionId: false } } }, ...(handedOverFrom ? { handedOverFrom } : {}) }
     internals.live.set(key(agentId), l)
@@ -45,14 +45,14 @@ describe('a handover links the conversations it joins, whenever the target names
     return run(() => internals.recordSession(proj, { id: l.state.agentId, name: l.state.agentId }, l))
   }
   const given: { now: unknown[]; launched: { line: string }[] } = { now: [], launched: [] }
-  const saved = { deliveries: internals.deliveries, hiveMcp: internals.hiveMcp }
+  const saved = { deliveries: internals.deliveries, combworkMcp: internals.combworkMcp }
 
   beforeAll(async () => {
-    mkdirSync(join(proj, '.hive'), { recursive: true })
-    writeFileSync(join(proj, '.hive', 'project.json'), JSON.stringify({ version: 2, layout: 'auto', agents: [{ id: 'src', name: 'Source', provider: 'codex', lastSessionId: from }, { id: 'dst', name: 'Target', provider: 'codex' }] }))
+    mkdirSync(join(proj, '.combwork'), { recursive: true })
+    writeFileSync(join(proj, '.combwork', 'project.json'), JSON.stringify({ version: 2, layout: 'auto', agents: [{ id: 'src', name: 'Source', provider: 'codex', lastSessionId: from }, { id: 'dst', name: 'Target', provider: 'codex' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
-    internals.hiveMcp = () => ({})
+    internals.combworkMcp = () => ({})
     internals.deliveries = {
       give: async () => undefined,
       now: async (_host: string, nd: unknown) => void given.now.push(nd),
@@ -72,7 +72,7 @@ describe('a handover links the conversations it joins, whenever the target names
   afterAll(async () => {
     vi.restoreAllMocks()
     internals.deliveries = saved.deliveries
-    internals.hiveMcp = saved.hiveMcp
+    internals.combworkMcp = saved.combworkMcp
     await disposeWorkspaceService(w)
   })
 
@@ -125,7 +125,7 @@ describe('a handover links the conversations it joins, whenever the target names
     const old = launch('dst', 'run-f')
     const real = internals.deliveries as { now: (h: string, nd: unknown) => Promise<unknown> }
     const now = real.now
-    // The delivery lands, then the agent restarts before Hive links: another launch, by then.
+    // The delivery lands, then the agent restarts before Combwork links: another launch, by then.
     real.now = async (h, nd) => {
       await now(h, nd)
       internals.live.delete(key('dst'))
@@ -139,4 +139,40 @@ describe('a handover links the conversations it joins, whenever the target names
     expect(old.handedOverFrom).toBeUndefined()
     expect(internals.live.get(key('dst'))?.handedOverFrom).toBeUndefined()
   })
+
+  // HI-2420 (HR1's round 1): the Assistant's hand-over carries its guard. Revoked while the handover is still being read
+  // (before anything is given or launched), the target gets nothing: neither a delivery nor a launch.
+  for (const running of [false, true]) {
+    it(`the Assistant's hand-over revoked while its handover is read: the ${running ? 'running' : 'stopped'} target is given nothing (HI-2420)`, async () => {
+      if (running) launch('dst', 'run-h')
+      const start = vi.spyOn(sessions, 'start').mockImplementation(async (_p, opts) => {
+        opts.allowed?.()
+        return launch(opts.agentId!, 'run-i').state as never
+      })
+      let release!: () => void
+      let reached!: () => void
+      const held = new Promise<void>((r) => (release = r))
+      const reading = new Promise<void>((r) => (reached = r))
+      vi.spyOn(sessions, 'latestHandover').mockImplementationOnce(async () => {
+        reached()
+        await held
+        return { relPath: 'handovers/2026-10-17-demo.md' } as never
+      })
+      let revoked = false
+      const allowed = () => {
+        if (revoked) throw new Error('Control was turned down meanwhile')
+      }
+      try {
+        const op = run(() => sessions.handOver(proj, 'src', 'dst', { handover: false, allowed }))
+        await reading
+        revoked = true
+        release()
+        await expect(op).rejects.toThrow(/turned down/)
+        expect(start).not.toHaveBeenCalled()
+        expect(given).toEqual({ now: [], launched: [] })
+      } finally {
+        start.mockRestore()
+      }
+    })
+  }
 })

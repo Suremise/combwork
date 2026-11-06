@@ -1,13 +1,13 @@
-// hive_prompt_agent with newConversation (#437): an idle agent's conversation ends and a new one starts on the task. The
+// cw_prompt_agent with newConversation (#437): an idle agent's conversation ends and a new one starts on the task. The
 // Assistant's authority (Settings → Assistant → Control, its own session) is checked again after the stop's await, so a
-// request whose permission ended meanwhile starts nothing; and nothing is stopped for a prompt Hive just typed.
+// request whose permission ended meanwhile starts nothing; and nothing is stopped for a prompt Combwork just typed.
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-newconv-')
+const base = tempDir('cw-newconv-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -49,9 +49,9 @@ function authority() {
 
 describe('a new conversation for an idle agent', () => {
   beforeAll(async () => {
-    mkdirSync(join(wsPath, '.hive'), { recursive: true })
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }] }))
+    mkdirSync(join(wsPath, '.combwork'), { recursive: true })
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
   })
@@ -108,7 +108,7 @@ describe('a new conversation for an idle agent', () => {
     expect(s.live.has(id)).toBe(true)
   })
 
-  it("stops nothing while a prompt Hive typed hasn't been taken (it would be lost)", async () => {
+  it("stops nothing while a prompt Combwork typed hasn't been taken (it would be lost)", async () => {
     idleAgent()
     s.live.get(id)!.typed = { at: Date.now(), prompts: 0 }
     const stop = stopping()

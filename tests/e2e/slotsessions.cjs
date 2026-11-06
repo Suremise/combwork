@@ -1,6 +1,6 @@
 // Sessions on leases (#1434, S35; SPEC §16.10.2–16.10.3): a Git project's slots lent through the test copies'
 // `slots:test` channel (as #1438's card start will), on the fake Claude Code:
-// 1. B1's card #12 gets slot-a: B1's new conversation starts there, with HIVE_SLOT and HIVE_SLOT_PORT_BASE, bound to
+// 1. B1's card #12 gets slot-a: B1's new conversation starts there, with CW_SLOT and CW_SLOT_PORT_BASE, bound to
 //    the lease. The lease ends while B1 is in a turn: its session is stopped once the turn is over. #13's lease ends
 //    while B1's next run there is still starting (its CLI asking to trust the folder): slot-a isn't lent meanwhile, and
 //    is free once that run is idle and stopped.
@@ -48,7 +48,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
 
   let h = null
   const start = async () => {
-    h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT) }, viewport: { width: 1400, height: 850 } })
+    h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT) }, viewport: { width: 1400, height: 850 } })
     h.page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.waitForProvider(h.inv)
     await lib.openWorkspace(h.inv, h.page, ws)
@@ -103,9 +103,9 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     const s1 = await until(async () => ((await idle(b1.id)) ? live(b1.id) : null), HUNG_MS)
     check("B1's new conversation starts in its card's slot", same(s1?.cwd, folderA) && s1?.slot === 'slot-a', JSON.stringify(s1))
     check('…the fake Claude Code was started there', same(lines(path.join(home, 'fake-launches.jsonl')).at(-1)?.cwd, folderA))
-    await say(b1.id, 'shell: echo %HIVE_SLOT% %HIVE_SLOT_PORT_BASE%')
+    await say(b1.id, 'shell: echo %CW_SLOT% %CW_SLOT_PORT_BASE%')
     const echoed = await until(() => lines(path.join(home, 'fake-shell.jsonl')).find((l) => l.agent === 'B1'), HUNG_MS)
-    check('…with HIVE_SLOT and HIVE_SLOT_PORT_BASE', echoed?.stdout?.trim() === `slot-a ${l12.slot.portBase}`, JSON.stringify(echoed))
+    check('…with CW_SLOT and CW_SLOT_PORT_BASE', echoed?.stdout?.trim() === `slot-a ${l12.slot.portBase}`, JSON.stringify(echoed))
     const conv1 = s1.sessionId
     check('…its session recorded in slot-a, bound to #12\'s lease', !!(await until(async () => (await sessionOf(conv1))?.lease === l12.lease.id, HUNG_MS)) && (await sessionOf(conv1)).slot === 'slot-a' && !(await sessionOf(conv1)).hold, JSON.stringify(await sessionOf(conv1)))
     await until(() => idle(b1.id), HUNG_MS)
@@ -156,7 +156,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
     await leftNote.locator('button', { hasText: 'Show B1' }).click()
     check("…its Show opens the Sessions tab on B1's conversation", !!(await until(async () => (await h.page.locator('text=Ran in B1').count()) > 0, HUNG_MS)))
     // Back to the agents' panes.
-    await h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'menu-command', command: 'project.tab.session', args: [] })
+    await h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'menu-command', command: 'project.tab.session', args: [] })
     check('…slot-a still free', !(await slotList()).find((s) => s.name === 'slot-a')?.lease)
 
     // --- 3. A new card gets slot-a meanwhile: B1's conversation is refused with why; two launches for slot-a at once.
@@ -215,7 +215,7 @@ const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.reso
 
     // --- 6. A builder with a dirty carried slot and a card in another: the card's slot wins, the old one waits.
     const hb1 = path.join(root, 'hb1')
-    lib.git(alpha, ['worktree', 'add', '-q', '-b', 'hive/hb1', hb1])
+    lib.git(alpha, ['worktree', 'add', '-q', '-b', 'cw/hb1', hb1])
     const carried = await op({ op: 'carry', agent: b1.id, slot: 'hb1', folder: hb1 })
     check("B1's own worktree hb1 is adopted as its carried slot", carried?.kind === 'carried' && carried.agent === b1.id, JSON.stringify(carried))
     await inv('session:start', alpha, { agentId: b1.id })

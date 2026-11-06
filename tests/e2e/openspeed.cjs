@@ -4,14 +4,14 @@
 // with agents opens (workspace:open answers) within OPEN_MS. Before HI-1705 it took over 3 s here: its bundled skills
 // and modes were hashed inside the open, and its projects read one after another. Its bundled skills and modes are then
 // brought up to date after the open, and what the open started in the background is said in one "after opening" line
-// of hive.log, each part timed. Dev build, throwaway profile and workspace.
+// of combwork.log, each part timed. Dev build, throwaway profile and workspace.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 
 const userData = path.join(lib.WORK, 'openspeed-profile')
 const ws = path.join(lib.WORK, 'openspeed-ws')
-const logFile = path.join(userData, 'logs', 'hive.log')
+const logFile = path.join(userData, 'logs', 'combwork.log')
 // How long each of main's file calls waits during the timed open.
 const LAG_MS = 25
 // The bound on that open: about 0.6 s with HI-1705, over 3 s before it (a chain of some 140 calls).
@@ -30,15 +30,15 @@ const logText = () => (fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8')
   for (const name of ['alpha', 'bravo', 'charlie', 'delta']) {
     const dir = path.join(ws, name)
     lib.gitProject(dir)
-    fs.mkdirSync(path.join(dir, '.hive'), { recursive: true })
-    fs.writeFileSync(path.join(dir, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: `a-${name}-1`, name: 'Coder' }, { id: `a-${name}-2`, name: 'Reviewer' }] }))
+    fs.mkdirSync(path.join(dir, '.combwork'), { recursive: true })
+    fs.writeFileSync(path.join(dir, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: `a-${name}-1`, name: 'Coder' }, { id: `a-${name}-2`, name: 'Reviewer' }] }))
   }
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: lib.port(47700) } })
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_API_PORT: lib.port(47700) } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   try {
-    // Its first open sets it up (its .hive, the bundled skills and modes copied in): the timed open is an ordinary one.
+    // Its first open sets it up (its .combwork, the bundled skills and modes copied in): the timed open is an ordinary one.
     await lib.openWorkspace(inv, page, ws)
-    const manifest = path.join(ws, '.hive', 'bundled.json')
+    const manifest = path.join(ws, '.combwork', 'bundled.json')
     check('the first open brings its bundled skills and modes in, after it', !!(await lib.until(() => fs.existsSync(manifest), HUNG_MS)))
     await inv('workspace:close')
 
@@ -70,7 +70,7 @@ const logText = () => (fs.existsSync(logFile) ? fs.readFileSync(logFile, 'utf8')
     const after = await lib.until(() => logText().slice(mark).match(/after opening ⁨?openspeed-ws⁩?: (.*)/)?.[1], HUNG_MS)
     check('what the open started is said once it has all ended, each part timed', !!after && /\d+ ms in all/.test(after), after ?? 'no line')
     check('…its bundled skills and modes among them', !!after && /its bundled skills and modes \d+ ms/.test(after), after ?? 'no line')
-    check('the open said its own parts too', /Opened workspace .* in \d+ ms: its \.hive folder and settings \d+ ms/.test(logText().slice(mark)))
+    check('the open said its own parts too', /Opened workspace .* in \d+ ms: its \.combwork folder and settings \d+ ms/.test(logText().slice(mark)))
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {

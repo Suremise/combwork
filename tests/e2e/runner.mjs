@@ -22,34 +22,34 @@ export const keepLimits = (name, lang = []) => (name === LANG_SUITE && lang.leng
  * (HI-2159: a language takes about 3 minutes, so a seven-language run reached four in 10).
  */
 export const suiteLimitMs = (name, lang = []) => Math.max(10, name === LANG_SUITE ? 6 * lang.length : 0) * 60_000
-/** A language tag as --lang takes it (pl, pt-BR, en-XA); whether Hive has the language, the suite checks by starting it. */
+/** A language tag as --lang takes it (pl, pt-BR, en-XA); whether Combwork has the language, the suite checks by starting it. */
 const LANG_TAG = /^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/i
 
 /** Whether a suite starts a real CLI (Claude Code, or Codex in its test home): the real tier, opt-in with --real. */
 export const isRealCli = (s) => (s.needs ?? []).some((n) => n === 'claude' || n === 'codex')
 
 /**
- * The HIVE_TEST_ seams a packaged Hive ignores (src/main reads them in unpackaged builds only, #1591): a suite needing
- * one tests the dev build's behaviour. tests/e2esuites.test.ts checks every HIVE_TEST_ name src reads is here, in
+ * The CW_TEST_ seams a packaged Combwork ignores (src/main reads them in unpackaged builds only, #1591): a suite needing
+ * one tests the dev build's behaviour. tests/e2esuites.test.ts checks every CW_TEST_ name src reads is here, in
  * or in PACKAGED_SEAMS.
  */
 export const DEV_SEAMS = [
-  'HIVE_TEST_ANTIVIRUS', 'HIVE_TEST_ANTIVIRUS_LOG', 'HIVE_TEST_BLOCK_IPC', 'HIVE_TEST_BOARD_UPGRADE', 'HIVE_TEST_CLI_HOME_CONNECTION', 'HIVE_TEST_CLI_LOG', 'HIVE_TEST_DAY_MS', 'HIVE_TEST_DECISION_SETTLE_MS',
-  'HIVE_TEST_DELIVERY_OVERDUE_MS', 'HIVE_TEST_DETECT_WAIT_MS', 'HIVE_TEST_DROP_HOOKS', 'HIVE_TEST_FAIL_IPC', 'HIVE_TEST_FLIGHT_AFTER_MS',
-  'HIVE_TEST_HOLD_DRAIN', 'HIVE_TEST_HOLD_MERGE_RECOVERY', 'HIVE_TEST_HOLD_TRUST', 'HIVE_TEST_HOLD_TYPED','HIVE_TEST_HOOKS_HOLD', 'HIVE_TEST_IDLE', 'HIVE_TEST_INSTALL_DIR', 'HIVE_TEST_JOB_KILL_FAILS', 'HIVE_TEST_LOG_DIRECT', 'HIVE_TEST_LOOP_GRACE_MS',
-  'HIVE_TEST_MCP_LOG', 'HIVE_TEST_MERGE_CHOICE_CRASH', 'HIVE_TEST_MERGE_HOLD_MS', 'HIVE_TEST_MERGE_SLOT_LOG', 'HIVE_TEST_ORPHAN_MS', 'HIVE_TEST_ORPHAN_POLL_MS', 'HIVE_TEST_PROCESS_TRACKER', 'HIVE_TEST_QUEUE_CRASH',
-  'HIVE_TEST_QUEUE_RACE', 'HIVE_TEST_QUEUE_RETURNS', 'HIVE_TEST_REGISTRY_PATH', 'HIVE_TEST_RELAUNCH_LOG', 'HIVE_TEST_RESOURCES', 'HIVE_TEST_RUN_ON_CLOSE', 'HIVE_TEST_SILENT_MS',
-  'HIVE_TEST_SLOT_CRASH', 'HIVE_TEST_SLOT_MIGRATION', 'HIVE_TEST_SLOW_DETECT', 'HIVE_TEST_SYSTEM_BROKER', 'HIVE_TEST_SYSTEM_BROKER_ACTIVE', 'HIVE_TEST_SLOW_IPC', 'HIVE_TEST_SLOW_LOG_MS', 'HIVE_TEST_STALL_QUIET_MS',
-  'HIVE_TEST_START_VIEW_LOG', 'HIVE_TEST_TASKBAR_LOG', 'HIVE_TEST_TESTED_CLIS', 'HIVE_TEST_TRACKER_HEARD', 'HIVE_TEST_TRACKER_WAIT_MS',
-  'HIVE_TEST_UPGRADE_HOLD', 'HIVE_TEST_WAKE_TAKE_MS'
+  'CW_TEST_ANTIVIRUS', 'CW_TEST_ANTIVIRUS_LOG', 'CW_TEST_BLOCK_IPC', 'CW_TEST_BOARD_UPGRADE', 'CW_TEST_CLI_HOME_CONNECTION', 'CW_TEST_CLI_LOG', 'CW_TEST_DAY_MS', 'CW_TEST_DECISION_SETTLE_MS',
+  'CW_TEST_DELIVERY_OVERDUE_MS', 'CW_TEST_DETECT_WAIT_MS', 'CW_TEST_DROP_HOOKS', 'CW_TEST_FAIL_IPC', 'CW_TEST_FLIGHT_AFTER_MS',
+  'CW_TEST_HOLD_AGENT_TEMP', 'CW_TEST_HOLD_DRAIN', 'CW_TEST_HOLD_IPC', 'CW_TEST_HOLD_MERGE_RECOVERY', 'CW_TEST_HOLD_TRUST', 'CW_TEST_HOLD_TYPED','CW_TEST_HOOKS_HOLD', 'CW_TEST_IDLE', 'CW_TEST_INSTALL_DIR', 'CW_TEST_JOB_KILL_FAILS', 'CW_TEST_LOG_DIRECT', 'CW_TEST_LOOP_GRACE_MS',
+  'CW_TEST_MCP_LOG', 'CW_TEST_MERGE_CHOICE_CRASH', 'CW_TEST_MERGE_HOLD_MS', 'CW_TEST_MERGE_SLOT_LOG', 'CW_TEST_ORPHAN_MS', 'CW_TEST_ORPHAN_POLL_MS', 'CW_TEST_PROCESS_TRACKER', 'CW_TEST_PROFILE_CHOOSE', 'CW_TEST_QUEUE_CRASH',
+  'CW_TEST_QUEUE_RACE', 'CW_TEST_QUEUE_RETURNS', 'CW_TEST_REGISTRY_PATH', 'CW_TEST_RELAUNCH_LOG', 'CW_TEST_RESOURCES', 'CW_TEST_RUN_ON_CLOSE', 'CW_TEST_SILENT_MS',
+  'CW_TEST_SLOT_CRASH', 'CW_TEST_SLOT_MIGRATION', 'CW_TEST_SLOW_DETECT', 'CW_TEST_SYSTEM_BROKER', 'CW_TEST_SYSTEM_BROKER_ACTIVE', 'CW_TEST_SLOW_IPC', 'CW_TEST_SLOW_LOG_MS', 'CW_TEST_STALL_QUIET_MS',
+  'CW_TEST_START_VIEW_LOG', 'CW_TEST_TASKBAR_LOG', 'CW_TEST_TESTED_CLIS', 'CW_TEST_TRACKER_HEARD', 'CW_TEST_TRACKER_WAIT_MS',
+  'CW_TEST_UPGRADE_HOLD', 'CW_TEST_WAKE_TAKE_MS'
 ]
 /**
- * The seams a packaged Hive honours too, when quiet (#1253: lib.hiveEnv starts every test copy quiet), among them the two
- * every test copy is given, HIVE_TEST_TIPS and HIVE_TEST_TRASH_DIR (#1599: takesTestSeams in src/main/testQuiet.ts).
+ * The seams a packaged Combwork honours too, when quiet (#1253: lib.combworkEnv starts every test copy quiet), among them the two
+ * every test copy is given, CW_TEST_TIPS and CW_TEST_TRASH_DIR (#1599: takesTestSeams in src/main/testQuiet.ts).
  */
-export const PACKAGED_SEAMS = ['HIVE_TEST_ASK_LEFTOVERS', 'HIVE_TEST_DIALOG_SNAPSHOT', 'HIVE_TEST_NOTIFY_LOG', 'HIVE_TEST_QUIET', 'HIVE_TEST_TIPS', 'HIVE_TEST_TOKEN_LOG', 'HIVE_TEST_TRASH_DIR']
+export const PACKAGED_SEAMS = ['CW_TEST_ASK_LEFTOVERS', 'CW_TEST_DIALOG_SNAPSHOT', 'CW_TEST_NOTIFY_LOG', 'CW_TEST_QUIET', 'CW_TEST_TIPS', 'CW_TEST_TOKEN_LOG', 'CW_TEST_TRASH_DIR']
 /**
- * The test copies' channels a packaged Hive refuses: 0.9 worktree agents (agents:testLegacy; `{ worktree: true })`, an
+ * The test copies' channels a packaged Combwork refuses: 0.9 worktree agents (agents:testLegacy; `{ worktree: true })`, an
  * agent asked for in a worktree, as q.agent does; a 0.9 template's worktree modes) and slots:test. A worktree agent asked
  * of agents:add is refused by any 1.0 build (gitmissing checks that), so isn't one.
  */
@@ -64,25 +64,25 @@ export function suiteSource(source) {
 }
 
 /**
- * Why a suite can't run on a packaged build (HIVE_EXE), from its source, or null (#1591): its header says "Dev build
+ * Why a suite can't run on a packaged build (CW_EXE), from its source, or null (#1591): its header says "Dev build
  * only"; it starts this checkout's Electron itself (executablePath: lib.ELECTRON) rather than through lib.launch; or,
- * unless it handles HIVE_EXE itself (reads it, or q.devSeam: its dev-only parts say NOT RUN and the rest runs), it needs
- * a dev-only seam or a test channel. Under HIVE_EXE the runner reports such a suite NOT RUN with this reason, so a
+ * unless it handles CW_EXE itself (reads it, or q.devSeam: its dev-only parts say NOT RUN and the rest runs), it needs
+ * a dev-only seam or a test channel. Under CW_EXE the runner reports such a suite NOT RUN with this reason, so a
  * dev-build pass is never taken for a packaged one; tests/e2esuites.test.ts uses it for the suites' headers.
  */
 export function devBuildOnly(source) {
   const { header, code } = suiteSource(source)
   if (/Dev build only/.test(header)) return 'its header says "Dev build only"'
   if (code.some((l) => /executablePath:\s*lib\.ELECTRON\b/.test(l))) return "it starts this checkout's Electron itself (executablePath: lib.ELECTRON), not lib.launch"
-  if (code.some((l) => /process\.env\.HIVE_EXE|\bdevSeam\(/.test(l))) return null
-  const seam = code.flatMap((l) => l.match(/HIVE_TEST_[A-Z0-9_]+/g) ?? []).find((s) => DEV_SEAMS.includes(s))
+  if (code.some((l) => /process\.env\.CW_EXE|\bdevSeam\(/.test(l))) return null
+  const seam = code.flatMap((l) => l.match(/CW_TEST_[A-Z0-9_]+/g) ?? []).find((s) => DEV_SEAMS.includes(s))
   if (seam) return `it needs ${seam}, a test seam a packaged build ignores`
   const channel = code.filter((l) => !/inv\('agents:add'/.test(l)).map((l) => TEST_CHANNELS.exec(l)?.[0]).find(Boolean)
   if (channel) return `it uses a test channel a packaged build refuses (${channel})`
   return null
 }
 
-/** The launch helpers every suite shares: lib.launch honours HIVE_EXE, and the seams they give are every copy's. */
+/** The launch helpers every suite shares: lib.launch honours CW_EXE, and the seams they give are every copy's. */
 const SHARED_HELPERS = new Set(['lib.cjs', 'runContext.cjs'])
 
 /**
@@ -103,7 +103,7 @@ export function suiteFiles(name, dir) {
 }
 
 /**
- * A run's suites on a packaged build (exe: HIVE_EXE, or none): { devOnly (a Map of each suite NOT RUN to why), nothingRan
+ * A run's suites on a packaged build (exe: CW_EXE, or none): { devOnly (a Map of each suite NOT RUN to why), nothingRan
  * (why the run tested nothing, when none of them can run: the run still writes its record, not valid, and fails) }.
  */
 export function packagedPlan(chosen, dir, exe) {
@@ -254,11 +254,11 @@ export function suiteOutcome({ code, out }) {
  */
 /**
  * The suite this runner was started inside, or null: the runner marks each suite's environment (E2E_RUN_SUITE, and
- * HIVE_E2E_PORT), and E2E_RUN_SUITE survives into the sessions of the Hive a suite starts, which drop HIVE_ variables.
+ * CW_E2E_PORT), and E2E_RUN_SUITE survives into the sessions of the Combwork a suite starts, which drop CW_ variables.
  */
 export function parentSuite(env = process.env) {
-  if (!env.E2E_RUN_SUITE && !env.HIVE_E2E_PORT) return null
-  const port = Number(env.E2E_RUN_PORT || env.HIVE_E2E_PORT) || null
+  if (!env.E2E_RUN_SUITE && !env.CW_E2E_PORT) return null
+  const port = Number(env.E2E_RUN_PORT || env.CW_E2E_PORT) || null
   return { name: env.E2E_RUN_SUITE ?? null, port }
 }
 
@@ -309,4 +309,4 @@ export function packagedStatus(info, code) {
  * Whether a run needs the dev build in out/ at all: not when every suite is one of the installer's, which test
  * dist/win-unpacked (packagedStatus checks that one), unless packaged-progress is told to check the dev build's wrapper.
  */
-export const needsDevBuild = (suites, env = process.env) => !suites.length || !suites.every((s) => (s.needs ?? []).includes('packaged')) || env.HIVE_PROGRESS_CHECK_DEV === '1'
+export const needsDevBuild = (suites, env = process.env) => !suites.length || !suites.every((s) => (s.needs ?? []).includes('packaged')) || env.CW_PROGRESS_CHECK_DEV === '1'

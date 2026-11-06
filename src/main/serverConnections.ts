@@ -6,7 +6,7 @@ import { keepListedRemote, keyProblem, listedIds, listedRemote, listingUrl, merg
 import { accountFolder, addAccount, connectionInternals, connectionReadyAgain, effectiveModels, getAccount, isServer, loginKey, readSetUp, rereadTrust, serverEnv } from './accounts'
 import { hasPty } from './ptyHost'
 import { emit } from './events'
-import { hiveError } from './hiveError'
+import { combworkError } from './combworkError'
 import { keyInfo, removeKey, saveKey, withKey } from './keyStore'
 import { createLogger, userText } from './logger'
 import { plainHttpGet, type PlainReply } from './plainHttpsJson'
@@ -30,10 +30,10 @@ const LIST_TIMEOUT_MS = 10_000
 const LIST_MAX_BYTES = 1024 * 1024
 
 const URL_PROBLEM: Record<BaseUrlProblem, Msg> = {
-  invalid: msg({ id: 'main.server.url.invalid', defaultMessage: "That isn't a URL Hive can use: write it in full, such as https://api.example.com.", description: "An error saving a server connection's base URL (Settings → Accounts & Connections): it can't be read as a URL." }),
+  invalid: msg({ id: 'main.server.url.invalid', defaultMessage: "That isn't a URL Combwork can use: write it in full, such as https://api.example.com.", description: "An error saving a server connection's base URL (Settings → Accounts & Connections): it can't be read as a URL." }),
   scheme: msg({ id: 'main.server.url.scheme', defaultMessage: 'The URL must start with https:// (or http:// for a server on this PC).', description: "An error saving a server connection's base URL: it isn't http or https." }),
-  userinfo: msg({ id: 'main.server.url.userinfo', defaultMessage: "The URL can't hold a user name or password: give the key in its own field.", description: "An error saving a server connection's base URL: it has user:password@ in it, which Hive won't keep." }),
-  extra: msg({ id: 'main.server.url.extra', defaultMessage: "The URL can't have a query (?…) or a fragment (#…): give the key in its own field.", description: "An error saving a server connection's base URL: it has a query string or a fragment, which Hive won't keep (a key could be in it)." }),
+  userinfo: msg({ id: 'main.server.url.userinfo', defaultMessage: "The URL can't hold a user name or password: give the key in its own field.", description: "An error saving a server connection's base URL: it has user:password@ in it, which Combwork won't keep." }),
+  extra: msg({ id: 'main.server.url.extra', defaultMessage: "The URL can't have a query (?…) or a fragment (#…): give the key in its own field.", description: "An error saving a server connection's base URL: it has a query string or a fragment, which Combwork won't keep (a key could be in it)." }),
   remoteHttp: msg({ id: 'main.server.url.remoteHttp', defaultMessage: 'A server on another computer needs https://. Plain http:// is only for a server on this PC (localhost).', description: "An error saving a server connection's base URL: it uses http:// to a server that isn't on this computer, which would send the key unencrypted." })
 }
 const KEY_PROBLEM = {
@@ -42,37 +42,37 @@ const KEY_PROBLEM = {
 }
 const KEY_IN = msg({ id: 'main.server.key.inField', defaultMessage: 'The key appears in the {field, select, name {name} url {base URL} other {model list}}: take it out of there first. Nothing was saved.', description: "An error saving a server connection's API key: the key was also typed into another field ({field}: its name, its base URL or its models), where it would be kept unencrypted." })
 const NOT_SERVER = msg({ id: 'main.server.notServer', defaultMessage: "That connection doesn't get its model from a server.", description: 'An error: an action for a server connection (its key, its models, its Set Up) was asked for a connection signed in through its CLI instead.' })
-const NO_SERVERS = msg({ id: 'main.server.unsupported', defaultMessage: "{cli} can't get its model from a server in Hive.", description: 'An error adding a server connection for a coding agent CLI ({cli}: "Codex") that Hive has no server connections for.' })
+const NO_SERVERS = msg({ id: 'main.server.unsupported', defaultMessage: "{cli} can't get its model from a server in Combwork.", description: 'An error adding a server connection for a coding agent CLI ({cli}: "Codex") that Combwork has no server connections for.' })
 
 function capsOf(cli: ProviderId): ServerCaps {
   const caps = providerDescriptor(cli).capabilities.connections?.server
-  if (!caps) throw hiveError(NO_SERVERS, { cli: providerDescriptor(cli).name }, { kind: 'invalid' })
+  if (!caps) throw combworkError(NO_SERVERS, { cli: providerDescriptor(cli).name }, { kind: 'invalid' })
   return caps
 }
 
 function serverOf(id: string): { a: Account; server: ServerConnection; caps: ServerCaps } {
   const a = mustGet(id)
-  if (!isServer(a) || !a.server) throw hiveError(NOT_SERVER, undefined, { kind: 'invalid' })
+  if (!isServer(a) || !a.server) throw combworkError(NOT_SERVER, undefined, { kind: 'invalid' })
   return { a, server: a.server, caps: capsOf(a.provider) }
 }
 
 function checkedUrl(raw: string): { url: string; origin: string; local: boolean } {
   const b = parseBaseUrl(raw)
-  if (!b.ok) throw hiveError(URL_PROBLEM[b.why], undefined, { kind: 'invalid' })
+  if (!b.ok) throw combworkError(URL_PROBLEM[b.why], undefined, { kind: 'invalid' })
   return b
 }
 
 function checkedKey(key: string): string {
   const p = keyProblem(key)
-  if (p === 'length') throw hiveError(KEY_PROBLEM.length, { min: 16, max: 512 }, { kind: 'invalid' })
-  if (p) throw hiveError(KEY_PROBLEM.chars, undefined, { kind: 'invalid' })
+  if (p === 'length') throw combworkError(KEY_PROBLEM.length, { min: 16, max: 512 }, { kind: 'invalid' })
+  if (p) throw combworkError(KEY_PROBLEM.chars, undefined, { kind: 'invalid' })
   return key
 }
 
 /** Refuses a key that also appears in a field kept unencrypted (its name, base URL or a model id). */
 function assertKeyNotIn(key: string, fields: { name: string; url: string; models: readonly ServerModel[] }): void {
   const field = fields.name.includes(key) ? 'name' : fields.url.includes(key) ? 'url' : fields.models.some((m) => m.id.includes(key)) ? 'models' : null
-  if (field) throw hiveError(KEY_IN, { field }, { kind: 'invalid' })
+  if (field) throw combworkError(KEY_IN, { field }, { kind: 'invalid' })
 }
 
 export interface ServerInput {
@@ -238,7 +238,7 @@ export async function readServerModels(id: string, request: string): Promise<Lis
     if (res.status === 403) return said({ ok: false, why: 'forbidden', status: 403 }) // i18n-ignore: a reason's code, not text
     if (res.status < 200 || res.status >= 300) return said({ ok: false, why: 'failed', status: res.status }) // i18n-ignore: a reason's code, not text
     if (res.refused === 'tooBig') return said({ ok: false, why: 'tooBig' }) // i18n-ignore: a reason's code, not text
-    // An encoded reply is refused unread: not a listing Hive can read.
+    // An encoded reply is refused unread: not a listing Combwork can read.
     if (res.refused) return said({ ok: false, why: 'shape' }) // i18n-ignore: a reason's code, not text
     let parsed: unknown
     try {
@@ -269,12 +269,12 @@ export async function readServerModels(id: string, request: string): Promise<Lis
 }
 
 // ---------------------------------------------------------------------------
-// Set Up: the CLI's first-run screens, in a terminal of Hive's.
+// Set Up: the CLI's first-run screens, in a terminal of Combwork's.
 // ---------------------------------------------------------------------------
 
 /**
  * Opens the CLI in a server connection's folder, with its server's variables, so the user answers its first-run screens
- * (its theme, its notes) in its own way before an agent starts on it: Hive types nothing and writes none of its files.
+ * (its theme, its notes) in its own way before an agent starts on it: Combwork types nothing and writes none of its files.
  * The key (if any) is masked while the terminal is open. Returns the terminal's key.
  */
 export async function setUpServerConnection(id: string, folder?: string): Promise<string> {
@@ -286,7 +286,7 @@ export async function setUpServerConnection(id: string, folder?: string): Promis
     await connectionInternals.assertUsable(a)
     const b = checkedUrl(server.baseUrl)
     const got = await withKey(id, b.origin)
-    if (!got && !b.local) throw hiveError(msg({ id: 'main.server.setUp.noKey', defaultMessage: '{name} has no key yet. Add its key first, then set it up.', description: "An error opening Set Up for a server connection ({name}, its name in Settings → Accounts & Connections): its server needs an API key and none is saved." }), { name: a.name }, { kind: 'conflict' })
+    if (!got && !b.local) throw combworkError(msg({ id: 'main.server.setUp.noKey', defaultMessage: '{name} has no key yet. Add its key first, then set it up.', description: "An error opening Set Up for a server connection ({name}, its name in Settings → Accounts & Connections): its server needs an API key and none is saved." }), { name: a.name }, { kind: 'conflict' })
     const homeEnv = providerDescriptor(a.provider).capabilities.connections!.homeEnv
     // Once it ends, its set-up state is read again (HI-1870).
     return providerService.runAccountLogin(a.provider, id, { [homeEnv]: accountFolder(id) }, () => (void readSetUp(id), rereadTrust(id)), { env: serverEnv(caps, server, got?.key ?? null), cwd: folder ?? accountFolder(id) })

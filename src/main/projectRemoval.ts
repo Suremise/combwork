@@ -2,7 +2,7 @@ import { randomBytes } from 'crypto'
 import { basename, dirname, extname, join, resolve } from 'path'
 import { copyFile, mkdir, readdir, readFile, rmdir } from 'original-fs/promises'
 import { existsSync } from 'original-fs'
-import { HIVE_DIR, agentPtyKey, projectAgents } from '../shared/defaults'
+import { CW_DIR, agentPtyKey, projectAgents } from '../shared/defaults'
 import { fmt, msg, tr } from '../shared/i18n'
 import { forgetPtys } from './ptyHost'
 import type { AgentDef, ProjectFolderOf, ProjectRemoval, ProjectRemovalInfo, TaskCard } from '../shared/types'
@@ -27,10 +27,10 @@ import { folderWhat } from '../shared/projectFolders'
 const log = createLogger('projects')
 
 /**
- * A project leaving Hive (Project → Remove Project…), three ways:
- * - Hide: nothing moves; Hive leaves the folder out until it's restored (Settings → Workspace).
- * - Remove from Hive: its workspace files (handovers, cards) are packed into its own .hive/removed and leave the
- *   workspace, so the folder carries them wherever it goes; Hive offers them back when it sees the folder again.
+ * A project leaving Combwork (Project → Remove Project…), three ways:
+ * - Hide: nothing moves; Combwork leaves the folder out until it's restored (Settings → Workspace).
+ * - Remove from Combwork: its workspace files (handovers, cards) are packed into its own .combwork/removed and leave the
+ *   workspace, so the folder carries them wherever it goes; Combwork offers them back when it sees the folder again.
  * - Delete: the folder, its worktrees and its handovers go to the Recycle Bin, and its cards are deleted.
  * The CLIs' own transcripts (~/.claude, ~/.codex) are never touched.
  *
@@ -46,7 +46,7 @@ async function allNames(ws: WorkspaceService): Promise<string[]> {
 }
 
 /**
- * The project's handovers in the shared notes, by path relative to .hive/shared: those its id owns (#514), never
+ * The project's handovers in the shared notes, by path relative to .combwork/shared: those its id owns (#514), never
  * another project's that had its name (they are moved or deleted).
  */
 async function handoversOf(ws: WorkspaceService, name: string): Promise<string[]> {
@@ -80,13 +80,13 @@ export async function checkedWorktrees(ws: WorkspaceService, p: string, all: Age
     if (!tree) continue
     const t = resolve(tree.path)
     const why = !registered.has(realPath(t).toLowerCase())
-      ? tr(msg({ id: 'main.removal.why.notListed', defaultMessage: "git doesn't list it as one of the project's worktrees", description: "Why Hive won't remove or delete an agent's worktree with its project: a clause in brackets (main.removal.refusedTree)." }))
+      ? tr(msg({ id: 'main.removal.why.notListed', defaultMessage: "git doesn't list it as one of the project's worktrees", description: "Why Combwork won't remove or delete an agent's worktree with its project: a clause in brackets (main.removal.refusedTree)." }))
       : containsPlace(t, p) || containsPlace(t, ws.path!)
-        ? tr(msg({ id: 'main.removal.why.contains', defaultMessage: 'it contains the project or the workspace', description: "Why Hive won't remove or delete an agent's worktree with its project: a clause in brackets (main.removal.refusedTree)." }))
+        ? tr(msg({ id: 'main.removal.why.contains', defaultMessage: 'it contains the project or the workspace', description: "Why Combwork won't remove or delete an agent's worktree with its project: a clause in brackets (main.removal.refusedTree)." }))
         : projects.some((x) => samePlace(x, t))
-          ? tr(msg({ id: 'main.removal.why.otherProject', defaultMessage: 'it is another project of the workspace', description: "Why Hive won't remove or delete an agent's worktree with its project: a clause in brackets (main.removal.refusedTree)." }))
+          ? tr(msg({ id: 'main.removal.why.otherProject', defaultMessage: 'it is another project of the workspace', description: "Why Combwork won't remove or delete an agent's worktree with its project: a clause in brackets (main.removal.refusedTree)." }))
           : null
-    if (why) refused.push(tr(msg({ id: 'main.removal.refusedTree', defaultMessage: "{agent}'s worktree {path} ({why})", description: "An agent's worktree Hive won't remove or delete with its project. {agent} is the agent's name, {path} the worktree's folder, {why} why (main.removal.why.*)." }), { agent: a.name, path: t, why }))
+    if (why) refused.push(tr(msg({ id: 'main.removal.refusedTree', defaultMessage: "{agent}'s worktree {path} ({why})", description: "An agent's worktree Combwork won't remove or delete with its project. {agent} is the agent's name, {path} the worktree's folder, {why} why (main.removal.why.*)." }), { agent: a.name, path: t, why }))
     else ok.push(a)
   }
   return { ok, refused }
@@ -122,22 +122,22 @@ export async function removalInfo(projectPath: string): Promise<ProjectRemovalIn
   }
 }
 
-/** Why Remove from Hive can't go ahead: worktrees with work not merged, or that git can't check. Null when it can. */
+/** Why Remove from Combwork can't go ahead: worktrees with work not merged, or that git can't check. Null when it can. */
 function unmergedWork(worktrees: ProjectRemovalInfo['worktrees']): string | null {
   const held = worktrees.filter((w) => w.ahead || w.dirty || w.error)
   if (!held.length) return null
   const what = (w: ProjectRemovalInfo['worktrees'][number]): string =>
     w.error ??
     fmt.list([
-      ...(w.ahead ? [tr(msg({ id: 'main.removal.ahead', defaultMessage: '{n, plural, one {# commit not merged} other {# commits not merged}}', description: "Work in an agent's worktree that stops Remove from Hive: its commits not merged. {n} is how many." }), { n: w.ahead })] : []),
-      ...(w.dirty ? [tr(msg({ id: 'main.removal.dirty', defaultMessage: '{n, plural, one {# uncommitted file} other {# uncommitted files}}', description: "Work in an agent's worktree that stops Remove from Hive: its files not committed. {n} is how many." }), { n: w.dirty })] : [])
+      ...(w.ahead ? [tr(msg({ id: 'main.removal.ahead', defaultMessage: '{n, plural, one {# commit not merged} other {# commits not merged}}', description: "Work in an agent's worktree that stops Remove from Combwork: its commits not merged. {n} is how many." }), { n: w.ahead })] : []),
+      ...(w.dirty ? [tr(msg({ id: 'main.removal.dirty', defaultMessage: '{n, plural, one {# uncommitted file} other {# uncommitted files}}', description: "Work in an agent's worktree that stops Remove from Combwork: its files not committed. {n} is how many." }), { n: w.dirty })] : [])
     ])
-  return tr(msg({ id: 'main.removal.unmerged', defaultMessage: "Merge or discard the work in {worktrees} first: a worktree can't go with the project folder.", description: "Why Remove from Hive can't go ahead. {worktrees} lists the agents' worktrees with work in them (main.removal.heldTree)." }), { worktrees: fmt.list(held.map((w) => tr(msg({ id: 'main.removal.heldTree', defaultMessage: "{agent}'s worktree ({work})", description: "An agent's worktree with work in it, in the reason Remove from Hive can't go ahead. {work} says what (commits not merged, uncommitted files) or why git couldn't check." }), { agent: w.agent, work: what(w) }))) })
+  return tr(msg({ id: 'main.removal.unmerged', defaultMessage: "Merge or discard the work in {worktrees} first: a worktree can't go with the project folder.", description: "Why Remove from Combwork can't go ahead. {worktrees} lists the agents' worktrees with work in them (main.removal.heldTree)." }), { worktrees: fmt.list(held.map((w) => tr(msg({ id: 'main.removal.heldTree', defaultMessage: "{agent}'s worktree ({work})", description: "An agent's worktree with work in it, in the reason Remove from Combwork can't go ahead. {work} says what (commits not merged, uncommitted files) or why git couldn't check." }), { agent: w.agent, work: what(w) }))) })
 }
 
 /** The slots, copies and old folders a removal left (#1447), one warning each, with why. */
 function keptWarnings(folders: readonly { of: ProjectFolderOf; path: string; kept: string | null }[]): string[] {
-  return folders.flatMap((f) => (f.kept ? [tr(msg({ id: 'main.removal.folderKept', defaultMessage: 'Left in place: {what} at {path} ({why}).', description: "A warning after Remove from Hive or Delete (#1447): a slot, review copy or old reviewer folder ({what}: its name) that was kept, at {path}, and why ({why}: a clause)." }), { what: folderWhat(f.of), path: f.path, why: f.kept })] : []))
+  return folders.flatMap((f) => (f.kept ? [tr(msg({ id: 'main.removal.folderKept', defaultMessage: 'Left in place: {what} at {path} ({why}).', description: "A warning after Remove from Combwork or Delete (#1447): a slot, review copy or old reviewer folder ({what}: its name) that was kept, at {path}, and why ({why}: a clause)." }), { what: folderWhat(f.of), path: f.path, why: f.kept })] : []))
 }
 
 /** Stops the project's agents (and starts in progress) and waits for them, so nothing holds or changes its folders. */
@@ -179,9 +179,9 @@ export async function removeProject(projectPath: string, how: ProjectRemoval): P
       log.info(`Hid ${userText(name)}`)
       return { warnings: [] }
     }
-    // Its merge queues go with it (#1360): this Hive's runners released, their worktrees and records removed.
+    // Its merge queues go with it (#1360): this Combwork's runners released, their worktrees and records removed.
     await forgetProjectQueues({ store: FactStore.forBoard(ws, { project: name, key: name }), project: p, root: join(ws.worktreesRoot, name), locked: (fn) => boardWrite(ws, async () => fn()) }).catch((e) => log.warn(`removing ${userText(name)}'s merge queue folders`, e))
-    const done = how === 'remove' ? await removeFromHive(ws, p, info, agents) : await deleteProject(ws, p, info, agents)
+    const done = how === 'remove' ? await removeFromCombwork(ws, p, info, agents) : await deleteProject(ws, p, info, agents)
     // Its agents' terminals' kept sizes and output go with it (#489); a hidden project keeps them.
     forgetPtys(agentPtyKey(p, ''))
     return done
@@ -194,12 +194,12 @@ export async function removeProject(projectPath: string, how: ProjectRemoval): P
   }
 }
 
-async function removeFromHive(ws: WorkspaceService, p: string, info: ProjectRemovalInfo, agents: AgentDef[]): Promise<{ warnings: string[] }> {
+async function removeFromCombwork(ws: WorkspaceService, p: string, info: ProjectRemovalInfo, agents: AgentDef[]): Promise<{ warnings: string[] }> {
   const name = basename(p)
   const held = unmergedWork(info.worktrees)
   if (held) throw new Error(held)
   const { ok, refused } = await checkedWorktrees(ws, p, agents)
-  if (refused.length) throw new Error(tr(msg({ id: 'main.removal.wontRemove', defaultMessage: "Hive won't remove {worktrees}. Fix or remove that agent first.", description: "Why Remove from Hive refused: agents' worktrees it won't remove. {worktrees} lists them, joined with “or” (main.removal.refusedTree)." }), { worktrees: fmt.list(refused, 'disjunction') }))
+  if (refused.length) throw new Error(tr(msg({ id: 'main.removal.wontRemove', defaultMessage: "Combwork won't remove {worktrees}. Fix or remove that agent first.", description: "Why Remove from Combwork refused: agents' worktrees it won't remove. {worktrees} lists them, joined with “or” (main.removal.refusedTree)." }), { worktrees: fmt.list(refused, 'disjunction') }))
   // Packed first: everything after it can be undone from the pack.
   await pack(ws, p, info.handovers)
   // Its sessions' records too (#1061): out of the workspace's database, into its folder, which takes them wherever it goes.
@@ -218,25 +218,25 @@ async function removeFromHive(ws: WorkspaceService, p: string, info: ProjectRemo
   for (const rel of info.handovers) {
     await trash(join(ws.sharedDir, rel)).catch((e) => {
       log.warn(`Could not move ${userText(rel)} to the Recycle Bin`, e)
-      warnings.push(tr(msg({ id: 'main.removal.handoverKept', defaultMessage: '{note} stayed in the shared notes (a copy is packed in the folder): {why}', description: "A warning after Remove from Hive: a handover note couldn't be moved to the Recycle Bin. {note} is its path, {why} the system's message." }), { note: rel, why: (e as Error).message }))
+      warnings.push(tr(msg({ id: 'main.removal.handoverKept', defaultMessage: '{note} stayed in the shared notes (a copy is packed in the folder): {why}', description: "A warning after Remove from Combwork: a handover note couldn't be moved to the Recycle Bin. {note} is its path, {why} the system's message." }), { note: rel, why: (e as Error).message }))
     })
   }
   await ws.setHidden(name, 'removed')
-  log.info(`Removed ${userText(name)} from Hive (packed ${info.handovers.length} handovers and its cards)`)
+  log.info(`Removed ${userText(name)} from Combwork (packed ${info.handovers.length} handovers and its cards)`)
   return { warnings: [...keptWarnings(folders), ...warnings] }
 }
 
 async function deleteProject(ws: WorkspaceService, p: string, info: ProjectRemovalInfo, agents: AgentDef[]): Promise<{ warnings: string[] }> {
   const name = basename(p)
   // Its slots, copies and old folders (#1447, HR1's round 1): refused before anything is done if one is outside the
-  // project's worktrees folder or held by one of Hive's steps; the rest go to the Recycle Bin after the folder.
+  // project's worktrees folder or held by one of Combwork's steps; the rest go to the Recycle Bin after the folder.
   const folders = await projectFolders(ws, p)
   // Its id now: its project.json goes with the folder (the slots' rows are kept by it).
   const id = (await ws.projectConfig(p)).id ?? name
   const blocked = (items: string[]): Error => new Error(tr(msg({ id: 'main.removal.deleteBlocked', defaultMessage: "Delete can't go ahead: {folders}. Nothing was deleted.", description: "Why Delete refused (#1447): the project's slots or old folders that stop it ({folders}: each one's name and why, a list). Nothing was changed." }), { folders: fmt.list(items) }))
   const blocks = await deleteBlocks(ws, p, folders)
   if (blocks.size) throw blocked(folders.filter((f) => blocks.has(f.key)).map((f) => `${folderWhat(f.of)} (${blocks.get(f.key)})`))
-  // Then held, in one write against the rows as they are then (HR1's round 2): no step of any Hive begins on the
+  // Then held, in one write against the rows as they are then (HR1's round 2): no step of any Combwork begins on the
   // project's slots or copies, nor makes one, until Delete has finished with them or let them go.
   const token = `d-${randomBytes(8).toString('hex')}`
   const { holder } = await import('./slotsApp')
@@ -264,7 +264,7 @@ async function deleteProject(ws: WorkspaceService, p: string, info: ProjectRemov
       )
     }
     // From here the project is gone: what can't follow is reported, not undone.
-    const warnings = refused.map((r) => tr(msg({ id: 'main.removal.leftAlone', defaultMessage: 'Left alone: {worktree}.', description: "A warning after Delete: an agent's worktree Hive didn't delete with the project (main.removal.refusedTree)." }), { worktree: r }))
+    const warnings = refused.map((r) => tr(msg({ id: 'main.removal.leftAlone', defaultMessage: 'Left alone: {worktree}.', description: "A warning after Delete: an agent's worktree Combwork didn't delete with the project (main.removal.refusedTree)." }), { worktree: r }))
     // Its slots, copies and old folders follow it to the Recycle Bin, with their work (#1447), their rows with the hold.
     warnings.push(...(await trashFolders(ws, p, id, folders, token, trash)))
     held = false
@@ -307,9 +307,9 @@ interface Manifest {
   cards: number
 }
 
-/** Writes the project's handovers and cards into <project>/.hive/removed, with a manifest. */
+/** Writes the project's handovers and cards into <project>/.combwork/removed, with a manifest. */
 async function pack(ws: WorkspaceService, p: string, handovers: string[]): Promise<void> {
-  const dir = join(p, HIVE_DIR, REMOVED_DIR)
+  const dir = join(p, CW_DIR, REMOVED_DIR)
   // An older pack (removed before, restored without unpacking) makes way for this one.
   await removePath(dir)
   await mkdir(join(dir, 'handovers'), { recursive: true })
@@ -336,12 +336,12 @@ async function restoreTarget(dir: string, f: string, text: string): Promise<stri
 }
 
 /**
- * Puts back what Remove from Hive packed: handovers into the shared notes (never over a different note: that one
+ * Puts back what Remove from Combwork packed: handovers into the shared notes (never over a different note: that one
  * keeps its name and the packed one comes back beside it), and the cards: in the workspace it was removed from,
  * the archived ones come back; anywhere else, copies with new numbers. The pack is deleted only once all is back.
  */
 async function unpack(ws: WorkspaceService, p: string): Promise<{ handovers: number; cards: number }> {
-  const dir = join(p, HIVE_DIR, REMOVED_DIR)
+  const dir = join(p, CW_DIR, REMOVED_DIR)
   const manifest = await readJson<Partial<Manifest> | null>(join(dir, 'manifest.json'), null)
   if (!manifest) return { handovers: 0, cards: 0 }
   let handovers = 0
@@ -370,19 +370,19 @@ export async function restoreProject(name: string): Promise<{ handovers: number;
   if (!existsSync(p)) throw new Error(tr(msg({ id: 'main.removal.folderGone', defaultMessage: 'The folder {folder} is no longer in the workspace. Put it back, or forget it.', description: 'An error restoring a project whose folder has gone. Forget is the button that stops listing it.' }), { folder: entry.name }))
   await ws.setHidden(entry.name, null)
   // If unpacking fails, the project is back and its pack stays: its banner offers to restore it again.
-  const result = entry.mode === 'removed' && existsSync(join(p, HIVE_DIR, REMOVED_DIR)) ? await unpack(ws, p) : { handovers: 0, cards: await restoreProjectCards(ws, entry.name) }
+  const result = entry.mode === 'removed' && existsSync(join(p, CW_DIR, REMOVED_DIR)) ? await unpack(ws, p) : { handovers: 0, cards: await restoreProjectCards(ws, entry.name) }
   await ws.ensureProject(p)
   log.info(`Restored ${userText(entry.name)}`)
   await ws.refresh()
   return result
 }
 
-/** A project folder holding a pack from Remove from Hive (moved here, or never unpacked): takes it in, or drops it. */
+/** A project folder holding a pack from Remove from Combwork (moved here, or never unpacked): takes it in, or drops it. */
 export async function takeRemovedData(projectPath: string, keep: boolean): Promise<{ handovers: number; cards: number }> {
   const ws = workspace
   const p = ws.assertProject(projectPath)
   const result = keep ? await unpack(ws, p) : { handovers: 0, cards: 0 }
-  if (!keep) await removePath(join(p, HIVE_DIR, REMOVED_DIR))
+  if (!keep) await removePath(join(p, CW_DIR, REMOVED_DIR))
   await ws.refresh()
   return result
 }

@@ -1,7 +1,7 @@
 // Heavy test runs, machine-wide (#204). Several agents checking their cards at once on one machine (full e2e sets,
 // repeats, scenario runs) slowed each other until tests timed out: the flakes were the load, not the code. So at most
-// a few heavy runs go at once across every worktree (heavySlots in hive-test\config.json, default 2, #589); a heavy run started while
-// they are all taken waits for one, in the order the runs asked, saying who holds them (and in Hive's Progress panel).
+// a few heavy runs go at once across every worktree (heavySlots in combwork-test\config.json, default 2, #589); a heavy run started while
+// they are all taken waits for one, in the order the runs asked, saying who holds them (and in Combwork's Progress panel).
 // A pre-merge run goes first (#558): one started by the agent holding its project's merge slot (holdsMergeSlot), or
 // with --pre-merge. It takes the next free slot before runs that asked earlier for other reasons (a merge shouldn't wait
 // behind flake-proof repeats while every other merge waits behind it), but never stops a run that holds one.
@@ -20,11 +20,11 @@
 // waiting (when it asked, which pool; `first` for a pre-merge run), each with its runner's process id, changed only
 // under the claims lock. A crashed run's claim expires: its process is gone (or it is a day old).
 //
-// A run left over (#1008): one started in an agent's session that has ended since (Hive closed under it, the agent
+// A run left over (#1008): one started in an agent's session that has ended since (Combwork closed under it, the agent
 // stopped or restarted) keeps running, and keeps its slot, while its process lives. Its claim records the agent's launch
-// (owner: runOwner), and a waiting run asks Hive whether that launch still runs (launchEnded): the wait line names a
+// (owner: runOwner), and a waiting run asks Combwork whether that launch still runs (launchEnded): the wait line names a
 // holder that was left over, and a run in the same worktree says so as it starts. Nothing is stopped on its own: its
-// results may still be wanted. Hive's notice after an unexpected close offers to stop it (#987).
+// results may still be wanted. Combwork's notice after an unexpected close offers to stop it (#987).
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
@@ -32,7 +32,7 @@ import { processAlive } from './logs.mjs'
 import { claimHeld, describeHolder, withLock } from './lanes.mjs'
 import { parentSuite } from './runner.mjs'
 
-/** Heavy runs at once, unless the machine's config.json or HIVE_TEST_HEAVY_SLOTS says otherwise. */
+/** Heavy runs at once, unless the machine's config.json or CW_TEST_HEAVY_SLOTS says otherwise. */
 export const DEFAULT_SLOTS = 2
 /**
  * The machine's test settings (#589): `{ "heavySlots": 3 }` in the shared test folder, read each time a run asks, so an
@@ -51,16 +51,16 @@ const sayOnce = (say, line) => {
 }
 
 /**
- * How many heavy runs may go at once (#589): HIVE_TEST_HEAVY_SLOTS, a one-off override; else `heavySlots` in the machine's
+ * How many heavy runs may go at once (#589): CW_TEST_HEAVY_SLOTS, a one-off override; else `heavySlots` in the machine's
  * config.json (CONFIG_FILE); else DEFAULT_SLOTS. Each a whole number, 1 or more. A missing or unreadable file, or a value
  * that isn't one, falls back to the default, and the run says so in one line (once).
  */
 export function heavySlots(env = process.env, file = CONFIG_FILE, say = (line) => console.error(line)) {
   const whole = (v) => Number.isInteger(v) && v >= 1
-  const set = env.HIVE_TEST_HEAVY_SLOTS
+  const set = env.CW_TEST_HEAVY_SLOTS
   if (set !== undefined && set !== '') {
     if (whole(Number(set))) return Number(set)
-    sayOnce(say, `Test slots: HIVE_TEST_HEAVY_SLOTS=${JSON.stringify(set)} isn't a whole number from 1; it is left out.`)
+    sayOnce(say, `Test slots: CW_TEST_HEAVY_SLOTS=${JSON.stringify(set)} isn't a whole number from 1; it is left out.`)
   }
   let text
   try {
@@ -98,7 +98,7 @@ export const MODEL_PROVIDERS = ['claude-code', 'codex']
 /**
  * The side slots, model trials and small-run bound (HI-2070), from the machine's config.json beside heavySlots
  * (`sideSlots`, a whole number from 0; `modelTrials`, from 1; `smallRun: { e2eSuites, e2eRepeat, scenarioRuns }`, each
- * from 1), read each time a run asks; HIVE_TEST_SIDE_SLOTS and HIVE_TEST_MODEL_TRIALS override the first two for one run.
+ * from 1), read each time a run asks; CW_TEST_SIDE_SLOTS and CW_TEST_MODEL_TRIALS override the first two for one run.
  * A value that isn't one falls back to its default, said in one line (once).
  */
 export function slotSettings(env = process.env, file = CONFIG_FILE, say = (line) => console.error(line)) {
@@ -121,8 +121,8 @@ export function slotSettings(env = process.env, file = CONFIG_FILE, say = (line)
     sayOnce(say, `Test slots: ${name} ${JSON.stringify(v)} in ${file} isn't a whole number from ${from}; ${def}, the default.`)
     return def
   }
-  const side = pick('sideSlots', 'HIVE_TEST_SIDE_SLOTS', DEFAULT_SIDE_SLOTS, 0)
-  const models = pick('modelTrials', 'HIVE_TEST_MODEL_TRIALS', DEFAULT_MODEL_TRIALS, 1)
+  const side = pick('sideSlots', 'CW_TEST_SIDE_SLOTS', DEFAULT_SIDE_SLOTS, 0)
+  const models = pick('modelTrials', 'CW_TEST_MODEL_TRIALS', DEFAULT_MODEL_TRIALS, 1)
   const small = { ...DEFAULT_SMALL_RUN }
   if (cfg.smallRun !== undefined) {
     for (const k of Object.keys(DEFAULT_SMALL_RUN)) {
@@ -141,7 +141,7 @@ export const SIDE_E2E_JOBS = 2
 /**
  * The kinds of slot the run this one was started inside holds for it (HI-2070): 'cpu' (a heavy or side slot) and
  * 'model' (a model trial's), from E2E_RUN_SLOTS, comma-separated, which the runners set for what they start and which
- * is carried into a test Hive's sessions (runContext CARRIED). A run inside a suite marked without it (an older runner)
+ * is carried into a test Combwork's sessions (runContext CARRIED). A run inside a suite marked without it (an older runner)
  * has the CPU credit every nested run had before (#211); a run started outside any has none.
  */
 export function heldCredit(env = process.env) {
@@ -208,18 +208,18 @@ export function needsSlot({ count, repeat = 1 }, env = process.env) {
 }
 
 /**
- * A GET of Hive's Agent API with the session's own variables, which the runners read from the shell they were started
- * in, as their progress reporting does: the reply's JSON, or null when no Hive agent runs this, or the API doesn't answer
- * in time or refuses. workspace: the X-Hive-Workspace to name (the session's own by default).
+ * A GET of Combwork's Agent API with the session's own variables, which the runners read from the shell they were started
+ * in, as their progress reporting does: the reply's JSON, or null when no Combwork agent runs this, or the API doesn't answer
+ * in time or refuses. workspace: the X-Combwork-Workspace to name (the session's own by default).
  */
-async function apiGet(path, env, { fetch = globalThis.fetch, timeoutMs = 3000, workspace = env.HIVE_WORKSPACE } = {}) {
-  const url = env.HIVE_API_URL?.replace(/\/+$/, '')
+async function apiGet(path, env, { fetch = globalThis.fetch, timeoutMs = 3000, workspace = env.CW_WORKSPACE } = {}) {
+  const url = env.CW_API_URL?.replace(/\/+$/, '')
   if (!url) return null
-  // The session's token file, never HIVE_API_TOKEN (HI-2262: sessions no longer get it).
+  // The session's token file, never CW_API_TOKEN (HI-2262: sessions no longer get it).
   let token = ''
-  if (env.HIVE_API_TOKEN_FILE) {
+  if (env.CW_API_TOKEN_FILE) {
     try {
-      token = String(JSON.parse(readFileSync(env.HIVE_API_TOKEN_FILE, 'utf8')).token ?? '')
+      token = String(JSON.parse(readFileSync(env.CW_API_TOKEN_FILE, 'utf8')).token ?? '')
     } catch {
       token = ''
     }
@@ -227,7 +227,7 @@ async function apiGet(path, env, { fetch = globalThis.fetch, timeoutMs = 3000, w
   if (!token) return null
   try {
     const res = await fetch(`${url}${path}`, {
-      headers: { Authorization: `Bearer ${token}`, ...(workspace ? { 'X-Hive-Workspace': encodeURIComponent(workspace) } : {}) },
+      headers: { Authorization: `Bearer ${token}`, ...(workspace ? { 'X-Combwork-Workspace': encodeURIComponent(workspace) } : {}) },
       signal: AbortSignal.timeout(timeoutMs)
     })
     return res.ok ? await res.json() : null
@@ -238,13 +238,13 @@ async function apiGet(path, env, { fetch = globalThis.fetch, timeoutMs = 3000, w
 
 /**
  * Whether this run is the merge slot holder's (#558): started in the session of the agent that holds its project's
- * merge slot (the default branch's), asked through Hive's Agent API. False when no Hive agent runs it or the API doesn't
+ * merge slot (the default branch's), asked through Combwork's Agent API. False when no Combwork agent runs it or the API doesn't
  * answer in time: an ordinary run then.
  */
 export async function holdsMergeSlot(env = process.env, { fetch = globalThis.fetch, timeoutMs = 3000 } = {}) {
-  if (!env.HIVE_PROJECT || !env.HIVE_AGENT) return false
-  const holder = (await apiGet(`/v1/projects/${encodeURIComponent(env.HIVE_PROJECT)}/merge-slot`, env, { fetch, timeoutMs }))?.holder
-  return holder?.kind === 'agent' && holder.name === env.HIVE_AGENT
+  if (!env.CW_PROJECT || !env.CW_AGENT) return false
+  const holder = (await apiGet(`/v1/projects/${encodeURIComponent(env.CW_PROJECT)}/merge-slot`, env, { fetch, timeoutMs }))?.holder
+  return holder?.kind === 'agent' && holder.name === env.CW_AGENT
 }
 
 /**
@@ -252,14 +252,14 @@ export async function holdsMergeSlot(env = process.env, { fetch = globalThis.fet
  * workspace }, or undefined outside an agent's session.
  */
 export function runOwner(env = process.env) {
-  if (!env.HIVE_PROJECT || !env.HIVE_AGENT || !env.HIVE_RUN_ID) return undefined
-  return { project: env.HIVE_PROJECT, agent: env.HIVE_AGENT, run: env.HIVE_RUN_ID, ...(env.HIVE_WORKSPACE ? { workspace: env.HIVE_WORKSPACE } : {}) }
+  if (!env.CW_PROJECT || !env.CW_AGENT || !env.CW_RUN_ID) return undefined
+  return { project: env.CW_PROJECT, agent: env.CW_AGENT, run: env.CW_RUN_ID, ...(env.CW_WORKSPACE ? { workspace: env.CW_WORKSPACE } : {}) }
 }
 
 /**
- * Whether the launch a claim's run was started in has ended (#1008): Hive closed under it, or its agent stopped or
+ * Whether the launch a claim's run was started in has ended (#1008): Combwork closed under it, or its agent stopped or
  * restarted, so the run was left over and nobody waits for its results in that session. Asked through the Agent API
- * with this run's own session: true or false, or null when it can't say (no owner, no Hive agent here, no answer).
+ * with this run's own session: true or false, or null when it can't say (no owner, no Combwork agent here, no answer).
  */
 export async function launchEnded(owner, env = process.env, opts = {}) {
   if (!owner?.project || !owner.agent || !owner.run) return null
@@ -382,7 +382,7 @@ export function describeClaim(c, now = Date.now()) {
 function capacity(pool, slots, settings) {
   if (pool === 'model') return `${settings.models} real-model trials at once on this machine, modelTrials`
   if (pool === 'small' && settings.side) return `a small run: ${settings.side} side and ${slots} heavy slots on this machine, sideSlots and heavySlots`
-  return `${slots} heavy runs at once on this machine, HIVE_TEST_HEAVY_SLOTS`
+  return `${slots} heavy runs at once on this machine, CW_TEST_HEAVY_SLOTS`
 }
 
 /** What a waiting run prints at a look that finds no slot (both runners): how many go at once, its place, the holders. */

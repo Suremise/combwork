@@ -1,7 +1,7 @@
 // Overview tab: the session details' agent picker and the compaction history, a data table (#124): pages, rows per
 // page, a trigger filter and a text filter (no matches: Clear filters), sorting by a header, and a row opening its
 // compaction in the Sessions tab at its divider; a compaction after a big turn says so (#154). In a throwaway profile
-// and workspace. Transcripts are Hive backups (.hive/sessions); no agent is started.
+// and workspace. Transcripts are Combwork backups (.combwork/sessions); no agent is started.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -14,7 +14,7 @@ const shots = path.join(scratch, 'oshots')
 for (const d of [userData, ws, shots]) fs.rmSync(d, { recursive: true, force: true })
 fs.mkdirSync(shots, { recursive: true })
 const proj = path.join(ws, 'demo')
-const sessDir = path.join(proj, '.hive', 'sessions')
+const sessDir = path.join(proj, '.combwork', 'sessions')
 fs.mkdirSync(sessDir, { recursive: true })
 lib.enableProviders(userData)
 
@@ -53,7 +53,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   const alpha = await lib.addAgent(inv, proj, { name: 'Alpha' })
   const beta = await lib.addAgent(inv, proj, { name: 'Beta' })
   const t = '2026-09-29T09:00:00.000Z'
-  // Hive has read the project's records: they are replaced in the workspace's database (#1061).
+  // Combwork has read the project's records: they are replaced in the workspace's database (#1061).
   putSessions(proj, { version: 1, sessions: [
     { id: A, agent: 'claude-code', agentId: alpha.id, name: 'Alpha work', createdAt: t, lastActiveAt: t, archived: false },
     { id: B, agent: 'claude-code', agentId: beta.id, name: 'Beta work', createdAt: t, lastActiveAt: '2026-09-29T10:00:00.000Z', archived: false }
@@ -156,7 +156,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   await cpu.send('Emulation.setCPUThrottlingRate', { rate: 4 })
   const placedAt = []
   for (let ms = 6; ms <= 50; ms += 4) {
-    await app.evaluate((_e, v) => { process.env.HIVE_TEST_SLOW_IPC = v }, `transcript:compactions=${ms}`)
+    await app.evaluate((_e, v) => { process.env.CW_TEST_SLOW_IPC = v }, `transcript:compactions=${ms}`)
     await rows.first().focus()
     await page.keyboard.press('Enter')
     const inView = async () => (await divider.count()) === 1 && (await divider.evaluate((el) => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight }))
@@ -164,7 +164,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
     await page.locator('.tab', { hasText: 'Overview' }).click()
     await head.waitFor({ timeout: 10000 })
   }
-  await app.evaluate(() => { delete process.env.HIVE_TEST_SLOW_IPC })
+  await app.evaluate(() => { delete process.env.CW_TEST_SLOW_IPC })
   await cpu.send('Emulation.setCPUThrottlingRate', { rate: 1 })
   await cpu.detach().catch(() => undefined)
   check('…also when its place arrives just after the transcript opened at its end', placedAt.every((p) => p.ok), JSON.stringify(placedAt))

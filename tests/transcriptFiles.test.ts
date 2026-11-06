@@ -18,7 +18,7 @@ async function readAll(path: string, from = 0, chunk?: number): Promise<{ text: 
 
 describe('transcript files', () => {
   it('reads a plain and a compressed transcript to the same lines, from any line offset', async () => {
-    const dir = tempDir('hive-transcript-files-')
+    const dir = tempDir('cw-transcript-files-')
     const plain = join(dir, 'a.jsonl')
     writeFileSync(plain, lines)
     const gz = join(dir, 'b.jsonl.gz')
@@ -34,7 +34,7 @@ describe('transcript files', () => {
   })
 
   it('reads a range of either (an image the viewer shows, where the parser saw it)', async () => {
-    const dir = tempDir('hive-transcript-files-')
+    const dir = tempDir('cw-transcript-files-')
     const plain = join(dir, 'a.jsonl')
     writeFileSync(plain, lines)
     const gz = join(dir, 'b.jsonl.gz')
@@ -47,7 +47,7 @@ describe('transcript files', () => {
   })
 
   it('a range of a missing or damaged .gz fails its call, not the process', async () => {
-    const dir = tempDir('hive-transcript-files-')
+    const dir = tempDir('cw-transcript-files-')
     const uncaught: unknown[] = []
     const onUncaught = (e: unknown): void => void uncaught.push(e)
     process.on('uncaughtException', onUncaught)
@@ -66,14 +66,14 @@ describe('transcript files', () => {
   })
 
   it("leaves a plain file's line still being written for the next read", async () => {
-    const dir = tempDir('hive-transcript-files-')
+    const dir = tempDir('cw-transcript-files-')
     const plain = join(dir, 'a.jsonl')
     writeFileSync(plain, '{"a":1}\n{"b":')
     expect(await readAll(plain)).toEqual({ text: '{"a":1}\n', offset: 8 })
   })
 
   it('reads the first line of either, and the size a compressed one holds', async () => {
-    const dir = tempDir('hive-transcript-files-')
+    const dir = tempDir('cw-transcript-files-')
     const gz = join(dir, 'b.jsonl.gz')
     writeFileSync(gz, gzipSync(lines))
     expect(await readFirstLineOf(gz)).toBe(lines.slice(0, lines.indexOf('\n')))
@@ -82,7 +82,7 @@ describe('transcript files', () => {
   })
 
   it('compresses a file whole, and decompresses one, never leaving half of either', async () => {
-    const dir = tempDir('hive-transcript-files-')
+    const dir = tempDir('cw-transcript-files-')
     const plain = join(dir, 's.jsonl')
     writeFileSync(plain, lines)
     const gz = await compressFile(plain)
@@ -99,7 +99,7 @@ describe('transcript files', () => {
   })
 
   it("expands a backup for a move: its .gz decompressed in its place, or dropped beside a newer plain one", async () => {
-    const dir = tempDir('hive-transcript-files-')
+    const dir = tempDir('cw-transcript-files-')
     const plain = join(dir, 's.jsonl')
     writeFileSync(plain + '.gz', gzipSync(lines))
     await expandBackup(plain)

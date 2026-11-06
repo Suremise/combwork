@@ -19,7 +19,7 @@ export interface ConnectionShown {
   other: boolean
 }
 
-/** Every account in the one order (decision A): Hive's folders and the CLI's own homes alike. */
+/** Every account in the one order (decision A): Combwork's folders and the CLI's own homes alike. */
 export function orderedAccounts(view: Pick<ConnectionsView, 'connections' | 'homes' | 'order'>): Account[] {
   const all: Account[] = [...view.connections, ...(view.homes ?? [])]
   const order = view.order ?? all.map((a) => a.id)
@@ -34,6 +34,16 @@ export function connectionsHere(view: ConnectionsView, cli?: ProviderId): Connec
 /** The connection a run launched on, as the window names it (HI-2397): the named connection, else (a launch from before it) its account. */
 export function launchedName(launched: NonNullable<LiveSessionState['launchedConnection']>): { id: string; name: string } {
   return launched.connection ?? { id: launched.id, name: launched.name }
+}
+
+/**
+ * Whether a running agent is due a switch to the connection it would launch on now (HI-1755; HI-2413: by connection, as
+ * connectionOf's `other`, not by account, so another connection on the same account counts too). `now` is what it would
+ * launch on: `connection` its account (`!<why>`: none usable), `connectionId` the connection. A launch from before
+ * HI-2397, which kept only its account, is compared by account. Its own connection chosen again is no change.
+ */
+export function connectionSwitchDue(launched: NonNullable<LiveSessionState['launchedConnection']>, now: { connection: string | null; connectionId?: string }): boolean {
+  return launched.connection && now.connectionId ? now.connectionId !== launched.connection.id : now.connection !== launched.id
 }
 
 export function connectionOf(own: string | undefined, provider: ProviderId, launched: LiveSessionState['launchedConnection'] | undefined, view: ConnectionsView | null): ConnectionShown | null {
@@ -57,7 +67,27 @@ export function offeredConnections(view: ConnectionsView | null, settings: Param
 }
 
 /**
- * Whether a CLI can run a new agent now, as Hive's detection says (decision A: on and installed): `yes`, installed;
+ * What to offer where nothing can start here for want of a connection (HI-2650, Darren 6 Nov: nothing is turned on by
+ * itself): the accounts that are off in this workspace, never turned on until the user clicks.
+ * - Eligible: Combwork's accounts (not a CLI's own home) whose CLI the view lists (on in Settings, with connections), not
+ *   a test copy's CLI on its test home, and not on here. `cli`: that CLI's only (a project's agents' CLI).
+ * - With no `cli`, those of an installed CLI first (`ready`), so the offer is one that can start; else all of them.
+ * - `one`: exactly one: Turn On Here on it. `several`: Choose in Settings. `none`: none at all, add one (as before).
+ */
+export type OffHereChoice = { kind: 'one'; id: string; name: string; cli: ProviderId } | { kind: 'several'; names: string[]; cli?: ProviderId } | { kind: 'none'; cli?: ProviderId }
+
+export function offHereChoice(view: Pick<ConnectionsView, 'connections' | 'homes' | 'order' | 'providers' | 'testHome' | 'workspace'>, ready: CliReady, cli?: ProviderId): OffHereChoice {
+  const eligible = orderedAccounts(view).filter((a) => !a.home && view.providers.includes(a.provider) && !view.testHome.includes(a.provider) && (!cli || a.provider === cli) && !view.workspace[a.provider]?.on.includes(a.id))
+  const installed = eligible.filter((a) => ready(a.provider) === 'yes')
+  const offer = !cli && installed.length ? installed : eligible
+  if (!offer.length) return { kind: 'none', ...(cli ? { cli } : {}) }
+  if (offer.length === 1) return { kind: 'one', id: offer[0].id, name: offer[0].name, cli: offer[0].provider }
+  const clis = [...new Set(offer.map((a) => a.provider))]
+  return { kind: 'several', names: offer.map((a) => a.name), ...(clis.length === 1 ? { cli: clis[0] } : {}) }
+}
+
+/**
+ * Whether a CLI can run a new agent now, as Combwork's detection says (decision A: on and installed): `yes`, installed;
  * `no`, not found; `checking`, not known yet (detection under way).
  */
 export type CliReady = (cli: ProviderId) => 'yes' | 'no' | 'checking'

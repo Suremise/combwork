@@ -9,7 +9,7 @@
 // 3. Move it (`git reset --keep`, through the platform), recorded as a `LineMoved` on the card just Done, the builder
 //    told; git's refusal is asked of the user with its reason, nothing else tried.
 // With Settings → Advanced → Bring an agent's branch up to date after a squash merge off, the user is asked every time
-// (approve: Hive does it once). With workflow rules off, nothing happens here at all (as before 1.0).
+// (approve: Combwork does it once). With workflow rules off, nothing happens here at all (as before 1.0).
 //
 // Each question is asked once for the branch's head (bound to it), so a branch nobody touches is never asked about twice.
 // Looked at after board changes and when an agent goes idle (its session's status), per open workspace, one pass at a time.
@@ -17,7 +17,7 @@
 import { AsyncResource } from 'async_hooks'
 import { advanced } from '../advanced'
 import { boardWaits } from '../boardStore'
-import { onHiveEvent } from '../events'
+import { onCombworkEvent } from '../events'
 import { createLogger, userText } from '../logger'
 import { coalesced } from '../coalesce'
 import { gitStep } from '../platform/git'
@@ -30,8 +30,8 @@ import type { LineBehind, Workflow } from './runtime'
 
 const log = createLogger('workflow')
 
-/** The Advanced switch (#1271): Hive moves an agent's branch after a squash merge (on), or asks the user every time. */
-export const UPDATE_AGENT_BRANCH = 'hive.workflow.updateAgentBranch'
+/** The Advanced switch (#1271): Combwork moves an agent's branch after a squash merge (on), or asks the user every time. */
+export const UPDATE_AGENT_BRANCH = 'cw.workflow.updateAgentBranch'
 
 /** Whether an agent is in a turn (busy): set by main from its sessions; idle when unset (unit tests set it). */
 let busy: (project: string, agent: string) => boolean = () => false
@@ -228,7 +228,7 @@ let started = false
 export function startLineUpdates(): void {
   if (started) return
   started = true
-  onHiveEvent((e) => {
+  onCombworkEvent((e) => {
     if (e.type === 'tasks-changed') {
       const ws = openWorkspaces().find((w) => w.path && w.path.toLowerCase() === e.workspacePath.toLowerCase())
       if (ws) soon(ws)

@@ -1,21 +1,21 @@
-// The merge queue runner's process ownership (#1360): a Windows job object per lease, on Hive's process supervisor
+// The merge queue runner's process ownership (#1360): a Windows job object per lease, on Combwork's process supervisor
 // (processSupervisor.ts, shared with agents' launches), which owns every process the runner starts for the whole life
 // of its tree (a shell's detached server too), and a launcher that is in the job, and recorded, before the command it
 // runs exists.
 //
-// The job is named after the lease (`Local\HiveQueue-<lease>`) and kill on close: the supervisor is a child of Hive,
-// which Windows ends with Hive, and once its handle goes every process in the job ends too, by the operating system's
+// The job is named after the lease (`Local\CombworkQueue-<lease>`) and kill on close: the supervisor is a child of Combwork,
+// which Windows ends with Combwork, and once its handle goes every process in the job ends too, by the operating system's
 // guarantee; nothing in it may break away. What escapes it anyway (a packaged app's process, such as the Store's
 // PowerShell, starts its children outside every job) is adopted into it, or followed by the supervisor (#543, #659,
 // #678); each process it follows is first written to the lease's journal (journalPath), flushed through to the disk,
 // and one it can't write down is ended at once ("unowned": the runner pauses): a followed process isn't in the job, so
-// the job closing doesn't end it, and the journal is how the next runner finds it after a crash. Another Hive taking a
-// dead runner's lease over opens its job by name while anything still holds it (a supervisor that outlived its Hive),
+// the job closing doesn't end it, and the journal is how the next runner finds it after a crash. Another Combwork taking a
+// dead runner's lease over opens its job by name while anything still holds it (a supervisor that outlived its Combwork),
 // ends what is in it and sees it empty, and ends what the journal names.
 //
-// A command starts through the launcher (Node: Hive's own executable as Node, or Node itself in tests), started
-// detached (outside Hive's own job, whose children break away silently) and waiting on its input: it is put in the job
-// and recorded, and only then told to run the command. A launcher whose input closes first (Hive gone, or the record
+// A command starts through the launcher (Node: Combwork's own executable as Node, or Node itself in tests), started
+// detached (outside Combwork's own job, whose children break away silently) and waiting on its input: it is put in the job
+// and recorded, and only then told to run the command. A launcher whose input closes first (Combwork gone, or the record
 // not written) exits without running anything.
 
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process'
@@ -31,12 +31,12 @@ const log = createLogger('queue')
 const END_MS = 15_000
 
 /**
- * Tests only (`linger`): a supervisor that outlives its Hive, as one whose Hive's job didn't end it would. A detached
+ * Tests only (`linger`): a supervisor that outlives its Combwork, as one whose Combwork's job didn't end it would. A detached
  * Node relay (PowerShell started detached gets no console, and reads nothing) starts it and passes its input on, but
- * never closes it: so it stays when its Hive has gone, until it is ended. The relay ends with it.
+ * never closes it: so it stays when its Combwork has gone, until it is ended. The relay ends with it.
  */
 const RELAY = `
-// A process of its own, not Hive's: its exit isn't one of Hive's ways out (exitBy).
+// A process of its own, not Combwork's: its exit isn't one of Combwork's ways out (exitBy).
 const end = process.exit.bind(process)
 const p = require('child_process').spawn(process.argv[1], process.argv.slice(2), { stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true })
 process.stdin.on('data', (d) => p.stdin.write(d))
@@ -47,7 +47,7 @@ p.on('exit', () => end(0))
 `
 
 
-/** A host of the queue's own (unit tests, a Hive with no agents' host given): one per process, made on first use. */
+/** A host of the queue's own (unit tests, a Combwork with no agents' host given): one per process, made on first use. */
 let own: JobHost | null = null
 
 /**
@@ -136,11 +136,11 @@ export const fileTimeMs = (created: string): number => Number((BigInt(created) -
 
 /**
  * A lease's journal (#1360): the file its job's supervisor writes each process it follows to, durably, before it
- * follows it (HiveJobs.Journal), so another Hive can end those after a crash. In the project's worktrees folder (or
+ * follows it (CombworkJobs.Journal), so another Combwork can end those after a crash. In the project's worktrees folder (or
  * `dir`, tests), made ready here.
  *
  * Sealing it (sealJournal) closes it to writers for good: what it held is moved aside (`<lease>.sealed-<n>`), and a
- * folder takes its name, so a supervisor that outlived its Hive and finds something more to follow can't write it down,
+ * folder takes its name, so a supervisor that outlived its Combwork and finds something more to follow can't write it down,
  * and so ends it itself instead (its fail-closed rule): no entry can arrive after the last read (HR4's design review of
  * round 5). What is moved aside stays until a settle has ended what it names; the seal stays until the lease's job is
  * gone, nothing holding it to write there (retireSeal, HI-1723).
@@ -206,7 +206,7 @@ const FILETIME_1970 = 116444736000000000n
 const filetimeNow = (): bigint => BigInt(Date.now() + 86_400_000) * 10000n + FILETIME_1970
 
 /**
- * A journal's text as whole records (HiveJobs.Journal writes each as "pid:created:check\n"), or why it isn't one
+ * A journal's text as whole records (CombworkJobs.Journal writes each as "pid:created:check\n"), or why it isn't one
  * (HR4's round 5 finding): every record must end with its newline (an unterminated tail is a torn append), have all
  * three fields, a pid Windows could give (1 to 2^32 - 1), a start (FILETIME) between 1970 and a day from now, and the
  * check the supervisor wrote ((pid + created) mod 1000003), so a record cut short or damaged is never read as another,
@@ -258,7 +258,7 @@ export async function sealJournal(root: string, lease: string, dir?: string): Pr
 
 /**
  * Removes a lease's journal, once what it names is seen gone: its moved-aside parts, and the journal itself unless it
- * is sealed (the seal stays: a supervisor that outlived its Hive may still try to write there, until retireSeal finds
+ * is sealed (the seal stays: a supervisor that outlived its Combwork may still try to write there, until retireSeal finds
  * its job gone).
  */
 export async function clearJournal(root: string, lease: string, dir?: string): Promise<void> {
@@ -321,5 +321,5 @@ async function retireIn(folder: string, lease: string, gone: (lease: string) => 
   return rmdir(join(folder, `${lease}.followed`)).then(() => true, () => false)
 }
 
-// The launcher (run by Node, waiting for its go-ahead) is launcher.ts's, shared with hive-progress's isolated checks (#1435).
+// The launcher (run by Node, waiting for its go-ahead) is launcher.ts's, shared with cw-progress's isolated checks (#1435).
 export { launcherNotStarted, launcherSignalled, SIGNALLED, startLauncher } from './launcher'

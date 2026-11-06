@@ -26,7 +26,7 @@ const PARSERS: Partial<Record<ProviderId, new (sessionId: string) => { feed(text
   [COPILOT]: CopilotUsageParser
 }
 
-/** A provider's parser for a session, or null for one this Hive can't read. */
+/** A provider's parser for a session, or null for one this Combwork can't read. */
 export function newUsageParser(provider: ProviderId, sessionId: string): RawUsageParser | null {
   const P = PARSERS[provider]
   if (!P) return null
@@ -39,7 +39,7 @@ const own = (p: RawUsageParser): Record<string, unknown> => (p as unknown as Rec
 
 /**
  * What a saved state must match to be taken up: the parser's field names and those of the objects in it made by a class
- * (the timeline's builder), so a state saved by a parser of another shape is read afresh rather than misread. With Hive's
+ * (the timeline's builder), so a state saved by a parser of another shape is read afresh rather than misread. With Combwork's
  * version beside it (usageDb: a state is kept only for the version that saved it), a parser changed between versions
  * never takes one up.
  */

@@ -1,6 +1,7 @@
 import { EFFORT_TEXT, OLDER_VERSIONS } from './claude'
 import { withCliOwn } from './cliOwnMode'
 import { msg } from './i18n/msg'
+import { agentMsg, say } from './agentText'
 import type { ModeOption, ModelGroup, ProviderDescriptor } from './providers'
 
 /**
@@ -11,12 +12,26 @@ import type { ModeOption, ModelGroup, ProviderDescriptor } from './providers'
 export const CODEX = 'codex'
 
 /** The presets of Codex's /permissions menu, in its order (checked with Codex 0.159). */
+/** Codex's permission modes as agents and the Agent API read them (dialects, HI-2065): said when read (the getters below), so in the reader's dialect. The window has its own messages (`text`). */
+const M = {
+  readOnlyLabel: agentMsg({ id: 'mode.codex.readOnly.label', text: 'Read only', note: "Codex's permission mode read-only: its name, as agents and the Agent API read it (the window has its own message)." }),
+  readOnlyDescription: agentMsg({ id: 'mode.codex.readOnly.desc', text: 'Reads workspace files; asks before any edit or internet access.', note: "What Codex's permission mode read-only does, as agents and the Agent API read it (the window has its own message)." }),
+  askDescription: agentMsg({ id: 'mode.codex.ask.desc', text: 'Reads and edits workspace files and runs commands in its sandbox; asks before internet access or edits outside the workspace.', note: "What Codex's permission mode ask does, as agents and the Agent API read it (the window has its own message)." }),
+  approveForMeDescription: agentMsg({ id: 'mode.codex.approveForMe.desc', text: 'An automatic reviewer approves safe actions itself and only asks about ones it thinks are risky.', note: "What Codex's permission mode approve-for-me does, as agents and the Agent API read it (the window has its own message)." }),
+  fullAccessLabel: agentMsg({ id: 'mode.codex.fullAccess.label', text: 'Full access', note: "Codex's permission mode full-access: its name, as agents and the Agent API read it (the window has its own message)." }),
+  fullAccessDescription: agentMsg({ id: 'mode.codex.fullAccess.desc', text: 'No sandbox and no approvals: edits anything and uses the internet without asking. Use only in disposable environments.', note: "What Codex's permission mode full-access does, as agents and the Agent API read it (the window has its own message)." })
+}
+
 // The English labels and descriptions are what agents and the Agent API read; `text` is the window's (#800).
 export const CODEX_PERMISSION_MODES: ModeOption[] = [
   {
     value: 'read-only',
-    label: 'Read only', // i18n-ignore: agent-facing English (text is the window's)
-    description: 'Reads workspace files; asks before any edit or internet access.', // i18n-ignore: agent-facing English (text is the window's)
+    get label() {
+      return say(M.readOnlyLabel)
+    },
+    get description() {
+      return say(M.readOnlyDescription)
+    },
     text: {
       label: msg({ id: 'agents.codex.readOnly', defaultMessage: 'Read only', description: "Codex's permission preset: it only reads. Keep it short." }),
       description: msg({ id: 'agents.codex.readOnlyDescription', defaultMessage: 'Reads workspace files; asks before any edit or internet access.', description: "What Codex's Read only permission preset does (the mode picker)." })
@@ -24,8 +39,11 @@ export const CODEX_PERMISSION_MODES: ModeOption[] = [
   },
   {
     value: 'ask',
+    // agent-protocol: also Codex's own preset name, matched in its "Permission selection requested" line (the codex adapter's modeFromOutput)
     label: 'Ask for approval', // i18n-ignore: agent-facing English (text is the window's)
-    description: 'Reads and edits workspace files and runs commands in its sandbox; asks before internet access or edits outside the workspace.', // i18n-ignore: agent-facing English (text is the window's)
+    get description() {
+      return say(M.askDescription)
+    },
     text: {
       label: msg({ id: 'agents.codex.ask', defaultMessage: 'Ask for approval', description: "Codex's permission preset: it asks before internet access or edits outside the workspace. Keep it short." }),
       description: msg({ id: 'agents.codex.askDescription', defaultMessage: 'Reads and edits workspace files and runs commands in its sandbox; asks before internet access or edits outside the workspace.', description: "What Codex's Ask for approval permission preset does (the mode picker)." })
@@ -33,8 +51,11 @@ export const CODEX_PERMISSION_MODES: ModeOption[] = [
   },
   {
     value: 'approve-for-me',
+    // agent-protocol: also Codex's own preset name, matched in its "Permission selection requested" line (the codex adapter's modeFromOutput)
     label: 'Approve for me', // i18n-ignore: agent-facing English (text is the window's)
-    description: 'An automatic reviewer approves safe actions itself and only asks about ones it thinks are risky.', // i18n-ignore: agent-facing English (text is the window's)
+    get description() {
+      return say(M.approveForMeDescription)
+    },
     reviewed: true,
     text: {
       label: msg({ id: 'agents.codex.approveForMe', defaultMessage: 'Approve for me', description: "Codex's permission preset: its own reviewer approves safe actions. Keep it short." }),
@@ -43,8 +64,12 @@ export const CODEX_PERMISSION_MODES: ModeOption[] = [
   },
   {
     value: 'full-access',
-    label: 'Full access', // i18n-ignore: agent-facing English (text is the window's)
-    description: 'No sandbox and no approvals: edits anything and uses the internet without asking. Use only in disposable environments.', // i18n-ignore: agent-facing English (text is the window's)
+    get label() {
+      return say(M.fullAccessLabel)
+    },
+    get description() {
+      return say(M.fullAccessDescription)
+    },
     danger: true,
     text: {
       label: msg({ id: 'agents.codex.fullAccess', defaultMessage: 'Full access', description: "Codex's permission preset with no guardrails. Keep it short." }),
@@ -124,7 +149,7 @@ export const CODEX_DESCRIPTOR: ProviderDescriptor = {
     imagePaste: true,
     // Images (pasted, or its view_image tool) and text; a PDF it can only dump with a shell command (checked with 0.162.1).
     attachments: ['image', 'text'],
-    // Codex rejects permissionDecision "ask" (and then runs the tool), so Hive asks the user itself.
+    // Codex rejects permissionDecision "ask" (and then runs the tool), so Combwork asks the user itself.
     lockAsk: false,
     backgroundSessions: false,
     // Codex isn't told when a background terminal ends: it finds out only by checking during a turn.
@@ -156,13 +181,13 @@ export const CODEX_DESCRIPTOR: ProviderDescriptor = {
   installNote:
     'The installer runs `irm https://chatgpt.com/codex/install.ps1 | iex` in PowerShell and installs to `%LOCALAPPDATA%\\Programs\\OpenAI\\Codex`. After installing, sign in with your ChatGPT account (Plus, Pro, Business or Enterprise) or an API key, then set up its Windows sandbox once. If the CLI is installed somewhere else, set its path in Settings → Codex.', // i18n-ignore: English, as main's notices use it (text has the window's)
   extensionNote:
-    "You have the Codex extension for VS Code (or a similar editor). Hive doesn't use it — the extension's built-in copy moves with every extension update. Install the CLI; your extension keeps working as before.", // i18n-ignore: English, as main's notices use it (text has the window's)
+    "You have the Codex extension for VS Code (or a similar editor). Combwork doesn't use it — the extension's built-in copy moves with every extension update. Install the CLI; your extension keeps working as before.", // i18n-ignore: English, as main's notices use it (text has the window's)
   signInHelp: 'Sign in again in Help → Provider Setup → Codex → Sign in (or run codex login in a terminal).', // i18n-ignore: English for main's notices (text has the window's)
   safeguardHelp: 'Codex sends a request it flags to another model, or stops the turn. For security work, OpenAI’s Trusted Access for Cyber program lifts that.', // i18n-ignore: English, the same as its message (text has it: a card comment stores the message, #866)
   text: {
-    installNote: msg({ id: 'agents.codex.installNote', defaultMessage: 'The installer runs `irm https://chatgpt.com/codex/install.ps1 | iex` in PowerShell and installs to `%LOCALAPPDATA%\\Programs\\OpenAI\\Codex`. After installing, sign in with your ChatGPT account (Plus, Pro, Business or Enterprise) or an API key, then set up its Windows sandbox once. If the CLI is installed somewhere else, set its path in Settings → Codex.', description: "Provider Setup → Codex: how its installer works. Keep the command and the path in backticks exactly as they are, and the plan names (Plus, Pro, Business, Enterprise); Settings → Codex is a place in Hive's settings." }),
-    extensionNote: msg({ id: 'agents.codex.extensionNote', defaultMessage: "You have the Codex extension for VS Code (or a similar editor). Hive doesn't use it — the extension's built-in copy moves with every extension update. Install the CLI; your extension keeps working as before.", description: 'Provider Setup → Codex, when only an editor extension was found: why Hive needs the standalone CLI.' }),
-    signInHelp: msg({ id: 'agents.codex.signInHelp', defaultMessage: 'Sign in again in Help → Provider Setup → Codex → Sign in (or run codex login in a terminal).', description: "How to sign in to Codex again after its sign-in expired (an agent's pane, a notification). Help → Provider Setup → Codex → Sign in is a menu path in Hive; codex login is a command: keep it." }),
+    installNote: msg({ id: 'agents.codex.installNote', defaultMessage: 'The installer runs `irm https://chatgpt.com/codex/install.ps1 | iex` in PowerShell and installs to `%LOCALAPPDATA%\\Programs\\OpenAI\\Codex`. After installing, sign in with your ChatGPT account (Plus, Pro, Business or Enterprise) or an API key, then set up its Windows sandbox once. If the CLI is installed somewhere else, set its path in Settings → Codex.', description: "Provider Setup → Codex: how its installer works. Keep the command and the path in backticks exactly as they are, and the plan names (Plus, Pro, Business, Enterprise); Settings → Codex is a place in Combwork's settings." }),
+    extensionNote: msg({ id: 'agents.codex.extensionNote', defaultMessage: "You have the Codex extension for VS Code (or a similar editor). Combwork doesn't use it — the extension's built-in copy moves with every extension update. Install the CLI; your extension keeps working as before.", description: 'Provider Setup → Codex, when only an editor extension was found: why Combwork needs the standalone CLI.' }),
+    signInHelp: msg({ id: 'agents.codex.signInHelp', defaultMessage: 'Sign in again in Help → Provider Setup → Codex → Sign in (or run codex login in a terminal).', description: "How to sign in to Codex again after its sign-in expired (an agent's pane, a notification). Help → Provider Setup → Codex → Sign in is a menu path in Combwork; codex login is a command: keep it." }),
     safeguardHelp: msg({ id: 'agents.codex.safeguardHelp', defaultMessage: 'Codex sends a request it flags to another model, or stops the turn. For security work, OpenAI’s Trusted Access for Cyber program lifts that.', description: "What happens after Codex's safety check flags a request (an agent's safeguard note). Trusted Access for Cyber is the name of OpenAI's program: keep it." }),
     modelPlaceholder: msg({ id: 'agents.codex.modelPlaceholder', defaultMessage: 'Model ID, e.g. gpt-6-sol', description: 'Placeholder of the custom model ID box (Codex). Keep the model ID exactly as it is.' })
   },

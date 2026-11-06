@@ -1,0 +1,8 @@
+{
+  "freshResume.confirm": "Começar nova conversa",
+  "freshResume.detail": "{assistant, select, yes {O Assistente começa uma nova conversa no lugar, e a antiga fica nas conversas dele para ler.} other {{agent} começa uma nova conversa no lugar. Ela continua o trabalho do agente (a vigilância, as mensagens e as tarefas dele), e a conversa antiga fica em Sessões para ler.}}",
+  "freshResume.message": "{why, select, moved {Esta conversa rodou em uma pasta que foi movida para .combwork com a pasta de dados antiga, então não pode continuar lá.} other {Esta conversa começou antes de o Combwork renomear as ferramentas que os agentes usam, então não pode continuar.}}",
+  "freshResume.short": "começa uma nova conversa",
+  "freshResume.tip": "{why, select, moved {Começa uma nova conversa: “{session}” rodou em uma pasta que foi movida para .combwork com a pasta de dados antiga, então não pode continuar} other {Começa uma nova conversa: “{session}” é de antes de o Combwork renomear as ferramentas que os agentes usam, então não pode continuar}}",
+  "freshResume.title": "Começar uma nova conversa?"
+}

@@ -6,12 +6,12 @@ import { providerDescriptor, providerSettings } from './providers'
 import { msg, tr } from './i18n'
 
 /**
- * API prices Hive ships, in USD per million tokens, for estimating what a session would have cost at
+ * API prices Combwork ships, in USD per million tokens, for estimating what a session would have cost at
  * API rates (the Overview's "≈ cost"). They are editable defaults, never fetched (#125): in Settings → <provider> → API
  * prices the user can change, add and remove models, and Reset to defaults; only their changes are stored, so a later
- * Hive's prices still reach models they never edited. Claude Code reports its own cost, so its table is only a fallback
+ * Combwork's prices still reach models they never edited. Claude Code reports its own cost, so its table is only a fallback
  * for sessions without one, unless the user chooses their prices over the report (`costSource`, #436). Each table also
- * lists the models the CLI has (its model list), priced or not, so a model a CLI update adds shows without a Hive release.
+ * lists the models the CLI has (its model list), priced or not, so a model a CLI update adds shows without a Combwork release.
  *
  * Sources (checked 30 Sep 2026): Anthropic's model table (Claude API docs; cache writes 1.25× input and
  * cache reads 0.1× input unless listed) and OpenAI's API pricing page (standard tier).
@@ -117,8 +117,8 @@ export function priceRows(provider: ProviderId, settings?: Pick<AppSettings, 'pr
 }
 
 /**
- * Whether a provider's session costs come from Hive's price table rather than the CLI's own report (#436): only for a
- * provider that reports one (capabilities.reportsCost), when the user chose their prices. Hive never recomputes a
+ * Whether a provider's session costs come from Combwork's price table rather than the CLI's own report (#436): only for a
+ * provider that reports one (capabilities.reportsCost), when the user chose their prices. Combwork never recomputes a
  * reported cost otherwise, even when the CLI's own price table lags a price change (#442).
  */
 export function usesOwnPrices(provider: ProviderId, settings?: Pick<AppSettings, 'providers'> | null): boolean {
@@ -126,7 +126,7 @@ export function usesOwnPrices(provider: ProviderId, settings?: Pick<AppSettings,
 }
 
 /**
- * The model when Hive can't estimate its sessions' cost because it has no price for it (shipped or the user's), so the
+ * The model when Combwork can't estimate its sessions' cost because it has no price for it (shipped or the user's), so the
  * cost shows as unknown rather than missing or $0; null when it has a price or there is no model to price.
  */
 export function unpricedModel(provider: ProviderId, model: string | null | undefined, settings?: Pick<AppSettings, 'providers'> | null): string | null {
@@ -135,7 +135,7 @@ export function unpricedModel(provider: ProviderId, model: string | null | undef
 
 const UNPRICED = msg({
   id: 'project.cost.unpriced',
-  defaultMessage: "Hive has no API price for {model}, so it can't estimate this session's cost. Add one in Settings → {provider} → API prices.",
+  defaultMessage: "Combwork has no API price for {model}, so it can't estimate this session's cost. Add one in Settings → {provider} → API prices.",
   description: 'Tooltip on a cost shown as Unknown. {model} is the model; {provider} the provider (Claude Code, Codex…). Settings → {provider} → API prices is where prices are set: name it as Settings does.'
 })
 

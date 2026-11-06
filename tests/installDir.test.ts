@@ -1,5 +1,5 @@
 // Electron refuses to start from a folder whose permissions name an AppContainer package but not ALL APPLICATION
-// PACKAGES (#431): reading those permissions (SDDL from icacls /save), what Hive does about them at start, with
+// PACKAGES (#431): reading those permissions (SDDL from icacls /save), what Combwork does about them at start, with
 // stand-ins for Windows' tools, and the command it gives the user.
 import { dirname, join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -10,7 +10,7 @@ const PACKAGE = 'S-1-15-2-1430448594-2639229838-973813799-439329657-1197984847-4
 const BROKEN = `D:PAI(A;OICI;0x1200a9;;;${PACKAGE})(A;OICI;FA;;;SY)(A;OICI;FA;;;${USER})`
 const FIXED = `D:PAI(A;OICI;0x1200a9;;;AC)(A;OICI;0x1200a9;;;${PACKAGE})(A;OICI;FA;;;SY)(A;OICI;FA;;;${USER})`
 const USUAL = `D:AI(A;OICIID;FA;;;SY)(A;OICIID;FA;;;BA)(A;OICIID;FA;;;${USER})`
-const DIR = 'C:\\Users\\me\\AppData\\Local\\Programs\\Hive'
+const DIR = 'C:\\Users\\me\\AppData\\Local\\Programs\\Combwork'
 const ICU = join(DIR, 'icudtl.dat')
 const FOLDER = `grant ${DIR} *S-1-15-2-1:(OI)(CI)(RX)`
 
@@ -67,10 +67,10 @@ describe('install folder permissions', () => {
 
   it('names what still lacks the entry', () => {
     const folder = cantStartMessage(DIR)
-    expect(folder.text).toContain(`the folder Hive is installed in:\n${DIR}\n`)
+    expect(folder.text).toContain(`the folder Combwork is installed in:\n${DIR}\n`)
     expect(folder.command).toBe(grantCommand(DIR))
     const file = cantStartMessage(DIR, ICU)
-    expect(file.text).toContain(`a file in the folder Hive is installed in:\n${ICU}\n`)
+    expect(file.text).toContain(`a file in the folder Combwork is installed in:\n${ICU}\n`)
     expect(file.command).toBe(grantCommand(DIR, ICU))
   })
 })
@@ -138,17 +138,17 @@ describe('which folder', () => {
   afterEach(() => vi.unstubAllEnvs())
 
   it("a development or test copy checks node_modules' Electron and never changes it", () => {
-    vi.stubEnv('HIVE_TEST_INSTALL_DIR', '')
+    vi.stubEnv('CW_TEST_INSTALL_DIR', '')
     expect(installDirTarget()).toEqual({ dir: dirname(process.execPath), mayChange: false })
   })
 
   it('a test folder of its own may be changed', () => {
-    vi.stubEnv('HIVE_TEST_INSTALL_DIR', 'C:\\test\\folder')
+    vi.stubEnv('CW_TEST_INSTALL_DIR', 'C:\\test\\folder')
     expect(installDirTarget()).toEqual({ dir: 'C:\\test\\folder', mayChange: true })
   })
 })
 
-describe("telling the user Hive can't start", () => {
+describe("telling the user Combwork can't start", () => {
   afterEach(() => vi.unstubAllEnvs())
 
   function ui(quiet: boolean, shows: boolean): MessageTools & { calls: string[] } {
@@ -168,26 +168,26 @@ describe("telling the user Hive can't start", () => {
   it('shows the window with Copy Command', () => {
     const t = ui(false, true)
     tellCantStart(DIR, undefined, t)
-    expect(t.calls).toEqual(["record Hive can't start", "window Hive can't start"])
+    expect(t.calls).toEqual(["record Combwork can't start", "window Combwork can't start"])
   })
 
   it("falls back to Electron's error box, with the command, when the window can't be shown", () => {
     const t = ui(false, false)
     tellCantStart(DIR, undefined, t)
-    expect(t.calls.slice(0, 2)).toEqual(["record Hive can't start", "window Hive can't start"])
-    expect(t.calls[2]).toContain("errorBox Hive can't start: ")
+    expect(t.calls.slice(0, 2)).toEqual(["record Combwork can't start", "window Combwork can't start"])
+    expect(t.calls[2]).toContain("errorBox Combwork can't start: ")
     expect(t.calls[2]).toContain(cantStartMessage(DIR).command)
     expect(t.calls[2]).toContain(DIR)
   })
 
   it('a quiet test copy shows nothing: it records it, and draws the window only to a picture asked for', () => {
-    vi.stubEnv('HIVE_TEST_DIALOG_SNAPSHOT', '')
+    vi.stubEnv('CW_TEST_DIALOG_SNAPSHOT', '')
     const t = ui(true, false)
     tellCantStart(DIR, undefined, t)
-    expect(t.calls).toEqual(["record Hive can't start"])
-    vi.stubEnv('HIVE_TEST_DIALOG_SNAPSHOT', 'C:\\shot.png')
+    expect(t.calls).toEqual(["record Combwork can't start"])
+    vi.stubEnv('CW_TEST_DIALOG_SNAPSHOT', 'C:\\shot.png')
     const u = ui(true, false)
     tellCantStart(DIR, undefined, u)
-    expect(u.calls).toEqual(["record Hive can't start", "window Hive can't start to C:\\shot.png"])
+    expect(u.calls).toEqual(["record Combwork can't start", "window Combwork can't start to C:\\shot.png"])
   })
 })

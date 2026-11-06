@@ -108,7 +108,7 @@ describe("a lane's end waits for its builder's turn to be over", () => {
     expect(h.retired).toEqual(['its run ended'])
   })
 
-  it('a quit held by the user typing (or a line of Hive\'s) is tried again, never forced before the deadline', async () => {
+  it('a quit held by the user typing (or a line of Combwork\'s) is tried again, never forced before the deadline', async () => {
     const h = harness()
     h.s.why = null
     h.s.quitAnswer = 'held'
@@ -231,7 +231,7 @@ describe("a lane's note", () => {
       { key: 'HI-1', merged: 'aaa9a0c3c180fc41a6298d7a19f17a1f9239b3f5' },
       { key: 'HI-2', merged: null }
     ])
-    expect(t).toBe("Lane Off main is finished: HI-1 merged at aaa9a0c3c180; HI-2 not merged. Your session ends once this turn does; Hive resumes it for your next lane. Close the lane's work in your reply, then end your turn.")
+    expect(t).toBe("Lane Off main is finished: HI-1 merged at aaa9a0c3c180; HI-2 not merged. Your session ends once this turn does; Combwork resumes it for your next lane. Close the lane's work in your reply, then end your turn.")
   })
 
   it('says an abandoned lane was abandoned', () => {

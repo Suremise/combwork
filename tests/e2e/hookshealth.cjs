@@ -1,5 +1,5 @@
-// Hooks health (#1336): an agent whose hooks stop reaching Hive is shown so, instead of a wrong status. Acted out with
-// the fake Claude Code, which sends no hook or status line while fake-nohooks-<agent> is in its home, with Hive's bound
+// Hooks health (#1336): an agent whose hooks stop reaching Combwork is shown so, instead of a wrong status. Acted out with
+// the fake Claude Code, which sends no hook or status line while fake-nohooks-<agent> is in its home, with Combwork's bound
 // (Settings → Advanced, Hooks missing: wait) at 3 s:
 // - a healthy agent's long silent think (10 s, over three bounds) and an idle one never show it (no false alarms);
 // - its hooks turned off mid-session, its next prompt's work (held on screen until the test ends it) with no hook turns
@@ -8,7 +8,7 @@
 //   once, nothing typed into it (the Agent API says why), and its lane paused: "paused: Builder's hooks aren't arriving";
 // - an agent started with its hooks off shows it from its start; a Codex agent (the fake, whose first hook comes with its
 //   first prompt) started on a task with its hooks off shows it after that task, watched though it was still starting;
-// - a Codex agent whose hooks worked and then stop while it is idle shows it after the next line Hive types (#1520);
+// - a Codex agent whose hooks worked and then stop while it is idle shows it after the next line Combwork types (#1520);
 // - Restart session from the banner with working hooks clears it, and the lane goes on.
 // Screenshots of the pane and the banner in both themes. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -55,16 +55,16 @@ const hooksOff = (agent, off) => {
   cfg.settings.notifications = { ...cfg.settings.notifications, desktopNotifications: false, chimeEnabled: false }
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  fs.writeFileSync(path.join(userData, 'advanced.json'), JSON.stringify({ format: 1, values: { 'hive.hooks.missingSeconds': 3 } }, null, 2))
+  fs.writeFileSync(path.join(userData, 'advanced.json'), JSON.stringify({ format: 1, values: { 'cw.hooks.missingSeconds': 3 } }, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), ...cenv, CODEX_HOME: codexHome, FAKE_CODEX_VERSION: '0.162.1', HIVE_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), ...cenv, CODEX_HOME: codexHome, FAKE_CODEX_VERSION: '0.162.1', CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1400, height: 850 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     await inv('project:setActive', alpha, true)
     await lib.waitForProvider(inv)
@@ -112,7 +112,7 @@ const hooksOff = (agent, off) => {
     clearInterval(sampler)
 
     // --- Builder's hooks stop mid-session: its next prompt, with no hook while its screen shows it working, shows it. The
-    // turn holds until the test ends it (holduntil), so Hive's look sees it working whenever it comes: a condition, not
+    // turn holds until the test ends it (holduntil), so Combwork's look sees it working whenever it comes: a condition, not
     // a turn's length.
     hooksOff('Builder', true)
     const runBefore = (await live(builder))?.runId
@@ -134,7 +134,7 @@ const hooksOff = (agent, off) => {
     check('its mark is stalled', !!(await until(async () => (await header.locator('.state-mark.stalled').count()) > 0, HUNG_MS)), await header.innerHTML().catch(() => ''))
     await header.click()
     const banner = page.locator('.banner.hooks-missing')
-    check("the project's banner says why it may be wrong and what to do, with Restart session", !!(await until(async () => (await banner.count()) === 1 && /Hive isn't hearing from Claude Code's hooks, so its status may be wrong\..*Restart the session/.test(await banner.innerText()) && (await banner.locator('button', { hasText: 'Restart session' }).count()) === 1, HUNG_MS)), await banner.innerText().catch(() => ''))
+    check("the project's banner says why it may be wrong and what to do, with Restart session", !!(await until(async () => (await banner.count()) === 1 && /Combwork isn't hearing from Claude Code's hooks, so its status may be wrong\..*Restart the session/.test(await banner.innerText()) && (await banner.locator('button', { hasText: 'Restart session' }).count()) === 1, HUNG_MS)), await banner.innerText().catch(() => ''))
 
     const paused = await until(async () => {
       const l = await laneNow()
@@ -143,11 +143,11 @@ const hooksOff = (agent, off) => {
     check("its lane is paused, saying whose hooks aren't arriving", paused?.status?.reason === 'hooks' && paused?.status?.agent === 'Builder', JSON.stringify(paused))
     const project = await api('GET', '/v1/projects/alpha')
     const shown = JSON.stringify(project.body ?? {})
-    check("the Agent API says its hooks aren't reaching Hive and it isn't given work", /hooks aren't reaching Hive, so its status may be wrong and it isn't given work/.test(shown), shown.slice(0, 400))
+    check("the Agent API says its hooks aren't reaching Combwork and it isn't given work", /hooks aren't reaching Combwork, so its status may be wrong and it isn't given work/.test(shown), shown.slice(0, 400))
 
     // Told once in Notifications.
     await page.locator('.activitybar button[aria-label="Notifications"]').click()
-    const told = page.locator('.notif-panel .toast-title', { hasText: /Hive isn't hearing from .*Builder's hooks/ })
+    const told = page.locator('.notif-panel .toast-title', { hasText: /Combwork isn't hearing from .*Builder's hooks/ })
     check('a Notifications entry, once', !!(await until(async () => (await told.count()) === 1, HUNG_MS)), `${await told.count()}: ${await page.locator('.notif-panel').innerText().catch((e) => String(e))}`)
     await page.locator('.notif-panel button[aria-label="Close"]').click()
 
@@ -179,8 +179,8 @@ const hooksOff = (agent, off) => {
     check("a Codex agent's launch task with no hook after it, at work on its screen: its hooks are missing", deafCx?.after === 'prompt', JSON.stringify(deafCx ?? (await live(cx))))
     await inv('session:stop', alpha, cx.id)
 
-    // --- A Codex agent whose hooks reached Hive (a turn heard) and then stop while it is idle (#1520: on 23 Oct its hooks'
-    // PowerShell went): the next line Hive types into it, a task's doorbell as a wake's is, shows its hooks missing once
+    // --- A Codex agent whose hooks reached Combwork (a turn heard) and then stop while it is idle (#1520: on 23 Oct its hooks'
+    // PowerShell went): the next line Combwork types into it, a task's doorbell as a wake's is, shows its hooks missing once
     // the turn that line starts works, though nothing came since.
     const cy = await lib.addAgent(inv, alpha, { name: 'Cy', provider: 'codex', permissionMode: 'full-access' })
     await inv('session:start', alpha, { agentId: cy.id })
@@ -189,7 +189,7 @@ const hooksOff = (agent, off) => {
     fs.writeFileSync(path.join(codexHome, 'fake-nohooks-Cy'), '')
     const cyCard = await inv('tasks:create', { title: 'Hooks gone', project: 'alpha', column: 'todo' })
     const given = await inv('tasks:start', cyCard.number, { kind: 'agent', agentId: cy.id })
-    check('its hooks off while idle, a card started on it: Hive types its line', given?.agentId === cy.id, JSON.stringify(given))
+    check('its hooks off while idle, a card started on it: Combwork types its line', given?.agentId === cy.id, JSON.stringify(given))
     const deafCy = await until(async () => (await live(cy))?.hooksMissing, HUNG_MS)
     check('…and the turn it starts, with no hook, shows its hooks missing', ['transcript', 'prompt'].includes(deafCy?.after), JSON.stringify(deafCy ?? (await live(cy))))
     await inv('session:stop', alpha, cy.id)

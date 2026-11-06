@@ -6,7 +6,7 @@ import { fmt, msg, tr } from '../shared/i18n'
 import { projectNow } from '../shared/projectIds'
 import { keyProblem, KEY_FORM, nameWithKey, normalKey, setCardNaming, suggestKey, type CardNames, type KeyHeld } from '../shared/projectKeys'
 import type { WorkspaceInfo } from '../shared/types'
-import { hiveError } from './hiveError'
+import { combworkError } from './combworkError'
 import { createLogger, userText } from './logger'
 import { contextWorkspace, workspaceFor, type WorkspaceService } from './workspace'
 
@@ -147,10 +147,10 @@ export async function createProjectWithKey(ws: WorkspaceService, name: string, k
     // Its id read now, so it has its key before this returns (the chosen one is only known meanwhile).
     const ids = await ws.projectIds({ fresh: true })
     await keyProjects(ws)
-    // Never another key in its place without saying so (another Hive on the same workspace could have taken it).
+    // Never another key in its place without saying so (another Combwork on the same workspace could have taken it).
     const id = path ? ids.byPath.get(path) : undefined
     const now = id ? projectKeys(ws).find((h) => h.projectId === id && h.current)?.key : undefined
-    if (k && now && now !== k) throw hiveError(PROBLEM.taken, { key: k }, { kind: 'conflict' })
+    if (k && now && now !== k) throw combworkError(PROBLEM.taken, { key: k }, { kind: 'conflict' })
     return info
   } finally {
     if (path && wsPath && mine?.get(path) === k) {
@@ -166,17 +166,17 @@ const PROBLEM = {
   taken: msg({ id: 'service.keys.taken', defaultMessage: '{key} is another project’s key, or was: a key stays with its project for good.', description: "An error changing a project's key: {key} (letters such as AM) belongs to another project now or did before (its old keys stay its aliases)." }),
   prefix: msg({ id: 'service.keys.prefix', defaultMessage: '{key} and another project’s key {other} begin alike: no key can be the start of another.', description: "An error changing a project's key: {key} and another project's key {other} (both letters such as AM and AMB) would be one the start of the other, which isn't allowed." }),
   closed: msg({ id: 'service.keys.closed', defaultMessage: 'The workspace was closed, or the window opened another, before the key was changed: nothing changed.', description: "An error changing a project's key: its workspace closed (or the window switched to another workspace) while the change waited; nothing was changed." }),
-  unknownProject: msg({ id: 'service.keys.unknownProject', defaultMessage: 'That project has no id yet, so it can’t have a key: open it in Hive first.', description: "An error changing a project's key: the project hasn't been given Hive's id (it hasn't been opened yet)." })
+  unknownProject: msg({ id: 'service.keys.unknownProject', defaultMessage: 'That project has no id yet, so it can’t have a key: open it in Combwork first.', description: "An error changing a project's key: the project hasn't been given Combwork's id (it hasn't been opened yet)." })
 }
 
 /** Refuses a key the project `id` can't take, saying why. */
 function refuseKey(k: string, id: string, held: KeyHeld[]): void {
   const problem = keyProblem(k, id, held)
-  if (problem === 'form') throw hiveError(PROBLEM.form, undefined, { kind: 'invalid' })
-  if (problem === 'taken') throw hiveError(PROBLEM.taken, { key: k }, { kind: 'conflict' })
+  if (problem === 'form') throw combworkError(PROBLEM.form, undefined, { kind: 'invalid' })
+  if (problem === 'taken') throw combworkError(PROBLEM.taken, { key: k }, { kind: 'conflict' })
   if (problem === 'prefix') {
     const other = held.find((h) => h.projectId !== id && (normalKey(h.key).startsWith(k) || k.startsWith(normalKey(h.key))))!.key
-    throw hiveError(PROBLEM.prefix, { key: k, other: normalKey(other) }, { kind: 'conflict' })
+    throw combworkError(PROBLEM.prefix, { key: k, other: normalKey(other) }, { kind: 'conflict' })
   }
 }
 
@@ -188,12 +188,12 @@ export async function changeProjectKey(ws: WorkspaceService, projectPath: string
   const path = ws.path
   const life = ws.lifetime
   const ids = await ws.projectIds({ fresh: true })
-  if (!path || !stillIn(ws, path, life)) throw hiveError(PROBLEM.closed, undefined, { kind: 'conflict' })
+  if (!path || !stillIn(ws, path, life)) throw combworkError(PROBLEM.closed, undefined, { kind: 'conflict' })
   const id = ids.byPath.get(resolve(projectPath).toLowerCase())
-  if (!id) throw hiveError(PROBLEM.unknownProject, undefined, { kind: 'invalid' })
+  if (!id) throw combworkError(PROBLEM.unknownProject, undefined, { kind: 'invalid' })
   const k = normalKey(String(key ?? ''))
   return boardWrite(ws, async () => {
-    if (!stillIn(ws, path, life)) throw hiveError(PROBLEM.closed, undefined, { kind: 'conflict' })
+    if (!stillIn(ws, path, life)) throw combworkError(PROBLEM.closed, undefined, { kind: 'conflict' })
     const held = projectKeys(ws)
     refuseKey(k, id, [...held, ...reserved(path)])
     if (held.some((h) => h.projectId === id && h.current && normalKey(h.key) === k)) return k
@@ -225,8 +225,8 @@ export function sayKeysOnce(ws: WorkspaceService): void {
   const life = ws.lifetime
   if (!path || !keysNoticeDue(ws)) return
   const keys = projectKeys(ws).filter((k) => k.current).map((k) => k.key).sort()
-  const title = tr(msg({ id: 'service.keys.noticeTitle', defaultMessage: 'Projects have keys now', description: "A quiet notice's title, once after the upgrade to Hive 1.0: each project now has a short key (letters such as HI or AM) its cards are named by (HI-12)." }))
-  const message = tr(msg({ id: 'service.keys.notice', defaultMessage: 'Cards are named by their project’s key: {keys}. Change a key in Project Settings; the old one keeps working.', description: "A quiet notice once after the upgrade to Hive 1.0. {keys}: the projects' keys, joined (HI, AM and WE)." }), { keys: fmt.list(keys) })
+  const title = tr(msg({ id: 'service.keys.noticeTitle', defaultMessage: 'Projects have keys now', description: "A quiet notice's title, once after the upgrade to 1.0: each project now has a short key (letters such as HI or AM) its cards are named by (HI-12)." }))
+  const message = tr(msg({ id: 'service.keys.notice', defaultMessage: 'Cards are named by their project’s key: {keys}. Change a key in Project Settings; the old one keeps working.', description: "A quiet notice once after the upgrade to 1.0. {keys}: the projects' keys, joined (HI, AM and WE)." }), { keys: fmt.list(keys) })
   ws.emit({ type: 'toast', toast: { id: randomUUID(), level: 'info', title, message, timestamp: new Date().toISOString(), quiet: true } })
   void boardWrite(ws, async () => {
     if (stillIn(ws, path, life)) keysNoticeSaid(ws)
@@ -234,7 +234,7 @@ export function sayKeysOnce(ws: WorkspaceService): void {
 }
 
 /**
- * The card a reference names, for the Agent API and the hive tools (#1219; Darren, 20 Oct: tools take a key string too):
+ * The card a reference names, for the Agent API and the Combwork tools (#1219; Darren, 20 Oct: tools take a key string too):
  * a key (`HI-12`, any case, an old key too), an old number as `#1061`, or the number the tools take (`1061`, the old global
  * number until P8). Null for a key or number no card has.
  */

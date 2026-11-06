@@ -1,11 +1,11 @@
-// Start and Resume look busy while a session starts (#1177): with session:start slowed (HIVE_TEST_SLOW_IPC, unpackaged
+// Start and Resume look busy while a session starts (#1177): with session:start slowed (CW_TEST_SLOW_IPC, unpackaged
 // builds only), from the click until the agent runs the button clicked shows a spinner and "Resuming…" or "Starting…",
 // is disabled and aria-busy, and the other ways to start that agent are disabled too, elsewhere as well (the project
 // header's Resume, the Sessions tab's); once it runs they are gone. In an agent's pane (its ended bar), the Sessions
-// tab (also for a session no agent can run, while one is added for it), Start Without Setup and the Hive Assistant's
+// tab (also for a session no agent can run, while one is added for it), Start Without Setup and the Combwork Assistant's
 // panel, in both themes (screenshots in the run's folder). The agents run the fake Claude Code (fake-claude/). Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR.
-// Dev build only (#1580): session:start is slowed through HIVE_TEST_SLOW_IPC (a seam a packaged build ignores), and
+// Dev build only (#1580): session:start is slowed through CW_TEST_SLOW_IPC (a seam a packaged build ignores), and
 // Tree is a 0.9 worktree agent (agents:testLegacy, refused by a packaged build) whose setup fails.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -34,7 +34,7 @@ const check = (name, ok, extra = '') => {
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  const { app, page, inv } = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: lib.port(47911) }, viewport: { width: 1400, height: 850 } })
+  const { app, page, inv } = await lib.launch({ userData, env: { ...env, CW_API_PORT: lib.port(47911) }, viewport: { width: 1400, height: 850 } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   try {
     await lib.openWorkspace(inv, page, ws)
@@ -43,7 +43,7 @@ const check = (name, ok, extra = '') => {
     const liveOf = async (proj, id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === proj.toLowerCase() && s.agentId === id)
     let slowed = 0
     // Each time a new value, so its one slowed call counts afresh.
-    const slowStart = () => app.evaluate((_, v) => void (process.env.HIVE_TEST_SLOW_IPC = v), `session:start=${SLOW_MS + ++slowed}*1`)
+    const slowStart = () => app.evaluate((_, v) => void (process.env.CW_TEST_SLOW_IPC = v), `session:start=${SLOW_MS + ++slowed}*1`)
     const shots = []
     const shot = async (name) => {
       const file = path.join(lib.WORK, `startbusy-${name}.png`)
@@ -150,7 +150,7 @@ const check = (name, ok, extra = '') => {
     check('the worktree agent starts without its setup', await started(alpha, tree.id))
     check('and stops', await stop(alpha, tree.id))
 
-    // --- The Hive Assistant's panel: Start, then Resume.
+    // --- The Combwork Assistant's panel: Start, then Resume.
     const home = (await inv('workspace:refresh')).assistant.path
     await page.locator('.assistant-rail').click().catch(() => undefined)
     const panel = page.locator('.assistant-panel')

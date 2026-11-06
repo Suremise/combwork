@@ -1,9 +1,9 @@
-// Hive's performance metrics (src/main/metrics.ts): exact units, hourly buckets on a fake clock (folded into days after
+// Combwork's performance metrics (src/main/metrics.ts): exact units, hourly buckets on a fake clock (folded into days after
 // a week, gone after 30 days), per-workspace stores that never mix, project parts that add up to the workspace's totals
 // with the workspace's own work kept apart, caps that drop and count rather than grow, malformed bridge reports refused,
 // recording off, what is saved (in the workspace database, #1019: moved in from metrics.json once, its totals unchanged;
 // size-capped, reset; read as untrusted input), work started in a workspace
-// that has since closed or switched (dropped, never moved), retention applied however long Hive was idle and whichever
+// that has since closed or switched (dropped, never moved), retention applied however long Combwork was idle and whichever
 // way the clock moved, the launch's skill sizes measured on the copies delivered, and what recording costs. MEASURE=1 prints the overhead numbers (docs/ARCHITECTURE.md records them).
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -13,7 +13,7 @@ import { LATENCY_BOUNDS_MS, percentile, utf8Bytes, type MetricsPart } from '../s
 import { tempDir } from './tempDir'
 import { metricsSaved, putMetrics } from './storeDocs'
 
-const base = tempDir('hive-metrics-')
+const base = tempDir('cw-metrics-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
@@ -56,7 +56,7 @@ const sumApi = (parts: MetricsPart[]) => parts.flatMap((p) => p.api).reduce((a, 
 
 describe('units', () => {
   it('UTF-8 bytes match what Node encodes, for ASCII, accents, CJK, emoji and a lone surrogate', () => {
-    for (const s of ['plain', 'Ünïcödé', '日本語', '🐝 hive', 'a\uD800b', JSON.stringify({ q: 'quote " and \\ and \n' })]) expect(utf8Bytes(s), s).toBe(Buffer.byteLength(s, 'utf8'))
+    for (const s of ['plain', 'Ünïcödé', '日本語', '🐝 combwork', 'a\uD800b', JSON.stringify({ q: 'quote " and \\ and \n' })]) expect(utf8Bytes(s), s).toBe(Buffer.byteLength(s, 'utf8'))
   })
 
   it('latency histogram: each time in its bucket, and percentiles from them', async () => {
@@ -138,7 +138,7 @@ describe('scope', () => {
     for (let i = 0; i < 3; i++) metrics.recordApi(metrics.metricsHandle(a.w), 'alpha', api())
     for (let i = 0; i < 2; i++) metrics.recordApi(metrics.metricsHandle(a.w), 'beta', api('/v1/tasks/:n'))
     for (let i = 0; i < 4; i++) metrics.recordApi(metrics.metricsHandle(a.w), null, api('/v1/tasks', { role: 'assistant' }))
-    metrics.recordMcp(metrics.metricsHandle(a.w), 'alpha', 'agent', { tool: 'hive_list_tasks', mode: 'compact', ok: true, chars: 50, bytes: 60, ms: 3 })
+    metrics.recordMcp(metrics.metricsHandle(a.w), 'alpha', 'agent', { tool: 'cw_list_tasks', mode: 'compact', ok: true, chars: 50, bytes: 60, ms: 3 })
     metrics.recordApi(metrics.metricsHandle(b.w), 'alpha', api())
 
     const whole = metrics.queryMetrics(a.w, { scope: { kind: 'workspace' } })
@@ -153,7 +153,7 @@ describe('scope', () => {
     expect(alpha.workspace).toBeUndefined()
     expect(alpha.skills).toBeUndefined()
     expect(sumApi(Object.values(alpha.projects)).count).toBe(3)
-    expect(alpha.projects.alpha.mcp[0]).toMatchObject({ tool: 'hive_list_tasks', chars: 50, bytes: 60, count: 1 })
+    expect(alpha.projects.alpha.mcp[0]).toMatchObject({ tool: 'cw_list_tasks', chars: 50, bytes: 60, count: 1 })
     // B saw nothing of A's.
     expect(sumApi(Object.values(metrics.queryMetrics(b.w, { scope: { kind: 'workspace' } }).projects)).count).toBe(1)
     // An unknown project: an empty part, not another's.
@@ -206,13 +206,13 @@ describe('bounds', () => {
 
   it('a malformed bridge report is refused, not stored; an unknown tool name is "(other)"', async () => {
     const { w } = await open()
-    const ok = { tool: 'hive_read_task', mode: 'compact', ok: true, chars: 10, bytes: 10, ms: 1 }
+    const ok = { tool: 'cw_read_task', mode: 'compact', ok: true, chars: 10, bytes: 10, ms: 1 }
     for (const bad of [{ ...ok, chars: -1 }, { ...ok, bytes: 'many' }, { ...ok, ms: Infinity }, { ...ok, ok: 'yes' }, { ...ok, mode: 'verbose' }, { ...ok, chars: 1e12 }]) {
       expect(metrics.recordMcp(metrics.metricsHandle(w), 'alpha', 'agent', bad as never)).toBe(false)
     }
     expect(metrics.recordMcp(metrics.metricsHandle(w), 'alpha', 'agent', { ...ok, tool: 'rm -rf /' })).toBe(true)
-    // Well-formed, but not one of Hive's tools: not recorded under its name.
-    expect(metrics.recordMcp(metrics.metricsHandle(w), 'alpha', 'agent', { ...ok, tool: 'hive_private_secret' })).toBe(true)
+    // Well-formed, but not one of Combwork's tools: not recorded under its name.
+    expect(metrics.recordMcp(metrics.metricsHandle(w), 'alpha', 'agent', { ...ok, tool: 'acme_private_secret' })).toBe(true)
     expect(metrics.recordCatalog(metrics.metricsHandle(w), 'alpha', 'agent', 'builder', { tools: 1.5, toolsBytes: 10 })).toBe(false)
     const part = metrics.queryMetrics(w, { scope: { kind: 'project', project: 'alpha' } }).projects.alpha
     expect(part.mcp.map((s) => [s.tool, s.count])).toEqual([['(other)', 2]])
@@ -244,10 +244,10 @@ describe('saving', () => {
     await w.close()
     await metrics.flushMetrics()
     expect(metricsSaved(path)).not.toBeNull()
-    // No file of their own, nor a .gitignore for one: the database is git-ignored by .hive's.
-    expect(existsSync(join(path, '.hive', 'metrics', 'metrics.json'))).toBe(false)
-    expect(existsSync(join(path, '.hive', 'metrics', '.gitignore'))).toBe(false)
-    expect(readFileSync(join(path, '.hive', '.gitignore'), 'utf8')).toMatch(/^hive\.db$/m)
+    // No file of their own, nor a .gitignore for one: the database is git-ignored by .combwork's.
+    expect(existsSync(join(path, '.combwork', 'metrics', 'metrics.json'))).toBe(false)
+    expect(existsSync(join(path, '.combwork', 'metrics', '.gitignore'))).toBe(false)
+    expect(readFileSync(join(path, '.combwork', '.gitignore'), 'utf8')).toMatch(/^combwork.db$/m)
     // Only aggregates: no project path, no route asked for.
     expect(savedText(path)).not.toContain(path.replace(/\\/g, '\\\\'))
     await w.open(path)
@@ -265,7 +265,7 @@ describe('saving', () => {
     const { w, path } = await open()
     const saved = { ...metrics.METRICS_LIMITS }
     try {
-      metrics.METRICS_LIMITS.fileBytes = 20_000
+      metrics.METRICS_LIMITS.storeBytes = 20_000
       for (let h = 0; h < 100; h++) {
         now = T0 + h * HOUR
         for (let p = 0; p < 5; p++) metrics.recordApi(metrics.metricsHandle(w), `p${p}`, api())
@@ -316,7 +316,7 @@ describe('switching and the skill service', () => {
     await inWorkspace(w, () => skillRevisions())
     // Edited: invalidated, read again.
     const { appendFileSync } = await import('fs')
-    appendFileSync(join(path, '.hive', 'skills', 'handover', 'SKILL.md'), '\nmore\n')
+    appendFileSync(join(path, '.combwork', 'skills', 'handover', 'SKILL.md'), '\nmore\n')
     await inWorkspace(w, () => Promise.all([skillRevisions(), skillRevisions(), skillRevisions()]))
     const s = metrics.queryMetrics(w, { scope: { kind: 'workspace' } }).skills!
     expect(s.scans.count).toBeGreaterThanOrEqual(3)
@@ -401,9 +401,9 @@ describe('retention, whatever happens to the clock', () => {
 
 describe('the saved file is untrusted', () => {
   const hourOf = (t: number) => Math.floor(t / HOUR) * HOUR
-  const fileOf = (path: string) => join(path, '.hive', 'metrics', 'metrics.json')
+  const fileOf = (path: string) => join(path, '.combwork', 'metrics', 'metrics.json')
   const write = (path: string, data: unknown) => {
-    mkdirSync(join(path, '.hive', 'metrics'), { recursive: true })
+    mkdirSync(join(path, '.combwork', 'metrics'), { recursive: true })
     writeFileSync(fileOf(path), typeof data === 'string' ? data : JSON.stringify(data))
   }
   const histogram = Array.from({ length: LATENCY_BOUNDS_MS.length + 1 }, () => 0)
@@ -424,7 +424,7 @@ describe('the saved file is untrusted', () => {
           projects: {
             alpha: {
               api: { a: good, b: { ...good, count: -1 }, c: { ...good, histogram: [1] }, d: { ...good, role: 'root' } },
-              mcp: { x: { tool: 'hive_private_secret', role: 'agent', mode: 'compact', outcome: 'ok', count: 1, totalMs: 1, maxMs: 1, histogram, chars: 5, bytes: 5 } }
+              mcp: { x: { tool: 'acme_private_secret', role: 'agent', mode: 'compact', outcome: 'ok', count: 1, totalMs: 1, maxMs: 1, histogram, chars: 5, bytes: 5 } }
             },
             '../escape': { api: { a: good } }
           },
@@ -450,6 +450,17 @@ describe('the saved file is untrusted', () => {
     const r = metrics.queryMetrics(w, { scope: { kind: 'workspace' }, from: new Date(T0 - 2 * HOUR).toISOString() })
     expect(r.workspace!.guidance).toMatchObject([{ role: 'assistant', modeBytes: 70, modeChars: 60 }])
     expect(r.workspace!.guidance[0]).not.toHaveProperty('personaBytes')
+    await disposeWorkspaceService(w)
+  })
+
+  it('HI-2443: a saved launch series keeps its dialect chain; one that is not a hash counts as the Default', async () => {
+    const { w, path } = await open()
+    await w.close()
+    const g = { provider: 'codex', role: 'agent', workflow: 'builder', launches: 1, guidanceBytes: 100, guidanceChars: 100, customBytes: 0, customChars: 0, roleBytes: 0, roleChars: 0, modeBytes: 0, modeChars: 0, skills: 0, skillCatalogBytes: 0, skillBytes: 0, skillsNotDelivered: 0, skillsUnmeasured: 0 }
+    write(path, { version: 1, buckets: [{ start: hourOf(T0) - HOUR, span: 'hour', workspace: { guidance: { a: { ...g, dialect: 'abcdef0123456789' }, b: { ...g, dialect: '../x' }, c: g } } }] })
+    await w.open(path)
+    const r = metrics.queryMetrics(w, { scope: { kind: 'workspace' }, from: new Date(T0 - 2 * HOUR).toISOString() })
+    expect(r.workspace!.guidance.map((s) => [s.dialect ?? null, s.launches]).sort()).toEqual([[null, 2], ['abcdef0123456789', 1]])
     await disposeWorkspaceService(w)
   })
 
@@ -480,9 +491,9 @@ describe('the saved file is untrusted', () => {
 
 describe('moved into the workspace database (#1019)', () => {
   const hourOf = (t: number) => Math.floor(t / HOUR) * HOUR
-  const dirOf = (path: string) => join(path, '.hive', 'metrics')
+  const dirOf = (path: string) => join(path, '.combwork', 'metrics')
   const backups = (path: string) => readdirSync(dirOf(path)).filter((f) => f.startsWith('metrics.json.imported-'))
-  /** A workspace folder never opened, with its metrics folder (an older Hive's). */
+  /** A workspace folder never opened, with its metrics folder (an older version's). */
   const fresh = () => {
     const path = join(base, `ws-${++n}`)
     mkdirSync(dirOf(path), { recursive: true })
@@ -567,7 +578,7 @@ describe('moved into the workspace database (#1019)', () => {
     expect(whole(w)).toEqual(before)
     await w.close()
     await metrics.flushMetrics()
-    // An older Hive's metrics.json written after the move: kept as a backup too, never read.
+    // An older version's metrics.json written after the move: kept as a backup too, never read.
     const later = JSON.stringify({ version: 1, buckets: [{ start: hourOf(T0), span: 'hour', projects: { beta: { api: { 'GET /v1/tasks agent ok': series } } } }] })
     writeFileSync(join(dirOf(path), 'metrics.json'), later)
     await w.open(path)
@@ -581,7 +592,7 @@ describe('moved into the workspace database (#1019)', () => {
 
   it("a migrated workspace's metrics report the same numbers (#1019)", async () => {
     const { metricsReport } = await import('../src/main/metricsUsage')
-    // Recorded as Hive records them, over 13 days (hours for the last week, days before it): projects, the workspace's
+    // Recorded as Combwork records them, over 13 days (hours for the last week, days before it): projects, the workspace's
     // own work, API, MCP, catalog, guidance and skill-service series, observed in stretches.
     const { w: src, path: srcPath } = await open()
     for (let d = 12; d >= 0; d--) {
@@ -591,8 +602,8 @@ describe('moved into the workspace database (#1019)', () => {
         metrics.recordApi(handle, 'alpha', api('/v1/tasks', { ms: d + h }))
         metrics.recordApi(handle, 'beta', api('/v1/tasks/:n', { outcome: d % 3 ? 'ok' : 'server-error', ms: 40 * h, responseBytes: 1000 + d }))
         metrics.recordApi(handle, null, api('/v1/tasks', { role: 'assistant' }))
-        metrics.recordMcp(handle, 'alpha', 'agent', { tool: 'hive_list_tasks', mode: 'compact', ok: true, chars: 50 * h, bytes: 60 * h, ms: 3 })
-        metrics.recordMcp(handle, null, 'assistant', { tool: 'hive_read_task', mode: 'detail', ok: d % 2 === 0, chars: 500, bytes: 520, ms: 12 })
+        metrics.recordMcp(handle, 'alpha', 'agent', { tool: 'cw_list_tasks', mode: 'compact', ok: true, chars: 50 * h, bytes: 60 * h, ms: 3 })
+        metrics.recordMcp(handle, null, 'assistant', { tool: 'cw_read_task', mode: 'detail', ok: d % 2 === 0, chars: 500, bytes: 520, ms: 12 })
         metrics.recordCatalog(handle, 'beta', 'agent', 'builder', { tools: 30, toolsBytes: 9000 + d })
         metrics.recordLaunch(handle, d % 2 ? 'alpha' : 'beta', { provider: d % 2 ? 'codex' : 'claude-code', role: 'agent', workflow: 'builder', guidanceBytes: 1234, guidanceChars: 1200, customBytes: 10 * d, customChars: 10 * d, roleBytes: 0, roleChars: 0, modeBytes: 0, modeChars: 0, skills: 7, skillCatalogBytes: 900, skillBytes: 40000, skillsNotDelivered: d % 2, skillsUnmeasured: 0 })
         metrics.recordSkills(handle, { hits: 2, misses: 1, scanMs: 4, files: 3, bytes: 900 })
@@ -611,7 +622,7 @@ describe('moved into the workspace database (#1019)', () => {
     expect(data.observed.length).toBeGreaterThan(1)
     await disposeWorkspaceService(src)
 
-    // An older Hive's workspace with that metrics.json: the reports the Overview and Performance show, the whole range
+    // An older version's workspace with that metrics.json: the reports the Overview and Performance show, the whole range
     // and the last two days (hourly), for the workspace and each project.
     // Recording off while it is opened and reopened: a reopen is a new stretch of observation otherwise (a close is a
     // gap), the one difference that isn't the move's.
@@ -679,10 +690,10 @@ describe('cost', () => {
     const N = 100_000
     for (let i = 0; i < N; i++) metrics.recordApi(metrics.metricsHandle(w), `p${i % 20}`, api(i % 2 ? '/v1/tasks' : '/v1/tasks/:n', { ms: i % 300 }))
     const perCallUs = ((performance.now() - t) * 1000) / N
-    // Every series the caps allow, in one hour: Hive's tools x roles x modes x outcomes, over projects.
-    const { HIVE_TOOLS } = await import('../src/shared/assistantTools')
+    // Every series the caps allow, in one hour: Combwork's tools x roles x modes x outcomes, over projects.
+    const { CW_TOOLS } = await import('../src/shared/assistantTools')
     const h = metrics.metricsHandle(w)
-    for (let p = 0; p < 12; p++) for (const tool of HIVE_TOOLS) for (const role of ['agent', 'assistant'] as const) for (const mode of ['compact', 'detail']) for (const ok of [true, false]) metrics.recordMcp(h, `project-${p}`, role, { tool, mode, ok, chars: 1000, bytes: 1200, ms: 3 })
+    for (let p = 0; p < 12; p++) for (const tool of CW_TOOLS) for (const role of ['agent', 'assistant'] as const) for (const mode of ['compact', 'detail']) for (const ok of [true, false]) metrics.recordMcp(h, `project-${p}`, role, { tool, mode, ok, chars: 1000, bytes: 1200, ms: 3 })
     const full = metrics.queryMetrics(w, { scope: { kind: 'workspace' } })
     const kept = Object.values(full.projects).reduce((total, pt) => total + pt.mcp.length + pt.api.length, 0) + full.workspace!.api.length
     expect(kept).toBe(metrics.METRICS_LIMITS.series)
@@ -692,18 +703,18 @@ describe('cost', () => {
     const heap = Buffer.byteLength(JSON.stringify(metrics.metricsHandle(w)!.store.buckets))
     if (process.env.MEASURE) console.log(`recordApi: ${perCallUs.toFixed(2)} µs a call; a bucket at its ${metrics.METRICS_LIMITS.series}-series cap: ${(size / 1024).toFixed(0)} KB on disk, ${(heap / 1024).toFixed(0)} KB as JSON in memory`)
     expect(perCallUs).toBeLessThan(50)
-    expect(size).toBeLessThanOrEqual(metrics.METRICS_LIMITS.fileBytes)
+    expect(size).toBeLessThanOrEqual(metrics.METRICS_LIMITS.storeBytes)
     await disposeWorkspaceService(w)
   }, 60_000)
 })
 
 describe('approved labels', () => {
-  it("the tool names metrics take are exactly the hive MCP server's tools", async () => {
-    const { HIVE_TOOLS } = await import('../src/shared/assistantTools')
-    const source = readFileSync(join(__dirname, '..', 'src', 'main', 'mcp', 'hive-mcp.ts'), 'utf8')
-    // A tool's name, or an intent tool's (#1267: intent('hive_submit', …)).
-    const offered = [...source.matchAll(/(?:^ {4}name: |\bintent\(\s*)'(hive_[a-z_]+)'/gm)].map((m) => m[1])
-    expect([...offered].sort()).toEqual([...HIVE_TOOLS].sort())
+  it("the tool names metrics take are exactly the Combwork MCP server's tools", async () => {
+    const { CW_TOOLS } = await import('../src/shared/assistantTools')
+    const source = readFileSync(join(__dirname, '..', 'src', 'main', 'mcp', 'cw-mcp.ts'), 'utf8')
+    // A tool's name, or an intent tool's (#1267: intent('cw_submit', …)).
+    const offered = [...source.matchAll(/(?:^ {4}name: |\bintent\(\s*)'(cw_[a-z_]+)'/gm)].map((m) => m[1])
+    expect([...offered].sort()).toEqual([...CW_TOOLS].sort())
   })
 })
 
@@ -765,11 +776,11 @@ describe('round 3: names, drops, saved expiry, byte cap, unmeasured copies', () 
     await disposeWorkspaceService(w)
   })
 
-  it('the size cap is in UTF-8 bytes, a lone bucket over it included, so Hive never saves more than it would read', async () => {
+  it('the size cap is in UTF-8 bytes, a lone bucket over it included, so Combwork never saves more than it would read', async () => {
     const { w, path } = await open()
     const saved = { ...metrics.METRICS_LIMITS }
     try {
-      metrics.METRICS_LIMITS.fileBytes = 4600
+      metrics.METRICS_LIMITS.storeBytes = 4600
       for (let h = 0; h < 6; h++) {
         now = T0 + h * HOUR
         for (let p = 0; p < 4; p++) metrics.recordApi(metrics.metricsHandle(w), `日本語プロジェクト-${p}`, api())
@@ -777,7 +788,7 @@ describe('round 3: names, drops, saved expiry, byte cap, unmeasured copies', () 
       await metrics.flushMetrics()
       expect(savedBytes(path)).toBeLessThanOrEqual(4600)
       // One bucket bigger than the whole cap: nothing is kept rather than an over-cap file.
-      metrics.METRICS_LIMITS.fileBytes = 200
+      metrics.METRICS_LIMITS.storeBytes = 200
       metrics.recordApi(metrics.metricsHandle(w), '🐝🐝🐝', api())
       await metrics.flushMetrics()
       expect(savedBytes(path)).toBeLessThanOrEqual(200)
@@ -795,15 +806,15 @@ describe('round 3: names, drops, saved expiry, byte cap, unmeasured copies', () 
     const { codex } = await import('../src/main/providers/codex/adapter')
     const root = join(base, 'unmeasured')
     const cwd = join(root, 'project')
-    mkdirSync(join(cwd, '.agents', 'skills', 'hive-ok'), { recursive: true })
-    writeFileSync(join(cwd, '.agents', 'skills', 'hive-ok', 'SKILL.md'), '---\nname: ok\ndescription: Fine.\n---\n')
-    mkdirSync(join(cwd, '.agents', 'skills', 'hive-headless'), { recursive: true })
-    writeFileSync(join(cwd, '.agents', 'skills', 'hive-headless', 'notes.md'), 'no SKILL.md here')
+    mkdirSync(join(cwd, '.agents', 'skills', 'cw-ok'), { recursive: true })
+    writeFileSync(join(cwd, '.agents', 'skills', 'cw-ok', 'SKILL.md'), '---\nname: ok\ndescription: Fine.\n---\n')
+    mkdirSync(join(cwd, '.agents', 'skills', 'cw-headless'), { recursive: true })
+    writeFileSync(join(cwd, '.agents', 'skills', 'cw-headless', 'notes.md'), 'no SKILL.md here')
     const ctx = { projectPath: cwd, agentId: 'a1', cwd } as never
     const r = await deliveredSkillSizes(codex, ctx, { ok: { revision: 'r1' }, gone: { revision: 'r2' }, headless: { revision: 'r3' }, never: { revision: null } })
     expect(r.unmeasured).toBe(2)
     expect(r.catalog).toBe(utf8Bytes('ok') + utf8Bytes('Fine.'))
-    expect(r.bytes).toBe(statSync(join(cwd, '.agents', 'skills', 'hive-ok', 'SKILL.md')).size)
+    expect(r.bytes).toBe(statSync(join(cwd, '.agents', 'skills', 'cw-ok', 'SKILL.md')).size)
   })
 })
 
@@ -850,8 +861,8 @@ describe('round 4: bounded loss owners, unreadable copied headers', () => {
       fine: '---\nname: fine\ndescription: Good.\n---\n'
     }
     for (const [name, text] of Object.entries(headers)) {
-      mkdirSync(join(cwd, '.agents', 'skills', `hive-${name}`), { recursive: true })
-      writeFileSync(join(cwd, '.agents', 'skills', `hive-${name}`, 'SKILL.md'), text)
+      mkdirSync(join(cwd, '.agents', 'skills', `cw-${name}`), { recursive: true })
+      writeFileSync(join(cwd, '.agents', 'skills', `cw-${name}`, 'SKILL.md'), text)
     }
     const r = await deliveredSkillSizes(codex, { projectPath: cwd, agentId: 'a1', cwd } as never, Object.fromEntries(Object.keys(headers).map((k) => [k, { revision: 'r' }])))
     expect(r.unmeasured).toBe(3)
@@ -939,7 +950,7 @@ describe('round 6: long project names, drop-only saves', () => {
       metrics.METRICS_LIMITS.projects = 1
       metrics.recordApi(metrics.metricsHandle(w), 'alpha', api())
       await metrics.flushMetrics()
-      metrics.recordMcp(metrics.metricsHandle(w), 'beta', 'agent', { tool: 'hive_list_tasks', mode: 'compact', ok: true, chars: 1, bytes: 1, ms: 1 })
+      metrics.recordMcp(metrics.metricsHandle(w), 'beta', 'agent', { tool: 'cw_list_tasks', mode: 'compact', ok: true, chars: 1, bytes: 1, ms: 1 })
       metrics.recordCatalog(metrics.metricsHandle(w), 'gamma', 'agent', 'builder', { tools: 1, toolsBytes: 10 })
       metrics.recordLaunch(metrics.metricsHandle(w), 'delta', { provider: 'codex', role: 'agent', workflow: 'builder', guidanceBytes: 1, guidanceChars: 1, customBytes: 0, customChars: 0, roleBytes: 0, roleChars: 0, modeBytes: 0, modeChars: 0, skills: 0, skillCatalogBytes: 0, skillBytes: 0, skillsNotDelivered: 0, skillsUnmeasured: 0 })
       await w.close()
@@ -951,7 +962,7 @@ describe('round 6: long project names, drop-only saves', () => {
       for (const p of ['gamma', 'delta']) expect(metrics.queryMetrics(w, { scope: { kind: 'project', project: p } }).lossesUnattributed, p).toBe(true)
       expect(metrics.queryMetrics(w, { scope: { kind: 'workspace' } }).dropped).toBe(3)
       config.settings.sessions.recordPerformance = false
-      metrics.recordMcp(metrics.metricsHandle(w), 'beta', 'agent', { tool: 'hive_list_tasks', mode: 'compact', ok: true, chars: 1, bytes: 1, ms: 1 })
+      metrics.recordMcp(metrics.metricsHandle(w), 'beta', 'agent', { tool: 'cw_list_tasks', mode: 'compact', ok: true, chars: 1, bytes: 1, ms: 1 })
       expect(metrics.queryMetrics(w, { scope: { kind: 'project', project: 'beta' } }).dropped).toBe(1)
     } finally {
       Object.assign(metrics.METRICS_LIMITS, saved)
@@ -969,7 +980,7 @@ describe('round 7: a shortened label never equals a real project name', () => {
     // The label the round-6 encoding gave the long project: a valid name of its own.
     const lookalike = `${long.slice(0, 111)}~${createHash('sha256').update(long.toLowerCase()).digest('hex').slice(0, 16)}`
     await w.createProject(lookalike)
-    // The new encoding's separator can't be in a project's name: Hive refuses it.
+    // The new encoding's separator can't be in a project's name: Combwork refuses it.
     await expect(w.createProject(`${long.slice(0, 111)}|${'0'.repeat(16)}`)).rejects.toThrow(/Project names cannot/)
     metrics.recordApi(metrics.metricsHandle(w), long, api())
     metrics.recordApi(metrics.metricsHandle(w), lookalike, api('/v1/tasks/:n'))
@@ -1011,7 +1022,7 @@ describe('trend, the Performance view and export', () => {
     metrics.recordApi(metrics.metricsHandle(w), 'beta', api())
     metrics.recordApi(metrics.metricsHandle(w), null, api('/v1/tasks', { role: 'assistant' }))
     now = T0 - 5 * HOUR
-    metrics.recordMcp(metrics.metricsHandle(w), 'alpha', 'agent', { tool: 'hive_list_tasks', mode: 'compact', ok: true, chars: 50, bytes: 60, ms: 3 })
+    metrics.recordMcp(metrics.metricsHandle(w), 'alpha', 'agent', { tool: 'cw_list_tasks', mode: 'compact', ok: true, chars: 50, bytes: 60, ms: 3 })
     now = T0
     const day = metrics.queryMetrics(w, { scope: { kind: 'workspace' }, from: new Date(T0 - DAY).toISOString(), trend: true })
     expect(day.trendStep).toBe('hour')
@@ -1037,8 +1048,8 @@ describe('trend, the Performance view and export', () => {
     for (let i = 0; i < 3; i++) metrics.recordApi(metrics.metricsHandle(w), 'Alpha', api('/v1/tasks', { ms: 3 }))
     metrics.recordApi(metrics.metricsHandle(w), 'beta', api('/v1/tasks/:n', { outcome: 'cancelled', ms: 300 }))
     metrics.recordApi(metrics.metricsHandle(w), null, api('/v1/tasks', { role: 'api' }))
-    metrics.recordMcp(metrics.metricsHandle(w), 'Alpha', 'agent', { tool: 'hive_list_tasks', mode: 'compact', ok: true, chars: 50, bytes: 60, ms: 3 })
-    metrics.recordMcp(metrics.metricsHandle(w), 'Alpha', 'agent', { tool: 'hive_read_task', mode: 'detail', ok: false, chars: 500, bytes: 500, ms: 3 })
+    metrics.recordMcp(metrics.metricsHandle(w), 'Alpha', 'agent', { tool: 'cw_list_tasks', mode: 'compact', ok: true, chars: 50, bytes: 60, ms: 3 })
+    metrics.recordMcp(metrics.metricsHandle(w), 'Alpha', 'agent', { tool: 'cw_read_task', mode: 'detail', ok: false, chars: 500, bytes: 500, ms: 3 })
     metrics.recordLaunch(metrics.metricsHandle(w), 'Alpha', { provider: 'claude-code', role: 'agent', workflow: 'builder', guidanceBytes: 1000, guidanceChars: 1000, customBytes: 0, customChars: 0, roleBytes: 0, roleChars: 0, modeBytes: 0, modeChars: 0, skills: 4, skillCatalogBytes: 400, skillBytes: 9000, skillsNotDelivered: 1, skillsUnmeasured: 0 })
     metrics.recordLaunch(metrics.metricsHandle(w), 'beta', { provider: 'codex', role: 'agent', workflow: 'builder', guidanceBytes: 2000, guidanceChars: 2000, customBytes: 0, customChars: 0, roleBytes: 0, roleChars: 0, modeBytes: 0, modeChars: 0, skills: 2, skillCatalogBytes: 200, skillBytes: 1000, skillsNotDelivered: 0, skillsUnmeasured: 1 })
     const r = report(metrics.queryMetrics(w, { scope: { kind: 'workspace' } }), [usage('claude-code', 1), usage('codex', 2)])
@@ -1063,7 +1074,7 @@ describe('trend, the Performance view and export', () => {
     const routes = byRoute(select(r, DEFAULT_PERF_FILTERS).api)
     expect(routes.map((x) => [x.key, x.requests, x.failed])).toEqual([['GET /v1/tasks', 4, 0], ['GET /v1/tasks/:n', 1, 1]])
     const tools = byTool(select(r, DEFAULT_PERF_FILTERS).mcp)
-    expect(tools.map((x) => [x.tool, x.calls, x.chars, x.detail, x.errors])).toEqual([['hive_read_task', 1, 500, 1, 1], ['hive_list_tasks', 1, 50, 0, 0]])
+    expect(tools.map((x) => [x.tool, x.calls, x.chars, x.detail, x.errors])).toEqual([['cw_read_task', 1, 500, 1, 1], ['cw_list_tasks', 1, 50, 0, 0]])
 
     // A project's report holds only that project: no filter widens it.
     const alpha = report(metrics.queryMetrics(w, { scope: { kind: 'project', project: 'alpha' } }))
@@ -1080,7 +1091,7 @@ describe('trend, the Performance view and export', () => {
     metrics.recordApi(metrics.metricsHandle(w), 'other', api())
     const r = { ...report(metrics.queryMetrics(w, { scope: { kind: 'workspace' }, trend: true })), safeguards: [{ project: 'Secret-Project', agent: 'Secret-Agent', provider: 'claude-code', role: 'agent' as const, model: 'claude-opus-5-5', stops: 1 }] }
     const plain = metricsExport(r, '9.9.9', false) as Record<string, unknown>
-    expect(plain).toMatchObject({ schema: METRICS_EXPORT_SCHEMA, app: { name: 'Hive', version: '9.9.9' }, sanitized: false })
+    expect(plain).toMatchObject({ schema: METRICS_EXPORT_SCHEMA, app: { name: 'Combwork', version: '9.9.9' }, sanitized: false })
     expect(Object.keys(plain.units as object)).toEqual(expect.arrayContaining(['bytes', 'chars', 'ms', 'tokens', 'costUsd']))
     expect(JSON.stringify(plain)).toContain('Secret-Project')
     const clean = JSON.stringify(metricsExport(r, '9.9.9', true))
@@ -1104,7 +1115,7 @@ describe('#116 round 1: filters, coverage, attribution, unknown usage, guidance 
     metrics.recordApi(metrics.metricsHandle(w), 'alpha', api())
     metrics.recordApi(metrics.metricsHandle(w), null, api('/v1/tasks', { role: 'api' }))
     metrics.recordApi(metrics.metricsHandle(w), null, api('/v1/tasks', { role: 'assistant', outcome: 'cancelled' }))
-    metrics.recordMcp(metrics.metricsHandle(w), 'alpha', 'agent', { tool: 'hive_list_tasks', mode: 'compact', ok: true, chars: 50, bytes: 50, ms: 1 })
+    metrics.recordMcp(metrics.metricsHandle(w), 'alpha', 'agent', { tool: 'cw_list_tasks', mode: 'compact', ok: true, chars: 50, bytes: 50, ms: 1 })
     metrics.recordLaunch(metrics.metricsHandle(w), 'alpha', launch())
     metrics.recordLaunch(metrics.metricsHandle(w), 'alpha', launch({ provider: 'codex' }))
     const q = (extra: Partial<import('../src/shared/metrics').MetricsQuery>) => metrics.queryMetrics(w, { scope: { kind: 'workspace' }, trend: true, ...extra })
@@ -1195,7 +1206,7 @@ describe('#116 round 1: filters, coverage, attribution, unknown usage, guidance 
     for (const p of ['alpha', 'beta']) mkdirSync(join(path, p), { recursive: true })
     const at = new Date(T0 - HOUR).toISOString()
     const usage = (input: number, cost: number | null, context = 0) => ({ inputTokens: input, outputTokens: 1, cacheWriteTokens: 0, cacheReadTokens: 0, requests: 2, reasoningTokens: 0, contextTokens: context, contextWindow: context ? 200000 : null, compactions: [], cacheTtlSeconds: 300, firstActivity: at, lastActivity: at, userMessages: 1, lastPrompt: null, costUsd: cost, costEstimated: false })
-    const item = (id: string, u: (ReturnType<typeof usage> & { safeguards?: Record<string, number> }) | null, agentName?: string) => ({ id, provider: 'claude-code', source: 'hive', title: null, lastActivity: at, hasTranscript: true, hasBackup: false, usage: u, recache: null, ...(agentName ? { agentName } : {}) })
+    const item = (id: string, u: (ReturnType<typeof usage> & { safeguards?: Record<string, number> }) | null, agentName?: string) => ({ id, provider: 'claude-code', source: 'combwork', title: null, lastActivity: at, hasTranscript: true, hasBackup: false, usage: u, recache: null, ...(agentName ? { agentName } : {}) })
     const byPath: Record<string, unknown[]> = {
       [join(path, 'alpha').toLowerCase()]: [item('a1', { ...usage(100, 1, 5000), safeguards: { 'claude-opus-5-5': 2 } }, 'HB3'), item('a2', { ...usage(50, null, 15000), safeguards: { 'claude-opus-5-5': 1, 'claude-opus-4-8': 1 } }, 'HB3')],
       [join(path, 'beta').toLowerCase()]: [item('b1', null)],
@@ -1240,27 +1251,27 @@ describe('#116 round 1: filters, coverage, attribution, unknown usage, guidance 
 
   it("a launch's guidance in parts: core, the project's additions, the Assistant's role and mode", async () => {
     const { launchParts } = await import('../src/main/guidance')
-    const { hiveInstructions, withLatestHandover } = await import('../src/shared/hiveGuidance')
-    const core = hiveInstructions('alpha')
+    const { combworkInstructions, withLatestHandover } = await import('../src/shared/combworkGuidance')
+    const core = combworkInstructions('alpha')
     const withHandover = withLatestHandover(core, 'handovers/alpha/one.md')
     const agent = launchParts(withHandover, 'agent', 'alpha', null)
     expect([agent.guidanceBytes, agent.customBytes, agent.roleBytes, agent.modeBytes]).toEqual([utf8Bytes(core), utf8Bytes(withHandover) - utf8Bytes(core), 0, 0])
     expect(agent.customChars).toBeGreaterThan(0)
     const mode = '# Your mode: Bee\n\nBuzz. Ünïcödé.'
-    const text = `You are the Hive Assistant…\n\n${mode}`
-    const assistant = launchParts(hiveInstructions('', 'assistant'), 'assistant', 'assistant', { text, modeText: mode })
+    const text = `You are the Combwork Assistant…\n\n${mode}`
+    const assistant = launchParts(combworkInstructions('', 'assistant'), 'assistant', 'assistant', { text, modeText: mode })
     expect([assistant.customBytes, assistant.roleBytes, assistant.modeBytes]).toEqual([0, utf8Bytes(text) - utf8Bytes(mode), utf8Bytes(mode)])
     // The Assistant's journal (HI-2112): off, the contract is all core; on, its skills line changes inside the contract
     // (HI-2048), which is still core, and its rule after it is custom.
-    const { withJournal, journalRule } = await import('../src/shared/hiveGuidance')
-    const assistantCore = hiveInstructions('', 'assistant')
-    expect(launchParts(withJournal(assistantCore, null), 'assistant', 'assistant', null)).toMatchObject({ guidanceBytes: utf8Bytes(assistantCore), customBytes: 0 })
-    const journalOn = withJournal(assistantCore, ['decision', 'plan'])
+    const { journalRule } = await import('../src/shared/combworkGuidance')
+    const assistantCore = combworkInstructions('', 'assistant')
+    expect(launchParts(combworkInstructions('', 'assistant', true, undefined, null), 'assistant', 'assistant', null)).toMatchObject({ guidanceBytes: utf8Bytes(assistantCore), customBytes: 0 })
+    const journalOn = combworkInstructions('', 'assistant', true, undefined, ['decision', 'plan'])
     expect(journalOn.startsWith(assistantCore)).toBe(false)
     const rule = `\n${journalRule(['decision', 'plan'])}`
     expect(launchParts(journalOn, 'assistant', 'assistant', null)).toMatchObject({ guidanceBytes: utf8Bytes(journalOn) - utf8Bytes(rule), customBytes: utf8Bytes(rule) })
     // Without long commands wrapped too (Settings → General).
-    const unwrapped = withJournal(hiveInstructions('', 'assistant', false), ['decision'])
+    const unwrapped = combworkInstructions('', 'assistant', false, undefined, ['decision'])
     expect(launchParts(unwrapped, 'assistant', 'assistant', null).customBytes).toBe(utf8Bytes(`\n${journalRule(['decision'])}`))
     // Text that isn't as expected is counted whole, never split by guesswork.
     expect(launchParts('something else', 'agent', 'alpha', null)).toMatchObject({ guidanceBytes: 14, customBytes: 0 })
@@ -1356,7 +1367,7 @@ describe('#116 round 2: observation boundaries, evicted history, unreadable sess
     const saved = { ...metrics.METRICS_LIMITS }
     try {
       // The probe: a tiny cap, one request, a minute observed, saved.
-      metrics.METRICS_LIMITS.fileBytes = 500
+      metrics.METRICS_LIMITS.storeBytes = 500
       metrics.recordApi(metrics.metricsHandle(w), null, api())
       at(1)
       cov(w)
@@ -1401,7 +1412,7 @@ describe('#116 round 2: observation boundaries, evicted history, unreadable sess
     const { w, path } = await open()
     for (const p of ['alpha', 'beta']) mkdirSync(join(path, p), { recursive: true })
     const when = new Date(T0 - HOUR).toISOString()
-    const item = (id: string) => ({ id, provider: 'claude-code', source: 'hive', title: null, lastActivity: when, hasTranscript: true, hasBackup: false, usage: null, recache: null })
+    const item = (id: string) => ({ id, provider: 'claude-code', source: 'combwork', title: null, lastActivity: when, hasTranscript: true, hasBackup: false, usage: null, recache: null })
     const broken = new Set<string>()
     const orig = { usageItems: sessions.usageItems }
     ;(sessions as unknown as { usageItems: (p: string) => Promise<unknown[]> }).usageItems = async (p) => {
@@ -1438,8 +1449,8 @@ describe('#116 round 2: observation boundaries, evicted history, unreadable sess
 describe('HI-2049: launches and tool lists by workflow role', () => {
   const hourOf = (t: number) => Math.floor(t / HOUR) * HOUR
   const write = (path: string, data: unknown) => {
-    mkdirSync(join(path, '.hive', 'metrics'), { recursive: true })
-    writeFileSync(join(path, '.hive', 'metrics', 'metrics.json'), JSON.stringify(data))
+    mkdirSync(join(path, '.combwork', 'metrics'), { recursive: true })
+    writeFileSync(join(path, '.combwork', 'metrics', 'metrics.json'), JSON.stringify(data))
   }
   const launch = (workflow: 'builder' | 'reviewer' | 'either' | 'none') => ({ provider: 'claude-code', role: 'agent' as const, workflow, guidanceBytes: 100, guidanceChars: 100, customBytes: 0, customChars: 0, roleBytes: 0, roleChars: 0, modeBytes: 0, modeChars: 0, skills: 1, skillCatalogBytes: 10, skillBytes: 20, skillsNotDelivered: 0, skillsUnmeasured: 0 })
 
@@ -1454,6 +1465,18 @@ describe('HI-2049: launches and tool lists by workflow role', () => {
     await disposeWorkspaceService(w)
   })
 
+  it('HI-2443: launches on a dialect chain are a series of their own, kept by its hash; the Default has none', async () => {
+    const { w } = await open()
+    const h = metrics.metricsHandle(w)
+    metrics.recordLaunch(h, 'alpha', launch('builder'))
+    metrics.recordLaunch(h, 'alpha', { ...launch('builder'), dialect: '0123456789abcdef' })
+    metrics.recordLaunch(h, 'alpha', { ...launch('builder'), dialect: '0123456789abcdef' })
+    const g = metrics.queryMetrics(w, { scope: { kind: 'project', project: 'alpha' } }).projects.alpha.guidance
+    expect(g.map((s) => [s.dialect ?? null, s.launches]).sort()).toEqual([[null, 1], ['0123456789abcdef', 2]])
+    expect(g.find((s) => !s.dialect)).not.toHaveProperty('dialect')
+    await disposeWorkspaceService(w)
+  })
+
   it("the tool list's characters, on its launch's side; a bridge from before sends bytes only, so its start has no characters", async () => {
     const { w } = await open()
     const h = metrics.metricsHandle(w)
@@ -1462,7 +1485,7 @@ describe('HI-2049: launches and tool lists by workflow role', () => {
     expect(metrics.recordCatalog(h, 'alpha', 'agent', 'builder', { tools: 42, toolsBytes: 9500, toolsChars: 9400 })).toBe(true)
     expect(metrics.recordCatalog(h, 'alpha', 'agent', 'unknown', { tools: 1, toolsBytes: 10, toolsChars: 10 })).toBe(true)
     for (const bad of [{ toolsChars: -1 }, { toolsChars: 1.5 }, { toolsChars: 'many' }]) expect(metrics.recordCatalog(h, 'alpha', 'agent', 'builder', { tools: 1, toolsBytes: 10, ...bad })).toBe(false)
-    // A side Hive doesn't record is unknown, never one it does.
+    // A side Combwork doesn't record is unknown, never one it does.
     expect(metrics.recordCatalog(h, 'alpha', 'agent', 'boss' as never, { tools: 1, toolsBytes: 10, toolsChars: 10 })).toBe(true)
     const c = metrics.queryMetrics(w, { scope: { kind: 'project', project: 'alpha' } }).projects.alpha.catalog
     const by = Object.fromEntries(c.map((s) => [s.workflow, s]))
@@ -1492,8 +1515,8 @@ describe('HI-2049: launches and tool lists by workflow role', () => {
 describe("HI-2063: the tool list's parts", () => {
   const hourOf = (t: number) => Math.floor(t / HOUR) * HOUR
   const write = (path: string, data: unknown) => {
-    mkdirSync(join(path, '.hive', 'metrics'), { recursive: true })
-    writeFileSync(join(path, '.hive', 'metrics', 'metrics.json'), JSON.stringify(data))
+    mkdirSync(join(path, '.combwork', 'metrics'), { recursive: true })
+    writeFileSync(join(path, '.combwork', 'metrics', 'metrics.json'), JSON.stringify(data))
   }
 
   it('parts come both or neither, with the characters, and add up to no more than them', async () => {
@@ -1560,8 +1583,8 @@ describe('HI-2063: Copy Diagnostics says the tool list a start', () => {
     const { toolListLine } = await import('../src/main/diagnostics')
     const row = { role: 'agent' as const, workflow: 'builder' as const, starts: 3, tools: 98, bytes: 63000.4, chars: 61234.2, descriptionChars: 30120, paramChars: 12004, schemaChars: 19110 }
     expect(toolListLine('Workspace 1', [row, { ...row, role: 'assistant', workflow: 'none', starts: 1, chars: 70000, descriptionChars: null, paramChars: null, schemaChars: null }, { ...row, workflow: 'unknown', chars: null }])).toBe(
-      '- Workspace 1 hive tool list (24 h): agents · builder: 98 tools, 61,234 chars a start (descriptions 30,120, parameters 12,004, schemas 19,110), 63,000 bytes, 3 starts; assistant · none: 98 tools, 70,000 chars a start (parts not measured), 63,000 bytes, 1 start; agents · unknown: 98 tools, characters not measured, 63,000 bytes, 3 starts'
+      '- Workspace 1 Combwork tool list (24 h): agents · builder: 98 tools, 61,234 chars a start (descriptions 30,120, parameters 12,004, schemas 19,110), 63,000 bytes, 3 starts; assistant · none: 98 tools, 70,000 chars a start (parts not measured), 63,000 bytes, 1 start; agents · unknown: 98 tools, characters not measured, 63,000 bytes, 3 starts'
     )
-    expect(toolListLine('Workspace 2', [])).toBe('- Workspace 2 hive tool list (24 h): none recorded')
+    expect(toolListLine('Workspace 2', [])).toBe('- Workspace 2 Combwork tool list (24 h): none recorded')
   })
 })

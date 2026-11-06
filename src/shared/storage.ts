@@ -1,4 +1,4 @@
-// What Hive keeps per project (Project Settings → Storage), which of it Clean Up… may remove, and what Purge… removes.
+// What Combwork keeps per project (Project Settings → Storage), which of it Clean Up… may remove, and what Purge… removes.
 import type { CleanupItem, CleanupOptions, PurgeItem } from './types'
 import { tr } from './i18n'
 import { msg } from './i18n/msg'
@@ -23,13 +23,13 @@ export interface CleanupSession {
   running: boolean
   /** The CLI (Claude Code, Codex) still has its transcript. */
   inCli: boolean
-  /** Hive's backups of it (active and archived copies) and their sizes. */
+  /** Combwork's backups of it (active and archived copies) and their sizes. */
   backups: { path: string; bytes: number }[]
 }
 
 export interface CleanupFacts {
   sessions: CleanupSession[]
-  /** The folders in .hive/attachments: a session id, or run-<launch> for a launch that had no id yet. */
+  /** The folders in .combwork/attachments: a session id, or run-<launch> for a launch that had no id yet. */
   attachmentFolders: { name: string; path: string; bytes: number }[]
   /** Session ids and run-<launch> names of what is running now. */
   liveNames: Set<string>
@@ -38,7 +38,7 @@ export interface CleanupFacts {
 
 /**
  * What Clean Up removes with these options: attachments of archived sessions last active more than N days ago, attachments of
- * sessions Hive no longer has (deleted, or launches that never got an id), Hive's backups of archived sessions older
+ * sessions Combwork no longer has (deleted, or launches that never got an id), Combwork's backups of archived sessions older
  * than N days that the CLI still has, and the backups of archived sessions the CLI no longer has (which deletes them).
  * Running and non-archived sessions are never in it.
  */
@@ -70,7 +70,7 @@ export interface PurgeSession {
   name: string
   /** Running or starting now (never touched). */
   running: boolean
-  /** The CLI still has its transcript: Hive's files aren't its last copy. */
+  /** The CLI still has its transcript: Combwork's files aren't its last copy. */
   inCli: boolean
   /** The size of old usage kept on its record (keptUsage, from before the usage history), or null: none. */
   keptUsageBytes: number | null
@@ -89,12 +89,12 @@ export interface PurgeFacts {
   assistant?: boolean
   sessions: PurgeSession[]
   /**
-   * The files of .hive/sessions and .hive/archive (`folder`) named for a session: its backups (`backup`: an active or
+   * The files of .combwork/sessions and .combwork/archive (`folder`) named for a session: its backups (`backup`: an active or
    * archived copy, compressed or not) and what is left of one (a spare, a half-made or set-aside copy). Nothing else
-   * there is Hive's per session.
+   * there is Combwork's per session.
    */
   files: (PurgeFile & { id: string; folder: 'sessions' | 'archive'; backup: boolean })[]
-  /** The folders in .hive/attachments (a session id, or run-<launch> for a launch that had no id yet) and their plain files. */
+  /** The folders in .combwork/attachments (a session id, or run-<launch> for a launch that had no id yet) and their plain files. */
   attachmentFolders: { name: string; path: string; files: PurgeFile[] }[]
   /** Old usage kept for deleted sessions (deletedUsage, from before the usage history), with its size. */
   deletedUsage: { id: string; name: string; bytes: number }[]
@@ -109,10 +109,10 @@ export interface PurgeFacts {
 export const purgeKey = (kind: PurgeItem['kind'], where: string, id?: string): string => `${kind}:${where.toLowerCase()}${id ? `|${id.toLowerCase()}` : ''}`
 
 /**
- * What Purge… removes of a host (#1138): everything Hive keeps per session — each session's backups, leftovers of them,
- * each of its attachments, and old usage on its record — and what is left of sessions Hive no longer has (their files,
+ * What Purge… removes of a host (#1138): everything Combwork keeps per session — each session's backups, leftovers of them,
+ * each of its attachments, and old usage on its record — and what is left of sessions Combwork no longer has (their files,
  * attachments and kept usage). With `only`, that session's alone. Running sessions are left out, and counted. A leftover
- * of a session that may be its only copy (Hive stopped while it deleted or moved it: the CLI has no transcript and no
+ * of a session that may be its only copy (Combwork stopped while it deleted or moved it: the CLI has no transcript and no
  * backup of it is in that folder) is kept, and counted as `recoverable`. The usage history and the CLIs' own files are
  * never in it.
  */

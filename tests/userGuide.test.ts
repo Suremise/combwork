@@ -10,7 +10,7 @@ import { SETTINGS_CATALOG } from '../src/shared/settingsCatalog'
 import { BOARD_UPGRADE_GUIDE } from '../src/shared/userGuide'
 import { GIT_VIEW_GUIDE } from '../src/shared/gitRepo'
 import { GIT_GUIDE } from '../src/shared/gitTool'
-import { HIVE_FOLDER_GUIDE } from '../src/shared/hiveVcsText'
+import { CW_FOLDER_GUIDE } from '../src/shared/combworkVcsText'
 import { UNUSED_WORKTREES_GUIDE } from '../src/shared/unusedWorktrees'
 
 const root = join(__dirname, '..')
@@ -18,7 +18,7 @@ const guide = readFileSync(join(root, 'docs', 'USER_GUIDE.md'), 'utf8')
 const ids = (md: string): Set<string> => new Set(docOutline(md).filter((h) => h.fixed).map((h) => h.slug))
 
 /** The window's links that aren't tips or settings, by the constant `openGuideAt` is called with. */
-const CONSTANTS: Record<string, string> = { BOARD_UPGRADE_GUIDE, GIT_VIEW_GUIDE, GIT_GUIDE, HIVE_FOLDER_GUIDE, UNUSED_WORKTREES_GUIDE }
+const CONSTANTS: Record<string, string> = { BOARD_UPGRADE_GUIDE, GIT_VIEW_GUIDE, GIT_GUIDE, CW_FOLDER_GUIDE, UNUSED_WORKTREES_GUIDE }
 
 /** Every link the app makes into the guide, each with where it comes from. */
 const appLinks = (): [string, string][] => [
@@ -37,7 +37,7 @@ describe("the user guide's heading ids", () => {
     const shared = outline.filter((h) => h.sharedId).map((h) => `line ${h.line}: ${h.text} (${h.sharedId})`)
     expect(shared, 'an id two headings carry (a copied heading): give the new one its own').toEqual([])
     const without = outline.filter((h) => !h.fixed).map((h) => `line ${h.line}: ${h.text}`)
-    expect(without, 'a heading without an id: end it with <a id="its-slug"></a> (its slug as hive_doc_outline lists it, then never change the id)').toEqual([])
+    expect(without, 'a heading without an id: end it with <a id="its-slug"></a> (its slug as cw_doc_outline lists it, then never change the id)').toEqual([])
     expect(new Set(outline.map((h) => h.slug)).size).toBe(outline.length)
     for (const h of outline) expect(h.slug, h.text).toMatch(/^[a-z0-9][a-z0-9_-]*$/)
   })

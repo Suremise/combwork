@@ -11,7 +11,7 @@ import { tempDir } from './tempDir'
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
 const HUNG_MS = 10000
 
-const base = tempDir('hive-titleorder-')
+const base = tempDir('cw-titleorder-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -50,7 +50,7 @@ function agent() {
 describe('the title in order with the hooks', () => {
   const told = vi.spyOn(sessions as unknown as { notify: (...a: unknown[]) => void }, 'notify').mockImplementation(() => undefined)
   beforeAll(async () => {
-    mkdirSync(join(p, '.hive'), { recursive: true })
+    mkdirSync(join(p, '.combwork'), { recursive: true })
     w = createWorkspaceService()
     await w.open(wsPath)
   })

@@ -1,9 +1,9 @@
-// The merge slot (#350) on fake Claude Code agents (fake-claude/), through the real hive tool: two agents claiming at
+// The merge slot (#350) on fake Claude Code agents (fake-claude/), through the real Combwork tool: two agents claiming at
 // once merge one after the other and the second runs its checks once; the waiter's status says who it waits for, and
 // the project's Overview and the Progress panel show the holder and the line; a holder whose session ends frees the
 // slot; a hold that runs out passes on and is reported; the user releases a holder from the Overview; the Merge dialog
 // waits while the slot is taken; another project's agent can't reach the slot. Dev build, throwaway profile, workspace
-// and CLAUDE_CONFIG_DIR; holds last 20 s here (HIVE_TEST_MERGE_HOLD_MS).
+// and CLAUDE_CONFIG_DIR; holds last 20 s here (CW_TEST_MERGE_HOLD_MS).
 // Dev build only (#1580): it starts this checkout's Electron itself, and Wes is a 0.9 worktree agent
 // (agents:testLegacy, refused by a packaged build), with a branch for the Merge dialog.
 const lib = require('./lib.cjs')
@@ -44,13 +44,13 @@ const check = (name, ok, extra = '') => {
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off', HIVE_TEST_MERGE_HOLD_MS: String(HOLD_MS) })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off', CW_TEST_MERGE_HOLD_MS: String(HOLD_MS) })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await lib.waitForProvider(inv)
   const apiToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
@@ -73,12 +73,12 @@ const check = (name, ok, extra = '') => {
   const idle = (dir, id) => until(async () => ['ready', 'finished'].includes((await live(dir, id))?.status), 60000)
   /**
    * Types a prompt into an agent (as the user does), Enter included, once it is idle: taken once a turn of its starts.
-   * Typed again when a wake of Hive's disturbed it (typeLine).
+   * Typed again when a wake of Combwork's disturbed it (typeLine).
    */
   const say = async (dir, agent, text) => {
     await lib.typeLine(inv, lib.ptyKey(dir, agent.id), claudeHome, agent.name, text, { ready: async () => ['ready', 'finished'].includes((await live(dir, agent.id))?.status), live: () => live(dir, agent.id), hungMs: 60000 })
   }
-  const slot = (args) => `hive hive_merge_slot ${JSON.stringify(args)}`
+  const slot = (args) => `cw cw_merge_slot ${JSON.stringify(args)}`
   const shellRuns = () => {
     const f = path.join(claudeHome, 'fake-shell.jsonl')
     return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []

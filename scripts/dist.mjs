@@ -1,4 +1,4 @@
-// npm run dist [-- --here | --replace | --kind <beta|baseline|rc|release>]: builds Hive and its Windows installer (dist/Hive-Setup-<version>.exe, with its
+// npm run dist [-- --here | --replace | --kind <beta|baseline|rc|release>]: builds Combwork and its Windows installer (dist/Combwork-Setup-<version>.exe, with its
 // blockmap and latest.yml; never published: npm run release does that, RELEASING.md), and writes dist/build-info.json:
 // what the installer was built from (the code's fingerprint, commit, branch, version, time), only if that didn't change
 // while it was built. Built in an agent's git worktree, the installer is also copied to the main checkout's dist, where
@@ -7,7 +7,7 @@
 // Its `npm run build` makes the dev build in out/ that the app is packaged from: that is stamped as `npm run e2e --
 // --build` stamps it (tests/e2e/build.mjs, under the worktree's build lock), so the packaged checks run straight after
 // it (npm run e2e -- packaged packaged-mcp packaged-progress --record) find out/ from this source (#274).
-// A successful build is then recorded in Hive's journal (buildFact.mjs, #1534); --kind says what it is (else from the
+// A successful build is then recorded in Combwork's journal (buildFact.mjs, #1534); --kind says what it is (else from the
 // version: RELEASING.md).
 import { spawnSync } from 'child_process'
 import { existsSync, readFileSync } from 'fs'
@@ -41,7 +41,13 @@ const notices = () => (existsSync(noticesFile) ? readFileSync(noticesFile, 'utf8
 const noticesBefore = notices()
 // An earlier build's records go first, so a build that fails part way leaves nothing vouching for its installer and
 // dist/win-unpacked, and the e2e runner's packaged checks say so (tests/e2e/runner.mjs packagedStatus): makeDist.
-const lines = makeDist({ root, here: args.includes('--here'), replace: args.includes('--replace'), run, buildStamped })
+// It refuses, building nothing, while a release or another npm run dist builds in this checkout's dist (HI-2417).
+const made = makeDist({ root, here: args.includes('--here'), replace: args.includes('--replace'), run, buildStamped })
+if (made.refused) {
+  console.error(`\n${made.refused}`)
+  process.exit(1)
+}
+const { lines } = made
 if (notices() !== noticesBefore) lines.push('THIRD_PARTY_NOTICES.md changed: the build regenerated it for changed dependencies. Commit it (the unit tests fail until it is).')
 const recorded = await recordDist({ root, lines, kind })
 if (recorded) lines.push(recorded)

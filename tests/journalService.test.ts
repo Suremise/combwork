@@ -1,4 +1,4 @@
-// The Assistant's journal in a workspace (#1031): its settings in workspace.json (on by default, work only), Hive's own
+// The Assistant's journal in a workspace (#1031): its settings in workspace.json (on by default, work only), Combwork's own
 // facts (lanes started and ended with their merge, a card into Done, an unexpected close), nothing written while it is
 // off or outside its scope while the entries are kept, the Assistant told when they change, and deleting it.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
@@ -10,7 +10,7 @@ import { DEFAULT_JOURNAL } from '../src/shared/journal'
 // The longest a wait here waits for what it waits on: a bound for a hung run (tests/README.md).
 const HUNG_MS = 10_000
 
-const base = tempDir('hive-journal-service-')
+const base = tempDir('cw-journal-service-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -31,17 +31,17 @@ describe('the journal in a workspace', () => {
   const wsPath = join(base, 'ws')
   const trashDir = join(base, 'trash')
   beforeAll(async () => {
-    process.env.HIVE_TEST_TRASH_DIR = trashDir
+    process.env.CW_TEST_TRASH_DIR = trashDir
     // The Assistant reads an inbox (its CLI would say so as it starts).
     deliveries.setReadsInboxForTests(() => true)
     const p = join(wsPath, 'alpha')
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }] }))
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
   })
   afterAll(async () => {
-    delete process.env.HIVE_TEST_TRASH_DIR
+    delete process.env.CW_TEST_TRASH_DIR
     deliveries.setReadsInboxForTests(null)
     await disposeWorkspaceService(w)
   })
@@ -59,7 +59,7 @@ describe('the journal in a workspace', () => {
     await run(() => tasks.updateTask(c.number, { column: 'done' }, user))
     await finished(c.number)
   }
-  const facts = (): string[] => (existsSync(journal.journalFile(home())) ? journal.recall(home(), { limit: 50 }).filter((r) => r.source === 'hive').map((r) => r.summary) : [])
+  const facts = (): string[] => (existsSync(journal.journalFile(home())) ? journal.recall(home(), { limit: 50 }).filter((r) => r.source === 'combwork').map((r) => r.summary) : [])
   /** What the Assistant was told (its inbox's bodies). */
   const told = async (): Promise<string[]> => (await deliveries.deliveriesOf(home(), 'assistant')).map((d) => d.body)
 
@@ -68,7 +68,7 @@ describe('the journal in a workspace', () => {
     expect(service.journalStatus(w)).toEqual({ settings: DEFAULT_JOURNAL, bytes: 0, entries: 0 })
     const s = await service.setJournalSettings(w, { scope: ['decision', 'event', 'preference'], capMB: null })
     expect(s).toEqual({ ...DEFAULT_JOURNAL, scope: ['decision', 'event', 'preference'], capMB: null })
-    expect(JSON.parse(readFileSync(join(wsPath, '.hive', 'workspace.json'), 'utf8')).journal).toEqual(s)
+    expect(JSON.parse(readFileSync(join(wsPath, '.combwork', 'workspace.json'), 'utf8')).journal).toEqual(s)
     // Told: the scope changed while it may be running.
     expect((await told()).at(-1)).toMatch(/scope changed: store only decision, event, preference entries/)
   })
@@ -79,14 +79,14 @@ describe('the journal in a workspace', () => {
     expect(a.enabled).toBe(false)
     expect(b).toMatchObject({ enabled: false, capMB: 20 })
     expect(service.journalSettingsOf(w)).toEqual({ ...before, enabled: false, capMB: 20 })
-    expect(JSON.parse(readFileSync(join(wsPath, '.hive', 'workspace.json'), 'utf8')).journal).toMatchObject({ enabled: false, capMB: 20 })
+    expect(JSON.parse(readFileSync(join(wsPath, '.combwork', 'workspace.json'), 'utf8')).journal).toMatchObject({ enabled: false, capMB: 20 })
     // Told once that it went off (the cap's save changed nothing it tells).
     expect((await told()).filter((t) => /journal is off/.test(t))).toHaveLength(1)
     await Promise.all([service.setJournalSettings(w, { enabled: true }), service.setJournalSettings(w, { scope: before.scope, capMB: before.capMB })])
     expect(service.journalSettingsOf(w)).toEqual(before)
   })
 
-  it("records Hive's facts: a lane started and ended with its merge, a card into Done", async () => {
+  it("records Combwork's facts: a lane started and ended with its merge, a card into Done", async () => {
     const [c1, c2] = [await run(() => tasks.createTask({ title: 'One', project: 'alpha' }, user)), await run(() => tasks.createTask({ title: 'Two', project: 'alpha' }, user))]
     const l = await run(() => lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c1.number, c2.number], name: 'storage', by: 'B1 (alpha)' }))
     await run(() => tasks.updateTask(c1.number, { column: 'done' }, user))
@@ -100,13 +100,13 @@ describe('the journal in a workspace', () => {
     // Linked and marked: the merge is important and points at its commit and cards.
     const merged = journal.recall(home(), { link: { type: 'commit', ref: '45b5696b' } })
     expect(merged).toHaveLength(1)
-    expect(journal.readEntry(home(), merged[0].id)).toMatchObject({ kind: 'event', source: 'hive', project: 'alpha', importance: 2, tags: ['hive', 'lane'] })
+    expect(journal.readEntry(home(), merged[0].id)).toMatchObject({ kind: 'event', source: 'combwork', project: 'alpha', importance: 2, tags: ['combwork', 'lane'] })
     expect(journal.recall(home(), { link: { type: 'card', ref: String(c1.number) } })).toHaveLength(3)
   })
 
   it('an unexpected close is a fact for the workspace, open or not', async () => {
-    await service.journalFactAt(wsPath, { summary: 'Hive closed unexpectedly (a test)', importance: 2, tags: ['incident'] })
-    expect(facts()[0]).toBe('Hive closed unexpectedly (a test)')
+    await service.journalFactAt(wsPath, { summary: 'Combwork closed unexpectedly (a test)', importance: 2, tags: ['incident'] })
+    expect(facts()[0]).toBe('Combwork closed unexpectedly (a test)')
   })
 
   it('off: nothing written, the entries kept; facts outside the scope neither; on again, as before', async () => {
@@ -116,7 +116,7 @@ describe('the journal in a workspace', () => {
     await doneCard('Three')
     expect(facts()).toHaveLength(before)
     expect(service.journalStatus(w).entries).toBeGreaterThanOrEqual(before)
-    // On, but events out of the scope: Hive's facts aren't written either.
+    // On, but events out of the scope: Combwork's facts aren't written either.
     await service.setJournalSettings(w, { enabled: true, scope: ['decision'] })
     expect((await told()).at(-1)).toMatch(/journal is on again/)
     await doneCard('Four')

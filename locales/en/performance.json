@@ -1,7 +1,7 @@
 {
   "performance.appWide": {
-    "defaultMessage": "Hive-wide, not this workspace’s: {inFlight, plural, one {# request} other {# requests}} in flight · {refused, number} refused before Hive knew whose · event streams: {connections, plural, one {# connection} other {# connections}}, {events, number} events, {size}.",
-    "description": "A line at the end of the Performance view: Agent API requests under way, requests refused before Hive knew whose they were, and the event streams (connections, events and their size, such as \"1.5 MB\")."
+    "defaultMessage": "Combwork-wide, not this workspace’s: {inFlight, plural, one {# request} other {# requests}} in flight · {refused, number} refused before Combwork knew whose · event streams: {connections, plural, one {# connection} other {# connections}}, {events, number} events, {size}.",
+    "description": "A line at the end of the Performance view: Agent API requests under way, requests refused before Combwork knew whose they were, and the event streams (connections, events and their size, such as \"1.5 MB\")."
   },
   "performance.card.data": {
     "defaultMessage": "Data",
@@ -12,19 +12,19 @@
     "description": "Under the Data card's number (what was sent). {size} is a size such as \"1.5 MB\"."
   },
   "performance.card.dataTip": {
-    "defaultMessage": "Bodies only, in UTF-8 bytes: what Hive's API sent and received. Not provider traffic: Hive isn't between the CLIs and their providers.",
+    "defaultMessage": "Bodies only, in UTF-8 bytes: what Combwork's API sent and received. Not provider traffic: Combwork isn't between the CLIs and their providers.",
     "description": "Tooltip of the Data card. Keep UTF-8."
   },
   "performance.card.guidance": {
     "defaultMessage": "Guidance per launch",
-    "description": "Title of a Performance card: the size of what Hive gave each session at launch, on average."
+    "description": "Title of a Performance card: the size of what Combwork gave each session at launch, on average."
   },
   "performance.card.guidanceSub": {
     "defaultMessage": "{launches, plural, one {# launch} other {# launches}} · core {core} · catalog {catalog}",
-    "description": "Under the Guidance per launch card's size. {core} and {catalog} are sizes such as \"4 KB\": Hive's session contract and its skills' catalog."
+    "description": "Under the Guidance per launch card's size. {core} and {catalog} are sizes such as \"4 KB\": Combwork's session contract and its skills' catalog."
   },
   "performance.card.guidanceTip": {
-    "defaultMessage": "What Hive gave each session at launch, on average: its session contract (core), what it adds for the project, the Assistant's role and mode, and its skills' catalog (names and descriptions). Skill bodies are separate: a model reads one only when it uses it.",
+    "defaultMessage": "What Combwork gave each session at launch, on average: its session contract (core), what it adds for the project, the Assistant's role and mode, and its skills' catalog (names and descriptions). Skill bodies are separate: a model reads one only when it uses it.",
     "description": "Tooltip of the Guidance per launch card. core and catalog are words of the card: keep them as there."
   },
   "performance.card.latency": {
@@ -32,7 +32,7 @@
     "description": "Title of a Performance card: how long Agent API requests took."
   },
   "performance.card.latencyTip": {
-    "defaultMessage": "Request time in Hive, from the request to its reply, on a monotonic clock. Percentiles are the bounds of the histogram's buckets.",
+    "defaultMessage": "Request time in Combwork, from the request to its reply, on a monotonic clock. Percentiles are the bounds of the histogram's buckets.",
     "description": "Tooltip of the Latency card."
   },
   "performance.card.p50": {
@@ -45,7 +45,7 @@
   },
   "performance.card.requests": {
     "defaultMessage": "API requests",
-    "description": "Title of a Performance card: how many Agent API requests Hive answered."
+    "description": "Title of a Performance card: how many Agent API requests Combwork answered."
   },
   "performance.card.requestsSub": {
     "defaultMessage": "{failed} failed · {cancelled} cancelled",
@@ -53,22 +53,22 @@
   },
   "performance.card.requestsSubRate": {
     "defaultMessage": "{rate, number} an hour recorded · {failed} failed · {cancelled} cancelled",
-    "description": "Under the API requests card's number. {rate} is requests per hour while Hive was recording; {failed} and {cancelled} are percentages (\"2%\")."
+    "description": "Under the API requests card's number. {rate} is requests per hour while Combwork was recording; {failed} and {cancelled} are percentages (\"2%\")."
   },
   "performance.card.requestsTip": {
-    "defaultMessage": "Agent API requests (agents’ tools, the Assistant, scripts). An hour: over the time Hive was recording, not the whole range. Failed: refused, client or server errors. Cancelled: the client went away before the reply. Waits (an isolated check waiting for a check copy) are counted but never failed.",
+    "defaultMessage": "Agent API requests (agents’ tools, the Assistant, scripts). An hour: over the time Combwork was recording, not the whole range. Failed: refused, client or server errors. Cancelled: the client went away before the reply. Waits (an isolated check waiting for a check copy) are counted but never failed.",
     "description": "Tooltip of the API requests card. An hour, Failed and Cancelled are words of the card, Waits a column of the Agent API table: keep them as there."
   },
   "performance.card.toolReplies": {
     "defaultMessage": "Tool replies",
-    "description": "Title of a Performance card: how many characters Hive's tools replied with (its number)."
+    "description": "Title of a Performance card: how many characters Combwork's tools replied with (its number)."
   },
   "performance.card.toolRepliesSub": {
     "defaultMessage": "{calls, plural, one {characters in # call} other {characters in # calls}} · {size}",
     "description": "Under the Tool replies card's number (characters). {size} is the same in bytes, such as \"12 KB\"."
   },
   "performance.card.toolRepliesTip": {
-    "defaultMessage": "The text Hive's tools gave the models (what goes into their context), exactly: characters (UTF-16 code units) and UTF-8 bytes. Not tokens.",
+    "defaultMessage": "The text Combwork's tools gave the models (what goes into their context), exactly: characters (UTF-16 code units) and UTF-8 bytes. Not tokens.",
     "description": "Tooltip of the Tool replies card. Keep UTF-16 and UTF-8."
   },
   "performance.cards.builder": {
@@ -124,8 +124,8 @@
     "description": "Info tip of the Rounds column of the Performance page's Cards table. Review is the name of a board column."
   },
   "performance.cards.tip": {
-    "defaultMessage": "Each card its agents held in the last {range, select, 24h {24 hours} 7d {7 days} other {30 days}}: what its builder used while it was in Active and its reviewer from the review's start to its verdict, as the providers reported it (each card's whole cost, as Provider usage counts whole sessions). ≈ is Hive's estimate; Unknown is what isn't known, never {zero}. Tokens on hover. What a lane's agents used holding no card is its overhead, on the lane's hover in the Progress panel.",
-    "description": "Info tip beside the Cards heading of the Performance page. Active is a board column, Provider usage a section of the page and Progress a panel: keep them as Hive names them. Keep ≈, and use the same word for Unknown as the costs do. {zero} is no cost, as costs show it (\"$0.00\"). {range} (24h, 7d or 30d) is a key: don't translate the keys, only the texts."
+    "defaultMessage": "Each card its agents held in the last {range, select, 24h {24 hours} 7d {7 days} other {30 days}}: what its builder used while it was in Active and its reviewer from the review's start to its verdict, as the providers reported it (each card's whole cost, as Provider usage counts whole sessions). ≈ is Combwork's estimate; Unknown is what isn't known, never {zero}. Tokens on hover. What a lane's agents used holding no card is its overhead, on the lane's hover in the Progress panel.",
+    "description": "Info tip beside the Cards heading of the Performance page. Active is a board column, Provider usage a section of the page and Progress a panel: keep them as Combwork names them. Keep ≈, and use the same word for Unknown as the costs do. {zero} is no cost, as costs show it (\"$0.00\"). {range} (24h, 7d or 30d) is a key: don't translate the keys, only the texts."
   },
   "performance.cards.unknown": {
     "defaultMessage": "+ {n, number} unknown",
@@ -153,31 +153,31 @@
   },
   "performance.compare.about.scenarios": {
     "defaultMessage": "{real, select, yes {Model trial {provider} {model} ({effort}, {mode})} other {Fake {provider}}}, fixtures v{fixtures}, {scenarios, plural, one {# scenario} other {# scenarios}} × {repeats, number}, source {head}{real, select, yes {, spent {spent}{unpriced, plural, =0 {} other { + {unpriced, number} unpriced (total unknown)}}} other {}}",
-    "description": "What a kept scenario benchmark is, in a line under its name in Performance → Compare. A model trial ran a real model ({provider} the CLI, {model}, its {effort} and permission {mode}); Fake ran Hive's fake CLI. fixtures v{fixtures} is the version of the test fixtures (keep v); {head} is the git commit the run was made from; {spent} what the trial cost; unpriced trials are ones with no known cost."
+    "description": "What a kept scenario benchmark is, in a line under its name in Performance → Compare. A model trial ran a real model ({provider} the CLI, {model}, its {effort} and permission {mode}); Fake ran Combwork's fake CLI. fixtures v{fixtures} is the version of the test fixtures (keep v); {head} is the git commit the run was made from; {spent} what the trial cost; unpriced trials are ones with no known cost."
   },
   "performance.compare.agent.assistant": {
     "defaultMessage": "the Assistant",
-    "description": "An agent in the Hive calls by agent line of Performance → Compare (HI-2186): the Hive Assistant."
+    "description": "An agent in the Combwork calls by agent line of Performance → Compare (HI-2186): the Combwork Assistant."
   },
   "performance.compare.agent.overflow": {
     "defaultMessage": "{n, plural, one {# other agent} other {# other agents}}",
-    "description": "An entry in the Hive calls by agent line of Performance → Compare (HI-2186): the agents past the list’s limit, their calls summed."
+    "description": "An entry in the Combwork calls by agent line of Performance → Compare (HI-2186): the agents past the list’s limit, their calls summed."
   },
   "performance.compare.agent.unattributed": {
     "defaultMessage": "an agent not in the fixture",
-    "description": "An agent in the Hive calls by agent line of Performance → Compare (HI-2186): calls of an agent the scenario's fixture didn't make."
+    "description": "An agent in the Combwork calls by agent line of Performance → Compare (HI-2186): calls of an agent the scenario's fixture didn't make."
   },
   "performance.compare.agentCalls": {
     "defaultMessage": "{agent}{role, select, builder { (builder)} reviewer { (reviewer)} other {}}: {base} → {run}",
-    "description": "An entry of the Hive calls by agent line in Performance → Compare (HI-2186): an agent's name (a test fixture's, such as Coder, or the Assistant), its role in a lane, and its calls in the baseline and in the run ({base} and {run} are numbers already formatted, or – when unknown). Glossary: builder, reviewer."
+    "description": "An entry of the Combwork calls by agent line in Performance → Compare (HI-2186): an agent's name (a test fixture's, such as Coder, or the Assistant), its role in a lane, and its calls in the baseline and in the run ({base} and {run} are numbers already formatted, or – when unknown). Glossary: builder, reviewer."
   },
   "performance.compare.baseline": {
     "defaultMessage": "Baseline",
     "description": "Performance → Compare: what a run is compared with (a list to choose it, a column, a row)."
   },
   "performance.compare.callsByAgent": {
-    "defaultMessage": "Hive calls by agent in the measured window, baseline → run: {agents}",
-    "description": "A line under a scenario's measures in Performance → Compare (HI-2186): each agent's hive tool calls, on average a sample. {agents} is a list of entries like \"Coder (builder): 1 → 4\"."
+    "defaultMessage": "Combwork calls by agent in the measured window, baseline → run: {agents}",
+    "description": "A line under a scenario's measures in Performance → Compare (HI-2186): each agent's Combwork tool calls, on average a sample. {agents} is a list of entries like \"Coder (builder): 1 → 4\"."
   },
   "performance.compare.cantCompare": {
     "defaultMessage": "Can’t compare that file",
@@ -185,15 +185,15 @@
   },
   "performance.compare.col.allAgentsTip": {
     "defaultMessage": "Every agent’s in the scenario together, as the result judges them; a scenario’s details show the session under test apart.",
-    "description": "Tooltip of the Tool replies column in Performance → Compare (HI-2186): the figure is all agents' together (the session the scenario tests, and any agents it or Hive started), which is what the Result column judges."
+    "description": "Tooltip of the Tool replies column in Performance → Compare (HI-2186): the figure is all agents' together (the session the scenario tests, and any agents it or Combwork started), which is what the Result column judges."
   },
   "performance.compare.col.calls": {
     "defaultMessage": "Calls (repeated)",
-    "description": "Column header in Performance → Compare: calls of Hive's tools, and how many repeated an earlier one."
+    "description": "Column header in Performance → Compare: calls of Combwork's tools, and how many repeated an earlier one."
   },
   "performance.compare.col.callsTip": {
-    "defaultMessage": "The hive tool calls of the session under test (the Assistant, or the agent the scenario tests), and how many repeated an earlier one.",
-    "description": "Tooltip of the Calls (repeated) column in Performance → Compare (HI-2186). Keep hive (Hive's tools)."
+    "defaultMessage": "The Combwork tool calls of the session under test (the Assistant, or the agent the scenario tests), and how many repeated an earlier one.",
+    "description": "Tooltip of the Calls (repeated) column in Performance → Compare (HI-2186). Keep Combwork (the app's name)."
   },
   "performance.compare.col.change": {
     "defaultMessage": "Change",
@@ -208,8 +208,8 @@
     "description": "Tooltip of the Checks column in Performance → Compare. Keep ✓, ✗ and – (they mark the counts)."
   },
   "performance.compare.col.context": {
-    "defaultMessage": "Hive context",
-    "description": "Column header in Performance → Compare: the size of what Hive put in a session's context."
+    "defaultMessage": "Combwork context",
+    "description": "Column header in Performance → Compare: the size of what Combwork put in a session's context."
   },
   "performance.compare.col.kept": {
     "defaultMessage": "Kept",
@@ -233,7 +233,7 @@
   },
   "performance.compare.col.toolReplies": {
     "defaultMessage": "Tool replies",
-    "description": "Column header in Performance → Compare: the size of the replies of Hive's tools."
+    "description": "Column header in Performance → Compare: the size of the replies of Combwork's tools."
   },
   "performance.compare.col.when": {
     "defaultMessage": "When",
@@ -279,6 +279,10 @@
     "defaultMessage": "It is the whole workspace’s: compare it with the whole workspace selected.",
     "description": "Why a Performance export is not imported to Performance → Compare."
   },
+  "performance.compare.error.from10": {
+    "defaultMessage": "It is a Performance export from version 1.0, which Combwork doesn’t import. Export again from Combwork to compare.",
+    "description": "Why a file is not imported to Performance → Compare (HI-2611): it was exported by version 1.0, from before the app was renamed Combwork."
+  },
   "performance.compare.error.holdsOther": {
     "defaultMessage": "It says it is {project}’s, but it also holds {other, select, projects {other projects’} other {the workspace’s own}} data: not imported.",
     "description": "Why a project's Performance export is not imported: it also holds other projects' data, or the workspace's own work's. {project} is the project's name."
@@ -299,8 +303,8 @@
     "defaultMessage": "It has no valid scenarios.",
     "description": "Why a scenario benchmark is not imported to Performance → Compare."
   },
-  "performance.compare.error.notHive": {
-    "defaultMessage": "It isn’t a Hive benchmark or Performance export.",
+  "performance.compare.error.notCombwork": {
+    "defaultMessage": "It isn’t a Combwork benchmark or Performance export.",
     "description": "Why a file is not imported to Performance → Compare."
   },
   "performance.compare.error.notJson": {
@@ -336,8 +340,8 @@
     "description": "Why a file is not imported to Performance → Compare: it is larger than {mb} MB."
   },
   "performance.compare.error.unknownSchema": {
-    "defaultMessage": "It isn’t a Hive benchmark (hive-benchmark/1) or Performance export (hive-metrics/1).",
-    "description": "Why a file is not imported to Performance → Compare. Keep hive-benchmark/1 and hive-metrics/1 (file formats)."
+    "defaultMessage": "It isn’t a Combwork benchmark (combwork-benchmark/1) or Performance export (combwork-metrics/1).",
+    "description": "Why a file is not imported to Performance → Compare. Keep combwork-benchmark/1 and combwork-metrics/1 (file formats)."
   },
   "performance.compare.failedInRun": {
     "defaultMessage": "Failed in the run: <warn>{checks}</warn>",
@@ -416,8 +420,8 @@
     "description": "Heading of the kept comparisons list in Performance → Compare, with how many there are."
   },
   "performance.compare.keptListTip": {
-    "defaultMessage": "Kept in the workspace’s .hive/metrics/benchmarks (this machine’s), at most {max, number}: when full, the oldest unpinned one goes. Pin one to keep it.",
-    "description": "Tooltip of the kept comparisons list in Performance → Compare. Keep .hive/metrics/benchmarks (a folder)."
+    "defaultMessage": "Kept in the workspace’s .combwork/metrics/benchmarks (this machine’s), at most {max, number}: when full, the oldest unpinned one goes. Pin one to keep it.",
+    "description": "Tooltip of the kept comparisons list in Performance → Compare. Keep .combwork/metrics/benchmarks (a folder)."
   },
   "performance.compare.keptLoadTarget": {
     "defaultMessage": "the kept comparisons",
@@ -437,31 +441,31 @@
   },
   "performance.compare.label.benchmark": {
     "defaultMessage": "{provider} benchmark",
-    "description": "The name Hive gives a kept scenario benchmark that came without one, in Performance → Compare. {provider} is the CLI's name (Claude Code, Codex…)."
+    "description": "The name Combwork gives a kept scenario benchmark that came without one, in Performance → Compare. {provider} is the CLI's name (Claude Code, Codex…)."
   },
   "performance.compare.label.export": {
     "defaultMessage": "Export {from} to {to}{own, select, yes {, own work} other {}}",
-    "description": "The name Hive gives a kept Performance export, in Performance → Compare: the dates it covers; own work when it is the workspace's own work (no project's)."
+    "description": "The name Combwork gives a kept Performance export, in Performance → Compare: the dates it covers; own work when it is the workspace's own work (no project's)."
   },
   "performance.compare.label.exportPart": {
     "defaultMessage": "Export {from} to {to}, {project}’s part",
-    "description": "The name Hive gives one project's part of a workspace's Performance export, kept in Performance → Compare: the dates it covers, and the project's name."
+    "description": "The name Combwork gives one project's part of a workspace's Performance export, kept in Performance → Compare: the dates it covers, and the project's name."
   },
   "performance.compare.label.kept": {
     "defaultMessage": "Kept {from} to {to}",
-    "description": "The name Hive gives a Performance view kept for comparison when you give it none (Keep current view), in Performance → Compare: the dates it covers."
+    "description": "The name Combwork gives a Performance view kept for comparison when you give it none (Keep current view), in Performance → Compare: the dates it covers."
   },
   "performance.compare.measure.apiCancelled": {
     "defaultMessage": "API cancelled",
-    "description": "A measure in Performance → Compare: requests to Hive's Agent API that the caller cancelled."
+    "description": "A measure in Performance → Compare: requests to Combwork's Agent API that the caller cancelled."
   },
   "performance.compare.measure.apiFailed": {
     "defaultMessage": "API failures",
-    "description": "A measure in Performance → Compare: requests to Hive's Agent API that failed."
+    "description": "A measure in Performance → Compare: requests to Combwork's Agent API that failed."
   },
   "performance.compare.measure.apiMs": {
     "defaultMessage": "API time",
-    "description": "A measure in Performance → Compare: the time Hive's Agent API spent on requests."
+    "description": "A measure in Performance → Compare: the time Combwork's Agent API spent on requests."
   },
   "performance.compare.measure.apiRequestBytes": {
     "defaultMessage": "API received",
@@ -469,7 +473,7 @@
   },
   "performance.compare.measure.apiRequests": {
     "defaultMessage": "API requests",
-    "description": "A measure in Performance → Compare: requests to Hive's Agent API."
+    "description": "A measure in Performance → Compare: requests to Combwork's Agent API."
   },
   "performance.compare.measure.apiResponseBytes": {
     "defaultMessage": "API sent",
@@ -483,9 +487,17 @@
     "defaultMessage": "Cache write",
     "description": "A measure in Performance → Compare: tokens written to the provider's prompt cache."
   },
+  "performance.compare.measure.combworkCallErrors": {
+    "defaultMessage": "Failed calls",
+    "description": "A measure in Performance → Compare: calls of Combwork's tools that failed."
+  },
+  "performance.compare.measure.combworkCalls": {
+    "defaultMessage": "Calls run",
+    "description": "A measure in Performance → Compare: calls of Combwork's tools that Combwork ran."
+  },
   "performance.compare.measure.contextBytes": {
-    "defaultMessage": "Hive context",
-    "description": "A measure in Performance → Compare: the size of what Hive put in an agent session's context."
+    "defaultMessage": "Combwork context",
+    "description": "A measure in Performance → Compare: the size of what Combwork put in an agent session's context."
   },
   "performance.compare.measure.costUsd": {
     "defaultMessage": "Cost",
@@ -493,7 +505,7 @@
   },
   "performance.compare.measure.exportDetailCalls": {
     "defaultMessage": "Detail calls",
-    "description": "A measure in Performance → Compare of exports: calls of Hive's tools that asked for the full reply."
+    "description": "A measure in Performance → Compare of exports: calls of Combwork's tools that asked for the full reply."
   },
   "performance.compare.measure.exportFailed": {
     "defaultMessage": "Failed or cancelled",
@@ -501,7 +513,7 @@
   },
   "performance.compare.measure.exportGuidancePerLaunch": {
     "defaultMessage": "Guidance a launch",
-    "description": "A measure in Performance → Compare of exports: the size of Hive's guidance for each session started."
+    "description": "A measure in Performance → Compare of exports: the size of Combwork's guidance for each session started."
   },
   "performance.compare.measure.exportLaunches": {
     "defaultMessage": "Launches",
@@ -509,7 +521,7 @@
   },
   "performance.compare.measure.exportRequests": {
     "defaultMessage": "API requests",
-    "description": "A measure in Performance → Compare of exports: requests to Hive's Agent API."
+    "description": "A measure in Performance → Compare of exports: requests to Combwork's Agent API."
   },
   "performance.compare.measure.exportResponseBytes": {
     "defaultMessage": "API sent",
@@ -517,31 +529,23 @@
   },
   "performance.compare.measure.exportToolCalls": {
     "defaultMessage": "Tool calls",
-    "description": "A measure in Performance → Compare of exports: calls of Hive's tools."
+    "description": "A measure in Performance → Compare of exports: calls of Combwork's tools."
   },
   "performance.compare.measure.exportToolChars": {
     "defaultMessage": "Tool replies",
-    "description": "A measure in Performance → Compare of exports: the size of the replies of Hive's tools."
+    "description": "A measure in Performance → Compare of exports: the size of the replies of Combwork's tools."
   },
   "performance.compare.measure.exportToolListPerLaunch": {
     "defaultMessage": "Tool list a launch",
-    "description": "A measure in Performance → Compare of exports (HI-2049): the size of the list of Hive's tools each session was given."
+    "description": "A measure in Performance → Compare of exports (HI-2049): the size of the list of Combwork's tools each session was given."
   },
   "performance.compare.measure.guidanceBytes": {
     "defaultMessage": "Launch guidance",
-    "description": "A measure in Performance → Compare: the size of the guidance Hive gave a session at launch."
+    "description": "A measure in Performance → Compare: the size of the guidance Combwork gave a session at launch."
   },
   "performance.compare.measure.guidanceChars": {
     "defaultMessage": "Launch guidance (characters)",
     "description": "A measure in Performance → Compare: the launch guidance counted in characters."
-  },
-  "performance.compare.measure.hiveCallErrors": {
-    "defaultMessage": "Failed calls",
-    "description": "A measure in Performance → Compare: calls of Hive's tools that failed."
-  },
-  "performance.compare.measure.hiveCalls": {
-    "defaultMessage": "Calls run",
-    "description": "A measure in Performance → Compare: calls of Hive's tools that Hive ran."
   },
   "performance.compare.measure.inputTokens": {
     "defaultMessage": "Input tokens",
@@ -573,23 +577,23 @@
   },
   "performance.compare.measure.skillBytesRead": {
     "defaultMessage": "Skill bytes read",
-    "description": "A measure in Performance → Compare: how much of the skills Hive read from disk."
+    "description": "A measure in Performance → Compare: how much of the skills Combwork read from disk."
   },
   "performance.compare.measure.skillHits": {
     "defaultMessage": "Skill cache hits",
-    "description": "A measure in Performance → Compare: skills Hive found unchanged in its cache."
+    "description": "A measure in Performance → Compare: skills Combwork found unchanged in its cache."
   },
   "performance.compare.measure.skillInvalidations": {
     "defaultMessage": "Skill changes seen",
-    "description": "A measure in Performance → Compare: skills Hive found changed."
+    "description": "A measure in Performance → Compare: skills Combwork found changed."
   },
   "performance.compare.measure.skillMisses": {
     "defaultMessage": "Skill cache misses",
-    "description": "A measure in Performance → Compare: skills Hive had to read again."
+    "description": "A measure in Performance → Compare: skills Combwork had to read again."
   },
   "performance.compare.measure.skillScans": {
     "defaultMessage": "Skill scans",
-    "description": "A measure in Performance → Compare: how often Hive looked through the skills."
+    "description": "A measure in Performance → Compare: how often Combwork looked through the skills."
   },
   "performance.compare.measure.skillsNotDelivered": {
     "defaultMessage": "Skills not given",
@@ -597,19 +601,19 @@
   },
   "performance.compare.measure.toolBytes": {
     "defaultMessage": "Tool replies (bytes)",
-    "description": "A measure in Performance → Compare: the size of the replies of Hive's tools, in bytes."
+    "description": "A measure in Performance → Compare: the size of the replies of Combwork's tools, in bytes."
   },
   "performance.compare.measure.toolCalls": {
     "defaultMessage": "Tool calls",
-    "description": "A measure in Performance → Compare: how many times agents called Hive's tools."
+    "description": "A measure in Performance → Compare: how many times agents called Combwork's tools."
   },
   "performance.compare.measure.toolChars": {
     "defaultMessage": "Tool replies",
-    "description": "A measure in Performance → Compare: the size of the replies of Hive's tools."
+    "description": "A measure in Performance → Compare: the size of the replies of Combwork's tools."
   },
   "performance.compare.measure.toolDetailCalls": {
     "defaultMessage": "Detail calls",
-    "description": "A measure in Performance → Compare: calls of Hive's tools that asked for the full reply."
+    "description": "A measure in Performance → Compare: calls of Combwork's tools that asked for the full reply."
   },
   "performance.compare.measure.toolErrors": {
     "defaultMessage": "Tool errors",
@@ -617,11 +621,11 @@
   },
   "performance.compare.measure.toolListBytes": {
     "defaultMessage": "Tool list",
-    "description": "A measure in Performance → Compare: the size of the list of Hive's tools a session was given."
+    "description": "A measure in Performance → Compare: the size of the list of Combwork's tools a session was given."
   },
   "performance.compare.measure.toolListChars": {
     "defaultMessage": "Tool list (characters)",
-    "description": "A measure in Performance → Compare: the size of the list of Hive's tools a session was given, in characters."
+    "description": "A measure in Performance → Compare: the size of the list of Combwork's tools a session was given, in characters."
   },
   "performance.compare.measureTip.apiCancelled": {
     "defaultMessage": "Requests the client gave up on.",
@@ -632,11 +636,11 @@
     "description": "Tooltip of the API failures measure in Performance → Compare."
   },
   "performance.compare.measureTip.apiMs": {
-    "defaultMessage": "Time Hive spent on the requests, in all.",
+    "defaultMessage": "Time Combwork spent on the requests, in all.",
     "description": "Tooltip of the API time measure in Performance → Compare."
   },
   "performance.compare.measureTip.apiRequestBytes": {
-    "defaultMessage": "Request bodies Hive’s API received.",
+    "defaultMessage": "Request bodies Combwork’s API received.",
     "description": "Tooltip of the API received measure in Performance → Compare."
   },
   "performance.compare.measureTip.apiRequests": {
@@ -644,19 +648,27 @@
     "description": "Tooltip of the API requests measure in Performance → Compare. The harness is the test program that runs the scenarios."
   },
   "performance.compare.measureTip.apiResponseBytes": {
-    "defaultMessage": "Response bodies Hive’s API sent.",
+    "defaultMessage": "Response bodies Combwork’s API sent.",
     "description": "Tooltip of the API sent measure in Performance → Compare."
   },
   "performance.compare.measureTip.asReported": {
     "defaultMessage": "As the provider reported them.",
     "description": "Tooltip of a token measure in Performance → Compare: the provider's own count."
   },
+  "performance.compare.measureTip.combworkCallErrors": {
+    "defaultMessage": "Combwork tool calls that failed.",
+    "description": "Tooltip of the Failed calls measure in Performance → Compare. Keep Combwork (the app's name)."
+  },
+  "performance.compare.measureTip.combworkCalls": {
+    "defaultMessage": "Combwork tool calls the server ran (its own log).",
+    "description": "Tooltip of the Calls run measure in Performance → Compare. Keep Combwork (the app's name)."
+  },
   "performance.compare.measureTip.contextBytes": {
-    "defaultMessage": "What Hive put in the session’s context: launch guidance (core, project, the Assistant’s role and mode, skills’ catalog), the hive tools’ list and every tool reply. Exact UTF-8 bytes, not tokens. Unknown if any part wasn’t measured.",
-    "description": "Tooltip of the Hive context measure in Performance → Compare. \"hive tools\" are Hive's tools for agents (keep hive)."
+    "defaultMessage": "What Combwork put in the session’s context: launch guidance (core, project, the Assistant’s role and mode, skills’ catalog), the Combwork tools’ list and every tool reply. Exact UTF-8 bytes, not tokens. Unknown if any part wasn’t measured.",
+    "description": "Tooltip of the Combwork context measure in Performance → Compare. \"Combwork tools\" are Combwork's tools for agents (keep Combwork)."
   },
   "performance.compare.measureTip.costUsd": {
-    "defaultMessage": "API-equivalent; only when every sample on both sides has a cost (≈ when Hive estimated one).",
+    "defaultMessage": "API-equivalent; only when every sample on both sides has a cost (≈ when Combwork estimated one).",
     "description": "Tooltip of the Cost measure in Performance → Compare. Keep ≈ (it marks an estimate)."
   },
   "performance.compare.measureTip.exportGuidancePerLaunch": {
@@ -672,8 +684,8 @@
     "description": "Tooltip of the Tool replies measure in Performance → Compare of exports."
   },
   "performance.compare.measureTip.exportToolListPerLaunch": {
-    "defaultMessage": "The hive tools’ names, descriptions and schemas as each session’s CLI got them, in characters, on average (not per hour). Sessions from before Hive counted characters are left out.",
-    "description": "Tooltip of the Tool list a launch measure in Performance → Compare of exports. Keep hive (the tools' name)."
+    "defaultMessage": "The Combwork tools’ names, descriptions and schemas as each session’s CLI got them, in characters, on average (not per hour). Sessions from before Combwork counted characters are left out.",
+    "description": "Tooltip of the Tool list a launch measure in Performance → Compare of exports. Keep Combwork (the app's name)."
   },
   "performance.compare.measureTip.guidanceBytes": {
     "defaultMessage": "Core contract, project additions, the Assistant’s role and mode, and the skills’ catalog, at launch.",
@@ -683,21 +695,13 @@
     "defaultMessage": "The same parts in characters (UTF-16 code units); the catalog has bytes only.",
     "description": "Tooltip of the Launch guidance (characters) measure in Performance → Compare."
   },
-  "performance.compare.measureTip.hiveCallErrors": {
-    "defaultMessage": "hive tool calls that failed.",
-    "description": "Tooltip of the Failed calls measure in Performance → Compare. Keep hive (the tools' name)."
-  },
-  "performance.compare.measureTip.hiveCalls": {
-    "defaultMessage": "hive tool calls the server ran (its own log).",
-    "description": "Tooltip of the Calls run measure in Performance → Compare. Keep hive (the tools' name)."
-  },
   "performance.compare.measureTip.outputTokens": {
     "defaultMessage": "Reasoning included, as the provider reported them.",
     "description": "Tooltip of the Output tokens measure in Performance → Compare."
   },
   "performance.compare.measureTip.perHour": {
     "defaultMessage": "Per hour recorded.",
-    "description": "Tooltip of a measure in Performance → Compare of exports: shown per hour Hive was recording."
+    "description": "Tooltip of a measure in Performance → Compare of exports: shown per hour Combwork was recording."
   },
   "performance.compare.measureTip.providerRequests": {
     "defaultMessage": "Model requests the session made.",
@@ -748,12 +752,12 @@
     "description": "Tooltip of the Tool replies (bytes) measure in Performance → Compare."
   },
   "performance.compare.measureTip.toolCalls": {
-    "defaultMessage": "hive tool calls measured by the bridge.",
-    "description": "Tooltip of the Tool calls measure in Performance → Compare. Keep hive (the tools' name); the bridge is Hive's MCP server between the CLI and Hive."
+    "defaultMessage": "Combwork tool calls measured by the bridge.",
+    "description": "Tooltip of the Tool calls measure in Performance → Compare. Keep Combwork (the app's name); the bridge is Combwork's MCP server between the CLI and Combwork."
   },
   "performance.compare.measureTip.toolChars": {
-    "defaultMessage": "Characters of the hive tools’ replies, as the model got them.",
-    "description": "Tooltip of the Tool replies measure in Performance → Compare. Keep hive (the tools' name)."
+    "defaultMessage": "Characters of the Combwork tools’ replies, as the model got them.",
+    "description": "Tooltip of the Tool replies measure in Performance → Compare. Keep Combwork (the app's name)."
   },
   "performance.compare.measureTip.toolDetailCalls": {
     "defaultMessage": "Calls that asked for the full form.",
@@ -761,14 +765,14 @@
   },
   "performance.compare.measureTip.toolErrors": {
     "defaultMessage": "Tool replies that were errors (the bridge’s count).",
-    "description": "Tooltip of the Tool errors measure in Performance → Compare. The bridge is Hive's MCP server between the CLI and Hive."
+    "description": "Tooltip of the Tool errors measure in Performance → Compare. The bridge is Combwork's MCP server between the CLI and Combwork."
   },
   "performance.compare.measureTip.toolListBytes": {
-    "defaultMessage": "The hive tools’ names, descriptions and schemas as the CLI got them.",
-    "description": "Tooltip of the Tool list measure in Performance → Compare. Keep hive (the tools' name)."
+    "defaultMessage": "The Combwork tools’ names, descriptions and schemas as the CLI got them.",
+    "description": "Tooltip of the Tool list measure in Performance → Compare. Keep Combwork (the app's name)."
   },
   "performance.compare.measureTip.toolListChars": {
-    "defaultMessage": "The same list in characters (UTF-16 code units). Unknown for a run from before Hive counted them.",
+    "defaultMessage": "The same list in characters (UTF-16 code units). Unknown for a run from before Combwork counted them.",
     "description": "Tooltip of the Tool list (characters) measure in Performance → Compare."
   },
   "performance.compare.noScenarios": {
@@ -784,12 +788,12 @@
     "description": "Performance → Compare, a note on two model trials: the coding agent CLIs' versions differ. {base} and {run} are lists of versions, or ? when unknown."
   },
   "performance.compare.note.estimates": {
-    "defaultMessage": "Some costs are Hive’s estimates (≈), not the provider’s.",
+    "defaultMessage": "Some costs are Combwork’s estimates (≈), not the provider’s.",
     "description": "Performance → Compare, a note on a scenario of model trials. Keep ≈ (it marks an estimate)."
   },
   "performance.compare.note.fakePerCall": {
-    "defaultMessage": "With the fake Claude Code or fake Codex, each hive call starts a hive MCP server of its own: API requests and tool-list starts count per call, not per session.",
-    "description": "Performance → Compare, a note on a comparison of scenario runs on the scripted fake CLIs (HI-2186): what they do differs from a real CLI. Keep hive (Hive's tools), MCP, Claude Code and Codex."
+    "defaultMessage": "With the fake Claude Code or fake Codex, each Combwork tool call starts a combwork MCP server of its own: API requests and tool-list starts count per call, not per session.",
+    "description": "Performance → Compare, a note on a comparison of scenario runs on the scripted fake CLIs (HI-2186): what they do differs from a real CLI. Keep Combwork (the app's name), MCP, Claude Code and Codex."
   },
   "performance.compare.note.fakeUsage": {
     "defaultMessage": "Provider usage isn’t compared: a fake’s tokens are simulated, not a provider’s.",
@@ -805,7 +809,7 @@
   },
   "performance.compare.note.noSplit": {
     "defaultMessage": "{side, select, baseline {The baseline has no per-agent figures} run {The run has no per-agent figures} other {Neither side has per-agent figures}}: totals of all agents shown.",
-    "description": "Performance → Compare, a note on a scenario (HI-2186): its measures can't be shown for the agent under test apart from the other agents, because a side was measured before Hive split them; the figures shown are every agent's together."
+    "description": "Performance → Compare, a note on a scenario (HI-2186): its measures can't be shown for the agent under test apart from the other agents, because a side was measured before Combwork split them; the figures shown are every agent's together."
   },
   "performance.compare.note.notJudged": {
     "defaultMessage": "Not judged: some of what it’s judged by wasn’t measured.",
@@ -824,7 +828,7 @@
     "description": "Performance → Compare, a note on two Performance exports of time ranges of different lengths."
   },
   "performance.compare.note.realUse": {
-    "defaultMessage": "Real use isn’t a controlled workload: a change here can be the work that was done, not Hive.",
+    "defaultMessage": "Real use isn’t a controlled workload: a change here can be the work that was done, not Combwork.",
     "description": "Performance → Compare, a note on two Performance exports (measurements of real use, not of a fixed test)."
   },
   "performance.compare.note.resumed": {
@@ -833,7 +837,7 @@
   },
   "performance.compare.note.sameGuidance": {
     "defaultMessage": "Both ran the same guidance revision: differences are in the tools, the API, the skills or the run itself.",
-    "description": "Performance → Compare, a note: both scenario benchmarks ran with the same revision of Hive's guidance for agents."
+    "description": "Performance → Compare, a note: both scenario benchmarks ran with the same revision of Combwork's guidance for agents."
   },
   "performance.compare.note.skillRevisions": {
     "defaultMessage": "The sessions were given different skill revisions.",
@@ -849,7 +853,7 @@
   },
   "performance.compare.note.stale": {
     "defaultMessage": "{n, plural, one {# sample} other {# samples}} left out: the session was given other guidance than the run started with (stale).",
-    "description": "Performance → Compare, a note on a scenario: samples left out because their session was given another revision of Hive's guidance."
+    "description": "Performance → Compare, a note on a scenario: samples left out because their session was given another revision of Combwork's guidance."
   },
   "performance.compare.note.usageNotEvery": {
     "defaultMessage": "Provider usage isn’t compared: not every sample reported it.",
@@ -893,7 +897,7 @@
   },
   "performance.compare.partial.unattributed": {
     "defaultMessage": "some losses couldn’t be attributed to a project",
-    "description": "What makes a Performance export partial, in \"The baseline is partial: {what}.\": measurements lost that Hive couldn't say were which project's. Lower case."
+    "description": "What makes a Performance export partial, in \"The baseline is partial: {what}.\": measurements lost that Combwork couldn't say were which project's. Lower case."
   },
   "performance.compare.pin": {
     "defaultMessage": "Pin (never removed to make room)",
@@ -928,7 +932,7 @@
     "description": "Performance → Compare: why two scenario benchmarks cannot be compared. A fake provider is a stand-in for a coding agent CLI that runs no model; a model trial runs the real one."
   },
   "performance.compare.reason.notRecording": {
-    "defaultMessage": "Hive wasn’t recording in one of the ranges: there is nothing to compare.",
+    "defaultMessage": "Combwork wasn’t recording in one of the ranges: there is nothing to compare.",
     "description": "Performance → Compare: why two Performance exports cannot be compared."
   },
   "performance.compare.reason.oneIncomplete": {
@@ -937,7 +941,7 @@
   },
   "performance.compare.reason.sourceChanged": {
     "defaultMessage": "{side, select, baseline {The baseline’s} other {The run’s}} source changed while it ran: its samples may mix two versions.",
-    "description": "Performance → Compare: why two scenario benchmarks cannot be compared: Hive's source code changed while one of them ran."
+    "description": "Performance → Compare: why two scenario benchmarks cannot be compared: Combwork's source code changed while one of them ran."
   },
   "performance.compare.regressions": {
     "defaultMessage": "Checks that passed or ran less often",
@@ -1001,10 +1005,10 @@
   },
   "performance.compare.sideMeasure": {
     "defaultMessage": "{measure} · {side, select, builder {builders} reviewer {reviewers} either {either role} none {no workflow role} other {role not recorded}}",
-    "description": "A measure of Performance → Compare of exports for one workflow role's launches (HI-2049): {measure} is the measure's name (\"Guidance a launch\"); then whose launches: builders', reviewers', agents that take either role, those with no workflow role (generalists, the Assistant), or launches recorded before Hive recorded the role. Glossary: builder, reviewer, either, workflow role."
+    "description": "A measure of Performance → Compare of exports for one workflow role's launches (HI-2049): {measure} is the measure's name (\"Guidance a launch\"); then whose launches: builders', reviewers', agents that take either role, those with no workflow role (generalists, the Assistant), or launches recorded before Combwork recorded the role. Glossary: builder, reviewer, either, workflow role."
   },
   "performance.compare.sizesHint": {
-    "defaultMessage": "Sizes are exact bytes and characters of what Hive gave the sessions; tokens are only what a provider reported. Skills on disk are what was available, not what a model read. A ~ marks a change within the samples’ spread.",
+    "defaultMessage": "Sizes are exact bytes and characters of what Combwork gave the sessions; tokens are only what a provider reported. Skills on disk are what was available, not what a model read. A ~ marks a change within the samples’ spread.",
     "description": "A note under Performance → Compare's scenarios. Keep ~ (it marks a change)."
   },
   "performance.compare.splitMeasure": {
@@ -1013,10 +1017,10 @@
   },
   "performance.compare.status.better": {
     "defaultMessage": "Smaller, still correct",
-    "description": "A scenario's result in Performance → Compare: Hive gave it less context and it still passes every check."
+    "description": "A scenario's result in Performance → Compare: Combwork gave it less context and it still passes every check."
   },
   "performance.compare.status.betterTip": {
-    "defaultMessage": "Less Hive context; every check that passed still passes and still runs; no more calls, failures or retries.",
+    "defaultMessage": "Less Combwork context; every check that passed still passes and still runs; no more calls, failures or retries.",
     "description": "Tooltip of the \"Smaller, still correct\" result in Performance → Compare."
   },
   "performance.compare.status.failing": {
@@ -1072,7 +1076,7 @@
     "description": "A scenario's result in Performance → Compare."
   },
   "performance.compare.status.worseTip": {
-    "defaultMessage": "More Hive context, more calls, failures or retries, or a check that passed (or ran) less often.",
+    "defaultMessage": "More Combwork context, more calls, failures or retries, or a check that passed (or ran) less often.",
     "description": "Tooltip of the \"Larger or worse\" result in Performance → Compare."
   },
   "performance.compare.summary": {
@@ -1112,7 +1116,7 @@
     "description": "Button: imports only this project's part of a workspace's Performance export. {project} is the project's name."
   },
   "performance.compare.usePart.detail": {
-    "defaultMessage": "Work of no project (the Assistant, scripts) and other projects’ work are left out. Losses Hive couldn’t attribute to a project are noted.",
+    "defaultMessage": "Work of no project (the Assistant, scripts) and other projects’ work are left out. Losses Combwork couldn’t attribute to a project are noted.",
     "description": "A question when a workspace's Performance export is imported on a project's page: what using the project's part leaves out."
   },
   "performance.compare.usePart.message": {
@@ -1128,20 +1132,20 @@
     "description": "At the top of the Performance page, when measurements were lost."
   },
   "performance.coverage.evicted": {
-    "defaultMessage": "History up to {when} was removed to keep the metrics file under its size limit: nothing before then is available.",
+    "defaultMessage": "History up to {when} was removed to keep the performance history under its size limit: nothing before then is available.",
     "description": "At the top of the Performance page. {when} is a date and time."
   },
   "performance.coverage.full": {
     "defaultMessage": "Recorded throughout.",
-    "description": "At the top of the Performance page, when Hive recorded the whole range."
+    "description": "At the top of the Performance page, when Combwork recorded the whole range."
   },
   "performance.coverage.none": {
-    "defaultMessage": "Hive wasn’t recording this workspace in this range, so there is nothing to show (no data, not zero).",
-    "description": "At the top of the Performance page, when Hive recorded nothing in the range."
+    "defaultMessage": "Combwork wasn’t recording this workspace in this range, so there is nothing to show (no data, not zero).",
+    "description": "At the top of the Performance page, when Combwork recorded nothing in the range."
   },
   "performance.coverage.partial": {
-    "defaultMessage": "Recorded for {duration} of it ({percent}){sinceShown, select, yes {, since {since}} other {}}{stretches, plural, =0 {} =1 {} other {, in # stretches}}: before that and in the gaps (Hive closed, recording off, a reset) nothing was seen.",
-    "description": "At the top of the Performance page, when Hive recorded only part of the range. {duration} is how long, such as \"3 h 10 min\"; {percent} its share (\"45%\"); {since} a date and time, shown when {sinceShown} is yes; {stretches} how many separate stretches (said from 2)."
+    "defaultMessage": "Recorded for {duration} of it ({percent}){sinceShown, select, yes {, since {since}} other {}}{stretches, plural, =0 {} =1 {} other {, in # stretches}}: before that and in the gaps (Combwork closed, recording off, a reset) nothing was seen.",
+    "description": "At the top of the Performance page, when Combwork recorded only part of the range. {duration} is how long, such as \"3 h 10 min\"; {percent} its share (\"45%\"); {since} a date and time, shown when {sinceShown} is yes; {stretches} how many separate stretches (said from 2)."
   },
   "performance.coverage.range": {
     "defaultMessage": "{from} to {to} · kept 30 days, hourly for the last 7.",
@@ -1188,7 +1192,7 @@
     "description": "Title of an error notification; its message is the error."
   },
   "performance.export.tip": {
-    "defaultMessage": "Save what this page shows (its scope, range and Who; every provider’s, each named in its rows) as a JSON file, with units, coverage and Hive's version. Shift+click: with project names replaced (project-1, project-2…) and no workspace path.",
+    "defaultMessage": "Save what this page shows (its scope, range and Who; every provider’s, each named in its rows) as a JSON file, with units, coverage and Combwork's version. Shift+click: with project names replaced (project-1, project-2…) and no workspace path.",
     "description": "Tooltip of the Performance page's Export button. Who is the name of the page's filter of who did the work: keep it as named there. Keep JSON, Shift+click and project-1, project-2… as they are."
   },
   "performance.guidance.catalog": {
@@ -1197,7 +1201,7 @@
   },
   "performance.guidance.core": {
     "defaultMessage": "Core",
-    "description": "Column header of the Guidance at launch table: Hive's session contract's size per launch."
+    "description": "Column header of the Guidance at launch table: Combwork's session contract's size per launch."
   },
   "performance.guidance.empty": {
     "defaultMessage": "No launches.",
@@ -1205,7 +1209,7 @@
   },
   "performance.guidance.heading": {
     "defaultMessage": "Guidance at launch",
-    "description": "Heading of the Performance page's table of what Hive gave sessions when they started."
+    "description": "Heading of the Performance page's table of what Combwork gave sessions when they started."
   },
   "performance.guidance.launches": {
     "defaultMessage": "Launches",
@@ -1229,7 +1233,7 @@
   },
   "performance.guidance.project": {
     "defaultMessage": "Project",
-    "description": "Column header of the Guidance at launch table: the size of what Hive adds for the project, per launch."
+    "description": "Column header of the Guidance at launch table: the size of what Combwork adds for the project, per launch."
   },
   "performance.guidance.role": {
     "defaultMessage": "Role",
@@ -1240,7 +1244,7 @@
     "description": "Column header of the Guidance at launch table: how many skills each launch got, on average."
   },
   "performance.guidance.tip": {
-    "defaultMessage": "What Hive gave sessions when they started, per launch on average, exactly. Core: Hive's session contract, the same for every session of a role. Project: what Hive adds for the project (the latest handover's pointer). Role and mode: the Assistant's. Catalog: the skills' names and descriptions (what a CLI lists); on disk: the delivered copies' bytes. A model reads a skill's body only when it uses it, which isn't observable.",
+    "defaultMessage": "What Combwork gave sessions when they started, per launch on average, exactly. Core: Combwork's session contract, the same for every session of a role. Project: what Combwork adds for the project (the latest handover's pointer). Role and mode: the Assistant's. Catalog: the skills' names and descriptions (what a CLI lists); on disk: the delivered copies' bytes. A model reads a skill's body only when it uses it, which isn't observable.",
     "description": "Info tip beside the Guidance at launch heading. Core, Project, Role, Mode, Catalog and On disk are its columns: keep them as named there."
   },
   "performance.guidance.unmeasured": {
@@ -1253,19 +1257,19 @@
   },
   "performance.guidance.workflowSide": {
     "defaultMessage": "{side, select, builder {Builder} reviewer {Reviewer} either {Either} none {None} other {Not recorded}}",
-    "description": "A cell of the Guidance at launch table's Workflow role column (HI-2049): builder, reviewer, either (builds or reviews), none (a generalist, the Assistant), or not recorded (launches from before Hive recorded it). Glossary: builder, reviewer, either."
+    "description": "A cell of the Guidance at launch table's Workflow role column (HI-2049): builder, reviewer, either (builds or reviews), none (a generalist, the Assistant), or not recorded (launches from before Combwork recorded it). Glossary: builder, reviewer, either."
   },
   "performance.heading": {
     "defaultMessage": "Performance",
-    "description": "Heading of the Performance view (what Hive's own parts cost) and of its sidebar."
+    "description": "Heading of the Performance view (what Combwork's own parts cost) and of its sidebar."
   },
   "performance.intro.project": {
-    "defaultMessage": "What Hive’s Agent API, its tools, the guidance it gives sessions cost, next to what the providers reported. Only this project’s work: the Assistant’s, scripts’ and other projects’ aren’t in it.",
-    "description": "Under the heading of a project's Performance tab. Agent API is the name of Hive's local HTTP API; the providers are Claude Code, Codex and Copilot."
+    "defaultMessage": "What Combwork’s Agent API, its tools, the guidance it gives sessions cost, next to what the providers reported. Only this project’s work: the Assistant’s, scripts’ and other projects’ aren’t in it.",
+    "description": "Under the heading of a project's Performance tab. Agent API is the name of Combwork's local HTTP API; the providers are Claude Code, Codex and Copilot."
   },
   "performance.intro.workspace": {
-    "defaultMessage": "What Hive’s Agent API, its tools, the guidance it gives sessions and its skill service cost, next to what the providers reported.",
-    "description": "Under the Performance view's heading. Agent API is the name of Hive's local HTTP API; the providers are Claude Code, Codex and Copilot."
+    "defaultMessage": "What Combwork’s Agent API, its tools, the guidance it gives sessions and its skill service cost, next to what the providers reported.",
+    "description": "Under the Performance view's heading. Agent API is the name of Combwork's local HTTP API; the providers are Claude Code, Codex and Copilot."
   },
   "performance.latency.ms": {
     "defaultMessage": "≤ {ms, number} ms",
@@ -1284,7 +1288,7 @@
     "description": "A folded section at the end of the Performance page: what its numbers leave out."
   },
   "performance.limits.window": {
-    "defaultMessage": "This page reads through Hive’s window, not the Agent API: refreshing it adds nothing to these numbers.",
+    "defaultMessage": "This page reads through Combwork’s window, not the Agent API: refreshing it adds nothing to these numbers.",
     "description": "The last line of What isn’t measured on the Performance page."
   },
   "performance.loadTarget": {
@@ -1300,7 +1304,7 @@
     "description": "The Performance view (and its sidebar) when no workspace is open."
   },
   "performance.notRecording": {
-    "defaultMessage": "Hive isn’t recording performance metrics, so nothing new is added (what was recorded is still shown).",
+    "defaultMessage": "Combwork isn’t recording performance metrics, so nothing new is added (what was recorded is still shown).",
     "description": "Banner on the Performance page when recording is turned off in Settings → Sessions. A link to the setting follows it."
   },
   "performance.notRecording.settings": {
@@ -1309,15 +1313,15 @@
   },
   "performance.pageLabel": {
     "defaultMessage": "Performance, {scope}",
-    "description": "Name of the Performance page for screen readers. {scope} is what it shows, such as \"Whole workspace\" or \"Project: hive\"."
+    "description": "Name of the Performance page for screen readers. {scope} is what it shows, such as \"Whole workspace\" or \"Project: demo\"."
   },
   "performance.panel.projects": {
     "defaultMessage": "Projects",
     "description": "Section heading in the Performance sidebar, above the workspace's projects."
   },
   "performance.panel.tip": {
-    "defaultMessage": "What Hive's Agent API, its tools, the guidance it gives sessions and its skill service cost. Pick what to look at.",
-    "description": "Info tip beside the Performance sidebar's heading. Agent API is the name of Hive's local HTTP API."
+    "defaultMessage": "What Combwork's Agent API, its tools, the guidance it gives sessions and its skill service cost. Pick what to look at.",
+    "description": "Info tip beside the Performance sidebar's heading. Agent API is the name of Combwork's local HTTP API."
   },
   "performance.provider.all": {
     "defaultMessage": "All providers",
@@ -1341,11 +1345,11 @@
   },
   "performance.providersNote.assistant": {
     "defaultMessage": "The Assistant’s sessions are the workspace’s, not a project’s.",
-    "description": "Performance, under Provider usage for a project with the Hive Assistant chosen as whose work: why the table is empty (the Assistant isn't any project's)."
+    "description": "Performance, under Provider usage for a project with the Combwork Assistant chosen as whose work: why the table is empty (the Assistant isn't any project's)."
   },
   "performance.providersNote.scripts": {
     "defaultMessage": "Scripts start no sessions, so they have no provider usage.",
-    "description": "Performance, under Provider usage with Scripts chosen as whose work: why the table is empty (scripts call Hive's API and run no coding agents)."
+    "description": "Performance, under Provider usage with Scripts chosen as whose work: why the table is empty (scripts call Combwork's API and run no coding agents)."
   },
   "performance.range.label": {
     "defaultMessage": "Time range",
@@ -1373,7 +1377,7 @@
   },
   "performance.role.assistant": {
     "defaultMessage": "The Assistant",
-    "description": "A choice of the Performance page's Who filter: the Hive Assistant's work."
+    "description": "A choice of the Performance page's Who filter: the Combwork Assistant's work."
   },
   "performance.role.viewer": {
     "defaultMessage": "Viewer apps",
@@ -1393,11 +1397,11 @@
   },
   "performance.routes.heading": {
     "defaultMessage": "Agent API",
-    "description": "Heading of the Performance page's table of Agent API requests. Agent API is the name of Hive's local HTTP API."
+    "description": "Heading of the Performance page's table of Agent API requests. Agent API is the name of Combwork's local HTTP API."
   },
   "performance.routes.received": {
     "defaultMessage": "Received",
-    "description": "Column header of the Agent API table: the size of the requests Hive received."
+    "description": "Column header of the Agent API table: the size of the requests Combwork received."
   },
   "performance.routes.route": {
     "defaultMessage": "Route",
@@ -1405,10 +1409,10 @@
   },
   "performance.routes.sent": {
     "defaultMessage": "Sent",
-    "description": "Column header of the Agent API table: the size of the replies Hive sent."
+    "description": "Column header of the Agent API table: the size of the replies Combwork sent."
   },
   "performance.routes.tip": {
-    "defaultMessage": "Requests by route (its template, never the path asked for). The hive tools call these too; a tool call and its request are the same work, so don't add them up.",
+    "defaultMessage": "Requests by route (its template, never the path asked for). The Combwork tools call these too; a tool call and its request are the same work, so don't add them up.",
     "description": "Info tip beside the Agent API heading."
   },
   "performance.routes.waits": {
@@ -1449,10 +1453,10 @@
   },
   "performance.scope.own": {
     "defaultMessage": "Workspace’s own work",
-    "description": "What the Performance view shows: the work of no project (the Hive Assistant's, scripts'). A row in its sidebar, a choice of its Scope list and its badge."
+    "description": "What the Performance view shows: the work of no project (the Combwork Assistant's, scripts'). A row in its sidebar, a choice of its Scope list and its badge."
   },
   "performance.scope.ownTip": {
-    "defaultMessage": "Work of no project: the Hive Assistant, scripts with the workspace token, and Hive’s shared work.",
+    "defaultMessage": "Work of no project: the Assistant, scripts with the workspace token, and Combwork’s shared work.",
     "description": "Tooltip of the Workspace's own work row in the Performance sidebar."
   },
   "performance.scope.project": {
@@ -1485,11 +1489,11 @@
   },
   "performance.skills.heading": {
     "defaultMessage": "Skill service",
-    "description": "Heading of the Performance view's cards about Hive's own work to know its skills."
+    "description": "Heading of the Performance view's cards about Combwork's own work to know its skills."
   },
   "performance.skills.read": {
     "defaultMessage": "Read",
-    "description": "Title of a Skill service card: how much Hive read from skills on disk (a size). Read is a past participle."
+    "description": "Title of a Skill service card: how much Combwork read from skills on disk (a size). Read is a past participle."
   },
   "performance.skills.readSub": {
     "defaultMessage": "{files, plural, one {# file} other {# files}} · {headers} headers · {entries, plural, one {# entry} other {# entries}}",
@@ -1497,15 +1501,15 @@
   },
   "performance.skills.scans": {
     "defaultMessage": "Scans",
-    "description": "Title of a Skill service card: how many times Hive scanned the skills' folders."
+    "description": "Title of a Skill service card: how many times Combwork scanned the skills' folders."
   },
   "performance.skills.scansSub": {
     "defaultMessage": "p95 {latency} · {shared, number} shared",
     "description": "Under the Scans card's number. {latency} is a time such as \"≤ 250 ms\" (p95: the 95th percentile, keep it); shared: scans that served several callers at once."
   },
   "performance.skills.tip": {
-    "defaultMessage": "Hive's own disk and cache work to know its skills (the status, launches, the Skills view). Shared by the whole workspace, so it is in no project's numbers. A saving in guidance isn't the same as a saving here.",
-    "description": "Info tip beside the Skill service heading. Skills is the name of a view of Hive."
+    "defaultMessage": "Combwork's own disk and cache work to know its skills (the status, launches, the Skills view). Shared by the whole workspace, so it is in no project's numbers. A saving in guidance isn't the same as a saving here.",
+    "description": "Info tip beside the Skill service heading. Skills is the name of a view of Combwork."
   },
   "performance.skills.tooBig": {
     "defaultMessage": "Too big",
@@ -1520,8 +1524,8 @@
     "description": "After the Skill service heading when the page's filters are set: they don't apply to it. Lower case."
   },
   "performance.stalls.count": {
-    "defaultMessage": "{total, plural, one {# stall since Hive started} other {# stalls since Hive started}}{listed, select, all {} other {; the last {kept, number} are listed}}.",
-    "description": "Under the Performance page's Main process stalls table: how many stalls there were since Hive started, and that only the last {kept} are listed when there were more. {listed} is a key (all or some): don't translate the keys, only the texts."
+    "defaultMessage": "{total, plural, one {# stall since Combwork started} other {# stalls since Combwork started}}{listed, select, all {} other {; the last {kept, number} are listed}}.",
+    "description": "Under the Performance page's Main process stalls table: how many stalls there were since Combwork started, and that only the last {kept} are listed when there were more. {listed} is a key (all or some): don't translate the keys, only the texts."
   },
   "performance.stalls.cpu": {
     "defaultMessage": "Main thread CPU",
@@ -1536,12 +1540,12 @@
     "description": "Column header of the Performance page's Main process stalls table: the other work under way during the stall (calls from the window, Agent API requests, hooks)."
   },
   "performance.stalls.empty": {
-    "defaultMessage": "No stalls since Hive started.",
+    "defaultMessage": "No stalls since Combwork started.",
     "description": "The Performance page's Main process stalls table when there were none."
   },
   "performance.stalls.heading": {
     "defaultMessage": "Main process stalls",
-    "description": "Heading of the Performance page's table of the times Hive's main process was busy long enough to be felt."
+    "description": "Heading of the Performance page's table of the times Combwork's main process was busy long enough to be felt."
   },
   "performance.stalls.length": {
     "defaultMessage": "Length",
@@ -1561,7 +1565,7 @@
   },
   "performance.stalls.none": {
     "defaultMessage": "none known",
-    "description": "A stall's Step or During it cell in the Performance page's Main process stalls table when Hive knows of none. Lower case."
+    "description": "A stall's Step or During it cell in the Performance page's Main process stalls table when Combwork knows of none. Lower case."
   },
   "performance.stalls.repeated": {
     "defaultMessage": "×{n, number} · {length}",
@@ -1576,16 +1580,16 @@
     "description": "A length in seconds (\"1.5 s\", the number already formatted) in the Performance page's Main process stalls table."
   },
   "performance.stalls.since": {
-    "defaultMessage": "since Hive started",
-    "description": "After the Main process stalls heading: the table covers the time since Hive started, not the page's range. Lower case."
+    "defaultMessage": "since Combwork started",
+    "description": "After the Main process stalls heading: the table covers the time since Combwork started, not the page's range. Lower case."
   },
   "performance.stalls.step": {
     "defaultMessage": "Step",
     "description": "Column header of the Performance page's Main process stalls table: the database or file step that held the main process."
   },
   "performance.stalls.tip": {
-    "defaultMessage": "Times Hive's main process was busy for more than 250 ms. Every pane's typing goes through it, so a stall is felt as lag. Step is the work that held it, where Hive knows it (a database or file step); During it is what else was under way, which may only have waited behind it. Little CPU means it was waiting (on the disk, a lock, another program); it is measured from half a second before, so it can be a little more than the length. The last {kept, number} since Hive started, kept in memory only; hive.log notes them too, at most one line a minute.",
-    "description": "Info tip beside the Main process stalls heading of the Performance page. Step and During it are its columns: keep them as named there. hive.log is a file name."
+    "defaultMessage": "Times Combwork's main process was busy for more than 250 ms. Every pane's typing goes through it, so a stall is felt as lag. Step is the work that held it, where Combwork knows it (a database or file step); During it is what else was under way, which may only have waited behind it. Little CPU means it was waiting (on the disk, a lock, another program); it is measured from half a second before, so it can be a little more than the length. The last {kept, number} since Combwork started, kept in memory only; combwork.log notes them too, at most one line a minute.",
+    "description": "Info tip beside the Main process stalls heading of the Performance page. Step and During it are its columns: keep them as named there. combwork.log is a file name."
   },
   "performance.stalls.waiting": {
     "defaultMessage": "mostly waiting",
@@ -1597,83 +1601,83 @@
   },
   "performance.toolList.bytes": {
     "defaultMessage": "Bytes",
-    "description": "Column header of the Hive tool list table: the list's size in UTF-8 bytes a start, on average."
+    "description": "Column header of the Combwork tool list table: the list's size in UTF-8 bytes a start, on average."
   },
   "performance.toolList.chars": {
     "defaultMessage": "Characters",
-    "description": "Column header of the Hive tool list table: the list's characters a start, on average."
+    "description": "Column header of the Combwork tool list table: the list's characters a start, on average."
   },
   "performance.toolList.descriptions": {
     "defaultMessage": "Descriptions",
-    "description": "Column header of the Hive tool list table: the characters of the tools' descriptions a start, on average."
+    "description": "Column header of the Combwork tool list table: the characters of the tools' descriptions a start, on average."
   },
   "performance.toolList.empty": {
     "defaultMessage": "No tool lists.",
-    "description": "The Hive tool list table when it has no rows."
+    "description": "The Combwork tool list table when it has no rows."
   },
   "performance.toolList.heading": {
-    "defaultMessage": "Hive tool list",
-    "description": "Heading of the Performance page's table of the hive tools' list each session was given (HI-2063). Keep hive (the tools' name)."
+    "defaultMessage": "Combwork tool list",
+    "description": "Heading of the Performance page's table of the Combwork tools' list each session was given (HI-2063). Keep Combwork (the app's name)."
   },
   "performance.toolList.params": {
     "defaultMessage": "Parameters",
-    "description": "Column header of the Hive tool list table: the characters of the tools' parameters' descriptions a start, on average."
+    "description": "Column header of the Combwork tool list table: the characters of the tools' parameters' descriptions a start, on average."
   },
   "performance.toolList.schemas": {
     "defaultMessage": "Schemas",
-    "description": "Column header of the Hive tool list table: the rest of the list's characters a start (names, types, keys, punctuation), on average."
+    "description": "Column header of the Combwork tool list table: the rest of the list's characters a start (names, types, keys, punctuation), on average."
   },
   "performance.toolList.starts": {
     "defaultMessage": "Starts",
-    "description": "Column header of the Hive tool list table: how many session starts were given the list."
+    "description": "Column header of the Combwork tool list table: how many session starts were given the list."
   },
   "performance.toolList.tip": {
-    "defaultMessage": "The hive tools’ names, descriptions and schemas as each session’s CLI got them, once a start, on average, for every provider (not recorded per provider). Characters are the list’s JSON; Descriptions and Parameters are the tools’ descriptions and their parameters’ descriptions in it; Schemas is the rest: names, types, keys, punctuation and escapes. A dash: not measured (sessions from before Hive measured it).",
-    "description": "Tooltip of the Hive tool list table on the Performance page (HI-2063). Descriptions, Parameters and Schemas are its columns: name them as there. Keep hive (the tools' name)."
+    "defaultMessage": "The Combwork tools’ names, descriptions and schemas as each session’s CLI got them, once a start, on average, for every provider (not recorded per provider). Characters are the list’s JSON; Descriptions and Parameters are the tools’ descriptions and their parameters’ descriptions in it; Schemas is the rest: names, types, keys, punctuation and escapes. A dash: not measured (sessions from before Combwork measured it).",
+    "description": "Tooltip of the Combwork tool list table on the Performance page (HI-2063). Descriptions, Parameters and Schemas are its columns: name them as there. Keep Combwork (the app's name)."
   },
   "performance.toolList.tools": {
     "defaultMessage": "Tools",
-    "description": "Column header of the Hive tool list table: how many tools a start was given, on average."
+    "description": "Column header of the Combwork tool list table: how many tools a start was given, on average."
   },
   "performance.tools.calls": {
     "defaultMessage": "Calls",
-    "description": "Column header of the Hive tools table: how many times it was called."
+    "description": "Column header of the Combwork tools table: how many times it was called."
   },
   "performance.tools.chars": {
     "defaultMessage": "Characters",
-    "description": "Column header of the Hive tools table: its replies' characters."
+    "description": "Column header of the Combwork tools table: its replies' characters."
   },
   "performance.tools.detail": {
     "defaultMessage": "Detail",
-    "description": "Column header of the Hive tools table: calls that asked for the full form of the reply."
+    "description": "Column header of the Combwork tools table: calls that asked for the full form of the reply."
   },
   "performance.tools.empty": {
     "defaultMessage": "No tool calls.",
-    "description": "The Hive tools table when it has no rows."
+    "description": "The Combwork tools table when it has no rows."
   },
   "performance.tools.errors": {
     "defaultMessage": "Errors",
-    "description": "Column header of the Hive tools table: calls that failed."
+    "description": "Column header of the Combwork tools table: calls that failed."
   },
   "performance.tools.heading": {
-    "defaultMessage": "Hive tools",
-    "description": "Heading of the Performance page's table of the hive tools agents called."
+    "defaultMessage": "Combwork tools",
+    "description": "Heading of the Performance page's table of the Combwork tools agents called."
   },
   "performance.tools.perCall": {
     "defaultMessage": "Per call",
-    "description": "Column header of the Hive tools table: its replies' characters per call, on average."
+    "description": "Column header of the Combwork tools table: its replies' characters per call, on average."
   },
   "performance.tools.tip": {
-    "defaultMessage": "Each hive tool's replies as the models got them: characters and UTF-8 bytes, exactly. Detail: calls that asked for the full form. Sorted by characters, what costs a context most.",
-    "description": "Info tip beside the Hive tools heading. Detail is a column of the table: keep it as named there."
+    "defaultMessage": "Each Combwork tool's replies as the models got them: characters and UTF-8 bytes, exactly. Detail: calls that asked for the full form. Sorted by characters, what costs a context most.",
+    "description": "Info tip beside the Combwork tools heading. Detail is a column of the table: keep it as named there."
   },
   "performance.tools.tool": {
     "defaultMessage": "Tool",
-    "description": "Column header of the Hive tools table: the tool's name (such as hive_read_task)."
+    "description": "Column header of the Combwork tools table: the tool's name (such as cw_read_task)."
   },
   "performance.trend.detail": {
     "defaultMessage": "{requests, plural, one {# request} other {# requests}}{failed, plural, =0 {} other {, # failed{cancelled, plural, =0 {} other { ({cancelled, number} cancelled)}}}} · {toolCalls, plural, one {# tool call} other {# tool calls}} ({chars, number} characters) · {launches, plural, one {# launch} other {# launches}}{partial, select, yes { · recorded for {duration} of it} other {}}",
-    "description": "Tooltip of a bar of the requests chart, after its hour or day and a colon: what happened then. {duration} is how long Hive recorded in it (\"40 min\"), shown when {partial} is yes. Lower case."
+    "description": "Tooltip of a bar of the requests chart, after its hour or day and a colon: what happened then. {duration} is how long Combwork recorded in it (\"40 min\"), shown when {partial} is yes. Lower case."
   },
   "performance.trend.failed": {
     "defaultMessage": "Failed",
@@ -1688,12 +1692,12 @@
     "description": "Name, for screen readers, of the Performance page's chart of requests. {step} is a key (hour or day): don't translate the keys, only the texts."
   },
   "performance.trend.notRecorded": {
-    "defaultMessage": "not recorded (Hive closed, recording off, or before a reset)",
-    "description": "Tooltip of a bar of the requests chart, after its hour or day and a colon: Hive recorded nothing then. Lower case."
+    "defaultMessage": "not recorded (Combwork closed, recording off, or before a reset)",
+    "description": "Tooltip of a bar of the requests chart, after its hour or day and a colon: Combwork recorded nothing then. Lower case."
   },
   "performance.trend.notRecordedLegend": {
     "defaultMessage": "Not recorded",
-    "description": "Legend of the requests chart: the hatched bars, when Hive recorded nothing."
+    "description": "Legend of the requests chart: the hatched bars, when Combwork recorded nothing."
   },
   "performance.trend.slot": {
     "defaultMessage": "<b>{when}</b>: {detail}",
@@ -1800,7 +1804,7 @@
     "description": "Column header of the Provider usage table: how many sessions."
   },
   "performance.usage.tip": {
-    "defaultMessage": "What the providers reported for the sessions active in the range, by whose sessions they were: each session's whole usage (so a long session counts in full). Reasoning is part of output, shown separately, not added. Context is a snapshot of each session's last request (average and largest), not a sum. Cost is API-equivalent (≈ estimated by Hive where the provider didn't report it); a subscription isn't billed per this. Sessions that reported nothing are unknown, left out of the totals.",
+    "defaultMessage": "What the providers reported for the sessions active in the range, by whose sessions they were: each session's whole usage (so a long session counts in full). Reasoning is part of output, shown separately, not added. Context is a snapshot of each session's last request (average and largest), not a sum. Cost is API-equivalent (≈ estimated by Combwork where the provider didn't report it); a subscription isn't billed per this. Sessions that reported nothing are unknown, left out of the totals.",
     "description": "Info tip beside the Provider usage heading. Keep ≈: it is how estimates show."
   },
   "performance.usage.unknownCount": {
@@ -1825,7 +1829,7 @@
   },
   "performance.who.assistant": {
     "defaultMessage": "Assistant",
-    "description": "In a Performance table's Who column: the Hive Assistant's sessions."
+    "description": "In a Performance table's Who column: the Combwork Assistant's sessions."
   },
   "performance.who.followsAll": {
     "defaultMessage": "Everything below follows it.",

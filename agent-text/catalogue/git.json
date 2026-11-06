@@ -1,0 +1,107 @@
+{
+  "git.busy.agent": {
+    "text": "{agent} {status, select, starting {is starting} working {is working} waiting {is waiting for your answer} background {is waiting on background tasks it started} watching {is waiting for cards to change (a card watch)} other {stopped in the middle of a task when its sign-in expired}} in the project folder: {action, select, switch {switch branches} create {create and switch to a branch} other {pull}} once it has finished.",
+    "note": "Why switching branch (or creating one, or pulling) is refused now: an agent works in the project folder. {agent} is the agent's name; {status} what it is doing; {action} what was refused.",
+    "audience": "both"
+  },
+  "git.busy.slotHeld": {
+    "text": "{agent} holds the merge slot for {branch}: {action, select, switch {switch branches} create {create and switch to a branch} other {pull}} once that merge is done.",
+    "note": "Why switching branch (or creating one, or pulling) is refused now: an agent is merging into {branch} (it holds the merge slot). {agent} is the agent's name.",
+    "audience": "both"
+  },
+  "git.busy.slotWaiting": {
+    "text": "{agents} {count, plural, one {is} other {are}} waiting for the merge slot for {branch}: {action, select, switch {switch branches} create {create and switch to a branch} other {pull}} once those merges are done.",
+    "note": "Why switching branch (or creating one, or pulling) is refused now: agents wait to merge into {branch}. {agents} is their names as a list; {count} how many.",
+    "audience": "both"
+  },
+  "git.busy.yourMerge": {
+    "text": "Your merge into {branch} is running: {action, select, switch {switch branches} create {create and switch to a branch} other {pull}} once it is done.",
+    "note": "Why switching branch (or creating one, or pulling) is refused now: the user's own merge into {branch} is running.",
+    "audience": "both"
+  },
+  "git.parentRepo": {
+    "text": "This project is inside the git repository in {folder}, so the Version Control tab only shows it: Combwork changes only a project's own repository.",
+    "note": "Banner in the Version Control tab of a project whose folder is inside another repository (a workspace kept in git). {folder} is that repository's folder.",
+    "audience": "both"
+  },
+  "git.repoLock.busy": {
+    "text": "Another Combwork is merging into this repository ({profile}). Nothing was changed: try again once it has finished.",
+    "note": "An error: a merge or another change to a repository didn't start, because another Combwork (its profile folder's name, {profile}) still held the repository's merge lock after Combwork had waited for it.",
+    "audience": "both"
+  },
+  "git.repoLock.noGitDir": {
+    "text": "Combwork couldn't find the git folder of {folder}, so nothing was changed: {why}",
+    "note": "An error: a merge or another change to a repository didn't start, because git couldn't name the repository's git folder (where Combwork's merge lock lives). {why} is git's message.",
+    "audience": "both"
+  },
+  "git.tool.missing": {
+    "text": "Git isn't installed (or isn't on Combwork's PATH)",
+    "note": "Said wherever git is needed when Combwork cannot run git. No full stop: some places add more after it.",
+    "audience": "both"
+  },
+  "git.tool.tooOld": {
+    "text": "Git {version} is too old for Combwork (it needs {min} or later)",
+    "note": "Said wherever git is needed when the installed git is too old to run. {version} and {min} are git versions. No full stop: some places add more after it.",
+    "audience": "both"
+  },
+  "git.validate.enterName": {
+    "text": "Enter a name",
+    "note": "Under a form's name box (a remote, a branch, a tag) while it is empty.",
+    "audience": "both"
+  },
+  "git.validate.enterUrl": {
+    "text": "Enter a URL",
+    "note": "Under a remote's URL box while it is empty.",
+    "audience": "both"
+  },
+  "git.validate.nameLine": {
+    "text": "A name is one line, without < or >",
+    "note": "Under a commit identity form when the name has a line break, < or >.",
+    "audience": "both"
+  },
+  "git.validate.notEmail": {
+    "text": "That isn't an email address",
+    "note": "Under a commit identity form.",
+    "audience": "both"
+  },
+  "git.validate.notUrl": {
+    "text": "That isn't a URL or path",
+    "note": "Under a remote's URL box.",
+    "audience": "both"
+  },
+  "git.validate.remoteName": {
+    "text": "Use letters, digits, \".\", \"_\" and \"-\"",
+    "note": "Under Add a remote's name box when the name has other characters.",
+    "audience": "both"
+  },
+  "git.validate.wholeUrl": {
+    "text": "Type the whole URL: its password or token is hidden here",
+    "note": "Under a remote's URL box when it still has ••• for a hidden password.",
+    "audience": "both"
+  },
+  "git.vc.git": {
+    "text": "Git",
+    "note": "A version control system’s name, in the choice atop the Version Control tab (glossary 2.1: keep).",
+    "audience": "both"
+  },
+  "git.vc.none": {
+    "text": "None",
+    "note": "The version control of a project without any, in the choice atop the Version Control tab and in \"Workflow: None · Solo\" (glossary 2.1: None).",
+    "audience": "both"
+  },
+  "git.vc.switch.changed": {
+    "text": "Changed meanwhile: this project uses {platform} now. Look again before switching.",
+    "note": "Why a switch of version control was refused: someone else switched it since the tab was shown. {platform} is None or Git.",
+    "audience": "both"
+  },
+  "git.vc.switch.noGit": {
+    "text": "No Git repository here: Initialise repository… first.",
+    "note": "Why a project can’t be switched to Git (the Version Control tab’s choice, a refusal): its folder has no Git repository. Initialise repository… is a button’s name: keep it as translated there.",
+    "audience": "both"
+  },
+  "git.vc.switch.otherFound": {
+    "text": "{vcs} found: not supported yet, so this project can only use None.",
+    "note": "Why a project can’t be switched to Git: another version control ({vcs}: Mercurial, Jujutsu) was found in its folder. None: glossary 2.1.",
+    "audience": "both"
+  }
+}

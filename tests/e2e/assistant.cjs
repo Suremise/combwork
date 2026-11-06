@@ -1,4 +1,4 @@
-// The Hive Assistant: its home and modes (#259) in a workspace, the side panel (remembered per workspace), switching
+// The Combwork Assistant: its home and modes (#259) in a workspace, the side panel (remembered per workspace), switching
 // mode, Assistant Settings (its connection and mode, HI-2108; dark and light screenshots), the Modes view, and one launch (no prompt is sent)
 // that runs in the workspace folder, in Auto mode, named "Assistant" in the quit dialog. The Assistant runs the fake
 // Claude Code (fake-claude/, #195); that the real Claude Code takes its launch (and falls back from Auto with Haiku) is
@@ -11,13 +11,13 @@ const path = require('path')
 const userData = path.join(lib.WORK, 'assistant-profile')
 const ws = path.join(lib.WORK, 'assistant-ws')
 const ws2 = path.join(lib.WORK, 'assistant-ws2')
-const home = path.join(ws, '.hive', 'assistant')
+const home = path.join(ws, '.combwork', 'assistant')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const agentFile = () => JSON.parse(fs.readFileSync(path.join(home, '.hive', 'project.json'), 'utf8')).agents?.[0] ?? {}
+const agentFile = () => JSON.parse(fs.readFileSync(path.join(home, '.combwork', 'project.json'), 'utf8')).agents?.[0] ?? {}
 // The longest a check waits for its condition: a bound for a hung run, never how long the step should take.
 const HUNG_MS = 10000
 /** Whether fn() comes true (checked until it does, up to HUNG_MS). */
@@ -28,27 +28,27 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   for (const p of ['api', 'web']) fs.mkdirSync(path.join(ws, p), { recursive: true })
   fs.mkdirSync(ws2, { recursive: true })
   const claude = lib.fakeClaude(userData, path.join(lib.WORK, 'assistant-claude-home'), [ws, home])
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47894), ...claude })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47894), ...claude })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
 
-  // The workspace gets the Assistant's home and Hive's modes; the home is not a project.
+  // The workspace gets the Assistant's home and Combwork's modes; the home is not a project.
   const info = await inv('workspace:get')
   check('the Assistant has its home and one agent', info.assistant?.path.toLowerCase() === home.toLowerCase() && info.assistant.agents.length === 1)
   check('its home is not listed as a project', info.projects.map((p) => p.name).sort().join(',') === 'api,web')
   check("its sessions are kept out of git", fs.readFileSync(path.join(home, '.gitignore'), 'utf8').includes('*'))
   // Brought in after the open (HI-1705): wait for them.
-  const modes = () => (fs.existsSync(path.join(ws, '.hive', 'modes')) ? fs.readdirSync(path.join(ws, '.hive', 'modes')).sort().join(',') : '')
-  check('Hive\'s four modes are in the workspace', await becomes(() => modes() === 'coordinator.md,planner.md,qa-triager.md,release-manager.md'), modes())
+  const modes = () => (fs.existsSync(path.join(ws, '.combwork', 'modes')) ? fs.readdirSync(path.join(ws, '.combwork', 'modes')).sort().join(',') : '')
+  check('Combwork\'s four modes are in the workspace', await becomes(() => modes() === 'coordinator.md,planner.md,qa-triager.md,release-manager.md'), modes())
   check("it defaults to the agents' model and effort, and Auto mode", JSON.stringify(info.assistant.config.providers['claude-code']) === JSON.stringify({ model: 'inherit', effort: 'inherit', permissionMode: 'auto', extraArgs: '', use200kContext: 'inherit' }), JSON.stringify(info.assistant.config.providers['claude-code']))
 
   // The panel: hidden at first, Ctrl+Alt+I shows it, and each workspace remembers it.
-  check('the panel starts hidden, as a strip', (await page.locator('.assistant-panel').count()) === 0 && (await page.locator('.assistant-rail', { hasText: 'Hive Assistant' }).count()) === 1)
+  check('the panel starts hidden, as a strip', (await page.locator('.assistant-panel').count()) === 0 && (await page.locator('.assistant-rail', { hasText: 'Assistant' }).count()) === 1)
   await page.locator('.assistant-rail').click()
   const panelWidth = async () => Math.round((await page.locator('.assistant-panel').boundingBox().catch(() => null))?.width ?? -1)
   check('clicking the strip shows the panel', await becomes(async () => (await page.locator('.assistant-panel').count()) === 1 && (await page.locator('.assistant-rail').count()) === 0))
@@ -128,14 +128,14 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
 
   // The Modes view: create, delete and restore.
   await inv('modes:create', 'Night Watch')
-  check('a new mode is a file', fs.existsSync(path.join(ws, '.hive', 'modes', 'night-watch.md')))
+  check('a new mode is a file', fs.existsSync(path.join(ws, '.combwork', 'modes', 'night-watch.md')))
   await inv('modes:delete', 'qa-triager')
   const listed = await inv('modes:list')
   check('a deleted bundled mode is offered for restoring', listed.find((p) => p.id === 'qa-triager')?.bundled === 'missing')
   await inv('modes:restore', 'qa-triager')
   check('and restores', (await inv('modes:list')).find((p) => p.id === 'qa-triager')?.bundled === 'same')
-  // The Hive Assistant view: a summary, its conversations and its modes.
-  await page.locator('.activity-btn[aria-label="Hive Assistant"]').click()
+  // The Combwork Assistant view: a summary, its conversations and its modes.
+  await page.locator('.activity-btn[aria-label="Assistant"]').click()
   check('the Assistant view has a summary', await becomes(async () => (await page.locator('.assistant-summary .assistant-stat').count()) === 4))
   // The summary's stats are drawn at once (showing "…" until its conversations are read), the list once they are: so
   // the list is waited for, not read once after the stats (#710: it failed under load).
@@ -147,7 +147,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   check('a mode opens in the editor', await becomes(async () => (await page.locator('.split-main .editor-toolbar', { hasText: 'QA triager' }).count()) === 1))
   check('its toolbar can delete it', (await page.locator('.split-main .editor-toolbar [aria-label="Delete mode"]').count()) === 1)
 
-  // One launch (no prompt): in the workspace folder, asking for Auto, with Hive's reading tools allowed.
+  // One launch (no prompt): in the workspace folder, asking for Auto, with Combwork's reading tools allowed.
   await inv('session:start', home, { agentId: 'assistant' })
   await lib.acceptClaudeTrust(inv, home, 'assistant', 20000)
   const t0 = Date.now()
@@ -156,14 +156,14 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   check('the Assistant starts', live?.status === 'ready', live?.status)
   check('it works in the workspace folder', live?.cwd.toLowerCase() === ws.toLowerCase(), live?.cwd)
   check('its conversation is named for the mode', (live?.sessionName ?? '').startsWith('Assistant · Planner · '), live?.sessionName)
-  const log = fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8')
+  const log = fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8')
   // The key is marked as the user's own text in the log (userText), so the line is found by its parts.
   const launch = log.split('\n').filter((l) => / spawn \W?session:/.test(l) && l.toLowerCase().includes('assistant#assistant')).pop() ?? ''
   check('it launches in Auto', launch.includes('"--permission-mode","auto"'))
   check('…with the model its connection sets', launch.includes('"--model","sonnet"'))
   check("its mode is appended to Claude Code's system prompt", launch.includes('--append-system-prompt-file'))
-  check("Hive's reading tools are allowed", launch.includes('mcp__hive__hive_list_projects') && !launch.includes('mcp__hive__hive_write_shared_note'))
-  check('Planner\'s instructions are in the launch', fs.readFileSync(path.join(home, '.hive', 'launch-assistant', 'instructions.md'), 'utf8').includes('# Your mode: Planner'))
+  check("Combwork's reading tools are allowed", launch.includes('mcp__combwork__cw_list_projects') && !launch.includes('mcp__combwork__cw_write_shared_note'))
+  check('Planner\'s instructions are in the launch', fs.readFileSync(path.join(home, '.combwork', 'launch-assistant', 'instructions.md'), 'utf8').includes('# Your mode: Planner'))
   check('it is not a project agent', (await inv('workspace:get')).projects.every((p) => p.agents.every((a) => a.id !== 'assistant')))
   // The header's fold button (#1330), as the Progress panel's: its tooltip names the shortcut (a rebinding too), and
   // folding the panel leaves the Assistant running.
@@ -171,7 +171,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   check('the header has a fold button, with its shortcut', (await fold.getAttribute('aria-label')) === 'Fold the Assistant panel (Ctrl+Alt+I)', await fold.getAttribute('aria-label'))
   await inv('settings:setKeybinding', 'assistant.toggle', 'Mod+Alt+J')
   check('…the shortcut as rebound', await becomes(async () => (await fold.getAttribute('aria-label')) === 'Fold the Assistant panel (Ctrl+Alt+J)'), await fold.getAttribute('aria-label'))
-  // null removes the shortcut (the tooltip names none); undefined resets it to Hive's (setKeybinding).
+  // null removes the shortcut (the tooltip names none); undefined resets it to Combwork's (setKeybinding).
   await inv('settings:setKeybinding', 'assistant.toggle', null)
   check('…none once it is removed', await becomes(async () => (await fold.getAttribute('aria-label')) === 'Fold the Assistant panel'), await fold.getAttribute('aria-label'))
   await inv('settings:setKeybinding', 'assistant.toggle', undefined)
@@ -194,7 +194,7 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   const closing = inv('workspace:close')
   await lib.until(async () => (await page.locator('.dialog').count()) > 0, 10000)
   const dialog = await page.locator('.dialog').last().innerText().catch(() => '')
-  check('the close dialog names it "Assistant"', /Assistant/.test(dialog) && !/\.hive|assistant ·/i.test(dialog), dialog.replace(/\s+/g, ' ').slice(0, 200))
+  check('the close dialog names it "Assistant"', /Assistant/.test(dialog) && !/\.combwork|assistant ·/i.test(dialog), dialog.replace(/\s+/g, ' ').slice(0, 200))
   await page.locator('.dialog .btn', { hasText: 'Close workspace now' }).click()
   check('closing the workspace stops it', (await closing) === true && !(await inv('session:live')).some((s) => s.agentId === 'assistant'))
 

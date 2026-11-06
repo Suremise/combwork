@@ -2,7 +2,7 @@ import { ASSISTANT_AGENT_ID, assistantModeId, modeMessage, modeSummary } from '.
 import { projectAgents } from '../shared/defaults'
 import { config } from './config'
 import { msg } from '../shared/i18n'
-import { hiveError } from './hiveError'
+import { combworkError } from './combworkError'
 import { createLogger, userText } from './logger'
 import { readMode } from './modes'
 import { sessions } from './sessions'
@@ -10,8 +10,8 @@ import { createDelivery, offerNow, registerSource } from './deliveries'
 import { inWorkspace, workspace, workspaceOf } from './workspace'
 
 /**
- * Switching the Hive Assistant's mode (#259): the workspace keeps the choice (its next launch uses the mode's
- * instructions), and a running Assistant is told at once, without a restart: Hive gives it "[Hive] Mode: …" with the
+ * Switching the Combwork Assistant's mode (#259): the workspace keeps the choice (its next launch uses the mode's
+ * instructions), and a running Assistant is told at once, without a restart: Combwork gives it "[CW] Mode: …" with the
  * mode's habits, a delivery (#649: a control notice for that launch, deliveries.ts) typed into its conversation, which
  * keeps its context. Offered only while it is idle and the user isn't typing there; otherwise when it next is (only the
  * latest switch is told). Its session stopping drops the message; the conversation records the mode once it is received.
@@ -33,8 +33,8 @@ const AGENT = ASSISTANT_AGENT_ID
 const switches = new Map<string, number>()
 const revision = (key: string): number => switches.get(key) ?? 0
 
-/** Hive's own deliveries come from it. */
-const HIVE = { kind: 'hive', name: 'Hive' } as const // i18n-ignore: the product's name, as a delivery's sender
+/** Combwork's own deliveries come from it. */
+const COMBWORK = { kind: 'combwork', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
 
 /**
  * The mode notices' part in their deliveries (#649): offered only while no newer switch has begun since it was made (one
@@ -52,7 +52,7 @@ registerSource('mode', {
 })
 
 /**
- * Makes a mode (a file in .hive/modes) this workspace's Assistant's. Returns whether a running Assistant was told now, will be
+ * Makes a mode (a file in .combwork/modes) this workspace's Assistant's. Returns whether a running Assistant was told now, will be
  * when it is idle, or wasn't running (the mode applies when it starts); 'saved' too for a switch a newer one overtook
  * (the newer one is saved and told, and says so).
  */
@@ -64,7 +64,7 @@ export async function switchMode(modeId: string, save = true): Promise<'told' | 
   switches.set(key, rev)
   const current = (): boolean => revision(key) === rev
   const mode = await readMode(modeId)
-  if (!mode) throw hiveError(msg({ id: 'content.mode.unknown', defaultMessage: 'There is no mode "{mode}" in this workspace.', description: "An error switching the Hive Assistant's mode: the workspace has no mode (a file in .hive/modes) called {mode}." }), { mode: modeId }, { kind: 'notFound' })
+  if (!mode) throw combworkError(msg({ id: 'content.mode.unknown', defaultMessage: 'There is no mode "{mode}" in this workspace.', description: "An error switching the Combwork Assistant's mode: the workspace has no mode (a file in .combwork/modes) called {mode}." }), { mode: modeId }, { kind: 'notFound' })
   if (!current()) return 'saved'
   // save=false: the choice is already saved (Assistant Settings, which can also choose "the default").
   if (save) {
@@ -76,7 +76,7 @@ export async function switchMode(modeId: string, save = true): Promise<'told' | 
         return {}
       }
       const agents = projectAgents(cfg)
-      if (!agents.some((a) => a.id === AGENT)) throw hiveError(msg({ id: 'content.mode.noAssistant', defaultMessage: 'The Assistant has no settings in this workspace.', description: "An error switching the Hive Assistant's mode: the workspace's Assistant settings are missing." }))
+      if (!agents.some((a) => a.id === AGENT)) throw combworkError(msg({ id: 'content.mode.noAssistant', defaultMessage: 'The Assistant has no settings in this workspace.', description: "An error switching the Combwork Assistant's mode: the workspace's Assistant settings are missing." }))
       return { agents: agents.map((a) => (a.id === AGENT ? { ...a, mode: modeId } : a)) }
     })
     if (overtaken) return 'saved'
@@ -112,7 +112,7 @@ async function tell(w: { home: string; runId: string; text: string; mode: string
   const key = w.home.toLowerCase()
   // Stopped or restarted since (the launch it has, or will have, is in the mode already), or a newer switch began.
   if (sessions.liveFor(w.home, AGENT)?.runId !== w.runId || w.rev !== revision(key)) return false
-  await createDelivery(w.home, { agentId: AGENT, kind: 'control', from: HIVE, body: w.text, source: 'mode', ref: 'mode', replace: true, forRun: w.runId, meta: { rev: w.rev, modeId: w.modeId, mode: w.mode } })
+  await createDelivery(w.home, { agentId: AGENT, kind: 'control', from: COMBWORK, body: w.text, source: 'mode', ref: 'mode', replace: true, forRun: w.runId, meta: { rev: w.rev, modeId: w.modeId, mode: w.mode } })
   const typed = await offerNow(w.home, AGENT)
   if (!typed) log.info('The Assistant will be told its mode when it is free')
   return typed

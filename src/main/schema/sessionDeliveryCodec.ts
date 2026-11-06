@@ -3,16 +3,16 @@ import type { SQLInputValue } from 'node:sqlite'
 /**
  * Session records and deliveries as rows of their 1.0 tables (#1211; the tables are v1_0.ts's "sessions and deliveries
  * in tables"), and back: `fromRow(toRow(x))` equals `x` as JSON (deep equality, the keys in each type's order) for every
- * record Hive keeps.
+ * record Combwork keeps.
  *
- * - A field of the form Hive writes goes to its column (a boolean as 0/1, an object or list as JSON in a JSON column).
- * - Anything else is kept in the row's `extra` (a JSON object) and read from there: a field Hive doesn't know (an older
- *   or newer Hive's), a known one of another type or null where Hive writes none, and a string with a lone surrogate
+ * - A field of the form Combwork writes goes to its column (a boolean as 0/1, an object or list as JSON in a JSON column).
+ * - Anything else is kept in the row's `extra` (a JSON object) and read from there: a field Combwork doesn't know (an older
+ *   or newer Combwork's), a known one of another type or null where Combwork writes none, and a string with a lone surrogate
  *   (valid in JSON, not in SQLite's UTF-8 text). So nothing a record holds is lost.
  * - A record missing a field its row needs, or with another kind of value there (a delivery whose body has a lone
  *   surrogate, which readDelivery accepts), still has its row: the column takes a fallback and `extra` keeps what it
  *   had (or that it had none), so its totals, lists and inbox still have it. Only one without an id (its key) isn't of
- *   Hive's form: the caller keeps it aside as it was (the store's `setAside` or deliveries' `invalid`).
+ *   Combwork's form: the caller keeps it aside as it was (the store's `setAside` or deliveries' `invalid`).
  * - `extra` is the record's own keys, whatever they are: an own `__proto__` stays one, and a key starting with `$` is
  *   escaped (one more `$`), so the codec's own `$absent` never meets a record's. An empty list stays an empty list.
  */
@@ -24,11 +24,11 @@ interface Field {
   /** Its column. */
   col: string
   kind: Kind
-  /** The row can't be without it: absent, or not of its kind, the record isn't of Hive's form. */
+  /** The row can't be without it: absent, or not of its kind, the record isn't of Combwork's form. */
   required?: boolean
   /** Required, and null is one of its values (a delivery's `conversation`). */
   nullable?: boolean
-  /** An optional boolean Hive writes only as true (`review?: true`): its column is 0 when it is absent. */
+  /** An optional boolean Combwork writes only as true (`review?: true`): its column is 0 when it is absent. */
   onlyTrue?: boolean
   /**
    * Required, but a record without it (or with another kind of value) still has a row: its column takes this, and
@@ -86,7 +86,7 @@ const fromCol = (f: Field, c: unknown): unknown => {
 }
 
 /**
- * A record's row by its fields, or null when it isn't of Hive's form (a required field missing or of another kind).
+ * A record's row by its fields, or null when it isn't of Combwork's form (a required field missing or of another kind).
  * `skip`: keys the caller stores itself (a session's cards, its `sub`).
  */
 function encode(fields: Field[], rec: Record<string, unknown>, skip: readonly string[] = []): Row | null {
@@ -169,9 +169,9 @@ const SESSION_CARD: Field[] = [
   { key: 'review', col: 'review', kind: 'bool', onlyTrue: true }
 ]
 
-/** A session record's rows: its own (with `host` and `ord`) and its cards', or null when it isn't of Hive's form. */
+/** A session record's rows: its own (with `host` and `ord`) and its cards', or null when it isn't of Combwork's form. */
 export function sessionToRows(host: string, ord: number, rec: Record<string, unknown>): { row: Row; cards: Row[] } | null {
-  // Its cards and its `sub` have columns or a table of their own when they are of Hive's form; else they stay in `extra`.
+  // Its cards and its `sub` have columns or a table of their own when they are of Combwork's form; else they stay in `extra`.
   const cards = Array.isArray(rec.cards) ? rec.cards.map((c) => (c && typeof c === 'object' ? encode(SESSION_CARD, c as Record<string, unknown>) : null)) : null
   // A typed list has a card: an empty one is kept as it is in `extra` (no rows would read back as no list).
   const cardsTyped = !!cards && cards.length > 0 && cards.every((c) => c && c.extra === null)
@@ -214,7 +214,7 @@ const KEPT: Field[] = [
   { key: 'usage', col: 'usage', kind: 'json', required: true, fallback: 'null' }
 ]
 
-/** A deleted session's kept usage (KeptUsage) as its row in `sessions_deleted_usage`, or null when it isn't of Hive's form. */
+/** A deleted session's kept usage (KeptUsage) as its row in `sessions_deleted_usage`, or null when it isn't of Combwork's form. */
 export function keptUsageToRow(host: string, ord: number, k: Record<string, unknown>): Row | null {
   const row = encode(KEPT, k)
   if (!row) return null
@@ -259,7 +259,7 @@ const DELIVERY: Field[] = [
   { key: 'action', col: 'action', kind: 'int' }
 ]
 
-/** A delivery as its row in `deliveries`, or null when it isn't of Hive's form. */
+/** A delivery as its row in `deliveries`, or null when it isn't of Combwork's form. */
 export function deliveryToRow(host: string, d: Record<string, unknown>): Row | null {
   const row = encode(DELIVERY, d)
   if (!row) return null

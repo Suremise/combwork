@@ -1,6 +1,6 @@
 // The board's Start of a card from before 1.0 in a project that builds in slots (HI-1966), on the real board (a temp
-// hive.db), a temp Git repository and the card's runtime, the slot lending stood in for (setSlotStarts, the seam
-// slotCards.ts fills). On rc.9 the Assistant started HI-1612 (a 0.9 card, marked `pre_workflow`) with hive_start_task:
+// combwork.db), a temp Git repository and the card's runtime, the slot lending stood in for (setSlotStarts, the seam
+// slotCards.ts fills). On rc.9 the Assistant started HI-1612 (a 0.9 card, marked `pre_workflow`) with cw_start_task:
 // its move took P3's recorded path, which lends no slot and recorded HB2's old 0.9 worktree, and HB2 was launched in the
 // main checkout. Now that start is the runtime's (its slot lent, the card a 1.0 card, its decisions kept as facts), and a
 // Start whose card still got no slot there is undone rather than launch its agent in the project folder.
@@ -11,7 +11,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-oldslotstart-')
+const base = tempDir('cw-oldslotstart-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -52,16 +52,16 @@ let n = 0
 async function workspace(): Promise<WS> {
   const ws = join(base, `ws-${++n}`)
   const repo = join(ws, 'p')
-  mkdirSync(join(repo, '.hive'), { recursive: true })
+  mkdirSync(join(repo, '.combwork'), { recursive: true })
   writeFileSync(join(repo, 'a.txt'), 'one\n')
   git(repo, 'init', '-q', '-b', 'main')
   for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) git(repo, 'config', k, v)
-  writeFileSync(join(repo, '.gitignore'), '.hive/\n')
+  writeFileSync(join(repo, '.gitignore'), '.combwork/\n')
   git(repo, 'add', '-A')
   git(repo, 'commit', '-qm', 'initial')
   const agents = [{ id: 'a1', name: 'Builder' }, { id: 'a2', name: 'Reviewer' }]
   const options = { ...allOff('git'), review: 'agent', noSelfReview: true, finish: 'agentMerges', folder: 'slots' }
-  writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents, workflow: { platform: 'git', preset: null, options } }))
+  writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents, workflow: { platform: 'git', preset: null, options } }))
   const w = createWorkspaceService()
   await w.open(ws)
   opened.push(w)
@@ -126,9 +126,9 @@ describe("a card from before 1.0 started by the board, in a project that builds 
   })
 
   // HI-2395: a no-code card takes no slot (HI-2335), so its start, a direct one (the window's Start, with no reason, as
-  // the Assistant's hive_start_task) as a lane's, is never taken for one that got none: it starts where its agent is
+  // the Assistant's cw_start_task) as a lane's, is never taken for one that got none: it starts where its agent is
   // (here the project folder), the agent launched.
-  for (const [who, actor] of [["the window's Start", user], ['a lane', tasks.HIVE_LANE_START]] as const) {
+  for (const [who, actor] of [["the window's Start", user], ['a lane', tasks.CW_LANE_START]] as const) {
     it(`a no-code card started by ${who} takes no slot and starts, its agent launched where it is (HI-2395)`, async () => {
       const w = await workspace()
       const card = await inWorkspace(w, async () => (await tasks.createTask({ title: 'A decision to write up', project: 'p' }, user)).number)

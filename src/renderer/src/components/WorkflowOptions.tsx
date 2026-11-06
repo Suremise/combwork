@@ -41,7 +41,7 @@ const T = {
   noPreset: msg({ id: 'workflow.form.noPreset', defaultMessage: 'No preset chosen', description: 'The Workflow section’s preset line when the options didn’t start from a preset (glossary 2.1: preset).' }),
   presetsLabel: msg({ id: 'workflow.form.presetsLabel', defaultMessage: 'Presets', description: 'Accessible name of the list of presets in the Workflow section (glossary 2.1: preset).' }),
   allOff: msg({ id: 'workflow.form.allOff', defaultMessage: 'All off', description: 'A choice beside the presets in the Workflow section: every rule off (SPEC §16.6.4).' }),
-  allOffSummary: msg({ id: 'workflow.form.allOffSummary', defaultMessage: 'No review, nothing checked, everyone in the project folder: cards move freely, and Hive still records what happens.', description: 'What the choice “All off” sets up, under its name in the Workflow section.' }),
+  allOffSummary: msg({ id: 'workflow.form.allOffSummary', defaultMessage: 'No review, nothing checked, everyone in the project folder: cards move freely, and Combwork still records what happens.', description: 'What the choice “All off” sets up, under its name in the Workflow section.' }),
   previewHead: msg({ id: 'workflow.form.previewHead', defaultMessage: 'What {preset} sets, and why:', description: 'Above the list of options a preset sets, in its preview in the Workflow section (glossary 2.1: preset). {preset} is its name.' }),
   previewChanges: msg({ id: 'workflow.form.previewChanges', defaultMessage: '{n, plural, =0 {Nothing here changes.} one {Marked: the option it changes here.} other {Marked: the # options it changes here.}}', description: 'In a preset’s preview in the Workflow section: how many of the options it sets differ from the form now (those are marked).' }),
   previewNow: msg({ id: 'workflow.form.previewNow', defaultMessage: 'Now: {value}', description: 'In a preset’s preview, beside an option it changes: its value in the form now.' }),
@@ -50,12 +50,12 @@ const T = {
   neverOffHead: msg({ id: 'workflow.form.neverOffHead', defaultMessage: 'What never turns off, to keep your work safe:', description: 'Above the list of protections that stay on with every rule off (SPEC §16.6.4), in the Workflow section.' }),
   neverOff: {
     fileLocks: msg({ id: 'workflow.form.neverOff.fileLocks', defaultMessage: 'File locks, while their own setting has them on.', description: 'A protection that stays on with every rule off: agents can’t edit one file at once (its own setting decides).' }),
-    indexLock: msg({ id: 'workflow.form.neverOff.indexLock', defaultMessage: 'Hive never deletes git’s index.lock.', description: 'A protection that stays on with every rule off. Keep index.lock (a file name).' }),
+    indexLock: msg({ id: 'workflow.form.neverOff.indexLock', defaultMessage: 'Combwork never deletes git’s index.lock.', description: 'A protection that stays on with every rule off. Keep index.lock (a file name).' }),
     folderGit: msg({ id: 'workflow.form.neverOff.folderGit', defaultMessage: 'No branch switch, pull or other git that changes the folder while an agent works there.', description: 'A protection that stays on with every rule off.' }),
     queue: msg({ id: 'workflow.form.neverOff.queue', defaultMessage: 'The merge queue moves a target branch only if nothing else moved it meanwhile.', description: 'A protection that stays on with every rule off (glossary 2.1: merge queue).' })
   },
   from: ORIGIN_TEXT,
-  inherit: msg({ id: 'workflow.form.inherit', defaultMessage: 'Inherit', description: 'A button beside a workflow option set for this project: stop setting it here, and use the workspace’s or Hive’s value.' }),
+  inherit: msg({ id: 'workflow.form.inherit', defaultMessage: 'Inherit', description: 'A button beside a workflow option set for this project: stop setting it here, and use the workspace’s or Combwork’s value.' }),
   inheritTip: msg({ id: 'workflow.form.inheritTip', defaultMessage: 'Use the inherited value: {value}', description: 'The tooltip of the Inherit button of a workflow option. {value} is the value it would have.' }),
   on: msg({ id: 'workflow.form.on', defaultMessage: 'On', description: 'A workflow option’s value: on.' }),
   off: msg({ id: 'workflow.form.off', defaultMessage: 'Off', description: 'A workflow option’s value: off.' }),
@@ -75,10 +75,10 @@ const T = {
   noChecks: msg({ id: 'workflow.form.noChecks', defaultMessage: 'No checks.', description: 'Under “Checks pass before review” when it has none.' }),
   folders: msg({ id: 'workflow.form.folders', defaultMessage: 'Folders and files, separated by commas', description: 'The placeholder of the field “What the work is” (folders and files left out).' }),
   carried: msg({ id: 'workflow.form.carried', defaultMessage: 'Agents’ old worktrees finish their current work first: {agents}. Then they work in slots too.', description: 'Under “Where cards are built” (G11) while agents still hold their worktrees from before 1.0 (#1441), kept until their current card or lane ends. {agents} is a list of agent names (glossary 2.5: slot).' }),
-  readOnly: msg({ id: 'workflow.form.readOnly', defaultMessage: '{agents} can’t be given review copies by their coding agent, so they review the builder’s folder read-only.', description: 'Under “Reviewers” (G17) when some reviewing agents use a coding agent that Hive can’t give review copies (folders at the exact revision, glossary 2.5: review copy). {agents} is a list of agent names.' }),
+  readOnly: msg({ id: 'workflow.form.readOnly', defaultMessage: '{agents} can’t be given review copies by their coding agent, so they review the builder’s folder read-only.', description: 'Under “Reviewers” (G17) when some reviewing agents use a coding agent that Combwork can’t give review copies (folders at the exact revision, glossary 2.5: review copy). {agents} is a list of agent names.' }),
   stageName: msg({ id: 'workflow.form.stageName', defaultMessage: 'Name of the stage {stage}', description: 'Accessible name of a stage’s name box under “Stage names” (glossary 2.2: stage). {stage} is its default name.' }),
   stageNamesValue: msg({ id: 'workflow.form.stageNamesValue', defaultMessage: '{n, plural, =0 {The default names} one {# stage renamed} other {# stages renamed}}', description: 'A value of “Stage names” in the list of what changes before saving workflow options, and in a preset’s preview (glossary 2.2: stage).' }),
-  fileLocksNote: msg({ id: 'workflow.form.fileLocksNote', defaultMessage: 'Applies to agents working in the same folder, outside a slot.', description: 'Under the workflow option “File locks”: a slot is a folder Hive lends to a card or its lane (glossary 2.5: slot), so agents in different slots never share a file.' }),
+  fileLocksNote: msg({ id: 'workflow.form.fileLocksNote', defaultMessage: 'Applies to agents working in the same folder, outside a slot.', description: 'Under the workflow option “File locks”: a slot is a folder Combwork lends to a card or its lane (glossary 2.5: slot), so agents in different slots never share a file.' }),
   loopsReadNote: msg({ id: 'workflow.form.loopsReadNote', defaultMessage: 'Read when a loop starts: a loop already running keeps its own, and one started with its own (“rounds: 5, wait: 2h”) keeps those.', description: 'Under the workflow options “Rounds” and “Wait (hours)” (Card loops), when a change applies. “rounds: 5, wait: 2h” is what the user types to an agent: keep it in English.' }),
   overMax: msg({ id: 'workflow.form.overMax', defaultMessage: 'This project has {count, plural, one {# agent} other {# agents}}: none is removed, but no agent can be added until it has fewer than {max, number}.', description: 'Under the workflow option “Maximum agents” (HI-2001) when the project already has more agents ({count}) than it is set to ({max}): nobody can add one (HI-2058), neither the user nor the Assistant.' }),
   stepWaitNote: msg({ id: 'workflow.form.stepWaitNote', defaultMessage: 'A design left unchecked longer shows its card as stalled; one already posted keeps its wait.', description: 'Under the workflow option “Design check wait (minutes)” (Card loops), when a change applies.' }),
@@ -95,7 +95,7 @@ const T = {
   pasteTitle: msg({ id: 'workflow.form.pasteTitle', defaultMessage: 'Paste Workflow Options', description: 'The title of the dialog pasting workflow options as JSON.' }),
   pasteMessage: msg({ id: 'workflow.form.pasteMessage', defaultMessage: 'Paste options copied from a project with the same version control. They replace the form’s, to save afterwards.', description: 'The message of the dialog pasting workflow options as JSON.' }),
   pasteApply: msg({ id: 'workflow.form.pasteApply', defaultMessage: 'Use These Options', description: 'The confirm button of the dialog pasting workflow options.' }),
-  pasteBad: msg({ id: 'workflow.form.pasteBad', defaultMessage: 'That isn’t workflow options copied from Hive.', description: 'An error pasting workflow options: the text isn’t the JSON Hive copies.' }),
+  pasteBad: msg({ id: 'workflow.form.pasteBad', defaultMessage: 'That isn’t workflow options copied from Combwork.', description: 'An error pasting workflow options: the text isn’t the JSON Combwork copies.' }),
   pastePlatform: msg({ id: 'workflow.form.pastePlatform', defaultMessage: 'These options are for another version control.', description: 'An error pasting workflow options: they were copied from a project with another version control.' }),
   cantSave: msg({ id: 'workflow.form.cantSave', defaultMessage: 'These options can’t be saved:', description: 'Above the reasons the workflow options can’t be saved, each a sentence of its own.' }),
   confirmTitle: msg({ id: 'workflow.form.confirmTitle', defaultMessage: 'Save Workflow Options', description: 'The title of the dialog before saving workflow options.' }),
@@ -119,7 +119,7 @@ const T = {
   heirs: msg({ id: 'workflow.form.heirs', defaultMessage: '{n, plural, one {This project inherits the change:} other {These # projects inherit the change:}}', description: 'In the dialog before saving workflow defaults, above the projects that use them (they don’t set the changed options themselves).' }),
   noHeirs: msg({ id: 'workflow.form.noHeirs', defaultMessage: 'No project inherits the change now: each sets these options itself, or none uses this version control.', description: 'In the dialog before saving workflow defaults, when no open project uses the changed options.' }),
   heir: msg({ id: 'workflow.form.heir', defaultMessage: 'Project {project}: {options}', description: 'A project inheriting a change of workflow defaults, in the dialog before saving them: its name, then the options that change for it, as a list.' }),
-  heirElsewhere: msg({ id: 'workflow.form.heirElsewhere', defaultMessage: 'Project {project} (workspace {workspace}): {options}', description: 'A project of another open workspace inheriting a change of Hive’s workflow defaults, in the dialog before saving them: its name, its workspace’s name, then the options that change for it, as a list.' }),
+  heirElsewhere: msg({ id: 'workflow.form.heirElsewhere', defaultMessage: 'Project {project} (workspace {workspace}): {options}', description: 'A project of another open workspace inheriting a change of Combwork’s workflow defaults, in the dialog before saving them: its name, its workspace’s name, then the options that change for it, as a list.' }),
   heirLanes: msg({ id: 'workflow.form.heirLanes', defaultMessage: '{n, plural, one {Its running lane keeps the old rules until it ends:} other {Its # running lanes keep the old rules until they end:}}', description: 'Under a project inheriting a change of workflow defaults, in the dialog before saving them, above a list of those lanes (glossary 2.1: old rules).' }),
   heirCards: msg({ id: 'workflow.form.heirCards', defaultMessage: '{n, plural, one {Its card in flight keeps the old rules:} other {Its # cards in flight keep the old rules:}}', description: 'Under a project inheriting a change of workflow defaults, in the dialog before saving them: its cards already started, listed below (glossary 2.1: old rules).' }),
   levelPlatform: msg({ id: 'workflow.form.levelPlatform', defaultMessage: 'Version control', description: 'Accessible name of the None · Git choice above workflow defaults: which version control’s defaults are shown (glossary 2.1).' }),
@@ -127,7 +127,7 @@ const T = {
   levelGit: msg({ id: 'workflow.form.levelGit', defaultMessage: 'Git', description: 'The choice of the defaults for Git projects (glossary 2.1: keep).' }),
   levelForNone: msg({ id: 'workflow.form.levelForNone', defaultMessage: 'The defaults of projects without version control.', description: 'Beside the None · Git choice above workflow defaults, while None is chosen.' }),
   levelForGit: msg({ id: 'workflow.form.levelForGit', defaultMessage: 'The defaults of Git projects.', description: 'Beside the None · Git choice above workflow defaults, while Git is chosen.' }),
-  changedMeanwhile: msg({ id: 'workflow.form.changedMeanwhile', defaultMessage: 'The workflow options changed meanwhile, so nothing was saved. They’re shown as they are now.', description: 'A notification: saving the Workflow section was refused because the options changed after it was read (in another window, or by the Hive Assistant); the section reloads them.' }),
+  changedMeanwhile: msg({ id: 'workflow.form.changedMeanwhile', defaultMessage: 'The workflow options changed meanwhile, so nothing was saved. They’re shown as they are now.', description: 'A notification: saving the Workflow section was refused because the options changed after it was read (in another window, or by the Combwork Assistant); the section reloads them.' }),
   loadFailed: msg({ id: 'workflow.form.loadFailed', defaultMessage: 'Couldn’t read the workflow options: {error}', description: 'An error showing Project Settings → Workflow. {error} says why.' })
 }
 
@@ -140,7 +140,7 @@ export const problemText = (p: WorkflowProblem): string => problemLines(p).join(
 
 /**
  * Where the editor's options come from and go to (#1422): a project's (the Version Control tab's Workflow section) or a
- * level's defaults (Hive's in Settings → Workflow defaults, the workspace's in Settings → Workspace). `key` scopes what
+ * level's defaults (Combwork's in Settings → Workflow defaults, the workspace's in Settings → Workspace). `key` scopes what
  * is shown: another source's read never shows.
  */
 export interface FormSource {
@@ -153,7 +153,7 @@ export interface FormSource {
 
 /** The JSON Copy as JSON gives: the version control, the preset and every option in force. */
 interface CopiedOptions {
-  hiveWorkflow: 1
+  combworkWorkflow: 1
   platform: WorkflowOptions['platform']
   preset: PresetId | null
   options: Partial<WorkflowOptions>
@@ -198,9 +198,9 @@ export function WorkflowOptionsForm({ project }: { project: ProjectInfo }) {
 }
 
 /**
- * A level's workflow defaults (#1422): Hive's (Settings → Workflow defaults) or the workspace's (Settings → Workspace),
+ * A level's workflow defaults (#1422): Combwork's (Settings → Workflow defaults) or the workspace's (Settings → Workspace),
  * for None or for Git, in the project form's editor: the same groups and checks, each option inheriting from the level
- * below (the workspace's from Hive's, Hive's from every rule off).
+ * below (the workspace's from Combwork's, Combwork's from every rule off).
  */
 export function WorkflowLevelForm({ level, onDirty }: { level: WorkflowLevel; onDirty?: (dirty: boolean) => void }) {
   const [platform, setPlatform] = useState<PlatformId>('git')
@@ -404,7 +404,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
   }
   const copy = (): void => {
     const { platform: p, ...options } = effective
-    const out: CopiedOptions = { hiveWorkflow: 1, platform: p, preset: draft.preset, options }
+    const out: CopiedOptions = { combworkWorkflow: 1, platform: p, preset: draft.preset, options }
     void navigator.clipboard.writeText(JSON.stringify(out, null, 2)).then(() => notify('success', tr(T.copied)))
   }
   const paste = async (): Promise<void> => {
@@ -422,7 +422,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
         } catch {
           v = null
         }
-        if (!v || v.hiveWorkflow !== 1 || !v.options || typeof v.options !== 'object') throw new Error(tr(T.pasteBad))
+        if (!v || v.combworkWorkflow !== 1 || !v.options || typeof v.options !== 'object') throw new Error(tr(T.pasteBad))
         if (v.platform !== platform) throw new Error(tr(T.pastePlatform))
         const change: WorkflowChange = { preset: v.preset ?? null, options: v.options }
         // Checked as a save would check it (OP-5): refused with its reasons, else it fills the form, to save.
@@ -530,14 +530,14 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
       case 'sameness':
         return select('sameness', [['change', tr(V.sameness.change)], ['exact', tr(V.sameness.exact)]])
       case 'finish':
-        // Hive merges since P5's queue (#1355).
-        return select('finish', [['hiveMerges', tr(V.finish.hiveMerges)], ['agentMerges', tr(V.finish.agentMerges)], ['committed', tr(V.finish.committed)], ['notChecked', tr(V.finish.notChecked)]])
+        // Combwork merges since P5's queue (#1355).
+        return select('finish', [['combworkMerges', tr(V.finish.combworkMerges)], ['agentMerges', tr(V.finish.agentMerges)], ['committed', tr(V.finish.committed)], ['notChecked', tr(V.finish.notChecked)]])
       case 'mergeInstall':
         return select('mergeInstall', [['onManifestChange', tr(V.mergeInstall.onManifestChange)], ['always', tr(V.mergeInstall.always)]])
       case 'style':
         return select('style', [['merge', tr(V.style.merge)], ['squash', tr(V.style.squash)], ['rebase', tr(V.style.rebase)]])
       case 'commitMessage':
-        return select('commitMessage', [['hive', tr(V.commitMessage.hive)], ['branch', tr(V.commitMessage.branch)]])
+        return select('commitMessage', [['combwork', tr(V.commitMessage.combwork)], ['branch', tr(V.commitMessage.branch)]])
       case 'folder':
         return select('folder', [['slots', tr(V.folder.slots)], ['project', tr(V.folder.project)]])
       case 'reviewerMode':
@@ -931,7 +931,7 @@ function SaveDetails({ changes, check, picked, title }: { changes: string[]; che
           <ul>
             {check.projects.map((h) => (
               <li key={h.path} data-heir={h.name}>
-                {/* Another workspace's project (Hive's level) says which: names repeat across workspaces. */}
+                {/* Another workspace's project (Combwork's level) says which: names repeat across workspaces. */}
                 {h.workspace.path.toLowerCase() === workspacePath.toLowerCase() ? tr(T.heir, { project: h.name, options: fmt.list(h.changed.filter((k): k is OptionKey => k !== 'platform').map(title)) }) : tr(T.heirElsewhere, { project: h.name, workspace: h.workspace.name, options: fmt.list(h.changed.filter((k): k is OptionKey => k !== 'platform').map(title)) })}
                 {/* Each lane and card by name (HR5's round 1), as a project's warning lists its own. */}
                 {h.lanes.length > 0 && (

@@ -1,0 +1,10 @@
+{
+  "finish.cancel.cardDone": {
+    "text": "its card reaching Done",
+    "note": "Who cancelled the Assistant's unread asks on a card that reached Done, as the delivery records it: cancelled by …"
+  },
+  "finish.journal.done": {
+    "text": "{card} \"{title}\" is Done ({how, select, queue {merged by the merge queue} reported {merged, reported by its builder} unchecked {reported merged by its builder, not checked} accepted {accepted} override {moved there by an override} other {moved there on the board}}), by {byUser, select, yes {You} other {{by}}}",
+    "note": "The journal's fact of a card reaching Done (HI-2014), the Assistant's to read. how: how it got there (FinishHow: queue, reported, unchecked, accepted, override, board). byUser: yes when the user moved it; by: else who did (an agent's name, or Combwork). Written once per finish: its summary and detail are the once-check's key, so it is always the Default's."
+  }
+}

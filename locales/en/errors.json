@@ -1,11 +1,11 @@
 {
   "errors.assistantUndo.gone": {
     "defaultMessage": "That change of the Assistant's is no longer kept: changes are kept for 7 days.",
-    "description": "An error: the user asked to undo a change the Hive Assistant made, but it is older than 7 days (or was never kept), so it can't be undone any more."
+    "description": "An error: the user asked to undo a change the Combwork Assistant made, but it is older than 7 days (or was never kept), so it can't be undone any more."
   },
   "errors.assistantUndo.which": {
     "defaultMessage": "Choose one change of the Assistant's to undo, or one message's changes.",
-    "description": "An error: the window asked to undo the Hive Assistant's changes without saying which: one change, or all the changes made for one of the user's messages."
+    "description": "An error: the window asked to undo the Combwork Assistant's changes without saying which: one change, or all the changes made for one of the user's messages."
   },
   "errors.changes.notFile": {
     "defaultMessage": "{file} isn't a file of {folder}.",
@@ -13,7 +13,7 @@
   },
   "errors.commands.otherWorkspace": {
     "defaultMessage": "This window shows another workspace now, so the commands you changed weren't saved.",
-    "description": "An error: the user changed a workspace's commands in Settings (HI-1954), and the window switched to another workspace before the change was saved, so Hive didn't save it into the wrong one."
+    "description": "An error: the user changed a workspace's commands in Settings (HI-1954), and the window switched to another workspace before the change was saved, so Combwork didn't save it into the wrong one."
   },
   "errors.console.hidden": {
     "defaultMessage": "The developer console is hidden: turn on Settings → Advanced → Show developer features.",
@@ -21,7 +21,7 @@
   },
   "errors.console.notRecording": {
     "defaultMessage": "Not a developer console recording",
-    "description": "Showing a developer console recording that isn't one of Hive's."
+    "description": "Showing a developer console recording that isn't one of Combwork's."
   },
   "errors.console.notSource": {
     "defaultMessage": "Not a developer console source this window can record",
@@ -29,7 +29,27 @@
   },
   "errors.console.sourcesList": {
     "defaultMessage": "The sources to watch must be a list.",
-    "description": "The developer console asked to watch sources in a form Hive doesn't take (a programming error, rarely seen)."
+    "description": "The developer console asked to watch sources in a form Combwork doesn't take (a programming error, rarely seen)."
+  },
+  "errors.cw.cantList": {
+    "defaultMessage": "Git couldn't list the files it tracks in .combwork.",
+    "description": "Listing the files of .combwork that git tracks failed. Keep \".combwork\" as it is."
+  },
+  "errors.cw.noRepo": {
+    "defaultMessage": "No git repository holds this project: exclude .combwork in the version control or sync service you use.",
+    "description": "Exclude .combwork from git: the project isn't in a git repository. Keep \".combwork\" as it is."
+  },
+  "errors.cw.notIgnored": {
+    "defaultMessage": "Git still doesn't ignore .combwork here: a rule in a .gitignore (a line starting with !) may bring it back. Combwork doesn't edit .gitignore files.",
+    "description": "Exclude .combwork from git: after excluding it, git still sees it. Keep \".combwork\", \".gitignore\" and \"!\" as they are."
+  },
+  "errors.dialects.notDialect": {
+    "defaultMessage": "{path} isn't a dialect file Combwork can change.",
+    "description": "An error in the Dialects view (HI-2444): the file asked for isn't one of the workspace's dialect files (or can't be reverted: it isn't shipped). {path} is its path in the dialects folder. Glossary: dialect."
+  },
+  "errors.dialects.pickAgain": {
+    "defaultMessage": "Choose the file to import again: the one chosen before has expired.",
+    "description": "An error in the Dialects view's Import (HI-2444): the file chosen earlier can no longer be used (too long ago, or chosen in another window). Glossary: dialect."
   },
   "errors.dialog.addMcp": {
     "defaultMessage": "Add an MCP server from a file",
@@ -47,6 +67,10 @@
     "defaultMessage": "Choose or create a folder for the new workspace",
     "description": "Title of Windows' folder picker for a new workspace."
   },
+  "errors.dialog.dialectFiles": {
+    "defaultMessage": "Dialect file",
+    "description": "The file type in Windows' file dialogs for dialect files (HI-2444, JSON). Glossary: dialect."
+  },
   "errors.dialog.exportBoard": {
     "defaultMessage": "Export Board to JSON: Choose a Folder",
     "description": "Title of Windows' folder picker for Export Board to JSON: the board's cards are saved as JSON files in a new folder inside the one chosen."
@@ -54,6 +78,10 @@
   "errors.dialog.exportBoardButton": {
     "defaultMessage": "Export Here",
     "description": "The button of Windows' folder picker for Export Board to JSON."
+  },
+  "errors.dialog.exportDialect": {
+    "defaultMessage": "Export Dialect File",
+    "description": "Title of Windows' save dialog in the Dialects view (HI-2444): where to write a dialect file. Glossary: dialect."
   },
   "errors.dialog.exportMetrics": {
     "defaultMessage": "Export Performance Metrics",
@@ -70,6 +98,10 @@
   "errors.dialog.importBenchmark": {
     "defaultMessage": "Import a Benchmark or Performance Export",
     "description": "Title of Windows' file picker in Performance → Compare."
+  },
+  "errors.dialog.importDialect": {
+    "defaultMessage": "Import a Dialect File",
+    "description": "Title of Windows' file picker in the Dialects view (HI-2444): a dialect file to add. Glossary: dialect."
   },
   "errors.dialog.importTemplate": {
     "defaultMessage": "Import a Template",
@@ -96,7 +128,7 @@
     "description": "The file type in Windows' file picker for a skill. Keep \".md\" and \".zip\" as they are."
   },
   "errors.dialog.templateFiles": {
-    "defaultMessage": "Hive template",
+    "defaultMessage": "Combwork template",
     "description": "The file type in Windows' file dialogs for templates."
   },
   "errors.dialog.useFolder": {
@@ -104,28 +136,16 @@
     "description": "Button of Windows' folder picker in Repair."
   },
   "errors.file.insideArchive": {
-    "defaultMessage": "Hive opens no files inside .asar archives.",
+    "defaultMessage": "Combwork opens no files inside .asar archives.",
     "description": "Refusal to open a file inside an Electron .asar archive. Keep \".asar\" as it is."
   },
   "errors.file.outsideWorkspace": {
-    "defaultMessage": "Hive can only read and write files inside the workspace, and the agents' instruction, memory and skill files.",
-    "description": "Refusal to open or save a file outside what Hive may touch."
-  },
-  "errors.hive.cantList": {
-    "defaultMessage": "Git couldn't list the files it tracks in .hive.",
-    "description": "Listing the files of .hive that git tracks failed. Keep \".hive\" as it is."
-  },
-  "errors.hive.noRepo": {
-    "defaultMessage": "No git repository holds this project: exclude .hive in the version control or sync service you use.",
-    "description": "Exclude .hive from git: the project isn't in a git repository. Keep \".hive\" as it is."
-  },
-  "errors.hive.notIgnored": {
-    "defaultMessage": "Git still doesn't ignore .hive here: a rule in a .gitignore (a line starting with !) may bring it back. Hive doesn't edit .gitignore files.",
-    "description": "Exclude .hive from git: after excluding it, git still sees it. Keep \".hive\", \".gitignore\" and \"!\" as they are."
+    "defaultMessage": "Combwork can only read and write files inside the workspace, and the agents' instruction, memory and skill files.",
+    "description": "Refusal to open or save a file outside what Combwork may touch."
   },
   "errors.image.not": {
     "defaultMessage": "Not an image",
-    "description": "Copy image: the file isn't an image Hive can read."
+    "description": "Copy image: the file isn't an image Combwork can read."
   },
   "errors.lane.builderRequired": {
     "defaultMessage": "A lane's builder is required",
@@ -145,15 +165,15 @@
   },
   "errors.log.notFullPath": {
     "defaultMessage": "The run reported its log without a full path: {path}",
-    "description": "Progress panel: a run gave its log as a relative path, which Hive won't open. {path} is that path."
+    "description": "Progress panel: a run gave its log as a relative path, which Combwork won't open. {path} is that path."
   },
   "errors.log.notText": {
-    "defaultMessage": "Hive opens only text logs and reports, not {file}: use Show in folder.",
-    "description": "Progress panel: a run's log isn't a text file, so Hive won't open it. {file} is its file name. \"Show in folder\" is the menu item beside it."
+    "defaultMessage": "Combwork opens only text logs and reports, not {file}: use Show in folder.",
+    "description": "Progress panel: a run's log isn't a text file, so Combwork won't open it. {file} is its file name. \"Show in folder\" is the menu item beside it."
   },
   "errors.merge.queueMerges": {
-    "defaultMessage": "Hive merges {card} through the merge queue. Merge it there, or choose Merge anyway in the Merge dialog.",
-    "description": "Refusal of a Merge of an agent's branch whose card Hive's merge queue merges (the dialog's state was out of date). {card} is the card's key. Merge anyway is a button: keep it as Hive shows it. Glossary 2.5: merge queue."
+    "defaultMessage": "Combwork merges {card} through the merge queue. Merge it there, or choose Merge anyway in the Merge dialog.",
+    "description": "Refusal of a Merge of an agent's branch whose card Combwork's merge queue merges (the dialog's state was out of date). {card} is the card's key. Merge anyway is a button: keep it as Combwork shows it. Glossary 2.5: merge queue."
   },
   "errors.mergeSlot.holdRequired": {
     "defaultMessage": "Which hold to release is required",
@@ -177,7 +197,7 @@
   },
   "errors.provider.unknown": {
     "defaultMessage": "Unknown provider \"{provider}\".",
-    "description": "A call named a coding-agent CLI this version of Hive doesn't know. {provider} is the id it gave."
+    "description": "A call named a coding-agent CLI this version of Combwork doesn't know. {provider} is the id it gave."
   },
   "errors.tips.notChange": {
     "defaultMessage": "Not a tips change.",

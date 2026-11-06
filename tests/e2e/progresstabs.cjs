@@ -44,7 +44,7 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
   cfg.settings.notifications = { ...cfg.settings.notifications, desktopNotifications: false, chimeEnabled: false }
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' })
 
   // --- First launch: the agents and the cards.
   let builder, reviewer
@@ -53,7 +53,7 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
   try {
     const page = await app.firstWindow()
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     await page.getByText('alpha', { exact: true }).first().click()
     builder = await lib.addAgent(inv, alpha, { name: 'B1' })
@@ -88,7 +88,7 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1400, height: 850 })
     await lib.appReady(page)
-    const inv = (ch, ...x) => page.evaluate(([ch2, y]) => window.hive.invoke(ch2, ...y), [ch, x])
+    const inv = (ch, ...x) => page.evaluate(([ch2, y]) => window.combwork.invoke(ch2, ...y), [ch, x])
     if ((await inv('workspace:get'))?.path?.toLowerCase() !== ws.toLowerCase()) await lib.openWorkspace(inv, page, ws)
     await page.getByText('alpha', { exact: true }).first().click()
     const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
@@ -102,8 +102,8 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
     const tokenOf = async (id) => {
       const sessionId = (await live(id))?.sessionId
       const launch = await until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
-      const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive : null
-      return hive ? JSON.parse(fs.readFileSync(hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token : null
+      const server = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
+      return server ? JSON.parse(fs.readFileSync(server.env.CW_API_TOKEN_FILE, 'utf8')).token : null
     }
     const [t1, tr] = [await tokenOf(builder.id), await tokenOf(reviewer.id)]
     const workspaceToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
@@ -334,12 +334,12 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
     check("…and its card in the lane's queue is waiting for you", !!(await until(async () => (await tabsLane.locator(`.progress-lane-queue-row[data-card="${a.number}"]`).getAttribute('data-state').catch(() => null)) === 'waiting', HUNG_MS)), await tabsLane.locator(`.progress-lane-queue-row[data-card="${a.number}"]`).getAttribute('data-state').catch(() => ''))
     await tabsLane.locator('.progress-lane-expand').click()
     await shoot('lanes-wait')
-    await inv('advanced:set', 'hive.lanes.waitYouMinutes', 1)
+    await inv('advanced:set', 'cw.lanes.waitYouMinutes', 1)
     // The bound a minute: marked once a minute has passed (a condition, bounded for a hung run).
     check('…past its bound (a minute, Settings → Advanced), the time is marked', !!(await until(async () => ((await tabsWaited.getAttribute('class').catch(() => '')) ?? '').includes('long'), 120_000)), await tabsWaited.textContent().catch(() => ''))
     await shoot('lanes-wait-long')
-    await inv('advanced:set', 'hive.lanes.waitYouMinutes', null)
-    // Six more lanes (solo, their builders started by Hive): seven in all, more than fit.
+    await inv('advanced:set', 'cw.lanes.waitYouMinutes', null)
+    // Six more lanes (solo, their builders started by Combwork): seven in all, more than fit.
     for (let i = 2; i <= 7; i++) {
       const bx = await lib.addAgent(inv, alpha, { name: `B${i}` })
       const card = await inv('tasks:create', { title: `Lane card ${i}`, project: 'alpha' })
@@ -444,7 +444,7 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
     source: o.source ?? 'agent',
     agentName: o.agentName ?? 'B1',
     ...(o.source === 'api' ? {} : { projectPath: alpha }),
-    ...(o.source === 'hive' ? { defaultName: 'mergeQueue' } : o.source === 'api' ? {} : { agentId: o.agentId ?? builder.id, provider: 'claude-code' }),
+    ...(o.source === 'combwork' ? { defaultName: 'mergeQueue' } : o.source === 'api' ? {} : { agentId: o.agentId ?? builder.id, provider: 'claude-code' }),
     ...(o.card ? { card: o.card, revision: o.revision ?? REV } : {}),
     ...(o.check ? { check: o.check } : {}),
     ...(o.copy ? { copy: o.copy } : {})
@@ -452,7 +452,7 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
   const R1 = { agentName: 'R1', agentId: reviewer.id }
   const REV2 = '0123e4979f1c2b3a4d5e6f708192a3b4c5d6e7f8'
   // The merge queue's runs as queueChecks.ts names them, "<key> · <check> · <revision>", with no check name of their own.
-  const queued = (card, label, revision = REV) => ({ card: card.number, title: `${card.key} · ${label} · ${revision.slice(0, 7)}`, command: `npm run ${label}`, revision, source: 'hive', agentName: 'Hive (merge queue)' })
+  const queued = (card, label, revision = REV) => ({ card: card.number, title: `${card.key} · ${label} · ${revision.slice(0, 7)}`, command: `npm run ${label}`, revision, source: 'combwork', agentName: 'Combwork (merge queue)' })
   const busy = [
     ran('b-unit', 1, 40, { card: b.number, title: 'unit', command: 'npm test' }),
     ran('b-review', 3, 20, { card: b.number, title: 'Review lint', command: 'npm run lint', copy: 'copy-7', ...R1 }),
@@ -480,7 +480,7 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
     page.on('pageerror', (e) => check('no page errors (busy Today)', false, e.message))
     await lib.fitWindow(app, page, { width: 1400, height: 850 })
     await lib.appReady(page)
-    const inv = (ch, ...x) => page.evaluate(([ch2, y]) => window.hive.invoke(ch2, ...y), [ch, x])
+    const inv = (ch, ...x) => page.evaluate(([ch2, y]) => window.combwork.invoke(ch2, ...y), [ch, x])
     if ((await inv('workspace:get'))?.path?.toLowerCase() !== ws.toLowerCase()) await lib.openWorkspace(inv, page, ws)
     const panel = page.locator('.progress-panel')
     if (!(await panel.count())) await page.locator('.progress-rail').click()
@@ -512,15 +512,15 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
     check(`${b.key}'s: 4 runs · all passed, with a pass's icon`, (await headText(b.number)) === `${b.key} | Lane hover | 4 runs · all passed` && (await head(b.number).locator('.progress-card-icon.codicon-pass').count()) === 1, await headText(b.number))
     const rows = (card) => group(card).locator('.progress-card-items > .progress-recent-item > .progress-recent, .progress-card-items > .progress-run-group > .progress-group-head')
     const lines = async (card) => Promise.all((await rows(card).all()).map((h) => lineOf(h)))
-    const aLines = ['Hive (merge queue) · lint, typecheck', 'B1 · final typecheck ×2 · all passed', 'B1 · cardloop on base c0ffee1', 'R1 · Review delivery typecheck', 'B1 · unit: 6 files ×3 · 2 failed, then passed']
+    const aLines = ['Combwork (merge queue) · lint, typecheck', 'B1 · final typecheck ×2 · all passed', 'B1 · cardloop on base c0ffee1', 'R1 · Review delivery typecheck', 'B1 · unit: 6 files ×3 · 2 failed, then passed']
     check(`${a.key}'s runs, a line each, newest first: the merge queue's checks in one, its key left out of a title`, JSON.stringify(await lines(a.number)) === JSON.stringify(aLines), JSON.stringify(await lines(a.number)))
     // The queue's titles carry the key and revision (HR6's round 1): opened, its runs name only their check.
-    await group(a.number).locator('.progress-run-group').filter({ hasText: 'Hive (merge queue)' }).locator('.progress-group-head').click()
+    await group(a.number).locator('.progress-run-group').filter({ hasText: 'Combwork (merge queue)' }).locator('.progress-group-head').click()
     const queueRuns = () => group(a.number).locator('.progress-group-runs .progress-recent-text').allTextContents()
     check("…opened, the queue's runs, newest first, each its check alone", !!(await until(async () => JSON.stringify(await queueRuns()) === JSON.stringify(['typecheck', 'lint', 'lint']), HUNG_MS)), JSON.stringify(await queueRuns()))
     const itemsText = await group(a.number).locator('.progress-card-items').innerText()
     check(`…no key nor revision in ${a.key}'s lines`, !itemsText.includes(a.key) && !itemsText.includes(REV.slice(0, 7)) && !itemsText.includes(REV2.slice(0, 7)), itemsText)
-    await group(a.number).locator('.progress-run-group').filter({ hasText: 'Hive (merge queue)' }).locator('.progress-group-head').click()
+    await group(a.number).locator('.progress-run-group').filter({ hasText: 'Combwork (merge queue)' }).locator('.progress-group-head').click()
     check('…one row shape: no line under a run, no copy name shown', (await group(a.number).locator('.progress-run-for').count()) === 0 && !/copy-5/.test(await group(a.number).innerText()))
     check('…the retries a warning (failed, then passed), the failed run a failure', (await group(a.number).locator('.progress-run-group').filter({ hasText: 'unit: 6 files' }).locator('.progress-group-head .codicon-warning').count()) === 1 && (await group(a.number).locator('.progress-recent-item[data-run="a-cardloop"] .progress-recent .codicon-error').count()) === 1)
     const reviewRow = group(a.number).locator('.progress-recent-item[data-run="a-review"] .progress-recent > .tip-wrap').first()

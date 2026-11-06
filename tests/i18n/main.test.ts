@@ -85,7 +85,7 @@ describe('the main area', () => {
     expect(reloadedMessage(3)).toBe('Agenci działają. Utracono zmiany w 3 plikach.')
     expect(finishedNotice([fin('site', 'B1'), fin('site', 'B2')]).title).toBe('2 agentów skończyło w site')
     setLanguage(PSEUDO_LANGUAGE, {})
-    const m = cantStartMessage('C:\\Hive')
+    const m = cantStartMessage('C:\\Combwork')
     expect([m.title, m.text].every((t) => t.startsWith('['))).toBe(true)
     expect(m.command).not.toMatch(/^\[/)
     expect(problems).toEqual([])

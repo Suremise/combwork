@@ -1,4 +1,4 @@
-// Where an agent works (#1434, SPEC §16.10.3): the folder contract every part of Hive uses, decided here only. Pure,
+// Where an agent works (#1434, SPEC §16.10.3): the folder contract every part of Combwork uses, decided here only. Pure,
 // over what main reads of a project's slots and leases (src/main/agentFolders.ts gathers it; the window reads the
 // answers main gives with each agent and session).
 //
@@ -91,7 +91,7 @@ export interface FolderSlot {
   folder: string
   /** slots.ts's SlotState. */
   state: string
-  /** Its block of ports (HIVE_SLOT_PORT_BASE). */
+  /** Its block of ports (CW_SLOT_PORT_BASE). */
   portBase: number
   /** The branch its lines merge into, when it has one (#1569: the base the Changes tab compares its work with). */
   target?: string | null

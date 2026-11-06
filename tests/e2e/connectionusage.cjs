@@ -27,10 +27,10 @@ const check = (name, ok, extra = '') => {
   fs.mkdirSync(userData, { recursive: true })
   const env = lib.fakeClaude(userData, home, [alpha])
   lib.gitProject(alpha)
-  fs.mkdirSync(path.join(alpha, '.hive'), { recursive: true })
-  fs.writeFileSync(path.join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One' }, { id: 'a-two', name: 'Two' }] }))
+  fs.mkdirSync(path.join(alpha, '.combwork'), { recursive: true })
+  fs.writeFileSync(path.join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One' }, { id: 'a-two', name: 'Two' }] }))
 
-  const { app, page, inv } = await lib.launch({ userData, env: { ...env, HIVE_TEST_CLI_HOME_CONNECTION: '0', HIVE_TEST_NOTIFY_LOG: notifyLog }, viewport: { width: 1400, height: 900 } })
+  const { app, page, inv } = await lib.launch({ userData, env: { ...env, CW_TEST_CLI_HOME_CONNECTION: '0', CW_TEST_NOTIFY_LOG: notifyLog }, viewport: { width: 1400, height: 900 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)
@@ -81,7 +81,7 @@ const check = (name, ok, extra = '') => {
     check('…and Max 2’s beside it: 5h 96% · Week 5%, warned', !!(await lib.until(async () => /Max 2.*5h 96%.*Week 5%/.test(await text(max2.id)), HUNG_MS)) && /\bwarn\b/.test((await item(max2.id).getAttribute('class')) ?? ''), await text(max2.id))
     check('…and no Claude Code-wide item', (await page.locator('.statusbar .status-item[data-plan]:not([data-plan-connection])').count()) === 0)
     const kept = await inv('app:connectionPlanUsage')
-    check('Hive keeps each connection’s figures apart, none as Claude Code’s', kept[max1.id]?.limits[0]?.usedPercent === 62 && kept[max2.id]?.limits[0]?.usedPercent === 96 && !(await inv('app:planUsage'))['claude-code'], JSON.stringify({ kept, cli: (await inv('app:planUsage'))['claude-code'] ?? null }))
+    check('Combwork keeps each connection’s figures apart, none as Claude Code’s', kept[max1.id]?.limits[0]?.usedPercent === 62 && kept[max2.id]?.limits[0]?.usedPercent === 96 && !(await inv('app:planUsage'))['claude-code'], JSON.stringify({ kept, cli: (await inv('app:planUsage'))['claude-code'] ?? null }))
     await item(max1.id).hover()
     const tip = page.locator('.tip', { hasText: 'Max 1 (Claude Code' })
     check('the item’s hover names the connection and its CLI', !!(await lib.until(async () => (await tip.count()) >= 1, HUNG_MS)))

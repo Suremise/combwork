@@ -1,4 +1,4 @@
-// What Hive says about unused worktrees (#353): shared by the window and its tests. Window text, in the language Hive
+// What Combwork says about unused worktrees (#353): shared by the window and its tests. Window text, in the language Combwork
 // shows (main's for lostLines, which main words for the removal's confirmation); reuseNote is also the Agent API's, so
 // it words its text in English unless given the window's tr().
 import type { UnusedWorktree, WorktreeReuse } from './types'
@@ -13,16 +13,16 @@ const M = {
   commitsNotOn: msg({ id: 'workspace.unused.commitsNotOn', defaultMessage: '{count, plural, one {# commit} other {# commits}} not on {known, select, yes {{into}} other {the main branch}}', description: "An unused worktree's state: commits on its branch that {into} (main) doesn't have." }),
   commitsNoBranch: msg({ id: 'workspace.unused.commitsNoBranch', defaultMessage: '{count, plural, one {# commit} other {# commits}} on no branch', description: "An unused worktree's state: commits only its detached HEAD has." }),
   changedFiles: msg({ id: 'workspace.unused.changedFiles', defaultMessage: '{count, plural, one {# changed file} other {# changed files}}', description: "An unused worktree's state: files changed and not committed." }),
-  notChecked: msg({ id: 'workspace.unused.notChecked', defaultMessage: "Hive couldn't check it", description: "An unused worktree's state when git couldn't say." }),
-  notMadeByHive: msg({ id: 'workspace.unused.notMadeByHive', defaultMessage: 'not made by Hive', description: 'Who made an unused worktree: something other than Hive (an agent\'s own git worktree add). Lower case: it follows its branch.' }),
-  was: msg({ id: 'workspace.unused.was', defaultMessage: 'was {agent}', description: "Who made an unused worktree: the Hive agent that worked in it ({agent}: its name). Lower case: it follows its branch." }),
-  madeByHive: msg({ id: 'workspace.unused.madeByHive', defaultMessage: 'made by Hive', description: 'Who made an unused worktree: Hive, for an agent no longer known. Lower case: it follows its branch.' }),
+  notChecked: msg({ id: 'workspace.unused.notChecked', defaultMessage: "Combwork couldn't check it", description: "An unused worktree's state when git couldn't say." }),
+  notMadeByCombwork: msg({ id: 'workspace.unused.notMadeByCombwork', defaultMessage: 'not made by Combwork', description: 'Who made an unused worktree: something other than Combwork (an agent\'s own git worktree add). Lower case: it follows its branch.' }),
+  was: msg({ id: 'workspace.unused.was', defaultMessage: 'was {agent}', description: "Who made an unused worktree: the Combwork agent that worked in it ({agent}: its name). Lower case: it follows its branch." }),
+  madeByCombwork: msg({ id: 'workspace.unused.madeByCombwork', defaultMessage: 'made by Combwork', description: 'Who made an unused worktree: Combwork, for an agent no longer known. Lower case: it follows its branch.' }),
   detached: msg({ id: 'workspace.unused.detached', defaultMessage: '(detached)', description: "An unused worktree with no branch (a detached HEAD), in the Changes tab's picker." }),
   pickMerged: msg({ id: 'workspace.unused.pickMerged', defaultMessage: 'merged, clean', description: "An unused worktree in the Changes tab's picker: merged and with no changes. Lower case." }),
   pickWork: msg({ id: 'workspace.unused.pickWork', defaultMessage: 'holds work', description: "An unused worktree in the Changes tab's picker: it holds work that is nowhere else. Lower case." }),
   pickNotChecked: msg({ id: 'workspace.unused.pickNotChecked', defaultMessage: 'not checked', description: "An unused worktree in the Changes tab's picker: git couldn't check it. Lower case." }),
   aboutUnused: msg({ id: 'workspace.changes.aboutUnusedShort', defaultMessage: 'Worktrees no agent of {project} works in: open one to see its changes and merge them, or remove it.', description: "The Changes tab's Unused worktrees page, at the top, in one sentence (#1314; its ⓘ says where they come from and what Remove does)." }),
-  aboutUnusedTip: msg({ id: 'workspace.changes.aboutUnusedTip', defaultMessage: "Kept when their agent was removed (by hand, or when a template's agents replaced it), or made outside Hive (by an agent's own git worktree add, say). Loading a template gives none of them to its agents.{known, select, yes { Those merged into {into} and clean can go with their branches; the others hold work that is nowhere else.} other {}}", description: "The ⓘ beside Unused worktrees' heading: where they come from and which can be removed. Keep git worktree add as it is; {into} is the main branch." }),
+  aboutUnusedTip: msg({ id: 'workspace.changes.aboutUnusedTip', defaultMessage: "Kept when their agent was removed (by hand, or when a template's agents replaced it), or made outside Combwork (by an agent's own git worktree add, say). Loading a template gives none of them to its agents.{known, select, yes { Those merged into {into} and clean can go with their branches; the others hold work that is nowhere else.} other {}}", description: "The ⓘ beside Unused worktrees' heading: where they come from and which can be removed. Keep git worktree add as it is; {into} is the main branch." }),
   aboutUnusedOne: msg({ id: 'workspace.changes.aboutUnusedOne', defaultMessage: "An unused worktree: everything on {branch} that isn't on {into}. Merge it, or go back to Unused worktrees to remove it.", description: "The Changes tab, over an unused worktree's changes. Unused worktrees is the page's name." }),
   aboutAgent: msg({ id: 'workspace.changes.aboutAgent', defaultMessage: "{agent}'s worktree: everything on {branch} since it left {base}. Merge… brings it into {base}.", description: "The Changes tab, over an agent's worktree's changes. Merge… is the button." }),
   aboutSlot: msg({ id: 'workspace.changes.aboutSlot', defaultMessage: '{is, select, carried {{agent} works in {name}, the slot kept for it} other {{agent} builds in {name}}}: {known, select, yes {everything on its branch since it left {base}.} other {what isn\'t committed there yet.}}', description: "The Changes tab, over the changes in the slot an agent works in (#1569): a slot it builds a card in, or the slot kept for it (its own worktree from before 1.0); {name} is the slot's name, such as slot-b; {base} the branch its work started from. Glossary: slot." }),
@@ -37,9 +37,9 @@ const M = {
   upTo: msg({ id: 'workspace.reuse.upTo', defaultMessage: 'reused {branch}, brought up to {base} at {commit}', description: 'After adding an agent: it works in an unused worktree again, brought up to {base} (main) at commit {commit}. Lower case: it follows the agent.' }),
   alreadyAt: msg({ id: 'workspace.reuse.alreadyAt', defaultMessage: 'reused {branch}, already at {base}', description: 'After adding an agent: it works in an unused worktree again, already up to {base} (main). Lower case: it follows the agent.' }),
   summary: msg({ id: 'workspace.unused.summary', defaultMessage: '{count, plural, one {# unused worktree} other {# unused worktrees}} ({merged, number} merged)', description: "The Overview's line on a project's unused worktrees." }),
-  kindSlot: msg({ id: 'workspace.unused.kind.slot', defaultMessage: 'free slot beyond the pool', description: "What an unused worktree is (#1450): one of Hive's slots, free and set up, beyond the number the project needs now. Lower case: a badge after its name." }),
-  kindDirtySlot: msg({ id: 'workspace.unused.kind.dirtySlot', defaultMessage: 'slot with changes, not lent', description: "What an unused worktree is (#1450): one of Hive's slots, left with uncommitted or untracked files and lent to no card. Lower case: a badge after its name." }),
-  kindCarried: msg({ id: 'workspace.unused.kind.carried', defaultMessage: "agent's old worktree, given up", description: "What an unused worktree is (#1450): an agent's 0.9 worktree Hive carried into the slots (a carried lease), whose lease has ended. Lower case: a badge after its name." }),
+  kindSlot: msg({ id: 'workspace.unused.kind.slot', defaultMessage: 'free slot beyond the pool', description: "What an unused worktree is (#1450): one of Combwork's slots, free and set up, beyond the number the project needs now. Lower case: a badge after its name." }),
+  kindDirtySlot: msg({ id: 'workspace.unused.kind.dirtySlot', defaultMessage: 'slot with changes, not lent', description: "What an unused worktree is (#1450): one of Combwork's slots, left with uncommitted or untracked files and lent to no card. Lower case: a badge after its name." }),
+  kindCarried: msg({ id: 'workspace.unused.kind.carried', defaultMessage: "agent's old worktree, given up", description: "What an unused worktree is (#1450): an agent's 0.9 worktree Combwork carried into the slots (a carried lease), whose lease has ended. Lower case: a badge after its name." }),
   kindHome: msg({ id: 'workspace.unused.kind.home', defaultMessage: 'retired home, no conversation left', description: "What an unused worktree is (#1450): an agent's old folder kept so its conversations could resume (a reviewer's old worktree, say), none of which can now. Lower case: a badge after its name." }),
   kindQueue: msg({ id: 'workspace.unused.kind.queue', defaultMessage: "merge queue's old folder, not needed now", description: "What an unused worktree is (#1644): a folder the merge queue tested merges in, kept after its last merge, which no merge waiting or card in progress needs now (the queue makes a new one when it does). Lower case: a badge after its name. Glossary: merge queue." }),
   workNotice: msg({ id: 'workspace.unused.workNotice', defaultMessage: "{count, plural, one {# unused worktree has} other {# unused worktrees have}} work that isn't on {known, select, yes {{into}} other {the main branch}}", description: "The Changes tab's notice on unused worktrees holding work." }),
@@ -59,12 +59,12 @@ export function unusedState(w: UnusedWorktree): string {
   return parts.length ? parts.join(' · ') : (c.reason ?? tr(M.notChecked))
 }
 
-/** Who made it, in a few words (#476): "was B4" (the Hive agent that worked there), "made by Hive", "not made by Hive". */
+/** Who made it, in a few words (#476): "was B4" (the Combwork agent that worked there), "made by Combwork", "not made by Combwork". */
 export function originLabel(w: Pick<UnusedWorktree, 'origin'>): string {
   const o = w.origin
   if (!o) return ''
-  if (o.madeBy === 'other') return tr(M.notMadeByHive)
-  return o.agentName ? tr(M.was, { agent: o.agentName }) : tr(M.madeByHive)
+  if (o.madeBy === 'other') return tr(M.notMadeByCombwork)
+  return o.agentName ? tr(M.was, { agent: o.agentName }) : tr(M.madeByCombwork)
 }
 
 /** Its name in lists (#1450): a slot's name (its branch after it, when it has one), else its branch, else "(detached)". */
@@ -73,7 +73,7 @@ export function unusedName(w: Pick<UnusedWorktree, 'branch' | 'slot'>): string {
   return w.branch ?? tr(M.detached)
 }
 
-/** What it is to Hive's pools, in a few words (#1450), or '' for a worktree no agent works in. */
+/** What it is to Combwork's pools, in a few words (#1450), or '' for a worktree no agent works in. */
 export function kindLabel(w: Pick<UnusedWorktree, 'kind'>): string {
   switch (w.kind) {
     case 'slot':
@@ -94,7 +94,7 @@ export function kindLabel(w: Pick<UnusedWorktree, 'kind'>): string {
 /** Whether it is one of the slot pool's (#1450): removed only by its guarded clean-up, never given to an agent. */
 export const isSlotRow = (w: Pick<UnusedWorktree, 'slot'>): boolean => !!w.slot
 
-/** One unused worktree in the Changes tab's picker (#476): "hive/b4 · was B4 · holds work", "slot-b · slot with changes, not lent · …". */
+/** One unused worktree in the Changes tab's picker (#476): "cw/b4 · was B4 · holds work", "slot-b · slot with changes, not lent · …". */
 export function unusedPickerLabel(w: UnusedWorktree): string {
   return [unusedName(w), kindLabel(w) || originLabel(w), tr(w.check.removable ? M.pickMerged : holdsWork(w) ? M.pickWork : M.pickNotChecked)].filter(Boolean).join(' · ')
 }
@@ -134,7 +134,7 @@ export function lostByRemoving(w: UnusedWorktree): string[] | null {
 
 /**
  * What adding an agent did about an unused worktree it could reuse (#456), as the dialog's notice and the Agent API's
- * reply say it: "reused hive/b4, brought up to main at 66ce11b", or why it made a new one. In English (the Agent API's,
+ * reply say it: "reused cw/b4, brought up to main at 66ce11b", or why it made a new one. In English (the Agent API's,
  * and the log's) unless given the window's tr().
  */
 export function reuseNote(r: WorktreeReuse, t?: Tr): string {

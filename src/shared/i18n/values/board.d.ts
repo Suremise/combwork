@@ -1,6 +1,6 @@
 // Generated from locales/en/board.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
-interface HiveMessageValues {
+interface CombworkMessageValues {
   'board.agent.folded': { agent: string | number; status: string | number }
   'board.agent.notRunning': undefined
   'board.agent.removed': { agent: string | number }
@@ -106,6 +106,8 @@ interface HiveMessageValues {
   'board.card.stageInProject': { project: string | number; stage: string | number }
   'board.card.stalled': { why: string | number }
   'board.card.stalledMark': undefined
+  'board.card.waitingMark': undefined
+  'board.card.waitingTip': { reason: string | number; by: string | number }
   'board.card.workspace': undefined
   'board.cards.count': { n: number }
   'board.chip.card': { card: string | number; title: string | number; decisions: number }
@@ -288,6 +290,8 @@ interface HiveMessageValues {
   'board.dialog.starting': undefined
   'board.dialog.titlePlaceholder': undefined
   'board.dialog.tryAgain': undefined
+  'board.dialog.waiting': undefined
+  'board.dialog.waitingPlaceholder': undefined
   'board.dialog.write': undefined
   'board.discard.answer': undefined
   'board.discard.changes': undefined
@@ -553,7 +557,9 @@ interface HiveMessageValues {
   'board.lanes.waitsFresh': { agent: string | number }
   'board.lanes.waitsLink': undefined
   'board.lanes.waitsPreparing': { slot: string | number }
+  'board.lanes.waitsSlotHeld': { slot: string | number; held: string; agent: string | number; broker: string | number; idle: string }
   'board.lanes.waitsStart': { card: string | number; why: string; agent: string | number }
+  'board.lanes.waitsStartHeld': { card: string | number; slot: string | number; held: string; agent: string | number; program: string | number; more: number; broker: string | number; idle: string }
   'board.leftOut.detail': { hasPaths: string; paths: string | number; card: string | number }
   'board.leftOut.include': { n: number }
   'board.leftOut.leave': { n: number }
@@ -561,7 +567,9 @@ interface HiveMessageValues {
   'board.leftOut.title': { card: string | number }
   'board.links.archivedTitle': { card: string | number; title: string | number; column: string | number }
   'board.links.title': { card: string | number; title: string | number; column: string | number }
+  'board.menu.clearWaiting': undefined
   'board.menu.delete': undefined
+  'board.menu.markWaiting': undefined
   'board.menu.moveTo': undefined
   'board.menu.nextRound': undefined
   'board.menu.open': undefined
@@ -602,6 +610,7 @@ interface HiveMessageValues {
   'board.progress.badgeRuns': { n: number }
   'board.progress.blocksReview': { card: string | number }
   'board.progress.cantShow': { agent: string | number }
+  'board.progress.combworkRun': undefined
   'board.progress.copied': { what: string }
   'board.progress.copiesRun': undefined
   'board.progress.copyCommand': undefined
@@ -615,7 +624,6 @@ interface HiveMessageValues {
   'board.progress.filterProject': undefined
   'board.progress.fold': undefined
   'board.progress.hideDetails': { run: string | number }
-  'board.progress.hiveRun': undefined
   'board.progress.inCopy': { copy: string | number }
   'board.progress.mergeQueue': undefined
   'board.progress.miniWaiting': { agent: string | number; run: string | number }
@@ -884,12 +892,12 @@ interface HiveMessageValues {
   'board.strip.count': { state: string; n: number }
   'board.strip.oneRun': { state: string }
   'board.strip.runs': { n: number; states: string | number }
+  'board.team.cw': undefined
   'board.team.endDetail': undefined
   'board.team.endFailed': { label: string | number }
   'board.team.endIt': undefined
   'board.team.endMessage': { agent: string | number; label: string | number; pid: string | number }
   'board.team.endTitle': undefined
-  'board.team.hive': undefined
   'board.team.install': undefined
   'board.team.item': { kind: string; agent: string | number; label: string | number; pid: string | number }
   'board.team.notParked': undefined
@@ -948,7 +956,7 @@ interface HiveMessageValues {
   'board.work.none': undefined
   'board.work.notRead': { note: string; why: string | number }
   'board.work.openFile': { path: string | number }
-  'board.work.outsideHive': undefined
+  'board.work.outsideCombwork': undefined
   'board.work.outsideRules': { rules: string | number }
   'board.work.overridden': undefined
   'board.work.preWorkflow': undefined

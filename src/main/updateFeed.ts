@@ -6,7 +6,7 @@ import { GitHubProvider } from 'electron-updater/out/providers/GitHubProvider'
 import { compareVersions } from '../shared/updates'
 
 /**
- * Hive's GitHub update feed (HI-2311). With pre-releases on, electron-updater (6.8.9, GitHubProvider.getLatestVersion)
+ * Combwork's GitHub update feed (HI-2311). With pre-releases on, electron-updater (6.8.9, GitHubProvider.getLatestVersion)
  * takes the channel from the running version's pre-release id: a running `-rc.n` is only offered a later `-rc.n` (never
  * the release, and with no later RC it says no version is published), and a running `-beta.n` skips every RC. So a
  * pre-release install with Include pre-releases on is offered the newest version newer by semver instead, whichever
@@ -52,7 +52,7 @@ export function withFirst(feed: string, tag: string): string {
 
 const isPrerelease = (v: string): boolean => /^v?\d+\.\d+\.\d+-/.test(v)
 
-export class HiveGitHubProvider extends GitHubProvider {
+export class CombworkGitHubProvider extends GitHubProvider {
   private readonly real: AppUpdater
   private readonly view: { on: boolean; version: string }
   /** While a pick is made: the feed already fetched, served again to electron-updater's code. */

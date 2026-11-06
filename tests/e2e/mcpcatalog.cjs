@@ -1,5 +1,5 @@
 // MCP catalogues (HI-545), in the window, from file:// catalogues on a throwaway share (no network: ours is off). The MCP
-// view's Catalogue lists each source as a category with the one-time note for a source Hive doesn't check; search and
+// view's Catalogue lists each source as a category with the one-time note for a source Combwork doesn't check; search and
 // the filter narrow it; a server's view shows its requirements checked; Install shows what it runs first and adds it
 // to the workspace added nowhere, its view opening for Add to…. A newer version is offered only after ↻ (the
 // catalogues aren't read otherwise), and Update says what changes and keeps the places it is added. Settings → MCP
@@ -28,8 +28,8 @@ const check = (name, ok, extra = '') => {
 /** Publishes demo at `version` (running `script`) and a server only macOS can run, as a file:// catalogue in `dir`. */
 function publish(dir, version, script, name = 'Test catalogue') {
   fs.mkdirSync(dir, { recursive: true })
-  const def = { description: 'A demo server', command: 'node', args: [`\${HIVE_MCP_DIR}/demo/${script}`] }
-  const zip = zipSync({ 'demo/hive-mcp.json': strToU8(JSON.stringify(def)), [`demo/${script}`]: strToU8(`// demo ${version}`) })
+  const def = { description: 'A demo server', command: 'node', args: [`\${CW_MCP_DIR}/demo/${script}`] }
+  const zip = zipSync({ 'demo/combwork-mcp.json': strToU8(JSON.stringify(def)), [`demo/${script}`]: strToU8(`// demo ${version}`) })
   const zipFile = path.join(dir, `demo-${version}.zip`)
   fs.writeFileSync(zipFile, zip)
   const z = { url: pathToFileURL(zipFile).href, sha256: crypto.createHash('sha256').update(zip).digest('hex'), size: zip.length }
@@ -40,8 +40,8 @@ function publish(dir, version, script, name = 'Test catalogue') {
 
 ;(async () => {
   for (const d of [userData, ws, share, share2]) fs.rmSync(d, { recursive: true, force: true })
-  fs.mkdirSync(path.join(proj, '.hive'), { recursive: true })
-  fs.mkdirSync(path.join(ws, '.hive', 'mcp'), { recursive: true })
+  fs.mkdirSync(path.join(proj, '.combwork'), { recursive: true })
+  fs.mkdirSync(path.join(ws, '.combwork', 'mcp'), { recursive: true })
   const source = publish(share, '1.0.0', 'server.js')
   const env = lib.fakeClaude(userData, path.join(lib.WORK, 'mcpcatalog-claude-home'), [proj])
   const cfgFile = path.join(userData, 'config.json')
@@ -61,7 +61,7 @@ function publish(dir, version, script, name = 'Test catalogue') {
       await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
     }
     // Installed as demo-cat: a local demo has the name (the clash below).
-    const installed = () => JSON.parse(fs.readFileSync(path.join(ws, '.hive', 'mcp', 'demo-cat.json'), 'utf8'))
+    const installed = () => JSON.parse(fs.readFileSync(path.join(ws, '.combwork', 'mcp', 'demo-cat.json'), 'utf8'))
     const cfgNow = () => JSON.parse(fs.readFileSync(cfgFile, 'utf8')).settings.mcpCatalogs
 
     // --- The Catalogue: a category per source, the one-time note, search and filter.
@@ -69,8 +69,8 @@ function publish(dir, version, script, name = 'Test catalogue') {
     await page.locator('[data-mcp-tab="catalogue"]').click()
     const row = (n) => page.locator(`.sidebar [data-catalog-server="${n}"]`)
     check('the Catalogue lists the source as a category with its servers', !!(await lib.until(async () => (await row('demo').count()) === 1 && (await row('mac-only').count()) === 1, HUNG_MS)) && (await page.locator('.sidebar .section-header', { hasText: 'Test catalogue' }).count()) === 1)
-    check("…with the note that Hive doesn't check its servers", (await page.locator('[data-catalog-unvetted]').count()) === 1)
-    check('…said once: remembered in Hive\'s settings', !!(await lib.until(async () => cfgNow().sources[0].noted === true, HUNG_MS)), JSON.stringify(cfgNow()))
+    check("…with the note that Combwork doesn't check its servers", (await page.locator('[data-catalog-unvetted]').count()) === 1)
+    check('…said once: remembered in Combwork\'s settings', !!(await lib.until(async () => cfgNow().sources[0].noted === true, HUNG_MS)), JSON.stringify(cfgNow()))
     check("mac-only says it can't run here", (await row('mac-only').innerText()).includes("Can't run here"))
     await page.locator('[data-catalog-filter]').selectOption('meets')
     check('Runs on this PC hides mac-only', !!(await lib.until(async () => (await row('mac-only').count()) === 0 && (await row('demo').count()) === 1, HUNG_MS)))
@@ -88,7 +88,7 @@ function publish(dir, version, script, name = 'Test catalogue') {
     await shots('catalogue')
     await detail.locator('[data-action="catalog-install"]').click()
     const ask = page.getByRole('dialog', { name: 'Install demo 1.0.0?' })
-    check('Install shows what it runs first, and its name', !!(await lib.until(async () => (await ask.count()) === 1, HUNG_MS)) && (await ask.innerText()).includes('Runs: node ${HIVE_MCP_DIR}/demo/server.js') && (await ask.locator('input').inputValue()) === 'demo', JSON.stringify(await page.getByRole('dialog').allInnerTexts()))
+    check('Install shows what it runs first, and its name', !!(await lib.until(async () => (await ask.count()) === 1, HUNG_MS)) && (await ask.innerText()).includes('Runs: node ${CW_MCP_DIR}/demo/server.js') && (await ask.locator('input').inputValue()) === 'demo', JSON.stringify(await page.getByRole('dialog').allInnerTexts()))
     await shots('install')
     await ask.getByRole('button', { name: 'Install', exact: true }).click()
     // The name is taken: Replace, or choose another (#550's Add).
@@ -98,7 +98,7 @@ function publish(dir, version, script, name = 'Test catalogue') {
     await lib.until(async () => (await ask.count()) === 1, HUNG_MS)
     await ask.locator('input').fill('demo-cat')
     await ask.getByRole('button', { name: 'Install', exact: true }).click()
-    check('installed under the other name, with where it came from; the local demo untouched', !!(await lib.until(async () => fs.existsSync(path.join(ws, '.hive', 'mcp', 'demo-cat.json')) && installed().catalog?.version === '1.0.0', HUNG_MS)) && fs.existsSync(path.join(ws, '.hive', 'mcp', 'demo-cat', 'server.js')) && !JSON.parse(fs.readFileSync(path.join(ws, '.hive', 'mcp', 'demo.json'), 'utf8')).catalog)
+    check('installed under the other name, with where it came from; the local demo untouched', !!(await lib.until(async () => fs.existsSync(path.join(ws, '.combwork', 'mcp', 'demo-cat.json')) && installed().catalog?.version === '1.0.0', HUNG_MS)) && fs.existsSync(path.join(ws, '.combwork', 'mcp', 'demo-cat', 'server.js')) && !JSON.parse(fs.readFileSync(path.join(ws, '.combwork', 'mcp', 'demo.json'), 'utf8')).catalog)
     const where = page.locator('.pane-body .row', { has: page.locator('.label', { hasText: /^demo-cat\s*$/ }) }).locator('.mcp-where')
     check('…its view opens on the Installed tab, added nowhere, with Add to…', !!(await lib.until(async () => (await where.innerText().catch(() => '')) === 'Not added anywhere' && (await page.locator('[data-action="mcp-places"]').count()) === 1, HUNG_MS)), await where.innerText().catch(() => ''))
 
@@ -107,7 +107,7 @@ function publish(dir, version, script, name = 'Test catalogue') {
     const places = page.getByRole('dialog', { name: 'Add demo-cat to…' })
     await places.getByRole('group', { name: 'Projects to add it to' }).getByRole('checkbox', { name: 'demo', exact: true }).check()
     await places.getByRole('button', { name: 'Save', exact: true }).click()
-    const projectMcp = () => JSON.parse(fs.readFileSync(path.join(proj, '.hive', 'project.json'), 'utf8')).mcp
+    const projectMcp = () => JSON.parse(fs.readFileSync(path.join(proj, '.combwork', 'project.json'), 'utf8')).mcp
     check('added to demo', !!(await lib.until(async () => (projectMcp().enabled ?? []).includes('demo-cat'), HUNG_MS)), JSON.stringify(projectMcp()))
     // Opening the Catalogue reads the catalogues; a search afterwards doesn't.
     await page.locator('[data-mcp-tab="catalogue"]').click()
@@ -120,7 +120,7 @@ function publish(dir, version, script, name = 'Test catalogue') {
     await row('demo').click()
     await page.locator('[data-action="catalog-update"]').click()
     const upd = page.getByRole('dialog', { name: 'Update demo from 1.0.0 to 1.1.0?' })
-    check('Update says where it is added and what changes', !!(await lib.until(async () => (await upd.count()) === 1, HUNG_MS)) && (await upd.innerText()).includes('Added in demo') && (await upd.innerText()).includes('+ Runs: node ${HIVE_MCP_DIR}/demo-cat/server2.js'), await upd.innerText().catch(() => ''))
+    check('Update says where it is added and what changes', !!(await lib.until(async () => (await upd.count()) === 1, HUNG_MS)) && (await upd.innerText()).includes('Added in demo') && (await upd.innerText()).includes('+ Runs: node ${CW_MCP_DIR}/demo-cat/server2.js'), await upd.innerText().catch(() => ''))
     await shots('update')
     await upd.getByRole('button', { name: 'Update', exact: true }).click()
     check('updated, and demo keeps it', !!(await lib.until(async () => installed().catalog?.version === '1.1.0', HUNG_MS)) && (projectMcp().enabled ?? []).includes('demo-cat') && String(installed().args?.[0]).includes('demo-cat/server2.js'), JSON.stringify([installed(), projectMcp()]))

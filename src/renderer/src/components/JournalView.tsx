@@ -22,7 +22,7 @@ import { Icon, IconButton, InfoTip, Markdown, SearchInput, Tooltip } from './ui'
 const KIND: Record<JournalKind, ReturnType<typeof msg>> = {
   decision: msg({ id: 'assistant.journal.kind.decision', defaultMessage: 'Decision', description: "A kind of entry in the Assistant's journal: something decided." }),
   plan: msg({ id: 'assistant.journal.kind.plan', defaultMessage: 'Plan', description: "A kind of journal entry: something planned." }),
-  event: msg({ id: 'assistant.journal.kind.event', defaultMessage: 'Event', description: 'A kind of journal entry: something that happened (Hive records lanes, merges and unexpected closes as events).' }),
+  event: msg({ id: 'assistant.journal.kind.event', defaultMessage: 'Event', description: 'A kind of journal entry: something that happened (Combwork records lanes, merges and unexpected closes as events).' }),
   incident: msg({ id: 'assistant.journal.kind.incident', defaultMessage: 'Incident', description: 'A kind of journal entry: something that went wrong.' }),
   insight: msg({ id: 'assistant.journal.kind.insight', defaultMessage: 'Insight', description: 'A kind of journal entry: something learned.' }),
   preference: msg({ id: 'assistant.journal.kind.preference', defaultMessage: 'Preference', description: 'A kind of journal entry: how the user likes things done.' }),
@@ -41,14 +41,14 @@ const IMPORTANCE = [
 ]
 
 const SOURCE: Record<JournalSource, ReturnType<typeof msg>> = {
-  assistant: msg({ id: 'assistant.journal.source.assistant', defaultMessage: 'The Assistant', description: 'Who wrote a journal entry: the Hive Assistant.' }),
-  hive: msg({ id: 'assistant.journal.source.hive', defaultMessage: 'Hive', description: "Who wrote a journal entry: Hive itself (its own facts: lanes, merges, unexpected closes). Hive's name stays as it is." })
+  assistant: msg({ id: 'assistant.journal.source.assistant', defaultMessage: 'The Assistant', description: 'Who wrote a journal entry: the Combwork Assistant.' }),
+  combwork: msg({ id: 'assistant.journal.source.cw', defaultMessage: 'Combwork', description: "Who wrote a journal entry: Combwork itself (its own facts: lanes, merges, unexpected closes). Combwork's name stays as it is." })
 }
 
 const M = {
   title: msg({ id: 'assistant.journal.title', defaultMessage: 'Journal', description: "The heading of the Assistant's journal browser (the Assistant view's main area)." }),
   digestsTitle: msg({ id: 'assistant.journal.digestsTitle', defaultMessage: 'Weekly Digests', description: "The heading of the journal browser showing only the Assistant's weekly digests." }),
-  titleTip: msg({ id: 'assistant.journal.titleTip', defaultMessage: "What the Assistant keeps in its journal in this workspace, and Hive's own facts (lanes, merges, unexpected closes), newest first. Open an entry to read it in full, correct it or delete it. It stays on this computer.", description: "The info tip of the journal browser's heading." }),
+  titleTip: msg({ id: 'assistant.journal.titleTip', defaultMessage: "What the Assistant keeps in its journal in this workspace, and Combwork's own facts (lanes, merges, unexpected closes), newest first. Open an entry to read it in full, correct it or delete it. It stays on this computer.", description: "The info tip of the journal browser's heading." }),
   refresh: msg({ id: 'assistant.journal.refresh', defaultMessage: 'Refresh', description: 'The journal browser: a button that reads the journal again.' }),
   search: msg({ id: 'assistant.journal.search', defaultMessage: 'Search the journal: summaries, details, why', description: "The journal browser's search box: what it searches (every word must be found)." }),
   filters: msg({ id: 'assistant.journal.filters', defaultMessage: 'Filters', description: "The accessible name of the journal browser's filters (kind, project, source, dates)." }),
@@ -57,8 +57,8 @@ const M = {
   allProjects: msg({ id: 'assistant.journal.allProjects', defaultMessage: 'All projects', description: "The journal browser's project filter: entries of every project and of the workspace." }),
   workspaceOnly: msg({ id: 'assistant.journal.workspaceOnly', defaultMessage: 'The workspace (no project)', description: "The journal browser's project filter: entries about the workspace as a whole, not one project." }),
   projectLabel: msg({ id: 'assistant.journal.projectLabel', defaultMessage: 'Project', description: "The accessible name of the journal browser's project filter." }),
-  allSources: msg({ id: 'assistant.journal.allSources', defaultMessage: 'Hive and the Assistant', description: "The journal browser's source filter: entries written by either." }),
-  sourceLabel: msg({ id: 'assistant.journal.sourceLabel', defaultMessage: 'Written by', description: "The accessible name of the journal browser's source filter (Hive or the Assistant), and a label in an entry's detail." }),
+  allSources: msg({ id: 'assistant.journal.allSources', defaultMessage: 'Combwork and the Assistant', description: "The journal browser's source filter: entries written by either." }),
+  sourceLabel: msg({ id: 'assistant.journal.sourceLabel', defaultMessage: 'Written by', description: "The accessible name of the journal browser's source filter (Combwork or the Assistant), and a label in an entry's detail." }),
   from: msg({ id: 'assistant.journal.from', defaultMessage: 'From', description: "The journal browser's first date filter: entries on or after this day." }),
   to: msg({ id: 'assistant.journal.to', defaultMessage: 'To', description: "The journal browser's second date filter: entries on or before this day." }),
   clearFilters: msg({ id: 'assistant.journal.clearFilters', defaultMessage: 'Clear Filters', description: "The journal browser: a button that empties the search and resets every filter." }),
@@ -79,11 +79,11 @@ const M = {
   timeline: msg({ id: 'assistant.journal.timeline', defaultMessage: 'Journal entries, newest first', description: "The journal timeline's accessible name." }),
   today: msg({ id: 'assistant.journal.today', defaultMessage: 'Today', description: "A day's heading in the journal timeline." }),
   yesterday: msg({ id: 'assistant.journal.yesterday', defaultMessage: 'Yesterday', description: "A day's heading in the journal timeline." }),
-  empty: msg({ id: 'assistant.journal.empty', defaultMessage: 'No entries yet. The Assistant writes decisions, plans and what it learns as it works, and Hive adds its own facts: lanes, merges, unexpected closes.', description: 'The journal browser when the journal has no entries.' }),
+  empty: msg({ id: 'assistant.journal.empty', defaultMessage: 'No entries yet. The Assistant writes decisions, plans and what it learns as it works, and Combwork adds its own facts: lanes, merges, unexpected closes.', description: 'The journal browser when the journal has no entries.' }),
   emptyDigests: msg({ id: 'assistant.journal.emptyDigests', defaultMessage: 'No weekly digests yet: the Assistant sums up each week in one.', description: 'The journal browser showing digests when there are none.' }),
   noMatch: msg({ id: 'assistant.journal.noMatch', defaultMessage: 'No entries match.', description: 'The journal browser when nothing matches the search and filters.' }),
   noWorkspace: msg({ id: 'assistant.journal.noWorkspace', defaultMessage: "Open a workspace to see its Assistant's journal.", description: 'The journal browser with no workspace open.' }),
-  off: msg({ id: 'assistant.journal.off', defaultMessage: "The journal is off: the Assistant doesn't write to it and Hive records nothing. What it has is kept, and you can still read, correct and delete it here.", description: 'A note at the top of the journal browser while the journal is off (Settings → Assistant → Journal).' }),
+  off: msg({ id: 'assistant.journal.off', defaultMessage: "The journal is off: the Assistant doesn't write to it and Combwork records nothing. What it has is kept, and you can still read, correct and delete it here.", description: 'A note at the top of the journal browser while the journal is off (Settings → Assistant → Journal).' }),
   turnOn: msg({ id: 'assistant.journal.turnOn', defaultMessage: 'Turn On', description: 'A button in the note that the journal is off: turns it on.' }),
   turnedOn: msg({ id: 'assistant.journal.turnedOn', defaultMessage: "Journal on: the Assistant's journal tools come with its next start.", description: 'A notice after the journal browser turned the journal on.' }),
   footer: msg({ id: 'assistant.journal.footer', defaultMessage: '{size} · {entries, plural, one {# entry} other {# entries}} · everyday entries kept {days, plural, one {# day} other {# days}} · {cap, select, none {no size cap} other {cap {cap} MB}}', description: "The journal browser's footer: its size on disk ({size}: \"1.2 MB\"), how many entries, how long everyday entries are kept, and the size cap in MB (none: no cap)." }),
@@ -341,7 +341,7 @@ export function JournalView({ digests }: { digests: boolean }) {
           <select className="select journal-source" aria-label={tr(M.sourceLabel)} value={filters.source} onChange={(e) => setFilters({ ...filters, source: e.target.value as Filters['source'] })}>
             <option value="">{tr(M.allSources)}</option>
             <option value="assistant">{tr(SOURCE.assistant)}</option>
-            <option value="hive">{tr(SOURCE.hive)}</option>
+            <option value="combwork">{tr(SOURCE.combwork)}</option>
           </select>
           <label className="journal-date">
             <span className="faint">{tr(M.from)}</span>
@@ -441,7 +441,7 @@ function groupByDay(rows: JournalRow[]): { day: string; label: string; rows: Jou
   return out
 }
 
-/** Who wrote an entry, as a small mark: the Assistant's own, or Hive's. */
+/** Who wrote an entry, as a small mark: the Assistant's own, or Combwork's. */
 function SourceMark({ source }: { source: JournalSource }) {
   const name = tr(SOURCE[source])
   return source === 'assistant' ? <AssistantMark className="journal-source-mark" title={name} /> : (

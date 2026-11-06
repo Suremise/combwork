@@ -1,25 +1,27 @@
+import { NOTICE_PREFIX } from './doorbell'
+import { agentMsg, say } from './agentText'
 import type { AppSettings, ProjectConfig, ProjectProviderConfig, ProviderId } from './types'
 import { DEFAULT_SETTINGS, projectAgents } from './defaults'
 import { isCliOwnMode } from './cliOwnMode'
 import { PROVIDERS } from './providers'
 
 /**
- * The Hive Assistant: one per workspace, its overseer. It runs like a project's agent (same terminal, hooks,
- * status, usage and quit handling) from a home folder Hive never lists as a project, .hive/assistant, and
+ * The Combwork Assistant: one per workspace, its overseer. It runs like a project's agent (same terminal, hooks,
+ * status, usage and quit handling) from a home folder Combwork never lists as a project, .combwork/assistant, and
  * works in the workspace folder. Settings → Assistant holds its defaults; the home's one agent holds the
  * workspace's own choices (Assistant Settings), over them.
  */
 
-/** The Assistant's home in a workspace's .hive folder. */
+/** The Assistant's home in a workspace's .combwork folder. */
 export const ASSISTANT_DIR = 'assistant'
 /** Its agent's id (the home's only agent). */
 export const ASSISTANT_AGENT_ID = 'assistant'
 export const ASSISTANT_NAME = 'Assistant'
-/** Where the workspace's modes are, in its .hive folder. */
+/** Where the workspace's modes are, in its .combwork folder. */
 export const MODES_DIR = 'modes'
 /**
  * Where they were until 0.9.3, when modes were called personas (#1084): moved to MODES_DIR as the workspace opens, and
- * still read while there is no MODES_DIR (an older Hive may make it again), in 0.9.3 only.
+ * still read while there is no MODES_DIR (an older version may make it again), in 0.9.3 only.
  */
 export const LEGACY_MODES_DIR = 'personas'
 /** The mode (a file in MODES_DIR) new conversations use unless Settings or the workspace chooses another (#259). */
@@ -27,17 +29,17 @@ export const DEFAULT_MODE = 'coordinator'
 
 export { RETIRED_PERSONAS } from './defaults'
 
-/** Hive's tools that only read: the Assistant uses them without being asked each time (the ones that write still ask). */
+/** Combwork's tools that only read: the Assistant uses them without being asked each time (the ones that write still ask). */
 export const ASSISTANT_TRUSTED_TOOLS = [
-  'hive_list_projects',
-  'hive_project_status',
-  'hive_session_usage',
-  'hive_list_shared_notes',
-  'hive_read_shared_note',
-  'hive_doc_outline',
-  'hive_read_section',
-  'hive_read_latest_handover',
-  'hive_list_skills'
+  'cw_list_projects',
+  'cw_project_status',
+  'cw_session_usage',
+  'cw_list_shared_notes',
+  'cw_read_shared_note',
+  'cw_doc_outline',
+  'cw_read_section',
+  'cw_read_latest_handover',
+  'cw_list_skills'
 ]
 
 /**
@@ -116,11 +118,14 @@ export function modeSummary(p: { summary?: string; body: string }): string {
 }
 
 /**
- * What Hive types into a running Assistant when the user switches its mode: the mode and its habits, marked as Hive's
- * (not a task), and always Hive's last sentence (never the file's): a mode can't change what the Assistant may do.
+ * What Combwork types into a running Assistant when the user switches its mode: the mode and its habits, marked as Combwork's
+ * (not a task), and always Combwork's last sentence (never the file's): a mode can't change what the Assistant may do.
  */
+const MODE_LINE = agentMsg({ id: 'notice.mode.chosen', text: 'Mode: {name} (chosen by the user). {summary} Your tools and permissions are unchanged.', note: "Typed into a running Assistant when the user switches its mode: name is the mode's name, summary its habits from the mode's file. The last sentence is always Combwork's: a mode can't change what the Assistant may do." })
+
 export function modeMessage(name: string, summary: string): string {
-  return `[Hive] Mode: ${name} (chosen by the user). ${summary.replace(/\s+/g, ' ').trim()} Your tools and permissions are unchanged.`
+  // agent-protocol: NOTICE_PREFIX, the fixed opening of Combwork's lines; the words are an agent message.
+  return `${NOTICE_PREFIX}${say(MODE_LINE, { name, summary: summary.replace(/\s+/g, ' ').trim() })}`
 }
 
 /** A new mode's description until the user writes one (the window shows it in its language while the file has it, #889). */
@@ -128,7 +133,7 @@ export const NEW_MODE_DESCRIPTION = 'What this mode is for, in one line.'
 
 /** A new mode's file: a header and a starting point for its instructions. */
 export function newModeText(name: string): string {
-  return `---\nname: ${name}\ndescription: ${NEW_MODE_DESCRIPTION}\nicon: 🐝\nsummary: |\n  Its habits in a few lines: what Hive tells the Assistant when you switch to it.\n---\n\nYou are in **${name}** mode.\n\nDescribe how the Assistant works in it: what it puts first, its habits and the shape of what it hands back.\n`
+  return `---\nname: ${name}\ndescription: ${NEW_MODE_DESCRIPTION}\nicon: 🐝\nsummary: |\n  Its habits in a few lines: what Combwork tells the Assistant when you switch to it.\n---\n\nYou are in **${name}** mode.\n\nDescribe how the Assistant works in it: what it puts first, its habits and the shape of what it hands back.\n`
 }
 
 /** A mode id from a name: lower case, words joined by hyphens. */

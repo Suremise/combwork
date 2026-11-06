@@ -6,7 +6,7 @@ import { writeMarkerFile } from '../src/main/lastRun'
 import type { RunMarker } from '../src/shared/unexpectedClose'
 import { tempDir } from './tempDir'
 
-const marker: RunMarker = { version: 1, pid: 42, startedAt: '2026-10-20T00:00:00.000Z', lastSeen: '2026-10-20T00:01:00.000Z', hive: '0.9.4', workspaces: [], agents: [], processes: [] }
+const marker: RunMarker = { version: 1, pid: 42, startedAt: '2026-10-20T00:00:00.000Z', lastSeen: '2026-10-20T00:01:00.000Z', app: '0.9.4', workspaces: [], agents: [], processes: [] }
 
 describe('the running marker (#1111)', () => {
   it('is written whole, compact, with no temp file left', async () => {
@@ -19,7 +19,7 @@ describe('the running marker (#1111)', () => {
     expect(readdirSync(dir)).toEqual(['running.json'])
   })
 
-  it('is not put back when the run ended while it was written (Hive quitting)', async () => {
+  it('is not put back when the run ended while it was written (Combwork quitting)', async () => {
     const dir = tempDir('run-marker-')
     const file = join(dir, 'running.json')
     expect(await writeMarkerFile(file, marker, () => false)).toBe(false)

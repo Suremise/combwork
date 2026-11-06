@@ -2,6 +2,7 @@ import { basename } from 'path'
 import { app } from 'electron'
 import { ORPHAN_NOTICE } from '../shared/advanced'
 import { commandText, filetimeMs, type ActivityProcess } from '../shared/activity'
+import { agentMsg, inDialectOf, say } from '../shared/agentText'
 import { NOTICE_PREFIX } from '../shared/doorbell'
 import { msg, tr } from '../shared/i18n'
 import { durationText } from '../shared/tasks'
@@ -21,7 +22,7 @@ import { createLogger, userText } from './logger'
  *
  * An orphan seen at two looks that has run for ORPHAN_MS is shown: Activity marks it (its CPU time too) with End It, a
  * notice says so once, and the agent is told once, at its next tool call or turn's end (inboxNotices), so it can end
- * it; Hive doesn't. Pause the team counts every orphan as not parked (teamParked.ts). ORPHAN_NOTICE turns off the notice
+ * it; Combwork doesn't. Pause the team counts every orphan as not parked (teamParked.ts). ORPHAN_NOTICE turns off the notice
  * and the agent's line.
  */
 
@@ -31,7 +32,7 @@ const log = createLogger('processes')
 export const ORPHAN_MS = 10 * 60_000
 /** How often running launches are looked at. */
 const POLL_MS = 30_000
-/** Test copies (unpackaged) shorten both: HIVE_TEST_ORPHAN_MS, HIVE_TEST_ORPHAN_POLL_MS. */
+/** Test copies (unpackaged) shorten both: CW_TEST_ORPHAN_MS, CW_TEST_ORPHAN_POLL_MS. */
 const testMs = (name: string, fallback: number): number => (!app.isPackaged && Number(process.env[name]) > 0 ? Number(process.env[name]) : fallback)
 
 /** A process of a launch's job as the host's "lineage" gives it: its parent's id, and that id's state now. */
@@ -142,11 +143,11 @@ let looking = false
 /** Starts looking (once, at start): every POLL_MS, only while a launch runs, never starting the job host. */
 export function startOrphanWatch(): void {
   if (timer || process.platform !== 'win32') return
-  timer = setInterval(() => void look(), testMs('HIVE_TEST_ORPHAN_POLL_MS', POLL_MS))
+  timer = setInterval(() => void look(), testMs('CW_TEST_ORPHAN_POLL_MS', POLL_MS))
   timer.unref?.()
 }
 
-/** Hive quitting. */
+/** Combwork quitting. */
 export function stopOrphanWatch(): void {
   if (timer) clearInterval(timer)
   timer = null
@@ -164,7 +165,7 @@ async function look(): Promise<void> {
     const now = Date.now()
     for (const launch of launches) {
       if (!(launch.runId in all)) continue
-      const { orphans, due } = lookAtLaunch(byLaunch.get(launch.runId) ?? new Map(), launch, parseLineage(all[launch.runId]), now, testMs('HIVE_TEST_ORPHAN_MS', ORPHAN_MS))
+      const { orphans, due } = lookAtLaunch(byLaunch.get(launch.runId) ?? new Map(), launch, parseLineage(all[launch.runId]), now, testMs('CW_TEST_ORPHAN_MS', ORPHAN_MS))
       // Named before any is shown (HR2's round 1): nothing reads a due orphan until its command line is known.
       const shown = due.length ? nameDue(due, (await launchProcessesNow(launch.runId)) ?? []) : []
       // Stopped meanwhile: its leftovers are listed as such.
@@ -246,8 +247,26 @@ export function orphanLinesFor(projectPath: string, agentId: string): string {
   const due = orphansOf(projectPath, agentId).filter((o) => o.shown && !o.told)
   if (!due.length) return ''
   for (const o of due) o.told = true
-  const each = due.map((o) => `pid ${o.pid} ${o.command ?? o.label ? `\`${cut(o.command ?? o.label ?? '', 200)}\`` : '(its command line could not be read)'} (running ${Math.round((Date.now() - (filetimeMs(o.created) ?? Date.now())) / 60_000)} min)`) // i18n-ignore: agent-facing (a hook notice to the agent)
-  return `${NOTICE_PREFIX}${due.length === 1 ? 'A process your command started is' : `${due.length} processes your commands started are`} still running with the shell that started ${due.length === 1 ? 'it' : 'them'} gone: ${each.join('; ')}. End ${due.length === 1 ? 'it' : 'them'} if not needed; Hive won't.` // i18n-ignore: agent-facing (a hook notice to the agent)
+  return inDialectOf({ projectPath, agentId }, () => {
+    const each = due.map((o) => {
+      const command = o.command ?? o.label
+      return say(T.process, { pid: String(o.pid), known: command ? 'yes' : 'no', command: command ? cut(command, 200) : '', min: String(Math.round((Date.now() - (filetimeMs(o.created) ?? Date.now())) / 60_000)) })
+    })
+    return NOTICE_PREFIX + say(T.running, { n: due.length, count: String(due.length), list: each.join('; ') })
+  })
+}
+
+const T = {
+  process: agentMsg({
+    id: 'notice.orphan.process',
+    text: 'pid {pid} {known, select, yes {`{command}`} other {(its command line could not be read)}} (running {min} min)',
+    note: 'One process an agent\'s command left running, in the orphan notice\'s list (HI-2111). pid: its process id; known: yes when its command line was read; command: that command line, cut to 200 characters; min: how many minutes it has run.'
+  }),
+  running: agentMsg({
+    id: 'notice.orphan.running',
+    text: '{n, plural, one {A process your command started is} other {{count} processes your commands started are}} still running with the shell that started {n, plural, one {it} other {them}} gone: {list}. End {n, plural, one {it} other {them}} if not needed; Combwork won\'t.',
+    note: 'After "[CW] ", at the agent\'s next tool call or turn\'s end: processes its commands started still run with their shell gone (HI-2111), told once; Combwork doesn\'t end them. n and count: how many; list: each process (notice.orphan.process), joined by "; ".'
+  })
 }
 
 /** For tests: a launch's orphans as a look would leave them (null: forgotten). */
@@ -258,5 +277,5 @@ export function setOrphansForTests(runId: string, orphans: Orphan[] | null): voi
 
 const M = {
   title: msg({ id: 'session.orphan.title', defaultMessage: '{agent} left {command} running for {time}', description: "A notice's title (HI-2111): a process an agent's command started is still running with the shell that started it gone. {agent} is the agent's name; {command} what the process runs, cut short; {time} how long it has run (\"12 min\")." }),
-  body: msg({ id: 'session.orphan.body', defaultMessage: 'Process {pid}: the shell that started it has exited. Activity lists it, with End It; the agent is told too.', description: "The notice that an agent left a process running (HI-2111). {pid} is its process id. Activity is a tab of Hive's; End It is a button there." })
+  body: msg({ id: 'session.orphan.body', defaultMessage: 'Process {pid}: the shell that started it has exited. Activity lists it, with End It; the agent is told too.', description: "The notice that an agent left a process running (HI-2111). {pid} is its process id. Activity is a tab of Combwork's; End It is a button there." })
 }

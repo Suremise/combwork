@@ -1,9 +1,9 @@
-// S28 (#1347, SPEC §16.9.3): two Hives merge into one repository at once, and one waits on the repository lock. Two
-// test Hives (their own profiles and ports) each have a project in the same repository: A's the main checkout, B's a
+// S28 (#1347, SPEC §16.9.3): two copies of Combwork merge into one repository at once, and one waits on the repository lock. Two
+// test copies (their own profiles and ports) each have a project in the same repository: A's the main checkout, B's a
 // linked worktree of it, so they share its common git dir and so its lock. A git hook holds A's merge (the lock taken)
-// until the test lets it go: B's merge waits, its window saying which Hive holds the repository, and merges once A's is
+// until the test lets it go: B's merge waits, its window saying which Combwork holds the repository, and merges once A's is
 // done. With B's wait (Settings → Advanced) cut to 1 s, B gives up, changing nothing and naming A. Dev build, fake tier.
-// Dev build only (#1580): each Hive's agent is a 0.9 worktree agent (agents:testLegacy, refused by a packaged build),
+// Dev build only (#1580): each Combwork's agent is a 0.9 worktree agent (agents:testLegacy, refused by a packaged build),
 // with a commit on its branch to merge (S28 isn't one of the packaged checks).
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -59,12 +59,12 @@ async function agentWithWork(inv, project, name) {
   fs.writeFileSync(path.join(alpha, '.git', 'hooks', 'pre-merge-commit'), `#!/bin/sh\necho started > "${slash(started)}"\nwhile [ -f "${slash(hold)}" ]; do sleep 0.1; done\nexit 0\n`)
   for (const p of [profileA, profileB]) lib.enableProviders(p)
 
-  const hives = []
+  const apps = []
   try {
-    const a = await lib.launch({ userData: profileA, env: { HIVE_API_PORT: lib.port(47844) } })
-    hives.push(a.app)
-    const b = await lib.launch({ userData: profileB, env: { HIVE_API_PORT: await freePort() } })
-    hives.push(b.app)
+    const a = await lib.launch({ userData: profileA, env: { CW_API_PORT: lib.port(47844) } })
+    apps.push(a.app)
+    const b = await lib.launch({ userData: profileB, env: { CW_API_PORT: await freePort() } })
+    apps.push(b.app)
     for (const [h, ws] of [[a, wsA], [b, wsB]]) {
       h.page.on('pageerror', (e) => check('no page errors', false, e.message))
       await lib.openWorkspace(h.inv, h.page, ws)
@@ -79,8 +79,8 @@ async function agentWithWork(inv, project, name) {
     const other = rev('other')
     let bDone = false
     const mergeB = b.inv('agents:merge', beta, two.id, { squash: false, message: 'Two into other', cleanup: false }).finally(() => (bDone = true))
-    const notice = b.page.locator('.toast', { hasText: 'Another Hive is merging into this repository (repolock-a)' })
-    check("B waits, and its window names A's Hive", !!(await lib.until(async () => (await notice.count()) > 0, HUNG_MS)), await b.page.locator('.toast').allInnerTexts().catch(() => []).then(String))
+    const notice = b.page.locator('.toast', { hasText: 'Another Combwork is merging into this repository (repolock-a)' })
+    check("B waits, and its window names A's Combwork", !!(await lib.until(async () => (await notice.count()) > 0, HUNG_MS)), await b.page.locator('.toast').allInnerTexts().catch(() => []).then(String))
     await b.page.screenshot({ path: path.join(lib.WORK, 'repolock-1-waiting.png') })
     check('…B has merged nothing meanwhile', !bDone && rev('other') === other)
     fs.rmSync(hold)
@@ -91,7 +91,7 @@ async function agentWithWork(inv, project, name) {
     check('…both merged', git(alpha, 'show', 'HEAD:One.txt') === 'One' && git(alpha, 'show', 'other:Two.txt') === 'Two')
 
     // 2. With B's wait cut to 1 s, B gives up while A holds the lock: nothing changed, A named.
-    await b.inv('advanced:set', 'hive.merge.lockWaitSeconds', 1)
+    await b.inv('advanced:set', 'cw.merge.lockWaitSeconds', 1)
     fs.writeFileSync(path.join(one.worktree.path, 'One.txt'), 'One again')
     git(one.worktree.path, 'commit', '-qam', 'One again')
     fs.writeFileSync(path.join(two.worktree.path, 'Two.txt'), 'Two again')
@@ -105,7 +105,7 @@ async function agentWithWork(inv, project, name) {
       (r) => `merged: ${JSON.stringify(r)}`,
       (e) => String(e?.message ?? e)
     )
-    check('B gives up after its wait, naming A, changing nothing', /Another Hive is merging into this repository \(repolock-a\)\. Nothing was changed/.test(refused) && rev('other') === before, refused)
+    check('B gives up after its wait, naming A, changing nothing', /Another Combwork is merging into this repository \(repolock-a\)\. Nothing was changed/.test(refused) && rev('other') === before, refused)
     fs.rmSync(hold)
     const ra2 = await mergeA2
     check("…A's merge isn't disturbed", ra2.ok && ra2.mergeCommit === rev('HEAD'), JSON.stringify(ra2))
@@ -115,7 +115,7 @@ async function agentWithWork(inv, project, name) {
     check('suite ran', false, e?.stack ?? String(e))
   } finally {
     fs.rmSync(hold, { force: true })
-    for (const app of hives) await app.close().catch(() => undefined)
+    for (const app of apps) await app.close().catch(() => undefined)
   }
   console.log(failed ? `\n${failed} FAILED` : '\nALL PASS')
   process.exit(failed ? 1 : 0)

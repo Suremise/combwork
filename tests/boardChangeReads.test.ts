@@ -6,7 +6,7 @@ import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import type { HiveEvent, TaskCard } from '../src/shared/types'
+import type { CombworkEvent, TaskCard } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
 /** A bound for a hung run (the waits are for conditions). */
@@ -36,7 +36,7 @@ vi.mock('../src/main/boardStore', async (original) => {
   }
 })
 
-const base = tempDir('hive-board-change-reads-')
+const base = tempDir('cw-board-change-reads-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -49,12 +49,12 @@ const { coalescing } = await import('../src/main/coalesce')
 const user = { kind: 'user' } as const
 const wsPath = join(base, 'ws')
 const alpha = join(wsPath, 'alpha')
-const tasksDir = join(wsPath, '.hive', 'tasks')
+const tasksDir = join(wsPath, '.combwork', 'tasks')
 const BOARD = 200
 let w: ReturnType<typeof createWorkspaceService>
 const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
 const COLUMNS = ['todo', 'doing', 'review', 'passed', 'done'] as const
-/** A card as Hive saves one, with a long description and comments: what a reader of heads must not parse. */
+/** A card as Combwork saves one, with a long description and comments: what a reader of heads must not parse. */
 const card = (n: number): Record<string, unknown> => ({
   number: n,
   title: `Card ${n}`,
@@ -87,8 +87,8 @@ const head = (c: TaskCard) => ({ number: c.number, title: c.title, project: c.pr
 
 beforeAll(async () => {
   for (const p of ['alpha', 'beta']) {
-    mkdirSync(join(wsPath, p, '.hive'), { recursive: true })
-    writeFileSync(join(wsPath, p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }, { id: 'a2', name: 'Reviewer' }] }))
+    mkdirSync(join(wsPath, p, '.combwork'), { recursive: true })
+    writeFileSync(join(wsPath, p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }, { id: 'a2', name: 'Reviewer' }] }))
   }
   // A board of 200 cards' files from before 0.9, a quarter archived: moved into the database as the board is first used.
   mkdirSync(tasksDir, { recursive: true })
@@ -160,7 +160,7 @@ describe('a board change reads no card documents for the fresh-start nudge (HI-1
     // The first look learns what is Done: no card's document read (the whole board, 200 here, before).
     const first = await readsOf(async () => {
       // Its handler starts the look as it is told (coalesced): waited for until it has run.
-      tellListeners({ type: 'tasks-changed', workspacePath: wsPath } as unknown as HiveEvent)
+      tellListeners({ type: 'tasks-changed', workspacePath: wsPath } as unknown as CombworkEvent)
       await looked()
     })
     expect(first).toBe(0)

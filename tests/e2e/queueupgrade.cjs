@@ -1,16 +1,16 @@
 // The merge queue after the 1.0 upgrade, in one session (#1621): a workspace whose board 0.9 left opens in the dev build,
 // read-only and asked first. Opening it, the steps that need a board taking writes (the merge queues, the cards' and
-// projects' ids and keys, ending reviews, archiving) skip it quietly: the log has no "no such table" nor "This board is
-// from Hive 0.9" from them. The user says Upgrade; then, with no restart, a card approved under "Hive merges" is merged
-// by the queue (Done, Integrated by Hive, the target at it). HI-1694: the window shows the upgrade and the steps after it
+// projects' ids and keys, ending reviews, archiving) skip it quietly: the log has no "no such table" nor its line that the
+// board is from 0.9 from them. The user says Upgrade; then, with no restart, a card approved under "Combwork merges" is merged
+// by the queue (Done, Integrated by Combwork, the target at it). HI-1694: the window shows the upgrade and the steps after it
 // as they go, nothing runs against the board meanwhile ("no such table", "readonly"), and the log times each step.
 // The first merge waits for the merge style and commit message, which the upgrade left to the user (HI-1697): asked under
 // For you, answered there (Squash, the branch's own message); then by a Workflow save; then through a crash after the
-// board records the choice and one inside its change, each started again (HIVE_TEST_MERGE_CHOICE_CRASH); then a card with
-// Hive's message.
+// board records the choice and one inside its change, each started again (CW_TEST_MERGE_CHOICE_CRASH); then a card with
+// Combwork's message.
 // The 0.9 board is written here as 0.9.3's schema steps made it (v1 `cards`, v2 `store_rows`: 0.9 is released, so they
 // are fixed), so no packaged 0.9 is needed. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
-// Dev build only (HI-1697): its crash cases end Hive at a merge choice's seam (HIVE_TEST_MERGE_CHOICE_CRASH), which a
+// Dev build only (HI-1697): its crash cases end Combwork at a merge choice's seam (CW_TEST_MERGE_CHOICE_CRASH), which a
 // packaged build ignores.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -29,15 +29,21 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 const until = (fn, ms) => lib.until(fn, ms, 200)
-const dbFile = path.join(fx.ws, '.hive', 'hive.db')
+const dbFile = path.join(fx.ws, '.combwork', 'combwork.db')
+// old-name: begin queueupgrade-inputs
+/** 0.9's schema_version column, as its board has it. */
+const OLD_VERSION_COL = 'hive_version'
+/** The log line of a step that ran against a 0.9 board (its text names the old release). */
+const OLD_BOARD_LINE = /This board is from Hive 0\.9/
+// old-name: end queueupgrade-inputs
 
-/** The workspace's board as Hive 0.9.3 left it: its two schema steps, no cards. */
+/** The workspace's board as 0.9.3 left it: its two schema steps, no cards. */
 function board09() {
   fs.mkdirSync(path.dirname(dbFile), { recursive: true })
   const db = new DatabaseSync(dbFile)
   try {
     db.exec(`
-      CREATE TABLE schema_version (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL, hive_version TEXT NOT NULL) STRICT;
+      CREATE TABLE schema_version (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL, ${OLD_VERSION_COL} TEXT NOT NULL) STRICT;
       CREATE TABLE cards (
         number     INTEGER PRIMARY KEY,
         doc        TEXT NOT NULL,
@@ -59,7 +65,7 @@ function board09() {
       CREATE TABLE store_meta (store TEXT NOT NULL, scope TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY (store, scope, key)) STRICT, WITHOUT ROWID;
     `)
     const at = new Date().toISOString()
-    const put = db.prepare('INSERT INTO schema_version (version, name, applied_at, hive_version) VALUES (?, ?, ?, ?)')
+    const put = db.prepare(`INSERT INTO schema_version (version, name, applied_at, ${OLD_VERSION_COL}) VALUES (?, ?, ?, ?)`)
     put.run(1, 'cards', at, '0.9.3')
     put.run(2, 'store_rows', at, '0.9.3')
   } finally {
@@ -80,7 +86,7 @@ function rows(sql, ...args) {
 /** The test profile's log as it is now. */
 const log = () => {
   try {
-    return fs.readFileSync(path.join(fx.userData, 'logs', 'hive.log'), 'utf8')
+    return fs.readFileSync(path.join(fx.userData, 'logs', 'combwork.log'), 'utf8')
   } catch {
     return ''
   }
@@ -91,10 +97,10 @@ const log = () => {
   board09()
   // The project as 0.9 left it: a project.json with no platform recorded (1.0 records it as it makes one), so the
   // upgrade gives it its options, and leaves its merge style and commit message to be asked (HI-1697).
-  fs.mkdirSync(path.join(fx.alpha, '.hive'), { recursive: true })
-  fs.writeFileSync(path.join(fx.alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
-  // Opened as the user opens it: the ask shows, nothing is pre-answered (no HIVE_TEST_BOARD_UPGRADE), options kept for after.
-  let h = await q.startHive(fx, { port: PORT, keepOptions: true })
+  fs.mkdirSync(path.join(fx.alpha, '.combwork'), { recursive: true })
+  fs.writeFileSync(path.join(fx.alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+  // Opened as the user opens it: the ask shows, nothing is pre-answered (no CW_TEST_BOARD_UPGRADE), options kept for after.
+  let h = await q.startCombwork(fx, { port: PORT, keepOptions: true })
   try {
     h.page.on('pageerror', (e) => check('no page errors', false, e.message))
     const ask = h.page.locator('.dialog', { hasText: ASK })
@@ -112,7 +118,7 @@ const log = () => {
     // board, takes all three events before it renders again, so a step it was told need not be painted.
     await h.page.evaluate(() => {
       const seen = (window.__opening = { told: [], shown: [] })
-      window.hive.onEvent((e) => e.type === 'workspace-progress' && seen.told.push(e.progress))
+      window.combwork.onEvent((e) => e.type === 'workspace-progress' && seen.told.push(e.progress))
       new MutationObserver(() => {
         const el = document.querySelector('.workspace-opening')
         const t = el?.innerText.replace(/\s+/g, ' ').trim()
@@ -130,16 +136,16 @@ const log = () => {
     const toldSteps = told.map((p) => p?.step ?? null)
     check("…the window told the upgrade's steps, with the workspace's name, then that they ended", toldSteps.join() === 'upgrade,adoption,slots,' && told.slice(0, 3).every((p) => p.name === name), JSON.stringify(told))
     const STEP_TEXT = { upgrade: 'Upgrading its board.', adoption: 'Adopting its cards and projects…', slots: "Adopting its agents' worktrees as slots…" }
-    check("…having shown each, as far as it was painted, under the workspace's name", shown.length > 0 && shown.every((s) => s.text.includes(`Upgrading ${name} to Hive 1.0`) && s.text.includes(STEP_TEXT[s.step] ?? '\0')), shown.map((s) => `${s.step}: ${s.text}`).join(' | '))
-    const skipped = log().split(/\r?\n/).filter((l) => /\[(WARN|ERROR)\]/.test(l) && /no such table|This board is from Hive 0\.9|readonly database|Could not save the performance metrics|bringing builders/.test(l))
-    check('while it waited, nothing failed on the read-only board (no "no such table", "readonly", nor "This board is from Hive 0.9")', skipped.length === 0, skipped.join(' | '))
+    check("…having shown each, as far as it was painted, under the workspace's name", shown.length > 0 && shown.every((s) => s.text.includes(`Upgrading ${name} to Combwork 1.0`) && s.text.includes(STEP_TEXT[s.step] ?? '\0')), shown.map((s) => `${s.step}: ${s.text}`).join(' | '))
+    const skipped = log().split(/\r?\n/).filter((l) => /\[(WARN|ERROR)\]/.test(l) && new RegExp(`no such table|${OLD_BOARD_LINE.source}|readonly database|Could not save the performance metrics|bringing builders`).test(l))
+    check('while it waited, nothing failed on the read-only board (no "no such table", "readonly", nor that the board is from 0.9)', skipped.length === 0, skipped.join(' | '))
     const timed = log().split(/\r?\n/).filter((l) => /schema step|\[workspace\] opening |upgraded the board/.test(l))
     check("the log times the upgrade's steps and the opening's (HI-1694)", timed.some((l) => /took \d+ schema step\(s\) in \d+ ms, its copy before them \d+ ms: .*sessions and deliveries in tables \d+ ms/.test(l)) && timed.some((l) => /upgraded the board of .* to 1\.0 \(from v2\) in \d+ ms/.test(l)) && timed.some((l) => /opening .*: slots took \d+ ms; \d+ ms in all/.test(l)), timed.join(' | '))
 
-    // No restart: "Hive merges" into integration, and a card approved now goes to the queue. The upgrade left the merge
+    // No restart: "Combwork merges" into integration, and a card approved now goes to the queue. The upgrade left the merge
     // style and commit message unchosen (HI-1697): the queue asks under For you before it merges, and merges as answered.
     await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { commitMessage: undefined }) })
-    const projectJson = () => JSON.parse(fs.readFileSync(path.join(fx.alpha, '.hive', 'project.json'), 'utf8'))
+    const projectJson = () => JSON.parse(fs.readFileSync(path.join(fx.alpha, '.combwork', 'project.json'), 'utf8'))
     check('the upgrade marked the project: its merge style and commit message are to be asked (a save keeping them keeps it)', projectJson().workflow?.mergeAsk === true, JSON.stringify(projectJson().workflow))
     let reviewer = await q.agent(fx, h, 'R1')
     check('the reviewer has its token', !!reviewer.token)
@@ -165,7 +171,7 @@ const log = () => {
     const integrated = (await h.facts(one.n)).find((f) => f.kind === 'Integrated')
     const msgOf = (ref = 'integration') => lib.git(fx.alpha, ['log', '-1', '--format=%B', ref]).trim()
     const parents = (ref = 'integration') => lib.git(fx.alpha, ['log', '-1', '--format=%P', ref]).trim().split(' ').length
-    check("…Integrated by Hive, the target at its result, one squashed commit with the branch's own message: no key, no trailer", integrated?.data?.by === 'hive' && integrated.data.result === q.head(fx) && parents() === 1 && msgOf() === 'After the upgrade', `${JSON.stringify(integrated)} / ${msgOf()}`)
+    check("…Integrated by Combwork, the target at its result, one squashed commit with the branch's own message: no key, no trailer", integrated?.data?.by === 'combwork' && integrated.data.result === q.head(fx) && parents() === 1 && msgOf() === 'After the upgrade', `${JSON.stringify(integrated)} / ${msgOf()}`)
     // The board records the choice first; project.json follows it (the upgrade's mark stays: the record answers it).
     const recorded = () => {
       const row = rows("SELECT value FROM board_meta WHERE key = 'workflow:alpha:mergeChoice'")[0]
@@ -176,8 +182,8 @@ const log = () => {
     const request = (await asked())?.data?.request
     check('…and the question answered as the user', (await h.facts(one.n)).some((f) => f.kind === 'Approval' && f.data?.request === request && f.actor === 'user'), JSON.stringify(await h.kinds(one.n)))
 
-    // The question again for each way the rest answers it: back to a merge commit and Hive's message (the choice made, an
-    // ordinary save), then Hive closed, the board's record removed (as before any answer), and Hive started again (with a
+    // The question again for each way the rest answers it: back to a merge commit and Combwork's message (the choice made, an
+    // ordinary save), then Combwork closed, the board's record removed (as before any answer), and Combwork started again (with a
     // crash seam, `crash`). The builder and reviewer rejoin each run.
     let builder = one.builder
     const unchosen = async (crash) => {
@@ -189,10 +195,10 @@ const log = () => {
       } finally {
         db.close()
       }
-      await startAgain(crash ? { HIVE_TEST_MERGE_CHOICE_CRASH: crash } : {})
+      await startAgain(crash ? { CW_TEST_MERGE_CHOICE_CRASH: crash } : {})
     }
     const startAgain = async (env = {}) => {
-      h = await q.startHive(fx, { port: PORT, keepOptions: true, env })
+      h = await q.startCombwork(fx, { port: PORT, keepOptions: true, env })
       reviewer = await q.rejoin(fx, h, reviewer)
       builder = await q.rejoin(fx, h, builder)
     }
@@ -210,7 +216,7 @@ const log = () => {
     /** What the choice must leave alone: the project's other options, as queueOptions set them. */
     const unrelated = () => {
       const o = projectJson().workflow?.options ?? {}
-      return o.finish === 'hiveMerges' && o.target === 'integration' && JSON.stringify(o.mergeChecks) === '["quick"]' && o.identity?.email === fx.identity.email
+      return o.finish === 'combworkMerges' && o.target === 'integration' && JSON.stringify(o.mergeChecks) === '["quick"]' && o.identity?.email === fx.identity.email
     }
 
     // The other way to answer (decision 3, HR5's round 1): a save in Version Control → Workflow, Squash with the branch's
@@ -222,13 +228,13 @@ const log = () => {
     check('…the save recorded the choice and closed the question', recorded()?.style === 'squash' && (await h.facts(three.n)).some((f) => f.kind === 'RequestClosed' && f.data?.request === three.request))
 
     // A crash after the board's commit, before project.json (the Assistant's design, HR5's round 3): the board has the
-    // choice, its file write pending; started again, Hive writes the file from it, and the queue merges as chosen.
+    // choice, its file write pending; started again, Combwork writes the file from it, and the queue merges as chosen.
     await unchosen('beforeFile')
     const four = await askedCard('Crash after the board', 'four.txt')
     let ended = false
     h.app.process().once('exit', () => (ended = true))
     void h.inv('workflow:chooseMerge', fx.alpha, { card: four.n, request: four.request, style: 'squash', commitMessage: 'branch' }).catch(() => {})
-    check('crash after the board: Hive ended at the seam', !!(await until(() => ended, HUNG_MS)))
+    check('crash after the board: Combwork ended at the seam', !!(await until(() => ended, HUNG_MS)))
     check('…the board has the choice, its file write pending; project.json still has a merge commit', recorded()?.style === 'squash' && recorded().pending === true && projectJson().workflow?.options?.style === 'merge', `${JSON.stringify(recorded())} / ${JSON.stringify(projectJson().workflow?.options)}`)
     await h.app.close().catch(() => {})
     await startAgain()
@@ -242,15 +248,15 @@ const log = () => {
     ended = false
     h.app.process().once('exit', () => (ended = true))
     void h.inv('workflow:chooseMerge', fx.alpha, { card: five.n, request: five.request, style: 'squash', commitMessage: 'branch' }).catch(() => {})
-    check('crash inside the board: Hive ended at the seam', !!(await until(() => ended, HUNG_MS)))
+    check('crash inside the board: Combwork ended at the seam', !!(await until(() => ended, HUNG_MS)))
     await h.app.close().catch(() => {})
     // Started again in German (HI-1733): the answer kept on the card as the user's comment is in their language.
-    await startAgain({ HIVE_LANG: 'de' })
-    // The crash is told in the corner ("Hive closed unexpectedly", for two minutes), beside other notices of the restart
+    await startAgain({ CW_LANG: 'de' })
+    // The crash is told in the corner ("Combwork closed unexpectedly", for two minutes), beside other notices of the restart
     // (resume the agent that was working…), any of which can lie over the card clicked below (HI-1989): the crash's seen,
     // then the corner's notices hidden.
     const notice = h.page.locator('.toasts .toast-title', { hasText: JSON.parse(fs.readFileSync(path.join(lib.ROOT, 'locales', 'de', 'main.json'), 'utf8'))['main.unexpectedClose.title'] })
-    check('…the crash told in the corner: Hive closed unexpectedly', !!(await until(async () => (await notice.count()) === 1, HUNG_MS)))
+    check('…the crash told in the corner: Combwork closed unexpectedly', !!(await until(async () => (await notice.count()) === 1, HUNG_MS)))
     await h.page.addStyleTag({ content: '.toasts { display: none !important; }' })
     const open = async () => !(await h.facts(five.n)).some((f) => (f.kind === 'Approval' || f.kind === 'RequestClosed') && f.data?.request === five.request)
     check('…nothing kept: no choice recorded, project.json as it was, the question still open, nothing merged', recorded() === null && projectJson().workflow?.options?.style === 'merge' && unrelated() && (await open()) && (await h.card(five.n))?.column !== 'done', `${JSON.stringify(recorded())} / ${JSON.stringify(projectJson().workflow?.options)}`)
@@ -261,7 +267,7 @@ const log = () => {
     const answer = (await h.facts(five.n)).find((x) => x.kind === 'Approval' && x.data?.request === five.request)
     check("…the answer, in German, as Version Control → Workflow names the options (HI-1733)", answer?.data?.note === german, JSON.stringify(answer?.data))
     // The board by its command, as the menu runs it (its button's name is German now).
-    if (!(await h.page.locator('.board').isVisible())) await h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'menu-command', command: 'view.board', args: [] })
+    if (!(await h.page.locator('.board').isVisible())) await h.app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'menu-command', command: 'view.board', args: [] })
     await until(async () => (await h.page.locator(`.task-card[data-task="${five.n}"]`).count()) === 1, HUNG_MS)
     await q.openByTitle(h.page, five.n)
     const comment = h.page.locator('.task-comment', { hasText: de['workflow.value.style.squash'] }).last()
@@ -270,12 +276,12 @@ const log = () => {
     await comment.screenshot({ path: path.join(fx.shots, 'queueupgrade-answer-de.png') })
     await h.page.keyboard.press('Escape')
 
-    // Hive's message again (the other option), still squashing: the next card lands as "KEY: title" with its trailers.
-    await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { style: 'squash', commitMessage: 'hive' }) })
+    // Combwork's message again (the other option), still squashing: the next card lands as "KEY: title" with its trailers.
+    await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { style: 'squash', commitMessage: 'combwork' }) })
     q.steer(fx, 'pass')
     const two = await q.approveBy(fx, h, builder, reviewer, 'With the key', { 'two.txt': 'two\n' })
     check('a card with the choice made is approved', Object.values(two.steps).every((s) => s.status === 200), JSON.stringify(two.steps))
-    check("…merged with no question: Hive's message, its key and trailers", !!(await until(async () => (await h.card(two.n))?.column === 'done', HUNG_MS)) && /^[A-Z][A-Z0-9]*-\d+: With the key\n\nHive-Card: [A-Z][A-Z0-9]*-\d+\nHive-Revision: /.test(msgOf()) && parents() === 1, msgOf())
+    check("…merged with no question: Combwork's message, its key and trailers", !!(await until(async () => (await h.card(two.n))?.column === 'done', HUNG_MS)) && /^[A-Z][A-Z0-9]*-\d+: With the key\n\nCombwork-Card: [A-Z][A-Z0-9]*-\d+\nCombwork-Revision: /.test(msgOf()) && parents() === 1, msgOf())
     const queueWarnings = log().split(/\r?\n/).filter((l) => /\[WARN\] \[queue\]/.test(l))
     check('…and the queue warned of nothing', queueWarnings.length === 0, queueWarnings.join(' | '))
   } catch (e) {

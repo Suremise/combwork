@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { writeFileSync } from 'fs'
 import { join } from 'path'
-import { B1, B2, commit, moved, R1, R2, refusedBy, setup, sh, type Env } from './harness'
+import { B1, B2, commit, GIT_HEAVY_MS, moved, R1, R2, refusedBy, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
 import { reconcile } from '../../src/main/workflow/reconcile'
 import { runCheck, blocks } from '../../src/main/workflow/checks'
@@ -78,7 +78,7 @@ describe('the agent merges with no review and no OK before merging (no Approved 
     moved(await e.wf.submit(c2.key, B1, { summary: 'x' }))
   })
 
-  it('a submit retrying a failed Hive merge also refuses an unread decision, before it or during it, and queues nothing (HI-2275)', async () => {
+  it('a submit retrying a failed Combwork merge also refuses an unread decision, before it or during it, and queues nothing (HI-2275)', async () => {
     const e = pair({}, { review: 'none', noSelfReview: false, mergeChecks: ['quick'] })
     let fail = true
     const q = e.queue({ runCheck: async () => (fail ? { ok: false, transient: true, output: 'network' } : { ok: true, output: '' }) })
@@ -106,7 +106,7 @@ describe('the agent merges with no review and no OK before merging (no Approved 
     fail = false
   })
 
-  it('a merge outside Hive while it waits in Active is found and makes it Done', async () => {
+  it('a merge outside Combwork while it waits in Active is found and makes it Done', async () => {
     const e = noReview()
     const { card } = await started(e)
     moved(await e.wf.submit(card.key, B1, { summary: 'done' }))
@@ -197,7 +197,7 @@ describe('workflow scenarios, Git', () => {
       commit(folder, { 'src/fix.txt': 'a follow-up\n' }, 'follow-up')
       await reconcile(e.wf, card)
       expect(e.wf.state(card)).toMatchObject({ stage: 'approved', stale: { approved: rev, why: 'change' } })
-      // Stale in Approved under Hive merges: Retry merge is refused, naming submit (not report merge) as the way on.
+      // Stale in Approved under Combwork merges: Retry merge is refused, naming submit (not report merge) as the way on.
       const r = refusedBy(await e.wf.retryMerge(card.key, 'just merge it'), 'move.notFromHere')
       expect(r.next).toBe('From Approved, use: submit.')
       expect(e.wf.movesFrom('approved', e.wf.rulesetOf(e.wf.store.card(card.id)), e.wf.state(card))).toEqual(['submit'])
@@ -231,7 +231,7 @@ describe('workflow scenarios, Git', () => {
       const write = e.wf.write.bind(e.wf)
       let raced = false
       e.wf.write = (async (...args: Parameters<typeof e.wf.write>) => {
-        if (!raced && args[2] === 'hive' && e.wf.state(card).stale && e.wf.state(card).head === rev) {
+        if (!raced && args[2] === 'combwork' && e.wf.state(card).stale && e.wf.state(card).head === rev) {
           raced = true
           sh(folder, 'reset', '-q', '--hard', other)
           await reconcile(e.wf, card)
@@ -312,7 +312,7 @@ describe('workflow scenarios, Git', () => {
       const write = e.wf.write.bind(e.wf)
       let raced = false
       e.wf.write = (async (...args: Parameters<typeof e.wf.write>) => {
-        if (!raced && args[2] === 'hive' && !e.wf.state(card).stale && e.wf.state(card).head === rev) {
+        if (!raced && args[2] === 'combwork' && !e.wf.state(card).stale && e.wf.state(card).head === rev) {
           raced = true
           sh(folder, 'reset', '-q', '--hard', other)
           await reconcile(e.wf, card)
@@ -369,7 +369,7 @@ describe('workflow scenarios, Git', () => {
       const e = pair()
       const { card } = await approved(e)
       const entry = e.wf.state(card).entries.at(-1)!
-      await e.wf.write(e.wf.store.card(card.id), e.wf.rulesetOf(e.wf.store.card(card.id)), 'hive', (w) => {
+      await e.wf.write(e.wf.store.card(card.id), e.wf.rulesetOf(e.wf.store.card(card.id)), 'combwork', (w) => {
         w.fact('IntegrationStarted', { entry: entry.id, expected: 'x', result: 'y' })
       })
       refusedBy(await e.wf.loopStep(card.key, B1, 'followUp', 'One more', reviewer), 'loop.followUpMerging')
@@ -473,7 +473,7 @@ describe('workflow scenarios, Git', () => {
   })
 
   it('S15: a commit authored with a personal email refuses submit with the fix', async () => {
-    const e = pair({}, { identity: { name: 'Hive Test', email: 'test@hive.invalid' } })
+    const e = pair({}, { identity: { name: 'Combwork Test', email: 'test@example.invalid' } })
     const card = e.wf.createCard({ title: 'Identity' })
     const s = await e.wf.start(card.key, B1)
     moved(s)
@@ -484,31 +484,31 @@ describe('workflow scenarios, Git', () => {
 
   it("HI-2266: G12 on, git config corrected after it was turned on: commits with git's identity now pass, the saved copy's are refused naming git's", async () => {
     // G12's saved copy is the old typo; git config (the Git tab) has the corrected identity, as the commits do.
-    const e = pair({}, { identity: { name: 'Old Typo', email: 'typo@hive.invalid' } })
+    const e = pair({}, { identity: { name: 'Old Typo', email: 'typo@example.invalid' } })
     const card = e.wf.createCard({ title: 'Identity' })
     const s = await e.wf.start(card.key, B1)
     moved(s)
     const folder = s.data!.folder as string
-    commit(folder, { 'x.txt': 'x\n' }, 'old', { email: 'typo@hive.invalid' })
+    commit(folder, { 'x.txt': 'x\n' }, 'old', { email: 'typo@example.invalid' })
     const r = refusedBy(await e.wf.submit(card.key, B1, { summary: 'x' }), 'submit.identity')
-    expect(r.message).toContain('(test@hive.invalid)')
+    expect(r.message).toContain('(test@example.invalid)')
     sh(folder, 'commit', '-q', '--amend', '--no-edit', '--reset-author')
     moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
   })
 
   it('HI-2266: the guard reads git each time: an identity changed in git config between submissions is the one expected', async () => {
-    const e = pair({}, { identity: { name: 'Hive Test', email: 'test@hive.invalid' } })
+    const e = pair({}, { identity: { name: 'Combwork Test', email: 'test@example.invalid' } })
     const card = e.wf.createCard({ title: 'Identity' })
     const s = await e.wf.start(card.key, B1)
     moved(s)
     commit(s.data!.folder as string, { 'x.txt': 'x\n' }, 'as configured')
-    sh(e.project, 'config', 'user.email', 'new@hive.invalid')
+    sh(e.project, 'config', 'user.email', 'new@example.invalid')
     const r = refusedBy(await e.wf.submit(card.key, B1, { summary: 'x' }), 'submit.identity')
-    expect(r.message).toContain('(new@hive.invalid)')
+    expect(r.message).toContain('(new@example.invalid)')
   })
 
   it('HI-2266: G12 on with a saved copy, git with no identity for the project: refused as missing, never compared with the copy', async () => {
-    const e = pair({}, { identity: { name: 'Hive Test', email: 'test@hive.invalid' } })
+    const e = pair({}, { identity: { name: 'Combwork Test', email: 'test@example.invalid' } })
     const card = e.wf.createCard({ title: 'Identity' })
     const s = await e.wf.start(card.key, B1)
     moved(s)
@@ -523,8 +523,8 @@ describe('workflow scenarios, Git', () => {
   it('S16: an agent moving a card to Done is refused with the intent; the user drags it with no merge → asked, override recorded', async () => {
     const e = pair()
     const { card } = await started(e)
-    // Pair: Hive merges it, so the refusal names the queue (#1354) rather than an intent the agent can't use.
-    const r = refusedBy(await e.wf.agentColumnMove(card.key, B1, 'done'), 'merge.hiveMerges')
+    // Pair: Combwork merges it, so the refusal names the queue (#1354) rather than an intent the agent can't use.
+    const r = refusedBy(await e.wf.agentColumnMove(card.key, B1, 'done'), 'merge.combworkMerges')
     expect(r.next).toBe('Once it is approved, the merge queue merges it and moves it to Done: wait for that, or for it to come back.')
     const ask = await e.wf.move(card.key, 'done', 'user')
     expect(ask).toMatchObject({ ask: true })
@@ -545,7 +545,7 @@ describe('workflow scenarios, Git', () => {
     moved(await e.wf.startReview(other.key, R1))
   })
 
-  it('S17: the agent merges, Hive checks: a reported merge not in the target is refused', async () => {
+  it('S17: the agent merges, Combwork checks: a reported merge not in the target is refused', async () => {
     const e = agentMerges()
     const { card, folder } = await approved(e)
     const r = refusedBy(await e.wf.reportMerge(card.key, B1), 'done.contained')
@@ -579,7 +579,7 @@ describe('workflow scenarios, Git', () => {
     expect(blocks(e.wf, card, run)).toBe('review')
     const r = refusedBy(await e.wf.submit(card.key, B1, { summary: 'x' }), 'submit.checksPassed')
     expect(r.message).toMatch(/^Review refused: lint hasn't passed on [0-9a-f]{7}\.$/)
-    expect(r.next).toBe(`Run hive-progress --check lint --card ${card.key}, then submit again.`)
+    expect(r.next).toBe(`Run cw-progress --check lint --card ${card.key}, then submit again.`)
     const green = await runCheck(e.wf, { card, name: 'lint', by: 'B1', exec: async () => ({ ok: true }) })
     expect(green).toMatchObject({ counted: true, result: 'passed' })
     moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
@@ -589,7 +589,7 @@ describe('workflow scenarios, Git', () => {
     const e = pair({}, { preChecks: ['lint'], commands: { lint: 'npm run lint' } })
     const { card, folder } = await started(e)
     const revision = sh(folder, 'rev-parse', 'HEAD')
-    const command = `hive-progress --check lint --card ${card.key}`
+    const command = `cw-progress --check lint --card ${card.key}`
     const ran = async (data: Partial<FactData['CheckRan']>) => {
       const s = e.wf.state(card)
       await e.wf.write(card, e.wf.rulesetOf(card, s), 'agent:B1', (w) => w.fact('CheckRan', { name: 'lint', command: 'npm run lint', revision, tested: revision, result: 'passed', run: `run-${Math.random()}`, durationMs: 800, by: 'B1', counted: false, ...data }))
@@ -617,7 +617,7 @@ describe('workflow scenarios, Git', () => {
   })
 
   it('#1651: a passed check whose record is still being written when submit comes is waited for: accepted the first time', async () => {
-    // The check's command ends only once the submit waits for the project's check records (as hive-progress exits
+    // The check's command ends only once the submit waits for the project's check records (as cw-progress exits
     // before its run's CheckRan is written): without the wait the submit reads no passed lint and is refused.
     let release: () => void = () => undefined
     const gate = new Promise<void>((r) => (release = r))
@@ -666,7 +666,9 @@ describe('workflow scenarios, Git', () => {
     expect(await e.wf.move(other.key, 'review', 'user')).toMatchObject({ refused: true, rule: 'move.noStage' })
   })
 
-  it('S41: a card just started is never Done by observation; part of an Active card\'s work merged by hand is a mark; a Review card merged by hand → Done outside the rules', async () => {
+  // GIT_HEAVY_MS (HI-2453's decision, HI-2025's rule): three cards started in folders of their own, two merged by hand and
+  // each reconciled, 52 git processes, 7.9 s alone with no wait between them; past 20 s in HI-2499's run of 353 files.
+  it('S41: a card just started is never Done by observation; part of an Active card\'s work merged by hand is a mark; a Review card merged by hand → Done outside the rules', { timeout: GIT_HEAVY_MS }, async () => {
     const e = pair()
     const fresh = e.wf.createCard({ title: 'Just started' })
     moved(await e.wf.start(fresh.key, B1))
@@ -726,7 +728,9 @@ describe('workflow scenarios, Git', () => {
     expect(e.wf.state(card).stale?.why).toBe('change')
   })
 
-  it('S5 (Git): a decision wakes builder and reviewer; the verdict waits for it; after a pass it returns the card to Review; a submit on its way is refused', async () => {
+  // GIT_HEAVY_MS (HI-2453's decision, HI-2025's rule): two cards started, one submitted, reviewed and passed twice, 60 git
+  // processes, 8.2 s alone with no wait between them; past 20 s in HI-2499's run of 353 files (3 workers).
+  it('S5 (Git): a decision wakes builder and reviewer; the verdict waits for it; after a pass it returns the card to Review; a submit on its way is refused', { timeout: GIT_HEAVY_MS }, async () => {
     const e = pair()
     const { card } = await started(e)
     // The reviewer to wake is the card's lane's (#1291).
@@ -871,7 +875,7 @@ describe('a pass covers only the revision submitted; a stale pass says so (HI-17
     moved(await e.wf.loopStep(card.key, R1, 'ok', 'Checked', { ...reviewer, design: (posted as { data?: Record<string, unknown> }).data?.design as string }))
     const r = refusedBy(await e.wf.verdict(card.key, R1, { pass: true, comment: 'good' }), 'review.headMoved')
     expect(r.message).toBe(`${card.key}'s line has moved since it was submitted: it was submitted at ${submitted.slice(0, 7)}, and its head is now ${now.slice(0, 7)}, a different change. A pass covers only the revision submitted.`)
-    expect(r.next).toBe(`A commit you asked for: ask its builder to submit ${now.slice(0, 7)} as a follow-up (hive_request_builder), which keeps it in Review with no round counted, then start your review again. Otherwise give a failing verdict saying so (hive_verdict, pass: false), and its builder submits it as the next round.`)
+    expect(r.next).toBe(`A commit you asked for: ask its builder to submit ${now.slice(0, 7)} as a follow-up (cw_request_builder), which keeps it in Review with no round counted, then start your review again. Otherwise give a failing verdict saying so (cw_verdict, pass: false), and its builder submits it as the next round.`)
     // Nothing silent: still in Review, no pass, no Stale, nothing queued.
     expect(e.wf.state(card)).toMatchObject({ stage: 'review', stale: null, verdicts: [] })
     expect(await e.queue().runOnce('main')).toBeNull()
@@ -906,9 +910,9 @@ describe('a pass covers only the revision submitted; a stale pass says so (HI-17
     const s = e.wf.state(card)
     expect(s).toMatchObject({ stage: 'approved', stale: { approved: passed, current: now, why: 'change' } })
     expect(s.staleSince).toBeTruthy()
-    expect(e.wakes.some((w) => w.agent === 'B1' && w.why === `${card.key}: its pass is stale: it is for ${passed.slice(0, 7)}, but its line is at ${now.slice(0, 7)} (changed since). Submit ${now.slice(0, 7)} for review (hive_submit). Or put its branch back at ${passed.slice(0, 7)}.`)).toBe(true)
+    expect(e.wakes.some((w) => w.agent === 'B1' && w.why === `${card.key}: its pass is stale: it is for ${passed.slice(0, 7)}, but its line is at ${now.slice(0, 7)} (changed since). Submit ${now.slice(0, 7)} for review (cw_submit). Or put its branch back at ${passed.slice(0, 7)}.`)).toBe(true)
     expect(e.wf.queueLineOf(card.key)).toContain(`Its pass is for ${passed.slice(0, 7)}, but its line is at ${now.slice(0, 7)}`)
-    expect(refusedBy(await e.wf.reportMerge(card.key, B1), 'merge.hiveMerges').next).toBe(`Its pass is stale: its line changed since it passed review (it is at ${now.slice(0, 7)}). Submit it again for review; it is queued once it passes again.`)
+    expect(refusedBy(await e.wf.reportMerge(card.key, B1), 'merge.combworkMerges').next).toBe(`Its pass is stale: its line changed since it passed review (it is at ${now.slice(0, 7)}). Submit it again for review; it is queued once it passes again.`)
     expect(await e.queue().runOnce('main')).toBeNull()
   })
 })
@@ -941,7 +945,7 @@ describe('a follow-up submitted in Review (HI-1832): the revision under review m
     expect(s.started?.builder).toBe('B1')
     // No move written, and its pin is the card's second.
     expect(e.store.facts(card.id).filter((f) => f.kind === 'Moved').map((f) => (f.data as FactData['Moved']).to)).toEqual(['active', 'review'])
-    expect(sh(e.project, 'rev-parse', `refs/hive/cards/${card.key.toLowerCase()}/2`).trim()).toBe(now)
+    expect(sh(e.project, 'rev-parse', `refs/cw/cards/${card.key.toLowerCase()}/2`).trim()).toBe(now)
     // No lane holds it (HI-2046, HR1's round 1): R1 keeps it, carried onto the follow-up in the submit's write, and the
     // reviewer pool's pass tells it to start again (reviewerPool.test.ts), so nothing is woken here.
     expect(e.wakes).toEqual([])

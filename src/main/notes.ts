@@ -1,20 +1,20 @@
 import { join, relative, resolve, sep, dirname, basename } from 'path'
 import { mkdir, readdir, readFile, rename, stat, writeFile } from 'original-fs/promises'
 import { existsSync } from 'original-fs'
-import { handoverHeader, handoverProject, handoverSession, type HandoverAuthor } from '../shared/hiveGuidance'
-import { HIVE_DIR } from '../shared/defaults'
+import { handoverHeader, handoverProject, handoverSession, type HandoverAuthor } from '../shared/combworkGuidance'
+import { CW_DIR } from '../shared/defaults'
 import { isProjectId } from '../shared/projectIds'
 import type { NoteFile } from '../shared/types'
 import { hashText, insideReal, readKeptJson, retryWhileSaving, withFileLock, writeKeptJson, writeTextAtomic } from './fsutil'
 import { msg } from '../shared/i18n'
-import { hiveError } from './hiveError'
+import { combworkError } from './combworkError'
 import { nameJournal, nameJournalNow as nameJournalNowOf, ownerOfName, ownersOfName } from './projectNames'
 import { currentWorkspace, workspace, type WorkspaceService } from './workspace'
 import { trash } from './trash'
 
 /** Shared notes' refusals the window shows in its language (#849); agents (the Agent API's notes) read their English. */
 const M = {
-  outside: msg({ id: 'content.notes.outside', defaultMessage: 'Path is outside the shared notes folder', description: "An error: a shared note's path leads out of the workspace's shared notes folder (.hive/shared)." }),
+  outside: msg({ id: 'content.notes.outside', defaultMessage: 'Path is outside the shared notes folder', description: "An error: a shared note's path leads out of the workspace's shared notes folder (.combwork/shared)." }),
   exists: msg({ id: 'content.notes.exists', defaultMessage: '"{name}" already exists', description: 'An error making or renaming a shared note or folder: one called {name} is already there.' }),
   closed: msg({ id: 'content.notes.closed', defaultMessage: 'The workspace was closed or switched: nothing was changed.', description: 'An error: the workspace closed, or another opened in its window, while a handover was being renamed; nothing changed.' })
 }
@@ -22,8 +22,8 @@ const M = {
 function assertInShared(p: string): string {
   const root = resolve(workspace.sharedDir)
   const abs = resolve(root, p)
-  if (abs !== root && !abs.toLowerCase().startsWith(root.toLowerCase() + sep)) throw hiveError(M.outside)
-  if (!insideReal(abs, [root])) throw hiveError(M.outside)
+  if (abs !== root && !abs.toLowerCase().startsWith(root.toLowerCase() + sep)) throw combworkError(M.outside)
+  if (!insideReal(abs, [root])) throw combworkError(M.outside)
   return abs
 }
 
@@ -56,10 +56,10 @@ export async function notesTree(root: string | null = workspace.path ? workspace
 
 export async function createNote(relPath: string, isDir: boolean): Promise<string> {
   let rel = relPath.trim().replace(/^[\\/]+/, '')
-  if (!rel) throw hiveError(msg({ id: 'content.notes.nameRequired', defaultMessage: 'Name is required', description: 'An error making a shared note or folder with no name.' }), undefined, { kind: 'invalid' })
+  if (!rel) throw combworkError(msg({ id: 'content.notes.nameRequired', defaultMessage: 'Name is required', description: 'An error making a shared note or folder with no name.' }), undefined, { kind: 'invalid' })
   if (!isDir && !/\.[a-z0-9]+$/i.test(rel)) rel += '.md'
   const abs = assertInShared(rel)
-  if (existsSync(abs)) throw hiveError(M.exists, { name: rel })
+  if (existsSync(abs)) throw combworkError(M.exists, { name: rel })
   if (isDir) await mkdir(abs, { recursive: true })
   else {
     await mkdir(dirname(abs), { recursive: true })
@@ -71,18 +71,18 @@ export async function createNote(relPath: string, isDir: boolean): Promise<strin
 
 export async function deleteNote(p: string): Promise<void> {
   const abs = assertInShared(p)
-  if (abs === resolve(workspace.sharedDir)) throw hiveError(msg({ id: 'content.notes.deleteRoot', defaultMessage: 'Cannot delete the shared folder itself', description: "An error: the shared notes folder itself (.hive/shared) can't be deleted, only what is in it." }))
+  if (abs === resolve(workspace.sharedDir)) throw combworkError(msg({ id: 'content.notes.deleteRoot', defaultMessage: 'Cannot delete the shared folder itself', description: "An error: the shared notes folder itself (.combwork/shared) can't be deleted, only what is in it." }))
   // To the Recycle Bin, like files, skills, modes and sessions.
   if (existsSync(abs)) await trash(abs)
 }
 
 export async function renameNote(p: string, newName: string): Promise<string> {
   const abs = assertInShared(p)
-  if (!newName.trim() || /[\\/:*?"<>|]/.test(newName)) throw hiveError(msg({ id: 'content.notes.badName', defaultMessage: 'Invalid name', description: 'An error renaming a shared note: the new name is empty or has a character Windows can\'t have in a name (such as / or :).' }), undefined, { kind: 'invalid' })
+  if (!newName.trim() || /[\\/:*?"<>|]/.test(newName)) throw combworkError(msg({ id: 'content.notes.badName', defaultMessage: 'Invalid name', description: 'An error renaming a shared note: the new name is empty or has a character Windows can\'t have in a name (such as / or :).' }), undefined, { kind: 'invalid' })
   const dest = assertInShared(join(dirname(abs), newName.trim()))
   // Only its letters' case changed: the same file (Windows), renamed.
   const caseOnly = abs !== dest && abs.toLowerCase() === dest.toLowerCase()
-  if (!caseOnly && existsSync(dest)) throw hiveError(M.exists, { name: newName })
+  if (!caseOnly && existsSync(dest)) throw combworkError(M.exists, { name: newName })
   const at = workspaceAt(currentWorkspace())
   if (!at || resolve(dirname(abs)).toLowerCase() !== resolve(at.shared, 'handovers').toLowerCase()) {
     await rename(abs, dest)
@@ -140,10 +140,10 @@ function workspaceAt(ws: WorkspaceService): WorkspaceAt | null {
   const path = ws.path
   if (!path) return null
   const life = ws.lifetime
-  return { ws, shared: join(path, HIVE_DIR, 'shared'), owners: join(path, HIVE_DIR, 'handover-owners.json'), open: () => !life.aborted && ws.lifetime === life && ws.path === path }
+  return { ws, shared: join(path, CW_DIR, 'shared'), owners: join(path, CW_DIR, 'handover-owners.json'), open: () => !life.aborted && ws.lifetime === life && ws.path === path }
 }
 function stillOpen(at: WorkspaceAt): void {
-  if (!at.open()) throw hiveError(M.closed, undefined, { kind: 'conflict' })
+  if (!at.open()) throw combworkError(M.closed, undefined, { kind: 'conflict' })
 }
 
 /** The workspace's handovers, as files of shared/handovers (its README aside). */
@@ -171,7 +171,7 @@ async function readOwners(file: string): Promise<Record<string, string>> {
 }
 
 /**
- * Records that a handover is a project's (by its id) as Hive writes it: `write` creates the file, in the record's lock
+ * Records that a handover is a project's (by its id) as Combwork writes it: `write` creates the file, in the record's lock
  * once the record has been read (#1600), so a record still being saved by something else refuses the handover before
  * there is any file to take back.
  */
@@ -243,7 +243,7 @@ export async function adoptHandovers(ws: WorkspaceService): Promise<Map<string, 
     // can't be read fails, never forgetting them all.
     const here = await handoverNames(at)
     stillOpen(at)
-    // Its name's case changed outside Hive (Explorer): the same file, its owner under the name it has now.
+    // Its name's case changed outside Combwork (Explorer): the same file, its owner under the name it has now.
     const byCase = new Map([...here].map((f) => [f.toLowerCase(), f]))
     for (const f of Object.keys(owners)) {
       if (here.has(f)) continue
@@ -292,7 +292,7 @@ async function sessionsByProject(ws: WorkspaceService): Promise<Map<string, stri
 }
 
 /**
- * A project's handovers, newest first (#514): those whose owner is its id, recorded as Hive wrote them or worked out
+ * A project's handovers, newest first (#514): those whose owner is its id, recorded as Combwork wrote them or worked out
  * once for older ones (adoptHandovers). A renamed project keeps its own, and a project that takes a name some other
  * project had never gets that one's. No project: every handover.
  */
@@ -319,7 +319,7 @@ export async function createHandover(project: string, title: string, content: st
   const dir = join(at.shared, 'handovers')
   await mkdir(dir, { recursive: true })
   stillOpen(at)
-  // The same slug as hive-mcp's, which finds a project's handovers by this prefix.
+  // The same slug as cw-mcp's, which finds a project's handovers by this prefix.
   const projectSlug = project.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
   let file = join(dir, `${date}-${projectSlug ? projectSlug + '-' : ''}${slug}.md`)
   const header = handoverHeader(title, project, by, new Date())
@@ -360,7 +360,7 @@ export async function readNote(abs: string): Promise<{ content: string; revision
 }
 
 /**
- * Writes or appends to a note. Locked from read to write (the same lock as Hive's editors' saves), so two agents
+ * Writes or appends to a note. Locked from read to write (the same lock as Combwork's editors' saves), so two agents
  * appending at once both keep their text, and with `expectedRevision` the check and the write can't be split by
  * another write: the second of two writers that read the same text is refused rather than dropping the first's change.
  */

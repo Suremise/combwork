@@ -14,6 +14,7 @@ import { providerDescriptor, providerName } from '@shared/providers'
 import { safeguardText } from '@shared/safeguards'
 import { placeTip, type Box } from '@shared/tipPlacement'
 import { placeMenu } from '@shared/menuPlacement'
+import { tabAfterKey } from '@shared/tabs'
 import { msg, tr, tRich, type Msg } from '@shared/i18n'
 import { watchStatus } from './watchLine'
 import { dialogOpened } from '../windowHealth'
@@ -198,6 +199,80 @@ export function OneLineTitle({ text, className }: { text: string; className?: st
   )
 }
 
+/**
+ * A list row's description kept to one line (HI-2527, Darren: "They look good on one row"), cut with "…" and then given
+ * in full on hover. The same size and look as the `.desc` it replaces. While cut, its text is also a stop for Tab (list
+ * rows aren't), so the keyboard shows the same tooltip; one that fits is no stop.
+ */
+export function OneLineDesc({ text, className }: { text: string | null | undefined; className?: string }) {
+  const [ref, clipped] = useClipped<HTMLDivElement>()
+  const cut = clipped && !!text
+  return (
+    <div ref={ref} className={cx(/* i18n-ignore: class names */ 'desc one-line-desc', className)}>
+      <Tooltip content={cut ? text : null} focus>
+        {cut ? <span tabIndex={0}>{text}</span> : text}
+      </Tooltip>
+    </div>
+  )
+}
+
+/**
+ * A section of Settings' or Project Settings' list (HI-2531): its icon and name on one compact row, the name cut with
+ * "…" where the list is narrow, and then given in full on hover and on keyboard focus (the tooltip wraps the whole row).
+ * A tab of its SectionNav (HI-2532): in the Tab order only when `tabbable`.
+ */
+function SectionNavRow({ id, icon, label, sub, selected, tabbable, onSelect }: { id: string; icon: ReactNode; label: string; sub?: boolean; selected: boolean; tabbable: boolean; onSelect: () => void }) {
+  const [ref, clipped] = useClipped<HTMLSpanElement>()
+  return (
+    <Tooltip content={clipped ? label : null} block focus>
+      <div className={cx('row', selected && 'selected')} data-section={id} role="tab" aria-selected={selected} tabIndex={tabbable ? 0 : -1} onClick={onSelect}>
+        {icon} <span ref={ref} className={cx('label', sub && 'settings-sub')}>{label}</span>
+      </div>
+    </Tooltip>
+  )
+}
+
+export interface SectionNavItem {
+  id: string
+  icon: ReactNode
+  label: string
+  /** A provider's page under Providers: indented. */
+  sub?: boolean
+}
+
+/**
+ * Settings' and Project Settings' list of sections (HI-2532): a vertical tab list the keyboard reaches and chooses in, as
+ * Tabs does a row (roving focus: one row in the Tab order, the selected one, or the first while a search shows every
+ * section). Up and Down (Left and Right too: a narrow pane lays it out as a row) choose the next section and take the
+ * focus with it, Home and End the ends, Enter and Space the focused one.
+ */
+export function SectionNav({ items, selected, onSelect }: { items: SectionNavItem[]; selected: string | null; onSelect: (id: string) => void }) {
+  const listRef = useRef<HTMLDivElement>(null)
+  const ids = items.map((s) => s.id)
+  const inOrder = selected !== null && ids.includes(selected) ? selected : ids[0]
+  const onKeyDown = (e: React.KeyboardEvent): void => {
+    const at = (e.target as HTMLElement).closest<HTMLElement>('[data-section]')?.dataset.section
+    if (!at) return
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onSelect(at)
+      return
+    }
+    const next = tabAfterKey(ids, at, e.key === 'ArrowDown' ? 'ArrowRight' : e.key === 'ArrowUp' ? 'ArrowLeft' : e.key)
+    if (next === null) return
+    e.preventDefault()
+    onSelect(next)
+    listRef.current?.querySelector<HTMLElement>(`[data-section="${CSS.escape(next)}"]`)?.focus()
+  }
+  return (
+    <div ref={listRef} className="settings-nav" role="tablist" aria-orientation="vertical" aria-label={tr(msg({ id: 'settings.sections', defaultMessage: 'Settings sections', description: "The list of sections beside Settings and Project Settings (General, Providers, Agents…), for screen readers: its name as a list of tabs (HI-2532)." }))} onKeyDown={onKeyDown}>
+      {items.map((s) => (
+        <SectionNavRow key={s.id} id={s.id} icon={s.icon} label={s.label} sub={s.sub} selected={s.id === selected} tabbable={s.id === inOrder} onSelect={() => onSelect(s.id)} />
+      ))}
+    </div>
+  )
+}
+
 /** A tooltip's way to tell the one around it that it is showing, so only the innermost one shows (#287). */
 const TipParent = createContext<((inner: boolean) => void) | null>(null)
 
@@ -207,7 +282,7 @@ const TipParent = createContext<((inner: boolean) => void) | null>(null)
  */
 let hovered: { owner: object; wrap: HTMLElement; hide: () => void } | null = null
 /** Whether a hover tooltip holds the slot, and whether its anchor is still in the page, for tests (HI-2084). */
-;(window as unknown as { __hiveHoveredTip?: () => { connected: boolean } | null }).__hiveHoveredTip = () => (hovered ? { connected: hovered.wrap.isConnected } : null)
+;(window as unknown as { __cwHoveredTip?: () => { connected: boolean } | null }).__cwHoveredTip = () => (hovered ? { connected: hovered.wrap.isConnected } : null)
 
 /**
  * Two sentences one after the other, each with its own full stop, spaced as the language does: a space in English,
@@ -566,7 +641,7 @@ export const STATUS_TEXT: Readonly<Record<SessionStatus | 'idle', string>> = Obj
 
 /**
  * What an agent is doing, in words: projected from its runtime's facts (#648: asking, compacting, silent with its state
- * unknown, working…); when no turn runs, Hive's policy words: what its watch waits for, its status message, finished or
+ * unknown, working…); when no turn runs, Combwork's policy words: what its watch waits for, its status message, finished or
  * ready, with any background tasks it is running.
  */
 /** A server connection's refused key (HI-1772), where a sign-in connection's agent needs sign-in. */
@@ -585,7 +660,7 @@ export function statusText(live: Pick<LiveSessionState, 'status' | 'statusMessag
     // Waiting on cards: what for, in the window's words and its card names ("Waiting for HI-12 → Review", HI-1679: never
     // the watch's `label`, the English agents read).
     if (live.status === 'watching' && live.watch) return watchStatus(live.watch)
-    // Hive's own words in the window's language (#847), or the CLI's as they came.
+    // Combwork's own words in the window's language (#847), or the CLI's as they came.
     if (live.statusMessage) return shownStatusMessage(live)!
     // At the merge slot (#350): waiting for it, or merging.
     if (live.mergeSlot) return shownMergeSlot(live)!
@@ -657,7 +732,7 @@ export function SafeguardMark({ live }: { live: Pick<LiveSessionState, 'safeguar
 export function signInNote(live: Pick<LiveSessionState, 'status' | 'signIn' | 'provider' | 'launchedConnection'> | null | undefined): string | null {
   if (!live?.signIn) return null
   const d = providerDescriptor(live.provider)
-  // Hive's own message in the window's language (#847), else what the CLI said, as it said it.
+  // Combwork's own message in the window's language (#847), else what the CLI said, as it said it.
   const message = live.signIn.messageText ? shownText(live.signIn.messageText) : live.signIn.message
   const said = message.length > 160 ? `${message.slice(0, 160)}…` : message
   // On a server connection (HI-1772): its key was refused, replaced in Settings → Accounts & Connections (no sign-in).
@@ -776,7 +851,7 @@ export function useBackdrop(): () => boolean {
   return useCallback(() => backdrops[backdrops.length - 1] === me.current, [])
 }
 
-/** Where a moved dialog may go: its header wholly in the window, below Hive's title bar (whose native buttons would cover its ×). */
+/** Where a moved dialog may go: its header wholly in the window, below Combwork's title bar (whose native buttons would cover its ×). */
 function clampOffset(dialog: HTMLElement, offset: { x: number; y: number }, want: { x: number; y: number }): { x: number; y: number } {
   const header = dialog.querySelector('.dialog-header')
   if (!header) return want
@@ -866,7 +941,7 @@ export function Modal({
 }) {
   const busyNow = useRef(busy)
   busyNow.current = busy
-  // Open: where the window is, for hive.log's long-task and hang lines (HI-1775).
+  // Open: where the window is, for combwork.log's long-task and hang lines (HI-1775).
   useEffect(() => dialogOpened(title), [title])
   // Escape runs this render's onClose, never an earlier one's: a dialog whose fields fill in after it opens would
   // otherwise answer an Escape with its first render's view of them (#288).
@@ -977,7 +1052,7 @@ export function Modal({
 }
 
 marked.setOptions({ gfm: true, breaks: false })
-// GitHub-style heading ids, so the docs' #links work in Hive as they do on GitHub; a heading's explicit id
+// GitHub-style heading ids, so the docs' #links work in Combwork as they do on GitHub; a heading's explicit id
 // (`<a id="git"></a>`, #1535) is its id instead, and its empty anchor is dropped.
 marked.use({
   renderer: {
@@ -997,8 +1072,8 @@ export interface MarkdownCards {
 }
 
 /**
- * Wraps the card references in rendered Markdown's text in links (`hive-card:N`), never inside a link, code or a code
- * block. Done on the sanitized HTML, whose text nodes only gain links of Hive's own scheme.
+ * Wraps the card references in rendered Markdown's text in links (`cw-card:N`), never inside a link, code or a code
+ * block. Done on the sanitized HTML, whose text nodes only gain links of Combwork's own scheme.
  */
 function linkCards(html: string, cards: MarkdownCards): string {
   const doc = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html')
@@ -1014,7 +1089,7 @@ function linkCards(html: string, cards: MarkdownCards): string {
     for (const m of found) {
       frag.append(text.slice(at, m.start))
       const a = doc.createElement('a')
-      a.setAttribute('href', `hive-card:${m.number}`)
+      a.setAttribute('href', `cw-card:${m.number}`)
       a.className = 'card-ref'
       const title = cards.title(m.number)
       if (title) a.setAttribute('title', title)
@@ -1036,7 +1111,7 @@ export function Markdown({ source, className, onLink, cards, breaks, images }: {
   const clean = DOMPurify.sanitize(marked.parse(source, { async: false, ...(breaks ? { breaks: true } : {}) }) as string)
   const html = cards ? linkCards(clean, cards) : clean
   // Images the caller gives a source of its own once shown (HI-1700: a card's attachments, by a relative placeholder the
-  // sanitiser keeps; their hive-img: and blob: URLs it wouldn't).
+  // sanitiser keeps; their combwork-img: and blob: URLs it wouldn't).
   const ref = useRef<HTMLDivElement>(null)
   useLayoutEffect(() => {
     if (!images || !ref.current) return
@@ -1054,10 +1129,10 @@ export function Markdown({ source, className, onLink, cards, breaks, images }: {
         if (!a) return
         const href = a.getAttribute('href') ?? ''
         e.preventDefault()
-        const card = /^hive-card:(\d+)$/.exec(href)
+        const card = /^cw-card:(\d+)$/.exec(href)
         if (card && cards) return cards.open(Number(card[1]))
         if (onLink?.(href)) return
-        if (/^https?:/.test(href)) void window.hive.invoke('app:openExternal', href)
+        if (/^https?:/.test(href)) void window.combwork.invoke('app:openExternal', href)
         else if (href.startsWith('#')) document.getElementById(href.slice(1))?.scrollIntoView({ behavior: 'smooth' })
       }}
       dangerouslySetInnerHTML={{ __html: html }}

@@ -1,5 +1,5 @@
 // The i18nshots route's text report (#899): its layout check (layoutReport.cjs) on a page seeded with the kinds of
-// problems the language runs found in #886, #887, #890 and #892, now fixed in Hive: a menu detail cut off with "…", a
+// problems the language runs found in #886, #887, #890 and #892, now fixed in Combwork: a menu detail cut off with "…", a
 // board column heading wrapping under its buttons, a table's last column cut off and a table scrolling sideways, a
 // banner squeezed into a narrow column, a command name broken mid-word, a badge over its label, a button past the
 // window's edge, and English left beside its translation. Each must be reported, and a clean part of the page
@@ -11,9 +11,9 @@
 // Japanese and Chinese text wrapping between characters (not mid-word: they have no spaces between words), a Latin word
 // broken inside Japanese text (mid-word), and a translation ending in a word a placeholder message ends in ("Notes de
 // version", not English left). HI-1915 added the user's own words equal to a message (a template named "Pair") or
-// fitting a placeholder message ("Waiting for the release" as a blocked reason), where Hive shows them (authored): not
-// English left; the same words in Hive's own controls (a preset button "Pair", a status "Waiting for the agents") still
-// are. The page runs in a bare Electron window (no Hive), hidden.
+// fitting a placeholder message ("Waiting for the release" as a blocked reason), where Combwork shows them (authored): not
+// English left; the same words in Combwork's own controls (a preset button "Pair", a status "Waiting for the agents") still
+// are. The page runs in a bare Electron window (no Combwork), hidden.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -41,7 +41,7 @@ const ENGLISH = {
   'workflow.preset.pair': 'Pair'
 }
 const TRANSLATIONS = { 'board.agent.notRunning': 'Nie działa', 'board.agent.removed': '{agent} (usunięty)', 'panes.waitingFor': 'Czekam na {what}', 'providers.version': 'Wersja {provider}', 'shell.ok': 'OK', 'workspace.kind': 'projekt', 'workflow.preset.pair': 'Para' }
-// What the user wrote, where Hive shows it (HI-1915): English there is theirs.
+// What the user wrote, where Combwork shows it (HI-1915): English there is theirs.
 const AUTHORED = [
   { text: 'Pair', within: '.template-row, .template-detail-title' },
   { text: 'Waiting for the release', within: '.task-blocked' }
@@ -72,7 +72,7 @@ section { margin: 8px; }
 <section><div class="col"><div class="col-head"><h3>DO ZROBIENIA TERAZ</h3><button>+</button><button>⋯</button></div></div></section>
 <section><div class="archive"><table><tr><td>Karta</td><td>Zarchiwizowano</td><td>Przywróć kartę</td></tr></table></div></section>
 <section><div class="prices"><table><tr><th>Model</th><th>Wejście</th><th>Wyjście</th><th>Pamięć podręczna</th></tr></table></div></section>
-<section><div class="banner"><div class="text">Folder .hive jest zatwierdzony w repozytorium, więc jego pliki trafiają do historii projektu i widzą je wszyscy.</div><div class="space"></div></div></section>
+<section><div class="banner"><div class="text">Folder .combwork jest zatwierdzony w repozytorium, więc jego pliki trafiają do historii projektu i widzą je wszyscy.</div><div class="space"></div></div></section>
 <section style="display: flex; gap: 20px"><table class="keys"><tr><td class="cmd">Einstellungen</td><td>Ctrl+,</td></tr></table><div lang="ja" style="width: 70px; word-break: break-all">設定のArbeitsbereichを開く</div></section>
 <section><div class="mode"><span>Domyślny tryb pracy</span><span class="badge">W użyciu</span></div></section>
 <section style="position: relative; height: 30px"><button class="edge">Wznów w agencie</button></section>
@@ -85,10 +85,10 @@ section { margin: 8px; }
   <pre>npm run e2e -- --lang en-XA,pl --build --keep-files and a long line of code that scrolls</pre>
   <div class="list"><div>Pierwszy</div><div>Drugi</div><div>Trzeci</div></div>
   <span>Nie działa</span> <span>Bob (usunięty)</span> <span>OK</span> <span>To do</span>
-  <div style="width: 120px; overflow-wrap: anywhere">C:\\Users\\Someone\\AppData\\Local\\hive-test\\e2e\\lanes</div>
+  <div style="width: 120px; overflow-wrap: anywhere">C:\\Users\\Someone\\AppData\\Local\\combwork-test\\e2e\\lanes</div>
   <div style="width: 120px">Kliknij prawym-przyciskiem-myszy-tutaj</div>
   <div class="menu-detail" style="width: 150px">Opis umiejętności, który jest długi i celowo skrócony do jednej linii w liście, bo cały tekst widać po wybraniu wiersza.</div>
-  <div class="menu-detail" style="width: 150px">C:\\Users\\Someone\\AppData\\Local\\hive-test\\e2e\\lanes\\0</div>
+  <div class="menu-detail" style="width: 150px">C:\\Users\\Someone\\AppData\\Local\\combwork-test\\e2e\\lanes\\0</div>
   <div style="width: 60px; overflow-wrap: anywhere">session.applyPermissionModes</div>
   <div class="popup-wrap"><span>Etykieta paska</span><div class="popup">Menu nad paskiem</div></div>
   <div class="sticky-wrap"><div class="sticky-head">Nagłówek</div><div>Wiersz pierwszy</div><div>Wiersz drugi</div></div>
@@ -123,7 +123,7 @@ app.whenReady().then(() => {
   const main = path.join(dir, 'main.js')
   fs.writeFileSync(page0, PAGE)
   fs.writeFileSync(main, MAIN)
-  const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [main], cwd: dir, env: lib.hiveEnv({ HIVE_USER_DATA: path.join(dir, 'profile') }), timeout: 20000 })
+  const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [main], cwd: dir, env: lib.combworkEnv({ CW_USER_DATA: path.join(dir, 'profile') }), timeout: 20000 })
   try {
     const page = await app.firstWindow()
     await page.waitForLoadState('load')
@@ -138,7 +138,7 @@ app.whenReady().then(() => {
     check('a column heading wrapping under its buttons (#886, #890, #892: board columns)', has('wraps', 'DO ZROBIENIA TERAZ'), said())
     check("a table's last column cut off (#886: the archived cards table)", has('cut-off', 'Przywróć kartę'), said())
     check('a table scrolling sideways (#887, #892: the API prices table)', has('sideways', 'Pamięć podręczna'), said())
-    check('a banner squeezed into a narrow column (#886: the .hive committed banner)', has('squeezed', 'Folder .hive'), said())
+    check('a banner squeezed into a narrow column (#886: the .combwork committed banner)', has('squeezed', 'Folder .combwork'), said())
     check('a word broken across lines (#887, #892: the shortcuts table)', has('mid-word', 'Einstellungen'), said())
     check('a Latin word broken inside Japanese text (HI-1590)', has('mid-word', 'Arbeitsbereich'), said())
     check('a badge over its label (#890, #892: the mode row)', has('overlaps', 'W użyciu') || has('overlaps', 'Domyślny tryb'), said())
@@ -147,13 +147,13 @@ app.whenReady().then(() => {
     check('a line cut in half by the box around it (#899 round 1: at the bottom)', has('cut-off', 'Druga linia'), said())
     check('English left: a translated message shown in English', has('english', 'Not running'), said())
     check('English left: a message with a placeholder', has('english', 'Alice (removed)'), said())
-    // HI-1915: the user's words where Hive shows them aren't English left; the same words in Hive's own controls are.
+    // HI-1915: the user's words where Combwork shows them aren't English left; the same words in Combwork's own controls are.
     const englishAt = (text, where) => issues.some((i) => i.kind === 'english' && i.text === text && where.test(i.where))
-    check("English left: Hive's own control, untranslated, though the user named a template the same (the positive control)", englishAt('Pair', /button\.preset/), said())
-    check("English left: Hive's own status, untranslated, fitting a placeholder message (the positive control)", englishAt('Waiting for the agents', /span\.status/), said())
+    check("English left: Combwork's own control, untranslated, though the user named a template the same (the positive control)", englishAt('Pair', /button\.preset/), said())
+    check("English left: Combwork's own status, untranslated, fitting a placeholder message (the positive control)", englishAt('Waiting for the agents', /span\.status/), said())
     check("English left: not a template's name the user gave, equal to a message (HI-1915: \"Pair\")", !issues.some((i) => i.kind === 'english' && /template-row|template-detail-title/.test(i.where)), said())
     check("English left: not a blocked reason the user gave, fitting a placeholder message (HI-1915: \"Waiting for {what}\")", !issues.some((i) => i.kind === 'english' && /task-blocked/.test(i.where)), said())
-    const clean = ['To jest zwykły', 'Ustawienia', 'Zapisz', 'Nowy', 'npm run', 'Pierwszy', 'Drugi', 'Trzeci', 'Nie działa', 'Bob (usunięty)', 'OK', 'To do', 'hive-test', 'Users', 'przyciskiem', 'Nagłówek', 'Wiersz', 'Okno dialogowe', 'Tylko dla', 'Opis umiejętności', 'Someone', 'applyPermissionModes', 'Etykieta paska', 'Menu nad', 'エージェント', '报告', 'Notes de version']
+    const clean = ['To jest zwykły', 'Ustawienia', 'Zapisz', 'Nowy', 'npm run', 'Pierwszy', 'Drugi', 'Trzeci', 'Nie działa', 'Bob (usunięty)', 'OK', 'To do', 'combwork-test', 'Users', 'przyciskiem', 'Nagłówek', 'Wiersz', 'Okno dialogowe', 'Tylko dla', 'Opis umiejętności', 'Someone', 'applyPermissionModes', 'Etykieta paska', 'Menu nad', 'エージェント', '报告', 'Notes de version']
     const wrong = issues.filter((i) => clean.some((c) => i.text.includes(c)) || /markdown|kb-id/.test(i.where))
     check('nothing reported in the clean part', !wrong.length, layout.summarize({ pl: { page: { image: '', issues: wrong } } }))
     // The report's lines name the screen, the language and the screenshot to open.

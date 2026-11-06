@@ -1,6 +1,6 @@
 // Generated from locales/en/panes.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
-interface HiveMessageValues {
+interface CombworkMessageValues {
   'panes.add.button': undefined
   'panes.add.caretLabel': undefined
   'panes.add.caretTip': undefined
@@ -60,6 +60,7 @@ interface HiveMessageValues {
   'panes.footer.costReported': undefined
   'panes.footer.ctxValue': { value: string | number }
   'panes.footer.handOverWhen': { when: string }
+  'panes.footer.modelSwitched': { launched: string | number; provider: string | number; running: string | number }
   'panes.footer.modelTip': { chosenAs: string; model: string | number; provider: string | number; effort: string; live: string; reported: string; where: string | number }
   'panes.footer.reading': undefined
   'panes.footer.retryWaited': { minutes: number; provider: string | number; waits: number; time: string | number; ongoing: string }
@@ -257,6 +258,7 @@ interface HiveMessageValues {
   'panes.watch.cards': { cards: string | number }
   'panes.watch.cardsInto': { cards: string | number; column: string | number }
   'panes.watch.lanes': { lanes: string; lane: string | number; n: number; cards: string }
+  'panes.watch.oneLane': { kind: string; name: string | number; builder: string | number }
   'panes.watchCancel.failed': undefined
   'panes.watchCell.agents': { agents: string | number }
   'panes.watchCell.cardsInto': { cards: string | number; column: string | number }

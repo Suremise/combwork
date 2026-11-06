@@ -13,8 +13,8 @@ import { DEFAULT_SETTINGS } from '../src/shared/defaults'
 import type { SessionListItem, SessionUsage } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-usage-backfill-')
-// The CLIs' homes are the test's own (HI-1666): a list looks in each for sessions started outside Hive, and the user's
+const base = tempDir('cw-usage-backfill-')
+// The CLIs' homes are the test's own (HI-1666): a list looks in each for sessions started outside Combwork, and the user's
 // ~/.codex (a thousand rollouts) took 14 s of it under a full unit run's load.
 process.env.CLAUDE_CONFIG_DIR = join(base, 'claude-home')
 process.env.CODEX_HOME = join(base, 'codex-home')
@@ -42,7 +42,7 @@ const write = (file: string, text: string): void => {
   mkdirSync(join(file, '..'), { recursive: true })
   writeFileSync(file, text)
 }
-const backup = (id: string): string => join(p, '.hive', 'sessions', `${id}.jsonl`)
+const backup = (id: string): string => join(p, '.combwork', 'sessions', `${id}.jsonl`)
 const keptUsage = (sid: string, outputs: number[]): SessionUsage => {
   const parser = newUsageParser('claude-code', sid)!
   parser.feed(transcript(sid, outputs))
@@ -77,16 +77,16 @@ describe("the usage history's import", () => {
   const deletedEarly = newId()
 
   beforeAll(async () => {
-    mkdirSync(join(wsPath, '.hive'), { recursive: true })
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'c1', name: 'Agent 1' }] }))
+    mkdirSync(join(wsPath, '.combwork'), { recursive: true })
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'c1', name: 'Agent 1' }] }))
     mkdirSync(join(base, 'profile'), { recursive: true })
     writeFileSync(cache, '{"version":"0.9.3","entries":[]}')
     cliLookup.mockImplementation(async () => null)
     // A record whose backup is stale (10) while its kept usage counted 500; one with only its kept usage; a deleted one.
     write(backup(stale), transcript(stale, [10]))
     write(
-      join(p, '.hive', 'sessions.json'),
+      join(p, '.combwork', 'sessions.json'),
       JSON.stringify({
         version: 1,
         sessions: [
@@ -148,14 +148,14 @@ describe("the usage history's import", () => {
   it("isn't recorded as done when a session fails to import: nothing is retired, and the next try imports what is left", async () => {
     const h = usageHistory as unknown as { importKept: (...a: unknown[]) => Promise<unknown> }
     const real = h.importKept.bind(usageHistory)
-    // The deleted session's import fails (the worker ended, a write another Hive held).
+    // The deleted session's import fails (the worker ended, a write another Combwork held).
     const fail = vi.spyOn(h, 'importKept').mockImplementation((host, k, ...rest) => ((k as { id: string }).id === deleted ? Promise.reject(new Error('the usage worker ended')) : real(host, k, ...rest)))
     await run(() => usageHistory.opened(w))
     fail.mockRestore()
     expect(usageHistory.progressOf(wsPath).importing).toBe(true)
     expect(usageHistory.backfilled(wsPath)).toBe(false)
     expect(existsSync(cache)).toBe(true)
-    // Meanwhile the deleted session still counts, from what an older Hive kept.
+    // Meanwhile the deleted session still counts, from what an older Combwork kept.
     expect(outputOf(await run(() => sessions.keptUsage(p)), deleted)).toBe(300)
     // Tried again (the next open, or the ten-minute tick): what is left is imported, and it's done.
     await run(() => usageHistory.opened(w))

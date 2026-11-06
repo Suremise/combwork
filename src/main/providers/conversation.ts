@@ -14,7 +14,7 @@ import { relativeInside } from '../places'
 /** An item before it gets its id (distributes over the union, so each kind keeps its own fields). */
 export type NewItem = TranscriptItem extends infer T ? (T extends TranscriptItem ? Omit<T, 'id'> : never) : never
 
-/** "mcp__hive__hive_notify" → "hive · hive_notify"; built-in tools keep their name. */
+/** "mcp__combwork__cw_notify" → "combwork · cw_notify"; built-in tools keep their name. */
 export function toolLabel(name: string): string {
   const m = /^mcp__(.+?)__(.+)$/.exec(name)
   return m ? `${m[1]} · ${m[2]}` : name
@@ -45,7 +45,7 @@ function realInside(root: string, p: string): string | null {
 export const firstLine = (s: unknown): string => (typeof s === 'string' ? s.trim().split('\n')[0] : '')
 
 /** Everything searchable in an item, in the order it is shown. */
-/** Hive's notices in a conversation (#797), kept as data and shown in the language the window shows (shownNotice). */
+/** Combwork's notices in a conversation (#797), kept as data and shown in the language the window shows (shownNotice). */
 export const NOTICE_TEXT = {
   interrupted: msg({ id: 'providers.transcript.interrupted', defaultMessage: 'Interrupted by you', description: "A notice in a conversation, in the Sessions tab's transcript viewer and its Markdown export: the user stopped the agent's turn." }),
   apiError: msg({ id: 'providers.transcript.apiError', defaultMessage: 'API error', description: "A notice in a conversation, in the Sessions tab's transcript viewer and its Markdown export: the coding agent's model API failed, with no message of its own." }),
@@ -54,10 +54,11 @@ export const NOTICE_TEXT = {
   resumed: msg({ id: 'providers.transcript.resumed', defaultMessage: 'Session resumed', description: "A notice in a conversation, in the Sessions tab's transcript viewer and its Markdown export: the conversation was resumed here (GitHub Copilot)." })
 }
 
-/** A notice of Hive's: its English text (the transcript's own words, as cached) and the same as data, for the window. */
+/** A notice of Combwork's: its English text (the transcript's own words, as cached) and the same as data, for the window. */
+// window: a notice in the window's view of a conversation (transcripts.ts shownNotice); no agent reads it
 export const noticeOf = (message: Text, level: 'info' | 'error'): { kind: 'notice'; text: string; level: 'info' | 'error'; message: Text } => ({ kind: 'notice', text: englishText(message), level, message })
 
-/** A notice's text in the language the window shows: Hive's own words translated, a CLI's as they are. */
+/** A notice's text in the language the window shows: Combwork's own words translated, a CLI's as they are. */
 export const shownNotice = (item: { text: string; message?: Text }): string => (item.message ? shownText(item.message) : item.text)
 
 export function itemText(item: TranscriptItem): string {

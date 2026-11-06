@@ -1,5 +1,5 @@
 // How long the board's reads and writes take on a copy of a real board (#1209's timings, for the cards' storage cards to
-// compare before and after a change): HIVE_BOARD_BENCH_DB=<a hive.db> copies it (with its -wal) into tempDir() (the file
+// compare before and after a change): CW_BOARD_BENCH_DB=<a combwork.db> copies it (with its -wal) into tempDir() (the file
 // itself is never opened), upgrades the copy and prints the median of each. Skipped without it. It uses only the board's
 // public calls, so the same file runs on an older commit for the "before".
 import { copyFileSync, existsSync, mkdirSync } from 'fs'
@@ -9,8 +9,8 @@ import * as electron from 'electron'
 import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
 
-const source = process.env.HIVE_BOARD_BENCH_DB
-const base = tempDir('hive-board-bench-')
+const source = process.env.CW_BOARD_BENCH_DB
+const base = tempDir('cw-board-bench-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -30,8 +30,8 @@ afterAll(async () => {
 describe('the board on a real board’s copy', () => {
   it.skipIf(!source)('reads and writes, timed', { timeout: 600_000 }, async () => {
     const ws = join(base, 'ws')
-    mkdirSync(join(ws, '.hive'), { recursive: true })
-    const file = join(ws, '.hive', 'hive.db')
+    mkdirSync(join(ws, '.combwork'), { recursive: true })
+    const file = join(ws, '.combwork', 'combwork.db')
     copyFileSync(source!, file)
     if (existsSync(`${source}-wal`)) copyFileSync(`${source}-wal`, `${file}-wal`)
     const raw = new DatabaseSync(file)
@@ -64,7 +64,7 @@ describe('the board on a real board’s copy', () => {
       await tasks.getTask(card, w)
       await tasks.updateTask(card, { column: 'doing' }, user)
     }
-    const agent = { projectPath: join(ws, 'hive'), agentId: 'bench' }
+    const agent = { projectPath: join(ws, 'demo'), agentId: 'bench' }
     // A comment on the largest card (#1210), and that change written whole (before) and by what changed (after), each in a
     // transaction undone, on the writer.
     const rows = await import('../src/main/schema/cardRows')

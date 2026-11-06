@@ -6,7 +6,7 @@ export function resourcesDir(): string {
   return app.isPackaged ? join(process.resourcesPath, 'resources') : join(__dirname, '../../resources')
 }
 
-/** The Hive icon for Windows notifications (otherwise they may show a generic app icon). */
+/** The Combwork icon for Windows notifications (otherwise they may show a generic app icon). */
 export function notificationIcon(): string {
   return join(resourcesDir(), 'icon.png')
 }

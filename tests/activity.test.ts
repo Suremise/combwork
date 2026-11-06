@@ -99,8 +99,8 @@ describe('the tabs (HI-1743)', () => {
     const input = base()
     input.now = { launches: [{ agentId: 'hr1', runId: 'r', cli: [10], processes: [proc(10, 0), proc(11, 1, 10)], more: 0 }], tasks: [] }
     expect(activityTabs(input).map((t) => t.agentId)).toEqual(['hb1', 'hr1', 'solo'])
-    input.now = { launches: [{ agentId: 'hr1', runId: 'r', cli: [10], processes: [proc(10, 0), { ...proc(12, 1, 10), command: 'electron.exe C:\\hive\\out\\main\\hive-mcp.js' }], more: 0 }], tasks: [{ agentId: 'hb2', sessionId: 'z', id: 't', at: T0 }] }
-    // Its CLI (and Hive's tool server for it) isn't something running; HB2 isn't running at all, whatever is listed for it.
+    input.now = { launches: [{ agentId: 'hr1', runId: 'r', cli: [10], processes: [proc(10, 0), { ...proc(12, 1, 10), command: 'electron.exe C:\\combwork\\out\\main\\cw-mcp.js' }], more: 0 }], tasks: [{ agentId: 'hb2', sessionId: 'z', id: 't', at: T0 }] }
+    // Its CLI (and Combwork's tool server for it) isn't something running; HB2 isn't running at all, whatever is listed for it.
     expect(activityTabs(input).map((t) => t.agentId)).toEqual(['hb1', 'solo'])
   })
 
@@ -129,7 +129,7 @@ describe('the tabs (HI-1743)', () => {
 })
 
 
-const session = (id: string, agentId: string, s: number, more: Partial<SessionListItem> = {}): SessionListItem => ({ id, provider: 'claude-code', source: 'hive', agentId, name: id, lastActivity: iso(s), lastActiveAt: iso(s), hasTranscript: true, hasBackup: false, usage: null, recache: null, title: null, ...more }) as SessionListItem
+const session = (id: string, agentId: string, s: number, more: Partial<SessionListItem> = {}): SessionListItem => ({ id, provider: 'claude-code', source: 'combwork', agentId, name: id, lastActivity: iso(s), lastActiveAt: iso(s), hasTranscript: true, hasBackup: false, usage: null, recache: null, title: null, ...more }) as SessionListItem
 const keys = (nodes: readonly (ActivityNode | null)[]): (string | null)[] => nodes.map((n) => n?.key ?? null)
 const withCommand = (p: AgentProcess, command: string): AgentProcess & { command: string } => ({ ...p, command })
 
@@ -146,7 +146,7 @@ describe("a tab's content: what runs now (HI-1743)", () => {
     ],
     sessions: [session('s1', 'hb1', 0, { cards: [{ number: 7, title: 'Seven' }] }), session('old', 'hb1', -3600, { cards: [{ number: 3, title: 'Three' }] }), session('sub1', 'hb1', 15, { sub: { parentId: 's1', kind: 'sub-agent' } }), session('sub0', 'hb1', -30, { sub: { parentId: 's1', kind: 'sub-agent' } })],
     turns: new Map(),
-    now: { launches: [{ agentId: 'hb1', runId: 'run1', cli: [10, 11], processes: [proc(10, -100), proc(11, -99, 10), withCommand(proc(12, -98, 10), 'electron.exe C:\\hive\\out\\main\\hive-mcp.js'), withCommand(proc(20, 15, 11), 'C:\\WINDOWS\\system32\\cmd.exe /d /s /c "npm test"')], more: 0 }], tasks: [{ agentId: 'hb1', sessionId: 's1', id: 'bg1', type: 'subagent', description: 'Explore', at: T0 }] },
+    now: { launches: [{ agentId: 'hb1', runId: 'run1', cli: [10, 11], processes: [proc(10, -100), proc(11, -99, 10), withCommand(proc(12, -98, 10), 'electron.exe C:\\combwork\\out\\main\\cw-mcp.js'), withCommand(proc(20, 15, 11), 'C:\\WINDOWS\\system32\\cmd.exe /d /s /c "npm test"')], more: 0 }], tasks: [{ agentId: 'hb1', sessionId: 's1', id: 'bg1', type: 'subagent', description: 'Explore', at: T0 }] },
     at: T0 + 60_000
   })
   const turnsOf = (sid: string, items: TranscriptItem[]): [string, ActivityTurns] => [sid, { sessionId: sid, version: String(items.length), ...activityTurns(items) }]
@@ -164,7 +164,7 @@ describe("a tab's content: what runs now (HI-1743)", () => {
     expect(JSON.stringify(v)).not.toContain('old')
   })
 
-  it("its own plumbing (its CLI, its terminal, hive-mcp.js) is left out unless asked for; what it started stays", () => {
+  it("its own plumbing (its CLI, its terminal, cw-mcp.js) is left out unless asked for; what it started stays", () => {
     const [hb1] = buildActivityView(base(), 'hb1').parts
     expect(keys(hb1.processes)).toEqual(['p:20:' + ft(15)])
     expect(hb1.ownHidden).toBe(3)

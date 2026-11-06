@@ -11,7 +11,7 @@ import { tempDir } from './tempDir'
 
 vi.mock('../src/main/agentProcesses', async (orig) => ({ ...(await orig<object>()), projectLaunches: async (p: string) => [{ agentId: 'b1', runId: `run:${p.toLowerCase()}`, cli: [], processes: [], more: 0 }] }))
 
-const base = tempDir('hive-activity-workspace-')
+const base = tempDir('cw-activity-workspace-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const tasks = await import('../src/main/tasks')
@@ -23,9 +23,9 @@ const wsPath = join(base, 'ws')
 const otherWs = join(base, 'other')
 const project = (ws: string, name: string): string => {
   const p = join(ws, name)
-  mkdirSync(join(p, '.hive'), { recursive: true })
+  mkdirSync(join(p, '.combwork'), { recursive: true })
   // The same agent id in both projects.
-  writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'Builder' }, { id: 'r1', name: 'Reviewer' }] }))
+  writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'Builder' }, { id: 'r1', name: 'Reviewer' }] }))
   return p
 }
 const alpha = project(wsPath, 'alpha')

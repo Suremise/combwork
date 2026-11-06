@@ -9,7 +9,7 @@ import { DEFAULT_CLEANUP } from '../src/shared/storage'
 import type { CleanupOptions } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-cleanup-')
+const base = tempDir('cw-cleanup-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 // The Recycle Bin, as deleting the file.
 ;(electron.shell as unknown as { trashItem: (p: string) => Promise<void> }).trashItem = async (p) => rmSync(p, { recursive: true, force: true })
@@ -41,9 +41,9 @@ const write = (file: string, text: string): void => {
   mkdirSync(join(file, '..'), { recursive: true })
   writeFileSync(file, text)
 }
-const archived = (id: string): string => join(p, '.hive', 'archive', `${id}.jsonl`)
-const active = (id: string): string => join(p, '.hive', 'sessions', `${id}.jsonl`)
-const attachments = (id: string): string => join(p, '.hive', 'attachments', id)
+const archived = (id: string): string => join(p, '.combwork', 'archive', `${id}.jsonl`)
+const active = (id: string): string => join(p, '.combwork', 'sessions', `${id}.jsonl`)
+const attachments = (id: string): string => join(p, '.combwork', 'attachments', id)
 
 /** An archived session 200 days old with a backup and attachments; `inCli`: the CLI still has its transcript. */
 async function oldSession(inCli: boolean): Promise<string> {
@@ -86,16 +86,16 @@ const totalTokens = async (id: string): Promise<number | undefined> => {
 
 describe('Clean Up while sessions change', () => {
   beforeAll(async () => {
-    mkdirSync(join(wsPath, '.hive'), { recursive: true })
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'c1', name: 'Agent 1' }] }))
+    mkdirSync(join(wsPath, '.combwork'), { recursive: true })
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'c1', name: 'Agent 1' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     cliLookup.mockImplementation(lookup)
   })
   // Each test starts from no sessions, so what Clean Up does is only to the test's own.
   beforeEach(async () => {
-    for (const d of ['archive', 'sessions', 'attachments']) rmSync(join(p, '.hive', d), { recursive: true, force: true })
+    for (const d of ['archive', 'sessions', 'attachments']) rmSync(join(p, '.combwork', d), { recursive: true, force: true })
     await w.mutateSessions(p, (f) => {
       f.sessions = []
       f.deleted = []
@@ -149,7 +149,7 @@ describe('Clean Up while sessions change', () => {
     expect(await totalTokens(id)).toBe(before)
   })
 
-  it('a session whose only copy is Hive’s is not deleted when its usage read throws', async () => {
+  it('a session whose only copy is Combwork’s is not deleted when its usage read throws', async () => {
     const id = await oldSession(false)
     const usage = failUsage(id, async () => {
       throw new Error('EBUSY')

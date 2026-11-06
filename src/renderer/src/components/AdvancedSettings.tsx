@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useState } from 'react'
-import { ADVANCED_DEFS, advancedRow, type AdvancedGroup, advancedShown, advancedTakesText, advancedUnit, checkAdvanced, cliFacing, groupName, shownText, type AdvancedDef, type AdvancedRow } from '@shared/advanced'
+import { ADVANCED_DEFS, advancedRow, type AdvancedGroup, advancedShown, advancedTakesText, advancedUnit, checkAdvanced, cliFacing, folderList, foldersText, groupName, shownText, type AdvancedDef, type AdvancedRow } from '@shared/advanced'
 import { msg, tr, tRich } from '@shared/i18n'
 import { INBOX_SWITCH_ID } from '@shared/inboxSwitches'
 import type { ProviderId } from '@shared/types'
@@ -10,35 +10,35 @@ import { NumberField } from './NumberField'
 import { DottedId, Icon, IconButton, InfoTip, SearchInput, Switch, Tooltip } from './ui'
 import { cx } from '../util'
 import { ProviderIcon } from './ProviderIcon'
-import { HiveMark } from './Updates'
+import { CombworkMark } from './Updates'
 import { TabPanel, Tabs } from './Tabs'
 
 /**
- * Settings → Advanced's list (#367), in the manner of about:config: every overridable default, grouped by Hive and each
- * CLI, searchable, a modified one marked with its default beside it and Reset. A value that isn't valid says why (Hive
+ * Settings → Advanced's list (#367), in the manner of about:config: every overridable default, grouped by Combwork and each
+ * CLI, searchable, a modified one marked with its default beside it and Reset. A value that isn't valid says why (Combwork
  * uses the default); a CLI's value that no longer finds what the CLI was recorded sending, or that was made for another
  * CLI version, says so, with Keep for the installed version. Values a workspace can set have a This workspace box too.
  * advanced.json holds the same values, Show developer features too: Open advanced.json edits them by hand, and the list
  * follows the file. `query` and `modifiedOnly` are Settings' own search and Modified only, on top of the list's. A
- * value that applies when Hive restarts, changed since this Hive started, offers Restart Hive (#676).
+ * value that applies when Combwork restarts, changed since this Combwork started, offers Restart Combwork (#676).
  */
 const T = {
-  tabs: msg({ id: 'settings.advancedList.tabs', defaultMessage: 'Hive and the CLIs', description: "Accessible name of Settings → Advanced's tabs: Hive, then one per CLI (Claude Code, Codex, GitHub Copilot)." }),
+  tabs: msg({ id: 'settings.advancedList.tabs', defaultMessage: 'Combwork and the CLIs', description: "Accessible name of Settings → Advanced's tabs: Combwork, then one per CLI (Claude Code, Codex, GitHub Copilot)." }),
   cliOff: msg({ id: 'settings.advancedList.cliOff', defaultMessage: '{cli} is turned off: these settings apply once you turn it on', description: "Tooltip of a dimmed tab of Settings → Advanced, and part of its name for screen readers: the CLI is turned off in Settings → Providers. {cli} is its name." }),
   off: msg({ id: 'settings.advancedList.off', defaultMessage: 'off', description: "A short mark on the tab of a CLI turned off in Settings → Advanced (beside its name, such as Codex). Lower case, one short word." }),
-  noMatchHere: msg({ id: 'settings.advancedList.noMatchHere', defaultMessage: 'No settings of {group} match.', description: "A tab of Settings → Advanced with none of the filtered values: {group} is Hive or the CLI's name." })
+  noMatchHere: msg({ id: 'settings.advancedList.noMatchHere', defaultMessage: 'No settings of {group} match.', description: "A tab of Settings → Advanced with none of the filtered values: {group} is Combwork or the CLI's name." })
 }
 
 /** The tab the list remembers (HI-1839). */
 const TABS_KEY = 'settings.advanced'
 
 /**
- * Its tabs (HI-1839): Hive, then each CLI with advanced values, in Hive's order (HI-2139), as the descriptors name them;
- * a group of a CLI Hive no longer offers keeps a tab after them.
+ * Its tabs (HI-1839): Combwork, then each CLI with advanced values, in Combwork's order (HI-2139), as the descriptors name them;
+ * a group of a CLI Combwork no longer offers keeps a tab after them.
  */
 const GROUPS: AdvancedGroup[] = (() => {
   const used = new Set(ADVANCED_DEFS.map((d) => d.group))
-  const ordered: AdvancedGroup[] = ['hive', ...PROVIDERS.map((p) => p.id).filter((id) => used.has(id))]
+  const ordered: AdvancedGroup[] = ['cw', ...PROVIDERS.map((p) => p.id).filter((id) => used.has(id))]
   return [...ordered, ...[...used].filter((g) => !ordered.includes(g))].filter((g) => used.has(g))
 })()
 
@@ -69,7 +69,7 @@ export function AdvancedSettings({ query, modifiedOnly: outerModified }: { query
   useEffect(() => {
     setClicked((c) => (c && c.key !== filterKey ? null : c))
   }, [filterKey])
-  const remembered = useRememberedTab<AdvancedGroup>(TABS_KEY, GROUPS, 'hive')
+  const remembered = useRememberedTab<AdvancedGroup>(TABS_KEY, GROUPS, 'cw')
   const count = (g: AdvancedGroup): number => shown.filter((r) => r.def.group === g).length
   // A value's own id searched for opens its group's tab, whatever is remembered.
   const exact = ADVANCED_DEFS.find((d) => words.length === 1 && d.id.toLowerCase() === words[0])?.group
@@ -89,12 +89,12 @@ export function AdvancedSettings({ query, modifiedOnly: outerModified }: { query
       </div>
       {state.fileError && (
         <div className="advanced-note error" role="alert">
-          <Icon name="warning" /> {tr(msg({ id: 'settings.advancedList.fileError', defaultMessage: '{problem} Hive keeps using the values it read before; fix the file to change them.', description: "Above Settings → Advanced's list when advanced.json can't be read. {problem} says why, a sentence of its own." }), { problem: state.fileErrorText ? shownText(state.fileErrorText) : state.fileError })}
+          <Icon name="warning" /> {tr(msg({ id: 'settings.advancedList.fileError', defaultMessage: '{problem} Combwork keeps using the values it read before; fix the file to change them.', description: "Above Settings → Advanced's list when advanced.json can't be read. {problem} says why, a sentence of its own." }), { problem: state.fileErrorText ? shownText(state.fileErrorText) : state.fileError })}
         </div>
       )}
       {state.unknown.length > 0 && (
         <div className="advanced-note">
-          <Icon name="info" /> {tr(msg({ id: 'settings.advancedList.unknown', defaultMessage: "advanced.json also names {ids}, which this Hive doesn't know (a typo, or a newer Hive's): kept in the file, not used.", description: "Above Settings → Advanced's list. {ids} lists values' ids, as advanced.json writes them; advanced.json is a file name: keep it." }), { ids: state.unknown.join(', ') })}
+          <Icon name="info" /> {tr(msg({ id: 'settings.advancedList.unknown', defaultMessage: "advanced.json also names {ids}, which this Combwork doesn't know (a typo, or a newer Combwork's): kept in the file, not used.", description: "Above Settings → Advanced's list. {ids} lists values' ids, as advanced.json writes them; advanced.json is a file name: keep it." }), { ids: state.unknown.join(', ') })}
         </div>
       )}
       <Tabs<AdvancedGroup>
@@ -103,7 +103,7 @@ export function AdvancedSettings({ query, modifiedOnly: outerModified }: { query
         label={tr(T.tabs)}
         value={tab}
         onChange={choose}
-        items={groups.map((g) => ({ id: g, label: groupName(g), icon: isCli(g) ? <ProviderIcon provider={g} /> : <HiveMark className="tab-hex" />, ...(filtering ? { count: count(g) } : {}), ...(isCli(g) && !isProviderEnabled(settings, g) ? { muted: tr(T.cliOff, { cli: groupName(g) }), tag: tr(T.off) } : {}) }))}
+        items={groups.map((g) => ({ id: g, label: groupName(g), icon: isCli(g) ? <ProviderIcon provider={g} /> : <CombworkMark className="tab-hex" />, ...(filtering ? { count: count(g) } : {}), ...(isCli(g) && !isProviderEnabled(settings, g) ? { muted: tr(T.cliOff, { cli: groupName(g) }), tag: tr(T.off) } : {}) }))}
       />
       {/* Every group's rows stay mounted, the tab shown alone visible: a value being typed is never lost to a switch. */}
       {groups.map((g) => {
@@ -145,7 +145,7 @@ async function save(def: AdvancedDef, value: unknown, scope: 'app' | 'workspace'
 }
 
 /**
- * What a box shows for a value as written (in advanced.json or workspace.json): as Hive reads it when it checks out (a
+ * What a box shows for a value as written (in advanced.json or workspace.json): as Combwork reads it when it checks out (a
  * number written as text, "600", is 600), as written when it doesn't and the box can show text, else `fallback`.
  */
 function shownValue(def: AdvancedDef, raw: unknown, fallback: unknown): unknown {
@@ -172,13 +172,13 @@ function AdvancedItem({ row, cli, workspace, restartDue }: { row: AdvancedRow; c
     if (err) throw new Error(err)
   }
   const title = shownText(def.text.title)
-  const label = tr(msg({ id: 'settings.advancedList.label', defaultMessage: '{group}: {title}', description: "The name, for screen readers, of an advanced value's box: Hive or the CLI it belongs to, then its title." }), { group: groupName(def.group), title })
+  const label = tr(msg({ id: 'settings.advancedList.label', defaultMessage: '{group}: {title}', description: "The name, for screen readers, of an advanced value's box: Combwork or the CLI it belongs to, then its title." }), { group: groupName(def.group), title })
   const about = [
     shownText(advancedTakesText(def)),
     def.applies === 'sessions' ? tr(msg({ id: 'settings.advancedList.appliesToSessions', defaultMessage: 'Applies to sessions started afterwards.', description: "A line of an advanced value's info tip." })) : '',
-    def.applies === 'restart' ? tr(msg({ id: 'settings.advancedList.appliesAtRestart', defaultMessage: 'Applies when Hive restarts.', description: "A line of an advanced value's info tip." })) : '',
+    def.applies === 'restart' ? tr(msg({ id: 'settings.advancedList.appliesAtRestart', defaultMessage: 'Applies when Combwork restarts.', description: "A line of an advanced value's info tip." })) : '',
     cliFacing(def) ? tr(msg({ id: 'settings.advancedList.cliVersion', defaultMessage: "It is {cli}'s: a change records the version it was made for.", description: "A line of an advanced value's info tip, for a CLI's value. {cli} is the CLI's name." }), { cli: groupName(def.group) }) : '',
-    def.setting ? tr(msg({ id: 'settings.advancedList.alsoSetting', defaultMessage: "Hive's setting {key}, kept in advanced.json too.", description: "A line of an advanced value's info tip, for one of Hive's settings shown here. {key} is its key in Hive's settings: keep it." }), { key: def.setting }) : ''
+    def.setting ? tr(msg({ id: 'settings.advancedList.alsoSetting', defaultMessage: "Combwork's setting {key}, kept in advanced.json too.", description: "A line of an advanced value's info tip, for one of Combwork's settings shown here. {key} is its key in Combwork's settings: keep it." }), { key: def.setting }) : ''
   ].filter(Boolean)
   return (
     <div
@@ -205,7 +205,7 @@ function AdvancedItem({ row, cli, workspace, restartDue }: { row: AdvancedRow; c
         )}
         {row.problemText && (
           <div className="advanced-note error">
-            <Icon name="error" /> {tr(msg({ id: 'settings.advancedList.notValid', defaultMessage: 'Not valid, so Hive uses the default: {problem}', description: "Under an advanced value that isn't valid. {problem} says why." }), { problem: shownText(row.problemText) })}
+            <Icon name="error" /> {tr(msg({ id: 'settings.advancedList.notValid', defaultMessage: 'Not valid, so Combwork uses the default: {problem}', description: "Under an advanced value that isn't valid. {problem} says why." }), { problem: shownText(row.problemText) })}
           </div>
         )}
         {row.missText && (
@@ -223,9 +223,9 @@ function AdvancedItem({ row, cli, workspace, restartDue }: { row: AdvancedRow; c
         )}
         {restartDue && (
           <div className="advanced-note" data-note="restart">
-            <Icon name="info" /> {tr(msg({ id: 'settings.advancedList.restartDue', defaultMessage: 'Restart Hive to apply this.', description: 'Under an advanced value that applies when Hive restarts, changed since Hive started.' }))}
-            <button className="btn small subtle" onClick={() => void call('app:restart').catch((e) => notify('error', tr(msg({ id: 'settings.advancedList.restartFailed', defaultMessage: 'Could not restart Hive', description: "An error's title: restarting Hive from Settings → Advanced failed." })), errorMessage(e)))}>
-              {tr(msg({ id: 'settings.advancedList.restart', defaultMessage: 'Restart Hive', description: 'Button under an advanced value that applies when Hive restarts: quits Hive (asking about running agents, as quitting does) and starts it again.' }))}
+            <Icon name="info" /> {tr(msg({ id: 'settings.advancedList.restartDue', defaultMessage: 'Restart Combwork to apply this.', description: 'Under an advanced value that applies when Combwork restarts, changed since Combwork started.' }))}
+            <button className="btn small subtle" onClick={() => void call('app:restart').catch((e) => notify('error', tr(msg({ id: 'settings.advancedList.restartFailed', defaultMessage: 'Could not restart Combwork', description: "An error's title: restarting Combwork from Settings → Advanced failed." })), errorMessage(e)))}>
+              {tr(msg({ id: 'settings.advancedList.restart', defaultMessage: 'Restart Combwork', description: 'Button under an advanced value that applies when Combwork restarts: quits Combwork (asking about running agents, as quitting does) and starts it again.' }))}
             </button>
           </div>
         )}
@@ -247,20 +247,20 @@ function AdvancedItem({ row, cli, workspace, restartDue }: { row: AdvancedRow; c
 }
 
 /**
- * Whether agents can read their inbox at all (#1432): owned by Settings → Agent API (their hive tools), so it is shown
+ * Whether agents can read their inbox at all (#1432): owned by Settings → Agent API (their Combwork tools), so it is shown
  * here as a link to that setting, not a second switch.
  */
 function InboxAvailableNote() {
   const api = useStore((s) => s.settings?.agentApi)
-  const on = !!api?.enabled && !!api.provideHiveMcp
+  const on = !!api?.enabled && !!api.provideCombworkMcp
   return (
     <div className="advanced-note" data-note="inbox-available">
       <Icon name="info" />{' '}
       {tr(
         msg({
           id: 'settings.advancedList.inboxAvailable',
-          defaultMessage: "{on, select, true {Agents can read their inbox: they have Hive's tools (Settings → Agent API → Provide Hive tools to sessions).} other {Agents can't read an inbox now: they need Hive's tools (Settings → Agent API → Provide Hive tools to sessions), so nothing is left for them and these switches don't apply.}}",
-          description: 'A note under the advanced setting "Tell a working agent at the end of a tool" (Settings → Advanced), beside the other inbox switches: whether agents can read their inbox at all, which another setting decides. Settings → Agent API → Provide Hive tools to sessions names a setting: use its names as Hive shows them.'
+          defaultMessage: "{on, select, true {Agents can read their inbox: they have Combwork's tools (Settings → Agent API → Provide Combwork tools to sessions).} other {Agents can't read an inbox now: they need Combwork's tools (Settings → Agent API → Provide Combwork tools to sessions), so nothing is left for them and these switches don't apply.}}",
+          description: 'A note under the advanced setting "Tell a working agent at the end of a tool" (Settings → Advanced), beside the other inbox switches: whether agents can read their inbox at all, which another setting decides. Settings → Agent API → Provide Combwork tools to sessions names a setting: use its names as Combwork shows them.'
         }),
         { on: String(on) }
       )}
@@ -271,11 +271,18 @@ function InboxAvailableNote() {
   )
 }
 
+/** A value as its text box shows it: a list of folders semicolons apart, as it is read back (HI-2480: a comma can be in a folder's name; HI-2538: `;` alone, as typed). */
+const boxText = (def: AdvancedDef, v: unknown): string => (v === null || v === undefined ? '' : Array.isArray(v) ? (def.paths ? foldersText(v) : v.join(', ')) : String(v))
+
 /** The value's box: a switch, a number field, or text saved on Enter or leaving it (empty: back to the default, or Settings'). */
 function ValueBox({ def, value, label, placeholder, onCommit }: { def: AdvancedDef; value: unknown; label: string; placeholder?: string; onCommit: (v: unknown) => Promise<void> }) {
-  const shown = (v: unknown): string => (v === null || v === undefined ? '' : Array.isArray(v) ? v.join(', ') : String(v))
+  const shown = (v: unknown): string => boxText(def, v)
   const [draft, setDraft] = useState(shown(value))
-  useEffect(() => setDraft(shown(value)), [value])
+  // Follows the value only when its text changes (HI-2537): Settings reloads the advanced state on every change, its own
+  // or the workspace's, and each reload gives a list value as a new array. Keyed on the array, a reload landing while
+  // something was typed reset the box, and Enter then saved nothing (the text was the value's again).
+  const text = shown(value)
+  useEffect(() => setDraft(text), [text])
   // A workspace's own switch or choice (HI-2344): a select whose first option follows Settings' value (null, so no
   // override), shown as that value, then each value; a bare switch couldn't show inheriting or go back to it.
   if (placeholder !== undefined && (def.kind === 'boolean' || def.kind === 'choice')) {
@@ -307,7 +314,11 @@ function ValueBox({ def, value, label, placeholder, onCommit }: { def: AdvancedD
     return <NumberField value={typeof value === 'number' ? value : null} min={def.min} max={def.max} step={1} inherit={placeholder} label={label} unit={advancedUnit(def) ?? undefined} onCommit={(v) => onCommit(v)} />
   const commit = (): void => {
     const v = draft.trim()
-    if (v === shown(value)) return
+    // The same folders typed with other spaces (`a; b` for `a;b`) are no change: shown as kept (HI-2538).
+    if (v === shown(value) || (def.paths && Array.isArray(value) && foldersText(folderList(v)) === shown(value))) {
+      setDraft(shown(value))
+      return
+    }
     void onCommit(v === '' ? null : def.kind === 'list' ? v : draft).catch(() => setDraft(shown(value)))
   }
   return (

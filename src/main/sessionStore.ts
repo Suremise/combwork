@@ -15,13 +15,13 @@ const log = createLogger('sessions')
 
 /**
  * A session host's records (#1061: a project's, the Assistant's), in its workspace's database rather than its
- * `.hive/sessions.json`, which was rewritten whole (746 KB on the hive project) at every change of a record. Since 1.0
+ * `.combwork/sessions.json`, which was rewritten whole (746 KB on this repository's project) at every change of a record. Since 1.0
  * (#1211) in their own tables (schema/sessionDeliveryTables.ts): `sessions` (a record a row, under the host's scope: its project
  * id, `assistant` for the Assistant), the cards each worked on in `session_cards`, the deleted sessions' ids and kept usage
  * in `sessions_deleted` and `sessions_deleted_usage`, each in its order. A change writes only the rows it changed. The
  * file is moved in the first time a host's records are read, then kept as `sessions.json.imported-<time>`; so is one
  * found later while the host has no records (its folder removed from another workspace, exportSessions), else it is kept
- * so unread. Remove from Hive writes them back into the folder, which takes them wherever it goes, and marks them
+ * so unread. Remove from Combwork writes them back into the folder, which takes them wherever it goes, and marks them
  * `exported` here: while the project is removed (or being removed) nothing reads that file; once it is back (Restore, or
  * the folder shown again), it is moved in again, with what was recorded here meanwhile. While the workspace's upgrade to
  * 1.0 waits (#1207) its file is 0.9's: the records are read from its `store_rows`, and nothing is written.
@@ -35,7 +35,7 @@ export interface SessionsPlace {
   scope: string
   file: string
   /**
-   * Removed from Hive (hidden as removed in its workspace): records it took away in its folder stay there (#1061). Asked
+   * Removed from Combwork (hidden as removed in its workspace): records it took away in its folder stay there (#1061). Asked
    * when a file would be moved in, not when the place was worked out (#1161): a change can wait for its turn meanwhile,
    * and land after its workspace closed. True too when that can't be known now (its workspace no longer open): no file
    * is moved in then.
@@ -170,7 +170,7 @@ onDbReplaced((workspacePath, place) => {
 /** For tests: the workspaces (as spelt, lower-cased) whose hosts were moved in this run. */
 export const sessionsOpenedFor = (): string[] => [...new Set([...opened.keys()].map((k) => k.slice(0, k.indexOf('\0'))))]
 
-/** Hosts being removed now (Remove from Hive, by workspace and scope): what they export stays in their folder. */
+/** Hosts being removed now (Remove from Combwork, by workspace and scope): what they export stays in their folder. */
 const removing = new Set<string>()
 
 /** The sessions' side of a move in (openTable): how many records a host has, and a file's written beside them. */
@@ -180,7 +180,7 @@ const TABLE = {
 }
 
 /**
- * Moves a host's old file in if it hasn't been this run (openTable says when it is due), or the file Remove from Hive
+ * Moves a host's old file in if it hasn't been this run (openTable says when it is due), or the file Remove from Combwork
  * left in its folder once the project is back. A removed host's file stays where it is. Nothing while the workspace's
  * upgrade to 1.0 waits (asked again once it is upgraded).
  */
@@ -245,7 +245,7 @@ export async function readCardSessions(place: SessionsPlace, card: number): Prom
 const byActivity = (recs: SessionsFile['sessions']): SessionsFile['sessions'] => [...recs].sort((a, b) => (b.lastActiveAt ?? '').localeCompare(a.lastActiveAt ?? ''))
 
 /**
- * Changes a host's records from what is committed now, one change at a time across Hive's windows and processes: `fn`
+ * Changes a host's records from what is committed now, one change at a time across Combwork's windows and processes: `fn`
  * changes them in place (with nothing awaited), and only the rows it changed are written; a deleted list it never used
  * isn't read. It throws, and nothing is written.
  */
@@ -273,7 +273,7 @@ export async function changeSessionRecord<T>(place: SessionsPlace, id: string, f
       if (!saved) return { found: false }
       // Its text as saved, before recordOf's upgrade of an old record (so that upgrade is written), as saveSessions takes it.
       const had = sessionTexts(place.scope, [saved]).get(id)
-      if (!had) throw new Error(`a saved session record without the fields Hive keeps (${JSON.stringify(id)}): nothing was saved`) // i18n-ignore: a mistake in Hive's code, logged
+      if (!had) throw new Error(`a saved session record without the fields Combwork keeps (${JSON.stringify(id)}): nothing was saved`) // i18n-ignore: a mistake in Combwork's code, logged
       const rec = recordOf(saved)
       const value = fn(rec)
       writeSessionRecord(db, place.scope, rec as unknown as Record<string, unknown>, had)
@@ -307,7 +307,7 @@ function saveSessions<T>(place: SessionsPlace, fn: (f: SessionsFile) => T): Prom
 }
 
 /**
- * Writes a host's records into its folder's sessions.json and takes them out of the database (#1061: Remove from Hive),
+ * Writes a host's records into its folder's sessions.json and takes them out of the database (#1061: Remove from Combwork),
  * so the folder takes them with it: restored, or opened in another workspace, they are moved in again. All of it under
  * the store's lock, so no change lands between the records written and those taken out; the file is written first: a
  * failure leaves them in the database. The host stays held (its file unread here) until `releaseSessions`: by then a
@@ -320,8 +320,8 @@ export async function exportSessions(place: SessionsPlace): Promise<number> {
   try {
     const count = await withStoreLock(place.workspace, 'sessions', place.scope, async (db) => {
       // One write transaction from the read to the delete, the file written inside it (review round 2): no writer, in this
-      // process or another (another Hive, a script on the database), commits between them; a failure undoes it all.
-      timedStep('db begin hive.db', () => db.exec('BEGIN IMMEDIATE'))
+      // process or another (another Combwork, a script on the database), commits between them; a failure undoes it all.
+      timedStep('db begin combwork.db', () => db.exec('BEGIN IMMEDIATE'))
       try {
         const f = fromTables(db, place.scope)
         const deleted = f.deleted
@@ -345,14 +345,14 @@ export async function exportSessions(place: SessionsPlace): Promise<number> {
   }
 }
 
-/** Remove from Hive is over (#1061): a project it hid keeps its file unread while removed; one it didn't moves it back. */
+/** Remove from Combwork is over (#1061): a project it hid keeps its file unread while removed; one it didn't moves it back. */
 export function releaseSessions(place: SessionsPlace): void {
   removing.delete(openedKey(place))
   opened.delete(openedKey(place))
 }
 
 /**
- * The file Remove from Hive left in a host's folder, moved back in now it is back (#1061): its records, beside any
+ * The file Remove from Combwork left in a host's folder, moved back in now it is back (#1061): its records, beside any
  * recorded here since (those win: they are newer), in one transaction that ends the mark; the file then kept as a
  * backup. Gone (taken in by another workspace meanwhile), the mark just ends.
  */

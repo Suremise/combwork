@@ -1,0 +1,498 @@
+{
+  "main.accounts.badTarget": {
+    "placeholders": {
+      "target": "plain",
+      "cli": "plain"
+    }
+  },
+  "main.accounts.checkHeld": {
+    "placeholders": {
+      "name": "plain",
+      "cli": "plain"
+    }
+  },
+  "main.accounts.folderNotUsable": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "main.accounts.inUse": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "main.accounts.keyRemoveFailed": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "main.accounts.leftover": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "main.accounts.makeFailed": {
+    "placeholders": {
+      "error": "plain"
+    }
+  },
+  "main.accounts.noHome": {
+    "placeholders": {
+      "cli": "plain",
+      "folder": "plain"
+    }
+  },
+  "main.accounts.noName": {
+    "placeholders": {}
+  },
+  "main.accounts.noProvider": {
+    "placeholders": {
+      "cli": "plain"
+    }
+  },
+  "main.accounts.notFound": {
+    "placeholders": {}
+  },
+  "main.accounts.nothingToKeep": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "main.accounts.removeFailed": {
+    "placeholders": {
+      "name": "plain",
+      "error": "plain"
+    }
+  },
+  "main.accounts.running": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "main.accounts.setUpCancelled": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "main.accounts.usageMove.bad": {
+    "placeholders": {}
+  },
+  "main.branchMerge.cardWork": {
+    "placeholders": {
+      "branch": "plain",
+      "card": "plain"
+    }
+  },
+  "main.branchMerge.notBranch": {
+    "placeholders": {
+      "branch": "plain"
+    }
+  },
+  "main.branchMerge.same": {
+    "placeholders": {
+      "branch": "plain"
+    }
+  },
+  "main.combworkMove.what.cards": {
+    "placeholders": {}
+  },
+  "main.combworkMove.what.excludes": {
+    "placeholders": {}
+  },
+  "main.combworkMove.what.folders": {
+    "placeholders": {}
+  },
+  "main.combworkMove.what.notes": {
+    "placeholders": {}
+  },
+  "main.combworkMove.what.worktrees": {
+    "placeholders": {}
+  },
+  "main.connections.badMode": {
+    "placeholders": {
+      "cli": "plain",
+      "mode": "plain"
+    }
+  },
+  "main.connections.beingRemoved": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "main.connections.choice.missing": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "main.connections.choice.off": {
+    "placeholders": {
+      "name": "plain",
+      "agent": "plain"
+    }
+  },
+  "main.connections.choice.otherCli": {
+    "placeholders": {
+      "name": "plain",
+      "agent": "plain"
+    }
+  },
+  "main.connections.inUse": {
+    "placeholders": {
+      "name": "plain",
+      "users": "plain"
+    }
+  },
+  "main.connections.launch.changedAgain": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "main.connections.launch.changing": {
+    "placeholders": {
+      "name": "plain",
+      "agent": "plain"
+    }
+  },
+  "main.connections.launch.deleted": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "main.connections.launch.noKey": {
+    "placeholders": {
+      "name": "plain",
+      "agent": "plain"
+    }
+  },
+  "main.connections.launch.none": {
+    "placeholders": {
+      "cli": "plain",
+      "agent": "plain"
+    }
+  },
+  "main.connections.launch.offHere": {
+    "placeholders": {
+      "n": "plural",
+      "cli": "plain",
+      "names": "plain",
+      "agent": "plain"
+    }
+  },
+  "main.connections.launch.offNoDefault": {
+    "placeholders": {
+      "agent": "plain",
+      "name": "plain",
+      "cli": "plain"
+    }
+  },
+  "main.connections.launch.otherProvider": {
+    "placeholders": {
+      "agent": "plain",
+      "cli": "plain"
+    }
+  },
+  "main.connections.launch.signedOut": {
+    "placeholders": {
+      "name": "plain",
+      "agent": "plain"
+    }
+  },
+  "main.connections.nameTaken": {
+    "placeholders": {
+      "account": "plain",
+      "name": "plain"
+    }
+  },
+  "main.connections.noName": {
+    "placeholders": {}
+  },
+  "main.connections.notFound": {
+    "placeholders": {}
+  },
+  "main.connections.tagTooLong": {
+    "placeholders": {
+      "max": "number"
+    }
+  },
+  "main.finished.inProject": {
+    "placeholders": {
+      "n": "plural",
+      "project": "plain"
+    }
+  },
+  "main.finished.many": {
+    "placeholders": {
+      "n": "plural"
+    }
+  },
+  "main.freshStart.notFound": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "main.gitInit.already": {
+    "placeholders": {}
+  },
+  "main.gitInit.failed.commit": {
+    "placeholders": {}
+  },
+  "main.gitInit.failed.config": {
+    "placeholders": {
+      "key": "plain"
+    }
+  },
+  "main.gitInit.failed.exclude": {
+    "placeholders": {}
+  },
+  "main.gitInit.failed.gitignore": {
+    "placeholders": {}
+  },
+  "main.gitInit.failed.identity": {
+    "placeholders": {
+      "which": "select"
+    }
+  },
+  "main.gitInit.failed.ignored": {
+    "placeholders": {}
+  },
+  "main.gitInit.failed.init": {
+    "placeholders": {}
+  },
+  "main.gitInit.failed.stage": {
+    "placeholders": {}
+  },
+  "main.gitInit.failed.staged": {
+    "placeholders": {}
+  },
+  "main.gitInit.fix.commit": {
+    "placeholders": {
+      "git": "plain"
+    }
+  },
+  "main.gitInit.fix.identity": {
+    "placeholders": {
+      "which": "select"
+    }
+  },
+  "main.gitInit.fix.ignored": {
+    "placeholders": {}
+  },
+  "main.gitInit.fix.staged": {
+    "placeholders": {}
+  },
+  "main.gitInit.nested": {
+    "placeholders": {
+      "root": "plain"
+    }
+  },
+  "main.gitInit.noEmail": {
+    "placeholders": {}
+  },
+  "main.gitInit.noGit": {
+    "placeholders": {
+      "problem": "plain"
+    }
+  },
+  "main.gitInit.noName": {
+    "placeholders": {}
+  },
+  "main.gitInit.otherVcs": {
+    "placeholders": {
+      "vcs": "plain",
+      "root": "plain"
+    }
+  },
+  "main.gitInit.stopped": {
+    "placeholders": {
+      "what": "plain",
+      "why": "plain"
+    }
+  },
+  "main.gitInit.stoppedAfter": {
+    "placeholders": {
+      "done": "plain",
+      "what": "plain",
+      "why": "plain"
+    }
+  },
+  "main.gitInit.unreadable": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "main.keys.maskingFull": {
+    "placeholders": {}
+  },
+  "main.keys.maskingUnreadable": {
+    "placeholders": {}
+  },
+  "main.keys.unsafe": {
+    "placeholders": {}
+  },
+  "main.leftovers.offerNotEnded": {
+    "placeholders": {
+      "n": "plural"
+    }
+  },
+  "main.leftovers.offerUnchecked": {
+    "placeholders": {}
+  },
+  "main.nameUpgrade.what.board": {
+    "placeholders": {}
+  },
+  "main.nameUpgrade.what.files": {
+    "placeholders": {}
+  },
+  "main.nameUpgrade.what.projects": {
+    "placeholders": {}
+  },
+  "main.outage.gaveUpBody": {
+    "placeholders": {
+      "n": "plural"
+    }
+  },
+  "main.outage.gaveUpTitle": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "main.outage.progressTitle": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "main.outage.progressWaiting": {
+    "placeholders": {}
+  },
+  "main.outage.resumedSummary": {
+    "placeholders": {
+      "dropped": "plain",
+      "back": "plain"
+    }
+  },
+  "main.outage.timedOutBody": {
+    "placeholders": {
+      "minutes": "plural"
+    }
+  },
+  "main.outage.timedOutTitle": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "main.plan.used": {
+    "placeholders": {
+      "share": "number",
+      "provider": "plain",
+      "window": "select",
+      "hours": "plural",
+      "label": "plain"
+    }
+  },
+  "main.plan.usedOn": {
+    "placeholders": {
+      "share": "number",
+      "window": "select",
+      "hours": "plural",
+      "label": "plain",
+      "connection": "plain"
+    }
+  },
+  "main.quit.closed": {
+    "placeholders": {}
+  },
+  "main.server.key.chars": {
+    "placeholders": {}
+  },
+  "main.server.key.inField": {
+    "placeholders": {
+      "field": "select"
+    }
+  },
+  "main.server.key.length": {
+    "placeholders": {
+      "min": "number",
+      "max": "number"
+    }
+  },
+  "main.server.notServer": {
+    "placeholders": {}
+  },
+  "main.server.setUp.noKey": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
+  "main.server.unsupported": {
+    "placeholders": {
+      "cli": "plain"
+    }
+  },
+  "main.server.url.extra": {
+    "placeholders": {}
+  },
+  "main.server.url.invalid": {
+    "placeholders": {}
+  },
+  "main.server.url.remoteHttp": {
+    "placeholders": {}
+  },
+  "main.server.url.scheme": {
+    "placeholders": {}
+  },
+  "main.server.url.userinfo": {
+    "placeholders": {}
+  },
+  "main.storage.purgeChanged": {
+    "placeholders": {}
+  },
+  "main.storage.purgeClaimed": {
+    "placeholders": {}
+  },
+  "main.storage.purgeExpired": {
+    "placeholders": {}
+  },
+  "main.storage.purgeNotKept": {
+    "placeholders": {}
+  },
+  "main.storage.purgeRunning": {
+    "placeholders": {}
+  },
+  "main.storage.purgeSessionChanged": {
+    "placeholders": {}
+  },
+  "main.storage.purgeUnrecorded": {
+    "placeholders": {}
+  },
+  "main.unexpectedClose.notChecked": {
+    "placeholders": {
+      "u": "plural",
+      "ids": "plain"
+    }
+  },
+  "main.unexpectedClose.notStopped": {
+    "placeholders": {
+      "n": "plural"
+    }
+  },
+  "main.unexpectedClose.notStoppedNorChecked": {
+    "placeholders": {
+      "n": "plural",
+      "u": "plural",
+      "ids": "plain"
+    }
+  },
+  "main.usageMove.blockedTitle": {
+    "placeholders": {
+      "from": "plain",
+      "to": "plain"
+    }
+  },
+  "main.usageMove.movedTitle": {
+    "placeholders": {
+      "count": "plural",
+      "from": "plain",
+      "to": "plain"
+    }
+  }
+}

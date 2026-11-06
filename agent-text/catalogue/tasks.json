@@ -1,0 +1,877 @@
+{
+  "tasks.error.actionGone": {
+    "text": "{action, select, done {{card} is already in Done.} noCode {{card} is already no code.} other {{card} isn't blocked.}} Answer the question with a reply instead.",
+    "note": "An error when the user clicks an action an agent's question offered on its card (For you): the card has changed so the action no longer applies. {card} is the card's key (HI-12); keep the select keys as they are. Answer with a reply: type an answer in the box instead.",
+    "audience": "both"
+  },
+  "tasks.error.addOwnOnly": {
+    "text": "You can add cards only to your project ({project}).",
+    "note": "An error: an agent tried to add a card to another project, or to the whole workspace; it adds cards only to its own project ({project}, its folder name).",
+    "audience": "both"
+  },
+  "tasks.error.answersNot": {
+    "text": "{why, select, open {{request} isn't an open request on {card}.} other {A decision can't answer {request} on {card}: approve, decline or choose it in For you.}}",
+    "note": "An error (HI-1932): a decision named a request ({request}: its id, such as r12) of card {card} (its key) that it can't answer: it isn't open on the card (answered or closed meanwhile), or it is an approval or one of Combwork's own requests (a review, the OK before merging, the round limit), which the user answers in For you. Keep the select keys.",
+    "audience": "both"
+  },
+  "tasks.error.answersNotAgents": {
+    "text": "Only the user, or the Assistant recording the user's decision, closes a request for the user.",
+    "note": "An error (HI-1932): an agent recorded a decision naming the card's requests it answers (For you); only the user, or the Combwork Assistant writing down the user's own decision, may close them that way.",
+    "audience": "both"
+  },
+  "tasks.error.answersShape": {
+    "text": "answers takes the ids of 1 to {max, number} of the card’s open requests, with a decision and nothing else in the same change.",
+    "note": "An error (HI-1932): a decision naming the card's requests it answers was sent wrongly: answers must list between 1 and {max} request ids (For you's requests), together with the decision's text and no other change. Keep answers as it is (a field's name).",
+    "audience": "both"
+  },
+  "tasks.error.archiveNone": {
+    "text": "cards: list the cards to archive.",
+    "note": "An error: a call to archive cards listed none. \"cards:\" is the name of the call's field: keep it as it is.",
+    "audience": "both"
+  },
+  "tasks.error.archiveNumbers": {
+    "text": "cards: card numbers only.",
+    "note": "An error: the list of cards to archive has something other than card numbers in it. \"cards:\" is the name of the call's field: keep it as it is.",
+    "audience": "both"
+  },
+  "tasks.error.archived": {
+    "text": "{card} is archived. Only the user can bring it back.",
+    "note": "An error: card {card} (its key, such as HI-12) is archived, so an agent or the Assistant cannot change it; only the user can bring it back from the archive.",
+    "audience": "both"
+  },
+  "tasks.error.badAnswer": {
+    "text": "That answer doesn't fit the request: approve or decline an approval, answer a question with a reply or a decision, and choose a way on at the round limit (a carry on with 1 to {max} more rounds).",
+    "note": "An error answering a request for the user (For you): what was sent doesn't fit the request's kind. {max} is the most rounds a carry on can add (a number).",
+    "audience": "both"
+  },
+  "tasks.error.badKind": {
+    "text": "A card is code or no-code, not {kind}.",
+    "note": "An error: a card's kind was given as {kind}; it is code (work in commits, the default) or no-code (a decision, a write-up, a trial). Keep code and no-code as they are (they are values).",
+    "audience": "both"
+  },
+  "tasks.error.badReviewSkip": {
+    "text": "skipReview is the user's reason the card skips review (text), or false to review it after all.",
+    "note": "An error: a card's skipReview was given as something else than a reason (text) or false. Keep skipReview and false as they are (a field's name and a value).",
+    "audience": "both"
+  },
+  "tasks.error.badReviewSkipNew": {
+    "text": "A new card reviews as its rules say: give skipReview the user's reason to skip it, or leave it out.",
+    "note": "An error: a card was made with skipReview false. Keep skipReview as it is (a field's name).",
+    "audience": "both"
+  },
+  "tasks.error.batchGone": {
+    "text": "That batch is no longer kept: unarchive its cards from Archived.",
+    "note": "An error: the Archive All batch to bring back is no longer kept (Combwork keeps the latest 50); its cards can still be brought back one by one from the board's Archived list.",
+    "audience": "both"
+  },
+  "tasks.error.beforeArchived": {
+    "text": "{before} is archived, not in {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}: {card} can only go before a card in the column it's in.",
+    "note": "An error: card {card} was to be placed just above card {before} (their keys, such as HI-12), which is archived, not in the column {column} (select: a board column; translate each).",
+    "audience": "both"
+  },
+  "tasks.error.beforeElsewhere": {
+    "text": "{before} is in {other, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{other}}}, not in {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}: {card} can only go before a card in the column it's in.",
+    "note": "An error: card {card} was to be placed just above card {before} (their keys, such as HI-12), which is in the column {other}, not in {column} (select: board columns; translate each).",
+    "audience": "both"
+  },
+  "tasks.error.beforeItself": {
+    "text": "A card can't go before itself.",
+    "note": "An error: a card was to be placed just above itself.",
+    "audience": "both"
+  },
+  "tasks.error.beforeOrPosition": {
+    "text": "Give before or position, not both.",
+    "note": "An error: the call gave both of its fields \"before\" and \"position\" (keep them as they are), which place a card in two ways.",
+    "audience": "both"
+  },
+  "tasks.error.cardsNotNumber": {
+    "text": "cards: \"{value}\" is not a card number",
+    "note": "An error: {value} in the list of cards is not a card number. \"cards:\" is the name of the call's field: keep it as it is.",
+    "audience": "both"
+  },
+  "tasks.error.cardsTooMany": {
+    "text": "cards: at most {max, number} cards at once.",
+    "note": "An error: a call listed more than {max} cards. \"cards:\" is the name of the call's field: keep it as it is.",
+    "audience": "both"
+  },
+  "tasks.error.cardsTwice": {
+    "text": "cards: {card} is listed twice",
+    "note": "An error: the list of cards names card {card} (its key, such as HI-12) twice. \"cards:\" is the name of the call's field: keep it as it is.",
+    "audience": "both"
+  },
+  "tasks.error.changeNone": {
+    "text": "cards: list the card numbers to change.",
+    "note": "An error: a call to change several cards listed none. \"cards:\" is the name of the call's field: keep it as it is.",
+    "audience": "both"
+  },
+  "tasks.error.contextList": {
+    "text": "context must be a list",
+    "note": "An error: the call gave the card's context (the doc sections to read first) as something other than a list. \"context\" is the name of the call's field: keep it as it is.",
+    "audience": "both"
+  },
+  "tasks.error.contextRef": {
+    "text": "\"{ref}\" isn't a doc section: give a Markdown file, optionally with # and a heading's slug (\"docs/PLAN.md#setup\", \"shared:plans/notes.md#open-questions\"), never a line number.",
+    "note": "An error: one of the card's context references isn't a Markdown file with an optional #heading-slug. Keep the examples in quotes as they are.",
+    "audience": "both"
+  },
+  "tasks.error.decisionEmptied": {
+    "text": "The decision is empty: remove it instead.",
+    "note": "An error: the user emptied a decision's text; to take it off the card, remove it.",
+    "audience": "both"
+  },
+  "tasks.error.decisionGone": {
+    "text": "That decision is no longer on {card}.",
+    "note": "An error: the decision being changed was removed from card {card} (its key, such as HI-12) meanwhile.",
+    "audience": "both"
+  },
+  "tasks.error.decisionsUsers": {
+    "text": "Only the user changes or removes a card's decisions.",
+    "note": "An error: an agent or the Assistant tried to change or remove a decision on a card; only the user does that (they only record them).",
+    "audience": "both"
+  },
+  "tasks.error.doingNobodyNew": {
+    "text": "A card made in Active needs an agent on it (agent). Ask the user which they want: an agent on it, an agent started on it (make it in Todo, then cw_start_task), or nobody on it (make it in Todo, then move it with override and their reason).",
+    "note": "An error said to the Combwork Assistant (HI-2062): it made a card straight into the Active stage with no agent on it. agent, override and cw_start_task are names of a call's fields and a tool: keep them as they are. Active and Todo are stage names.",
+    "audience": "both"
+  },
+  "tasks.error.emptyComment": {
+    "text": "The comment is empty.",
+    "note": "An error: a comment on a card has no text.",
+    "audience": "both"
+  },
+  "tasks.error.emptyDecision": {
+    "text": "The decision is empty.",
+    "note": "An error: a decision recorded on a card has no text.",
+    "audience": "both"
+  },
+  "tasks.error.failedToDoing": {
+    "text": "A failed review sends {card} back to Doing, to its builder: give the verdict without column.",
+    "note": "An error: a failed review also tried to move card {card} (its key, such as HI-12) somewhere other than Doing; a failed card goes back to Doing, to the agent that built it. \"column\" is the name of the call's field: keep it as it is.",
+    "audience": "both"
+  },
+  "tasks.error.holdCard": {
+    "text": "Only the user or the Assistant puts cards On Hold. Where the user has decided to park {card}, ask the Assistant (cw_ask_assistant); otherwise ask the user.",
+    "note": "An error: an agent tried to move card {card} (its key, such as HI-12) On Hold (a board column), which only the user or the Assistant may do (HI-2227): a decision already made goes to the Assistant, cw_ask_assistant (a tool name: keep it as it is), else the user is asked.",
+    "audience": "both"
+  },
+  "tasks.error.holdNew": {
+    "text": "Only the user or the Assistant puts cards On Hold. Add it to Todo; where the user has decided to park it, ask the Assistant (cw_ask_assistant), otherwise ask the user.",
+    "note": "An error: an agent tried to add a card On Hold (a board column), which only the user or the Assistant may do (HI-2227): add it to Todo, then a decision already made goes to the Assistant, cw_ask_assistant (a tool name: keep it as it is), else the user is asked.",
+    "audience": "both"
+  },
+  "tasks.error.inDoingWith": {
+    "text": "{card} is in {active} with agent {agent}, who is working on it: newer work is in progress, so another agent can't move it to {stage}. Leave it where it is; agent {agent} moves it to {review} when done, and the user can move it.",
+    "note": "An error, read by agents: an agent tried to move card {card} (its key, such as HI-12) on to the stage {stage}, but the card is in {active} with another agent ({agent}, its name), whose work is in progress. {active}, {review} and {stage} are stage names as the board shows them (glossary 2.2).",
+    "audience": "both"
+  },
+  "tasks.error.inDoingWithAnother": {
+    "text": "{card} is in {active} with another agent, who is working on it: newer work is in progress, so another agent can't move it to {stage}. Leave it where it is; that agent moves it to {review} when done, and the user can move it.",
+    "note": "An error, read by agents: an agent tried to move card {card} (its key, such as HI-12) on to the stage {stage}, but the card is in {active} with another agent (whose name isn't known), whose work is in progress. {active}, {review} and {stage} are stage names as the board shows them (glossary 2.2).",
+    "audience": "both"
+  },
+  "tasks.error.kindNeedsReason": {
+    "text": "Changing a card's kind after it is made is an exception to its rules: pass override.reason with the user's reason.",
+    "note": "An error said to the Combwork Assistant: it changed a card's kind (code or no-code) after the card was made without giving the user's reason (override.reason: keep it as it is).",
+    "audience": "both"
+  },
+  "tasks.error.kindNotAgents": {
+    "text": "Agents can't change a card's kind: propose no-code when you make the card, and the user or the Assistant confirms it.",
+    "note": "An error: an agent tried to change a card's kind (code or no-code) after it was made, or to answer a proposed kind; only the user or the Combwork Assistant can.",
+    "audience": "both"
+  },
+  "tasks.error.labelFieldList": {
+    "text": "{field} must be a list",
+    "note": "An error: the call gave the labels to add or remove as something other than a list. {field} is the name of the call's field (\"addLabels\" or \"removeLabels\"): keep it as it is.",
+    "audience": "both"
+  },
+  "tasks.error.labelsAddedAndRemoved": {
+    "text": "A label can't be both added and removed: {labels}.",
+    "note": "An error: the call named the same labels ({labels}, separated by commas) both to add to the card and to take off it.",
+    "audience": "both"
+  },
+  "tasks.error.labelsList": {
+    "text": "labels must be a list",
+    "note": "An error: the call gave the card's labels as something other than a list. \"labels\" is the name of the call's field: keep it as it is.",
+    "audience": "both"
+  },
+  "tasks.error.labelsMixed": {
+    "text": "labels replaces a card's labels: give it alone, or addLabels and removeLabels to change only those.",
+    "note": "An error: the call gave the card's labels in full (labels, which replaces them) and also labels to add or take off. \"labels\", \"addLabels\" and \"removeLabels\" are the names of the call's fields: keep them as they are.",
+    "audience": "both"
+  },
+  "tasks.error.noCard": {
+    "text": "There is no card {card}.",
+    "note": "An error: there is no card {card} (its key, such as HI-12) that the caller may see.",
+    "audience": "both"
+  },
+  "tasks.error.noKindProposal": {
+    "text": "Nothing proposes a kind for {card}: its kind is {kind}.",
+    "note": "An error: confirming a card's proposed kind, but no agent proposed one (or it was answered already). {card} is the card's key (HI-12); {kind} its kind, code or no-code (values: keep them as they are).",
+    "audience": "both"
+  },
+  "tasks.error.noWorkspace": {
+    "text": "No workspace is open",
+    "note": "An error: a change to the task board needs an open workspace, and there is none.",
+    "audience": "both"
+  },
+  "tasks.error.notReviewing": {
+    "text": "You aren't reviewing {card} now: its review ended (the card moved, or your session ended) or never started. Start one with review \"start\" if it is in Review.",
+    "note": "An error: an agent tried to give a verdict on card {card} (its key, such as HI-12), but it has no review going on it. \"review\" and \"start\" are the call's field and value: keep them as they are.",
+    "audience": "both"
+  },
+  "tasks.error.onlyUserArchives": {
+    "text": "Only the user archives cards.",
+    "note": "An error: an agent or the Assistant tried to archive cards; only the user does that.",
+    "audience": "both"
+  },
+  "tasks.error.onlyUserDone": {
+    "text": "Only the user puts cards in Done.",
+    "note": "An error: an agent or the Assistant tried to add a card straight into Done (a board column), which only the user does.",
+    "audience": "both"
+  },
+  "tasks.error.onlyUserOrdersDone": {
+    "text": "Only the user puts the cards in Done in order.",
+    "note": "An error: an agent or the Assistant tried to put the cards of the Done column in order; only the user does that.",
+    "audience": "both"
+  },
+  "tasks.error.onlyUserUnarchives": {
+    "text": "Only the user brings archived cards back.",
+    "note": "An error: an agent or the Assistant tried to bring archived cards back onto the board; only the user does that.",
+    "audience": "both"
+  },
+  "tasks.error.orderArchived": {
+    "text": "{card} is archived, not in {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}. Only cards already in {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}} can be put in order there.",
+    "note": "An error: card {card} (its key, such as HI-12) was listed to be put in order in the column {column}, but it is archived (select: a board column; translate each).",
+    "audience": "both"
+  },
+  "tasks.error.orderChanged": {
+    "text": "{card} changed while the cards were being put in order; read the board again.",
+    "note": "An error: card {card} (its key, such as HI-12) moved or was archived while the cards were being put in order, so the order asked for no longer holds.",
+    "audience": "both"
+  },
+  "tasks.error.orderElsewhere": {
+    "text": "{card} is in {other, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{other}}}, not in {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}}. Only cards already in {column, select, hold {On Hold} todo {Todo} doing {Doing} review {Review} passed {Passed} done {Done} other {{column}}} can be put in order there.",
+    "note": "An error: card {card} (its key, such as HI-12) was listed to be put in order in the column {column}, but it is in the column {other} (select: board columns; translate each).",
+    "audience": "both"
+  },
+  "tasks.error.orderNone": {
+    "text": "cards: list the card numbers in the order wanted.",
+    "note": "An error: a call to put cards in order listed none. \"cards:\" is the name of the call's field: keep it as it is.",
+    "audience": "both"
+  },
+  "tasks.error.overrideNotAgents": {
+    "text": "Agents can't override workflow rules: only the user or the Assistant can.",
+    "note": "An error: an agent passed an override (moving a card across a workflow rule, with a reason); only the user or the Combwork Assistant can.",
+    "audience": "both"
+  },
+  "tasks.error.overrideShape": {
+    "text": "An override needs a reason: why the card moves across its rules, as text.",
+    "note": "An error: an override (moving a card across a workflow rule) was passed without its reason as text.",
+    "audience": "both"
+  },
+  "tasks.error.ownCardsOnly": {
+    "text": "You can see only your project's cards ({project}).",
+    "note": "An error: an agent asked for another project's cards; it sees only its own project's ({project}, its folder name).",
+    "audience": "both"
+  },
+  "tasks.error.projectThenAgent": {
+    "text": "Move the card to the other project first, then give it to one of its agents.",
+    "note": "An error: one change both moved a card to another project and gave it to an agent; those are two changes, in that order.",
+    "audience": "both"
+  },
+  "tasks.error.refsList": {
+    "text": "{field} must be a list of card numbers",
+    "note": "An error: the call gave {field} (the name of its field: blockedBy or links, kept as it is) as something other than a list of card numbers.",
+    "audience": "both"
+  },
+  "tasks.error.refsNoCard": {
+    "text": "{field}: there is no card {card}",
+    "note": "An error: the list {field} (the name of the call's field: blockedBy or links, kept as it is) names card #{n} (a number), which there is not.",
+    "audience": "both"
+  },
+  "tasks.error.refsNotNumber": {
+    "text": "{field}: \"{value}\" is not a card number",
+    "note": "An error: the list {field} (the name of the call's field: blockedBy or links, kept as it is) has {value} in it, which is not a card number.",
+    "audience": "both"
+  },
+  "tasks.error.refsSelf": {
+    "text": "{field}: a card can't refer to itself",
+    "note": "An error: the list {field} (the name of the call's field: blockedBy or links, kept as it is) names the card itself.",
+    "audience": "both"
+  },
+  "tasks.error.repairNoProject": {
+    "text": "{project} isn't a project of the workspace now",
+    "note": "An error from Repair: the project {project} (a folder name) it was to give cards to isn't in the workspace any more.",
+    "audience": "both"
+  },
+  "tasks.error.reviewAgentsOnly": {
+    "text": "Only an agent of the card's project reviews it, through its own Combwork tools.",
+    "note": "An error: the user, the Assistant or a script tried to start or end a card's review; only an agent of the card's project does that, with its Combwork tools (the app's name).",
+    "audience": "both"
+  },
+  "tasks.error.reviewNotInReview": {
+    "text": "{card} is in {column, select, hold {On Hold} todo {Todo} doing {Doing} passed {Passed} done {Done} other {{column}}}. A card is reviewed in Review; if it needs more work, that is work on it (move it to doing).",
+    "note": "An error: an agent tried to review card {card} (its key, such as HI-12), which is in the column {column} (select: a board column; translate each), not in Review. \"doing\" is the value the call takes: keep it as it is.",
+    "audience": "both"
+  },
+  "tasks.error.reviewOnItsOwn": {
+    "text": "Start a review on its own: the card stays where it is, with its agent.",
+    "note": "An error: a call started a review and also moved the card or gave it to an agent; a review starts on its own.",
+    "audience": "both"
+  },
+  "tasks.error.reviewSkipInReview": {
+    "text": "{card} is in Review: whether it skips review is decided before it is submitted. To take it past its review now, the user moves it on (an override, with their reason).",
+    "note": "An error: a card's review skip was to change while the card is in Review. The way past its review is the user's override of the move (dragging it on, or the Assistant moving it with the user's reason). {card} is the card's key (HI-12).",
+    "audience": "both"
+  },
+  "tasks.error.reviewSkipNeedsReason": {
+    "text": "A card skips review only with the user's reason: pass skipReview with it, in the user's words.",
+    "note": "An error said to the Combwork Assistant (or an agent proposing it): it asked for a card to skip its review without a reason. Keep skipReview as it is (a field's name).",
+    "audience": "both"
+  },
+  "tasks.error.reviewSkipNotAgents": {
+    "text": "Agents can't make a card skip review: propose it when you make the card (skipReview, with your reason), and the user or the Assistant decides.",
+    "note": "An error: an agent tried to make a card skip its review, or to answer a proposal that it skip review, after the card was made; only the user or the Combwork Assistant can. Keep skipReview as it is (a field's name).",
+    "audience": "both"
+  },
+  "tasks.error.reviewSkipNothing": {
+    "text": "{card}'s rules don't review it: there is no review to skip.",
+    "note": "An error: a card was to skip its review, but its project's workflow has no review (Solo, or no workflow). {card} is the card's key (HI-12).",
+    "audience": "both"
+  },
+  "tasks.error.reviewSkipNothingNew": {
+    "text": "This card's rules don't review it: there is no review to skip.",
+    "note": "An error making a card: it was to skip its review, but its project's workflow has no review (Solo, or no workflow).",
+    "audience": "both"
+  },
+  "tasks.error.reviewSkipPast": {
+    "text": "{stage, select, done {{card} is Done: it has no review left to skip.} other {{card} is past its review already: there is nothing left to skip.}}",
+    "note": "An error: a card's review skip was to change once the card was past Review (approved, being merged, or Done). {card} is the card's key (HI-12); {stage} its stage (select: done, or another).",
+    "audience": "both"
+  },
+  "tasks.error.reviewTaken": {
+    "text": "{agent} is already reviewing {card} (since {since} UTC).",
+    "note": "An error: another agent ({agent}, its name) is already reviewing card {card} (its key, such as HI-12), since {since} (a date and time, UTC).",
+    "audience": "both"
+  },
+  "tasks.error.setAsideGone": {
+    "text": "That set-aside card is gone, or isn't a card: it can only be discarded.",
+    "note": "An error in the Review… dialog for cards an older Combwork saved: the card's file was removed meanwhile, or can't be read as a card.",
+    "audience": "both"
+  },
+  "tasks.error.staysInProject": {
+    "text": "Cards stay in your project ({project}).",
+    "note": "An error: an agent tried to move a card to another project, or to the whole workspace; its cards stay in its own project ({project}, its folder name).",
+    "audience": "both"
+  },
+  "tasks.error.tooLong": {
+    "text": "{what, select, title {The title is too long (at most {max, number} characters).} description {The description is too long (at most {max, number} characters).} comment {The comment is too long (at most {max, number} characters).} decision {The decision is too long (at most {max, number} characters).} other {The blocked reason is too long (at most {max, number} characters).}}",
+    "note": "An error: a card's field is longer than it may be ({what}, select: its title, description, comment, decision or blocked reason; translate each sentence); {max} is the most characters it takes.",
+    "audience": "both"
+  },
+  "tasks.error.tooManyContext": {
+    "text": "A card can have up to {max} doc sections to read first.",
+    "note": "An error: a card was given more context references (doc sections the agent reads first) than it may have ({max}, a number).",
+    "audience": "both"
+  },
+  "tasks.error.tooManyDecisions": {
+    "text": "A card can have up to {max} decisions.",
+    "note": "An error: a card already has as many decisions as it may have ({max}, a number).",
+    "audience": "both"
+  },
+  "tasks.error.tooManyLabels": {
+    "text": "A card can have up to {max} labels.",
+    "note": "An error: a card was given more labels than it may have ({max}, a number).",
+    "audience": "both"
+  },
+  "tasks.error.unknownAgent": {
+    "text": "Unknown agent \"{agent}\" in {project}",
+    "note": "An error: the project {project} (a folder name) has no agent named {agent}.",
+    "audience": "both"
+  },
+  "tasks.error.unknownColumn": {
+    "text": "Unknown column \"{column}\": {choices}.",
+    "note": "An error: {column} is not a column of the board; {choices} lists the column ids the call takes (hold, todo, doing… kept as they are).",
+    "audience": "both"
+  },
+  "tasks.error.unknownPosition": {
+    "text": "Unknown position \"{position}\": top or bottom.",
+    "note": "An error: the call's position was {position}, which it doesn't take. \"top\" and \"bottom\" are the values it takes: keep them as they are.",
+    "audience": "both"
+  },
+  "tasks.error.unknownProject": {
+    "text": "Unknown project \"{project}\"",
+    "note": "An error: the workspace has no project named {project}.",
+    "audience": "both"
+  },
+  "tasks.error.unknownReview": {
+    "text": "Unknown review \"{review}\": start, passed or failed.",
+    "note": "An error: the call's review was {review}, which it doesn't take. \"start\", \"passed\" and \"failed\" are the values it takes: keep them as they are.",
+    "audience": "both"
+  },
+  "tasks.error.verdictNotYours": {
+    "text": "{agent} is reviewing {card}: its verdict is its own.",
+    "note": "An error: an agent tried to give a verdict on card {card} (its key, such as HI-12), which another agent ({agent}, its name) is reviewing.",
+    "audience": "both"
+  },
+  "tasks.error.waitingNotActive": {
+    "text": "{card} isn't in {active}: only a card in {active} can be marked waiting.",
+    "note": "An error (HI-2618): only a card in the stage {active} (the board's name for it, such as Active) can be marked as waiting on purpose; card {card} (its key, such as HI-12) is elsewhere.",
+    "audience": "both"
+  },
+  "tasks.error.waitingNotYours": {
+    "text": "Only {card}'s own agent, the user or the Assistant can mark it waiting or clear that.",
+    "note": "An error, read by agents (HI-2618): an agent tried to mark card {card} (its key, such as HI-12) as waiting on purpose, or clear that mark, but the card isn't its own. A waiting card isn't reported as stalled.",
+    "audience": "both"
+  },
+  "tasks.error.waitingTooLong": {
+    "text": "The waiting reason is too long (at most {max, number} characters).",
+    "note": "An error (HI-2618): the reason a card waits on purpose is longer than it may be; {max} is the most characters it takes.",
+    "audience": "both"
+  },
+  "tasks.history.answerTold": {
+    "text": "Told agent {agent} of your answer",
+    "note": "A line in a card's history: Combwork told the agent {agent} (its name) of the user's answer to a request for them (For you: an approval, a reply, a decision, a choice at the round limit). A noun before the name (glossary §1 rule 4).",
+    "audience": "both"
+  },
+  "tasks.history.answerUntold": {
+    "text": "The Assistant couldn't be told of your answer to {agent}'s question: only {agent} has it",
+    "note": "A line in a card's history (and a notification): the user answered a question the agent {agent} (its name) asked on the card; Combwork gives such answers to the Combwork Assistant too, in case they grant something the agent can't do itself, but the Assistant couldn't be told (its tools are off, or Settings → Assistant → Control doesn't let it change cards).",
+    "audience": "both"
+  },
+  "tasks.history.answerUntoldNeed": {
+    "text": "{agent} can't {action, select, done {move this card to Done} noCode {make this card no code} skipReview {skip this card's review} other {unblock this card}} by itself, and the Assistant couldn't be told of your answer: do it yourself if you agreed to it",
+    "note": "A line in a card's history (and a notification): the user answered a question the agent {agent} (its name) asked on the card; the card needs something only the user or the Combwork Assistant may do (select: translate each; keep the keys), the agent can't, and the Assistant couldn't be told (its tools are off, or Settings → Assistant → Control doesn't let it change cards).",
+    "audience": "both"
+  },
+  "tasks.history.archived": {
+    "text": "Archived",
+    "note": "A line in a card's history: the user archived the card (hidden from the board, kept).",
+    "audience": "both"
+  },
+  "tasks.history.archivedDone": {
+    "text": "Archived after {days, plural, one {# day} other {# days}} in Done",
+    "note": "A line in a card's history: Combwork archived the card on its own, because it had been in the Done column for {days} days (Settings → Board).",
+    "audience": "both"
+  },
+  "tasks.history.archivedHidden": {
+    "text": "Archived: {project} was hidden",
+    "note": "A line in a card's history: the card was archived because the user hid its project {project} (its folder name) from Combwork.",
+    "audience": "both"
+  },
+  "tasks.history.archivedInBatch": {
+    "text": "Archived in a batch of {n, number} ({label})",
+    "note": "A line in a card's history: the user archived {n} cards at once (Archive All), this one among them; {label} is the batch's name (\"All in Done\").",
+    "audience": "both"
+  },
+  "tasks.history.archivedRemoved": {
+    "text": "Archived: {project} was removed from Combwork",
+    "note": "A line in a card's history: the card was archived because the user removed its project {project} (its folder name) from Combwork.",
+    "audience": "both"
+  },
+  "tasks.history.assistantAskUntold": {
+    "text": "The Assistant couldn't be told of {agent}'s request on this card: read it in the card's comments and act on it yourself if it needs doing",
+    "note": "A line in a card's history (and a notification), HI-1866: the agent {agent} (its name) asked the Combwork Assistant for something on the card, but the request couldn't reach the Assistant (its tools are off, Settings → Assistant → Control doesn't let it change cards, or it went unread too long). The request is the agent's comment on the card.",
+    "audience": "both"
+  },
+  "tasks.history.assistantAsked": {
+    "text": "Asked the Assistant: \"{text}\"",
+    "note": "A line in a card's history (HI-1866): an agent (named beside it) asked the Combwork Assistant for something only it or the user can do on the card (put a card On Hold, move it past its rules on the user's answer); {text} is what it asked (cut short). The request went to the Assistant's inbox.",
+    "audience": "both"
+  },
+  "tasks.history.attachmentsCleaned": {
+    "text": "{n, plural, one {Removed # attachment} other {Removed # attachments}} ({names}): this project removes archived cards' attachments {days, plural, one {# day} other {# days}} after archiving (Project Settings → Storage). {n, plural, one {It is} other {They are}} in the Recycle Bin.",
+    "note": "A comment Combwork writes on an archived card when it removes the files kept with it: {n} how many, {names} their names (a list), {days} the project's setting (days after the card was archived). Project Settings → Storage is where the setting is: use its translated name.",
+    "audience": "both"
+  },
+  "tasks.history.backWithBatch": {
+    "text": "Brought back with its batch ({label})",
+    "note": "A line in a card's history: the user undid an Archive All, which brought this card back; {label} is the batch's name (\"All in Done\").",
+    "audience": "both"
+  },
+  "tasks.history.blocked": {
+    "text": "Blocked: {reason}",
+    "note": "A line in a card's history: the card was marked blocked, with this reason ({reason}, written by whoever blocked it).",
+    "audience": "both"
+  },
+  "tasks.history.builderReply": {
+    "text": "Replied to the reviewer: \"{text}\"",
+    "note": "A line in a card's history (HI-2302): the agent building the card (named beside it) commented on it in Review after its reviewer asked or said something in that round of review, so the reviewer was woken with the reply; {text} is what it said (cut short).",
+    "audience": "both"
+  },
+  "tasks.history.closedByDecision": {
+    "text": "Closed a question for you with your decision: \"{question}\"",
+    "note": "A line in a card's history (HI-1932): a question waiting for the user (For you) was answered by a decision the user made, recorded on the card (by the user, or by the Combwork Assistant writing down the user's words: the history line's author says who). {question} is the question, cut short.",
+    "audience": "both"
+  },
+  "tasks.history.context": {
+    "text": "Read first: {refs}",
+    "note": "A line in a card's history: the doc sections the agent reads first were set to these ({refs}: references such as \"docs/PLAN.md#setup\", separated by commas; keep them as they are).",
+    "audience": "both"
+  },
+  "tasks.history.contextRemoved": {
+    "text": "Removed the doc sections to read first",
+    "note": "A line in a card's history: the card's list of doc sections the agent reads first was cleared.",
+    "audience": "both"
+  },
+  "tasks.history.created": {
+    "text": "Created in {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}",
+    "note": "A line in a card's history: the card was added, in this column. {column} is a board column (select: On Hold, Todo, Active, Review, Approved, Done): translate each.",
+    "audience": "both"
+  },
+  "tasks.history.decision": {
+    "text": "Recorded a decision: \"{decision}\"",
+    "note": "A line in a card's history: a decision the user made was written on the card; {decision} is its text (cut short).",
+    "audience": "both"
+  },
+  "tasks.history.decisionChanged": {
+    "text": "Changed a decision to \"{decision}\" (was \"{was}\")",
+    "note": "A line in a card's history: the user changed the words of one of the card's decisions; {decision} is the new text and {was} the old (each cut short).",
+    "audience": "both"
+  },
+  "tasks.history.decisionRemoved": {
+    "text": "Removed a decision: \"{decision}\"",
+    "note": "A line in a card's history: the user removed one of the card's decisions; {decision} is its text (cut short).",
+    "audience": "both"
+  },
+  "tasks.history.decisionsTold": {
+    "text": "Told {agent} of {count, plural, one {# new decision} other {# new decisions}}",
+    "note": "A line in a card's history: Combwork told the agent {agent} (its name) of {count} decisions the user recorded on the card since it last read them.",
+    "audience": "both"
+  },
+  "tasks.history.dependsOn": {
+    "text": "Depends on {cards}",
+    "note": "A line in a card's history: the cards that have to be done first were set to these ({cards}: card keys such as \"HI-3, HI-4\").",
+    "audience": "both"
+  },
+  "tasks.history.description": {
+    "text": "Changed the description",
+    "note": "A line in a card's history: the card's description was edited.",
+    "audience": "both"
+  },
+  "tasks.history.followUpSubmitted": {
+    "text": "Follow-up submitted for review at {revision}",
+    "note": "A line in a card's history (HI-1832): while the card was in Review, its builder submitted a change its reviewer asked for (a follow-up), which its reviewer reviews now, with no new round. {revision} is a commit's short hash (keep it as it is).",
+    "audience": "both"
+  },
+  "tasks.history.fromOlder": {
+    "text": "Added from an older Combwork, where it was made as #{was}",
+    "note": "A line in a card's history, by Repair: the card was made in an older version of Combwork (which saved it after the board moved to its database), set aside, and the user added it to the board from Review…; {was} is the number it had there (it keeps it when no card here has it).",
+    "audience": "both"
+  },
+  "tasks.history.given": {
+    "text": "Given to {agent}",
+    "note": "A line in a card's history: the card was given to the agent {agent} (its name) to work on.",
+    "audience": "both"
+  },
+  "tasks.history.imported": {
+    "text": "Brought back with {project} (it was #{was})",
+    "note": "A line in a card's history: the card came back with its removed project {project} (its folder name), under a new number; {was} was its number before.",
+    "audience": "both"
+  },
+  "tasks.history.kind": {
+    "text": "{how, select, made {Made as no code} proposed {Proposed as no code} confirmed {Confirmed as no code} kept {Kept as code} other {Kind changed to {kind, select, code {code} other {no code}}}}",
+    "note": "A line in a card's history (#1277): the card's kind, code (the default) or no code (a decision, a write-up, a trial: no commits): it was made as no code, an agent proposed no code, the user or the Assistant confirmed that or kept it as code, or its kind was changed later (an exception to the rules). Select keys: translate each sentence.",
+    "audience": "both"
+  },
+  "tasks.history.labels": {
+    "text": "Labels: {labels}",
+    "note": "A line in a card's history: the card's labels were set to these ({labels}: the user's labels, separated by commas).",
+    "audience": "both"
+  },
+  "tasks.history.labelsAdded": {
+    "text": "Labels: added {labels}",
+    "note": "A line in a card's history: these labels were added to the card, its other labels kept ({labels}: the user's labels, separated by commas).",
+    "audience": "both"
+  },
+  "tasks.history.labelsAddedTakenOff": {
+    "text": "Labels: added {added}; removed {removed}",
+    "note": "A line in a card's history: in one change, the labels {added} were added to the card and the labels {removed} taken off, its other labels kept (each: the user's labels, separated by commas).",
+    "audience": "both"
+  },
+  "tasks.history.labelsRemoved": {
+    "text": "Removed the labels",
+    "note": "A line in a card's history: the card's labels were all removed.",
+    "audience": "both"
+  },
+  "tasks.history.labelsTakenOff": {
+    "text": "Labels: removed {labels}",
+    "note": "A line in a card's history: these labels were taken off the card, its other labels kept ({labels}: the user's labels, separated by commas).",
+    "audience": "both"
+  },
+  "tasks.history.linked": {
+    "text": "Linked to {cards}",
+    "note": "A line in a card's history: the card's related cards were set to these ({cards}: card keys such as \"HI-3, HI-4\").",
+    "audience": "both"
+  },
+  "tasks.history.linksRemoved": {
+    "text": "Removed the links",
+    "note": "A line in a card's history: the card's links to related cards were all removed.",
+    "audience": "both"
+  },
+  "tasks.history.loopStep": {
+    "text": "{step, select, design {Posted a design for the reviewer to check} followUp {Posted a follow-up for the reviewer to check} ok {Checked the design: OK} gaps {Checked the design: gaps} okFollowUp {Checked the follow-up: OK} gapsFollowUp {Checked the follow-up: gaps} other {Went ahead with the design unchecked}}: \"{text}\"",
+    "note": "A line in a card's history (#1382, #1467), a step of a card loop: its builder (named beside it) posted a design for its reviewer to check before building (design), or a follow-up of reviewed work for its check, such as a change asked of a screenshot (followUp); the reviewer checked a design and found it OK (ok) or found gaps (gaps), or checked a follow-up so (okFollowUp, gapsFollowUp); or, with no answer in time, the builder went ahead with its design as posted (other). {text} is what they said (cut short). Select keys: translate each sentence.",
+    "audience": "both"
+  },
+  "tasks.history.loopWake": {
+    "text": "Woke {agent} {kind, select, review {to review it} step {with a card loop step} other {with its verdict}} (a loop wake)",
+    "note": "A line in a card's history: in a card loop, Combwork woke the agent {agent} (its name), as the card arrived in Review for it to review (review), with a step of the loop for it (step: its builder's design to check, or its reviewer's answer, #1382), or with its review's verdict (other). \"Card loop\" and \"loop wake\" are Combwork's terms.",
+    "audience": "both"
+  },
+  "tasks.history.moved": {
+    "text": "Moved to {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}",
+    "note": "A line in a card's history: the card was moved to this column. {column} is a board column (select: On Hold, Todo, Active, Review, Approved, Done): translate each.",
+    "audience": "both"
+  },
+  "tasks.history.movedBefore": {
+    "text": "Moved to {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}, before {before}",
+    "note": "A line in a card's history: the card was moved to this column, just above card {before} (its key, such as HI-12; #12 in lines from before keys). {column} is a board column (select: On Hold, Todo, Active, Review, Approved, Done): translate each.",
+    "audience": "both"
+  },
+  "tasks.history.movedBeforeIn": {
+    "text": "Moved before {before} in {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}",
+    "note": "A line in a card's history: within its column, the card was moved just above card {before} (its key, such as HI-12; #12 in lines from before keys). {column} is a board column (select: On Hold, Todo, Active, Review, Approved, Done): translate each.",
+    "audience": "both"
+  },
+  "tasks.history.movedBottom": {
+    "text": "Moved to the bottom of {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}",
+    "note": "A line in a card's history: the card was put last in this column. {column} is a board column (select: On Hold, Todo, Active, Review, Approved, Done): translate each.",
+    "audience": "both"
+  },
+  "tasks.history.movedTop": {
+    "text": "Moved to the top of {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}",
+    "note": "A line in a card's history: the card was put first in this column. {column} is a board column (select: On Hold, Todo, Active, Review, Approved, Done): translate each.",
+    "audience": "both"
+  },
+  "tasks.history.noDependencies": {
+    "text": "No longer depends on other cards",
+    "note": "A line in a card's history: the list of cards that had to be done first was cleared.",
+    "audience": "both"
+  },
+  "tasks.history.notWaiting": {
+    "text": "No longer waiting",
+    "note": "A line in a card's history (HI-2618): the card's waiting mark was cleared, by hand or because the card left Active.",
+    "audience": "both"
+  },
+  "tasks.history.notified": {
+    "text": "Notified you {event, select, failed {that its review failed} blocked {that it's blocked} stalled {that it has stalled} mergeDue {that every card of lane {lane} passed review, so its merge is due} mergeStalled {that the merge of lane {lane} has stalled} other {that it needs you}}{hasWhy, select, yes {: {why}} other {}}",
+    "note": "A line in a card's history: Combwork sent the user a notification about this card (a banner or a Windows notification): its review failed, it is blocked, it has stalled, every card of its lane ({lane}, a label such as “B1 / R1 (greetings)”) passed review so the lane's work can be merged, that merge has stalled, or the card needs the user (an approval, a question) (select: translate each). A lane is Combwork's record of a card loop. With hasWhy yes, it ends with what the notification said ({why}): why it is blocked or stalled, or the question (someone's own words, or Combwork's own sentence already translated).",
+    "audience": "both"
+  },
+  "tasks.history.placed": {
+    "text": "Placed {place, selectordinal, one {#st} two {#nd} few {#rd} other {#th}} in {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}}",
+    "note": "A line in a card's history: an agent put the column's cards in order, and this card is now at place {place} (an ordinal: 2nd, 3rd). {column} is a board column (select: On Hold, Todo, Active, Review, Approved, Done): translate each.",
+    "audience": "both"
+  },
+  "tasks.history.queueReturned": {
+    "text": "Came back from the merge queue: {reason, select, conflict {a conflict with {target}} checks {the merge check {check} failed on the merged result} checksSome {a merge check failed on the merged result} checksEnv {the merge check {check} failed because of the environment, not the work} install {the install before the merge checks failed} hook {a git hook refused its merge commit} targetMoved {{target} moved while it was being merged} folderBusy {the folder {target} is checked out in was busy} notUpToDate {it isn't up to date with {target}} focused {its focused tests couldn't run on the merged result} other {{reason}}}{files, select, none {} other { (in {files})}}. The card's Work section shows the run.",
+    "note": "A comment Combwork writes on a card when the merge queue sends it back to its builder instead of merging it (HI-2087). {reason} says why (select: translate each; keep the keys): a merge conflict with the target branch {target} (a branch name, such as main), a merge check {check} (the check's name, such as typecheck) that failed on the merged result or failed because of the machine or network rather than the code, the install before the checks, a git hook that refused the merge commit, the target branch moving while it was merged, the folder where the target branch is checked out being busy, the card's work not being up to date with the target, or its focused tests. {files} lists the files concerned (file paths, keep them; none: leave that part out). \"Merge queue\" and \"Work section\" are Combwork's terms.",
+    "audience": "both"
+  },
+  "tasks.history.renamed": {
+    "text": "Renamed to \"{title}\"",
+    "note": "A line in a card's history: the card's title was changed to {title}.",
+    "audience": "both"
+  },
+  "tasks.history.repaired": {
+    "text": "Project: {from} → {to} (renamed or moved)",
+    "note": "A line in a card's history, by Repair: the card was given to the project {to}, the new name of its project {from} (folder names), which was renamed or moved.",
+    "audience": "both"
+  },
+  "tasks.history.requestClosed": {
+    "text": "{why, select, done {Closed a question for you: the card is in Done} other {Closed a question for you: the agent that asked carried on}}",
+    "note": "A line in a card's history (#1638): a question waiting for the user (For you) was closed without an answer, because the card reached Done, or because the agent that asked moved the card on itself (answered some other way). Keep the select keys.",
+    "audience": "both"
+  },
+  "tasks.history.restored": {
+    "text": "Brought back: {project} was restored",
+    "note": "A line in a card's history: the card came back onto the board because the user restored its project {project} (its folder name).",
+    "audience": "both"
+  },
+  "tasks.history.returned": {
+    "text": "Returned for review, round {round}",
+    "note": "A line in a card's history: after a failed review, the card was sent back for its next review; {round} is the round's number.",
+    "audience": "both"
+  },
+  "tasks.history.reviewCopyLeased": {
+    "text": "{agent} reviews in {copy} at {revision}",
+    "note": "A line in a card's history (#1439): the reviewer {agent} (its name) reviews in the review copy {copy} (its name, \"copy-2\": keep it as it is), a folder at exactly the revision {revision} (a commit id: keep it as it is).",
+    "audience": "both"
+  },
+  "tasks.history.reviewCopyWaiting": {
+    "text": "{agent} is waiting for a review copy",
+    "note": "A line in a card's history (#1439): the reviewer {agent} (its name) started reviewing, but every review copy is in use or being set up; Combwork gives it one when it can. A review copy: a folder Combwork keeps at exactly the revision under review.",
+    "audience": "both"
+  },
+  "tasks.history.reviewEnded": {
+    "text": "Review by {agent} stopped: {why, select, sessionEnded {its session ended} agentRemoved {the agent was removed} other {{why}}}",
+    "note": "A line in a card's history: the review the agent {agent} (its name) had going on the card ended, because its session ended or it was removed from the project ({why}, select: translate each).",
+    "audience": "both"
+  },
+  "tasks.history.reviewFailed": {
+    "text": "Review failed",
+    "note": "A line in a card's history: the reviewer (named beside it) failed the card's review: it needs more work.",
+    "audience": "both"
+  },
+  "tasks.history.reviewPassed": {
+    "text": "Review passed",
+    "note": "A line in a card's history: the reviewer (named beside it) passed the card's review.",
+    "audience": "both"
+  },
+  "tasks.history.reviewSkip": {
+    "text": "{how, select, set {Set to skip review} proposed {Proposed to skip review} confirmed {Confirmed to skip review} kept {Kept with its review} other {Set to be reviewed}}",
+    "note": "A line in a card's history (#1625): whether the card skips its review: it was set to skip review (by the user, or the Assistant with the user's reason), an agent proposed that, the user or the Assistant confirmed it or kept the review, or it was set back to be reviewed. Select keys: translate each sentence.",
+    "audience": "both"
+  },
+  "tasks.history.reviewStarted": {
+    "text": "Started reviewing",
+    "note": "A line in a card's history: an agent (named beside it) began reviewing the card.",
+    "audience": "both"
+  },
+  "tasks.history.reviewStopped": {
+    "text": "Review by {agent} stopped",
+    "note": "A line in a card's history: the review the agent {agent} (its name) had going on the card ended without a verdict (the card moved on).",
+    "audience": "both"
+  },
+  "tasks.history.reviewerRequest": {
+    "text": "Asked the builder: \"{text}\"",
+    "note": "A line in a card's history: the card's reviewer (named beside it), mid-review, asked the agent building it for something (a commit, a run); {text} is what it asked (cut short). Builder: the agent working on the card.",
+    "audience": "both"
+  },
+  "tasks.history.safeguardStop": {
+    "text": "**{agent}, after a safeguard stop:** {stops, plural, =0 {} other {A safety classifier stopped a response{model, select, none {} other { on {model}}} at {time}{stops, plural, =1 {} other { (# this session)}}. }}It now runs on {to} instead of {from} (since {since}).{state, select, asks { Its CLI asks what to do about it.} idle { Idle after the stop: give it a nudge.} other {}}{hasTools, select, yes { Before it, its last tool calls: {tools}.} other {}}{hasHelp, select, yes { {help}} other {}}",
+    "note": "A comment Combwork writes on the cards an agent works on, after its CLI's safety classifier stopped a response and the agent moved to another model. {agent}: the agent's name, in bold (keep the ** marks). Then, when it stopped any ({stops}: how many this session), on which model ({model}: its name; none: leave that branch empty) and when ({time}: \"15:12\"); the model it runs on now ({to}) instead of the old one ({from}) since a time ({since}); whether its CLI asks what to do (asks) or it sits idle (idle); its last tool calls before the stop ({tools}: tool names, keep them); and what to do about it in that CLI ({help}: its own sentence, already translated). Only names, never what was stopped.",
+    "audience": "both"
+  },
+  "tasks.history.stageRepaired": {
+    "text": "Recorded as Done, as the board had it: its workflow still had it in {stage, select, hold {On Hold} todo {Todo} active {Active} review {Review} approved {Approved} merging {Merging} other {{stage}}}",
+    "note": "A line in a card's history, by Combwork (HI-1674): the card was in the Done column, but a move had not reached its workflow, which still had it at an earlier stage ({stage}, select: a board stage; translate each); Combwork recorded it as Done and closed its open questions.",
+    "audience": "both"
+  },
+  "tasks.history.startsWithout": {
+    "text": "{card} was moved to Done without its work in the target ({reason}): this card can start without it.",
+    "note": "A comment from Combwork on a card that depends on another (HI-2014): the user (or the Combwork Assistant with the user's reason) moved {card} (a card's key, such as HI-12) to Done by an override, without its work being merged into the target branch; this card no longer waits for it and starts without that work. {reason} is the override's reason, in the words it was given.",
+    "audience": "both"
+  },
+  "tasks.history.takenFrom": {
+    "text": "Taken from {agent}",
+    "note": "A line in a card's history: the card no longer belongs to the agent {agent} (its name).",
+    "audience": "both"
+  },
+  "tasks.history.takenFromAgent": {
+    "text": "Taken from its agent",
+    "note": "A line in a card's history: the card no longer belongs to the agent it had (whose name isn't known).",
+    "audience": "both"
+  },
+  "tasks.history.takenFromOf": {
+    "text": "Taken from {agent} of {project}",
+    "note": "A line in a card's history: the card was moved to another project, so it no longer belongs to {agent} (an agent's name) of its old project {project}.",
+    "audience": "both"
+  },
+  "tasks.history.takenFromOfWorkspace": {
+    "text": "Taken from {agent} of the workspace",
+    "note": "A line in a card's history: the card was moved to a project, so it no longer belongs to {agent} (an agent's name) of the workspace.",
+    "audience": "both"
+  },
+  "tasks.history.toProject": {
+    "text": "Moved to {project}",
+    "note": "A line in a card's history: the card now belongs to another project ({project}, its folder name).",
+    "audience": "both"
+  },
+  "tasks.history.toWorkspace": {
+    "text": "Moved to the workspace",
+    "note": "A line in a card's history: the card no longer belongs to a project, only to the workspace.",
+    "audience": "both"
+  },
+  "tasks.history.unarchived": {
+    "text": "Brought back from the archive",
+    "note": "A line in a card's history: the user brought the card back onto the board from the archive.",
+    "audience": "both"
+  },
+  "tasks.history.unblocked": {
+    "text": "No longer blocked",
+    "note": "A line in a card's history: the card's blocked reason was cleared.",
+    "audience": "both"
+  },
+  "tasks.history.waiting": {
+    "text": "Waiting: {reason}",
+    "note": "A line in a card's history (HI-2618): the card, in Active, was marked as waiting on purpose (held for a quiet window, say), with this reason ({reason}, written by whoever marked it). Combwork doesn't report it as stalled meanwhile. Not the same as Blocked.",
+    "audience": "both"
+  },
+  "tasks.history.watchEnded": {
+    "text": "Ended {watcher}'s watch on it: {why, select, blocked {the card is blocked} reviewer {{agent} reviews it} reviewTaken {its review was taken from it} reassigned {reassigned to {agent}} unassigned {reassigned to no agent} done {the card is in Done} laneEnded {its lane ended} laneAbandoned {its lane was abandoned} other {{why}}}",
+    "note": "A line in a card's history: Combwork stopped the agent {watcher} (its name) waiting for the card to change, because the card is blocked, another agent ({agent}) now reviews it, the review it waited for was taken from it, the card was given to another agent ({agent}) or to none, the card reached the Done column (its work merged), or the card loop (lane) the agent waited in ended or was abandoned ({why}, select: translate each).",
+    "audience": "both"
+  },
+  "tasks.start.alreadyStarting": {
+    "text": "{card} is already being started.",
+    "note": "An error: card {card} (its key, such as HI-12) is being started already; a second Start of it is refused.",
+    "audience": "both"
+  },
+  "tasks.start.archived": {
+    "text": "{card} is archived. Bring it back first.",
+    "note": "An error: card {card} (its key, such as HI-12) is archived, so it cannot be started; bring it back onto the board first.",
+    "audience": "both"
+  },
+  "tasks.start.beingGiven": {
+    "text": "{agent} is being given another card. Start this one once it's idle, or give it to another agent.",
+    "note": "An error: the agent {agent} (its name) is being given another card right now, so this one cannot be started with it.",
+    "audience": "both"
+  },
+  "tasks.start.changed": {
+    "text": "{card} changed while it was being started (archived, moved, given to another agent, or its Read first edited): start it again if it should still go.",
+    "note": "An error: the card {card} (its key, such as HI-12) was changed while Combwork was starting it (archived, moved to another column or project, given to another agent, deleted, or its Read first doc sections edited), so it wasn't given to the agent. Read first is the card's field: keep its name as the card dialog shows it.",
+    "audience": "both"
+  },
+  "tasks.start.movedColumn": {
+    "text": "{card} was moved to {column, select, hold {On Hold} todo {Todo} doing {Active} review {Review} passed {Approved} done {Done} other {{column}}} meanwhile. Start it again if it's still to do.",
+    "note": "An error: while card {card} (its key, such as HI-12) was being started, it was moved to the column {column} (select: a board column; translate each).",
+    "audience": "both"
+  },
+  "tasks.start.movedDone": {
+    "text": "{card} was moved to Done meanwhile. Start it again if there is more to do.",
+    "note": "An error: while card {card} (its key, such as HI-12) was being started, it was moved to Done (a board column).",
+    "audience": "both"
+  },
+  "tasks.start.movedProject": {
+    "text": "{card} moved to {project} meanwhile. Start it again.",
+    "note": "An error: while card {card} (its key, such as HI-12) was being started, it was moved to the project {project} (a folder name).",
+    "audience": "both"
+  },
+  "tasks.start.movedWorkspace": {
+    "text": "{card} moved to the workspace meanwhile. Start it again.",
+    "note": "An error: while card {card} (its key, such as HI-12) was being started, it was taken out of its project, to the whole workspace.",
+    "audience": "both"
+  },
+  "tasks.start.noProject": {
+    "text": "{card} has no project. Give it one first: the agent works in that project.",
+    "note": "An error: card {card} (its key, such as HI-12) belongs to no project (only the workspace), so no agent can start it; give it a project first.",
+    "audience": "both"
+  },
+  "tasks.start.noSlot": {
+    "text": "{card} wasn't started: its project builds each card in a slot, and {active, select, yes {its start has none} other {this start got none}}, so its agent would have worked in the project folder. {active, select, yes {Put it back to Todo, then start it again.} other {The card is back where it was: start it again.}}",
+    "note": "An error: a Start of the card {card} (its key, such as HI-12) was refused. The card's project has each card built in a slot (a working folder of its own), but the card's start has no slot, so the agent would have worked in the project's own folder instead. {active} (select): yes, the card was already Active (in work) with no slot, and must be put back to Todo and started again; other, this start was undone and the card moved back to its column. Translate both.",
+    "audience": "both"
+  },
+  "tasks.start.notGiven": {
+    "text": "{agent} wasn't given {card}: {why}.",
+    "note": "An error: the card {card} (its key, such as HI-12) could not be typed into the terminal of the agent {agent} (its name); {why} says why.",
+    "audience": "both"
+  },
+  "tasks.start.noteTooLong": {
+    "text": "The note is too long (at most {max, number} characters).",
+    "note": "An error: the note given with a Start (what the agent should do now) is longer than it may be ({max}, a number of characters).",
+    "audience": "both"
+  },
+  "tasks.start.reassigned": {
+    "text": "{card} was given to {who, select, another {another agent} other {nobody}} meanwhile. Start it again if it's still to do.",
+    "note": "An error: while card {card} (its key, such as HI-12) was being started, it was given to another agent, or taken from its agent ({who}, select: translate each).",
+    "audience": "both"
+  },
+  "tasks.start.userTyping": {
+    "text": "The user has just typed in {agent}'s terminal and may still be writing there. Ask the user first.",
+    "note": "An error: an agent or the Assistant tried to give a card to the agent {agent} (its name), but the user has just typed in that agent's terminal.",
+    "audience": "both"
+  }
+}

@@ -22,8 +22,8 @@ const check = (name, ok, extra = '') => {
 /** A project whose attachments are DIRS folders of one 100-byte file each. */
 function project(p) {
   for (let i = 0; i < DIRS; i++) {
-    fs.mkdirSync(path.join(p, '.hive', 'attachments', `d${i}`), { recursive: true })
-    fs.writeFileSync(path.join(p, '.hive', 'attachments', `d${i}`, 'f.png'), 'x'.repeat(100))
+    fs.mkdirSync(path.join(p, '.combwork', 'attachments', `d${i}`), { recursive: true })
+    fs.writeFileSync(path.join(p, '.combwork', 'attachments', `d${i}`, 'f.png'), 'x'.repeat(100))
   }
 }
 
@@ -40,7 +40,7 @@ function project(p) {
   const page2 = await next
   await page2.waitForLoadState('domcontentloaded')
   await lib.appReady(page2)
-  const inv2 = (ch, ...a) => page2.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv2 = (ch, ...a) => page2.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv2, page2, wsB)
 
   // The gate: main's opendir under a project's attachments waits while held, and counts each folder read, by project.
@@ -60,17 +60,17 @@ function project(p) {
       }
       return real(p, ...rest)
     }
-  }, [alpha, beta].map((p) => path.join(p, '.hive', 'attachments').toLowerCase()))
+  }, [alpha, beta].map((p) => path.join(p, '.combwork', 'attachments').toLowerCase()))
   const reads = async () => {
     const r = await app.evaluate(() => globalThis.__storageGate.reads)
-    return { alpha: r[path.join(alpha, '.hive', 'attachments').toLowerCase()] ?? 0, beta: r[path.join(beta, '.hive', 'attachments').toLowerCase()] ?? 0 }
+    return { alpha: r[path.join(alpha, '.combwork', 'attachments').toLowerCase()] ?? 0, beta: r[path.join(beta, '.combwork', 'attachments').toLowerCase()] ?? 0 }
   }
   const hold = () => app.evaluate(() => void (globalThis.__storageGate.held = true))
   const release = () => app.evaluate(() => globalThis.__storageGate.release())
   /** Asks for a project's storage from a page, without waiting: its answer goes to window.__storage. */
   const ask = (pg, p, request) =>
     pg.evaluate(([x, r]) => {
-      window.__storage = window.hive.invoke('storage:project', x, true, r).then((v) => ({ attachments: v.attachments }), (e) => ({ error: String(e) }))
+      window.__storage = window.combwork.invoke('storage:project', x, true, r).then((v) => ({ attachments: v.attachments }), (e) => ({ error: String(e) }))
     }, [p, request])
 
   // Both windows measure, with the same request id; each walk is held at its first folder.

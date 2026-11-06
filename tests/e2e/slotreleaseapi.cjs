@@ -1,7 +1,7 @@
-// Release Slot through the Agent API and the Hive Assistant (#1561, SPEC §16.10.3): B1's card is lent slot-a, whose
-// writer is planted as a run of a Hive that has gone (`slots:test` writer, a process that has ended); B2, a 0.9 agent,
+// Release Slot through the Agent API and the Combwork Assistant (#1561, SPEC §16.10.3): B1's card is lent slot-a, whose
+// writer is planted as a run of a Combwork that has gone (`slots:test` writer, a process that has ended); B2, a 0.9 agent,
 // has its worktree carried as hb2. On the fake Claude Code, the Agent API on:
-// 1. GET …/slots/releasable lists hb2 (kept for B2) and slot-a (held by B1's ended run, its Hive gone), for a script
+// 1. GET …/slots/releasable lists hb2 (kept for B2) and slot-a (held by B1's ended run, its Combwork gone), for a script
 //    and for a project agent of the project.
 // 2. Releasing is refused (403) to a project agent and a script, and to the Assistant at Look and advise: nothing changes.
 // 3. The Assistant at Control agents: a writer's release without the user's confirmation (400) or naming another run
@@ -40,7 +40,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
 ;(async () => {
   for (const d of [userData, ws, `${ws}.worktrees`, shots]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(shots, { recursive: true })
-  lib.gitProject(alpha, { '.gitignore': '.hive/\n' })
+  lib.gitProject(alpha, { '.gitignore': '.combwork/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
   const env = lib.fakeClaude(userData, home, [alpha, ws, ...['slot-a', 'hb2'].map((s) => path.join(root, s))])
   const cfgFile = path.join(userData, 'config.json')
@@ -50,7 +50,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off' }, viewport: { width: 1500, height: 900 } })
+  const h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off' }, viewport: { width: 1500, height: 900 } })
   const { app, page, inv } = h
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -69,8 +69,8 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const tokenOf = async (id) => {
       const sessionId = await until(async () => (await live(alpha, id))?.sessionId, HUNG_MS)
       const launch = await until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
-      const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive : null
-      return hive ? JSON.parse(fs.readFileSync(hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token : null
+      const combwork = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
+      return combwork ? JSON.parse(fs.readFileSync(combwork.env.CW_API_TOKEN_FILE, 'utf8')).token : null
     }
     const writerA = () => inv('slots:heldWriter', alpha, 'slot-a')
     const carriedHb2 = async () => (await inv('slots:list', alpha)).find((s) => s.name === 'hb2')?.lease?.kind === 'carried'
@@ -80,19 +80,19 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     const b1 = await lib.addAgent(inv, alpha, { name: 'B1', workflowRole: 'builder' })
     const r1 = await lib.addAgent(inv, alpha, { name: 'R1', workflowRole: 'reviewer' })
     // B2: a 0.9 agent with its own worktree, adopted as its carried slot hb2 (as agentapislots does).
-    const b2 = await lib.addAgent(inv, alpha, { location: 'new-worktree', name: 'B2', branch: 'hive/hb2', workflowRole: 'builder' })
+    const b2 = await lib.addAgent(inv, alpha, { location: 'new-worktree', name: 'B2', branch: 'cw/hb2', workflowRole: 'builder' })
     const hb2 = (await inv('workspace:refresh')).projects.find((p) => same(p.path, alpha)).agents.find((a) => a.id === b2.id)?.worktree?.path
     const carried = hb2 && fs.existsSync(hb2) ? await op({ op: 'carry', agent: b2.id, slot: 'hb2', folder: hb2 }) : null
     check("B2's 0.9 worktree carried as its slot hb2", carried?.kind === 'carried', JSON.stringify(carried))
     const l12 = await op({ op: 'lend', agent: b1.id, card: 12 })
     check("B1's card #12 is lent slot-a", l12?.ok && l12.slot.name === 'slot-a', JSON.stringify(l12))
-    // slot-a's writer: a run of B1's in a Hive whose process has ended (a crash), never this Hive.
+    // slot-a's writer: a run of B1's in a Combwork whose process has ended (a crash), never this Combwork.
     const gone = spawnSync(process.execPath, ['-e', ''], { env: runContext.baseEnv() }).pid
-    check("slot-a's writer planted: B1's run in a Hive that has gone", (await op({ op: 'writer', slot: 'slot-a', agent: b1.id, run: 'r-crashed', pid: gone, started: 1 })) === true)
+    check("slot-a's writer planted: B1's run in a Combwork that has gone", (await op({ op: 'writer', slot: 'slot-a', agent: b1.id, run: 'r-crashed', pid: gone, started: 1 })) === true)
 
     // --- 1. What there is to release, for a script and for a project agent of the project.
     const listed = await releasable()
-    check('GET releasable: hb2 kept for B2, slot-a held by B1\'s ended run (its Hive gone, nothing known of its processes)', listed.status === 200 && JSON.stringify(listed.body?.carried) === JSON.stringify([{ slot: 'hb2', agent: 'B2' }]) && listed.body?.held?.length === 1 && listed.body.held[0].slot === 'slot-a' && listed.body.held[0].agent === 'B1' && listed.body.held[0].run === 'r-crashed' && listed.body.held[0].hive === `gone (process ${gone})` && listed.body.held[0].processes === null, JSON.stringify(listed.body))
+    check('GET releasable: hb2 kept for B2, slot-a held by B1\'s ended run (its Combwork gone, nothing known of its processes)', listed.status === 200 && JSON.stringify(listed.body?.carried) === JSON.stringify([{ slot: 'hb2', agent: 'B2' }]) && listed.body?.held?.length === 1 && listed.body.held[0].slot === 'slot-a' && listed.body.held[0].agent === 'B1' && listed.body.held[0].run === 'r-crashed' && listed.body.held[0].combwork === `gone (process ${gone})` && listed.body.held[0].processes === null, JSON.stringify(listed.body))
     await inv('session:start', alpha, { agentId: r1.id })
     const r1Token = await tokenOf(r1.id)
     check('R1 (a project agent) has its token', !!r1Token)

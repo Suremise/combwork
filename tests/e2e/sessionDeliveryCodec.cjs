@@ -1,5 +1,5 @@
 // The suites' reader and writer of sessions' and deliveries' 1.0 tables (#1211): src/main/schema/sessionDeliveryCodec.ts's field
-// maps and its encode/decode, as plain JS (the suites can't import Hive's TypeScript). tests/sessionDeliveryCodecCjs.test.ts holds
+// maps and its encode/decode, as plain JS (the suites can't import Combwork's TypeScript). tests/sessionDeliveryCodecCjs.test.ts holds
 // both to the same maps and the same rows, so a column added there fails here until it is added here too.
 
 const ABSENT = '$absent'

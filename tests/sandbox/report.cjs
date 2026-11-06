@@ -9,16 +9,32 @@
  * The one exception: a run kind in meta.notRun ({ kind: { reason, installer } }) wasn't checked at all (its installer
  * was refused by an App Control policy before anything could run). Its checks are left out and, unless another check
  * failed, the report is NOT RUN with that reason.
+ * Scenario 9 (HI-2592, run kind clean) is the rename's acceptance test: its scan (clean.cjs) must find the old name nowhere.
+ * Scenario 11 (HI-2602, run kind profile-move): the profile move the installer couldn't make, made by the app at start.
  */
+const { cleanChecks, hitsMarkdown } = require('./clean.cjs')
+// old-name: begin report-inputs
+/** The 1.0 app's names: a meta from before HI-2458 names no app, and what the installer removes runs its exe. */
+const OLD_APP = { productName: 'Hive Desktop', shortcutName: 'Hive Desktop', exeName: 'Hive' }
+// old-name: end report-inputs
 const SCENARIOS = {
   1: 'Fresh install and first launch',
   2: 'First run with no coding-agent CLIs',
-  3: 'A CLI appearing while Hive runs (fake CLI)',
-  4: 'Upgrade from the previous release (--updated /S --force-run)',
+  3: 'A CLI appearing while Combwork runs (fake CLI)',
+  4: 'Upgrade from the previous release, running, as its updater runs the installer (--updated /S --force-run)',
   5: 'Uninstall',
-  6: 'A new workspace in the fresh install (for the fresh-install comparison)'
+  6: 'A new workspace in the fresh install (for the fresh-install comparison)',
+  7: 'Install by hand over the previous release, running (/S --force-run)',
+  8: "The installer's edge cases over the previous release, and a notification under the new app ID",
+  9: 'A clean install used as a new user would, then searched: no trace of the old name anywhere (HI-2592)',
+  10: 'Upgrade from a 1.1 release candidate (--previous-rc, e.g. RC2), running, as its updater runs the installer (--updated /S --force-run): the names upgrade (HI-2587) moves only what is still old',
+  11: "The profile move the installer couldn't make (a file in 1.0's local profile folder held as it ran): the app refuses to start while it is held, then moves it itself (HI-2602)"
 }
-const KINDS = ['fresh', 'upgrade']
+const KINDS = ['fresh', 'upgrade', 'manual', 'edges', 'clean', 'upgrade-rc', 'profile-move']
+/** The names upgrade's checks after an upgrade (HI-2587), from 1.0 and from a release candidate alike. */
+const NAME_IDS = ['4.board-file', '4.board-backups', '4.log-file', '4.workspace-files', '4.copy-marker', '4.names-done', '4.no-old-names']
+/** electron-builder's APP_GUID for appId it.surmise.combwork (HI-2460): its uninstall entry's key. */
+const COMBWORK_GUID = '10a7595a-0e90-558c-b6b6-ae33bdd80748'
 
 // What each run kind must produce: the drivers' check ids and facts, and the screenshots.
 const REQUIRED = {
@@ -26,16 +42,51 @@ const REQUIRED = {
     drivers: {
       s1: { scenario: 1, ids: ['1.start-screen', '1.profile', '2.banner', '2.no-claude-warning', '2.api-providers', '2.agent-setup-opens', '2.agent-setup-three'], facts: ['version'] },
       s3: { scenario: 3, ids: ['3.on-not-found', '3.banner-none-installed', '3.setup-not-installed', '3.user-path', '3.check-again-finds', '3.setup-found', '3.api-installed', '3.banner-gone'], facts: [] },
-      s6: { scenario: 6, ids: ['6.workspace-opens', '6.hive-folder', '6.views'], facts: ['hive', 'views'] }
+      s6: { scenario: 6, ids: ['6.workspace-opens', '6.combwork-folder', '6.views'], facts: ['workspaceTree', 'views'] }
     },
-    shots: ['s1-desktop.jpg', 's1-installed-apps.jpg', 's1-start-dark.png', 's1-start-light.png', 's1-agent-setup-dark.png', 's1-agent-setup-light.png', 's3-missing-dark.png', 's3-found-dark.png', 's3-found-light.png', 's6-workspace.png', 's6-workspace-overview.png', 's6-skills.png', 's6-mcp-servers.png', 's6-hive-assistant.png', 's5-desktop.jpg']
+    shots: ['s1-desktop.jpg', 's1-installed-apps.jpg', 's1-start-dark.png', 's1-start-light.png', 's1-agent-setup-dark.png', 's1-agent-setup-light.png', 's3-missing-dark.png', 's3-found-dark.png', 's3-found-light.png', 's6-workspace.png', 's6-workspace-overview.png', 's6-skills.png', 's6-mcp-servers.png', 's6-assistant.png', 's5-desktop.jpg']
   },
-  upgrade: {
+  upgrade: overPrevious(4, 's4'),
+  manual: overPrevious(7, 's7'),
+  'upgrade-rc': overPrevious(10, 's10', true),
+  edges: { drivers: { s8: { scenario: 8, ids: ['8.notification'], facts: ['exe'] } }, shots: ['s8-notified.png', 's8-desktop.jpg'] },
+  // HI-2592: a new user's first session (drive.cjs clean), then the scan (inside/clean-scan.cjs, its checks clean.cjs's).
+  clean: {
+    // Each a step a new user takes.
+    drivers: { s9: { scenario: 9, ids: ['9.first-run', '9.provider-on', '9.account', '9.workspace', '9.git-project', '9.account-off-here', '9.account-on', '9.agent-started', '9.agent-env', '9.card', '9.settings', '9.diagnostics', '9.export', '9.quit'], facts: ['version', 'workspace', 'exportDir'] } },
+    shots: ['s9-desktop.jpg', 's9-start.png', 's9-off-here.png', 's9-agent.png', 's9-board.png', 's9-settings.png']
+  },
+  // HI-2602: profile-move.ps1's record (PROFILE_MOVE_IDS), not a driver's; the error box and the moved app's window.
+  'profile-move': { drivers: {}, shots: ['s11-refused.png', 's11-moved.png', 's11-desktop.jpg'] }
+}
+
+/** The edge cases' checks edges.ps1 must record (HI-2460). */
+const EDGE_IDS = ['8.wait', '8.wait-unchanged', '8.continues', '8.refuses', '8.refuses-unchanged', '8.running', '8.running-unchanged', '8.uninstall-fails', '8.uninstall-fails-unchanged', '8.moved-at-start', '8.moved-at-start-installed']
+
+/** The profile move's checks profile-move.ps1 must record (HI-2602), in its order. */
+const PROFILE_MOVE_IDS = ['11.old-profile', '11.installer-held', '11.refused', '11.refused-unchanged', '11.moved', '11.record', '11.sign-in-checked', '11.sign-in-once']
+
+/** An upgrade over the previous release (scenario n, its files' prefix pre): the drivers' checks (HI-2460's too) and shots. */
+function overPrevious(n, pre, fromRc = false) {
+  // From a release candidate (HI-2587): its profile, .combwork and cw.* ids are moved already, so only what a 1.1 RC
+  // still keeps under the old names is checked, besides what every upgrade keeps.
+  if (fromRc) {
+    return {
+      drivers: {
+        [`${pre}-mark`]: { scenario: n, ids: ['4.settings-saved', '4.workspace-made', '4.values-written'], facts: ['version'] },
+        [`${pre}-after`]: { scenario: n, ids: ['4.settings-kept', '4.theme-applied', '4.combwork-runs', '4.workspace-moved', '4.workspace-card', '4.values-options', '4.values-facts', ...NAME_IDS], facts: ['version'] },
+        [`${pre}-notify`]: { scenario: n, ids: [`${n}.notification`], facts: ['exe'] }
+      },
+      shots: [`${pre}-mark-before-upgrade.png`, `${pre}-desktop-before.jpg`, `${pre}-desktop-after.jpg`, `${pre}-after-after-upgrade-light.png`, `${pre}-after-after-upgrade-dark.png`, `${pre}-toast.jpg`]
+    }
+  }
+  return {
     drivers: {
-      's4-mark': { scenario: 4, ids: ['4.settings-saved'], facts: ['version'] },
-      's4-after': { scenario: 4, ids: ['4.settings-kept', '4.theme-applied'], facts: ['version'] }
+      [`${pre}-mark`]: { scenario: n, ids: ['4.settings-saved', '4.login-registered', '4.workspace-made', '4.advanced-saved', '4.values-written'], facts: ['version'] },
+      [`${pre}-after`]: { scenario: n, ids: ['4.settings-kept', '4.theme-applied', '4.combwork-runs', '4.local-moved', '4.trust-kept', '4.roaming-moved', '4.record', '4.login-moved', '4.no-fallback', '4.workspace-moved', '4.workspace-card', '4.values-options', '4.values-facts', '4.advanced-kept', '4.advanced-old-id', ...NAME_IDS], facts: ['version'] },
+      [`${pre}-notify`]: { scenario: n, ids: [`${n}.notification`], facts: ['exe'] }
     },
-    shots: ['s4-mark-before-upgrade.png', 's4-desktop-before.jpg', 's4-desktop-after.jpg', 's4-after-after-upgrade-light.png', 's4-after-after-upgrade-dark.png']
+    shots: [`${pre}-mark-before-upgrade.png`, `${pre}-desktop-before.jpg`, `${pre}-desktop-after.jpg`, `${pre}-after-after-upgrade-light.png`, `${pre}-after-after-upgrade-dark.png`, `${pre}-toast.jpg`]
   }
 }
 
@@ -43,8 +94,10 @@ const entriesOf = s => (s?.uninstallEntries ? [].concat(s.uninstallEntries) : []
 const shortcutsOf = s => (s?.shortcuts ? [].concat(s.shortcuts) : [])
 const inDesktop = l => /\\Desktop$/i.test(l.folder)
 const inStart = l => /Start Menu\\Programs$/i.test(l.folder)
+/** Whether a shortcut's target is `<name>.exe` in its own install folder (Programs\\<name>). */
+const exeIn = (target, name) => new RegExp(`\\\\${name}\\\\${name}\\.exe$`, 'i').test(String(target))
 
-/** Shortcuts as a short text: "Hive Desktop (Desktop, Start menu)". */
+/** Shortcuts as a short text: "Combwork (Desktop, Start menu)". */
 const describeShortcuts = list => list.map(l => `${l.name} (${inDesktop(l) ? 'Desktop' : inStart(l) ? 'Start menu' : l.folder})`).join(', ') || 'none'
 
 function evaluate(meta, files) {
@@ -72,13 +125,16 @@ function evaluate(meta, files) {
     return d
   }
   const version = meta.installerVersion
+  // The build's names (checks.cjs appNames: HI-2458's productName, HI-2460's shortcut and exe).
+  const app = meta.app || OLD_APP
+  let asarNote = null
 
   const unknown = ran.filter(k => !KINDS.includes(k))
   if ((!asked.length) || unknown.length) add(0, 'The scenarios asked for ran', false, unknown.length ? `unknown: ${unknown.join(', ')}` : 'none ran')
   // Every step the runner took must have succeeded: a failed command or timeout fails the report.
   for (const s of meta.steps || []) add(s.scenario, `Step: ${s.what}`, s.ok, s.detail)
   for (const kind of ran.filter(k => KINDS.includes(k))) {
-    for (const shot of REQUIRED[kind].shots) if (!(meta.shots || []).includes(shot)) add(Number(shot[1]) || 0, `Screenshot ${shot} collected`, false, 'missing')
+    for (const shot of REQUIRED[kind].shots) if (!(meta.shots || []).includes(shot)) add(Number(/^s(\d+)/.exec(shot)?.[1]) || 0, `Screenshot ${shot} collected`, false, 'missing')
   }
 
   if (ran.includes('fresh')) {
@@ -87,10 +143,10 @@ function evaluate(meta, files) {
     if (run) add(1, `Silent install (/S) succeeds (${run.seconds} s)`, run.exitCode === 0, `exit ${run.exitCode}`)
     if (st) {
       const e = entriesOf(st)
-      add(1, `One Installed-apps entry: "Hive Desktop ${version}"`, e.length === 1 && e[0].displayName === `Hive Desktop ${version}`, JSON.stringify(e.map(x => x.displayName)))
-      add(1, 'Installed in %LOCALAPPDATA%\\Programs\\Hive (Hive.exe, Uninstall Hive.exe)', st.installDir?.hiveExe && st.installDir?.uninstaller, JSON.stringify(st.installDir))
+      add(1, `One Installed-apps entry: "${app.productName} ${version}"`, e.length === 1 && e[0].displayName === `${app.productName} ${version}`, JSON.stringify(e.map(x => x.displayName)))
+      add(1, `Installed in %LOCALAPPDATA%\\Programs\\${app.exeName} (${app.exeName}.exe, Uninstall ${app.exeName}.exe)`, st.installDir?.hasExe && st.installDir?.uninstaller && st.installDir?.exe === `${app.exeName}.exe`, JSON.stringify(st.installDir))
       const l = shortcutsOf(st)
-      add(1, 'Shortcuts named "Hive Desktop" on the Desktop and in the Start menu', l.length >= 2 && l.every(x => x.name === 'Hive Desktop' && /\\Hive\\Hive\.exe$/i.test(x.target)) && l.some(inDesktop) && l.some(inStart), describeShortcuts(l))
+      add(1, `Shortcuts named "${app.shortcutName}" on the Desktop and in the Start menu`, l.length >= 2 && l.every(x => x.name === app.shortcutName && exeIn(x.target, app.exeName)) && l.some(inDesktop) && l.some(inStart), describeShortcuts(l))
     }
     const s1 = driver('fresh', 's1')
     if (s1?.facts?.version !== undefined) add(1, `The app reports version ${version}`, s1.facts.version === version, `reports ${s1.facts.version}`)
@@ -98,53 +154,96 @@ function evaluate(meta, files) {
     driver('fresh', 's6')
     const run5 = need(5, 's5-run')
     const st5 = need(5, 's5-state')
-    if (run5) add(5, `Silent uninstall ("Uninstall Hive.exe" /S) succeeds (${run5.seconds} s)`, run5.exitCode === 0, `exit ${run5.exitCode}`)
+    if (run5) add(5, `Silent uninstall ("Uninstall ${app.exeName}.exe" /S) succeeds (${run5.seconds} s)`, run5.exitCode === 0, `exit ${run5.exitCode}`)
     if (st5) {
       add(5, 'The Installed-apps entry is gone', !entriesOf(st5).length, JSON.stringify(entriesOf(st5).map(x => x.displayName)))
       add(5, 'The install folder is gone', st5.installDir?.exists === false, st5.installDir?.path)
       add(5, 'The shortcuts are gone', !shortcutsOf(st5).length, describeShortcuts(shortcutsOf(st5)))
-      add(5, 'The profile (%APPDATA%\\Hive) is kept (deleteAppDataOnUninstall: false)', st5.profileDir?.exists === true, JSON.stringify(st5.profileDir))
+      add(5, `The profile (${st5.profileDir?.path}) is kept (deleteAppDataOnUninstall: false)`, st5.profileDir?.exists === true, JSON.stringify(st5.profileDir))
     }
   }
 
-  if (ran.includes('upgrade')) {
-    const prevRun = need(4, 's4-prev-run')
-    const prevSt = need(4, 's4-prev-state')
-    if (prevRun) add(4, `The previous release installs (${prevRun.seconds} s)`, prevRun.exitCode === 0, `exit ${prevRun.exitCode}`)
+  for (const [kind, n, pre] of [['upgrade', 4, 's4'], ['manual', 7, 's7'], ['upgrade-rc', 10, 's10']]) {
+    if (!ran.includes(kind)) continue
+    const prevRun = need(n, `${pre}-prev-run`)
+    const prevSt = need(n, `${pre}-prev-state`)
+    if (prevRun) add(n, `The previous release installs (${prevRun.seconds} s)`, prevRun.exitCode === 0, `exit ${prevRun.exitCode}`)
     const prevNames = entriesOf(prevSt).map(x => x.displayName)
-    driver('upgrade', 's4-mark')
-    const newRun = need(4, 's4-new-run')
-    const newSt = need(4, 's4-new-state')
+    driver(kind, `${pre}-mark`)
+    const started = need(n, `${pre}-prev-started`)
+    if (started) add(n, `The previous release ran (pid ${started.pid}, with a window) as the new installer started`, started.window === true && !!started.pid, JSON.stringify(started))
+    const newRun = need(n, `${pre}-new-run`)
+    const newSt = need(n, `${pre}-new-state`)
     if (newRun) {
-      add(4, `The new build installs over it with --updated /S --force-run (${newRun.seconds} s)`, newRun.exitCode === 0, `exit ${newRun.exitCode}`)
-      add(4, '--force-run starts Hive after the update', newRun.hiveRunning === true, 'no Hive.exe running from the install folder')
+      add(n, `The new build installs over it, running, with ${newRun.arguments} (${newRun.seconds} s)`, newRun.exitCode === 0, `exit ${newRun.exitCode}`)
+      add(n, `--force-run starts ${app.exeName}.exe after the install`, newRun.installedRunning === true && [].concat(newRun.running || []).includes('combwork'), `running: ${JSON.stringify(newRun.running)}`)
+      add(n, 'The 1.0 app no longer runs', ![].concat(newRun.running || []).includes('old'), `running: ${JSON.stringify(newRun.running)}`)
     }
     if (newSt) {
       const e = entriesOf(newSt)
-      add(4, `One Installed-apps entry after the upgrade: "Hive Desktop ${version}"`, e.length === 1 && e[0].displayName === `Hive Desktop ${version}`, `before: ${JSON.stringify(prevNames)}; after: ${JSON.stringify(e.map(x => x.displayName))}`)
+      // HI-2460: the 1.0 app's entry gone, one of the new app's: "nobody ends up with both installed".
+      // Its key is the new app ID's (it.surmise.combwork's APP_GUID), whatever the display name says.
+      add(n, `One Installed-apps entry after the upgrade: "${app.productName} ${version}", Combwork's own (${COMBWORK_GUID}), none of the 1.0 app's`, e.length === 1 && e[0].displayName === `${app.productName} ${version}` && String(e[0].key).toLowerCase() === COMBWORK_GUID, `before: ${JSON.stringify(prevNames)}; after: ${JSON.stringify(e.map(x => x.displayName))}`)
       const l = shortcutsOf(newSt)
-      add(4, `Shortcuts renamed or kept: only "Hive Desktop", on the Desktop and in the Start menu (before: ${describeShortcuts(shortcutsOf(prevSt))})`, l.length >= 2 && l.every(x => x.name === 'Hive Desktop') && l.some(inDesktop) && l.some(inStart), describeShortcuts(l))
-      add(4, 'Same install folder, Hive.exe there', newSt.installDir?.hiveExe, JSON.stringify(newSt.installDir))
-      // Test builds carry the previous release's version number: the app code's hash shows the new build went in.
-      const before = prevSt?.installDir?.appAsarSha256
-      const now = newSt.installDir?.appAsarSha256
-      if (meta.sameInstaller) add(4, 'The installed app code is this build\'s', now && now === before, `${before} → ${now}`)
-      else add(4, `The installed app code changed (app.asar ${String(before).slice(0, 12)}… → ${String(now).slice(0, 12)}…)`, before && now && before !== now, `${before} → ${now}`)
+      add(n, `Shortcuts: only "${app.shortcutName}", starting ${app.exeName}.exe, on the Desktop and in the Start menu (before: ${describeShortcuts(shortcutsOf(prevSt))})`, l.length >= 2 && l.every(x => x.name === app.shortcutName && exeIn(x.target, app.exeName)) && l.some(inDesktop) && l.some(inStart), describeShortcuts(l))
+      const ins = newSt.installs || {}
+      add(n, `Installed in %LOCALAPPDATA%\\Programs\\${app.exeName}; the 1.0 app's folder gone`, ins.combwork?.hasExe === true && ins.old?.exists === false, JSON.stringify(ins))
+      add(n, `The installed app code is the new build's (app.asar ${String(ins.combwork?.appAsarSha256).slice(0, 12)}…)`, !!ins.combwork?.appAsarSha256, JSON.stringify(ins.combwork))
+      const pr = newSt.profiles || {}
+      add(n, 'The profile folders moved: %APPDATA%\\Combwork and %LOCALAPPDATA%\\Combwork, none of the 1.0 app\'s left', pr.roamingCombwork?.exists && pr.localCombwork?.exists && !pr.roamingOld?.exists && !pr.localOld?.exists, JSON.stringify({ roaming: [pr.roamingCombwork?.exists, pr.roamingOld?.exists], local: [pr.localCombwork?.exists, pr.localOld?.exists] }))
+      add(n, "The installer's record is in %LOCALAPPDATA%\\Combwork", /"by"\s*:\s*"installer"/.test(String(pr.localCombwork?.record)), String(pr.localCombwork?.record))
+      const run = [].concat(newSt.run || [])
+      add(n, "The 1.0 app's Launch at login removed by the installer", !run.some(v => String(v.command).toLowerCase().includes(`\\${OLD_APP.exeName}.exe`.toLowerCase())), JSON.stringify(run))
     }
-    const after = driver('upgrade', 's4-after')
-    if (after?.facts?.version !== undefined) add(4, `After the upgrade the app reports ${version}`, after.facts.version === version, `reports ${after.facts.version}`)
+    driver(kind, `${pre}-notify`)
+    const after = driver(kind, `${pre}-after`)
+    if (after?.facts?.version !== undefined) add(n, `After the upgrade the app reports ${version}`, after.facts.version === version, `reports ${after.facts.version}`)
+  }
+
+  if (ran.includes('edges')) {
+    const e = need(8, 'edges')
+    if (e) {
+      if (e.completed !== true) add(8, 'edges.ps1 finished', false, 'it stopped before the end')
+      const list = [].concat(e.checks || [])
+      for (const c of list) add(8, c.name, c.ok === true, c.detail)
+      for (const id of EDGE_IDS) if (!list.some(c => c.id === id)) add(8, `edge check "${id}" ran`, false, 'missing from edges.json')
+    }
+    driver('edges', 's8')
+  }
+
+  if (ran.includes('clean')) {
+    const run = need(9, 's9-run')
+    if (run) add(9, `Silent install (/S) on a Windows that never had Combwork or the app before it (${run.seconds} s)`, run.exitCode === 0, `exit ${run.exitCode}`)
+    driver('clean', 's9')
+    const scan = need(9, 's9-scan')
+    if (scan) {
+      const asar = cleanChecks(scan, (id, name, ok, detail) => add(9, name, ok, detail))
+      asarNote = `**app.asar** holds ${asar.total} hit(s) of the old name (${asar.files.map(a => `${a.place}: ${a.count}`).join(', ') || 'none found'}): counted, not failed. The app's own code, with the upgrade code that knows the 1.0 names. The bundled code in app.asar.unpacked (${Number(scan.code) || 0} file(s)) is named, not read: which code may name the old name is the repository's name guard's job (tests/oldNames.mjs, HI-2647).`
+    }
+  }
+
+  if (ran.includes('profile-move')) {
+    const prev = need(11, 's11-prev-run')
+    if (prev) add(11, `The 1.0 app installs (${prev.seconds} s)`, prev.exitCode === 0, `exit ${prev.exitCode}`)
+    const m = need(11, 's11-profile')
+    if (m) {
+      if (m.completed !== true) add(11, 'profile-move.ps1 finished', false, 'it stopped before the end')
+      const list = [].concat(m.checks || [])
+      for (const c of list) add(11, c.name, c.ok === true, c.detail)
+      for (const id of PROFILE_MOVE_IDS) if (!list.some(c => c.id === id)) add(11, `profile move check "${id}" ran`, false, 'missing from s11-profile.json')
+    }
   }
 
   for (const id of meta.leftRunning || []) add(0, `CLEANUP: Sandbox ${id} confirmed stopped`, false, `CLEANUP NOT CONFIRMED: Sandbox ${id} may still be running`)
   if (!checks.length && !notRun.length) add(0, 'At least one check ran', false, 'nothing was checked')
 
   const passed = checks.filter(c => c.ok).length
-  const differences = []
-  if (ran.includes('upgrade') && meta.previousVersion === meta.installerVersion) {
-    differences.push(`The previous release and this build both say **${meta.installerVersion}**: the in-app updater (no downgrades, only newer versions) would not offer this build, so the upgrade check is a reinstall over it, run by hand with the updater's arguments. The "Hive Desktop updated to …" notice can't show.`)
+  const differences = asarNote ? [asarNote] : []
+  if ((ran.includes('upgrade') || ran.includes('manual')) && meta.previousVersion === meta.installerVersion) {
+    differences.push(`The previous release and this build both say **${meta.installerVersion}**: the in-app updater (no downgrades, only newer versions) would not offer this build, so the upgrade check is a reinstall over it, run by hand with the updater's arguments. The previous release's "updated to …" notice can't show.`)
   }
   const s1 = files.s1
-  if (s1?.facts?.gitMissing || files['s1-state']?.git === false) differences.push('**No Git** on a fresh machine: Hive shows its Git warning (status bar "Git", Provider Setup "Git not found"). Expected; a fresh-install difference.')
+  if (s1?.facts?.gitMissing || files['s1-state']?.git === false) differences.push('**No Git** on a fresh machine: Combwork shows its Git warning (status bar "Git", Provider Setup "Git not found"). Expected; a fresh-install difference.')
   return { meta, checks, passed, failed: checks.length - passed, notRun, differences, files }
 }
 
@@ -164,12 +263,13 @@ function markdown(r) {
   const m = r.meta
   const esc = s => String(s).replace(/\|/g, '\\|').replace(/\r?\n/g, ' ')
   const lines = [
-    `# Hive build checks in Windows Sandbox`,
+    `# Combwork build checks in Windows Sandbox`,
     '',
     `**${verdict(r)}** · ${m.date}`,
     '',
     `- Installer: \`${m.installer}\` (version ${m.installerVersion}${m.buildInfo ? `, code ${m.buildInfo.code}, branch ${m.buildInfo.branch}, built ${m.buildInfo.builtAt}` : ''})`,
     m.previous ? `- Previous release for the upgrade: \`${m.previous}\` (version ${m.previousVersion})` : null,
+    m.previousRc ? `- Release candidate for scenario 10's upgrade: \`${m.previousRc}\` (version ${m.previousRcVersion})` : null,
     `- Host Windows ${m.hostBuild}; network **off** in the Sandbox; fake CLIs only, nothing signed in.`,
     m.smartAppControl?.option === 'off' ? `- **Smart App Control in the Sandbox: ${m.smartAppControl.note}** (\`--smart-app-control off\`; state ${m.smartAppControl.state ?? 'unknown'}, read before each install). Inside the Sandbox only: the host isn't changed. Unsigned installers could run, so this run says nothing about signing.` : null,
     `- Scenarios run: ${(m.ran || []).filter(k => !(r.notRun || []).some(n => n.kind === k)).join(', ') || 'none'}. Took ${m.minutes} min.`,
@@ -193,10 +293,13 @@ function markdown(r) {
     for (const c of cs) lines.push(`| ${esc(c.name)} | ${c.ok ? 'pass' : `**FAIL**: ${esc(c.detail || '').slice(0, 300)}`} |`)
     lines.push('')
   }
+  // Scenario 9's hits, each with its place and text (HI-2592).
+  const hits = hitsMarkdown(r.files?.['s9-scan'])
+  if (hits.length) lines.push('## 9. Where the old name was found', '', ...hits)
   if (r.differences.length) lines.push('## Notes and fresh-install differences', '', ...r.differences.map(d => `- ${d}`), '')
   if (m.timings && Object.keys(m.timings).length) lines.push('## Timings', '', ...Object.entries(m.timings).map(([k, v]) => `- ${k}: ${v}`), '')
   if (m.shots?.length) lines.push('## Screenshots', '', ...m.shots.map(s => `- [${s}](${encodeURI(s)})`), '')
   return lines.join('\n')
 }
 
-module.exports = { evaluate, markdown, verdict, SCENARIOS, KINDS, REQUIRED }
+module.exports = { evaluate, markdown, verdict, SCENARIOS, KINDS, REQUIRED, COMBWORK_GUID, PROFILE_MOVE_IDS }

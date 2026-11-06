@@ -2,7 +2,7 @@
 // sign-in (fake-signin.json in its test home: each turn ends with StopFailure authentication_failed, `auth status` says
 // signed out): the agents show "needs sign-in", one notification is recorded for all of them, "/login" in one agent's
 // terminal carries that agent on by itself and ends it for all, and Resume (n) carries on the others with a short prompt.
-// A later expiry is told again. Quiet test build (HIVE_TEST_NOTIFY_LOG), throwaway profile, workspace and test home;
+// A later expiry is told again. Quiet test build (CW_TEST_NOTIFY_LOG), throwaway profile, workspace and test home;
 // no real sign-in is touched.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -42,18 +42,18 @@ const until = async (fn, ms = 10000) => {
 
   const notifyLog = path.join(lib.WORK, 'signin-notify.log')
   fs.rmSync(notifyLog, { force: true })
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47919), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_QUIET: '1', HIVE_TEST_NOTIFY_LOG: notifyLog })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47919), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_QUIET: '1', CW_TEST_NOTIFY_LOG: notifyLog })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1300, height: 800 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await app.evaluate(({ Notification }) => {
     Notification.isSupported = () => true
   })
-  // The sign-in notifications Hive would have shown (a finish is told too, separately).
+  // The sign-in notifications Combwork would have shown (a finish is told too, separately).
   const signInNotes = () => (fs.existsSync(notifyLog) ? fs.readFileSync(notifyLog, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []).filter((e) => e.kind === 'notification' && /sign in/i.test(e.title ?? ''))
   const expire = (expired) => fs.writeFileSync(path.join(claudeHome, 'fake-signin.json'), JSON.stringify({ expired }))
 
@@ -107,7 +107,7 @@ const until = async (fn, ms = 10000) => {
     return s.every((x) => x?.status === 'ready') ? s : null
   }, 10000)
   check('the others are idle again, marked as stopped by the sign-in', !!others && others.every((s) => s.signIn && s.statusMessage === 'Stopped while signed out'), JSON.stringify((others ?? []).map((s) => [s?.status, s?.statusMessage, !!s?.signIn])))
-  check('Hive says so, counting only the two it stopped', !!(await until(async () => ((await page.getByText("2 agents stopped while it was signed out: Resume in the project's header carries them on.").count()) ? true : null), 5000)))
+  check('Combwork says so, counting only the two it stopped', !!(await until(async () => ((await page.getByText("2 agents stopped while it was signed out: Resume in the project's header carries them on.").count()) ? true : null), 5000)))
   const back = await until(async () => {
     const i = (await inv('provider:info'))['claude-code']
     return i && !i.checking && i.loggedIn === true ? i : null

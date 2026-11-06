@@ -18,7 +18,7 @@ export interface CardMatch {
 const CARD_RE = /(?<![\p{L}\p{N}_&#/\\.])#([1-9]\d{0,6})(?![\p{L}\p{N}_]|[.-][\p{L}\p{N}_])/gu
 /**
  * A card's key, `AM-12` (#1221): 2–4 capital letters, a hyphen and a number with no leading zero, not inside a longer
- * word, path or version (`XAM-12`, `a/AM-12`, `AM-12.5`). Capitals only, as Hive writes keys: `re-1` in output isn't one.
+ * word, path or version (`XAM-12`, `a/AM-12`, `AM-12.5`). Capitals only, as Combwork writes keys: `re-1` in output isn't one.
  */
 const KEY_RE = /(?<![\p{L}\p{N}_/\\.-])([A-Z]{2,4})-([1-9]\d{0,8})(?![\p{L}\p{N}_]|[.-][\p{L}\p{N}_])/gu
 /** A URL, whose fragment (`https://x/y#12`) is the web link's. */

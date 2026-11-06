@@ -11,14 +11,16 @@ const line = (o: unknown): string => JSON.stringify(o)
 
 describe('Codex hook trust', () => {
   it("hashes hooks the way Codex does (values from Codex 0.159's hooks/list)", () => {
-    expect(hookHash('session_start', undefined, 'echo hive-test', 5)).toBe('sha256:9304855a6bdb130c5107b4f69e530cbf6f7cb00c82e7bcd218d8bb4f071a8c7a')
-    expect(hookHash('pre_tool_use', '*', 'echo hive-test', 10)).toBe('sha256:fc3016d3b175c2e0d43538eff55ae4adb352fc1d3bb47acc3ac9d651e7b68024')
-    expect(hookHash('session_end', undefined, 'echo hive-test', 3)).toBe('sha256:22b9953958a5515d3eda16a1a8ce24cd1a55b3685b278840eed401bf0d7e1573')
+    // old-name: begin recorded-hook-hashes
+    expect(hookHash('session_start', undefined, 'echo hive-test', 5)).toBe('sha256:9304855a6bdb130c5107b4f69e530cbf6f7cb00c82e7bcd218d8bb4f071a8c7a') // Codex's own values: the command as recorded (HI-2590)
+    expect(hookHash('pre_tool_use', '*', 'echo hive-test', 10)).toBe('sha256:fc3016d3b175c2e0d43538eff55ae4adb352fc1d3bb47acc3ac9d651e7b68024') // Codex's own values: the command as recorded (HI-2590)
+    expect(hookHash('session_end', undefined, 'echo hive-test', 3)).toBe('sha256:22b9953958a5515d3eda16a1a8ce24cd1a55b3685b278840eed401bf0d7e1573') // Codex's own values: the command as recorded (HI-2590)
+    // old-name: end recorded-hook-hashes
   })
 })
 
 describe('Codex hooks', () => {
-  it('turns hook calls into Hive events', async () => {
+  it('turns hook calls into Combwork events', async () => {
     const { codex } = await import('../src/main/providers/codex/adapter')
     const h = (body: Record<string, unknown>) => codex.normalizeHook(body)
     expect(h({ hook_event_name: 'SessionStart', session_id: 's1', transcript_path: 'C:\\x\\r.jsonl', source: 'startup', permission_mode: 'default' })).toMatchObject({ event: { kind: 'start', source: 'startup' }, sessionId: 's1', transcriptPath: 'C:\\x\\r.jsonl', mode: null })
@@ -98,16 +100,16 @@ describe('Codex: when a person must act', () => {
     }
   })
 
-  it("pins the title's items for Hive's sessions, so a user's [tui].terminal_title can't hide it", async () => {
+  it("pins the title's items for Combwork's sessions, so a user's [tui].terminal_title can't hide it", async () => {
     const { rmSync } = await import('fs')
-    const home = tempDir('hive-codex-home-')
+    const home = tempDir('cw-codex-home-')
     const before = process.env.CODEX_HOME
     process.env.CODEX_HOME = home
     try {
       const { codex } = await import('../src/main/providers/codex/adapter')
       const ctx = {
         projectPath: home, agentId: 'a-1', executable: 'C:\\bin\\codex.exe', cwd: home, workspacePath: home, runId: 'r', sessionId: '',
-        resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: [], hookUrl: 'http://127.0.0.1:1/hook?run=r', hookAuthFile: 'C:/hive/hook-auth/r.txt', privateDir: 'C:/hive/launches/r', guidance: '', env: {}, allowBackgroundSessions: false, use200kContext: false
+        resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: [], hookUrl: 'http://127.0.0.1:1/hook?run=r', hookAuthFile: 'C:/profile/hook-auth/r.txt', privateDir: 'C:/profile/launches/r', guidance: '', env: {}, allowBackgroundSessions: false, use200kContext: false
       }
       const { args } = codex.buildCommand(ctx.executable, ctx)
       expect(args.join(' ')).toContain('tui.terminal_title=')
@@ -127,8 +129,8 @@ describe('Codex: when a person must act', () => {
 
   it("says a connection's folder is set up (HI-1870) when its launches run in a Windows sandbox: its own, or this PC's passed on", async () => {
     const { mkdirSync, rmSync, statSync, utimesSync, writeFileSync } = await import('fs')
-    const pc = tempDir('hive-codex-pc-')
-    const conn = tempDir('hive-codex-conn-')
+    const pc = tempDir('cw-codex-pc-')
+    const conn = tempDir('cw-codex-conn-')
     const before = process.env.CODEX_HOME
     process.env.CODEX_HOME = pc
     try {
@@ -167,13 +169,13 @@ describe('Codex: when a person must act', () => {
     }
   })
 
-  it("reads a connection's trust of a workspace's folders as Codex 0.164.0 looked it up (HI-1870), with Hive's per-launch trust off", async () => {
+  it("reads a connection's trust of a workspace's folders as Codex 0.164.0 looked it up (HI-1870), with Combwork's per-launch trust off", async () => {
     const { mkdirSync, rmSync, writeFileSync } = await import('fs')
     const { codex } = await import('../src/main/providers/codex/adapter')
     const { advanced } = await import('../src/main/advanced')
     const real = advanced.get.bind(advanced)
     const off = vi.spyOn(advanced, 'get').mockImplementation(((id: string) => (id === 'codex.trust.perLaunch' ? false : real(id))) as typeof advanced.get)
-    const home = tempDir('hive-codex-trust-')
+    const home = tempDir('cw-codex-trust-')
     try {
       const t = (root: string | null, git = true) => ({ root, git, short: false })
       const targets = [t('C:\\work\\alpha'), t('c:\\WORK\\Alpha'), t('C:\\work\\beta'), t('C:\\work\\notes', false), t(null)]
@@ -201,24 +203,24 @@ describe('Codex: when a person must act', () => {
     }
   })
 
-  it("trusts each launch's own folder when Hive's per-launch trust is on (HI-1871, Darren: on by default): its -c, and nothing pending", async () => {
+  it("trusts each launch's own folder when Combwork's per-launch trust is on (HI-1871, Darren: on by default): its -c, and nothing pending", async () => {
     const { rmSync } = await import('fs')
     const { codex } = await import('../src/main/providers/codex/adapter')
     const { advanced } = await import('../src/main/advanced')
-    const home = tempDir('hive-codex-perlaunch-')
+    const home = tempDir('cw-codex-perlaunch-')
     const before = process.env.CODEX_HOME
     process.env.CODEX_HOME = home
     try {
       const ctx = {
-        projectPath: home, agentId: 'a-1', executable: 'C:\\bin\\codex.exe', cwd: 'C:\\work\\HIVE.worktrees\\alpha\\slot-a', workspacePath: home, runId: 'r', sessionId: '',
-        resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: [], hookUrl: 'http://127.0.0.1:1/hook?run=r', hookAuthFile: 'C:/hive/hook-auth/r.txt', privateDir: 'C:/hive/launches/r', guidance: '', env: {}, allowBackgroundSessions: false, use200kContext: false
+        projectPath: home, agentId: 'a-1', executable: 'C:\\bin\\codex.exe', cwd: 'C:\\work\\DEMO.worktrees\\alpha\\slot-a', workspacePath: home, runId: 'r', sessionId: '',
+        resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: [], hookUrl: 'http://127.0.0.1:1/hook?run=r', hookAuthFile: 'C:/profile/hook-auth/r.txt', privateDir: 'C:/profile/launches/r', guidance: '', env: {}, allowBackgroundSessions: false, use200kContext: false
       }
       expect(advanced.get<boolean>('codex.trust.perLaunch')).toBe(true)
       const { args } = codex.buildCommand(ctx.executable, ctx)
       const i = args.findIndex((a) => a.startsWith('projects='))
-      // The inline table (a dotted -c key would split the path at "HIVE.worktrees"), its folder alone.
+      // The inline table (a dotted -c key would split the path at "DEMO.worktrees"), its folder alone.
       expect(args[i - 1]).toBe('-c')
-      expect(args[i]).toBe('projects={"C:\\\\work\\\\HIVE.worktrees\\\\alpha\\\\slot-a"={trust_level="trusted"}}')
+      expect(args[i]).toBe('projects={"C:\\\\work\\\\DEMO.worktrees\\\\alpha\\\\slot-a"={trust_level="trusted"}}')
       expect(await codex.connectionTrusts(home, [{ root: 'C:\\work\\alpha', git: true, short: false }, { root: null, git: true, short: false }])).toEqual([true, true])
       // Off: no -c of it, and trust read from the connection's own file.
       const real = advanced.get.bind(advanced)
@@ -238,14 +240,14 @@ describe('Codex: when a person must act', () => {
 
   it('passes the first task after "--", so extra arguments ending in --image keep it (#523)', async () => {
     const { rmSync } = await import('fs')
-    const home = tempDir('hive-codex-home-')
+    const home = tempDir('cw-codex-home-')
     const before = process.env.CODEX_HOME
     process.env.CODEX_HOME = home
     try {
       const { codex } = await import('../src/main/providers/codex/adapter')
       const ctx = {
         projectPath: home, agentId: 'a-1', executable: 'C:\\bin\\codex.exe', cwd: home, workspacePath: home, runId: 'r', sessionId: '00000000-0000-4000-8000-000000000000',
-        resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: ['--image', 'a.png', 'b.png'], hookUrl: 'http://127.0.0.1:1/hook?run=r', hookAuthFile: 'C:/hive/hook-auth/r.txt', privateDir: 'C:/hive/launches/r', guidance: '', env: {}, allowBackgroundSessions: false, use200kContext: false,
+        resume: false, name: '', skills: [], mcpServers: {}, model: null, effort: null, permissionMode: null, extraArgs: ['--image', 'a.png', 'b.png'], hookUrl: 'http://127.0.0.1:1/hook?run=r', hookAuthFile: 'C:/profile/hook-auth/r.txt', privateDir: 'C:/profile/launches/r', guidance: '', env: {}, allowBackgroundSessions: false, use200kContext: false,
         initialPrompt: 'Work on card #12'
       }
       // Codex 0.162 reads a plain argument after "--image a.png" as another image; after "--" it is the prompt.
@@ -261,22 +263,22 @@ describe('Codex: when a person must act', () => {
     }
   })
 
-  it("pre-approves only Hive's own server's tools: a third-party one follows Codex's approval policy (#1166)", async () => {
+  it("pre-approves only Combwork's own server's tools: a third-party one follows Codex's approval policy (#1166)", async () => {
     const { rmSync } = await import('fs')
-    const home = tempDir('hive-codex-home-')
+    const home = tempDir('cw-codex-home-')
     const before = process.env.CODEX_HOME
     process.env.CODEX_HOME = home
     try {
       const { codex } = await import('../src/main/providers/codex/adapter')
-      const mcpServers = { hive: { command: 'node', args: ['hive-mcp.js'] }, gh: { command: 'npx', args: ['-y', 'gh-mcp'] }, api: { url: 'https://mcp.example.com' } }
+      const mcpServers = { combwork: { command: 'node', args: ['cw-mcp.js'] }, gh: { command: 'npx', args: ['-y', 'gh-mcp'] }, api: { url: 'https://mcp.example.com' } }
       const ctx = {
         projectPath: home, agentId: 'a-1', executable: 'C:\\bin\\codex.exe', cwd: home, workspacePath: home, runId: 'r', sessionId: '',
-        resume: false, name: '', skills: [], mcpServers, model: null, effort: null, permissionMode: null, extraArgs: [], hookUrl: 'http://127.0.0.1:1/hook?run=r', hookAuthFile: 'C:/hive/hook-auth/r.txt', privateDir: 'C:/hive/launches/r', guidance: '', env: {}, allowBackgroundSessions: false, use200kContext: false
+        resume: false, name: '', skills: [], mcpServers, model: null, effort: null, permissionMode: null, extraArgs: [], hookUrl: 'http://127.0.0.1:1/hook?run=r', hookAuthFile: 'C:/profile/hook-auth/r.txt', privateDir: 'C:/profile/launches/r', guidance: '', env: {}, allowBackgroundSessions: false, use200kContext: false
       }
       const server = (args: string[], name: string) => args.find((a) => a.startsWith(`mcp_servers.${name}=`))
       for (const permissionMode of [null, 'read-only', 'ask', 'approve-for-me', 'full-access']) {
         const { args } = codex.buildCommand(ctx.executable, { ...ctx, permissionMode })
-        expect(server(args, 'hive'), String(permissionMode)).toContain('default_tools_approval_mode="approve"')
+        expect(server(args, 'combwork'), String(permissionMode)).toContain('default_tools_approval_mode="approve"')
         expect(server(args, 'gh'), String(permissionMode)).toMatch(/^mcp_servers\.gh=\{command="npx"/)
         expect(server(args, 'gh'), String(permissionMode)).not.toContain('default_tools_approval_mode')
         expect(server(args, 'api'), String(permissionMode)).toMatch(/^mcp_servers\.api=\{url="https:\/\/mcp\.example\.com"/)
@@ -393,8 +395,8 @@ describe("a Codex code-mode script's calls (HI-2240)", () => {
       line({ type: 'response_item', payload: { type: 'function_call', name: 'exec_command', call_id: 'direct', arguments: '{"cmd":"ls"}' } }),
       done({ type: 'CommandExecution', id: 'direct', command: ['pwsh', '-Command', 'ls'], status: 'completed', exit_code: 0, aggregated_output: '' }),
       // A failed MCP call, and one that isn't a call at all.
-      exec('s2', 'text(await tools.mcp__hive__hive_read_task({number: 1}))'),
-      done({ type: 'McpToolCall', id: 'exec-2', server: 'hive', tool: 'hive_read_task', arguments: { number: 1 }, status: 'failed', error: { message: 'No such card' } }),
+      exec('s2', 'text(await tools.mcp__combwork__cw_read_task({number: 1}))'),
+      done({ type: 'McpToolCall', id: 'exec-2', server: 'combwork', tool: 'cw_read_task', arguments: { number: 1 }, status: 'failed', error: { message: 'No such card' } }),
       done({ type: 'AgentMessage', id: 'm1', content: [] }),
       // Recorded with no start time, while a script runs (none of these has ended): that script's.
       done({ type: 'CommandExecution', id: 'exec-3', command: ['pwsh', '-Command', 'npm test'], status: 'failed', exit_code: 1, aggregated_output: 'failed' })
@@ -403,10 +405,10 @@ describe("a Codex code-mode script's calls (HI-2240)", () => {
     expect(edit).toMatchObject({ name: 'Edit', summary: 'a.txt', calls: [expect.objectContaining({ name: 'Edit', summary: 'a.txt' })] })
     expect(direct).toMatchObject({ name: 'Shell' })
     expect(direct.calls).toBeUndefined()
-    expect(script.calls).toEqual([expect.objectContaining({ name: 'hive · hive_read_task', result: 'No such card', isError: true }), expect.objectContaining({ name: 'Shell', input: 'npm test', isError: true })])
+    expect(script.calls).toEqual([expect.objectContaining({ name: 'combwork · cw_read_task', result: 'No such card', isError: true }), expect.objectContaining({ name: 'Shell', input: 'npm test', isError: true })])
   })
 
-  it("hive_agent_activity's recent tools are the calls a script made, in order; any other tool is itself", async () => {
+  it("cw_agent_activity's recent tools are the calls a script made, in order; any other tool is itself", async () => {
     const { callsMade } = await import('../src/shared/activity')
     expect(parsed(fixture()).flatMap(callsMade).map((t) => [t.name, t.summary])).toEqual([['Shell', 'echo hello'], ['Edit', 'notes.txt'], ['probe · echo', 'hi']])
     const plain = { toolUseId: 'x', name: 'Shell', summary: 'ls', input: 'ls', result: '', isError: false, images: [] }
@@ -416,7 +418,7 @@ describe("a Codex code-mode script's calls (HI-2240)", () => {
 
   it("a command left running is the script's that started it, ending in a later script or turn (HR1's round 1)", () => {
     // Recorded by Codex 0.166.0 in a scenario run (the Codex test home): script call_da8eb… starts `npm test` through
-    // hive-progress (started_at 15:59:51.791) and returns while it runs; it ends at 16:00:59, during call_a4ddc….
+    // cw-progress (started_at 15:59:51.791) and returns while it runs; it ends at 16:00:59, during call_a4ddc….
     const real = parsed(require('fs').readFileSync(require('path').join(__dirname, 'fixtures', 'codex-0.166.0-delayed-command.jsonl'), 'utf8'))
     const byId = (id: string) => real.find((t) => t.toolUseId === id)!
     const delayed = 'exec-c26e1c16-34dd-4b62-88cc-5917b9fbe5f0'
@@ -493,36 +495,36 @@ describe('Codex models', () => {
 })
 
 describe('Codex skill copies', () => {
-  it("replaces and removes only Hive's marked copies, and leaves the user's own folders alone", async () => {
+  it("replaces and removes only Combwork's marked copies, and leaves the user's own folders alone", async () => {
     const { mkdirSync, writeFileSync, existsSync, readFileSync } = await import('fs')
     const { join } = await import('path')
-    const root = tempDir('hive-skills-')
+    const root = tempDir('cw-skills-')
     const src = join(root, 'src', 'deploy')
     mkdirSync(src, { recursive: true })
     writeFileSync(join(src, 'SKILL.md'), '# deploy v1')
     const cwd = join(root, 'proj')
     const skills = join(cwd, '.agents', 'skills')
     // The user's own folder that happens to use the prefix.
-    mkdirSync(join(skills, 'hive-mine'), { recursive: true })
-    writeFileSync(join(skills, 'hive-mine', 'SKILL.md'), '# mine')
+    mkdirSync(join(skills, 'cw-mine'), { recursive: true })
+    writeFileSync(join(skills, 'cw-mine', 'SKILL.md'), '# mine')
     const { syncAgentsSkills } = await import('../src/main/providers/common')
     const sync = (list: { name: string; sourcePath: string }[]) => syncAgentsSkills({ cwd, skills: list } as never, 'Codex')
     await sync([{ name: 'deploy', sourcePath: src }])
-    expect(readFileSync(join(skills, 'hive-deploy', 'SKILL.md'), 'utf8')).toBe('# deploy v1')
-    expect(existsSync(join(skills, 'hive-deploy', '.hive-copy'))).toBe(true)
+    expect(readFileSync(join(skills, 'cw-deploy', 'SKILL.md'), 'utf8')).toBe('# deploy v1')
+    expect(existsSync(join(skills, 'cw-deploy', '.combwork-copy'))).toBe(true)
     writeFileSync(join(src, 'SKILL.md'), '# deploy v2')
     await sync([{ name: 'deploy', sourcePath: src }])
-    expect(readFileSync(join(skills, 'hive-deploy', 'SKILL.md'), 'utf8')).toBe('# deploy v2')
-    // Disabled: Hive's copy goes, the user's folder stays.
+    expect(readFileSync(join(skills, 'cw-deploy', 'SKILL.md'), 'utf8')).toBe('# deploy v2')
+    // Disabled: Combwork's copy goes, the user's folder stays.
     await sync([])
-    expect(existsSync(join(skills, 'hive-deploy'))).toBe(false)
-    expect(existsSync(join(skills, 'hive-mine', 'SKILL.md'))).toBe(true)
+    expect(existsSync(join(skills, 'cw-deploy'))).toBe(false)
+    expect(existsSync(join(skills, 'cw-mine', 'SKILL.md'))).toBe(true)
   })
 })
 
 describe('Codex permission menu (#396)', () => {
   // Codex's /permissions menu as rendered: 0.161.0's own (captured in a test home, with Read Only and with Ask for
-  // approval current), and 0.160's order (Read Only first) in the same layout, as Hive's earlier number picks assumed.
+  // approval current), and 0.160's order (Read Only first) in the same layout, as Combwork's earlier number picks assumed.
   // A line per row, however git checked the fixture out (CRLF on Windows).
   const screen = (name: string) => readText(joinPath(__dirname, 'fixtures', `codex-${name}.txt`), 'utf8').replace(/\r\n/g, '\n')
   const MODES = ['read-only', 'ask', 'approve-for-me', 'full-access'] as const

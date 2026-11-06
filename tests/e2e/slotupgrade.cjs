@@ -1,8 +1,8 @@
 // S56, agents' worktrees become slots at the upgrade (#1441, SPEC §16.10.8), on fake Claude Code agents, the Assistant
 // off; alpha is a 6×6 team (#1448: B1–B6 each in a worktree of its own, R2 too, the other reviewers in the folder).
 // The workspace is made as 0.9 left it: each builder's own worktree in project.json, the slots' migration held off
-// for the first start (HIVE_TEST_SLOT_MIGRATION=off, unpackaged only), so the dev build runs it as 0.9 did:
-// 1. "0.9 day": alpha (Pair with Hive merges into integration, cards in slots) runs a lane of two cards on B1, whose
+// for the first start (CW_TEST_SLOT_MIGRATION=off, unpackaged only), so the dev build runs it as 0.9 did:
+// 1. "0.9 day": alpha (Pair with Combwork merges into integration, cards in slots) runs a lane of two cards on B1, whose
 //    worktree hb1 is where it works and where card 1 starts; the solo project's agent Me works in its worktree, no cards.
 // 2. The upgrade (the next start, migrated): hb1 is a slot carried by B1 for the lane, me one carried by Me for nothing.
 //    The lane finishes there: card 1 submitted, reviewed and merged, card 2 started in hb1 too (the stand-in path), and
@@ -34,7 +34,7 @@ const meTree = path.join(`${ws}.worktrees`, 'solo', 'me')
 const others = [2, 3, 4, 5, 6].map((n) => ({ n, tree: path.join(root, `hb${n}`) }))
 const hr2 = path.join(root, 'hr2')
 const PORT = Number(lib.port(47937))
-const identity = { name: 'Hive Slot Test', email: 'slots@example.com' }
+const identity = { name: 'Combwork Slot Test', email: 'slots@example.com' }
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -59,32 +59,32 @@ const isIn = (dir, rev, ref) => {
 
 ;(async () => {
   for (const d of [userData, ws, `${ws}.worktrees`]) fs.rmSync(d, { recursive: true, force: true })
-  // 0.9's layout: alpha with B1's worktree hb1 (on hive/hb1, from integration), R1 in the project folder; solo with Me's.
-  lib.gitProject(alpha, { 'a.txt': 'a\n', '.gitignore': '.hive/\n' })
+  // 0.9's layout: alpha with B1's worktree hb1 (on cw/hb1, from integration), R1 in the project folder; solo with Me's.
+  lib.gitProject(alpha, { 'a.txt': 'a\n', '.gitignore': '.combwork/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
   lib.git(alpha, ['branch', 'integration'])
   // The identity its commits use, in its git config: G12 reads it from git each time (HI-2266, HI-2283).
   lib.git(alpha, ['config', 'user.name', identity.name])
   lib.git(alpha, ['config', 'user.email', identity.email])
-  lib.git(alpha, ['worktree', 'add', '-q', '-b', 'hive/hb1', hb1, 'integration'])
-  for (const o of others) lib.git(alpha, ['worktree', 'add', '-q', '-b', `hive/hb${o.n}`, o.tree, 'integration'])
-  lib.git(alpha, ['worktree', 'add', '-q', '-b', 'hive/hr2', hr2, 'integration'])
-  lib.gitProject(solo, { 's.txt': 's\n', '.gitignore': '.hive/\n' })
+  lib.git(alpha, ['worktree', 'add', '-q', '-b', 'cw/hb1', hb1, 'integration'])
+  for (const o of others) lib.git(alpha, ['worktree', 'add', '-q', '-b', `cw/hb${o.n}`, o.tree, 'integration'])
+  lib.git(alpha, ['worktree', 'add', '-q', '-b', 'cw/hr2', hr2, 'integration'])
+  lib.gitProject(solo, { 's.txt': 's\n', '.gitignore': '.combwork/\n' })
   lib.git(solo, ['branch', '-M', 'main'])
-  lib.git(solo, ['worktree', 'add', '-q', '-b', 'hive/me', meTree, 'main'])
+  lib.git(solo, ['worktree', 'add', '-q', '-b', 'cw/me', meTree, 'main'])
   const agents = {
     [alpha]: [
-      { id: 'b1', name: 'B1', provider: 'claude-code', workflowRole: 'builder', worktree: { path: hb1, branch: 'hive/hb1', base: 'integration' } },
+      { id: 'b1', name: 'B1', provider: 'claude-code', workflowRole: 'builder', worktree: { path: hb1, branch: 'cw/hb1', base: 'integration' } },
       { id: 'r1', name: 'R1', provider: 'claude-code', workflowRole: 'reviewer' },
-      ...others.map((o) => ({ id: `b${o.n}`, name: `B${o.n}`, provider: 'claude-code', workflowRole: 'builder', worktree: { path: o.tree, branch: `hive/hb${o.n}`, base: 'integration' } })),
-      { id: 'r2', name: 'R2', provider: 'claude-code', workflowRole: 'reviewer', worktree: { path: hr2, branch: 'hive/hr2', base: 'integration' } },
+      ...others.map((o) => ({ id: `b${o.n}`, name: `B${o.n}`, provider: 'claude-code', workflowRole: 'builder', worktree: { path: o.tree, branch: `cw/hb${o.n}`, base: 'integration' } })),
+      { id: 'r2', name: 'R2', provider: 'claude-code', workflowRole: 'reviewer', worktree: { path: hr2, branch: 'cw/hr2', base: 'integration' } },
       ...[3, 4, 5, 6].map((n) => ({ id: `r${n}`, name: `R${n}`, provider: 'claude-code', workflowRole: 'reviewer' }))
     ],
-    [solo]: [{ id: 'me', name: 'Me', provider: 'claude-code', worktree: { path: meTree, branch: 'hive/me', base: 'main' } }]
+    [solo]: [{ id: 'me', name: 'Me', provider: 'claude-code', worktree: { path: meTree, branch: 'cw/me', base: 'main' } }]
   }
   for (const [p, list] of Object.entries(agents)) {
-    fs.mkdirSync(path.join(p, '.hive'), { recursive: true })
-    fs.writeFileSync(path.join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: list }, null, 2))
+    fs.mkdirSync(path.join(p, '.combwork'), { recursive: true })
+    fs.writeFileSync(path.join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: list }, null, 2))
   }
   const env = lib.fakeClaude(userData, home, [alpha, solo, ws, hb1, slotA, slotB, meTree, hr2, ...others.map((o) => o.tree)])
   const cfgFile = path.join(userData, 'config.json')
@@ -96,7 +96,7 @@ const isIn = (dir, rev, ref) => {
 
   let h = null
   const start = async (extra = {}) => {
-    h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off', ...extra } })
+    h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off', ...extra } })
     h.page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.waitForProvider(h.inv)
     await lib.openWorkspace(h.inv, h.page, ws)
@@ -118,8 +118,8 @@ const isIn = (dir, rev, ref) => {
   const tokenOf = async (p, id) => {
     const sessionId = await until(async () => (await live(p, id))?.sessionId, HUNG_MS)
     const launch = await until(() => launches().filter((l) => l.sessionId === sessionId && l.opts['--mcp-config'] && fs.existsSync(l.opts['--mcp-config'])).at(-1), HUNG_MS)
-    const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive : null
-    return hive ? JSON.parse(fs.readFileSync(hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token : null
+    const server = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
+    return server ? JSON.parse(fs.readFileSync(server.env.CW_API_TOKEN_FILE, 'utf8')).token : null
   }
   const intent = async (token, n, name, body = {}) => {
     const res = await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${encodeURIComponent(`#${n}`)}/${name}`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -142,8 +142,8 @@ const isIn = (dir, rev, ref) => {
 
   try {
     // --- 1. "0.9 day": the dev build with the slots' migration held off.
-    await start({ HIVE_TEST_SLOT_MIGRATION: 'off' })
-    await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'hiveMerges', folder: 'slots', target: 'integration', style: 'merge', preChecks: [], mergeChecks: [], identity, okBefore: { mode: 'never', labels: [] } } })
+    await start({ CW_TEST_SLOT_MIGRATION: 'off' })
+    await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'combworkMerges', folder: 'slots', target: 'integration', style: 'merge', preChecks: [], mergeChecks: [], identity, okBefore: { mode: 'never', labels: [] } } })
     await inv('workflow:setOptions', solo, { preset: null, options: { review: 'none', finish: 'notChecked', folder: 'slots' } })
     const create = async (title, project) => (await inv('tasks:create', { title, project })).number
     const c1 = await create('Old one', 'alpha')
@@ -195,10 +195,10 @@ const isIn = (dir, rev, ref) => {
     if (!(await live(alpha, 'r1'))) await inv('session:start', alpha, { agentId: 'r1' })
     const tr1 = await tokenOf(alpha, 'r1')
     check('card 1 submitted, reviewed and passed', await pass(tb1b, tr1, c1, 'Old one'))
-    check("…merged by Hive's queue: Done", !!(await until(async () => (await card(c1))?.column === 'done', HUNG_MS)) && isIn(alpha, git(hb1, 'rev-parse', 'HEAD'), 'integration'), (await card(c1))?.column)
+    check("…merged by Combwork's queue: Done", !!(await until(async () => (await card(c1))?.column === 'done', HUNG_MS)) && isIn(alpha, git(hb1, 'rev-parse', 'HEAD'), 'integration'), (await card(c1))?.column)
     const s2 = await intent(tb1b, c2, 'start')
     check('card 2 starts in hb1 too (the lane goes on there)', s2.status === 200 && same(s2.body?.data?.folder, hb1), JSON.stringify(s2.body))
-    check('…on its own branch, no per-card line', branchIn(hb1) === 'hive/hb1')
+    check('…on its own branch, no per-card line', branchIn(hb1) === 'cw/hb1')
     const rev2 = commitIn(hb1, { 'two.txt': 'two\n' }, 'Old two')
     check('card 2 submitted, reviewed and passed', await pass(tb1b, tr1, c2, 'Old two'))
     check('…merged: the lane ends', !!(await until(async () => (await card(c2))?.column === 'done' && !!(await lane(started.lane.id))?.endedAt, HUNG_MS)) && isIn(alpha, rev2, 'integration'))
@@ -207,7 +207,7 @@ const isIn = (dir, rev, ref) => {
     // hb1, free, renamed slot-a with Repair's steps; B1's last conversation goes with it.
     const renamed = await until(async () => (await slots(alpha)).find((s) => s.name === 'slot-a'), HUNG_MS)
     check('hb1 is renamed slot-a once free', !!renamed && same(renamed.folder, slotA) && !fs.existsSync(hb1) && !(await slots(alpha)).some((s) => s.name === 'hb1'), JSON.stringify(await slots(alpha)))
-    check("…git lists it there, on B1's branch", git(alpha, 'worktree', 'list', '--porcelain').toLowerCase().includes(slotA.toLowerCase().replace(/\\/g, '/')) && branchIn(slotA) === 'hive/hb1')
+    check("…git lists it there, on B1's branch", git(alpha, 'worktree', 'list', '--porcelain').toLowerCase().includes(slotA.toLowerCase().replace(/\\/g, '/')) && branchIn(slotA) === 'cw/hb1')
     const moved = await sessionOf(alpha, b1Old.sessionId)
     check("…B1's conversation recorded in slot-a", same(moved?.cwd, slotA), JSON.stringify(moved))
     await inv('session:start', alpha, { agentId: 'b1', resumeId: b1Old.sessionId })
@@ -224,7 +224,7 @@ const isIn = (dir, rev, ref) => {
     const folder = path.join(root, next.slot ?? 'none')
     await until(async () => same((await live(alpha, 'b1'))?.cwd, folder) && (await idle(alpha, 'b1')), HUNG_MS)
     const s3 = await intent(await tokenOf(alpha, 'b1'), c3, 'start')
-    check(`…card 3 is built there on its own line hive/${key}/${key}-${c3}-new-three`, s3.status === 200 && same(s3.body?.data?.folder, folder) && !!(await until(() => branchIn(folder) === `hive/${key}/${key}-${c3}-new-three`, HUNG_MS)), JSON.stringify(s3.body))
+    check(`…card 3 is built there on its own line cw/${key}/${key}-${c3}-new-three`, s3.status === 200 && same(s3.body?.data?.folder, folder) && !!(await until(() => branchIn(folder) === `cw/${key}/${key}-${c3}-new-three`, HUNG_MS)), JSON.stringify(s3.body))
 
     // Me's first card under slots: the handoff, its conversation going on.
     const tMe = await tokenOf(solo, 'me')
@@ -233,11 +233,11 @@ const isIn = (dir, rev, ref) => {
     const handed = await until(async () => (await slots(solo)).find((s) => s.name === 'me' && s.lease?.kind === 'card'), HUNG_MS)
     check('…its slot handed over to the card', handed?.lease?.card === cMe && handed.lease.agent === 'me', JSON.stringify(await slots(solo)))
     check('…the same conversation going on', (await live(solo, 'me'))?.sessionId === meOld.sessionId && (await sessionOf(solo, meOld.sessionId))?.lease === handed?.lease?.id)
-    // Hive gives Me the card there once Me is quiet (slotCards.ts's placement, recorded as BuilderPlaced after the start's
-    // reply). Waited for before the close: one cut short is owed at the restart, where Hive starts Me itself with the
+    // Combwork gives Me the card there once Me is quiet (slotCards.ts's placement, recorded as BuilderPlaced after the start's
+    // reply). Waited for before the close: one cut short is owed at the restart, where Combwork starts Me itself with the
     // card's prompt and races Resume All (HI-1732).
     const placed = await until(async () => (await inv('tasks:facts', cMe)).find((f) => f.kind === 'BuilderPlaced'), HUNG_MS)
-    check('…Hive gives Me the card there, typed into that conversation', placed?.data?.how === 'typed' && (await live(solo, 'me'))?.sessionId === meOld.sessionId, JSON.stringify(placed))
+    check('…Combwork gives Me the card there, typed into that conversation', placed?.data?.how === 'typed' && (await live(solo, 'me'))?.sessionId === meOld.sessionId, JSON.stringify(placed))
     await close()
 
     // --- 3. A restart: Resume All resumes Me there, on its card's lease.

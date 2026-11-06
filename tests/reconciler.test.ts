@@ -1,8 +1,8 @@
-// Reconciliation in the app (#1217, SPEC §16.4.4): what was done outside Hive to a card's work becomes observed facts on
+// Reconciliation in the app (#1217, SPEC §16.4.4): what was done outside Combwork to a card's work becomes observed facts on
 // the board's store. Record-only with workflow rules not enforced (Settings → Advanced, #1263), as most of this file
 // runs: nothing moves. Enforced, it acts at the app level (S7, S41). A card works in its agent's worktree on its own line: a hand
 // merge of its branch after its pass (Integrated by outside, the card still Passed), a rebase after a pass (CarriedOver),
-// an amend with new content (Stale), a reset of the target under a Done card (LeftTarget), and two Hives racing on one
+// an amend with new content (Stale), a reset of the target under a Done card (LeftTarget), and two Combworks racing on one
 // head (the log says what is true now).
 import { execFileSync } from 'child_process'
 import { mkdirSync, renameSync, writeFileSync } from 'fs'
@@ -11,7 +11,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-reconciler-')
+const base = tempDir('cw-reconciler-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -55,16 +55,16 @@ async function workspace(opts: { shared?: boolean; options?: object } = {}): Pro
   const ws = join(base, `ws-${++n}`)
   const repo = join(ws, 'p')
   const wt = join(ws, 'p-card')
-  mkdirSync(join(repo, '.hive'), { recursive: true })
+  mkdirSync(join(repo, '.combwork'), { recursive: true })
   git(repo, 'init', '-q', '-b', 'main')
   for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) git(repo, 'config', k, v)
-  writeFileSync(join(repo, '.gitignore'), '.hive/\n')
+  writeFileSync(join(repo, '.gitignore'), '.combwork/\n')
   writeFileSync(join(repo, 'a.txt'), 'one\n')
   git(repo, 'add', '-A')
   git(repo, 'commit', '-qm', 'initial')
   git(repo, 'worktree', 'add', '-q', '-b', 'card', wt, 'main')
   // `shared`: both agents work in the project folder itself.
-  writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', ...(opts.shared ? {} : { worktree: { path: wt, branch: 'card', base: 'main' } }) }, { id: 'a2', name: 'Reviewer' }], ...(opts.options ? { workflow: { platform: 'git', preset: null, options: opts.options } } : {}) }))
+  writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', ...(opts.shared ? {} : { worktree: { path: wt, branch: 'card', base: 'main' } }) }, { id: 'a2', name: 'Reviewer' }], ...(opts.options ? { workflow: { platform: 'git', preset: null, options: opts.options } } : {}) }))
   const w = createWorkspaceService()
   await w.open(ws)
   opened.push(w)
@@ -135,20 +135,20 @@ describe('reconciliation in the app, record-only (#1217)', () => {
     expect(foldCard(factsOf(w, card)).head).toBe(amended)
   })
 
-  it('two Hives racing on one head (A→B seen by one, A→C by the other): the log says what is true now, once', async () => {
+  it('two Combworks racing on one head (A→B seen by one, A→C by the other): the log says what is true now, once', async () => {
     const { ws, w, repo, wt } = await workspace()
     const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Race', project: 'p' }, user))).number
     await inWorkspace(w, () => tasks.updateTask(card, { column: 'doing', agent: 'a1' }, user))
     const a = git(wt, 'rev-parse', 'HEAD')
     const runtime = (s: ReturnType<typeof FactStore.open>, locked?: <T>(fn: () => T) => Promise<T>) =>
-      new Workflow({ store: s, project: repo, projectKey: '', options: () => allOff('git'), slots: join(ws, '.hive', 'slots'), autoRun: false, reconcileActs: false, ...(locked ? { locked } : {}) })
-    // This Hive: the board's store, its writes changes of the board. The other: a connection of its own.
+      new Workflow({ store: s, project: repo, projectKey: '', options: () => allOff('git'), slots: join(ws, '.combwork', 'slots'), autoRun: false, reconcileActs: false, ...(locked ? { locked } : {}) })
+    // This Combwork: the board's store, its writes changes of the board. The other: a connection of its own.
     const ours = runtime(FactStore.forBoard(w, { project: 'p', key: '' }), (fn) => store.boardWrite(w, async () => fn()))
     const other = FactStore.open(store.boardFile(ws), { project: 'p', key: '' })
     const theirs = runtime(other)
     try {
       const b = commitIn(wt, 'b.txt')
-      // Ours reads B, then waits: meanwhile the head moves to C and the other Hive records A→C.
+      // Ours reads B, then waits: meanwhile the head moves to C and the other Combwork records A→C.
       let c = ''
       await reconcile(ours, ours.store.card(card), {
         afterRead: async () => {
@@ -158,7 +158,7 @@ describe('reconciliation in the app, record-only (#1217)', () => {
       })
       const heads = factsOf(w, card).filter((f) => f.kind === 'HeadMoved').map((f) => f.data)
       expect(b).not.toBe(c)
-      // One observation, from where its line started (A) to where it is now (C): B, which only one Hive saw, isn't in it.
+      // One observation, from where its line started (A) to where it is now (C): B, which only one Combwork saw, isn't in it.
       expect(heads).toEqual([{ line: 'card', from: a, to: c }])
       expect(foldCard(factsOf(w, card)).head).toBe(c)
     } finally {
@@ -191,7 +191,7 @@ describe('reconciliation in the app, round 2 (#1217)', () => {
     await inWorkspace(w, () => tasks.updateTask(two, { column: 'doing', agent: 'a2' }, user))
     writeFileSync(join(repo, 'two.txt'), 'two\n')
     git(repo, 'add', '-A')
-    git(repo, 'commit', '-qm', 'for two', '-m', `Hive-Card: P-${two}`)
+    git(repo, 'commit', '-qm', 'for two', '-m', `Combwork-Card: P-${two}`)
     const sha = git(repo, 'rev-parse', 'HEAD')
     await reconcileNow(w, repo)
     expect(factsOf(w, two).find((f) => f.kind === 'CommitAttributed')).toMatchObject({ data: { commit: sha, how: 'trailer' } })
@@ -200,7 +200,7 @@ describe('reconciliation in the app, round 2 (#1217)', () => {
   })
 
   // #1294: the runtime names cards by #1219's keys, a project's own numbers apart from the board's.
-  it("a project's cards by its key and their number there: the runtime's names, cardByKey (an old key, #N, the name form) and a Hive-Card trailer", async () => {
+  it("a project's cards by its key and their number there: the runtime's names, cardByKey (an old key, #N, the name form) and a Combwork-Card trailer", async () => {
     const { w, repo } = await workspace({ shared: true })
     await keys.keyProjects(w)
     const key = (await keys.projectKeyOf(w, repo))!
@@ -219,7 +219,7 @@ describe('reconciliation in the app, round 2 (#1217)', () => {
     await inWorkspace(w, () => tasks.updateTask(two, { column: 'doing', agent: 'a2' }, user))
     writeFileSync(join(repo, 'two.txt'), 'two\n')
     git(repo, 'add', '-A')
-    git(repo, 'commit', '-qm', 'for two', '-m', `Hive-Card: ${key}-2`)
+    git(repo, 'commit', '-qm', 'for two', '-m', `Combwork-Card: ${key}-2`)
     const sha = git(repo, 'rev-parse', 'HEAD')
     await reconcileNow(w, repo)
     expect(factsOf(w, two).find((f) => f.kind === 'CommitAttributed')).toMatchObject({ data: { commit: sha, how: 'trailer' } })
@@ -233,7 +233,7 @@ describe('reconciliation in the app, round 2 (#1217)', () => {
     const { ws, w, repo, wt } = await workspace()
     const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Cycles', project: 'p' }, user))).number
     await inWorkspace(w, () => tasks.updateTask(card, { column: 'doing', agent: 'a1' }, user))
-    const ours = new Workflow({ store: FactStore.forBoard(w, { project: 'p', key: 'p' }), project: repo, projectKey: 'p', options: () => allOff('git'), slots: join(ws, '.hive', 'slots'), autoRun: false, reconcileActs: false, locked: (fn) => store.boardWrite(w, async () => fn()) })
+    const ours = new Workflow({ store: FactStore.forBoard(w, { project: 'p', key: 'p' }), project: repo, projectKey: 'p', options: () => allOff('git'), slots: join(ws, '.combwork', 'slots'), autoRun: false, reconcileActs: false, locked: (fn) => store.boardWrite(w, async () => fn()) })
     const b = commitIn(wt, 'b.txt')
     // Read B; meanwhile C is committed and the card goes Done and is started again: a new cycle.
     await reconcile(ours, ours.store.card(card), {
@@ -286,7 +286,7 @@ describe('reconciliation in the app, round 2 (#1217)', () => {
     expect(factsOf(other.w, c2).filter((f) => f.kind === 'Gone').map((f) => f.data)).toEqual([{ what: 'repository' }])
   })
 
-  it("a Done card's target reset while Hive was closed: found at the next open, with no event", async () => {
+  it("a Done card's target reset while Combwork was closed: found at the next open, with no event", async () => {
     const { w, repo, wt } = await workspace()
     const { card, head } = await passedCard(w, wt)
     const before = git(repo, 'rev-parse', 'main')

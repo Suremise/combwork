@@ -8,7 +8,7 @@ import * as electron from 'electron'
 import { atMost, whenAll } from '../src/shared/atMost'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-openreads-')
+const base = tempDir('cw-openreads-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
@@ -70,7 +70,7 @@ describe('whenAll and atMost (HI-1705)', () => {
 
 describe("a workspace's reads, one failing (HR2's round 1 finding)", () => {
   const twoProjects = async () => {
-    const dir = tempDir('hive-openreads-ws-')
+    const dir = tempDir('cw-openreads-ws-')
     for (const name of ['alpha', 'bravo']) mkdirSync(join(dir, name), { recursive: true })
     const w = createWorkspaceService()
     await w.open(dir)

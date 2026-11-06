@@ -1,0 +1,137 @@
+{
+  "activity.batch.update": {
+    "placeholders": {
+      "n": "plain",
+      "count": "plural"
+    }
+  },
+  "activity.reason.conflict": {
+    "placeholders": {}
+  },
+  "activity.reason.failed": {
+    "placeholders": {}
+  },
+  "activity.reason.forbidden": {
+    "placeholders": {}
+  },
+  "activity.reason.invalid": {
+    "placeholders": {}
+  },
+  "activity.reason.notFound": {
+    "placeholders": {}
+  },
+  "activity.undo.agentAdded": {
+    "placeholders": {}
+  },
+  "activity.undo.agentStopped": {
+    "placeholders": {}
+  },
+  "activity.undo.ask": {
+    "placeholders": {}
+  },
+  "activity.undo.cannot": {
+    "placeholders": {}
+  },
+  "activity.undo.cardPlace": {
+    "placeholders": {}
+  },
+  "activity.undo.cardsOrder": {
+    "placeholders": {}
+  },
+  "activity.undo.comment": {
+    "placeholders": {}
+  },
+  "activity.undo.connectionChanged": {
+    "placeholders": {}
+  },
+  "activity.undo.connectionMade": {
+    "placeholders": {}
+  },
+  "activity.undo.context": {
+    "placeholders": {}
+  },
+  "activity.undo.decision": {
+    "placeholders": {}
+  },
+  "activity.undo.declarePaths": {
+    "placeholders": {}
+  },
+  "activity.undo.freshRetried": {
+    "placeholders": {}
+  },
+  "activity.undo.handOver": {
+    "placeholders": {}
+  },
+  "activity.undo.laneEnded": {
+    "placeholders": {}
+  },
+  "activity.undo.laneReorderNow": {
+    "placeholders": {}
+  },
+  "activity.undo.message": {
+    "placeholders": {}
+  },
+  "activity.undo.nothing": {
+    "placeholders": {}
+  },
+  "activity.undo.projectClosed": {
+    "placeholders": {}
+  },
+  "activity.undo.projectMade": {
+    "placeholders": {}
+  },
+  "activity.undo.projectOpened": {
+    "placeholders": {}
+  },
+  "activity.undo.prompt": {
+    "placeholders": {}
+  },
+  "activity.undo.putBack": {
+    "placeholders": {}
+  },
+  "activity.undo.queuePaused": {
+    "placeholders": {}
+  },
+  "activity.undo.queueResumed": {
+    "placeholders": {}
+  },
+  "activity.undo.removedFromQueue": {
+    "placeholders": {}
+  },
+  "activity.undo.reportMerge": {
+    "placeholders": {}
+  },
+  "activity.undo.request": {
+    "placeholders": {}
+  },
+  "activity.undo.retriedMerge": {
+    "placeholders": {}
+  },
+  "activity.undo.slotReleased": {
+    "placeholders": {}
+  },
+  "activity.undo.start": {
+    "placeholders": {}
+  },
+  "activity.undo.startReview": {
+    "placeholders": {}
+  },
+  "activity.undo.submit": {
+    "placeholders": {}
+  },
+  "activity.undo.teamPaused": {
+    "placeholders": {}
+  },
+  "activity.undo.teamResumed": {
+    "placeholders": {}
+  },
+  "activity.undo.templateCards": {
+    "placeholders": {}
+  },
+  "activity.undo.verdict": {
+    "placeholders": {}
+  },
+  "activity.undo.withdrawn": {
+    "placeholders": {}
+  }
+}

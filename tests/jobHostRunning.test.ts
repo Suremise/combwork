@@ -11,7 +11,7 @@ import { tempDir } from './tempDir'
 const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take.
 const HUNG_MS = 60_000
-const dir = tempDir('hive-jobhost-running-')
+const dir = tempDir('cw-jobhost-running-')
 const started: ChildProcessWithoutNullStreams[] = []
 let launches = 0
 const host = new JobHost({
@@ -38,7 +38,7 @@ describe.runIf(process.platform === 'win32')('the helper says which executables 
   it('names with dots reach the helper: those running are named, the rest not', async () => {
     // Only made-up names besides node.exe (HI-2347): a real one, such as vmmemWindowsSandbox, runs whenever anything on
     // the shared machine has a Windows Sandbox up.
-    const r = await host.request('running', 'node.exe,windowssandboxclient-hive-test-2304.exe,vmmem-hive-test-2347')
+    const r = await host.request('running', 'node.exe,windowssandboxclient-combwork-test-2304.exe,vmmem-combwork-test-2347')
     expect(r).toEqual(['node.exe'])
     expect(launches).toBe(1)
   }, HUNG_MS)

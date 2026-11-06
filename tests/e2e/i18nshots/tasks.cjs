@@ -1,5 +1,5 @@
 // Screenshot cases for the `tasks` area (#846): a card's history as the card dialog shows it, in the run's language
-// (each line Hive's board wrote is stored with its message, shared/taskHistory.ts), reached for the i18nshots route
+// (each line Combwork's board wrote is stored with its message, shared/taskHistory.ts), reached for the i18nshots route
 // (tests/e2e/i18nshots.cjs has the case format and ctx) with locale-independent means only: IPC, command ids and
 // structural hooks (data-task, classes), never English text. The board's refusals reach the window through IPC, which
 // tests/i18n/tasks.test.ts checks in another language.

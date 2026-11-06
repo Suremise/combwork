@@ -1,7 +1,7 @@
 import { WorkflowLevelForm } from '../components/WorkflowOptions'
 import { JournalSettingsPanel } from '../components/JournalSettings'
-import { HiveCommands, QuitPoint, WorkspaceCommands, WorkspacePoint } from '../components/CommandsSettings'
-import { useCallback, useEffect, useId, useMemo, useState } from 'react'
+import { CombworkCommands, QuitPoint, WorkspaceCommands, WorkspacePoint } from '../components/CommandsSettings'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { AppSettings, ChimeSound, EffortOption, FallbackModel, McpCatalogSettings, ModelPrice, ProviderId, TaskColumn } from '@shared/types'
 import { DEFAULT_COLUMN_COLORS, TASK_COLUMNS, columnColor, columnName } from '@shared/tasks'
 import { DEFAULT_MODE } from '@shared/assistant'
@@ -16,7 +16,7 @@ import { ProviderIcon } from '../components/ProviderIcon'
 import * as actions from '../actions'
 import { call, errorMessage } from '../api'
 import { playChime } from '../chime'
-import { Icon, IconButton, InfoTip, SearchInput, Switch, Tooltip, usePlaceholderClipped } from '../components/ui'
+import { Icon, IconButton, InfoTip, SearchInput, SectionNav, Switch, Tooltip, usePlaceholderClipped } from '../components/ui'
 import { UpdateStatusRow } from '../components/Updates'
 import { KeybindingsEditor } from '../components/Keybindings'
 import { HiddenProjectsList } from '../components/ProjectRemoval'
@@ -31,6 +31,23 @@ import { fmt, msg, tr, tRich } from '@shared/i18n'
 import { LANGUAGES, SOURCE_LANGUAGE, languageOf } from '@shared/i18n/languages'
 import { LANGUAGE_TEXT } from '@shared/i18n/languageText'
 import { cx, timeAgo } from '../util'
+
+/**
+ * What is half typed in a box that only saves on its button (a model to add, a viewer token's name…), kept while Combwork
+ * runs (HI-2525): leaving Settings for the side panel or the activity bar closes it, and reopening it shows the text again.
+ */
+const drafts = new Map<string, string>()
+
+/** A box's text, kept in `drafts` under `key` while Settings is closed and opened again. */
+function useSettingsDraft(key: string): [string, (v: string) => void] {
+  const [value, setValue] = useState(() => drafts.get(key) ?? '')
+  const change = useCallback((v: string): void => {
+    if (v) drafts.set(key, v)
+    else drafts.delete(key)
+    setValue(v)
+  }, [key])
+  return [value, change]
+}
 
 /** A settings section: a group of AppSettings, "providers" (turning them on), one provider's page ("provider:<id>"), or "advanced". */
 type Section = SettingsSection
@@ -50,7 +67,7 @@ const CONTROLS: Record<string, () => React.ReactNode> = {
   'keybindings.editor': () => <KeybindingsEditor />,
   'providers.list': () => <ProvidersList />,
   'general.language': () => <LanguagePicker />,
-  'general.commands': () => <HiveCommands />,
+  'general.commands': () => <CombworkCommands />,
   'general.onQuit': () => <QuitPoint />,
   'notifications.chimeSound': () => <ChimePicker />,
   'sessions.usageCacheClear': () => <ClearUsageCacheButton />,
@@ -72,7 +89,7 @@ const CONTROLS: Record<string, () => React.ReactNode> = {
   'agentApi.viewers': () => <ViewerTokens />,
   'advanced.logs': () => (
     <button className="btn subtle" onClick={() => void call('app:openLogs')}>
-      <Icon name="output" /> {tr(msg({ id: 'settings.advanced.openLogs', defaultMessage: 'Open logs', description: "Button in Settings → Advanced → Logs: opens the folder of Hive's log files." }))}
+      <Icon name="output" /> {tr(msg({ id: 'settings.advanced.openLogs', defaultMessage: 'Open logs', description: "Button in Settings → Advanced → Logs: opens the folder of Combwork's log files." }))}
     </button>
   ),
   'advanced.values': () => <AdvancedValues />,
@@ -110,7 +127,7 @@ const linkTo =
   )
 
 /**
- * The price table for a provider's models: Hive's prices (editable defaults), with the user's changes, added and removed
+ * The price table for a provider's models: Combwork's prices (editable defaults), with the user's changes, added and removed
  * models (#125), and the models the CLI lists (#436): one with no price marked to enter one, a priced one it no longer
  * lists greyed. A provider that doesn't report costs says where to check its prices.
  */
@@ -124,7 +141,7 @@ function PriceTable({ provider }: { provider: ProviderId }) {
   const p = providerDescriptor(provider)
   const listed = useMemo(() => listedPriceModels(provider, catalog), [provider, catalog])
   const rows = priceRows(provider, settings, listed)
-  const [adding, setAdding] = useState('')
+  const [adding, setAdding] = useSettingsDraft(`prices:${provider}`)
   const newHint = tr(msg({ id: 'settings.prices.newPlaceholder', defaultMessage: 'Model ID, e.g. a new model', description: "Placeholder of the box under a price table where a model's ID is typed to add it." }))
   const [newBox, hintClipped] = usePlaceholderClipped(newHint)
   const cols: { key: keyof ModelPrice; label: string }[] = [
@@ -165,11 +182,11 @@ function PriceTable({ provider }: { provider: ProviderId }) {
         <div className="fallback-source price-note">
           <Icon name="info" />
           <span>
-            {tRich(msg({ id: 'settings.prices.noReports', defaultMessage: "{provider} doesn't report costs, so Hive estimates them from these prices. Check them against <link>{company}'s pricing</link>.", description: "Above a provider's price table when the provider reports no costs. {provider} is its name, {company} the company's; <link> opens the company's price page." }), { provider: p.name, company: p.company, link: linkTo(p.pricingUrl) })}
+            {tRich(msg({ id: 'settings.prices.noReports', defaultMessage: "{provider} doesn't report costs, so Combwork estimates them from these prices. Check them against <link>{company}'s pricing</link>.", description: "Above a provider's price table when the provider reports no costs. {provider} is its name, {company} the company's; <link> opens the company's price page." }), { provider: p.name, company: p.company, link: linkTo(p.pricingUrl) })}
           </span>
         </div>
       )}
-      <div className="fallback-source faint">{tr(msg({ id: 'settings.prices.checked', defaultMessage: "Hive's starting prices, checked {checked}: edit them if they are out of date.", description: "Above a provider's price table. {checked} is a date." }), { checked: PRICES_CHECKED })}</div>
+      <div className="fallback-source faint">{tr(msg({ id: 'settings.prices.checked', defaultMessage: "Combwork's starting prices, checked {checked}: edit them if they are out of date.", description: "Above a provider's price table. {checked} is a date." }), { checked: PRICES_CHECKED })}</div>
       {/* Narrower than the table even with its boxes narrowed, it scrolls sideways in its own box (#887). */}
       <div className="price-table-wrap">
       <table className="table price-table">
@@ -188,7 +205,7 @@ function PriceTable({ provider }: { provider: ProviderId }) {
           {rows.map(({ model: m, price, shipped: isShipped, edited: isEdited, listed: isListed }) => (
             <tr key={m} className={cx(isListed === false && 'unlisted')}>
               <td className="mono">
-                {m} {isEdited && <span className="badge">{isShipped ? tr(msg({ id: 'settings.prices.edited', defaultMessage: 'edited', description: "A badge on a model in a price table: one of Hive's prices that the user changed." })) : tr(msg({ id: 'settings.prices.yours', defaultMessage: 'yours', description: 'A badge on a model in a price table: a model the user added.' }))}</span>}
+                {m} {isEdited && <span className="badge">{isShipped ? tr(msg({ id: 'settings.prices.edited', defaultMessage: 'edited', description: "A badge on a model in a price table: one of Combwork's prices that the user changed." })) : tr(msg({ id: 'settings.prices.yours', defaultMessage: 'yours', description: 'A badge on a model in a price table: a model the user added.' }))}</span>}
                 {!price && <span className="badge warn">{tr(msg({ id: 'settings.prices.noPrice', defaultMessage: 'No price: enter one', description: 'A badge on a model in a price table that has no price yet.' }))}</span>}
                 {isListed === false && (
                   <Tooltip content={tr(msg({ id: 'settings.prices.unlistedTip', defaultMessage: "{provider} doesn't list this model now; its price stays for older sessions.", description: 'Tooltip of a model in a price table that the provider no longer lists. {provider} is its name.' }), { provider: p.name })}>
@@ -202,7 +219,7 @@ function PriceTable({ provider }: { provider: ProviderId }) {
                 </td>
               ))}
               <td className="row-actions">
-                {isEdited && isShipped && <IconButton icon="discard" title={tr(msg({ id: 'settings.prices.back', defaultMessage: "Back to Hive's price", description: "Button on an edited model in a price table: puts Hive's price back." }))} onClick={() => back(m)} />}
+                {isEdited && isShipped && <IconButton icon="discard" title={tr(msg({ id: 'settings.prices.back', defaultMessage: "Back to Combwork's price", description: "Button on an edited model in a price table: puts Combwork's price back." }))} onClick={() => back(m)} />}
                 {price && <IconButton icon="trash" title={tr(msg({ id: 'settings.prices.remove', defaultMessage: 'Remove from the table', description: 'Button on a model in a price table: removes it.' }))} onClick={() => remove(m)} />}
               </td>
             </tr>
@@ -219,7 +236,7 @@ function PriceTable({ provider }: { provider: ProviderId }) {
           <Icon name="add" /> {tr(msg({ id: 'settings.prices.add', defaultMessage: 'Add model', description: 'Button under a price table: adds the model typed beside it.' }))}
         </button>
         <button className="btn subtle" disabled={!edited} onClick={() => void save({}, [])}>
-          <Icon name="discard" /> {tr(msg({ id: 'settings.fallback.reset', defaultMessage: 'Reset to defaults', description: "Button under a provider's table (prices, models or effort levels): goes back to Hive's own." }))}
+          <Icon name="discard" /> {tr(msg({ id: 'settings.fallback.reset', defaultMessage: 'Reset to defaults', description: "Button under a provider's table (prices, models or effort levels): goes back to Combwork's own." }))}
         </button>
       </div>
     </div>
@@ -228,18 +245,18 @@ function PriceTable({ provider }: { provider: ProviderId }) {
 
 /**
  * An editable list for a provider's fallback (models or effort levels): value, name and, for models, Older. Any edit
- * stores the whole list as the user's; Reset to defaults removes it, so Hive's own list (and its updates) applies again.
+ * stores the whole list as the user's; Reset to defaults removes it, so Combwork's own list (and its updates) applies again.
  */
 function FallbackRows<T extends FallbackModel | EffortOption>({ provider, kind, rows, edited, valueLabel, newLabel, placeholder, open: startOpen }: { provider: ProviderId; kind: 'models' | 'efforts'; rows: T[]; edited: boolean; valueLabel: string; newLabel: string; placeholder: string; open: boolean }) {
-  const [adding, setAdding] = useState('')
-  // Folded while the CLI's answer is in use and the list is Hive's own: it is only used without one.
+  const [adding, setAdding] = useSettingsDraft(`fallback:${provider}:${kind}`)
+  // Folded while the CLI's answer is in use and the list is Combwork's own: it is only used without one.
   const [open, setOpen] = useState(startOpen)
   useEffect(() => {
     if (startOpen) setOpen(true)
   }, [startOpen])
   const save = (next: T[] | null): Promise<void> => actions.attempt(tr(msg({ id: 'settings.fallback.saveFailed', defaultMessage: 'Could not save the list', description: "An error's title: saving a provider's fallback list of models or effort levels failed." })), () => call('settings:setProviderFallback', provider, kind, next)).then((s) => void (s && set({ settings: s })))
   const change = (i: number, patch: Partial<FallbackModel>): void => void save(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)))
-  // A level's name as Hive ships it is shown in the window's language (#889), as the pickers show it; one the user gave stays theirs.
+  // A level's name as Combwork ships it is shown in the window's language (#889), as the pickers show it; one the user gave stays theirs.
   const shownName = (r: T): string => {
     const shipped = kind === 'efforts' ? providerDescriptor(provider).effortLevels.find((e) => e.value === r.value && e.label === r.label) : undefined
     return shipped?.text ? tr(shipped.text) : r.label
@@ -294,7 +311,7 @@ function FallbackRows<T extends FallbackModel | EffortOption>({ provider, kind, 
           <Icon name="add" /> {tr(msg({ id: 'settings.fallback.add', defaultMessage: 'Add', description: 'Button under a fallback list: adds the value typed beside it.' }))}
         </button>
         <button className="btn subtle" disabled={!edited} onClick={() => void save(null)}>
-          <Icon name="discard" /> {tr(msg({ id: 'settings.fallback.reset', defaultMessage: 'Reset to defaults', description: "Button under a provider's table (prices, models or effort levels): goes back to Hive's own." }))}
+          <Icon name="discard" /> {tr(msg({ id: 'settings.fallback.reset', defaultMessage: 'Reset to defaults', description: "Button under a provider's table (prices, models or effort levels): goes back to Combwork's own." }))}
         </button>
       </div>
     </>
@@ -313,7 +330,7 @@ function ModelFallbackTable({ provider }: { provider: ProviderId }) {
       <div className={cx('fallback-source', src.kind === 'fallback' ? 'warn' : 'faint')}>
         <Icon name={src.kind === 'fallback' ? 'warning' : 'check'} /> {tr(msg({ id: 'settings.fallback.modelsNow', defaultMessage: 'Models now: {source}', description: "Above a provider's fallback list of models: where the model pickers' models come from now. {source} says it." }), { source: modelSourceText(provider, { ...src, edited }, tr) })}
       </div>
-      <FallbackRows provider={provider} kind="models" rows={fallbackModels(provider, settings)} edited={edited} valueLabel={tr(msg({ id: 'settings.fallback.modelId', defaultMessage: 'Model ID', description: "A column of a provider's fallback list of models: the ID Hive passes to the CLI." }))} newLabel={tr(msg({ id: 'settings.fallback.newModel', defaultMessage: 'New model ID', description: 'The name, for screen readers, of the box under a fallback list of models where a new one is typed.' }))} placeholder={providerText(p.modelPlaceholder, p.text?.modelPlaceholder, tr)} open={src.kind === 'fallback' || edited} />
+      <FallbackRows provider={provider} kind="models" rows={fallbackModels(provider, settings)} edited={edited} valueLabel={tr(msg({ id: 'settings.fallback.modelId', defaultMessage: 'Model ID', description: "A column of a provider's fallback list of models: the ID Combwork passes to the CLI." }))} newLabel={tr(msg({ id: 'settings.fallback.newModel', defaultMessage: 'New model ID', description: 'The name, for screen readers, of the box under a fallback list of models where a new one is typed.' }))} placeholder={providerText(p.modelPlaceholder, p.text?.modelPlaceholder, tr)} open={src.kind === 'fallback' || edited} />
     </div>
   )
 }
@@ -332,12 +349,12 @@ function EffortFallbackTable({ provider }: { provider: ProviderId }) {
           ? tr(msg({ id: 'settings.fallback.levelsPerModel', defaultMessage: "{source}: each model offers its own levels; this list names them and is used for models it doesn't describe.", description: "Above a provider's fallback list of effort levels, when the CLI reports each model's levels. {source} says where the models come from." }), { source: modelSourceText(provider, modelSource(provider, info, settings), tr) })
           : tr(msg({ id: 'settings.fallback.levelsUsed', defaultMessage: "Used now: {provider} hasn't reported per-model levels.", description: "Above a provider's fallback list of effort levels, when the CLI reports none per model. {provider} is its name." }), { provider: providerDescriptor(provider).name })}
       </div>
-      <FallbackRows provider={provider} kind="efforts" rows={fallbackEfforts(provider, settings)} edited={edited} valueLabel={tr(msg({ id: 'settings.fallback.level', defaultMessage: 'Level', description: "A column of a provider's fallback list of effort levels: the value Hive passes to the CLI." }))} newLabel={tr(msg({ id: 'settings.fallback.newLevel', defaultMessage: 'New level', description: 'The name, for screen readers, of the box under a fallback list of effort levels where a new one is typed.' }))} placeholder={tr(msg({ id: 'settings.fallback.levelPlaceholder', defaultMessage: 'e.g. xhigh', description: "Placeholder of the box where a new effort level is typed. xhigh is a level's value: keep it." }))} open={!perModel || edited} />
+      <FallbackRows provider={provider} kind="efforts" rows={fallbackEfforts(provider, settings)} edited={edited} valueLabel={tr(msg({ id: 'settings.fallback.level', defaultMessage: 'Level', description: "A column of a provider's fallback list of effort levels: the value Combwork passes to the CLI." }))} newLabel={tr(msg({ id: 'settings.fallback.newLevel', defaultMessage: 'New level', description: 'The name, for screen readers, of the box under a fallback list of effort levels where a new one is typed.' }))} placeholder={tr(msg({ id: 'settings.fallback.levelPlaceholder', defaultMessage: 'e.g. xhigh', description: "Placeholder of the box where a new effort level is typed. xhigh is a level's value: keep it." }))} open={!perModel || edited} />
     </div>
   )
 }
 
-/** A row's value: Hive's settings. */
+/** A row's value: Combwork's settings. */
 const getValue = (s: AppSettings, def: SettingDef): unknown => settingValue(def, s, null)
 
 const defaultValue = (def: SettingDef): unknown => settingDefault(def)
@@ -480,7 +497,7 @@ function ProviderStatus({ provider }: { provider: ProviderId }) {
   if (!info || info.checking)
     return (
       <span className="muted">
-        <Icon name="loading" spin /> {tr(msg({ id: 'settings.provider.checking', defaultMessage: 'Checking…', description: "While Hive looks for a provider's CLI (Settings → <provider> → Installation)." }))}
+        <Icon name="loading" spin /> {tr(msg({ id: 'settings.provider.checking', defaultMessage: 'Checking…', description: "While Combwork looks for a provider's CLI (Settings → <provider> → Installation)." }))}
       </span>
     )
   const problems = (info.readiness ?? []).filter((r) => r.level !== 'info')
@@ -493,7 +510,7 @@ function ProviderStatus({ provider }: { provider: ProviderId }) {
           </span>
         </Tooltip>
       ) : (
-        <span className="badge error">{tr(msg({ id: 'settings.provider.notInstalled', defaultMessage: 'CLI not installed', description: "A badge on a provider's page: Hive didn't find its CLI." }))}</span>
+        <span className="badge error">{tr(msg({ id: 'settings.provider.notInstalled', defaultMessage: 'CLI not installed', description: "A badge on a provider's page: Combwork didn't find its CLI." }))}</span>
       )}
       {info.found &&
         problems.map((r) => (
@@ -502,7 +519,7 @@ function ProviderStatus({ provider }: { provider: ProviderId }) {
           </span>
         ))}
       {info.updateAvailable && <span className="badge accent">{tr(msg({ id: 'settings.provider.updateAvailable', defaultMessage: '{version} available', description: "A badge on a provider's page: a newer version of its CLI. {version} is its number." }), { version: info.latestVersion ?? '' })}</span>}
-      <button className="btn small subtle" onClick={() => void actions.refreshProviders()}>
+      <button className="btn small subtle" onClick={() => void actions.refreshProviders(provider)}>
         {tr(msg({ id: 'settings.provider.checkNow', defaultMessage: 'Check now', description: "Button on a provider's page: looks for its CLI and updates again." }))}
       </button>
       <button className="btn small primary" onClick={() => set({ setupOpen: provider })}>
@@ -524,7 +541,7 @@ function ProvidersList() {
       {PROVIDERS.map((p) => {
         const info = providers[p.id]
         const on = isProviderEnabled(settings, p.id)
-        const state = !info || info.checking ? tr(msg({ id: 'settings.provider.checking', defaultMessage: 'Checking…', description: "While Hive looks for a provider's CLI (Settings → <provider> → Installation)." })) : !info.found ? tr(msg({ id: 'settings.provider.notInstalledShort', defaultMessage: 'Not installed', description: "Under a provider in Settings → Providers: Hive didn't find its CLI." })) : (info.readiness?.find((r) => r.level === 'error')?.message ?? tr(msg({ id: 'settings.provider.installed', defaultMessage: 'Installed · {version}', description: 'Under a provider in Settings → Providers: its CLI is installed. {version} is its number.' }), { version: info.version ?? '' }))
+        const state = !info || info.checking ? tr(msg({ id: 'settings.provider.checking', defaultMessage: 'Checking…', description: "While Combwork looks for a provider's CLI (Settings → <provider> → Installation)." })) : !info.found ? tr(msg({ id: 'settings.provider.notInstalledShort', defaultMessage: 'Not installed', description: "Under a provider in Settings → Providers: Combwork didn't find its CLI." })) : (info.readiness?.find((r) => r.level === 'error')?.message ?? tr(msg({ id: 'settings.provider.installed', defaultMessage: 'Installed · {version}', description: 'Under a provider in Settings → Providers: its CLI is installed. {version} is its number.' }), { version: info.version ?? '' }))
         return (
           <div key={p.id} className={cx('provider-row', !on && 'off')} data-provider={p.id}>
             <ProviderIcon provider={p.id} />
@@ -549,7 +566,7 @@ function ProvidersList() {
 function AssistantMcpServers() {
   return (
     <button className="btn small" data-action="assistant-mcp-view" onClick={() => showView('assistant')}>
-      <Icon name="link-external" /> {tr(msg({ id: 'settings.assistant.mcp.show', defaultMessage: "Show in the Assistant's View", description: "A button in Settings → Assistant → MCP servers (HI-2059): shows the Hive Assistant's view on the activity bar, where its MCP servers are added." }))}
+      <Icon name="link-external" /> {tr(msg({ id: 'settings.assistant.mcp.show', defaultMessage: "Show in the Assistant's View", description: "A button in Settings → Assistant → MCP servers (HI-2059): shows the Combwork Assistant's view on the activity bar, where its MCP servers are added." }))}
     </button>
   )
 }
@@ -557,7 +574,7 @@ function AssistantMcpServers() {
 /** Settings → MCP Catalogues (HI-545): ours first (on or off), then the user's, each on or off, reordered, removed, and one added by its address. */
 function McpCatalogSources() {
   const saved = useStore((s) => s.settings?.mcpCatalogs ?? null)
-  const [url, setUrl] = useState('')
+  const [url, setUrl] = useSettingsDraft('mcpCatalogs:url')
   const [error, setError] = useState<string | null>(null)
   if (!saved) return null
   const save = (next: McpCatalogSettings): void => {
@@ -579,17 +596,17 @@ function McpCatalogSources() {
         <div className="toggle-item" data-catalog-source="ours">
           <Icon name="package" />
           <div className="ti-text">
-            <div className="ti-name">{'Suremise/hive-mcp' /* i18n-ignore: the catalogue's name */}</div>
-            <div className="ti-desc">{tr(msg({ id: 'settings.mcpCatalogs.ours', defaultMessage: "Hive's own catalogue, checked by Hive.", description: 'Settings → MCP Catalogues (HI-545): under the name of Hive’s own catalogue (Suremise/hive-mcp).' }))}</div>
+            <div className="ti-name">{'Suremise/combwork-mcp' /* i18n-ignore: the catalogue's name */}</div>
+            <div className="ti-desc">{tr(msg({ id: 'settings.mcpCatalogs.ours', defaultMessage: "Combwork's own catalogue, checked by Combwork.", description: 'Settings → MCP Catalogues (HI-545): under the name of Combwork’s own catalogue (Suremise/combwork-mcp).' }))}</div>
           </div>
-          <Switch checked={saved.oursOn} label={tr(msg({ id: 'settings.mcpCatalogs.oursSwitch', defaultMessage: "Hive's own catalogue listed", description: "Settings → MCP Catalogues (HI-545): the switch of Hive's own catalogue, for screen readers." }))} onChange={(v) => save({ ...saved, oursOn: v })} />
+          <Switch checked={saved.oursOn} label={tr(msg({ id: 'settings.mcpCatalogs.oursSwitch', defaultMessage: "Combwork's own catalogue listed", description: "Settings → MCP Catalogues (HI-545): the switch of Combwork's own catalogue, for screen readers." }))} onChange={(v) => save({ ...saved, oursOn: v })} />
         </div>
         {saved.sources.map((s, i) => (
           <div key={s.url} className="toggle-item" data-catalog-source={s.url}>
             <Icon name="link" />
             <div className="ti-text">
               <div className="ti-name mono">{s.url}</div>
-              <div className="ti-desc">{tr(msg({ id: 'settings.mcpCatalogs.theirs', defaultMessage: "Its servers aren't checked by Hive.", description: 'Settings → MCP Catalogues (HI-545): under a catalogue the user added.' }))}</div>
+              <div className="ti-desc">{tr(msg({ id: 'settings.mcpCatalogs.theirs', defaultMessage: "Its servers aren't checked by Combwork.", description: 'Settings → MCP Catalogues (HI-545): under a catalogue the user added.' }))}</div>
             </div>
             <IconButton icon="arrow-up" disabled={i === 0} title={tr(msg({ id: 'settings.mcpCatalogs.up', defaultMessage: 'Move up', description: 'Settings → MCP Catalogues (HI-545): moves a catalogue up the list.' }))} onClick={() => move(i, -1)} />
             <IconButton icon="arrow-down" disabled={i === saved.sources.length - 1} title={tr(msg({ id: 'settings.mcpCatalogs.down', defaultMessage: 'Move down', description: 'Settings → MCP Catalogues (HI-545): moves a catalogue down the list.' }))} onClick={() => move(i, 1)} />
@@ -617,7 +634,7 @@ function McpCatalogSources() {
   )
 }
 
-/** Hive's modes, for choosing a default before a workspace is open. */
+/** Combwork's modes, for choosing a default before a workspace is open. */
 const SHIPPED_MODES = [
   { id: 'coordinator', name: 'Coordinator', icon: '🧭', bundled: 'same' as const }, // i18n-ignore: the shipped modes' names, as their files name them (modeName shows them translated)
   { id: 'planner', name: 'Planner', icon: '🗺️', bundled: 'same' as const }, // i18n-ignore: the shipped modes' names, as their files name them (modeName shows them translated)
@@ -694,6 +711,10 @@ function ResetMetricsButton() {
 function ColumnColors() {
   const board = useStore((st) => st.settings!.board)
   const [draft, setDraft] = useState<Partial<Record<TaskColumn, string>>>({})
+  // A pick not saved yet when Settings closes (HI-2525) is saved then, not lost.
+  const pending = useRef(draft)
+  pending.current = draft
+  useEffect(() => () => void (Object.keys(pending.current).length && saveSettings({ board: { colors: pending.current } } as SettingsPatch)), [])
   useEffect(() => {
     if (!Object.keys(draft).length) return
     const t = setTimeout(() => {
@@ -722,7 +743,7 @@ function ColumnColors() {
 }
 
 /**
- * Settings → General → Language (#767): Automatic, then each of Hive's languages by its own name, those drafted by AI
+ * Settings → General → Language (#767): Automatic, then each of Combwork's languages by its own name, those drafted by AI
  * marked, with the chosen one's note in its own words under the list. What a language hasn't translated yet shows in
  * English.
  */
@@ -826,10 +847,10 @@ function ApiToken() {
   )
 }
 
-/** Settings → Agent API → Viewer tokens (#620): read-only tokens for apps that show Hive, made and revoked here. */
+/** Settings → Agent API → Viewer tokens (#620): read-only tokens for apps that show Combwork, made and revoked here. */
 function ViewerTokens() {
   const api = useStore((s) => s.api)
-  const [name, setName] = useState('')
+  const [name, setName] = useSettingsDraft('viewers:name')
   const [shown, setShown] = useState<string | null>(null)
   if (!api) return null
   const create = async (): Promise<void> => {
@@ -850,7 +871,7 @@ function ViewerTokens() {
     if (
       !(await confirm({
         title: tr(msg({ id: 'settings.viewers.revokeTitle', defaultMessage: 'Revoke "{name}"?', description: 'Title of the question before a viewer token is revoked. {name} is its name.' }), { name: label }),
-        message: tr(msg({ id: 'settings.viewers.revokeMessage', defaultMessage: 'The app using it can no longer read Hive, and its event stream ends now.', description: 'The question before a viewer token is revoked.' })),
+        message: tr(msg({ id: 'settings.viewers.revokeMessage', defaultMessage: 'The app using it can no longer read Combwork, and its event stream ends now.', description: 'The question before a viewer token is revoked.' })),
         confirmLabel: tr(msg({ id: 'settings.viewers.revoke', defaultMessage: 'Revoke', description: 'Button: revokes a viewer token.' })),
         danger: true
       }))
@@ -976,10 +997,10 @@ function ResetAll() {
 
 /** Settings → Version Control's workspace part with the open workspace's name (HI-1768). */
 const WORKSPACE_DEFAULTS_NAMED = msg({ id: 'settings.workflow.workspaceDefaultsNamed', defaultMessage: 'Workspace defaults ({workspace})', description: 'The title of the part of Settings → Version Control holding the open workspace’s workflow defaults; {workspace} is its name.' })
-const WORKFLOW_TABS_LABEL = msg({ id: 'settings.workflow.tabs', defaultMessage: 'Workflow defaults', description: "Accessible name of Settings → Version Control's tabs: Hive defaults and the open workspace's (HI-1837)." })
+const WORKFLOW_TABS_LABEL = msg({ id: 'settings.workflow.tabs', defaultMessage: 'Workflow defaults', description: "Accessible name of Settings → Version Control's tabs: Combwork defaults and the open workspace's (HI-1837)." })
 
 /**
- * Settings → Version Control's two levels as tabs (HI-1837): Hive defaults and the open workspace's, each its own form
+ * Settings → Version Control's two levels as tabs (HI-1837): Combwork defaults and the open workspace's, each its own form
  * and Save…, the tab last chosen shown. Both forms stay mounted while the section is shown, so switching (or a search
  * offering only one tab) keeps each draft; a tab with one says so. `rows` are the section's rows the search shows.
  */
@@ -1057,17 +1078,14 @@ export function SettingsView() {
         </label>
       </div>
       <div className="settings-body">
-        <div className="settings-nav">
-          {sections.map((s) => (
-            <div key={s.id} className={cx('row', !query && !modifiedOnly && section === s.id && 'selected')} data-section={s.id} onClick={() => {
-                set({ settingsSection: s.id, settingsQuery: '' })
-                setModifiedOnly(false)
-              }}
-            >
-              {navIcon(s)} <span className={cx('label', s.provider && 'settings-sub')}>{sectionText(s).label}</span>
-            </div>
-          ))}
-        </div>
+        <SectionNav
+          items={sections.map((s) => ({ id: s.id, icon: navIcon(s), label: sectionText(s).label, sub: !!s.provider }))}
+          selected={!query && !modifiedOnly ? section : null}
+          onSelect={(id) => {
+            set({ settingsSection: id as Section, settingsQuery: '' })
+            setModifiedOnly(false)
+          }}
+        />
         <div className="settings-content">
           {grouped.length === 0 && <div className="empty-state">{tr(msg({ id: 'settings.noMatch', defaultMessage: 'No settings match.', description: 'Settings when its search finds nothing.' }))}</div>}
           {grouped.map((g) => (

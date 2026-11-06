@@ -1,27 +1,27 @@
-# Contributing to Hive
+# Contributing to Combwork
 
-Thank you for helping. This page is mostly about **translations**: fixing a word in a language Hive already has, and
+Thank you for helping. This page is mostly about **translations**: fixing a word in a language Combwork already has, and
 adding a new language. You can do a small fix in GitHub's web editor without installing anything. The checks run on
 your pull request. Code changes are covered briefly at the end.
 
-**Found a bug, or have an idea?** [Open an issue](https://github.com/Suremise/hive-desktop/issues/new/choose): there
+**Found a bug, or have an idea?** [Open an issue](https://github.com/Suremise/combwork/issues/new/choose): there
 are forms for a bug report (with **Help → Copy Diagnostics…**), a feature request, a translation and anything else.
 A **security problem** goes privately, never in an issue: see [SECURITY.md](.github/SECURITY.md). Pull requests start
 from [a short template](.github/PULL_REQUEST_TEMPLATE.md). Everyone taking part follows the
 [code of conduct](.github/CODE_OF_CONDUCT.md).
 
-Hive's languages besides English are **drafted by AI**, and Hive marks them so: *Deutsch (KI)*, *Polski
+Combwork's languages besides English are **drafted by AI**, and Combwork marks them so: *Deutsch (KI)*, *Polski
 (AI)*. They are a starting point. A native speaker who fixes what reads badly is exactly what they need.
 
-## How Hive's text is organised
+## How Combwork's text is organised
 
 | Where | What | Edit it? |
 |---|---|---|
-| `locales/<code>/<area>.json` | One language's translations for one area of Hive (settings, board, progress…): message id → text. | **Yes.** This is where translations go. |
+| `locales/<code>/<area>.json` | One language's translations for one area of Combwork (settings, board, progress…): message id → text. | **Yes.** This is where translations go. |
 | `locales/en/<area>.json` | The English source: each message's `defaultMessage`, and a `description` that tells you where it appears and what its placeholders are. | **No.** It is generated from the code (`npm run i18n:extract`). Read it, don't edit it. |
-| `locales/.source/<code>/<area>.json` | The English each translation was made from, so Hive can tell when the English changed later. | Only through `npm run i18n:coverage -- --record` (below). |
+| `locales/.source/<code>/<area>.json` | The English each translation was made from, so Combwork can tell when the English changed later. | Only through `npm run i18n:coverage -- --record` (below). |
 | `src/shared/i18n/languages.ts` | The list of languages: each one's own name, its AI mark and note, and its direction. | When you add a language. A maintainer takes a language's AI mark off once it has been reviewed (below). |
-| `docs/translating/glossary.md` | Hive's terms, and which to keep in English. | Suggest changes in a pull request. |
+| `docs/translating/glossary.md` | Combwork's terms, and which to keep in English. | Suggest changes in a pull request. |
 | `docs/translating/<code>.md` | One language's style page: how to address the reader, its word for each glossary term, its punctuation. | Yes, for your language. New ones start from `style-template.md`. |
 
 A message's **area** is the first part of its id: `language.setting.title` is in `language.json`. Each language has
@@ -36,11 +36,11 @@ A translation file is just ids and text:
 }
 ```
 
-**What isn't translated.** Text that Hive sends to coding agents and the Hive Assistant (tool replies, guidance,
+**What isn't translated.** Text that Combwork sends to coding agents and the Combwork Assistant (tool replies, guidance,
 messages in an agent's inbox), the Agent API, and command-line output all stay in English, so none of it is in
 `locales/`. The user guide is English only for now.
 
-**What a missing translation does.** Nothing breaks: Hive shows that message in English. So you can translate one area
+**What a missing translation does.** Nothing breaks: Combwork shows that message in English. So you can translate one area
 at a time, and an unfinished language still works.
 
 ## Fix a translation
@@ -82,21 +82,21 @@ Say a German button reads badly.
    `npm run i18n:coverage -- --record de <id>`. If you added new translations, `npm run i18n:coverage -- --record de`
    records all of them. Commit the files it writes in `locales/.source/de/` with your change. A wording fix to a
    translation that wasn't outdated needs no record.
-6. **Look at it in Hive** (optional, but the best check of length and tone). Any one of these:
-   - **Installed Hive:** quit Hive, then start it with `--lang=de`. In PowerShell:
-     `& "$env:LOCALAPPDATA\Programs\Hive\Hive.exe" --lang=de`. Your edited file only appears once a build includes it,
+6. **Look at it in Combwork** (optional, but the best check of length and tone). Any one of these:
+   - **Installed Combwork:** quit Combwork, then start it with `--lang=de`. In PowerShell:
+     `& "$env:LOCALAPPDATA\Programs\Combwork\Combwork.exe" --lang=de`. Your edited file only appears once a build includes it,
      so this shows the current release's German.
    - **From the source:** `npx install-electron --no` once, then `npm run dev -- -- --lang=de` (both `--` are
      needed: the first is npm's, the second electron-vite's).
    - **Screenshots of the main screens** in both themes, without clicking around:
-     `npm run e2e -- --lang de --build` (after `npx install-electron --no`; outside a Hive workspace, set
-     `HIVE_TEST_NO_BOARD=1` first, in PowerShell `$env:HIVE_TEST_NO_BOARD='1'`). It needs no sign-in: the agents in it
+     `npm run e2e -- --lang de --build` (after `npx install-electron --no`; outside a Combwork workspace, set
+     `CW_TEST_NO_BOARD=1` first, in PowerShell `$env:CW_TEST_NO_BOARD='1'`). It needs no sign-in: the agents in it
      are a stand-in. The runner prints where it kept the screenshots. Look for text that is cut off or wraps
      badly. See [tests/e2e/README.md](tests/e2e/README.md), *The i18n screenshot route*.
 
    A language started this way stays for that run only. The setting (**Settings → General → Language**) says so and
    applies from the next start.
-7. **Open a pull request** against `main` on [Suremise/hive-desktop](https://github.com/Suremise/hive-desktop). Say
+7. **Open a pull request** against `main` on [Suremise/combwork](https://github.com/Suremise/combwork). Say
    what you changed and why, and add a screenshot if you have one. Keep each pull request to one language.
 
 **The English itself is wrong?** English text lives in the code, not in `locales/`. Open an issue, or change the
@@ -122,9 +122,9 @@ Say you want to add Italian (`it`). Use the language's BCP 47 tag, as Windows do
    - `ai: true` if a machine drafted it. Then also give `aiMark`, the short mark after its name in its own words
      (`'(IA)'`), and `aiNote`, the line under the picker, in its own words
      (`'Tradotto dall’IA: i miglioramenti sono benvenuti.'`).
-   - `dir: 'rtl'` for a right-to-left language. Hive doesn't lay itself out right to left yet, so ask in an issue
+   - `dir: 'rtl'` for a right-to-left language. Combwork doesn't lay itself out right to left yet, so ask in an issue
      first.
-   - Hive finds the language's files by itself: nothing else in the code lists them.
+   - Combwork finds the language's files by itself: nothing else in the code lists them.
 4. **Let the installer speak it:** add its NSIS name (`it_IT`) to `installerLanguages` in `electron-builder.yml`.
 5. **Update the lists the tests expect.** Two unit tests name every language, so that one isn't added or dropped by
    mistake. Add yours to both:
@@ -139,8 +139,8 @@ Say you want to add Italian (`it`). Use the language's BCP 47 tag, as Windows do
    npm test                               # includes the language lists, the catalogues and the guard
    npm run typecheck
    ```
-7. **Say what's new:** a line under **Unreleased** in `CHANGELOG.md` (*Hive speaks Italian*). Where `docs/SPEC.md` and
-   `docs/USER_GUIDE.md` list Hive's languages (their *Language* sections), add it there too.
+7. **Say what's new:** a line under **Unreleased** in `CHANGELOG.md` (*Combwork speaks Italian*). Where `docs/SPEC.md` and
+   `docs/USER_GUIDE.md` list Combwork's languages (their *Language* sections), add it there too.
 8. **Look at it** with `--lang=it` or the screenshot route (Fix a translation, step 6), then open a pull request.
 
 **Automatic only picks a language that has translations.** Until `locales/it/` has a file, Windows set to Italian
@@ -153,18 +153,18 @@ checks, each on its own line:
 
 - `npm run i18n:extract -- --check`: `locales/en/` matches the code. You only change it through the code.
 - `npm run i18n:check`: **blocks the merge** when a translation would show wrong (step 4 above).
-- `npm run i18n:guard`: no new hard-coded English in Hive's interface. This only concerns code changes.
+- `npm run i18n:guard`: no new hard-coded English in Combwork's interface. This only concerns code changes.
 - `npm run i18n:coverage`: informational. Missing and outdated translations are listed, never failed.
 
 A maintainer reviews the change too.
 
 **From AI-drafted to reviewed.** When a native speaker has read through a language (all of it, or at least every
-area Hive shows often), say so in the pull request. The maintainer then sets `ai: false` for it in `languages.ts` and
-removes its `aiMark` and `aiNote`, and Hive stops marking it.
+area Combwork shows often), say so in the pull request. The maintainer then sets `ai: false` for it in `languages.ts` and
+removes its `aiMark` and `aiNote`, and Combwork stops marking it.
 
 ## Style
 
-Hive's English is plain: short sentences, everyday words, and it says what happens rather than how the code works.
+Combwork's English is plain: short sentences, everyday words, and it says what happens rather than how the code works.
 Buttons say what they do: *Remove*, *Move them back*. Translations should read the same way in their own language.
 They should be natural, not word for word.
 
@@ -175,14 +175,14 @@ They should be natural, not word for word.
 - **Never guess a gender from a name.** Agent names (*One*, *Codex*, *Builder*) have no known gender, so avoid a verb
   or adjective that must agree with one: *Usunięto {agent}* ("{agent} was removed", impersonal), not *{agent} został
   usunięty*.
-- **Keep the glossary's "keep" terms** in English (Hive, Claude Code, Codex, GitHub Copilot, MCP…), and use your
-  style page's word for each of Hive's own terms every time.
-- **Numbers, dates, money and lists** are formatted by Hive for the language (`1 234,50 USD`, `14.10.2026`), so never
+- **Keep the glossary's "keep" terms** in English (Combwork, Claude Code, Codex, GitHub Copilot, MCP…), and use your
+  style page's word for each of Combwork's own terms every time.
+- **Numbers, dates, money and lists** are formatted by Combwork for the language (`1 234,50 USD`, `14.10.2026`), so never
   write them out in a translation. Keep them as the placeholders they are.
 - **Keep the line breaks.** A message with `\n` in it (a hover of several lines) shows each part on its own line:
   keep them where the English has them.
 - **Mind the length.** Buttons, tabs and column headings have little room. If a translation is much longer than the
-  English, look at it in Hive or in the screenshots.
+  English, look at it in Combwork or in the screenshots.
 - **Read the description.** Each message in `locales/en/<area>.json` has a note saying where it appears and what its
   placeholders hold. When it says to keep a word (`--lang`, *Chromium*), keep it.
 
@@ -191,7 +191,7 @@ The details are in [docs/translating/glossary.md](docs/translating/glossary.md) 
 
 ## Code
 
-Hive is an Electron, TypeScript and React app for Windows.
+Combwork is an Electron, TypeScript and React app for Windows.
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) explains how it fits together, and [docs/SPEC.md](docs/SPEC.md) is what
 it should do. The commands and conventions are in [AGENTS.md](AGENTS.md). Agents and people follow the same file.
 In short:
@@ -199,7 +199,7 @@ In short:
 ```bash
 npm install
 npx install-electron --no   # once: Electron downloads its binary when first needed
-npm run dev                 # Hive from source, beside an installed Hive (its own profile)
+npm run dev                 # Combwork from source, beside an installed Combwork (its own profile)
 npm run typecheck
 npm run lint
 npm test
@@ -213,4 +213,4 @@ npm test
 - The end-to-end suites (`npm run e2e`) run on your machine, not in CI: see
   [tests/e2e/README.md](tests/e2e/README.md).
 
-Hive is MIT-licensed ([LICENSE](LICENSE)).
+Combwork is MIT-licensed ([LICENSE](LICENSE)).

@@ -1,7 +1,7 @@
-// A SKILL.md's header is YAML: who gets a Hive skill (metadata.audience) is read as YAML says, whatever form it is
+// A SKILL.md's header is YAML: who gets a Combwork skill (metadata.audience) is read as YAML says, whatever form it is
 // written in (comments, flow mappings, quotes, block scalars, CRLF, a BOM). No audience means the project agents. A
-// header that can't be read, or an audience Hive doesn't know, is a problem: nobody gets that skill, and the Skills view,
-// the API, tool listings and each launch say why, instead of Hive guessing a recipient.
+// header that can't be read, or an audience Combwork doesn't know, is a problem: nobody gets that skill, and the Skills view,
+// the API, tool listings and each launch say why, instead of Combwork guessing a recipient.
 import { mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -9,7 +9,7 @@ import * as electron from 'electron'
 import { skillListText } from '../src/shared/toolReplies'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-frontmatter-')
+const base = tempDir('cw-frontmatter-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 
@@ -43,7 +43,7 @@ describe('reading the header as YAML', () => {
     expect(parseSkillFrontmatter('# Just a heading\n')).toEqual({})
   })
 
-  it("an audience Hive doesn't know, or the wrong type, is a problem rather than a default", () => {
+  it("an audience Combwork doesn't know, or the wrong type, is a problem rather than a default", () => {
     expect(parse('name: a\nmetadata:\n  audience: assitant')).toEqual({ name: 'a', problem: 'its audience is "assitant", not agents, assistant or all', problemText: expect.anything() })
     expect(parse('name: a\nmetadata:\n  audience: [assistant]').problem).toBe('its audience is a list, not agents, assistant or all')
     expect(parse('name: a\nmetadata:\n  audience: 3').problem).toBe('its audience is a number, not agents, assistant or all')
@@ -84,16 +84,16 @@ describe('who gets which skill', () => {
   it('the Skills view, the role filters and a launch agree; a broken one reaches nobody and says why', async () => {
     const ws = join(base, 'ws')
     const proj = join(ws, 'proj')
-    mkdirSync(join(proj, '.hive'), { recursive: true })
-    writeFileSync(join(proj, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
+    mkdirSync(join(proj, '.combwork'), { recursive: true })
+    writeFileSync(join(proj, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
     const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
-    const { hiveSkills } = await import('../src/main/skills')
+    const { combworkSkills } = await import('../src/main/skills')
     const { sessions } = await import('../src/main/sessions')
     const w = createWorkspaceService()
     await w.open(ws)
     const skill = (name: string, header: string) => {
-      mkdirSync(join(ws, '.hive', 'skills', name), { recursive: true })
-      writeFileSync(join(ws, '.hive', 'skills', name, 'SKILL.md'), head(`name: ${name}\ndescription: The ${name} skill.\n${header}`))
+      mkdirSync(join(ws, '.combwork', 'skills', name), { recursive: true })
+      writeFileSync(join(ws, '.combwork', 'skills', name, 'SKILL.md'), head(`name: ${name}\ndescription: The ${name} skill.\n${header}`))
     }
     skill('inline-assistant', 'metadata:\n  audience: assistant # only the Assistant')
     skill('flow-all', 'metadata: { audience: all }')
@@ -104,10 +104,10 @@ describe('who gets which skill', () => {
     skill('twice', 'metadata:\n  audience: assistant\n  audience: agents')
     skill('empty', 'metadata:\n  audience: ~')
     try {
-      const names = async (role?: 'agent' | 'assistant') => (await inWorkspace(w, () => hiveSkills(false, role))).map((s) => s.name).sort()
+      const names = async (role?: 'agent' | 'assistant') => (await inWorkspace(w, () => combworkSkills(false, role))).map((s) => s.name).sort()
       expect(await names('agent')).toEqual(['flow-all', 'plain'])
       expect(await names('assistant')).toEqual(['commented-assistant', 'flow-all', 'inline-assistant'])
-      const all = await inWorkspace(w, () => hiveSkills())
+      const all = await inWorkspace(w, () => combworkSkills())
       const of = (n: string) => all.find((s) => s.name === n)!
       expect([of('misspelt').audience, of('misspelt').problem]).toEqual([undefined, 'its audience is "assitant", not agents, assistant or all'])
       expect(of('broken').problem).toMatch(/^its header isn't valid YAML/)
@@ -126,9 +126,9 @@ describe('who gets which skill', () => {
 
       // A tool listing says it too.
       const text = skillListText(all.filter((s) => ['misspelt', 'inline-assistant', 'plain'].includes(s.name)).map((s) => ({ name: s.name, description: s.description, level: s.level, ...(s.audience ? { audience: s.audience } : {}), ...(s.problem ? { problem: s.problem } : {}) })))
-      expect(text).toContain('misspelt (Hive, given to nobody: its audience is "assitant", not agents, assistant or all)')
-      expect(text).toContain('inline-assistant (Hive, for the Assistant)')
-      expect(text).toContain('plain (Hive, for agents)')
+      expect(text).toContain('misspelt (Combwork, given to nobody: its audience is "assitant", not agents, assistant or all)')
+      expect(text).toContain('inline-assistant (Combwork, for the Assistant)')
+      expect(text).toContain('plain (Combwork, for agents)')
     } finally {
       await disposeWorkspaceService(w)
     }

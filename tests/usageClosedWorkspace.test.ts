@@ -1,8 +1,8 @@
 // A workspace's databases aren't opened again once a window starts closing it (#1379): an import begun as it opened, a
 // session's ingest queued from no window's request, a host's first read waiting for the board's lock, a read resuming
 // while the close waits for its file watcher, housekeeping between compression and retention, a transcript read taking
-// its saved state from the closed workspace's usage.db. Each used to open its hive.db or usage.db again as the window
-// switched away, holding its folder until Hive quit (the user couldn't move or delete it).
+// its saved state from the closed workspace's usage.db. Each used to open its combwork.db or usage.db again as the window
+// switched away, holding its folder until Combwork quit (the user couldn't move or delete it).
 import { mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join, resolve as resolvePath } from 'path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -10,7 +10,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { junction } from './pathAliases'
 
-const base = tempDir('hive-usage-closed-')
+const base = tempDir('cw-usage-closed-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 ;(electron.shell as unknown as { trashItem: (f: string) => Promise<void> }).trashItem = async (f) => rmSync(f, { force: true })
 
@@ -33,8 +33,8 @@ function gate(): { held: Promise<void>; release: () => void } {
 describe('the usage history of a workspace that closed', () => {
   beforeAll(async () => {
     for (const ws of [wsA, wsB, wsC, wsD, wsE, wsF, wsG, wsH, wsI]) {
-      mkdirSync(join(ws, 'proj', '.hive'), { recursive: true })
-      writeFileSync(join(ws, 'proj', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'c1', name: 'Agent 1' }] }))
+      mkdirSync(join(ws, 'proj', '.combwork'), { recursive: true })
+      writeFileSync(join(ws, 'proj', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'c1', name: 'Agent 1' }] }))
     }
     mkdirSync(join(base, 'profile'), { recursive: true })
     usageHistory.start()
@@ -115,7 +115,7 @@ describe('the usage history of a workspace that closed', () => {
       await reading
       // Its saved state isn't looked for in the closed workspace's usage.db (or, sent before the close, the file is closed
       // again after): the folder can go.
-      await vi.waitFor(() => rmSync(join(wsD, '.hive'), { recursive: true }), { timeout: 20000 })
+      await vi.waitFor(() => rmSync(join(wsD, '.combwork'), { recursive: true }), { timeout: 20000 })
     } finally {
       spy.mockRestore()
       inner.closeInProcess = closeAll
@@ -152,7 +152,7 @@ describe('the usage history of a workspace that closed', () => {
   it("a session's ingest, finding its transcript as the window switches away, doesn't open the closed board again", async () => {
     const id = '00000000-0000-4000-9000-000000000002'
     const at = new Date().toISOString()
-    writeFileSync(join(wsF, 'proj', '.hive', 'sessions.json'), JSON.stringify({ version: 1, sessions: [{ id, agent: 'claude-code', agentId: 'c1', name: 'a session', createdAt: at, lastActiveAt: at }] }))
+    writeFileSync(join(wsF, 'proj', '.combwork', 'sessions.json'), JSON.stringify({ version: 1, sessions: [{ id, agent: 'claude-code', agentId: 'c1', name: 'a session', createdAt: at, lastActiveAt: at }] }))
     await w.open(wsF)
     const host = join(wsF, 'proj')
     const g = gate()

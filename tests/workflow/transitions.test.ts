@@ -34,16 +34,16 @@ async function passed(e: Env, key: string, reviewer = R1) {
 }
 
 describe('intents only where the compiled table has them', () => {
-  it('under Hive merges a report merge is refused, as is the translated `done` column move; the queue merges', async () => {
+  it('under Combwork merges a report merge is refused, as is the translated `done` column move; the queue merges', async () => {
     const e = (env = setup({ ...pairOpts, okBefore: { mode: 'labels', labels: ['release'] } }))
     const { card } = await startedIn(e, 'Release', 'r.txt', { labels: ['release'] })
     moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
     await passed(e, card.key)
     expect(e.wf.state(card).stage).toBe('approved')
     // The queue merges it (#1354): the refusal says so, not where a report would be possible.
-    const r = refusedBy(await e.wf.reportMerge(card.key, B1), 'merge.hiveMerges')
-    expect(r.message).toBe(`Hive merges ${card.key}: agents don't merge it or report its merge.`)
-    refusedBy(await e.wf.agentColumnMove(card.key, B1, 'done', { translate: true }), 'merge.hiveMerges')
+    const r = refusedBy(await e.wf.reportMerge(card.key, B1), 'merge.combworkMerges')
+    expect(r.message).toBe(`Combwork merges ${card.key}: agents don't merge it or report its merge.`)
+    refusedBy(await e.wf.agentColumnMove(card.key, B1, 'done', { translate: true }), 'merge.combworkMerges')
     expect(e.wf.state(card)).toMatchObject({ stage: 'approved', integrated: null })
   })
 
@@ -195,7 +195,7 @@ describe('dependencies and decisions', () => {
 })
 
 describe('observations, idempotent', () => {
-  it('attribution and an integration found after an override are written once, by two Hives', async () => {
+  it('attribution and an integration found after an override are written once, by two Combworks', async () => {
     const e = (env = setup({ platform: 'git', folder: 'project' }))
     const other = e.another()
     const card = e.wf.createCard({ title: 'Shared' })

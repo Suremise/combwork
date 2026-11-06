@@ -92,7 +92,7 @@ export class NonePlatform implements PlatformAdapter {
     if (!files.length && rev.revision === s.started!.base) return { ok: false, refusal: { rule: 'submit.unchanged', values: { card: card.key } } }
     // Paths stored from before #1511 under an excluded folder: left out of the revision, and said so.
     const left = this.hashing.leftOut(paths)
-    const warnings = left.length ? [`left out of ${card.key}'s revision: ${left.join(', ')} (under .hive, .git or a folder the project excludes, never part of a card's work); declare its paths again without them`] : [] // i18n-ignore: agent-facing warning in the submit's reply
+    const warnings = left.length ? [`left out of ${card.key}'s revision: ${left.join(', ')} (under .combwork, .git or a folder the project excludes, never part of a card's work); declare its paths again without them`] : [] // i18n-ignore: agent-facing warning in the submit's reply
     return { ok: true, revision: rev.revision, base: s.started!.base, key: rev.revision, files, paths, inputs: {}, warnings }
   }
 

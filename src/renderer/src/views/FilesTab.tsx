@@ -17,7 +17,8 @@ import type { CardAttachment } from '@shared/cardAttachments'
 import { TabPanel, Tabs } from '../components/Tabs'
 import { useScopedLoad } from '../scopedLoad'
 import { agentFolder, awayFromProject, legacyOf, placeText } from '../agentPlace'
-import { cx, formatBytes, formatKeybinding, HIVE_FILES_MIME, IMAGE_EXT, imageUrl, quotePath, timeAgo } from '../util'
+import { cx, formatBytes, formatKeybinding, FILES_MIME, IMAGE_EXT, imageUrl, quotePath, timeAgo } from '../util'
+import { CW_DIR } from '@shared/defaults'
 
 const parentOf = (rel: string): string => (rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '')
 const absOf = (project: ProjectInfo, rel: string): string => (rel ? `${project.path}\\${rel.replace(/\//g, '\\')}` : project.path)
@@ -30,7 +31,7 @@ const rich = (m: Msg, values: Parameters<typeof tRich<React.ReactNode>>[1]): Rea
 
 const M = {
   attachToCard: msg({ id: 'files.attach.toCard', defaultMessage: 'Attach to a card', description: "A session attachment's menu entry in the Attachments tab (HI-1700): opens a menu of the project's cards, to copy the file to one." }),
-  rootTip: msg({ id: 'files.root.tip', defaultMessage: 'Show the project folder, or the folder an agent works in: its slot or worktree', description: "Tooltip on the Files tab's folder picker, shown when agents work outside the project folder (in slots, Hive's worktrees lent to cards, or their own worktrees from before 1.0)." }),
+  rootTip: msg({ id: 'files.root.tip', defaultMessage: 'Show the project folder, or the folder an agent works in: its slot or worktree', description: "Tooltip on the Files tab's folder picker, shown when agents work outside the project folder (in slots, Combwork's worktrees lent to cards, or their own worktrees from before 1.0)." }),
   projectFolder: msg({ id: 'files.root.projectFolder', defaultMessage: 'Project folder', description: "The Files tab's folder picker: the project's own folder." }),
   agentPlace: msg({ id: 'files.root.place', defaultMessage: '{agent} · {place}', description: "The Files tab's folder picker: the folder an agent works in. {agent} is the agent's name, {place} where (agents.place.short: \"in slot-b\", \"carried: hb2\", \"home: hr4\")." }),
   agentWorktree: msg({ id: 'files.root.worktree', defaultMessage: "{agent}'s worktree · {branch}", description: "The Files tab's folder picker: a worktree agent's folder. {agent} is the agent's name, {branch} its git branch." }),
@@ -92,18 +93,18 @@ const M = {
   attachDeleteFailed: msg({ id: 'files.attachments.deleteFailed', defaultMessage: 'Could not delete the attachment', description: 'Title of an error notification.' }),
   groupDeleteTitle: msg({ id: 'files.attachments.groupDeleteTitle', defaultMessage: 'Move {count, plural, one {# attachment} other {# attachments}} to the Recycle Bin?', description: "Title of the confirmation before deleting all of a session's attachments." }),
   groupDeleteMessage: msg({ id: 'files.attachments.groupDeleteMessage', defaultMessage: 'Move {count, plural, one {the attachment} other {all # attachments}} of "{name}" to the Recycle Bin?', description: "The confirmation before deleting all of a session's attachments. {name} is the session's (or conversation's) name." }),
-  groupDeleteDetail: msg({ id: 'files.attachments.groupDeleteDetail', defaultMessage: '{filtered, select, yes {All of its attachments go, whatever the filter shows. } other {}}{host, select, assistant {The conversation keeps its transcript, which still mentions their paths.} other {The session keeps its transcript, which still mentions their paths.}} You can restore them from the Recycle Bin.', description: "Under the confirmation before deleting a session's attachments. {filtered} is yes when a filter hides some of them; {host} is assistant for the Hive Assistant's conversations." }),
+  groupDeleteDetail: msg({ id: 'files.attachments.groupDeleteDetail', defaultMessage: '{filtered, select, yes {All of its attachments go, whatever the filter shows. } other {}}{host, select, assistant {The conversation keeps its transcript, which still mentions their paths.} other {The session keeps its transcript, which still mentions their paths.}} You can restore them from the Recycle Bin.', description: "Under the confirmation before deleting a session's attachments. {filtered} is yes when a filter hides some of them; {host} is assistant for the Combwork Assistant's conversations." }),
   groupDeleteFailed: msg({ id: 'files.attachments.groupDeleteFailed', defaultMessage: 'Could not delete the attachments', description: 'Title of an error notification.' }),
   groupDeleted: msg({ id: 'files.attachments.groupDeleted', defaultMessage: 'Moved {count, plural, one {# attachment} other {# attachments}} to the Recycle Bin.', description: "Notification after deleting a session's attachments." }),
   view: msg({ id: 'files.attachments.view', defaultMessage: 'View', description: "An attachment's right-click menu: opens it in the viewer." }),
   copyImage: msg({ id: 'files.attachments.copyImage', defaultMessage: 'Copy Image', description: "Menu item or button: copies the attachment's picture to the clipboard." }),
   copyImageFailed: msg({ id: 'files.attachments.copyImageFailed', defaultMessage: 'Could not copy image', description: 'Title of an error notification.' }),
-  running: msg({ id: 'files.attachments.running', defaultMessage: '{host, select, assistant {Its conversation is running} other {Its session is running}}', description: "Why an attachment can't be deleted now. {host} is assistant for the Hive Assistant's conversations." }),
+  running: msg({ id: 'files.attachments.running', defaultMessage: '{host, select, assistant {Its conversation is running} other {Its session is running}}', description: "Why an attachment can't be deleted now. {host} is assistant for the Combwork Assistant's conversations." }),
   loading: msg({ id: 'files.loading', defaultMessage: 'Loading…', description: 'Shown while the attachments (or one of them) load.' }),
   noneYet: msg({ id: 'files.attachments.none', defaultMessage: 'No attachments yet', description: 'The Attachments tab when there are none.' }),
-  noneHintAssistant: msg({ id: 'files.attachments.noneHintAssistant', defaultMessage: "Paste a screenshot into the Assistant's panel with <kbd>Ctrl+V</kbd>, or drag files onto it: images, PDFs, logs, any file. Hive keeps a copy of each one here, grouped by conversation.", description: "Under \"No attachments yet\" in the Hive Assistant's Attachments. <kbd> marks a key: keep it as it is." }),
-  noneHint: msg({ id: 'files.attachments.noneHint', defaultMessage: 'Paste a screenshot into a session with <kbd>Ctrl+V</kbd>, or drag files onto the terminal: images, PDFs, logs, any file. Hive keeps a copy of each one here, grouped by session.', description: 'Under "No attachments yet" in a project\'s Attachments tab. <kbd> marks a key: keep it as it is.' }),
-  openTranscript: msg({ id: 'files.attachments.openTranscript', defaultMessage: "{host, select, assistant {Open this conversation's transcript} other {Open this session's transcript}}", description: "Tooltip on a session's name in the Attachments tab. {host} is assistant for the Hive Assistant's conversations." }),
+  noneHintAssistant: msg({ id: 'files.attachments.noneHintAssistant', defaultMessage: "Paste a screenshot into the Assistant's panel with <kbd>Ctrl+V</kbd>, or drag files onto it: images, PDFs, logs, any file. Combwork keeps a copy of each one here, grouped by conversation.", description: "Under \"No attachments yet\" in the Combwork Assistant's Attachments. <kbd> marks a key: keep it as it is." }),
+  noneHint: msg({ id: 'files.attachments.noneHint', defaultMessage: 'Paste a screenshot into a session with <kbd>Ctrl+V</kbd>, or drag files onto the terminal: images, PDFs, logs, any file. Combwork keeps a copy of each one here, grouped by session.', description: 'Under "No attachments yet" in a project\'s Attachments tab. <kbd> marks a key: keep it as it is.' }),
+  openTranscript: msg({ id: 'files.attachments.openTranscript', defaultMessage: "{host, select, assistant {Open this conversation's transcript} other {Open this session's transcript}}", description: "Tooltip on a session's name in the Attachments tab. {host} is assistant for the Combwork Assistant's conversations." }),
   unnamedGroup: msg({ id: 'files.attachments.unnamed', defaultMessage: '{host, select, assistant {Conversation {id}} other {Session {id}}}', description: 'A session without a name, in the Attachments tab. {id} is the start of its id.' }),
   runningBadge: msg({ id: 'files.attachments.runningBadge', defaultMessage: 'Running', description: "Badge beside a session's name in the Attachments tab: it is running now." }),
   archivedBadge: msg({ id: 'files.attachments.archivedBadge', defaultMessage: 'archived', description: "Badge beside an archived session's name in the Attachments tab." }),
@@ -112,11 +113,11 @@ const M = {
   attachmentsLoadTarget: msg({ id: 'files.attachments.loadTarget', defaultMessage: 'the attachments', description: 'What could not be loaded when the Attachments tab first opened: shown in "Could not load {what}: {error}", with Retry.' }),
   attachmentsRefreshTarget: msg({ id: 'files.attachments.refreshTarget', defaultMessage: 'the attachments', description: 'What could not be refreshed while the attachments shown stay on screen: shown in "Could not refresh {what}; last updated …", with Retry.' }),
   attachments: msg({ id: 'files.attachments.title', defaultMessage: 'Attachments', description: 'Heading of the Attachments tab.' }),
-  infoAssistant: msg({ id: 'files.attachments.infoAssistant', defaultMessage: "Kept in the Assistant's home, .hive/attachments. Click a conversation's name to read it.", description: "The (i) beside the Hive Assistant's Attachments heading. Keep .hive/attachments as it is." }),
-  info: msg({ id: 'files.attachments.info', defaultMessage: "Kept in the project's .hive/attachments. Drag one onto the Session tab to send it again; click a session's name to read it.", description: "The (i) beside a project's Attachments heading. Keep .hive/attachments as it is." }),
-  total: msg({ id: 'files.attachments.total', defaultMessage: '{host, select, assistant {{total, number} in {groups, plural, one {# conversation} other {# conversations}}} other {{total, number} in {groups, plural, one {# session} other {# sessions}}}}', description: 'Beside the Attachments heading: how many attachments, in how many sessions (conversations for the Hive Assistant).' }),
+  infoAssistant: msg({ id: 'files.attachments.infoAssistant', defaultMessage: "Kept in the Assistant's home, .combwork/attachments. Click a conversation's name to read it.", description: "The (i) beside the Combwork Assistant's Attachments heading. Keep .combwork/attachments as it is." }),
+  info: msg({ id: 'files.attachments.info', defaultMessage: "Kept in the project's .combwork/attachments. Drag one onto the Session tab to send it again; click a session's name to read it.", description: "The (i) beside a project's Attachments heading. Keep .combwork/attachments as it is." }),
+  total: msg({ id: 'files.attachments.total', defaultMessage: '{host, select, assistant {{total, number} in {groups, plural, one {# conversation} other {# conversations}}} other {{total, number} in {groups, plural, one {# session} other {# sessions}}}}', description: 'Beside the Attachments heading: how many attachments, in how many sessions (conversations for the Combwork Assistant).' }),
   openFolder: msg({ id: 'files.attachments.openFolder', defaultMessage: 'Open Attachments Folder', description: "Tooltip on the button that opens the attachments' folder in File Explorer." }),
-  descAssistant: msg({ id: 'files.attachments.descAssistant', defaultMessage: 'Files pasted or dropped into the Assistant, by conversation.', description: "Under the Hive Assistant's Attachments heading." }),
+  descAssistant: msg({ id: 'files.attachments.descAssistant', defaultMessage: 'Files pasted or dropped into the Assistant, by conversation.', description: "Under the Combwork Assistant's Attachments heading." }),
   desc: msg({ id: 'files.attachments.desc', defaultMessage: "Files kept with this project's cards, and files pasted or dropped into its agents' sessions.", description: "Under a project's Attachments heading (HI-1700: cards' files, then sessions')." }),
   totalWithCards: msg({ id: 'files.attachments.totalWithCards', defaultMessage: '{total, plural, one {# file} other {# files}} · {cards, number} on cards, {sessions, number} in {groups, plural, one {# session} other {# sessions}}', description: "Beside a project's Attachments heading when its cards keep files too (HI-1700): how many files in all, how many on cards, and how many in how many sessions." }),
   sessionsKept: msg({ id: 'files.attachments.sessionsKept', defaultMessage: 'Kept with their session: Clean Up and Purge can remove them with it.', description: "Atop a project's Attachments tab's Pane attachments (HI-1700, HI-1841): the files pasted or dropped into sessions." }),
@@ -651,14 +652,14 @@ function FilesBrowser({ project, selector, jump }: { project: ProjectInfo; selec
     const items = selected.includes(e.relPath) ? selEntries : [e]
     if (!selected.includes(e.relPath)) setSelected([e.relPath])
     const paths = items.map((i) => absOf(project, i.relPath))
-    ev.dataTransfer.setData(HIVE_FILES_MIME, JSON.stringify({ project: project.path, rels: items.map((i) => i.relPath), paths }))
+    ev.dataTransfer.setData(FILES_MIME, JSON.stringify({ project: project.path, rels: items.map((i) => i.relPath), paths }))
     ev.dataTransfer.setData('text/plain', paths.map(quotePath).join(' '))
     ev.dataTransfer.effectAllowed = 'copyMove'
   }
 
   const dragOverDir = (ev: React.DragEvent, dir: string): void => {
     const dt = ev.dataTransfer
-    const internal = dt.types.includes(HIVE_FILES_MIME)
+    const internal = dt.types.includes(FILES_MIME)
     if (!internal && !dt.types.includes('Files')) return
     ev.preventDefault()
     ev.stopPropagation()
@@ -677,7 +678,7 @@ function FilesBrowser({ project, selector, jump }: { project: ProjectInfo; selec
     setDropTarget(null)
     window.clearTimeout(hoverTimer.current)
     const unchanged = unchangedSelection()
-    const internal = ev.dataTransfer.getData(HIVE_FILES_MIME)
+    const internal = ev.dataTransfer.getData(FILES_MIME)
     let out: string[] | undefined
     if (internal) {
       const data = JSON.parse(internal) as { project: string; rels?: string[]; paths: string[] }
@@ -691,7 +692,7 @@ function FilesBrowser({ project, selector, jump }: { project: ProjectInfo; selec
         out = await actions.attempt(tr(M.couldNotCopy), () => call('files:copy', project.path, data.rels!, dir))
       } else out = await actions.attempt(tr(M.couldNotCopy), () => call('files:import', project.path, data.paths, dir))
     } else {
-      const sources = [...ev.dataTransfer.files].map((f) => window.hive.pathForFile(f)).filter(Boolean)
+      const sources = [...ev.dataTransfer.files].map((f) => window.combwork.pathForFile(f)).filter(Boolean)
       if (sources.length) out = await actions.attempt(tr(M.couldNotCopyIn), () => call('files:import', project.path, sources, dir))
     }
     if (dir) expand(dir)
@@ -988,7 +989,7 @@ const spanDay = (t: number): string => {
 const dayKey = (iso: string): string => new Date(iso).toDateString()
 
 /**
- * A project's Attachments tab, and the Hive Assistant's Attachments (`assistant`: its home's .hive/attachments, grouped by
+ * A project's Attachments tab, and the Combwork Assistant's Attachments (`assistant`: its home's .combwork/attachments, grouped by
  * conversation): what was pasted or dropped into sessions, with filters by kind. Clicking a group's name opens that
  * session's transcript.
  */
@@ -1057,7 +1058,7 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
   }, [project.path, loadScoped])
   useEffect(load, [load])
   useFileEvents(project.path, (dirs) => {
-    if (dirs.some((d) => d === '.hive' || d.startsWith('.hive/attachments'))) load()
+    if (dirs.some((d) => d === CW_DIR || d.startsWith('.combwork/attachments'))) load()
   })
 
   // How many of each kind the tab shown has: a filter is offered for each kind present, counting only its own files.
@@ -1226,7 +1227,7 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
                   onClick={() => setViewing(a)}
                   onContextMenu={(e) => menu.open(e, menuFor(a, { x: e.clientX, y: e.clientY }))}
                   onDragStart={(e) => {
-                    e.dataTransfer.setData(HIVE_FILES_MIME, JSON.stringify({ project: project.path, paths: [a.path] }))
+                    e.dataTransfer.setData(FILES_MIME, JSON.stringify({ project: project.path, paths: [a.path] }))
                     e.dataTransfer.setData('text/plain', quotePath(a.path))
                     e.dataTransfer.effectAllowed = 'copy'
                   }}
@@ -1259,7 +1260,7 @@ export function AttachmentsTab({ project: owner, assistant = false }: { project:
         <span className="faint">{!assistant && cardCount ? tr(M.totalWithCards, { total: total + cardCount, cards: cardCount, sessions: total, groups: all.length }) : tr(M.total, { host, total, groups: all.length })}</span>
         <div className="grow" />
         <IconButton icon="refresh" title={tr(M.refresh)} action="refresh-attachments" onClick={load} />
-        <IconButton icon="folder-opened" title={tr(M.openFolder)} onClick={() => void call('app:openPath', `${project.path}\\.hive\\attachments`)} />
+        <IconButton icon="folder-opened" title={tr(M.openFolder)} onClick={() => void call('app:openPath', `${project.path}\\.combwork\\attachments`)} />
       </div>
       <p className="hint images-desc">{tr(assistant ? M.descAssistant : M.desc)}</p>
       {!assistant && <Tabs<AttachTab> idBase={`${tabsId}-attach`} className="attachment-tabs" label={tr(M.tabs)} value={tab} onChange={chooseAttachTab} items={[{ id: 'pane', label: tr(M.paneTab), icon: 'comment-discussion', count: total }, { id: 'card', label: tr(M.cardTab), icon: 'checklist', count: cardCount }]} />}
@@ -1348,7 +1349,7 @@ function PanePanel({ assistant, idBase, selected, children }: { assistant: boole
 /** The filters' names, plural. */
 const ATTACHMENT_FILTER_LABEL: Record<AttachmentKind, Msg> = { image: M.images, pdf: M.pdfs, text: M.text, file: M.other }
 
-/** A kept attachment's own name, without the time Hive put in front of it ("2026-10-12_09-30-00_report.pdf" is "report.pdf"). */
+/** A kept attachment's own name, without the time Combwork put in front of it ("2026-10-12_09-30-00_report.pdf" is "report.pdf"). */
 const shownName = (name: string): string => name.replace(/^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}_/, '')
 
 /**

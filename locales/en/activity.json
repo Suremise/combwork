@@ -9,14 +9,14 @@
   },
   "activity.block.asked": {
     "defaultMessage": "{other, select, yes {Edit waiting for your OK: {file} is locked by an agent of another project} other {Edit waiting for your OK: {file} is locked by agent {holder}}}",
-    "description": "In the Activity tab, under Now: Hive's file lock (Ask me) holds the agent's edit of a file another agent is editing until the user allows it. {file} is the file's path; {holder} the agent editing it."
+    "description": "In the Activity tab, under Now: Combwork's file lock (Ask me) holds the agent's edit of a file another agent is editing until the user allows it. {file} is the file's path; {holder} the agent editing it."
   },
   "activity.block.blocked": {
     "defaultMessage": "{other, select, yes {Edit blocked: {file} is locked by an agent of another project} other {Edit blocked: {file} is locked by agent {holder}}}",
-    "description": "In the Activity tab, under Now: Hive's file lock blocked the agent's edit of a file another agent is editing, while that stands. {file} is the file's path; {holder} the agent editing it."
+    "description": "In the Activity tab, under Now: Combwork's file lock blocked the agent's edit of a file another agent is editing, while that stands. {file} is the file's path; {holder} the agent editing it."
   },
   "activity.block.for": {
-    "defaultMessage": "Hive's file lock · {time}",
+    "defaultMessage": "Combwork's file lock · {time}",
     "description": "The second line of a lock block in the Activity tab: what blocked the edit, and for how long it has stood ({time}, such as \"2 min\")."
   },
   "activity.block.tip": {
@@ -123,6 +123,14 @@
     "defaultMessage": "Loading…",
     "description": "The Activity tab, or a detail in it, while it loads."
   },
+  "activity.modelSwitch": {
+    "defaultMessage": "Model changed: {launched} → {running}",
+    "description": "In the Activity tab, under Now (HI-2609): the agent runs another model ({running}) than Combwork started it with ({launched}), its connection's. Both are model names (\"GPT-6 Astra\"); keep the arrow."
+  },
+  "activity.modelSwitch.tip": {
+    "defaultMessage": "Its coding agent changed model by itself or at a prompt of its own. Shown while it runs the other model; restart the agent to go back to its connection's.",
+    "description": "Tooltip on the \"Model changed\" row in the Activity tab (HI-2609). Its connection is the account Combwork started the agent on."
+  },
   "activity.noPrompt": {
     "defaultMessage": "(no prompt text)",
     "description": "A turn node in the Activity tree whose prompt has no text (only images, say)."
@@ -148,7 +156,7 @@
     "description": "A button in the Activity tab's details: opens the session's transcript in the Sessions tab."
   },
   "activity.orphanFact": {
-    "defaultMessage": "The process that started it has exited, and it has run for over ten minutes. The agent is told; Hive doesn’t end it.",
+    "defaultMessage": "The process that started it has exited, and it has run for over ten minutes. The agent is told; Combwork doesn’t end it.",
     "description": "The value beside Left running in the Activity tab's details (HI-2111): why this process counts as left running."
   },
   "activity.orphanFor": {
@@ -217,7 +225,7 @@
   },
   "activity.showOwn": {
     "defaultMessage": "{n, plural, =0 {Show the agent’s own processes} one {Show the agent’s own process (#)} other {Show the agent’s own processes (#)}}",
-    "description": "A checkbox beside the Activity tab's Processes heading: also shows the agent's own processes (its CLI, the terminal hosting it, Hive's tool server for it), hidden by default. {n}: how many are hidden."
+    "description": "A checkbox beside the Activity tab's Processes heading: also shows the agent's own processes (its CLI, the terminal hosting it, Combwork's tool server for it), hidden by default. {n}: how many are hidden."
   },
   "activity.started": {
     "defaultMessage": "Started",
@@ -257,7 +265,7 @@
   },
   "activity.workspace.assistant": {
     "defaultMessage": "Assistant",
-    "description": "The Assistant's group heading among the Activity view's agent tabs (its tabs grouped by project; the Hive Assistant is its own group)."
+    "description": "The Assistant's group heading among the Activity view's agent tabs (its tabs grouped by project; the Combwork Assistant is its own group)."
   },
   "activity.workspace.cardNobody": {
     "defaultMessage": "Nobody is working on {card} now. The card has its history.",

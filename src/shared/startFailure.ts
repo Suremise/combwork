@@ -56,12 +56,12 @@ export function lastErrorLines(output: string): string {
   return text.length > MAX_CHARS ? `${text.slice(0, MAX_CHARS - 1).trimEnd()}…` : text
 }
 
-/** What Hive knows of an agent when its CLI exits. */
+/** What Combwork knows of an agent when its CLI exits. */
 export interface ExitInput {
   status: SessionStatus
   /** Its worktree setup still ran: a setup failure is reported by itself. */
   settingUp?: boolean
-  /** The user stopped it, or Hive is quitting. */
+  /** The user stopped it, or Combwork is quitting. */
   stopRequested: boolean
   /** The CLI refused the conversation because it runs it as a background job (reported by itself). */
   backgroundJob: boolean

@@ -39,13 +39,13 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47930), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47930), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   const info = async (p) => (await inv('provider:info'))[p]
   const update = (patch) => inv('settings:update', patch)
 
@@ -147,7 +147,7 @@ const check = (name, ok, extra = '') => {
   const footerText = async () => (await footer.innerText().catch(() => '')) + (await footer.locator('[title]').evaluateAll((es) => es.map((e) => e.getAttribute('title')).join(' ')).catch(() => ''))
   const shown = await lib.until(async () => /Medium \(default\)/.test(await footerText()), 8000)
   check("the footer shows the model's default effort: Medium (default)", !!shown, await footer.innerText().catch(() => ''))
-  // Effort levels renamed in Settings name the footer's effort too, as they do the pickers' (#230); Reset gives Hive's.
+  // Effort levels renamed in Settings name the footer's effort too, as they do the pickers' (#230); Reset gives Combwork's.
   await inv('settings:setProviderFallback', 'codex', 'efforts', [{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Mid' }, { value: 'high', label: 'High' }])
   check('a renamed effort level names the footer’s effort: Mid (default)', !!(await lib.until(async () => /Mid \(default\)/.test(await footerText()), 8000)), await footer.innerText().catch(() => ''))
   await inv('settings:setProviderFallback', 'codex', 'efforts', null)
@@ -164,7 +164,7 @@ const check = (name, ok, extra = '') => {
   await modelOf('Writer').hover()
   check('…and the tooltip says it was chosen as Opus', !!(await lib.until(async () => (await page.locator('.tip', { hasText: 'Opus 5.5 · chosen as Opus' }).count()) > 0, HUNG_MS)))
   // The Assistant's model is its connection's (HI-2108): set as an agent's is (lib.setLaunch), onto a connection on its account.
-  const assistantHome = path.join(ws, '.hive', 'assistant')
+  const assistantHome = path.join(ws, '.combwork', 'assistant')
   await lib.setLaunch(inv, assistantHome, 'assistant', { model: 'opus' })
   if ((await page.locator('.assistant-panel').count()) === 0) await page.locator('.assistant-rail').click()
   const assistantModel = async () => (await page.locator('.assistant-footer .foot-model').innerText().catch(() => '')).split(' · ')[0].trim()
@@ -188,7 +188,7 @@ const check = (name, ok, extra = '') => {
   await page.keyboard.press('Control+,')
   await openSection('Claude Code')
   const modelsRow = page.locator('.fallback-table', { has: page.locator('.fallback-source', { hasText: 'Models now' }) })
-  // While the CLI answers and the list is Hive's own, it is folded.
+  // While the CLI answers and the list is Combwork's own, it is folded.
   check("the models fallback is folded while the CLI's answer is in use", (await modelsRow.locator('.fallback-toggle', { hasText: /Show the list \(\d+ models\)/ }).count()) === 1 && (await modelsRow.locator('.fallback-list').count()) === 0)
   await modelsRow.locator('.fallback-toggle').click()
   await modelsRow.getByLabel("New model id").fill('claude-test-9')
@@ -196,7 +196,7 @@ const check = (name, ok, extra = '') => {
   await lib.until(async () => ((await update({})).providers['claude-code'].modelFallback ?? []).some((m) => m.value === 'claude-test-9'), HUNG_MS)
   const edited = (await update({})).providers['claude-code'].modelFallback ?? []
   check('adding a model stores the list as yours (the shipped ones and yours)', edited.at(-1)?.value === 'claude-test-9' && edited.some((m) => m.value === 'opus'), JSON.stringify(edited.map((m) => m.value)))
-  // The CLI can't be asked: one that gives its version but answers nothing else (a missing path would have Hive look
+  // The CLI can't be asked: one that gives its version but answers nothing else (a missing path would have Combwork look
   // for the machine's own Claude Code, which a test never uses).
   const broken = path.join(lib.WORK, 'models-broken-claude', 'claude.cmd')
   fs.mkdirSync(path.dirname(broken), { recursive: true })
@@ -204,7 +204,7 @@ const check = (name, ok, extra = '') => {
   await update({ providers: { 'claude-code': { executablePath: broken } } })
   await inv('provider:refresh', 'claude-code')
   await lib.until(async () => { const i = await info('claude-code'); return !i.checking && i.version === '2.1.998' && !i.catalog }, 20000)
-  check('the broken CLI is the one Hive uses, and it gave no models', (await info('claude-code')).version === '2.1.998' && !(await info('claude-code')).catalog, JSON.stringify((await info('claude-code')).version))
+  check('the broken CLI is the one Combwork uses, and it gave no models', (await info('claude-code')).version === '2.1.998' && !(await info('claude-code')).catalog, JSON.stringify((await info('claude-code')).version))
   // The picker: a connection's (Claude Code has no default model of its own, HI-1774); the list's source on its page.
   await editConnection(claudeAccount)
   const fallbackOffered = (await options(modelSelect)).map((o) => o.value)
@@ -220,7 +220,7 @@ const check = (name, ok, extra = '') => {
   await editConnection(claudeAccount)
   const shipped = await modelSelect.locator('optgroup').evaluateAll((gs) => gs.map((g) => g.label))
   await cancelConnection()
-  check("Reset to defaults: Hive's own list again", !(await update({})).providers['claude-code'].modelFallback && shipped[0] === 'Latest (follows new releases)', JSON.stringify(shipped))
+  check("Reset to defaults: Combwork's own list again", !(await update({})).providers['claude-code'].modelFallback && shipped[0] === 'Latest (follows new releases)', JSON.stringify(shipped))
   await openSection('Claude Code')
   // The effort fallback: renamed levels name the pickers' options.
   const effortsRow = page.locator('.fallback-table', { has: page.locator('.fallback-source', { hasText: /levels|per-model/ }) })
@@ -252,7 +252,7 @@ const check = (name, ok, extra = '') => {
   await prices.getByRole('button', { name: 'Reset to defaults' }).click()
   await lib.until(async () => !Object.keys((await update({})).providers['claude-code'].prices).length, HUNG_MS)
   const afterReset = await update({})
-  check("Reset to defaults: Hive's prices again", !Object.keys(afterReset.providers['claude-code'].prices).length && !afterReset.providers['claude-code'].pricesRemoved && (await prices.locator('tr', { hasText: 'claude-haiku-4-5' }).count()) === 1)
+  check("Reset to defaults: Combwork's prices again", !Object.keys(afterReset.providers['claude-code'].prices).length && !afterReset.providers['claude-code'].pricesRemoved && (await prices.locator('tr', { hasText: 'claude-haiku-4-5' }).count()) === 1)
 
   // The CLI back: its models again.
   await update({ providers: { 'claude-code': { executablePath: FAKE_CLAUDE } } })
@@ -289,7 +289,7 @@ const check = (name, ok, extra = '') => {
   await openSection('Codex')
   check('Codex: no Session costs choice', (await costRow.count()) === 0)
   const note = page.locator('.price-note')
-  check("…but a note that it doesn't report costs, with OpenAI's pricing link", !!(await lib.until(async () => (await note.count()) === 1, HUNG_MS)) && /Codex doesn't report costs, so Hive estimates them from these prices/.test(await note.innerText()) && (await note.locator('a', { hasText: "OpenAI's pricing" }).count()) === 1)
+  check("…but a note that it doesn't report costs, with OpenAI's pricing link", !!(await lib.until(async () => (await note.count()) === 1, HUNG_MS)) && /Codex doesn't report costs, so Combwork estimates them from these prices/.test(await note.innerText()) && (await note.locator('a', { hasText: "OpenAI's pricing" }).count()) === 1)
   check('…and a shipped model Codex no longer lists (gpt-5.3-codex) greyed', (await row('gpt-5.3-codex').locator('.badge', { hasText: "not in Codex's list" }).count()) === 1)
   await page.screenshot({ path: path.join(lib.WORK, 'models-prices-codex.png') })
 

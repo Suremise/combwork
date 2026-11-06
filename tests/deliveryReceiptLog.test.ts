@@ -1,5 +1,5 @@
-// A delivery's receipt and ack are logged (HI-2036): only "queued" was, so a message read through hive_inbox at once read
-// in hive.log as queued for hours (m637, Legible's lane). Once each, as saved, with how it was received, its agent's
+// A delivery's receipt and ack are logged (HI-2036): only "queued" was, so a message read through cw_inbox at once read
+// in combwork.log as queued for hours (m637, Legible's lane). Once each, as saved, with how it was received, its agent's
 // name as the user's text (left out of Copy Diagnostics), never what it says. The session layer is a stand-in.
 import { rmSync } from 'fs'
 import { join } from 'path'
@@ -18,7 +18,7 @@ vi.mock('../src/main/logger', async (original) => ({
 }))
 
 describe("a delivery's receipt and ack in the log (HI-2036)", async () => {
-  const base = tempDir('hive-deliverylog-')
+  const base = tempDir('cw-deliverylog-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   const dismiss = admitted(base)
   afterAll(async () => {
@@ -38,15 +38,15 @@ describe("a delivery's receipt and ack in the log (HI-2036)", async () => {
     setInbox: () => undefined
   })
   deliveries.setSenderCheckForTests(() => null)
-  const hive: DeliverySender = { kind: 'hive', name: 'Hive' }
-  const make = (body = 'Use the staging database.') => deliveries.createDelivery(alpha, { agentId: 'b1', agentName: 'B1', conversation: 's1', kind: 'rebrief', from: hive, body })
+  const combwork: DeliverySender = { kind: 'combwork', name: 'Combwork' }
+  const make = (body = 'Use the staging database.') => deliveries.createDelivery(alpha, { agentId: 'b1', agentName: 'B1', conversation: 's1', kind: 'rebrief', from: combwork, body })
   const lines = (id: string) => logged.lines.filter((l) => l.startsWith(`Delivery ${id} `))
   beforeEach(() => {
     alpha = join(base, `alpha${++n}`)
     logged.lines.length = 0
   })
 
-  it('received through hive_inbox and acked: a line each, with how it was received; never what it says', async () => {
+  it('received through cw_inbox and acked: a line each, with how it was received; never what it says', async () => {
     const r = await make()
     await deliveries.readInbox(alpha, 'b1')
     await deliveries.ackDeliveries(alpha, 'b1', [r.id])

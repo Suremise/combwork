@@ -56,7 +56,7 @@ function sampleValues(message: string): Record<string, string | number> {
   return out
 }
 
-const tree = (check: Partial<UnusedWorktree['check']>, branch: string | null = 'hive/b4'): UnusedWorktree => ({ path: 'D:/w/.worktrees/b4', branch, check: { removable: false, into: 'main', ...check } }) as UnusedWorktree
+const tree = (check: Partial<UnusedWorktree['check']>, branch: string | null = 'cw/b4'): UnusedWorktree => ({ path: 'D:/w/.worktrees/b4', branch, check: { removable: false, into: 'main', ...check } }) as UnusedWorktree
 
 describe('the workspace area', () => {
   it('has its messages, each with a note for translators, all under workspace.', () => {
@@ -123,7 +123,7 @@ describe('the sentences once built by hand read as before, in English', () => {
     expect(unusedSummary([tree({ removable: true }), tree({ ahead: 1 })])).toBe('2 unused worktrees (1 merged)')
     expect(unusedWorkNotice([tree({ ahead: 1 })])).toBe("1 unused worktree has work that isn't on main")
     expect(lostLines({ path: 'D:/x', branch: null, into: null, ahead: 1, dirty: 2 })).toEqual(['1 commit on no branch (only its detached HEAD has it)', '2 uncommitted files in D:/x', 'the files git ignores in its folder (build output, copied .env files)'])
-    expect(CHANGES_ABOUT.unused('hive')).toBe('Worktrees no agent of hive works in: open one to see its changes and merge them, or remove it.')
+    expect(CHANGES_ABOUT.unused('alpha')).toBe('Worktrees no agent of alpha works in: open one to see its changes and merge them, or remove it.')
     expect(CHANGES_ABOUT.unusedTip('main')).toMatch(/^Kept when their agent was removed \(by hand, or when a template's agents replaced it\), .*Loading a template gives none of them to its agents\. Those merged into main and clean can go with their branches; the others hold work that is nowhere else\.$/)
     expect(CHANGES_ABOUT.unusedTip(null)).not.toMatch(/merged into/)
     // #1562: 1.0's templates make agents without worktrees, so loading one gives no unused worktree back.
@@ -134,25 +134,25 @@ describe('the sentences once built by hand read as before, in English', () => {
     expect(changeOutcome('add', { started: false, cancelled: true }, null).message).toBe('The administrator prompt was declined: nothing changed.')
     expect(changeOutcome('add', { started: false, error: 'no shell' }, null).message).toBe("Windows couldn't start the administrator prompt: no shell")
     expect(changeOutcome('add', { started: true }, { ok: true, listed: true, exclusions: ['D:\\w'], requested: ['D:\\w'] }).message).toBe('Defender no longer scans this folder.')
-    expect(changeOutcome('remove', { started: true }, { ok: true, listed: true, exclusions: [], requested: ['D:\\a', 'D:\\b'] }).message).toBe('Removed 2 exclusions Hive added.')
+    expect(changeOutcome('remove', { started: true }, { ok: true, listed: true, exclusions: [], requested: ['D:\\a', 'D:\\b'] }).message).toBe('Removed 2 exclusions Combwork added.')
     expect(changeOutcome('add', { started: true }, { ok: true, listed: true, exclusions: [], requested: ['D:\\a'] }).message).toBe("Defender accepted the change but doesn't list one folder: your organisation's settings probably override local exclusions.")
     expect(folderPlan({ root: 'D:\\', trees: null, tests: null }, [])[0].unsafe).toBe('a whole drive')
     expect(tr(KIND_LABEL.worktrees)).toBe('Its worktrees')
   })
 })
 
-describe("what Hive works out follows the window's language; what agents read doesn't", () => {
+describe("what Combwork works out follows the window's language; what agents read doesn't", () => {
   it('worked out under the pseudo-locale', () => {
     setLanguage(PSEUDO_LANGUAGE, {})
     expect(keepAwakeText(2)).toMatch(/^\[/)
     expect(unusedState(tree({ removable: true }))).toMatch(/^\[.*main.*\]$/)
     expect(changeOutcome('add', { started: false, cancelled: true }, null).message).toMatch(/^\[/)
-    expect(reuseNote({ reused: true, branch: 'hive/b4', base: 'main', upTo: '66ce11b0' } as never, tr)).toMatch(/^\[.*hive\/b4.*66ce11b.*\]$/)
+    expect(reuseNote({ reused: true, branch: 'cw/b4', base: 'main', upTo: '66ce11b0' } as never, tr)).toMatch(/^\[.*cw\/b4.*66ce11b.*\]$/)
   })
 
   it("a reused worktree's note stays English for the Agent API and the log (no tr given)", () => {
     setLanguage(PSEUDO_LANGUAGE, {})
-    expect(reuseNote({ reused: true, branch: 'hive/b4', base: 'main', upTo: '66ce11b0' } as never)).toBe('reused hive/b4, brought up to main at 66ce11b')
-    expect(reuseNote({ reused: false, branch: 'hive/b4' } as never)).toBe("made a new worktree, leaving hive/b4's unused one as it is (not checked)")
+    expect(reuseNote({ reused: true, branch: 'cw/b4', base: 'main', upTo: '66ce11b0' } as never)).toBe('reused cw/b4, brought up to main at 66ce11b')
+    expect(reuseNote({ reused: false, branch: 'cw/b4' } as never)).toBe("made a new worktree, leaving cw/b4's unused one as it is (not checked)")
   })
 })

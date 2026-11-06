@@ -1,6 +1,6 @@
 // Per-agent MCP server access (#537), in the window: two agents in one project with two workspace MCP servers on. The
 // Agent Settings dialog gives Tester only one of them (MCP servers: Only these); Builder keeps all of the project's.
-// Each agent's launch (the fake Claude Code's --mcp-config) has only its own servers, the hive server in both; the
+// Each agent's launch (the fake Claude Code's --mcp-config) has only its own servers, the Combwork MCP server in both; the
 // agent's tooltip, the project's MCP tab and the Agent API's project status say who has what; the API changes the choice
 // and puts it back. Throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -27,15 +27,15 @@ const check = (name, ok, extra = '') => {
   fs.mkdirSync(proj, { recursive: true })
   fs.mkdirSync(shots, { recursive: true })
   // Two servers, both on in the workspace (they never run: the fake Claude Code only records its --mcp-config).
-  fs.mkdirSync(path.join(ws, '.hive', 'mcp'), { recursive: true })
-  for (const n of ['notes', 'sandbox']) fs.writeFileSync(path.join(ws, '.hive', 'mcp', `${n}.json`), JSON.stringify({ description: `The ${n} server`, command: 'node', args: [`${n}.js`] }))
-  fs.writeFileSync(path.join(ws, '.hive', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['notes', 'sandbox'] } }))
+  fs.mkdirSync(path.join(ws, '.combwork', 'mcp'), { recursive: true })
+  for (const n of ['notes', 'sandbox']) fs.writeFileSync(path.join(ws, '.combwork', 'mcp', `${n}.json`), JSON.stringify({ description: `The ${n} server`, command: 'node', args: [`${n}.js`] }))
+  fs.writeFileSync(path.join(ws, '.combwork', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['notes', 'sandbox'] } }))
   const env = lib.fakeClaude(userData, home, [proj, ws])
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  const { app, page, inv } = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT) } })
+  const { app, page, inv } = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT) } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)
@@ -89,7 +89,7 @@ const check = (name, ok, extra = '') => {
     const of = (name) => status?.agents?.find((a) => a.name === name)
     check('the API says what each agent gets', JSON.stringify([of('Builder')?.mcpServers, of('Builder')?.mcpChoice, of('Tester')?.mcpServers, of('Tester')?.mcpChoice]) === '[["notes","sandbox"],"all",["sandbox"],"only"]', JSON.stringify(status?.agents))
 
-    // --- Each launch has only its own servers, the hive server in both.
+    // --- Each launch has only its own servers, the Combwork MCP server in both.
     await inv('session:start', proj, { agentId: builder.id })
     await inv('session:start', proj, { agentId: tester.id })
     const launched = async (agentId) => {
@@ -98,14 +98,14 @@ const check = (name, ok, extra = '') => {
       for (const l of lines.map((x) => JSON.parse(x))) {
         const f = l.opts?.['--mcp-config']
         const servers = f && fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')).mcpServers : null
-        if (servers?.hive?.env?.HIVE_AGENT_ID === agentId) return servers
+        if (servers?.combwork?.env?.CW_AGENT_ID === agentId) return servers
       }
       return null
     }
     const b = await lib.until(() => launched(builder.id), 30000)
     const t = await lib.until(() => launched(tester.id), 30000)
-    check("Builder's launch has both servers", !!b?.notes && !!b?.sandbox && !!b?.hive, JSON.stringify(Object.keys(b ?? {})))
-    check("Tester's launch has only sandbox, and the hive server", !t?.notes && !!t?.sandbox && !!t?.hive, JSON.stringify(Object.keys(t ?? {})))
+    check("Builder's launch has both servers", !!b?.notes && !!b?.sandbox && !!b?.combwork, JSON.stringify(Object.keys(b ?? {})))
+    check("Tester's launch has only sandbox, and the Combwork MCP server", !t?.notes && !!t?.sandbox && !!t?.combwork, JSON.stringify(Object.keys(t ?? {})))
 
     // --- The API changes the choice; a running agent is told to restart; ["*"] puts all back.
     // Changes through the Agent API are the Assistant's: started (in the workspace folder) for its token.
@@ -118,8 +118,8 @@ const check = (name, ok, extra = '') => {
     const patched = await api('PATCH', `/v1/projects/demo/agents/Builder`, { mcpServers: ['notes'] })
     check('the API gives Builder only notes', patched.status === 200 && JSON.stringify(patched.body?.mcpServers) === '["notes"]', JSON.stringify(patched))
     check('and the running Builder needs a restart for it', !!(await lib.until(async () => (await inv('workspace:refresh')).projects.find((p) => p.name === 'demo').agents.find((a) => a.id === builder.id)?.restartNeeded, HUNG_MS)))
-    const bad = await api('PATCH', `/v1/projects/demo/agents/Builder`, { mcpServers: ['hive'] })
-    check('the hive server is not one to choose', bad.status === 400 && /always given/.test(bad.body?.error ?? ''), JSON.stringify(bad))
+    const bad = await api('PATCH', `/v1/projects/demo/agents/Builder`, { mcpServers: ['combwork'] })
+    check('the Combwork MCP server is not one to choose', bad.status === 400 && /always given/.test(bad.body?.error ?? ''), JSON.stringify(bad))
     const back = await api('PATCH', `/v1/projects/demo/agents/Builder`, { mcpServers: ['*'] })
     check('["*"] gives it all again', back.status === 200 && !('mcpServers' in (back.body ?? {})), JSON.stringify(back.body))
 

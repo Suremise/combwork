@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react'
 import { parseDocRef } from '@shared/docRefs'
-import type { HiveRequests } from '@shared/api'
+import type { CombworkRequests } from '@shared/api'
 import type { ContextProblem } from '@shared/types'
 import { fmt, msg, tr } from '@shared/i18n'
 import { call, errorMessage } from '../api'
 import { openFileLink } from '../fileLinks'
 import { get, set, showView, useLanguage } from '../store'
 import { Markdown, Modal } from './ui'
+import { CW_DIR } from '@shared/defaults'
 
-type Section = Awaited<ReturnType<HiveRequests['docs:section']>>
+type Section = Awaited<ReturnType<CombworkRequests['docs:section']>>
 
 const M = {
   open: msg({ id: 'board.context.open', defaultMessage: 'Open in Files', description: "Button in the doc section viewer (a card's Read first reference, #818): opens the project's file in the Files tab, at the section." }),
@@ -31,7 +32,7 @@ export const problemLines = (problems: readonly ContextProblem[]): string[] =>
   problems.map((p) => `${p.ref}: ${tr(PROBLEM, { why: p.problem, closest: p.closest?.length ? fmt.list(p.closest.map((s) => `#${s}`)) : 'none' })}`) // i18n-ignore: a reference and its message, joined
 
 /**
- * A card's Read first reference (#818), read: the section (the whole document when it names no heading) in Hive's
+ * A card's Read first reference (#818), read: the section (the whole document when it names no heading) in Combwork's
  * Markdown, with a button to open its file in the Files tab at the heading, or a shared note in Shared Notes.
  */
 export function DocRefViewer({ projectPath, docRef, onClose, onOpen }: { projectPath: string | null; docRef: string; onClose: () => void; onOpen?: (go: () => void) => void }) {
@@ -57,7 +58,7 @@ export function DocRefViewer({ projectPath, docRef, onClose, onOpen }: { project
       const ws = get().workspace?.path
       if (!ws) return
       showView('notes')
-      set({ selectedNote: [ws, '.hive', 'shared', ...parsed.path.slice('shared:'.length).split('/')].join('\\') })
+      set({ selectedNote: [ws, CW_DIR, 'shared', ...parsed.path.slice('shared:'.length).split('/')].join('\\') })
     } else if (projectPath) openFileLink({ project: projectPath, agentId: null, root: projectPath, rel: parsed.path }, line)
   }
   // The viewer closes, then whatever it opens over (the card dialog) closes the way it does, asking about unsaved edits:

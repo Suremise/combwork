@@ -42,7 +42,7 @@ const NO_RUNS: ProgressRun[] = []
 const SHOW_THE_AGENT: Msg = msg({ id: 'board.progress.showTheAgent', defaultMessage: 'Show the agent', description: 'Button and tooltip on a Progress panel run: shows the agent that ran it.' })
 const WAITING: Msg = msg({ id: 'board.progress.waiting', defaultMessage: 'waiting', description: "A run's state on its bar (accessible value) and in a list of runs (build (waiting)), lower case: it waits (for a test slot, say)." })
 
-const IN_COPY: Msg = msg({ id: 'board.progress.inCopy', defaultMessage: 'in {copy}', description: "Under a run's agent in the Progress panel, after its card and revision (\"AM-12 · a3f2c1d · in copy-2\"): the run ran in that review or check copy (a folder Hive keeps at exactly the card's revision). {copy} is its name, such as copy-2: keep it as it is." })
+const IN_COPY: Msg = msg({ id: 'board.progress.inCopy', defaultMessage: 'in {copy}', description: "Under a run's agent in the Progress panel, after its card and revision (\"AM-12 · a3f2c1d · in copy-2\"): the run ran in that review or check copy (a folder Combwork keeps at exactly the card's revision). {copy} is its name, such as copy-2: keep it as it is." })
 
 const OPEN_CARD: Msg = msg({ id: 'board.progress.openCard', defaultMessage: 'Open {card}', description: "Tooltip of a run's card in the Progress panel (under its agent): opens the card. {card} is the card's reference (#1061)." })
 
@@ -53,10 +53,10 @@ type StoreState = Parameters<typeof findProject>[0]
 
 /** Why a run's agent can't be shown, or null when it can: the Assistant, or a project agent that is still there. */
 function whyNotShown(s: StoreState, r: ProgressRun): string | null {
-  if (r.source === 'assistant') return s.workspace?.assistant ? null : tr(msg({ id: 'board.progress.noAssistant', defaultMessage: 'The Assistant is not in this workspace.', description: "Why a Progress panel run's agent can't be shown: the run is the Hive Assistant's, and this workspace has none." }))
+  if (r.source === 'assistant') return s.workspace?.assistant ? null : tr(msg({ id: 'board.progress.noAssistant', defaultMessage: 'The Assistant is not in this workspace.', description: "Why a Progress panel run's agent can't be shown: the run is the Combwork Assistant's, and this workspace has none." }))
   if (r.source === 'api') return tr(msg({ id: 'board.progress.scriptRun', defaultMessage: 'A script reported it, not an agent: there is no agent to show.', description: "Why a Progress panel run's agent can't be shown: a script reported the run." }))
-  // Hive's setup run in a review copy names the agent whose lease held it (HI-1710): shown as that agent's.
-  if (r.source === 'hive' && !r.agentId) return tr(msg({ id: 'board.progress.hiveRun', defaultMessage: 'Hive’s merge queue ran it, not an agent: there is no agent to show.', description: "Why a Progress panel run's agent can't be shown: Hive's merge queue ran the run itself (a merge check on a card's merged result; glossary 2.5: merge queue)." }))
+  // Combwork's setup run in a review copy names the agent whose lease held it (HI-1710): shown as that agent's.
+  if (r.source === 'combwork' && !r.agentId) return tr(msg({ id: 'board.progress.combworkRun', defaultMessage: 'Combwork’s merge queue ran it, not an agent: there is no agent to show.', description: "Why a Progress panel run's agent can't be shown: Combwork's merge queue ran the run itself (a merge check on a card's merged result; glossary 2.5: merge queue)." }))
   const p = r.projectPath ? findProject(s, r.projectPath) : null
   if (!p) return tr(msg({ id: 'board.progress.projectGone', defaultMessage: 'Its project is no longer in this workspace.', description: "Why a Progress panel run's agent can't be shown: its project was removed from the workspace." }))
   if (!r.agentId || !p.agents.some((a) => a.id === r.agentId)) return tr(msg({ id: 'board.progress.agentGone', defaultMessage: '{agent} has been removed from {project}.', description: "Why a Progress panel run's agent can't be shown: the agent ({agent}) was removed from its project ({project})." }), { agent: runAgentName(r, tr), project: p.name })
@@ -92,7 +92,7 @@ function showRunAgent(r: ProgressRun): void {
 /** What showing a run's agent is called, for its button. */
 const showLabel = (r: ProgressRun): string =>
   r.source === 'assistant'
-    ? tr(msg({ id: 'board.progress.showAssistant', defaultMessage: 'Show the Assistant, which ran {run}', description: "Accessible name of the button showing the Hive Assistant, which ran a Progress panel run ({run}: the run's title)." }), { run: r.title })
+    ? tr(msg({ id: 'board.progress.showAssistant', defaultMessage: 'Show the Assistant, which ran {run}', description: "Accessible name of the button showing the Combwork Assistant, which ran a Progress panel run ({run}: the run's title)." }), { run: r.title })
     : tr(msg({ id: 'board.progress.showAgent', defaultMessage: 'Show {agent}, which ran {run}', description: "Accessible name of the button showing the agent ({agent}) that ran a Progress panel run ({run}: the run's title)." }), { agent: runAgentName(r, tr), run: r.title })
 
 /** This window's runs, kept in step with main's tellings (#1108): the others stay the same objects. */
@@ -320,7 +320,7 @@ export function ProgressPanel() {
           (merging.length || shownQueue.length ? (
             <MergesList queues={shownQueue} slots={merging} runs={runs} now={now} projectName={nameOf} showProject={multi} stepOf={stepOf} agent={filter.agent ?? null} />
           ) : (
-            <div className="pane-empty progress-empty">{tr(msg({ id: 'board.progress.noMerges', defaultMessage: "No merge is going on. While Hive's merge queue merges a card, or an agent merges its branch, it shows here with its cards, its checks and what waits.", description: "The Progress panel's Merges tab when nothing is merging: no merge queue shows, and no agent holds the merge slot. Glossary 2.5: merge queue." }))}</div>
+            <div className="pane-empty progress-empty">{tr(msg({ id: 'board.progress.noMerges', defaultMessage: "No merge is going on. While Combwork's merge queue merges a card, or an agent merges its branch, it shows here with its cards, its checks and what waits.", description: "The Progress panel's Merges tab when nothing is merging: no merge queue shows, and no agent holds the merge slot. Glossary 2.5: merge queue." }))}</div>
           ))}
         {tab === 'runs' && <RunsTab runs={shown} lanes={shownLanes} now={now} detail={detail} toggle={toggle} filter={runsFilter} setFilter={setRunsFilter} />}
         {tab === 'lanes' && <LanesSection lanes={shownLanes} all={lanes} width={width} runs={shown} full />}
@@ -376,7 +376,7 @@ const FIND_RUNS = msg({ id: 'board.runs.search', defaultMessage: 'Find runs', de
 
 /**
  * The Runs tab (#1309): its filters (failures only, a lane, an agent, words to find), what is running now, then every
- * run Hive keeps that ended, by day, each day by card (HI-1701), a run and its retries the same day folded into one line
+ * run Combwork keeps that ended, by day, each day by card (HI-1701), a run and its retries the same day folded into one line
  * that opens to each.
  */
 function RunsTab({ runs, lanes, now, detail, toggle, filter, setFilter }: { runs: ProgressRun[]; lanes: Lane[]; now: number; detail: string | null; toggle: (id: string) => void; filter: RunsFilter; setFilter: (f: RunsFilter) => void }) {
@@ -384,7 +384,7 @@ function RunsTab({ runs, lanes, now, detail, toggle, filter, setFilter }: { runs
   const words = (r: ProgressRun): string => [runAgentName(r, tr), r.title, r.command ?? '', r.card ? cardName(r.card) : ''].join('\n')
   // The lane chosen, as it is now (its cards change between cards, #1270); one no longer shown leaves the filter.
   const lane = filter.lane ? lanes.find((l) => l.id === filter.lane) : undefined
-  // Agents by their runs' names; Hive's own runs as "Hive (merge queue)" (#1356 item 5).
+  // Agents by their runs' names; Combwork's own runs as "Combwork (merge queue)" (#1356 item 5).
   const agents = [...new Map(runs.filter((r) => runAgentKey(r)).map((r) => [runAgentKey(r)!, runAgentName(r, tr)])).entries()].sort((a, b) => a[1].localeCompare(b[1]))
   const goneLane = !!filter.lane && !lane
   const goneAgent = !!filter.agent && !agents.some(([id]) => id === filter.agent)
@@ -442,7 +442,7 @@ function RunsTab({ runs, lanes, now, detail, toggle, filter, setFilter }: { runs
       </div>
       {/* What runs or waits now, scrolling in the room the dock leaves (HI-1925). */}
       <div className="progress-body progress-runs-body">
-        {!running.length && !days.length && !filtered && <div className="pane-empty progress-empty">{tr(msg({ id: 'board.runs.none', defaultMessage: 'No runs yet. When an agent runs tests or a build with progress reporting, every run shows here, kept by day.', description: "The Progress panel's Runs tab when Hive has no runs." }))}</div>}
+        {!running.length && !days.length && !filtered && <div className="pane-empty progress-empty">{tr(msg({ id: 'board.runs.none', defaultMessage: 'No runs yet. When an agent runs tests or a build with progress reporting, every run shows here, kept by day.', description: "The Progress panel's Runs tab when Combwork has no runs." }))}</div>}
         {running.map((r) => (
           <RunRow key={r.id} run={r} now={now} open={detail === r.id} onToggle={toggle} />
         ))}
@@ -523,7 +523,7 @@ function RunsDock({ days, running, filtered, runningCards, now, opened, flip }: 
       )}
       <div className="progress-runs-dock-list" style={{ height: shown * PITCH_PX }}>
         {!days.length && !filtered ? (
-          <div className="faint progress-runs-none">{tr(msg({ id: 'board.runs.noFinished', defaultMessage: 'No finished runs', description: "The Progress panel's Runs tab's finished runs (docked at the bottom) when Hive has none." }))}</div>
+          <div className="faint progress-runs-none">{tr(msg({ id: 'board.runs.noFinished', defaultMessage: 'No finished runs', description: "The Progress panel's Runs tab's finished runs (docked at the bottom) when Combwork has none." }))}</div>
         ) : (
           <>
             <section className="progress-runs-day" data-day={0} aria-label={todayLabel}>
@@ -558,7 +558,7 @@ function CardGroup({ group: c, running, now, opened, flip }: { group: CardRuns; 
   const key = useStore((s) => (c.card ? cardLabelOf(s, c.card) : null))
   const title = useStore((s) => (c.card ? (s.tasks.find((t) => t.number === c.card)?.title ?? null) : null))
   const look = cardLook(c)
-  const name = key ?? tr(msg({ id: 'board.runs.other', defaultMessage: 'Other', description: "The heading of a group in the Progress panel's Runs tab, where runs are grouped by card: the runs for no card (Hive's own, the user's scripts) follow." }))
+  const name = key ?? tr(msg({ id: 'board.runs.other', defaultMessage: 'Other', description: "The heading of a group in the Progress panel's Runs tab, where runs are grouped by card: the runs for no card (Combwork's own, the user's scripts) follow." }))
   const at = c.last.finishedAt ?? c.last.updatedAt
   return (
     <section className={cx('progress-card-runs', look, 'open')} data-card-runs={c.card ?? 'other'} aria-label={name}>
@@ -596,7 +596,7 @@ function CardGroup({ group: c, running, now, opened, flip }: { group: CardRuns; 
 
 /**
  * A run tried several times the same day (#1309), or the merge queue's checks of a card (HI-1701): one line, as a run's,
- * "B1 cardwork ×4 · 2 failed, then passed" or "Hive (merge queue) lint, typecheck"; opened, each run.
+ * "B1 cardwork ×4 · 2 failed, then passed" or "Combwork (merge queue) lint, typecheck"; opened, each run.
  */
 function GroupRow({ group: g, cardKey, now, opened, flip }: { group: RunGroup; cardKey: string | null; now: number; opened: ReadonlySet<string>; flip: (id: string) => void }) {
   const [open, setOpen] = useState(false)
@@ -684,11 +684,11 @@ const RunRow = memo(function RunRow({ run: r, now, open, onToggle }: { run: Prog
         {r.state === 'stopped' && <Icon name="circle-slash" className="progress-stopped" />}
         {look === 'waiting' && <Icon name="clock" className="progress-waiting-icon" />}
         <DetailsToggle run={r} open={open} onToggle={onToggle} />
-        {/* An isolated check (#1435): its processes are its copy's, so Hive can end them all. */}
+        {/* An isolated check (#1435): its processes are its copy's, so Combwork can end them all. */}
         {r.copy && r.source === 'agent' && isOpenRun(r) && (
           <IconButton
             icon="debug-stop"
-            title={tr(msg({ id: 'board.progress.stopIsolated', defaultMessage: 'Stop this check and everything it started', description: "Tooltip of the button stopping an isolated check (a check an agent runs in a copy of its own) in the Progress panel: Hive ends its command and every process it started." }))}
+            title={tr(msg({ id: 'board.progress.stopIsolated', defaultMessage: 'Stop this check and everything it started', description: "Tooltip of the button stopping an isolated check (a check an agent runs in a copy of its own) in the Progress panel: Combwork ends its command and every process it started." }))}
             onClick={(e) => {
               e.stopPropagation()
               void call('progress:stop', r.id)
@@ -814,7 +814,7 @@ function DetailsToggle({ run: r, open, onToggle }: { run: ProgressRun; open: boo
 function RunWho({ run: r, project }: { run: ProgressRun; project: string | null }) {
   return (
     <>
-      {r.source === 'assistant' ? <AssistantMark /> : r.source === 'hive' ? <Icon name="git-merge" /> : r.provider ? <ProviderIcon provider={r.provider} /> : <Icon name="terminal" />}
+      {r.source === 'assistant' ? <AssistantMark /> : r.source === 'combwork' ? <Icon name="git-merge" /> : r.provider ? <ProviderIcon provider={r.provider} /> : <Icon name="terminal" />}
       <span className="progress-agent">{runAgentName(r, tr)}</span>
       {project && <span className="faint progress-project">{project}</span>}
     </>
@@ -873,7 +873,7 @@ function copy(what: 'command' | 'details', text: string): void {
 }
 
 /**
- * Everything Hive has for a run (`runDetails`): what ran (the command, copyable), who, when, how long, its steps, state,
+ * Everything Combwork has for a run (`runDetails`): what ran (the command, copyable), who, when, how long, its steps, state,
  * exit code and the log the reporter named, which opens or shows in its folder (#251); the failure's summary; all of it
  * copyable at once (Copy details, to paste to the Assistant); and its agent, to show.
  */

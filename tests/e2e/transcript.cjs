@@ -1,5 +1,5 @@
-// Sessions tab transcript viewer, in a throwaway profile and workspace. Transcripts are Hive backups
-// (.hive/sessions), so nothing is read from or written to the real ~/.claude. Never touches the clipboard.
+// Sessions tab transcript viewer, in a throwaway profile and workspace. Transcripts are Combwork backups
+// (.combwork/sessions), so nothing is read from or written to the real ~/.claude. Never touches the clipboard.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
@@ -13,7 +13,7 @@ const shots = path.join(scratch, 'tshots')
 for (const d of [userData, ws, shots]) fs.rmSync(d, { recursive: true, force: true })
 fs.mkdirSync(shots, { recursive: true })
 const proj = path.join(ws, 'demo')
-const sessDir = path.join(proj, '.hive', 'sessions')
+const sessDir = path.join(proj, '.combwork', 'sessions')
 fs.mkdirSync(sessDir, { recursive: true })
 
 const A = '11111111-aaaa-bbbb-cccc-000000000001' // synthetic
@@ -32,7 +32,7 @@ const lines = [
   { type: 'user', timestamp: t(3), message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'tu2', content: 'The file has been updated.' }] } },
   { type: 'assistant', requestId: 'r3', timestamp: t(4), message: { model: 'claude-opus-5-5', content: [{ type: 'text', text: 'Fixed: the zebra test now waits long enough.' }], usage: usage(2500) } },
   { type: 'user', timestamp: t(5), message: { role: 'user', content: [{ type: 'text', text: '[Image #1] this is what I see now' }, { type: 'image', source: { type: 'base64', media_type: 'image/png', data: png } }] } },
-  { type: 'user', isMeta: true, timestamp: t(5), message: { role: 'user', content: [{ type: 'text', text: `[Image: source: ${proj}\\.hive\\images\\${A}\\shot.png]` }] } },
+  { type: 'user', isMeta: true, timestamp: t(5), message: { role: 'user', content: [{ type: 'text', text: `[Image: source: ${proj}\\.combwork\\images\\${A}\\shot.png]` }] } },
   { type: 'assistant', requestId: 'r4', timestamp: t(6), message: { model: 'claude-opus-5-5', content: [{ type: 'text', text: 'That looks right.' }], usage: usage(3000) } },
   { type: 'system', subtype: 'compact_boundary', timestamp: t(7), content: 'Conversation compacted', compactMetadata: { trigger: 'manual', preTokens: 180000, postTokens: 9000 } },
   { type: 'user', isCompactSummary: true, isVisibleInTranscriptOnly: true, timestamp: t(7), message: { role: 'user', content: 'Summary:\n1. We fixed the zebra test by waiting longer.' } },
@@ -59,7 +59,7 @@ fs.writeFileSync(path.join(sessDir, `${A}.jsonl`), lines.map((l) => JSON.stringi
   fs.writeFileSync(path.join(sessDir, `${B}.jsonl`), out.map((l) => JSON.stringify(l)).join('\n') + '\n')
 }
 fs.writeFileSync(
-  path.join(proj, '.hive', 'sessions.json'),
+  path.join(proj, '.combwork', 'sessions.json'),
   JSON.stringify({ version: 1, sessions: [
     // Active just now: the suite appends to its backup as a running session's is (#1110: an ended one's is compressed).
     { id: A, agent: 'claude-code', name: 'Zebra test fix', createdAt: t(0), lastActiveAt: new Date().toISOString(), archived: false },
@@ -78,13 +78,13 @@ const becomes = async (fn) => !!(await lib.until(() => Promise.resolve().then(fn
 const text = (loc) => loc.textContent({ timeout: 1000 }).then((got) => got ?? '').catch(() => '')
 
 ;(async () => {
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => results.push(`PAGEERROR ${e.message}`))
   page.on('console', (m) => m.type() === 'error' && results.push(`CONSOLE ${m.text().slice(0, 200)}`))
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('demo', { exact: true }).first().click()
   await page.locator('.tab', { hasText: 'Sessions' }).click()
@@ -159,7 +159,7 @@ const text = (loc) => loc.textContent({ timeout: 1000 }).then((got) => got ?? ''
   check('search lists the matches under their session', hits >= 4, String(hits))
   await page.locator('.search-hit', { hasText: 'timed out' }).click()
   check('jumping to a tool hit expands it', await becomes(async () => (await page.locator('.tx-tool.open').count()) >= 1))
-  const highlights = () => page.evaluate(() => CSS.highlights.get('hive-search')?.size ?? 0)
+  const highlights = () => page.evaluate(() => CSS.highlights.get('cw-search')?.size ?? 0)
   check('matches highlighted', await becomes(async () => (await highlights()) > 0), String(await highlights()))
   await page.screenshot({ path: path.join(shots, '5-search-this.png') })
 
@@ -197,7 +197,7 @@ const text = (loc) => loc.textContent({ timeout: 1000 }).then((got) => got ?? ''
   await page.screenshot({ path: path.join(shots, '7-light.png') })
   await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
 
-  // Rename (the tag) and delete show on hover; deleting moves Hive's copy to the Recycle Bin and hides the session.
+  // Rename (the tag) and delete show on hover; deleting moves Combwork's copy to the Recycle Bin and hides the session.
   const row = page.locator('.session-row', { hasText: 'Zebra test fix' })
   await page.mouse.move(600, 5)
   check('row buttons are hidden until hover', !(await row.locator('.row-actions').isVisible()))
@@ -213,9 +213,9 @@ const text = (loc) => loc.textContent({ timeout: 1000 }).then((got) => got ?? ''
   await row.locator('.row-actions [aria-label="Delete session"]').click()
   await page.locator('.dialog-footer button', { hasText: /^Delete$/ }).click()
   check('the deleted session leaves the list', await becomes(async () => (await page.locator('.session-row', { hasText: 'Zebra test fix' }).count()) === 0))
-  check("Hive's copy is gone", await becomes(() => !fs.existsSync(path.join(sessDir, `${A}.jsonl`))))
+  check("Combwork's copy is gone", await becomes(() => !fs.existsSync(path.join(sessDir, `${A}.jsonl`))))
   const sessionsFile = () => sessionsOf(proj)
-  check('Hive remembers it as deleted', await becomes(() => { const f = sessionsFile(); return !f.sessions.some((s) => s.id === A) && f.deleted?.includes(A) }), JSON.stringify(sessionsFile().deleted))
+  check('Combwork remembers it as deleted', await becomes(() => { const f = sessionsFile(); return !f.sessions.some((s) => s.id === A) && f.deleted?.includes(A) }), JSON.stringify(sessionsFile().deleted))
   check('the list leaves it out', !(await inv('session:list', proj)).some((s) => s.id === A))
   const kept = (await inv('session:keptUsage', proj)).find((s) => s.id === A)
   check('what it used stays in the totals', !!kept?.deleted && kept.usage?.requests > 0 && Object.keys(kept.usage.days ?? {}).length > 0, JSON.stringify(kept && { requests: kept.usage?.requests }))

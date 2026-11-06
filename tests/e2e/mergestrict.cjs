@@ -1,8 +1,8 @@
-// Strict, G8 (#1352, SPEC §16.9.1 step 3; S55's strict part): a project set to "Hive merges" into `integration` (checked
+// Strict, G8 (#1352, SPEC §16.9.1 step 3; S55's strict part): a project set to "Combwork merges" into `integration` (checked
 // out in no folder) with Work is up to date with its target branch before it merges on, fake Claude Code agents acting
 // by their own tokens (one builder in the project folder, building each card on the slot its start lends, as 1.0 does:
 // #1573; one reviewer), the Assistant off.
-// - The form offers G8 beside G9 when Hive merges (screenshots of its row, both themes), and saves it.
+// - The form offers G8 beside G9 when Combwork merges (screenshots of its row, both themes), and saves it.
 // - The target moves after the review passed: the queue brings the reviewed revision up to date on its own ref
 //   (`Updated`, carried), merges it, and the card's slot is untouched (its HEAD and status).
 // - A conflict with the moved target: back to the builder (notUpToDate) with the file, its slot untouched; the
@@ -37,19 +37,19 @@ const who = ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.ident
 
 ;(async () => {
   q.prepare(fx)
-  const h = await q.startHive(fx, { port: PORT, keepOptions: true })
+  const h = await q.startCombwork(fx, { port: PORT, keepOptions: true })
   try {
     h.page.on('pageerror', (e) => check('no page errors', false, e.message))
     await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx) })
     const column = async (n) => (await h.card(n))?.column
     const facts = async (n, kind) => (await h.facts(n)).filter((x) => x.kind === kind)
 
-    // --- The form: G8 beside G9 while Hive merges; saved through the form.
+    // --- The form: G8 beside G9 while Combwork merges; saved through the form.
     await h.page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
     await h.page.locator('.git-sections [data-section="workflow"]').click()
     const section = h.page.locator('.workflow-form')
     const row = section.locator('.workflow-option[data-option="strict"]')
-    check('Version Control → Workflow offers G8 while Hive merges', !!(await waitHung(async () => (await row.count()) === 1)) && (await row.innerText()).includes('Work is up to date with its target branch before it merges'), await section.innerText().catch(() => ''))
+    check('Version Control → Workflow offers G8 while Combwork merges', !!(await waitHung(async () => (await row.count()) === 1)) && (await row.innerText()).includes('Work is up to date with its target branch before it merges'), await section.innerText().catch(() => ''))
     await row.scrollIntoViewIfNeeded()
     await row.locator('[role="switch"], input[type="checkbox"]').first().click()
     await section.getByRole('button', { name: 'Save…' }).click()
@@ -92,10 +92,10 @@ const who = ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.ident
     check('S55: merged: Done', !!(await waitHung(async () => (await column(one.n)) === 'done')), JSON.stringify(await h.kinds(one.n)))
     const [up] = await facts(one.n, 'Updated')
     check('…brought up to date by the queue: Updated, carried, from the reviewed revision', up?.data?.carried === true && up.data.from === one.revision && up.data.how === 'mergedTarget', JSON.stringify(up))
-    check('…the update contains the moved target, and the merge brought it in, naming both revisions', ancestor(one.moved, up?.data?.to ?? one.revision) && lib.git(fx.alpha, ['log', '-1', '--format=%B', 'integration']).includes(`Hive-Updated: ${up?.data?.to}`) && lib.git(fx.alpha, ['log', '-1', '--format=%B', 'integration']).includes(`Hive-Revision: ${one.revision}`))
+    check('…the update contains the moved target, and the merge brought it in, naming both revisions', ancestor(one.moved, up?.data?.to ?? one.revision) && lib.git(fx.alpha, ['log', '-1', '--format=%B', 'integration']).includes(`Combwork-Updated: ${up?.data?.to}`) && lib.git(fx.alpha, ['log', '-1', '--format=%B', 'integration']).includes(`Combwork-Revision: ${one.revision}`))
     check("…the card's slot untouched: its HEAD and status as they were, its branch at the reviewed revision", untouched(one) && lib.git(fx.alpha, ['rev-parse', `refs/heads/${(await h.facts(one.n)).find((x) => x.kind === 'Started')?.data?.line}`]).trim() === one.revision)
     const key1 = (await h.card(one.n)).key
-    check("…its entry's update ref dropped with the outcome", !!(await waitHung(() => !lib.git(fx.alpha, ['for-each-ref', '--format=%(refname)', 'refs/hive/queue/']).includes(`${key1}-e`))))
+    check("…its entry's update ref dropped with the outcome", !!(await waitHung(() => !lib.git(fx.alpha, ['for-each-ref', '--format=%(refname)', 'refs/cw/queue/']).includes(`${key1}-e`))))
 
     // --- A conflict with the moved target: returned (notUpToDate) with the file; the builder resumes in its slot.
     const two = await build('Two', { 'a.txt': 'one\ntwo by the builder\nthree\n' }, () => q.commitOn(fx, 'integration', { 'a.txt': 'one\nTWO by someone\nthree\n' }, 'someone changes a.txt'))

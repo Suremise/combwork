@@ -1,5 +1,5 @@
 // What the page did lately (HI-1775): each store update, by the parts it changed, the same in a row counted as one, so a
-// long task's line in hive.log names the updates made in it (windowHealth.ts). It imports nothing (the store imports it).
+// long task's line in combwork.log names the updates made in it (windowHealth.ts). It imports nothing (the store imports it).
 
 const marks: { at: number; what: string; n: number }[] = []
 

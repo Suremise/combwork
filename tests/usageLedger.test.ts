@@ -192,7 +192,7 @@ describe("a session's rows", () => {
   })
 })
 
-const card = (number: number, held: TaskCard['held']): TaskCard => ({ number, title: `#${number}`, description: '', project: 'hive', agent: null, column: 'done', order: 1, labels: [], blocked: null, blockedBy: [], links: [], comments: [], history: [], archived: false, createdAt: at(0), createdBy: 'You', updatedAt: at(0), held })
+const card = (number: number, held: TaskCard['held']): TaskCard => ({ number, title: `#${number}`, description: '', project: 'demo', agent: null, column: 'done', order: 1, labels: [], blocked: null, blockedBy: [], links: [], comments: [], history: [], archived: false, createdAt: at(0), createdBy: 'You', updatedAt: at(0), held })
 
 describe('the cards a session held', () => {
   it("are its agent's holds by id, each role apart, shared while it held several", () => {

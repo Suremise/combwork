@@ -10,7 +10,7 @@ import * as electron from 'electron'
 import type { RetryWait } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-retry-wait-')
+const base = tempDir('cw-retry-wait-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -83,16 +83,16 @@ const prompt = (turn: string) => ({ hook_event_name: 'UserPromptSubmit', turn_id
 
 describe("a CLI's retry wait in a session (HI-1972)", () => {
   beforeAll(async () => {
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    mkdirSync(join(wsPath, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    mkdirSync(join(wsPath, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     vi.spyOn(providerService, 'refresh').mockResolvedValue([])
     s.notify = () => {}
   })
   afterEach(() => {
-    delete process.env.HIVE_TEST_SILENT_MS
+    delete process.env.CW_TEST_SILENT_MS
   })
   afterAll(async () => {
     s.live.clear()
@@ -174,7 +174,7 @@ describe("a CLI's retry wait in a session (HI-1972)", () => {
   it('turns an unknown turn back to running while the wait is current, and an expired one lets silence go on', async () => {
     const { st, l, reads } = agent('unknown')
     await hook(st, prompt('t1'))
-    process.env.HIVE_TEST_SILENT_MS = '1000'
+    process.env.CW_TEST_SILENT_MS = '1000'
     l.ledger.heard = Date.now() - 5000
     s.checkSilence(p, st.agentId)
     await settled(st)

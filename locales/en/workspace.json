@@ -4,16 +4,20 @@
     "description": "The activity bar (left edge): the Activity view (what every project's agents run now, HI-1664)."
   },
   "workspace.activity.assistant": {
-    "defaultMessage": "Hive Assistant",
-    "description": "The activity bar (left edge): the Hive Assistant's view. Hive's name stays as it is."
+    "defaultMessage": "Assistant",
+    "description": "The activity bar (left edge): the Combwork Assistant's view. Combwork's name stays as it is."
   },
   "workspace.activity.board": {
     "defaultMessage": "Task Board",
     "description": "The activity bar (left edge): the task board."
   },
+  "workspace.activity.dialects": {
+    "defaultMessage": "Dialects",
+    "description": "The activity bar (left edge): the Dialects view (HI-2444), where the wording Combwork gives agents is tuned per model and CLI. Glossary: dialect."
+  },
   "workspace.activity.docs": {
     "defaultMessage": "Documentation",
-    "description": "The activity bar (left edge): Hive's documentation."
+    "description": "The activity bar (left edge): Combwork's documentation."
   },
   "workspace.activity.forYou": {
     "defaultMessage": "{n, plural, one {# card waits for you} other {# cards wait for you}}",
@@ -49,11 +53,11 @@
   },
   "workspace.activity.settings": {
     "defaultMessage": "Settings",
-    "description": "The activity bar (left edge): Hive's settings."
+    "description": "The activity bar (left edge): Combwork's settings."
   },
   "workspace.activity.skills": {
     "defaultMessage": "Skills",
-    "description": "The activity bar (left edge): the workspace's Hive skills."
+    "description": "The activity bar (left edge): the workspace's Combwork skills."
   },
   "workspace.activity.templates": {
     "defaultMessage": "Templates",
@@ -84,7 +88,7 @@
     "description": "Settings → Workspace's antivirus: a button."
   },
   "workspace.antivirus.addMessage": {
-    "defaultMessage": "Hive asks Defender to exclude:",
+    "defaultMessage": "Combwork asks Defender to exclude:",
     "description": "Confirmation before Add Exclusions; the folders follow."
   },
   "workspace.antivirus.addTitle": {
@@ -192,28 +196,28 @@
     "description": "Settings → Workspace's antivirus table: a column."
   },
   "workspace.antivirus.goneHint": {
-    "defaultMessage": "{n, plural, one {Hive excluded this folder, which no longer exists (moved or deleted). Remove Hive’s Exclusions… takes it away too.} other {Hive excluded these folders, which no longer exist (moved or deleted). Remove Hive’s Exclusions… takes them away too.}}",
-    "description": "Settings → Workspace's antivirus, under the heading for exclusions of folders that are gone. {n}: how many. Remove Hive’s Exclusions… is the button below: use its name as shown."
+    "defaultMessage": "{n, plural, one {Combwork excluded this folder, which no longer exists (moved or deleted). Remove Combwork’s Exclusions… takes it away too.} other {Combwork excluded these folders, which no longer exist (moved or deleted). Remove Combwork’s Exclusions… takes them away too.}}",
+    "description": "Settings → Workspace's antivirus, under the heading for exclusions of folders that are gone. {n}: how many. Remove Combwork’s Exclusions… is the button below: use its name as shown."
   },
   "workspace.antivirus.goneTitle": {
-    "defaultMessage": "Hive’s exclusions of folders that are gone",
-    "description": "Settings → Workspace's antivirus: a heading over a list of exclusions Hive added for folders that no longer exist (moved or deleted)."
+    "defaultMessage": "Combwork’s exclusions of folders that are gone",
+    "description": "Settings → Workspace's antivirus: a heading over a list of exclusions Combwork added for folders that no longer exist (moved or deleted)."
   },
   "workspace.antivirus.hidden": {
-    "defaultMessage": "Defender shows its exclusions only to administrators, so Hive can’t see them without asking.",
+    "defaultMessage": "Defender shows its exclusions only to administrators, so Combwork can’t see them without asking.",
     "description": "Settings → Workspace's antivirus: why the states are unknown."
   },
   "workspace.antivirus.holdsHome": {
     "defaultMessage": "it is, or holds, your home folder, profile or a system folder",
-    "description": "Why Hive won't offer to exclude a folder from Defender's scans. Lower case: it follows the folder."
+    "description": "Why Combwork won't offer to exclude a folder from Defender's scans. Lower case: it follows the folder."
   },
   "workspace.antivirus.kindTests": {
-    "defaultMessage": "Hive’s test area (developing Hive)",
-    "description": "A folder Defender may scan: where Hive's own tests work, offered to people developing Hive."
+    "defaultMessage": "Combwork’s test area (developing Combwork)",
+    "description": "A folder Defender may scan: where Combwork's own tests work, offered to people developing Combwork."
   },
   "workspace.antivirus.kindWorkspace": {
     "defaultMessage": "The workspace (every project in it)",
-    "description": "A folder Defender may scan, as the antivirus status and Hive's offer name it."
+    "description": "A folder Defender may scan, as the antivirus status and Combwork's offer name it."
   },
   "workspace.antivirus.kindWorktrees": {
     "defaultMessage": "Its worktrees",
@@ -229,11 +233,11 @@
   },
   "workspace.antivirus.moveNotApplied": {
     "defaultMessage": "Defender accepted the change but {missing, plural, one {one folder isn't} other {# folders aren't}} as asked: your organisation's settings probably override local exclusions.",
-    "description": "After Repair moved Hive's Defender exclusions (#1302), when Defender doesn't show the change for some folders (an old one still listed, or a new one missing)."
+    "description": "After Repair moved Combwork's Defender exclusions (#1302), when Defender doesn't show the change for some folders (an old one still listed, or a new one missing)."
   },
   "workspace.antivirus.moved": {
-    "defaultMessage": "Moved Hive's exclusions to the new folders: {removed, plural, =0 {none removed} one {# removed} other {# removed}}, {added, plural, =0 {none added (Defender already skips them)} one {# added} other {# added}}.",
-    "description": "After Repair moved Hive's Defender exclusions from a moved workspace's old folders to its new ones (#1302): how many old ones were removed and new ones added."
+    "defaultMessage": "Moved Combwork's exclusions to the new folders: {removed, plural, =0 {none removed} one {# removed} other {# removed}}, {added, plural, =0 {none added (Defender already skips them)} one {# added} other {# added}}.",
+    "description": "After Repair moved Combwork's Defender exclusions from a moved workspace's old folders to its new ones (#1302): how many old ones were removed and new ones added."
   },
   "workspace.antivirus.noPrompt": {
     "defaultMessage": "Windows couldn't start the administrator prompt{hasError, select, yes {: {error}} other {.}}",
@@ -252,12 +256,12 @@
     "description": "Settings → Workspace's antivirus status."
   },
   "workspace.antivirus.noneLeft": {
-    "defaultMessage": "None of Hive’s exclusions is in Defender’s list any more: nothing removed.",
+    "defaultMessage": "None of Combwork’s exclusions is in Defender’s list any more: nothing removed.",
     "description": "After Remove exclusions, when there was nothing to remove."
   },
   "workspace.antivirus.notAbsolute": {
     "defaultMessage": "not an absolute folder",
-    "description": "Why Hive won't offer to exclude a folder from Defender's scans. Lower case: it follows the folder."
+    "description": "Why Combwork won't offer to exclude a folder from Defender's scans. Lower case: it follows the folder."
   },
   "workspace.antivirus.notApplied": {
     "defaultMessage": "Defender accepted the change but {action, select, add {doesn't list {missing, plural, one {one folder} other {# folders}}} other {still lists {missing, plural, one {one folder} other {# folders}}}}: your organisation's settings probably override local exclusions.",
@@ -265,14 +269,14 @@
   },
   "workspace.antivirus.notOffered": {
     "defaultMessage": "Not offered: {why}.",
-    "description": "Under a folder Hive won't offer to exclude; {why} says why (lower case)."
+    "description": "Under a folder Combwork won't offer to exclude; {why} says why (lower case)."
   },
   "workspace.antivirus.notWindows": {
     "defaultMessage": "Only Windows has Defender to check.",
     "description": "Settings → Workspace's antivirus status, on another system."
   },
   "workspace.antivirus.other": {
-    "defaultMessage": "Another antivirus is active ({names}). Hive can only manage Microsoft Defender: see its own settings for exclusions.",
+    "defaultMessage": "Another antivirus is active ({names}). Combwork can only manage Microsoft Defender: see its own settings for exclusions.",
     "description": "Settings → Workspace's antivirus status ({names}: the other antivirus products)."
   },
   "workspace.antivirus.policy": {
@@ -280,7 +284,7 @@
     "description": "After a change to Defender's exclusions; {error} is Defender's own message."
   },
   "workspace.antivirus.realTimeOff": {
-    "defaultMessage": "Microsoft Defender is the antivirus, with real-time protection off: it doesn’t slow Hive’s work now.",
+    "defaultMessage": "Microsoft Defender is the antivirus, with real-time protection off: it doesn’t slow Combwork’s work now.",
     "description": "Settings → Workspace's antivirus status."
   },
   "workspace.antivirus.realTimeOn": {
@@ -292,31 +296,31 @@
     "description": "After a change to Defender's exclusions; {error} is Defender's own message."
   },
   "workspace.antivirus.reminder": {
-    "defaultMessage": "A reminder: Microsoft Defender still scans every file Hive’s work creates or opens ({why}). Excluding the workspace’s folders, or a Dev Drive, can make builds, tests and git much faster. Hive reminds you at most once a day; Don’t Ask Again stops it for this workspace.",
+    "defaultMessage": "A reminder: Microsoft Defender still scans every file Combwork’s work creates or opens ({why}). Excluding the workspace’s folders, or a Dev Drive, can make builds, tests and git much faster. Combwork reminds you at most once a day; Don’t Ask Again stops it for this workspace.",
     "description": "The suggestion, as a reminder ({why}: why now). Don’t Ask Again is its button."
+  },
+  "workspace.antivirus.removeCombwork": {
+    "defaultMessage": "Remove Combwork’s Exclusions…",
+    "description": "Settings → Workspace's antivirus: a button."
   },
   "workspace.antivirus.removeConfirm": {
     "defaultMessage": "Remove Exclusions",
-    "description": "Remove Hive's Exclusions' confirmation: its button."
+    "description": "Remove Combwork's Exclusions' confirmation: its button."
   },
   "workspace.antivirus.removeDetail": {
-    "defaultMessage": "Defender scans these folders again. Exclusions Hive didn’t add stay. Windows asks for administrator rights once.",
-    "description": "Confirmation before Remove Hive's Exclusions."
-  },
-  "workspace.antivirus.removeHive": {
-    "defaultMessage": "Remove Hive’s Exclusions…",
-    "description": "Settings → Workspace's antivirus: a button."
+    "defaultMessage": "Defender scans these folders again. Exclusions Combwork didn’t add stay. Windows asks for administrator rights once.",
+    "description": "Confirmation before Remove Combwork's Exclusions."
   },
   "workspace.antivirus.removeMessage": {
-    "defaultMessage": "Hive asks Defender to scan again:",
-    "description": "Confirmation before Remove Hive's Exclusions; the folders follow."
+    "defaultMessage": "Combwork asks Defender to scan again:",
+    "description": "Confirmation before Remove Combwork's Exclusions; the folders follow."
   },
   "workspace.antivirus.removeTitle": {
-    "defaultMessage": "Remove the exclusions Hive added?",
-    "description": "Confirmation before Remove Hive's Exclusions."
+    "defaultMessage": "Remove the exclusions Combwork added?",
+    "description": "Confirmation before Remove Combwork's Exclusions."
   },
   "workspace.antivirus.removed": {
-    "defaultMessage": "Removed {count, plural, one {the exclusion} other {# exclusions}} Hive added.",
+    "defaultMessage": "Removed {count, plural, one {the exclusion} other {# exclusions}} Combwork added.",
     "description": "After Remove exclusions: done."
   },
   "workspace.antivirus.review": {
@@ -328,16 +332,16 @@
     "description": "Settings → Workspace's antivirus table: a column (whether Defender scans the folder)."
   },
   "workspace.antivirus.slowLine": {
-    "defaultMessage": "Microsoft Defender scans this workspace’s folders as Hive’s work changes them, which slows builds, tests and git. <link>Antivirus scanning…</link>",
+    "defaultMessage": "Microsoft Defender scans this workspace’s folders as Combwork’s work changes them, which slows builds, tests and git. <link>Antivirus scanning…</link>",
     "description": "Performance, when Defender likely slows the workspace. <link> opens Settings → Workspace's antivirus."
   },
   "workspace.antivirus.stateAdded": {
-    "defaultMessage": "Added by Hive",
-    "description": "A folder's scanning: Hive added its exclusion (not confirmed)."
+    "defaultMessage": "Added by Combwork",
+    "description": "A folder's scanning: Combwork added its exclusion (not confirmed)."
   },
   "workspace.antivirus.stateAddedTip": {
-    "defaultMessage": "Hive added this exclusion; Defender hides its list without administrator rights, so it isn’t confirmed.",
-    "description": "Tooltip on Added by Hive."
+    "defaultMessage": "Combwork added this exclusion; Defender hides its list without administrator rights, so it isn’t confirmed.",
+    "description": "Tooltip on Added by Combwork."
   },
   "workspace.antivirus.stateExcluded": {
     "defaultMessage": "Excluded",
@@ -352,7 +356,7 @@
     "description": "A folder's scanning: Defender scans it."
   },
   "workspace.antivirus.stateScannedTip": {
-    "defaultMessage": "Defender scans every file Hive’s work creates or opens here.",
+    "defaultMessage": "Defender scans every file Combwork’s work creates or opens here.",
     "description": "Tooltip on Scanned."
   },
   "workspace.antivirus.stateUnknown": {
@@ -368,11 +372,11 @@
     "description": "The suggestion's title, as a reminder."
   },
   "workspace.antivirus.suggestion": {
-    "defaultMessage": "Microsoft Defender scans every file Hive’s work creates or opens ({why}). Excluding the workspace’s folders, or a Dev Drive, can make builds, tests and git much faster.",
+    "defaultMessage": "Microsoft Defender scans every file Combwork’s work creates or opens ({why}). Excluding the workspace’s folders, or a Dev Drive, can make builds, tests and git much faster.",
     "description": "The suggestion ({why}: why now)."
   },
   "workspace.antivirus.testCopy": {
-    "defaultMessage": "A test copy of Hive: it never asks Defender.",
+    "defaultMessage": "A test copy of Combwork: it never asks Defender.",
     "description": "Settings → Workspace's antivirus status, in a test copy."
   },
   "workspace.antivirus.title": {
@@ -380,7 +384,7 @@
     "description": "The suggestion's title."
   },
   "workspace.antivirus.unavailable": {
-    "defaultMessage": "Hive couldn’t read Defender’s status{hasError, select, yes {: {error}} other {.}}",
+    "defaultMessage": "Combwork couldn’t read Defender’s status{hasError, select, yes {: {error}} other {.}}",
     "description": "Settings → Workspace's antivirus status when it couldn't be read ({error}: why)."
   },
   "workspace.antivirus.unknownError": {
@@ -393,26 +397,26 @@
   },
   "workspace.antivirus.unresolved": {
     "defaultMessage": "its real location couldn’t be established",
-    "description": "Why Hive won't offer to exclude a folder from Defender's scans (a link it couldn't follow). Lower case: it follows the folder."
+    "description": "Why Combwork won't offer to exclude a folder from Defender's scans (a link it couldn't follow). Lower case: it follows the folder."
   },
   "workspace.antivirus.wholeDrive": {
     "defaultMessage": "a whole drive",
-    "description": "Why Hive won't offer to exclude a folder from Defender's scans. Lower case: it follows the folder."
+    "description": "Why Combwork won't offer to exclude a folder from Defender's scans. Lower case: it follows the folder."
   },
   "workspace.antivirus.wholeShare": {
     "defaultMessage": "a whole network share",
-    "description": "Why Hive won't offer to exclude a folder from Defender's scans. Lower case: it follows the folder."
+    "description": "Why Combwork won't offer to exclude a folder from Defender's scans. Lower case: it follows the folder."
   },
   "workspace.antivirus.whyAgents": {
     "defaultMessage": "several agents are running",
-    "description": "Why Hive suggests exclusions now. Lower case: it goes in brackets in the suggestion."
+    "description": "Why Combwork suggests exclusions now. Lower case: it goes in brackets in the suggestion."
   },
   "workspace.antivirus.whySlow": {
     "defaultMessage": "a long command just ran",
-    "description": "Why Hive suggests exclusions now. Lower case: it goes in brackets in the suggestion."
+    "description": "Why Combwork suggests exclusions now. Lower case: it goes in brackets in the suggestion."
   },
   "workspace.antivirus.wontAsk": {
-    "defaultMessage": "Hive won’t suggest it again for this workspace",
+    "defaultMessage": "Combwork won’t suggest it again for this workspace",
     "description": "What the suggestion to exclude the workspace from Defender's scanning says after Don't Ask Again (HI-2320), in place of its buttons."
   },
   "workspace.banners.more": {
@@ -444,28 +448,28 @@
     "description": "The Changes tab's Unused worktrees page, at the top, in one sentence (#1314; its ⓘ says where they come from and what Remove does)."
   },
   "workspace.changes.aboutUnusedTip": {
-    "defaultMessage": "Kept when their agent was removed (by hand, or when a template's agents replaced it), or made outside Hive (by an agent's own git worktree add, say). Loading a template gives none of them to its agents.{known, select, yes { Those merged into {into} and clean can go with their branches; the others hold work that is nowhere else.} other {}}",
+    "defaultMessage": "Kept when their agent was removed (by hand, or when a template's agents replaced it), or made outside Combwork (by an agent's own git worktree add, say). Loading a template gives none of them to its agents.{known, select, yes { Those merged into {into} and clean can go with their branches; the others hold work that is nowhere else.} other {}}",
     "description": "The ⓘ beside Unused worktrees' heading: where they come from and which can be removed. Keep git worktree add as it is; {into} is the main branch."
   },
   "workspace.closeCommand.close": {
     "defaultMessage": "Close",
-    "description": "The button of the close command panel after the command failed: closes the panel, and Hive goes on closing."
+    "description": "The button of the close command panel after the command failed: closes the panel, and Combwork goes on closing."
   },
   "workspace.closeCommand.command": {
     "defaultMessage": "The command",
-    "description": "In the close command panel: the accessible name of the command Hive runs, shown as it runs."
+    "description": "In the close command panel: the accessible name of the command Combwork runs, shown as it runs."
   },
   "workspace.closeCommand.dontWait": {
     "defaultMessage": "Don't wait",
-    "description": "A button of the close command panel: Hive stops waiting for the command and goes on closing; the command keeps running."
+    "description": "A button of the close command panel: Combwork stops waiting for the command and goes on closing; the command keeps running."
   },
   "workspace.closeCommand.dontWaitNote": {
-    "defaultMessage": "If you don't wait, Hive goes on and the command keeps running by itself.",
+    "defaultMessage": "If you don't wait, Combwork goes on and the command keeps running by itself.",
     "description": "Under the close command panel's Don't wait button."
   },
   "workspace.closeCommand.drain": {
-    "defaultMessage": "Hive couldn't finish saving this workspace in time, so your command didn't run.",
-    "description": "The heading of the close command panel when Hive didn't run the user's command because saving the workspace as it closed took too long."
+    "defaultMessage": "Combwork couldn't finish saving this workspace in time, so your command didn't run.",
+    "description": "The heading of the close command panel when Combwork didn't run the user's command because saving the workspace as it closed took too long."
   },
   "workspace.closeCommand.elapsed": {
     "defaultMessage": "Running for {time}",
@@ -473,46 +477,46 @@
   },
   "workspace.closeCommand.failed": {
     "defaultMessage": "{kind, select, quit {Your quit command failed} other {Your close command failed}}",
-    "description": "The heading of the close command panel when the user's command failed with no exit code. kind quit: the command run as Hive quits; other: as a workspace closes."
+    "description": "The heading of the close command panel when the user's command failed with no exit code. kind quit: the command run as Combwork quits; other: as a workspace closes."
   },
   "workspace.closeCommand.failedExit": {
     "defaultMessage": "{kind, select, quit {Your quit command failed (exit code {code})} other {Your close command failed (exit code {code})}}",
-    "description": "The heading of the close command panel when the user's command ended with an error. {code} is its exit code (a number, kept as it is). kind quit: the command run as Hive quits; other: as a workspace closes."
+    "description": "The heading of the close command panel when the user's command ended with an error. {code} is its exit code (a number, kept as it is). kind quit: the command run as Combwork quits; other: as a workspace closes."
   },
   "workspace.closeCommand.output": {
     "defaultMessage": "The command's last output",
     "description": "In the close command panel: the accessible name of the command's last lines of output."
   },
   "workspace.closeCommand.runner": {
-    "defaultMessage": "Hive stopped following your command before it ended. It may still be running.",
-    "description": "The heading of the close command panel when Hive lost track of the command it was running (it may carry on by itself)."
+    "defaultMessage": "Combwork stopped following your command before it ended. It may still be running.",
+    "description": "The heading of the close command panel when Combwork lost track of the command it was running (it may carry on by itself)."
   },
   "workspace.closeCommand.running": {
     "defaultMessage": "{kind, select, quit {Running your quit command…} other {Running your close command…}}",
-    "description": "The heading of the panel Hive shows while it runs the user's own command as a workspace closes (kind other: Settings → Workspace → When this workspace closes, run) or as Hive quits (kind quit: Settings → General → When Hive quits, run)."
+    "description": "The heading of the panel Combwork shows while it runs the user's own command as a workspace closes (kind other: Settings → Workspace → When this workspace closes, run) or as Combwork quits (kind quit: Settings → General → When Combwork quits, run)."
   },
   "workspace.closeCommand.saving": {
     "defaultMessage": "Waiting for {workspace} to finish saving…",
-    "description": "The heading of the close command panel's first step: Hive waits until it has finished writing the closing workspace's files before it runs the user's close command (or When Hive quits, run). {workspace} is the workspace's folder name."
+    "description": "The heading of the close command panel's first step: Combwork waits until it has finished writing the closing workspace's files before it runs the user's close command (or When Combwork quits, run). {workspace} is the workspace's folder name."
   },
   "workspace.closeCommand.savingNote": {
-    "defaultMessage": "Hive finishes saving first. If you skip, it won't run your close command or the \"When Hive quits\" one.",
-    "description": "Under the close command panel's Skip the command button, while Hive is still closing and saving the workspace (the close always finishes). The quoted When Hive quits names the setting Settings → General → When Hive quits, run: keep it in quotes."
+    "defaultMessage": "Combwork finishes saving first. If you skip, it won't run your close command or the \"When Combwork quits\" one.",
+    "description": "Under the close command panel's Skip the command button, while Combwork is still closing and saving the workspace (the close always finishes). The quoted When Combwork quits names the setting Settings → General → When Combwork quits, run: keep it in quotes."
   },
   "workspace.closeCommand.skip": {
     "defaultMessage": "Skip the command",
-    "description": "A button of the close command panel while Hive is still closing and saving the workspace: the user's close command (and When Hive quits, run) won't run; Hive still finishes closing the workspace."
+    "description": "A button of the close command panel while Combwork is still closing and saving the workspace: the user's close command (and When Combwork quits, run) won't run; Combwork still finishes closing the workspace."
   },
   "workspace.closeCommand.skipped": {
-    "defaultMessage": "Skipped: the command won't run. Hive is finishing closing the workspace.",
-    "description": "In the close command panel once the user has pressed Skip the command, while Hive finishes closing the workspace (the panel then goes)."
+    "defaultMessage": "Skipped: the command won't run. Combwork is finishing closing the workspace.",
+    "description": "In the close command panel once the user has pressed Skip the command, while Combwork finishes closing the workspace (the panel then goes)."
   },
   "workspace.closeCommand.spawn": {
     "defaultMessage": "{kind, select, quit {Your quit command couldn't be started} other {Your close command couldn't be started}}",
-    "description": "The heading of the close command panel when Windows couldn't start the user's command (the system's reason follows). kind quit: the command run as Hive quits; other: as a workspace closes."
+    "description": "The heading of the close command panel when Windows couldn't start the user's command (the system's reason follows). kind quit: the command run as Combwork quits; other: as a workspace closes."
   },
   "workspace.commands.dontWaitNote": {
-    "defaultMessage": "{point, select, open {If you don't wait, Hive goes on and the rest run by themselves, in order. Agents start now.} other {If you don't wait, Hive goes on and the rest run by themselves, in order.}}",
+    "defaultMessage": "{point, select, open {If you don't wait, Combwork goes on and the rest run by themselves, in order. Agents start now.} other {If you don't wait, Combwork goes on and the rest run by themselves, in order.}}",
     "description": "Under the commands dialog's Don't wait button (HI-1954): the commands not finished keep running in the background, one after another. point open: the workspace is opening, and its agents, held back meanwhile, can start now."
   },
   "workspace.commands.exitCode": {
@@ -548,8 +552,8 @@
     "description": "A button of the commands dialog when one of the user's commands failed (HI-1954): runs that command again."
   },
   "workspace.commands.running": {
-    "defaultMessage": "{point, select, open {Running your commands for when {workspace} opens…} close {Running your commands for when {workspace} closes…} quit {Running your commands for when Hive quits…} other {Running your command…}}",
-    "description": "The heading of the dialog Hive shows while it runs the user's own commands (HI-1954): as a workspace opens or closes ({workspace}: its folder name), as Hive quits, or one the user ran by hand (other)."
+    "defaultMessage": "{point, select, open {Running your commands for when {workspace} opens…} close {Running your commands for when {workspace} closes…} quit {Running your commands for when Combwork quits…} other {Running your command…}}",
+    "description": "The heading of the dialog Combwork shows while it runs the user's own commands (HI-1954): as a workspace opens or closes ({workspace}: its folder name), as Combwork quits, or one the user ran by hand (other)."
   },
   "workspace.commands.skipContinue": {
     "defaultMessage": "Skip it and continue",
@@ -569,7 +573,7 @@
   },
   "workspace.commands.stopHere": {
     "defaultMessage": "Stop here",
-    "description": "A button of the commands dialog when one of the user's commands failed (HI-1954): runs none of the rest of the list; Hive goes on (a workspace opening still starts its agents)."
+    "description": "A button of the commands dialog when one of the user's commands failed (HI-1954): runs none of the rest of the list; Combwork goes on (a workspace opening still starts its agents)."
   },
   "workspace.commands.waiting": {
     "defaultMessage": "waiting",
@@ -577,7 +581,7 @@
   },
   "workspace.docs.about": {
     "defaultMessage": "About {app}",
-    "description": "The Documentation view: opens About ({app}: Hive's name)."
+    "description": "The Documentation view: opens About ({app}: Combwork's name)."
   },
   "workspace.docs.api": {
     "defaultMessage": "Agent API",
@@ -593,15 +597,15 @@
   },
   "workspace.docs.license": {
     "defaultMessage": "License",
-    "description": "The Documentation view: Hive's licence page, and its heading."
+    "description": "The Documentation view: Combwork's licence page, and its heading."
   },
   "workspace.docs.notices": {
     "defaultMessage": "Third-Party Notices",
-    "description": "The Documentation view: a page (the licences of what Hive includes)."
+    "description": "The Documentation view: a page (the licences of what Combwork includes)."
   },
   "workspace.docs.seeAlso": {
     "defaultMessage": "See also the [third-party notices]({file}).",
-    "description": "Under Hive's licence (Markdown: a link, its words in the brackets; {file} is the page it opens)."
+    "description": "Under Combwork's licence (Markdown: a link, its words in the brackets; {file} is the page it opens)."
   },
   "workspace.docs.shortcuts": {
     "defaultMessage": "Keyboard Shortcuts",
@@ -621,26 +625,26 @@
   },
   "workspace.folder.slot": {
     "defaultMessage": "{carried, select, yes {{name} (carried, {agent})} other {{hasAgent, select, yes {{hasCards, select, yes {{name} ({agent}, {cards})} other {{name} ({agent})}}} other {{hasCards, select, yes {{name} ({cards})} other {{name}}}}}}}",
-    "description": "What a project's slot is called in Repair's plan and report and in Remove Project (#1447): its name ({name}, such as slot-b), the agent it is lent to ({agent}) and the cards it held ({cards}, keys such as AM-12, a list). carried: an agent's own worktree from before 1.0, kept as a slot for it (carried is Hive's term: translate it as a short word)."
+    "description": "What a project's slot is called in Repair's plan and report and in Remove Project (#1447): its name ({name}, such as slot-b), the agent it is lent to ({agent}) and the cards it held ({cards}, keys such as AM-12, a list). carried: an agent's own worktree from before 1.0, kept as a slot for it (carried is Combwork's term: translate it as a short word)."
   },
   "workspace.mcpView.builtIn": {
-    "defaultMessage": "Built-in Hive MCP server",
-    "description": "The heading of the built-in hive server's page."
+    "defaultMessage": "Built-in Combwork MCP server",
+    "description": "The heading of the built-in combwork server's page."
   },
   "workspace.mcpView.builtInText": {
-    "defaultMessage": "Every session started from Hive gets a <code>hive</code> MCP server that connects to the Agent API{hasUrl, select, yes { at {url}} other {}}. Turn it off in Settings → Agent API.",
-    "description": "The built-in server's page. <code> is the server's name: keep hive as it is."
+    "defaultMessage": "Every session started from Combwork gets a <code>combwork</code> MCP server that connects to the Agent API{hasUrl, select, yes { at {url}} other {}}. Turn it off in Settings → Agent API.",
+    "description": "The built-in server's page. <code> is the server's name: keep combwork as it is (HI-2463)."
   },
   "workspace.mcpView.deleteServer": {
     "defaultMessage": "Delete server",
     "description": "A button over an MCP server's definition."
   },
   "workspace.mcpView.dir": {
-    "defaultMessage": "Use {variable} to point at server code stored in `.hive/mcp`.",
-    "description": "An MCP server's view, beside its editor (Markdown). {variable} is ${HIVE_MCP_DIR}."
+    "defaultMessage": "Use {variable} to point at server code stored in `.combwork/mcp`.",
+    "description": "An MCP server's view, beside its editor (Markdown). {variable} is ${CW_MCP_DIR}."
   },
   "workspace.mcpView.format": {
-    "defaultMessage": "**Format** — one server per file, in Claude Code's .mcp.json format (Hive converts it for other providers) plus an optional `description`:",
+    "defaultMessage": "**Format** — one server per file, in Claude Code's .mcp.json format (Combwork converts it for other providers) plus an optional `description`:",
     "description": "An MCP server's view, beside its editor (Markdown: keep ** and the backticks). An example follows."
   },
   "workspace.mcpView.invalidJson": {
@@ -685,42 +689,42 @@
   },
   "workspace.mcpView.toolHandover": {
     "defaultMessage": "Write a handover note for a future session",
-    "description": "What the built-in server's hive_create_handover tool does."
+    "description": "What the built-in server's cw_create_handover tool does."
   },
   "workspace.mcpView.toolListNotes": {
-    "defaultMessage": "List notes in .hive/shared",
-    "description": "What the built-in server's hive_list_shared_notes tool does."
+    "defaultMessage": "List notes in .combwork/shared",
+    "description": "What the built-in server's cw_list_shared_notes tool does."
   },
   "workspace.mcpView.toolListProjects": {
     "defaultMessage": "List projects and their session status",
-    "description": "What the built-in server's hive_list_projects tool does."
+    "description": "What the built-in server's cw_list_projects tool does."
   },
   "workspace.mcpView.toolListSkills": {
     "defaultMessage": "List skills available to a project",
-    "description": "What the built-in server's hive_list_skills tool does."
+    "description": "What the built-in server's cw_list_skills tool does."
   },
   "workspace.mcpView.toolNotify": {
-    "defaultMessage": "Show a notification to you in Hive",
-    "description": "What the built-in server's hive_notify tool does."
+    "defaultMessage": "Show a notification to you in Combwork",
+    "description": "What the built-in server's cw_notify tool does."
   },
   "workspace.mcpView.toolProjectStatus": {
     "defaultMessage": "Status and settings of one project",
-    "description": "What the built-in server's hive_project_status tool does."
+    "description": "What the built-in server's cw_project_status tool does."
   },
   "workspace.mcpView.toolReadNote": {
     "defaultMessage": "Read a shared note",
-    "description": "What the built-in server's hive_read_shared_note tool does."
+    "description": "What the built-in server's cw_read_shared_note tool does."
   },
   "workspace.mcpView.toolSessionUsage": {
     "defaultMessage": "Token use, cache and compactions for a session",
-    "description": "What the built-in server's hive_session_usage tool does."
+    "description": "What the built-in server's cw_session_usage tool does."
   },
   "workspace.mcpView.toolWriteNote": {
     "defaultMessage": "Create, overwrite or append to a shared note",
-    "description": "What the built-in server's hive_write_shared_note tool does."
+    "description": "What the built-in server's cw_write_shared_note tool does."
   },
   "workspace.mcpView.tryAsking": {
-    "defaultMessage": "Try asking an agent: *\"Write a handover for the next session using the hive tools.\"*",
+    "defaultMessage": "Try asking an agent: *\"Write a handover for the next session using the Combwork tools.\"*",
     "description": "The built-in server's page, under its tools (Markdown: keep the * around the example prompt)."
   },
   "workspace.mcpView.whatItDoes": {
@@ -733,7 +737,7 @@
   },
   "workspace.move.branchesBanner": {
     "defaultMessage": "{count, plural, one {An agent's branch is still named after an old folder; Repair renames it.} other {# agents' branches are still named after an old folder; Repair renames them.}}",
-    "description": "The banner when agents' git branches are named after where the workspace or project was (hive/<workspace>/<project>/<agent>)."
+    "description": "The banner when agents' git branches are named after where the workspace or project was (cw/<workspace>/<project>/<agent>)."
   },
   "workspace.move.cancel": {
     "defaultMessage": "Cancel",
@@ -745,7 +749,7 @@
   },
   "workspace.move.cardsBanner": {
     "defaultMessage": "{lines}, which was renamed or moved: the board still lists them under the old name.",
-    "description": "The banner when cards are listed under a project's old name ({lines}: \"9 cards of hive-website belong to website\", several separated by ;)."
+    "description": "The banner when cards are listed under a project's old name ({lines}: \"9 cards of demo-website belong to website\", several separated by ;)."
   },
   "workspace.move.cardsLine": {
     "defaultMessage": "{total, plural, one {{what} of {from} belongs to {to}} other {{what} of {from} belong to {to}}}",
@@ -793,7 +797,7 @@
   },
   "workspace.move.owner": {
     "defaultMessage": "{owner, select, project {the project} assistant {the Assistant} other {{agent}'s worktree}}",
-    "description": "Repair's plan: whose folder a coding agent's conversations are copied for, put into its lines (\"… for {of}\", workspace.move.copy and copyNone): the project, the Hive Assistant, or an agent's worktree ({agent}: its name). Word it to fit there in your translation of those lines."
+    "description": "Repair's plan: whose folder a coding agent's conversations are copied for, put into its lines (\"… for {of}\", workspace.move.copy and copyNone): the project, the Combwork Assistant, or an agent's worktree ({agent}: its name). Word it to fit there in your translation of those lines."
   },
   "workspace.move.pending": {
     "defaultMessage": "A worktree of {projects} was made again at a new folder, and not everything has followed it yet.",
@@ -804,8 +808,8 @@
     "description": "After Repair; what failed follows."
   },
   "workspace.move.profileBanner": {
-    "defaultMessage": "Some of Hive's records of this workspace couldn't follow it from its old folder yet.",
-    "description": "The banner when the output Hive keeps of the workspace's close command couldn't all be moved from its old folder's records after a move (HI-2007); Repair… tries again."
+    "defaultMessage": "Some of Combwork's records of this workspace couldn't follow it from its old folder yet.",
+    "description": "The banner when the output Combwork keeps of the workspace's close command couldn't all be moved from its old folder's records after a move (HI-2007); Repair… tries again."
   },
   "workspace.move.projects": {
     "defaultMessage": "{count, plural, one {The project {name} was moved to another folder.} other {# projects were moved to another folder.}}",
@@ -880,12 +884,12 @@
     "description": "A button over an open shared note."
   },
   "workspace.notes.select": {
-    "defaultMessage": "Select a note, or create one. Shared notes live in <code>.hive/shared</code> and are available to every project and agent.",
-    "description": "The Shared Notes view with no note selected. <code> is a folder: keep .hive/shared as it is."
+    "defaultMessage": "Select a note, or create one. Shared notes live in <code>.combwork/shared</code> and are available to every project and agent.",
+    "description": "The Shared Notes view with no note selected. <code> is a folder: keep .combwork/shared as it is."
   },
   "workspace.notes.workspaceNotes.assistant": {
     "defaultMessage": "the Assistant",
-    "description": "In the warning that the Workspace notes note is cut for some: the Hive Assistant, which gets the whole note."
+    "description": "In the warning that the Workspace notes note is cut for some: the Combwork Assistant, which gets the whole note."
   },
   "workspace.notes.workspaceNotes.cut": {
     "defaultMessage": "Over {max, number} bytes for {who}: they get it cut, and are told to read the note for the rest.",
@@ -905,31 +909,31 @@
   },
   "workspace.notes.workspaceNotes.title": {
     "defaultMessage": "Workspace notes",
-    "description": "The title of the shared note Hive gives every agent when it starts (notes about this machine), over its editor. Keep Workspace notes in English: it is the note's name (its file is Workspace notes.md) and what agents are told."
+    "description": "The title of the shared note Combwork gives every agent when it starts (notes about this machine), over its editor. Keep Workspace notes in English: it is the note's name (its file is Workspace notes.md) and what agents are told."
   },
   "workspace.opening.adoption": {
     "defaultMessage": "Adopting its cards and projects…",
-    "description": "A step of upgrading a Hive 0.9 workspace to 1.0: its projects get their workflow options and its cards are taken on by 1.0's workflow (or marked as from before 1.0)."
+    "description": "A step of upgrading a 0.9 workspace to 1.0: its projects get their workflow options and its cards are taken on by 1.0's workflow (or marked as from before 1.0)."
   },
   "workspace.opening.projects": {
     "defaultMessage": "Reading its projects…",
-    "description": "A step of opening a workspace: Hive reads its projects."
+    "description": "A step of opening a workspace: Combwork reads its projects."
   },
   "workspace.opening.slots": {
     "defaultMessage": "Adopting its agents' worktrees as slots…",
-    "description": "A step of upgrading a Hive 0.9 workspace to 1.0: each agent's own worktree becomes a slot (a working folder Hive lends to cards)."
+    "description": "A step of upgrading a 0.9 workspace to 1.0: each agent's own worktree becomes a slot (a working folder Combwork lends to cards)."
   },
   "workspace.opening.title": {
     "defaultMessage": "Opening {name}",
-    "description": "The heading of the view Hive shows while it opens a workspace ({name}: the workspace's folder name)."
+    "description": "The heading of the view Combwork shows while it opens a workspace ({name}: the workspace's folder name)."
   },
   "workspace.opening.upgrade": {
     "defaultMessage": "Upgrading its board. The 0.9 board is kept as a backup.",
-    "description": "A step of upgrading a Hive 0.9 workspace to 1.0: its task board is converted to 1.0's format, after a copy of it as it was is kept."
+    "description": "A step of upgrading a 0.9 workspace to 1.0: its task board is converted to 1.0's format, after a copy of it as it was is kept."
   },
   "workspace.opening.upgradingTitle": {
-    "defaultMessage": "Upgrading {name} to Hive 1.0",
-    "description": "The heading of the view Hive shows while it upgrades a workspace made by Hive 0.9 ({name}: its folder name), after the user said yes to the upgrade."
+    "defaultMessage": "Upgrading {name} to Combwork 1.0",
+    "description": "The heading of the view Combwork shows while it upgrades a workspace made by version 0.9 ({name}: its folder name), after the user said yes to the upgrade."
   },
   "workspace.opening.wait": {
     "defaultMessage": "Another workspace can be opened in this window once this is done.",
@@ -949,7 +953,7 @@
   },
   "workspace.overview.assistant": {
     "defaultMessage": "Assistant",
-    "description": "The Workspace Overview: the Hive Assistant's row and series (beside the projects)."
+    "description": "The Workspace Overview: the Combwork Assistant's row and series (beside the projects)."
   },
   "workspace.overview.byDay": {
     "defaultMessage": "Every project and the Assistant, by calendar day: a session that ran over several days counts only its part in the period.",
@@ -992,7 +996,7 @@
     "description": "Under Prompts: how many times sessions were compacted."
   },
   "workspace.overview.costTip": {
-    "defaultMessage": "What this work would have cost at API prices: reported by the provider where it does (Claude Code), else estimated by Hive from token counts and the prices in Settings → the provider. On a subscription you are not charged this; it shows how heavy the work was.",
+    "defaultMessage": "What this work would have cost at API prices: reported by the provider where it does (Claude Code), else estimated by Combwork from token counts and the prices in Settings → the provider. On a subscription you are not charged this; it shows how heavy the work was.",
     "description": "The Workspace Overview: tooltip on API-equivalent cost."
   },
   "workspace.overview.dayTip": {
@@ -1001,7 +1005,7 @@
   },
   "workspace.overview.estimated": {
     "defaultMessage": "estimated",
-    "description": "Under API-equivalent cost: Hive worked it out from prices. Lower case."
+    "description": "Under API-equivalent cost: Combwork worked it out from prices. Lower case."
   },
   "workspace.overview.hidden": {
     "defaultMessage": "{count, plural, one {# hidden or removed project isn't counted} other {# hidden or removed projects aren't counted}} (Settings → Workspace).",
@@ -1009,11 +1013,11 @@
   },
   "workspace.overview.importing": {
     "defaultMessage": "Importing the usage history: {done, number} of {total, plural, one {# session} other {# sessions}}. The figures are partial until it is done.",
-    "description": "The Workspace Overview while Hive records, once, what the workspace's existing sessions used ({done} of {total} so far)."
+    "description": "The Workspace Overview while Combwork records, once, what the workspace's existing sessions used ({done} of {total} so far)."
   },
   "workspace.overview.importingStart": {
     "defaultMessage": "Importing the usage history. The figures are partial until it is done.",
-    "description": "The Workspace Overview while Hive starts recording, once, what the workspace's existing sessions used (before it has counted them)."
+    "description": "The Workspace Overview while Combwork starts recording, once, what the workspace's existing sessions used (before it has counted them)."
   },
   "workspace.overview.loadTarget": {
     "defaultMessage": "the workspace's usage",
@@ -1025,7 +1029,7 @@
   },
   "workspace.overview.noAnswer": {
     "defaultMessage": "no answer after {seconds, number} s",
-    "description": "Why the workspace's usage could not be loaded: Hive read it for this long without finishing. Shown as {error} in \"Could not load {what}: {error}\", with Retry."
+    "description": "Why the workspace's usage could not be loaded: Combwork read it for this long without finishing. Shown as {error} in \"Could not load {what}: {error}\", with Retry."
   },
   "workspace.overview.noWorkspace": {
     "defaultMessage": "Open a workspace to see its overview.",
@@ -1132,8 +1136,8 @@
     "description": "Under a coding agent's API-equivalent cost: sessions whose model has no known price."
   },
   "workspace.purge.assistant": {
-    "defaultMessage": "Hive Assistant",
-    "description": "The Purge dialog's tables: the Assistant, in the column of projects. Hive's name stays as it is."
+    "defaultMessage": "Assistant",
+    "description": "The Purge dialog's tables: the Assistant, in the column of projects. Combwork's name stays as it is."
   },
   "workspace.purge.button": {
     "defaultMessage": "Purge",
@@ -1160,20 +1164,20 @@
     "description": "The Purge dialog, beside a group: how many and how big ({size}: \"12 MB\")."
   },
   "workspace.purge.intro": {
-    "defaultMessage": "Removes what Hive keeps: its backups of the transcripts (the archive's too), attachments, and what is left of deleted sessions. The coding agents' own files (in ~/.claude, ~/.codex and ~/.copilot) are never touched, and running sessions are left alone. What the sessions used stays in the usage history, so the totals don't change.",
+    "defaultMessage": "Removes what Combwork keeps: its backups of the transcripts (the archive's too), attachments, and what is left of deleted sessions. The coding agents' own files (in ~/.claude, ~/.codex and ~/.copilot) are never touched, and running sessions are left alone. What the sessions used stays in the usage history, so the totals don't change.",
     "description": "The Purge dialog, at the top. Keep the paths as they are."
   },
   "workspace.purge.introSession": {
-    "defaultMessage": "Removes what Hive keeps of this session: its backups of the transcript (the archive's too) and its attachments. The coding agent's own files (in ~/.claude, ~/.codex or ~/.copilot) are never touched. What the session used stays in the usage history, so the totals don't change.",
+    "defaultMessage": "Removes what Combwork keeps of this session: its backups of the transcript (the archive's too) and its attachments. The coding agent's own files (in ~/.claude, ~/.codex or ~/.copilot) are never touched. What the session used stays in the usage history, so the totals don't change.",
     "description": "The Purge dialog for one session, at the top. Keep the paths as they are."
   },
   "workspace.purge.kindAttachments": {
     "defaultMessage": "Attachments",
-    "description": "The Purge dialog, a group: files pasted or dropped into sessions (.hive/attachments)."
+    "description": "The Purge dialog, a group: files pasted or dropped into sessions (.combwork/attachments)."
   },
   "workspace.purge.kindBackup": {
     "defaultMessage": "Transcript backups",
-    "description": "The Purge dialog, a group: Hive's copies of the sessions' transcripts (.hive/sessions, .hive/archive)."
+    "description": "The Purge dialog, a group: Combwork's copies of the sessions' transcripts (.combwork/sessions, .combwork/archive)."
   },
   "workspace.purge.kindDeletedUsage": {
     "defaultMessage": "Old usage of deleted sessions",
@@ -1185,15 +1189,15 @@
   },
   "workspace.purge.kindLeftover": {
     "defaultMessage": "Leftover backup files",
-    "description": "The Purge dialog, a group: files left of Hive's backups (of deleted sessions, or half made when Hive stopped)."
+    "description": "The Purge dialog, a group: files left of Combwork's backups (of deleted sessions, or half made when Combwork stopped)."
   },
   "workspace.purge.kindOrphan": {
     "defaultMessage": "Attachments of deleted sessions",
-    "description": "The Purge dialog, a group: attachments whose session Hive no longer has."
+    "description": "The Purge dialog, a group: attachments whose session Combwork no longer has."
   },
   "workspace.purge.lastCopies": {
-    "defaultMessage": "{count, plural, one {# session has no other copy: its CLI no longer has the transcript. It is deleted from Hive, as Delete Session does, and can't be resumed or read afterwards.} other {# sessions have no other copy: their CLI no longer has the transcripts. They are deleted from Hive, as Delete Session does, and can't be resumed or read afterwards.}} What they used still counts in the totals.",
-    "description": "The Purge dialog's warning when Hive's backup is a session's last copy. Delete Session is the Sessions tab's command."
+    "defaultMessage": "{count, plural, one {# session has no other copy: its CLI no longer has the transcript. It is deleted from Combwork, as Delete Session does, and can't be resumed or read afterwards.} other {# sessions have no other copy: their CLI no longer has the transcripts. They are deleted from Combwork, as Delete Session does, and can't be resumed or read afterwards.}} What they used still counts in the totals.",
+    "description": "The Purge dialog's warning when Combwork's backup is a session's last copy. Delete Session is the Sessions tab's command."
   },
   "workspace.purge.lastCopy": {
     "defaultMessage": "last copy",
@@ -1216,7 +1220,7 @@
     "description": "The Purge dialog's button while it works."
   },
   "workspace.purge.nothing": {
-    "defaultMessage": "Hive keeps nothing here that Purge removes.",
+    "defaultMessage": "Combwork keeps nothing here that Purge removes.",
     "description": "The Purge dialog when there is nothing to remove."
   },
   "workspace.purge.nothingRemoved": {
@@ -1240,7 +1244,7 @@
     "description": "The Purge dialog, beside old usage kept in a session's record (not a file)."
   },
   "workspace.purge.recoverable": {
-    "defaultMessage": "{count, plural, one {# leftover file is kept: it may be a session's only copy, left when Hive stopped while deleting or moving it.} other {# leftover files are kept: they may be a session's only copy, left when Hive stopped while deleting or moving it.}}",
+    "defaultMessage": "{count, plural, one {# leftover file is kept: it may be a session's only copy, left when Combwork stopped while deleting or moving it.} other {# leftover files are kept: they may be a session's only copy, left when Combwork stopped while deleting or moving it.}}",
     "description": "The Purge dialog: leftover backup files Purge doesn't remove, because they may be all that's left of a session's transcript."
   },
   "workspace.purge.running": {
@@ -1248,7 +1252,7 @@
     "description": "The Purge dialog: sessions running now, whose files are not listed."
   },
   "workspace.purge.sessionsDeleted": {
-    "defaultMessage": "{count, plural, one {# session whose last copy went was deleted from Hive.} other {# sessions whose last copy went were deleted from Hive.}}",
+    "defaultMessage": "{count, plural, one {# session whose last copy went was deleted from Combwork.} other {# sessions whose last copy went were deleted from Combwork.}}",
     "description": "Under the notice after Purge: sessions deleted because their last copy went."
   },
   "workspace.purge.size": {
@@ -1264,7 +1268,7 @@
     "description": "Under the notice after Purge, an item left alone ({what}: like \"Transcript backups · fix-login\") and why ({reason}: a sentence)."
   },
   "workspace.purge.title": {
-    "defaultMessage": "{scope, select, session {Purge Hive's Files of \"{name}\"} project {Purge What Hive Keeps for {name}} other {Purge What Hive Keeps in {name}}}",
+    "defaultMessage": "{scope, select, session {Purge Combwork's Files of \"{name}\"} project {Purge What Combwork Keeps for {name}} other {Purge What Combwork Keeps in {name}}}",
     "description": "The Purge dialog's title: for a session ({name}: its name), a project ({name}: its name) or the workspace ({name}: its folder's name)."
   },
   "workspace.purge.what": {
@@ -1280,12 +1284,12 @@
     "description": "A notice after Restore."
   },
   "workspace.removal.banner": {
-    "defaultMessage": "This folder holds {what} from when it was removed from Hive ({when}). Restore them to this workspace?",
-    "description": "A banner over a project whose folder holds what Remove from Hive packed ({when}: \"3 days ago\")."
+    "defaultMessage": "This folder holds {what} from when it was removed from Combwork ({when}). Restore them to this workspace?",
+    "description": "A banner over a project whose folder holds what Remove from Combwork packed ({when}: \"3 days ago\")."
   },
   "workspace.removal.blocked": {
-    "defaultMessage": "Merge or discard the work in {agents}'s worktree first: a worktree can't go with the project folder.{unchecked, select, yes { Git couldn't check one, so Hive can't tell whether anything would be lost.} other {}}",
-    "description": "Remove Project: why Remove from Hive can't go yet ({agents}: the agents whose worktrees hold work)."
+    "defaultMessage": "Merge or discard the work in {agents}'s worktree first: a worktree can't go with the project folder.{unchecked, select, yes { Git couldn't check one, so Combwork can't tell whether anything would be lost.} other {}}",
+    "description": "Remove Project: why Remove from Combwork can't go yet ({agents}: the agents whose worktrees hold work)."
   },
   "workspace.removal.cancel": {
     "defaultMessage": "Cancel",
@@ -1336,7 +1340,7 @@
     "description": "An error notice: the folder's packed data."
   },
   "workspace.removal.drafts": {
-    "defaultMessage": "Files of this project have unsaved edits in Hive. They are lost.",
+    "defaultMessage": "Files of this project have unsaved edits in Combwork. They are lost.",
     "description": "Remove Project, before Delete."
   },
   "workspace.removal.folderBlocks": {
@@ -1348,7 +1352,7 @@
     "description": "Under a hidden project whose folder is gone."
   },
   "workspace.removal.folderHow": {
-    "defaultMessage": "{how, select, delete {to the Recycle Bin} remove {stays where it is} other {stays, hidden from Hive}}",
+    "defaultMessage": "{how, select, delete {to the Recycle Bin} remove {stays where it is} other {stays, hidden from Combwork}}",
     "description": "Remove Project, What it touches, What happens to the project folder, for the choice made."
   },
   "workspace.removal.folderKept": {
@@ -1373,15 +1377,15 @@
   },
   "workspace.removal.foldersHow": {
     "defaultMessage": "{how, select, hide {left as they are} delete {to the Recycle Bin, with what is in them} other {removed when clean and merged; the rest stay, listed}}",
-    "description": "Remove Project, What it touches, what happens to the project's slots, copies and old folders for the choice made (#1447): Hive removes those with nothing to lose, and keeps the others."
+    "description": "Remove Project, What it touches, what happens to the project's slots, copies and old folders for the choice made (#1447): Combwork removes those with nothing to lose, and keeps the others."
   },
   "workspace.removal.foldersThing": {
     "defaultMessage": "{count, plural, one {# slot, copy or old folder} other {# slots, copies and old folders}}",
-    "description": "Remove Project, What it touches, the What column (#1447): the project's slots (working folders Hive lends to cards), review copies and old reviewer folders, each on a row under it."
+    "description": "Remove Project, What it touches, the What column (#1447): the project's slots (working folders Combwork lends to cards), review copies and old reviewer folders, each on a row under it."
   },
   "workspace.removal.forget": {
     "defaultMessage": "Forget",
-    "description": "A button: drops a removed project whose folder is gone from Hive's list."
+    "description": "A button: drops a removed project whose folder is gone from Combwork's list."
   },
   "workspace.removal.forgetFailed": {
     "defaultMessage": "Could not forget {name}",
@@ -1404,7 +1408,7 @@
     "description": "Remove Project: a choice, and the dialog's button for it."
   },
   "workspace.removal.hideSummary": {
-    "defaultMessage": "Hive leaves the project out until you restore it. Nothing is moved or deleted.",
+    "defaultMessage": "Combwork leaves the project out until you restore it. Nothing is moved or deleted.",
     "description": "Remove Project: what Hide does."
   },
   "workspace.removal.hiding": {
@@ -1413,7 +1417,7 @@
   },
   "workspace.removal.how": {
     "defaultMessage": "How",
-    "description": "Settings → Workspace's hidden projects table: a column (hidden, or removed from Hive)."
+    "description": "Settings → Workspace's hidden projects table: a column (hidden, or removed from Combwork)."
   },
   "workspace.removal.loadTarget": {
     "defaultMessage": "the hidden projects",
@@ -1432,15 +1436,15 @@
     "description": "A hidden project, in Settings → Workspace."
   },
   "workspace.removal.modeRemoved": {
-    "defaultMessage": "Removed from Hive",
-    "description": "A project removed from Hive, in Settings → Workspace."
+    "defaultMessage": "Removed from Combwork",
+    "description": "A project removed from Combwork, in Settings → Workspace."
   },
   "workspace.removal.noWorkspace": {
     "defaultMessage": "Open a workspace to see its hidden projects.",
     "description": "Settings → Workspace, hidden projects, with no workspace open."
   },
   "workspace.removal.none": {
-    "defaultMessage": "None. Project → Remove Project… hides a project or removes it from Hive.",
+    "defaultMessage": "None. Project → Remove Project… hides a project or removes it from Combwork.",
     "description": "Settings → Workspace with no hidden projects. Project → Remove Project… is the menu item."
   },
   "workspace.removal.notAll": {
@@ -1452,19 +1456,19 @@
     "description": "Settings → Workspace's hidden projects table: a column."
   },
   "workspace.removal.remove": {
-    "defaultMessage": "Remove from Hive",
+    "defaultMessage": "Remove from Combwork",
     "description": "Remove Project: a choice, and the dialog's button for it."
   },
   "workspace.removal.removeSummary": {
-    "defaultMessage": "The folder stays on disk, and its handovers and cards are packed into it (.hive/removed), so you can move it elsewhere. Hive offers them back wherever it sees the folder again.",
-    "description": "Remove Project: what Remove from Hive does. Keep .hive/removed as it is."
+    "defaultMessage": "The folder stays on disk, and its handovers and cards are packed into it (.combwork/removed), so you can move it elsewhere. Combwork offers them back wherever it sees the folder again.",
+    "description": "Remove Project: what Remove from Combwork does. Keep .combwork/removed as it is."
   },
   "workspace.removal.removedDone": {
-    "defaultMessage": "{name} was removed from Hive",
-    "description": "A notice after Remove from Hive."
+    "defaultMessage": "{name} was removed from Combwork",
+    "description": "A notice after Remove from Combwork."
   },
   "workspace.removal.removing": {
-    "defaultMessage": "Removing from Hive…",
+    "defaultMessage": "Removing from Combwork…",
     "description": "Remove Project's button while it works."
   },
   "workspace.removal.restore": {
@@ -1477,7 +1481,7 @@
   },
   "workspace.removal.restoreIn": {
     "defaultMessage": "Restore it in Settings → Workspace.",
-    "description": "Under the notice after Hide or Remove from Hive."
+    "description": "Under the notice after Hide or Remove from Combwork."
   },
   "workspace.removal.restoreThemFailed": {
     "defaultMessage": "Could not restore them",
@@ -1516,8 +1520,8 @@
     "description": "Remove Project, before Delete: type the project's name in the box below. <b> is bold."
   },
   "workspace.removal.what": {
-    "defaultMessage": "{which, select, both {{handovers, plural, one {# handover} other {# handovers}} and {cards, plural, one {# board card} other {# board cards}}} handovers {{handovers, plural, one {# handover} other {# handovers}}} cards {{cards, plural, one {# board card} other {# board cards}}} other {Hive data}}",
-    "description": "What a folder holds from when its project was removed from Hive: handovers, board cards, or both."
+    "defaultMessage": "{which, select, both {{handovers, plural, one {# handover} other {# handovers}} and {cards, plural, one {# board card} other {# board cards}}} handovers {{handovers, plural, one {# handover} other {# handovers}}} cards {{cards, plural, one {# board card} other {# board cards}}} other {Combwork data}}",
+    "description": "What a folder holds from when its project was removed from Combwork: handovers, board cards, or both."
   },
   "workspace.removal.when": {
     "defaultMessage": "When",
@@ -1545,7 +1549,7 @@
   },
   "workspace.repair.addLater": {
     "defaultMessage": "Defender scans the new folders: Settings → Workspace → Antivirus scanning can exclude them.",
-    "description": "Repair's plan, under the table, when Hive had no Defender exclusions to move and the new folders are scanned. Use the settings' names as shown."
+    "description": "Repair's plan, under the table, when Combwork had no Defender exclusions to move and the new folders are scanned. Use the settings' names as shown."
   },
   "workspace.repair.board": {
     "defaultMessage": "Board: {from}",
@@ -1569,7 +1573,7 @@
   },
   "workspace.repair.closeRuns": {
     "defaultMessage": "The close command's output",
-    "description": "Repair's plan and report, the What column: the output Hive keeps of the workspace's close command (Settings → Workspace → When this workspace closes, run), moved from the old folder's records to the new one's (HI-2007)."
+    "description": "Repair's plan and report, the What column: the output Combwork keeps of the workspace's close command (Settings → Workspace → When this workspace closes, run), moved from the old folder's records to the new one's (HI-2007)."
   },
   "workspace.repair.conversations": {
     "defaultMessage": "{provider}'s conversations and memory",
@@ -1621,11 +1625,11 @@
   },
   "workspace.repair.later": {
     "defaultMessage": "made again here when next used",
-    "description": "Repair's plan, the Will do column: a free slot or review copy wasn't found; Hive makes it again at its new place the next time it's used (#1447)."
+    "description": "Repair's plan, the Will do column: a free slot or review copy wasn't found; Combwork makes it again at its new place the next time it's used (#1447)."
   },
   "workspace.repair.leaveExclusion": {
-    "defaultMessage": "leave Hive's exclusion as it is",
-    "description": "Repair's plan, the Will do column of a Defender row, when the box to move Hive's exclusions is unticked."
+    "defaultMessage": "leave Combwork's exclusion as it is",
+    "description": "Repair's plan, the Will do column of a Defender row, when the box to move Combwork's exclusions is unticked."
   },
   "workspace.repair.listNew": {
     "defaultMessage": "list the new folder",
@@ -1636,24 +1640,24 @@
     "description": "Repair's plan, the Will do column of Working on ({projects}: the projects)."
   },
   "workspace.repair.moveBox": {
-    "defaultMessage": "Move Hive's {count, plural, one {exclusion} other {exclusions}} to the new folders (one administrator prompt)",
-    "description": "Repair's plan: a box, ticked when Hive added the old folders' Defender exclusions; Repair then removes those and adds the same for the new folders, in one Windows administrator prompt."
+    "defaultMessage": "Move Combwork's {count, plural, one {exclusion} other {exclusions}} to the new folders (one administrator prompt)",
+    "description": "Repair's plan: a box, ticked when Combwork added the old folders' Defender exclusions; Repair then removes those and adds the same for the new folders, in one Windows administrator prompt."
   },
   "workspace.repair.moveExclusion": {
-    "defaultMessage": "move Hive's exclusion",
-    "description": "Repair's plan, the Will do column of a Defender row: Hive's exclusion of the old folder is removed and the new folder excluded instead."
+    "defaultMessage": "move Combwork's exclusion",
+    "description": "Repair's plan, the Will do column of a Defender row: Combwork's exclusion of the old folder is removed and the new folder excluded instead."
   },
   "workspace.repair.moveRuns": {
     "defaultMessage": "move here (last try: {why})",
-    "description": "Repair's plan, the Will do column of the close command's output (HI-2007): the runs Hive keeps are moved from the old folder's records to the new one's; {why} is the system's message from the last try, which failed."
+    "description": "Repair's plan, the Will do column of the close command's output (HI-2007): the runs Combwork keeps are moved from the old folder's records to the new one's; {why} is the system's message from the last try, which failed."
   },
   "workspace.repair.needsAdmin": {
-    "defaultMessage": "Defender shows its exclusions only to administrators: these states are what Hive knows. Check them with administrator rights in Settings → Workspace → Antivirus scanning.",
+    "defaultMessage": "Defender shows its exclusions only to administrators: these states are what Combwork knows. Check them with administrator rights in Settings → Workspace → Antivirus scanning.",
     "description": "Repair's plan, under the table: Defender hides its exclusion list without administrator rights."
   },
   "workspace.repair.noneToMove": {
-    "defaultMessage": "nothing (no exclusion of Hive's)",
-    "description": "Repair's plan, the Will do column of a Defender row: no exclusion of Hive's to move, and whether Defender scans the new folder isn't known (its list needs administrator rights)."
+    "defaultMessage": "nothing (no exclusion of Combwork's)",
+    "description": "Repair's plan, the Will do column of a Defender row: no exclusion of Combwork's to move, and whether Defender scans the new folder isn't known (its list needs administrator rights)."
   },
   "workspace.repair.notFound": {
     "defaultMessage": "not found",
@@ -1681,7 +1685,7 @@
   },
   "workspace.repair.readingDefender": {
     "defaultMessage": "Reading Defender's exclusions…",
-    "description": "Repair's plan, under the table, while Hive reads Microsoft Defender's state of the old and new folders."
+    "description": "Repair's plan, under the table, while Combwork reads Microsoft Defender's state of the old and new folders."
   },
   "workspace.repair.recent": {
     "defaultMessage": "Open Recent",
@@ -1689,7 +1693,7 @@
   },
   "workspace.repair.recheck": {
     "defaultMessage": "Repair's administrator prompt reads Defender's list again before it changes anything.",
-    "description": "Repair's plan, under the table, after the line saying when Defender's exclusions were last read with administrator rights: moving Hive's exclusions reads them again first."
+    "description": "Repair's plan, under the table, after the line saying when Defender's exclusions were last read with administrator rights: moving Combwork's exclusions reads them again first."
   },
   "workspace.repair.recreate": {
     "defaultMessage": "{exists, select, yes {recreate on {branch}} other {create new on {branch}}}",
@@ -1717,7 +1721,7 @@
   },
   "workspace.repair.releaseSlot": {
     "defaultMessage": "Release the slot: it is made again when next lent",
-    "description": "Repair's plan, a missing lent slot's button, in full (its tooltip; #1447): its agent gives it up, and Hive makes it again the next time it lends it."
+    "description": "Repair's plan, a missing lent slot's button, in full (its tooltip; #1447): its agent gives it up, and Combwork makes it again the next time it lends it."
   },
   "workspace.repair.relink": {
     "defaultMessage": "{located, select, yes {located · } other {}}git worktree repair",
@@ -1737,7 +1741,7 @@
   },
   "workspace.repair.scanned": {
     "defaultMessage": "nothing (Defender scans it)",
-    "description": "Repair's plan, the Will do column of a Defender row: no exclusion of Hive's to move, and Defender scans the new folder."
+    "description": "Repair's plan, the Will do column of a Defender row: no exclusion of Combwork's to move, and Defender scans the new folder."
   },
   "workspace.repair.sentence": {
     "defaultMessage": "{what}{hasWas, select, yes {: was {was}} other {}}{hasNow, select, yes {, now {now}} other {}}; will {does}",
@@ -1757,10 +1761,10 @@
   },
   "workspace.repair.theirs": {
     "defaultMessage": "yours: change it in Windows Security",
-    "description": "Repair's plan, the Will do column of a Defender row: the old folder's exclusion is the user's own, which Hive never changes. Windows Security is Windows' app: use its name as shown."
+    "description": "Repair's plan, the Will do column of a Defender row: the old folder's exclusion is the user's own, which Combwork never changes. Windows Security is Windows' app: use its name as shown."
   },
   "workspace.repair.theirsNote": {
-    "defaultMessage": "An exclusion you made of an old folder stays as it is: Hive never changes yours. Change it in Windows Security if you want.",
+    "defaultMessage": "An exclusion you made of an old folder stays as it is: Combwork never changes yours. Change it in Windows Security if you want.",
     "description": "Repair's plan, under the table: the user's own Defender exclusion of an old folder."
   },
   "workspace.repair.unlink": {
@@ -1836,12 +1840,12 @@
     "description": "What could not be refreshed while the skill stays open: shown in \"Could not refresh {what}; last updated …\", with Retry."
   },
   "workspace.skillView.select": {
-    "defaultMessage": "Select a Hive skill to view or edit it. The agents in every project of this workspace get these skills, except those marked for the Hive Assistant and those switched off beside them (Delivered to agents).",
+    "defaultMessage": "Select a Combwork skill to view or edit it. The agents in every project of this workspace get these skills, except those marked for the Assistant and those switched off beside them (Delivered to agents).",
     "description": "The Skills view with no skill selected."
   },
   "workspace.statusBar.api": {
     "defaultMessage": "API",
-    "description": "The status bar's item for Hive's Agent API. Keep it short."
+    "description": "The status bar's item for Combwork's Agent API. Keep it short."
   },
   "workspace.statusBar.apiError": {
     "defaultMessage": "Agent API: {error}",
@@ -1853,7 +1857,7 @@
   },
   "workspace.statusBar.apiOn": {
     "defaultMessage": "Agent API listening on {url}",
-    "description": "Tooltip on the status bar's API: Hive's Agent API is on ({url}: its address)."
+    "description": "Tooltip on the status bar's API: Combwork's Agent API is on ({url}: its address)."
   },
   "workspace.statusBar.asOf": {
     "defaultMessage": "As of {when}. Updates while a session is running.",
@@ -1881,7 +1885,7 @@
   },
   "workspace.statusBar.keepAwake": {
     "defaultMessage": "Keeping the PC awake: {working, plural, one {# agent} other {# agents}} working",
-    "description": "The status bar's note while Hive keeps Windows from sleeping because agents are working (Settings → General → Keep the PC awake)."
+    "description": "The status bar's note while Combwork keeps Windows from sleeping because agents are working (Settings → General → Keep the PC awake)."
   },
   "workspace.statusBar.limitLine": {
     "defaultMessage": "{window, select, fiveHour {5-hour limit} weekly {Weekly limit} other {{label} limit}}: {used, number, ::percent} used{hasReset, select, yes {, resets {when}} other {}}",
@@ -1933,11 +1937,11 @@
   },
   "workspace.storage.archive": {
     "defaultMessage": "Archive",
-    "description": "Storage: Hive's archive folder (.hive/archive)."
+    "description": "Storage: Combwork's archive folder (.combwork/archive)."
   },
   "workspace.storage.assistant": {
-    "defaultMessage": "Hive Assistant",
-    "description": "Settings → Workspace's storage: the Assistant's row and heading. Hive's name stays as it is."
+    "defaultMessage": "Assistant",
+    "description": "Settings → Workspace's storage: the Assistant's row and heading. Combwork's name stays as it is."
   },
   "workspace.storage.attachmentDays": {
     "defaultMessage": "Attachment age in days",
@@ -1945,7 +1949,7 @@
   },
   "workspace.storage.attachments": {
     "defaultMessage": "Attachments",
-    "description": "Storage: files pasted or dropped into sessions (.hive/attachments)."
+    "description": "Storage: files pasted or dropped into sessions (.combwork/attachments)."
   },
   "workspace.storage.backupDays": {
     "defaultMessage": "Backup age in days",
@@ -1953,11 +1957,11 @@
   },
   "workspace.storage.backups": {
     "defaultMessage": "Transcript backups",
-    "description": "Storage: Hive's copies of the sessions' transcripts (.hive/sessions)."
+    "description": "Storage: Combwork's copies of the sessions' transcripts (.combwork/sessions)."
   },
   "workspace.storage.beforeCompression": {
     "defaultMessage": "{size} before compression",
-    "description": "Storage, beside the size of Hive's transcript backups or archive: what they hold uncompressed ({size}: like 1.2 GB). Ended sessions' backups are compressed."
+    "description": "Storage, beside the size of Combwork's transcript backups or archive: what they hold uncompressed ({size}: like 1.2 GB). Ended sessions' backups are compressed."
   },
   "workspace.storage.cancel": {
     "defaultMessage": "Cancel",
@@ -1965,7 +1969,7 @@
   },
   "workspace.storage.cardAttachments": {
     "defaultMessage": "Card attachments",
-    "description": "Storage (HI-1700): files kept with cards (.hive/attachments/cards). Clean Up and Purge never remove them."
+    "description": "Storage (HI-1700): files kept with cards (.combwork/attachments/cards). Clean Up and Purge never remove them."
   },
   "workspace.storage.cardCleanup.archived": {
     "defaultMessage": "Archived",
@@ -2021,7 +2025,7 @@
   },
   "workspace.storage.copies": {
     "defaultMessage": "Review and check copies",
-    "description": "Storage (#1451): the folder of the project's review and check copies (folders Hive keeps at one revision for a reviewer, or an isolated check). Glossary: review copy."
+    "description": "Storage (#1451): the folder of the project's review and check copies (folders Combwork keeps at one revision for a reviewer, or an isolated check). Glossary: review copy."
   },
   "workspace.storage.deletedSession": {
     "defaultMessage": "Deleted session {id}",
@@ -2029,18 +2033,18 @@
   },
   "workspace.storage.freeSlot": {
     "defaultMessage": "{slot}, not lent",
-    "description": "Storage (#1451): one of the project's slots (a working folder Hive lends to a card or a lane; {slot} is its name, such as slot-b: keep it as it is), kept on disk but lent to no one now. Glossary: slot."
+    "description": "Storage (#1451): one of the project's slots (a working folder Combwork lends to a card or a lane; {slot} is its name, such as slot-b: keep it as it is), kept on disk but lent to no one now. Glossary: slot."
   },
   "workspace.storage.goneBackups": {
     "defaultMessage": "Backups of archived sessions the CLI no longer has",
     "description": "A Clean Up choice (it deletes those sessions)."
   },
   "workspace.storage.goneBackupsDesc": {
-    "defaultMessage": "Hive's copy is the last one: the sessions are deleted, as Delete Session does.",
+    "defaultMessage": "Combwork's copy is the last one: the sessions are deleted, as Delete Session does.",
     "description": "Under a Clean Up choice. Delete Session is the Sessions tab's command."
   },
   "workspace.storage.goneWarning": {
-    "defaultMessage": "These sessions can't be resumed or read afterwards: Hive's backup is the only copy left. They leave the Sessions tab; what they used still counts in the totals.",
+    "defaultMessage": "These sessions can't be resumed or read afterwards: Combwork's backup is the only copy left. They leave the Sessions tab; what they used still counts in the totals.",
     "description": "The Clean Up dialog, while it would delete sessions."
   },
   "workspace.storage.groupCount": {
@@ -2120,7 +2124,7 @@
     "description": "Settings → Workspace's storage table with no projects."
   },
   "workspace.storage.noWorkspace": {
-    "defaultMessage": "Open a workspace to see what Hive keeps for it.",
+    "defaultMessage": "Open a workspace to see what Combwork keeps for it.",
     "description": "Settings → Workspace's storage with no workspace open."
   },
   "workspace.storage.nothing": {
@@ -2129,7 +2133,7 @@
   },
   "workspace.storage.nothingKept": {
     "defaultMessage": "Nothing kept.",
-    "description": "Storage's table when Hive keeps nothing for the project."
+    "description": "Storage's table when Combwork keeps nothing for the project."
   },
   "workspace.storage.nothingMatches": {
     "defaultMessage": "Nothing matches.",
@@ -2144,11 +2148,11 @@
     "description": "A Clean Up choice; {days} is a box where you type the number of days."
   },
   "workspace.storage.oldAttachmentsDesc": {
-    "defaultMessage": "Files pasted or dropped into those sessions (.hive/attachments).",
-    "description": "Under a Clean Up choice. Keep .hive/attachments as it is."
+    "defaultMessage": "Files pasted or dropped into those sessions (.combwork/attachments).",
+    "description": "Under a Clean Up choice. Keep .combwork/attachments as it is."
   },
   "workspace.storage.oldBackups": {
-    "defaultMessage": "Hive's backups of archived sessions last active more than {days} days ago",
+    "defaultMessage": "Combwork's backups of archived sessions last active more than {days} days ago",
     "description": "A Clean Up choice; {days} is a box where you type the number of days."
   },
   "workspace.storage.oldBackupsDesc": {
@@ -2165,7 +2169,7 @@
   },
   "workspace.storage.purge": {
     "defaultMessage": "Purge…",
-    "description": "Storage: opens the Purge dialog, which removes everything Hive keeps per session (it lists it first)."
+    "description": "Storage: opens the Purge dialog, which removes everything Combwork keeps per session (it lists it first)."
   },
   "workspace.storage.refresh": {
     "defaultMessage": "Refresh",
@@ -2185,7 +2189,7 @@
   },
   "workspace.storage.slot": {
     "defaultMessage": "{slot}, lent to agent {agent}",
-    "description": "Storage (#1451): one of the project's slots (a working folder Hive lends to a card or a lane; {slot} is its name, such as slot-b: keep it as it is), lent now to the agent {agent}. Glossary: slot. A noun before the name (glossary §1 rule 4)."
+    "description": "Storage (#1451): one of the project's slots (a working folder Combwork lends to a card or a lane; {slot} is its name, such as slot-b: keep it as it is), lent now to the agent {agent}. Glossary: slot. A noun before the name (glossary §1 rule 4)."
   },
   "workspace.storage.storage": {
     "defaultMessage": "Storage",
@@ -2205,7 +2209,7 @@
   },
   "workspace.storage.what": {
     "defaultMessage": "What",
-    "description": "Storage's table: the column of what Hive keeps."
+    "description": "Storage's table: the column of what Combwork keeps."
   },
   "workspace.storage.whatGoes": {
     "defaultMessage": "What goes to the Recycle Bin",
@@ -2221,7 +2225,7 @@
   },
   "workspace.taskbar.needYou": {
     "defaultMessage": "{count, plural, one {# needs you} other {# need you}}",
-    "description": "What the taskbar badge over Hive's icon says to screen readers: how many things wait for you (requests on cards and agents stopped at a prompt, a sign-in, a question or an error). Keep it short."
+    "description": "What the taskbar badge over Combwork's icon says to screen readers: how many things wait for you (requests on cards and agents stopped at a prompt, a sign-in, a question or an error). Keep it short."
   },
   "workspace.unused.changedFiles": {
     "defaultMessage": "{count, plural, one {# changed file} other {# changed files}}",
@@ -2241,11 +2245,11 @@
   },
   "workspace.unused.kind.carried": {
     "defaultMessage": "agent's old worktree, given up",
-    "description": "What an unused worktree is (#1450): an agent's 0.9 worktree Hive carried into the slots (a carried lease), whose lease has ended. Lower case: a badge after its name."
+    "description": "What an unused worktree is (#1450): an agent's 0.9 worktree Combwork carried into the slots (a carried lease), whose lease has ended. Lower case: a badge after its name."
   },
   "workspace.unused.kind.dirtySlot": {
     "defaultMessage": "slot with changes, not lent",
-    "description": "What an unused worktree is (#1450): one of Hive's slots, left with uncommitted or untracked files and lent to no card. Lower case: a badge after its name."
+    "description": "What an unused worktree is (#1450): one of Combwork's slots, left with uncommitted or untracked files and lent to no card. Lower case: a badge after its name."
   },
   "workspace.unused.kind.home": {
     "defaultMessage": "retired home, no conversation left",
@@ -2257,7 +2261,7 @@
   },
   "workspace.unused.kind.slot": {
     "defaultMessage": "free slot beyond the pool",
-    "description": "What an unused worktree is (#1450): one of Hive's slots, free and set up, beyond the number the project needs now. Lower case: a badge after its name."
+    "description": "What an unused worktree is (#1450): one of Combwork's slots, free and set up, beyond the number the project needs now. Lower case: a badge after its name."
   },
   "workspace.unused.lostCommits": {
     "defaultMessage": "{count, plural, one {# commit} other {# commits}} on {branch} not on {known, select, yes {{into}} other {any other branch}}",
@@ -2275,21 +2279,21 @@
     "defaultMessage": "the files git ignores in its folder (build output, copied .env files)",
     "description": "What removing an unused worktree anyway loses: the last line of the confirmation's list. Lower case."
   },
-  "workspace.unused.madeByHive": {
-    "defaultMessage": "made by Hive",
-    "description": "Who made an unused worktree: Hive, for an agent no longer known. Lower case: it follows its branch."
+  "workspace.unused.madeByCombwork": {
+    "defaultMessage": "made by Combwork",
+    "description": "Who made an unused worktree: Combwork, for an agent no longer known. Lower case: it follows its branch."
   },
   "workspace.unused.merged": {
     "defaultMessage": "Merged into {into} · clean",
     "description": "An unused worktree's state: its branch is merged into {into} (main) and it has no changes."
   },
   "workspace.unused.notChecked": {
-    "defaultMessage": "Hive couldn't check it",
+    "defaultMessage": "Combwork couldn't check it",
     "description": "An unused worktree's state when git couldn't say."
   },
-  "workspace.unused.notMadeByHive": {
-    "defaultMessage": "not made by Hive",
-    "description": "Who made an unused worktree: something other than Hive (an agent's own git worktree add). Lower case: it follows its branch."
+  "workspace.unused.notMadeByCombwork": {
+    "defaultMessage": "not made by Combwork",
+    "description": "Who made an unused worktree: something other than Combwork (an agent's own git worktree add). Lower case: it follows its branch."
   },
   "workspace.unused.pickMerged": {
     "defaultMessage": "merged, clean",
@@ -2309,7 +2313,7 @@
   },
   "workspace.unused.was": {
     "defaultMessage": "was {agent}",
-    "description": "Who made an unused worktree: the Hive agent that worked in it ({agent}: its name). Lower case: it follows its branch."
+    "description": "Who made an unused worktree: the Combwork agent that worked in it ({agent}: its name). Lower case: it follows its branch."
   },
   "workspace.unused.workNotice": {
     "defaultMessage": "{count, plural, one {# unused worktree has} other {# unused worktrees have}} work that isn't on {known, select, yes {{into}} other {the main branch}}",
@@ -2337,7 +2341,7 @@
   },
   "workspace.unusedList.changed": {
     "defaultMessage": "what it holds changed",
-    "description": "Why Remove anyway removed nothing, when Hive gave no other reason. Lower case: it follows \"Nothing was removed:\"."
+    "description": "Why Remove anyway removed nothing, when Combwork gave no other reason. Lower case: it follows \"Nothing was removed:\"."
   },
   "workspace.unusedList.checkFailed": {
     "defaultMessage": "{refused}. Checking it again failed: {error}",
@@ -2372,7 +2376,7 @@
     "description": "An unused worktree with no branch (a detached HEAD)."
   },
   "workspace.unusedList.gitProblem": {
-    "defaultMessage": "{problem}, so Hive can't list the unused worktrees.",
+    "defaultMessage": "{problem}, so Combwork can't list the unused worktrees.",
     "description": "The Changes tab's Unused worktrees when git can't run ({problem}: what is wrong with git)."
   },
   "workspace.unusedList.heading": {
@@ -2469,19 +2473,19 @@
   },
   "workspace.updates.available": {
     "defaultMessage": "{skipped, select, yes {Version {version} is available (skipped).} other {Version {version} is available.}}",
-    "description": "Hive's updates, in Settings → Updates and About: a newer version; (skipped) when you chose Skip This Version."
+    "description": "Combwork's updates, in Settings → Updates and About: a newer version; (skipped) when you chose Skip This Version."
   },
   "workspace.updates.checkNow": {
     "defaultMessage": "Check Now",
-    "description": "Settings → Updates and About: checks for a newer Hive."
+    "description": "Settings → Updates and About: checks for a newer Combwork."
   },
   "workspace.updates.checkTip": {
-    "defaultMessage": "{hasKey, select, yes {Check GitHub for a newer Hive now ({key})} other {Check GitHub for a newer Hive now}}",
+    "defaultMessage": "{hasKey, select, yes {Check GitHub for a newer Combwork now ({key})} other {Check GitHub for a newer Combwork now}}",
     "description": "Tooltip on Check Now, with its shortcut ({key})."
   },
   "workspace.updates.checking": {
     "defaultMessage": "Checking for updates…",
-    "description": "Hive's updates: a check is running."
+    "description": "Combwork's updates: a check is running."
   },
   "workspace.updates.details": {
     "defaultMessage": "Details",
@@ -2493,15 +2497,15 @@
   },
   "workspace.updates.downloading": {
     "defaultMessage": "Downloading version {version}… {percent, number, ::percent}",
-    "description": "Hive's updates: the download's progress."
+    "description": "Combwork's updates: the download's progress."
   },
   "workspace.updates.failed": {
     "defaultMessage": "The last check failed.",
-    "description": "Hive's updates: the last check didn't work."
+    "description": "Combwork's updates: the last check didn't work."
   },
   "workspace.updates.headAvailable": {
     "defaultMessage": "{app} {version} is available",
-    "description": "The update dialog's heading: a newer Hive."
+    "description": "The update dialog's heading: a newer Combwork."
   },
   "workspace.updates.headReady": {
     "defaultMessage": "{app} {version} is ready to install",
@@ -2509,15 +2513,15 @@
   },
   "workspace.updates.itemAvailable": {
     "defaultMessage": "{app} {version} available",
-    "description": "The status bar: a newer Hive ({app}: Hive's name) can be downloaded. Keep it short."
+    "description": "The status bar: a newer Combwork ({app}: Combwork's name) can be downloaded. Keep it short."
   },
   "workspace.updates.itemDownloading": {
     "defaultMessage": "Downloading {app} {version}… {percent, number, ::percent}",
-    "description": "The status bar: Hive's update downloading. Keep it short."
+    "description": "The status bar: Combwork's update downloading. Keep it short."
   },
   "workspace.updates.itemReady": {
     "defaultMessage": "Restart to update to {version}",
-    "description": "The status bar: Hive's update is downloaded. Keep it short."
+    "description": "The status bar: Combwork's update is downloaded. Keep it short."
   },
   "workspace.updates.later": {
     "defaultMessage": "Later",
@@ -2525,11 +2529,11 @@
   },
   "workspace.updates.latest": {
     "defaultMessage": "{app} {version} is the latest version.",
-    "description": "The update dialog: no newer Hive."
+    "description": "The update dialog: no newer Combwork."
   },
   "workspace.updates.localBuild": {
     "defaultMessage": "Local build {version}{hasCommit, select, yes { ({commit})} other {}}",
-    "description": "Settings → Updates and About: the running Hive is a local build (one built on this computer with npm run dist, not a published release), with the commit it was built from."
+    "description": "Settings → Updates and About: the running Combwork is a local build (one built on this computer with npm run dist, not a published release), with the commit it was built from."
   },
   "workspace.updates.mb": {
     "defaultMessage": "{mb, number, ::.0} MB",
@@ -2541,19 +2545,19 @@
   },
   "workspace.updates.notChecked": {
     "defaultMessage": "Not checked yet.",
-    "description": "Hive's updates: no check since Hive started."
+    "description": "Combwork's updates: no check since Combwork started."
   },
   "workspace.updates.notInstalledNotNewer": {
-    "defaultMessage": "Version {version} is downloaded, but the copy installed on this computer is the same version or newer, so Hive won't install it.",
-    "description": "Hive's updates: a downloaded update isn't installed, since what is installed (a local build, say) isn't older."
+    "defaultMessage": "Version {version} is downloaded, but the copy installed on this computer is the same version or newer, so Combwork won't install it.",
+    "description": "Combwork's updates: a downloaded update isn't installed, since what is installed (a local build, say) isn't older."
   },
   "workspace.updates.notInstalledUnreadable": {
-    "defaultMessage": "Version {version} is downloaded, but Hive couldn't read the copy installed on this computer, so it won't replace it.",
-    "description": "Hive's updates: a downloaded update isn't installed, since the installed copy couldn't be read (another installer may be replacing it)."
+    "defaultMessage": "Version {version} is downloaded, but Combwork couldn't read the copy installed on this computer, so it won't replace it.",
+    "description": "Combwork's updates: a downloaded update isn't installed, since the installed copy couldn't be read (another installer may be replacing it)."
   },
   "workspace.updates.off": {
     "defaultMessage": "Updates are off in this build.",
-    "description": "Hive's updates, in Settings → Updates and About: this build doesn't update itself."
+    "description": "Combwork's updates, in Settings → Updates and About: this build doesn't update itself."
   },
   "workspace.updates.ok": {
     "defaultMessage": "OK",
@@ -2576,15 +2580,15 @@
     "description": "The update dialog: the download's progress ({done}, {total}: sizes in MB)."
   },
   "workspace.updates.published": {
-    "defaultMessage": "A published {version} is available. Hive doesn’t install a release of the same version over your local build.",
-    "description": "Hive's updates: the user runs a local build, and a published release of the same version exists; it is offered (its page), never installed by itself."
+    "defaultMessage": "A published {version} is available. Combwork doesn’t install a release of the same version over your local build.",
+    "description": "Combwork's updates: the user runs a local build, and a published release of the same version exists; it is offered (its page), never installed by itself."
   },
   "workspace.updates.ready": {
     "defaultMessage": "Version {version} is ready to install.",
-    "description": "Hive's updates: downloaded, installed on restart."
+    "description": "Combwork's updates: downloaded, installed on restart."
   },
   "workspace.updates.readyNote": {
-    "defaultMessage": "{auto, select, yes {It installs automatically when you quit Hive. } other {}}Restart and Update closes Hive, installs the update and opens Hive again.{busy, select, yes { Some agents are busy: Hive asks before stopping them, and you can wait for them to finish.} other { Running sessions are stopped and can be resumed afterwards.}}",
+    "defaultMessage": "{auto, select, yes {It installs automatically when you quit Combwork. } other {}}Restart and Update closes Combwork, installs the update and opens Combwork again.{busy, select, yes { Some agents are busy: Combwork asks before stopping them, and you can wait for them to finish.} other { Running sessions are stopped and can be resumed afterwards.}}",
     "description": "The update dialog when the update is downloaded. Restart and Update is its button."
   },
   "workspace.updates.released": {
@@ -2593,7 +2597,7 @@
   },
   "workspace.updates.releasesPage": {
     "defaultMessage": "Releases Page",
-    "description": "The update dialog after a failed check: opens Hive's releases on GitHub."
+    "description": "The update dialog after a failed check: opens Combwork's releases on GitHub."
   },
   "workspace.updates.restartUpdate": {
     "defaultMessage": "Restart and Update",
@@ -2613,11 +2617,11 @@
   },
   "workspace.updates.titleAvailable": {
     "defaultMessage": "Update Available",
-    "description": "The update dialog's title: a newer Hive."
+    "description": "The update dialog's title: a newer Combwork."
   },
   "workspace.updates.titleReady": {
     "defaultMessage": "Update Ready",
-    "description": "The update dialog's title: Hive's update is downloaded."
+    "description": "The update dialog's title: Combwork's update is downloaded."
   },
   "workspace.updates.titleSoftware": {
     "defaultMessage": "Software Update",
@@ -2629,11 +2633,11 @@
   },
   "workspace.updates.upToDate": {
     "defaultMessage": "{checked, select, yes {Up to date, checked {when}.} other {Up to date.}}",
-    "description": "Hive's updates: no newer version ({when}: \"4 minutes ago\")."
+    "description": "Combwork's updates: no newer version ({when}: \"4 minutes ago\")."
   },
   "workspace.updates.versionTip": {
     "defaultMessage": "{app} {version}{dev, select, yes { (development build)} other {}} · Electron {electron}{hasSummary, select, yes { · {summary}} other {}}",
-    "description": "Tooltip on the status bar's version: Hive's version, Electron's, and the update state ({summary}). Keep Electron as it is."
+    "description": "Tooltip on the status bar's version: Combwork's version, Electron's, and the update state ({summary}). Keep Electron as it is."
   },
   "workspace.updates.youHave": {
     "defaultMessage": "You have {version}",
@@ -2653,11 +2657,11 @@
   },
   "workspace.welcome.flow": {
     "defaultMessage": "Stay in flow",
-    "description": "The welcome page, How Hive works: a heading."
+    "description": "The welcome page, How Combwork works: a heading."
   },
   "workspace.welcome.flowText": {
-    "defaultMessage": "Hive chimes and notifies you when an agent finishes or needs input — even from the system tray.",
-    "description": "The welcome page, How Hive works."
+    "defaultMessage": "Combwork chimes and notifies you when an agent finishes or needs input — even from the system tray.",
+    "description": "The welcome page, How Combwork works."
   },
   "workspace.welcome.guide": {
     "defaultMessage": "User guide",
@@ -2668,7 +2672,7 @@
     "description": "The welcome page: a heading."
   },
   "workspace.welcome.howItWorks": {
-    "defaultMessage": "How Hive works",
+    "defaultMessage": "How Combwork works",
     "description": "The welcome page: a heading."
   },
   "workspace.welcome.install": {
@@ -2685,11 +2689,11 @@
   },
   "workspace.welcome.projects": {
     "defaultMessage": "Projects",
-    "description": "The welcome page, How Hive works: a heading."
+    "description": "The welcome page, How Combwork works: a heading."
   },
   "workspace.welcome.projectsText": {
     "defaultMessage": "Each subfolder is a project. Toggle the ones you're working on; each gets its own coding agents, running side by side.",
-    "description": "The welcome page, How Hive works."
+    "description": "The welcome page, How Combwork works."
   },
   "workspace.welcome.recent": {
     "defaultMessage": "Recent",
@@ -2713,11 +2717,11 @@
   },
   "workspace.welcome.skills": {
     "defaultMessage": "Skills & MCP",
-    "description": "The welcome page, How Hive works: a heading."
+    "description": "The welcome page, How Combwork works: a heading."
   },
   "workspace.welcome.skillsText": {
-    "defaultMessage": "Hive skills in the workspace reach the agents of every project (and the Hive Assistant, for those written for it); each project also shows its own and your user skills. An MCP server is on only where you turn it on: in one project, or in all of them. Changes apply to new sessions.",
-    "description": "The welcome page, How Hive works."
+    "defaultMessage": "Combwork skills in the workspace reach the agents of every project (and the Assistant, for those written for it); each project also shows its own and your user skills. An MCP server is on only where you turn it on: in one project, or in all of them. Changes apply to new sessions.",
+    "description": "The welcome page, How Combwork works."
   },
   "workspace.welcome.start": {
     "defaultMessage": "Start",
@@ -2725,14 +2729,14 @@
   },
   "workspace.welcome.tagline": {
     "defaultMessage": "Run AI coding agents across your projects, side by side.",
-    "description": "The welcome page (no workspace open), under Hive's name."
+    "description": "The welcome page (no workspace open), under Combwork's name."
   },
   "workspace.welcome.workspace": {
     "defaultMessage": "Workspace",
-    "description": "The welcome page, How Hive works: a heading."
+    "description": "The welcome page, How Combwork works: a heading."
   },
   "workspace.welcome.workspaceText": {
-    "defaultMessage": "A folder of projects. Hive adds a <code>.hive</code> folder for shared notes, skills and MCP servers — commit it to share with your team.",
-    "description": "The welcome page, How Hive works. <code> is a folder name: keep .hive as it is."
+    "defaultMessage": "A folder of projects. Combwork adds a <code>.combwork</code> folder for shared notes, skills and MCP servers — commit it to share with your team.",
+    "description": "The welcome page, How Combwork works. <code> is a folder name: keep .combwork as it is."
   }
 }

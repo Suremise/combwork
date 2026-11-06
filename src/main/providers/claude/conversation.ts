@@ -137,7 +137,7 @@ export class ConversationParser implements ConversationParserLike {
         this.push({ kind: 'thinking', timestamp: ts, text: b.thinking })
       } else if (b?.type === 'tool_use') {
         const input: Record<string, unknown> = b.input && typeof b.input === 'object' ? b.input : {}
-        const name = String(b.name ?? 'Tool') // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
+        const name = String(b.name ?? 'Tool') // i18n-ignore: a tool's name, as agents read it (cw_agent_activity)
         const tool: TranscriptTool = {
           toolUseId: String(b.id ?? ''),
           name: toolLabel(name),

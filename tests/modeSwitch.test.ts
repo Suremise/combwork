@@ -8,7 +8,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-// What Hive types into agents' terminals, recorded instead (no process runs); onWrite acts as each piece goes in.
+// What Combwork types into agents' terminals, recorded instead (no process runs); onWrite acts as each piece goes in.
 const pty = vi.hoisted(() => ({ typed: [] as { key: string; data: string }[], onWrite: (_data: string, _key: string): void => undefined }))
 vi.mock('../src/main/ptyHost', async (original) => ({
   ...(await original<object>()),
@@ -18,7 +18,7 @@ vi.mock('../src/main/ptyHost', async (original) => ({
   }
 }))
 
-const base = tempDir('hive-modeswitch-')
+const base = tempDir('cw-modeswitch-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -59,9 +59,9 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 describe("switching a running Codex agent's preset through its menu (#363)", () => {
   beforeAll(async () => {
-    mkdirSync(join(wsPath, '.hive'), { recursive: true })
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    mkdirSync(join(wsPath, '.combwork'), { recursive: true })
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     advanced.load(join(base, 'advanced'))
@@ -363,7 +363,7 @@ describe("switching a running Codex agent's preset through its menu (#363)", () 
       expect((restarted.state as { modeSwitching?: string }).modeSwitching).toBeUndefined()
       expect(r.switched).toEqual([])
       expect(r.skipped).toHaveLength(7)
-      expect(r.skipped[6]).toMatch(/session ended before Hive could switch it/)
+      expect(r.skipped[6]).toMatch(/session ended before Combwork could switch it/)
       expect(delivering().size).toBe(0)
     })
 
@@ -375,7 +375,7 @@ describe("switching a running Codex agent's preset through its menu (#363)", () 
       expect(list[6].typed()).toEqual([])
       expect(list[6].state.modeSwitching).toBeUndefined()
       expect(r.skipped).toHaveLength(7)
-      expect(r.skipped[6]).toMatch(/session ended before Hive could switch it/)
+      expect(r.skipped[6]).toMatch(/session ended before Combwork could switch it/)
       expect(delivering().size).toBe(0)
     })
   })

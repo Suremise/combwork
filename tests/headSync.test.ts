@@ -18,9 +18,9 @@ describe("headSync: a checkout's branch and commit from its ref files", () => {
     commit(repo, { 'a.txt': 'a\n' }, 'first')
     expect(headSync(repo)).toEqual({ line: sh(repo, 'symbolic-ref', '--short', 'HEAD').trim(), head: rev(repo) })
     const wt = join(repo, '..', 'wt')
-    sh(repo, 'worktree', 'add', '-q', '-b', 'hive/side', wt)
+    sh(repo, 'worktree', 'add', '-q', '-b', 'cw/side', wt)
     commit(wt, { 'b.txt': 'b\n' }, 'side')
-    expect(headSync(wt)).toEqual({ line: 'hive/side', head: rev(wt) })
+    expect(headSync(wt)).toEqual({ line: 'cw/side', head: rev(wt) })
     // A commit since: read again, the new one.
     commit(wt, { 'c.txt': 'c\n' }, 'more')
     expect(headSync(wt)?.head).toBe(rev(wt))
@@ -52,7 +52,7 @@ describe("headSync: a checkout's branch and commit from its ref files", () => {
     gitRepo(repo)
     commit(repo, { 'a.txt': 'a\n' }, 'first')
     const wt = join(base, 'wt')
-    sh(repo, 'worktree', 'add', '-q', '-b', 'hive/gone', wt)
+    sh(repo, 'worktree', 'add', '-q', '-b', 'cw/gone', wt)
     // Its HEAD damaged: neither a ref nor a commit.
     const gitDir = sh(wt, 'rev-parse', '--absolute-git-dir').trim()
     writeFileSync(join(gitDir, 'HEAD'), 'not a head\n')

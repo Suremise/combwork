@@ -1,12 +1,12 @@
 name: Bug report
-description: Something in Hive doesn't work as it should.
+description: Something in Combwork doesn't work as it should.
 labels: [bug]
 body:
   - type: markdown
     attributes:
       value: |
-        Thank you for reporting it. Please check the [open issues](https://github.com/Suremise/hive-desktop/issues) first: someone may have reported it already.
-        A security problem? Don't open an issue: report it privately, as [SECURITY.md](https://github.com/Suremise/hive-desktop/blob/main/.github/SECURITY.md) says.
+        Thank you for reporting it. Please check the [open issues](https://github.com/Suremise/combwork/issues) first: someone may have reported it already.
+        A security problem? Don't open an issue: report it privately, as [SECURITY.md](https://github.com/Suremise/combwork/blob/main/.github/SECURITY.md) says.
   - type: textarea
     id: what-happened
     attributes:
@@ -26,10 +26,10 @@ body:
     validations:
       required: true
   - type: input
-    id: hive-version
+    id: combwork-version
     attributes:
-      label: Hive version
-      description: Help → About Hive Desktop shows it.
+      label: Combwork version
+      description: Help → About Combwork shows it.
       placeholder: "0.9.0"
     validations:
       required: true
@@ -52,7 +52,7 @@ body:
   - type: dropdown
     id: language
     attributes:
-      label: Hive's language
+      label: Combwork's language
       description: Settings → General → Language.
       options:
         - English
@@ -71,7 +71,7 @@ body:
     attributes:
       label: Diagnostics
       description: |
-        In Hive, click **Help → Copy Diagnostics…**, look at what it shows, click **Copy** and paste it here. It has Hive's and Windows' versions, your coding agents, the settings that change how Hive behaves and the last lines of its log. Your own text is left out: folders, workspace, project and agent names, card titles, what you asked agents to do, and anything that looks like a key or token.
+        In Combwork, click **Help → Copy Diagnostics…**, look at what it shows, click **Copy** and paste it here. It has Combwork's and Windows' versions, your coding agents, the settings that change how Combwork behaves and the last lines of its log. Your own text is left out: folders, workspace, project and agent names, card titles, what you asked agents to do, and anything that looks like a key or token.
       render: text
   - type: textarea
     id: screenshots

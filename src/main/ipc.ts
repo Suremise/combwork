@@ -8,7 +8,7 @@ import type { WebContents } from 'electron'
 import { existsSync } from 'original-fs'
 import { basename, dirname, isAbsolute, join, resolve } from 'path'
 import { readFile } from 'original-fs/promises'
-import type { HiveChannel, HiveRequests } from '../shared/api'
+import type { CombworkChannel, CombworkRequests } from '../shared/api'
 import * as updater from './updater'
 import type { LaneStartRequest, MergeResult, ProviderId, QuitChoice } from '../shared/types'
 import { instructionFiles, instructionsShared, shareInstructions, SHARED_INSTRUCTIONS, type InstructionsFile } from '../shared/instructions'
@@ -28,7 +28,7 @@ import { maskDeep, maskKeys } from './keyMatcher'
 import { dismissMovedNotice, movedNotice } from './connectionMoves'
 import { config } from './config'
 import { clearRecent, recentChanged, recentFor, removeRecent } from './recentWorkspaces'
-import { emit, emitTo, onHiveEvent } from './events'
+import { emit, emitTo, onCombworkEvent } from './events'
 import { setPinned } from './pin'
 import { presentWindow } from './testQuiet'
 import { insideArchive, insideReal, isFile, samePlace, writeTextAtomic, writeTextUnlessChanged } from './fsutil'
@@ -39,11 +39,11 @@ import { addRemote, branchDrops, branchUpdatePlan, createBranch, createTag, dele
 import { checkGit, gitTool } from './gitTool'
 import { refreshPath, refreshPathBeforeStart } from './freshPath'
 import { openExternalTerminal } from './externalTerminal'
-import { hiveWorktreeOf, mergeUnused, removalPreview, removeUnusedWorktree, unusedBranchOf, unusedBranchStatus, unusedWorktrees } from './unusedWorktrees'
+import { combworkWorktreeOf, mergeUnused, removalPreview, removeUnusedWorktree, unusedBranchOf, unusedBranchStatus, unusedWorktrees } from './unusedWorktrees'
 import { branchMergeStatus, lineCard, lineConfirmed, mergeBranch, mergeBranches } from './branchMerge'
 import { createLogger, logsDir, userText } from './logger'
 import { closeCommandsRun, closeCommandState, closeWithCommand, controlRun, dismiss, dontWait, runByHand, runOpenCommands } from './closeCommand/closeCommands'
-import { cleanHive, cleanWorkspace } from '../shared/commands'
+import { cleanCombwork, cleanWorkspace } from '../shared/commands'
 import { diagnostics } from './diagnostics'
 import { resumeAfterClose, startupStep, stopLeftAfterClose } from './lastRun'
 import { dismissOffered, resumeOffered, workspaceRecovering } from './restartResume'
@@ -69,18 +69,21 @@ import * as tasks from './tasks'
 import { changeProjectKey, createProjectWithKey, keyProjects, sayKeysOnce } from './projectKeys'
 import { startTask } from './taskStart'
 import * as assistantControl from './assistantControl'
-import { revertSetting } from './settingsTools'
 import { finalWhys } from '../shared/assistantActivity'
 import { changeGroups } from './assistantChanges'
 import { UndoNotFound, userUndo } from './assistantUndo'
-import { advanced, updateSettingsChecked } from './advanced'
+import { advanced, resetSettingsChecked, updateSettingsChecked } from './advanced'
 import type { AdvancedState } from '../shared/advanced'
 import { switchMode } from './assistantMode'
 import * as modes from './modes'
-import { syncBundled } from './bundled'
+import { bundledIds, restoreBundled, syncBundled } from './bundled'
+import { API_FOLDER, agentTextSchema, createDialect, deleteDialect, dialectsDir, importDialect, placeOf, promoteDialect, saveDialect, saveDialectRaw, setDialectOn } from './dialects'
+import { dialectCatalogue, dialectChoices, dialectFileView, forgetPicks, listDialects, pickOfToken, rememberPick, spendPick } from './dialects/view'
+import type { DialectFile } from '../shared/dialects'
+import { trash } from './trash'
 import { checkMoved, finishPending, movePlan, repairMove } from './workspaceMove'
 import { missingWorktree, recreateWorktree, unlinkMissingWorktree } from './agentWorktree'
-import { projectAgents as agentsOf } from '../shared/defaults'
+import { CW_DIR, projectAgents as agentsOf } from '../shared/defaults'
 import type { MoveOptions, TaskCard } from '../shared/types'
 import { killPty, ptyBuffer, ptySize, resizePty, writePty } from './ptyHost'
 import { apiInfo, createViewer, regenerateToken, revokeViewer } from './servers'
@@ -100,8 +103,8 @@ import { antivirusStatus, antivirusSuggestion, applyAntivirus, dismissAntivirus,
 import { agentsMemory, allLeftovers, endAgentProcess, leftoversSettled, settleLeftovers, settleOffer } from './agentProcesses'
 import { cardWork, forYou, workBadges } from './workflow/cardWork'
 import { contextWorkspace, currentWorkspace, inWorkspace, workspace, workspaceFor, workspaceOf, WorkspaceService } from './workspace'
-import { ensureHiveExcluded, trackedHiveFiles, untrackHive, vcsOf } from './hiveVcs'
-import { hiveWindows, windowForPath, windowOf, windowShowing } from './windows'
+import { ensureCombworkExcluded, trackedCombworkFiles, untrackCombwork, vcsOf } from './combworkVcs'
+import { combworkWindows, windowForPath, windowOf, windowShowing } from './windows'
 import { noteLongTasks, noteWhere } from './rendererWatch'
 import { cleanTasks, cleanWhere } from '../shared/windowHealth'
 import { setTitleBarBackdrops, setTitleBarColors } from './titleBar'
@@ -119,7 +122,7 @@ import { CONSOLE_WINDOW_CHANNELS, consoleOwner, openConsoleWindow, sendToConsole
 import { isRecordingName, latestRecording, listCaptures, recordingOf, recordingsDir, startRecording, stopRecording, stopRecordingsWhere } from './consoleRecorder'
 import { mayRead, type ConsoleEvent } from '../shared/devConsole'
 import { benchContext, importBenchmark, keepReport, listBenchmarks, pinBenchmark, readBenchmark, removeBenchmark, selectBenchmarks } from './benchmarks'
-import { capturedText, englishError, HiveError, hiveError, windowError } from './hiveError'
+import { capturedText, englishError, CombworkError, combworkError, windowError } from './combworkError'
 import { deleteJournalEntry, deleteWorkspaceJournal, editJournalEntry, forgetJournalEntries, forgetJournalPreview, journalEntry, journalStatus, setJournalSettings } from './journalService'
 import { browseJournal, journalProjects } from './journal'
 import { runActions } from './workflow/actionWorker'
@@ -148,40 +151,40 @@ import { pauseApp, resumeApp } from './teamPause'
 import { endParkedProcess, installIfParked, teamPauseState } from './teamParked'
 
 /**
- * What the window is told when a call is refused (#845): thrown as HiveErrors, so the window reads them in its language
+ * What the window is told when a call is refused (#845): thrown as CombworkErrors, so the window reads them in its language
  * and anything else that calls these services reads English. The native dialogs' text is the window's too.
  */
 const M = {
-  queueMerges: msg({ id: 'errors.merge.queueMerges', defaultMessage: "Hive merges {card} through the merge queue. Merge it there, or choose Merge anyway in the Merge dialog.", description: "Refusal of a Merge of an agent's branch whose card Hive's merge queue merges (the dialog's state was out of date). {card} is the card's key. Merge anyway is a button: keep it as Hive shows it. Glossary 2.5: merge queue." }),
-  unknownProvider: msg({ id: 'errors.provider.unknown', defaultMessage: 'Unknown provider "{provider}".', description: "A call named a coding-agent CLI this version of Hive doesn't know. {provider} is the id it gave." }),
-  insideArchive: msg({ id: 'errors.file.insideArchive', defaultMessage: 'Hive opens no files inside .asar archives.', description: 'Refusal to open a file inside an Electron .asar archive. Keep ".asar" as it is.' }),
-  outsideWorkspace: msg({ id: 'errors.file.outsideWorkspace', defaultMessage: "Hive can only read and write files inside the workspace, and the agents' instruction, memory and skill files.", description: 'Refusal to open or save a file outside what Hive may touch.' }),
+  queueMerges: msg({ id: 'errors.merge.queueMerges', defaultMessage: "Combwork merges {card} through the merge queue. Merge it there, or choose Merge anyway in the Merge dialog.", description: "Refusal of a Merge of an agent's branch whose card Combwork's merge queue merges (the dialog's state was out of date). {card} is the card's key. Merge anyway is a button: keep it as Combwork shows it. Glossary 2.5: merge queue." }),
+  unknownProvider: msg({ id: 'errors.provider.unknown', defaultMessage: 'Unknown provider "{provider}".', description: "A call named a coding-agent CLI this version of Combwork doesn't know. {provider} is the id it gave." }),
+  insideArchive: msg({ id: 'errors.file.insideArchive', defaultMessage: 'Combwork opens no files inside .asar archives.', description: 'Refusal to open a file inside an Electron .asar archive. Keep ".asar" as it is.' }),
+  outsideWorkspace: msg({ id: 'errors.file.outsideWorkspace', defaultMessage: "Combwork can only read and write files inside the workspace, and the agents' instruction, memory and skill files.", description: 'Refusal to open or save a file outside what Combwork may touch.' }),
   noLog: msg({ id: 'errors.log.none', defaultMessage: 'That run reported no log.', description: "Progress panel: a run's log can't be opened because the run never said where it was." }),
-  logNotFull: msg({ id: 'errors.log.notFullPath', defaultMessage: 'The run reported its log without a full path: {path}', description: "Progress panel: a run gave its log as a relative path, which Hive won't open. {path} is that path." }),
+  logNotFull: msg({ id: 'errors.log.notFullPath', defaultMessage: 'The run reported its log without a full path: {path}', description: "Progress panel: a run gave its log as a relative path, which Combwork won't open. {path} is that path." }),
   logGone: msg({ id: 'errors.log.gone', defaultMessage: "The log isn't there any more: {path}", description: "Progress panel: a run's log file was deleted or moved. {path} is where it was." }),
-  logNotText: msg({ id: 'errors.log.notText', defaultMessage: 'Hive opens only text logs and reports, not {file}: use Show in folder.', description: "Progress panel: a run's log isn't a text file, so Hive won't open it. {file} is its file name. \"Show in folder\" is the menu item beside it." }),
-  commandsMoved: msg({ id: 'errors.commands.otherWorkspace', defaultMessage: "This window shows another workspace now, so the commands you changed weren't saved.", description: "An error: the user changed a workspace's commands in Settings (HI-1954), and the window switched to another workspace before the change was saved, so Hive didn't save it into the wrong one." }),
+  logNotText: msg({ id: 'errors.log.notText', defaultMessage: 'Combwork opens only text logs and reports, not {file}: use Show in folder.', description: "Progress panel: a run's log isn't a text file, so Combwork won't open it. {file} is its file name. \"Show in folder\" is the menu item beside it." }),
+  commandsMoved: msg({ id: 'errors.commands.otherWorkspace', defaultMessage: "This window shows another workspace now, so the commands you changed weren't saved.", description: "An error: the user changed a workspace's commands in Settings (HI-1954), and the window switched to another workspace before the change was saved, so Combwork didn't save it into the wrong one." }),
   notProjectPref: msg({ id: 'errors.pref.notProjectPref', defaultMessage: 'Not a project preference.', description: "Refusal of a call to save a per-project view setting that doesn't exist (a programming error, rarely seen)." }),
   notPrefValue: msg({ id: 'errors.pref.notValue', defaultMessage: 'Not a {pref} value.', description: "Refusal of a per-project view setting's value. {pref} is the setting's internal name." }),
   notTipsChange: msg({ id: 'errors.tips.notChange', defaultMessage: 'Not a tips change.', description: 'Refusal of a call to change which tips were seen (a programming error, rarely seen).' }),
   workspaceNotFound: msg({ id: 'errors.workspace.notFound', defaultMessage: "The workspace folder {path} can't be found. It may have been moved or deleted, or be on a drive that isn't connected.", description: "Opening a workspace whose folder isn't there. {path} is the folder." }),
-  undoWhich: msg({ id: 'errors.assistantUndo.which', defaultMessage: "Choose one change of the Assistant's to undo, or one message's changes.", description: "An error: the window asked to undo the Hive Assistant's changes without saying which: one change, or all the changes made for one of the user's messages." }),
-  undoGone: msg({ id: 'errors.assistantUndo.gone', defaultMessage: "That change of the Assistant's is no longer kept: changes are kept for 7 days.", description: "An error: the user asked to undo a change the Hive Assistant made, but it is older than 7 days (or was never kept), so it can't be undone any more." }),
+  undoWhich: msg({ id: 'errors.assistantUndo.which', defaultMessage: "Choose one change of the Assistant's to undo, or one message's changes.", description: "An error: the window asked to undo the Combwork Assistant's changes without saying which: one change, or all the changes made for one of the user's messages." }),
+  undoGone: msg({ id: 'errors.assistantUndo.gone', defaultMessage: "That change of the Assistant's is no longer kept: changes are kept for 7 days.", description: "An error: the user asked to undo a change the Combwork Assistant made, but it is older than 7 days (or was never kept), so it can't be undone any more." }),
   noWorkspace: msg({ id: 'errors.workspace.none', defaultMessage: 'No workspace is open.', description: 'An action needs an open workspace and this window has none.' }),
   notWorktree: msg({ id: 'errors.worktree.notGit', defaultMessage: "{path} isn't a git worktree (it has no .git file). Choose the folder the worktree was moved to.", description: "Repair: the folder chosen as an agent's moved worktree isn't one. {path} is that folder. Keep \".git\" as it is." }),
   removeHow: msg({ id: 'errors.project.removeHow', defaultMessage: 'Unknown way to remove a project: {how}', description: "Refusal of a call to remove a project in a way that doesn't exist (a programming error, rarely seen). {how} is what it asked for." }),
   stopFirst: msg({ id: 'errors.project.stopFirst', defaultMessage: 'Stop the running session before deactivating this project.', description: 'Turning a project off while one of its agents is running.' }),
-  noRepo: msg({ id: 'errors.hive.noRepo', defaultMessage: 'No git repository holds this project: exclude .hive in the version control or sync service you use.', description: "Exclude .hive from git: the project isn't in a git repository. Keep \".hive\" as it is." }),
-  stillTracked: msg({ id: 'errors.hive.notIgnored', defaultMessage: "Git still doesn't ignore .hive here: a rule in a .gitignore (a line starting with !) may bring it back. Hive doesn't edit .gitignore files.", description: 'Exclude .hive from git: after excluding it, git still sees it. Keep ".hive", ".gitignore" and "!" as they are.' }),
-  cantList: msg({ id: 'errors.hive.cantList', defaultMessage: "Git couldn't list the files it tracks in .hive.", description: 'Listing the files of .hive that git tracks failed. Keep ".hive" as it is.' }),
-  notImage: msg({ id: 'errors.image.not', defaultMessage: 'Not an image', description: "Copy image: the file isn't an image Hive can read." }),
+  noRepo: msg({ id: 'errors.cw.noRepo', defaultMessage: 'No git repository holds this project: exclude .combwork in the version control or sync service you use.', description: "Exclude .combwork from git: the project isn't in a git repository. Keep \".combwork\" as it is." }),
+  stillTracked: msg({ id: 'errors.cw.notIgnored', defaultMessage: "Git still doesn't ignore .combwork here: a rule in a .gitignore (a line starting with !) may bring it back. Combwork doesn't edit .gitignore files.", description: 'Exclude .combwork from git: after excluding it, git still sees it. Keep ".combwork", ".gitignore" and "!" as they are.' }),
+  cantList: msg({ id: 'errors.cw.cantList', defaultMessage: "Git couldn't list the files it tracks in .combwork.", description: 'Listing the files of .combwork that git tracks failed. Keep ".combwork" as it is.' }),
+  notImage: msg({ id: 'errors.image.not', defaultMessage: 'Not an image', description: "Copy image: the file isn't an image Combwork can read." }),
   holdRequired: msg({ id: 'errors.mergeSlot.holdRequired', defaultMessage: 'Which hold to release is required', description: 'Releasing a merge slot without saying which (a programming error, rarely seen).' }),
   laneRequired: msg({ id: 'errors.lane.required', defaultMessage: 'Which lane to end is required', description: 'Ending a card loop without saying which (a programming error, rarely seen).' }),
   laneBuilderRequired: msg({ id: 'errors.lane.builderRequired', defaultMessage: "A lane's builder is required", description: 'Starting a lane (a card loop) without saying which agent builds it (a programming error, rarely seen).' }),
   consoleHidden: msg({ id: 'errors.console.hidden', defaultMessage: 'The developer console is hidden: turn on Settings → Advanced → Show developer features.', description: 'Opening the developer console while it is turned off. "Settings → Advanced → Show developer features" is the way to the setting: translate it as Settings shows it.' }),
-  sourcesList: msg({ id: 'errors.console.sourcesList', defaultMessage: 'The sources to watch must be a list.', description: "The developer console asked to watch sources in a form Hive doesn't take (a programming error, rarely seen)." }),
+  sourcesList: msg({ id: 'errors.console.sourcesList', defaultMessage: 'The sources to watch must be a list.', description: "The developer console asked to watch sources in a form Combwork doesn't take (a programming error, rarely seen)." }),
   notSource: msg({ id: 'errors.console.notSource', defaultMessage: 'Not a developer console source this window can record', description: "Recording a developer console source this window can't read." }),
-  notRecording: msg({ id: 'errors.console.notRecording', defaultMessage: 'Not a developer console recording', description: "Showing a developer console recording that isn't one of Hive's." }),
+  notRecording: msg({ id: 'errors.console.notRecording', defaultMessage: 'Not a developer console recording', description: "Showing a developer console recording that isn't one of Combwork's." }),
   notFileOf: msg({ id: 'errors.changes.notFile', defaultMessage: "{file} isn't a file of {folder}.", description: 'Changes tab: opening a file outside the folder it shows. {file} is the file, {folder} the folder.' }),
   // The native dialogs.
   openWorkspace: msg({ id: 'errors.dialog.openWorkspace', defaultMessage: 'Open Workspace', description: "Title and button of Windows' folder picker for opening a workspace." }),
@@ -196,7 +199,12 @@ const M = {
   useFolder: msg({ id: 'errors.dialog.useFolder', defaultMessage: 'Use This Folder', description: "Button of Windows' folder picker in Repair." }),
   exportTemplate: msg({ id: 'errors.dialog.exportTemplate', defaultMessage: 'Export Template', description: "Title of Windows' save dialog for a template." }),
   importTemplate: msg({ id: 'errors.dialog.importTemplate', defaultMessage: 'Import a Template', description: "Title of Windows' file picker for a template." }),
-  templateFiles: msg({ id: 'errors.dialog.templateFiles', defaultMessage: 'Hive template', description: "The file type in Windows' file dialogs for templates." }),
+  templateFiles: msg({ id: 'errors.dialog.templateFiles', defaultMessage: 'Combwork template', description: "The file type in Windows' file dialogs for templates." }),
+  notDialect: msg({ id: 'errors.dialects.notDialect', defaultMessage: "{path} isn't a dialect file Combwork can change.", description: "An error in the Dialects view (HI-2444): the file asked for isn't one of the workspace's dialect files (or can't be reverted: it isn't shipped). {path} is its path in the dialects folder. Glossary: dialect." }),
+  pickAgain: msg({ id: 'errors.dialects.pickAgain', defaultMessage: 'Choose the file to import again: the one chosen before has expired.', description: "An error in the Dialects view's Import (HI-2444): the file chosen earlier can no longer be used (too long ago, or chosen in another window). Glossary: dialect." }),
+  importDialect: msg({ id: 'errors.dialog.importDialect', defaultMessage: 'Import a Dialect File', description: "Title of Windows' file picker in the Dialects view (HI-2444): a dialect file to add. Glossary: dialect." }),
+  exportDialect: msg({ id: 'errors.dialog.exportDialect', defaultMessage: 'Export Dialect File', description: "Title of Windows' save dialog in the Dialects view (HI-2444): where to write a dialect file. Glossary: dialect." }),
+  dialectFiles: msg({ id: 'errors.dialog.dialectFiles', defaultMessage: 'Dialect file', description: "The file type in Windows' file dialogs for dialect files (HI-2444, JSON). Glossary: dialect." }),
   exportTranscript: msg({ id: 'errors.dialog.exportTranscript', defaultMessage: 'Export Transcript as Markdown', description: "Title of Windows' save dialog for a session's transcript." }),
   addSkill: msg({ id: 'errors.dialog.addSkill', defaultMessage: 'Add a skill from a file', description: "Title of Windows' file picker for a skill." }),
   skillFiles: msg({ id: 'errors.dialog.skillFiles', defaultMessage: 'Skill (.md or .zip)', description: "The file type in Windows' file picker for a skill. Keep \".md\" and \".zip\" as they are." }),
@@ -211,9 +219,9 @@ const advancedState = (): AdvancedState => advanced.state(workspace.path ? (work
 const senderStore = new AsyncLocalStorage<WebContents>()
 
 /**
- * The Hive window whose IPC request is being served now (HI-2355), or null outside one (a timer, a hook, the Agent API):
+ * The Combwork window whose IPC request is being served now (HI-2355), or null outside one (a timer, a hook, the Agent API):
  * a result or warning made for that request is told in that window (main/notify.ts), even if another has the focus by
- * then. A console window's request is its own, not a Hive window's: none.
+ * then. A console window's request is its own, not a Combwork window's: none.
  */
 export function requestingWindow(): BrowserWindow | null {
   const wc = senderStore.getStore()
@@ -228,7 +236,7 @@ const consoleWindows = new Map<string, { wc: WebContents; workspace: string }>()
 /** Pages whose subscription already ends when they close. */
 const consolePages = new WeakSet<WebContents>()
 const consoleWorkspace = (wc: WebContents): string => ((windowOf(wc) ?? consoleOwner(wc))?.ws.path ?? '').toLowerCase()
-onHiveEvent((e) => {
+onCombworkEvent((e) => {
   if (e.type !== 'workspace-changed') return
   for (const [id, sub] of consoleWindows) {
     if (!sub.wc.isDestroyed() && consoleWorkspace(sub.wc) === sub.workspace) continue
@@ -242,13 +250,13 @@ onHiveEvent((e) => {
  * Settings → Advanced → Developer console: show text (#699): while it is on, the console's windows are sent prompt, reply
  * and command text (secrets still masked, shared/devConsole.ts); a change applies to their subscriptions at once.
  */
-const consoleShowsText = (): boolean => advanced.get<boolean>('hive.console.showText') === true
+const consoleShowsText = (): boolean => advanced.get<boolean>('cw.console.showText') === true
 advanced.onChange(() => {
   const showText = consoleShowsText()
   for (const id of consoleWindows.keys()) devConsole.setIncludeText(id, showText)
   sendToConsoles({ type: 'console-options', showText })
 })
-/** Whether this window's workspace may read a console source (its own agents, its Assistant and Hive there). */
+/** Whether this window's workspace may read a console source (its own agents, its Assistant and Combwork there). */
 const windowMayRead = (source: string): boolean => {
   const ws = currentWorkspace().path
   return !!ws && mayRead({ kind: 'assistant', workspace: ws }, source, (p) => workspaceFor(p)?.path ?? null)
@@ -262,30 +270,30 @@ async function projectInstructions(project: string, ids: ProviderId[]): Promise<
   return instructionFiles(descriptors, (f) => content.get(f) ?? null)
 }
 
-type Impl = { [C in HiveChannel]: (...args: Parameters<HiveRequests[C]>) => ReturnType<HiveRequests[C]> | Promise<ReturnType<HiveRequests[C]>> }
+type Impl = { [C in CombworkChannel]: (...args: Parameters<CombworkRequests[C]>) => ReturnType<CombworkRequests[C]> | Promise<ReturnType<CombworkRequests[C]>> }
 
 /** A provider id this version knows; anything else is refused (it would become a settings key). */
 function knownProvider(id: unknown): ProviderId {
-  if (typeof id !== 'string' || !isKnownProvider(id)) throw hiveError(M.unknownProvider, { provider: String(id) }, { kind: 'invalid' })
+  if (typeof id !== 'string' || !isKnownProvider(id)) throw combworkError(M.unknownProvider, { provider: String(id) }, { kind: 'invalid' })
   return id
 }
 
-/** Refuses extra arguments with a bare "--" (#523): Hive passes the task after its own. */
+/** Refuses extra arguments with a bare "--" (#523): Combwork passes the task after its own. */
 function assertExtraArgs(args: unknown): void {
   const problem = typeof args === 'string' ? capturedText((t) => extraArgsProblem(args, t)) : null
-  if (problem) throw new HiveError(problem, { kind: 'invalid' })
+  if (problem) throw new CombworkError(problem, { kind: 'invalid' })
 }
 
 function guardFile(path: string, write = false): string {
-  if (insideArchive(path)) throw hiveError(M.insideArchive, undefined, { kind: 'forbidden' })
+  if (insideArchive(path)) throw combworkError(M.insideArchive, undefined, { kind: 'forbidden' })
   // A CLI's own files: its connections' homes on in this workspace (HI-1755), else the CLI's own home.
   if (workspace.isAllowedPath(path) || allProviders().some((p) => p.fileAllowed(path, write, connectionHomes(p.id, workspace.path ? workspace.config : null)?.map((h) => h.home)))) return path
-  // The skills that ship with Hive, to view one the workspace doesn't have.
+  // The skills that ship with Combwork, to view one the workspace doesn't have.
   if (!write && insideReal(path, [skills.bundledSkillsDir()])) return path
-  throw hiveError(M.outsideWorkspace, undefined, { kind: 'forbidden' })
+  throw combworkError(M.outsideWorkspace, undefined, { kind: 'forbidden' })
 }
 
-/** The log files Hive opens itself (#251): text and reports. Anything else is only shown in its folder, never run. */
+/** The log files Combwork opens itself (#251): text and reports. Anything else is only shown in its folder, never run. */
 const OPENABLE_LOG = /\.(md|markdown|txt|log|out|err|json|jsonl|csv|tsv|xml|html?)$/i
 
 /**
@@ -295,20 +303,20 @@ const OPENABLE_LOG = /\.(md|markdown|txt|log|out|err|json|jsonl|csv|tsv|xml|html
  */
 async function runLog(id: unknown): Promise<string> {
   const p = workspace.path && typeof id === 'string' ? progress.logOf(workspace.path, id) : null
-  if (!p) throw hiveError(M.noLog, undefined, { kind: 'notFound' })
-  if (!isAbsolute(p)) throw hiveError(M.logNotFull, { path: p }, { kind: 'invalid' })
-  if (!(await isFile(p))) throw hiveError(M.logGone, { path: p }, { kind: 'notFound' })
+  if (!p) throw combworkError(M.noLog, undefined, { kind: 'notFound' })
+  if (!isAbsolute(p)) throw combworkError(M.logNotFull, { path: p }, { kind: 'invalid' })
+  if (!(await isFile(p))) throw combworkError(M.logGone, { path: p }, { kind: 'notFound' })
   return p
 }
 
 /** Quitting and closing windows (index.ts): each call names the window it came from. */
 export interface QuitControl {
   quit: () => void
-  /** Quits as quit does (asking about running agents), then starts Hive again (#676). */
+  /** Quits as quit does (asking about running agents), then starts Combwork again (#676). */
   restart: () => void
   decide: (from: BrowserWindow, choice: QuitChoice, dontAskAgain: boolean) => void
   cancelPending: () => void
-  state: (from: BrowserWindow) => ReturnType<HiveRequests['app:quitState']>
+  state: (from: BrowserWindow) => ReturnType<CombworkRequests['app:quitState']>
   setUnsaved: (from: BrowserWindow, paths: string[]) => void
   newWindow: (from: BrowserWindow) => void
   /** Before closing or switching a window's workspace: asks (per Confirm on quit) and stops its agents; false if cancelled. */
@@ -350,7 +358,7 @@ function moveOptions(o: unknown): MoveOptions {
 
 
 /**
- * Every merge route's authorization, decided now in main (#1357 and #1450, OP-13): a branch whose card Hive's merge
+ * Every merge route's authorization, decided now in main (#1357 and #1450, OP-13): a branch whose card Combwork's merge
  * queue merges goes only as Merge anyway for that card (then recorded on it as an override, with the reason); a line
  * whose card isn't Done otherwise only when the request names that card, after the window's confirmation. So no dialog
  * whose lookup was pending, failed or out of date, and no older route, merges a card's work plainly.
@@ -358,7 +366,7 @@ function moveOptions(o: unknown): MoveOptions {
 async function authorizedMerge(path: string, branch: string | null | undefined, opts: { card?: number; outsideQueue?: { card: number; reason: string } } | undefined, run: () => Promise<MergeResult>): Promise<MergeResult> {
   const queued = branch ? await branchQueueCard(workspace, path, branch) : null
   const out = opts?.outsideQueue
-  if (queued && (!out || out.card !== queued.card)) throw hiveError(M.queueMerges, { card: queued.key }, { kind: 'conflict' })
+  if (queued && (!out || out.card !== queued.card)) throw combworkError(M.queueMerges, { card: queued.key }, { kind: 'conflict' })
   if (!queued) await lineConfirmed(path, branch, opts?.card)
   const r = await run()
   // Merged anyway, outside the merge queue: an override on the card, with the user's reason.
@@ -410,7 +418,7 @@ function boardSteps(ws: WorkspaceService, upgraded = false, after?: AfterOpen): 
     'adoption, slots, repairs and what changed while closed', // i18n-ignore: a part of a log line's timing
     adoptWorkspace(ws)
       .then(() => settleSlotsUpToDate(ws))
-      // HI-1997: a commit message a preset stored as Hive's, switched once to the branch's own (a proven choice kept).
+      // HI-1997: a commit message a preset stored as Combwork's, switched once to the branch's own (a proven choice kept).
       .then(() => settleCommitMessageDefault(ws))
       .then(() => step('slots'))
       .then(() => migrateSlots(ws))
@@ -435,10 +443,10 @@ function boardSteps(ws: WorkspaceService, upgraded = false, after?: AfterOpen): 
   void mcp.sayMcpAddedOnce(ws).catch((e) => log.warn('the MCP added-servers notice', e))
 }
 
-export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info']>, quitControl: QuitControl): void {
+export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:info']>, quitControl: QuitControl): void {
   // A board upgraded to 1.0 while its workspace is open: what its opening skipped, now (#1621).
   onBoardUpgraded((ws) => boardSteps(ws, true))
-  // Each time a workspace opens: Hive's bundled skills and modes it hasn't got, or has untouched older copies of.
+  // Each time a workspace opens: Combwork's bundled skills and modes it hasn't got, or has untouched older copies of.
   // After the open, not before it (HI-1705): a launch waits for it.
   WorkspaceService.bringItemsUpToDate = (fresh) => syncBundled({ fresh })
   WorkspaceService.runsCommands = closeCommandsRun
@@ -449,16 +457,16 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     void after.track('usage history', usageHistory.opened(contextWorkspace()!)) // i18n-ignore: a part of a log line's timing
     // Its board's steps: skipped while the board waits for its upgrade to 1.0, and run again once it is upgraded.
     boardSteps(contextWorkspace()!, false, after)
-    // Builds of Hive left for it while it was closed (#1534), into the journal once.
-    void after.track('builds left for it', pickUpBuilds(ws).catch((e) => log.warn('recording the builds left for Hive', e))) // i18n-ignore: a part of a log line's timing
-    // What failed or interrupted saves and the project-id migration left in the .hive folders (#1016).
+    // Builds of Combwork left for it while it was closed (#1534), into the journal once.
+    void after.track('builds left for it', pickUpBuilds(ws).catch((e) => log.warn('recording the builds left for Combwork', e))) // i18n-ignore: a part of a log line's timing
+    // What failed or interrupted saves and the project-id migration left in the .combwork folders (#1016).
     void after.track('leftovers', sweepWorkspaceLeftovers(ws).catch((e) => log.warn('removing leftover temp and backup files', e))) // i18n-ignore: a part of a log line's timing
     // Its open point's commands (HI-1954), in its window, its agents held until they're done (the gate reserved as it opened).
     void after.track('open commands', runOpenCommands(contextWorkspace()!)) // i18n-ignore: a part of a log line's timing
     // Moved since it was last opened (#146)? In the background: the window opens meanwhile, and a banner follows.
     void after.track('whether it moved', checkMoved(contextWorkspace()!).catch((e) => log.warn('checking whether the workspace moved', e))) // i18n-ignore: a part of a log line's timing
-    // A merge slot an agent held when Hive closed: its merge may be half done (#350).
-    // At start, the notice that Hive closed unexpectedly waits for it, and tells its holds (#984).
+    // A merge slot an agent held when Combwork closed: its merge may be half done (#350).
+    // At start, the notice that Combwork closed unexpectedly waits for it, and tells its holds (#984).
     // Resumes after a restart wait for it too (HI-1707).
     if (ws.path) {
       const recovery = after.track('merge slots', recoverMergeSlots(ws.path).catch((e) => log.warn('recovering the merge slots', e))) // i18n-ignore: a part of a log line's timing
@@ -472,6 +480,11 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     // A project added since (made, or a folder opened): its key (#1219).
     void keyProjects(ws).catch((e) => log.warn('giving the projects their keys', e))
   }
+  /** The window's workspace's dialect files changed (HI-2444): its Dialects view reads them again (the watch also tells it). */
+  const dialectsChanged = (): void => contextWorkspace()?.emit({ type: 'dialects-changed' })
+  // A file picked to import is its window's and workspace's: gone with either (HR1 on HI-2444's design; a window's
+  // close is index.ts's, where the app's window events are).
+  WorkspaceService.closingListeners.add((path) => forgetPicks({ combworkDir: join(path, CW_DIR) }))
   /** The window the current request came from. */
   const win = (): BrowserWindow => {
     const w = contextWorkspace()?.window
@@ -502,14 +515,14 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'commands:setWorkspace': async (workspacePath, commands) => {
       const ws = currentWorkspace()
       // To the workspace it was edited in: one switched away from meanwhile keeps its own (HR2's round 1).
-      if (!ws.path || typeof workspacePath !== 'string' || !samePlace(ws.path, workspacePath)) throw hiveError(M.commandsMoved, undefined, { kind: 'conflict' })
+      if (!ws.path || typeof workspacePath !== 'string' || !samePlace(ws.path, workspacePath)) throw combworkError(M.commandsMoved, undefined, { kind: 'conflict' })
       const saved = cleanWorkspace(commands)
       await ws.saveWorkspaceConfigWith(() => ({ commands: saved }))
       ws.scheduleRefresh()
       return saved
     },
-    'commands:setHive': (commands) => {
-      const saved = cleanHive(commands)
+    'commands:setCombwork': (commands) => {
+      const saved = cleanCombwork(commands)
       config.updateSettings({ commands: saved })
       return saved
     },
@@ -568,7 +581,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'window:minimize': () => win().minimize(),
     'window:toggleMaximize': () => (win().isMaximized() ? win().unmaximize() : win().maximize()),
     'window:close': () => win().close(),
-    'window:count': () => hiveWindows().length,
+    'window:count': () => combworkWindows().length,
     'window:new': () => quitControl.newWindow(win()),
     'window:toggleDevTools': () => win().webContents.toggleDevTools(),
     'window:zoom': (dir) => {
@@ -584,7 +597,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     },
     'window:getAlwaysOnTop': () => win().isAlwaysOnTop(),
     'window:showing': (projectPath) => {
-      const e = hiveWindows().find((x) => x.win === win())
+      const e = combworkWindows().find((x) => x.win === win())
       if (e) e.showing = projectPath
     },
     'notice:open': (projectPath) => {
@@ -620,7 +633,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     },
     'window:setTitleBarColors': (color, symbolColor) => setTitleBarColors(win(), { color, symbolColor }),
     'window:setBackdrops': (count) => setTitleBarBackdrops(win(), count),
-    // The page's health in hive.log (HI-1775): where it is, and its long tasks.
+    // The page's health in combwork.log (HI-1775): where it is, and its long tasks.
     'window:where': (where) => {
       const wc = senderStore.getStore()
       const entry = wc ? windowOf(wc) : null
@@ -640,8 +653,12 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'settings:setProviderFallback': (provider, kind, list) => config.setProviderFallback(knownProvider(provider), kind === 'efforts' ? 'efforts' : 'models', list),
     'settings:reset': async (section) => {
       // All of them: advanced.json's overrides too (#367), first, as it can refuse (a file it can't read).
-      if (!section) await advanced.resetAll()
-      return config.resetSettings(section)
+      if (!section) {
+        await advanced.resetAll()
+        return config.resetSettings()
+      }
+      // A section with a value kept there too (Show developer features): the file first, in one turn (HI-2418).
+      return resetSettingsChecked(section, () => config.resetSettings(section))
     },
     // Advanced settings (#367): the overrides in advanced.json, and this window's workspace's own values.
     'advanced:state': () => advancedState(),
@@ -667,10 +684,10 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
         else delete c.ui.panes[String(key)]
       }),
     'ui:setProjectPref': (pref, project, value) => {
-      if (!isProjectPref(pref) || typeof project !== 'string' || !project) throw hiveError(M.notProjectPref, undefined, { kind: 'invalid' })
+      if (!isProjectPref(pref) || typeof project !== 'string' || !project) throw combworkError(M.notProjectPref, undefined, { kind: 'invalid' })
       const key = project.toLowerCase()
       const kept = value === null ? null : projectPrefValue(pref, value)
-      if (kept === undefined) throw hiveError(M.notPrefValue, { pref }, { kind: 'invalid' })
+      if (kept === undefined) throw combworkError(M.notPrefValue, { pref }, { kind: 'invalid' })
       // This project's value merged into the saved map, never the window's whole copy of it.
       config.update((c) => {
         ;(c.ui as Record<string, unknown>)[pref] = withProjectPref(c.ui[pref] as Record<string, unknown> | undefined, key, kept)
@@ -679,7 +696,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     },
     'ui:changeTips': (change) => {
       const kept = tipsChange(change)
-      if (!kept) throw hiveError(M.notTipsChange, undefined, { kind: 'invalid' })
+      if (!kept) throw combworkError(M.notTipsChange, undefined, { kind: 'invalid' })
       // The change applied to what is saved, never the window's whole copy of the state.
       let tips = EMPTY_TIPS_STATE
       config.update((c) => void (c.ui.tips = tips = applyTipsChange(tipsState(c.ui.tips), kept)))
@@ -718,7 +735,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       }
       if (shownElsewhere(target)) return workspace.info()
       // A recent workspace whose folder was deleted or moved (#144): said plainly, so the window can offer to forget it.
-      if (!existsSync(target)) throw hiveError(M.workspaceNotFound, { path: target }, { kind: 'notFound' })
+      if (!existsSync(target)) throw combworkError(M.workspaceNotFound, { path: target }, { kind: 'notFound' })
       // This window's workspace already, or the one it is opening (its restore at start), by any name (an 8.3 short name,
       // a junction, #455): left as it is, never closed and opened again, which ended what its passes were writing
       // (HI-2141); it keeps the name it has, which its agents' sessions use.
@@ -766,7 +783,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'workspace:recent': () => recentFor(workspace.path),
     'workspace:usage': async () => {
       const ws = workspace
-      if (!ws.path) throw hiveError(M.noWorkspace, undefined, { kind: 'conflict' })
+      if (!ws.path) throw combworkError(M.noWorkspace, undefined, { kind: 'conflict' })
       // From the usage history (#1106): each host's records and its sessions there, no transcript read.
       const projects = []
       for (const p of await ws.listProjectPaths()) projects.push({ name: basename(p), path: p, items: await sessions.usageItems(p).catch(() => []) })
@@ -782,7 +799,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       const scope = q.scope.kind === 'project' && !sanitize ? q.scope.project.replace(/[<>:"/\\|?*\x00-\x1f]+/g, ' ').trim().slice(0, 60) : q.own ? 'own-work' : q.scope.kind
       const r = await dialog.showSaveDialog(win(), {
         title: tr(M.exportMetrics),
-        defaultPath: join(app.getPath('downloads'), `hive-performance-${scope}-${new Date().toISOString().slice(0, 10)}.json`),
+        defaultPath: join(app.getPath('downloads'), `combwork-performance-${scope}-${new Date().toISOString().slice(0, 10)}.json`),
         filters: [{ name: 'JSON', extensions: ['json'] }]
       })
       if (r.canceled || !r.filePath) return null
@@ -836,14 +853,14 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       const title = agent ? tr(M.locateWorktree, { agent: agent.name }) : tr(M.locateAgentWorktree)
       const r = await dialog.showOpenDialog(win(), { title, properties: ['openDirectory'], buttonLabel: tr(M.useFolder) })
       if (r.canceled || !r.filePaths[0]) return null
-      if (!(await isFile(join(r.filePaths[0], '.git')))) throw hiveError(M.notWorktree, { path: r.filePaths[0] }, { kind: 'invalid' })
+      if (!(await isFile(join(r.filePaths[0], '.git')))) throw combworkError(M.notWorktree, { path: r.filePaths[0] }, { kind: 'invalid' })
       return r.filePaths[0]
     },
 
     'project:create': (name, key) => createProjectWithKey(workspace, name, key),
     'project:removalInfo': (p) => removal.removalInfo(p),
     'project:remove': (p, how) => {
-      if (!['hide', 'remove', 'delete'].includes(how)) throw hiveError(M.removeHow, { how: String(how) }, { kind: 'invalid' })
+      if (!['hide', 'remove', 'delete'].includes(how)) throw combworkError(M.removeHow, { how: String(how) }, { kind: 'invalid' })
       return removal.removeProject(p, how)
     },
     'project:hidden': () => workspace.hiddenProjects(),
@@ -877,7 +894,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       const ws = currentWorkspace()
       const r = await dialog.showOpenDialog(win(), { title: tr(M.exportBoard), buttonLabel: tr(M.exportBoardButton), defaultPath: app.getPath('documents'), properties: ['openDirectory', 'createDirectory'] })
       if (r.canceled || !r.filePaths[0]) return null
-      const dir = join(r.filePaths[0], `hive-board-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}`)
+      const dir = join(r.filePaths[0], `combwork-board-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}`)
       await requireMasking()
       return { dir, cards: await exportBoard(ws, dir, maskDeep) }
     },
@@ -969,7 +986,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     },
     'project:setActive': async (p, active) => {
       p = workspace.assertProject(p)
-      if (!active && sessions.liveFor(p)) throw hiveError(M.stopFirst, undefined, { kind: 'conflict' })
+      if (!active && sessions.liveFor(p)) throw combworkError(M.stopFirst, undefined, { kind: 'conflict' })
       if (active) await workspace.ensureProject(p)
       workspace.setActive(p, active)
       return workspace.refresh()
@@ -989,9 +1006,9 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'project:updateConfig': (p, patch) => {
       for (const c of Object.values(patch.providers ?? {})) assertExtraArgs(c?.extraArgs)
       // The workflow options are checked as a whole (contradictions, what this version offers): workflow:setOptions.
-      if (patch.workflow !== undefined) throw new HiveError({ lines: ["A project's workflow options change through workflow:setOptions"] }, { kind: 'invalid' }) // i18n-ignore: a mistake in Hive's code, never shown
+      if (patch.workflow !== undefined) throw new CombworkError({ lines: ["A project's workflow options change through workflow:setOptions"] }, { kind: 'invalid' }) // i18n-ignore: a mistake in Combwork's code, never shown
       // Its version control switches only with its checks and its options kept per platform (#1419): workflow:setPlatform.
-      if (patch.platform !== undefined) throw new HiveError({ lines: ["A project's version control changes through workflow:setPlatform"] }, { kind: 'invalid' }) // i18n-ignore: a mistake in Hive's code, never shown
+      if (patch.platform !== undefined) throw new CombworkError({ lines: ["A project's version control changes through workflow:setPlatform"] }, { kind: 'invalid' }) // i18n-ignore: a mistake in Combwork's code, never shown
       const projectPath = workspace.assertProject(p)
       // A project has no provider pages or default provider since HI-2106/HI-2107: its agents' connections hold what they
       // set (HI-2122: nothing is made from them), and project.json keeps none.
@@ -1035,30 +1052,30 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'queue:resume': (p, target) => resumeQueue(workspace, workspace.assertProject(p), queueTarget(target)),
     'queue:remove': async (n, reason) => (await queueCardChange(workspace, n, { kind: 'user' }, 'removeFromQueue', typeof reason === 'string' ? reason : '')).card,
     'queue:retry': async (n, reason) => (await queueCardChange(workspace, n, { kind: 'user' }, 'retryMerge', typeof reason === 'string' ? reason : '')).card,
-    'project:excludeHive': async (p) => {
+    'project:excludeCombwork': async (p) => {
       p = workspace.assertProject(p)
-      const r = await ensureHiveExcluded(p)
-      if (!r) throw hiveError(M.noRepo, undefined, { kind: 'conflict' })
-      if (!r.excluded) throw hiveError(M.stillTracked, undefined, { kind: 'conflict' })
+      const r = await ensureCombworkExcluded(p)
+      if (!r) throw combworkError(M.noRepo, undefined, { kind: 'conflict' })
+      if (!r.excluded) throw combworkError(M.stillTracked, undefined, { kind: 'conflict' })
       return workspace.refresh()
     },
-    'project:hiveTracked': async (p) => {
+    'project:combworkTracked': async (p) => {
       p = workspace.assertProject(p)
       const found = vcsOf(p)
       if (found?.kind !== 'git') return []
-      const tracked = await trackedHiveFiles(p, found.root, { fresh: true })
-      if (tracked === null) throw hiveError(M.cantList)
+      const tracked = await trackedCombworkFiles(p, found.root, { fresh: true })
+      if (tracked === null) throw combworkError(M.cantList)
       return tracked
     },
-    'project:untrackHive': async (p, confirmed) => {
+    'project:untrackCombwork': async (p, confirmed) => {
       p = workspace.assertProject(p)
-      await untrackHive(p, confirmed)
+      await untrackCombwork(p, confirmed)
       return workspace.refresh()
     },
     'project:openInExplorer': (p) => void shell.openPath(workspace.assertProject(p)),
     'project:openTerminal': async (p) => {
       const dir = workspace.assertProject(p)
-      // A new terminal gets what was installed since Hive started (#821).
+      // A new terminal gets what was installed since Combwork started (#821).
       await refreshPathBeforeStart()
       openExternalTerminal(dir)
     },
@@ -1184,6 +1201,76 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       return templates.inspectImport(r.filePaths[0])
     },
     'templates:import': (path, to, onClash) => templates.importTemplate(path, to, onClash),
+    // The Dialects view (HI-2444): in the window's workspace, on paths the service accepts (placeOf), its changes checked there.
+    'dialects:catalogue': () => dialectCatalogue(),
+    'dialects:list': () => listDialects(workspace.combworkDir),
+    'dialects:file': (path) => dialectFileView(workspace.combworkDir, String(path)),
+    'dialects:usage': () => sessions.dialectUsage(currentWorkspace().path ?? ''),
+    'dialects:save': async (path, draft, base) => {
+      const dir = dialectsDir(workspace.combworkDir)
+      const opts = { base: typeof base === 'string' ? base : '' }
+      const r = draft && typeof draft === 'object' && 'raw' in draft ? await saveDialectRaw(dir, String(path), String(draft.raw), agentTextSchema(), opts) : await saveDialect(dir, String(path), (draft as { file: DialectFile }).file, agentTextSchema(), opts)
+      if (!r) dialectsChanged()
+      return r
+    },
+    'dialects:setOn': async (path, on) => {
+      if (!placeOf(String(path))) throw combworkError(M.notDialect, { path: String(path) }, { kind: 'invalid' })
+      await setDialectOn(dialectsDir(workspace.combworkDir), String(path), on === true)
+      dialectsChanged()
+    },
+    'dialects:create': async (folder, label, model, from) => {
+      const r = await createDialect(dialectsDir(workspace.combworkDir), String(folder), String(label), { model: String(model ?? ''), ...(from ? { from: String(from) } : {}), isCli: (f) => isKnownProvider(f) })
+      if (!('refused' in r)) dialectsChanged()
+      return r
+    },
+    'dialects:promote': async (path, model) => {
+      const r = await promoteDialect(dialectsDir(workspace.combworkDir), String(path), String(model), { shipped: new Set(await bundledIds('dialects')) })
+      if ('from' in r) dialectsChanged()
+      return r
+    },
+    'dialects:models': (cli) => (isKnownProvider(String(cli)) ? sessions.dialectModelsSeen(workspace.path, String(cli) as ProviderId) : []),
+    'dialects:revert': async (path) => {
+      const id = String(path).replace(/\.json$/i, '')
+      if (!placeOf(String(path)) || !(await bundledIds('dialects')).some((x) => x.toLowerCase() === id.toLowerCase())) throw combworkError(M.notDialect, { path: String(path) }, { kind: 'invalid' })
+      await restoreBundled('dialects', id)
+      dialectsChanged()
+    },
+    'dialects:delete': async (path) => {
+      const r = await deleteDialect(dialectsDir(workspace.combworkDir), String(path), { shipped: new Set(await bundledIds('dialects')), remove: (f) => trash(f) })
+      if (!r) dialectsChanged()
+      return r
+    },
+    'dialects:pickImport': async () => {
+      const w = win()
+      const r = await dialog.showOpenDialog(w, { title: tr(M.importDialect), properties: ['openFile'], filters: [{ name: tr(M.dialectFiles), extensions: ['json'] }] })
+      if (r.canceled || !r.filePaths[0]) return null
+      return { token: rememberPick(r.filePaths[0], w.id, workspace.combworkDir), label: basename(r.filePaths[0]).replace(/\.json$/i, '') }
+    },
+    'dialects:import': async (token, folder, label) => {
+      const file = pickOfToken(String(token), win().id, workspace.combworkDir)
+      if (!file) throw combworkError(M.pickAgain, undefined, { kind: 'conflict' })
+      const f = String(folder)
+      if (f !== API_FOLDER && !isKnownProvider(f)) throw combworkError(M.unknownProvider, { provider: f }, { kind: 'invalid' })
+      const path = `${f}/${String(label).trim()}.json`
+      const raw = await readFile(file, 'utf8')
+      const r = await importDialect(dialectsDir(workspace.combworkDir), path, raw, agentTextSchema())
+      if ('testCopy' in r) {
+        spendPick(String(token))
+        dialectsChanged()
+        return { path, testCopy: r.testCopy }
+      }
+      return r
+    },
+    'dialects:export': async (path) => {
+      const p = String(path)
+      const view = await dialectFileView(workspace.combworkDir, p)
+      if (!view) throw combworkError(M.notDialect, { path: p }, { kind: 'notFound' })
+      const r = await dialog.showSaveDialog(win(), { title: tr(M.exportDialect), defaultPath: join(app.getPath('downloads'), basename(p)), filters: [{ name: tr(M.dialectFiles), extensions: ['json'] }] })
+      if (r.canceled || !r.filePath) return null
+      await writeTextAtomic(r.filePath, view.raw)
+      return r.filePath
+    },
+    'dialects:choices': (cli) => dialectChoices(workspace.combworkDir, String(cli)),
     'agents:gitInfo': (p) => projectAgents.gitInfo(p),
     'agents:worktreeMatch': (p, branch, base, name) => projectAgents.worktreeMatch(p, branch, base, name),
     'agents:branchStatus': async (p, id) => {
@@ -1285,7 +1372,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'attachments:copyImage': async (path) => {
       // From its bytes: nativeImage reading a path itself is asar-aware (#246).
       const img = nativeImage.createFromBuffer(await readFile(guardFile(path)))
-      if (img.isEmpty()) throw hiveError(M.notImage, undefined, { kind: 'invalid' })
+      if (img.isEmpty()) throw combworkError(M.notImage, undefined, { kind: 'invalid' })
       await clipboard.write([new ClipboardItem({ 'image/png': new Blob([new Uint8Array(img.toPNG())], { type: 'image/png' }) })])
     },
 
@@ -1307,7 +1394,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       skills.invalidateSkillCache()
       return skills.listSkills(p ? workspace.assertProject(p) : undefined)
     },
-    'skills:workspace': () => skills.hiveSkills(true),
+    'skills:workspace': () => skills.combworkSkills(true),
     'skills:create': async (name, description, targets) => {
       const s = await skills.createSkill(name, description, targets)
       emit({ type: 'skills-changed' })
@@ -1345,7 +1432,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'skills:openFolder': () => void shell.openPath(workspace.skillsDir),
     'skills:files': (path, p) => skills.listedSkillFiles(path, p ? workspace.assertProject(p) : undefined),
     'skills:setDelivered': async (p, name, on) => {
-      if (typeof name !== 'string' || !skills.validSkillName(name)) throw hiveError(msg({ id: 'content.skill.deliveredName', defaultMessage: 'That is not a skill name.', description: 'An error switching a skill on or off for agents (Skills → Delivered to agents): the name given is not a valid skill name.' }))
+      if (typeof name !== 'string' || !skills.validSkillName(name)) throw combworkError(msg({ id: 'content.skill.deliveredName', defaultMessage: 'That is not a skill name.', description: 'An error switching a skill on or off for agents (Skills → Delivered to agents): the name given is not a valid skill name.' }))
       if (p) await workspace.mutateProjectConfig(workspace.assertProject(p), (cfg) => ({ skillDelivery: withSkillDelivered(cfg.skillDelivery, name, on === true) }))
       else await workspace.saveWorkspaceConfigWith((c) => ({ skillDelivery: withSkillDelivered(c.skillDelivery, name, on === true) }))
       emit({ type: 'skills-changed' })
@@ -1446,36 +1533,32 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     // Its question while its panel is hidden here (HI-2320): told once, as the routing table says.
     'assistant:tellQuestion': (id) => (workspace.path && typeof id === 'string' ? assistantControl.tellQuestion(workspace.path, id) : false),
     'assistant:switchMode': (modeId, save) => switchMode(String(modeId), save !== false),
-    'assistant:revertSetting': async (actionId) => {
-      if (!workspace.path) throw hiveError(M.noWorkspace, undefined, { kind: 'conflict' })
-      await revertSetting(workspace.path, String(actionId))
-    },
     // The window words what can't be undone in its language, from the reasons' codes (#1283).
     'assistant:changes': () => (workspace.path ? changeGroups(currentWorkspace()).map((g) => ({ ...g, changes: g.changes.map((c) => (c.final ? { ...c, finalWhy: finalWhys(c.final) } : c)) })) : []),
     'assistant:undo': async (sel) => {
-      if (!workspace.path) throw hiveError(M.noWorkspace, undefined, { kind: 'conflict' })
+      if (!workspace.path) throw combworkError(M.noWorkspace, undefined, { kind: 'conflict' })
       const s = sel && typeof sel === 'object' ? sel : {}
       const change = typeof s.change === 'string' && s.change ? s.change : undefined
       const group = typeof s.group === 'string' && s.group ? s.group : undefined
-      if (!change === !group) throw hiveError(M.undoWhich, undefined, { kind: 'invalid' })
+      if (!change === !group) throw combworkError(M.undoWhich, undefined, { kind: 'invalid' })
       try {
         return (await userUndo(currentWorkspace(), change ? { change } : { group })).map((r) => (r.final ? { ...r, finalWhy: finalWhys(r.final) } : r))
       } catch (e) {
-        throw e instanceof UndoNotFound ? hiveError(M.undoGone, undefined, { kind: 'conflict' }) : e
+        throw e instanceof UndoNotFound ? combworkError(M.undoGone, undefined, { kind: 'conflict' }) : e
       }
     },
     'mergeSlots:list': () => (workspace.path ? workspaceSlots(workspace.path) : []),
     'mergeSlots:release': (p, branch, holdId) => {
-      if (typeof holdId !== 'string' || !holdId) throw hiveError(M.holdRequired, undefined, { kind: 'invalid' })
+      if (typeof holdId !== 'string' || !holdId) throw combworkError(M.holdRequired, undefined, { kind: 'invalid' })
       return mergeSlots.releaseByUser(workspace.assertProject(p), slotBranch(branch), holdId)
     },
     'lanes:list': () => (workspace.path ? listLanes(currentWorkspace()) : []),
     'lanes:end': (id, abandoned) => {
-      if (typeof id !== 'string' || !id) throw hiveError(M.laneRequired, undefined, { kind: 'invalid' })
+      if (typeof id !== 'string' || !id) throw combworkError(M.laneRequired, undefined, { kind: 'invalid' })
       return endLane(currentWorkspace(), id, { abandoned: abandoned === true })
     },
     'lanes:retryFresh': (id) => {
-      if (typeof id !== 'string' || !id) throw hiveError(M.laneRequired, undefined, { kind: 'invalid' })
+      if (typeof id !== 'string' || !id) throw combworkError(M.laneRequired, undefined, { kind: 'invalid' })
       return retryFreshStart(currentWorkspace(), id)
     },
     'lanes:test': async (op) => {
@@ -1491,7 +1574,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'lanes:start': (p, req) => {
       const r = req && typeof req === 'object' ? req : ({} as LaneStartRequest)
       const cards = Array.isArray(r.cards) ? r.cards.filter((n: unknown): n is number => Number.isInteger(n) && (n as number) > 0).slice(0, 200) : []
-      if (typeof r.builder !== 'string' || !r.builder) throw hiveError(M.laneBuilderRequired, undefined, { kind: 'invalid' })
+      if (typeof r.builder !== 'string' || !r.builder) throw combworkError(M.laneBuilderRequired, undefined, { kind: 'invalid' })
       return startLaneFromWindow(currentWorkspace(), workspace.assertProject(p), { builder: r.builder, reviewer: typeof r.reviewer === 'string' && r.reviewer ? r.reviewer : null, pool: r.pool === true, cards, note: typeof r.note === 'string' ? r.note.slice(0, 4000) : '', name: typeof r.name === 'string' ? r.name.slice(0, 200) : null, ...(r.applyNow === true ? { applyNow: true } : {}) })
     },
     'lanes:startInfo': (p) => laneStartInfo(currentWorkspace(), workspace.assertProject(p)),
@@ -1526,7 +1609,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     },
     'progress:openLog': async (id) => {
       const p = await runLog(id)
-      if (!OPENABLE_LOG.test(p)) throw hiveError(M.logNotText, { file: basename(p) }, { kind: 'invalid' })
+      if (!OPENABLE_LOG.test(p)) throw combworkError(M.logNotText, { file: basename(p) }, { kind: 'invalid' })
       const failed = await shell.openPath(p)
       if (failed) throw new Error(failed)
     },
@@ -1535,16 +1618,16 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'console:open': () => {
       const wc = senderStore.getStore()
       const owner = wc ? windowOf(wc) : null
-      if (!owner) throw new Error('Not allowed') // i18n-ignore: a refusal of a page that isn't Hive's window (security, never shown)
-      if (!config.settings.advanced.showDeveloperFeatures) throw hiveError(M.consoleHidden, undefined, { kind: 'conflict' })
+      if (!owner) throw new Error('Not allowed') // i18n-ignore: a refusal of a page that isn't Combwork's window (security, never shown)
+      if (!config.settings.advanced.showDeveloperFeatures) throw combworkError(M.consoleHidden, undefined, { kind: 'conflict' })
       openConsoleWindow(owner)
     },
     'console:sources': () => consoleSources(currentWorkspace()),
     'console:options': () => ({ showText: consoleShowsText() }),
     'console:subscribe': (sources) => {
       const wc = senderStore.getStore()
-      if (!wc) throw new Error('Not allowed') // i18n-ignore: a refusal of a page that isn't Hive's window (security, never shown)
-      if (!Array.isArray(sources)) throw hiveError(M.sourcesList, undefined, { kind: 'invalid' })
+      if (!wc) throw new Error('Not allowed') // i18n-ignore: a refusal of a page that isn't Combwork's window (security, never shown)
+      if (!Array.isArray(sources)) throw combworkError(M.sourcesList, undefined, { kind: 'invalid' })
       const ids = sources.filter((s): s is string => typeof s === 'string' && windowMayRead(s))
       const id = `window:${wc.id}`
       // A recording is of a source the window watches: watching another ends it, with what it captured until now.
@@ -1563,7 +1646,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
         })
       }
       const deliver = (events: ConsoleEvent[], dropped: number): void => {
-        if (!wc.isDestroyed()) wc.send('hive:event', { type: 'console-events', events, ...(dropped ? { dropped } : {}) })
+        if (!wc.isDestroyed()) wc.send('cw:event', { type: 'console-events', events, ...(dropped ? { dropped } : {}) })
       }
       // Text only while the setting is on, whatever the page asks.
       return Object.fromEntries(devConsole.subscribe(id, ids, { deliver, includeText: consoleShowsText() }))
@@ -1579,7 +1662,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
       const wc = senderStore.getStore()
       const id = String(source)
       const row = wc && windowMayRead(id) ? consoleSources(currentWorkspace()).find((s) => s.id === id) : undefined
-      if (!wc || !row) throw hiveError(M.notSource, undefined, { kind: 'forbidden' })
+      if (!wc || !row) throw combworkError(M.notSource, undefined, { kind: 'forbidden' })
       const shown = consoleWorkspace(wc)
       // Only while the window still watches that source in this workspace: a start overtaken by a close, another
       // source or another workspace records nothing.
@@ -1596,8 +1679,8 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     },
     'console:captures': () => listCaptures(),
     'console:showRecording': (name) => {
-      // Only Hive's own recordings, by name, in its folder: never a path the page gives.
-      if (typeof name !== 'string' || !isRecordingName(name)) throw hiveError(M.notRecording, undefined, { kind: 'invalid' })
+      // Only Combwork's own recordings, by name, in its folder: never a path the page gives.
+      if (typeof name !== 'string' || !isRecordingName(name)) throw combworkError(M.notRecording, undefined, { kind: 'invalid' })
       shell.showItemInFolder(join(recordingsDir(), name))
     },
     'modes:list': () => modes.listModes(),
@@ -1656,7 +1739,7 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'changes:openFile': (root, f) => {
       const dir = workspace.assertChangesRoot(root)
       const file = resolve(dir, f)
-      if (file === dir || !insideReal(file, [dir]) || insideArchive(file)) throw hiveError(M.notFileOf, { file: f, folder: dir }, { kind: 'forbidden' })
+      if (file === dir || !insideReal(file, [dir]) || insideArchive(file)) throw combworkError(M.notFileOf, { file: f, folder: dir }, { kind: 'forbidden' })
       void shell.openPath(file)
     },
     'git:tool': (recheck) => (recheck ? checkGit() : gitTool()),
@@ -1665,10 +1748,10 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     'git:info': async (p) => {
       p = workspace.assertProject(p)
       const info = await repoInfo(p, await workTargetOf(p))
-      // Hive's own worktrees said as such (HI-1710): its review copies and the merge queue's folder.
+      // Combwork's own worktrees said as such (HI-1710): its review copies and the merge queue's folder.
       return { ...info, worktrees: info.worktrees.map((w) => {
-        const hive = hiveWorktreeOf(p, w.path)
-        return hive ? { ...w, hive } : w
+        const combwork = combworkWorktreeOf(p, w.path)
+        return combwork ? { ...w, combwork } : w
       }) }
     },
     'git:deleteBranches': (p, items, unmerged) => deleteBranches(p, Array.isArray(items) ? items : [], !!unmerged),
@@ -1768,10 +1851,12 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
   }
 
   // Tests only (unpackaged builds), so a suite can see what the window does while an action runs or fails:
-  // HIVE_TEST_SLOW_IPC="tasks:start=1500,git:diff=1500*1" delays those calls (`*n`: only the first n), and
-  // HIVE_TEST_FAIL_IPC="git:status*1" makes them fail, and HIVE_TEST_BLOCK_IPC="app:info=1500*1" holds the main process
-  // that long in them (a stall, #1109).
-  // A suite may change them while Hive runs (in the main process): they are read again when they change.
+  // CW_TEST_SLOW_IPC="tasks:start=1500,git:diff=1500*1" delays those calls (`*n`: only the first n), and
+  // CW_TEST_FAIL_IPC="git:status*1" makes them fail, and CW_TEST_BLOCK_IPC="app:info=1500*1" holds the main process
+  // that long in them (a stall, #1109). CW_TEST_HOLD_IPC="activity:cardAgents" holds those calls until a suite takes
+  // the channel out of it, so a race is decided by the suite, not by a delay (HI-2652); main's
+  // globalThis.__cwHeldIpc counts the calls held now, by channel.
+  // A suite may change them while Combwork runs (in the main process): they are read again when they change.
   type TestCalls = { from: string; calls: Map<string, { ms: number; left: number }> }
   const testCalls = (name: string, held: TestCalls): TestCalls => {
     const from = app.isPackaged ? '' : (process.env[name] ?? '')
@@ -1794,29 +1879,41 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
     c.left--
     return c
   }
+  const holding = (channel: string): boolean => !app.isPackaged && (process.env.CW_TEST_HOLD_IPC ?? '').split(',').some((x) => x.trim() === channel)
+  const heldIpc: Record<string, number> = {}
+  if (!app.isPackaged) (globalThis as { __cwHeldIpc?: Record<string, number> }).__cwHeldIpc = heldIpc
+  const hold = async (channel: string): Promise<void> => {
+    heldIpc[channel] = (heldIpc[channel] ?? 0) + 1
+    try {
+      while (holding(channel)) await new Promise((r) => setTimeout(r, 20))
+    } finally {
+      heldIpc[channel]--
+    }
+  }
   for (const [channel, fn] of Object.entries(impl)) {
     ipcMain.handle(channel, async (e, ...args: unknown[]) => {
-      // Only Hive's own pages may call: not another window, and not a frame inside one (e.g. an HTML preview). A developer
+      // Only Combwork's own pages may call: not another window, and not a frame inside one (e.g. an HTML preview). A developer
       // console's page calls only the console's channels, in the workspace of the window it belongs to (#637).
       const w = windowOf(e.sender) ?? (CONSOLE_WINDOW_CHANNELS.has(channel) ? consoleOwner(e.sender) : null)
-      if (!w || e.senderFrame?.parent) throw new Error('Not allowed') // i18n-ignore: a refusal of a page that isn't Hive's window (security, never shown)
-      slow = testCalls('HIVE_TEST_SLOW_IPC', slow)
-      failing = testCalls('HIVE_TEST_FAIL_IPC', failing)
-      blocking = testCalls('HIVE_TEST_BLOCK_IPC', blocking)
+      if (!w || e.senderFrame?.parent) throw new Error('Not allowed') // i18n-ignore: a refusal of a page that isn't Combwork's window (security, never shown)
+      slow = testCalls('CW_TEST_SLOW_IPC', slow)
+      failing = testCalls('CW_TEST_FAIL_IPC', failing)
+      blocking = testCalls('CW_TEST_BLOCK_IPC', blocking)
       const delay = take(slow, channel)
       if (delay?.ms) await new Promise((r) => setTimeout(r, delay.ms))
-      if (take(failing, channel)) throw new Error(`${channel} failed (HIVE_TEST_FAIL_IPC)`) // i18n-ignore: test-only
+      if (holding(channel)) await hold(channel)
+      if (take(failing, channel)) throw new Error(`${channel} failed (CW_TEST_FAIL_IPC)`) // i18n-ignore: test-only
       // Named in a "main process was busy" warning that it overlaps (mainStalls.ts).
-      const done = beginWork(`ipc ${channel}`) // i18n-ignore: a line of hive.log, in English
+      const done = beginWork(`ipc ${channel}`) // i18n-ignore: a line of combwork.log, in English
       // Everything the call does is for that window's workspace (and from that window: the console's subscriptions).
       try {
         const block = take(blocking, channel)
         if (block?.ms) for (const until = Date.now() + block.ms; Date.now() < until; );
         return await senderStore.run(e.sender, () => inWorkspace(w.ws, () => (fn as (...a: unknown[]) => unknown)(...args)))
       } catch (err) {
-        // A failure that isn't one of Hive's own refusals (a file that couldn't be written, HI-1749): the window shows it, and
-        // hive.log has it too, so every "Could not …" notification has its line.
-        if (!(err instanceof HiveError)) log.warn(`ipc ${channel} failed: ${userText(englishError(err))}${typeof (err as NodeJS.ErrnoException)?.code === 'string' ? ` (${(err as NodeJS.ErrnoException).code})` : ''}`)
+        // A failure that isn't one of Combwork's own refusals (a file that couldn't be written, HI-1749): the window shows it, and
+        // combwork.log has it too, so every "Could not …" notification has its line.
+        if (!(err instanceof CombworkError)) log.warn(`ipc ${channel} failed: ${userText(englishError(err))}${typeof (err as NodeJS.ErrnoException)?.code === 'string' ? ` (${(err as NodeJS.ErrnoException).code})` : ''}`)
         throw windowError(err)
       } finally {
         done()
@@ -1827,6 +1924,6 @@ export function registerIpc(getAppInfo: () => ReturnType<HiveRequests['app:info'
 
 /** A merge queue's target as the window names it (a branch): refused when it isn't one. */
 function queueTarget(target: unknown): string {
-  if (typeof target !== 'string' || !target || target.length > 255 || /[\s~^:?*[\\]/.test(target)) throw new HiveError({ lines: ['A merge queue is named by its target branch'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in Hive's code, never shown
+  if (typeof target !== 'string' || !target || target.length > 255 || /[\s~^:?*[\\]/.test(target)) throw new CombworkError({ lines: ['A merge queue is named by its target branch'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in Combwork's code, never shown
   return target
 }

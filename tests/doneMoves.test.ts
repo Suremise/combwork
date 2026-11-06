@@ -1,4 +1,4 @@
-// A move to Done always goes through the card's workflow (HI-1674), on the real board (a temp hive.db) and a temp Git
+// A move to Done always goes through the card's workflow (HI-1674), on the real board (a temp combwork.db) and a temp Git
 // repository. On rc.1 the Assistant moved two code cards with no change from Doing to Done: the column moved, the
 // stage stayed Active and their agents' questions stayed For you. The cause: cards from before 1.0 started by an
 // intent kept their 1.0 mark (`pre_workflow`), so the board's moves of them took P3's path, around their rules. Now a
@@ -11,7 +11,7 @@ import { afterAll, afterEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-donemoves-')
+const base = tempDir('cw-donemoves-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -47,16 +47,16 @@ let n = 0
 async function workspace(): Promise<WS> {
   const ws = join(base, `ws-${++n}`)
   const repo = join(ws, 'p')
-  mkdirSync(join(repo, '.hive'), { recursive: true })
+  mkdirSync(join(repo, '.combwork'), { recursive: true })
   writeFileSync(join(repo, 'a.txt'), 'one\n')
   git(repo, 'init', '-q', '-b', 'main')
   for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) git(repo, 'config', k, v)
-  writeFileSync(join(repo, '.gitignore'), '.hive/\n')
+  writeFileSync(join(repo, '.gitignore'), '.combwork/\n')
   git(repo, 'add', '-A')
   git(repo, 'commit', '-qm', 'initial')
   const agents = [{ id: 'a1', name: 'Builder' }, { id: 'a2', name: 'Reviewer' }]
   const options = { ...allOff('git'), review: 'agent', noSelfReview: true, finish: 'agentMerges' }
-  writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents, workflow: { platform: 'git', preset: null, options } }))
+  writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents, workflow: { platform: 'git', preset: null, options } }))
   const w = createWorkspaceService()
   await w.open(ws)
   opened.push(w)
@@ -64,11 +64,11 @@ async function workspace(): Promise<WS> {
 }
 const facts = (w: WS, card: number) => FactStore.forBoard(w, { project: 'p', key: 'p' }).facts(card)
 const row = (w: WS, card: number) => store.workspaceDb(w.path!).reader.prepare('SELECT col, stage, pre_workflow FROM cards WHERE number = ?').get(card) as { col: string; stage: string; pre_workflow: number }
-/** Sets the card's row as a test's stand-in for what an older Hive left (rc.1's), under the board's lock. */
+/** Sets the card's row as a test's stand-in for what an older Combwork left (rc.1's), under the board's lock. */
 const setRow = (w: WS, card: number, sql: string) => inWorkspace(w, () => store.boardWrite(w, async () => store.boardWriteOp(w, (db) => db.prepare(`UPDATE cards SET ${sql} WHERE number = ?`).run(card))))
 
 /**
- * HI-1151's start on rc.1: a card from before 1.0 (marked `pre_workflow`), started by its builder's hive_start_card (an
+ * HI-1151's start on rc.1: a card from before 1.0 (marked `pre_workflow`), started by its builder's cw_start_card (an
  * intent, so the runtime's write, not P3's recorder), then its builder's question (no change, how to close it?).
  */
 async function startedOld(w: WS): Promise<{ card: number; request: string }> {

@@ -1,5 +1,5 @@
 // An agent whose input takes no keys (HI-2191): Claude Code 2.1.314 drew its offer to teach auto mode under its empty
-// input box, the dialog took the keys, and Hive typed its letter into it 105 times in five minutes while nobody was told.
+// input box, the dialog took the keys, and Combwork typed its letter into it 105 times in five minutes while nobody was told.
 // With the real SessionManager on a stand-in Claude Code input (claudeInputStandIn) that stops reading keys: three
 // clears in a row unanswered while the box reads empty block the input, the agent waits for the user with why, and no key
 // is pressed there until it is seen to take keys again (its box taking the user's key, a hook that moves it, or the
@@ -15,7 +15,7 @@ const { advanced } = await import('../src/main/advanced')
 const { hookStep } = await import('../src/main/hookStatus')
 const writer = await import('../src/main/lineWriter')
 
-const project = 'C:/hive-test/input-blocked'
+const project = 'C:/combwork-test/input-blocked'
 const id = 'b1'
 const key = `${project.toLowerCase()}#${id}`
 /** Its terminal's key (agentPtyKey), as the user's typing is noted by. */
@@ -47,7 +47,7 @@ const shortWait = (): void => {
   vi.spyOn(advanced, 'number').mockImplementation((setting: string) => (setting === 'claude-code.prompt.clearKeySeconds' ? 0.2 : number(setting)))
 }
 /** A delivery's try: refused because its letter went unanswered. */
-const refusedTry = (): Promise<void> => expect(sessions.sendPrompt(project, id, '[Hive] New in your inbox: 1 task')).rejects.toThrow(/couldn't be seen empty/)
+const refusedTry = (): Promise<void> => expect(sessions.sendPrompt(project, id, '[CW] New in your inbox: 1 task')).rejects.toThrow(/couldn't be seen empty/)
 const blockIt = async (): Promise<void> => {
   for (let i = 0; i < 3; i++) await refusedTry()
 }
@@ -123,7 +123,7 @@ describe('an input that takes no keys (HI-2191)', () => {
     expect(e.state.statusMessage).toBe(OTHER.message)
   })
 
-  it("Hive done with a line it typed says so (lineWriter.onLineFreed): what waits on 'already typing' looks again by it", async () => {
+  it("Combwork done with a line it typed says so (lineWriter.onLineFreed): what waits on 'already typing' looks again by it", async () => {
     running()
     const told: string[] = []
     const off = writer.onLineFreed((p, a) => void told.push(`${p}#${a}`))
@@ -131,7 +131,7 @@ describe('an input that takes no keys (HI-2191)', () => {
       // Its typing begun (the line writer's own lock held), however it ends (here put off part-way): done with, and said.
       expect(writer.whyNoLine(project, id)).toBeNull()
       let held = false
-      await writer.typeLine(project, id, '[Hive] New in your inbox: 1 task', () => (held ||= writer.lineBusy(project, id), true))
+      await writer.typeLine(project, id, '[CW] New in your inbox: 1 task', () => (held ||= writer.lineBusy(project, id), true))
       expect(held, 'its lock was held while it typed').toBe(true)
       expect(writer.lineBusy(project, id)).toBe(false)
       expect(told).toEqual([`${project}#${id}`])
@@ -176,7 +176,7 @@ describe('an input that takes no keys (HI-2191)', () => {
       expect(sessions.inputBlocked(project, id)).toBe(false)
       expect(e.state.status).toBe('ready')
       expect(e.state.inputBlocked).toBeUndefined()
-      expect(writes, 'Hive pressed nothing').toEqual([])
+      expect(writes, 'Combwork pressed nothing').toEqual([])
     })
 
     it('a hook that moves it frees it (a prompt: working; a new question keeps its own reason); its idle notice does not', async () => {
@@ -224,7 +224,7 @@ describe('an input that takes no keys (HI-2191)', () => {
       expect(writes).toEqual([])
     })
 
-    it("Try again just after the user's Esc tries (their click); their text in the box frees it without a key of Hive's", async () => {
+    it("Try again just after the user's Esc tries (their click); their text in the box frees it without a key of Combwork's", async () => {
       const e = await blocked()
       const since = e.state.inputBlocked!.since
       // Their Esc a moment ago (typing, for the pause after it): Try again is theirs, so it tries.

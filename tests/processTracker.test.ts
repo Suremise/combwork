@@ -1,4 +1,4 @@
-// When Hive's process tracker fails (#507, Darren's decision B): agents start all the same, untracked, and Hive says so
+// When Combwork's process tracker fails (#507, Darren's decision B): agents start all the same, untracked, and Combwork says so
 // once, with Diagnostics saying why. A helper that starts but never says it is ready is given up on in bounded time;
 // one that dies after starting loses its jobs: said at once, kept for Diagnostics, nothing ended, and what was listed as
 // left running stays listed by pid and start time (#614), for the next helper to end exactly that. The real helper
@@ -20,13 +20,13 @@ vi.mock('../src/main/events', () => ({
   emit: (e: { type: string }) => events.push(e),
   toast: (_level: string, title: string, message?: string) => toasts.push({ title, message })
 }))
-// Hive's profile, where what is listed is kept (#614): this file's own, never the shared test root.
+// Combwork's profile, where what is listed is kept (#614): this file's own, never the shared test root.
 const profile = vi.hoisted(() => ({ dir: '' }))
 vi.mock('electron', async (importOriginal) => {
   const stub = await importOriginal<typeof import('./electron-stub')>()
   return { ...stub, app: { ...stub.app, getPath: () => profile.dir } }
 })
-profile.dir = tempDir('hive-tracker-profile-')
+profile.dir = tempDir('cw-tracker-profile-')
 
 const alive = (pid: number): boolean => {
   try {
@@ -43,7 +43,7 @@ async function until(fn: () => boolean, ms: number): Promise<boolean> {
 }
 
 describe.runIf(process.platform === 'win32')("when the process tracker fails", () => {
-  const dir = tempDir('hive-tracker-')
+  const dir = tempDir('cw-tracker-')
   const since = Date.now()
   const children: ChildProcess[] = []
   let mod: typeof import('../src/main/agentProcesses') | null = null
@@ -54,9 +54,9 @@ describe.runIf(process.platform === 'win32')("when the process tracker fails", (
   })
   afterEach(async () => {
     await mod?.closeProcessTracking()
-    delete process.env.HIVE_TEST_PROCESS_TRACKER
-    delete process.env.HIVE_TEST_TRACKER_WAIT_MS
-    delete process.env.HIVE_TEST_TRACKER_HEARD
+    delete process.env.CW_TEST_PROCESS_TRACKER
+    delete process.env.CW_TEST_TRACKER_WAIT_MS
+    delete process.env.CW_TEST_TRACKER_HEARD
   })
   afterAll(() => {
     // Its own children, through their handles (not a pid Windows may have reused).
@@ -65,8 +65,8 @@ describe.runIf(process.platform === 'win32')("when the process tracker fails", (
   })
 
   it("gives up on a helper that never says it is ready, in bounded time, and says why", async () => {
-    process.env.HIVE_TEST_PROCESS_TRACKER = 'silent'
-    process.env.HIVE_TEST_TRACKER_WAIT_MS = '3000'
+    process.env.CW_TEST_PROCESS_TRACKER = 'silent'
+    process.env.CW_TEST_TRACKER_WAIT_MS = '3000'
     mod = await import('../src/main/agentProcesses')
     const t = Date.now()
     expect(await mod.trackingReady()).toBe(false)
@@ -98,10 +98,10 @@ describe.runIf(process.platform === 'win32')("when the process tracker fails", (
   it('answers a request on its way when closing, at once, and its next look starts no helper (#1020)', async () => {
     // A helper that is ready but never answers: a request stays on its way for as long as the test needs, and its own
     // reply wait (60 s) is longer than the test's limit, so only the close can answer it.
-    process.env.HIVE_TEST_PROCESS_TRACKER = 'mute'
-    process.env.HIVE_TEST_TRACKER_WAIT_MS = '60000'
+    process.env.CW_TEST_PROCESS_TRACKER = 'mute'
+    process.env.CW_TEST_TRACKER_WAIT_MS = '60000'
     const heard = join(dir, 'heard.txt')
-    process.env.HIVE_TEST_TRACKER_HEARD = heard
+    process.env.CW_TEST_TRACKER_HEARD = heard
     mod = await import('../src/main/agentProcesses')
     const next = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 30000)'], { stdio: 'ignore', windowsHide: true })
     children.push(next)
@@ -122,8 +122,8 @@ describe.runIf(process.platform === 'win32')("when the process tracker fails", (
   }, 30_000)
 
   it('ends a helper not yet ready when closing, and the close waits for it', async () => {
-    process.env.HIVE_TEST_PROCESS_TRACKER = 'silent'
-    process.env.HIVE_TEST_TRACKER_WAIT_MS = '60000'
+    process.env.CW_TEST_PROCESS_TRACKER = 'silent'
+    process.env.CW_TEST_TRACKER_WAIT_MS = '60000'
     mod = await import('../src/main/agentProcesses')
     const ready = mod.trackingReady()
     expect(await until(() => mod!.trackerPid() !== null, 10_000)).toBe(true)
@@ -153,8 +153,8 @@ describe.runIf(process.platform === 'win32')("when the process tracker fails", (
 
     // Quitting while a warmed helper is still starting: it is ended, and none starts after.
     vi.resetModules()
-    process.env.HIVE_TEST_PROCESS_TRACKER = 'silent'
-    process.env.HIVE_TEST_TRACKER_WAIT_MS = '60000'
+    process.env.CW_TEST_PROCESS_TRACKER = 'silent'
+    process.env.CW_TEST_TRACKER_WAIT_MS = '60000'
     mod = await import('../src/main/agentProcesses')
     mod.warmProcessTracking()
     expect(await until(() => mod!.trackerPid() !== null, 10_000)).toBe(true)

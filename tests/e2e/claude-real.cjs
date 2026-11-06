@@ -1,10 +1,10 @@
-// What only the real Claude Code can show, from suites whose Hive-side checks run the fake (#195): no prompt is sent.
+// What only the real Claude Code can show, from suites whose Combwork-side checks run the fake (#195): no prompt is sent.
 // - A session starts in a worktree agent's worktree (agents checks the rest of worktree agents with the fake).
 // - A relaunch with a changed setting (Restart session after a new effort) is taken by Claude Code, bringing the same
-//   session back (restart checks Hive's side with the fake).
+//   session back (restart checks Combwork's side with the fake).
 // - The Assistant's launch is taken by Claude Code in the workspace folder, asking for Auto, with Haiku. Whether Claude
 //   Code runs Haiku in Auto depends on its version and the account (#129): its initialize reply says (supportsAutoMode).
-//   Hive must show the mode the session really runs in, whichever that is, and warn exactly when Auto isn't offered:
+//   Combwork must show the mode the session really runs in, whichever that is, and warn exactly when Auto isn't offered:
 //   Auto when it says Haiku takes Auto, else Manual (2.1.286 and 2.1.289 run it in Manual); either when it doesn't say
 //   (assistant checks the rest with the fake).
 // Each wait on the CLI is a lib.cliStep: a usage limit, sign-in or network failure there makes the suite a SKIP.
@@ -22,7 +22,7 @@ const userData = path.join(lib.WORK, 'claude-real-profile')
 const ws = path.join(lib.WORK, 'claude-real-ws')
 const wtRoot = `${ws}.worktrees`
 const proj = path.join(ws, 'demo')
-const home = path.join(ws, '.hive', 'assistant')
+const home = path.join(ws, '.combwork', 'assistant')
 let failed = 0
 const check = (name, ok, extra = '') => {
   lib.checked(ok)
@@ -34,12 +34,12 @@ const check = (name, ok, extra = '') => {
   for (const d of [userData, ws, wtRoot]) fs.rmSync(d, { recursive: true, force: true })
   lib.gitProject(proj, { 'README.md': '# Demo\n' })
   lib.enableProviders(userData)
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47925), ...lib.ownClaudeHome('claude-real').env })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47925), ...lib.ownClaudeHome('claude-real').env })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await lib.waitForProvider(inv)
   await page.getByText('demo', { exact: true }).first().click()
@@ -49,8 +49,8 @@ const check = (name, ok, extra = '') => {
     await inv('session:stop', host, id)
     await lib.until(async () => !(await live(host, id)), 20000)
   }
-  /** Hive's last launch line for a session key (its log marks the key and ids as the user's text: found by their parts). */
-  const launchLine = (key) => fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8').split('\n').filter((l) => / spawn \W?session:/.test(l) && l.toLowerCase().includes(key)).pop() ?? ''
+  /** Combwork's last launch line for a session key (its log marks the key and ids as the user's text: found by their parts). */
+  const launchLine = (key) => fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8').split('\n').filter((l) => / spawn \W?session:/.test(l) && l.toLowerCase().includes(key)).pop() ?? ''
 
   // --- A session in a worktree.
   const reviewer = await inv('agents:testLegacy', proj, { location: 'new-worktree', name: 'Reviewer' })
@@ -81,7 +81,7 @@ const check = (name, ok, extra = '') => {
   await inv('workspace:refresh')
   const restart = page.getByRole('button', { name: 'Restart session' })
   check('a new effort offers Restart session', !!(await lib.until(async () => (await restart.count()) > 0, 10000)))
-  const launched = () => fs.readFileSync(path.join(userData, 'logs', 'hive.log'), 'utf8').split('\n').filter((line) => / spawn \W?session:/.test(line) && line.toLowerCase().includes(`#${agent.id.toLowerCase()}`)).length
+  const launched = () => fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8').split('\n').filter((line) => / spawn \W?session:/.test(line) && line.toLowerCase().includes(`#${agent.id.toLowerCase()}`)).length
   const before = launched()
   await restart.first().click()
   await lib.cliStep('the relaunch with the new effort', { session: lib.ptyKey(proj, agent.id) }, async () => {
@@ -114,13 +114,13 @@ const check = (name, ok, extra = '') => {
     if (!relaunched) console.log(`(its terminal: …${lib.plainText(await inv('pty:buffer', key).catch(() => '')).slice(-1500)})`)
   })
   const relaunch = launchLine(`#${agent.id.toLowerCase()}`)
-  // Nothing typed yet, Claude Code has no transcript to resume: Hive starts the same session id again (--session-id);
+  // Nothing typed yet, Claude Code has no transcript to resume: Combwork starts the same session id again (--session-id);
   // the fake writes one at once, so restart sees the --resume path.
   check('…which was launched with the new effort, for the same session', relaunch.includes('"--effort","low"') && new RegExp(`"--(session-id|resume)","\\W?${st.sessionId}\\W?"`).test(relaunch), relaunch.slice(0, 300))
   check('…and brought the same conversation back', (await live(proj, agent.id))?.sessionId === st.sessionId, (await live(proj, agent.id))?.sessionId)
   await stop(proj, agent.id)
 
-  // --- The Assistant with Haiku: launched asking for Auto; what Claude Code runs it in, and what Hive shows and says.
+  // --- The Assistant with Haiku: launched asking for Auto; what Claude Code runs it in, and what Combwork shows and says.
   // Its model is its connection's (HI-2108; Settings → Assistant's old one is only read by the migration): HI-2145.
   await lib.setLaunch(inv, home, 'assistant', { model: 'haiku' })
   await inv('session:start', home, { agentId: 'assistant' })
@@ -131,13 +131,13 @@ const check = (name, ok, extra = '') => {
   const a = await live(home, 'assistant')
   check('…in the workspace folder', a?.cwd.toLowerCase() === ws.toLowerCase(), a?.cwd)
   check('…asking for Auto, with Haiku', launchLine('assistant#assistant').includes('"--permission-mode","auto"') && launchLine('assistant#assistant').includes('"--model","haiku"'))
-  // The mode Claude Code itself showed (its footer or a hook: never the one asked for at launch), and Hive's (#234).
+  // The mode Claude Code itself showed (its footer or a hook: never the one asked for at launch), and Combwork's (#234).
   let m = null
   await lib.cliStep('Claude Code shows its mode', { session: lib.ptyKey(home, 'assistant') }, async () => {
     m = await lib.haikuAutoMode(inv, home)
     console.log(`Claude Code ${m.version}: Haiku ${m.autoOffered === undefined ? "doesn't say whether it takes" : m.autoOffered ? 'takes' : "doesn't take"} Auto; it showed ${m.observed ?? 'no mode'}`)
     check(`with Haiku, Claude Code shows the mode it says (${m.expected.join(' or ')})`, m.expected.includes(m.observed), m.observed ?? 'none shown')
-    check('…and Hive shows that mode', !!m.observed && m.shown === m.observed, `${m.shown} / ${m.observed}`)
+    check('…and Combwork shows that mode', !!m.observed && m.shown === m.observed, `${m.shown} / ${m.observed}`)
   })
   // The warning matches what this Claude Code says: there exactly when Auto isn't offered (a guess when it doesn't say).
   const [caveatRight, caveat] = await lib.haikuAutoCaveat(page, m?.autoOffered)

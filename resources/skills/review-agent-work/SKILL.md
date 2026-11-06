@@ -11,11 +11,11 @@ You are the reviewer: find what's wrong, don't fix it. Leave the code, the branc
 
 ## 1. Find exactly what to review
 
-- **A card** (AM-12): read it with `hive_read_task`. Start with `hive_start_review`: its reply names what to review (a revision with its base and files, or a no-code card's summary; `submission` names an earlier one), and the review copy holding that revision when the project has them. Review there, never in the builder's slot or folder. Your session and its shell stay in your own folder, so run every command with the review copy as its working directory: change into it first (`cd`, `Set-Location`) or give the command its working directory; one that doesn't runs your folder's code, not the submission, and leaves its output there. Where the project's rules forbid it, Hive refuses a review of work you built, saying so. What start review names is what you review, and what your verdict is recorded against: if the builder's summary names another commit, ask the builder (`hive_request_builder`) rather than review that one.
+- **A card** (AM-12): read it with `cw_read_task`. Start with `cw_start_review`: its reply names what to review (a revision with its base and files, or a no-code card's summary; `submission` names an earlier one), and the review copy holding that revision when the project has them. Review there, never in the builder's slot or folder. Your session and its shell stay in your own folder, so run every command with the review copy as its working directory: change into it first (`cd`, `Set-Location`) or give the command its working directory; one that doesn't runs your folder's code, not the submission, and leaves its output there. Where the project's rules forbid it, Combwork refuses a review of work you built, saying so. What start review names is what you review, and what your verdict is recorded against: if the builder's summary names another commit, ask the builder (`cw_request_builder`) rather than review that one.
 
 ## 2. Know the intent
 
-Check the change against what was asked: the card, the user's request, a handover (`hive_read_latest_handover`) or a plan in the shared notes. A convention your brief or the card names (screenshots the user OKs before a visible change merges, say) is part of the intent: check the work has it. Where the project's options ask for the user's OK, Hive asks them itself. A card's **decisions** (listed first) are what the user decided, and win over its description: check the work against every one, and work that doesn't follow one is a blocking finding.
+Check the change against what was asked: the card, the user's request, a handover (`cw_read_latest_handover`) or a plan in the shared notes. A convention your brief or the card names (screenshots the user OKs before a visible change merges, say) is part of the intent: check the work has it. Where the project's options ask for the user's OK, Combwork asks them itself. A card's **decisions** (listed first) are what the user decided, and win over its description: check the work against every one, and work that doesn't follow one is a blocking finding.
 
 ## 3. Review
 
@@ -27,7 +27,7 @@ Read the whole change, and the code around it where needed. In order of importan
 4. **Tests**: new behaviour without tests, or tests that don't test it. A new or changed test that sleeps and then checks, reads state once just after an action, depends on another test's leftovers, or raises a timeout with no stated reason is a blocking finding: it fails on a loaded or slower machine.
 5. **Clarity**: only where it will cause real trouble later.
 
-**Don't repeat the builder's run**: check its run record (the summary's, and the runs Hive recorded as the card's checks of that revision): for this code, recent, the checks the change needs, every failure explained. Rerun only what the project's notes ask of a reviewer (else typecheck, lint and the tests the change affects), plus your own probes of the riskiest parts, in the review copy (§1), changing nothing. Note what you ran.
+**Don't repeat the builder's run**: check its run record (the summary's, and the runs recorded as the card's checks of that revision): for this code, recent, the checks the change needs, every failure explained. Rerun only what the project's notes ask of a reviewer (else typecheck, lint and the tests the change affects), plus your own probes of the riskiest parts, in the review copy (§1), changing nothing. Note what you ran.
 
 ## 4. Report
 

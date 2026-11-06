@@ -1,12 +1,12 @@
 // Pausing the team before an update (HI-2081, SPEC §16.10.9): each running agent told once a pause, the user's pause
-// holding a workspace opened while it lasts, kept for the running Hive only (HI-2156: a start is unpaused and removes
+// holding a workspace opened while it lasts, kept for the running Combwork only (HI-2156: a start is unpaused and removes
 // what earlier builds saved), one answer for status, resume and lane starts; and a paused workspace's running lanes
 // paused, so none is due a start.
 import { existsSync, mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { laneStartDue, laneView, type LaneRecord } from '../src/shared/lanes'
-import { TEAM_PAUSE_LINE } from '../src/shared/teamPause'
+import { teamPauseLine } from '../src/shared/teamPause'
 import type { TaskCard } from '../src/shared/types'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
@@ -35,12 +35,12 @@ const tp = await import('../src/main/teamPause')
 const { refuseWhileTeamPaused } = await import('../src/main/lanes')
 const { scanWorkspace } = await import('../src/main/teamParked')
 
-const base = tempDir('hive-teampause-')
+const base = tempDir('cw-teampause-')
 let n = 0
 /** A workspace with a project of two agents (alpha: B1, R1), as the pause reads it. */
 function workspace(): { path: string; info: () => unknown } {
   const path = join(base, `ws-${++n}`)
-  mkdirSync(join(path, '.hive'), { recursive: true })
+  mkdirSync(join(path, '.combwork'), { recursive: true })
   const alpha = join(path, 'alpha')
   return { path, info: () => ({ projects: [{ name: 'alpha', path: alpha, config: { agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }] } }] }) }
 }
@@ -65,7 +65,7 @@ describe("a workspace's pause (HI-2081)", () => {
     const p = await tp.pauseTeam(ws(w), 'user')
     expect(tp.teamPauseOf(ws(w))).toEqual(p)
     expect(tp.pausedFor(join(w.path, 'alpha'))).toEqual(p)
-    expect(state.told).toEqual([expect.objectContaining({ agentId: 'b1', source: 'team-pause', ref: p.pauseId, body: TEAM_PAUSE_LINE })])
+    expect(state.told).toEqual([expect.objectContaining({ agentId: 'b1', source: 'team-pause', ref: p.pauseId, body: teamPauseLine() })])
     expect(state.events.at(-1)).toMatchObject({ type: 'team-pause-changed', pause: p })
     // Paused again with the same id (the user's pause reaching it twice): nothing more told.
     await tp.pauseTeam(ws(w), 'user', p.pauseId)
@@ -103,7 +103,7 @@ describe("a workspace's pause (HI-2081)", () => {
   })
 })
 
-describe('one answer, for this running Hive only (HI-2156)', () => {
+describe('one answer, for this running Combwork only (HI-2156)', () => {
   it('a start with pauses an earlier build saved: unpaused, and their files removed', async () => {
     const dir = profile()
     const w = workspace()
@@ -111,13 +111,13 @@ describe('one answer, for this running Hive only (HI-2156)', () => {
     const old = JSON.stringify({ pauseId: 'p-old', since: '2026-10-30T15:05:44.452Z', by: 'user' })
     writeFileSync(join(dir, 'team-pause.json'), old)
     writeFileSync(join(dir, 'team-pause-closing.json'), JSON.stringify({ reason: 'quit', at: '', pauses: [] }))
-    writeFileSync(join(w.path, '.hive', 'team-pause.json'), old)
+    writeFileSync(join(w.path, '.combwork', 'team-pause.json'), old)
     tp.clearSavedPauses()
     expect(tp.appPause()).toBeNull()
     expect(tp.teamPauseOf(ws(w))).toBeNull()
     expect(() => refuseWhileTeamPaused(ws(w))).not.toThrow()
     expect((await scanWorkspace(ws(w))).pause).toBeNull()
-    await vi.waitFor(() => expect([join(dir, 'team-pause.json'), join(dir, 'team-pause-closing.json'), join(w.path, '.hive', 'team-pause.json')].filter((f) => existsSync(f))).toEqual([]), { timeout: 10_000 })
+    await vi.waitFor(() => expect([join(dir, 'team-pause.json'), join(dir, 'team-pause-closing.json'), join(w.path, '.combwork', 'team-pause.json')].filter((f) => existsSync(f))).toEqual([]), { timeout: 10_000 })
   })
 
   it("the user's pause: status and lane starts agree; the Assistant's resume lifts it in its workspace, and it ends with the last workspace it held", async () => {

@@ -1,4 +1,4 @@
-// A dev copy of an Electron app (fake-claude's "devapp", #614): a hidden window, as an agent's dev launch of Hive or a
+// A dev copy of an Electron app (fake-claude's "devapp", #614): a hidden window, as an agent's dev launch of Combwork or a
 // suite's Playwright copy is, its pid recorded once the window is made (FAKE_DEVAPP_FILE). Its profile is kept beside it,
 // never in the user's AppData; it quits by itself after two minutes, in case a test leaves it.
 const { app, BrowserWindow } = require('electron')

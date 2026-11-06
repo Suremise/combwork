@@ -8,7 +8,7 @@ import * as electron from 'electron'
 import { carryLegacyAgentFields, legacySetupPending, legacyWorktree } from '../src/shared/agentFolders'
 import { tempDir } from './tempDir'
 
-const TREE = { path: 'C:\\ws.worktrees\\alpha\\hb1', branch: 'hive/hb1', base: 'main' }
+const TREE = { path: 'C:\\ws.worktrees\\alpha\\hb1', branch: 'cw/hb1', base: 'main' }
 
 describe("0.9.3's agent fields, carried through (pure)", () => {
   it('an agent written without them keeps the stored ones; one that writes the key, as undefined, drops them', () => {
@@ -27,15 +27,15 @@ describe("0.9.3's agent fields, carried through (pure)", () => {
 })
 
 describe("0.9.3's agent fields survive the workspace's saves", async () => {
-  const base = tempDir('hive-legacyfields-')
+  const base = tempDir('cw-legacyfields-')
   ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
   const { createWorkspaceService, disposeWorkspaceService, inWorkspace, workspace } = await import('../src/main/workspace')
 
   it('renaming an agent, changing its model, reordering and a whole agents list sent without it: the stored worktree is byte-identical', async () => {
     const ws = join(base, 'ws')
     const alpha = join(ws, 'alpha')
-    mkdirSync(join(alpha, '.hive'), { recursive: true })
-    const file = join(alpha, '.hive', 'project.json')
+    mkdirSync(join(alpha, '.combwork'), { recursive: true })
+    const file = join(alpha, '.combwork', 'project.json')
     // As 0.9.3 wrote it: its agents' worktree and setup fields.
     writeFileSync(file, JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'HB1', provider: 'claude-code', worktree: TREE, needsSetup: true }, { id: 'a2', name: 'HR1', provider: 'codex' }] }))
     const stored = () => {
@@ -68,8 +68,8 @@ describe("0.9.3's agent fields survive the workspace's saves", async () => {
     const a = join(base, 'first', 'alpha')
     const b = join(base, 'second', 'beta')
     for (const p of [a, b]) {
-      mkdirSync(join(p, '.hive'), { recursive: true })
-      writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'B1', ...(p === a ? { worktree: TREE, needsSetup: true } : {}) }] }))
+      mkdirSync(join(p, '.combwork'), { recursive: true })
+      writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'B1', ...(p === a ? { worktree: TREE, needsSetup: true } : {}) }] }))
     }
     try {
       await first.open(join(base, 'first'))
@@ -78,7 +78,7 @@ describe("0.9.3's agent fields survive the workspace's saves", async () => {
       await second.refreshesSettled()
       // Asked while the second workspace is current: written in the first's project, recorded by the first.
       await inWorkspace(second, () => workspace.updateLegacyAgent(a, 'a1', { needsSetup: false }))
-      expect(JSON.parse(readFileSync(join(a, '.hive', 'project.json'), 'utf8')).agents[0].needsSetup).toBe(false)
+      expect(JSON.parse(readFileSync(join(a, '.combwork', 'project.json'), 'utf8')).agents[0].needsSetup).toBe(false)
       expect([second.projectForRoot(TREE.path), first.projectForRoot(TREE.path)]).toEqual([null, a])
     } finally {
       await disposeWorkspaceService(first)

@@ -69,11 +69,11 @@ const readBefore = (home: string, ...data: string[]): void => {
 }
 
 describe("typeLine's line as the fake reads it (HI-2385)", () => {
-  const doorbell = '[Hive] New in your inbox: 1 card event (DE-1) (m8). Call hive_inbox to read it.'
+  const doorbell = '[CW] New in your inbox: 1 card event (DE-1) (m8). Call cw_inbox to read it.'
 
-  it('a doorbell Hive withdrew with DELs leaves the line empty: typed at once, taken on the first attempt', async () => {
+  it('a doorbell Combwork withdrew with DELs leaves the line empty: typed at once, taken on the first attempt', async () => {
     const t = terminal()
-    // As on HI-2384's run: Hive's probe ("x", DEL), the doorbell pasted, then erased one DEL a character.
+    // As on HI-2384's run: Combwork's probe ("x", DEL), the doorbell pasted, then erased one DEL a character.
     readBefore(t.home, 'x', '\x7f', `\x1b[200~${doorbell}\x1b[201~`, '\x7f'.repeat(8), '\x7f'.repeat([...doorbell].length - 8))
     const r = await typeLine(t.inv, 'k', t.home, 'B1', 'shell: echo hi', { taken: t.taken, hungMs: HUNG_MS })
     expect(r).toEqual({ attempt: 1, lost: [] })

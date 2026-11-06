@@ -16,28 +16,28 @@ import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
 import { PurgeDialog } from './Purge'
 
 const M = {
-  what: msg({ id: 'workspace.storage.what', defaultMessage: 'What', description: "Storage's table: the column of what Hive keeps." }),
+  what: msg({ id: 'workspace.storage.what', defaultMessage: 'What', description: "Storage's table: the column of what Combwork keeps." }),
   size: msg({ id: 'workspace.storage.size', defaultMessage: 'Size', description: "Storage's tables: the column of sizes." }),
   reviewInChanges: msg({ id: 'workspace.storage.reviewInChanges', defaultMessage: 'Review in Changes', description: "Storage, beside the unused worktrees: a link to them in the Git tab's Changes." }),
   loadTarget: msg({ id: 'workspace.storage.loadTarget', defaultMessage: 'the storage sizes', description: 'What could not be loaded when Storage measured: shown in "Could not load {what}: {error}", with Retry.' }),
-  backups: msg({ id: 'workspace.storage.backups', defaultMessage: 'Transcript backups', description: "Storage: Hive's copies of the sessions' transcripts (.hive/sessions)." }),
-  archive: msg({ id: 'workspace.storage.archive', defaultMessage: 'Archive', description: "Storage: Hive's archive folder (.hive/archive)." }),
-  beforeCompression: msg({ id: 'workspace.storage.beforeCompression', defaultMessage: '{size} before compression', description: "Storage, beside the size of Hive's transcript backups or archive: what they hold uncompressed ({size}: like 1.2 GB). Ended sessions' backups are compressed." }),
-  attachments: msg({ id: 'workspace.storage.attachments', defaultMessage: 'Attachments', description: 'Storage: files pasted or dropped into sessions (.hive/attachments).' }),
-  cardAttachments: msg({ id: 'workspace.storage.cardAttachments', defaultMessage: 'Card attachments', description: 'Storage (HI-1700): files kept with cards (.hive/attachments/cards). Clean Up and Purge never remove them.' }),
+  backups: msg({ id: 'workspace.storage.backups', defaultMessage: 'Transcript backups', description: "Storage: Combwork's copies of the sessions' transcripts (.combwork/sessions)." }),
+  archive: msg({ id: 'workspace.storage.archive', defaultMessage: 'Archive', description: "Storage: Combwork's archive folder (.combwork/archive)." }),
+  beforeCompression: msg({ id: 'workspace.storage.beforeCompression', defaultMessage: '{size} before compression', description: "Storage, beside the size of Combwork's transcript backups or archive: what they hold uncompressed ({size}: like 1.2 GB). Ended sessions' backups are compressed." }),
+  attachments: msg({ id: 'workspace.storage.attachments', defaultMessage: 'Attachments', description: 'Storage: files pasted or dropped into sessions (.combwork/attachments).' }),
+  cardAttachments: msg({ id: 'workspace.storage.cardAttachments', defaultMessage: 'Card attachments', description: 'Storage (HI-1700): files kept with cards (.combwork/attachments/cards). Clean Up and Purge never remove them.' }),
   agentWorktree: msg({ id: 'workspace.storage.worktree', defaultMessage: "{agent}'s worktree", description: "Storage: an agent's worktree." }),
-  slot: msg({ id: 'workspace.storage.slot', defaultMessage: '{slot}, lent to agent {agent}', description: "Storage (#1451): one of the project's slots (a working folder Hive lends to a card or a lane; {slot} is its name, such as slot-b: keep it as it is), lent now to the agent {agent}. Glossary: slot. A noun before the name (glossary §1 rule 4)." }),
-  freeSlot: msg({ id: 'workspace.storage.freeSlot', defaultMessage: '{slot}, not lent', description: "Storage (#1451): one of the project's slots (a working folder Hive lends to a card or a lane; {slot} is its name, such as slot-b: keep it as it is), kept on disk but lent to no one now. Glossary: slot." }),
-  copies: msg({ id: 'workspace.storage.copies', defaultMessage: 'Review and check copies', description: "Storage (#1451): the folder of the project's review and check copies (folders Hive keeps at one revision for a reviewer, or an isolated check). Glossary: review copy." }),
+  slot: msg({ id: 'workspace.storage.slot', defaultMessage: '{slot}, lent to agent {agent}', description: "Storage (#1451): one of the project's slots (a working folder Combwork lends to a card or a lane; {slot} is its name, such as slot-b: keep it as it is), lent now to the agent {agent}. Glossary: slot. A noun before the name (glossary §1 rule 4)." }),
+  freeSlot: msg({ id: 'workspace.storage.freeSlot', defaultMessage: '{slot}, not lent', description: "Storage (#1451): one of the project's slots (a working folder Combwork lends to a card or a lane; {slot} is its name, such as slot-b: keep it as it is), kept on disk but lent to no one now. Glossary: slot." }),
+  copies: msg({ id: 'workspace.storage.copies', defaultMessage: 'Review and check copies', description: "Storage (#1451): the folder of the project's review and check copies (folders Combwork keeps at one revision for a reviewer, or an isolated check). Glossary: review copy." }),
   unused: msg({ id: 'workspace.storage.unused', defaultMessage: 'Unused worktrees ({count})', description: 'Storage: the worktrees no agent works in, on one line.' }),
   measuring: msg({ id: 'workspace.storage.measuring', defaultMessage: 'Measuring…', description: 'Storage while it measures the folders.' }),
-  nothingKept: msg({ id: 'workspace.storage.nothingKept', defaultMessage: 'Nothing kept.', description: "Storage's table when Hive keeps nothing for the project." }),
+  nothingKept: msg({ id: 'workspace.storage.nothingKept', defaultMessage: 'Nothing kept.', description: "Storage's table when Combwork keeps nothing for the project." }),
   total: msg({ id: 'workspace.storage.total', defaultMessage: 'Total', description: "Storage's table: the last row, the project's total." }),
   measuringAgain: msg({ id: 'workspace.storage.measuringAgain', defaultMessage: 'Measuring again…', description: 'Storage while Refresh measures again.' }),
   measured: msg({ id: 'workspace.storage.measured', defaultMessage: 'Measured {when}', description: 'Storage: when the sizes were measured ({when}: "4 minutes ago").' }),
   refresh: msg({ id: 'workspace.storage.refresh', defaultMessage: 'Refresh', description: 'Storage: measures again.' }),
   cleanUp: msg({ id: 'workspace.storage.cleanUp', defaultMessage: 'Clean Up…', description: 'Storage: opens the Clean Up dialog.' }),
-  purge: msg({ id: 'workspace.storage.purge', defaultMessage: 'Purge…', description: "Storage: opens the Purge dialog, which removes everything Hive keeps per session (it lists it first)." }),
+  purge: msg({ id: 'workspace.storage.purge', defaultMessage: 'Purge…', description: "Storage: opens the Purge dialog, which removes everything Combwork keeps per session (it lists it first)." }),
   kindArchivedAttachments: msg({ id: 'workspace.storage.kindArchivedAttachments', defaultMessage: 'Attachments of archived sessions', description: 'Clean Up, a group of what goes.' }),
   kindOrphanAttachments: msg({ id: 'workspace.storage.kindOrphanAttachments', defaultMessage: 'Attachments of deleted sessions', description: 'Clean Up, a group of what goes; and its choice.' }),
   kindArchivedBackup: msg({ id: 'workspace.storage.kindArchivedBackup', defaultMessage: 'Backups of archived sessions (the CLI still has them)', description: 'Clean Up, a group of what goes.' }),
@@ -52,25 +52,25 @@ const M = {
   move: msg({ id: 'workspace.storage.move', defaultMessage: 'Move to the Recycle Bin', description: "The Clean Up dialog's button with nothing chosen." }),
   neverTouched: msg({ id: 'workspace.storage.neverTouched', defaultMessage: "Running sessions and sessions that aren't archived are never touched, nor the coding agents' own transcripts (in ~/.claude, ~/.codex and ~/.copilot). What the sessions used still counts in the totals.", description: 'The Clean Up dialog, at the top. Keep the paths as they are.' }),
   oldAttachments: msg({ id: 'workspace.storage.oldAttachments', defaultMessage: 'Attachments of archived sessions last active more than {days} days ago', description: 'A Clean Up choice; {days} is a box where you type the number of days.' }),
-  oldAttachmentsDesc: msg({ id: 'workspace.storage.oldAttachmentsDesc', defaultMessage: 'Files pasted or dropped into those sessions (.hive/attachments).', description: 'Under a Clean Up choice. Keep .hive/attachments as it is.' }),
+  oldAttachmentsDesc: msg({ id: 'workspace.storage.oldAttachmentsDesc', defaultMessage: 'Files pasted or dropped into those sessions (.combwork/attachments).', description: 'Under a Clean Up choice. Keep .combwork/attachments as it is.' }),
   attachmentDays: msg({ id: 'workspace.storage.attachmentDays', defaultMessage: 'Attachment age in days', description: "Clean Up: the days box's accessible name." }),
   orphansDesc: msg({ id: 'workspace.storage.orphansDesc', defaultMessage: 'Attachments whose session was deleted, or whose launch never got a session (folders named run-…).', description: 'Under a Clean Up choice. Keep run-… as it is (the folders\' names).' }),
-  oldBackups: msg({ id: 'workspace.storage.oldBackups', defaultMessage: "Hive's backups of archived sessions last active more than {days} days ago", description: 'A Clean Up choice; {days} is a box where you type the number of days.' }),
+  oldBackups: msg({ id: 'workspace.storage.oldBackups', defaultMessage: "Combwork's backups of archived sessions last active more than {days} days ago", description: 'A Clean Up choice; {days} is a box where you type the number of days.' }),
   oldBackupsDesc: msg({ id: 'workspace.storage.oldBackupsDesc', defaultMessage: "Only where Claude Code or Codex still has the transcript: the session stays, and can be resumed and read from the CLI's copy for as long as the CLI keeps it.", description: 'Under a Clean Up choice.' }),
   backupDays: msg({ id: 'workspace.storage.backupDays', defaultMessage: 'Backup age in days', description: "Clean Up: the days box's accessible name." }),
   goneBackups: msg({ id: 'workspace.storage.goneBackups', defaultMessage: 'Backups of archived sessions the CLI no longer has', description: 'A Clean Up choice (it deletes those sessions).' }),
-  goneBackupsDesc: msg({ id: 'workspace.storage.goneBackupsDesc', defaultMessage: "Hive's copy is the last one: the sessions are deleted, as Delete Session does.", description: 'Under a Clean Up choice. Delete Session is the Sessions tab\'s command.' }),
-  goneWarning: msg({ id: 'workspace.storage.goneWarning', defaultMessage: "These sessions can't be resumed or read afterwards: Hive's backup is the only copy left. They leave the Sessions tab; what they used still counts in the totals.", description: 'The Clean Up dialog, while it would delete sessions.' }),
+  goneBackupsDesc: msg({ id: 'workspace.storage.goneBackupsDesc', defaultMessage: "Combwork's copy is the last one: the sessions are deleted, as Delete Session does.", description: 'Under a Clean Up choice. Delete Session is the Sessions tab\'s command.' }),
+  goneWarning: msg({ id: 'workspace.storage.goneWarning', defaultMessage: "These sessions can't be resumed or read afterwards: Combwork's backup is the only copy left. They leave the Sessions tab; what they used still counts in the totals.", description: 'The Clean Up dialog, while it would delete sessions.' }),
   whatGoes: msg({ id: 'workspace.storage.whatGoes', defaultMessage: 'What goes to the Recycle Bin', description: "The Clean Up dialog's heading over the files." }),
   looking: msg({ id: 'workspace.storage.looking', defaultMessage: 'Looking…', description: 'The Clean Up dialog while it finds the files.' }),
   nothingMatches: msg({ id: 'workspace.storage.nothingMatches', defaultMessage: 'Nothing matches.', description: 'The Clean Up dialog when no file matches the choices.' }),
   groupCount: msg({ id: 'workspace.storage.groupCount', defaultMessage: '{count, plural, one {# item} other {# items}}, {size}', description: 'The Clean Up dialog, beside a group: how many and how big.' }),
   nothing: msg({ id: 'workspace.storage.nothing', defaultMessage: 'Nothing.', description: 'An empty group in the Clean Up dialog.' }),
-  assistant: msg({ id: 'workspace.storage.assistant', defaultMessage: 'Hive Assistant', description: "Settings → Workspace's storage: the Assistant's row and heading. Hive's name stays as it is." }),
+  assistant: msg({ id: 'workspace.storage.assistant', defaultMessage: 'Assistant', description: "Settings → Workspace's storage: the Assistant's row and heading. Combwork's name stays as it is." }),
   project: msg({ id: 'workspace.storage.project', defaultMessage: 'Project', description: "Settings → Workspace's storage table: the column of projects." }),
   hide: msg({ id: 'workspace.storage.hide', defaultMessage: 'Hide', description: "Settings → Workspace's storage: hides the Assistant's storage." }),
   storage: msg({ id: 'workspace.storage.storage', defaultMessage: 'Storage', description: "Settings → Workspace's storage: shows a project's (or the Assistant's) storage." }),
-  noWorkspace: msg({ id: 'workspace.storage.noWorkspace', defaultMessage: 'Open a workspace to see what Hive keeps for it.', description: "Settings → Workspace's storage with no workspace open." }),
+  noWorkspace: msg({ id: 'workspace.storage.noWorkspace', defaultMessage: 'Open a workspace to see what Combwork keeps for it.', description: "Settings → Workspace's storage with no workspace open." }),
   measuringProjects: msg({ id: 'workspace.storage.measuringProjects', defaultMessage: 'Measuring the projects…', description: "Settings → Workspace's storage while it measures." }),
   noProjects: msg({ id: 'workspace.storage.noProjects', defaultMessage: 'No projects.', description: "Settings → Workspace's storage table with no projects." }),
   workspace: msg({ id: 'workspace.storage.workspace', defaultMessage: 'Workspace', description: "Settings → Workspace's storage table: the last row, the workspace's total." }),
@@ -136,7 +136,7 @@ const storageColumns = (): DataColumn<StorageRow>[] => [
 
 /**
  * Measuring walks every file of every worktree, so the page abandons a call it no longer waits for (a newer one, the page
- * closed) and Hive stops measuring what nothing else waits for. `start` sends the call with its request; the earlier
+ * closed) and Combwork stops measuring what nothing else waits for. `start` sends the call with its request; the earlier
  * one is abandoned after it, so a measurement both wait for carries on. `current` says whether a call is still the latest.
  */
 export function useStorageRequests(): <T>(start: (request: string) => Promise<T>) => { result: Promise<T>; current: () => boolean } {
@@ -157,7 +157,7 @@ export function useStorageRequests(): <T>(start: (request: string) => Promise<T>
   }, [])
 }
 
-/** Project Settings → Storage (and the Assistant's in Settings → Workspace): what Hive keeps, Refresh, Clean Up… and Purge…. */
+/** Project Settings → Storage (and the Assistant's in Settings → Workspace): what Combwork keeps, Refresh, Clean Up… and Purge…. */
 export function StorageView({ path }: { path: string }) {
   const [data, setData] = useState<ProjectStorage | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -185,10 +185,10 @@ export function StorageView({ path }: { path: string }) {
   if (error) return <LoadFailed inline what={tr(M.loadTarget)} error={error} onRetry={() => load(true)} />
   const rows: StorageRow[] = data
     ? [
-        { label: tr(M.backups), where: '.hive/sessions', bytes: data.sessions, raw: data.sessionsRaw },
-        { label: tr(M.archive), where: '.hive/archive', bytes: data.archive, raw: data.archiveRaw },
-        { label: tr(M.attachments), where: '.hive/attachments', bytes: data.attachments },
-        ...(data.cardAttachments ? [{ label: tr(M.cardAttachments), where: '.hive/attachments/cards', bytes: data.cardAttachments }] : []),
+        { label: tr(M.backups), where: '.combwork/sessions', bytes: data.sessions, raw: data.sessionsRaw },
+        { label: tr(M.archive), where: '.combwork/archive', bytes: data.archive, raw: data.archiveRaw },
+        { label: tr(M.attachments), where: '.combwork/attachments', bytes: data.attachments },
+        ...(data.cardAttachments ? [{ label: tr(M.cardAttachments), where: '.combwork/attachments/cards', bytes: data.cardAttachments }] : []),
         ...data.worktrees.map((w) => ({ label: w.slot ? (w.agent ? tr(M.slot, { slot: w.slot, agent: w.agent }) : tr(M.freeSlot, { slot: w.slot })) : tr(M.agentWorktree, { agent: w.agent ?? '' }), where: w.path, bytes: w.bytes })),
         ...(data.copies ? [{ label: tr(M.copies), where: data.copies.path, bytes: data.copies.bytes }] : []),
         // The worktrees no agent works in (#353), on one line: the Overview lists and tidies them.

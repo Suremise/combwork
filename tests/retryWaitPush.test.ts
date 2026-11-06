@@ -3,7 +3,7 @@
 // never a retry time or a total it doesn't say), Claude Code's transcript read by its adapter while its turn is quiet
 // (a read that comes back after a hook loses to it), and the Assistant told once a turn when a wait goes on past
 // Settings → Advanced's while (a wait that ends sooner tells nothing; a later turn's is told again). Each wait that ends
-// is kept in the launch's tally (HI-1996), which hive_agent_activity reads.
+// is kept in the launch's tally (HI-1996), which cw_agent_activity reads.
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -11,7 +11,7 @@ import * as electron from 'electron'
 import type { RetryWait } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-retry-push-')
+const base = tempDir('cw-retry-push-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -64,9 +64,9 @@ const REFUSED = '"Failed native model HTTP request: error sending request for ur
 
 describe("other CLIs' retry waits (HI-1973)", () => {
   beforeAll(async () => {
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    mkdirSync(join(wsPath, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    mkdirSync(join(wsPath, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     vi.spyOn(providerService, 'refresh').mockResolvedValue([])
@@ -74,7 +74,7 @@ describe("other CLIs' retry waits (HI-1973)", () => {
   })
   afterEach(async () => {
     sessions.retryOverdue = null
-    await advanced.set('hive.retry.tellAssistantAfterSeconds', null)
+    await advanced.set('cw.retry.tellAssistantAfterSeconds', null)
   })
   afterAll(async () => {
     s.live.clear()
@@ -150,7 +150,7 @@ describe("other CLIs' retry waits (HI-1973)", () => {
   })
 
   it('tells the Assistant once a turn when a wait goes on past the while, kept through its tries; one that ends sooner tells nothing', async () => {
-    await advanced.set('hive.retry.tellAssistantAfterSeconds', 60)
+    await advanced.set('cw.retry.tellAssistantAfterSeconds', 60)
     const told: State[] = []
     sessions.retryOverdue = (st) => void told.push(st as never)
     const { st } = agent('notice', copilot, 'copilot')
@@ -192,7 +192,7 @@ describe("other CLIs' retry waits (HI-1973)", () => {
   })
 
   it("Copilot's wait, its retry time unknown, stands through long quiet backoffs (the 5 s loop's looks), tells the Assistant once past the while, and ends on progress (HR6's round 1)", async () => {
-    await advanced.set('hive.retry.tellAssistantAfterSeconds', 60)
+    await advanced.set('cw.retry.tellAssistantAfterSeconds', 60)
     const told: State[] = []
     sessions.retryOverdue = (st) => void told.push(st as never)
     const start = Date.now()
@@ -241,7 +241,7 @@ describe("other CLIs' retry waits (HI-1973)", () => {
     expect(st.retryWait).toBeUndefined()
   })
 
-  it('HI-1996: each wait that ends, on progress or with its turn, is kept in the launch’s tally that hive_agent_activity reads', async () => {
+  it('HI-1996: each wait that ends, on progress or with its turn, is kept in the launch’s tally that cw_agent_activity reads', async () => {
     const { st } = agent('tally', copilot, 'copilot')
     const tally = () => (st as unknown as { retryWaited?: { waits: number; ms: number; latest: { since: string; ended: string; tries: number; status: number | null } } }).retryWaited
     await hook(st, { hook_event_name: 'UserPromptSubmit', prompt: 'go' })
@@ -270,7 +270,7 @@ describe("other CLIs' retry waits (HI-1973)", () => {
   })
 
   it('tells nobody at 0', async () => {
-    await advanced.set('hive.retry.tellAssistantAfterSeconds', 0)
+    await advanced.set('cw.retry.tellAssistantAfterSeconds', 0)
     const told: unknown[] = []
     sessions.retryOverdue = (st) => void told.push(st)
     const { st } = agent('never', copilot, 'copilot')

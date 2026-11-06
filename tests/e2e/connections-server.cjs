@@ -36,8 +36,8 @@ const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '')
   fs.mkdirSync(userData, { recursive: true })
   const env = lib.fakeClaude(userData, home, [alpha])
   lib.gitProject(alpha)
-  fs.mkdirSync(path.join(alpha, '.hive'), { recursive: true })
-  fs.writeFileSync(path.join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One' }, { id: 'a-two', name: 'Two' }] }))
+  fs.mkdirSync(path.join(alpha, '.combwork'), { recursive: true })
+  fs.writeFileSync(path.join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One' }, { id: 'a-two', name: 'Two' }] }))
 
   // A local server standing in for Ollama: its model list (/api/tags), the Authorization header it got recorded. A cloud
   // model (HI-1773) has remote_host, as Ollama's ListModelResponse does.
@@ -51,12 +51,12 @@ const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '')
   await new Promise((r) => stub.listen(0, '127.0.0.1', r))
   const port = stub.address().port
 
-  const { app, page } = await lib.launch({ userData, env: { ...env, HIVE_TEST_CLI_HOME_CONNECTION: '0' }, viewport: { width: 1400, height: 950 } })
+  const { app, page } = await lib.launch({ userData, env: { ...env, CW_TEST_CLI_HOME_CONNECTION: '0' }, viewport: { width: 1400, height: 950 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     const consoleText = []
     page.on('console', (m) => consoleText.push(m.text()))
-    const invOn = (p) => (ch, ...a) => p.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const invOn = (p) => (ch, ...a) => p.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     const inv = invOn(page)
     await lib.openWorkspace(inv, page, ws1)
     const list = () => inv('connections:list')
@@ -105,7 +105,7 @@ const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '')
     await inv('connections:setOn', ds.id, true)
     await closeSettings()
     await inv('session:start', alpha, { agentId: 'a-one' })
-    const launch = await lib.until(async () => launchedIn(ds.id).find((l) => l.env.HIVE_AGENT === 'One') ?? null, HUNG_MS)
+    const launch = await lib.until(async () => launchedIn(ds.id).find((l) => l.env.CW_AGENT === 'One') ?? null, HUNG_MS)
     check('One launches on the server connection, in its folder', !!launch && launch.env.CLAUDE_CONFIG_DIR === path.join(accountsRoot, ds.id))
     check('…with its base URL and the key as a bearer token', launch?.env.ANTHROPIC_BASE_URL === 'https://api.deepseek.com/anthropic' && launch?.env.ANTHROPIC_AUTH_TOKEN === KEY && !launch?.env.ANTHROPIC_API_KEY)
     check("…and each Claude name's model", launch?.env.ANTHROPIC_DEFAULT_OPUS_MODEL === 'deepseek-flash[1m]' && launch?.env.ANTHROPIC_DEFAULT_HAIKU_MODEL === 'deepseek-flash' && launch?.env.CLAUDE_CODE_SUBAGENT_MODEL === 'deepseek-flash' && launch?.env.ANTHROPIC_MODEL === 'deepseek-flash[1m]', JSON.stringify(launch?.env))
@@ -138,7 +138,7 @@ const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '')
     fs.writeFileSync(path.join(accountsRoot, ol.id, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase()]))
     await inv('agents:update', alpha, 'a-two', { connection: ol.id })
     await inv('session:start', alpha, { agentId: 'a-two' })
-    const local = await lib.until(async () => launchedIn(ol.id).find((l) => l.env.HIVE_AGENT === 'Two') ?? null, HUNG_MS)
+    const local = await lib.until(async () => launchedIn(ol.id).find((l) => l.env.CW_AGENT === 'Two') ?? null, HUNG_MS)
     check('an agent on it launches with its base URL and the placeholder, no key', local?.env.ANTHROPIC_BASE_URL === `http://127.0.0.1:${port}` && local?.env.ANTHROPIC_AUTH_TOKEN === 'none' && local?.env.ANTHROPIC_MODEL === 'qwen3:8b', JSON.stringify(local?.env))
     // Its conversation runs only on a server on this PC: free (Darren, 27 Oct), whatever the CLI reports.
     await lib.until(async () => ['idle', 'ready'].includes((await live('a-two'))?.status), HUNG_MS)
@@ -192,7 +192,7 @@ const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '')
     const keyStore = read(path.join(userData, 'connection-keys.json'))
     check('the key store holds it encrypted, by its last 4 characters', keyStore.includes(ds.id) && !keyStore.includes(KEY) && !keyStore.includes(KEY2))
     check('…and no backup of it is kept', !fs.existsSync(path.join(userData, 'connection-keys.json.bak')))
-    for (const [where, text] of [['hive.log', lib.hiveLogLines(userData).join('\n')], ['config.json', read(path.join(userData, 'config.json'))], ['config.json.bak', read(path.join(userData, 'config.json.bak'))], ['Copy Diagnostics', String(diag)], ["the window's console", consoleText.join('\n')]]) check(`no key in ${where}`, !text.includes(KEY) && !text.includes(KEY2))
+    for (const [where, text] of [['combwork.log', lib.combworkLogLines(userData).join('\n')], ['config.json', read(path.join(userData, 'config.json'))], ['config.json.bak', read(path.join(userData, 'config.json.bak'))], ['Copy Diagnostics', String(diag)], ["the window's console", consoleText.join('\n')]]) check(`no key in ${where}`, !text.includes(KEY) && !text.includes(KEY2))
 
     // --- Removed: its key goes with it.
     await inv('connections:remove', ds.id)

@@ -1,9 +1,9 @@
 // An agent's worktree between a lane's cards (#1271, SPEC §16.19.2): after a squash merge the builder's branch isn't in
-// the target, so the lane's next card waits (its start refused, lane.lineBehind) while Hive brings the branch up to date:
+// the target, so the lane's next card waits (its start refused, lane.lineBehind) while Combwork brings the branch up to date:
 // once the builder is idle with no run going and its worktree clean, and only when everything on it is in the target;
 // recorded as LineMoved on the card just Done, before the next card's Started (whose base is its `to`). Work that isn't
 // in the target, and git's refusal, are asked of the user (For you); with the switch off the user is asked every time;
-// with workflow rules off nothing moves. A merge commit needs nothing. On a real board (a temp hive.db) and temp repos.
+// with workflow rules off nothing moves. A merge commit needs nothing. On a real board (a temp combwork.db) and temp repos.
 import { execFileSync } from 'child_process'
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -28,7 +28,7 @@ vi.mock('original-fs', async () => {
   }
 })
 
-const base = tempDir('hive-lines-')
+const base = tempDir('cw-lines-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -49,6 +49,7 @@ const service = await import('../src/main/workflow/service')
 const G = await import('../src/main/platform/git')
 const { gitTestHooks } = await import('../src/main/git')
 const { Workflow } = await import('../src/main/workflow/runtime')
+const { GIT_HEAVY_MS } = await import('./workflow/harness')
 
 advanced.load(join(base, 'profile'))
 type WS = ReturnType<typeof createWorkspaceService>
@@ -99,16 +100,16 @@ async function makeWorkspace(options: typeof PAIR | typeof UNREVIEWED): Promise<
   const ws = join(base, `ws-${++n}`)
   const repo = join(ws, 'p')
   const wt = join(ws, 'p-card')
-  mkdirSync(join(repo, '.hive'), { recursive: true })
+  mkdirSync(join(repo, '.combwork'), { recursive: true })
   writeFileSync(join(repo, 'a.txt'), 'one\n')
   git(repo, 'init', '-q', '-b', 'main')
   git(repo, 'config', 'core.autocrlf', 'false')
-  writeFileSync(join(repo, '.gitignore'), '.hive/\n')
+  writeFileSync(join(repo, '.gitignore'), '.combwork/\n')
   git(repo, 'add', '-A')
   git(repo, 'commit', '-qm', 'initial')
   git(repo, 'worktree', 'add', '-q', '-b', 'card', wt, 'main')
   const agents = [{ id: 'a1', name: 'Builder', worktree: { path: wt, branch: 'card', base: 'main' } }, { id: 'a2', name: 'Reviewer' }]
-  writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents, workflow: { platform: 'git', preset: null, options } }))
+  writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents, workflow: { platform: 'git', preset: null, options } }))
   const w = createWorkspaceService()
   await w.open(ws)
   opened.push(w)
@@ -163,7 +164,10 @@ const update = (w: WS) => step('update', () => inWorkspace(w, () => lines.update
 const laneStatus = async (w: WS, lane: string) => (await lanes.getLane(w, lane)).status
 
 describe("an agent's branch between a lane's cards (#1271)", () => {
-  it('after a squash, the next card waits; Hive brings the branch up to date; two squashed cards in a row each review only their own work', async () => {
+  // GIT_HEAVY_MS (HI-2025's rule): two cards squash-merged through real git on a real board, the branch brought up to date
+  // between them; 4.0 s alone, 9.6 s beside three spinner workers, and past 20 s in HI-2453's proof beside two (every step
+  // slow, about 2 to 4 s each, none hung).
+  it('after a squash, the next card waits; Combwork brings the branch up to date; two squashed cards in a row each review only their own work', { timeout: GIT_HEAVY_MS }, async () => {
     // No review step (HI-1963: 16 workflow steps timed out at 20 s in a multi-file run): what each card would be reviewed
     // on is its submission, checked below; the other tests here go through the review.
     const { w, repo, wt, cards, lane } = await workspace(UNREVIEWED)
@@ -234,7 +238,10 @@ describe("an agent's branch between a lane's cards (#1271)", () => {
     expect(facts(w, cards[0]).some((f) => f.kind === 'LineMoved')).toBe(true)
   })
 
-  it('a commit made after approval is work not in main: asked of the user (Decide), once, and nothing moves', async () => {
+  // GIT_HEAVY_MS (HI-2494, HI-2453's policy): about 50 real Git commands for approval, a late commit, squash and
+  // two update passes; 94% of its 2.5 s isolated time was Git. At ~100% CPU it exceeded 20 s with every step slow
+  // (workspace 4.0 s, submit 2.9 s, verdict 4.9 s, reportMerge 3.3 s), rather than one condition left unawaited.
+  it('a commit made after approval is work not in main: asked of the user (Decide), once, and nothing moves', { timeout: GIT_HEAVY_MS }, async () => {
     const { w, repo, wt, cards } = await workspace()
     const rev = await approved(w, wt, cards[0], 'one.txt')
     commit(wt, 'late.txt')
@@ -267,7 +274,10 @@ describe("an agent's branch between a lane's cards (#1271)", () => {
     expect(move).toHaveBeenCalledTimes(1)
   })
 
-  it('switched off, the user is asked every time: approved, Hive moves it once; declined, it stays for the user', async () => {
+  // GIT_HEAVY_MS (HI-2025's rule): two cards squash-merged through real git on a real board, the branch asked about twice;
+  // 3.7 s alone, 10 s beside three spinner workers, and past 20 s in HI-2453's loaded full run, every step slow (about
+  // 2 s each), none hung.
+  it('switched off, the user is asked every time: approved, Combwork moves it once; declined, it stays for the user', { timeout: GIT_HEAVY_MS }, async () => {
     await advanced.set(lines.UPDATE_AGENT_BRANCH, false)
     const { w, repo, wt, cards } = await workspace()
     const [c1, c2, c3] = cards
@@ -276,7 +286,7 @@ describe("an agent's branch between a lane's cards (#1271)", () => {
     await update(w)
     let asked = forYou(w).items.filter((i) => i.card === c2)
     expect(asked).toMatchObject([{ kind: 'approve' }])
-    expect(asked[0].text).toMatch(/^card still has .+'s work, squashed into main: approve and Hive brings the branch up to date once/)
+    expect(asked[0].text).toMatch(/^card still has .+'s work, squashed into main: approve and Combwork brings the branch up to date once/)
     expect(facts(w, c1).some((f) => f.kind === 'LineMoved')).toBe(false)
     await inWorkspace(w, () => tasks.answerTask(c2, asked[0].request, { outcome: 'approved' }))
     await update(w)
@@ -296,7 +306,7 @@ describe("an agent's branch between a lane's cards (#1271)", () => {
     expect(await refused(act(w, c3, builder, { kind: 'start' }))).toBeNull()
   })
 
-  it('with workflow rules off, Hive never moves the branch nor asks, and nothing waits for it', async () => {
+  it('with workflow rules off, Combwork never moves the branch nor asks, and nothing waits for it', async () => {
     const { w, repo, wt, cards, lane } = await workspace()
     await approved(w, wt, cards[0], 'one.txt')
     await merged(w, repo, cards[0], 'squash')
@@ -553,7 +563,7 @@ describe("with workflow rules off, 0.9's Merge dialog squash still moves the age
   it('a squash with Move branch moves it to the merged branch, as before 1.0', async () => {
     await advanced.set(ENFORCE, false)
     const { repo, wt } = await workspace()
-    // Hive's merge commits in the repository as its own identity says (unit tests have no global git config).
+    // Combwork's merge commits in the repository as its own identity says (unit tests have no global git config).
     git(repo, 'config', 'user.name', 'Test')
     git(repo, 'config', 'user.email', 'test@example.com')
     commit(wt, 'work.txt')
@@ -590,7 +600,7 @@ describe('a move failing after its first change (#1271 round 4)', () => {
     expect(git(wt, 'rev-parse', 'HEAD')).toBe(at)
     expect(git(wt, 'status', '--porcelain')).toBe('')
     const index = git(wt, 'rev-parse', '--path-format=absolute', '--git-path', 'index')
-    expect([existsSync(`${index}.lock`), existsSync(`${index}.hive-line`)]).toEqual([false, false])
+    expect([existsSync(`${index}.lock`), existsSync(`${index}.cw-line`)]).toEqual([false, false])
   }
 
   it("the new index can't be staged in the lock: the files are put back, nothing moved, the user told, the next card held", async () => {
@@ -625,7 +635,7 @@ describe('a move failing after its first change (#1271 round 4)', () => {
   it("not put back (the branch moved on meanwhile): its LineMoving holds the next card, the user is asked once; settled by hand, it is recorded and the card starts", async () => {
     const { w, wt, repo, cards, head } = await squashed()
     refuseRename(wt, '', 100)
-    // The branch moved elsewhere just as Hive swaps it back: the swap back fails.
+    // The branch moved elsewhere just as Combwork swaps it back: the swap back fails.
     let other = ''
     gitTestHooks.started = (_cwd, args) => {
       if (args[0] !== 'update-ref' || !args.some((x) => x.includes('put back')) || other) return

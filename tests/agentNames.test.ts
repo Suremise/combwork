@@ -1,5 +1,5 @@
 // Agent names unique across the workspace (#702): the rules (a project's prefix, a suggested name, duplicates from
-// before), and Hive keeping them — Add Agent and its default name, a rename (its own name kept), a template's load
+// before), and Combwork keeping them — Add Agent and its default name, a rename (its own name kept), a template's load
 // (renamed, refused while a name is another project's, a name taken while it stages) and one of its agents (numbered), adds and renames in two projects at once (only one gets the name), duplicates from before flagged
 // once, and a template loading into a project without git (#1436: no worktrees, so nothing needs one).
 import { AsyncLocalStorage } from 'async_hooks'
@@ -9,10 +9,10 @@ import { join } from 'path'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { duplicateAgentNames, nameTaken, projectPrefix, suggestAgentName } from '../src/shared/agentNames'
-import type { AgentDef, HiveEvent } from '../src/shared/types'
+import type { AgentDef, CombworkEvent } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-agentnames-')
+const base = tempDir('cw-agentnames-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -20,7 +20,7 @@ const templates = await import('../src/main/templates')
 const { config } = await import('../src/main/config')
 const { providerService } = await import('../src/main/providerService')
 const { addAgent, updateAgent } = await import('../src/main/projectAgents')
-const { onHiveEvent } = await import('../src/main/events')
+const { onCombworkEvent } = await import('../src/main/events')
 const { withAgentNames } = await import('../src/main/agentNames')
 
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
@@ -28,13 +28,13 @@ const HUNG_MS = 10000
 
 describe('the name rules', () => {
   it("a project's prefix is its initials", () => {
-    expect(['hive', 'hive-desktop', 'amberLight', 'Amberlight', '2nd go', '---'].map(projectPrefix)).toEqual(['H', 'HD', 'AL', 'A', '2G', 'P'])
+    expect(['acme', 'acme-desktop', 'ambrosiaLabs', 'Ambrosialabs', '2nd go', '---'].map(projectPrefix)).toEqual(['A', 'AD', 'AL', 'A', '2G', 'P'])
   })
 
   it('suggests a free name: the prefix before a short code, then longer ones, a word with its project, else a number', () => {
-    expect(suggestAgentName('B1', 'hive', ['B1'])).toBe('HB1')
-    expect(suggestAgentName('B1', 'amberlight', ['B1', 'AB1'])).toBe('AMB1')
-    expect(suggestAgentName('B1', 'amberlight', ['b1', 'ab1', 'amb1'])).toBe('AMBB1')
+    expect(suggestAgentName('B1', 'acme', ['B1'])).toBe('AB1')
+    expect(suggestAgentName('B1', 'ambrosia', ['B1', 'AB1'])).toBe('AMB1')
+    expect(suggestAgentName('B1', 'ambrosia', ['b1', 'ab1', 'amb1'])).toBe('AMBB1')
     expect(suggestAgentName('Builder', 'beta', ['Builder'])).toBe('Builder (beta)')
     expect(suggestAgentName('Builder', 'beta', ['Builder', 'builder (BETA)'])).toBe('Builder (beta) 2')
     expect(suggestAgentName('X', 'x', ['X', 'XX'])).toBe('XX 2')
@@ -59,21 +59,21 @@ describe('the name rules', () => {
   })
 
   it('finds a name taken (case and spacing aside), not by the agent being renamed; lists duplicates by project', () => {
-    const all = [{ project: 'hive', name: 'B1', id: 'a' }, { project: 'amber', name: 'b1 ', id: 'b' }, { project: 'hive', name: 'R1', id: 'c' }]
-    expect(nameTaken(' B1', all)?.project).toBe('hive')
-    expect(nameTaken('r1', all, { project: 'HIVE', id: 'c' })).toBeNull()
-    expect(nameTaken('r1', all, { project: 'amber', id: 'c' })?.id).toBe('c')
+    const all = [{ project: 'beta', name: 'B1', id: 'a' }, { project: 'ambrosia', name: 'b1 ', id: 'b' }, { project: 'beta', name: 'R1', id: 'c' }]
+    expect(nameTaken(' B1', all)?.project).toBe('beta')
+    expect(nameTaken('r1', all, { project: 'BETA', id: 'c' })).toBeNull()
+    expect(nameTaken('r1', all, { project: 'ambrosia', id: 'c' })?.id).toBe('c')
     expect(duplicateAgentNames(all)).toEqual([{ name: 'B1', agents: [all[1], all[0]] }])
   })
 })
 
-describe('Hive keeps agent names unique across the workspace', () => {
+describe('Combwork keeps agent names unique across the workspace', () => {
   const wsPath = join(base, 'ws')
   const alpha = join(wsPath, 'alpha')
   const beta = join(wsPath, 'beta')
   const plain = join(wsPath, 'plain')
   const git = (cwd: string, ...a: string[]) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...a], { cwd, stdio: 'pipe' })
-  const cfgOf = (p: string) => JSON.parse(readFileSync(join(p, '.hive', 'project.json'), 'utf8'))
+  const cfgOf = (p: string) => JSON.parse(readFileSync(join(p, '.combwork', 'project.json'), 'utf8'))
   const names = (p: string): string[] => cfgOf(p).agents.map((a: AgentDef) => a.name)
   const ids = (p: string): string[] => cfgOf(p).agents.map((a: AgentDef) => a.id)
   let w: ReturnType<typeof createWorkspaceService>
@@ -83,20 +83,20 @@ describe('Hive keeps agent names unique across the workspace', () => {
 
   beforeAll(async () => {
     for (const p of [alpha, beta]) {
-      mkdirSync(join(p, '.hive'), { recursive: true })
+      mkdirSync(join(p, '.combwork'), { recursive: true })
       execFileSync('git', ['init', '-q', '-b', 'main', p])
       writeFileSync(join(p, 'a.txt'), 'a')
       git(p, 'add', '.')
       git(p, 'commit', '-qm', 'a')
     }
     // A folder that isn't a git repository.
-    mkdirSync(join(plain, '.hive'), { recursive: true })
-    writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, layout: 'auto', agents: [{ id: 'a1', name: 'B1', provider: 'claude-code' }, { id: 'a2', name: 'R1', provider: 'claude-code' }] }))
-    writeFileSync(join(beta, '.hive', 'project.json'), JSON.stringify({ version: 2, layout: 'auto', agents: [{ id: 'b1', name: 'Old', provider: 'claude-code' }] }))
-    writeFileSync(join(plain, '.hive', 'project.json'), JSON.stringify({ version: 2, layout: 'auto', agents: [] }))
-    mkdirSync(join(wsPath, '.hive', 'templates'), { recursive: true })
-    writeFileSync(join(wsPath, '.hive', 'templates', 'pair.json'), JSON.stringify({ version: 2, name: 'Pair', layout: 'auto', agents: [{ name: 'B1', role: 'builder', provider: 'claude-code' }, { name: 'R1', role: 'reviewer', provider: 'claude-code' }] }))
-    writeFileSync(join(wsPath, '.hive', 'templates', 'trees.json'), JSON.stringify({ version: 2, name: 'Trees', layout: 'auto', agents: [{ name: 'T1', role: 'builder', provider: 'claude-code' }, { name: 'Folder', role: 'reviewer', provider: 'claude-code' }] }))
+    mkdirSync(join(plain, '.combwork'), { recursive: true })
+    writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, layout: 'auto', agents: [{ id: 'a1', name: 'B1', provider: 'claude-code' }, { id: 'a2', name: 'R1', provider: 'claude-code' }] }))
+    writeFileSync(join(beta, '.combwork', 'project.json'), JSON.stringify({ version: 2, layout: 'auto', agents: [{ id: 'b1', name: 'Old', provider: 'claude-code' }] }))
+    writeFileSync(join(plain, '.combwork', 'project.json'), JSON.stringify({ version: 2, layout: 'auto', agents: [] }))
+    mkdirSync(join(wsPath, '.combwork', 'templates'), { recursive: true })
+    writeFileSync(join(wsPath, '.combwork', 'templates', 'pair.json'), JSON.stringify({ version: 2, name: 'Pair', layout: 'auto', agents: [{ name: 'B1', role: 'builder', provider: 'claude-code' }, { name: 'R1', role: 'reviewer', provider: 'claude-code' }] }))
+    writeFileSync(join(wsPath, '.combwork', 'templates', 'trees.json'), JSON.stringify({ version: 2, name: 'Trees', layout: 'auto', agents: [{ name: 'T1', role: 'builder', provider: 'claude-code' }, { name: 'Folder', role: 'reviewer', provider: 'claude-code' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     config.settings.providers['claude-code'].enabled = true
@@ -119,7 +119,7 @@ describe('Hive keeps agent names unique across the workspace', () => {
   it('a rename to a name taken elsewhere is refused; its own name again is no change, even one it shares from before', async () => {
     const oldId = ids(beta)[0]
     await expect(run(() => updateAgent(beta, oldId, { name: 'r1' }))).rejects.toThrow(/already an agent called "R1" in alpha/)
-    // A duplicate from before (written as an older Hive might have): it keeps working, and saves its other settings.
+    // A duplicate from before (written as an older version might have): it keeps working, and saves its other settings.
     await run(() => w.mutateProjectConfig(beta, (c) => ({ agents: c.agents.map((a) => (a.id === oldId ? { ...a, name: 'B1' } : a)) })))
     expect((await run(() => updateAgent(beta, oldId, { name: 'B1', role: 'builder' }))).role).toBe('builder')
     await run(() => updateAgent(beta, oldId, { name: 'Old' }))
@@ -202,7 +202,7 @@ describe('Hive keeps agent names unique across the workspace', () => {
     expect((await run(() => templates.templatePlan(plain, 'workspace', 'trees.json'))).blocked).toEqual([])
     expect((await run(() => templates.templatePlan(plain, 'workspace', 'pair.json', undefined, ['PB1', 'PR1']))).blocked).toEqual([])
     const fresh = join(wsPath, 'fresh')
-    mkdirSync(join(fresh, '.hive'), { recursive: true })
+    mkdirSync(join(fresh, '.combwork'), { recursive: true })
     execFileSync('git', ['init', '-q', '-b', 'main', fresh])
     expect((await run(() => templates.templatePlan(fresh, 'workspace', 'trees.json'))).blocked).toEqual([])
     // The new project made (a refresh writes its project.json) and given its id now, and the refreshes that scheduled run
@@ -216,14 +216,14 @@ describe('Hive keeps agent names unique across the workspace', () => {
 
   it('names two projects shared from before are flagged once, with a rename to make, while they last', async () => {
     const toasts: string[] = []
-    const off = onHiveEvent((e: HiveEvent) => void (e.type === 'toast' && toasts.push(`${e.toast.title} | ${e.toast.message} | ${e.toast.actions?.[0]?.label}`)))
+    const off = onCombworkEvent((e: CombworkEvent) => void (e.type === 'toast' && toasts.push(`${e.toast.title} | ${e.toast.message} | ${e.toast.actions?.[0]?.label}`)))
     try {
       await run(() => w.mutateProjectConfig(beta, (c) => ({ agents: [...c.agents, { id: 'dup', name: 'R1', provider: 'claude-code' }] })))
       await run(() => w.refresh())
       await run(() => w.refresh())
       expect(toasts).toEqual(["Two agents are called R1 | Agent names are unique across the workspace now, so each agent can be told apart. R1 is in alpha and beta: they keep working, but rename one of each, e.g. beta's R1 to BR1. | Rename beta's R1…"])
       // workspace.json is saved behind the refresh (#731: read once, it could still be the save before).
-      const flagged = () => JSON.parse(readFileSync(join(wsPath, '.hive', 'workspace.json'), 'utf8')).flaggedAgentNames
+      const flagged = () => JSON.parse(readFileSync(join(wsPath, '.combwork', 'workspace.json'), 'utf8')).flaggedAgentNames
       await vi.waitFor(() => expect(flagged()).toEqual(['r1']), { timeout: HUNG_MS })
       // Renamed: forgotten, so a new clash of that name is said again.
       await run(() => updateAgent(beta, 'dup', { name: 'BR1' }))
@@ -237,7 +237,7 @@ describe('Hive keeps agent names unique across the workspace', () => {
 
   it('a refresh begun before a newer one that has reported changes nothing: no agent list from before, no name said twice (#731)', async () => {
     const toasts: string[] = []
-    const off = onHiveEvent((e: HiveEvent) => void (e.type === 'toast' && toasts.push(e.toast.title)))
+    const off = onCombworkEvent((e: CombworkEvent) => void (e.type === 'toast' && toasts.push(e.toast.title)))
     // The older refresh is held once it has read beta, as one begun just before a change and slow to end. Only the test's
     // own: it runs in a context of its own, which a refresh the watcher schedules meanwhile doesn't have.
     const service = w as unknown as { projectInfo: (p: string) => Promise<{ path: string }> }

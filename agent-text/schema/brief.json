@@ -1,0 +1,197 @@
+{
+  "brief.lane.builder": {
+    "placeholders": {
+      "project": "plain",
+      "reviewer": "select",
+      "reviewerName": "plain",
+      "pool": "plain",
+      "rounds": "plain"
+    }
+  },
+  "brief.lane.builderMoves": {
+    "placeholders": {}
+  },
+  "brief.lane.cards": {
+    "placeholders": {}
+  },
+  "brief.lane.note": {
+    "placeholders": {
+      "note": "plain"
+    }
+  },
+  "brief.lane.poolEmpty": {
+    "placeholders": {}
+  },
+  "brief.lane.reviewer": {
+    "placeholders": {
+      "builder": "plain",
+      "project": "plain",
+      "rounds": "plain"
+    }
+  },
+  "brief.lane.reviewerMoves": {
+    "placeholders": {}
+  },
+  "brief.lane.rules": {
+    "placeholders": {}
+  },
+  "brief.lane.where": {
+    "placeholders": {
+      "place": "select",
+      "builder": "plain",
+      "slot": "plain",
+      "folder": "plain",
+      "hasBranch": "select",
+      "branch": "plain",
+      "hasTarget": "select",
+      "target": "plain"
+    }
+  },
+  "brief.record.brief": {
+    "placeholders": {
+      "lane": "plain",
+      "from": "plain",
+      "text": "plain"
+    }
+  },
+  "brief.record.byCombwork": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "brief.record.cleared": {
+    "placeholders": {}
+  },
+  "brief.record.deferred": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "brief.record.delivered": {
+    "placeholders": {}
+  },
+  "brief.record.failed": {
+    "placeholders": {
+      "failed": "plain",
+      "count": "plural"
+    }
+  },
+  "brief.record.failedOne": {
+    "placeholders": {
+      "agent": "plain",
+      "hasWhy": "select",
+      "why": "plain"
+    }
+  },
+  "brief.record.fresh": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "brief.record.inSlot": {
+    "placeholders": {}
+  },
+  "brief.record.noSlot": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "brief.record.started": {
+    "placeholders": {
+      "agents": "plain",
+      "hasSlot": "select",
+      "slot": "plain"
+    }
+  },
+  "brief.record.tell": {
+    "placeholders": {
+      "agents": "plain",
+      "count": "plural"
+    }
+  },
+  "brief.rule.finish.accept": {
+    "placeholders": {}
+  },
+  "brief.rule.finish.agentMerges": {
+    "placeholders": {}
+  },
+  "brief.rule.finish.combworkMerges": {
+    "placeholders": {}
+  },
+  "brief.rule.finish.committed": {
+    "placeholders": {}
+  },
+  "brief.rule.finish.notChecked": {
+    "placeholders": {}
+  },
+  "brief.rule.off": {
+    "placeholders": {}
+  },
+  "brief.rule.okBefore.every": {
+    "placeholders": {}
+  },
+  "brief.rule.okBefore.labels": {
+    "placeholders": {
+      "labels": "plain"
+    }
+  },
+  "brief.rule.preChecks": {
+    "placeholders": {
+      "checks": "plain"
+    }
+  },
+  "brief.rule.review.agent": {
+    "placeholders": {}
+  },
+  "brief.rule.review.agentThenYou": {
+    "placeholders": {}
+  },
+  "brief.rule.review.none": {
+    "placeholders": {}
+  },
+  "brief.rule.review.you": {
+    "placeholders": {}
+  },
+  "brief.start.builderFailed": {
+    "placeholders": {
+      "agent": "plain",
+      "error": "plain"
+    }
+  },
+  "brief.start.builderPrompt": {
+    "placeholders": {
+      "lane": "plain"
+    }
+  },
+  "brief.start.builderStarted": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "brief.start.byUser": {
+    "placeholders": {}
+  },
+  "brief.start.firstCard": {
+    "placeholders": {}
+  },
+  "brief.start.firstWithBrief": {
+    "placeholders": {}
+  },
+  "brief.start.fromUser": {
+    "placeholders": {}
+  },
+  "brief.start.nextCard": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "brief.start.notGiven": {
+    "placeholders": {
+      "agent": "plain",
+      "state": "plain"
+    }
+  },
+  "brief.start.retryCancel": {
+    "placeholders": {}
+  }
+}

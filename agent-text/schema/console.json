@@ -1,0 +1,11 @@
+{
+  "console.cancelled": {
+    "placeholders": {}
+  },
+  "console.fileFull": {
+    "placeholders": {}
+  },
+  "console.tooMany": {
+    "placeholders": {}
+  }
+}

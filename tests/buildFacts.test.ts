@@ -1,6 +1,6 @@
-// Builds recorded as facts (#1534, #1062): npm run dist and npm run release tell Hive of each successful build
-// (scripts/buildFact.mjs), through the Agent API when Hive answers, else by a marker in the workspace's .hive/builds;
-// Hive writes it into the journal as its own entry, once, while Settings → Advanced → Record builds in the journal and
+// Builds recorded as facts (#1534, #1062): npm run dist and npm run release tell Combwork of each successful build
+// (scripts/buildFact.mjs), through the Agent API when Combwork answers, else by a marker in the workspace's .combwork/builds;
+// Combwork writes it into the journal as its own entry, once, while Settings → Advanced → Record builds in the journal and
 // the journal take it (src/main/buildFacts.ts). A failed build records nothing.
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { createServer } from 'http'
@@ -29,7 +29,7 @@ vi.mock('fs/promises', async () => {
   return { ...real, readFile, default: { ...real, readFile } }
 })
 
-const base = tempDir('hive-build-facts-')
+const base = tempDir('cw-build-facts-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
@@ -42,10 +42,10 @@ vi.setConfig({ testTimeout: 30_000 })
 // The longest a wait here waits for what it waits on: a bound for a hung run (tests/README.md).
 const HUNG_MS = 10_000
 
-const fact = { kind: 'baseline', version: '1.0.0-rc.1', commit: '1fef5341a2b3c4d5e6f708192a3b4c5d6e7f8091', branch: '1.0.0', installer: 'D:\\HIVE\\hive\\dist\\Hive-Setup-1.0.0-rc.1.exe', builtAt: '2026-10-24T11:00:00.000Z', by: 'dist' }
+const fact = { kind: 'baseline', version: '1.0.0-rc.1', commit: '1fef5341a2b3c4d5e6f708192a3b4c5d6e7f8091', branch: '1.0.0', installer: 'D:\\Work\\demo\\dist\\Combwork-Setup-1.0.0-rc.1.exe', builtAt: '2026-10-24T11:00:00.000Z', by: 'dist' }
 
 describe('a build fact', () => {
-  it('has the same kinds in the scripts and in Hive', () => {
+  it('has the same kinds in the scripts and in Combwork', () => {
     expect(script.BUILD_KINDS).toEqual([...BUILD_KINDS])
   })
 
@@ -65,8 +65,8 @@ describe('a build fact', () => {
     expect(buildFactOf({ ...fact, commit: 'HEAD' })).toEqual({ error: expect.stringMatching(/^commit is a commit id/) })
     expect(buildFactOf({ ...fact, installer: '' })).toEqual({ error: expect.stringMatching(/^installer/) })
     expect(buildFactOf({ ...fact, by: 'ci' })).toEqual({ error: 'by is dist or release.' })
-    expect(buildFactSummary(buildFactOf(fact) as never)).toBe('Built Hive 1.0.0-rc.1 (baseline) from 1fef5341 on 1.0.0')
-    expect(buildFactSummary(buildFactOf({ ...fact, kind: 'release', version: '1.0.0', by: 'release' }) as never)).toBe('Uploaded a draft of Hive 1.0.0 (release) from 1fef5341 on 1.0.0')
+    expect(buildFactSummary(buildFactOf(fact) as never)).toBe('Built Combwork 1.0.0-rc.1 (baseline) from 1fef5341 on 1.0.0')
+    expect(buildFactSummary(buildFactOf({ ...fact, kind: 'release', version: '1.0.0', by: 'release' }) as never)).toBe('Uploaded a draft of Combwork 1.0.0 (release) from 1fef5341 on 1.0.0')
   })
 
   it('reads its line and detail back, for the window', () => {
@@ -74,6 +74,10 @@ describe('a build fact', () => {
     expect(parseBuildSummary(buildFactSummary(f))).toEqual({ by: 'dist', version: '1.0.0-rc.1', kind: 'baseline', commit: '1fef5341', branch: '1.0.0' })
     expect(parseBuildSummary(buildFactSummary({ ...f, kind: 'rc', branch: null, by: 'release' }))).toEqual({ by: 'release', version: '1.0.0-rc.1', kind: 'rc', commit: '1fef5341', branch: null })
     expect(parseBuildSummary('#12 "Ship it" is Done (merged), moved there by B1')).toBeNull()
+    // HI-2581, Darren's decision: a one-way rename. An old entry's line under the old name is history, shown as written.
+    // old-name: begin old-build-line
+    expect(parseBuildSummary('Built Hive 1.0.0-rc.1 (baseline) from 1fef5341 on 1.0.0')).toBeNull()
+    // old-name: end old-build-line
     expect(parseBuildDetail(buildFactDetail(f))).toEqual({ installer: f.installer, builtAt: f.builtAt, uploaded: false })
     expect(parseBuildDetail(buildFactDetail({ ...f, by: 'release' }))?.uploaded).toBe(true)
     expect(parseBuildDetail('Some other detail')).toBeNull()
@@ -82,8 +86,14 @@ describe('a build fact', () => {
   // #1534 round 1, finding 4: the window shows a build's line in the user's language (stored and recalled in English).
   it("shows a build's line and detail in every language, and any other entry as written", () => {
     const f = buildFactOf({ ...fact, by: 'release', kind: 'rc' }) as Exclude<ReturnType<typeof buildFactOf>, { error: string }>
-    const e = { source: 'hive' as const, summary: buildFactSummary(f), detail: buildFactDetail(f) }
+    const e = { source: 'combwork' as const, summary: buildFactSummary(f), detail: buildFactDetail(f) }
+    // Stored in English as agents read it; the window says it in the user's language (here English: the same line).
     expect(journalSummary(e)).toBe(e.summary)
+    // An old entry's "Built Combwork …" (before HI-2581) is shown as written (Darren's decision: one name, no reading of two).
+    // old-name: begin old-build-summary
+    const old = e.summary.replace(' Combwork ', ' Hive ')
+    // old-name: end old-build-summary
+    expect(journalSummary({ ...e, summary: old })).toBe(old)
     expect(journalSummary({ ...e, source: 'assistant' })).toBe(e.summary)
     expect(journalBuildDetail({ ...e, source: 'assistant' })).toBeNull()
     expect(journalBuildDetail(e)?.[0]).toBe(`Installer: ${fact.installer}`)
@@ -108,58 +118,58 @@ describe('a build fact', () => {
   })
 
   it("reads the installer's path from dist's lines", () => {
-    expect(script.installerOf(['Installer: D:\\HIVE\\hive\\dist\\Hive-Setup-1.0.0.exe (copied from this worktree, which keeps its own)'])).toBe('D:\\HIVE\\hive\\dist\\Hive-Setup-1.0.0.exe')
-    expect(script.installerOf(['Not copied to the main checkout: no.', 'Installer: C:\\wt\\dist\\Hive-Setup-1.0.0.exe (this worktree). Run again with --replace to copy it over anyway.'])).toBe('C:\\wt\\dist\\Hive-Setup-1.0.0.exe')
-    expect(script.installerOf(['Installer: C:\\wt\\dist\\Hive-Setup-1.0.0.exe'])).toBe('C:\\wt\\dist\\Hive-Setup-1.0.0.exe')
+    expect(script.installerOf(['Installer: D:\\Work\\demo\\dist\\Combwork-Setup-1.0.0.exe (copied from this worktree, which keeps its own)'])).toBe('D:\\Work\\demo\\dist\\Combwork-Setup-1.0.0.exe')
+    expect(script.installerOf(['Not copied to the main checkout: no.', 'Installer: C:\\wt\\dist\\Combwork-Setup-1.0.0.exe (this worktree). Run again with --replace to copy it over anyway.'])).toBe('C:\\wt\\dist\\Combwork-Setup-1.0.0.exe')
+    expect(script.installerOf(['Installer: C:\\wt\\dist\\Combwork-Setup-1.0.0.exe'])).toBe('C:\\wt\\dist\\Combwork-Setup-1.0.0.exe')
     expect(script.installerOf([])).toBeNull()
   })
 })
 
-describe('the scripts tell Hive of a build', () => {
+describe('the scripts tell Combwork of a build', () => {
   const ws = join(base, 'scripts-ws')
-  const repo = join(ws, 'hive')
-  const markers = (): string[] => (existsSync(join(ws, '.hive', 'builds')) ? readdirSync(join(ws, '.hive', 'builds')) : [])
-  const env = { HIVE_WORKSPACE: ws }
-  // The session's token in its file (HI-2262: never HIVE_API_TOKEN).
+  const repo = join(ws, 'demo')
+  const markers = (): string[] => (existsSync(join(ws, '.combwork', 'builds')) ? readdirSync(join(ws, '.combwork', 'builds')) : [])
+  const env = { CW_WORKSPACE: ws }
+  // The session's token in its file (HI-2262: never CW_API_TOKEN).
   const tokenFile = join(base, 'agent-token.json')
   writeFileSync(tokenFile, JSON.stringify({ token: 't' }))
   beforeAll(() => {
-    mkdirSync(join(ws, '.hive'), { recursive: true })
-    writeFileSync(join(ws, '.hive', 'workspace.json'), '{}')
+    mkdirSync(join(ws, '.combwork'), { recursive: true })
+    writeFileSync(join(ws, '.combwork', 'workspace.json'), '{}')
     mkdirSync(join(repo, 'dist'), { recursive: true })
   })
   const input = { root: repo, version: '1.0.0-rc.1', commit: fact.commit, branch: '1.0.0', installer: fact.installer, builtAt: fact.builtAt, by: 'dist', kind: 'baseline' }
 
-  it('through the Agent API while Hive answers, leaving no marker', async () => {
+  it('through the Agent API while Combwork answers, leaving no marker', async () => {
     const sent: unknown[] = []
     const post = async (f: unknown, to: unknown) => (sent.push({ f, to }), { recorded: true })
-    expect(await script.recordBuild(input, { env: { ...env, HIVE_API_URL: 'http://127.0.0.1:1', HIVE_API_TOKEN_FILE: tokenFile }, post })).toBe("Build recorded in Hive's journal (baseline).")
+    expect(await script.recordBuild(input, { env: { ...env, CW_API_URL: 'http://127.0.0.1:1', CW_API_TOKEN_FILE: tokenFile }, post })).toBe("Build recorded in Combwork's journal (baseline).")
     expect(sent).toEqual([{ f: fact, to: { url: 'http://127.0.0.1:1', token: 't', workspace: ws } }])
     expect(markers()).toEqual([])
-    // Hive answered but didn't write it (the switch or the journal off): said, and no marker either.
-    expect(await script.recordBuild(input, { env: { ...env, HIVE_API_URL: 'http://127.0.0.1:1', HIVE_API_TOKEN_FILE: tokenFile }, post: async () => ({ recorded: false, reason: 'off.' }) })).toBe("Build not recorded in Hive's journal: off.")
+    // Combwork answered but didn't write it (the switch or the journal off): said, and no marker either.
+    expect(await script.recordBuild(input, { env: { ...env, CW_API_URL: 'http://127.0.0.1:1', CW_API_TOKEN_FILE: tokenFile }, post: async () => ({ recorded: false, reason: 'off.' }) })).toBe("Build not recorded in Combwork's journal: off.")
     expect(markers()).toEqual([])
   })
 
-  it('never with HIVE_API_TOKEN alone (HI-2262: sessions get only its file): nothing is posted', async () => {
+  it('never with CW_API_TOKEN alone (HI-2262: sessions get only its file): nothing is posted', async () => {
     const sent: unknown[] = []
     const post = async (f: unknown, to: unknown) => (sent.push({ f, to }), { recorded: true })
     const was = new Set(markers())
-    expect(await script.recordBuild(input, { env: { ...env, HIVE_API_URL: 'http://127.0.0.1:1', HIVE_API_TOKEN: 't' }, post })).toMatch(/^Build left for Hive's journal/)
+    expect(await script.recordBuild(input, { env: { ...env, CW_API_URL: 'http://127.0.0.1:1', CW_API_TOKEN: 't' }, post })).toMatch(/^Build left for Combwork's journal/)
     expect(sent).toEqual([])
     // Left as a marker, as with no API named; taken away again so the next test counts its own.
     const left = markers().filter((m) => !was.has(m))
     expect(left).toHaveLength(1)
-    for (const m of left) rmSync(join(ws, '.hive', 'builds', m))
+    for (const m of left) rmSync(join(ws, '.combwork', 'builds', m))
   })
 
-  it("by a marker when Hive can't be reached, or no API is named", async () => {
-    expect(await script.recordBuild(input, { env: { ...env, HIVE_API_URL: 'http://127.0.0.1:1', HIVE_API_TOKEN_FILE: tokenFile }, post: async () => null })).toMatch(/^Build left for Hive's journal \(baseline\)/)
-    expect(await script.recordBuild(input, { env })).toMatch(/^Build left for Hive's journal/)
+  it("by a marker when Combwork can't be reached, or no API is named", async () => {
+    expect(await script.recordBuild(input, { env: { ...env, CW_API_URL: 'http://127.0.0.1:1', CW_API_TOKEN_FILE: tokenFile }, post: async () => null })).toMatch(/^Build left for Combwork's journal \(baseline\)/)
+    expect(await script.recordBuild(input, { env })).toMatch(/^Build left for Combwork's journal/)
     const left = markers()
     expect(left).toHaveLength(2)
     expect(left.every((n) => n.endsWith('.json'))).toBe(true)
-    expect(JSON.parse(readFileSync(join(ws, '.hive', 'builds', left[0]), 'utf8'))).toEqual(fact)
+    expect(JSON.parse(readFileSync(join(ws, '.combwork', 'builds', left[0]), 'utf8'))).toEqual(fact)
   })
 
   it('after dist: only a build with its build-info.json (a successful one) is recorded', async () => {
@@ -185,11 +195,11 @@ describe('the scripts tell Hive of a build', () => {
     })
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
     const url = `http://127.0.0.1:${(server.address() as { port: number }).port}`
-    const api = { ...env, HIVE_API_URL: url, HIVE_API_TOKEN_FILE: tokenFile }
+    const api = { ...env, CW_API_URL: url, CW_API_TOKEN_FILE: tokenFile }
     try {
       expect(await script.postBuild(fact, { url, token: 't', workspace: ws })).toBeNull()
       const before = markers().length
-      expect(await script.recordBuild(input, { env: api })).toMatch(/^Build left for Hive's journal \(baseline\)/)
+      expect(await script.recordBuild(input, { env: api })).toMatch(/^Build left for Combwork's journal \(baseline\)/)
       expect(markers()).toHaveLength(before + 1)
       // A post that throws, or rejects, is no reply either.
       const throws = (): never => {
@@ -217,24 +227,24 @@ describe('the scripts tell Hive of a build', () => {
   })
 
   it('says so when no workspace holds the checkout', async () => {
-    const lone = tempDir('hive-build-facts-lone-')
-    expect(await script.recordBuild({ ...input, root: lone }, { env: {} })).toBe("Build not recorded in Hive's journal: no Hive workspace holds this checkout (HIVE_WORKSPACE names one).")
+    const lone = tempDir('cw-build-facts-lone-')
+    expect(await script.recordBuild({ ...input, root: lone }, { env: {} })).toBe("Build not recorded in Combwork's journal: no Combwork workspace holds this checkout (CW_WORKSPACE names one).")
   })
 })
 
-describe('Hive records a build in the journal', () => {
+describe('Combwork records a build in the journal', () => {
   let w: ReturnType<typeof createWorkspaceService>
   const wsPath = join(base, 'ws')
-  const dir = join(wsPath, '.hive', 'builds')
+  const dir = join(wsPath, '.combwork', 'builds')
   const leave = (name: string, body: unknown): void => {
     mkdirSync(dir, { recursive: true })
     writeFileSync(join(dir, name), typeof body === 'string' ? body : JSON.stringify(body))
   }
-  const facts = (): { summary: string; tags?: string[] }[] => (existsSync(journal.journalFile(w.assistantHome)) ? journal.recall(w.assistantHome, { limit: 50 }).filter((r) => r.source === 'hive') : [])
+  const facts = (): { summary: string; tags?: string[] }[] => (existsSync(journal.journalFile(w.assistantHome)) ? journal.recall(w.assistantHome, { limit: 50 }).filter((r) => r.source === 'combwork') : [])
   beforeAll(async () => {
     advanced.load(join(base, 'profile'))
-    mkdirSync(join(wsPath, 'alpha', '.hive'), { recursive: true })
-    writeFileSync(join(wsPath, 'alpha', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    mkdirSync(join(wsPath, 'alpha', '.combwork'), { recursive: true })
+    writeFileSync(join(wsPath, 'alpha', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     w = createWorkspaceService()
     await w.open(wsPath)
   })
@@ -246,7 +256,7 @@ describe('Hive records a build in the journal', () => {
 
   it('as its own fact, from the API', () => {
     expect(builds.recordBuild(w, buildFactOf(fact) as never)).toEqual({ recorded: true })
-    expect(facts().map((f) => f.summary)).toEqual(['Built Hive 1.0.0-rc.1 (baseline) from 1fef5341 on 1.0.0'])
+    expect(facts().map((f) => f.summary)).toEqual(['Built Combwork 1.0.0-rc.1 (baseline) from 1fef5341 on 1.0.0'])
     // The same build again (a reply cut off, then its marker): one entry.
     expect(builds.recordBuild(w, buildFactOf(fact) as never)).toEqual({ recorded: true })
     expect(facts()).toHaveLength(1)
@@ -269,10 +279,10 @@ describe('Hive records a build in the journal', () => {
   it("keeps a long detail's entry once too (kept compressed)", () => {
     const long = { kind: 'event', summary: 'A fact with a long detail', detail: 'x'.repeat(5000), links: [{ type: 'commit', ref: 'abcdef1' }] }
     const settings = service.journalSettingsOf(w)
-    expect(journal.writeEntryOnce(w.assistantHome, settings, long, 'hive', { type: 'commit', ref: 'abcdef1' })).toEqual(expect.any(Number))
-    expect(journal.writeEntryOnce(w.assistantHome, settings, long, 'hive', { type: 'commit', ref: 'abcdef1' })).toBeNull()
+    expect(journal.writeEntryOnce(w.assistantHome, settings, long, 'combwork', { type: 'commit', ref: 'abcdef1' })).toEqual(expect.any(Number))
+    expect(journal.writeEntryOnce(w.assistantHome, settings, long, 'combwork', { type: 'commit', ref: 'abcdef1' })).toBeNull()
     // Another detail, or by the Assistant, is another entry.
-    expect(journal.writeEntryOnce(w.assistantHome, settings, { ...long, detail: 'y'.repeat(5000) }, 'hive', { type: 'commit', ref: 'abcdef1' })).toEqual(expect.any(Number))
+    expect(journal.writeEntryOnce(w.assistantHome, settings, { ...long, detail: 'y'.repeat(5000) }, 'combwork', { type: 'commit', ref: 'abcdef1' })).toEqual(expect.any(Number))
     expect(journal.writeEntryOnce(w.assistantHome, settings, long, 'assistant', { type: 'commit', ref: 'abcdef1' })).toEqual(expect.any(Number))
   })
 
@@ -325,8 +335,8 @@ describe('Hive records a build in the journal', () => {
   // other workspace's journal and the marker was gone. Now it's put back for its own workspace's next open.
   it("writes a marker only into its own workspace's journal: switched meanwhile, it's put back", async () => {
     const other = join(base, 'ws-other')
-    mkdirSync(join(other, 'beta', '.hive'), { recursive: true })
-    writeFileSync(join(other, 'beta', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    mkdirSync(join(other, 'beta', '.combwork'), { recursive: true })
+    writeFileSync(join(other, 'beta', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     leave('2026-10-24T11-06-00-000Z-ff.json', { ...fact, version: '1.0.0-rc.5' })
     let release = (): void => {}
     held.gate = new Promise<void>((resolve) => (release = resolve))

@@ -1,0 +1,102 @@
+{
+  "mcp.catalog.badName": {
+    "text": "Server names may contain letters, numbers, \"-\" and \"_\" (max 64 characters). \"combwork\" is reserved.",
+    "note": "An error installing a catalogue server (HI-545) under a name a server can't have. Keep combwork as it is (Combwork's own server).",
+    "audience": "both"
+  },
+  "mcp.catalog.expired": {
+    "text": "That download has expired: choose Install or Update again.",
+    "note": "An error installing or updating a server from an MCP catalogue (HI-545): the download made for it was dropped (too old, or the window closed).",
+    "audience": "both"
+  },
+  "mcp.catalog.folder": {
+    "text": "{name}'s zip doesn't hold a folder named {name}: not installed.",
+    "note": "An error installing a server from an MCP catalogue (HI-545): the zip is not laid out as catalogues require (one top folder named after the server).",
+    "audience": "both"
+  },
+  "mcp.catalog.gone": {
+    "text": "{name} isn't in its catalogue any more: refresh the list.",
+    "note": "An error installing or updating a server from an MCP catalogue (HI-545): the catalogue read last no longer lists it.",
+    "audience": "both"
+  },
+  "mcp.catalog.http": {
+    "text": "{url} answered {status}.",
+    "note": "An error downloading from an MCP catalogue (HI-545): the server answered with an HTTP error {status} (a number such as 404).",
+    "audience": "both"
+  },
+  "mcp.catalog.mismatch": {
+    "text": "{name}'s download doesn't match its catalogue (its size or checksum differ): not installed.",
+    "note": "An error installing a server from an MCP catalogue (HI-545): the zip downloaded is not the one the catalogue describes, so Combwork used none of it. {name} is the server.",
+    "audience": "both"
+  },
+  "mcp.catalog.needs": {
+    "text": "{name} can't run on this PC: {needs}.",
+    "note": "An error installing a server from an MCP catalogue (HI-545): a requirement Combwork checked is not met. {needs} lists them.",
+    "audience": "both"
+  },
+  "mcp.catalog.notInstalled": {
+    "text": "{name} isn't installed from this catalogue: install it instead.",
+    "note": "An error updating a server from an MCP catalogue (HI-545): no server of the name came from it.",
+    "audience": "both"
+  },
+  "mcp.catalog.redirects": {
+    "text": "Too many redirects downloading {url}.",
+    "note": "An error downloading from an MCP catalogue (HI-545): more than 5 redirects. {url} is the address asked for.",
+    "audience": "both"
+  },
+  "mcp.catalog.scheme": {
+    "text": "{url} leads to an address this source may not use (only https for an https catalogue).",
+    "note": "An error downloading from an MCP catalogue (HI-545): a redirect led away from https (to http or a file). {url} is where it led.",
+    "audience": "both"
+  },
+  "mcp.catalog.sourceTaken": {
+    "text": "That catalogue is listed already.",
+    "note": "An error adding an MCP catalogue source (HI-545): it is in the list already.",
+    "audience": "both"
+  },
+  "mcp.catalog.sourceUrl": {
+    "text": "A catalogue is an https:// or file:// address of its catalog.json.",
+    "note": "An error adding an MCP catalogue source (Settings → MCP Catalogues, HI-545): the address is neither.",
+    "audience": "both"
+  },
+  "mcp.catalog.timeout": {
+    "text": "{url} took too long (over {seconds, number} s).",
+    "note": "An error downloading from an MCP catalogue (HI-545): no complete answer within the time limit (Settings → Advanced).",
+    "audience": "both"
+  },
+  "mcp.catalog.tooLarge": {
+    "text": "{url} is larger than its catalogue says ({max, number} bytes at most): not used.",
+    "note": "An error downloading from an MCP catalogue (HI-545): the download went past the size its catalogue gives, or the limit. {url} is the address.",
+    "audience": "both"
+  },
+  "mcp.catalog.tooManySources": {
+    "text": "Combwork lists at most {max, number} catalogues of your own: remove one first.",
+    "note": "An error adding an MCP catalogue source (Settings → MCP Catalogues, HI-545): the list is full.",
+    "audience": "both"
+  },
+  "mcp.catalog.workspaceGone": {
+    "text": "The workspace closed before {name} was installed: nothing was written.",
+    "note": "An error installing or updating a server from an MCP catalogue (HI-545): the workspace it was for closed while it downloaded.",
+    "audience": "both"
+  },
+  "mcp.error.cannotClear": {
+    "text": "Couldn't read the settings of {project}, so {name} wasn't changed: it may still be added there. Try again once the project can be read.",
+    "note": "An error replacing, creating or deleting an MCP server (HI-2059): a project's settings file could not be read, so Combwork could not make sure the server is removed there, and changed nothing. {project} is the project's folder name, {name} the server.",
+    "audience": "both"
+  },
+  "mcp.error.invalidName": {
+    "text": "Invalid server name",
+    "note": "An error: an MCP server name Combwork refuses.",
+    "audience": "both"
+  },
+  "mcp.error.noProject": {
+    "text": "{project} is no longer a project in this workspace.",
+    "note": "An error adding an MCP server to a project, or removing it (HI-2059): the project was removed or moved meanwhile. {project} is its folder name.",
+    "audience": "both"
+  },
+  "mcp.error.noServerAdd": {
+    "text": "The workspace has no MCP server named {name}.",
+    "note": "An error adding a server to a project or the Combwork Assistant. {name} is its name.",
+    "audience": "both"
+  }
+}

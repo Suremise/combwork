@@ -1,14 +1,14 @@
-// Hive owns the lane (#1270, SPEC §16.11): a list change made while a card is in flight is queued and applied at the
+// Combwork owns the lane (#1270, SPEC §16.11): a list change made while a card is in flight is queued and applied at the
 // next card boundary (the builder told, none dropped: S3); a lane's cards start under the ruleset it started with (S19);
 // one card at a time (a lane's card starts only once the ones before it are Done: S43's P4 form); a lane ends by itself
 // once its cards are Done, its merge commit from their facts (an agent's ignored) and a verified lane-end event fired
-// once; why a lane waits, as data; hive_lane next. With workflow rules off, a lane is bookkeeping, as before 1.0.
+// once; why a lane waits, as data; cw_lane next. With workflow rules off, a lane is bookkeeping, as before 1.0.
 import { AsyncLocalStorage } from 'async_hooks'
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import type { HiveEvent, LaneCard } from '../src/shared/types'
+import type { CombworkEvent, LaneCard } from '../src/shared/types'
 import { laneNextText, laneStatus, laneStatusText, type LaneCardFacts } from '../src/shared/lanes'
 import { laneHits, type LaneNow } from '../src/shared/laneWatch'
 import { tempDir } from './tempDir'
@@ -16,7 +16,7 @@ import { tempDir } from './tempDir'
 /** The bound for a hung run: the lanes are read again within it after each change. */
 const HUNG_MS = 15_000
 
-const base = tempDir('hive-lane-ownership-')
+const base = tempDir('cw-lane-ownership-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -26,7 +26,7 @@ const store = await import('../src/main/boardStore')
 const { advanced } = await import('../src/main/advanced')
 const { ENFORCE, workflowFor } = await import('../src/main/workflow/service')
 const { FactStore } = await import('../src/main/workflow/factStore')
-const { onHiveEvent } = await import('../src/main/events')
+const { onCombworkEvent } = await import('../src/main/events')
 const { deliveriesOf } = await import('../src/main/deliveries')
 const { agentActor } = await import('../src/shared/workflow/facts')
 const tables = await import('../src/main/storeTables')
@@ -72,7 +72,7 @@ describe('why a lane waits (laneStatus)', () => {
     expect(laneStatus(rec, [lc(1, 'doing', { blocked: 'Why' })], 1, true, null)).toEqual({ reason: 'blocked', card: 1, blocked: 'Why' })
   })
 
-  it('reads in English for the hive tools', () => {
+  it('reads in English for the Combwork tools', () => {
     expect(laneStatusText({ reason: 'notMerged', card: 11 })).toBe('waiting: #11 not merged')
     expect(laneStatusText({ reason: 'listChanges', card: 12 })).toBe('list changes after #12')
   })
@@ -87,25 +87,25 @@ describe('why a lane waits (laneStatus)', () => {
 
 // --- The service.
 
-describe('Hive owns the lane (lanes.ts, #1270)', () => {
+describe('Combwork owns the lane (lanes.ts, #1270)', () => {
   type WS = ReturnType<typeof createWorkspaceService>
   let w: WS
   const wsPath = join(base, 'ws')
   const project = join(wsPath, 'alpha')
-  const ended: HiveEvent[] = []
+  const ended: CombworkEvent[] = []
   let off: () => void
   const user = { kind: 'user' } as const
   beforeAll(async () => {
-    mkdirSync(join(project, '.hive'), { recursive: true })
+    mkdirSync(join(project, '.combwork'), { recursive: true })
     writeFileSync(join(project, 'a.txt'), 'a\n')
-    writeFileSync(join(project, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'b1', name: 'B1' }, { id: 'b2', name: 'B2' }, { id: 'r1', name: 'R1' }] }))
+    writeFileSync(join(project, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'b1', name: 'B1' }, { id: 'b2', name: 'B2' }, { id: 'r1', name: 'R1' }] }))
     // Another project, for a card moved there and back (HI-1821).
-    mkdirSync(join(wsPath, 'beta', '.hive'), { recursive: true })
-    writeFileSync(join(wsPath, 'beta', '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'c1', name: 'C1' }] }))
+    mkdirSync(join(wsPath, 'beta', '.combwork'), { recursive: true })
+    writeFileSync(join(wsPath, 'beta', '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'c1', name: 'C1' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     lanes.startLanes()
-    off = onHiveEvent((e) => e.type === 'lane-ended' && ended.push(e))
+    off = onCombworkEvent((e) => e.type === 'lane-ended' && ended.push(e))
   })
   afterAll(async () => {
     off()
@@ -142,7 +142,7 @@ describe('Hive owns the lane (lanes.ts, #1270)', () => {
   it('HI-2167: a new card placed on its builder’s lane: refused with none when one is needed, else started; last or next, queued while a card is in flight, from the queued list', async () => {
     const [p1, p2, p3, p4, p5] = [await make('Place 1'), await make('Place 2'), await make('Place 3'), await make('Place 4'), await make('Place 5')]
     const nums = (r: { lane: { cards: { number: number }[] } }) => r.lane.cards.map((c) => c.number)
-    // hive_create_task's lane: "B2" with no running lane: refused, no lane started.
+    // cw_create_task's lane: "B2" with no running lane: refused, no lane started.
     await expect(lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [], place: { card: p1, needsLane: true }, by: 'B2 (alpha)' })).rejects.toMatchObject({ status: 409, message: expect.stringMatching(/B2 has no running lane in alpha: the card was made but not placed/) })
     expect((await lanes.listLanes(w)).some((l) => l.builder.id === 'b2')).toBe(false)
     // { builder, reviewer }: starts one with the card alone (its `cards` ignored).
@@ -152,7 +152,7 @@ describe('Hive owns the lane (lanes.ts, #1270)', () => {
     expect(nums(await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [], place: { card: p2, needsLane: true }, by: 'B2 (alpha)' }))).toEqual([p1, p2])
     const next = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [], place: { card: p3, position: 'next', needsLane: true }, by: 'B2 (alpha)' })
     expect([next.did, next.lane.id, nums(next), next.lane.queued]).toEqual(['updated', started.lane.id, [p3, p1, p2], null])
-    // A card in flight: the placement is queued as hive_lane start's list change is, the reviewer kept.
+    // A card in flight: the placement is queued as cw_lane start's list change is, the reviewer kept.
     await run(() => tasks.updateTask(p3, { column: 'doing', agent: 'b2' }, user))
     const queued = await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [], place: { card: p4, needsLane: true }, by: 'B2 (alpha)' })
     expect([nums(queued), queued.lane.queued, queued.lane.reviewer?.id]).toEqual([[p3, p1, p2], [p3, p1, p2, p4], 'r1'])
@@ -163,12 +163,12 @@ describe('Hive owns the lane (lanes.ts, #1270)', () => {
     await lanes.endLane(w, started.lane.id, { abandoned: true })
   })
 
-  it("HI-2167: hive_lane start's safety net names a card made by someone else since the caller's turn began, moments ago; never the caller's own, one from before its turn, an older one, or with no turn", async () => {
+  it("HI-2167: cw_lane start's safety net names a card made by someone else since the caller's turn began, moments ago; never the caller's own, one from before its turn, an older one, or with no turn", async () => {
     const c = await make('Fresh card')
     const made = Date.parse((await run(() => tasks.getTask(c))).createdAt!)
     const by = tasks.actorName(user)
     const turn = made - 1000
-    expect(await lanes.freshCardsNote(w, [c], 'HB6', turn, 'alpha', made + 3000)).toMatch(new RegExp(`^Warning: #${c} was created 3 s ago by ${by}: is it the card you meant\\? To put a new card on a lane, create it with hive_create_task's lane`))
+    expect(await lanes.freshCardsNote(w, [c], 'HB6', turn, 'alpha', made + 3000)).toMatch(new RegExp(`^Warning: #${c} was created 3 s ago by ${by}: is it the card you meant\\? To put a new card on a lane, create it with cw_create_task's lane`))
     expect(await lanes.freshCardsNote(w, [c], by, turn, 'alpha', made + 3000)).toBeNull()
     // Made before the caller's turn began: a card it was told of (the user's, asking it to put it on a lane).
     expect(await lanes.freshCardsNote(w, [c], 'HB6', made + 1, 'alpha', made + 3000)).toBeNull()
@@ -196,7 +196,7 @@ describe('Hive owns the lane (lanes.ts, #1270)', () => {
     // HB6's card-loop registration, naming only the card its start prompt gave it.
     const own = await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [a], ownBuilder: true, by: 'B2 (alpha)' })
     expect([own.lane.id, own.lane.cards.map((c) => c.number)]).toEqual([l.id, [a, b]])
-    expect(own.note).toMatch(new RegExp(`#${b} stays on the lane, after the cards you listed: a builder's own hive_lane start adds or reorders cards, never takes one off`))
+    expect(own.note).toMatch(new RegExp(`#${b} stays on the lane, after the cards you listed: a builder's own cw_lane start adds or reorders cards, never takes one off`))
     // It still reorders and adds.
     expect((await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [b, a], ownBuilder: true, by: 'B2 (alpha)' })).lane.cards.map((c) => c.number)).toEqual([b, a])
     await lanes.startLane(w, { project: 'alpha', builder: 'b2', cards: [a, b], by: 'Assistant' })
@@ -279,7 +279,7 @@ describe('Hive owns the lane (lanes.ts, #1270)', () => {
     await lanes.endLane(w, l.id, { abandoned: true })
   })
 
-  it("why a lane waits comes with it: a card passed but not merged pauses it; hive_lane next names the card or the wait", async () => {
+  it("why a lane waits comes with it: a card passed but not merged pauses it; cw_lane next names the card or the wait", async () => {
     const [a, b] = [await make('Wait a'), await make('Wait b')]
     const l = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [a, b], by: 'B1 (alpha)' })).lane
     const first = await lanes.laneNext(w, 'alpha', 'b1')

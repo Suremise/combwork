@@ -35,7 +35,7 @@ vi.mock('node:fs', async () => {
 
 const { estimateFor, recordTiming } = await import('../src/main/progressReporters/report.mts')
 
-const dir = tempDir('hive-timings-')
+const dir = tempDir('cw-timings-')
 let file = ''
 let n = 0
 beforeEach(() => {

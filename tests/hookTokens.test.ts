@@ -1,5 +1,5 @@
 // Hook tokens (#345): one per launch, checked against the launch a hook names and ended with it; hook commands read the
-// header from a file in Hive's user data, so nothing Hive generates for a launch (either provider) holds a token.
+// header from a file in Combwork's user data, so nothing Combwork generates for a launch (either provider) holds a token.
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
@@ -10,12 +10,12 @@ import { tempDir } from './tempDir'
 const HUNG_MS = 10000
 
 // Its own user data folder, so the auth files never meet another test's.
-const userData = await vi.hoisted(async () => (await import('./tempDir')).tempDir('hive-hook-tokens-'))
+const userData = await vi.hoisted(async () => (await import('./tempDir')).tempDir('cw-hook-tokens-'))
 vi.mock('electron', () => ({ app: { getPath: () => userData, getVersion: () => '0.0.0-test', isPackaged: false } }))
 
 const { clearHookAuth, endHookToken, hookAuthFile, hookTokenMatches, newHookToken, refusedHookNote } = await import('../src/main/hookTokens')
 
-const base = tempDir('hive-hook-launch-')
+const base = tempDir('cw-hook-launch-')
 afterAll(() => {
   rmSync(base, { recursive: true, force: true })
   rmSync(userData, { recursive: true, force: true })
@@ -55,7 +55,7 @@ describe('hook tokens per launch (#345)', () => {
     endHookToken('runb')
   })
 
-  it("writes the header curl reads to a file in Hive's user data, and clears what an earlier run left", async () => {
+  it("writes the header curl reads to a file in Combwork's user data, and clears what an earlier run left", async () => {
     const t = await newHookToken('runfile')
     expect(t.file).toBe(join(userData, 'launches', 'runfile', 'hook-auth.txt'))
     expect(t.dir).toBe(join(userData, 'launches', 'runfile'))
@@ -66,7 +66,7 @@ describe('hook tokens per launch (#345)', () => {
     endHookToken('runfile')
   })
 
-  it('no file Hive generates in a project, and no argument it passes, holds a secret: the hook token, MCP servers\' own, a --settings env (Claude Code and Codex)', async () => {
+  it('no file Combwork generates in a project, and no argument it passes, holds a secret: the hook token, MCP servers\' own, a --settings env (Claude Code and Codex)', async () => {
     const { claudeCode } = await import('../src/main/providers/claude/adapter')
     const { codex } = await import('../src/main/providers/codex/adapter')
     // Hook trust is checked against the Codex executable; not what this test is about.
@@ -79,7 +79,7 @@ describe('hook tokens per launch (#345)', () => {
     // Synthetic secrets: a workspace MCP server's env and header, and the env of a user's --settings.
     const SECRETS = ['SYNTHETIC-MCP-ENV-SECRET', 'SYNTHETIC-MCP-HEADER-SECRET', 'SYNTHETIC-SETTINGS-ENV-SECRET']
     const mcpServers = {
-      hive: { command: 'node', args: ['hive-mcp.js'], env: { HIVE_API_TOKEN_FILE: join(userData, 'agent-api', 'x.json') } },
+      combwork: { command: 'node', args: ['cw-mcp.js'], env: { CW_API_TOKEN_FILE: join(userData, 'agent-api', 'x.json') } },
       third: { command: 'node', args: ['server.js'], env: { API_KEY: SECRETS[0] } },
       remote: { type: 'http', url: 'https://mcp.example/x', headers: { Authorization: `Bearer ${SECRETS[1]}` } }
     }
@@ -91,7 +91,7 @@ describe('hook tokens per launch (#345)', () => {
         resume: false, name: '', skills: [{ name: 'demo', sourcePath: skill }], mcpServers,
         model: null, effort: null, permissionMode: null, extraArgs: adapter === claudeCode ? ['--settings', JSON.stringify({ env: { MY_API_KEY: SECRETS[2] } })] : [],
         hookUrl: `http://127.0.0.1:9/hook?run=${runId}`, hookAuthFile: auth.file, privateDir: auth.dir, guidance: 'Guidance.',
-        env: { HIVE_HOOK_TOKEN: auth.token }, allowBackgroundSessions: false, use200kContext: false
+        env: { CW_HOOK_TOKEN: auth.token }, allowBackgroundSessions: false, use200kContext: false
       }
       await adapter.prepareLaunch(ctx as never)
       const cmd = adapter.buildCommand(ctx.executable, ctx as never)
@@ -122,7 +122,7 @@ describe('hook tokens per launch (#345)', () => {
     }
   })
 
-  it('logs a refused hook call once a run, saying why, and names only runs this Hive started (#711)', async () => {
+  it('logs a refused hook call once a run, saying why, and names only runs this Combwork started (#711)', async () => {
     await newHookToken('runlive')
     await newHookToken('runended')
     endHookToken('runended')
@@ -133,13 +133,13 @@ describe('hook tokens per launch (#345)', () => {
     expect(refusedHookNote('runended')).toBeNull()
     expect(refusedHookNote(null)).toBe('Refused a hook call that named no launch')
     expect(refusedHookNote(null)).toBeNull()
-    // What a caller sent that names no run of Hive's is never in the log, however it looks (review round 1: a plain
+    // What a caller sent that names no run of Combwork's is never in the log, however it looks (review round 1: a plain
     // word a character check takes for a run id, or a forged log line), and Copy Diagnostics keeps the reason.
     const unknown = refusedHookNote('ConfidentialAcquisitionDelta')
-    expect(unknown).toBe("Refused a hook call naming a run this Hive didn't start")
+    expect(unknown).toBe("Refused a hook call naming a run this Combwork didn't start")
     expect(refusedHookNote('a b\n[ERROR] forged')).toBeNull()
     const copied = redactLog(`2026-10-14T02:36:34.759Z [INFO] [servers] ${unknown}`, { home: 'C:\\Users\\nobody', folders: [], names: [] })
     expect(copied).not.toContain('Confidential')
-    expect(copied).toContain("naming a run this Hive didn't start")
+    expect(copied).toContain("naming a run this Combwork didn't start")
   })
 })

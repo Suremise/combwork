@@ -1,23 +1,25 @@
 import { existsSync } from 'original-fs'
 import { join } from 'path'
 import { ASSISTANT_AGENT_ID, ASSISTANT_DIR } from '../shared/assistant'
-import { HIVE_DIR } from '../shared/defaults'
+import { CW_DIR } from '../shared/defaults'
 import { readKeptJson } from './fsutil'
 import { JOURNAL_LIMITS, journalSettings, inScope, type JournalEdit, type JournalFilter, type JournalForgetPreview, type JournalForgetResult, type JournalSettings, type LinkType } from '../shared/journal'
 import { browseEntry, closeJournal, deleteEntry, deleteJournal, forgetJournal, forgetPreview, journalFile, journalFileBytes, journalSize, leaveEntry, onJournalChange, pruneJournal, updateEntry, writeEntry, writeEntryOnce } from './journal'
 import { emit } from './events'
 import { createLogger } from './logger'
 import type { WorkspaceService } from './workspace'
+import type { StoredText } from '../shared/types'
 
 const log = createLogger('journal')
 
-// The windows showing a workspace's journal browser (#1033) follow its changes: its Assistant home is `<workspace>/.hive/assistant`.
+// The windows showing a workspace's journal browser (#1033) follow its changes: its Assistant home is `<workspace>/.combwork/assistant`.
 onJournalChange((home) => emit({ type: 'journal-changed', workspacePath: join(home, '..', '..') }))
-const HIVE = { kind: 'hive', name: 'Hive' } as const
+// agent-protocol: who a journal entry or delivery is from: Combwork's own name (HI-2463)
+const COMBWORK = { kind: 'combwork', name: 'Combwork' } as const
 
 /**
  * The journal as a workspace has it (#1031): its settings (workspace.json `journal`, Settings → Assistant → Journal),
- * Hive's own facts, and the Assistant told when the settings change while it may be running. The store is journal.ts.
+ * Combwork's own facts, and the Assistant told when the settings change while it may be running. The store is journal.ts.
  * Agent-facing words here stay English.
  */
 
@@ -80,14 +82,14 @@ function pruneNow(ws: WorkspaceService, s: JournalSettings): void {
 /** Tells the workspace's Assistant something (an inbox notice), if the workspace has one. */
 async function tellAssistant(ws: WorkspaceService, body: string): Promise<void> {
   const home = ws.assistantHome
-  if (!existsSync(join(home, '.hive', 'project.json'))) return
+  if (!existsSync(join(home, CW_DIR, 'project.json'))) return
   // Loaded when used: sessions.ts reads the settings here, and deliveries.ts needs sessions loaded first.
   const { createDelivery } = await import('./deliveries')
-  await createDelivery(home, { agentId: ASSISTANT_AGENT_ID, kind: 'control', from: HIVE, body }).catch((e) => log.warn('telling the Assistant its journal settings changed', e))
+  await createDelivery(home, { agentId: ASSISTANT_AGENT_ID, kind: 'control', from: COMBWORK, body }).catch((e) => log.warn('telling the Assistant its journal settings changed', e))
 }
 
 /** What the Assistant is asked to suggest, once, when it writes a handover with its journal off (#1032). */
-export const JOURNAL_SUGGESTION = "Your journal is off. Suggest to the user once, in a line, that Settings → Assistant → Journal lets you remember decisions and plans across sessions without handovers; Hive won't ask again."
+export const JOURNAL_SUGGESTION = "Your journal is off. Suggest to the user once, in a line, that Settings → Assistant → Journal lets you remember decisions and plans across sessions without handovers; Combwork won't ask again."
 
 /**
  * The suggestion for a handover the Assistant writes (#1032, Darren's decision on #989): while its journal is off, the
@@ -115,7 +117,7 @@ export function closeWorkspaceJournal(ws: WorkspaceService): void {
   if (ws.path) closeJournal(ws.assistantHome)
 }
 
-/** A fact Hive records (#1031): an event, by Hive, small and linked. */
+/** A fact Combwork records (#1031): an event, by Combwork, small and linked. */
 export interface Fact {
   summary: string
   project?: string | null
@@ -123,6 +125,8 @@ export interface Fact {
   links?: { type: LinkType; ref: string }[]
   tags?: string[]
   detail?: string
+  /** The summary as Combwork's message, beside its English (dialects, HI-2438). */
+  summaryText?: StoredText
 }
 
 /**
@@ -131,11 +135,11 @@ export interface Fact {
  * admitted for it.
  */
 export async function journalFactAt(workspacePath: string, fact: Fact): Promise<void> {
-  const saved = await readKeptJson<{ journal?: unknown }>(join(workspacePath, HIVE_DIR, 'workspace.json'), {})
+  const saved = await readKeptJson<{ journal?: unknown }>(join(workspacePath, CW_DIR, 'workspace.json'), {})
   const s = journalSettings(saved.journal)
   if (!s.enabled || !inScope(s, 'event')) return
   try {
-    leaveEntry(join(workspacePath, HIVE_DIR, ASSISTANT_DIR), s, { kind: 'event', ...fact, tags: ['hive', ...(fact.tags ?? [])] }, 'hive')
+    leaveEntry(join(workspacePath, CW_DIR, ASSISTANT_DIR), s, { kind: 'event', ...fact, tags: ['combwork', ...(fact.tags ?? [])] }, 'combwork')
   } catch (e) {
     log.warn('recording a fact in the journal', e)
   }
@@ -151,9 +155,9 @@ export function journalFact(ws: WorkspaceService | null | undefined, fact: Fact,
   const s = journalSettingsOf(ws)
   if (!s.enabled || !inScope(s, 'event')) return false
   try {
-    const input = { kind: 'event', ...fact, tags: ['hive', ...(fact.tags ?? [])] }
-    if (once) writeEntryOnce(ws.assistantHome, s, input, 'hive', once)
-    else writeEntry(ws.assistantHome, s, input, 'hive')
+    const input = { kind: 'event', ...fact, tags: ['combwork', ...(fact.tags ?? [])] }
+    if (once) writeEntryOnce(ws.assistantHome, s, input, 'combwork', once)
+    else writeEntry(ws.assistantHome, s, input, 'combwork')
     return true
   } catch (e) {
     log.warn('recording a fact in the journal', e)

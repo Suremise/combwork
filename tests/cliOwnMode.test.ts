@@ -1,6 +1,6 @@
 // "The CLI's own setting" (#1284, #966 row 1, Darren's decision on #1120 point 3): a permission choice every provider
-// offers, where Hive passes no mode flag. The session keeps saying so (never a mode guessed or read off the CLI), no mode
-// switches live to or from it, and the Hive Assistant is never offered it.
+// offers, where Combwork passes no mode flag. The session keeps saying so (never a mode guessed or read off the CLI), no mode
+// switches live to or from it, and the Combwork Assistant is never offered it.
 import { mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -15,7 +15,7 @@ import { settingEntry } from '../src/shared/settingsCatalog'
 import type { AppSettings, ProjectConfig } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-cliown-')
+const base = tempDir('cw-cliown-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 const homes = { CODEX_HOME: process.env.CODEX_HOME, COPILOT_HOME: process.env.COPILOT_HOME }
 // Never the user's own homes: the adapters read their config.
@@ -84,8 +84,8 @@ describe('a launch on it', () => {
     mkdirSync(cwd, { recursive: true })
     return {
       projectPath: cwd, agentId: 'a-1', executable: 'C:\\bin\\cli.exe', cwd, workspacePath: base, runId: 'r1', sessionId: '0cb916db-26aa-40f2-86b5-1ba81b225fd2',
-      resume: false, name: '', skills: [], mcpServers: { hive: { command: 'node', args: ['hive-mcp.js'] } }, model: null, effort: null, permissionMode: null, extraArgs: [],
-      hookUrl: 'http://127.0.0.1:5000/hook?run=r1', hookAuthFile: join(base, 'auth.txt'), privateDir: join(base, 'private'), guidance: 'Hive guidance', allowBackgroundSessions: false, use200kContext: false,
+      resume: false, name: '', skills: [], mcpServers: { combwork: { command: 'node', args: ['cw-mcp.js'] } }, model: null, effort: null, permissionMode: null, extraArgs: [],
+      hookUrl: 'http://127.0.0.1:5000/hook?run=r1', hookAuthFile: join(base, 'auth.txt'), privateDir: join(base, 'private'), guidance: 'Combwork guidance', allowBackgroundSessions: false, use200kContext: false,
       env: { PATH: 'C:\\Windows' },
       ...over
     }
@@ -129,8 +129,8 @@ describe('a resumed launch on it', () => {
     mkdirSync(cwd, { recursive: true })
     return {
       projectPath: cwd, agentId: 'a-1', executable: 'C:\\bin\\cli.exe', cwd, workspacePath: base, runId: 'r2', sessionId: SID,
-      resume: true, name: '', skills: [], mcpServers: { hive: { command: 'node', args: ['hive-mcp.js'] } }, model: null, effort: null, permissionMode: CLI_OWN_MODE, extraArgs: [],
-      hookUrl: 'http://127.0.0.1:5000/hook?run=r2', hookAuthFile: join(base, 'auth.txt'), privateDir: join(base, 'private'), guidance: 'Hive guidance', allowBackgroundSessions: false, use200kContext: false,
+      resume: true, name: '', skills: [], mcpServers: { combwork: { command: 'node', args: ['cw-mcp.js'] } }, model: null, effort: null, permissionMode: CLI_OWN_MODE, extraArgs: [],
+      hookUrl: 'http://127.0.0.1:5000/hook?run=r2', hookAuthFile: join(base, 'auth.txt'), privateDir: join(base, 'private'), guidance: 'Combwork guidance', allowBackgroundSessions: false, use200kContext: false,
       env: { PATH: 'C:\\Windows' },
       ...over
     }
@@ -170,9 +170,9 @@ describe('a running session on it', () => {
   let sessions: typeof import('../src/main/sessions').sessions
   let run: <T>(fn: () => Promise<T> | T) => Promise<T>
   beforeAll(async () => {
-    mkdirSync(join(wsPath, '.hive'), { recursive: true })
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    mkdirSync(join(wsPath, '.combwork'), { recursive: true })
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     const ws = await import('../src/main/workspace')
     sessions = (await import('../src/main/sessions')).sessions
     const svc = ws.createWorkspaceService()
@@ -234,7 +234,7 @@ describe('a running session on it', () => {
   })
 
   // Codex's Approve for me: its reviewer, not a person, answers its permission requests (ModeOption.reviewed). On the CLI's
-  // own setting Hive knows it from the mode Codex reports, for its status: by its hooks or its title (#1284 round 1).
+  // own setting Combwork knows it from the mode Codex reports, for its status: by its hooks or its title (#1284 round 1).
   describe("Codex's reviewer, by the mode Codex reports", () => {
     const priv = () => sessions as unknown as { applyDetails: (l: unknown, d: object) => void; statusInput: (l: unknown) => { reviewed: boolean; attention: string }; guardCandidate: (l: unknown, ev: object) => boolean }
     const ask = { kind: 'ask', ask: { kind: 'permission', blocking: true, message: 'Codex asks to run a command' } } as const

@@ -32,13 +32,13 @@ export type CopilotSignInSource = 'token' | 'stored' | 'gh'
 export interface CopilotSignIn {
   loggedIn: boolean | null
   source: CopilotSignInSource | null
-  /** The GitHub account, when known (a token's isn't: Hive never reads one). */
+  /** The GitHub account, when known (a token's isn't: Combwork never reads one). */
   account: string | null
   /** The token variable in use (source 'token'). */
   variable: string | null
 }
 
-/** What `gh auth status --json hosts` says of the active github.com account (the fields Hive reads; it never asks for the token). */
+/** What `gh auth status --json hosts` says of the active github.com account (the fields Combwork reads; it never asks for the token). */
 export interface GhStatus {
   login: string | null
   ok: boolean
@@ -47,7 +47,7 @@ export interface GhStatus {
 /**
  * Which sign-in Copilot agents get, in the CLI's own order (`copilot login --help`, 1.0.93): a token in the
  * environment (COPILOT_GITHUB_TOKEN, GH_TOKEN, GITHUB_TOKEN), else a stored login (`loggedInUsers` in its config.json),
- * else the GitHub CLI's login, which it asks `gh auth token` for. `env` is the environment agents get (Hive leaves
+ * else the GitHub CLI's login, which it asks `gh auth token` for. `env` is the environment agents get (Combwork leaves
  * GH_TOKEN and GITHUB_TOKEN out, which other tools set); a token is only checked for being set, never read. `gh` is null when gh isn't installed.
  */
 export function copilotSignIn(env: Record<string, string | undefined>, cliConfig: unknown, gh: GhStatus | null): CopilotSignIn {
@@ -97,16 +97,16 @@ export function parseGhStatus(stdout: string): GhStatus | null {
 }
 
 /**
- * The environment Copilot agents get, for checking their sign-in: Hive's, without the token variables its launches
+ * The environment Copilot agents get, for checking their sign-in: Combwork's, without the token variables its launches
  * leave out (COPILOT_ENV_STRIP) and without auto-update (agents run the installed version, which --version reports).
  */
 export function copilotCheckEnv(base: NodeJS.ProcessEnv = process.env): Record<string, string> {
   const env: Record<string, string> = {}
-  for (const [k, v] of Object.entries(base)) if (v !== undefined && k !== 'ELECTRON_RUN_AS_NODE' && k !== 'CHROME_CRASHPAD_PIPE_NAME' && !k.startsWith('HIVE_')) env[k] = v
+  for (const [k, v] of Object.entries(base)) if (v !== undefined && k !== 'ELECTRON_RUN_AS_NODE' && k !== 'CHROME_CRASHPAD_PIPE_NAME' && !k.startsWith('CW_')) env[k] = v
   return copilotEnv(env)
 }
 
-/** The token variables set in Hive's own environment that Copilot agents don't get (none are read). */
+/** The token variables set in Combwork's own environment that Copilot agents don't get (none are read). */
 export function ignoredTokens(base: NodeJS.ProcessEnv = process.env): string[] {
   return stripsTokens() ? COPILOT_ENV_STRIP.filter((k) => !!base[k]?.trim()) : []
 }
@@ -121,7 +121,7 @@ async function candidates(env: Record<string, string>): Promise<{ path: string; 
     if (process.platform !== 'win32' || /\.(exe|cmd|bat)$/i.test(line)) out.push({ path: line, source: 'PATH' })
   }
   if (process.platform === 'win32') {
-    // A Hive started before the install doesn't have the new PATH yet.
+    // A Combwork started before the install doesn't have the new PATH yet.
     if (process.env.LOCALAPPDATA) out.push({ path: join(process.env.LOCALAPPDATA, 'Microsoft', 'WinGet', 'Links', 'copilot.exe'), source: 'WinGet' })
     if (process.env.APPDATA) out.push({ path: join(process.env.APPDATA, 'npm', 'copilot.cmd'), source: 'npm' })
   } else out.push({ path: join(homedir(), '.local', 'bin', 'copilot'), source: 'PATH' })
@@ -183,24 +183,24 @@ async function checkSignIn(env: Record<string, string>): Promise<CopilotSignIn> 
   return copilotSignIn(env, cliConfig, gh.stdout.trim() ? parseGhStatus(gh.stdout) : null)
 }
 
-export function copilotReadiness(info: AgentInstallInfo, hiveEnv: NodeJS.ProcessEnv = process.env): ReadinessIssue[] {
+export function copilotReadiness(info: AgentInstallInfo, combworkEnv: NodeJS.ProcessEnv = process.env): ReadinessIssue[] {
   if (!info.found) return [notInstalledIssue(NAME)]
   const out: ReadinessIssue[] = []
   if (info.loggedIn === false) {
-    const ignored = ignoredTokens(hiveEnv)
+    const ignored = ignoredTokens(combworkEnv)
     out.push(
       signedOutIssue(NAME, [
-        msg({ id: 'providers.copilot.signIn.runs', defaultMessage: '**Sign in** runs `copilot login` in a terminal: it opens GitHub in your browser to authorise Copilot. Hive never signs in for you.', description: "Provider Setup, under GitHub Copilot's Sign in: what it does. **…** marks bold text and `…` a command: keep the marks and the command." }),
+        msg({ id: 'providers.copilot.signIn.runs', defaultMessage: '**Sign in** runs `copilot login` in a terminal: it opens GitHub in your browser to authorise Copilot. Combwork never signs in for you.', description: "Provider Setup, under GitHub Copilot's Sign in: what it does. **…** marks bold text and `…` a command: keep the marks and the command." }),
         msg({ id: 'providers.copilot.signIn.deviceCode', defaultMessage: 'For a code to enter on GitHub instead, run `copilot login --device-code` in a terminal.', description: "Provider Setup, under GitHub Copilot's Sign in: another way to sign in. `…` marks a command: keep it." }),
         msg({ id: 'providers.copilot.signIn.gh', defaultMessage: 'With no login of its own, Copilot uses the GitHub CLI’s (`gh auth login`).', description: "Provider Setup, under GitHub Copilot's Sign in: Copilot falls back to the GitHub CLI's sign-in. `…` marks a command: keep it." }),
-        ...(ignored.length ? [{ m: msg({ id: 'providers.copilot.signIn.ignored', defaultMessage: '{n, plural, one {Copilot agents don’t get {variables} from Hive’s environment, so it doesn’t sign them in. For a token of Copilot’s own, set `COPILOT_GITHUB_TOKEN`.} other {Copilot agents don’t get {variables} from Hive’s environment, so they don’t sign them in. For a token of Copilot’s own, set `COPILOT_GITHUB_TOKEN`.}}', description: "Provider Setup, under GitHub Copilot's Sign in: environment variables with a GitHub token that Hive keeps from Copilot agents. {variables} lists them (joined with “or”), {n} is how many. `…` marks a variable name: keep it." }), values: { variables: listOf(ignored.map((k) => `\`${k}\``), 'disjunction'), n: ignored.length } }] : [])
+        ...(ignored.length ? [{ m: msg({ id: 'providers.copilot.signIn.ignored', defaultMessage: '{n, plural, one {Copilot agents don’t get {variables} from Combwork’s environment, so it doesn’t sign them in. For a token of Copilot’s own, set `COPILOT_GITHUB_TOKEN`.} other {Copilot agents don’t get {variables} from Combwork’s environment, so they don’t sign them in. For a token of Copilot’s own, set `COPILOT_GITHUB_TOKEN`.}}', description: "Provider Setup, under GitHub Copilot's Sign in: environment variables with a GitHub token that Combwork keeps from Copilot agents. {variables} lists them (joined with “or”), {n} is how many. `…` marks a variable name: keep it." }), values: { variables: listOf(ignored.map((k) => `\`${k}\``), 'disjunction'), n: ignored.length } }] : [])
       ])
     )
   }
   if (info.updateAvailable) {
     // Use the installer that owns this executable, keeping its package record consistent.
     const updatable = !!info.path && installKind(info.path) !== 'other'
-    out.push(updateIssue(NAME, info.latestVersion, updatable ? undefined : [{ m: msg({ id: 'providers.copilot.updateManual', defaultMessage: 'Update {provider} the way you installed it, then choose Check again.', description: "Provider Setup, under a newer GitHub Copilot that Hive can't update itself. {provider} is its name. Check again is the button in Provider Setup." }), values: { provider: NAME } }]))
+    out.push(updateIssue(NAME, info.latestVersion, updatable ? undefined : [{ m: msg({ id: 'providers.copilot.updateManual', defaultMessage: 'Update {provider} the way you installed it, then choose Check again.', description: "Provider Setup, under a newer GitHub Copilot that Combwork can't update itself. {provider} is its name. Check again is the button in Provider Setup." }), values: { provider: NAME } }]))
   }
   return out
 }
@@ -242,7 +242,7 @@ export function copilotUpdateRetry(executable: string, exitCode: number): Update
   }
 }
 
-/** `copilot login` in a terminal the user signs in with (Hive types nothing into it). */
+/** `copilot login` in a terminal the user signs in with (Combwork types nothing into it). */
 export function copilotLoginCommand(executable: string): CommandSpec {
   return toSpawnable(executable, ['login'])
 }

@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { advanced } from '../src/main/advanced'
-import { copilot, copilotHooks, copilotMcpServer, HIVE_TOOL_NAMES } from '../src/main/providers/copilot/adapter'
+import { copilot, copilotHooks, copilotMcpServer, toolNamesLine } from '../src/main/providers/copilot/adapter'
 import { COPILOT_ENV_STRIP, copilotEnv } from '../src/main/providers/copilot/home'
 import { parseCopilotModels } from '../src/main/providers/copilot/models'
 import type { LaunchContext } from '../src/main/providers/types'
@@ -12,7 +12,7 @@ import { tempDir } from './tempDir'
 
 // Payloads and screens as Copilot CLI 1.0.93 sent and drew them (the #403 spike), with paths shortened.
 
-const base = tempDir('hive-copilot-')
+const base = tempDir('cw-copilot-')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 // Never the user's ~/.copilot: the adapter reads its mcp-config.json and settings.json.
 process.env.COPILOT_HOME = join(base, 'copilot-home')
@@ -22,9 +22,9 @@ function context(over: Partial<LaunchContext> = {}): LaunchContext {
   mkdirSync(cwd, { recursive: true })
   return {
     projectPath: cwd, agentId: 'a-1', executable: 'C:\\bin\\copilot.exe', cwd, workspacePath: base, runId: 'r1', sessionId: '0cb916db-26aa-40f2-86b5-1ba81b225fd2',
-    resume: false, name: 'Agent 1', skills: [], mcpServers: { hive: { command: 'node', args: ['hive-mcp.js'], env: { HIVE_PROJECT: 'proj' } } }, model: null, effort: null, permissionMode: 'ask', extraArgs: [],
-    hookUrl: 'http://127.0.0.1:5000/hook?run=r1', hookAuthFile: join(base, 'auth.txt'), privateDir: join(base, 'private'), guidance: 'Hive guidance', allowBackgroundSessions: false, use200kContext: false,
-    env: { PATH: 'C:\\Windows', GH_TOKEN: 'gho_stray', GITHUB_TOKEN: 'ghp_other', COPILOT_GITHUB_TOKEN: 'github_pat_x', HIVE_HOOK_TOKEN: 'tok123' },
+    resume: false, name: 'Agent 1', skills: [], mcpServers: { combwork: { command: 'node', args: ['cw-mcp.js'], env: { CW_PROJECT: 'proj' } } }, model: null, effort: null, permissionMode: 'ask', extraArgs: [],
+    hookUrl: 'http://127.0.0.1:5000/hook?run=r1', hookAuthFile: join(base, 'auth.txt'), privateDir: join(base, 'private'), guidance: 'Combwork guidance', allowBackgroundSessions: false, use200kContext: false,
+    env: { PATH: 'C:\\Windows', GH_TOKEN: 'gho_stray', GITHUB_TOKEN: 'ghp_other', COPILOT_GITHUB_TOKEN: 'github_pat_x', CW_HOOK_TOKEN: 'tok123' },
     ...over
   }
 }
@@ -59,7 +59,7 @@ describe('Copilot footer and modes', () => {
     expect(copilotFooterMode(' ← open sidebar · Plan · Manual Approval · / commands · ? help · tab next tab')).toBe('plan')
     expect(copilotFooterMode(' ← open sidebar · Autopilot · Manual Approval · / commands · tab next tab')).toBe('autopilot')
     expect(copilotFooterMode(' ← open sidebar · Interactive · Allow All · / commands · ? help · tab next tab')).toBe('allow-all')
-    // A pane too narrow for one line (seen in Hive's agent terminal with two panes).
+    // A pane too narrow for one line (seen in Combwork's agent terminal with two panes).
     expect(copilotFooterMode('← open ·Interactive · Manual · / commands · ? help · tab\nsidebar Approval next tab gpt-4.1')).toBe('ask')
     expect(copilotFooterMode('← open ·Plan · Manual · / commands\nsidebar Approval')).toBe('plan')
     // While typing, the footer lists other items; the last footer drawn wins.
@@ -94,8 +94,8 @@ describe('Copilot footer and modes', () => {
 })
 
 describe('Copilot launch', () => {
-  it('starts a new session under the id Hive chose, with its hooks, MCP servers and modes', () => {
-    const ctx = context({ model: 'claude-sonnet-5.5', effort: 'high', trustedHiveTools: ['hive_list_tasks', 'hive_read_task'], initialPrompt: 'Fix the bug' })
+  it('starts a new session under the id Combwork chose, with its hooks, MCP servers and modes', () => {
+    const ctx = context({ model: 'claude-sonnet-5.5', effort: 'high', trustedCombworkTools: ['cw_list_tasks', 'cw_read_task'], initialPrompt: 'Fix the bug' })
     const { file, args, env } = copilot.buildCommand(ctx.executable, ctx)
     expect(file).toBe('C:\\bin\\copilot.exe')
     expect(args.slice(0, 4)).toEqual(['--session-id', ctx.sessionId, '--name', 'Agent 1'])
@@ -104,7 +104,7 @@ describe('Copilot launch', () => {
     expect(args[args.indexOf('--additional-mcp-config') + 1]).toBe(`@${join(ctx.privateDir, 'mcp.json')}`)
     expect(args).toContain('--allow-all-mcp-server-instructions')
     expect(args).toContain('--disable-builtin-mcps')
-    expect(args.filter((a) => a.startsWith('--allow-tool='))).toEqual(['--allow-tool=hive(hive_list_tasks)', '--allow-tool=hive(hive_read_task)'])
+    expect(args.filter((a) => a.startsWith('--allow-tool='))).toEqual(['--allow-tool=combwork(cw_list_tasks)', '--allow-tool=combwork(cw_read_task)'])
     expect(args[args.indexOf('--model') + 1]).toBe('claude-sonnet-5.5')
     expect(args[args.indexOf('--reasoning-effort') + 1]).toBe('high')
     expect(args.slice(-2)).toEqual(['-i', 'Fix the bug'])
@@ -114,20 +114,20 @@ describe('Copilot launch', () => {
     for (const k of COPILOT_ENV_STRIP) expect(env?.[k]).toBeUndefined()
     expect(COPILOT_ENV_STRIP).toEqual(['GH_TOKEN', 'GITHUB_TOKEN'])
     expect(env?.COPILOT_GITHUB_TOKEN).toBe('github_pat_x')
-    expect(env).toMatchObject({ PATH: 'C:\\Windows', HIVE_HOOK_TOKEN: 'tok123', COPILOT_HOOK_ALLOW_LOCALHOST: '1', COPILOT_AUTO_UPDATE: 'false' })
-    // Its custom instructions: the hive tools' names (#1530).
+    expect(env).toMatchObject({ PATH: 'C:\\Windows', CW_HOOK_TOKEN: 'tok123', COPILOT_HOOK_ALLOW_LOCALHOST: '1', COPILOT_AUTO_UPDATE: 'false' })
+    // Its custom instructions: the Combwork tools' names (#1530).
     expect(env?.COPILOT_CUSTOM_INSTRUCTIONS_DIRS).toBe(join(ctx.privateDir, 'instructions'))
     // The token never goes on the command line.
     expect(args.join(' ')).not.toContain('tok123')
   })
 
-  it("pre-approves Hive's tools: a project agent's all of them, the Assistant's only its trusted ones (#468)", () => {
+  it("pre-approves Combwork's tools: a project agent's all of them, the Assistant's only its trusted ones (#468)", () => {
     const allow = (over: Partial<LaunchContext>) => copilot.buildCommand('x.exe', context(over)).args.filter((a) => a.startsWith('--allow-tool='))
-    expect(allow({})).toEqual(['--allow-tool=hive'])
-    expect(allow({ permissionMode: 'plan' })).toEqual(['--allow-tool=hive'])
-    expect(allow({ trustedHiveTools: [] })).toEqual([])
-    expect(allow({ trustedHiveTools: ['hive_read_task'] })).toEqual(['--allow-tool=hive(hive_read_task)'])
-    // No hive server, nothing to approve.
+    expect(allow({})).toEqual(['--allow-tool=combwork'])
+    expect(allow({ permissionMode: 'plan' })).toEqual(['--allow-tool=combwork'])
+    expect(allow({ trustedCombworkTools: [] })).toEqual([])
+    expect(allow({ trustedCombworkTools: ['cw_read_task'] })).toEqual(['--allow-tool=combwork(cw_read_task)'])
+    // No combwork server, nothing to approve.
     expect(allow({ mcpServers: {} })).toEqual([])
   })
 
@@ -156,7 +156,7 @@ describe('Copilot launch', () => {
       expect(copilotModeFlags('accept-edits', folder)).toEqual([])
       const { args } = copilot.buildCommand('x.exe', context({ permissionMode: 'accept-edits', cwd: folder }))
       expect(args.filter((a) => a.startsWith('--allow-tool=write'))).toEqual([])
-      expect(args.some((a) => /^--allow-tool=[^h]/.test(a))).toBe(false)
+      expect(args.some((a) => /^--allow-tool=(?!combwork)/.test(a))).toBe(false)
     }
     expect(copilotCanApproveEdits('D:\\w\\demo[1]{x}')).toBe(true)
     // The notice: only for Accept edits (or the default) in such a folder.
@@ -174,18 +174,19 @@ describe('Copilot launch', () => {
     expect(r.args).toContain('--plan')
     expect(copilot.buildCommand('x.exe', context({ permissionMode: 'allow-all' })).args).toContain('--allow-all')
     expect(copilot.buildCommand('x.exe', context({ permissionMode: 'autopilot' })).args).toContain('--autopilot')
-    const ctx = context({ instructions: 'You are the Hive Assistant.', env: { COPILOT_CUSTOM_INSTRUCTIONS_DIRS: 'D:\\mine' } })
+    const ctx = context({ instructions: 'You are the Combwork Assistant.', env: { COPILOT_CUSTOM_INSTRUCTIONS_DIRS: 'D:\\mine' } })
     expect(copilot.buildCommand('x.exe', ctx).env?.COPILOT_CUSTOM_INSTRUCTIONS_DIRS).toBe(`D:\\mine,${join(ctx.privateDir, 'instructions')}`)
   })
 
   it("turns off the user's and the project's own MCP servers, never the workspace's", () => {
     const ctx = context()
     mkdirSync(join(ctx.cwd, '.github'), { recursive: true })
-    writeFileSync(join(ctx.cwd, '.mcp.json'), JSON.stringify({ mcpServers: { theirs: { command: 'x' }, hive: { command: 'y' } } }))
+    writeFileSync(join(ctx.cwd, '.mcp.json'), JSON.stringify({ mcpServers: { theirs: { command: 'x' }, acme: { command: 'y' } } }))
     writeFileSync(join(ctx.cwd, '.github', 'mcp.json'), '// VS Code format, with a comment\n{ "servers": { "gh-only": { "url": "https://x" } } }')
     const { args } = copilot.buildCommand('x.exe', ctx)
     const off = args.flatMap((a, i) => (a === '--disable-mcp-server' ? [args[i + 1]] : []))
-    expect(off.sort()).toEqual(['gh-only', 'theirs'])
+    // Every server of the project's own, whatever its name, is off with the others.
+    expect(off.sort()).toEqual(['acme', 'gh-only', 'theirs'])
   })
 
   it('writes the plugin (hooks with the token), the MCP config and the instructions in the launch’s private folder', async () => {
@@ -193,9 +194,9 @@ describe('Copilot launch', () => {
     await copilot.prepareLaunch(ctx)
     const hooks = JSON.parse(readFileSync(join(ctx.privateDir, 'plugin', 'hooks.json'), 'utf8'))
     expect(hooks).toEqual(copilotHooks(ctx.hookUrl, 'tok123'))
-    expect(JSON.parse(readFileSync(join(ctx.privateDir, 'plugin', 'plugin.json'), 'utf8')).name).toBe('hive-launch')
-    expect(JSON.parse(readFileSync(join(ctx.privateDir, 'mcp.json'), 'utf8'))).toEqual({ mcpServers: { hive: { type: 'local', command: 'node', args: ['hive-mcp.js'], env: { HIVE_PROJECT: 'proj' }, tools: ['*'] } } })
-    expect(readFileSync(join(ctx.privateDir, 'instructions', '.github', 'instructions', 'hive.instructions.md'), 'utf8')).toBe(`---\napplyTo: '**'\n---\n${HIVE_TOOL_NAMES}\n\nRole: assistant.\n`)
+    expect(JSON.parse(readFileSync(join(ctx.privateDir, 'plugin', 'plugin.json'), 'utf8')).name).toBe('combwork-launch')
+    expect(JSON.parse(readFileSync(join(ctx.privateDir, 'mcp.json'), 'utf8'))).toEqual({ mcpServers: { combwork: { type: 'local', command: 'node', args: ['cw-mcp.js'], env: { CW_PROJECT: 'proj' }, tools: ['*'] } } })
+    expect(readFileSync(join(ctx.privateDir, 'instructions', '.github', 'instructions', 'combwork.instructions.md'), 'utf8')).toBe(`---\napplyTo: '**'\n---\n${toolNamesLine()}\n\nRole: assistant.\n`)
   })
 
   it('is ended with Ctrl+C before it is killed, so it writes its token totals (#465)', async () => {
@@ -208,7 +209,7 @@ describe('Copilot launch', () => {
     // Stop types them on conditions (HI-2272): the key that exits once its screen shows the exit armed.
     expect(exit.armed.test(readFileSync(join(__dirname, 'fixtures', 'advanced', 'exit-armed-copilot-1.0.105.txt'), 'utf8'))).toBe(true)
     expect(exit.armed.test(readFileSync(join(__dirname, 'fixtures', 'advanced', 'ready-copilot-1.0.95.txt'), 'utf8'))).toBe(false)
-    // Quitting Hive or closing a workspace (stopWhereAndWait, 3 s) waits past the grace, for the kill and its exit.
+    // Quitting Combwork or closing a workspace (stopWhereAndWait, 3 s) waits past the grace, for the kill and its exit.
     const { stopWaitMs } = await import('../src/main/sessions')
     expect(stopWaitMs(3000, [exit.graceMs])).toBeGreaterThan(exit.graceMs)
     expect(stopWaitMs(3000, [undefined, undefined])).toBe(3000)
@@ -224,7 +225,7 @@ describe('Copilot launch', () => {
 
   it('takes its exit grace from Settings → Advanced (copilot.exit.graceSeconds), at each stop (#727)', async () => {
     const { stopWaitMs } = await import('../src/main/sessions')
-    advanced.load(tempDir('hive-copilot-advanced-'))
+    advanced.load(tempDir('cw-copilot-advanced-'))
     try {
       expect(copilot.exitKeys.graceMs).toBe(10_000)
       await advanced.set('copilot.exit.graceSeconds', 25)
@@ -243,7 +244,7 @@ describe('Copilot launch', () => {
     }
   })
 
-  it('gives every event to Hive’s hook server over HTTP, by the PascalCase names', () => {
+  it('gives every event to Combwork’s hook server over HTTP, by the PascalCase names', () => {
     const h = copilotHooks('http://127.0.0.1:5000/hook?run=r1', 'tok') as { version: number; hooks: Record<string, { type: string; url: string; headers: Record<string, string>; timeoutSec: number }[]> }
     expect(h.version).toBe(1)
     expect(Object.keys(h.hooks)).toEqual(['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'Notification', 'Stop', 'ErrorOccurred', 'PreCompact', 'SessionEnd'])
@@ -266,12 +267,12 @@ describe('Copilot launch', () => {
 describe('Copilot hooks', () => {
   const h = (body: Record<string, unknown>) => copilot.normalizeHook(body)
 
-  it('turns its hook calls into Hive events', () => {
+  it('turns its hook calls into Combwork events', () => {
     expect(h({ hook_event_name: 'SessionStart', session_id: 's1', source: 'new', initial_prompt: 'do it' })).toMatchObject({ event: { kind: 'start', source: 'new' }, sessionId: 's1', mode: null })
     expect(h({ hook_event_name: 'UserPromptSubmit', session_id: 's1', prompt: 'hello there' }).event).toEqual({ kind: 'prompt', text: 'hello there' })
     expect(h({ hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_input: { path: 'C:\\w\\a.ts', old_str: 'x', new_str: 'y' } })).toMatchObject({ event: { kind: 'toolStart' }, editedPaths: ['C:\\w\\a.ts'] })
     expect(h({ hook_event_name: 'PreToolUse', tool_name: 'Write', tool_input: { path: 'C:\\w\\hello.txt', file_text: 'hi' } }).editedPaths).toEqual(['C:\\w\\hello.txt'])
-    expect(h({ hook_event_name: 'PreToolUse', tool_name: 'hive-hive_ping', tool_input: {} })).toMatchObject({ event: { kind: 'toolStart' }, editedPaths: [] })
+    expect(h({ hook_event_name: 'PreToolUse', tool_name: 'combwork-cw_ping', tool_input: {} })).toMatchObject({ event: { kind: 'toolStart' }, editedPaths: [] })
     expect(h({ hook_event_name: 'PreToolUse', tool_name: 'powershell', tool_input: { command: 'New-Item x', path: 'C:\\w' } }).editedPaths).toEqual([])
     expect(h({ hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: {}, tool_result: { result_type: 'success' } }).event).toEqual({ kind: 'toolEnd' })
     expect(h({ hook_event_name: 'PostToolUseFailure', tool_name: 'Edit' }).event).toEqual({ kind: 'toolEnd' })
@@ -294,7 +295,7 @@ describe('Copilot hooks', () => {
     const [pre, notification, post] = readFileSync(join(__dirname, 'fixtures', 'advanced', 'question-copilot-1.0.105.jsonl'), 'utf8').trim().split(/\r?\n/).map((l) => JSON.parse(l) as Record<string, unknown>)
     const asked = (message: string) => ({ kind: 'ask', ask: { kind: 'question', blocking: true, message } })
     // Overridden in a profile of its own, never the user's.
-    beforeAll(() => advanced.load(tempDir('hive-copilot-question-')))
+    beforeAll(() => advanced.load(tempDir('cw-copilot-question-')))
     afterAll(async () => {
       await advanced.set('copilot.question.tool', null)
       await advanced.set('copilot.question.field', null)
@@ -367,10 +368,10 @@ describe('Copilot models', () => {
 })
 
 describe('Copilot files', () => {
-  it('reads skills from its own folders and three project folders, sharing Hive’s copies with Codex', () => {
+  it('reads skills from its own folders and three project folders, sharing Combwork’s copies with Codex', () => {
     const roots = copilot.skillRoots()
     expect(roots.local).toEqual([join('.github', 'skills'), join('.agents', 'skills'), join('.claude', 'skills')])
-    expect(copilot.skillCopyPath(context(), 'deploy')).toBe(join(context().cwd, '.agents', 'skills', 'hive-deploy'))
+    expect(copilot.skillCopyPath(context(), 'deploy')).toBe(join(context().cwd, '.agents', 'skills', 'cw-deploy'))
     expect(COPILOT_DESCRIPTOR.instructionsFile).toBe('AGENTS.md')
   })
 

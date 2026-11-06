@@ -1,7 +1,9 @@
-appId: com.hive.desktop
-# The displayed name (#443). The install folder (%LOCALAPPDATA%\Programs\Hive) comes from executableName and the
-# profile folder (%APPDATA%\Hive) is set in main (shared/appName.ts), so neither moves; appId keeps the uninstall entry.
-productName: Hive Desktop
+appId: it.surmise.combwork
+# The displayed name (#443, HI-2458: Combwork) and the install identity (HI-2460): app ID it.surmise.combwork, installed as
+# Combwork.exe in %LOCALAPPDATA%\Programs\Combwork (from executableName). Its installer removes the 1.0 app (by its
+# appId) and moves its profile folders (build/installer.nsh, legacyUpgrade.ps1); main sets the profile folder
+# (shared/appName.ts).
+productName: Combwork
 copyright: Copyright © 2026 Darren Marshall
 directories:
   buildResources: build
@@ -19,10 +21,10 @@ extraResources:
     to: build-identity.json
 asarUnpack:
   - '**/node_modules/@lydell/node-pty*/**'
-  - out/main/hive-mcp.js
-  - out/main/hive-progress.js
-  - out/main/hive-close-runner.js
-  # Code hive-mcp.js (or hive-progress.js) shares with the main process (e.g. shared/hiveGuidance.ts) is split into chunks,
+  - out/main/cw-mcp.js
+  - out/main/cw-progress.js
+  - out/main/cw-close-runner.js
+  # Code cw-mcp.js (or cw-progress.js) shares with the main process (e.g. shared/combworkGuidance.ts) is split into chunks,
   # which the CLIs load from outside the asar too.
   - out/main/chunks/**
 npmRebuild: false
@@ -31,30 +33,30 @@ npmRebuild: false
 publish:
   provider: github
   owner: Suremise
-  repo: hive-desktop
+  repo: combwork
   releaseType: draft
 win:
   target:
     - target: nsis
       arch: [x64]
   icon: build/icon.ico
-  executableName: Hive
+  executableName: Combwork
 nsis:
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: Hive Desktop
+  shortcutName: Combwork
   installerIcon: build/icon.ico
   uninstallerIcon: build/icon.ico
-  artifactName: Hive-Setup-${version}.${ext}
+  artifactName: Combwork-Setup-${version}.${ext}
   deleteAppDataOnUninstall: false
-  # Hive's languages (#767), so the installer, which follows Windows' display language without asking, never speaks one
+  # Combwork's languages (#767), so the installer, which follows Windows' display language without asking, never speaks one
   # the app doesn't. electron-builder's NSIS messages come in all of them (one or two of its own fall back to English).
   installerLanguages: [en_US, de_DE, es_ES, fr_FR, ja_JP, pl_PL, pt_BR, zh_CN]
   # No resources/elevate.exe (#385): electron-updater only runs it for per-machine installs (or if starting the
-  # installer fails with EACCES), and Hive's per-user installer needs no administrator rights.
+  # installer fails with EACCES), and Combwork's per-user installer needs no administrator rights.
   packElevateHelper: false
   # Gives ALL APPLICATION PACKAGES read access to the install folder (installer.nsh).
   include: build/installer.nsh

@@ -1,8 +1,8 @@
 // Compressed transcript backups (#1110): a session's backups are gzipped once it ends or is archived, never while it
 // runs; archiving and unarchiving move them compressed; the viewer, search, export and usage read them as plain ones;
-// Storage says what they hold before compression. Backup retention (off by default) sends Hive's copies of sessions idle
+// Storage says what they hold before compression. Backup retention (off by default) sends Combwork's copies of sessions idle
 // that long to the Recycle Bin, only where the CLI still has the session, after the usage history has what it used; a
-// session whose only copy is Hive's is never touched.
+// session whose only copy is Combwork's is never touched.
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { gunzipSync, gzipSync } from 'zlib'
@@ -10,7 +10,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-backup-gz-')
+const base = tempDir('cw-backup-gz-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 // The Recycle Bin, as deleting the file.
 const trashed: string[] = []
@@ -49,11 +49,11 @@ const write = (file: string, text: string): void => {
   mkdirSync(join(file, '..'), { recursive: true })
   writeFileSync(file, text)
 }
-const backup = (id: string, archived = false): string => join(p, '.hive', archived ? 'archive' : 'sessions', `${id}.jsonl`)
+const backup = (id: string, archived = false): string => join(p, '.combwork', archived ? 'archive' : 'sessions', `${id}.jsonl`)
 const cliFile = (id: string): string => join(cli, `${id}.jsonl`)
 const gz = (file: string): string => gunzipSync(readFileSync(file + '.gz')).toString('utf8')
 
-/** One of Hive's sessions, last active `days` ago, with a plain backup; `inCli`: the CLI still has its transcript. */
+/** One of Combwork's sessions, last active `days` ago, with a plain backup; `inCli`: the CLI still has its transcript. */
 async function session(opts: { days?: number; inCli?: boolean; archived?: boolean } = {}): Promise<string> {
   const id = newId()
   await run(() => workspace.upsertSession(p, { id, agent: 'claude-code', name: id, archived: !!opts.archived, lastActiveAt: ago(opts.days ?? 100) }))
@@ -68,9 +68,9 @@ const lookup = async (_p: string, id: string) => (existsSync(cliFile(id)) ? { pa
 
 describe('compressed transcript backups', () => {
   beforeAll(async () => {
-    mkdirSync(join(wsPath, '.hive'), { recursive: true })
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'c1', name: 'Agent 1' }] }))
+    mkdirSync(join(wsPath, '.combwork'), { recursive: true })
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'c1', name: 'Agent 1' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     cliLookup.mockImplementation(lookup)
@@ -78,7 +78,7 @@ describe('compressed transcript backups', () => {
   beforeEach(async () => {
     trashed.length = 0
     config.settings.sessions.backupRetention = 'off'
-    for (const d of ['archive', 'sessions']) rmSync(join(p, '.hive', d), { recursive: true, force: true })
+    for (const d of ['archive', 'sessions']) rmSync(join(p, '.combwork', d), { recursive: true, force: true })
     await w.mutateSessions(p, (f) => {
       f.sessions = []
       f.deleted = []
@@ -192,11 +192,11 @@ describe('compressed transcript backups', () => {
       expect(trashed).toEqual([])
     })
 
-    it("sends Hive's copies of sessions idle that long to the Recycle Bin, only where the CLI has the session, and keeps what they used", async () => {
+    it("sends Combwork's copies of sessions idle that long to the Recycle Bin, only where the CLI has the session, and keeps what they used", async () => {
       config.settings.sessions.backupRetention = '30'
       const gone = await session({ days: 40, inCli: true })
       write(backup(gone, true) + '.gz', '')
-      const hiveOnly = await session({ days: 400 })
+      const combworkOnly = await session({ days: 400 })
       const recent = await session({ days: 10, inCli: true })
       const live = await session({ days: 40, inCli: true })
       running(live)
@@ -208,7 +208,7 @@ describe('compressed transcript backups', () => {
       expect(existsSync(cliFile(gone))).toBe(true)
       const u = await run(() => sessions.usage(p, gone))
       expect(u && u.outputTokens).toBe(2000)
-      for (const kept of [hiveOnly, recent, live]) expect(existsSync(backup(kept)), kept).toBe(true)
+      for (const kept of [combworkOnly, recent, live]) expect(existsSync(backup(kept)), kept).toBe(true)
     })
 
     // What decides it can change while it waits: before the session is reserved (the first look at the CLI), and while

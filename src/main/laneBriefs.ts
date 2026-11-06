@@ -1,4 +1,4 @@
-// A lane's brief for its builder (HI-1795, SPEC §16.10.2): `hive_lane start`'s `brief`, kept with the lane (lanes.ts,
+// A lane's brief for its builder (HI-1795, SPEC §16.10.2): `cw_lane start`'s `brief`, kept with the lane (lanes.ts,
 // shared/lanes.ts nextBrief). In slots, every placement of the lane's cards carries it (slotCards.ts' place, briefOf):
 // the conversation that works the card gets it with the card, whatever that conversation is. Outside slots there is no
 // placement, so it is delivered to the builder once per revision (source `lane-brief`, ref `<lane>:<rev>`): the lane
@@ -9,9 +9,10 @@
 // Agent-facing: English.
 
 import { join } from 'path'
+import { agentMsg, inDefaultDialect, say } from '../shared/agentText'
 import type { LaneRecord } from '../shared/lanes'
 import { cancelDeliveries, createDelivery, deliveriesOf, registerSource, type DeliverySource } from './deliveries'
-import { onHiveEvent } from './events'
+import { onCombworkEvent } from './events'
 import { mutateLanes, onLanesWritten, rawLanes } from './lanes'
 import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
@@ -21,10 +22,22 @@ import { openWorkspaces, workspaceFor, type WorkspaceService } from './workspace
 
 const log = createLogger('lanes')
 
+/** What a lane's brief says around the user's text (dialects, HI-2438). */
+const A = {
+  brief: agentMsg({
+    id: 'brief.record.brief',
+    text: "Your lane's brief (lane {lane}, from {from}):\n{text}",
+    note: "A lane's brief as its builder reads it (with each card in slots, or delivered): who started the lane (from: the lane's startedBy), then the brief as it was written (text)."
+  }),
+  cleared: agentMsg({ id: 'brief.record.cleared', text: 'Its brief is cleared.', note: "The lane change's reply: the lane's brief was cleared." }),
+  inSlot: agentMsg({ id: 'brief.record.inSlot', text: "Its brief is given with each of its cards, in the builder's slot.", note: "The lane change's reply, the project's cards built in slots: the brief goes with each card placed there." }),
+  delivered: agentMsg({ id: 'brief.record.delivered', text: 'Its brief is delivered to the builder now.', note: "The lane change's reply: the brief is delivered to the builder's inbox." })
+}
+
 export const LANE_BRIEF_SOURCE = 'lane-brief'
 
 /** A brief as its builder reads it: who started the lane, then the text. */
-export const briefText = (lane: Pick<LaneRecord, 'startedBy' | 'id'>, text: string): string => `Your lane's brief (lane ${lane.id}, from ${lane.startedBy}):\n${text}` // i18n-ignore: agent-facing
+export const briefText = (lane: Pick<LaneRecord, 'startedBy' | 'id'>, text: string): string => say(A.brief, { lane: lane.id, from: lane.startedBy, text })
 
 /** The brief a placement of one of the lane's cards carries (in slots): its text as it is now, or null. */
 export const briefOf = (lane: Pick<LaneRecord, 'brief' | 'startedBy' | 'id'> | undefined | null): string | null => (lane?.brief?.text ? briefText(lane, lane.brief.text) : null)
@@ -41,8 +54,8 @@ export async function inSlots(ws: WorkspaceService, projectPath: string): Promis
 /** The words a lane start's reply adds for its brief (agent-facing): where it is given. */
 export async function briefNote(ws: WorkspaceService, lane: Pick<LaneRecord, 'project' | 'brief'>): Promise<string | null> {
   if (!ws.path || !lane.brief) return null
-  if (!lane.brief.text) return 'Its brief is cleared.' // i18n-ignore: agent-facing
-  return (await inSlots(ws, join(ws.path, lane.project))) ? "Its brief is given with each of its cards, in the builder's slot." : 'Its brief is delivered to the builder now.' // i18n-ignore: agent-facing
+  if (!lane.brief.text) return say(A.cleared)
+  return (await inSlots(ws, join(ws.path, lane.project))) ? say(A.inSlot) : say(A.delivered)
 }
 
 const refOf = (lane: string, rev: number): string => `${lane}:${rev}`
@@ -84,10 +97,12 @@ async function settleOnce(ws: WorkspaceService): Promise<void> {
     const current = refOf(lane.id, b.rev)
     // An older rev's delivery not received yet: cancelled, so it never arrives as the current brief.
     await cancelDeliveries(projectPath, lane.builder.id, 'its lane brief changed', ['rebrief'], (r) => r.source === LANE_BRIEF_SOURCE && !!r.ref?.startsWith(`${lane.id}:`) && r.ref !== current) // i18n-ignore: why a delivery was cancelled, for the log
-    if (b.text) {
+    const text = b.text
+    if (text) {
       const made = (await deliveriesOf(projectPath, lane.builder.id)).some((r) => r.source === LANE_BRIEF_SOURCE && r.ref === current)
       if (!made) {
-        await createDelivery(projectPath, { agentId: lane.builder.id, agentName: lane.builder.name, kind: 'rebrief', from: { kind: 'hive', name: 'Hive' }, body: briefText(lane, b.text), source: LANE_BRIEF_SOURCE, ref: current, meta: { lane: lane.id, rev: b.rev, ...(b.notIn ? { notIn: b.notIn } : {}) } }) // i18n-ignore: who a delivery is from, as agents read it
+        // agent-protocol: the sender is the product's name, Combwork
+        await createDelivery(projectPath, { agentId: lane.builder.id, agentName: lane.builder.name, kind: 'rebrief', from: { kind: 'combwork', name: 'Combwork' }, body: inDefaultDialect(() => briefText(lane, text)), source: LANE_BRIEF_SOURCE, ref: current, meta: { lane: lane.id, rev: b.rev, ...(b.notIn ? { notIn: b.notIn } : {}) } }) // i18n-ignore: who a delivery is from, as agents read it
         log.info(`Lane ${lane.id}'s brief (rev ${b.rev}) delivered to ${userText(lane.builder.name)}`)
       }
     }
@@ -134,7 +149,7 @@ export function startLaneBriefs(): void {
     for (const ws of openWorkspaces()) void settleLaneBriefs(ws)
   }
   const offLanes = onLanesWritten(all)
-  const offOpen = onHiveEvent((e) => {
+  const offOpen = onCombworkEvent((e) => {
     if (e.type === 'workspace-changed') all()
   })
   stop = () => {

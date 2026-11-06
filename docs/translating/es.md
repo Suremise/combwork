@@ -1,4 +1,4 @@
-# Español (`es`): style for Hive
+# Español (`es`): style for Combwork
 
 **Status:** drafted by AI (Claude, October 2026, card #854), not yet reviewed by a native speaker. Its entry in
 `src/shared/i18n/languages.ts` says the same (`ai: true` until it is reviewed).
@@ -9,13 +9,13 @@ bienvenidas.*
 **Improving it:** this translation was drafted by an AI model and has not been checked by a native speaker yet, so
 some wording will be stiff or wrong. Corrections are very welcome: edit `locales/es/<area>.json`, run
 `npm run i18n:check` (it must pass), and open a pull request on
-[Suremise/hive-desktop](https://github.com/Suremise/hive-desktop) saying what you changed and why. A change to a
+[Suremise/combwork](https://github.com/Suremise/combwork) saying what you changed and why. A change to a
 term in the table below changes it everywhere: change this page first, then every message that uses it. Once a
 native speaker has reviewed the whole language, its `ai` flag comes off.
 
 ## Voice
 
-Hive's English is plain and direct: short sentences, everyday words, *you* for the reader, and it says what happens.
+Combwork's English is plain and direct: short sentences, everyday words, *you* for the reader, and it says what happens.
 Translate the meaning, not the words, and keep the result as short and plain.
 
 - **Neutral international Spanish:** words understood from Mexico to Spain. No *vosotros* and no *vos*: the plural
@@ -23,8 +23,8 @@ Translate the meaning, not the words, and keep the result as short and plain.
   or *computadora*: see Terms), *costo* (not *coste*), *hacer clic*, *pegar*, *usar*.
 - **Addressing the reader:** the informal *tú* (*Elige un proyecto*, *tus agentes*), as Spanish software usually does.
   Never *usted*. *Tú* is written in lower case.
-- **Tone:** friendly and direct, never casual. Prefer active sentences: *Hive guarda la sesión*, not *La sesión es
-  guardada por Hive*. Avoid bureaucratic phrasing (*proceder a*, *efectuar*, *realizar* where *hacer* works).
+- **Tone:** friendly and direct, never casual. Prefer active sentences: *Combwork guarda la sesión*, not *La sesión es
+  guardada por Combwork*. Avoid bureaucratic phrasing (*proceder a*, *efectuar*, *realizar* where *hacer* works).
 - **Sentence length:** keep one English sentence as one Spanish sentence where it reads well; split a long one rather
   than chain *que* clauses. Spanish runs about 20% longer than English: in buttons, titles and column headings,
   choose the shorter word.
@@ -34,14 +34,14 @@ Translate the meaning, not the words, and keep the result as short and plain.
 - **Buttons and menu commands:** the infinitive (*Guardar*, *Agregar agente…*, *Mostrar notas compartidas*). The same
   form everywhere, including the command palette.
 - **Capitalisation:** sentence case everywhere: titles, buttons, menus, headings, tabs, settings and column names
-  (*Configuración del agente*, *Reiniciar y actualizar Hive*). Don't copy the English Title Case. Names of products and
+  (*Configuración del agente*, *Reiniciar y actualizar Combwork*). Don't copy the English Title Case. Names of products and
   the glossary's kept names keep theirs.
 - **A trailing `…`** (the command asks something before it acts) stays, with no space before it: *Quitar agente…*.
   Always the single character …, never three dots.
 - **Column headings** (the 1.0 stages, glossary-1.0 §2.2): *En espera*, *Pendiente*, *En curso* (Active, was Doing),
   *Revisión*, *Aprobado* (Approved, was Passed), with *Fusionando* (Merging) inside Aprobado, and *Hecho*. In running
   text name the column (*en la columna Revisión*, *pasa a Hecho*) so a sentence never reads *en En curso*.
-- **Where things are:** paths through menus and settings keep Hive's arrows, with each name as Hive shows it in Spanish:
+- **Where things are:** paths through menus and settings keep Combwork's arrows, with each name as Combwork shows it in Spanish:
   *Configuración → Proveedores*, *Ayuda → Configuración de proveedores*.
 
 ## Grammar
@@ -57,7 +57,7 @@ Translate the meaning, not the words, and keep the result as short and plain.
   `{n, plural, one {# tarjeta} many {# tarjetas} other {# tarjetas}}`. Exact cases from the English (`=0`) stay.
 - **Cases and placeholders:** a placeholder like `{project}` or `{agent}` is a name inserted as it is. Write the noun
   before it where the sentence needs an article or preposition: *en el proyecto {project}*, *para el agente {agent}*.
-- **Lists:** Hive joins lists itself (*One, Two y Three*). Never write *y* or *o* into a message around a list
+- **Lists:** Combwork joins lists itself (*One, Two y Three*). Never write *y* or *o* into a message around a list
   placeholder.
 - **Questions and exclamations** open with *¿* and *¡*.
 
@@ -69,11 +69,11 @@ Translate the meaning, not the words, and keep the result as short and plain.
 - **Spaces:** none before : ; ? !, as in English.
 - **Dashes, colons, ellipsis:** as in the English. The colon is followed by a lower-case letter unless a name or a
   full quotation follows.
-- **Numbers, dates, money, durations:** formatted by Hive in the reader's locale. Never write them into a message.
+- **Numbers, dates, money, durations:** formatted by Combwork in the reader's locale. Never write them into a message.
 
 ## Terms
 
-The words Spanish uses for Hive's terms ([glossary.md](glossary.md)). Use them every time. Where a term is kept in
+The words Spanish uses for Combwork's terms ([glossary.md](glossary.md)). Use them every time. Where a term is kept in
 English, it says so.
 
 | English | Español | Notes |
@@ -83,7 +83,7 @@ English, it says so.
 | agent | agente | Masculine: *el agente {agent}*. |
 | provider | proveedor | |
 | session | sesión | Starting an agent's session: *iniciar* / *empezar una sesión nueva*; *iniciar sesión* alone means signing in (below). |
-| the Assistant | el Asistente | Capitalised. The full name *Hive Assistant* stays in English: *el Hive Assistant*. |
+| the Assistant | el Asistente | Capitalised. Its only name: the full English name it had before went with the rename (HI-2458). |
 | persona (now: working mode) | modo (modo de trabajo) | The Assistant's personas became *modes*; the old *persona* is *personaje*. |
 | task board / board | tablero de tareas / tablero | The *Tasks* tab is *Tareas*. |
 | card | tarjeta | Never *tarea* in running text. |
@@ -100,7 +100,7 @@ English, it says so.
 | check / checks before review / merge checks | comprobación / comprobaciones antes de la revisión / comprobaciones de fusión | |
 | review copy | copia de revisión | *Check copy*: *copia de comprobación*. |
 | merge queue / test merge | cola de fusión / fusión de prueba | *Pause queue* / *Resume queue*: *Pausar la cola* / *Reanudar la cola*. |
-| merge slot | turno de fusión | Only the agents' own merges; Hive's merges are the *cola de fusión*. |
+| merge slot | turno de fusión | Only the agents' own merges; Combwork's merges are the *cola de fusión*. |
 | slot / pool / ready | slot / grupo / listo | *Slot* is kept, masculine (*el slot*). |
 | Version Control (the tab) / version control | Control de versiones / control de versiones | |
 | workflow / workflow options | flujo de trabajo / opciones del flujo de trabajo | |
@@ -111,12 +111,12 @@ English, it says so.
 | rule / old rules | regla / reglas anteriores | |
 | refused / override / Move anyway | rechazado / excepción / Mover de todos modos | |
 | returned (to its builder) | devuelta | Of a card. |
-| no-code card / before 1.0 / outside Hive | tarjeta sin código / anterior a 1.0 / fuera de Hive | |
+| no-code card / before 1.0 / outside Combwork | tarjeta sin código / anterior a 1.0 / fuera de Combwork | |
 | target branch / up to date / repository root | rama de destino / al día / raíz del repositorio | |
 | work (a card's Work section) / deliverables | trabajo / entregables | |
 | project key | clave del proyecto | |
 | in flight (a card) | en marcha | Not *en curso*, which is the column. |
-| inbox / message / wake | bandeja de entrada / mensaje / despertar | *Wake* as a verb is *despertar* (*Hive despierta al revisor*); as a noun, *aviso* (*un aviso del ciclo*). |
+| inbox / message / wake | bandeja de entrada / mensaje / despertar | *Wake* as a verb is *despertar* (*Combwork despierta al revisor*); as a noun, *aviso* (*un aviso del ciclo*). |
 | handover / shared notes | traspaso / notas compartidas | |
 | skill / template | habilidad / plantilla | A skill's own name (`work-on-card`) is kept. |
 | worktree / branch / commit / merge | worktree / rama / commit / fusionar, fusión | *worktree* and *commit* are kept, masculine (*el worktree*, *los commits*; *hacer commit*). *Remote*: *remoto*. *Push*, *pull*, *fetch*, *rebase* are kept as git's commands: *hacer push*. *Repository*: *repositorio*. |
@@ -147,7 +147,7 @@ English, it says so.
 | Remove agent… | Quitar agente… |
 | {name} has {n, plural, one {# open card} other {# open cards}} | {name} tiene {n, plural, one {# tarjeta abierta} many {# tarjetas abiertas} other {# tarjetas abiertas}} |
 | {agent} was removed. Its sessions stay in the Sessions tab. | Se quitó el agente {agent}. Sus sesiones siguen en la pestaña Sesiones. |
-| Hive was started in {language} (--lang): this setting applies from its next start. | Hive se inició en {language} (--lang): esta configuración se aplica a partir del próximo inicio. |
+| Combwork was started in {language} (--lang): this setting applies from its next start. | Combwork se inició en {language} (--lang): esta configuración se aplica a partir del próximo inicio. |
 
 ## Checking
 

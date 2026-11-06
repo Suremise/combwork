@@ -1,13 +1,13 @@
-// HI-1368: a command Hive runs as a workspace closes, and When Hive quits, run. The command (onclose/command.cjs) copies
-// the workspace's hive.db and opens the copy, as a backup would: it opens cleanly (integrity_check ok), holds the card
+// HI-1368: a command Combwork runs as a workspace closes, and When Combwork quits, run. The command (onclose/command.cjs) copies
+// the workspace's combwork.db and opens the copy, as a backup would: it opens cleanly (integrity_check ok), holds the card
 // made just before the close, and no -wal with anything in it is left beside the file. A switch runs the old
 // workspace's command, its panel (spinner, the command, its output) up while it runs; Don't wait opens the next
 // workspace with the command still running, and it finishes by itself. Close Workspace with a failing command keeps
 // the window waiting on the failed panel (its exit code, its output) until Close. Quitting with two windows runs each
-// window's command and then When Hive quits, after them; a chatty command left running (Don't wait) outlives Hive's
+// window's command and then When Combwork quits, after them; a chatty command left running (Don't wait) outlives Combwork's
 // exit and finishes, its output kept to the last 64 KB. Screenshots of the panel, running and failed, in both themes,
 // and of the settings rows. Dev build, throwaway profile and workspaces; test copies run close commands only with
-// HIVE_TEST_RUN_ON_CLOSE=1 (unpackaged builds).
+// CW_TEST_RUN_ON_CLOSE=1 (unpackaged builds).
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -25,7 +25,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-/** The close command for `label`: its marker in `marks`, its reason and workspace filled in by Hive. */
+/** The close command for `label`: its marker in `marks`, its reason and workspace filled in by Combwork. */
 const command = (label, mode, ws = '"{workspace}"') => `"${process.execPath}" "${COMMAND}" "${path.join(marks, `${label}.json`)}" ${label} {reason} ${ws} ${mode}`
 const mark = (label) => {
   try {
@@ -34,13 +34,13 @@ const mark = (label) => {
     return null
   }
 }
-const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
 /** A workspace's commands with its close point running `cmd` (HI-1954: a list of one), as Settings saves them. */
 const closeList = (cmd) => ({ list: [{ id: 'c-00000001', name: 'Close', command: cmd }], onOpen: { run: [] }, onClose: { run: [{ scope: 'workspace', id: 'c-00000001' }] } })
-/** Hive's commands with When Hive quits running `cmd`. */
+/** Combwork's commands with When Combwork quits running `cmd`. */
 /** Saves a workspace's close commands (`cmd`) to the workspace its window shows (commands:setWorkspace names it). */
 const saveClose = async (i, cmd) => i('commands:setWorkspace', (await i('workspace:get')).path, closeList(cmd))
-const quitList = (cmd) => ({ list: [{ id: 'c-0000000f', name: 'Quit', command: cmd }], onQuit: { run: [{ scope: 'hive', id: 'c-0000000f' }] } })
+const quitList = (cmd) => ({ list: [{ id: 'c-0000000f', name: 'Quit', command: cmd }], onQuit: { run: [{ scope: 'combwork', id: 'c-0000000f' }] } })
 /** A failed command's choice in the panel (HI-1954): Rerun, Skip it and continue, Stop here. */
 const choose = (page, name) => page.locator('.close-command .dialog-footer button', { hasText: name }).click()
 const panel = (page, state) => page.locator(`.overlay.close-command[data-state="${state}"]`)
@@ -69,15 +69,15 @@ async function shots(page, name) {
 
   // The settings rows' first two saves each slowed (HR6's round 1, finding 5): a tick right after typing must not save
   // the old command over the new one.
-  // The saving step held while this file exists (HIVE_TEST_HOLD_DRAIN), as a slow save would keep it.
+  // The saving step held while this file exists (CW_TEST_HOLD_DRAIN), as a slow save would keep it.
   const holdDrain = path.join(marks, 'hold-drain')
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: lib.port(47792), HIVE_TEST_RUN_ON_CLOSE: '1', HIVE_TEST_SLOW_IPC: 'commands:setWorkspace=1500*2,commands:setHive=1500*2', HIVE_TEST_HOLD_DRAIN: holdDrain } })
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_API_PORT: lib.port(47792), CW_TEST_RUN_ON_CLOSE: '1', CW_TEST_SLOW_IPC: 'commands:setWorkspace=1500*2,commands:setCombwork=1500*2', CW_TEST_HOLD_DRAIN: holdDrain } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.openWorkspace(inv, page, wsA)
 
-  // HI-1368's When Hive quits, run, as config.json held it: adopted at load as Hive's command "Quit command" (HI-1954).
+  // HI-1368's When Combwork quits, run, as config.json held it: adopted at load as Combwork's command "Quit command" (HI-1954).
   const adopted = (await inv('settings:get'))?.commands
-  check("HI-1368's quit command is adopted at load: Hive's command, run by When Hive quits", adopted?.list?.[0]?.name === 'Quit command' && adopted.list[0].command === command('global', 'quick', '-') && adopted.onQuit?.run?.[0]?.id === adopted.list[0].id, JSON.stringify(adopted))
+  check("HI-1368's quit command is adopted at load: Combwork's command, run by When Combwork quits", adopted?.list?.[0]?.name === 'Quit command' && adopted.list[0].command === command('global', 'quick', '-') && adopted.onQuit?.run?.[0]?.id === adopted.list[0].id, JSON.stringify(adopted))
 
   // --- 0. Settings → Commands (HI-1954): a command added, then picked for the point and the update box ticked at once,
   // each save slow: all of it lands, in order.
@@ -107,7 +107,7 @@ async function shots(page, name) {
     check(`${section}: a command added, picked for its points (each from its own control) and the box ticked at once: all saved, in order`, !!landed, JSON.stringify(await saved()))
     check('…and the rows still show them once the saves are in', (await page.locator(`[data-setting="${section}.commands"] .commands-row`, { hasText: `typed ${section}` }).count()) === 1 && (await row.locator('.close-command-update').isChecked()))
   }
-  await inv('commands:setHive', quitList(command('global', 'quick', '-')))
+  await inv('commands:setCombwork', quitList(command('global', 'quick', '-')))
 
   // --- 1. A switch: the panel while it runs, Don't wait, the next workspace opens, the command finishes by itself.
   const goA = path.join(marks, 'go-a')
@@ -121,11 +121,11 @@ async function shots(page, name) {
   await preview.scrollIntoViewIfNeeded()
   await page.screenshot({ path: path.join(lib.WORK, 'onclose-settings-workspace-dark.png') })
   await page.locator('.dialog button', { hasText: 'Cancel' }).click()
-  // Hive's command, in Settings → General: its preview, run by hand here.
+  // Combwork's command, in Settings → General: its preview, run by hand here.
   await page.locator('.settings-nav .row[data-section="general"]').click()
   await page.locator('[data-setting="general.commands"] .commands-row', { hasText: 'Quit' }).getByRole('button', { name: 'Edit…' }).click()
   const quitPreview = page.locator('.dialog .close-command-preview')
-  check('…and a command of Hive\'s, its own', !!(await lib.until(async () => ((await quitPreview.textContent().catch(() => '')) ?? '').includes('global manual -'), HUNG_MS)), await quitPreview.textContent().catch(() => ''))
+  check('…and a command of Combwork\'s, its own', !!(await lib.until(async () => ((await quitPreview.textContent().catch(() => '')) ?? '').includes('global manual -'), HUNG_MS)), await quitPreview.textContent().catch(() => ''))
   await quitPreview.scrollIntoViewIfNeeded()
   await page.screenshot({ path: path.join(lib.WORK, 'onclose-settings-general-dark.png') })
   await page.locator('.dialog button', { hasText: 'Cancel' }).click()
@@ -153,7 +153,7 @@ async function shots(page, name) {
   fs.writeFileSync(goA, 'go')
   const a = await lib.until(() => mark('a-switch'), HUNG_MS)
   check('it finishes by itself, after the close: its reason switch', a?.reason === 'switch', JSON.stringify(a))
-  check('…the copy of hive.db opens cleanly, with the card made just before the close, and no WAL left', a?.integrity === 'ok' && a.titles?.includes('Made as the workspace closed') && a.walLeft === 0, JSON.stringify(a))
+  check('…the copy of combwork.db opens cleanly, with the card made just before the close, and no WAL left', a?.integrity === 'ok' && a.titles?.includes('Made as the workspace closed') && a.walLeft === 0, JSON.stringify(a))
 
   // --- 2. Close Workspace with a failing command: the window waits on the failed panel until Close.
   await saveClose(inv, command('b-fail', 'fail'))
@@ -226,7 +226,7 @@ async function shots(page, name) {
   const heldRuns = fs.existsSync(path.join(userData, 'close-commands')) ? fs.readdirSync(path.join(userData, 'close-commands')).filter((n) => fs.readFileSync(path.join(userData, 'close-commands', n, 'job.json'), 'utf8').includes('b-held')) : []
   check('Skip the command: once the close ends the switch goes on, and the command never starts', switchedHeld && (await panel(page, 'saving').count()) === 0 && heldRuns.length === 0 && mark('b-held') === null, JSON.stringify(heldRuns))
 
-  // --- 3. Quitting with two windows: each window's command, then When Hive quits after them; one left running.
+  // --- 3. Quitting with two windows: each window's command, then When Combwork quits after them; one left running.
   await lib.openWorkspace(inv, page, wsA)
   await saveClose(inv, command('a-quit', 'quick'))
   const next = app.waitForEvent('window')
@@ -238,15 +238,15 @@ async function shots(page, name) {
   const goC = path.join(marks, 'go-c')
   await saveClose(inv2, command('c-quit', `chatty:${goC}`))
   const watch = await lib.quitWatch(app)
-  void page.evaluate(() => window.hive.invoke('app:quit')).catch(() => undefined)
+  void page.evaluate(() => window.combwork.invoke('app:quit')).catch(() => undefined)
   check("quitting: the second window's panel runs its chatty command", !!(await lib.until(async () => (await panel(p2, 'running').count()) === 1 && /z{20}/.test((await p2.locator('.close-command-output').textContent().catch(() => '')) ?? ''), HUNG_MS)))
   await p2.locator('.close-command .dialog-footer button').click()
-  check('…Hive quits once every command has ended or been let go', await watch.gone(HUNG_MS * 2))
+  check('…Combwork quits once every command has ended or been let go', await watch.gone(HUNG_MS * 2))
   const aq = mark('a-quit')
   const g = mark('global')
-  check("the first window's command ran as Hive quit, on a cleanly closed workspace", aq?.reason === 'quit' && aq.integrity === 'ok' && aq.walLeft === 0, JSON.stringify(aq))
-  check('When Hive quits, run: after the windows\' commands, its reason quit', g?.reason === 'quit' && !!aq && g.at >= aq.at, JSON.stringify({ g, aq }))
-  check('the one let go is still running after Hive exited', mark('c-quit') === null)
+  check("the first window's command ran as Combwork quit, on a cleanly closed workspace", aq?.reason === 'quit' && aq.integrity === 'ok' && aq.walLeft === 0, JSON.stringify(aq))
+  check('When Combwork quits, run: after the windows\' commands, its reason quit', g?.reason === 'quit' && !!aq && g.at >= aq.at, JSON.stringify({ g, aq }))
+  check('the one let go is still running after Combwork exited', mark('c-quit') === null)
   fs.writeFileSync(goC, 'go')
   const c = await lib.until(() => mark('c-quit'), HUNG_MS)
   check('…and finishes by itself, its workspace closed cleanly', c?.reason === 'quit' && c.integrity === 'ok', JSON.stringify(c))

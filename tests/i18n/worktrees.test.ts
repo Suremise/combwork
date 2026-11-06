@@ -1,4 +1,4 @@
-// #848 (E10d): the `worktrees` area, a project's agents and their worktrees. Refusals are HiveErrors: agents (the Agent
+// #848 (E10d): the `worktrees` area, a project's agents and their worktrees. Refusals are CombworkErrors: agents (the Agent
 // API's add and change agent) read them in English exactly as before, with the same status, and the window in its
 // language; git's own words stay as git said them, inside either. Why an unused worktree isn't reused is English for the
 // Agent API (`notReused`) and data for the window (`notReusedText`). Reasons and a merge's errors only the window reads
@@ -10,7 +10,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from '../tempDir'
 
-const base = tempDir('hive-i18n-worktrees-')
+const base = tempDir('cw-i18n-worktrees-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { setLanguage } = await import('../../src/shared/i18n')
@@ -18,7 +18,7 @@ const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await i
 const wt = await import('../../src/main/worktrees')
 const agents = await import('../../src/main/projectAgents')
 const { PruneBlocked, recreateWorktree, unlinkMissingWorktree } = await import('../../src/main/agentWorktree')
-const { shownError, windowError } = await import('../../src/main/hiveError')
+const { shownError, windowError } = await import('../../src/main/combworkError')
 const { apiErrorReply } = await import('../../src/main/servers')
 
 const ROOT = resolve(__dirname, '../..')
@@ -56,11 +56,11 @@ let w: ReturnType<typeof createWorkspaceService>
 const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
 
 beforeAll(async () => {
-  mkdirSync(join(proj, '.hive'), { recursive: true })
+  mkdirSync(join(proj, '.combwork'), { recursive: true })
   execFileSync('git', ['init', '-q', '-b', 'main', proj])
   for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com']]) git(proj, 'config', k, v)
   commit(proj, 'a.txt')
-  writeFileSync(join(proj, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
+  writeFileSync(join(proj, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
   w = createWorkspaceService()
   await w.open(wsPath)
 })
@@ -91,7 +91,7 @@ describe('the worktrees area', () => {
 describe("agents' and worktrees' refusals: English for agents as before, the window's language for the window", () => {
   it('says each in English with the status it always had, and in German to the window', async () => {
     setLanguage('de', GERMAN)
-    const notRepo = tempDir('hive-not-a-repo-')
+    const notRepo = tempDir('cw-not-a-repo-')
     const cases: [Error, string | RegExp, number, string | RegExp | null][] = [
       [await caught(run(() => agents.addAgent(proj, { name: 'P', location: 'project', provider: 'nope' }))), 'Unknown provider "nope".', 400, 'Unbekannter Anbieter „nope“.'],
       // 1.0 (#1451): no agent is pinned to a worktree, new or existing.
@@ -122,7 +122,7 @@ describe("agents' and worktrees' refusals: English for agents as before, the win
 
   it("keeps git's own words as they came, inside either language", async () => {
     setLanguage('de', GERMAN)
-    const notRepo = tempDir('hive-not-a-repo-')
+    const notRepo = tempDir('cw-not-a-repo-')
     const e = await caught(wt.checkedOutBranch(notRepo))
     const prefix = `git couldn't read the branch checked out in ${notRepo} (`
     expect(e.message.startsWith(prefix) && e.message.endsWith(')'), e.message).toBe(true)
@@ -135,11 +135,11 @@ describe("agents' and worktrees' refusals: English for agents as before, the win
 describe('an unused worktree not reused: English for the Agent API, data for the window', () => {
   it("the Add Agent dialog's look says why in the window's language (1.0 adds no agent in one: #1451), and so does a removal", async () => {
     setLanguage('de', GERMAN)
-    const t = { path: join(treesRoot, 'b1'), branch: 'hive/b1' }
+    const t = { path: join(treesRoot, 'b1'), branch: 'cw/b1' }
     await wt.createWorktree(proj, t.path, t.branch, 'main')
     commit(t.path, 'ahead.txt')
-    const look = await run(() => agents.worktreeMatch(proj, 'hive/b1', 'main', 'B1'))
-    expect(look).toMatchObject({ branch: 'hive/b1', reusable: false, why: '1 Commit nicht in main gemergt' })
+    const look = await run(() => agents.worktreeMatch(proj, 'cw/b1', 'main', 'B1'))
+    expect(look).toMatchObject({ branch: 'cw/b1', reusable: false, why: '1 Commit nicht in main gemergt' })
 
     // Removing that worktree is the window's: why it is kept, in its language (unmerged commits, and a file now too).
     writeFileSync(join(t.path, 'dirty.txt'), 'x')
@@ -149,17 +149,17 @@ describe('an unused worktree not reused: English for the Agent API, data for the
     expect((await wt.worktreeCheck(proj, { ...t, base: 'main' })).reason).toBe('1 commit not merged into main and 1 uncommitted file')
   })
 
-  it("a recreate git's prune refuses carries the worktrees git named, not those Hive thinks missing (#1313)", async () => {
-    // Third's folder is gone (to recreate); Second, missing to Hive, has no git registration left; an unmanaged worktree
-    // made outside Hive lost its folder: only that one is what git's prune would forget.
+  it("a recreate git's prune refuses carries the worktrees git named, not those Combwork thinks missing (#1313)", async () => {
+    // Third's folder is gone (to recreate); Second, missing to Combwork, has no git registration left; an unmanaged worktree
+    // made outside Combwork lost its folder: only that one is what git's prune would forget.
     const third = join(treesRoot, 'third')
     const ext = join(base, 'external-blocker')
-    await wt.createWorktree(proj, third, 'hive/third', 'main')
+    await wt.createWorktree(proj, third, 'cw/third', 'main')
     git(proj, 'worktree', 'add', '-q', '-b', 'ext', ext)
     const before = await run(() => w.projectConfig(proj))
     await run(() =>
       w.mutateProjectConfig(proj, (c) => ({
-        agents: [...(c.agents ?? []), { id: 'a2', name: 'Second', worktree: { path: join(treesRoot, 'second'), branch: 'hive/second', base: 'main' } }, { id: 'a3', name: 'Third', worktree: { path: third, branch: 'hive/third', base: 'main' } }]
+        agents: [...(c.agents ?? []), { id: 'a2', name: 'Second', worktree: { path: join(treesRoot, 'second'), branch: 'cw/second', base: 'main' } }, { id: 'a3', name: 'Third', worktree: { path: third, branch: 'cw/third', base: 'main' } }]
       }))
     )
     try {
@@ -172,7 +172,7 @@ describe('an unused worktree not reused: English for the Agent API, data for the
     } finally {
       await run(() => w.mutateProjectConfig(proj, () => ({ agents: before.agents })))
       git(proj, 'worktree', 'prune')
-      git(proj, 'branch', '-D', 'ext', 'hive/third')
+      git(proj, 'branch', '-D', 'ext', 'cw/third')
     }
   })
 

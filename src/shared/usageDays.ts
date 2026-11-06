@@ -38,8 +38,8 @@ const tokenCount = (t: UsageTokens): number => t.inputTokens + t.outputTokens + 
 /**
  * Works out each day's API-equivalent cost and removes the parser's cost reports from the usage. A provider that
  * reports its cost now and then (Claude Code) has each report's increase shared between the days its requests
- * ran on, in proportion to Hive's estimate for them (or their tokens, without a price), so the days add up to
- * the reported total; tokens after the last report get Hive's estimate. Otherwise each day is Hive's estimate.
+ * ran on, in proportion to Combwork's estimate for them (or their tokens, without a price), so the days add up to
+ * the reported total; tokens after the last report get Combwork's estimate. Otherwise each day is Combwork's estimate.
  */
 export function withDayCosts(usage: SessionUsage, settings?: Pick<AppSettings, 'providers'> | null): SessionUsage {
   const days = usage.days ?? {}
@@ -67,7 +67,7 @@ export function withDayCosts(usage: SessionUsage, settings?: Pick<AppSettings, '
         if (total > 0) days[day].costUsd! += r.costUsd * ((byTokens ? tokenCount(t) : weights[i]) / total)
       })
     }
-    // What came after the last report: Hive's estimate.
+    // What came after the last report: Combwork's estimate.
     for (const [day, d] of Object.entries(days)) {
       const c = covered[day]
       const rest = { inputTokens: d.inputTokens - c.inputTokens, outputTokens: d.outputTokens - c.outputTokens, cacheWriteTokens: d.cacheWriteTokens - c.cacheWriteTokens, cacheReadTokens: d.cacheReadTokens - c.cacheReadTokens }
@@ -85,8 +85,8 @@ export function withDayCosts(usage: SessionUsage, settings?: Pick<AppSettings, '
 
 /**
  * A session's usage without the CLI's own cost reports (HI-1772: a session that ran on a server connection, whose CLI
- * prices the server's model as a Claude model): priced then by Hive's estimate from its real model id alone, unpriced
- * where Hive has no price for it.
+ * prices the server's model as a Claude model): priced then by Combwork's estimate from its real model id alone, unpriced
+ * where Combwork has no price for it.
  */
 export function withoutCostReports<T extends SessionUsage>(raw: T): T {
   const t = raw.timeline
@@ -111,7 +111,7 @@ export function withCostFree<T extends SessionUsage>(raw: T): T {
 
 /**
  * A session's usage with costs from the current prices: the provider's report, else (or on top, for what came after
- * it) Hive's estimate; or, when the user chose their own prices over the report (usesOwnPrices, #436), Hive's estimate
+ * it) Combwork's estimate; or, when the user chose their own prices over the report (usesOwnPrices, #436), Combwork's estimate
  * alone wherever it has a price. Then each day's share (withDayCosts).
  */
 export function priceUsage(raw: SessionUsage, settings?: Pick<AppSettings, 'providers'> | null): SessionUsage {
@@ -122,11 +122,11 @@ export function priceUsage(raw: SessionUsage, settings?: Pick<AppSettings, 'prov
     // Each day is then priced the same way, not shared out from the reports.
     delete usage.costReports
   } else if (usage.costUsd === null) {
-    // Providers that don't report a cost get Hive's estimate from their token counts (prices: Settings → provider).
+    // Providers that don't report a cost get Combwork's estimate from their token counts (prices: Settings → provider).
     const est = estimateCost(usage, settings)
     if (est !== null) Object.assign(usage, { costUsd: est, costEstimated: true })
   } else if (usage.costUnreported) {
-    // The provider reports its cost only now and then: the tokens since get Hive's estimate on top.
+    // The provider reports its cost only now and then: the tokens since get Combwork's estimate on top.
     const est = estimateCost({ ...usage, ...usage.costUnreported }, settings)
     if (est) Object.assign(usage, { costUsd: usage.costUsd + est, costEstimated: true })
   }

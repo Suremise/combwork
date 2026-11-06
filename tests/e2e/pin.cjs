@@ -18,13 +18,13 @@ const check = (name, ok, extra = '') => {
 }
 
 async function start() {
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: PORT })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: PORT })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   app.on('window', (p) => p.on('pageerror', (e) => check('no page errors', false, e.message)))
   return app
 }
-const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
-/** The window's real state (Hive asks Electron), and what its title bar shows. */
+const invOn = (page) => (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
+/** The window's real state (Combwork asks Electron), and what its title bar shows. */
 const onTop = (page) => invOn(page)('window:getAlwaysOnTop')
 const pinLit = async (page) => (await page.locator('.titlebar-pin.on').count()) === 1 && (await page.locator('.titlebar-pin').getAttribute('aria-pressed')) === 'true'
 const both = async (page, on) => (await onTop(page)) === on && (await pinLit(page)) === on
@@ -61,7 +61,7 @@ const both = async (page, on) => (await onTop(page)) === on && (await pinLit(pag
   await lib.sleep(1500) // A fixed wait on purpose: this checks that the other window's workspace events do NOT unpin it.
   check("another window opening and refreshing a workspace leaves the pinned welcome window on top, its pin lit", await both(p1, true))
   check('…and that window starts off', await both(pw, false))
-  await pw.evaluate(() => window.hive.invoke('window:close')).catch(() => undefined)
+  await pw.evaluate(() => window.combwork.invoke('window:close')).catch(() => undefined)
   await lib.until(() => app.windows().length === 1, 10000)
   await p1.locator('.titlebar-pin').click()
   check('unpinned again', !!(await lib.until(() => both(p1, false), 5000)))
@@ -164,12 +164,12 @@ const both = async (page, on) => (await onTop(page)) === on && (await pinLit(pag
   await p2.locator('.titlebar-pin').click()
   check('pinning and unpinning the second leaves the first on', (await lib.until(() => both(p2, false), 5000)) && (await both(p1, true)))
 
-  // --- Remembered by workspace, in Hive's own config (never the workspace's .hive).
+  // --- Remembered by workspace, in Combwork's own config (never the workspace's .combwork).
   await lib.until(() => (JSON.parse(fs.readFileSync(cfgFile, 'utf8')).alwaysOnTop ?? {})[wsA.toLowerCase()] === true, 5000)
   const saved = JSON.parse(fs.readFileSync(cfgFile, 'utf8')).alwaysOnTop ?? {}
   check("config.json remembers A's pin only", saved[wsA.toLowerCase()] === true && !(wsB.toLowerCase() in saved), JSON.stringify(saved))
-  const inHive = [wsA, wsB].some((ws) => fs.readdirSync(path.join(ws, '.hive'), { recursive: true }).some((f) => /alwaysOnTop/.test(fs.statSync(path.join(ws, '.hive', String(f))).isFile() ? fs.readFileSync(path.join(ws, '.hive', String(f)), 'utf8') : '')))
-  check("…and no workspace's .hive does", !inHive)
+  const inCombwork = [wsA, wsB].some((ws) => fs.readdirSync(path.join(ws, '.combwork'), { recursive: true }).some((f) => /alwaysOnTop/.test(fs.statSync(path.join(ws, '.combwork', String(f))).isFile() ? fs.readFileSync(path.join(ws, '.combwork', String(f)), 'utf8') : '')))
+  check("…and no workspace's .combwork does", !inCombwork)
 
   // --- The welcome page is off; the workspace's pin comes back with it.
   await inv1('workspace:close')
@@ -180,7 +180,7 @@ const both = async (page, on) => (await onTop(page)) === on && (await pinLit(pag
   // --- Quit and start again: each window comes back with its own pin.
   const exited = app.waitForEvent('close', { timeout: 20000 }).then(() => true).catch(() => false)
   await inv1('app:quit').catch(() => undefined)
-  check('Hive quits', await exited)
+  check('Combwork quits', await exited)
   app = await start()
   await app.firstWindow()
   await lib.until(async () => {

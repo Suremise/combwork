@@ -2,7 +2,7 @@ import type { BrowserWindow } from 'electron'
 import { asksYou } from '../shared/inbox'
 import { shouldFlash } from '../shared/taskbar'
 import { config } from './config'
-import { onHiveEvent } from './events'
+import { onCombworkEvent } from './events'
 import { testNotifyLog, testQuiet } from './testQuiet'
 import { windowForPath } from './windows'
 
@@ -34,7 +34,7 @@ export function startTaskbarFlash(): () => void {
     win.once('focus', stop)
     win.once('closed', stop)
   }
-  return onHiveEvent((e) => {
+  return onCombworkEvent((e) => {
     if (e.type === 'settings-changed') {
       if (!e.settings.notifications.flashOnWaiting) for (const stop of [...flashing.values()]) stop()
       return

@@ -164,13 +164,13 @@ function problems(states, { hasTasks, hasSize, hasPlain }) {
   cfg.settings.sessions = { ...cfg.settings.sessions, compactSuggestTokens: 10, transcriptWarnMB: 1 }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47916), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47916), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.waitForProvider(inv, 'codex')
   // A price for the fake model, so the Claude Code agent has a cost.
   await inv('settings:setProviderPrices', 'claude-code', { 'claude-fake': { input: 1000, cachedInput: 100, cacheWrite: 1000, output: 1000 } })

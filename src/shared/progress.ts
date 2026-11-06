@@ -343,7 +343,7 @@ export interface RunDetail {
 }
 
 /**
- * Everything Hive has for a run, in the order its details show it: what ran (its title and command), who (agent,
+ * Everything Combwork has for a run, in the order its details show it: what ran (its title and command), who (agent,
  * project, provider), when it started and ended (in the user's date and time format), how long against what was
  * expected, its steps, its state and why, the exit code and a log the reporter named. `project` is its project's name.
  */
@@ -388,9 +388,9 @@ export function runDetails(r: ProgressRun, project: string | null, now: number, 
   if (r.testedCheckout && r.testedCheckout !== r.revision) out.push({ label: tr(msg({ id: 'board.details.testedOn', defaultMessage: 'Tested on', description: "A label in a run's details (Progress panel), shown when it differs from the card's revision: the commit that was checked out where the run ran follows (a commit id)." })), text: r.testedCheckout, code: true })
   // The folder it ran in, as its reporter said (#1446): the run's own, never where its agent works now.
   if (r.folder) out.push({ label: tr(msg({ id: 'board.details.folder', defaultMessage: 'Folder', description: "A label in a run's details (Progress panel): the folder it ran in follows (a path), as it was when it ran." })), text: r.folder, code: true })
-  // The review or check copy it ran in (#1435): an isolated check's, or a reviewer's, at exactly that revision; Hive's
+  // The review or check copy it ran in (#1435): an isolated check's, or a reviewer's, at exactly that revision; Combwork's
   // setup run in one too (HI-1710), credited to the agent whose lease held it.
-  if (r.copy) out.push({ label: tr(msg({ id: 'board.details.copy', defaultMessage: 'Copy', description: "A label in a run's details (Progress panel): the name of the review or check copy it ran in follows (copy-1): a folder Hive keeps at exactly the card's revision, which nothing else writes." })), text: r.copy })
+  if (r.copy) out.push({ label: tr(msg({ id: 'board.details.copy', defaultMessage: 'Copy', description: "A label in a run's details (Progress panel): the name of the review or check copy it ran in follows (copy-1): a folder Combwork keeps at exactly the card's revision, which nothing else writes." })), text: r.copy })
   // How it counted as a check of its card's revision (#1222, SPEC §16.13), once it finished.
   if (r.counts) {
     const text = r.counts.counted
@@ -399,7 +399,7 @@ export function runDetails(r: ProgressRun, project: string | null, now: number, 
           msg({
             id: 'board.details.notCounted',
             defaultMessage:
-              "Doesn't count as check {name}: {why, select, notCheck {it wasn't started as a check (hive-progress --check), and its command isn't one the project has for a check} notContained {what was checked out doesn't contain the card's revision} dirty {the folder had uncommitted changes when it started or ended} moved {something else was checked out when it ended} changed {files changed in the folder while it ran} revisionChanged {the card's files changed while it ran} other {it can't be told whether its files changed}}",
+              "Doesn't count as check {name}: {why, select, notCheck {it wasn't started as a check (cw-progress --check), and its command isn't one the project has for a check} notContained {what was checked out doesn't contain the card's revision} dirty {the folder had uncommitted changes when it started or ended} moved {something else was checked out when it ended} changed {files changed in the folder while it ran} revisionChanged {the card's files changed while it ran} other {it can't be told whether its files changed}}",
             description: "A run's details in the Progress panel: why the run doesn't count as the card's check named {name} (\"typecheck\", or the run's title when it wasn't a check). {why} picks the reason: keep each branch's key as it is."
           }),
           { name: r.counts.name, why: r.counts.whyNot ?? 'other' } // i18n-ignore: a select's key, never shown
@@ -407,8 +407,8 @@ export function runDetails(r: ProgressRun, project: string | null, now: number, 
     out.push({ label: tr(msg({ id: 'board.details.check', defaultMessage: 'Check', description: "A label in a run's details (Progress panel): whether it counts as a check of its card follows." })), text })
   }
   // The merge queue's checks with nothing installed before them (#1349): said once, on the first check after it.
-  if (r.installAsWritten) out.push({ label: tr(msg({ id: 'board.details.install', defaultMessage: 'Install', description: "A label in a run's details (Progress panel), on one of the merge queue's checks: what was installed before it follows." })), text: tr(msg({ id: 'board.details.installAsWritten', defaultMessage: 'The setup command as written, after removing node_modules: Hive has no clean form of it', description: "A run's details in the Progress panel, on the merge queue's install: Hive ran the project's worktree setup command as it is written (it is not a package manager's plain install, such as npm install, that Hive knows how to run clean), after deleting the queue folder's node_modules so the install starts from scratch." })) })
-  if (r.noInstall) out.push({ label: tr(msg({ id: 'board.details.install', defaultMessage: 'Install', description: "A label in a run's details (Progress panel), on one of the merge queue's checks: what was installed before it follows." })), text: tr(msg({ id: 'board.details.noInstall', defaultMessage: 'Nothing installed: the project has no setup command and no lock file', description: "A run's details in the Progress panel, on one of the merge queue's checks: Hive installed nothing before the checks, because the project has neither a worktree setup command (Project Settings → Agents) nor a package lock file." })) })
+  if (r.installAsWritten) out.push({ label: tr(msg({ id: 'board.details.install', defaultMessage: 'Install', description: "A label in a run's details (Progress panel), on one of the merge queue's checks: what was installed before it follows." })), text: tr(msg({ id: 'board.details.installAsWritten', defaultMessage: 'The setup command as written, after removing node_modules: Combwork has no clean form of it', description: "A run's details in the Progress panel, on the merge queue's install: Combwork ran the project's worktree setup command as it is written (it is not a package manager's plain install, such as npm install, that Combwork knows how to run clean), after deleting the queue folder's node_modules so the install starts from scratch." })) })
+  if (r.noInstall) out.push({ label: tr(msg({ id: 'board.details.install', defaultMessage: 'Install', description: "A label in a run's details (Progress panel), on one of the merge queue's checks: what was installed before it follows." })), text: tr(msg({ id: 'board.details.noInstall', defaultMessage: 'Nothing installed: the project has no setup command and no lock file', description: "A run's details in the Progress panel, on one of the merge queue's checks: Combwork installed nothing before the checks, because the project has neither a worktree setup command (Project Settings → Agents) nor a package lock file." })) })
   // A failed merge check or install that counts as temporary (#1362): why, so a network error or a project's exit 75 is visible.
   if (r.transient) {
     out.push({
@@ -437,17 +437,17 @@ export function runDetails(r: ProgressRun, project: string | null, now: number, 
 }
 
 /**
- * Who ran a run, as the window shows it (#872): a name Hive gave it (`defaultName`: "Script" for a script, "Agent" for
- * a kept run with no name, "Hive (merge queue)" for the queue's own runs, #1349, "Hive (slot <name>)" for a slot's warming,
+ * Who ran a run, as the window shows it (#872): a name Combwork gave it (`defaultName`: "Script" for a script, "Agent" for
+ * a kept run with no name, "Combwork (merge queue)" for the queue's own runs, #1349, "Combwork (slot <name>)" for a slot's warming,
  * #1429) in the window's language; a name an agent or the Assistant has stays as it is, "Agent"
- * too. The stored name stays English: agents read it through the Agent API and hive-progress.
+ * too. The stored name stays English: agents read it through the Agent API and cw-progress.
  */
 export function runAgentName(r: Pick<ProgressRun, 'agentName' | 'defaultName' | 'slot' | 'copy'>, tr: Tr): string {
-  if (r.defaultName === 'script') return tr(msg({ id: 'board.progress.script', defaultMessage: 'Script', description: "Who ran a run in the Progress panel when a script (a program calling Hive's Agent API) ran it, not an agent." }))
-  if (r.defaultName === 'agent') return tr(msg({ id: 'board.progress.anAgent', defaultMessage: 'Agent', description: "Who ran a run in the Progress panel when Hive doesn't have the agent's name (an older record)." }))
-  if (r.defaultName === 'mergeQueue') return tr(msg({ id: 'board.progress.mergeQueue', defaultMessage: 'Hive (merge queue)', description: "Who ran a run in the Progress panel when Hive's merge queue ran it itself: a merge check or install on a card's merged result, not an agent (glossary 2.5: merge queue)." }))
-  if (r.defaultName === 'slot' && r.slot) return tr(msg({ id: 'board.progress.slotRun', defaultMessage: 'Hive (slot {slot})', description: "Who ran a run in the Progress panel when Hive ran it itself to set up one of a project's slots (a worktree Hive lends to a card or a lane: its setup command, a dependency install or its archive command), not an agent. {slot} is the slot's name, such as slot-b: keep it as it is." }), { slot: r.slot })
-  if (r.defaultName === 'copy') return tr(msg({ id: 'board.progress.copiesRun', defaultMessage: 'Hive (review copies)', description: "Who ran a run in the Progress panel when Hive ran it itself to set up one of a project's review or check copies (folders at one revision where a reviewer reads a card's work, or an isolated check runs) and no agent's lease held the copy: its setup command or a dependency install. Also an entry of the panel's Agent filter." }))
+  if (r.defaultName === 'script') return tr(msg({ id: 'board.progress.script', defaultMessage: 'Script', description: "Who ran a run in the Progress panel when a script (a program calling Combwork's Agent API) ran it, not an agent." }))
+  if (r.defaultName === 'agent') return tr(msg({ id: 'board.progress.anAgent', defaultMessage: 'Agent', description: "Who ran a run in the Progress panel when Combwork doesn't have the agent's name (an older record)." }))
+  if (r.defaultName === 'mergeQueue') return tr(msg({ id: 'board.progress.mergeQueue', defaultMessage: 'Combwork (merge queue)', description: "Who ran a run in the Progress panel when Combwork's merge queue ran it itself: a merge check or install on a card's merged result, not an agent (glossary 2.5: merge queue)." }))
+  if (r.defaultName === 'slot' && r.slot) return tr(msg({ id: 'board.progress.slotRun', defaultMessage: 'Combwork (slot {slot})', description: "Who ran a run in the Progress panel when Combwork ran it itself to set up one of a project's slots (a worktree Combwork lends to a card or a lane: its setup command, a dependency install or its archive command), not an agent. {slot} is the slot's name, such as slot-b: keep it as it is." }), { slot: r.slot })
+  if (r.defaultName === 'copy') return tr(msg({ id: 'board.progress.copiesRun', defaultMessage: 'Combwork (review copies)', description: "Who ran a run in the Progress panel when Combwork ran it itself to set up one of a project's review or check copies (folders at one revision where a reviewer reads a card's work, or an isolated check runs) and no agent's lease held the copy: its setup command or a dependency install. Also an entry of the panel's Agent filter." }))
   return r.agentName
 }
 
@@ -481,7 +481,7 @@ export function filterChoices(runs: readonly ProgressRun[], nameOf: (projectPath
   for (const r of runs) if (r.projectPath && !seen.has(projectOf(r))) seen.set(projectOf(r), nameOf(r.projectPath))
   for (const p of also) if (!seen.has(p.toLowerCase())) seen.set(p.toLowerCase(), nameOf(p))
   const out = [...seen].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label))
-  if (runs.some((r) => !r.projectPath)) out.push({ value: NO_PROJECT, label: tr(msg({ id: 'board.filter.noProject', defaultMessage: 'Assistant and scripts', description: "A choice of the Progress panel's project filter: the runs of the Hive Assistant and of scripts, which belong to no project." })) })
+  if (runs.some((r) => !r.projectPath)) out.push({ value: NO_PROJECT, label: tr(msg({ id: 'board.filter.noProject', defaultMessage: 'Assistant and scripts', description: "A choice of the Progress panel's project filter: the runs of the Combwork Assistant and of scripts, which belong to no project." })) })
   return out
 }
 

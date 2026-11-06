@@ -1,0 +1,1332 @@
+{
+  "workflow.contradiction.combworkMergesNeedsGit": {
+    "placeholders": {}
+  },
+  "workflow.contradiction.committedNeedsFolder": {
+    "placeholders": {}
+  },
+  "workflow.contradiction.focusedNeedsRunner": {
+    "placeholders": {}
+  },
+  "workflow.contradiction.mergeNeedsSlots": {
+    "placeholders": {}
+  },
+  "workflow.contradiction.noneHasNoSlots": {
+    "placeholders": {}
+  },
+  "workflow.contradiction.okWithReview": {
+    "placeholders": {}
+  },
+  "workflow.contradiction.poolNeedsAgent": {
+    "placeholders": {}
+  },
+  "workflow.contradiction.quorumNeedsAgent": {
+    "placeholders": {}
+  },
+  "workflow.contradiction.selfReview": {
+    "placeholders": {}
+  },
+  "workflow.contradiction.subfolderTarget": {
+    "placeholders": {}
+  },
+  "workflow.contradiction.upToDateNeedsSlots": {
+    "placeholders": {}
+  },
+  "workflow.focused.programMissing": {
+    "placeholders": {
+      "command": "plain"
+    }
+  },
+  "workflow.focused.resultsUnread": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "workflow.forYou.decidedAfterMerge": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.forYou.focusedSkip": {
+    "placeholders": {
+      "card": "plain",
+      "tests": "plain"
+    }
+  },
+  "workflow.forYou.lineAsk": {
+    "placeholders": {
+      "line": "plain",
+      "card": "plain",
+      "target": "plain",
+      "next": "plain"
+    }
+  },
+  "workflow.forYou.lineRefused": {
+    "placeholders": {
+      "line": "plain",
+      "target": "plain",
+      "reason": "plain",
+      "next": "plain"
+    }
+  },
+  "workflow.forYou.lineUnfinished": {
+    "placeholders": {
+      "line": "plain",
+      "to": "plain",
+      "target": "plain",
+      "next": "plain"
+    }
+  },
+  "workflow.forYou.lineWork": {
+    "placeholders": {
+      "line": "plain",
+      "target": "plain",
+      "commits": "plain",
+      "next": "plain"
+    }
+  },
+  "workflow.forYou.mergeChoice": {
+    "placeholders": {
+      "project": "plain",
+      "target": "plain"
+    }
+  },
+  "workflow.forYou.newDecision": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.forYou.okBefore": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.forYou.passedReview": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.forYou.queueAdvance": {
+    "placeholders": {
+      "card": "plain",
+      "target": "plain",
+      "folder": "plain"
+    }
+  },
+  "workflow.forYou.queueStuck": {
+    "placeholders": {
+      "card": "plain",
+      "target": "plain",
+      "folder": "plain",
+      "files": "plural",
+      "how": "select",
+      "finish": "plain",
+      "project": "plain",
+      "undo": "plain"
+    }
+  },
+  "workflow.forYou.review": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.forYou.roundLimit": {
+    "placeholders": {
+      "card": "plain",
+      "rounds": "plural"
+    }
+  },
+  "workflow.forYou.slotDirty": {
+    "placeholders": {
+      "card": "plain",
+      "slot": "plain",
+      "line": "plain",
+      "target": "plain"
+    }
+  },
+  "workflow.forYouKind": {
+    "placeholders": {
+      "kind": "select"
+    }
+  },
+  "workflow.move.answer": {
+    "placeholders": {}
+  },
+  "workflow.move.declarePaths": {
+    "placeholders": {}
+  },
+  "workflow.move.loopStep": {
+    "placeholders": {}
+  },
+  "workflow.move.move": {
+    "placeholders": {}
+  },
+  "workflow.move.putBack": {
+    "placeholders": {}
+  },
+  "workflow.move.removeFromQueue": {
+    "placeholders": {}
+  },
+  "workflow.move.reportMerge": {
+    "placeholders": {}
+  },
+  "workflow.move.retryMerge": {
+    "placeholders": {}
+  },
+  "workflow.move.start": {
+    "placeholders": {}
+  },
+  "workflow.move.startReview": {
+    "placeholders": {}
+  },
+  "workflow.move.submit": {
+    "placeholders": {}
+  },
+  "workflow.move.verdict": {
+    "placeholders": {}
+  },
+  "workflow.option.commands.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.commands.title": {
+    "placeholders": {}
+  },
+  "workflow.option.commitMessage.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.commitMessage.title": {
+    "placeholders": {}
+  },
+  "workflow.option.dependenciesDone.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.dependenciesDone.none": {
+    "placeholders": {}
+  },
+  "workflow.option.dependenciesDone.title": {
+    "placeholders": {}
+  },
+  "workflow.option.excluded.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.excluded.title": {
+    "placeholders": {}
+  },
+  "workflow.option.fileLocks.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.fileLocks.title": {
+    "placeholders": {}
+  },
+  "workflow.option.finish.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.finish.title": {
+    "placeholders": {}
+  },
+  "workflow.option.focusedTests.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.focusedTests.title": {
+    "placeholders": {}
+  },
+  "workflow.option.folder.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.folder.title": {
+    "placeholders": {}
+  },
+  "workflow.option.identity.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.identity.title": {
+    "placeholders": {}
+  },
+  "workflow.option.loopRounds.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.loopRounds.title": {
+    "placeholders": {}
+  },
+  "workflow.option.loopStepWaitMinutes.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.loopStepWaitMinutes.title": {
+    "placeholders": {}
+  },
+  "workflow.option.loopWaitHours.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.loopWaitHours.title": {
+    "placeholders": {}
+  },
+  "workflow.option.loopWakes.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.loopWakes.title": {
+    "placeholders": {}
+  },
+  "workflow.option.maxAgents.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.maxAgents.title": {
+    "placeholders": {}
+  },
+  "workflow.option.mergeChecks.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.mergeChecks.title": {
+    "placeholders": {}
+  },
+  "workflow.option.mergeInstall.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.mergeInstall.title": {
+    "placeholders": {}
+  },
+  "workflow.option.noSelfReview.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.noSelfReview.title": {
+    "placeholders": {}
+  },
+  "workflow.option.okBefore.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.okBefore.title": {
+    "placeholders": {}
+  },
+  "workflow.option.preChecks.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.preChecks.title": {
+    "placeholders": {}
+  },
+  "workflow.option.pushTarget.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.pushTarget.title": {
+    "placeholders": {}
+  },
+  "workflow.option.review.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.review.none": {
+    "placeholders": {}
+  },
+  "workflow.option.review.shared": {
+    "placeholders": {}
+  },
+  "workflow.option.review.title": {
+    "placeholders": {}
+  },
+  "workflow.option.reviewerMode.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.reviewerMode.title": {
+    "placeholders": {}
+  },
+  "workflow.option.reviewers.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.reviewers.title": {
+    "placeholders": {}
+  },
+  "workflow.option.sameness.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.sameness.title": {
+    "placeholders": {}
+  },
+  "workflow.option.sharedFolderWarning.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.sharedFolderWarning.title": {
+    "placeholders": {}
+  },
+  "workflow.option.slotsUpToDate.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.slotsUpToDate.title": {
+    "placeholders": {}
+  },
+  "workflow.option.stageNames.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.stageNames.title": {
+    "placeholders": {}
+  },
+  "workflow.option.stopOwnRuns.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.stopOwnRuns.title": {
+    "placeholders": {}
+  },
+  "workflow.option.strict.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.strict.title": {
+    "placeholders": {}
+  },
+  "workflow.option.style.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.style.title": {
+    "placeholders": {}
+  },
+  "workflow.option.target.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.target.title": {
+    "placeholders": {}
+  },
+  "workflow.refused.approval.given.change": {
+    "placeholders": {}
+  },
+  "workflow.refused.approval.given.message": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.approval.given.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.card.plainNumber.message": {
+    "placeholders": {}
+  },
+  "workflow.refused.card.plainNumber.next": {
+    "placeholders": {
+      "key": "plain"
+    }
+  },
+  "workflow.refused.check.revisionMismatch.message": {
+    "placeholders": {
+      "revision": "plain"
+    }
+  },
+  "workflow.refused.check.revisionMismatch.next": {
+    "placeholders": {
+      "revision": "plain"
+    }
+  },
+  "workflow.refused.done.contained.change": {
+    "placeholders": {}
+  },
+  "workflow.refused.done.contained.message": {
+    "placeholders": {
+      "card": "plain",
+      "revision": "plain",
+      "target": "plain"
+    }
+  },
+  "workflow.refused.done.contained.next": {
+    "placeholders": {
+      "revision": "plain",
+      "target": "plain"
+    }
+  },
+  "workflow.refused.evidence.changed.message": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.evidence.changed.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.integrate.approved.message": {
+    "placeholders": {
+      "card": "plain",
+      "revision": "plain",
+      "why": "plain"
+    }
+  },
+  "workflow.refused.integrate.approved.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.integrate.checksPassed.change": {
+    "placeholders": {}
+  },
+  "workflow.refused.integrate.checksPassed.message": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.integrate.checksPassed.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.integrate.upToDate.change": {
+    "placeholders": {}
+  },
+  "workflow.refused.integrate.upToDate.message": {
+    "placeholders": {
+      "card": "plain",
+      "revision": "plain",
+      "target": "plain"
+    }
+  },
+  "workflow.refused.integrate.upToDate.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.lane.lineBehind.change": {
+    "placeholders": {}
+  },
+  "workflow.refused.lane.lineBehind.message": {
+    "placeholders": {
+      "card": "plain",
+      "line": "plain",
+      "earlier": "plain",
+      "target": "plain"
+    }
+  },
+  "workflow.refused.lane.lineBehind.next": {
+    "placeholders": {
+      "reader": "select",
+      "line": "plain",
+      "target": "plain",
+      "card": "plain"
+    }
+  },
+  "workflow.refused.lane.oneAtATime.change": {
+    "placeholders": {}
+  },
+  "workflow.refused.lane.oneAtATime.message": {
+    "placeholders": {
+      "card": "plain",
+      "earlier": "plain"
+    }
+  },
+  "workflow.refused.lane.oneAtATime.next": {
+    "placeholders": {
+      "earlier": "plain",
+      "card": "plain"
+    }
+  },
+  "workflow.refused.loop.followUpChecked.message": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.loop.followUpChecked.next": {
+    "placeholders": {
+      "reader": "select"
+    }
+  },
+  "workflow.refused.loop.followUpMerging.message": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.loop.followUpMerging.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.loop.noReviewer.message": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.loop.noReviewer.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.loop.noStep.message": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.loop.noStep.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.loop.roundLimit.message": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.loop.roundLimit.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.loop.staleStep.message": {
+    "placeholders": {
+      "card": "plain",
+      "design": "plain",
+      "waiting": "plain"
+    }
+  },
+  "workflow.refused.loop.staleStep.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.loop.stepNotHere.message": {
+    "placeholders": {
+      "step": "select",
+      "card": "plain",
+      "stage": "plain"
+    }
+  },
+  "workflow.refused.loop.stepNotHere.next": {
+    "placeholders": {
+      "step": "select"
+    }
+  },
+  "workflow.refused.loop.stepNotYours.message": {
+    "placeholders": {
+      "side": "select",
+      "card": "plain"
+    }
+  },
+  "workflow.refused.loop.stepNotYours.next": {
+    "placeholders": {
+      "side": "select"
+    }
+  },
+  "workflow.refused.loop.tooEarly.change": {
+    "placeholders": {}
+  },
+  "workflow.refused.loop.tooEarly.message": {
+    "placeholders": {
+      "card": "plain",
+      "minutes": "plural"
+    }
+  },
+  "workflow.refused.loop.tooEarly.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.merge.combworkMerges.change": {
+    "placeholders": {}
+  },
+  "workflow.refused.merge.combworkMerges.message": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.merge.combworkMerges.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.move.doingNobody.message": {
+    "placeholders": {
+      "card": "plain",
+      "stage": "plain",
+      "also": "select",
+      "rules": "plain"
+    }
+  },
+  "workflow.refused.move.doingNobody.next": {
+    "placeholders": {
+      "reader": "select"
+    }
+  },
+  "workflow.refused.move.needsOverride.change": {
+    "placeholders": {
+      "reader": "select"
+    }
+  },
+  "workflow.refused.move.needsOverride.message": {
+    "placeholders": {
+      "card": "plain",
+      "stage": "plain",
+      "rules": "plain"
+    }
+  },
+  "workflow.refused.move.needsOverride.next": {
+    "placeholders": {
+      "reader": "select"
+    }
+  },
+  "workflow.refused.move.noStage.change": {
+    "placeholders": {}
+  },
+  "workflow.refused.move.noStage.message": {
+    "placeholders": {
+      "card": "plain",
+      "stage": "plain"
+    }
+  },
+  "workflow.refused.move.noStage.next": {
+    "placeholders": {
+      "stages": "plain"
+    }
+  },
+  "workflow.refused.move.notFromHere.message": {
+    "placeholders": {
+      "card": "plain",
+      "stage": "plain",
+      "move": "plain"
+    }
+  },
+  "workflow.refused.move.notFromHere.next": {
+    "placeholders": {
+      "stage": "plain",
+      "moves": "plain"
+    }
+  },
+  "workflow.refused.move.useIntent.message": {
+    "placeholders": {}
+  },
+  "workflow.refused.move.useIntent.next": {
+    "placeholders": {
+      "intent": "plain"
+    }
+  },
+  "workflow.refused.paths.excluded.message": {
+    "placeholders": {
+      "card": "plain",
+      "path": "plain",
+      "folder": "plain"
+    }
+  },
+  "workflow.refused.paths.excluded.next": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "workflow.refused.platform.unknown.message": {
+    "placeholders": {
+      "card": "plain",
+      "what": "plain",
+      "rule": "plain"
+    }
+  },
+  "workflow.refused.platform.unknown.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.queue.advancing.message": {
+    "placeholders": {
+      "card": "plain",
+      "target": "plain"
+    }
+  },
+  "workflow.refused.queue.advancing.next": {
+    "placeholders": {
+      "target": "plain"
+    }
+  },
+  "workflow.refused.requeue.allowed.change": {
+    "placeholders": {}
+  },
+  "workflow.refused.requeue.allowed.message": {
+    "placeholders": {
+      "card": "plain",
+      "revision": "plain",
+      "why": "plain"
+    }
+  },
+  "workflow.refused.requeue.allowed.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.review.decisionsReceived.message": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.review.decisionsReceived.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.review.headMoved.message": {
+    "placeholders": {
+      "card": "plain",
+      "submitted": "plain",
+      "head": "plain"
+    }
+  },
+  "workflow.refused.review.headMoved.next": {
+    "placeholders": {
+      "head": "plain"
+    }
+  },
+  "workflow.refused.review.inProgress.change": {
+    "placeholders": {}
+  },
+  "workflow.refused.review.inProgress.message": {
+    "placeholders": {
+      "who": "select",
+      "card": "plain",
+      "submission": "plain",
+      "reviewer": "plain",
+      "minutes": "plural"
+    }
+  },
+  "workflow.refused.review.inProgress.next": {
+    "placeholders": {
+      "who": "select",
+      "reviewer": "plain",
+      "card": "plain"
+    }
+  },
+  "workflow.refused.review.noSubmission.message": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.review.noSubmission.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.review.notAuthor.change": {
+    "placeholders": {}
+  },
+  "workflow.refused.review.notAuthor.message": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.review.notAuthor.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.start.dependenciesIntegrated.change": {
+    "placeholders": {}
+  },
+  "workflow.refused.start.dependenciesIntegrated.message": {
+    "placeholders": {
+      "card": "plain",
+      "waitsFor": "plain"
+    }
+  },
+  "workflow.refused.start.dependenciesIntegrated.next": {
+    "placeholders": {
+      "waitsFor": "plain"
+    }
+  },
+  "workflow.refused.start.notBlocked.change": {
+    "placeholders": {}
+  },
+  "workflow.refused.start.notBlocked.message": {
+    "placeholders": {
+      "card": "plain",
+      "reason": "plain"
+    }
+  },
+  "workflow.refused.start.notBlocked.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.start.slotAvailable.change": {
+    "placeholders": {}
+  },
+  "workflow.refused.start.slotAvailable.message": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.start.slotAvailable.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.submit.checksPassed.change": {
+    "placeholders": {}
+  },
+  "workflow.refused.submit.checksPassed.message": {
+    "placeholders": {
+      "check": "plain",
+      "revision": "plain",
+      "why": "select",
+      "files": "select"
+    }
+  },
+  "workflow.refused.submit.checksPassed.next": {
+    "placeholders": {
+      "why": "select",
+      "command": "plain",
+      "copy": "select"
+    }
+  },
+  "workflow.refused.submit.clean.change": {
+    "placeholders": {}
+  },
+  "workflow.refused.submit.clean.message": {
+    "placeholders": {
+      "card": "plain",
+      "folder": "plain",
+      "files": "plain"
+    }
+  },
+  "workflow.refused.submit.clean.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.submit.decisionsReceived.message": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.submit.decisionsReceived.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.submit.empty.message": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.submit.empty.next": {
+    "placeholders": {
+      "changes": "select"
+    }
+  },
+  "workflow.refused.submit.focusedChosen.change": {
+    "placeholders": {}
+  },
+  "workflow.refused.submit.focusedChosen.message": {
+    "placeholders": {
+      "card": "plain",
+      "revision": "plain",
+      "state": "select",
+      "why": "select"
+    }
+  },
+  "workflow.refused.submit.focusedChosen.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.submit.followUpNotBuilder.message": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.submit.followUpNotBuilder.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.submit.identity.change": {
+    "placeholders": {}
+  },
+  "workflow.refused.submit.identity.message": {
+    "placeholders": {
+      "missing": "select",
+      "card": "plain",
+      "commit": "plain",
+      "email": "plain"
+    }
+  },
+  "workflow.refused.submit.identity.next": {
+    "placeholders": {
+      "missing": "select",
+      "command": "plain"
+    }
+  },
+  "workflow.refused.submit.notDuplicate.message": {
+    "placeholders": {
+      "card": "plain",
+      "revision": "plain"
+    }
+  },
+  "workflow.refused.submit.notDuplicate.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.submit.ownRunsStopped.change": {
+    "placeholders": {}
+  },
+  "workflow.refused.submit.ownRunsStopped.message": {
+    "placeholders": {
+      "card": "plain",
+      "runs": "plain"
+    }
+  },
+  "workflow.refused.submit.ownRunsStopped.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.submit.ready.message": {
+    "placeholders": {
+      "card": "plain",
+      "revision": "plain",
+      "files": "plain"
+    }
+  },
+  "workflow.refused.submit.ready.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.submit.sameRevisionNote.message": {
+    "placeholders": {
+      "revision": "plain"
+    }
+  },
+  "workflow.refused.submit.sameRevisionNote.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.submit.trailer.change": {
+    "placeholders": {}
+  },
+  "workflow.refused.submit.trailer.message": {
+    "placeholders": {
+      "card": "plain",
+      "commit": "plain"
+    }
+  },
+  "workflow.refused.submit.trailer.next": {
+    "placeholders": {
+      "at": "select",
+      "command": "plain"
+    }
+  },
+  "workflow.refused.submit.unchanged.message": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.submit.unchanged.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.verdict.currentSubmission.message": {
+    "placeholders": {
+      "submission": "plain",
+      "card": "plain"
+    }
+  },
+  "workflow.refused.verdict.currentSubmission.next": {
+    "placeholders": {
+      "latest": "plain"
+    }
+  },
+  "workflow.refused.verdict.reviewing.message": {
+    "placeholders": {
+      "card": "plain",
+      "submission": "plain"
+    }
+  },
+  "workflow.refused.verdict.reviewing.next": {
+    "placeholders": {}
+  },
+  "workflow.roundChoice": {
+    "placeholders": {
+      "choice": "select"
+    }
+  },
+  "workflow.rule.approval.given": {
+    "placeholders": {}
+  },
+  "workflow.rule.card.kind": {
+    "placeholders": {}
+  },
+  "workflow.rule.done.contained": {
+    "placeholders": {}
+  },
+  "workflow.rule.integrate.approved": {
+    "placeholders": {}
+  },
+  "workflow.rule.integrate.checksPassed": {
+    "placeholders": {}
+  },
+  "workflow.rule.integrate.upToDate": {
+    "placeholders": {}
+  },
+  "workflow.rule.move.doingNobody": {
+    "placeholders": {}
+  },
+  "workflow.rule.requeue.allowed": {
+    "placeholders": {}
+  },
+  "workflow.rule.review.decisionsReceived": {
+    "placeholders": {}
+  },
+  "workflow.rule.review.inProgress": {
+    "placeholders": {}
+  },
+  "workflow.rule.review.notAuthor": {
+    "placeholders": {}
+  },
+  "workflow.rule.start.dependenciesIntegrated": {
+    "placeholders": {}
+  },
+  "workflow.rule.start.notBlocked": {
+    "placeholders": {}
+  },
+  "workflow.rule.start.slotAvailable": {
+    "placeholders": {}
+  },
+  "workflow.rule.submit.checksPassed": {
+    "placeholders": {}
+  },
+  "workflow.rule.submit.clean": {
+    "placeholders": {}
+  },
+  "workflow.rule.submit.decisionsReceived": {
+    "placeholders": {}
+  },
+  "workflow.rule.submit.focusedChosen": {
+    "placeholders": {}
+  },
+  "workflow.rule.submit.identity": {
+    "placeholders": {}
+  },
+  "workflow.rule.submit.notDuplicate": {
+    "placeholders": {}
+  },
+  "workflow.rule.submit.ownRunsStopped": {
+    "placeholders": {}
+  },
+  "workflow.rule.submit.ready": {
+    "placeholders": {}
+  },
+  "workflow.rule.submit.trailer": {
+    "placeholders": {}
+  },
+  "workflow.rule.verdict.currentSubmission": {
+    "placeholders": {}
+  },
+  "workflow.rule.verdict.reviewing": {
+    "placeholders": {}
+  },
+  "workflow.stage.active": {
+    "placeholders": {}
+  },
+  "workflow.stage.approved": {
+    "placeholders": {}
+  },
+  "workflow.stage.done": {
+    "placeholders": {}
+  },
+  "workflow.stage.hold": {
+    "placeholders": {}
+  },
+  "workflow.stage.merging": {
+    "placeholders": {}
+  },
+  "workflow.stage.review": {
+    "placeholders": {}
+  },
+  "workflow.stage.todo": {
+    "placeholders": {}
+  },
+  "workflow.stageName.control": {
+    "placeholders": {
+      "stage": "plain"
+    }
+  },
+  "workflow.stageName.duplicate": {
+    "placeholders": {
+      "stage": "plain"
+    }
+  },
+  "workflow.stageName.empty": {
+    "placeholders": {
+      "stage": "plain"
+    }
+  },
+  "workflow.stageName.long": {
+    "placeholders": {
+      "stage": "plain",
+      "max": "number"
+    }
+  },
+  "workflow.unreadable.branch": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "workflow.unreadable.branchedOff": {
+    "placeholders": {
+      "a": "plain",
+      "b": "plain"
+    }
+  },
+  "workflow.unreadable.branchedOffTarget": {
+    "placeholders": {}
+  },
+  "workflow.unreadable.cardPathsFiles": {
+    "placeholders": {
+      "n": "plural"
+    }
+  },
+  "workflow.unreadable.cardPathsSize": {
+    "placeholders": {
+      "n": "number"
+    }
+  },
+  "workflow.unreadable.change": {
+    "placeholders": {
+      "from": "plain",
+      "to": "plain"
+    }
+  },
+  "workflow.unreadable.changeFingerprint": {
+    "placeholders": {}
+  },
+  "workflow.unreadable.commitsOf": {
+    "placeholders": {
+      "range": "plain"
+    }
+  },
+  "workflow.unreadable.commitsOn": {
+    "placeholders": {
+      "target": "plain"
+    }
+  },
+  "workflow.unreadable.commitsSince": {
+    "placeholders": {
+      "revision": "plain",
+      "base": "plain"
+    }
+  },
+  "workflow.unreadable.contains": {
+    "placeholders": {
+      "revision": "plain",
+      "target": "plain"
+    }
+  },
+  "workflow.unreadable.defaultBranch": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "workflow.unreadable.deliverables": {
+    "placeholders": {
+      "project": "plain",
+      "n": "plural"
+    }
+  },
+  "workflow.unreadable.files": {
+    "placeholders": {
+      "revision": "plain"
+    }
+  },
+  "workflow.unreadable.filesChanged": {
+    "placeholders": {
+      "from": "plain",
+      "to": "plain"
+    }
+  },
+  "workflow.unreadable.folderFor": {
+    "placeholders": {
+      "branch": "plain"
+    }
+  },
+  "workflow.unreadable.gitFolder": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "workflow.unreadable.head": {
+    "placeholders": {
+      "where": "plain"
+    }
+  },
+  "workflow.unreadable.history": {
+    "placeholders": {
+      "target": "plain"
+    }
+  },
+  "workflow.unreadable.holdsChange": {
+    "placeholders": {
+      "where": "plain"
+    }
+  },
+  "workflow.unreadable.ignored": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "workflow.unreadable.line": {
+    "placeholders": {
+      "branch": "plain"
+    }
+  },
+  "workflow.unreadable.pathOutside": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
+  "workflow.unreadable.replay": {
+    "placeholders": {
+      "revision": "plain",
+      "onto": "plain"
+    }
+  },
+  "workflow.unreadable.replayedFiles": {
+    "placeholders": {}
+  },
+  "workflow.unreadable.reviewers": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.unreadable.revision": {
+    "placeholders": {
+      "revision": "plain"
+    }
+  },
+  "workflow.unreadable.revisionIn": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "workflow.unreadable.state": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "workflow.unreadable.target": {
+    "placeholders": {
+      "target": "plain"
+    }
+  },
+  "workflow.unreadable.uncommitted": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "workflow.unreadable.worktrees": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "workflow.unreadable.writes": {
+    "placeholders": {
+      "folder": "plain"
+    }
+  },
+  "workflow.value.commitMessage.branch": {
+    "placeholders": {}
+  },
+  "workflow.value.commitMessage.cw": {
+    "placeholders": {}
+  },
+  "workflow.value.finish.agentMerges": {
+    "placeholders": {}
+  },
+  "workflow.value.finish.combworkMerges": {
+    "placeholders": {}
+  },
+  "workflow.value.finish.committed": {
+    "placeholders": {}
+  },
+  "workflow.value.finish.notChecked": {
+    "placeholders": {}
+  },
+  "workflow.value.folder.project": {
+    "placeholders": {}
+  },
+  "workflow.value.folder.slots": {
+    "placeholders": {}
+  },
+  "workflow.value.mergeInstall.always": {
+    "placeholders": {}
+  },
+  "workflow.value.mergeInstall.onManifestChange": {
+    "placeholders": {}
+  },
+  "workflow.value.review.agent": {
+    "placeholders": {}
+  },
+  "workflow.value.review.agentThenYou": {
+    "placeholders": {}
+  },
+  "workflow.value.review.none": {
+    "placeholders": {}
+  },
+  "workflow.value.review.noneNone": {
+    "placeholders": {}
+  },
+  "workflow.value.review.you": {
+    "placeholders": {}
+  },
+  "workflow.value.reviewerMode.lane": {
+    "placeholders": {}
+  },
+  "workflow.value.reviewerMode.pool": {
+    "placeholders": {}
+  },
+  "workflow.value.sameness.change": {
+    "placeholders": {}
+  },
+  "workflow.value.sameness.exact": {
+    "placeholders": {}
+  },
+  "workflow.value.style.merge": {
+    "placeholders": {}
+  },
+  "workflow.value.style.rebase": {
+    "placeholders": {}
+  },
+  "workflow.value.style.squash": {
+    "placeholders": {}
+  }
+}

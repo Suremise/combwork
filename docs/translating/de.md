@@ -1,4 +1,4 @@
-# Deutsch (`de`): style for Hive
+# Deutsch (`de`): style for Combwork
 
 **Status:** drafted by AI (Claude, October 2026), not yet reviewed by a native speaker. Its entry in
 `src/shared/i18n/languages.ts` says the same (`ai: true` until it is reviewed).
@@ -9,13 +9,13 @@ sind willkommen.“
 **Improving it:** every German text is in `locales/de/<area>.json`, one file per area (settings, board, tasks…), next
 to the English it was made from in `locales/en/<area>.json` (generated from the code: don't edit it). Change a text
 there, run `npm run i18n:check` (it must pass) and `npm run i18n:coverage`, and open a pull request on
-[Suremise/hive-desktop](https://github.com/Suremise/hive-desktop). A screenshot of the screen you changed helps the
-review: start Hive with `--lang=de` (`npm run dev -- --lang=de`). To change a term below, change it here first, in the
+[Suremise/combwork](https://github.com/Suremise/combwork). A screenshot of the screen you changed helps the
+review: start Combwork with `--lang=de` (`npm run dev -- --lang=de`). To change a term below, change it here first, in the
 same pull request, then in every message that uses it. A native speaker's review takes the (KI) mark off.
 
 ## Voice
 
-Hive's English is plain and direct: short sentences, everyday words, *you* for the reader, and it says what happens.
+Combwork's English is plain and direct: short sentences, everyday words, *you* for the reader, and it says what happens.
 Translate the meaning, not the words, and keep the result as short and plain.
 
 - **Addressing the reader:** *du*, lower case (*du*, *dich*, *dein*), as current German software for developers
@@ -37,12 +37,12 @@ Translate the meaning, not the words, and keep the result as short and plain.
 - **A trailing `…`** (the command asks something before it acts) stays, without a space: „Agent entfernen…“.
 - **Column headings (stages):** Geparkt (On Hold), Offen (Todo), In Arbeit (Active, was Doing), Review (Review),
   Genehmigt (Approved, was Passed), Wird gemergt (Merging), Erledigt (Done). *Erledigt* means merged (or accepted),
-  *Genehmigt* passed its review (or your approval) and waits to be merged. Hive 1.0 changed *Geprüft* to *Genehmigt*:
+  *Genehmigt* passed its review (or your approval) and waits to be merged. Combwork 1.0 changed *Geprüft* to *Genehmigt*:
   *Geprüft* read as "checked" (never *Freigegeben*, which reads as "released"). They are short on purpose: the board
   shows them in capitals, and *Zurückgestellt* and *Zu erledigen* didn't fit their column's header.
 - **Error titles** („Could not add an agent“): a short statement, „Agent konnte nicht hinzugefügt werden“, or a noun
   phrase where space is tight, „Hinzufügen fehlgeschlagen“.
-- **Shortcuts** use the German key names printed on keyboards where Hive shows them so: *Strg* for Ctrl (Hive's
+- **Shortcuts** use the German key names printed on keyboards where Combwork shows them so: *Strg* for Ctrl (Combwork's
   menus show `Strg+Shift+J`, from `actions.keys.ctrl`), *Entf* for Del. Shift, Alt and the F keys stay as written.
 
 ## Grammar
@@ -58,9 +58,9 @@ Translate the meaning, not the words, and keep the result as short and plain.
 - **Cases and placeholders:** a placeholder like `{project}` or `{agent}` is a name inserted as it is, uninflected.
   Build the sentence so it needs no case ending: „im Projekt {project}“, „für Agent {agent}“, „von {name}“, never
   „{project}s Agenten“ (write „die Agenten von {project}“). A placeholder that inserts a word or phrase (`{why}`,
-  `{what}`) is English-sourced text Hive translates elsewhere: keep it where it reads as a whole clause.
+  `{what}`) is English-sourced text Combwork translates elsewhere: keep it where it reads as a whole clause.
 - **`select`** keys (`{kind, select, file {…} other {…}}`) are ids: never translate them, only the texts inside.
-- **Lists:** Hive joins lists itself („One, Two und Three“). Never write *und* or *oder* into a message around a
+- **Lists:** Combwork joins lists itself („One, Two und Three“). Never write *und* or *oder* into a message around a
   list placeholder.
 - **Compounds with names and English terms** take a hyphen: „MCP-Server“, „Git-Branch“, „Claude-Code-Sitzung“,
   „Codex-Agent“. With a placeholder, put the noun in front instead: „Sitzung von {provider}“, „Anbieter {provider}“.
@@ -79,12 +79,12 @@ Translate the meaning, not the words, and keep the result as short and plain.
 - **Fragments inserted into other messages** (descriptions say so: „Could not load {what}“, „Closing loses {what}“)
   are written in the case the host sentence needs: „Konnte {what} nicht laden“ takes the accusative with its article
   („den Verlauf“, „die Sitzungen“).
-- **Numbers, dates, money, durations:** formatted by Hive in German (1.234,5; 15.10.2026). Never write them into a
+- **Numbers, dates, money, durations:** formatted by Combwork in German (1.234,5; 15.10.2026). Never write them into a
   message: keep the placeholder and its `number` format.
 
 ## Terms
 
-The words German uses for Hive's terms ([glossary.md](glossary.md)). Use them every time. Where a term is kept in
+The words German uses for Combwork's terms ([glossary.md](glossary.md)). Use them every time. Where a term is kept in
 English, it is as German developers say it.
 
 | English | Deutsch | Notes |
@@ -94,7 +94,7 @@ English, it is as German developers say it.
 | agent | Agent (der), Agenten | Put the noun before a name (above). |
 | provider | Anbieter | |
 | session | Sitzung | |
-| the Assistant | der Assistent | The full name *Hive Assistant* stays in English. |
+| the Assistant | der Assistent | Its only name: the full English name it had before went with the rename (HI-2458). |
 | persona | Persona, Personas | |
 | task board / board | Aufgabenboard / Board | *Board* alone in running text. |
 | card | Karte | Never *Aufgabe* for a card; *Aufgaben* only in *Aufgabenboard* and the *Tasks* tab („Aufgaben“), and for work given to an agent (below). |
@@ -106,7 +106,7 @@ English, it is as German developers say it.
 | card loop / lane / round | Kartenschleife / Lane / Runde | *Lane* as in Swimlane. |
 | merge slot | Merge-Slot | An agent's turn to merge its own branch. |
 | merge queue / test merge / Pause queue, Resume queue | Merge-Warteschlange / Test-Merge / Warteschlange anhalten, Warteschlange fortsetzen | A paused queue is *angehalten*, not *pausiert* (that is a lane). |
-| slot / pool / ready (a slot) | Slot / Pool / bereit | A slot is a working folder Hive lends to a card or lane. |
+| slot / pool / ready (a slot) | Slot / Pool / bereit | A slot is a working folder Combwork lends to a card or lane. |
 | review copy / check copy | Review-Kopie / Check-Kopie | Never *Prüfkopie*. |
 | Version Control (the tab), version control / None | Versionsverwaltung / Keine | „Tab „Versionsverwaltung““; *None* in quotes in running text: „auf „Keine“ umstellen“. |
 | workflow / workflow options / preset (Solo, Pair, Team, Custom) | Workflow / Workflow-Optionen / Voreinstellung (Solo, Paar, Team, Benutzerdefiniert) | |
@@ -118,10 +118,10 @@ English, it is as German developers say it.
 | approval / Approve / approved (a card) | Zustimmung / Zustimmen / genehmigt | Never *Freigabe* or *freigegeben*, which read as "released". |
 | For you (Decide, Test, Approve, Sign in) | Für dich (Entscheiden, Testen, Zustimmen, Anmelden) | In running text in quotes: „unter „Für dich““. |
 | refused / returned / override, Move anyway | abgelehnt / zurückgegeben / Ausnahme, Trotzdem verschieben | |
-| no-code card / before 1.0 / outside Hive / work (a card's section) | Karte ohne Code / vor 1.0 / außerhalb von Hive / Arbeit | The section in running text: „im Abschnitt „Arbeit““. |
+| no-code card / before 1.0 / outside Combwork / work (a card's section) | Karte ohne Code / vor 1.0 / außerhalb von Combwork / Arbeit | The section in running text: „im Abschnitt „Arbeit““. |
 | paused (a lane) / round limit | pausiert / Rundengrenze | |
 | project key / deliverables / repository root | Projektschlüssel / Ergebnisse / Repository-Stammordner | |
-| inbox / message / wake | Posteingang / Nachricht / wecken | „Hive weckt den Agenten.“ |
+| inbox / message / wake | Posteingang / Nachricht / wecken | „Combwork weckt den Agenten.“ |
 | handover / shared notes | Übergabe / gemeinsame Notizen | |
 | skill / template | Skill / Vorlage | The skill's own name stays (`work-on-card`). |
 | worktree / branch / commit / merge | Worktree / Branch / Commit / Merge, mergen | As German git users say them; *committen*, *gemergt*. *Remote* stays. |
@@ -160,7 +160,7 @@ Common UI words, for consistency:
 | shortcut | Tastenkombination |
 | Cancel / Close / OK | Abbrechen / Schließen / OK |
 | Remove / Delete | Entfernen / Löschen |
-| Stop (an agent, a run) / Quit (Hive) | Stoppen / Beenden |
+| Stop (an agent, a run) / Quit (Combwork) | Stoppen / Beenden |
 | Resume / Restart | Fortsetzen / Neu starten |
 | Recycle Bin | Papierkorb |
 | Diagnostics | Diagnosedaten |
@@ -173,7 +173,7 @@ Common UI words, for consistency:
 | Remove agent… | Agent entfernen… |
 | {name} has {n, plural, one {# open card} other {# open cards}} | {name} hat {n, plural, one {# offene Karte} other {# offene Karten}} |
 | {agent} was removed. Its sessions stay in the Sessions tab. | Agent {agent} wurde entfernt. Die Sitzungen bleiben im Tab „Sitzungen“. |
-| Hive was started in {language} (--lang): this setting applies from its next start. | Hive wurde mit --lang {language} gestartet: Diese Einstellung gilt ab dem nächsten Start. |
+| Combwork was started in {language} (--lang): this setting applies from its next start. | Combwork wurde mit --lang {language} gestartet: Diese Einstellung gilt ab dem nächsten Start. |
 
 ## Checking
 

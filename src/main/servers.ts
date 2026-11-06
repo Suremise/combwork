@@ -8,9 +8,9 @@ import { withAttachmentPaths, type CardAttachment } from '../shared/cardAttachme
 import { existsSync } from 'original-fs'
 import { stat } from 'original-fs/promises'
 import { LISTEN_RETRY_BOUND_MS, listenWithRetry } from './listenRetry'
-import type { AgentApiInfo, AgentDef, AgentInfo, Connection, AssistantControl, AssistantUndoResult, LaneInfo, EffortLevel, HiveEvent, LiveSessionState, McpServerInfo, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskComment, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage, ToastTarget, WorkspaceConnections } from '../shared/types'
+import type { AgentApiInfo, AgentDef, AgentInfo, Connection, AssistantControl, AssistantUndoResult, LaneInfo, EffortLevel, CombworkEvent, LiveSessionState, McpServerInfo, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskComment, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage, ToastTarget, WorkspaceConnections } from '../shared/types'
 import { callsMade } from '../shared/activity'
-import { DEFAULT_API_PORT, HIVE_DIR, projectAgents, stopAsksUser, transcriptWarnLimit } from '../shared/defaults'
+import { DEFAULT_API_PORT, CW_DIR, projectAgents, stopAsksUser, transcriptWarnLimit } from '../shared/defaults'
 import { PROVIDERS, agentProvider, isProviderEnabled, offeredModes, providerDescriptor, providerName } from '../shared/providers'
 import type { SafeguardNote } from '../shared/safeguards'
 import { agentChoosesMcp, agentGetsMcp, cleanMcpServers, serverOnIn } from '../shared/agentMcp'
@@ -30,16 +30,21 @@ import { admitLinked, commitIn, folderHead, IssuedLinks, linkOwner, publicLink, 
 import { assignIsolated, copiesFor, copyAt, isolatedLinked, isolatedRequest, isolatedRunEnded, takeStopped } from './copiesApp'
 import { reviewCopyOnStart, reviewCopyOnVerdict } from './reviewCopies'
 import { COLUMN_CHOICES, columnLabel, commentSummary, isTaskColumn, reviewStalled } from '../shared/tasks'
-import type { HandoverAuthor } from '../shared/hiveGuidance'
-import { cardRequests, laneOrderNote, modelInUse, newestComments, progressLabel, retryWaitsView, taskRow, withoutHistory, type CardRequest, type IntentDone, type ProjectRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskView, type AccountUsagePublic } from '../shared/toolReplies'
+import type { HandoverAuthor } from '../shared/combworkGuidance'
+import { inDefaultDialect, inRequestScope } from '../shared/agentText/asyncScope'
+import { apiChainReady, inApiWorkspace, requestApiWorkspace } from './dialects/apiChain'
+import { say, type AgentMsg, type AgentValues } from '../shared/agentText'
+import { API } from './apiText'
+import { cardRequests, commentsParam, laneOrderNote, modelInUse, newestComments, progressLabel, retryWaitsView, taskRow, withoutHistory, type CardRequest, type IntentDone, type ProjectRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskView, type AccountUsagePublic } from '../shared/toolReplies'
 import * as assistant from './assistantControl'
 import { STOP_ASK_MS } from './mcp/agentApiCall'
 import { SettingRefused, applySetting, checkedValue, entryOf, projectOf, restartText, settingDetail, settingRows } from './settingsTools'
-import { settingChangeTexts, settingPath, type SettingEntry, type SettingScope } from '../shared/settingsCatalog'
+import { agentTitle, settingChangeTexts, settingPath, settingReadOnly, type SettingEntry, type SettingScope } from '../shared/settingsCatalog'
 import { addAgent, updateAgent } from './projectAgents'
 import { DOC_MAX, SHARED_PREFIX, readDoc } from './docSections'
 import { docOutline, findHeading, sectionText, type DocHeading } from '../shared/docSections'
 import { providerService } from './providerService'
+import { agentInstallInfo } from './providers/common'
 import { config } from './config'
 import { refusal, refusalBody } from '../shared/workflow/refusals'
 import { testsGiven, type FocusedTest } from '../shared/workflow/focused'
@@ -50,7 +55,7 @@ import { journalSettingsOf, journalSuggestion } from './journalService'
 import { recordBuild } from './buildFacts'
 import { buildFactOf } from '../shared/buildFacts'
 import type { JournalSettings } from '../shared/journal'
-import { emit, onHiveEvent, toast } from './events'
+import { emit, onCombworkEvent, toast } from './events'
 import { msg, tr } from '../shared/i18n'
 import { addUsageToWatch, cancelWatch, encodeSince, onWatchPlacing, registerAgentWatch, registerLaneWatch, registerUsageWatch, registerWatch, scopedCard } from './watches'
 import { USAGE_WATCH_MAX, type UsageWatch } from '../shared/usageWatch'
@@ -79,7 +84,7 @@ import { agentPlace, folderFacts } from './agentFolders'
 import { releasableSlots, releaseSlot, SlotReleaseRefused, type HeldRow } from './slotRelease'
 import { applyForAssistant, findTemplate, loadForAssistant, planReply, templateRows } from './templateApi'
 import { slotAt } from '../shared/agentFolders'
-import { agentNowOf, cardStall, laneOrderView, stepWaitOf, type StallAgent } from './cardStall'
+import { agentNowOf, cardStall, laneOrderView, reviewDueOf, stepWaitOf, type StallAgent } from './cardStall'
 import { cancelMessages, leaveMessage, MESSAGE_MAX_CHARS } from './agentMessages'
 import { ackDeliveries, ackThenRead, deliveriesOf, deliverNow, deliveryView, inboxSwitch, launchWith, NotGiven, readInbox } from './deliveries'
 import { INBOX_SWITCHES, type InboxSwitch } from '../shared/inboxSwitches'
@@ -92,11 +97,11 @@ import { pauseQueue, queueCardChange, queueViews, resumeQueue } from './workflow
 import type { QueuePublic, QueueView } from '../shared/workflow/queue'
 import * as taskBatch from './taskBatch'
 import { startTask } from './taskStart'
-import { hiveSkills, listSkills, skillFiles, validSkillName } from './skills'
+import { combworkSkills, listSkills, skillFiles, validSkillName } from './skills'
 import { transcripts } from './transcripts'
 import { contextWorkspace, inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, type WorkspaceService } from './workspace'
 import { accountOnIn, connectionRef, connectionsFor, connectionsOn, usableConnections, workspaceAccounts, type ConnectionPatch } from '../shared/accounts'
-import { accountById, addConnection, allAccounts, allConnections, connectionProblem, firstUsableAccount, getConnection, hiveAccounts, updateConnection } from './accounts'
+import { accountById, addConnection, allAccounts, allConnections, connectionProblem, firstUsableAccount, getConnection, combworkAccounts, updateConnection } from './accounts'
 import { workspaceNotesFile } from './workspaceNotes'
 import { WORKSPACE_NOTES_PATH } from '../shared/workspaceNotes'
 import { cardStages } from './boardStore'
@@ -116,16 +121,18 @@ import { apiOutcome, appMetrics, clock as metricsClock, knownRoute, metricsHandl
 import { metricsReport } from './metricsUsage'
 import { apiLabel, beginWork, hookLabel } from './mainStalls'
 import type { GuidanceSeries, MetricOutcome, MetricsPart, MetricsQuery, MetricsReport } from '../shared/metrics'
-import { agentForToken, agentToken, agentTokenFile, type AgentIdentity } from './agentTokens'
+import { agentForToken, agentToken, agentTokenFile, onAgentTokenEnded, type AgentIdentity, type EndedLaunch } from './agentTokens'
 import { API_EVENTS, apiEventFor, publicRun } from './apiEvents'
 import { clearDiscovery, writeDiscovery } from './apiDiscovery'
 import { createViewerToken, loadViewerTokens, revokeViewerToken, viewerForToken, viewerTokens } from './viewerTokens'
 import { hookTokenMatches, refusedHookNote } from './hookTokens'
 import { unusedWorktreeCounts } from './unusedWorktrees'
-import { devConsole, hiveSourceId, sessionSourceId } from './devConsole'
+import { devConsole, combworkSourceId, sessionSourceId } from './devConsole'
 import { consoleSources } from './devConsoleSources'
-import { englishError, HiveError, shownError } from './hiveError'
-import { CONSOLE_KINDS, hiveName, mayRead, type ConsoleEvent, type ConsoleKind, type ConsoleReader, type ConsoleSource } from '../shared/devConsole'
+import { agentError, CombworkError, shownError } from './combworkError'
+import { agentField, agentText, type TextPart } from '../shared/advanced'
+import { storedForAgents } from '../shared/taskHistory'
+import { CONSOLE_KINDS, combworkName, mayRead, type ConsoleEvent, type ConsoleKind, type ConsoleReader, type ConsoleSource } from '../shared/devConsole'
 import { cardLabel, cardName, cardRef, namesOf } from '../shared/projectKeys'
 import { pauseTeam, resumeTeam } from './teamPause'
 import { scanWorkspace } from './teamParked'
@@ -148,7 +155,7 @@ function readBody(req: IncomingMessage, onChunk?: (bytes: number) => void): Prom
       size += c.length
       onChunk?.(c.length)
       if (size > MAX_BODY) {
-        reject(new HttpError(413, 'Request body too large'))
+        reject(new HttpError(413, say(API.http.bodyTooLarge)))
         req.destroy()
       } else chunks.push(c)
     })
@@ -162,11 +169,16 @@ class HttpError extends Error {
     public status: number,
     message: string,
     /** More of the reply's body, beside `error` (a conflict's current revision). */
-    public extra?: Record<string, unknown>
+    public extra?: Record<string, unknown>,
+    /** The text of the CombworkError it answers (httpFrom), said in the request's dialect (dialects, HI-2440). */
+    public text?: TextPart
   ) {
     super(message)
   }
 }
+
+/** An error answered with another status: its message, and a CombworkError's text, so the reply says it in the caller's dialect. */
+const httpFrom = (status: number, e: unknown, extra?: Record<string, unknown>): HttpError => new HttpError(status, (e as Error).message, extra, e instanceof CombworkError ? e.text : undefined)
 
 /** A reply's body as sent: its JSON as it is, whatever names its data uses (a console event's raw payload, #845). */
 export const replyText = (body: unknown): string => (body === undefined ? '' : JSON.stringify(body))
@@ -187,28 +199,31 @@ let hookServer: http.Server | null = null
 
 export async function startHookServer(): Promise<string> {
   hookServer = http.createServer(async (req, res) => {
+    // agent-protocol: the hook server answers a CLI hook, not an agent
     if (req.method !== 'POST' || !req.url?.startsWith('/hook')) return send(res, 404, { error: 'not found' })
     const query = new URL(req.url, 'http://127.0.0.1').searchParams
     const run = query.get('run')
     // Only the launch's own token, while it runs (#345).
     if (!hookTokenMatches(run, req.headers.authorization)) {
       // The developer console (#636): a hook refused (an ended launch's, or a wrong token), in every workspace watched.
-      devConsole.capture(devConsole.capturedLike('hive:'), () => ({ kind: 'hook-server', name: 'refused', raw: { statusline: query.has('statusline'), run: !!run }, made: { status: 401 }, summary: `hook refused (${run ? "not this launch's token, or it has ended" : 'no launch named'})` }))
-      // In the log too, once a run (#711): a hook the CLI sent but Hive refused leaves a trace on Hive's side.
+      // agent-protocol: the developer console's record of a refused hook (a log line)
+      devConsole.capture(devConsole.capturedLike('combwork:'), () => ({ kind: 'hook-server', name: 'refused', raw: { statusline: query.has('statusline'), run: !!run }, made: { status: 401 }, summary: `hook refused (${run ? "not this launch's token, or it has ended" : 'no launch named'})` }))
+      // In the log too, once a run (#711): a hook the CLI sent but Combwork refused leaves a trace on Combwork's side.
       const note = refusedHookNote(run)
       if (note) log.info(note)
+      // agent-protocol: the hook server answers a CLI hook, not an agent
       return send(res, 401, { error: 'unauthorized' })
     }
-    // Tests lose every hook while the file HIVE_TEST_DROP_HOOKS names is there (#1371: a CLI whose hooks Hive can't
-    // stop at its end, Copilot), answered as if Hive had taken them; unpackaged builds only.
-    const drop = !app.isPackaged ? process.env.HIVE_TEST_DROP_HOOKS : undefined
+    // Tests lose every hook while the file CW_TEST_DROP_HOOKS names is there (#1371: a CLI whose hooks Combwork can't
+    // stop at its end, Copilot), answered as if Combwork had taken them; unpackaged builds only.
+    const drop = !app.isPackaged ? process.env.CW_TEST_DROP_HOOKS : undefined
     if (drop && existsSync(drop)) {
       await readBody(req).catch(() => '')
       return send(res, 200, {})
     }
     let done: (() => void) | null = null
-    // What Hive observes of it, for the launch's Hooks dialog (HI-982): from here, on its own authenticated route, so
-    // a body Hive can't read is recorded too.
+    // What Combwork observes of it, for the launch's Hooks dialog (HI-982): from here, on its own authenticated route, so
+    // a body Combwork can't read is recorded too.
     let obs: HookObservation | null = null
     let step = 'read'
     try {
@@ -234,7 +249,7 @@ export async function startHookServer(): Promise<string> {
         sessions.handleStatusLine(run, body)
         return
       }
-      // A hook about to edit files waits for Hive's file-lock decision (made at once, in the order hooks came); a tool's
+      // A hook about to edit files waits for Combwork's file-lock decision (made at once, in the order hooks came); a tool's
       // end and a Stop that may carry a notice wait for their place in the launch's hook order, where the turn ledger
       // decides whose turn they are (#650: a notice of what is unread, or the drain carrying the turn on); other hooks
       // are answered at once so they never slow the agent down. Each is handled in the launch's order from when it came,
@@ -258,6 +273,7 @@ export async function startHookServer(): Promise<string> {
     } catch (e) {
       log.warn('hook error', e)
       if (obs) sessions.hookHandled(obs, null, { step, error: e })
+      // agent-protocol: the hook server answers a CLI hook, not an agent
       if (!res.headersSent) send(res, 400, { error: 'bad request' })
     } finally {
       done?.()
@@ -279,8 +295,8 @@ let apiServer: http.Server | null = null
 let apiToken = ''
 
 /**
- * Who made a request: a caller with the Agent API's token (agents' hive tools, scripts), which Settings → Agent
- * API governs, or a workspace's Hive Assistant with its own token, which Settings → Assistant → Control governs.
+ * Who made a request: a caller with the Agent API's token (agents' Combwork tools, scripts), which Settings → Agent
+ * API governs, or a workspace's Combwork Assistant with its own token, which Settings → Assistant → Control governs.
  */
 /** Who is calling: a script with the workspace token, the Assistant, or a project agent (by its own token). */
 /** An Assistant caller keeps the token it came with: one launch's, which its later work is checked against (#186). */
@@ -316,8 +332,12 @@ function assistantCallerToken(): string | null {
   return c?.kind === 'assistant' ? c.token : null
 }
 let apiError: string | undefined
-/** Event-stream clients: the project agent each is (null: a script or a viewer, which gets every event), and the viewer token it came with. */
-const sseClients = new Map<ServerResponse, { agent: AgentIdentity | null; viewer: string | null }>()
+/**
+ * Event-stream clients: the project agent each is (null: a script or a viewer, which gets every event) with the launch
+ * whose token it came with (`run`), and the viewer token it came with.
+ */
+/** Each events stream: its agent (null: the workspace token or a viewer); for one with none, the .combwork folder of the workspace its request was for (`apiDir`, HI-2465), whose API chain its lines are said in. */
+const sseClients = new Map<ServerResponse, { agent: AgentIdentity | null; apiDir: string | null; run: string | null; viewer: string | null }>()
 
 /** What an Agent API request is measured as (metrics.ts), filled in as it is handled and recorded when it ends. */
 interface ApiRequest {
@@ -333,7 +353,7 @@ interface ApiRequest {
   authenticated: boolean
   /** Answered with a wait (HI-1831: an error status whose body says to ask again): recorded as `waiting`, not a failure. */
   waiting: boolean
-  /** The request's workspace, as far as it was known (the developer console's Hive events). */
+  /** The request's workspace, as far as it was known (the developer console's Combwork events). */
   ws: string | null
 }
 const apiRequests = new WeakMap<ServerResponse, ApiRequest>()
@@ -355,13 +375,13 @@ async function loadToken(): Promise<string> {
 
 export async function regenerateToken(): Promise<string> {
   apiToken = randomBytes(32).toString('hex')
-  await writeJsonAtomic(tokenFile(), { token: apiToken, note: 'Bearer token for the Hive Agent API. Regenerate it in Settings → Agent API.' })
+  await writeJsonAtomic(tokenFile(), { token: apiToken, note: inDefaultDialect(() => say(API.http.tokenFileNote)) })
   return apiToken
 }
 
-/** HIVE_API_PORT overrides the setting; development builds default to the next port so they don't clash with the installed app. */
+/** CW_API_PORT overrides the setting; development builds default to the next port so they don't clash with the installed app. */
 function apiPort(): number {
-  const env = Number(process.env.HIVE_API_PORT)
+  const env = Number(process.env.CW_API_PORT)
   if (env > 0) return env
   const port = config.settings.agentApi.port
   return !app.isPackaged && port === DEFAULT_API_PORT ? port + 1 : port
@@ -369,7 +389,7 @@ function apiPort(): number {
 
 export function apiInfo(): AgentApiInfo {
   const s = config.settings.agentApi
-  // With the Agent API off, the server still runs for the Hive Assistant alone.
+  // With the Agent API off, the server still runs for the Combwork Assistant alone.
   const running = s.enabled && !!apiServer?.listening
   return {
     enabled: s.enabled,
@@ -381,13 +401,13 @@ export function apiInfo(): AgentApiInfo {
   }
 }
 
-/** The server's address for the Hive Assistant, which reaches it whether or not the Agent API is turned on. */
+/** The server's address for the Combwork Assistant, which reaches it whether or not the Agent API is turned on. */
 export function assistantApiUrl(): string | null {
   return apiServer?.listening ? `http://127.0.0.1:${apiPort()}` : null
 }
 
 /**
- * Environment passed to an agent's session so it (and its hive tools) can reach the API: the file holding the agent's
+ * Environment passed to an agent's session so it (and its Combwork tools) can reach the API: the file holding the agent's
  * own token for this launch (agentTokens.ts), never the workspace's, so the API knows which project's agent is calling.
  * Never the token itself (HI-2262, Darren's decision): an agent listing its environment printed it (HI-2259).
  */
@@ -395,8 +415,8 @@ export function apiEnv(projectPath: string, agentId: string): Record<string, str
   const info = apiInfo()
   const token = agentToken(projectPath, agentId)
   if (!info.running || !info.url || !token) return {}
-  // How long hive-progress waits for the API's answers (HI-1892: Settings → Advanced, its reply time).
-  return { HIVE_API_URL: info.url, HIVE_API_TOKEN_FILE: agentTokenFile(projectPath, agentId),HIVE_PROGRESS_REPLY_SECONDS: String(advanced.number('hive.progress.replySeconds')) }
+  // How long cw-progress waits for the API's answers (HI-1892: Settings → Advanced, its reply time).
+  return { CW_API_URL: info.url, CW_API_TOKEN_FILE: agentTokenFile(projectPath, agentId),CW_PROGRESS_REPLY_SECONDS: String(advanced.number('cw.progress.replySeconds')) }
 }
 
 /** An open workspace by its folder path or its name. A name two open workspaces share is refused (409): use the path. */
@@ -406,31 +426,31 @@ export function findWorkspace(want: string): WorkspaceService | null {
   const at = /[\\/]/.test(want) ? placeMatcher(resolvePath(want)) : null
   const hits = openWorkspaces().filter((w) => (at ? at(w.path!) : basename(w.path!).toLowerCase() === v))
   if (hits.length > 1) {
-    throw new HttpError(409, `Several open workspaces are named "${want}" (${hits.map((w) => w.path).join(', ')}): say which by its full path in the X-Hive-Workspace header or ?workspace=`)
+    throw new HttpError(409, say(API.workspace.severalNamed, { name: want, paths: hits.map((w) => w.path).join(', ') }))
   }
   return hits[0] ?? null
 }
 
-/** The workspace a request names (X-Hive-Workspace header, or ?workspace=), else the only open one. */
+/** The workspace a request names (X-Combwork-Workspace header, or ?workspace=), else the only open one. */
 function requestWorkspace(req: IncomingMessage, url: URL): WorkspaceService | null {
   const own = assistantCaller()
   if (own) {
     const w = openWorkspaces().find((x) => x.path!.toLowerCase() === own)
-    if (!w) throw new HttpError(409, "The Assistant's workspace isn't open in Hive")
+    if (!w) throw new HttpError(409, say(API.workspace.assistantNotOpen))
     return w
   }
   // An agent's calls are about its own workspace, whatever the request names.
   const agent = agentCaller()
   if (agent) {
     const w = openWorkspaces().find((x) => x.path!.toLowerCase() === agent.workspace.toLowerCase())
-    if (!w) throw new HttpError(409, "The agent's workspace isn't open in Hive")
+    if (!w) throw new HttpError(409, say(API.workspace.agentNotOpen))
     return w
   }
-  const header = req.headers['x-hive-workspace']
+  const header = req.headers['x-combwork-workspace']
   const raw = typeof header === 'string' && header ? decodeURIComponent(header) : url.searchParams.get('workspace')
   if (raw) {
     const w = findWorkspace(raw)
-    if (!w) throw new HttpError(404, `Unknown workspace "${raw}": it isn't open in Hive`)
+    if (!w) throw new HttpError(404, say(API.workspace.unknown, { name: raw }))
     return w
   }
   const open = openWorkspaces()
@@ -444,8 +464,8 @@ const titleKeys = (): string[] => keysForSearch(requireWorkspace()).flatMap((k) 
 function requireWorkspace(): WorkspaceService {
   const w = contextWorkspace()
   if (w) return w
-  if (!openWorkspaces().length) throw new HttpError(409, 'No workspace is open')
-  throw new HttpError(400, 'Several workspaces are open in Hive: say which with ?workspace=<name> or the X-Hive-Workspace header')
+  if (!openWorkspaces().length) throw new HttpError(409, say(API.workspace.noneOpen))
+  throw new HttpError(400, say(API.workspace.sayWhich))
 }
 
 /**
@@ -454,13 +474,13 @@ function requireWorkspace(): WorkspaceService {
  */
 function projectByName(name: string): string {
   const raw = decodeURIComponent(name)
-  if (!openWorkspaces().length) throw new HttpError(409, 'No workspace is open')
+  if (!openWorkspaces().length) throw new HttpError(409, say(API.workspace.noneOpen))
   const slash = raw.search(/[\\/]/)
   let project = raw
   let candidates: WorkspaceService[]
   if (slash > 0) {
     const w = findWorkspace(raw.slice(0, slash))
-    if (!w) throw new HttpError(404, `Unknown workspace "${raw.slice(0, slash)}": it isn't open in Hive`)
+    if (!w) throw new HttpError(404, say(API.workspace.unknown, { name: raw.slice(0, slash) }))
     candidates = [w]
     project = raw.slice(slash + 1)
   } else {
@@ -471,8 +491,8 @@ function projectByName(name: string): string {
   // The Assistant looks after its own workspace only.
   if (own) candidates = candidates.filter((w) => w.path!.toLowerCase() === own)
   const hits = candidates.map((w) => join(w.path!, project)).filter((p) => workspace.isProjectPath(p))
-  if (!hits.length) throw new HttpError(404, `Unknown project "${raw}"`)
-  if (hits.length > 1) throw new HttpError(409, `"${project}" is a project in several open workspaces: name it as <workspace>/<project>, e.g. ${basename(dirname(hits[0]))}/${project}`)
+  if (!hits.length) throw new HttpError(404, say(API.workspace.unknownProject, { name: raw }))
+  if (hits.length > 1) throw new HttpError(409, say(API.workspace.projectInSeveral, { project, workspace: basename(dirname(hits[0])) }))
   return hits[0]
 }
 
@@ -489,20 +509,20 @@ function progressOf(projectPath: string, agentId: string) {
 
 /**
  * An agent's status message: a watching agent's is what it waits for; one whose state is unknown says so (#648), as
- * does one whose hooks aren't reaching Hive (#1336) and one whose CLI waits to retry its model request (HI-1972).
+ * does one whose hooks aren't reaching Combwork (#1336) and one whose CLI waits to retry its model request (HI-1972).
  */
 const statusMessageOf = (live: LiveSessionState | null | undefined): string | null =>
   live?.hooksMissing
-    ? `${hooksMissingText(live)}: its CLI's hooks aren't reaching Hive, so its status may be wrong and it isn't given work; the user can restart its session`
+    ? say(API.status.hooksMissing, { state: hooksMissingText(live) ?? '' })
     : live?.status === 'watching'
     ? (live.watch?.label ?? null)
     : live?.status === 'signin'
-      ? `Its CLI's sign-in has expired: the user must sign in again (${live.signIn?.message ?? 'not signed in'})`
+      ? say(API.status.signInExpired, { reason: agentField(live.signIn?.message, live.signIn?.messageText) ?? say(API.status.notSignedIn) })
       : retryWaitText(live)
-        ? `${retryWaitText(live)}: its CLI is waiting to retry its model request and carries on by itself; it isn't given work meanwhile`
+        ? say(API.status.retryWait, { state: retryWaitText(live) ?? '' })
         : unknownStateText(live)
-          ? `${unknownStateText(live)}: Hive has heard nothing of its turn and seen no sign of its end, so it isn't given work; the user can mark it idle`
-          : (live?.statusMessage ?? live?.mergeSlot ?? null)
+          ? say(API.status.unknownState, { state: unknownStateText(live) ?? '' })
+          : (agentField(live?.statusMessage, live?.statusText) ?? agentField(live?.mergeSlot, live?.mergeSlotText) ?? null)
 
 async function projectSummary(p: string) {
   const info = await workspace.projectInfo(p)
@@ -543,7 +563,7 @@ async function projectSummary(p: string) {
       // An action under the CLI's automatic review (as asked); never a question for the user.
       reviewing: a.live?.review ?? null,
       backgroundTasks: a.live?.backgroundTasks ?? 0,
-      // The project's MCP servers it gets (the built-in hive server besides): all of them, or only those it was given.
+      // The project's MCP servers it gets (the built-in combwork server besides): all of them, or only those it was given.
       mcpServers: mcpOn.filter((n) => agentGetsMcp(a, n)),
       mcpChoice: agentChoosesMcp(a) ? 'only' : 'all',
       // The guidance and skill revisions it launched with (compare with GET /v1/status's to spot an old launch).
@@ -551,16 +571,16 @@ async function projectSummary(p: string) {
       // Its connection (HI-1771, for a CLI with connections): the one chosen (null: the default), the one its run is on, and a switch waiting.
       ...agentConnectionFields(p, a, a.live?.provider ?? agentProvider(a, config.settings))
     })),
-    // Its builder and reviewer pairs (#1531): its running lanes', each with its state as hive_lane list says it (HI-2271:
+    // Its builder and reviewer pairs (#1531): its running lanes', each with its state as cw_lane list says it (HI-2271:
     // the card it is on), then by name; empty without either.
     pairs: workflowPairs(info.agents, await lanes.listLanes(workspaceOf(p), { project: basename(p) }).catch(() => []), laneStateText),
     // The workspace's MCP servers (HI-2059): all available to the project, those added to it running; `on` is `added`'s
     // old name, kept for 1.0 (deprecated).
     mcp: { available: servers.filter((m) => m.def).map((m) => m.name), added: mcpOn, on: mcpOn },
-    // Its version control, what Hive finds in its folder now, and the switch it offers when they differ (#1419): never
+    // Its version control, what Combwork finds in its folder now, and the switch it offers when they differ (#1419): never
     // switched silently; the user switches it (the Assistant within Control: project.workflow.platform).
     ...(info.platform ? { versionControl: versionControlOf(info.platform) } : {}),
-    // The workflow options in force (#1278), and which the project, the workspace or Hive's settings set.
+    // The workflow options in force (#1278), and which the project, the workspace or Combwork's settings set.
     workflow: await inWorkspace(workspaceOf(p), () => workflowSummary(workspaceOf(p), p)).catch(() => null),
     // The project's configuration; its workflow options are `workflow`'s, resolved (not again here, raw).
     // Its MCP list as what is added (HI-2059), never its stored form (a list not yet converted means something else).
@@ -573,7 +593,7 @@ const withoutWorkflow = ({ workflow: _w, ...rest }: ProjectConfig): Omit<Project
 /** A project's version control for agents, lean: in force, found, and the offer when they differ. */
 function versionControlOf(p: ProjectPlatform): Record<string, unknown> {
   const d = p.detected
-  const found = d.other ? `${d.other} (not supported: None)` : d.platform === 'git' ? `git at ${d.root ?? ''}${d.subfolder ? ' (a subfolder of that repository)' : ''}` : 'none' // i18n-ignore: agent-facing (English)
+  const found = d.other ? say(API.project.vcsUnsupported, { name: d.other }) : d.platform === 'git' ? say(API.project.vcsGit, { root: d.root ?? '', subfolder: d.subfolder ? 'yes' : 'no' }) : 'none'
   return { platform: p.id, found, ...(p.offer ? { offers: p.offer.offer, why: p.offer.why } : {}) }
 }
 
@@ -582,10 +602,10 @@ async function agentParam(p: string, value: unknown): Promise<string> {
   if (typeof value !== 'string' || !value) {
     const agents = projectAgents(await workspace.projectConfig(p))
     if (agents.length === 1) return agents[0].id
-    throw agents.length ? new HttpError(400, 'This project has several agents: say which one with "agent" (its id or name)') : new HttpError(409, 'This project has no agents yet')
+    throw agents.length ? new HttpError(400, say(API.agent.sayWhich)) : new HttpError(409, say(API.agent.none))
   }
   const a = projectAgents(await workspace.projectConfig(p)).find((x) => x.id === value || x.name.toLowerCase() === value.toLowerCase())
-  if (!a) throw new HttpError(404, `Unknown agent "${value}"`)
+  if (!a) throw new HttpError(404, say(API.agent.unknownNamed, { name: value }))
   return a.id
 }
 
@@ -596,8 +616,18 @@ type Handler = (ctx: { params: string[]; query: URLSearchParams; body: any; sign
 /** The status a refusal answers with (an HttpError's, the change boundary's, a setting's), for its public reason (#763). */
 const statusOf = (e: unknown): number => (e instanceof assistant.ChangeRefused || e instanceof SettingRefused || e instanceof lanes.LaneError ? e.status : errorStatus(e))
 
+/**
+ * A message and its values, kept as data where one text is said in more than one scope (HI-2433 round 1): what the
+ * Assistant's change is called is said in its caller's scope in a refusal, and in the Default where it is recorded.
+ */
+type Said = readonly [AgentMsg, AgentValues?]
+/** Said in the request's scope: what its caller reads. */
+const sayNow = ([m, values]: Said): string => say(m, values)
+/** Said in the Default: text stored for any reader (the Assistant's activity, undo's records), until stored records are said when read (5b, 6b). */
+const sayStored = ([m, values]: Said): string => inDefaultDialect(() => say(m, values))
+
 /** A refusal of the Assistant's change boundary, or of a batch's request, as the Agent API answers it. */
-const httpOf = (e: unknown): unknown => (e instanceof assistant.ChangeRefused ? new HttpError(e.status, e.message, e.extra) : e)
+const httpOf = (e: unknown): unknown => (e instanceof assistant.ChangeRefused ? httpFrom(e.status, e, e.extra) : e)
 
 async function asRefused<T>(fn: () => Promise<T>): Promise<T> {
   try {
@@ -608,26 +638,30 @@ async function asRefused<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 /**
- * A change the Hive Assistant asks for: admitted by the Assistant's change boundary (control level, limit), run, and
- * recorded (its panel's list and hive.log) with `act`, its kind and targets (#763), and what `fn` adds to them once
+ * A change the Combwork Assistant asks for: admitted by the Assistant's change boundary (control level, limit), run, and
+ * recorded (its panel's list and combwork.log) with `act`, its kind and targets (#763), and what `fn` adds to them once
  * known (`act`: a new card's number, a new agent). `fn` gets the boundary's guard, to run again as each write is made.
  * Other callers can't make these changes through the API.
  */
-async function assistantChange<T>(need: AssistantControl, what: string, act: ActivityTarget, fn: (guard: () => void) => Promise<{ done: string; said?: string; brief?: string; act?: Partial<ActivityTarget>; result: T } & UndoNotes>): Promise<T> {
+async function assistantChange<T>(need: AssistantControl, what: Said, act: ActivityTarget, fn: (guard: () => void) => Promise<{ done: Said; said?: string; brief?: Said; act?: Partial<ActivityTarget>; result: T } & UndoNotes>): Promise<T> {
   const ws = assistantCaller()
-  if (!ws) throw new HttpError(403, `Only the Hive Assistant can ${what} through the Agent API.`)
-  const line = what.charAt(0).toUpperCase() + what.slice(1)
+  if (!ws) throw new HttpError(403, say(API.change.onlyAssistant, { what: sayNow(what) }))
+  // What is recorded (its activity, undo's records) is said in the Default; its refusals in the caller's scope.
+  const stored = sayStored(what)
+  const line = stored.charAt(0).toUpperCase() + stored.slice(1)
   const guard = await asRefused(async () => assistant.admit(ws, assistantCallerToken() ?? '', need, what, act))
   try {
     // `said`: what the line quotes (a prompt, a message), which the Agent API's event stream leaves out.
-    // `brief`: the line in Hive's own words when `done` carries an error's text (#763: the stream never does).
+    // `brief`: the line in Combwork's own words when `done` carries an error's text (#763: the stream never does).
     // Recorded for undo as it is made (#1282): a card's fields as the card is saved, the rest here once it is done.
-    const { done, said, brief, act: more, result } = await recordingChanges(ws, act.kind, what, async () => {
+    const changed = await recordingChanges(ws, act.kind, stored, async () => {
       const out = await fn(guard)
       await noteDone(requireWorkspace(), { ...act, ...out.act }, out)
       return out
     })
-    const pub = brief ?? (said ? done : undefined)
+    const { said, act: more, result } = changed
+    const done = sayStored(changed.done)
+    const pub = changed.brief ? sayStored(changed.brief) : said ? done : undefined
     assistant.record(ws, { ...act, ...more }, done + (said ?? ''), undefined, pub !== undefined ? { brief: pub } : {})
     return result
   } catch (e) {
@@ -695,7 +729,7 @@ const actAgent =(a: { id: string; name: string }): ActivityAgent => ({ id: a.id,
 const laneAct = (l: Pick<LaneInfo, 'id' | 'project' | 'cards' | 'builder'>): Partial<ActivityTarget> => ({ lane: l.id, project: l.project, cards: l.cards.map((c) => c.number), agent: actAgent(l.builder) })
 
 /** For routes that change something and that other callers may use too: the Assistant needs the control level. */
-function assistantMay(need: AssistantControl, what: string, act: ActivityTarget): void {
+function assistantMay(need: AssistantControl, what: Said, act: ActivityTarget): void {
   const ws = assistantCaller()
   if (!ws) return
   try {
@@ -713,9 +747,9 @@ function route(method: string, path: string, handler: Handler): void {
 }
 
 /** The Agent API's contract version: goes up when a route or field changes in a way a client would notice. */
-export const API_VERSION = 12
+export const API_VERSION = 14
 
-/** Who Hive takes a request's caller for, and what it may reach (GET /v1/status). */
+/** Who Combwork takes a request's caller for, and what it may reach (GET /v1/status). */
 async function callerInfo(): Promise<Record<string, unknown>> {
   const own = assistantCaller()
   if (own) return { role: 'assistant', workspace: basename(own), control: assistant.controlLevel() }
@@ -733,10 +767,10 @@ async function callerInfo(): Promise<Record<string, unknown>> {
 }
 
 /**
- * The request's workspace's Hive skills (null without one), read once its open has brought them up to date, as a launch
+ * The request's workspace's Combwork skills (null without one), read once its open has brought them up to date, as a launch
  * reads them (HI-1781: during the update after an open, a list half copied).
  */
-async function hiveSkillsNow(): Promise<Awaited<ReturnType<typeof skillRevisions>> | null> {
+async function combworkSkillsNow(): Promise<Awaited<ReturnType<typeof skillRevisions>> | null> {
   const ws = contextWorkspace()
   if (!ws) return null
   await ws.itemsUpToDate()
@@ -744,16 +778,18 @@ async function hiveSkillsNow(): Promise<Awaited<ReturnType<typeof skillRevisions
 }
 
 route('GET', '/v1/status', async () => ({
-  app: { name: 'Hive', version: app.getVersion() },
+  // agent-protocol: the app's name
+  app: { name: 'Combwork', version: app.getVersion() },
   api: { version: API_VERSION },
   caller: await callerInfo(),
-  // The guidance this Hive gives sessions, and the request's workspace's Hive skills (null without one).
-  guidance: { revision: GUIDANCE_REVISION, skills: await hiveSkillsNow() },
-  providers: providerService.all(),
+  // The guidance this Combwork gives sessions, and the request's workspace's Combwork skills (null without one).
+  guidance: { revision: GUIDANCE_REVISION, skills: await combworkSkillsNow() },
+  // Combwork's words in them in the caller's dialect (dialects, HI-2440).
+  providers: Object.fromEntries(Object.entries(providerService.all()).map(([id, info]) => [id, agentInstallInfo(info)])),
   /** The request's workspace (or the only open one); `workspaces` lists every window's. */
   workspace: contextWorkspace()?.path ? { name: basename(contextWorkspace()!.path!), path: contextWorkspace()!.path } : null,
   workspaces: openWorkspaces().map((w) => ({ name: basename(w.path!), path: w.path })),
-  // The Hive Assistant belongs to its workspace, not a project; it sees its own workspace's sessions only.
+  // The Combwork Assistant belongs to its workspace, not a project; it sees its own workspace's sessions only.
   liveSessions: sessions.liveStates().filter((s) => !assistantCaller() || workspaceOf(s.projectPath).path?.toLowerCase() === assistantCaller()).map((s) => ({ workspace: basename(workspaceOf(s.projectPath).path ?? ''), project: workspace.isAssistantHome(s.projectPath) ? null : basename(s.projectPath), agent: s.agentName ?? null, provider: s.provider, sessionId: s.sessionId || null, status: s.status }))
 }))
 
@@ -793,12 +829,14 @@ route('GET', '/v1/projects/:name', async ({ params }) => {
 // A project agent turns only its own project on or off (HI-2330: another project is its own agents', the Assistant's and the user's).
 route('POST', '/v1/projects/:name/activate', async ({ params }) => {
   const p = projectByName(params[0])
-  ownProjectOnly(p, 'Activating a project')
+  ownProjectOnly(p, [API.own.activating])
   if (assistantCaller()) {
-    return assistantChange('agents', `activate the project ${basename(p)}`, { kind: 'activate-project', project: basename(p) }, async () => {
+    return assistantChange('agents', [API.change.activateProject, { project: basename(p) }], { kind: 'activate-project', project: basename(p) }, async (guard) => {
+      // Its guard checked again just before the write (HI-2420), which is synchronous: nothing comes between.
+      guard()
       workspace.setActive(p, true)
       await workspaceOf(p).refresh()
-      return { done: `Activated ${basename(p)}`, result: await projectSummary(p) }
+      return { done: [API.done.activated, { project: basename(p) }], result: await projectSummary(p) }
     })
   }
   workspace.setActive(p, true)
@@ -808,9 +846,9 @@ route('POST', '/v1/projects/:name/activate', async ({ params }) => {
 
 route('POST', '/v1/projects/:name/deactivate', async ({ params }) => {
   const p = projectByName(params[0])
-  ownProjectOnly(p, 'Deactivating a project')
-  assistantMay('agents', `deactivate the project ${basename(p)}`, { kind: 'deactivate-project', project: basename(p) })
-  if (sessions.liveFor(p)) throw new HttpError(409, 'Stop the running session before deactivating the project')
+  ownProjectOnly(p, [API.own.deactivating])
+  assistantMay('agents', [API.change.deactivateProject, { project: basename(p) }], { kind: 'deactivate-project', project: basename(p) })
+  if (sessions.liveFor(p)) throw new HttpError(409, say(API.project.stopBeforeDeactivating))
   workspace.setActive(p, false)
   await workspaceOf(p).refresh()
   return projectSummary(p)
@@ -821,30 +859,30 @@ route('POST', '/v1/projects/:name/deactivate', async ({ params }) => {
  * conversations can hold that project's cards (a card started on an agent is its prompt), which are not its to see.
  * Status stays open to it (projects, project status, waiting for agents); the Assistant and scripts see everything.
  */
-function ownProjectOnly(p: string, what: string): void {
+function ownProjectOnly(p: string, what: Said): void {
   const a = agentCaller()
   if (a && resolvePath(a.projectPath).toLowerCase() !== resolvePath(p).toLowerCase()) {
-    throw new HttpError(403, `${what} is only for your own project's agents (${basename(a.projectPath)}). Another project's work is for its own agents, the Hive Assistant and the user.`)
+    throw new HttpError(403, say(API.agent.ownProjectOnly, { what: sayNow(what), project: basename(a.projectPath) }))
   }
 }
 
 route('GET', '/v1/projects/:name/sessions', async ({ params }) => {
   const p = projectByName(params[0])
-  ownProjectOnly(p, "Reading an agent's sessions")
+  ownProjectOnly(p, [API.own.readingSessions])
   return sessions.list(p)
 })
 
 route('POST', '/v1/projects/:name/sessions', async ({ params, body }) => {
   const p = projectByName(params[0])
-  if (assistantCaller()) throw new HttpError(400, 'Use hive_start_agent (POST /v1/projects/{name}/agents/{agent}/start) to start agents.')
-  ownProjectOnly(p, 'Starting an agent')
+  if (assistantCaller()) throw new HttpError(400, say(API.agent.useStartAgent))
+  ownProjectOnly(p, [API.own.starting])
   return sessions.start(p, { resumeId: body?.resumeId, name: body?.name, agentId: await agentParam(p, body?.agent) })
 })
 
 route('POST', '/v1/projects/:name/stop', async ({ params, query, body }) => {
   const p = projectByName(params[0])
-  if (assistantCaller()) throw new HttpError(400, 'Use hive_stop_agent (POST /v1/projects/{name}/agents/{agent}/stop) to stop agents.')
-  ownProjectOnly(p, 'Stopping an agent')
+  if (assistantCaller()) throw new HttpError(400, say(API.agent.useStopAgent))
+  ownProjectOnly(p, [API.own.stopping])
   const agent = query.get('agent') ?? body?.agent
   // Its cause from the caller's token (HI-1881): an agent's; a script's or another caller's unknown, just "stopped".
   sessions.stop(p, agent ? await agentParam(p, agent) : undefined, agentCaller() ? 'agent' : undefined)
@@ -854,8 +892,8 @@ route('POST', '/v1/projects/:name/stop', async ({ params, query, body }) => {
 route('GET', '/v1/projects/:name/usage', async ({ params, query }) => {
   const p = projectByName(params[0])
   const agent = query.get('agent')
-  const id = query.get('sessionId') ?? sessions.liveFor(p, agent ? await agentParam(p, agent) : undefined)?.sessionId ??(await sessions.list(p)).find((s) => s.source === 'hive')?.id
-  if (!id) throw new HttpError(404, 'No sessions for this project')
+  const id = query.get('sessionId') ?? sessions.liveFor(p, agent ? await agentParam(p, agent) : undefined)?.sessionId ??(await sessions.list(p)).find((s) => s.source === 'combwork')?.id
+  if (!id) throw new HttpError(404, say(API.agent.noSessions))
   const usage = await sessions.usage(p, id)
   // Where it ran (#1434): its folder, and the slot that is, if any.
   const rec = usage ? await workspace.sessionRecord(p, id).catch(() => undefined) : undefined
@@ -871,12 +909,12 @@ route('GET', '/v1/projects/:name/usage', async ({ params, query }) => {
 })
 
 route('POST', '/v1/projects/:name/input', async ({ params, body }) => {
-  if (assistantCaller()) throw new HttpError(400, 'Use hive_prompt_agent (POST /v1/projects/{name}/agents/{agent}/prompt) to give agents work.')
-  if (!config.settings.agentApi.allowSessionInput) throw new HttpError(403, 'Session input is disabled. Enable it in Settings → Agent API.')
+  if (assistantCaller()) throw new HttpError(400, say(API.agent.usePromptAgent))
+  if (!config.settings.agentApi.allowSessionInput) throw new HttpError(403, say(API.agent.inputDisabled))
   const p = projectByName(params[0])
-  ownProjectOnly(p, 'Typing into an agent')
+  ownProjectOnly(p, [API.own.typing])
   const agentId = await agentParam(p, body?.agent)
-  if (!sessions.liveFor(p, agentId)) throw new HttpError(409, 'That agent is not running')
+  if (!sessions.liveFor(p, agentId)) throw new HttpError(409, say(API.agent.notRunning))
   const text = String(body?.text ?? '')
   writePty(sessions.key(p, agentId),text + (body?.submit === false ? '' : '\r'))
   return { ok: true }
@@ -889,53 +927,57 @@ export const handOverFailedToast = (projectPath: string, to: string, e: unknown)
 
 route('POST', '/v1/projects/:name/handover', async ({ params, body }) => {
   const own = assistantCaller()
-  if (!own && !config.settings.agentApi.allowSessionInput) throw new HttpError(403, 'Session input is disabled. Enable it in Settings → Agent API.')
+  if (!own && !config.settings.agentApi.allowSessionInput) throw new HttpError(403, say(API.agent.inputDisabled))
   const p = projectByName(params[0])
   // A hand-over prompts its agent (HI-2327): another project's agents are not a project agent's to type into, as /input.
-  ownProjectOnly(p, 'Handing over an agent')
+  ownProjectOnly(p, [API.own.handingOver])
   const from = await agentParam(p, body?.from)
-  if (typeof body?.to !== 'string' || !body.to) throw new HttpError(400, 'to is required')
+  if (typeof body?.to !== 'string' || !body.to) throw new HttpError(400, say(API.handover.toRequired))
   const to = await agentParam(p, body.to)
   const handover = body?.handover !== false
   // Known at once rather than later in a notification: from the latest handover, there has to be one.
-  if (!handover && !(await sessions.latestHandover(p))) throw new HttpError(409, `There is no handover for ${basename(p)} yet. Hand over with a new handover (handover: true) instead.`)
+  if (!handover && !(await sessions.latestHandover(p))) throw new HttpError(409, say(API.handover.noneYet, { project: basename(p) }))
   const names = projectAgents(await workspace.projectConfig(p))
   const name = (id: string): string => names.find((a) => a.id === id)?.name ?? id
   // To itself it ends its conversation (#1057): not while it works, merges or is on a running card loop's card.
-  if (from === to && !(await sessions.handOverAllowed(p, from))) throw new HttpError(409, `${name(from)} is working, merging or on a card loop's card: its conversation isn't ended now. Hand it over when it has finished.`)
+  if (from === to && !(await sessions.handOverAllowed(p, from))) throw new HttpError(409, say(API.handover.busy, { agent: name(from) }))
   const act: ActivityTarget = { kind: 'hand-over', project: basename(p), agent: { id: from, name: name(from) }, toAgent: { id: to, name: name(to) } }
-  const start = async (): Promise<void> => {
-    // It can take minutes (the handover is written first): answer now, report failures in Hive.
-    void sessions.handOver(p, from, to, { handover }).catch((e) => {
+  // `allowed`: the Assistant's guard, carried into the hand-over (HI-2420, HR1's round 1): checked before each of its steps.
+  const start = async (allowed?: () => void): Promise<void> => {
+    // It can take minutes (the handover is written first): answer now, report failures in Combwork.
+    void sessions.handOver(p, from, to, { handover, ...(allowed ? { allowed } : {}) }).catch((e) => {
       handOverFailedToast(p, name(to), e)
-      if (own) assistant.record(own, act, `Hand over in ${basename(p)}`, (e as Error).message, { reason: publicReason(undefined) })
+      if (own) assistant.record(own, act, sayStored([API.handover.failedLine, { project: basename(p) }]), (e as Error).message, { reason: publicReason(undefined) })
     })
   }
   if (!own) {
     await start()
     return { ok: true }
   }
-  return assistantChange('agents', `hand ${name(from)}'s work over to ${name(to)} in ${basename(p)}`, act, async () => {
-    // Known at once rather than minutes later: without Hive's tools agents can't write or read a handover.
-    if (!sessions.hiveMcp(p)) throw new HttpError(409, "The project's agents don't have Hive's tools (Settings → Agent API is off, or Provide Hive tools to sessions), so they can't write or read a handover. Tell the user.")
+  return assistantChange('agents', [API.change.handOver, { from: name(from), to: name(to), project: basename(p) }], act, async (guard) => {
+    // Known at once rather than minutes later: without Combwork's tools agents can't write or read a handover.
+    if (!sessions.combworkMcp(p)) throw new HttpError(409, say(API.handover.noTools))
     for (const id of [from, to]) {
-      if (sessions.userMayBeTyping(p, id)) throw new HttpError(409, `The user has just typed in ${name(id)}'s terminal and may still be writing there. Ask the user before handing over.`)
+      if (sessions.userMayBeTyping(p, id)) throw new HttpError(409, say(API.handover.userTyping, { agent: name(id) }))
     }
-    await start()
+    // Its guard checked as it is set off (HI-2420), and carried into it: the hand-over takes minutes, and each of its steps
+    // (asking for the handover, ending a conversation, giving or launching the target) checks it again.
+    guard()
+    await start(guard)
     return {
-      done: `Handing ${name(from)}'s work over to ${name(to)} in ${basename(p)}${handover ? '' : ' (from the latest handover)'}`,
-      result: { ok: true, note: `Hive ${handover ? `asks ${name(from)} for a handover, waits until it exists, then ` : ''}starts ${name(to)} on it. Use hive_wait_for_agents to follow; problems show as notifications and in your actions.` }
+      done: [API.done.handingOver, { from: name(from), to: name(to), project: basename(p), latest: handover ? 'no' : 'yes' }],
+      result: { ok: true, note: say(API.handover.started, { from: name(from), to: name(to), ask: handover ? 'yes' : 'no' }) }
     }
   })
 })
 
 // ---------------------------------------------------------------------------
-// Agents and projects for the Hive Assistant (Settings → Assistant → Control). Reading is open to every caller.
+// Agents and projects for the Combwork Assistant (Settings → Assistant → Control). Reading is open to every caller.
 // ---------------------------------------------------------------------------
 
 /** The providers agents can run: whether each is on and installed, and its models, effort levels and modes. */
 route('GET', '/v1/providers', async () => {
-  // Installed or not is only known once Hive has looked for the CLIs (#506).
+  // Installed or not is only known once Combwork has looked for the CLIs (#506).
   await providerService.detected()
   const s = config.settings
   const here = contextWorkspace()
@@ -947,9 +989,9 @@ route('GET', '/v1/providers', async () => {
       enabled: isProviderEnabled(s, p.id),
       installed: info.found,
       version: info.version,
-      // The version this Hive release was tested with, and how the installed one compares (#365).
-      tested: info.tested ? { version: info.tested.version, installed: info.found ? info.tested.installed : 'not installed' } : null,
-      problem: info.readiness?.find((r) => r.level === 'error')?.message ?? null,
+      // The version this Combwork release was tested with, and how the installed one compares (#365).
+      tested: info.tested ? { version: info.tested.version, installed: info.found ? info.tested.installed : say(API.provider.notInstalled) } : null,
+      problem: agentInstallInfo(info).readiness?.find((r) => r.level === 'error')?.message ?? null,
       defaultModel: info.defaultModel ?? null,
       // What the pickers offer: the CLI's own models, else the fallback list in Settings (#125).
       models: modelGroups(p.id, info, s).filter((g) => !g.unavailable).flatMap((g) => g.models.map((m) => ({ value: m.value, label: m.label }))),
@@ -957,14 +999,14 @@ route('GET', '/v1/providers', async () => {
       // Whether agents can be given context200k (a 200K window instead of the model's 1M).
       context200k: p.capabilities.contextLimit,
       modes: offeredModes(p.id, s).map((m) => ({ value: m.value, label: m.label, description: m.description })),
-      // Its connections usable in the caller's workspace (HI-2108), in the order: what hive_add_agent's connection names.
+      // Its connections usable in the caller's workspace (HI-2108), in the order: what cw_add_agent's connection names.
       ...(here ? { connections: connectionsHere(here).filter((c) => accountById(c.account)?.provider === p.id).map((c) => ({ id: c.id, name: c.name })) } : {})
     }
   })
 })
 
-// --- Hive's settings (#186): anyone with a token reads them (the settings catalog's entries with their values); only
-// the Hive Assistant changes them, with Settings → Assistant → Control → Change settings on, and never a sensitive one.
+// --- Combwork's settings (#186): anyone with a token reads them (the settings catalog's entries with their values); only
+// the Combwork Assistant changes them, with Settings → Assistant → Control → Change settings on, and never a sensitive one.
 const SETTING_SCOPES: readonly SettingScope[] = ['app', 'provider', 'workspace', 'project']
 
 /** A settings call's project, by name (null without one). */
@@ -975,16 +1017,16 @@ async function settingsCall<T>(fn: () => Promise<T> | T): Promise<T> {
   try {
     return await fn()
   } catch (e) {
-    throw e instanceof SettingRefused ? new HttpError(e.status, e.message) : e
+    throw e instanceof SettingRefused ? httpFrom(e.status, e) : e
   }
 }
 
 route('GET', '/v1/settings', ({ query }) =>
   settingsCall(async () => {
     const scope = query.get('scope') || undefined
-    if (scope && !SETTING_SCOPES.includes(scope as SettingScope)) throw new HttpError(400, `scope is one of ${SETTING_SCOPES.join(', ')}.`)
+    if (scope && !SETTING_SCOPES.includes(scope as SettingScope)) throw new HttpError(400, say(API.settings.scopeIs, { scopes: SETTING_SCOPES.join(', ') }))
     const p = settingsProject(query.get('project'))
-    if (scope === 'project' && !p) throw new HttpError(400, "A project's settings need its name: project=<name>.")
+    if (scope === 'project' && !p) throw new HttpError(400, say(API.settings.projectNeedsName))
     return settingRows({ query: query.get('query') ?? '', scope: scope as SettingScope | undefined, project: await projectOf(p) })
   })
 )
@@ -995,30 +1037,34 @@ route('PATCH', '/v1/settings/:id', ({ params, body }) =>
   settingsCall(async () => {
     const e = entryOf(decodeURIComponent(params[0]))
     const p = settingsProject(body?.project)
-    if (e.scope === 'project' && !p) throw new HttpError(400, `${e.id} is a project's setting: say which project.`)
+    if (e.scope === 'project' && !p) throw new HttpError(400, say(API.settings.sayProject, { setting: e.id }))
     return settingsChange(e, body?.value, e.scope === 'project' ? p : null)
   })
 )
 
 /**
- * A setting the Hive Assistant changes: only with Change settings on, never a sensitive one (its own Control included),
+ * A setting the Combwork Assistant changes: only with Change settings on, never a sensitive one (its own Control included),
  * and listed in its panel with old → new for Revert. Other callers can't.
  */
 async function settingsChange(e: SettingEntry, value: unknown, projectPath: string | null) {
+  // Where it is, as the caller reads it; and as records keep it, in the Default (dialects, HI-2441).
   const path = settingPath(e)
-  const where = projectPath ? ` in ${basename(projectPath)}` : ''
+  const storedPath = inDefaultDialect(() => settingPath(e))
+  // Where: a project's setting names its project (` in webapp`).
+  const where = projectPath ? { where: 'project', project: basename(projectPath) } : { where: 'none', project: '' }
   const ws = assistantCaller()
-  if (!ws) throw new HttpError(403, `Only the Hive Assistant can change Hive's settings through the Agent API: the user changes them in ${path}.`)
-  const line = `Change ${path}${where}`
+  if (!ws) throw new HttpError(403, say(API.settings.onlyAssistant, { path }))
+  // Recorded lines are said in the Default (stored); refusals in the caller's scope.
+  const line = sayStored([API.settings.line, { path: storedPath, ...where }])
   // Which setting, never its value (#763).
   const act: ActivityTarget = { kind: 'setting', settingId: e.id, ...(projectPath ? { project: basename(projectPath) } : {}) }
   if (config.settings.assistant?.changeSettings !== true) {
-    assistant.record(ws, act, line, 'not allowed: Settings → Assistant → Control → Change settings is off', { reason: 'Not allowed: Settings → Assistant → Control → Change settings is off' })
-    throw new HttpError(403, `The user's settings don't let you change settings (Settings → Assistant → Control → Change settings is off). Tell the user how to change it in ${path}, or that turning Change settings on lets you.`)
+    assistant.record(ws, act, line, sayStored([API.settings.notAllowed]), { reason: sayStored([API.settings.notAllowedReason]) })
+    throw new HttpError(403, say(API.settings.controlOff, { path }))
   }
   if (e.sensitive) {
-    assistant.record(ws, act, line, 'only the user can change it', { reason: 'Only the user can change it' })
-    throw new HttpError(403, `${e.readOnly} Tell the user how, instead.`)
+    assistant.record(ws, act, line, sayStored([API.settings.userOnly]), { reason: sayStored([API.settings.userOnlyReason]) })
+    throw new HttpError(403, say(API.settings.readOnly, { readOnly: settingReadOnly(e) ?? '' }))
   }
   // Checked before the change: a value it can't take is the Assistant's to fix.
   await settingsCall(() => checkedValue(e, value, projectPath))
@@ -1027,27 +1073,28 @@ async function settingsChange(e: SettingEntry, value: unknown, projectPath: stri
   // The same session, too: one started since (a restart) mustn't carry out this one's pending change.
   const token = assistantCallerToken() ?? ''
   const stillAllowed = (): void => {
-    if (config.settings.assistant?.changeSettings !== true) throw new SettingRefused(403, `Settings → Assistant → Control → Change settings was turned off before the change was made: nothing changed. Tell the user how to change ${path} themselves.`)
-    if (!assistant.isCurrentToken(ws, token)) throw new SettingRefused(409, "The Assistant's session that asked for this ended before the change was made: nothing changed.")
+    if (config.settings.assistant?.changeSettings !== true) throw new SettingRefused(403, say(API.settings.turnedOff, { path }))
+    if (!assistant.isCurrentToken(ws, token)) throw new SettingRefused(409, say(API.settings.sessionEnded))
   }
   try {
-    // The value as sent (applySetting checks it again): a provider's prices take null, Hive's own, as more than {}.
+    // The value as sent (applySetting checks it again): a provider's prices take null, Combwork's own, as more than {}.
     const r = await applySetting(e, value, projectPath, stillAllowed)
     // What changed, as the list and the reply show it: a table's changed entries, not its size.
     const { oldText, newText } = settingChangeTexts(e, r.old, r.new, r.removed)
+    const stored = inDefaultDialect(() => settingChangeTexts(e, r.old, r.new, r.removed))
     const changed = JSON.stringify(r.old) !== JSON.stringify(r.new) || !!r.removed
     if (changed) {
       // The event stream says which setting, not its values (`brief`).
-      assistant.record(ws, act, `Changed ${path}${where}: ${oldText} → ${newText}`, undefined, { brief: `Changed ${path}${where}`, setting: { id: e.id, ...(projectPath ? { project: projectPath } : {}), path, old: r.old, new: r.new, ...(r.removed ? { removed: r.removed } : {}), oldText, newText } })
+      assistant.record(ws, act, sayStored([API.settings.changedLine, { path: storedPath, ...where, old: stored.oldText, new: stored.newText }]), undefined, { brief: sayStored([API.settings.changedBrief, { path: storedPath, ...where }]), setting: { id: e.id, ...(projectPath ? { project: projectPath } : {}), path: storedPath, old: r.old, new: r.new, ...(r.removed ? { removed: r.removed } : {}), oldText: stored.oldText, newText: stored.newText } })
       // For undo (#1282): its value (and a provider's removed models) as it was and as set.
       const fields = [{ field: 'value', old: r.old, new: r.new }, ...(r.removed ? [{ field: 'removed', old: r.removed.old, new: r.removed.new }] : [])]
-      await recordingChanges(ws, 'setting', `change ${path}${where}`, () => noteChange(requireWorkspace(), { kind: 'setting', project: projectPath ? basename(projectPath) : null, target: e.id, fields }))
+      await recordingChanges(ws, 'setting', sayStored([API.change.setting, { path: storedPath, ...where }]), () => noteChange(requireWorkspace(), { kind: 'setting', project: projectPath ? basename(projectPath) : null, target: e.id, fields }))
     }
     const restart = restartText(e)
-    return { id: e.id, title: e.title, path, ...(projectPath ? { project: basename(projectPath) } : {}), changed, old: oldText, new: newText, ...(restart ? { restart } : {}), ...(r.note ? { note: r.note } : {}) }
+    return { id: e.id, title: agentTitle(e), path, ...(projectPath ? { project: basename(projectPath) } : {}), changed, old: oldText, new: newText, ...(restart ? { restart } : {}), ...(r.note ? { note: r.note } : {}) }
   } catch (err) {
     assistant.record(ws, act, line, (err as Error).message, { reason: publicReason(statusOf(err)) })
-    throw err instanceof SettingRefused ? new HttpError(err.status, err.message) : err
+    throw err instanceof SettingRefused ? httpFrom(err.status, err) : err
   }
 }
 
@@ -1059,7 +1106,7 @@ const CHANGE_GROUPS_LISTED = 10
  * its line, its card, the fields it set, whether it was undone, and why one can't be (`final`). Only the Assistant's.
  */
 route('GET', '/v1/assistant/changes', async () => {
-  if (!assistantCaller()) throw new HttpError(403, 'Only the Hive Assistant has changes to undo: they are its own.')
+  if (!assistantCaller()) throw new HttpError(403, say(API.undo.onlyAssistant))
   return changeGroups(requireWorkspace())
     .slice(0, CHANGE_GROUPS_LISTED)
     .map((g) => ({ group: g.id, at: g.at, changes: g.changes.map((c) => ({ id: c.id, what: c.what, ...(c.card !== undefined ? { card: c.card } : {}), fields: c.fields, ...(c.final ? { final: c.final } : {}), ...(c.undoneAt ? { undone: true } : {}) })) }))
@@ -1074,58 +1121,48 @@ route('POST', '/v1/assistant/undo', async ({ body }) => {
   const ws = requireWorkspace()
   const change = typeof body?.change === 'string' && body.change ? body.change : undefined
   let group = typeof body?.group === 'string' && body.group ? body.group : undefined
-  if (!change === !group) throw new HttpError(400, 'Name one change (change: its id) or one message\'s changes (group: its id, or "latest").')
+  if (!change === !group) throw new HttpError(400, say(API.undo.nameOne))
   if (group === 'latest') {
     group = changeGroups(ws).find((g) => g.changes.some((c) => !c.undoneAt && !c.final))?.id
-    if (!group) throw new HttpError(404, 'None of your changes of the last 7 days is left to undo.')
+    if (!group) throw new HttpError(404, say(API.undo.noneLeft))
   }
-  return assistantChange('agents', change ? `undo a change of yours` : `undo your changes for a message`, { kind: 'undo' }, async (guard) => {
+  return assistantChange('agents', [change ? API.change.undoOne : API.change.undoMessage], { kind: 'undo' }, async (guard) => {
     let results: AssistantUndoResult[]
     try {
       // Its control level and its launch, checked again at each change's write (#1282 round 1): turned down or ended
       // meanwhile, the rest isn't undone.
       results = await undoChanges(ws, change ? { change } : { group }, 'assistant', guard)
     } catch (e) {
-      throw e instanceof UndoNotFound ? new HttpError(404, e.message) : e
+      throw e instanceof UndoNotFound ? httpFrom(404, e) : e
     }
     const undone = results.filter((r) => r.undone.length).length
     const skipped = results.reduce((n, r) => n + r.skipped.length, 0)
     const cards = [...new Set(results.flatMap((r) => (r.card !== undefined ? [r.card] : [])))]
-    return { done: `Undid ${undone} of ${results.length} change${results.length === 1 ? '' : 's'} of its own${skipped ? ` (${skipped} field${skipped === 1 ? '' : 's'} left: changed since or gone)` : ''}`, act: cards.length === 1 ? { card: cards[0] } : cards.length ? { cards } : {}, result: { results } }
+    return { done: [API.done.undid, { undone: String(undone), count: results.length, total: String(results.length), skipped, skippedTotal: String(skipped) }], act: cards.length === 1 ? { card: cards[0] } : cards.length ? { cards } : {}, result: { results } }
   })
 })
 
 route('POST', '/v1/projects', async ({ body }) => {
   const name = String(body?.name ?? '').trim()
-  if (!name) throw new HttpError(400, 'name is required')
-  return assistantChange('projects', `create the project "${name}"`, { kind: 'create-project', project: name }, async () => {
+  if (!name) throw new HttpError(400, say(API.project.nameRequired))
+  return assistantChange('projects', [API.change.createProject, { name }], { kind: 'create-project', project: name }, async (guard) => {
+    // Its guard checked again just before the write (HI-2420): createProject makes the folder before its first await.
+    // What follows only sets up the project that is then there (activated, listed), never left half made.
+    guard()
     await workspace.createProject(name)
     const p = join(workspace.path!, name)
     workspace.setActive(p, true)
     await workspace.refresh()
-    return { done: `Created the project ${name}`, result: await projectSummary(p) }
+    return { done: [API.done.createdProject, { name }], result: await projectSummary(p) }
   })
 })
 
 const busy = (s: LiveSessionState | null): boolean => !!s && (s.status === 'working' || s.status === 'waiting' || s.status === 'starting' || s.status === 'background' || s.status === 'signin')
-const STATUS_WORDS: Record<string, string> = {
-  working: 'working',
-  waiting: 'waiting for the user',
-  signin: 'waiting for the user to sign in to its CLI again (its sign-in expired)',
-  starting: 'starting',
-  background: 'waiting on background tasks it started',
-  watching: 'waiting for cards to change (a card watch: its card loop pauses until it is resumed)',
-  ready: 'idle',
-  finished: 'idle (finished its task)',
-  error: 'in error',
-  stopped: 'stopped'
-}
-const tasksWord = (n: number): string => `${n} background task${n === 1 ? '' : 's'}`
 const clip = (t: string, n: number): string => (t.length > n ? `${t.slice(0, n)}…` : t)
 
 async function agentDefOf(p: string, agentId: string) {
   const a = projectAgents(await workspace.projectConfig(p)).find((x) => x.id === agentId)
-  if (!a) throw new HttpError(404, 'Unknown agent')
+  if (!a) throw new HttpError(404, say(API.agent.unknown))
   return a
 }
 
@@ -1137,13 +1174,13 @@ function agentMcpArg(body: any): { mcpServers?: string[] | null } {
   try {
     return { mcpServers: all ? null : cleanMcpServers(m)! }
   } catch (e) {
-    throw new HttpError(400, `${(e as Error).message} mcpServers is a list of the project's server names, [] for none, or ["*"] for all of them.`)
+    throw new HttpError(400, say(API.agent.mcpServersArg, { error: (e as Error).message }))
   }
 }
 
 /** A workspace's connections per CLI, as they apply (dropping ids gone or another CLI's). */
 function workspaceConnections(ws: WorkspaceService): Partial<Record<ProviderId, WorkspaceConnections>> {
-  const all = hiveAccounts()
+  const all = combworkAccounts()
   return Object.fromEntries(PROVIDERS.flatMap((x) => (x.capabilities.connections ? [[x.id, workspaceAccounts(ws.config, x.id, all) ?? { on: [], default: null }]] : [])))
 }
 
@@ -1152,7 +1189,7 @@ const connectionsHere = (ws: WorkspaceService): Connection[] => usableConnection
 
 /** A connection's values as the Agent API shows them (HI-2108): only those set (each absent: the CLI decides); its extra arguments to `wide` callers only. */
 function connectionValues(c: Connection, wide: boolean): Record<string, unknown> {
-  return { ...(c.model ? { model: c.model } : {}), ...(c.effort ? { effort: c.effort } : {}), ...(c.use200kContext ? { context200k: true } : {}), ...(c.permissionMode ? { mode: c.permissionMode } : {}), ...(wide && c.extraArgs ? { extraArgs: c.extraArgs } : {}) }
+  return { ...(c.model ? { model: c.model } : {}), ...(c.effort ? { effort: c.effort } : {}), ...(c.use200kContext ? { context200k: true } : {}), ...(c.permissionMode ? { mode: c.permissionMode } : {}), ...(wide && c.extraArgs ? { extraArgs: c.extraArgs } : {}), ...(c.tag ? { tag: c.tag } : {}) }
 }
 
 /** A connection as the Agent API lists it (HI-2108): its id, name, account (its name and CLI), its values, and `usable: false` where it can't be used here. */
@@ -1164,8 +1201,8 @@ function connectionRow(c: Connection, usable: boolean, wide: boolean): Record<st
 /** An account's connections by name, for a refusal (HI-2108): "On Personal: Personal, Personal · High." */
 function connectionNamesOn(accountId: string | undefined): string {
   const a = accountById(accountId)
-  if (!a) return 'No account is on in this workspace: the user adds one in Settings → Accounts & Connections.'
-  return `On ${a.name}: ${connectionsOn(a.id, allConnections()).map((c) => c.name).join(', ')}.`
+  if (!a) return say(API.connection.noAccountOn)
+  return say(API.connection.namesOn, { account: a.name, connections: connectionsOn(a.id, allConnections()).map((c) => c.name).join(', ') })
 }
 
 /**
@@ -1177,7 +1214,7 @@ const OLD_AGENT_FIELDS = ['provider', 'model', 'effort', 'mode', 'context200k'] 
 export function refuseOldFields(body: any, account: string | undefined): void {
   const old = OLD_AGENT_FIELDS.filter((k) => body && typeof body === 'object' && k in body)
   if (!old.length) return
-  throw new HttpError(400, `An agent no longer takes ${old.join(', ')}: it runs on a connection, which holds its model, effort, context and mode, and its CLI follows from it. Pass connection (its id or name). ${connectionNamesOn(account)} hive_connection lists every one, and makes one when the user agrees.`)
+  throw new HttpError(400, say(API.connection.oldFields, { fields: old.join(', '), on: connectionNamesOn(account) }))
 }
 
 /**
@@ -1191,7 +1228,7 @@ function connectionArg(body: any, projectPath: string): { connection: string | n
   if (v === null || v === '') return { connection: null }
   const here = connectionsHere(workspaceOf(projectPath)).map((c) => c.id)
   const r = connectionRef(String(v), allConnections(), here)
-  if (!r.ok) throw r.why === 'ambiguous' ? new HttpError(409, `Several connections are named "${v}": use its id (${r.ids!.join(', ')}).`) : new HttpError(404, `No connection named "${v}" is usable in this workspace, and none has that id. hive_connection lists them.`)
+  if (!r.ok) throw r.why === 'ambiguous' ? new HttpError(409, say(API.connection.severalNamed, { name: v, ids: r.ids!.join(', ') })) : new HttpError(404, say(API.connection.noneNamedUsable, { name: v }))
   return { connection: r.id, cli: accountById(getConnection(r.id)?.account)?.provider }
 }
 
@@ -1219,7 +1256,7 @@ function agentConnectionFields(p: string, a: AgentInfo, cli: ProviderId): Record
 }
 
 /**
- * Hive's connections as the caller may see them (HI-2108): `connections`, the setups agents choose (a project agent only
+ * Combwork's connections as the caller may see them (HI-2108): `connections`, the setups agents choose (a project agent only
  * those usable in its workspace; the user's token and the Assistant every one, `usable: false` on the rest, with their
  * extra arguments); `accounts`, the sign-ins and servers they are on (a project agent only those on in its workspace: id,
  * name, CLI, kind, signed in; the others with on here and who each is signed in as). Never a token, a key or where a login
@@ -1229,7 +1266,7 @@ route('GET', '/v1/connections', async () => {
   const ws = requireWorkspace()
   const wide = !agentCaller()
   const here = new Set(connectionsHere(ws).map((c) => c.id))
-  const accounts = connectionsFor(hiveAccounts(), workspaceConnections(ws), wide)
+  const accounts = connectionsFor(combworkAccounts(), workspaceConnections(ws), wide)
   return { connections: allConnections().filter((c) => wide || here.has(c.id)).map((c) => connectionRow(c, here.has(c.id), wide)), accounts, usage: accountUsageRows(accounts.map((a) => a.id)) }
 })
 
@@ -1258,13 +1295,13 @@ route('GET', '/v1/connections/:ref', async ({ params }) => {
   const r = connectionRef(ref, allConnections(), here)
   // A project agent asking after one not usable in its workspace, by id or by name: as if there were none.
   const c = r.ok ? getConnection(r.id) : undefined
-  if (r.ok === false && r.why === 'ambiguous') throw new HttpError(409, `Several connections are named "${ref}": use its id (${r.ids!.join(', ')}).`)
-  if (!c || (agentCaller() && !here.includes(c.id))) throw new HttpError(404, `No connection named "${ref}" is usable in this workspace, and none has that id.`)
+  if (r.ok === false && r.why === 'ambiguous') throw new HttpError(409, say(API.connection.severalNamed, { name: ref, ids: r.ids!.join(', ') }))
+  if (!c || (agentCaller() && !here.includes(c.id))) throw new HttpError(404, say(API.connection.noneNamedUsableShort, { name: ref }))
   return connectionRow(c, here.includes(c.id), !agentCaller())
 })
 
 /**
- * A connection's name and values from a request body (HI-2108: hive_connection add and update): model, effort, mode,
+ * A connection's name and values from a request body (HI-2108: cw_connection add and update): model, effort, mode,
  * context200k and extraArgs, each "" or null for the CLI's own (on an update: cleared). Saving checks them as the
  * connection dialog's save does (a mode the CLI has, an effort the model takes: decision E).
  */
@@ -1273,28 +1310,30 @@ export function connectionValuesArg(body: any): ConnectionPatch {
   const text = (v: unknown): string | null => (v === null || v === undefined ? null : String(v).trim() || null)
   if (body?.name !== undefined) {
     const n = String(body.name ?? '').trim()
-    if (!n) throw new HttpError(400, 'A connection needs a name.')
+    if (!n) throw new HttpError(400, say(API.connection.needsName))
     out.name = n
   }
   if (body?.model !== undefined) out.model = text(body.model)
   if (body?.effort !== undefined) out.effort = text(body.effort) as EffortLevel | null
   if (body?.mode !== undefined) out.permissionMode = text(body.mode) as PermissionMode | null
   if (body?.extraArgs !== undefined) out.extraArgs = text(body.extraArgs)
+  // Its tag (HI-2530): free text, "" or null for none; its length is checked as Settings' save does.
+  if (body?.tag !== undefined) out.tag = text(body.tag)
   const c = body?.context200k
   if (c !== undefined) {
     if (c === true || c === 'on') out.use200kContext = true
     else if (c === false || c === 'off' || c === null || c === '') out.use200kContext = null
-    else throw new HttpError(400, 'context200k is "on", or "off" (or "") for the model\'s 1M.')
+    else throw new HttpError(400, say(API.connection.context200k))
   }
   return out
 }
 
 /**
- * The Assistant makes or changes a connection (HI-2108, hive_connection): only with Settings → Assistant → Control →
+ * The Assistant makes or changes a connection (HI-2108, cw_connection): only with Settings → Assistant → Control →
  * Change settings on, asked again at the change, and listed in its panel. Accounts (sign-ins, servers, keys) stay the
  * user's: a connection goes only on an account that exists.
  */
-async function connectionChange<T>(act: ActivityTarget, what: string, fn: (atTheChange: <R>(change: () => R) => R) => Promise<{ done: string; act?: Partial<ActivityTarget>; result: T }>): Promise<T> {
+async function connectionChange<T>(act: ActivityTarget, what: Said, fn: (atTheChange: <R>(change: () => R) => R) => Promise<{ done: Said; act?: Partial<ActivityTarget>; result: T }>): Promise<T> {
   connectionsAllowed()
   return assistantChange('look', what, act, async (guard) => {
     connectionsAllowed()
@@ -1304,7 +1343,7 @@ async function connectionChange<T>(act: ActivityTarget, what: string, fn: (atThe
 
 /** Change settings on (HI-2108): else a connection change is refused, saying where the user changes it. */
 function connectionsAllowed(): void {
-  if (config.settings.assistant?.changeSettings !== true) throw new HttpError(403, "The user's settings don't let you change connections (Settings → Assistant → Control → Change settings is off). Tell the user how to change it in Settings → Accounts & Connections, or that turning Change settings on lets you.")
+  if (config.settings.assistant?.changeSettings !== true) throw new HttpError(403, say(API.connection.controlOff))
 }
 
 /**
@@ -1324,58 +1363,58 @@ async function connectionsCall<T>(fn: () => T | Promise<T>): Promise<T> {
     return await fn()
   } catch (e) {
     if (e instanceof HttpError) throw e
-    throw new HttpError(e instanceof HiveError && e.kind === 'notFound' ? 404 : 409, (e as Error).message)
+    throw httpFrom(e instanceof CombworkError && e.kind === 'notFound' ? 404 : 409, e)
   }
 }
 
 route('POST', '/v1/connections', async ({ body }) =>
-  connectionChange({ kind: 'add-connection' }, 'make a connection', async (checked) => {
+  connectionChange({ kind: 'add-connection' }, [API.change.addConnection], async (checked) => {
     const ref = String(body?.account ?? '').trim()
-    if (!ref) throw new HttpError(400, "Name the account it goes on (account: its id or name, from hive_connection list). Adding an account is the user's, in Settings → Accounts & Connections.")
+    if (!ref) throw new HttpError(400, say(API.connection.nameAccount))
     const accounts = allAccounts()
     const byName = accounts.filter((a) => a.name.trim().toLowerCase() === ref.toLowerCase())
     const account = accounts.find((a) => a.id === ref) ?? (byName.length === 1 ? byName[0] : undefined)
-    if (!account) throw byName.length > 1 ? new HttpError(409, `Several accounts are named "${ref}": use its id (${byName.map((a) => a.id).join(', ')}).`) : new HttpError(404, `No account named "${ref}": hive_connection list names them. Adding one is the user's, in Settings → Accounts & Connections.`)
+    if (!account) throw byName.length > 1 ? new HttpError(409, say(API.connection.severalAccounts, { name: ref, ids: byName.map((a) => a.id).join(', ') })) : new HttpError(404, say(API.connection.noAccount, { name: ref }))
     const v = connectionValuesArg(body)
-    if (!v.name) throw new HttpError(400, 'A connection needs a name.')
+    if (!v.name) throw new HttpError(400, say(API.connection.needsName))
     const c = await checked(() => connectionsCall(() => addConnection(account.id, { ...v, name: v.name! })))
-    return { done: `Made the connection ${c.name} on ${account.name}`, act: { connection: c.id }, result: connectionRow(c, connectionsHere(requireWorkspace()).some((x) => x.id === c.id), true) }
+    return { done: [API.done.addedConnection, { connection: c.name, account: account.name }], act: { connection: c.id }, result: connectionRow(c, connectionsHere(requireWorkspace()).some((x) => x.id === c.id), true) }
   })
 )
 
 route('PATCH', '/v1/connections/:ref', async ({ params, body }) =>
-  connectionChange({ kind: 'update-connection' }, 'change a connection', async (checked) => {
+  connectionChange({ kind: 'update-connection' }, [API.change.updateConnection], async (checked) => {
     const ref = decodeURIComponent(params[0] ?? '')
     const r = connectionRef(ref, allConnections(), allConnections().map((c) => c.id))
-    if (!r.ok) throw r.why === 'ambiguous' ? new HttpError(409, `Several connections are named "${ref}": use its id (${r.ids!.join(', ')}).`) : new HttpError(404, `No connection named "${ref}", and none has that id.`)
+    if (!r.ok) throw r.why === 'ambiguous' ? new HttpError(409, say(API.connection.severalNamed, { name: ref, ids: r.ids!.join(', ') })) : new HttpError(404, say(API.connection.noneNamed, { name: ref }))
     const v = connectionValuesArg(body)
-    if (!Object.keys(v).length) throw new HttpError(400, 'Nothing to change: give name, model, effort, mode, context200k or extraArgs.')
+    if (!Object.keys(v).length) throw new HttpError(400, say(API.connection.nothingToChange))
     const c = await checked(() => connectionsCall(() => updateConnection(r.id, v)))
-    return { done: `Changed the connection ${c.name} (agents running on it take it when restarted)`, act: { connection: c.id }, result: connectionRow(c, connectionsHere(requireWorkspace()).some((x) => x.id === c.id), true) }
+    return { done: [API.done.updatedConnection, { connection: c.name }], act: { connection: c.id }, result: connectionRow(c, connectionsHere(requireWorkspace()).some((x) => x.id === c.id), true) }
   })
 )
 
 /** A workflowRole argument (#1430): builder, reviewer, either or generalist (HI-686). */
 function workflowRoleArg(v: unknown): WorkflowRole {
   if (isWorkflowRole(v)) return v
-  throw new HttpError(400, 'workflowRole is "builder", "reviewer", "either" or "generalist".')
+  throw new HttpError(400, say(API.agent.workflowRoleArg))
 }
 
 /** Why a worktree of an agent's own is refused (#1451): the Agent API's short note. */
-const NOT_PINNED = "Agents aren't pinned to worktrees in 1.0: slots are lent per card or lane." // i18n-ignore: an Agent API refusal (agents read it)
+const NOT_PINNED = API.agent.notPinned
 
 route('POST', '/v1/projects/:name/agents', async ({ params, body }) => {
   const p = projectByName(params[0])
   const project = basename(p)
-  return assistantChange('agents', `add an agent to ${project}`, { kind: 'add-agent', project }, async (guard) => {
+  return assistantChange('agents', [API.change.addAgent, { project }], { kind: 'add-agent', project }, async (guard) => {
     const conn = connectionArg(body, p)
     const ws = workspaceOf(p)
     // Decision D (HI-2108): provider, model, effort, mode and context are a connection's now, refused naming those there.
     refuseOldFields(body, getConnection(conn?.connection)?.account ?? firstUsableAccount(ws.path ? ws.config : null)?.id)
     const mcp = agentMcpArg(body)
-    if (conn?.cli && !isProviderEnabled(config.settings, conn.cli)) throw new HttpError(409, `${PROVIDERS.find((x) => x.id === conn.cli)?.name ?? conn.cli} is turned off in Settings → Providers.`)
+    if (conn?.cli && !isProviderEnabled(config.settings, conn.cli)) throw new HttpError(409, say(API.agent.providerOff, { provider: PROVIDERS.find((x) => x.id === conn.cli)?.name ?? conn.cli }))
     // 1.0 (#1451): no agent has a worktree of its own (slots are lent per card or lane): the old arguments are refused.
-    if (body?.worktree || body?.existingWorktree || body?.branch || body?.base || (body?.location && body.location !== 'project')) throw new HttpError(400, NOT_PINNED)
+    if (body?.worktree || body?.existingWorktree || body?.branch || body?.base || (body?.location && body.location !== 'project')) throw new HttpError(400, say(NOT_PINNED))
     // Its connection: the one named, else the first usable here (decision A), its CLI following from it.
     const def = await addAgent(p, {
       name: body?.name ? String(body.name) : undefined,
@@ -1389,24 +1428,24 @@ route('POST', '/v1/projects/:name/agents', async ({ params, body }) => {
     // The view stays where the user has it; the new agent is marked for them.
     emit({ type: 'agent-added', projectPath: p, agentId: def.id })
     const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : ''
-    let started = ''
+    let startError = ''
     let didStart: boolean | null = null
     // The launch it started, for undo (#1282): stopped only while that one runs.
     let launched: string | null = null
     if (body?.start || prompt) {
       try {
         launched = (prompt ? await startOnTask(p, def.id, def.name, prompt, (line) => sessions.start(p, { agentId: def.id, prompt: line, allowed: guard })) : await sessions.start(p, { agentId: def.id, allowed: guard }))?.runId ?? null
-        started = ' and started it'
         didStart = true
       } catch (e) {
-        started = ` (it didn't start: ${(e as Error).message})`
+        startError = (e as Error).message
         didStart = false
       }
     }
     const said = prompt && didStart ? ` on: ${clip(prompt.replace(/\s+/g, ' '), 80)}` : undefined
-    // The stream's line is Hive's own words: never why it didn't start.
-    const brief = `Added ${def.name} to ${project}${didStart === true ? ' and started it' : didStart === false ? "; it didn't start" : ''}`
-    return { done: `Added ${def.name} to ${project}${started}`, said, brief, act: { agent: actAgent(def) }, ...(launched ? { started: { project, agentId: def.id, run: launched } } : {}), result: { agent: addedForAgents(def), project: await projectSummary(p) } }
+    // The stream's line is Combwork's own words: never why it didn't start.
+    const started = didStart === true ? 'yes' : didStart === false ? 'no' : 'notAsked'
+    const brief: Said = [API.done.addedAgentBrief, { agent: def.name, project, started }]
+    return { done: [API.done.addedAgent, { agent: def.name, project, started, error: startError }], said, brief, act: { agent: actAgent(def) }, ...(launched ? { started: { project, agentId: def.id, run: launched } } : {}), result: { agent: addedForAgents(def), project: await projectSummary(p) } }
   })
 })
 
@@ -1414,7 +1453,7 @@ route('PATCH', '/v1/projects/:name/agents/:agent', async ({ params, body }) => {
   const p = projectByName(params[0])
   const agentId = await agentParam(p, params[1] && decodeURIComponent(params[1]))
   const a = await agentDefOf(p, agentId)
-  return assistantChange('agents', `change ${a.name}'s settings in ${basename(p)}`, { kind: 'update-agent', project: basename(p), agent: actAgent(a) }, async (guard) => {
+  return assistantChange('agents', [API.change.updateAgent, { agent: a.name, project: basename(p) }], { kind: 'update-agent', project: basename(p), agent: actAgent(a) }, async (guard) => {
     // What of its settings changed, for undo (#1282): as saved when the change was made, under the project's lock.
     let was: AgentDef | undefined
     const role = body?.workflowRole !== undefined ? { workflowRole: workflowRoleArg(body.workflowRole) } : {}
@@ -1431,7 +1470,7 @@ route('PATCH', '/v1/projects/:name/agents/:agent', async ({ params, body }) => {
     })
     if (was) await noteAgent(requireWorkspace(), basename(p), was, def)
     const live = sessions.liveFor(p, agentId)
-    return { done: `Changed ${def.name}'s settings in ${basename(p)}${live ? ' (it applies them when restarted)' : ''}`, act: { agent: actAgent(def) }, result: def }
+    return { done: [API.done.updatedAgent, { agent: def.name, project: basename(p), live: live ? 'yes' : 'no' }], act: { agent: actAgent(def) }, result: def }
   })
 })
 
@@ -1439,17 +1478,18 @@ route('POST', '/v1/projects/:name/agents/:agent/start', async ({ params, body })
   const p = projectByName(params[0])
   const agentId = await agentParam(p, decodeURIComponent(params[1]))
   const a = await agentDefOf(p, agentId)
-  return assistantChange('agents', `start ${a.name} in ${basename(p)}`, { kind: 'start-agent', project: basename(p), agent: actAgent(a) }, async (guard) => {
-    if (sessions.liveFor(p, agentId)) throw new HttpError(409, `${a.name} is already running. Use hive_prompt_agent to give it work once it's idle.`)
+  return assistantChange('agents', [API.change.startAgent, { agent: a.name, project: basename(p) }], { kind: 'start-agent', project: basename(p), agent: actAgent(a) }, async (guard) => {
+    if (sessions.liveFor(p, agentId)) throw new HttpError(409, say(API.agent.alreadyRunning, { agent: a.name }))
     let resumeId: string | undefined
     if (typeof body?.resume === 'string' && body.resume) resumeId = body.resume
     else if (body?.resume) {
       resumeId = (await workspace.projectInfo(p)).agents.find((x) => x.id === agentId)?.resume?.id
-      if (!resumeId) throw new HttpError(409, `${a.name} has no conversation to resume. Start it without resume.`)
+      if (!resumeId) throw new HttpError(409, say(API.agent.noConversation, { agent: a.name }))
     }
     const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : ''
     const st = prompt ? await startOnTask(p, agentId, a.name, prompt, (line) => sessions.start(p, { agentId, resumeId, prompt: line, allowed: guard })) : await sessions.start(p, { agentId, resumeId, allowed: guard })
-    return { done: `${resumeId ? 'Resumed' : 'Started'} ${a.name} in ${basename(p)}`, said: prompt ? ` on: ${clip(prompt.replace(/\s+/g, ' '), 80)}` : undefined, result: st, ...(st?.runId ? { started: { project: basename(p), agentId, run: st.runId } } : {}) }
+    // A resume that started a new conversation says so, and why (HI-2540).
+    return { done: [API.done.startedAgent, { agent: a.name, project: basename(p), resumed: resumeId && !st?.startedFresh ? 'yes' : 'no', fresh: st?.startedFresh ?? 'none' }], said: prompt ? ` on: ${clip(prompt.replace(/\s+/g, ' '), 80)}` : undefined, result: st, ...(st?.runId ? { started: { project: basename(p), agentId, run: st.runId } } : {}) }
   })
 })
 
@@ -1458,36 +1498,27 @@ route('POST', '/v1/projects/:name/agents/:agent/stop', async ({ params, body, si
   const agentId = await agentParam(p, decodeURIComponent(params[1]))
   const a = await agentDefOf(p, agentId)
   const ws = assistantCaller()
-  return assistantChange('agents', `stop ${a.name} in ${basename(p)}`, { kind: 'stop-agent', project: basename(p), agent: actAgent(a) }, async (guard) => {
+  return assistantChange('agents', [API.change.stopAgent, { agent: a.name, project: basename(p) }], { kind: 'stop-agent', project: basename(p), agent: actAgent(a) }, async (guard) => {
     const st = sessions.liveFor(p, agentId)
-    if (!st) return { done: `${a.name} in ${basename(p)} wasn't running`, result: { ok: true, wasRunning: false } }
+    if (!st) return { done: [API.done.notRunning, { agent: a.name, project: basename(p) }], result: { ok: true, wasRunning: false } }
     // Stopping an agent in the middle of something is the user's call; one only watching is idle (HI-1994).
     if (stopAsksUser(st.status) && ws) {
-      const said = typeof body?.reason === 'string' ? clip(body.reason.trim(), 300) : ''
-      const reason = said ? ` Its reason: ${said}${/[.!?]$/.test(said) ? '' : '.'}` : ''
-      const how = await assistant.ask(
-        ws,
-        {
-          title: `Stop ${a.name} in ${basename(p)}?`,
-          message: `The Assistant wants to stop ${a.name}, which is ${STATUS_WORDS[st.status] ?? st.status}.${reason} Its conversation is kept and can be resumed.`,
-          yes: 'Stop',
-          no: "Don't stop"
-        },
-        { timeoutMs: STOP_ASK_MS, signal }
-      )
+      // The user's question, in the window's language (HI-2449).
+      const reason = typeof body?.reason === 'string' ? clip(body.reason.trim(), 300) : ''
+      const how = await assistant.ask(ws, assistant.stopQuestion({ agent: a.name, project: basename(p), status: st.status, reason }), { timeoutMs: STOP_ASK_MS, signal })
       // Its question closed, whatever ended it: never left open in the panel with nobody waiting on it (HI-1994).
-      if (how === 'timedOut') throw new HttpError(408, `Your request to stop ${a.name} timed out: the user didn't answer in ${STOP_ASK_MS / 1000} seconds, and it was withdrawn. ${a.name} keeps running; ask the user in chat if it should still stop.`)
-      if (how === 'gone') throw new HttpError(409, `Your request to stop ${a.name} was withdrawn: you stopped waiting for the user's answer. ${a.name} keeps running.`)
-      if (how === 'no') throw new HttpError(409, `The user chose not to stop ${a.name}. Leave it running.`)
+      if (how === 'timedOut') throw new HttpError(408, say(API.agent.stopAskTimedOut, { agent: a.name, seconds: String(STOP_ASK_MS / 1000) }))
+      if (how === 'gone') throw new HttpError(409, say(API.agent.stopAskWithdrawn, { agent: a.name }))
+      if (how === 'no') throw new HttpError(409, say(API.agent.stopAskDeclined, { agent: a.name }))
       // The answer can come minutes later: only the run the user was asked about, and only if Control still allows it.
-      if (sessions.liveFor(p, agentId)?.runId !== st.runId) return { done: `${a.name} in ${basename(p)} had already stopped`, result: { ok: true, wasRunning: false } }
-      if (!assistant.allows('agents')) throw new HttpError(403, `The user's settings (Settings → Assistant → Control: ${assistant.LEVEL_NAME[assistant.controlLevel()]}) no longer let you stop agents.`)
+      if (sessions.liveFor(p, agentId)?.runId !== st.runId) return { done: [API.done.alreadyStopped, { agent: a.name, project: basename(p) }], result: { ok: true, wasRunning: false } }
+      if (!assistant.allows('agents')) throw new HttpError(403, say(API.agent.stopNotAllowed, { level: assistant.levelName(assistant.controlLevel()) }))
     }
     // Control and the Assistant's session that asked, checked again just before the stop (HI-2328).
     guard()
     // Its cause from the caller's token (HI-1881): the Assistant's, an agent's, or unknown (a script).
     sessions.stop(p, agentId, ws ? 'assistant' : agentCaller() ? 'agent' : undefined)
-    return { done: `Stopped ${a.name} in ${basename(p)}`, result: { ok: true, wasRunning: true } }
+    return { done: [API.done.stoppedAgent, { agent: a.name, project: basename(p) }], result: { ok: true, wasRunning: true } }
   })
 })
 
@@ -1496,81 +1527,82 @@ route('POST', '/v1/projects/:name/agents/:agent/prompt', async ({ params, body }
   const agentId = await agentParam(p, decodeURIComponent(params[1]))
   const a = await agentDefOf(p, agentId)
   const text = typeof body?.text === 'string' ? body.text.trim() : ''
-  if (!text) throw new HttpError(400, 'text is required')
+  if (!text) throw new HttpError(400, say(API.agent.textRequired))
   // A new conversation for the task (a new lane, say): the current one ends, as when it hands over to itself.
   const fresh = body?.newConversation === true
-  return assistantChange<{ ok: boolean; id?: string; newConversation?: boolean }>('agents', `give ${a.name} in ${basename(p)} a task${fresh ? ' in a new conversation' : ''}`, { kind: 'prompt-agent', project: basename(p), agent: actAgent(a) }, async (guard) => {
+  return assistantChange<{ ok: boolean; id?: string; newConversation?: boolean }>('agents', [API.change.promptAgent, { agent: a.name, project: basename(p), fresh: fresh ? 'yes' : 'no' }], { kind: 'prompt-agent', project: basename(p), agent: actAgent(a) }, async (guard) => {
     const st = sessions.liveFor(p, agentId)
     // Never over the top of the agent's work, a question to the user, or the user's own typing.
-    if (!st) throw new HttpError(409, `${a.name} isn't running. Start it with the task instead (hive_start_agent with prompt).`)
-    if (st.status === 'starting') throw new HttpError(409, `${a.name} is still starting. Wait for it (hive_wait_for_agents), then try again, or leave it a message (hive_message_agent).`)
-    if (st.status === 'waiting') throw new HttpError(409, `${a.name} is waiting for the user${st.statusMessage ? ` (${st.statusMessage})` : ''}. Tell the user; don't answer for them.`)
-    if (st.status === 'working') throw new HttpError(409, `${a.name} is working. Wait until it's idle (hive_wait_for_agents), then give it the task, or leave it a message it gets when it is (hive_message_agent).`)
-    if (st.status === 'signin') throw new HttpError(409, `${a.name}'s CLI needs the user to sign in again (its sign-in expired). Tell the user; nothing it is given runs until then.`)
-    if (st.status === 'watching') throw new HttpError(409, `${a.name} is ${st.watch?.label.replace(/^Waiting/, 'waiting') ?? 'waiting on cards'} (${st.watch?.agents && !st.watch.lanes ? 'an agent watch' : 'a card watch'}): it takes no new task until it is woken or the user cancels the watch. To tell it something for the work it is waiting on, leave it a message (hive_message_agent): it is woken by it and its watch carries on.`)
+    if (!st) throw new HttpError(409, say(API.agent.promptNotRunning, { agent: a.name }))
+    if (st.status === 'starting') throw new HttpError(409, say(API.agent.promptStarting, { agent: a.name }))
+    if (st.status === 'waiting') throw new HttpError(409, say(API.agent.promptWaiting, { agent: a.name, said: st.statusMessage ? 'yes' : 'no', message: st.statusMessage ?? '' }))
+    if (st.status === 'working') throw new HttpError(409, say(API.agent.promptWorking, { agent: a.name }))
+    if (st.status === 'signin') throw new HttpError(409, say(API.agent.promptSignIn, { agent: a.name }))
+    if (st.status === 'watching') throw new HttpError(409, say(API.agent.promptWatching, { agent: a.name, waiting: st.watch?.label.replace(/^Waiting/, 'waiting') ?? say(API.agent.waitingOnCards), watch: st.watch?.agents && !st.watch.lanes ? 'agents' : 'cards' }))
     if (st.status === 'background') {
-      throw new HttpError(409, `${a.name} is waiting on ${tasksWord(st.backgroundTasks ?? 0)} it started (such as a test run) and carries on by itself when they end. Wait for it (hive_wait_for_agents), then give it the task, or leave it a message it gets when it is idle (hive_message_agent). If it seems stuck, tell the user.`)
+      throw new HttpError(409, say(API.agent.promptBackground, { agent: a.name, tasks: st.backgroundTasks ?? 0, total: String(st.backgroundTasks ?? 0) }))
     }
-    if (sessions.userMayBeTyping(p, agentId)) throw new HttpError(409, `The user has just typed in ${a.name}'s terminal and may still be writing there. Ask the user before giving it a task.`)
-    // A line Hive typed that its CLI hasn't taken (#430): more typing would be lost behind it, or clear it.
-    if (sessions.lineUntaken(p, agentId)) throw new HttpError(409, `${a.name}'s CLI hasn't taken a line Hive typed into it (it wasn't reading its input). Tell the user: they can click its terminal and press Enter. Nothing is typed into it until then.`)
-    if (agentNowFor(p, agentId).pending) throw new HttpError(409, `${a.name} has just been given a prompt that its CLI hasn't taken yet. Wait for it (hive_wait_for_agents), then give it the task.`)
+    if (sessions.userMayBeTyping(p, agentId)) throw new HttpError(409, say(API.agent.promptUserTyping, { agent: a.name }))
+    // A line Combwork typed that its CLI hasn't taken (#430): more typing would be lost behind it, or clear it.
+    if (sessions.lineUntaken(p, agentId)) throw new HttpError(409, say(API.agent.promptNotTaken, { agent: a.name }))
+    if (agentNowFor(p, agentId).pending) throw new HttpError(409, say(API.agent.promptPending, { agent: a.name }))
     if (fresh) {
       // The Assistant's authority (Control, its session) again after the stop and at the launch: it may end meanwhile.
       await startOnTask(p, agentId, a.name, text, (line) => sessions.newConversation(p, agentId, line, guard)).catch((e: Error) => {
         const stopped = !sessions.liveFor(p, agentId)
         if (e instanceof assistant.ChangeRefused) {
           if (!stopped) throw e
-          const why = e.status === 403 ? 'the user turned Settings → Assistant → Control down meanwhile' : "the Assistant's session that asked for it ended meanwhile"
-          throw new HttpError(e.status, `${a.name}'s conversation ended (it is kept in the Sessions tab), but no new one was started: ${why}. It is stopped now.`)
+          const why = say(e.status === 403 ? API.agent.freshWhyControl : API.agent.freshWhySession)
+          throw new HttpError(e.status, say(API.agent.freshNotStarted, { agent: a.name, why }))
         }
-        throw new HttpError(409, `${a.name} wasn't given the task in a new conversation: ${e.message}${stopped ? ' It is stopped now (its conversation is kept): start it with the task (hive_start_agent with prompt).' : ''}`)
+        throw new HttpError(409, say(API.agent.freshFailed, { agent: a.name, error: e.message, stopped: stopped ? 'yes' : 'no' }))
       })
-      return { done: `Gave ${a.name} in ${basename(p)} a task in a new conversation`, said: `: ${clip(text.replace(/\s+/g, ' '), 80)}`, result: { ok: true, newConversation: true } }
+      return { done: [API.done.promptedFresh, { agent: a.name, project: basename(p) }], said: `: ${clip(text.replace(/\s+/g, ' '), 80)}`, result: { ok: true, newConversation: true } }
     }
     // A task delivery (#649), given now or not at all: never queued behind the agent's work.
     const r = await deliverNow(p, { agentId, agentName: a.name, conversation: st.sessionId || null, kind: 'task', from: callerSender(), body: text, need: 'free' }).catch((e: Error) => {
-      if (e instanceof NotGiven) throw new HttpError(409, `${a.name} wasn't given the task: ${e.message}.`)
+      if (e instanceof NotGiven) throw new HttpError(409, say(API.agent.promptFailed, { agent: a.name, error: e.message }))
       throw e
     })
-    return { done: `Gave ${a.name} in ${basename(p)} a task${r ? ` (${r.id})` : ''}`, said: `: ${clip(text.replace(/\s+/g, ' '), 80)}`, result: { ok: true, ...(r ? { id: r.id } : {}) } }
+    return { done: [API.done.prompted, { agent: a.name, project: basename(p), given: r ? 'yes' : 'no', id: r?.id ?? '' }], said: `: ${clip(text.replace(/\s+/g, ' '), 80)}`, result: { ok: true, ...(r ? { id: r.id } : {}) } }
   })
 })
 
 // A message for a running agent that may not take a prompt now (#530): a delivery (#647) offered at once when it can be
 // (idle, or watching: its watch carries on), else queued and offered as its next line once it is idle; the agent can also
-// fetch it with hive_inbox. cancel=true cancels those waiting.
+// fetch it with cw_inbox. cancel=true cancels those waiting.
 route('POST', '/v1/projects/:name/agents/:agent/message', async ({ params, body }) => {
   const p = projectByName(params[0])
   const agentId = await agentParam(p, decodeURIComponent(params[1]))
   const a = await agentDefOf(p, agentId)
   if (body?.cancel === true) {
-    return assistantChange<{ cancelled: number }>('agents', `cancel the messages waiting for ${a.name} in ${basename(p)}`, { kind: 'cancel-messages', project: basename(p), agent: actAgent(a) }, async () => {
-      const n = await cancelMessages(p, agentId, 'the Assistant')
-      return { done: n ? `Cancelled ${n === 1 ? 'the message' : `${n} messages`} waiting for ${a.name} in ${basename(p)}` : `No message was waiting for ${a.name} in ${basename(p)}`, result: { cancelled: n } }
+    return assistantChange<{ cancelled: number }>('agents', [API.change.cancelMessages, { agent: a.name, project: basename(p) }], { kind: 'cancel-messages', project: basename(p), agent: actAgent(a) }, async (guard) => {
+      // Checked again in the deliveries' own transaction (HI-2420): revoked while it waited for their lock, none is cancelled.
+      const n = await cancelMessages(p, agentId, sayStored([API.delivery.byAssistant]), guard)
+      return { done: [API.done.cancelledMessages, { agent: a.name, project: basename(p), n, total: String(n) }], result: { cancelled: n } }
     })
   }
   const text = typeof body?.text === 'string' ? body.text.trim() : ''
-  if (!text) throw new HttpError(400, 'text is required')
-  if (text.length > MESSAGE_MAX_CHARS) throw new HttpError(400, `text is at most ${MESSAGE_MAX_CHARS} characters (this has ${text.length})`)
+  if (!text) throw new HttpError(400, say(API.agent.textRequired))
+  if (text.length > MESSAGE_MAX_CHARS) throw new HttpError(400, say(API.agent.messageTooLong, { max: String(MESSAGE_MAX_CHARS), length: String(text.length) }))
   // Tied to a card's round (#652): stale, never given, once the card has moved on.
   const card = body?.card === undefined || body?.card === null ? undefined : Number(cardRefIn(body.card))
-  if (card !== undefined && !(Number.isInteger(card) && card > 0)) throw new HttpError(400, 'card must be a card: its number or key (12 or HI-12)')
-  return assistantChange<{ id: string; typed: boolean; queued: number; status: string; tells?: InboxSwitch[]; round?: number; card?: number; names?: Record<string, string> }>('agents', `leave ${a.name} in ${basename(p)} a message`, { kind: 'message-agent', project: basename(p), agent: actAgent(a), ...(card !== undefined ? { card } : {}) }, async (guard) => {
+  if (card !== undefined && !(Number.isInteger(card) && card > 0)) throw new HttpError(400, say(API.agent.messageCardArg))
+  return assistantChange<{ id: string; typed: boolean; queued: number; status: string; tells?: InboxSwitch[]; round?: number; card?: number; names?: Record<string, string> }>('agents', [API.change.messageAgent, { agent: a.name, project: basename(p) }], { kind: 'message-agent', project: basename(p), agent: actAgent(a), ...(card !== undefined ? { card } : {}) }, async (guard) => {
     const st = sessions.liveFor(p, agentId)
-    if (!st) throw new HttpError(409, `${a.name} isn't running. Start it with the message as its task instead (hive_start_agent with prompt).`)
+    if (!st) throw new HttpError(409, say(API.agent.messageNotRunning, { agent: a.name }))
     guard()
     // Its sender saved with it: the Assistant's launch, whose permission is worked out again at every step (#645).
     const r = await leaveMessage(p, agentId, a.name, callerSender(), text, card).catch((e: Error) => {
-      throw new HttpError(409, e.message)
+      throw httpFrom(409, e)
     })
-    if (r.fate === 'cancelled' || r.fate === 'expired' || r.fate === 'refused' || r.fate === 'stale') throw new HttpError(409, `The message wasn't typed into ${a.name}: ${r.fate === 'cancelled' ? (r.detail ?? 'cancelled') : `${r.fate}, ${r.detail ?? ''}`}.`)
+    if (r.fate === 'cancelled' || r.fate === 'expired' || r.fate === 'refused' || r.fate === 'stale') throw new HttpError(409, say(API.agent.messageNotTyped, { agent: a.name, why: r.fate === 'cancelled' ? (r.detail ?? 'cancelled') : `${r.fate}, ${r.detail ?? ''}` }))
     const typed = r.fate === 'typed'
-    const tied = r.round && card !== undefined ? ` for ${cardRef(card)} round ${r.round}` : ''
-    // Queued: the ways Hive tells it, by the carrying-on switches on for it now (#1497: its project's own, else Settings').
+    const tied = r.round && card !== undefined ? { tied: 'yes', card: cardRef(card), round: String(r.round) } : { tied: 'no', card: '', round: '' }
+    // Queued: the ways Combwork tells it, by the carrying-on switches on for it now (#1497: its project's own, else Settings').
     const on = typed ? null : await Promise.all(INBOX_SWITCHES.map((s) => inboxSwitch(p, s)))
     const tells = on ? INBOX_SWITCHES.filter((_s, i) => on[i]) : null
-    return { done: `${typed ? 'Gave' : 'Left'} ${a.name} in ${basename(p)} a message (${r.id})${tied}${typed ? '' : ' (queued)'}`, said: `: ${clip(text.replace(/\s+/g, ' '), 80)}`, result: { id: r.id, typed, queued: r.queued, status: typed ? (sessions.liveFor(p, agentId)?.status ?? 'stopped') : st.status, ...(tells ? { tells } : {}), ...(r.round ? { round: r.round, ...(card !== undefined ? { card, ...withNames([card]) } : {}) } : {}) } }
+    return { done: [API.done.messaged, { agent: a.name, project: basename(p), id: r.id, typed: typed ? 'yes' : 'no', ...tied }], said: `: ${clip(text.replace(/\s+/g, ' '), 80)}`, result: { id: r.id, typed, queued: r.queued, status: typed ? (sessions.liveFor(p, agentId)?.status ?? 'stopped') : st.status, ...(tells ? { tells } : {}), ...(r.round ? { round: r.round, ...(card !== undefined ? { card, ...withNames([card]) } : {}) } : {}) } }
   })
 })
 
@@ -1580,22 +1612,23 @@ route('POST', '/v1/projects/:name/agents/:agent/message', async ({ params, body 
  */
 function callerSender(): DeliverySender {
   const ws = assistantCaller()
-  if (!ws) return { kind: 'user', name: 'the user' }
+  // Stored with the delivery: said in the Default.
+  if (!ws) return { kind: 'user', name: sayStored([API.delivery.fromUser]) }
   const launch = sessions.liveFor(assistant.assistantHome(ws), ASSISTANT_AGENT_ID)?.runId ?? ''
-  return { kind: 'assistant', name: 'the Assistant', workspace: ws, launch }
+  return { kind: 'assistant', name: sayStored([API.delivery.fromAssistant]), workspace: ws, launch }
 }
 
 /** Starts an agent on a task (#649): a task delivery its launch carries as its prompt, received once its CLI takes it. */
-const startOnTask = (p: string, agentId: string, agentName: string, prompt: string, start: (line: string) => Promise<LiveSessionState>): Promise<LiveSessionState> =>
+const startOnTask = <T extends LiveSessionState>(p: string, agentId: string, agentName: string, prompt: string, start: (line: string) => Promise<T>): Promise<T> =>
   launchWith(p, { agentId, agentName, kind: 'task', from: callerSender(), body: prompt }, start).then((x) => x.launched)
 
-// The Assistant's journal (#1031): its tools (hive_journal_*) only, only while it is on (Settings → Assistant → Journal).
+// The Assistant's journal (#1031): its tools (cw_journal_*) only, only while it is on (Settings → Assistant → Journal).
 // The tools come and go with the Assistant's start; each call checks again, so one turned off meanwhile is refused.
 function journalHome(): { home: string; settings: JournalSettings } {
-  if (!assistantCaller()) throw new HttpError(403, "Only the Hive Assistant keeps a journal.")
+  if (!assistantCaller()) throw new HttpError(403, say(API.journal.onlyAssistant))
   const ws = requireWorkspace()
   const settings = journalSettingsOf(ws)
-  if (!settings.enabled) throw new HttpError(409, 'The journal is off (Settings → Assistant → Journal): nothing is written or recalled. Its entries are kept.')
+  if (!settings.enabled) throw new HttpError(409, say(API.journal.off))
   return { home: ws.assistantHome, settings }
 }
 /** A journal call: the caller's mistakes are 400s, said plainly; one while the journal is being deleted, 409. */
@@ -1603,18 +1636,18 @@ function journalCall<T>(fn: () => T): T {
   try {
     return fn()
   } catch (e) {
-    if (e instanceof JournalBusy) throw new HttpError(409, e.message)
-    if (e instanceof JournalError) throw new HttpError(400, e.message)
+    if (e instanceof JournalBusy) throw httpFrom(409, e)
+    if (e instanceof JournalError) throw httpFrom(400, e)
     throw e
   }
 }
 const entryId = (raw: string): number => {
   const n = Number(raw)
-  if (!Number.isInteger(n) || n < 1) throw new HttpError(400, 'An entry id is a whole number.')
+  if (!Number.isInteger(n) || n < 1) throw new HttpError(400, say(API.journal.entryId))
   return n
 }
 /**
- * A card link's ref as the journal keeps it (HI-1661): the card's number, as Hive's own facts link it, so an entry the
+ * A card link's ref as the journal keeps it (HI-1661): the card's number, as Combwork's own facts link it, so an entry the
  * Assistant links by key (`HI-12`, an old key, `#12`) is found by the same card's recall and shows its chip. A ref no card
  * has is kept as it was given.
  */
@@ -1644,50 +1677,50 @@ route('POST', '/v1/journal/recall', async ({ body }) => {
 route('GET', '/v1/journal/:id', async ({ params }) => {
   const { home } = journalHome()
   const e = journalCall(() => readEntry(home, entryId(params[0])))
-  if (!e) throw new HttpError(404, `There is no entry ${params[0]}.`)
+  if (!e) throw new HttpError(404, say(API.journal.noEntry, { entry: params[0] }))
   return e
 })
 route('PATCH', '/v1/journal/:id', async ({ params, body }) => {
   const { home, settings } = journalHome()
   const id = entryId(params[0])
   const patch = withCardLinks(requireWorkspace(), body, ['addLinks'])
-  if (!journalCall(() => updateEntry(home, settings, id, patch))) throw new HttpError(404, `There is no entry ${id}.`)
+  if (!journalCall(() => updateEntry(home, settings, id, patch))) throw new HttpError(404, say(API.journal.noEntry, { entry: String(id) }))
   return { id, updated: true }
 })
 route('DELETE', '/v1/journal/:id', async ({ params }) => {
   const { home } = journalHome()
   const id = entryId(params[0])
-  if (!journalCall(() => deleteEntry(home, id))) throw new HttpError(404, `There is no entry ${id}.`)
+  if (!journalCall(() => deleteEntry(home, id))) throw new HttpError(404, say(API.journal.noEntry, { entry: String(id) }))
   return { id, deleted: true }
 })
 
-// A successful build of Hive itself (#1534): scripts/buildFact.mjs, from npm run dist or npm run release, with the
-// workspace token or the agent's own (an agent running the build). Hive writes it into the workspace's journal as its fact.
+// A successful build of Combwork itself (#1534): scripts/buildFact.mjs, from npm run dist or npm run release, with the
+// workspace token or the agent's own (an agent running the build). Combwork writes it into the workspace's journal as its fact.
 route('POST', '/v1/builds', async ({ body }) => {
   const f = buildFactOf(body)
   if ('error' in f) throw new HttpError(400, f.error)
   return recordBuild(requireWorkspace(), f)
 })
 
-/** Who is calling hive_inbox: a project agent (its own), or the Assistant (its home's). */
+/** Who is calling cw_inbox: a project agent (its own), or the Assistant (its home's). */
 function inboxOwner(): { host: string; agentId: string } {
   const me = agentCaller()
   if (me) return { host: me.projectPath, agentId: me.agentId }
   if (assistantCaller()) return { host: requireWorkspace().assistantHome, agentId: ASSISTANT_AGENT_ID }
-  throw new HttpError(400, 'Only an agent or the Assistant has an inbox.')
+  throw new HttpError(400, say(API.inbox.noInbox))
 }
 
-// hive_inbox (#647): the caller's deliveries not received yet (a card's events in one item), now received; with ack, marks
+// cw_inbox (#647): the caller's deliveries not received yet (a card's events in one item), now received; with ack, marks
 // those ids acked and lists nothing. With ack and read: true (#1531, opt-in), both in one call: the ack first, by the
 // ack's own rules, then the read, whose items are received only (an item is never acked by being read). An id that
 // isn't the caller's is unknown, like one that doesn't exist.
 route('POST', '/v1/inbox', async ({ body }) => {
   const { host, agentId } = inboxOwner()
-  if (body?.read !== undefined && typeof body.read !== 'boolean') throw new HttpError(400, 'read is true or false')
-  // Its rows name cards by key, for the hive tools' words (#1219).
+  if (body?.read !== undefined && typeof body.read !== 'boolean') throw new HttpError(400, say(API.inbox.readArg))
+  // Its rows name cards by key, for the Combwork tools' words (#1219).
   const named = <T extends { items: InboxItem[] }>(inbox: T) => ({ ...inbox, ...withNames(inbox.items.flatMap((i) => (i.card ? [i.card] : []))) })
   if (body?.ack !== undefined) {
-    if (!Array.isArray(body.ack) || !body.ack.length || body.ack.length > 200 || !body.ack.every((x: unknown) => typeof x === 'string' && x.length <= 32)) throw new HttpError(400, 'ack is a list of delivery ids ("m12"), at most 200')
+    if (!Array.isArray(body.ack) || !body.ack.length || body.ack.length > 200 || !body.ack.every((x: unknown) => typeof x === 'string' && x.length <= 32)) throw new HttpError(400, say(API.inbox.ackArg))
     const ids = (body.ack as string[]).map((x) => x.trim())
     return body.read === true ? named(await ackThenRead(host, agentId, ids)) : ackDeliveries(host, agentId, ids)
   }
@@ -1697,7 +1730,7 @@ route('POST', '/v1/inbox', async ({ body }) => {
 // An agent's deliveries with their states and times (#647): the newest `limit` (default 20, at most 200).
 route('GET', '/v1/projects/:name/agents/:agent/deliveries', async ({ params, query }) => {
   const p = projectByName(params[0])
-  ownProjectOnly(p, "Reading an agent's deliveries")
+  ownProjectOnly(p, [API.own.readingDeliveries])
   const agentId = await agentParam(p, decodeURIComponent(params[1]))
   const limit = Math.min(200, Math.max(1, Number(query.get('limit')) || 20))
   return deliveryView(p, agentId, limit, 300)
@@ -1726,7 +1759,7 @@ function safeguardActivity(n: SafeguardNote) {
 async function agentActivity(p: string, agentId: string, detail = false) {
   const info = await workspace.projectInfo(p)
   const a = info.agents.find((x) => x.id === agentId)
-  if (!a) throw new HttpError(404, 'Unknown agent')
+  if (!a) throw new HttpError(404, say(API.agent.unknown))
   const st = a.live
   const sessionId = st?.sessionId || a.lastSessionId || a.resume?.id || ''
   let currentTask: string | null = null
@@ -1742,7 +1775,7 @@ async function agentActivity(p: string, agentId: string, detail = false) {
     const lastUser = items.map((x) => x.kind).lastIndexOf('user')
     const task = lastUser >= 0 ? items[lastUser] : null
     if (task?.kind === 'user') {
-      // Its last prompt Hive's doorbell (#650: ids only): the task it was last given is the newest one (or handover) delivered.
+      // Its last prompt Combwork's doorbell (#650: ids only): the task it was last given is the newest one (or handover) delivered.
       const given = isDoorbell(task.text) ? (await deliveriesOf(p, agentId)).findLast((r) => r.kind === 'task' || r.kind === 'handover')?.body : undefined
       const text = given ?? task.text
       currentTask = clip(text, lim.task)
@@ -1761,7 +1794,7 @@ async function agentActivity(p: string, agentId: string, detail = false) {
   // Where it is now and where a new conversation would start (#1451), each with why in a word.
   const place = await agentPlace(p, a, st ? { cwd: st.cwd } : null)
   const folder = place.now.path
-  // Only while the user may still be typing there (Settings → Assistant → Pause after you type), as Hive itself holds off
+  // Only while the user may still be typing there (Settings → Assistant → Pause after you type), as Combwork itself holds off
   // (HI-2261: kept after their Enter, it read as "the user just typed" and the Assistant wouldn't give the agent work).
   const typed = sessions.userMayBeTyping(p, agentId) ? sessions.userTypedAt(p, agentId) : 0
   const provider = st?.provider ?? agentProvider(a, config.settings)
@@ -1777,6 +1810,8 @@ async function agentActivity(p: string, agentId: string, detail = false) {
     id: a.id,
     provider,
     ...inUse,
+    // Another model than its launch gave it (HI-2609): the model it was launched with, beside the one it runs.
+    ...(st?.modelSwitch ? { launchedModel: st.modelSwitch.launched } : {}),
     status: st?.status ?? 'stopped',
     statusMessage: statusMessageOf(st),
     ...(retryWaits ? { retryWaits } : {}),
@@ -1792,7 +1827,7 @@ async function agentActivity(p: string, agentId: string, detail = false) {
     ...(place.now.slot ? { slot: place.now.slot } : {}),
     branch: place.branch,
     sessionId: sessionId || null,
-    // A long transcript slows the CLI and Hive; handing over to itself (a new conversation) makes it short again.
+    // A long transcript slows the CLI and Combwork; handing over to itself (a new conversation) makes it short again.
     transcriptMB: st?.transcriptBytes !== undefined ? Math.round((st.transcriptBytes / (1024 * 1024)) * 10) / 10 : null,
     transcriptWarnMB: transcriptWarnLimit(info.config, config.settings.sessions.transcriptWarnMB) || null,
     sessionName: st?.sessionName ?? null,
@@ -1803,7 +1838,7 @@ async function agentActivity(p: string, agentId: string, detail = false) {
     recentTools,
     ...(Object.keys(clipped).length ? { clipped } : {}),
     // Its CLI's safety classifier stopped a response or its model changed after one (#606): only names, never content.
-    ...(st?.safeguard ? { safeguard: safeguardActivity(st.safeguard) } : providerDescriptor(provider).safeguardHelp === null ? { safeguard: 'not detected' } : {}),
+    ...(st?.safeguard ? { safeguard: safeguardActivity(st.safeguard) } : providerDescriptor(provider).safeguardHelp === null ? { safeguard: say(API.activity.safeguardNotDetected) } : {}),
     lockedFiles: sessions.locksFor(p, agentId).map((f) => placeRelative(folder, f) || f),
     userTypedSecondsAgo: typed ? Math.round((Date.now() - typed) / 1000) : null,
     ...(inbox.deliveries.length ? { inbox } : {})
@@ -1812,14 +1847,14 @@ async function agentActivity(p: string, agentId: string, detail = false) {
 
 route('GET', '/v1/projects/:name/agents/:agent/activity', async ({ params, query }) => {
   const p = projectByName(params[0])
-  ownProjectOnly(p, "Reading an agent's activity")
+  ownProjectOnly(p, [API.own.readingActivity])
   return agentActivity(p, await agentParam(p, decodeURIComponent(params[1])), query.get('detail') === 'true')
 })
 
 /**
- * Whether a launch of an agent (its HIVE_RUN_ID) is still its running one (#1008): a test run started in an agent's
+ * Whether a launch of an agent (its CW_RUN_ID) is still its running one (#1008): a test run started in an agent's
  * shell records it, and a run waiting for a test slot asks, to say when the holder was left over by a session that has
- * ended (Hive closed, the agent stopped or restarted). Status, as agents' is: open to every caller.
+ * ended (Combwork closed, the agent stopped or restarted). Status, as agents' is: open to every caller.
  */
 route('GET', '/v1/projects/:name/agents/:agent/launches/:run', async ({ params }) => {
   const p = projectByName(params[0])
@@ -1827,13 +1862,13 @@ route('GET', '/v1/projects/:name/agents/:agent/launches/:run', async ({ params }
   return { running: sessions.liveFor(p, id)?.runId === decodeURIComponent(params[2]) }
 })
 
-/** An agent as a wait reads it: a prompt Hive just typed that its CLI hasn't taken yet counts as working (#416). */
+/** An agent as a wait reads it: a prompt Combwork just typed that its CLI hasn't taken yet counts as working (#416). */
 const agentNowFor = (p: string, id: string): AgentNow => sessions.agentNow(p, id) ?? { status: 'stopped', runId: null, prompts: 0, pending: false }
 
 /**
  * Waits until agents stop working (or `timeoutSeconds`, at most 10 minutes): the ones named, else every agent
  * working in the workspace. Answers with each one's status, so the caller sees who finished and who needs the user.
- * `wake: true` (#416): the calling agent or Assistant registers an agent watch instead and ends its turn; Hive types one
+ * `wake: true` (#416): the calling agent or Assistant registers an agent watch instead and ends its turn; Combwork types one
  * line into it when one finishes, waits for the user or stops (main/watches.ts). `cancel: true` ends its watch. Agents'
  * status is open to every caller, as before; another project's agent's reply isn't in a project agent's line.
  */
@@ -1842,11 +1877,11 @@ route('POST', '/v1/agents/wait', async ({ body }) => {
   const home = assistantCaller() ? requireWorkspace().assistantHome : null
   const who = me ? { projectPath: me.projectPath, agentId: me.agentId } : home ? { projectPath: home, agentId: 'assistant' } : null
   if (body?.cancel === true) {
-    if (!who) throw new HttpError(400, 'Only an agent or the Assistant has a watch to cancel.')
+    if (!who) throw new HttpError(400, say(API.watch.noWatchToCancel))
     const w = sessions.watchFor(who.projectPath, who.agentId)
     const kind = w?.lanes ? 'lane' : w?.agents ? 'agent' : 'card'
     const had = await cancelWatch(requireWorkspace(), who.projectPath, who.agentId)
-    return { done: had ? `Cancelled your ${kind} watch.` : 'You had no watch.' }
+    return { done: had ? say(API.watch.cancelled, { kind }) : say(API.watch.noneToCancel) }
   }
   const list: { project: string; agent?: string }[] = Array.isArray(body?.agents) ? body.agents : []
   let targets: { p: string; id: string }[] = []
@@ -1868,13 +1903,13 @@ route('POST', '/v1/agents/wait', async ({ body }) => {
       .map((s) => ({ p: s.projectPath, id: s.agentId }))
   }
   if (body?.wake === true) {
-    if (!who) throw new HttpError(400, 'Only an agent or the Assistant can be woken: a script waits without wake (timeoutSeconds).')
-    if (targets.some((t) => self(t.p, t.id))) throw new HttpError(400, "You can't watch yourself: nothing would wake you.")
+    if (!who) throw new HttpError(400, say(API.watch.wakeOnlyAgents))
+    if (targets.some((t) => self(t.p, t.id))) throw new HttpError(400, say(API.watch.notYourself))
     const limit = body?.limitMinutes === undefined ? WATCH_DEFAULT_LIMIT_MINUTES : Number(body.limitMinutes)
-    if (!Number.isFinite(limit) || limit < 1 || limit > WATCH_MAX_LIMIT_MINUTES) throw new HttpError(400, `limitMinutes must be from 1 to ${WATCH_MAX_LIMIT_MINUTES}`)
+    if (!Number.isFinite(limit) || limit < 1 || limit > WATCH_MAX_LIMIT_MINUTES) throw new HttpError(400, say(API.watch.limitMinutes, { max: String(WATCH_MAX_LIMIT_MINUTES) }))
     const unique = targets.filter((t, i) => targets.findIndex((u) => resolvePath(u.p).toLowerCase() === resolvePath(t.p).toLowerCase() && u.id === t.id) === i)
-    if (!unique.length) return { already: ['No agent is working'] }
-    if (unique.length > AGENT_WATCH_MAX_AGENTS) throw new HttpError(400, `at most ${AGENT_WATCH_MAX_AGENTS} agents in one watch`)
+    if (!unique.length) return { already: [say(API.watch.noAgentWorking)] }
+    if (unique.length > AGENT_WATCH_MAX_AGENTS) throw new HttpError(400, say(API.watch.maxAgents, { max: String(AGENT_WATCH_MAX_AGENTS) }))
     const agents: WatchedAgent[] = []
     for (const t of unique) agents.push({ projectPath: t.p, agentId: t.id, name: (await agentDefOf(t.p, t.id)).name, project: basename(t.p) })
     const r = await registerAgentWatch(requireWorkspace(), who.projectPath, who.agentId, { agents, ignoreBackground: !throughBackground }, limit)
@@ -1901,51 +1936,51 @@ route('POST', '/v1/agents/wait', async ({ body }) => {
 /** The calling agent as a holder of its project's slot. Scripts and the Assistant can look, not claim. */
 async function slotAgent(p: string): Promise<SlotAgent> {
   const a = agentCaller()
-  if (!a) throw new HttpError(403, "Only a project's own agents hold its merge slot (with their own token). Scripts and the Assistant can read it.")
-  ownProjectOnly(p, 'The merge slot')
+  if (!a) throw new HttpError(403, say(API.mergeSlot.onlyAgents))
+  ownProjectOnly(p, [API.own.mergeSlot])
   const live = sessions.liveFor(a.projectPath, a.agentId)
-  if (!live) throw new HttpError(409, 'Only a running agent can hold the merge slot.')
+  if (!live) throw new HttpError(409, say(API.mergeSlot.onlyRunning))
   const def = projectAgents(await workspace.projectConfig(a.projectPath)).find((x) => x.id === a.agentId)
   return { projectPath: a.projectPath, agentId: a.agentId, agentName: def?.name ?? a.agentId, runId: live.runId }
 }
 
 /**
- * A claim naming cards Hive merges (each card's own rules, #1354): refused before the slot is touched, as the card's
- * report merge would be (`merge.hiveMerges`, recorded as Refused, saying where it is in the merge queue). A claim naming
+ * A claim naming cards Combwork merges (each card's own rules, #1354): refused before the slot is touched, as the card's
+ * report merge would be (`merge.combworkMerges`, recorded as Refused, saying where it is in the merge queue). A claim naming
  * no card, or cards the agent merges, is unchanged: the slot stays for agents' merges and the user's own.
  */
-async function refuseHiveMerges(projectPath: string, cards: number[]): Promise<void> {
+async function refuseCombworkMerges(projectPath: string, cards: number[]): Promise<void> {
   if (!cards.length) return
   const wf = await workflowFor(workspace, projectPath).catch(() => null)
   if (!wf) return
   const actor = actorOf(await taskActor())
   for (const n of cards) {
-    const refused = await wf.refuseHiveMerge(`#${n}`, actor, 'merge slot') // i18n-ignore: the refused move's name, agent-facing
+    const refused = await wf.refuseCombworkMerge(`#${n}`, actor, say(API.mergeSlot.moveName))
     if (refused) throw new tasks.WorkflowRefusedError(refused)
   }
 }
 
-/** The branch a slot call names, or the one the project folder is on (what Hive's Merge dialog merges into). */
+/** The branch a slot call names, or the one the project folder is on (what Combwork's Merge dialog merges into). */
 async function slotBranchFor(p: string, v: unknown): Promise<string> {
   if (v !== undefined && v !== null) return slotBranch(v)
   const b = await workspace.branch(p)
-  if (!b) throw new HttpError(409, "The project folder isn't on a branch: name the branch to merge into.")
+  if (!b) throw new HttpError(409, say(API.mergeSlot.noBranch))
   return b
 }
 
 const slotCall = async <T>(fn: () => Promise<T> | T): Promise<T> => {
   try {
-    // The cards the slot's holders merge, named by key for the hive tools' words (#1219).
+    // The cards the slot's holders merge, named by key for the Combwork tools' words (#1219).
     return withCardsNamed(await fn())
   } catch (e) {
-    throw e instanceof MergeSlotError ? new HttpError(e.status, e.message) : e
+    throw e instanceof MergeSlotError ? httpFrom(e.status, e) : e
   }
 }
 
 route('GET', '/v1/projects/:name/merge-slot', async ({ params, query }) =>
   slotCall(async () => {
     const p = projectByName(params[0])
-    ownProjectOnly(p, "Reading a project's merge slot")
+    ownProjectOnly(p, [API.own.readingMergeSlot])
     return mergeSlots.status(p, await slotBranchFor(p, query.get('branch') ?? undefined))
   })
 )
@@ -1956,9 +1991,9 @@ route('POST', '/v1/projects/:name/merge-slot/claim', async ({ params, body, sign
     const agent = await slotAgent(p)
     const branch = await slotBranchFor(p, body?.branch)
     const cards = slotCards(cardRefsIn(body?.cards))
-    await refuseHiveMerges(p, cards)
+    await refuseCombworkMerges(p, cards)
     const t = body?.timeoutSeconds
-    if (t !== undefined && (typeof t !== 'number' || !Number.isFinite(t) || t < 0)) throw new HttpError(400, 'timeoutSeconds must be a number of seconds')
+    if (t !== undefined && (typeof t !== 'number' || !Number.isFinite(t) || t < 0)) throw new HttpError(400, say(API.watch.timeoutSeconds))
     const waitMs = t === undefined ? DEFAULT_WAIT_MS : Math.min(MAX_WAIT_MS, t * 1000)
     const result = await mergeSlots.claim(agent, p, branch, cards, waitMs, signal)
     slotTestEvent(agent, p, branch, result)
@@ -1987,13 +2022,13 @@ const laneCall = async <T>(fn: () => Promise<T> | T): Promise<T> => {
   try {
     return lanesNamed(await fn())
   } catch (e) {
-    throw e instanceof lanes.LaneError ? new HttpError(e.status, e.message) : e
+    throw e instanceof lanes.LaneError ? httpFrom(e.status, e) : e
   }
 }
 
 /**
  * A lane reply with `names` for its cards (#1219 round 2, finding 1): on each lane (a list, an ended lane) or on the
- * change (started, joined), for the hive MCP server that words it.
+ * change (started, joined), for the combwork MCP server that words it.
  */
 function lanesNamed<T>(r: T): T {
   const numbersOf = (l: LaneInfo | null | undefined): number[] => (l ? [...l.cards.map((c) => c.number), ...(l.current !== null ? [l.current] : []), ...(l.pausedOn !== null ? [l.pausedOn] : []), ...(l.queued ?? []), ...(l.status?.card != null ? [l.status.card] : [])] : [])
@@ -2009,10 +2044,10 @@ function lanesNamed<T>(r: T): T {
 function laneProject(v: unknown): string {
   const a = agentCaller()
   if (a) {
-    if (v !== undefined && v !== null && v !== '') ownProjectOnly(projectByName(String(v)), 'A lane')
+    if (v !== undefined && v !== null && v !== '') ownProjectOnly(projectByName(String(v)), [API.own.lane])
     return a.projectPath
   }
-  if (typeof v !== 'string' || !v) throw new HttpError(400, 'project is required')
+  if (typeof v !== 'string' || !v) throw new HttpError(400, say(API.lane.projectRequired))
   return projectByName(v)
 }
 
@@ -2033,8 +2068,8 @@ function laneArgs(body: any): { cards?: number[]; rounds?: number; waitMinutes?:
   if (body?.name !== undefined) out.name = laneName(body.name)
   // The builder's brief (HI-1795): text, or '' to clear it; left out, a running lane keeps its own.
   if (body?.brief !== undefined) {
-    if (typeof body.brief !== 'string') throw new HttpError(400, "brief must be text ('' clears it)")
-    if (body.brief.length > LANE_BRIEF_MAX) throw new HttpError(400, `brief is at most ${LANE_BRIEF_MAX} characters`)
+    if (typeof body.brief !== 'string') throw new HttpError(400, say(API.lane.briefText))
+    if (body.brief.length > LANE_BRIEF_MAX) throw new HttpError(400, say(API.lane.briefMax, { max: String(LANE_BRIEF_MAX) }))
     out.brief = body.brief
   }
   return out
@@ -2054,13 +2089,13 @@ route('GET', '/v1/lanes', async ({ query }) =>
   })
 )
 
-// The next card of the calling agent's running lane (#1270, hive_lane next): to start, to carry on, or why it waits.
+// The next card of the calling agent's running lane (#1270, cw_lane next): to start, to carry on, or why it waits.
 route('GET', '/v1/lanes/next', async () =>
   laneCall(async () => {
     const a = agentCaller()
-    if (!a) throw new HttpError(400, "next is a lane agent's: read a lane with GET /v1/lanes/{id}")
+    if (!a) throw new HttpError(400, say(API.lane.nextIsAgents))
     const r = await lanes.laneNext(requireWorkspace(), basename(a.projectPath), a.agentId)
-    // Its passed cards Hive merges, each with where it is in the merge queue (#1354): the next waits for them.
+    // Its passed cards Combwork merges, each with where it is in the merge queue (#1354): the next waits for them.
     const queue: { card: number; line: string }[] = []
     for (const c of r.lane.cards.filter((x) => x.column === 'passed')) {
       const line = await queueLineFor(r.lane.project, c.number)
@@ -2082,7 +2117,7 @@ route('GET', '/v1/lanes/:id', async ({ params }) =>
 route('POST', '/v1/lanes', async ({ body }) => laneCall(() => laneStartCall(body)))
 
 /**
- * hive_lane start (POST /v1/lanes), and a new card placed on a lane as it is made (HI-2167, `place`: POST /v1/tasks with
+ * cw_lane start (POST /v1/lanes), and a new card placed on a lane as it is made (HI-2167, `place`: POST /v1/tasks with
  * lane): one path, the same rules, launches and the Assistant's change for both.
  */
 async function laneStartCall(body: any, place?: lanes.LanePlace): Promise<LaneChange> {
@@ -2090,12 +2125,12 @@ async function laneStartCall(body: any, place?: lanes.LanePlace): Promise<LaneCh
   const p = laneProject(body?.project)
   const args = laneArgs(body)
   if (place) args.cards = [place.card]
-  if (!args.cards) throw new HttpError(400, 'cards must be the card numbers, in order (at least one)')
+  if (!args.cards) throw new HttpError(400, say(API.lane.cardsArg))
   const a = agentCaller()
   // A project agent registers its own lane: it is the builder.
   const builder = a ? (body?.builder !== undefined && body.builder !== '' && (await agentParam(p, body.builder)) !== a.agentId ? null : a.agentId) : await agentParam(p, body?.builder)
-  if (!builder) throw new HttpError(403, "An agent starts its own lane, as its builder: a reviewer joins its builder's lane (join)")
-  // A reviewer Hive doesn't know isn't a reason to refuse a new lane: it starts without one, and its reviewer can join it.
+  if (!builder) throw new HttpError(403, say(API.lane.agentStartsOwn))
+  // A reviewer Combwork doesn't know isn't a reason to refuse a new lane: it starts without one, and its reviewer can join it.
   // A running lane's start naming one is refused, naming its reviewer (HI-2273: startLane, under its lock).
   let reviewer: string | null | undefined
   let unknownReviewer: string | undefined
@@ -2105,31 +2140,32 @@ async function laneStartCall(body: any, place?: lanes.LanePlace): Promise<LaneCh
     reviewer = await agentParam(p, body.reviewer).catch(() => null)
     if (!reviewer) {
       unknownReviewer = String(body.reviewer)
-      note = `No agent "${unknownReviewer}" in ${basename(p)}: the lane has no reviewer until one joins it.`
+      note = say(API.lane.noReviewerNamed, { reviewer: unknownReviewer, project: basename(p) })
     }
   }
   // Reviewed by the project's reviewer pool (HI-1581, G17), the Assistant's and a script's: refused as Start Lane…
   // refuses it (the rules have no pool, nobody but the builder reviews), and with a reviewer of its own.
-  if (body?.pool !== undefined && typeof body.pool !== 'boolean') throw new HttpError(400, 'pool must be true or false')
+  if (body?.pool !== undefined && typeof body.pool !== 'boolean') throw new HttpError(400, say(API.lane.poolArg))
   const pool = body?.pool === true
   // A changed list applied now, its card in flight put back (HI-1995).
-  if (body?.applyNow !== undefined && typeof body.applyNow !== 'boolean') throw new HttpError(400, 'applyNow must be true or false')
+  if (body?.applyNow !== undefined && typeof body.applyNow !== 'boolean') throw new HttpError(400, say(API.lane.applyNowArg))
   const applyNow = body?.applyNow === true
-  if (pool && a) throw new HttpError(403, "A lane reviewed by the pool is started by the Assistant or the user (Start Lane): an agent's own lane names its reviewer")
-  if (pool && body?.reviewer !== undefined && body.reviewer !== null && body.reviewer !== '') throw new HttpError(400, 'A lane reviewed by the pool has no reviewer of its own: leave reviewer out')
+  if (pool && a) throw new HttpError(403, say(API.lane.poolStartedBy))
+  if (pool && body?.reviewer !== undefined && body.reviewer !== null && body.reviewer !== '') throw new HttpError(400, say(API.lane.poolNoReviewer))
   if (pool) await checkLanePool(ws, p, builder)
-  const start = async () => {
-    // Hive's own start of the lane's card waits for this one to launch its agents (HI-2029); a builder registering its
+  // `commit`: the Assistant's guard, checked again in the lanes' save (HI-2420).
+  const start = async (commit?: () => void) => {
+    // Combwork's own start of the lane's card waits for this one to launch its agents (HI-2029); a builder registering its
     // own loop is at work already.
     const release = a ? null : lanes.holdLaneStart(ws, basename(p), builder)
     try {
-      return await started()
+      return await started(commit)
     } finally {
       release?.()
     }
   }
-  const started = async () => {
-    const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, ...(unknownReviewer !== undefined ? { unknownReviewer } : {}), cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, briefNotIn: sessions.liveFor(p, builder)?.sessionId ?? null, by: await laneBy(), ...(pool ? { pool: true } : {}), ...(applyNow ? { applyNow: true } : {}), ...(place ? { place } : {}), ...(a ? { ownBuilder: true } : {}) })
+  const started = async (commit?: () => void) => {
+    const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, ...(unknownReviewer !== undefined ? { unknownReviewer } : {}), cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, briefNotIn: sessions.liveFor(p, builder)?.sessionId ?? null, by: await laneBy(), ...(pool ? { pool: true } : {}), ...(applyNow ? { applyNow: true } : {}), ...(place ? { place } : {}), ...(a ? { ownBuilder: true } : {}), ...(commit ? { commit } : {}) })
     // Its brief given where it goes (HI-1795): outside slots, delivered now (and again by laneBriefs' next look if not).
     // A new lane's brief carried from the builder's lane that had just ended (HI-2097) too.
     const rec = (await lanes.rawLanes(ws)).find((l) => l.id === r.lane.id)
@@ -2154,18 +2190,20 @@ async function laneStartCall(body: any, place?: lanes.LanePlace): Promise<LaneCh
   }
   if (!assistantCaller()) return start()
   const builderAct = await knownAgent(basename(p), builder)
-  return assistantChange('agents', `start a lane in ${basename(p)}`, { kind: 'lane-start', project: basename(p), ...(args.cards ? { cards: args.cards } : {}), ...(builderAct ? { agent: builderAct } : {}) }, async () => {
-    // Recorded for undo by lanes.ts, from the lane as read under its lock, in its save (#1282).
-    const r = await start()
+  return assistantChange('agents', [API.change.startLane, { project: basename(p) }], { kind: 'lane-start', project: basename(p), ...(args.cards ? { cards: args.cards } : {}), ...(builderAct ? { agent: builderAct } : {}) }, async (guard) => {
+    // Recorded for undo by lanes.ts, from the lane as read under its lock, in its save (#1282), where its guard is
+    // checked again (HI-2420). The agents launched for it after that save are its own (as the user's Start Lane…).
+    const r = await start(guard)
     // #402: a lane the Assistant starts but doesn't watch goes unfollowed ("they'll tell you"): its reply says so. A
     // lane watch (#531) on every running lane, or on this one, follows it.
     const w = sessions.watchFor(ws.assistantHome, ASSISTANT_AGENT_ID)
     const followed = !!w?.lanes && (w.lanes.includes('all') || w.lanes.includes(r.lane.id))
-    const nudge = followed ? '' : 'No watch of yours follows this lane: watch the lanes (hive_wait_for_tasks with lanes ["all"], wake) to follow it to its end.'
+    const nudge = followed ? '' : say(API.lane.noWatch)
     const result = nudge ? { ...r, note: [r.note, nudge].filter(Boolean).join(' ') } : r
     // A reorder applied now put a card back and gave the lane a card to start next (HI-1995): neither is undone.
     const putBack = applyNow && (r.note ?? '').startsWith('Applied now: ')
-    return { done: `Lane ${r.lane.id} ${r.did} in ${basename(p)}: ${r.lane.builder.name} / ${r.lane.reviewer?.name ?? 'no reviewer'}, ${r.lane.cards.map((c) => cardRef(c.number)).join(', ')}${putBack ? ` (${r.note!.replace(/^Applied now: /, 'applied now: ')})` : ''}`, act: laneAct(r.lane), result, ...(putBack ? { stays: UNDO_FINAL.laneReorderNow } : {}) }
+    const lane = { lane: r.lane.id, did: r.did, project: basename(p), builder: r.lane.builder.name, hasReviewer: r.lane.reviewer ? 'yes' : 'no', reviewer: r.lane.reviewer?.name ?? '', cards: r.lane.cards.map((c) => cardRef(c.number)).join(', ') }
+    return { done: [API.done.laneStarted, { ...lane, putBack: putBack ? 'yes' : 'no', note: putBack ? r.note!.replace(/^Applied now: /, 'applied now: ') : '' }], act: laneAct(r.lane), result, ...(putBack ? { stays: UNDO_FINAL.laneReorderNow } : {}) }
   })
 }
 
@@ -2176,14 +2214,15 @@ route('POST', '/v1/lanes/join', async ({ body }) =>
     const args = laneArgs(body)
     const a = agentCaller()
     const reviewer = a ? a.agentId : await agentParam(p, body?.reviewer)
-    if (typeof body?.builder !== 'string' || !body.builder) throw new HttpError(400, "builder is required: the name of the lane's builder")
+    if (typeof body?.builder !== 'string' || !body.builder) throw new HttpError(400, say(API.lane.builderRequired))
     const builder = await agentParam(p, body.builder)
-    const joined = async () => lanes.joinLane(ws, { project: basename(p), builder, reviewer, cards: args.cards, by: await laneBy() })
+    const joined = async (commit?: () => void) => lanes.joinLane(ws, { project: basename(p), builder, reviewer, cards: args.cards, by: await laneBy(), ...(commit ? { commit } : {}) })
     if (!assistantCaller()) return joined()
     const reviewerAct = await knownAgent(basename(p), reviewer)
-    return assistantChange('agents', `join a lane in ${basename(p)}`, { kind: 'lane-join', project: basename(p), ...(args.cards ? { cards: args.cards } : {}), ...(reviewerAct ? { agent: reviewerAct } : {}) }, async () => {
-      const r = await joined()
-      return { done: `${r.lane.reviewer?.name ?? 'A reviewer'} joined lane ${r.lane.id} in ${basename(p)}`, act: { ...laneAct(r.lane), ...(r.lane.reviewer ? { agent: actAgent(r.lane.reviewer) } : {}) }, result: r }
+    return assistantChange('agents', [API.change.joinLane, { project: basename(p) }], { kind: 'lane-join', project: basename(p), ...(args.cards ? { cards: args.cards } : {}), ...(reviewerAct ? { agent: reviewerAct } : {}) }, async (guard) => {
+      // Its guard checked again in the lanes' save (HI-2420).
+      const r = await joined(guard)
+      return { done: [API.done.laneJoined, { hasReviewer: r.lane.reviewer ? 'yes' : 'no', reviewer: r.lane.reviewer?.name ?? '', lane: r.lane.id, project: basename(p) }], act: { ...laneAct(r.lane), ...(r.lane.reviewer ? { agent: actAgent(r.lane.reviewer) } : {}) }, result: r }
     })
   })
 )
@@ -2194,15 +2233,16 @@ route('POST', '/v1/lanes/:id/end', async ({ params, body }) =>
     const id = decodeURIComponent(params[0])
     const a = agentCaller()
     const commit = body?.mergeCommit
-    if (commit !== undefined && commit !== null && (typeof commit !== 'string' || !/^[0-9a-zA-Z._/-]{4,64}$/.test(commit))) throw new HttpError(400, 'mergeCommit must be a commit (its hash)')
-    // With rules enforced Hive records the merge from the cards' facts (#1270, §16.8.2): an agent's commit is ignored, said.
-    const ignored = commit && a && (await lanes.lanesEnforced()) ? { note: 'mergeCommit is ignored: Hive records the lane\'s merge from its cards\' facts.' } : {} // i18n-ignore: an agent's reply (English)
-    const end = async () => ({ ...(await lanes.endLane(ws, id, { abandoned: body?.abandoned === true, mergeCommit: commit ?? null, ...(a ? { project: basename(a.projectPath), agent: a.agentId } : {}) })), ...ignored })
+    if (commit !== undefined && commit !== null && (typeof commit !== 'string' || !/^[0-9a-zA-Z._/-]{4,64}$/.test(commit))) throw new HttpError(400, say(API.lane.mergeCommitArg))
+    // With rules enforced Combwork records the merge from the cards' facts (#1270, §16.8.2): an agent's commit is ignored, said.
+    const ignored = commit && a && (await lanes.lanesEnforced()) ? { note: say(API.lane.mergeCommitIgnored) } : {}
+    const end = async (guard?: () => void) => ({ ...(await lanes.endLane(ws, id, { abandoned: body?.abandoned === true, mergeCommit: commit ?? null, ...(a ? { project: basename(a.projectPath), agent: a.agentId } : {}), ...(guard ? { commit: guard } : {}) })), ...ignored })
     if (!assistantCaller()) return end()
     const laneId = /^[\w.-]{1,64}$/.test(id) ? id : null
-    return assistantChange('agents', laneId ? `end lane ${laneId}` : 'end a lane', { kind: 'lane-end', ...(laneId ? { lane: laneId } : {}) }, async () => {
-      const l = await end()
-      return { done: `Lane ${l.id} in ${l.project}: ${l.state}`, act: laneAct(l), result: l }
+    return assistantChange('agents', laneId ? [API.change.endLane, { lane: laneId }] : [API.change.endALane], { kind: 'lane-end', ...(laneId ? { lane: laneId } : {}) }, async (guard) => {
+      // Its guard checked again in the lanes' save (HI-2420).
+      const l = await end(guard)
+      return { done: [API.done.laneEnded, { lane: l.id, project: l.project, state: l.state }], act: laneAct(l), result: l }
     })
   })
 )
@@ -2211,16 +2251,17 @@ route('POST', '/v1/lanes/:id/end', async ({ params, body }) =>
 // within Settings → Assistant → Control, never a project agent's (it would restart another agent).
 route('POST', '/v1/lanes/:id/fresh-start', async ({ params }) =>
   laneCall(async () => {
-    notAgents("retry a lane's new conversations")
+    notAgents([API.change.retryFreshAny])
     const ws = requireWorkspace()
     const id = decodeURIComponent(params[0])
     const lane = (await lanes.rawLanes(ws)).find((l) => l.id === id)
-    if (!lane) throw new HttpError(404, `No lane ${id}`)
-    const retry = async () => ({ retried: await retryFreshStart(ws, id) })
+    if (!lane) throw new HttpError(404, say(API.lane.unknown, { lane: id }))
+    const retry = async (guard?: () => void) => ({ retried: await retryFreshStart(ws, id, guard) })
     if (!assistantCaller()) return retry()
-    return assistantChange('agents', `retry lane ${id}'s new conversations`, { kind: 'lane-fresh-start', lane: id, project: lane.project }, async () => {
-      const r = await retry()
-      return { done: r.retried ? `Lane ${id}: ${r.retried} new conversation${r.retried > 1 ? 's' : ''} tried again` : `Lane ${id}: no new conversation was waiting to be retried`, result: r }
+    return assistantChange('agents', [API.change.retryFresh, { lane: id }], { kind: 'lane-fresh-start', lane: id, project: lane.project }, async (guard) => {
+      // Its guard checked again in each write it makes (HI-2420).
+      const r = await retry(guard)
+      return { done: [API.done.freshRetried, { lane: id, retried: r.retried, total: String(r.retried) }], result: r }
     })
   })
 )
@@ -2233,63 +2274,63 @@ route('POST', '/v1/lanes/:id/fresh-start', async ({ params }) =>
 function queueProject(v: unknown): string {
   const a = agentCaller()
   if (a) {
-    if (v !== undefined && v !== null && v !== '') ownProjectOnly(projectByName(String(v)), 'A merge queue')
+    if (v !== undefined && v !== null && v !== '') ownProjectOnly(projectByName(String(v)), [API.own.mergeQueue])
     return a.projectPath
   }
-  if (typeof v !== 'string' || !v) throw new HttpError(400, 'project is required')
+  if (typeof v !== 'string' || !v) throw new HttpError(400, say(API.queue.projectRequired))
   return projectByName(v)
 }
 
 /** A queue's target from a request: the one given, else the project's only queue's (several or none: say which). */
 async function queueTargetOf(ws: WorkspaceService, p: string, v: unknown): Promise<string> {
   if (v !== undefined && v !== null && v !== '') {
-    if (typeof v !== 'string' || v.length > 255 || /[\s~^:?*[\\]/.test(v)) throw new HttpError(400, 'target is a branch name')
+    if (typeof v !== 'string' || v.length > 255 || /[\s~^:?*[\\]/.test(v)) throw new HttpError(400, say(API.queue.targetArg))
     return v
   }
   const views = await queueViews(ws, p)
   if (views.length === 1) return views[0].target
-  throw new HttpError(400, `target is required: the branch the queue merges into${views.length ? ` (${views.map((x) => x.target).join(', ')})` : ''}`)
+  throw new HttpError(400, say(API.queue.targetRequired, { listed: views.length ? 'yes' : 'no', targets: views.map((x) => x.target).join(', ') }))
 }
 
 /** A queue as the Agent API gives it: no folder (a stuck advance's neither), and whether an outcome has a log rather than the log itself (lean). */
-const publicQueue = ({ projectPath: _p, paused, hiveMerges: _h, inFlight: _i, returns: _r, returnsMore: _more, pauses: _pauses, ...v }: QueueView): QueuePublic => ({
+const publicQueue = ({ projectPath: _p, paused, combworkMerges: _h, inFlight: _i, returns: _r, returnsMore: _more, pauses: _pauses, ...v }: QueueView): QueuePublic => ({
   ...v,
   paused: paused ? (({ stuck, message: _m, ...p }) => (stuck ? { ...p, stuck: (({ folder: _f, ...s }) => s)(stuck) } : p))(paused) : null,
   recent: v.recent.map(({ log: output, seen: _s, revision: _rev, tookMs: _took, push: _push, logPath: _lp, ...r }) => (output ? { ...r, hasLog: true as const } : r))
 })
 
 /** A project agent asking to change a queue: refused, saying whose controls these are. */
-function notAgents(what: string): void {
-  if (agentCaller()) throw new HttpError(403, `Project agents can't ${what}: the merge queue's controls are the user's, and the Hive Assistant's within Settings → Assistant → Control. Tell the user if it should be done.`)
+function notAgents(what: Said): void {
+  if (agentCaller()) throw new HttpError(403, say(API.queue.notAgents, { what: sayNow(what) }))
 }
 
 route('GET', '/v1/queue', async ({ query }) => {
   const ws = requireWorkspace()
   const p = queueProject(query.get('project'))
   const target = query.get('target') || undefined
-  if (target && (target.length > 255 || /[\s~^:?*[\\]/.test(target))) throw new HttpError(400, 'target is a branch name')
+  if (target && (target.length > 255 || /[\s~^:?*[\\]/.test(target))) throw new HttpError(400, say(API.queue.targetArg))
   return (await queueViews(ws, p, target)).map(publicQueue)
 })
 
 route('POST', '/v1/queue/pause', async ({ body }) => {
-  notAgents('pause a merge queue')
+  notAgents([API.change.pauseAQueue])
   const ws = requireWorkspace()
   const p = queueProject(body?.project)
-  return assistantChange('agents', `pause the merge queue of ${basename(p)}`, { kind: 'queue-pause', project: basename(p) }, async (guard) => {
+  return assistantChange('agents', [API.change.pauseQueue, { project: basename(p) }], { kind: 'queue-pause', project: basename(p) }, async (guard) => {
     const target = await queueTargetOf(ws, p, body?.target)
     const v = await pauseQueue(ws, p, target, 'assistant', guard)
-    return { done: `Paused the merge queue for ${target} in ${basename(p)}`, result: publicQueue(v) }
+    return { done: [API.done.queuePaused, { target, project: basename(p) }], result: publicQueue(v) }
   })
 })
 
 route('POST', '/v1/queue/resume', async ({ body }) => {
-  notAgents('resume a merge queue')
+  notAgents([API.change.resumeAQueue])
   const ws = requireWorkspace()
   const p = queueProject(body?.project)
-  return assistantChange('agents', `resume the merge queue of ${basename(p)}`, { kind: 'queue-resume', project: basename(p) }, async (guard) => {
+  return assistantChange('agents', [API.change.resumeQueue, { project: basename(p) }], { kind: 'queue-resume', project: basename(p) }, async (guard) => {
     const target = await queueTargetOf(ws, p, body?.target)
     const r = await resumeQueue(ws, p, target, guard)
-    return { done: r.resumed ? `Resumed the merge queue for ${target} in ${basename(p)}` : `The merge queue for ${target} in ${basename(p)} is still paused (${r.view.paused?.reason ?? 'paused'})`, result: { resumed: r.resumed, queue: publicQueue(r.view) } }
+    return { done: [API.done.queueResumed, { target, project: basename(p), resumed: r.resumed ? 'yes' : 'no', hasReason: r.view.paused?.reason ? 'yes' : 'no', reason: r.view.paused?.reason ?? '' }], result: { resumed: r.resumed, queue: publicQueue(r.view) } }
   })
 })
 
@@ -2297,8 +2338,8 @@ route('POST', '/v1/queue/resume', async ({ body }) => {
 // user's pause of every workspace is the window's. Another open workspace is told as one line, with none of its agents.
 
 /** Agents (and scripts) don't pause or resume the team: the user's, and the Assistant's within Control agents. */
-function notTeamAgents(what: string): void {
-  if (agentCaller()) throw new HttpError(403, `Project agents can't ${what}: pausing the team is the user's, and the Hive Assistant's within Settings → Assistant → Control. Tell the user if it should be done.`)
+function notTeamAgents(what: Said): void {
+  if (agentCaller()) throw new HttpError(403, say(API.team.notAgents, { what: sayNow(what) }))
 }
 
 /** The team's state as the Assistant sees it: its workspace's in full, any other open one as one line with no names. */
@@ -2312,10 +2353,10 @@ async function teamFor(ws: WorkspaceService): Promise<{ paused: boolean; pausedB
     const v = await scanWorkspace(w)
     if (!v.pause) {
       othersOk = false
-      lines.push("Another open workspace isn't paused: the user pauses it from its window, or with Pause the Team.")
+      lines.push(say(API.team.otherNotPaused))
     } else if (!v.parked) {
       othersOk = false
-      lines.push('Another open workspace is paused, not parked yet.')
+      lines.push(say(API.team.otherNotParked))
     }
   }
   return {
@@ -2330,83 +2371,82 @@ async function teamFor(ws: WorkspaceService): Promise<{ paused: boolean; pausedB
 }
 
 route('GET', '/v1/team', async () => {
-  notTeamAgents('read the team pause')
+  notTeamAgents([API.change.readTeam])
   return teamFor(requireWorkspace())
 })
 
 route('POST', '/v1/team/pause', async () => {
-  notTeamAgents('pause the team')
+  notTeamAgents([API.change.pauseTeam])
   const ws = requireWorkspace()
-  return assistantChange('agents', 'pause the team', { kind: 'team-pause' }, async (guard) => {
+  return assistantChange('agents', [API.change.pauseTeam], { kind: 'team-pause' }, async (guard) => {
     guard()
     const p = await pauseTeam(ws, 'assistant')
-    return { done: `Paused the team (${p.pauseId})`, result: await teamFor(ws) }
+    return { done: [API.done.teamPaused, { pause: p.pauseId }], result: await teamFor(ws) }
   })
 })
 
 route('POST', '/v1/team/resume', async () => {
-  notTeamAgents('resume the team')
+  notTeamAgents([API.change.resumeTeam])
   const ws = requireWorkspace()
-  return assistantChange('agents', 'resume the team', { kind: 'team-resume' }, async (guard) => {
+  return assistantChange('agents', [API.change.resumeTeam], { kind: 'team-resume' }, async (guard) => {
     guard()
     const was = await resumeTeam(ws)
-    return { done: was ? 'Resumed the team' : 'The team was not paused', result: await teamFor(ws) }
+    return { done: [API.done.teamResumed, { was: was ? 'yes' : 'no' }], result: await teamFor(ws) }
   })
 })
 
-/** A held writer as the Agent API lists it (#1561): who holds it, its run and Hive, and the processes Hive lists of it. */
-const publicHeld = (w: HeldRow) => ({ slot: w.slot, agent: w.agentName, run: w.run, hive: w.hive.self ? 'this Hive' : `gone (process ${w.hive.pid})`, processes: w.processes ? { list: w.processes.list.map((p) => ({ pid: p.pid, label: p.label })), more: w.processes.more } : null })
+/** A held writer as the Agent API lists it (#1561): who holds it, its run and Combwork, and the processes Combwork lists of it. */
+const publicHeld = (w: HeldRow) => ({ slot: w.slot, agent: w.agentName, run: w.run, combwork: w.combwork.self ? say(API.slot.heldThisCombwork) : say(API.slot.heldGone, { pid: String(w.combwork.pid) }), processes: w.processes ? { list: w.processes.list.map((p) => ({ pid: p.pid, label: p.label })), more: w.processes.more } : null })
 
 /** Release Slot's refusals (#1561) as the Agent API answers them. */
-const slotRefusal = (e: unknown): unknown => (e instanceof SlotReleaseRefused ? new HttpError(e.status, e.message) : e)
+const slotRefusal = (e: unknown): unknown => (e instanceof SlotReleaseRefused ? httpFrom(e.status, e) : e)
 
 // What a project has to release (#1561): carried slots (#1441) and held writers (#1506), as the agents' ⋯ offer them.
 route('GET', '/v1/projects/:name/slots/releasable', async ({ params }) => {
   const p = projectByName(params[0])
-  ownProjectOnly(p, "Reading a project's slots to release")
+  ownProjectOnly(p, [API.own.readingSlots])
   const r = await releasableSlots(p)
   return { project: basename(p), carried: r.carried.map((c) => ({ slot: c.slot, agent: c.agent.name })), held: r.held.map(publicHeld) }
 })
 
 // Release Slot (#1561): a carried slot, or a held writer once confirmed (its slot and run), as the window's ⋯ does.
 route('POST', '/v1/projects/:name/slots/:slot/release', async ({ params, body }) => {
-  if (agentCaller()) throw new HttpError(403, "Project agents can't release a slot: that is the user's, and the Hive Assistant's within Settings → Assistant → Control once the user agrees. Tell the user if a slot is stuck.")
+  if (agentCaller()) throw new HttpError(403, say(API.slot.notAgents))
   const p = projectByName(params[0])
   const slot = decodeURIComponent(params[1])
   const kind = body?.kind === undefined ? undefined : body.kind === 'carried' || body.kind === 'writer' ? body.kind : null
-  if (kind === null) throw new HttpError(400, 'kind is carried or writer')
+  if (kind === null) throw new HttpError(400, say(API.slot.kindArg))
   const confirm = body?.confirm && typeof body.confirm === 'object' ? (body.confirm as { slot?: unknown; run?: unknown }) : null
-  return assistantChange('agents', `release slot ${slot} in ${basename(p)}`, { kind: 'release-slot', project: basename(p) }, async (guard) => {
+  return assistantChange('agents', [API.change.releaseSlot, { slot, project: basename(p) }], { kind: 'release-slot', project: basename(p) }, async (guard) => {
     const r = await releaseSlot(requireWorkspace(), p, slot, { ...(kind ? { kind } : {}), confirm, end: body?.end === true, guard }).catch((e) => {
       throw slotRefusal(e)
     })
     await workspaceOf(p).refresh()
-    const what = r.kind === 'carried' ? `${r.slot} in ${basename(p)}: no longer kept for ${r.agent.name}` : `${r.slot} in ${basename(p)} from ${r.agent.name}'s ended run${r.ended ? ', its listed processes ended first' : ''}`
-    return { done: `Released ${what}`, act: { agent: { id: r.agent.id, name: r.agent.name } }, result: { project: basename(p), ...r, agent: r.agent.name } }
+    return { done: [API.done.slotReleased, { kind: r.kind === 'carried' ? 'carried' : 'writer', slot: r.slot, project: basename(p), agent: r.agent.name, ended: r.ended ? 'yes' : 'no' }], act: { agent: { id: r.agent.id, name: r.agent.name } }, result: { project: basename(p), ...r, agent: r.agent.name } }
   })
 })
 
 /** The Assistant's alone (HI-1502): a template's list, plan and load. Project agents, scripts and the user's token are refused before any template is read. */
-function assistantTemplates(what: string): void {
-  if (!assistantCaller()) throw new HttpError(403, `Only the Hive Assistant can ${what} through the Agent API: templates are loaded in Hive's window.`)
+function assistantTemplates(what: Said): void {
+  if (!assistantCaller()) throw new HttpError(403, say(API.template.onlyAssistant, { what: sayNow(what) }))
 }
 
 /** A body's workflow argument: true unless false (HI-1502: its workflow is applied by default, as the window's tick box is). */
 function workflowArg(body: any): boolean {
-  if (body?.workflow !== undefined && typeof body.workflow !== 'boolean') throw new HttpError(400, 'workflow is true or false')
+  if (body?.workflow !== undefined && typeof body.workflow !== 'boolean') throw new HttpError(400, say(API.template.workflowArg))
   return body?.workflow !== false
 }
 
-// The templates a project can use (HI-1502): Hive's own, the workspace's and its own, a row each.
+// The templates a project can use (HI-1502): Combwork's own, the workspace's and its own, a row each.
 route('GET', '/v1/projects/:name/templates', async ({ params }) => {
-  assistantTemplates("list a project's templates")
+  assistantTemplates([API.change.listTemplates])
   const p = projectByName(params[0])
   return { project: basename(p), templates: await templateRows(p) }
 })
 
 // What loading a template would do (HI-1502): nothing is changed.
 route('POST', '/v1/projects/:name/templates/plan', async ({ params, body }) => {
-  assistantTemplates('plan loading a template')
+  assistantTemplates([API.change.planTemplate])
   const p = projectByName(params[0])
   const e = await findTemplate(p, body ?? {})
   return (await planReply(p, e, body?.names, workflowArg(body), body?.connections)).reply
@@ -2414,39 +2454,38 @@ route('POST', '/v1/projects/:name/templates/plan', async ({ params, body }) => {
 
 // Loading a template (HI-1502): the window's load, its names given, its workflow saved unless workflow is false; undoable.
 route('POST', '/v1/projects/:name/templates/load', async ({ params, body }) => {
-  assistantTemplates('load a template')
+  assistantTemplates([API.change.loadATemplate])
   const p = projectByName(params[0])
   const applyWorkflow = workflowArg(body)
-  const named = typeof body?.template === 'string' ? clip(body.template, 60) : 'a template'
-  return assistantChange('agents', `load the template "${named}" into ${basename(p)}`, { kind: 'load-template', project: basename(p) }, async (guard) => {
+  const named = typeof body?.template === 'string' ? [API.change.loadTemplate, { template: clip(body.template, 60), project: basename(p) }] as const : [API.change.loadUnnamedTemplate, { project: basename(p) }] as const
+  return assistantChange('agents', named, { kind: 'load-template', project: basename(p) }, async (guard) => {
     const e = await findTemplate(p, body ?? {})
     const r = await loadForAssistant(p, e, body?.names, applyWorkflow, guard, body?.connections)
-    const wf = r.workflow ? (r.workflow.saved ? `, and its workflow (${r.workflow.changes.length} options changed)` : '; its workflow was not saved') : ''
-    return { done: `Loaded the template "${r.template.name}" into ${r.project}: ${r.created.length} agents${wf}`, stays: UNDO_FINAL.templateCards, result: r }
+    const workflow = r.workflow ? (r.workflow.saved ? 'saved' : 'notSaved') : 'none'
+    return { done: [API.done.templateLoaded, { template: r.template.name, project: r.project, agents: String(r.created.length), workflow, options: String(r.workflow?.changes.length ?? 0) }], stays: UNDO_FINAL.templateCards, result: r }
   })
 })
 
 // Choose Connections… (HI-2109): the project's existing agents given connections by role or name, nothing loaded; undoable.
 route('POST', '/v1/projects/:name/templates/apply', async ({ params, body }) => {
-  assistantTemplates("choose a project's agents' connections")
+  assistantTemplates([API.change.chooseConnectionsAny])
   const p = projectByName(params[0])
-  return assistantChange('agents', `choose connections for ${basename(p)}'s agents`, { kind: 'update-agent', project: basename(p) }, async (guard) => {
+  return assistantChange('agents', [API.change.chooseConnections, { project: basename(p) }], { kind: 'update-agent', project: basename(p) }, async (guard) => {
     const r = await applyForAssistant(p, body?.connections, guard)
-    return { done: `Chose connections in ${r.project}: ${r.changed.length} agents changed${r.skipped.length ? `, ${r.skipped.length} skipped` : ''}`, result: r }
+    return { done: [API.done.connectionsChosen, { project: r.project, changed: String(r.changed.length), skipped: r.skipped.length, skippedTotal: String(r.skipped.length) }], result: r }
   })
 })
 
 /** Remove from queue or Retry merge, the Assistant's: its reason required, run as the card's intent (#1353). */
 async function queueCard(body: any, kind: 'removeFromQueue' | 'retryMerge'): Promise<IntentDone> {
-  notAgents(kind === 'removeFromQueue' ? 'take a card out of the merge queue' : "retry a card's merge")
+  notAgents([kind === 'removeFromQueue' ? API.change.removeFromQueueAny : API.change.retryMergeAny])
   const ws = requireWorkspace()
   const ref = intentRef(String(body?.card ?? ''))
   const reason = textField(body, 'reason', true)
   const was = await tasks.getTask(ref.n).catch(() => null)
-  return assistantChange('agents', `${INTENT_WORDS[kind]} ${cardRef(ref.n)}`, { kind: 'update-task', card: ref.n, ...(was?.project ? { project: was.project } : {}) }, async (guard) => {
+  return assistantChange('agents', intentWhat(kind, ref.n), { kind: 'update-task', card: ref.n, ...(was?.project ? { project: was.project } : {}) }, async (guard) => {
     const { done, card } = await queueCardChange(ws, ref.n, await taskActor(), kind, reason, guard)
-    const moved = done.from && done.to && done.from !== done.to ? `, ${done.from} → ${done.to}` : ''
-    return { done: `${cardName(card)} ${clip(card.title, 60)}: ${INTENT_DONE[kind]}${moved}`, act: { column: card.column, agent: await cardAgent(card) }, result: done, stays: INTENT_STAYS[kind] }
+    return { done: intentDone(kind, card, done), act: { column: card.column, agent: await cardAgent(card) }, result: done, stays: INTENT_STAYS[kind] }
   })
 }
 
@@ -2456,7 +2495,7 @@ route('POST', '/v1/queue/retry', async ({ body }) => queueCard(body, 'retryMerge
 route('GET', '/v1/shared', async () => inWorkspace(requireWorkspace(), () => notesTree()))
 
 // A project's handovers, newest first (under its earlier folder names too, #514); no project: every one. Their paths
-// as /v1/shared/file takes them. What hive_read_latest_handover and the session guidance find.
+// as /v1/shared/file takes them. What cw_read_latest_handover and the session guidance find.
 route('GET', '/v1/shared/handovers', async ({ query }) => {
   const name = query.get('project')
   const project = name ? projectByName(name) : null
@@ -2467,23 +2506,23 @@ route('GET', '/v1/shared/handovers', async ({ query }) => {
 
 route('GET', '/v1/shared/file', async ({ query }) => {
   const rel = query.get('path')
-  if (!rel) throw new HttpError(400, 'path is required')
+  if (!rel) throw new HttpError(400, say(API.note.pathRequired))
   const abs = inWorkspace(requireWorkspace(), () => assertInShared(rel))
-  return { path: rel, ...(await readNote(abs).catch(() => { throw new HttpError(404, 'Not found') })) }
+  return { path: rel, ...(await readNote(abs).catch(() => { throw new HttpError(404, say(API.note.notFound)) })) }
 })
 
 route('PUT', '/v1/shared/file', async ({ query, body }) => {
   const rel = query.get('path') ?? body?.path
-  if (!rel) throw new HttpError(400, 'path is required')
+  if (!rel) throw new HttpError(400, say(API.note.pathRequired))
   const abs = inWorkspace(requireWorkspace(), () => assertInShared(rel))
   // Workspace notes reach every agent at launch (#1433): the user's and the Assistant's to write, never a project agent's.
   if (agentCaller() && resolvePath(abs).toLowerCase() === resolvePath(inWorkspace(requireWorkspace(), () => workspaceNotesFile(workspace.sharedDir))).toLowerCase()) {
-    throw new HttpError(403, `The shared note "${WORKSPACE_NOTES_PATH}" is the user's and the Hive Assistant's: project agents read it but don't change it. Tell the user what it should say.`)
+    throw new HttpError(403, say(API.note.workspaceNotesReadOnly, { path: WORKSPACE_NOTES_PATH }))
   }
   const content = String(body?.content ?? '')
   // Only a write that leaves it out is unguarded: one given (null, empty, not a string) must be a revision.
   const expected: unknown = body && typeof body === 'object' && 'expectedRevision' in body ? body.expectedRevision : undefined
-  if (expected !== undefined && (typeof expected !== 'string' || !expected)) throw new HttpError(400, 'expectedRevision must be the revision reading the note gave; nothing was written')
+  if (expected !== undefined && (typeof expected !== 'string' || !expected)) throw new HttpError(400, say(API.note.expectedRevision))
   const { revision } = await writeNote(abs, rel, content, { append: !!body?.append, expectedRevision: expected as string | undefined }).catch((e) => {
     throw e instanceof NoteConflict ? new HttpError(409, e.message, { revision: e.current }) : e
   })
@@ -2503,7 +2542,7 @@ const SECTION_MAX = 30_000
 /** The document a docs call names, read: its text and the reference it goes by. */
 async function docOf(query: URLSearchParams): Promise<{ ref: string; text: string }> {
   const path = query.get('path')?.trim()
-  if (!path) throw new HttpError(400, 'path is required: a project file ("docs/PLAN.md") or a shared note ("shared:plans/plan.md")')
+  if (!path) throw new HttpError(400, say(API.doc.pathRequired))
   let root: string
   let rel: string
   if (path.startsWith(SHARED_PREFIX)) {
@@ -2514,10 +2553,10 @@ async function docOf(query: URLSearchParams): Promise<{ ref: string; text: strin
   } else {
     const name = query.get('project')
     const own = agentCaller()
-    if (!name && !own) throw new HttpError(400, 'project is required for a project file (or a shared note: shared:<path>)')
+    if (!name && !own) throw new HttpError(400, say(API.doc.projectRequired))
     const p = name ? projectByName(name) : own!.projectPath
     // An agent: its own project only. The Assistant: its own workspace's (projectByName).
-    ownProjectOnly(p, "Reading a project's documents")
+    ownProjectOnly(p, [API.own.readingDocs])
     // A project agent reads its own copy: the folder it works in now (#1451: its running session's, its slot). from=project:
     // the project folder's, the copy a card's Read first references (#818) were written against, as its dialog and start
     // prompt read them.
@@ -2530,11 +2569,11 @@ async function docOf(query: URLSearchParams): Promise<{ ref: string; text: strin
   const r = await readDoc(root, rel)
   if (r.ok) return { ref: path, text: r.text }
   const why = {
-    outside: `${path} isn't inside ${path.startsWith(SHARED_PREFIX) ? 'the shared notes' : 'the project'}: give a path relative to it`,
-    hidden: `${path} is in Hive's or git's own folder: read shared notes as shared:<path>`,
-    notMarkdown: `${path} isn't a Markdown file (.md)`,
-    notFound: `Not found: ${path}`,
-    tooBig: `${path} is over ${Math.round(DOC_MAX / 1048576)} MB`
+    outside: say(API.doc.outside, { path, where: path.startsWith(SHARED_PREFIX) ? 'shared' : 'project' }),
+    hidden: say(API.doc.hidden, { path }),
+    notMarkdown: say(API.doc.notMarkdown, { path }),
+    notFound: say(API.doc.notFound, { path }),
+    tooBig: say(API.doc.tooBig, { path, megabytes: String(Math.round(DOC_MAX / 1048576)) })
   }[r.code]
   throw new HttpError(r.code === 'notFound' ? 404 : 400, why)
 }
@@ -2561,9 +2600,9 @@ route('GET', '/v1/docs/section', async ({ query }) => {
     return { path: ref, size: text.length, content: text }
   }
   const found = findHeading(outline, asked)
-  const list = (hs: DocHeading[]): string => hs.map((h) => `#${h.slug} (${h.text}, line ${h.line})`).join(', ')
-  if ('ambiguous' in found) throw new HttpError(409, `Several sections of ${ref} are called "${asked}": ${list(found.ambiguous)}. Ask for one as #<slug>.`, { matches: found.ambiguous.map(headingRow) })
-  if ('closest' in found) throw new HttpError(404, found.closest.length ? `No section "${asked}" in ${ref}. Closest: ${list(found.closest)}.` : `${ref} has no headings.`, { closest: found.closest.map(headingRow) })
+  const list = (hs: DocHeading[]): string => hs.map((h) => say(API.doc.headingRow, { slug: h.slug, heading: h.text, line: String(h.line) })).join(', ')
+  if ('ambiguous' in found) throw new HttpError(409, say(API.doc.severalSections, { doc: ref, asked, list: list(found.ambiguous) }), { matches: found.ambiguous.map(headingRow) })
+  if ('closest' in found) throw new HttpError(404, found.closest.length ? say(API.doc.noSection, { asked, doc: ref, list: list(found.closest) }) : say(API.doc.noHeadings, { doc: ref }), { closest: found.closest.map(headingRow) })
   const h = found.heading
   const content = sectionText(text, h)
   // A long section with subsections: its own text and their outline, unless asked for in full.
@@ -2578,11 +2617,12 @@ route('GET', '/v1/docs/section', async ({ query }) => {
 })
 
 /**
- * Who is writing a handover, for its header: the Assistant (its own token), or the agent whose hive tools sent
+ * Who is writing a handover, for its header: the Assistant (its own token), or the agent whose Combwork tools sent
  * it (they pass its id and project). Others (scripts, the user) leave no author.
  */
 async function handoverAuthor(body: any): Promise<HandoverAuthor | null> {
   const own = assistantCaller()
+  // agent-protocol: a handover header's author field, which code matches
   if (own) return { author: 'Assistant', session: sessions.liveFor(assistant.assistantHome(own), ASSISTANT_AGENT_ID)?.sessionId || undefined }
   if (typeof body?.agent !== 'string' || !body.agent || typeof body?.agentProject !== 'string') return null
   try {
@@ -2604,7 +2644,7 @@ export const handoverCreatedToast = (project: string, title: string, file: strin
   ])
 
 route('POST', '/v1/shared/handovers', async ({ body }) => {
-  if (!body?.title || !body?.content) throw new HttpError(400, 'title and content are required')
+  if (!body?.title || !body?.content) throw new HttpError(400, say(API.note.titleContentRequired))
   // For a named project, its workspace's notes; else the request's workspace.
   // The project's own name, also when it was given as "<workspace>/<project>".
   const project = body.project ? projectByName(String(body.project)) : null
@@ -2639,6 +2679,7 @@ async function taskActor(): Promise<tasks.TaskActor> {
       .catch(() => undefined)
     return { kind: 'agent', name: `${def?.name ?? agent.agentId} (${project})`, self: { project, agentId: agent.agentId }, scope: project }
   }
+  // agent-protocol: the name a script's change is recorded under
   return { kind: 'agent', name: 'Agent API' }
 }
 
@@ -2646,7 +2687,7 @@ async function taskActor(): Promise<tasks.TaskActor> {
  * A card with what its agent is doing now (and its name now), for callers deciding what to do next. `agents` keeps
  * each project's agents for a whole list, so a long board reads each project.json once.
  */
-/** A card's merge-queue line (#1354, queueState.ts), when its project has a workflow and its rules say Hive merges it. */
+/** A card's merge-queue line (#1354, queueState.ts), when its project has a workflow and its rules say Combwork merges it. */
 async function queueLineFor(project: string, n: number): Promise<string | null> {
   try {
     const wf = await workflowFor(workspace, projectByName(project))
@@ -2709,7 +2750,7 @@ async function taskView(c: TaskCard, agents =new Map<string, Promise<ReturnType<
   // Nobody working on a Doing card: the Assistant reports these and suggests who could take them.
   // Entry ids are the card watches' (#224): left out, so replies stay as lean as before.
   // Its decisions first (#357): what the user decided, which agents follow over the description. Its holds (#602) are
-  // for its cost in Hive's window: left out.
+  // for its cost in Combwork's window: left out.
   const { number, title, decisions, held: _held, ...rest } = c
   // Its running lane, for a card waiting in Review: its lane may be deadlocked (#1410).
   const lane = c.column === 'review' && c.project ? (await lanes.listLanes(workspace, { project: c.project }).catch(() => [])).find((l) => (l.state === 'active' || l.state === 'paused') && l.cards.some((x) => x.number === c.number)) : undefined
@@ -2733,9 +2774,9 @@ async function taskView(c: TaskCard, agents =new Map<string, Promise<ReturnType<
     agent,
     // A Doing card nobody works on, a card an agent was looping on and left with no watch (#376), or one in Review its
     // watching reviewer hasn't started on (#521), or one its lane's deadlock holds up (#1410), or a design nobody checks (#1382).
-    stalled: cardStall(c, now, workspace.path, lane && inLane ? laneOrderView(lane, (n) => inLane.get(n)) : null, await stepWaitOf(workspace, c))
+    stalled: cardStall(c, now, workspace.path, lane && inLane ? laneOrderView(lane, (n) => inLane.get(n)) : null, await stepWaitOf(workspace, c), undefined, undefined, await reviewDueOf(workspace, c))
   }
-  // A review whose reviewer has gone or isn't running (Hive ends those, but one can show while that happens).
+  // A review whose reviewer has gone or isn't running (Combwork ends those, but one can show while that happens).
   if (c.review && c.project) {
     try {
       const p = projectByName(c.project)
@@ -2745,7 +2786,7 @@ async function taskView(c: TaskCard, agents =new Map<string, Promise<ReturnType<
       const why = reviewStalled(c, def ? { name: def.name, running: !!sessions.liveFor(p, def.id) || isResuming(p, def.id) } : null)
       if (why) view.reviewStalled = why
     } catch {
-      view.reviewStalled = `${c.review.agentName} was removed.`
+      view.reviewStalled = say(API.card.reviewerRemoved, { agent: c.review.agentName })
     }
   }
   // A project agent sees the cards of other projects it links to or waits for as numbers, marked as such.
@@ -2757,7 +2798,7 @@ async function taskView(c: TaskCard, agents =new Map<string, Promise<ReturnType<
   const k = cardKind(workspace, c.number)
   // Whether it skips review (#1625), and an agent's proposal of it not answered yet: additive, only when there is one.
   const rs = cardReviewSkip(workspace, c.number)
-  // Who merges it and where it is with the merge queue, by its own rules (#1354): additive, only when Hive merges it.
+  // Who merges it and where it is with the merge queue, by its own rules (#1354): additive, only when Combwork merges it.
   const merge = c.project && !c.archived ? await queueLineFor(c.project, c.number) : null
   // A code card's checks before review and how to run one (HI-2276): additive, only when its rules name some.
   const checks = c.project && !c.archived ? await checksFor(c.project, c.number) : null
@@ -2770,7 +2811,7 @@ async function taskView(c: TaskCard, agents =new Map<string, Promise<ReturnType<
 /** A card attachment as agents read it (HI-1700): its path, name and size, who added it and when, and where it came. */
 function attachmentForAgents(a: CardAttachment, comments: readonly Pick<TaskComment, 'id' | 'by' | 'at'>[]): NonNullable<TaskView['attachments']>[number] {
   const said = a.comment && a.comment !== 'description' && a.comment !== 'pane' ? comments.find((x) => x.id === a.comment) : undefined
-  const from = said ? `comment by ${said.by} at ${said.at}` : a.comment === 'description' ? 'description' : a.comment === 'pane' ? 'attached from a session' : a.comment ? 'a comment no longer on the card' : 'attached to the card' // i18n-ignore: agent-facing
+  const from = said ? say(API.attachment.fromComment, { by: said.by, at: said.at }) : a.comment === 'description' ? 'description' : a.comment === 'pane' ? say(API.attachment.fromSession) : a.comment ? say(API.attachment.fromGoneComment) : say(API.attachment.fromCard) // i18n-ignore: agent-facing
   return { path: a.path, name: a.name, size: a.size, by: a.by, at: a.at, from, ...(a.missing ? { missing: true as const } : {}) }
 }
 
@@ -2784,7 +2825,7 @@ function callerScope(): string | null {
 function attachmentList(body: any): string[] | null {
   const raw = body?.attachments
   if (raw === undefined || (Array.isArray(raw) && !raw.length)) return null
-  if (!Array.isArray(raw) || raw.some((x) => typeof x !== 'string' || !x)) throw new HttpError(400, 'attachments is a list of file paths (strings).')
+  if (!Array.isArray(raw) || raw.some((x) => typeof x !== 'string' || !x)) throw new HttpError(400, say(API.attachment.listArg))
   checkBatch(raw.map(() => ({})))
   return raw as string[]
 }
@@ -2802,9 +2843,9 @@ async function withAttachments<T>(paths: string[] | null, project: string | null
   const agent = agentCaller()
   if (project !== null) {
     const known = [...(await ws.listProjectPaths()), ...(await ws.listProjectPaths({ hidden: true }))].some((p) => basename(p).toLowerCase() === project.toLowerCase())
-    if (!known) throw new HttpError(404, `Unknown project "${project}"`)
-    if (agent && basename(agent.projectPath).toLowerCase() !== project.toLowerCase()) throw new HttpError(403, `Cards stay in your project (${basename(agent.projectPath)}).`)
-  } else if (agent) throw new HttpError(403, `Cards stay in your project (${basename(agent.projectPath)}).`)
+    if (!known) throw new HttpError(404, say(API.workspace.unknownProject, { name: project }))
+    if (agent && basename(agent.projectPath).toLowerCase() !== project.toLowerCase()) throw new HttpError(403, say(API.card.stayInProject, { project: basename(agent.projectPath) }))
+  } else if (agent) throw new HttpError(403, say(API.card.stayInProject, { project: basename(agent.projectPath) }))
   const caller: AttachCaller = agent ? { kind: 'agent', project: basename(agent.projectPath) } : { kind: 'workspace' }
   const real: string[] = []
   for (const p of paths) real.push(await attachableSource(ws, caller, p))
@@ -2817,9 +2858,9 @@ async function withAttachments<T>(paths: string[] | null, project: string | null
 }
 
 /** A change's lines for the files it attached (HI-1700): stored, or already kept with the card (the same bytes). */
-const attachedLines = (c: TaskCard & { attached?: { name: string; path: string; added: boolean }[] }): string[] => (c.attached ?? []).map((a) => `${a.added ? 'Attached' : 'Already attached'}: ${a.name} (${a.path})`)
+const attachedLines = (c: TaskCard & { attached?: { name: string; path: string; added: boolean }[] }): string[] => (c.attached ?? []).map((a) => `${a.added ? say(API.attachment.attached) : say(API.attachment.alreadyAttached)}: ${a.name} (${a.path})`)
 
-/** The short reply a hive tool asks for (reply: "short") instead of the whole card or column. */
+/** The short reply a Combwork tool asks for (reply: "short") instead of the whole card or column. */
 const shortReply = (body: any): boolean => body?.reply === 'short'
 
 /**
@@ -2850,11 +2891,11 @@ const taskNumber = (v: string): number => {
   const ref = decodeURIComponent(v).trim()
   if (/^[A-Za-z]{2,4}-\d+$/.test(ref)) {
     const n = cardOfRef(requireWorkspace(), ref, callerScope())
-    if (n === null) throw new HttpError(404, `Unknown card ${ref}`)
+    if (n === null) throw new HttpError(404, say(API.card.unknown, { card: ref }))
     return n
   }
   const n = Number(ref.replace(/^#/, ''))
-  if (!Number.isInteger(n) || n < 1) throw new HttpError(400, `"${v}" is not a card number or key (12, #12 or HI-12)`)
+  if (!Number.isInteger(n) || n < 1) throw new HttpError(400, say(API.card.notANumber, { value: v }))
   return n
 }
 
@@ -2865,7 +2906,7 @@ const taskNumber = (v: string): number => {
 function cardRefIn(v: unknown): unknown {
   if (typeof v !== 'string' || !isCardRef(v) || /^\d+$/.test(v.trim())) return v
   const n = cardOfRef(requireWorkspace(), v, callerScope())
-  if (n === null) throw new HttpError(404, `Unknown card ${v.trim()}`)
+  if (n === null) throw new HttpError(404, say(API.card.unknown, { card: v.trim() }))
   return n
 }
 const cardRefsIn = <T>(v: T): T => (Array.isArray(v) ? (v.map(cardRefIn) as T) : v)
@@ -2884,7 +2925,7 @@ function withCardsNamed<T>(reply: T): T {
   return reply && typeof reply === 'object' && !Array.isArray(reply) && found.length ? { ...reply, ...withNames(found) } : reply
 }
 
-/** How a reply's text names these cards (#1219), for the hive MCP server that words it: `names`, or nothing. */
+/** How a reply's text names these cards (#1219), for the combwork MCP server that words it: `names`, or nothing. */
 const withNames = (numbers: number[]): { names?: Record<string, string> } => {
   const names = namesOf(numbers)
   return names ? { names } : {}
@@ -2892,7 +2933,7 @@ const withNames = (numbers: number[]): { names?: Record<string, string> } => {
 
 function columnParam(v: unknown): TaskColumn | undefined {
   if (v === undefined || v === null || v === '') return undefined
-  if (!isTaskColumn(v)) throw new HttpError(400, `Unknown column "${String(v)}": ${COLUMN_CHOICES}.`)
+  if (!isTaskColumn(v)) throw new HttpError(400, say(API.card.unknownColumn, { column: String(v), choices: COLUMN_CHOICES }))
   return v
 }
 
@@ -2900,13 +2941,13 @@ function columnParam(v: unknown): TaskColumn | undefined {
 function taskPatch(body: any): TaskPatch {
   const out: TaskPatch = {}
   // Archiving is the user's (#351), one card or a batch: no call of the Agent API's makes it.
-  if (body?.archived !== undefined) throw new HttpError(403, 'Only the user archives cards or brings them back, from the board: ask the user.')
-  for (const k of ['title', 'description', 'project', 'blocked'] as const) if (body?.[k] !== undefined) out[k] = body[k] === null ? (null as never) : String(body[k])
+  if (body?.archived !== undefined) throw new HttpError(403, say(API.card.onlyUserArchives))
+  for (const k of ['title', 'description', 'project', 'blocked', 'waitingFor'] as const) if (body?.[k] !== undefined) out[k] = body[k] === null ? (null as never) : String(body[k])
   if (body?.agent !== undefined) out.agent = body.agent ? String(body.agent) : null
   if (body?.column !== undefined) out.column = columnParam(body.column)
   if (body?.before !== undefined) out.before = body.before === null ? null : Number(String(cardRefIn(body.before)).replace(/^#/, ''))
   if (body?.position !== undefined && body.position !== null && body.position !== '') {
-    if (body.position !== 'top' && body.position !== 'bottom') throw new HttpError(400, `Unknown position "${String(body.position)}": top or bottom.`)
+    if (body.position !== 'top' && body.position !== 'bottom') throw new HttpError(400, say(API.card.unknownPosition, { position: String(body.position) }))
     out.position = body.position
   }
   for (const k of ['labels', 'addLabels', 'removeLabels', 'blockedBy', 'links', 'context'] as const) if (body?.[k] !== undefined) out[k] = k === 'blockedBy' || k === 'links' ? cardRefsIn(body[k]) : body[k]
@@ -2915,7 +2956,7 @@ function taskPatch(body: any): TaskPatch {
   // (shape, who, each request) by the route and where it is recorded.
   if (body?.answers !== undefined && body.answers !== null) out.answers = body.answers as string[]
   if (body?.review !== undefined && body.review !== null && body.review !== '') {
-    if (body.review !== 'start' && body.review !== 'passed' && body.review !== 'failed') throw new HttpError(400, `Unknown review "${String(body.review)}": start, passed or failed.`)
+    if (body.review !== 'start' && body.review !== 'passed' && body.review !== 'failed') throw new HttpError(400, say(API.card.unknownReview, { review: String(body.review) }))
     out.review = body.review
   }
   if (body?.override !== undefined && body.override !== null) out.override = overrideParam(body.override)
@@ -2925,7 +2966,7 @@ function taskPatch(body: any): TaskPatch {
 /** A move's override (#1265, SPEC §16.8.4): `{ reason }`, the Assistant's, why it moves the card across the rules. */
 export function overrideParam(v: unknown): { reason: string } {
   const reason = v && typeof v === 'object' ? (v as { reason?: unknown }).reason : undefined
-  if (typeof reason !== 'string' || !reason.trim()) throw new HttpError(400, 'override is { "reason": "<why>" }, the reason not empty.')
+  if (typeof reason !== 'string' || !reason.trim()) throw new HttpError(400, say(API.card.overrideArg))
   return { reason: reason.trim() }
 }
 
@@ -2940,21 +2981,26 @@ route('GET', '/v1/tasks', async ({ query }) => {
   const short = query.get('view') === 'short'
   const waiting = short ? new Map<number, ForYouItem[]>() : forYouOfCards(workspace, cards.map((c) => c.number))
   const views = await Promise.all(cards.map((c) => taskView(c, agents, waiting)))
-  return short ? views.map(taskRow) : views
+  if (short) return views.map(taskRow)
+  // HI-2568: whole cards without their history (historyEntries counts it), so the listing doesn't grow with every card's
+  // changes; ?history=true keeps it.
+  return query.get('history') === 'true' ? views : views.map(withoutHistory)
 })
 
 route('GET', '/v1/tasks/:n', async ({ params, query }) => {
   requireWorkspace()
   // The card with its decision generation, read together (#1216): what this reply gives an agent is what its receipt records.
   const seen = await tasks.readTaskSeen(taskNumber(params[0]), await taskActor())
-  const raw = query.get('comments')
-  const n = raw === null ? null : Number(raw)
-  if (n !== null && (!Number.isInteger(n) || n < 1)) throw new HttpError(400, `comments must be a whole number from 1: "${raw}"`)
+  // comments=0 (HI-2412): none of them, every one counted in commentsOmitted.
+  const parsed = commentsParam(query.get('comments'))
+  if (parsed !== null && typeof parsed === 'object') throw new HttpError(400, parsed.error)
+  const n = parsed
   const summary = query.get('summary') === 'true'
   // A narrowed read (HI-2402) keeps only the attachments of the comments it returns in full (none under summary=true,
   // whose comments are their first lines), unless attachments=true; a full read keeps them all.
   const narrowed = (n !== null || summary) && query.get('attachments') !== 'true'
-  const inFull = summary ? [] : n === null ? seen.card.comments : seen.card.comments.slice(-n)
+  // Never slice(-n): slice(-0) is every comment (HI-2412).
+  const inFull = summary ? [] : n === null ? seen.card.comments : seen.card.comments.slice(Math.max(0, seen.card.comments.length - n))
   const view = await taskView(seen.card, undefined, undefined, narrowed ? new Set(inFull.flatMap((x) => (x.id ? [x.id] : []))) : undefined)
   // Read in full, decisions included: those aren't new to the agent any more (#357).
   const me = agentCaller()
@@ -2969,7 +3015,41 @@ route('GET', '/v1/tasks/:n', async ({ params, query }) => {
   // summary=true (#532): each comment as its first line, with the whole comment's length when there is more; its open
   // requests' words too (HI-1992).
   const told = summary ? { ...lean, ...(lean.forYou ? { forYou: lean.forYou.map(commentSummary) } : {}), comments: lean.comments.map(commentSummary) } : lean
-  return query.get('history') === 'false' ? withoutHistory(told) : told
+  // Its comment archive (HI-2641): how many older comments it archived (read with /comments/archived), whether it may
+  // have lost some before archiving existed, and past SPLIT_HINT_COMMENTS in all, a hint to split it.
+  const archive = tasks.commentArchive(seen.card.number)
+  const all = seen.card.comments.length + archive.archived
+  const withArchive = {
+    ...told,
+    ...(archive.archived ? { commentsArchived: archive.archived } : {}),
+    ...(archive.mayHaveBeenLost ? { commentsMayHaveBeenLost: true, commentsNote: say(API.card.commentsMayHaveBeenLost) } : {}),
+    ...(all > SPLIT_HINT_COMMENTS ? { hint: say(API.card.splitHint, { n: String(all) }) } : {})
+  }
+  return query.get('history') === 'false' ? withoutHistory(withArchive) : withArchive
+})
+
+/** Past this many comments on a card (its archived ones counted), a read of it suggests splitting it (HI-2641). */
+const SPLIT_HINT_COMMENTS = 100
+/** The most archived comments one read returns (HI-2641), and how many when limit is left out. */
+const ARCHIVED_PAGE_MAX = 100
+const ARCHIVED_PAGE = 50
+
+/** A whole number from `min` (an archive read's offset or limit), or the default when it is absent; else a 400. */
+function pageParam(raw: string | null, arg: string, min: number, fallback: number): number {
+  if (raw === null) return fallback
+  const n = raw.trim() === '' ? NaN : Number(raw)
+  if (!Number.isInteger(n) || n < min) throw new HttpError(400, say(API.card.archivedArg, { arg, min: String(min), raw }))
+  return n
+}
+
+// A card's archived comments (HI-2641): its oldest, past the 500 it keeps, a page at a time, oldest first.
+route('GET', '/v1/tasks/:n/comments/archived', async ({ params, query }) => {
+  requireWorkspace()
+  const offset = pageParam(query.get('offset'), 'offset', 0, 0)
+  const limit = Math.min(ARCHIVED_PAGE_MAX, pageParam(query.get('limit'), 'limit', 1, ARCHIVED_PAGE))
+  const r = await tasks.archivedCommentsOf(taskNumber(params[0]), await taskActor(), offset, limit)
+  const next = offset + r.comments.length
+  return { ...r, offset, ...(next < r.total ? { next } : {}) }
 })
 
 /** A new card's lane (HI-2167, POST /v1/tasks `lane`): a builder's name or id, or { builder, reviewer, brief, name, position }. */
@@ -2986,16 +3066,16 @@ interface LanePlacement {
 async function lanePlacement(v: unknown, input: { project?: unknown; column?: TaskColumn }): Promise<LanePlacement | null> {
   if (v === undefined || v === null) return null
   const o: Record<string, unknown> = typeof v === 'string' ? { builder: v } : typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {}
-  if (typeof o.builder !== 'string' || !o.builder.trim()) throw new HttpError(400, 'lane is the builder whose running lane takes the card ("HB1"), or { builder, reviewer, brief, name, position } to start one if it has none')
-  for (const k of Object.keys(o)) if (!['builder', 'reviewer', 'brief', 'name', 'position'].includes(k)) throw new HttpError(400, `lane takes builder, reviewer, brief, name and position, not ${k}`)
-  if (o.position !== undefined && o.position !== 'last' && o.position !== 'next') throw new HttpError(400, "lane's position is last (the default) or next (before its first card still in Todo)")
-  if (input.column !== undefined && input.column !== 'todo') throw new HttpError(400, 'A card placed on a lane is made in Todo: leave column out')
+  if (typeof o.builder !== 'string' || !o.builder.trim()) throw new HttpError(400, say(API.card.laneArg))
+  for (const k of Object.keys(o)) if (!['builder', 'reviewer', 'brief', 'name', 'position'].includes(k)) throw new HttpError(400, say(API.card.laneArgField, { field: k }))
+  if (o.position !== undefined && o.position !== 'last' && o.position !== 'next') throw new HttpError(400, say(API.card.lanePosition))
+  if (input.column !== undefined && input.column !== 'todo') throw new HttpError(400, say(API.card.laneNoColumn))
   const project = typeof input.project === 'string' && input.project ? input.project : null
-  if (!project) throw new HttpError(400, 'A card placed on a lane needs its project')
+  if (!project) throw new HttpError(400, say(API.card.laneNeedsProject))
   const p = laneProject(project)
   const builder = await agentParam(p, o.builder.trim())
   const a = agentCaller()
-  if (a && builder !== a.agentId) throw new HttpError(403, "An agent places a new card on its own lane only, as its builder: another builder's lane is theirs, the Assistant's or the user's")
+  if (a && builder !== a.agentId) throw new HttpError(403, say(API.card.laneOwnOnly))
   laneArgs(o)
   const { position, ...rest } = o
   return { body: { ...rest, project, builder: o.builder.trim() }, position: position === 'next' ? 'next' : 'last', needsLane: typeof v === 'string' }
@@ -3013,29 +3093,30 @@ async function placeOnLane(l: LanePlacement, card: number): Promise<{ lane: Lane
 route('POST', '/v1/tasks', async ({ body }) => {
   requireWorkspace()
   const title = String(body?.title ?? '').trim()
-  if (!title) throw new HttpError(400, 'title is required')
+  if (!title) throw new HttpError(400, say(API.card.titleRequired))
   const input = { title, description: body?.description, project: body?.project, agent: body?.agent, column: columnParam(body?.column), labels: body?.labels, blocked: body?.blocked, blockedBy: cardRefsIn(body?.blockedBy), links: cardRefsIn(body?.links), context: body?.context, ...(body?.kind !== undefined ? { kind: body.kind } : {}), ...(body?.skipReview !== undefined ? { skipReview: body.skipReview as string } : {}) }
   const actor = await taskActor()
-  // Placed on a lane as it is made (HI-2167): checked before the card is made; placed after, through hive_lane start's
+  // Placed on a lane as it is made (HI-2167): checked before the card is made; placed after, through cw_lane start's
   // own path, so nobody guesses its key.
   const lane = await lanePlacement(body?.lane, input)
   // Files to keep with it (HI-1700): the list checked now; copied inside the operation that makes the card, once its
   // project is known to be allowed, and published with it.
   const paths = attachmentList(body)
-  const create = () => withAttachments(paths, typeof input.project === 'string' && input.project ? input.project : callerScope(), (files) => tasks.changeWithAttachments(actor, files, 'description', () => tasks.createTask(input, actor)))
+  // `commit`: the Assistant's guard (HI-2415), checked again just before each write, after the awaits a queued change waits on.
+  const create = (commit?: () => void) => withAttachments(paths, typeof input.project === 'string' && input.project ? input.project : callerScope(), (files) => tasks.changeWithAttachments(actor, files, 'description', () => tasks.createTask(input, actor, { commit }), commit))
   // A long title is kept, with a line suggesting a shorter one (HI-1872), or one with what belongs in the description (HI-2061).
   const nudge = titleNudge(title, actor, titleKeys())
   const reply = async (c: TaskCard) => ({ ...(shortReply(body) ? await taskChange(c, attachedLines(c)) : await taskView(c)), ...(nudge ? { nudge } : {}) })
-  // Placed once it is made (the Assistant's: its own change, as hive_lane start is), never inside the card's own change.
+  // Placed once it is made (the Assistant's: its own change, as cw_lane start is), never inside the card's own change.
   const placing = async <R extends { number: number }>(r: R) => (lane ? { ...r, ...(await placeOnLane(lane, r.number)) } : r)
   if (actor.kind !== 'assistant') return placing(await reply(await create()))
   const project = typeof input.project === 'string' && input.project ? input.project : null
   // Made in Doing with nobody on it (HI-2062): refused before the user is asked to approve it (checked again as it is made).
   if (project && input.column === 'doing' && !input.agent) throw new tasks.TaskConflictError(tasks.DOING_NOBODY_NEW)
   const given = await knownAgent(project, input.agent)
-  return placing(await assistantChange('agents', `add the task "${clip(title, 60)}" to the board`, { kind: 'create-task', ...(project ? { project } : {}), ...(given ? { agent: given } : {}) }, async () => {
-    const c = await create()
-    return { done: `Added ${cardName(c)} to the board${c.project ? ` (${c.project})` : ''}: ${clip(c.title, 80)}`, act: { card: c.number, column: c.column, ...(c.project ? { project: c.project } : {}), agent: await cardAgent(c) }, result: await reply(c) }
+  return placing(await assistantChange('agents', [API.change.createTask, { title: clip(title, 60) }], { kind: 'create-task', ...(project ? { project } : {}), ...(given ? { agent: given } : {}) }, async (guard) => {
+    const c = await create(guard)
+    return { done: [API.done.cardAdded, { card: cardName(c), inProject: c.project ? 'yes' : 'no', project: c.project ?? '', title: clip(c.title, 80) }], act: { card: c.number, column: c.column, ...(c.project ? { project: c.project } : {}), agent: await cardAgent(c) }, result: await reply(c) }
   }))
 })
 
@@ -3052,7 +3133,7 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
   // Its kind (#1277): changed after it was made (the Assistant's, with override.reason), or an agent's proposal answered.
   const kind = body?.kind
   const confirmKind = body?.confirmKind
-  if (confirmKind !== undefined && typeof confirmKind !== 'boolean') throw new HttpError(400, 'confirmKind is true (make it no-code, as proposed) or false (keep it as code).')
+  if (confirmKind !== undefined && typeof confirmKind !== 'boolean') throw new HttpError(400, say(API.card.confirmKindArg))
   // Checked before anything is written (HR3's #1277 round 1): a kind no card has is refused whole.
   if (kind !== undefined) tasks.kindOf(kind)
   // The override's reason is the kind change's when no column moves with it.
@@ -3062,29 +3143,29 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
   const write = async (commit?: () => void): Promise<TaskCard> => {
     if (confirmKind !== undefined) {
       await tasks.confirmKind(n, confirmKind, actor, { commit })
-      changes.push(confirmKind ? 'Confirmed as no code' : 'Kept as code')
+      changes.push(sayStored([confirmKind ? API.card.saidNoCode : API.card.saidCode]))
     }
     if (kind !== undefined) {
       await tasks.setKind(n, kind, actor, { commit, reason: body?.override && typeof body.override === 'object' ? String((body.override as { reason?: unknown }).reason ?? '') : '' })
-      changes.push(`Kind: ${kind}`)
+      changes.push(sayStored([API.card.saidKind, { kind: String(kind) }]))
     }
     if (skipReview !== undefined) {
       await tasks.setReviewSkip(n, skipReview !== false, actor, { commit, reason: skipReview || '' })
-      changes.push(skipReview !== false ? 'Skips review' : 'Reviewed')
+      changes.push(sayStored([skipReview !== false ? API.card.saidSkipsReview : API.card.saidReviewed]))
     }
     // A change and its comment are saved together: a card watch woken by the change names this comment.
-    const c = Object.keys(patch).length ? await tasks.updateTask(n, patch, actor, { said: changes, comment: comment || undefined, commit }) : comment ? await tasks.commentTask(n, comment, actor) : await tasks.readTask(n, actor)
-    if (comment) changes.push('Commented')
+    const c = Object.keys(patch).length ? await tasks.updateTask(n, patch, actor, { said: changes, comment: comment || undefined, commit }) : comment ? await tasks.commentTask(n, comment, actor, { commit }) : await tasks.readTask(n, actor)
+    if (comment) changes.push(say(API.card.saidCommented))
     return c
   }
   // Files to keep with it (HI-1700), with its comment if it has one: checked and copied first, published in its change.
-  if (body?.attachments !== undefined && patch.project !== undefined) throw new HttpError(400, 'Move the card to the other project first, then attach files to it.')
+  if (body?.attachments !== undefined && patch.project !== undefined) throw new HttpError(400, say(API.attachment.moveFirst))
   const paths = attachmentList(body)
   // A change of its kind with anything else is one board change (HR3's #1277 round 1): refused part way, none of it.
   const once = (commit?: () => void): Promise<TaskCard> => (kind !== undefined || confirmKind !== undefined || skipReview !== undefined ? tasks.cardBatch(workspace, () => write(commit)) : write(commit))
   const apply = async (commit?: () => void): Promise<TaskCard> => {
     // Its files copied here, inside the operation (the Assistant's: once admitted), to the card's own project.
-    const c = await withAttachments(paths, paths ? ((await tasks.readTask(n, actor)).project ?? null) : null, (files) => tasks.changeWithAttachments(actor, files, comment ? 'comment' : 'description', () => once(commit)))
+    const c = await withAttachments(paths, paths ? ((await tasks.readTask(n, actor)).project ?? null) : null, (files) => tasks.changeWithAttachments(actor, files, comment ? 'comment' : 'description', () => once(commit), commit))
     changes.push(...attachedLines(c))
     return c
   }
@@ -3100,35 +3181,39 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
   const was = await tasks.getTask(n).catch(() => null)
   // Into Doing with nobody on it and no reason from the user (HI-2062): refused before the user is asked to approve it.
   // Only a first look: the change checks it again on the card as it is then (and an agent named is checked there).
-  if (was?.project && patch.column === 'doing' && was.column !== 'doing' && !patch.override && (patch.agent === undefined ? !was.agent : !patch.agent)) throw new tasks.WorkflowRefusedError(refusal('move.doingNobody', { card: cardRef(n), stage: 'active' }, 'the user or the Assistant')) // i18n-ignore: who can override, agent-facing (§16.8.3)
+  if (was?.project && patch.column === 'doing' && was.column !== 'doing' && !patch.override && (patch.agent === undefined ? !was.agent : !patch.agent)) {
+    // agent-protocol: who can override, one of the names the refusal's own text gives (refusals.ts)
+    throw new tasks.WorkflowRefusedError(refusal('move.doingNobody', { card: cardRef(n), stage: 'active' }, 'the user or the Assistant'))
+  }
   const given = typeof patch.agent === 'string' ? await knownAgent(was?.project, patch.agent) : was ? await cardAgent(was) : undefined
-  return assistantChange('agents', `change ${cardRef(n)} on the board`, { kind: 'update-task', card: n, ...(patch.column ? { column: patch.column } : {}), ...(was?.project ? { project: was.project } : {}), ...(given ? { agent: given } : {}) }, async (commit) => {
+  return assistantChange('agents', [API.change.updateTask, { card: cardRef(n) }], { kind: 'update-task', card: n, ...(patch.column ? { column: patch.column } : {}), ...(was?.project ? { project: was.project } : {}), ...(given ? { agent: given } : {}) }, async (commit) => {
     const before = await tasks.getTask(n)
     const placed = (patch.before !== undefined && patch.before !== null) || patch.position !== undefined
     const c = await apply(commit)
-    const at = patch.position ? `at the ${patch.position}` : placed ? `before ${typeof patch.before === 'number' ? cardRef(patch.before) : patch.before}` : ''
+    // What it did, as its activity line says it (stored: said in the Default).
+    const at = patch.position ? sayStored([API.card.atEnd, { position: patch.position }]) : placed ? sayStored([API.card.before, { card: typeof patch.before === 'number' ? cardRef(patch.before) : String(patch.before) }]) : ''
     const what = [
       patch.column && patch.column !== before.column
-        ? `moved it to ${columnLabel(patch.column)}${at ? `, ${at}` : ''}`
+        ? sayStored([API.card.movedTo, { column: columnLabel(patch.column), placed: at ? 'yes' : 'no', at }])
         : patch.position
-          ? `moved it to the ${patch.position} of ${columnLabel(c.column)}`
+          ? sayStored([API.card.movedToEnd, { position: patch.position, column: columnLabel(c.column) }])
           : at
-            ? `moved it ${at}`
+            ? sayStored([API.card.movedAt, { at }])
             : '',
-      comment ? 'commented' : '',
-      patch.decision !== undefined ? 'recorded a decision' : '',
-      confirmKind !== undefined ? (confirmKind ? 'confirmed it as no code' : 'kept it as code') : '',
-      kind !== undefined ? `made it ${kind}` : '',
-      skipReview !== undefined ? (skipReview !== false ? 'set it to skip review' : 'set it to be reviewed') : '',
-      Object.keys(patch).some((k) => k !== 'column' && k !== 'before' && k !== 'position' && k !== 'decision') ? 'changed it' : ''
+      comment ? sayStored([API.card.commented]) : '',
+      patch.decision !== undefined ? sayStored([API.card.recordedDecision]) : '',
+      confirmKind !== undefined ? sayStored([confirmKind ? API.card.confirmedNoCode : API.card.keptCode]) : '',
+      kind !== undefined ? sayStored([API.card.madeKind, { kind: String(kind) }]) : '',
+      skipReview !== undefined ? sayStored([skipReview !== false ? API.card.setSkipReview : API.card.setReviewed]) : '',
+      Object.keys(patch).some((k) => k !== 'column' && k !== 'before' && k !== 'position' && k !== 'decision') ? sayStored([API.card.changedIt]) : ''
     ]
       .filter(Boolean)
       .join(', ')
-    return { done: `${cardName(c)} ${clip(c.title, 60)}: ${what || 'no change'}`, act: { column: c.column, ...(c.project ? { project: c.project } : {}), agent: await cardAgent(c) }, result: await reply(c) }
+    return { done: [API.done.cardChanged, { card: cardName(c), title: clip(c.title, 60), changed: what ? 'yes' : 'no', what }], act: { column: c.column, ...(c.project ? { project: c.project } : {}), agent: await cardAgent(c) }, result: await reply(c) }
   })
 })
 
-/** A batch change (hive_update_tasks): checked by taskBatch; its refusals are the Agent API's statuses. */
+/** A batch change (cw_update_tasks): checked by taskBatch; its refusals are the Agent API's statuses. */
 route('POST', '/v1/tasks/batch', async ({ body }) => {
   requireWorkspace()
   const short = shortReply(body)
@@ -3162,7 +3247,7 @@ route('POST', '/v1/tasks/batch', async ({ body }) => {
  * why. A short reply reads each column's list once, after every change, so a card's place is where it ends up.
  */
 async function batchReply(items: tasks.BatchItem[], short: boolean, unknown: string[] = []): Promise<unknown> {
-  const refused: TaskBatch['refused'] = [...unknown.map((ref) => ({ number: 0, ref, error: `Unknown card ${ref}` })), ...items.filter((i) => !i.card).map((i) => ({ number: i.number, error: i.error ?? 'refused', ...i.refused }))]
+  const refused: TaskBatch['refused'] = [...unknown.map((ref) => ({ number: 0, ref, error: say(API.card.unknown, { card: ref }) })), ...items.filter((i) => !i.card).map((i) => ({ number: i.number, error: i.error ?? 'refused', ...i.refused }))]
   const done = items.filter((i): i is tasks.BatchItem & { card: TaskCard } => !!i.card)
   if (!short) {
     const agents = new Map<string, Promise<ReturnType<typeof projectAgents>>>()
@@ -3181,7 +3266,7 @@ async function batchReply(items: tasks.BatchItem[], short: boolean, unknown: str
 route('POST', '/v1/tasks/reorder', async ({ body }) => {
   requireWorkspace()
   const column = columnParam(body?.column)
-  if (!column) throw new HttpError(400, 'column is required: hold, todo, doing, review or passed')
+  if (!column) throw new HttpError(400, say(API.card.columnRequired))
   const cards = cardRefsIn(body?.cards)
   const actor = await taskActor()
   const view = async (list: TaskCard[]): Promise<TaskView[] | TaskReorder> => {
@@ -3198,16 +3283,17 @@ route('POST', '/v1/tasks/reorder', async ({ body }) => {
   if (actor.kind !== 'assistant') return view(await tasks.reorderTasks(column, cards, actor))
   const count = Array.isArray(cards) ? cards.length : 0
   const ordered = Array.isArray(cards) ? cards.map((x) => Number(String(x).replace(/^#/, ''))).filter((x) => Number.isInteger(x) && x > 0) : []
-  return assistantChange('agents', `put ${count} card${count === 1 ? '' : 's'} in order in ${columnLabel(column)}`, { kind: 'reorder-tasks', column, cards: ordered }, async () => {
-    const list = await tasks.reorderTasks(column, cards, actor)
+  return assistantChange('agents', [API.change.reorderTasks, { count, total: String(count), column: columnLabel(column) }], { kind: 'reorder-tasks', column, cards: ordered }, async (guard) => {
+    // Checked again as each card is saved, in one batch (HI-2420): revoked while it waited for the board, none moves.
+    const list = await tasks.reorderTasks(column, cards, actor, { commit: guard })
     const top = (cards as unknown[]).map((x) => cardRef(Number(String(x).replace(/^#/, '')))).join(', ')
-    return { done: `Put ${top} at the top of ${columnLabel(column)}`, result: await view(list) }
+    return { done: [API.done.reordered, { cards: top, column: columnLabel(column) }], result: await view(list) }
   })
 })
 
 // Only a card's newest comment (its author, time and whole text), for "check the latest comment": the card's
 // description, earlier comments and history stay out of the reply. A card without comments gives comment null.
-// A card's attachment, read through Hive (HI-1751: the document tools refuse `.hive`, so a reviewer couldn't read the
+// A card's attachment, read through Combwork (HI-1751: the document tools refuse `.combwork`, so a reviewer couldn't read the
 // builder's evidence): a page of its text, or its kind and path for an image or a binary file. Only a card the caller may
 // read (its scope, as GET /v1/tasks/:n), from that card's own folder.
 route('GET', '/v1/tasks/:n/attachments/:name', async ({ params, query }) => {
@@ -3217,20 +3303,20 @@ route('GET', '/v1/tasks/:n/attachments/:name', async ({ params, query }) => {
   try {
     name = decodeURIComponent(params[1] ?? '')
   } catch {
-    throw new HttpError(400, "The attachment's name isn't a valid path segment: give it as hive_read_task lists it")
+    throw new HttpError(400, say(API.attachment.badName))
   }
   const r = await readCardAttachment(workspace, { number: c.number, project: c.project ?? null }, name, query.get('offset'))
   if (!('problem' in r)) return r
   const card = c.key ?? `#${c.number}`
-  const choices = r.choices?.length ? `: ${r.choices.join(', ')}` : ''
+  const choices = { listed: r.choices?.length ? 'yes' : 'no', choices: r.choices?.join(', ') ?? '' }
   const why = {
-    unknown: `${card} has no attachment called "${name}"${choices || ' (it has none)'}`,
-    ambiguous: `Several of ${card}'s attachments are called "${name}": name one by its file${choices}`,
-    missing: `${card}'s attachment "${name}" is listed, but its file is gone`,
-    outside: `${card}'s attachment "${name}" isn't where its card keeps it, so it isn't read`,
-    changed: `${card} or its attachment "${name}" changed while it was read: read the card again`,
-    offset: `offset is a byte of the file: a whole number from 0 to ${r.size ?? 0}`
-  }[r.problem] // i18n-ignore: agent-facing
+    unknown: say(API.attachment.unknown, { card, name, ...choices }),
+    ambiguous: say(API.attachment.ambiguous, { card, name, ...choices }),
+    missing: say(API.attachment.missing, { card, name }),
+    outside: say(API.attachment.outside, { card, name }),
+    changed: say(API.attachment.changed, { card, name }),
+    offset: say(API.attachment.offset, { size: String(r.size ?? 0) })
+  }[r.problem]
   throw new HttpError(r.problem === 'unknown' || r.problem === 'missing' ? 404 : r.problem === 'offset' || r.problem === 'outside' ? 400 : 409, why, r.choices?.length ? { choices: r.choices } : undefined)
 })
 
@@ -3257,7 +3343,7 @@ route('GET', '/v1/tasks/:n/comments/latest', async ({ params, query }) => {
 route('GET', '/v1/tasks/:n/facts', async ({ params, query }) => {
   requireWorkspace()
   const view = query.get('view') ?? 'short'
-  if (view !== 'short' && view !== 'full') throw new HttpError(400, `Unknown view "${view}": short or full.`)
+  if (view !== 'short' && view !== 'full') throw new HttpError(400, say(API.card.unknownView, { view }))
   const c = await tasks.readTask(taskNumber(params[0]), await taskActor())
   const got = cardFacts(workspace, c.number)
   const head = { number: c.number, stage: got?.card.stage ?? cardStages(workspace, [c.number]).get(c.number) ?? CATEGORY_STAGE[c.column], ...(got?.card.preWorkflow ? { preWorkflow: true } : {}) }
@@ -3283,10 +3369,11 @@ route('POST', '/v1/tasks/:n/comments', async ({ params, body }) => {
   const text = typeof body?.text === 'string' ? body.text : ''
   const actor = await taskActor()
   const paths = attachmentList(body)
-  const comment = async () => withAttachments(paths, paths ? ((await tasks.readTask(n, actor)).project ?? null) : null, (files) => tasks.changeWithAttachments(actor, files, 'comment', () => tasks.commentTask(n, text, actor)))
-  const reply = async (c: TaskCard) => (shortReply(body) ? taskChange(c, ['Commented', ...attachedLines(c)]) : taskView(c))
+  // `commit`: the Assistant's guard (HI-2415), checked again just before each write.
+  const comment = async (commit?: () => void) => withAttachments(paths, paths ? ((await tasks.readTask(n, actor)).project ?? null) : null, (files) => tasks.changeWithAttachments(actor, files, 'comment', () => tasks.commentTask(n, text, actor, { commit }), commit))
+  const reply = async (c: TaskCard) => (shortReply(body) ? taskChange(c, [say(API.card.saidCommented), ...attachedLines(c)]) : taskView(c))
   if (actor.kind !== 'assistant') return reply(await comment())
-  return assistantChange('agents', `comment on ${cardRef(n)}`, { kind: 'comment-task', card: n }, async () => ({ done: `Commented on ${cardRef(n)}`, result: await reply(await comment()) }))
+  return assistantChange('agents', [API.change.commentTask, { card: cardRef(n) }], { kind: 'comment-task', card: n }, async (guard) => ({ done: [API.done.commented, { card: cardRef(n) }], result: await reply(await comment(guard)) }))
 })
 
 /** Bounded waits running now, per caller (an agent, the Assistant, a script): at most WAITS_PER_CALLER at a time. */
@@ -3294,7 +3381,7 @@ const taskWaits = new Map<string, number>()
 const WAITS_PER_CALLER = 2
 
 /**
- * Waiting on cards (#128). `wake: true`: the calling agent (or the Assistant) registers a watch and ends its turn; Hive
+ * Waiting on cards (#128). `wake: true`: the calling agent (or the Assistant) registers a watch and ends its turn; Combwork
  * types one line into it when a watched card changes (main/watches.ts). `cancel: true`: ends its watch. Otherwise the
  * call waits itself, up to its longest (Settings → Advanced, #367), for a change since `since` (or since the call), driven by the board's
  * change events (no polling). A project agent waits only on its own project's cards.
@@ -3304,21 +3391,21 @@ const WAITS_PER_CALLER = 2
  * the default) }. A project agent names only accounts on in its workspace.
  */
 function readUsageWatch(v: unknown, ws: WorkspaceService): UsageWatch[] {
-  const shape = 'usage must be a list of { account, percent, limit? }, limit weekly, fiveHour or any'
+  const shape = say(API.watch.usageShape)
   if (!Array.isArray(v) || !v.length) throw new HttpError(400, shape)
-  if (v.length > USAGE_WATCH_MAX) throw new HttpError(400, `at most ${USAGE_WATCH_MAX} accounts in one usage watch`)
-  const seen = agentCaller() ? hiveAccounts().filter((a) => accountOnIn(ws.config, a, allAccounts())) : hiveAccounts()
+  if (v.length > USAGE_WATCH_MAX) throw new HttpError(400, say(API.watch.usageMax, { max: String(USAGE_WATCH_MAX) }))
+  const seen = agentCaller() ? combworkAccounts().filter((a) => accountOnIn(ws.config, a, allAccounts())) : combworkAccounts()
   return v.map((x: { account?: unknown; percent?: unknown; limit?: unknown }) => {
     if (!x || typeof x !== 'object' || typeof x.account !== 'string') throw new HttpError(400, shape)
     const percent = Number(x.percent)
     const limit = x.limit === undefined ? 'any' : x.limit
-    if (!Number.isInteger(percent) || percent < 1 || percent > 100) throw new HttpError(400, 'percent must be a whole number from 1 to 100')
+    if (!Number.isInteger(percent) || percent < 1 || percent > 100) throw new HttpError(400, say(API.watch.usagePercent))
     if (limit !== 'weekly' && limit !== 'fiveHour' && limit !== 'any') throw new HttpError(400, shape)
     const byId = seen.find((a) => a.id === x.account)
     const byName = seen.filter((a) => a.name.toLowerCase() === String(x.account).toLowerCase())
-    if (!byId && byName.length > 1) throw new HttpError(409, `Several accounts are named "${x.account}": use its id (${byName.map((a) => a.id).join(', ')}).`)
+    if (!byId && byName.length > 1) throw new HttpError(409, say(API.connection.severalAccounts, { name: x.account, ids: byName.map((a) => a.id).join(', ') }))
     const a = byId ?? byName[0]
-    if (!a) throw new HttpError(404, `No account named "${x.account}": hive_connection list names them.`)
+    if (!a) throw new HttpError(404, say(API.watch.usageNoAccount, { name: x.account }))
     return { account: a.id, name: a.name, percent, limit }
   })
 }
@@ -3335,29 +3422,30 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
   // The workspace as it is now: the call belongs to it, and stops (409) if it closes or the window opens another.
   const wsPath = ws.path
   const life = ws.lifetime
-  if (!wsPath) throw new HttpError(409, 'The workspace was closed')
+  if (!wsPath) throw new HttpError(409, say(API.workspace.closed))
   const stillOpen = (): void => {
-    if (life.aborted || !ws.path || ws.path.toLowerCase() !== wsPath.toLowerCase()) throw new HttpError(409, 'The workspace was closed')
+    if (life.aborted || !ws.path || ws.path.toLowerCase() !== wsPath.toLowerCase()) throw new HttpError(409, say(API.workspace.closed))
   }
   stillOpen()
   const me = agentCaller()
   const home = assistantCaller() ? ws.assistantHome : null
   const who = me ? { projectPath: me.projectPath, agentId: me.agentId } : home ? { projectPath: home, agentId: 'assistant' } : null
   if (body?.cancel === true) {
-    if (!who) throw new HttpError(400, 'Only an agent or the Assistant has a card watch to cancel.')
+    if (!who) throw new HttpError(400, say(API.watch.noCardWatchToCancel))
     const w = sessions.watchFor(who.projectPath, who.agentId)
     const had = await cancelWatch(ws, who.projectPath, who.agentId)
-    return { done: had ? `Cancelled your ${w?.lanes ? 'lane' : w?.agents ? 'agent' : 'card'} watch.` : 'You had no card watch.' }
+    return { done: had ? say(API.watch.cancelledOne, { kind: w?.lanes ? 'lane' : w?.agents ? 'agent' : 'card' }) : say(API.watch.noCardWatch) }
   }
   // A usage watch (HI-2195): accounts' limits reaching a share, alone or beside the cards or lanes; always one that wakes.
   const usage = body?.usage !== undefined ? readUsageWatch(body.usage, ws) : undefined
-  if (usage !== undefined && (body.wake !== true || !who)) throw new HttpError(400, 'A usage watch wakes you (wake: true), for an agent or the Assistant.')
+  if (usage !== undefined && (body.wake !== true || !who)) throw new HttpError(400, say(API.watch.usageWakes))
   if (usage && body.lanes === undefined && body.cards === undefined) {
-    if (body.agents !== undefined || body.column !== undefined) throw new HttpError(400, 'usage goes alone, or beside cards or lanes')
+    if (body.agents !== undefined || body.column !== undefined) throw new HttpError(400, say(API.watch.usageAlone))
     const limit = body?.limitMinutes === undefined ? WATCH_DEFAULT_LIMIT_MINUTES : Number(body.limitMinutes)
-    if (!Number.isFinite(limit) || limit < 1 || limit > WATCH_MAX_LIMIT_MINUTES) throw new HttpError(400, `limitMinutes must be from 1 to ${WATCH_MAX_LIMIT_MINUTES}`)
+    if (!Number.isFinite(limit) || limit < 1 || limit > WATCH_MAX_LIMIT_MINUTES) throw new HttpError(400, say(API.watch.limitMinutes, { max: String(WATCH_MAX_LIMIT_MINUTES) }))
     const r = await registerUsageWatch(ws, who!.projectPath, who!.agentId, usage, limit).catch((e: Error) => {
-      throw new HttpError(e.message.startsWith('Not a project') ? 400 : 409, e.message)
+      // agent-protocol: the start of the usage watch's own refusal (usageWatch.ts), matched for its status
+      throw httpFrom(e.message.startsWith('Not a project') ? 400 : 409, e)
     })
     const left = r.lanesLeft ? { lanesLeft: r.lanesLeft } : {}
     if ('already' in r) return { usageAlready: r.already, ...(r.replaced ? { replaced: r.replaced } : {}), ...left }
@@ -3367,20 +3455,20 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
   const withUsage = async (label: string): Promise<string> => (usage ? ((await addUsageToWatch(ws, who!.projectPath, who!.agentId, usage))?.label ?? label) : label)
   // A lane watch (#531): whole lanes; always one that wakes. With cards beside them (#726): `cards` and their `changes`.
   if (body?.lanes !== undefined) {
-    if (body.column !== undefined || body.fresh !== undefined) throw new HttpError(400, 'lanes goes without column or fresh: events says what counts on the lanes, changes on the cards beside them')
+    if (body.column !== undefined || body.fresh !== undefined) throw new HttpError(400, say(API.watch.lanesAlone))
     const lc = readLaneCondition(body)
     if (typeof lc === 'string') throw new HttpError(400, lc)
     const extra = readLaneCards(body)
     if (typeof extra === 'string') throw new HttpError(400, extra)
-    if (body.wake !== true || !who) throw new HttpError(400, 'A lane watch wakes you (wake: true), for an agent or the Assistant: a script waits on cards.')
+    if (body.wake !== true || !who) throw new HttpError(400, say(API.watch.laneWakes))
     // Agents beside the lanes (HI-1987): each { project, agent }; left out, the last lane watch's are kept, [] drops them.
     let laneAgents: WatchedAgent[] | undefined
     if (body.agents !== undefined) {
-      if (!Array.isArray(body.agents)) throw new HttpError(400, 'agents must be a list of { project, agent }')
-      if (body.agents.length > AGENT_WATCH_MAX_AGENTS) throw new HttpError(400, `at most ${AGENT_WATCH_MAX_AGENTS} agents in one watch`)
+      if (!Array.isArray(body.agents)) throw new HttpError(400, say(API.watch.agentsArg))
+      if (body.agents.length > AGENT_WATCH_MAX_AGENTS) throw new HttpError(400, say(API.watch.maxAgents, { max: String(AGENT_WATCH_MAX_AGENTS) }))
       laneAgents = []
       for (const x of body.agents as { project?: unknown; agent?: unknown }[]) {
-        if (!x || typeof x !== 'object' || typeof x.project !== 'string') throw new HttpError(400, 'agents must be a list of { project, agent }')
+        if (!x || typeof x !== 'object' || typeof x.project !== 'string') throw new HttpError(400, say(API.watch.agentsArg))
         const p = projectByName(x.project)
         const id = await agentParam(p, x.agent as string | undefined)
         if (!laneAgents.some((a) => resolvePath(a.projectPath).toLowerCase() === resolvePath(p).toLowerCase() && a.agentId === id)) laneAgents.push({ projectPath: p, agentId: id, name: (await agentDefOf(p, id)).name, project: basename(p) })
@@ -3388,7 +3476,7 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
       stillOpen()
     }
     const limit = body?.limitMinutes === undefined ? WATCH_DEFAULT_LIMIT_MINUTES : Number(body.limitMinutes)
-    if (!Number.isFinite(limit) || limit < 1 || limit > WATCH_MAX_LIMIT_MINUTES) throw new HttpError(400, `limitMinutes must be from 1 to ${WATCH_MAX_LIMIT_MINUTES}`)
+    if (!Number.isFinite(limit) || limit < 1 || limit > WATCH_MAX_LIMIT_MINUTES) throw new HttpError(400, say(API.watch.limitMinutes, { max: String(WATCH_MAX_LIMIT_MINUTES) }))
     // Each card named must be one the caller may see, as for a card watch.
     if (extra.cards?.length) {
       const actor = await taskActor()
@@ -3396,11 +3484,13 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
       stillOpen()
     }
     const r = await registerLaneWatch(ws, who.projectPath, who.agentId, lc, limit, { ...extra, ...(laneAgents ? { agents: { agents: laneAgents, ignoreBackground: false } } : {}) }).catch((e: Error) => {
-      throw e instanceof HttpError ? e : new HttpError(/^(No such lane|Unknown task)/.test(e.message) ? 404 : /^(You can't watch yourself|Not a project)/.test(e.message) ? 400 : 409, e.message)
+      throw e instanceof HttpError ? e : httpFrom(/^(No such lane|Unknown task)/.test(e.message) ? 404 : /^(You can't watch yourself|Not a project)/.test(e.message) ? 400 : 409, e)
     })
-    return { watching: await withUsage(r.watching.label), limitAt: r.watching.limitAt, events: lc.events, ...(r.replaced ? { replaced: r.replaced } : {}), ...(r.cards ? { cards: r.cards, ...withNames([...r.cards.now, ...(r.cards.replaced ?? []), ...(r.cards.dropped ?? [])]) } : {}), ...(r.agents ? { agents: r.agents } : {}) }
+    // HI-2521: a named lane that has already ended is the answer at once; no watch started, so no usage beside it.
+    if ('already' in r) return { lanesAlready: r.already, ...(r.replaced ? { replaced: r.replaced } : {}) }
+    return { watching: await withUsage(r.watching.label), limitAt: r.watching.limitAt, events: lc.events,...(r.replaced ? { replaced: r.replaced } : {}), ...(r.cards ? { cards: r.cards, ...withNames([...r.cards.now, ...(r.cards.replaced ?? []), ...(r.cards.dropped ?? [])]) } : {}), ...(r.agents ? { agents: r.agents } : {}) }
   }
-  if (body?.agents !== undefined) throw new HttpError(400, 'agents goes with lanes (a lane watch, HI-1987): to watch agents alone, use hive_wait_for_agents (POST /v1/agents/wait)')
+  if (body?.agents !== undefined) throw new HttpError(400, say(API.watch.agentsWithLanes))
   const cond = readCondition(body ?? {})
   if (typeof cond === 'string') throw new HttpError(400, cond)
   // Each card must be one the caller may see (a project agent: its project's; others are unknown to it), and stays so:
@@ -3410,9 +3500,9 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
   for (const n of cond.cards) await tasks.readTask(n, actor)
   stillOpen()
   if (body?.wake === true) {
-    if (!who) throw new HttpError(400, 'Only an agent or the Assistant can be woken: a script waits without wake (timeoutSeconds).')
+    if (!who) throw new HttpError(400, say(API.watch.wakeOnlyAgents))
     const limit = body?.limitMinutes === undefined ? WATCH_DEFAULT_LIMIT_MINUTES : Number(body.limitMinutes)
-    if (!Number.isFinite(limit) || limit < 1 || limit > WATCH_MAX_LIMIT_MINUTES) throw new HttpError(400, `limitMinutes must be from 1 to ${WATCH_MAX_LIMIT_MINUTES}`)
+    if (!Number.isFinite(limit) || limit < 1 || limit > WATCH_MAX_LIMIT_MINUTES) throw new HttpError(400, say(API.watch.limitMinutes, { max: String(WATCH_MAX_LIMIT_MINUTES) }))
     const r = await registerWatch(ws, who.projectPath, who.agentId, cond, limit)
     const left = r.lanesLeft ? { lanesLeft: r.lanesLeft } : {}
     // HI-2245: an agent's own cards in Review with commits past their submission: its reply says to hand them over first.
@@ -3424,15 +3514,15 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
     return { watching: await withUsage(r.watching.label), limitAt: r.watching.limitAt, ...unsubmitted, ...(idle !== null ? { idle } : {}), ...left, ...(mine.length || idle !== null ? withNames([...mine.map((u) => u.card), ...(idle !== null ? [idle] : [])]) : {}) }
   }
   const seconds = body?.timeoutSeconds === undefined ? 300 : Number(body.timeoutSeconds)
-  // The longest is Settings → Advanced's (#367), under Codex's timeout for hive's tools.
+  // The longest is Settings → Advanced's (#367), under Codex's timeout for Combwork's tools.
   const maxSeconds = waitMaxSeconds('cards')
-  if (!Number.isFinite(seconds) || seconds < 1) throw new HttpError(400, `timeoutSeconds must be from 1 to ${maxSeconds}`)
+  if (!Number.isFinite(seconds) || seconds < 1) throw new HttpError(400, say(API.watch.timeoutRange, { max: String(maxSeconds) }))
   const limitMs = Math.min(maxSeconds, seconds) * 1000
   let base: Map<number, CardMark> | null = null
   let sinceAt = Date.now()
   if (body?.since !== undefined) {
     const d = decodeSince(String(body.since))
-    if (!d) throw new HttpError(400, 'since must be the since of an earlier reply')
+    if (!d) throw new HttpError(400, say(API.watch.sinceArg))
     base = d.marks
     sinceAt = d.at
   }
@@ -3445,7 +3535,7 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
   }
   const callerKey = me ? `${me.projectPath.toLowerCase()}#${me.agentId}` : home ? `assistant:${wsPath}` : `api:${wsPath}`
   const running = taskWaits.get(callerKey) ?? 0
-  if (running >= WAITS_PER_CALLER) throw new HttpError(429, `You already have ${running} card waits running: wait for them to end.`)
+  if (running >= WAITS_PER_CALLER) throw new HttpError(429, say(API.watch.tooManyWaits, { running: String(running) }))
   taskWaits.set(callerKey, running + 1)
   try {
     const start = await marksOf()
@@ -3490,7 +3580,7 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
         finish()
         reject(e)
       }
-      const onClose = (): void => fail(new HttpError(409, 'The workspace was closed'))
+      const onClose = (): void => fail(new HttpError(409, say(API.workspace.closed)))
       const run = (): void => {
         if (ended) return
         if (checking) {
@@ -3508,7 +3598,7 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
           })
       }
       const timer = setTimeout(() => void check().then(done, () => (life.aborted ? onClose() : done({ changes: [], now: start }))), limitMs)
-      const off = onHiveEvent((e) => {
+      const off = onCombworkEvent((e) => {
         if (e.type === 'tasks-changed' && e.workspacePath.toLowerCase() === wsPath.toLowerCase()) run()
       })
       life.addEventListener('abort', onClose, { once: true })
@@ -3525,40 +3615,13 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
 /** A card in an intent's path (#1267): its number, and whether it was given plain (`12`), which an agent's isn't (S48). */
 const intentRef = (v: string): CardRefIn => ({ n: taskNumber(v), plain: /^\d+$/.test(decodeURIComponent(v).trim()) })
 
-/** What an intent is, in the Assistant's activity line. */
-const INTENT_WORDS: Record<CardIntent['kind'], string> = {
-  start: 'start',
-  putBack: 'put back',
-  submit: 'submit',
-  declarePaths: 'declare the paths of',
-  startReview: 'start the review of',
-  verdict: 'give the verdict on',
-  reportMerge: 'report the merge of',
-  ask: 'ask the user about',
-  cannot: 'report a rule blocking',
-  request: 'ask the builder of',
-  loopStep: 'take a card loop step on',
-  focusedSkip: 'decide on the skipped focused tests of',
-  removeFromQueue: 'take out of the merge queue',
-  retryMerge: 'retry the merge of'
-}
+/** What an intent is (API.change.intent, a select on its kind), in the Assistant's refusals and activity line. */
+const intentWhat = (kind: CardIntent['kind'], n: number): Said => [API.change.intent, { kind, card: cardRef(n) }]
 
-/** What an intent did, in the Assistant's activity line. */
-const INTENT_DONE: Record<CardIntent['kind'], string> = {
-  start: 'started',
-  putBack: 'put back',
-  submit: 'submitted',
-  declarePaths: 'declared its paths',
-  startReview: 'started its review',
-  verdict: 'gave the verdict',
-  reportMerge: 'reported its merge',
-  ask: 'asked the user',
-  cannot: 'reported a rule blocking it',
-  request: 'asked its builder',
-  loopStep: 'took a card loop step',
-  focusedSkip: 'decided on its skipped focused tests',
-  removeFromQueue: 'taken out of the merge queue',
-  retryMerge: 'queued again (Retry merge)'
+/** What an intent did (API.done.intent, a select on its kind), in the Assistant's activity line: its card, and its move. */
+const intentDone = (kind: CardIntent['kind'], card: TaskCard, done: { from?: string | null; to?: string | null }): Said => {
+  const moved = !!done.from && !!done.to && done.from !== done.to
+  return [API.done.intent, { kind, card: cardName(card), title: clip(card.title, 60), moved: moved ? 'yes' : 'no', from: moved ? done.from! : '', to: moved ? done.to! : '' }]
 }
 
 /**
@@ -3588,7 +3651,7 @@ async function reviewCopyAfter(actor: tasks.TaskActor, c: TaskCard, did: { start
 
 /**
  * A put-back of a card a running lane holds (HI-2267): its reply says the lane keeps its own order and takes the card in
- * it, and how to change that order (hive_lane start, applyNow), as a line of its own. Any other intent, as it was.
+ * it, and how to change that order (cw_lane start, applyNow), as a line of its own. Any other intent, as it was.
  */
 async function withLaneOrder(intent: CardIntent, card: TaskCard, done: IntentDone): Promise<IntentDone> {
   if (intent.kind !== 'putBack') return done
@@ -3612,12 +3675,11 @@ async function cardIntent(param: string, intent: CardIntent): Promise<IntentDone
     return copy ? { ...out, data: { reviewCopy: copy, ...out.data } } : out
   }
   const was = await tasks.getTask(ref.n).catch(() => null)
-  const what = INTENT_WORDS[intent.kind]
-  return assistantChange('agents', `${what} ${cardRef(ref.n)}`, { kind: 'update-task', card: ref.n, ...(was?.project ? { project: was.project } : {}) }, async () => {
-    const { done: ran, card } = await runCardIntent(ref, actor, intent)
+  return assistantChange('agents', intentWhat(intent.kind, ref.n), { kind: 'update-task', card: ref.n, ...(was?.project ? { project: was.project } : {}) }, async (guard) => {
+    // Its guard checked again in each write as the card is saved (HI-2420): one revoked while the intent waited saves nothing.
+    const { done: ran, card } = await runCardIntent(ref, actor, intent, { commit: guard })
     const done = await withLaneOrder(intent, card, ran)
-    const moved = done.from && done.to && done.from !== done.to ? `, ${done.from} → ${done.to}` : ''
-    return { done: `${cardName(card)} ${clip(card.title, 60)}: ${INTENT_DONE[intent.kind]}${moved}`, act: { column: card.column, agent: await cardAgent(card) }, result: done, ...(INTENT_STAYS[intent.kind] ? { stays: INTENT_STAYS[intent.kind] } : {}) }
+    return { done: intentDone(intent.kind, card, done), act: { column: card.column, agent: await cardAgent(card) }, result: done, ...(INTENT_STAYS[intent.kind] ? { stays: INTENT_STAYS[intent.kind] } : {}) }
   })
 }
 
@@ -3646,10 +3708,10 @@ function textField(body: any, key: string, required?: false): string | undefined
 function textField(body: any, key: string, required = false): string | undefined {
   const v = body?.[key]
   if (v === undefined || v === null || (typeof v === 'string' && !v.trim())) {
-    if (required) throw new HttpError(400, `${key} is required.`)
+    if (required) throw new HttpError(400, say(API.intent.fieldRequired, { field: key }))
     return undefined
   }
-  if (typeof v !== 'string') throw new HttpError(400, `${key} is text.`)
+  if (typeof v !== 'string') throw new HttpError(400, say(API.intent.fieldText, { field: key }))
   return v.trim()
 }
 
@@ -3657,10 +3719,10 @@ function textField(body: any, key: string, required = false): string | undefined
 function pathsField(body: any, required: boolean): string[] | undefined {
   const v = body?.paths
   if (v === undefined || v === null) {
-    if (required) throw new HttpError(400, 'paths is required: a list of paths, relative to the project.')
+    if (required) throw new HttpError(400, say(API.intent.pathsRequired))
     return undefined
   }
-  if (!Array.isArray(v) || v.some((p) => typeof p !== 'string' || !p.trim())) throw new HttpError(400, 'paths is a list of paths, relative to the project.')
+  if (!Array.isArray(v) || v.some((p) => typeof p !== 'string' || !p.trim())) throw new HttpError(400, say(API.intent.pathsArg))
   return v.map((p: string) => p.trim())
 }
 
@@ -3668,7 +3730,7 @@ function pathsField(body: any, required: boolean): string[] | undefined {
 function testsField(body: any): FocusedTest[] | undefined {
   if (body?.tests === undefined || body?.tests === null) return undefined
   const t = testsGiven(body.tests)
-  if ('bad' in t) throw new HttpError(400, `tests: ${t.bad}. Give the test ids the change needs, each a string or { id, needs } (needs: unit, fake, real, packaged).`) // i18n-ignore: agent-facing
+  if ('bad' in t) throw new HttpError(400, say(API.intent.testsArg, { problem: t.bad })) // i18n-ignore: agent-facing
   return t.tests
 }
 
@@ -3676,7 +3738,7 @@ function testsField(body: any): FocusedTest[] | undefined {
 function submissionField(body: any): number | undefined {
   const v = body?.submission
   if (v === undefined || v === null) return undefined
-  if (!Number.isInteger(v) || v < 1) throw new HttpError(400, 'submission is a submission number (1, 2…).')
+  if (!Number.isInteger(v) || v < 1) throw new HttpError(400, say(API.intent.submissionArg))
   return v
 }
 
@@ -3688,7 +3750,7 @@ const CHECKLIST_STEP_MAX = 500
 function checklistField(body: any): { checklist?: string[] } {
   const v = body?.checklist
   if (v === undefined || v === null) return {}
-  if (!Array.isArray(v) || !v.length || v.length > CHECKLIST_MAX || v.some((x) => typeof x !== 'string' || !x.trim() || x.length > CHECKLIST_STEP_MAX)) throw new HttpError(400, `checklist is a list of 1 to ${CHECKLIST_MAX} steps, each text of at most ${CHECKLIST_STEP_MAX} characters.`)
+  if (!Array.isArray(v) || !v.length || v.length > CHECKLIST_MAX || v.some((x) => typeof x !== 'string' || !x.trim() || x.length > CHECKLIST_STEP_MAX)) throw new HttpError(400, say(API.intent.checklistArg, { max: String(CHECKLIST_MAX), stepMax: String(CHECKLIST_STEP_MAX) }))
   return { checklist: v.map((x: string) => x.trim()) }
 }
 
@@ -3699,7 +3761,7 @@ const ASK_REASON_MAX = 1000
 function actionsField(body: any): { actions?: AskAction[] } {
   const v = body?.actions
   if (v === undefined || v === null) return {}
-  const bad = (): HttpError => new HttpError(400, `actions is a list of 1 to ${ASK_ACTIONS_MAX} actions, each {kind: ${ASK_ACTIONS.join(', ')}; reason?: text of at most ${ASK_REASON_MAX} characters}, each kind once.`)
+  const bad = (): HttpError => new HttpError(400, say(API.intent.actionsArg, { max: String(ASK_ACTIONS_MAX), kinds: ASK_ACTIONS.join(', '), reasonMax: String(ASK_REASON_MAX) }))
   if (!Array.isArray(v) || !v.length || v.length > ASK_ACTIONS_MAX) throw bad()
   const out: AskAction[] = []
   for (const x of v) {
@@ -3717,35 +3779,35 @@ const ASK_KINDS: readonly ForYouKind[] = ['approve', 'decide', 'test', 'signIn',
 export const INTENT_ROUTES: Record<string, (body: any) => CardIntent> = {
   'put-back': (body) => ({ kind: 'putBack', why: textField(body, 'why', true) }),
   submit: (body) => {
-    if (body?.followUp !== undefined && body?.followUp !== null && typeof body.followUp !== 'boolean') throw new HttpError(400, 'followUp is true or false.')
+    if (body?.followUp !== undefined && body?.followUp !== null && typeof body.followUp !== 'boolean') throw new HttpError(400, say(API.intent.followUpArg))
     const tests = testsField(body)
     return { kind: 'submit', summary: textField(body, 'summary', true), revision: textField(body, 'revision'), note: textField(body, 'note'), paths: pathsField(body, false), ...(body?.followUp === true ? { followUp: true } : {}), ...(tests ? { tests } : {}) }
   },
   'declare-paths': (body) => ({ kind: 'declarePaths', paths: pathsField(body, true)! }),
   'start-review': (body) => ({ kind: 'startReview', submission: submissionField(body) }),
   verdict: (body) => {
-    if (body?.pass !== true && body?.pass !== false) throw new HttpError(400, 'pass is true or false.')
+    if (body?.pass !== true && body?.pass !== false) throw new HttpError(400, say(API.intent.passArg))
     const failKind = body?.failKind ?? undefined
-    if (failKind !== undefined && failKind !== 'content' && failKind !== 'explanation') throw new HttpError(400, `Unknown failKind "${String(failKind)}": content or explanation.`)
+    if (failKind !== undefined && failKind !== 'content' && failKind !== 'explanation') throw new HttpError(400, say(API.intent.unknownFailKind, { value: String(failKind) }))
     return { kind: 'verdict', pass: body.pass, comment: textField(body, 'comment', true), submission: submissionField(body), failKind }
   },
   'report-merge': (body) => ({ kind: 'reportMerge', result: textField(body, 'result') }),
   'focused-skip': (body) => {
-    if (body?.merge !== true && body?.merge !== false) throw new HttpError(400, 'merge is true or false.')
+    if (body?.merge !== true && body?.merge !== false) throw new HttpError(400, say(API.intent.mergeArg))
     return { kind: 'focusedSkip', request: textField(body, 'request', true)!, merge: body.merge, why: textField(body, 'why', true)! }
   },
   ask: (body) => {
     const askKind = body?.kind ?? 'other'
-    if (!ASK_KINDS.includes(askKind)) throw new HttpError(400, `Unknown kind "${String(askKind)}": ${ASK_KINDS.join(', ')}.`)
+    if (!ASK_KINDS.includes(askKind)) throw new HttpError(400, say(API.intent.unknownAskKind, { value: String(askKind), kinds: ASK_KINDS.join(', ') }))
     const revision = textField(body, 'revision')
-    if (revision !== undefined && (revision.length > 200 || /\s/.test(revision))) throw new HttpError(400, 'revision is one revision (a commit id), with no spaces.')
+    if (revision !== undefined && (revision.length > 200 || /\s/.test(revision))) throw new HttpError(400, say(API.intent.revisionArg))
     return { kind: 'ask', askKind, text: textField(body, 'text', true), ...(revision ? { revision } : {}), ...checklistField(body), ...actionsField(body) }
   },
   cannot: (body) => ({ kind: 'cannot', rule: textField(body, 'rule', true), why: textField(body, 'why', true) }),
   request: (body) => ({ kind: 'request', text: textField(body, 'text', true) }),
   'loop-step': (body) => {
     const step = body?.step
-    if (!LOOP_STEPS.includes(step)) throw new HttpError(400, `Unknown step "${String(step)}": ${LOOP_STEPS.join(', ')}.`)
+    if (!LOOP_STEPS.includes(step)) throw new HttpError(400, say(API.intent.unknownStep, { value: String(step), steps: LOOP_STEPS.join(', ') }))
     // An answer and going ahead name the design or follow-up they are about (its reply's `design`), so a late one never
     // settles another.
     const design = step === 'design' || step === 'followUp' ? undefined : textField(body, 'design', true)
@@ -3754,13 +3816,13 @@ export const INTENT_ROUTES: Record<string, (body: any) => CardIntent> = {
 }
 for (const [path, intentOf] of Object.entries(INTENT_ROUTES)) route('POST', `/v1/tasks/:n/${path}`, async ({ params, body }) => cardIntent(params[0], intentOf(body)))
 
-// An agent asks the Hive Assistant on a card (HI-1866): its comment, and the Assistant's inbox. An agent's alone: the
+// An agent asks the Combwork Assistant on a card (HI-1866): its comment, and the Assistant's inbox. An agent's alone: the
 // Assistant has its own tools, and the user acts on the board.
 route('POST', '/v1/tasks/:n/ask-assistant', async ({ params, body }) => {
   const ws = requireWorkspace()
   const ref = intentRef(params[0])
   const actor = await taskActor()
-  if (actor.kind !== 'agent' || !actor.self) throw new HttpError(403, "Only a project's agents ask the Hive Assistant on a card.")
+  if (actor.kind !== 'agent' || !actor.self) throw new HttpError(403, say(API.intent.askAssistantAgentsOnly))
   const text = textField(body, 'text', true)
   // An agent's plain number is refused, naming the card's key (S48), as for the intents.
   if (ref.plain) throw new tasks.WorkflowRefusedError(refusal('card.plainNumber', { key: (await tasks.readTask(ref.n, actor)).key ?? `#${ref.n}` }, null))
@@ -3768,7 +3830,7 @@ route('POST', '/v1/tasks/:n/ask-assistant', async ({ params, body }) => {
     const { card, id } = await askAssistant(ws, ref.n, actor, text)
     return { ok: true, card: card.key ?? cardRef(ref.n), delivery: id }
   } catch (e) {
-    if (e instanceof AskRefused) throw new HttpError(e.status, e.message)
+    if (e instanceof AskRefused) throw httpFrom(e.status, e)
     throw e
   }
 })
@@ -3780,22 +3842,25 @@ route('POST', '/v1/tasks/:n/start', async ({ params, body }) => {
   const n = taskNumber(params[0])
   const card = await tasks.readTask(n, await taskActor())
   // 1.0 (#1451): no agent gets a worktree of its own: asking for one is refused, never ignored.
-  if (body?.worktree || body?.existingWorktree || body?.branch || body?.base || (body?.location && body.location !== 'project')) throw new HttpError(400, NOT_PINNED)
-  // A new agent's connection (HI-2121, as hive_add_agent's: decisions A and D): the one named, else the first usable here.
-  if (body?.agent && body?.connection !== undefined) throw new HttpError(400, 'connection is for a new agent: an existing agent runs on its own (hive_update_agent changes it).')
+  if (body?.worktree || body?.existingWorktree || body?.branch || body?.base || (body?.location && body.location !== 'project')) throw new HttpError(400, say(NOT_PINNED))
+  // A new agent's connection (HI-2121, as cw_add_agent's: decisions A and D): the one named, else the first usable here.
+  if (body?.agent && body?.connection !== undefined) throw new HttpError(400, say(API.intent.connectionNewAgentOnly))
   const conn = !body?.agent && card.project && ws.path ? connectionArg(body, join(ws.path, card.project)) : undefined
   // Decision D (HI-2108): provider, model, effort, mode and context are a connection's now, refused naming those there.
   refuseOldFields(body, getConnection(conn?.connection)?.account ?? firstUsableAccount(ws.path ? ws.config : null)?.id)
-  if (conn?.cli && !isProviderEnabled(config.settings, conn.cli)) throw new HttpError(409, `${providerName(conn.cli)} is turned off in Settings → Providers.`)
+  if (conn?.cli && !isProviderEnabled(config.settings, conn.cli)) throw new HttpError(409, say(API.agent.providerOff, { provider: providerName(conn.cli) }))
   const target: TaskStartTarget = body?.agent
     ? { kind: 'agent', agentId: String(body.agent) }
     : { kind: 'new-agent', name: body?.name ? String(body.name) : undefined, ...(conn?.connection ? { connection: conn.connection } : {}) }
   // The agent it is started on, when it exists (a new one is named once added).
   const named = target.kind === 'agent' ? await knownAgent(card.project, target.agentId) : undefined
-  return assistantChange('agents', `start ${cardRef(n)} ${target.kind === 'agent' ? `on ${named?.name ?? 'an agent'}` : 'on a new agent'}${card.project ? ` in ${card.project}` : ''}`, { kind: 'start-task', card: n, ...(card.project ? { project: card.project } : {}), ...(named ? { agent: named } : {}) }, async () => {
-    const r = await startTask(n, target, { kind: 'assistant' }, typeof body?.note === 'string' ? body.note : undefined)
+  const on = target.kind !== 'agent' ? 'new' : named ? 'named' : 'agent'
+  return assistantChange('agents', [API.change.startTask, { card: cardRef(n), on, agent: named?.name ?? '', inProject: card.project ? 'yes' : 'no', project: card.project ?? '' }], { kind: 'start-task', card: n, ...(card.project ? { project: card.project } : {}), ...(named ? { agent: named } : {}) }, async (guard) => {
+    // Its guard checked again as the card is taken, and before the task is typed or its agent launched (HI-2420): a
+    // revoked start is undone, the card back where it was and a new agent removed.
+    const r = await startTask(n, target, { kind: 'assistant' }, typeof body?.note === 'string' ? body.note : undefined, undefined, undefined, guard)
     return {
-      done: `Started ${cardRef(n)} on ${r.added ? 'a new agent, ' : ''}${r.agentName} in ${card.project}: ${clip(card.title, 80)}`,
+      done: [API.done.cardStarted, { card: cardRef(n), added: r.added ? 'yes' : 'no', agent: r.agentName, project: card.project ?? '', title: clip(card.title, 80) }],
       act: { agent: { id: r.agentId, name: r.agentName }, column: r.card.column },
       ...(r.run && card.project ? { started: { project: card.project, agentId: r.agentId, run: r.run } } : {}),
       result: { ok: true, agent: r.agentName, added: r.added, card: shortReply(body) ? taskRow(await taskView(r.card)) : await taskView(r.card) }
@@ -3811,7 +3876,7 @@ const skillRow = (s: SkillInfo): SkillRow & Pick<SkillInfo, 'bundled' | 'updateA
   ...(s.provider ? { provider: s.provider } : {}),
   ...(s.plugin ? { plugin: s.plugin } : {}),
   ...(s.audience ? { audience: s.audience } : {}),
-  ...(s.problem ? { problem: s.problem } : {}),
+  ...(s.problem ? { problem: agentField(s.problem, s.problemText) } : {}),
   ...(s.bundled ? { bundled: s.bundled } : {}),
   ...(s.updateAvailable ? { updateAvailable: s.updateAvailable } : {})
 })
@@ -3821,9 +3886,9 @@ route('GET', '/v1/skills', async ({ query }) => {
   if (project) {
     const p = projectByName(project)
     // A project's own skills are its agents' business (like its sessions).
-    ownProjectOnly(p, "Listing a project's skills")
-    // What the project's agents are given: not the Hive skills for the Assistant alone (as its Skills tab).
-    return (await inWorkspace(workspaceOf(p), () => listSkills(p))).filter((s) => !(s.level === 'hive' && s.audience === 'assistant')).map(skillRow)
+    ownProjectOnly(p, [API.own.listingSkills])
+    // What the project's agents are given: not the Combwork skills for the Assistant alone (as its Skills tab).
+    return (await inWorkspace(workspaceOf(p), () => listSkills(p))).filter((s) => !(s.level === 'combwork' && s.audience === 'assistant')).map(skillRow)
   }
   return (await inWorkspace(requireWorkspace(), () => listSkills())).map(skillRow)
 })
@@ -3831,21 +3896,21 @@ route('GET', '/v1/skills', async ({ query }) => {
 /** Largest skill file the API returns; skills are instructions, not data. */
 const SKILL_FILE_MAX = 512 * 1024
 
-// One of the workspace's Hive skills: its SKILL.md and the files beside it, or (?file=) one of those files.
+// One of the workspace's Combwork skills: its SKILL.md and the files beside it, or (?file=) one of those files.
 route('GET', '/v1/skills/:name', async ({ params, query }) => inWorkspace(requireWorkspace(), async () => {
   const name = decodeURIComponent(params[0])
-  const skill = validSkillName(name) ? (await hiveSkills()).find((s) => s.name.toLowerCase() === name.toLowerCase()) : undefined
-  if (!skill) throw new HttpError(404, `The workspace has no Hive skill "${name}"`)
+  const skill = validSkillName(name) ? (await combworkSkills()).find((s) => s.name.toLowerCase() === name.toLowerCase()) : undefined
+  if (!skill) throw new HttpError(404, say(API.skill.unknown, { name }))
   const file = query.get('file') ?? 'SKILL.md'
   // The whole path is checked before anything is read: relative, inside the skill's folder as written and as it
   // really is (a link can't lead out), and a file.
   const parts = file.replace(/\\/g, '/').split('/')
-  if (!file || /^[a-z]:|^\//i.test(file) || parts.some((x) => x === '' || x === '.' || x === '..')) throw new HttpError(400, `"${file}" isn't a path inside the skill's folder`)
+  if (!file || /^[a-z]:|^\//i.test(file) || parts.some((x) => x === '' || x === '.' || x === '..')) throw new HttpError(400, say(API.skill.fileOutside, { file }))
   const abs = join(skill.path, ...parts)
-  if (!insideReal(abs, [skill.path])) throw new HttpError(400, `"${file}" isn't a path inside the skill's folder`)
+  if (!insideReal(abs, [skill.path])) throw new HttpError(400, say(API.skill.fileOutside, { file }))
   const info = await stat(abs).catch(() => null)
-  if (!info?.isFile()) throw new HttpError(404, `The skill "${skill.name}" has no file "${file}"`)
-  const tooBig = new HttpError(413, `"${file}" is larger than ${SKILL_FILE_MAX / 1024} KB`)
+  if (!info?.isFile()) throw new HttpError(404, say(API.skill.noFile, { skill: skill.name, file }))
+  const tooBig = new HttpError(413, say(API.skill.fileTooBig, { file, kilobytes: String(SKILL_FILE_MAX / 1024) }))
   if (info.size > SKILL_FILE_MAX) throw tooBig
   // What is read is capped too: the file may have grown since the stat.
   const read = await readCapped(abs, SKILL_FILE_MAX)
@@ -3856,7 +3921,7 @@ route('GET', '/v1/skills/:name', async ({ params, query }) => inWorkspace(requir
   return { ...out, files: list.files, ...(list.truncated ? { filesTruncated: true } : {}) }
 }))
 
-// This Hive's own API reference (docs/AGENT_API.md as it shipped), for clients that need more than the status.
+// This Combwork's own API reference (docs/AGENT_API.md as it shipped), for clients that need more than the status.
 route('GET', '/v1/docs/agent-api', async () => ({ version: app.getVersion(), api: API_VERSION, content: agentApiDoc }))
 
 /**
@@ -3869,32 +3934,32 @@ route('GET', '/v1/metrics', async ({ query }) => {
   const agent = agentCaller()
   const asked = query.get('project')
   if (agent && (query.get('scope') !== 'project' || (asked && asked.toLowerCase() !== basename(agent.projectPath).toLowerCase()))) {
-    throw new HttpError(403, `An agent reads its own project's metrics: ?scope=project&project=${basename(agent.projectPath)}`)
+    throw new HttpError(403, say(API.metrics.ownProject, { project: basename(agent.projectPath) }))
   }
   const scope: MetricsQuery['scope'] = query.get('scope') === 'project' ? { kind: 'project', project: asked || (agent ? basename(agent.projectPath) : '') } : { kind: 'workspace' }
-  if (scope.kind === 'project' && !scope.project) throw new HttpError(400, 'scope=project needs project')
+  if (scope.kind === 'project' && !scope.project) throw new HttpError(400, say(API.metrics.scopeNeedsProject))
   const role = query.get('role') ?? undefined
-  if (role !== undefined && role !== 'agent' && role !== 'assistant' && role !== 'api') throw new HttpError(400, 'role must be agent, assistant or api')
+  if (role !== undefined && role !== 'agent' && role !== 'assistant' && role !== 'api') throw new HttpError(400, say(API.metrics.roleArg))
   return metricsReport(w, { scope, from: query.get('from') ?? undefined, to: query.get('to') ?? undefined, trend: query.get('trend') === '1', role, provider: query.get('provider') || undefined, own: query.get('own') === '1' }).then((r) => metricsForAgents(withPersonaAliases(r)), (e) => {
-    throw e instanceof HttpError ? e : new HttpError(400, (e as Error).message)
+    throw e instanceof HttpError ? e : httpFrom(400, e)
   })
 })
 
 
 /**
- * The hive MCP bridge's report of its tool calls (the final text each gave the model) and, once per start, its tool
+ * The cw-mcp bridge's report of its tool calls (the final text each gave the model) and, once per start, its tool
  * list and instructions. From an agent's or the Assistant's own token only, attributed by that token (an agent's
  * project; the Assistant's workspace); checked and bounded: a report that isn't valid is refused, not stored.
  */
 route('POST', '/v1/metrics/mcp', async ({ body }) => {
   const agent = agentCaller()
   const own = assistantCaller()
-  if (!agent && !own) throw new HttpError(403, "Only the hive MCP bridge reports its calls, with an agent's or the Assistant's token")
+  if (!agent && !own) throw new HttpError(403, say(API.mcp.reportOnlyBridge))
   const h = metricsHandle(requireWorkspace())
   const project = agent ? basename(agent.projectPath) : null
   const role = agent ? 'agent' : 'assistant'
   const calls: unknown[] = Array.isArray(body?.calls) ? body.calls : []
-  if (calls.length > MCP_REPORT_LIMITS.events) throw new HttpError(400, `At most ${MCP_REPORT_LIMITS.events} calls in one report`)
+  if (calls.length > MCP_REPORT_LIMITS.events) throw new HttpError(400, say(API.mcp.reportMax, { max: String(MCP_REPORT_LIMITS.events) }))
   let accepted = 0
   for (const c of calls) if (c && typeof c === 'object' && recordMcp(h, project, role, c as Record<string, unknown> as never)) accepted++
   // On the side of the launch its token is for (HI-2049), never the agent's next one; the Assistant's is none.
@@ -3904,19 +3969,19 @@ route('POST', '/v1/metrics/mcp', async ({ body }) => {
 })
 
 /**
- * The hive MCP bridge says its CLI has connected it (#865): the launch whose token it calls with may be given Hive's
- * lines now (sessions.hiveToolsConnected). An agent's or the Assistant's own token only, for its own launch: a token
+ * The cw-mcp bridge says its CLI has connected it (#865): the launch whose token it calls with may be given Combwork's
+ * lines now (sessions.combworkToolsConnected). An agent's or the Assistant's own token only, for its own launch: a token
  * names one launch, so a bridge left from an earlier one is refused (its token has stopped working).
  */
 route('POST', '/v1/launch/connected', async () => {
   const agent = agentCaller()
-  if (agent) return { ok: sessions.hiveToolsConnected(agent.projectPath, agent.agentId, agentCallerRun() ?? undefined) }
+  if (agent) return { ok: sessions.combworkToolsConnected(agent.projectPath, agent.agentId, agentCallerRun() ?? undefined) }
   const ws = assistantCaller()
   const token = assistantCallerToken()
-  if (!ws || !token) throw new HttpError(403, "Only the hive MCP bridge says it has connected, with an agent's or the Assistant's token")
+  if (!ws || !token) throw new HttpError(403, say(API.mcp.connectedOnlyBridge))
   // The Assistant's token is its running launch's (a new one each start): an earlier launch's no longer matches.
-  if (!assistant.isCurrentToken(ws, token)) throw new HttpError(403, "That is an earlier launch's token")
-  return { ok: sessions.hiveToolsConnected(assistant.assistantHome(ws), ASSISTANT_AGENT_ID) }
+  if (!assistant.isCurrentToken(ws, token)) throw new HttpError(403, say(API.mcp.earlierLaunch))
+  return { ok: sessions.combworkToolsConnected(assistant.assistantHome(ws), ASSISTANT_AGENT_ID) }
 })
 
 // Where each server is added (HI-2059) is the workspace's to read: a project agent sees only whether its own project has
@@ -3936,7 +4001,7 @@ route('GET', '/v1/mcp', async () => {
 
 route('POST', '/v1/notify', async ({ body }) => {
   const level: ToastLevel = ['info', 'success', 'warning', 'error'].includes(body?.level) ? body.level : 'info'
-  if (!body?.title) throw new HttpError(400, 'title is required')
+  if (!body?.title) throw new HttpError(400, say(API.card.titleRequired))
   const target = await notifyTarget(body.target)
   toast(level, String(body.title).slice(0, 200), body.message ? String(body.message).slice(0, 2000) : undefined, undefined, body.source ? String(body.source) : 'agent', target)
   return { ok: true, ...(target ? { opens: target.kind === 'agent' ? target.name : target.kind === 'card' ? target.label : target.project } : {}) }
@@ -3948,23 +4013,23 @@ route('POST', '/v1/notify', async ({ body }) => {
  */
 async function notifyTarget(raw: unknown): Promise<ToastTarget | undefined> {
   if (raw === undefined || raw === null) return undefined
-  if (typeof raw !== 'object' || Array.isArray(raw)) throw new HttpError(400, 'target is { agent, project? } or { card }')
+  if (typeof raw !== 'object' || Array.isArray(raw)) throw new HttpError(400, say(API.notify.targetArg))
   const t = raw as { agent?: unknown; project?: unknown; card?: unknown }
   const agent = typeof t.agent === 'string' && t.agent ? t.agent : null
   const card = typeof t.card === 'string' || typeof t.card === 'number' ? String(t.card).trim() : ''
-  if (agent && card) throw new HttpError(400, 'target is an agent or a card, not both')
+  if (agent && card) throw new HttpError(400, say(API.notify.targetBoth))
   if (card) {
     const ws = requireWorkspace()
     const n = cardOfRef(ws, card, callerScope())
-    if (n === null) throw new HttpError(404, `Unknown card ${card}`)
+    if (n === null) throw new HttpError(404, say(API.card.unknown, { card }))
     const c = await tasks.getTask(n, ws)
     // Its workspace too: a card's number is its workspace's alone (HR6 round 1, finding 1).
     return { kind: 'card', number: n, label: cardLabel(c), projectPath: c.project && ws.path ? join(ws.path, c.project) : null, workspacePath: ws.path! }
   }
-  if (!agent) throw new HttpError(400, 'target names an agent or a card')
+  if (!agent) throw new HttpError(400, say(API.notify.targetNames))
   const own = agentCaller()
   const projectPath = typeof t.project === 'string' && t.project ? projectByName(t.project) : own?.projectPath
-  if (!projectPath) throw new HttpError(400, 'Say which project the agent is in: target.project')
+  if (!projectPath) throw new HttpError(400, say(API.notify.sayProject))
   const id = await agentParam(projectPath, agent)
   const def = projectAgents(await workspace.projectConfig(projectPath)).find((x) => x.id === id)
   return { kind: 'agent', projectPath, agentId: id, name: def?.name ?? agent, project: basename(projectPath) }
@@ -3986,7 +4051,7 @@ async function progressCaller(): Promise<ProgressCaller> {
 
 /** Looking the caller up waited: a workspace that closed meanwhile (its runs cleared) must not get a run back. */
 function progressWorkspaceOpen(ws: WorkspaceService, workspacePath: string, life: WorkspaceService['lifetime']): void {
-  if (life.aborted || ws.path?.toLowerCase() !== workspacePath.toLowerCase()) throw new HttpError(409, 'The workspace was closed')
+  if (life.aborted || ws.path?.toLowerCase() !== workspacePath.toLowerCase()) throw new HttpError(409, say(API.workspace.closed))
 }
 
 async function progressCallerIn(workspacePath: string): Promise<ProgressCaller> {
@@ -3997,8 +4062,9 @@ async function progressCallerIn(workspacePath: string): Promise<ProgressCaller> 
     return { source: 'agent', workspacePath, projectPath: a.projectPath, agentId: a.agentId, agentName: def?.name ?? a.agentId, provider: def ? agentProvider(def, config.settings) : null }
   }
   if (assistantCaller()) {
-    const live = sessions.liveFor(join(workspacePath, HIVE_DIR, ASSISTANT_DIR), ASSISTANT_AGENT_ID)
-    return { source: 'assistant', workspacePath, agentName: `Hive ${ASSISTANT_NAME}`, provider: live?.provider ?? null }
+    const live = sessions.liveFor(join(workspacePath, CW_DIR, ASSISTANT_DIR), ASSISTANT_AGENT_ID)
+    // agent-protocol: the Assistant's name
+    return { source: 'assistant', workspacePath, agentName: `Combwork ${ASSISTANT_NAME}`, provider: live?.provider ?? null }
   }
   return { source: 'api', workspacePath }
 }
@@ -4014,7 +4080,7 @@ async function progressCall<T>(ignored: T, change: (caller: ProgressCaller) => T
   try {
     return await admitReport(progressGate, ignored, progressCaller, change)
   } catch (e) {
-    throw e instanceof ProgressError ? new HttpError(e.status, e.message) : e
+    throw e instanceof ProgressError ? httpFrom(e.status, e) : e
   }
 }
 
@@ -4033,7 +4099,7 @@ const CONSOLE_ROWS_MAX = 100
 const CONSOLE_DETAIL_MAX = 3
 const CONSOLE_SOURCES = 50
 const CONSOLE_SOURCES_MAX = 100
-const NOT_READABLE = 'Not a developer console source you can read'
+const NOT_READABLE = API.console.notReadable
 
 function consoleReader(): ConsoleReader {
   const a = agentCaller()
@@ -4043,13 +4109,13 @@ function consoleReader(): ConsoleReader {
 }
 
 function consoleAllowed(): void {
-  if (config.settings.agentApi.devConsole !== true) throw new HttpError(403, 'Reading the developer console is off: the user can turn it on in Settings → Agent API → Let agents read the developer console')
+  if (config.settings.agentApi.devConsole !== true) throw new HttpError(403, say(API.console.off))
 }
 
 const consoleWorkspaceOf = (projectPath: string): string | null => workspaceFor(projectPath)?.path ?? null
 
 /**
- * The source a console request names: source=hive or source=assistant (the request's workspace), or an agent (agent,
+ * The source a console request names: source=combwork or source=assistant (the request's workspace), or an agent (agent,
  * and project unless it is the caller's own); a project agent naming none reads its own session. Anything the caller
  * may not read is refused as if it didn't exist (404), and so is anything an agent names that doesn't.
  */
@@ -4060,33 +4126,34 @@ async function consoleSource(query: URLSearchParams): Promise<string> {
   const me = agentCaller()
   let id: string
   try {
-    if (which === 'hive') id = hiveSourceId(requireWorkspace().path!)
+    if (which === 'combwork') id = combworkSourceId(requireWorkspace().path!)
     else if (which === 'assistant') id = sessionSourceId(requireWorkspace().assistantHome, ASSISTANT_AGENT_ID)
-    else if (which) throw new HttpError(400, 'source is hive or assistant; name an agent with agent (and project)')
+    else if (which) throw new HttpError(400, say(API.console.sourceArg))
     else if (!project && !agent) {
-      if (!me) throw new HttpError(400, 'Say which source: agent (and project), source=assistant or source=hive')
+      if (!me) throw new HttpError(400, say(API.console.saySource))
       id = sessionSourceId(me.projectPath, me.agentId)
     } else {
       const p = project ? projectByName(project) : me?.projectPath
-      if (!p) throw new HttpError(400, 'project is required with agent')
+      if (!p) throw new HttpError(400, say(API.console.projectWithAgent))
       id = sessionSourceId(p, await agentParam(p, agent ?? undefined))
     }
   } catch (e) {
     // An agent learns nothing of what it can't read: an unknown project or agent is refused as one it may not read.
-    if (me && !(e instanceof HttpError && e.status === 400)) throw new HttpError(404, NOT_READABLE)
+    if (me && !(e instanceof HttpError && e.status === 400)) throw new HttpError(404, say(NOT_READABLE))
     throw e
   }
-  if (!mayRead(consoleReader(), id, consoleWorkspaceOf)) throw new HttpError(404, NOT_READABLE)
+  if (!mayRead(consoleReader(), id, consoleWorkspaceOf)) throw new HttpError(404, say(NOT_READABLE))
   return id
 }
 
 /** A source as a reply names it (bounded names; whether an open console is capturing it, and how many events it holds). */
 function consoleRow(s: ConsoleSource | undefined, id: string) {
-  const kind = s?.kind ?? (id.startsWith('hive:') ? 'hive' : 'session')
+  const kind = s?.kind ?? (id.startsWith('combwork:') ? 'combwork' : 'session')
   // `select` names it exactly as a read takes it (the agent's id and its project's own name), apart from the display
   // label, which is cut and masked: following a listing always reads the source it lists.
-  const select = kind === 'hive' ? { source: 'hive' } : kind === 'assistant' ? { source: 'assistant' } : s?.agentId && s.project ? { agent: s.agentId, project: s.project } : undefined
-  return { label: hiveName(s?.label ?? (kind === 'hive' ? 'Hive' : 'an agent'), 80), kind, ...(select ? { select } : {}), ...(s?.provider ? { provider: s.provider } : {}), capturing: devConsole.capturing(id), events: devConsole.count(id) }
+  const select = kind === 'combwork' ? { source: 'combwork' } : kind === 'assistant' ? { source: 'assistant' } : s?.agentId && s.project ? { agent: s.agentId, project: s.project } : undefined
+  // agent-protocol: the app's name, as a source's label
+  return { label: combworkName(s?.label ?? (kind === 'combwork' ? 'Combwork' : say(API.console.anAgent)), 80), kind, ...(select ? { select } : {}), ...(s?.provider ? { provider: s.provider } : {}), capturing: devConsole.capturing(id), events: devConsole.count(id) }
 }
 
 const consoleRowOf = (e: ConsoleEvent) => ({ seq: e.seq, at: e.at, kind: e.kind, name: e.name, summary: e.summary, ...(e.truncated ? { truncated: true } : {}) })
@@ -4113,13 +4180,13 @@ route('GET', '/v1/console/events', async ({ query }) => {
   const source = consoleRow(ws ? consoleSources(ws).find((x) => x.id === id) : undefined, id)
   const seqs = (query.get('seq') ?? '').split(',').map((x) => Number(x.trim())).filter((n) => Number.isInteger(n) && n > 0)
   if (seqs.length) {
-    if (seqs.length > CONSOLE_DETAIL_MAX) throw new HttpError(400, `At most ${CONSOLE_DETAIL_MAX} events in full at a time`)
+    if (seqs.length > CONSOLE_DETAIL_MAX) throw new HttpError(400, say(API.console.detailMax, { max: String(CONSOLE_DETAIL_MAX) }))
     const events = seqs.map((n) => devConsole.event(id, n)).filter((e): e is ConsoleEvent => !!e)
     return { source, events, missing: seqs.filter((n) => !events.some((e) => e.seq === n)) }
   }
   const kinds = (query.get('kinds') ?? '').split(',').map((k) => k.trim()).filter(Boolean)
   const unknown = kinds.filter((k) => !(CONSOLE_KINDS as readonly string[]).includes(k))
-  if (unknown.length) throw new HttpError(400, `Unknown event kinds: ${unknown.slice(0, 5).map((k) => k.slice(0, 30)).join(', ')} (kinds are ${CONSOLE_KINDS.join(', ')})`)
+  if (unknown.length) throw new HttpError(400, say(API.console.unknownKinds, { kinds: unknown.slice(0, 5).map((k) => k.slice(0, 30)).join(', '), known: CONSOLE_KINDS.join(', ') }))
   const since = intParam(query, 'since', 0, 0, Number.MAX_SAFE_INTEGER)
   const limit = intParam(query, 'limit', CONSOLE_ROWS, 1, CONSOLE_ROWS_MAX)
   const after = devConsole.events(id, since).filter((e) => !kinds.length || kinds.includes(e.kind as ConsoleKind))
@@ -4175,11 +4242,11 @@ async function runLinkOf(body: Record<string, unknown>) {
     const caller = await progressCallerIn(requireWorkspace().path!)
     return { caller, link: await resolveRunLink(caller, body, runLinkDeps) }
   } catch (e) {
-    throw e instanceof ProgressError ? new HttpError(e.status, e.message) : e
+    throw e instanceof ProgressError ? httpFrom(e.status, e) : e
   }
 }
 
-// What a run would run for (#1220), checked before its command starts: hive-progress calls it first, so a revision that
+// What a run would run for (#1220), checked before its command starts: cw-progress calls it first, so a revision that
 // isn't checked out, an unknown card or a check with no command is refused before anything runs. Its `link` is for the
 // start: the only way a start gets the checkout seen here rather than read again.
 route('POST', '/v1/progress/resolve', async ({ body }) => {
@@ -4193,7 +4260,7 @@ route('POST', '/v1/progress/resolve', async ({ body }) => {
   if (iso) link = { ...link, folder: iso.folder, testedCheckout: link.revision, copy: iso.copy, isolated: true }
   const id = issuedLinks.issue(linkOwner(caller), link)
   if (iso) await isolatedLinked(ws, iso.project, iso.lease, id)
-  // What a run for a card is checked against (#1222), read now: hive-progress starts its command after this reply, and
+  // What a run for a card is checked against (#1222), read now: cw-progress starts its command after this reply, and
   // reports its start up to 2 s later. Its start takes it with the link.
   const bracket = await bracketFor(ws, link).catch((e) => (log.warn('could not read what a run is checked against', e), null))
   if (bracket) bracketResolved(id, bracket)
@@ -4202,18 +4269,18 @@ route('POST', '/v1/progress/resolve', async ({ body }) => {
 
 /**
  * An isolated check's copy (#1435): an agent's check for a card of its own project on Git, leased at the card's revision.
- * Refused (400) for anything else, with what to do; 409 with `wait` while no copy is free (hive-progress asks again).
+ * Refused (400) for anything else, with what to do; 409 with `wait` while no copy is free (cw-progress asks again).
  */
 async function isolatedFor(ws: WorkspaceService, caller: ProgressCaller, link: RunLink, ticket?: string): Promise<{ project: string; lease: string; folder: string; copy: string }> {
-  if (caller.source !== 'agent') throw new HttpError(400, "--isolated runs an agent's check in a copy of its own: run it in an agent's session")
-  if (!link.check) throw new HttpError(400, '--isolated runs a check in a copy of its own: use it with --check <name>')
-  if (link.card === null || !link.revision) throw new HttpError(400, "--isolated runs a check at its card's revision: name the card (--card), or work on one in Doing")
+  if (caller.source !== 'agent') throw new HttpError(400, say(API.check.isolatedAgentsOnly))
+  if (!link.check) throw new HttpError(400, say(API.check.isolatedNeedsCheck))
+  if (link.card === null || !link.revision) throw new HttpError(400, say(API.check.isolatedNeedsCard))
   const cfg = await ws.projectConfig(caller.projectPath).catch(() => null)
   // None has no check copies (OP-16): its remedy is running again once the deliverables are quiet.
-  if (platformIdOf(caller.projectPath, cfg?.platform) !== 'git') throw new HttpError(400, "This project has no version control, so there are no check copies: run the check again without --isolated once nobody is changing the card's files")
+  if (platformIdOf(caller.projectPath, cfg?.platform) !== 'git') throw new HttpError(400, say(API.check.noVcs))
   // Leased and set up apart from this request (a first setup takes minutes): `wait` with a ticket to ask again with.
   const got = await isolatedRequest(ws, caller.projectPath, linkOwner(caller), { card: link.card, revision: link.revision, agent: caller.agentId }, ticket)
-  if ('wait' in got) throw new HttpError(409, `waiting for ${got.wait}`, { wait: got.wait, ...(got.ticket ? { ticket: got.ticket } : {}) })
+  if ('wait' in got) throw new HttpError(409, say(API.check.waiting, { what: got.wait }), { wait: got.wait, ...(got.ticket ? { ticket: got.ticket } : {}) })
   if ('refused' in got) throw new HttpError(400, got.refused)
   return { project: caller.projectPath, lease: got.lease.id, folder: got.folder, copy: got.copy }
 }
@@ -4223,11 +4290,11 @@ async function isolatedFor(ws: WorkspaceService, caller: ProgressCaller, link: R
 route('POST', '/v1/progress/isolated', async ({ body }) => {
   const ws = requireWorkspace()
   const a = agentCaller()
-  if (!a) throw new HttpError(403, "Only an agent's isolated check puts its launcher in a check copy's job")
+  if (!a) throw new HttpError(403, say(API.check.onlyIsolated))
   const b = bodyObject(body)
   const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : NaN)
   const req = { lease: typeof b.lease === 'string' ? b.lease : '', pid: num(b.pid), after: num(b.after), before: num(b.before) }
-  if (!req.lease || !Number.isInteger(req.pid) || req.pid <= 0 || Number.isNaN(req.after) || Number.isNaN(req.before)) throw new HttpError(400, 'lease, pid, after and before are required')
+  if (!req.lease || !Number.isInteger(req.pid) || req.pid <= 0 || Number.isNaN(req.after) || Number.isNaN(req.before)) throw new HttpError(400, say(API.check.leaseArgs))
   const why = await assignIsolated(ws, a.projectPath, a.agentId, req)
   if (why) throw new HttpError(409, why)
   return { ok: true }
@@ -4270,7 +4337,7 @@ route('POST', '/v1/progress', async ({ body }) => {
       }
     )
   } catch (e) {
-    throw e instanceof ProgressError ? new HttpError(e.status, e.message) : e
+    throw e instanceof ProgressError ? httpFrom(e.status, e) : e
   }
 })
 
@@ -4281,7 +4348,7 @@ route('PATCH', '/v1/progress/:id', async ({ params, body }) =>
   })
 )
 
-/** How long a finish waits for its run's record as a check, to say how it counted (#1654): hive-progress waits a little longer. */
+/** How long a finish waits for its run's record as a check, to say how it counted (#1654): cw-progress waits a little longer. */
 const CHECK_REPLY_MS = 8000
 
 route('POST', '/v1/progress/:id/finish', async ({ params, body }) => {
@@ -4295,7 +4362,7 @@ route('POST', '/v1/progress/:id/finish', async ({ params, body }) => {
     void recording.check.then(() => isolatedRunEnded(requireWorkspace(), run.id)).catch((e) => log.warn('returning a check copy', e))
     return { ok: true }
   })
-  // How it counted as a check, once recorded (within CHECK_REPLY_MS): hive-progress says why one didn't (#1654).
+  // How it counted as a check, once recorded (within CHECK_REPLY_MS): cw-progress says why one didn't (#1654).
   const c = recording.check ? await within(recording.check, CHECK_REPLY_MS) : null
   return c ? { ...r, check: { name: c.name, counted: c.counted, ...(c.whyNot ? { whyNot: c.whyNot } : {}), ...(c.changes ? { changes: c.changes } : {}), platform: c.platform } } : r
 })
@@ -4334,6 +4401,7 @@ async function handleApi(req: IncomingMessage, res: ServerResponse): Promise<voi
   // Measured from here to the response's end (or the client going away): latency on the monotonic clock, bodies'
   // UTF-8 bytes, outcome. Recorded once it ends, never in the way of the request.
   const started = metricsClock.mono()
+  // agent-protocol: a metrics route label for a request no route matched
   const m: ApiRequest = { route: '(no route)', handle: null, project: null, role: 'unknown', requestBytes: 0, responseBytes: 0, skip: false, authenticated: false, waiting: false, ws: null }
   apiRequests.set(res, m)
   appMetrics.requestStarted()
@@ -4349,12 +4417,13 @@ async function handleApi(req: IncomingMessage, res: ServerResponse): Promise<voi
   })
   const url = new URL(req.url ?? '/', 'http://127.0.0.1')
   // Browsers must not be able to drive the API from a web page.
-  if (req.headers.origin) return send(res, 403, { error: 'Cross-origin requests are not allowed' })
+  if (req.headers.origin) return send(res, 403, { error: say(API.http.crossOrigin) })
   const enabled = config.settings.agentApi.enabled
   if (url.pathname === '/v1/health' && enabled) {
     m.authenticated = true
     m.skip = true
-    return send(res, 200, { ok: true, app: 'Hive', version: app.getVersion() })
+    // agent-protocol: the app's name
+    return send(res, 200, { ok: true, app: 'Combwork', version: app.getVersion() })
   }
   const bearer = (req.headers.authorization ?? '').replace(/^Bearer\s+/i, '')
   const ownWorkspace = bearer ? assistant.assistantForToken(bearer) : null
@@ -4370,32 +4439,49 @@ async function handleApi(req: IncomingMessage, res: ServerResponse): Promise<voi
         : enabled && tokenMatches(req.headers.authorization, apiToken)
           ? { kind: 'api' }
           : null
-  if (!caller) return send(res, enabled ? 401 : 403, { error: enabled ? 'Missing or invalid bearer token' : 'The Agent API is turned off in Settings → Agent API' })
+  if (!caller) return send(res, enabled ? 401 : 403, { error: enabled ? say(API.http.badToken) : say(API.http.apiOff) })
   m.authenticated = true
   m.role = caller.kind
   who = caller
   // An agent's work is its project's; the Assistant's and scripts' are the workspace's own (not spread over projects).
   if (caller.kind === 'agent') m.project = basename(caller.projectPath)
-  return callerStore.run(caller, () => serveApi(req, res, url))
+  // Its replies are in the caller's dialect (HI-2065): its session's, or for a caller with none the API chain of the
+  // workspace the request names (or the only one open), decided here once for the whole request, its early and error
+  // replies too, never from the window with the focus (HR1 on HI-2443); none named among several: the Default. Loaded
+  // first where it isn't yet (kept until that workspace's dialect files change).
+  const apiWs = caller.kind === 'agent' || caller.kind === 'assistant' ? null : callerStore.run(caller, () => {
+    try {
+      return requestWorkspace(req, url)
+    } catch {
+      return null
+    }
+  })
+  const apiDir = apiWs?.path ? apiWs.combworkDir : null
+  if (apiDir) await apiChainReady(apiDir)
+  return callerStore.run(caller, () => inApiWorkspace(apiDir, () => inRequestScope(caller.kind === 'agent' ? caller : caller.kind === 'assistant' ? { projectPath: join(caller.workspace, CW_DIR, ASSISTANT_DIR), agentId: ASSISTANT_AGENT_ID } : null, () => serveApi(req, res, url))))
 }
 
 async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
   const m = apiRequests.get(res)!
   if (url.pathname === '/v1/health') {
     m.skip = true
-    return send(res, 200, { ok: true, app: 'Hive', version: app.getVersion() })
+    // agent-protocol: the app's name
+    return send(res, 200, { ok: true, app: 'Combwork', version: app.getVersion() })
   }
 
   // A viewer changes nothing: whatever the route (a wait that holds a watch, a report), only a GET is served. Refused
   // before its body is read or its route looked up, so no write is ever reached.
-  if (viewerCaller() && req.method !== 'GET') return send(res, 403, { error: 'A viewer token is read-only: it can read Hive (GET) and follow its events (GET /v1/events), not change anything' })
+  if (viewerCaller() && req.method !== 'GET') return send(res, 403, { error: say(API.http.viewerReadOnly) })
 
   if (req.method === 'GET' && url.pathname === '/v1/events') {
-    // Events are about every open workspace: not for an Assistant, which sees only its own (it has hive_wait_for_agents).
-    if (assistantCaller()) return send(res, 403, { error: 'The event stream is for Agent API callers. Use hive_wait_for_agents to follow agents.' })
+    // Events are about every open workspace: not for an Assistant, which sees only its own (it has cw_wait_for_agents).
+    if (assistantCaller()) return send(res, 403, { error: say(API.http.eventsForCallers) })
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' })
     res.write(': connected\n\n')
-    sseClients.set(res, { agent: agentCaller(), viewer: viewerCaller()?.id ?? null })
+    // A caller with no session keeps the workspace its request was for (the one it names, or the only one open): its
+    // stream's lines are said in that workspace's API chain, whatever request is running when an event comes (HI-2465).
+    const agent = agentCaller()
+    sseClients.set(res, { agent, apiDir: agent ? null : requestApiWorkspace(), run: agentCallerRun(), viewer: viewerCaller()?.id ?? null })
     // A stream is counted as one (connections, events, bytes, how long it stayed open), not as a request's latency.
     m.skip = true
     // Named so in a "main process was busy" warning (mainStalls.ts), which leaves it out once it is just open.
@@ -4419,7 +4505,7 @@ async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Pr
     m.handle = null
   }
   const r = routes.find((x) => x.method === req.method && x.pattern.test(url.pathname))
-  if (!r) return send(res, 404, { error: `No route for ${req.method} ${url.pathname}` })
+  if (!r) return send(res, 404, { error: say(API.http.noRoute, { method: req.method ?? '', path: url.pathname }) })
   m.route = r.template
   // The bridge's reports about its tool calls are bookkeeping, not traffic: counting them would count every call twice
   // (and its word that it has connected, #865, is the same).
@@ -4432,11 +4518,11 @@ async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Pr
       try {
         body = JSON.parse(raw)
       } catch {
-        throw new HttpError(400, 'Body must be JSON')
+        throw new HttpError(400, say(API.http.bodyJson))
       }
     }
     const params = url.pathname.match(r.pattern)!.slice(1)
-    // With several Hive windows, a request is for one workspace: the one it names, or the only one open.
+    // With several Combwork windows, a request is for one workspace: the one it names, or the only one open.
     const ws = requestWorkspace(req, url)
     const gone = new AbortController()
     res.on('close', () => {
@@ -4445,7 +4531,7 @@ async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Pr
     // Its replies name cards by key (#1219: "HI-12 (#40)"), its workspace's.
     const run = (): Promise<unknown> => withCardNames(ws, () => r.handler({ params, query: url.searchParams, body, signal: gone.signal }), callerScope())
     // A project agent's replies say when a card it works on or reviews has a new decision (#357), whatever it called:
-    // the hive tools add the line to their reply. (The bridge's own reports about its calls aren't the agent's.) Its
+    // the Combwork tools add the line to their reply. (The bridge's own reports about its calls aren't the agent's.) Its
     // cards as they were when the call began count too, so the call that moves a card on (to Review, say) still hears
     // of a decision it hasn't read, unless the call read it.
     const flagged = r.template !== '/v1/metrics/mcp' && r.template !== '/v1/launch/connected'
@@ -4453,7 +4539,7 @@ async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Pr
     const before = flagged ? await decisionsNew(ws) : null
     const result = ws ? await inWorkspace(ws, run) : await run()
     const notice = flagged ? await withCardNames(ws, () => decisionsNotice(ws, before, began), callerScope()) : null
-    send(res, 200, result ?? null, notice ? { 'X-Hive-Notice': encodeURIComponent(notice) } : {})
+    send(res, 200, result ?? null, notice ? { 'X-Combwork-Notice': encodeURIComponent(notice) } : {})
   } catch (e) {
     const { status, body } = apiErrorReply(e)
     if (status === 500) log.error(`API ${req.method} ${url.pathname}`, e)
@@ -4464,14 +4550,15 @@ async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Pr
 }
 
 /**
- * The developer console (#636): an Agent API call as it ended, in its workspace's Hive events and in the calling agent's
+ * The developer console (#636): an Agent API call as it ended, in its workspace's Combwork events and in the calling agent's
  * (or Assistant's) own session. Its route and how it went, never its body or the reply: the query's names only.
  */
 function captureApiCall(req: IncomingMessage, res: ServerResponse, url: URL, m: ApiRequest, who: Caller | null, ms: number): void {
-  const own = who?.kind === 'agent' ? sessionSourceId(who.projectPath, who.agentId) : who?.kind === 'assistant' ? sessionSourceId(join(who.workspace, HIVE_DIR, ASSISTANT_DIR), ASSISTANT_AGENT_ID) : null
-  devConsole.capture([m.ws && hiveSourceId(m.ws), own], () => {
+  const own = who?.kind === 'agent' ? sessionSourceId(who.projectPath, who.agentId) : who?.kind === 'assistant' ? sessionSourceId(join(who.workspace, CW_DIR, ASSISTANT_DIR), ASSISTANT_AGENT_ID) : null
+  devConsole.capture([m.ws && combworkSourceId(m.ws), own], () => {
     const name = `${req.method ?? ''} ${m.route}`
     const outcome = outcomeOf(res, m)
+    // agent-protocol: the developer console's record of a call (a log line)
     const by = who?.kind === 'agent' ? `agent ${who.agentId}` : who?.kind ?? 'unknown'
     return {
       kind: 'api',
@@ -4480,6 +4567,7 @@ function captureApiCall(req: IncomingMessage, res: ServerResponse, url: URL, m: 
       made: { status: res.statusCode, outcome, ms: Math.round(ms), responseBytes: m.responseBytes },
       // The query's parameter names are kept (identifiers only, never their values).
       safe: { raw: { method: true, route: true, params: true, role: true, project: true }, made: { outcome: true } },
+      // agent-protocol: the developer console's record of a call (a log line)
       summary: `${name} by ${by}${m.project ? ` (${m.project})` : ''} → ${res.statusCode} ${outcome} in ${Math.round(ms)} ms`
     }
   })
@@ -4511,18 +4599,27 @@ async function decisionsNotice(ws: WorkspaceService | null, before: Map<number, 
   return noticeText(now)
 }
 
-/** The Agent API's answer to an error: its status, and its English whatever language Hive shows (#845). */
+/**
+ * The Agent API's answer to an error: its status, and its text whatever language Combwork shows (#845), in the caller's
+ * dialect (dialects, HI-2440: a CombworkError's text, also one answered with another status, said in the request's scope).
+ */
 export function apiErrorReply(e: unknown): { status: number; body: Record<string, unknown> } {
-  return { status: errorStatus(e), body: { error: englishError(e), ...(e instanceof HttpError ? e.extra : undefined), ...(e instanceof tasks.WorkflowRefusedError ? refusalBody(e.refusal) : undefined) } }
+  // agent-protocol: a CombworkError's text, carried by httpFrom: its messages are found where it was thrown
+  const error = e instanceof HttpError && e.text !== undefined ? agentText(e.text) : agentError(e)
+  return { status: errorStatus(e), body: { error, ...(e instanceof HttpError ? e.extra : undefined), ...(e instanceof tasks.WorkflowRefusedError ? refusalBody(e.refusal) : undefined) } }
 }
 
 /**
- * Hive's own text as data beside an English field (#845, `WindowTextField` in types.ts) is the window's: agents read
+ * Combwork's own text as data beside an English field (#845, `WindowTextField` in types.ts) is the window's: agents read
  * the English. Replies are built field by field (sessions' status, skills, MCP servers, events); where a whole object
  * goes out, these leave its companions behind, and only them: the rest of the object, whatever it holds, as it is.
  */
-/** A card's history entry or comment: without its id (replies stay lean) or its text as data. */
-export const entryForAgents = <T extends { id?: string; whatText?: unknown; hiveText?: unknown }>({ id: _id, whatText: _what, hiveText: _hive, ...rest }: T): Omit<T, 'id' | 'whatText' | 'hiveText'> => rest
+/**
+ * A card's history entry or comment: without its id (replies stay lean) or its text as data, its English said in the
+ * reader's dialect where its chain overrides the line's message (storedForAgents, dialects HI-2440), else as stored.
+ */
+export const entryForAgents = <T extends { id?: string; what?: string; text?: string; whatText?: unknown; appText?: unknown }>({ id: _id, whatText, appText, ...rest }: T): Omit<T, 'id' | 'whatText' | 'appText'> =>
+  ({ ...rest, ...(typeof rest.what === 'string' && whatText ? { what: storedForAgents(rest.what, whatText) } : {}), ...(typeof rest.text === 'string' && appText ? { text: storedForAgents(rest.text, appText) } : {}) }) as Omit<T, 'id' | 'whatText' | 'appText'>
 /** A metrics report: its lists of what wasn't measured or filtered in English only. */
 /**
  * /v1/metrics in 0.9.3 only (#1084; deprecated, gone in the next release): each guidance series also under its names from before 0.9.3, when the
@@ -4533,28 +4630,31 @@ export function withPersonaAliases(r: MetricsReport): MetricsReport {
   return { ...r, projects: Object.fromEntries(Object.entries(r.projects).map(([k, p]) => [k, part(p)])), ...(r.workspace ? { workspace: part(r.workspace) } : {}) }
 }
 
-export function metricsForAgents<R extends { notMeasuredText?: unknown; providersNoteText?: unknown; filters?: { notFilteredText?: unknown } }>(r: R): Omit<R, 'notMeasuredText' | 'providersNoteText'> {
-  const { notMeasuredText: _m, providersNoteText: _p, ...rest } = r
-  if (!rest.filters) return rest
-  const { notFilteredText: _f, ...filters } = rest.filters
-  return { ...rest, filters }
+export function metricsForAgents<R extends { notMeasured?: string[]; notMeasuredText?: TextPart[]; providersNote?: string; providersNoteText?: TextPart; filters?: { notFiltered?: string[]; notFilteredText?: TextPart[] } }>(r: R): Omit<R, 'notMeasuredText' | 'providersNoteText'> {
+  // Their English said in the caller's dialect (agentField, dialects HI-2440), each item from its text as data.
+  const said = (english: string[] | undefined, texts: TextPart[] | undefined): string[] | undefined => english?.map((e, i) => agentField(e, texts?.[i]))
+  const { notMeasuredText, providersNoteText, ...rest } = r
+  const out = { ...rest, ...(rest.notMeasured ? { notMeasured: said(rest.notMeasured, notMeasuredText) } : {}), ...(rest.providersNote !== undefined ? { providersNote: agentField(rest.providersNote, providersNoteText) } : {}) }
+  if (!out.filters) return out
+  const { notFilteredText, ...filters } = out.filters
+  return { ...out, filters: { ...filters, ...(filters.notFiltered ? { notFiltered: said(filters.notFiltered, notFilteredText) } : {}) } }
 }
 /** An agent just added: its reuse note in English only. */
-export function addedForAgents<A extends { reuse?: { notReusedText?: unknown } }>(a: A): A {
+export function addedForAgents<A extends { reuse?: { notReused?: string; notReusedText?: TextPart } }>(a: A): A {
   if (!a.reuse) return a
-  const { notReusedText: _n, ...reuse } = a.reuse
-  return { ...a, reuse }
+  const { notReusedText, ...reuse } = a.reuse
+  return { ...a, reuse: { ...reuse, ...(reuse.notReused !== undefined ? { notReused: agentField(reuse.notReused, notReusedText) } : {}) } }
 }
 
-/** What a HiveError's kind answers with (#845). */
+/** What a CombworkError's kind answers with (#845). */
 const KIND_STATUS = { invalid: 400, forbidden: 403, notFound: 404, conflict: 409 } as const
 
 /**
  * The status the Agent API answers an error with. The session and workspace services don't know about HTTP: a
- * HiveError's kind says it, else its English message does (statusFor).
+ * CombworkError's kind says it, else its English message does (statusFor).
  */
 function errorStatus(e: unknown): number {
-  if (e instanceof HiveError && e.kind) return KIND_STATUS[e.kind]
+  if (e instanceof CombworkError && e.kind) return KIND_STATUS[e.kind]
   return e instanceof HttpError ? e.status : e instanceof tasks.TaskPermissionError ? 403 : e instanceof tasks.TaskConflictError ? 409 : statusFor(e as Error)
 }
 
@@ -4568,21 +4668,33 @@ function statusFor(e: Error): number {
   return 500
 }
 
-function broadcast(event: HiveEvent): void {
-  if (!sseClients.size || !(API_EVENTS as readonly string[]).includes(event.type)) return
-  // What each client gets (apiEvents.ts): every event for the workspace token and viewers, a project agent its project's.
-  const lines = new Map<AgentIdentity | null, string | null>()
-  const lineFor = (agent: AgentIdentity | null): string | null => {
-    if (!lines.has(agent)) {
-      const payload = apiEventFor(event, agent)
-      lines.set(agent, payload ? `event: ${event.type}\ndata: ${replyText(payload)}\n\n` : null)
+/**
+ * Each stream client's line for an event (apiEvents.ts: every event for the workspace token and viewers, a project agent
+ * its project's), said in that client's own dialect scope (HI-2465), bound here whatever request or none is running as
+ * the event comes: an agent's session's chain; for the workspace token and viewers, the API chain of the workspace their
+ * stream was opened for while it is open (`open`, .combwork folders in lower case; closed, or none named: the Default). One
+ * line per agent, and per such workspace.
+ */
+function streamLines(event: CombworkEvent, open: ReadonlySet<string>): (client: { agent: AgentIdentity | null; apiDir: string | null }) => string | null {
+  const lines = new Map<AgentIdentity | string, string | null>()
+  return ({ agent, apiDir }) => {
+    const dir = !agent && apiDir && open.has(apiDir.toLowerCase()) ? apiDir : null
+    const key = agent ?? `api:${dir?.toLowerCase() ?? ''}`
+    if (!lines.has(key)) {
+      const payload = inApiWorkspace(dir, () => inRequestScope(agent ? { projectPath: agent.projectPath, agentId: agent.agentId } : null, () => apiEventFor(event, agent)))
+      lines.set(key, payload ? `event: ${event.type}\ndata: ${replyText(payload)}\n\n` : null)
     }
-    return lines.get(agent)!
+    return lines.get(key)!
   }
-  for (const [c, { agent }] of sseClients) {
-    const line = lineFor(agent)
+}
+
+function broadcast(event: CombworkEvent): void {
+  if (!sseClients.size || !(API_EVENTS as readonly string[]).includes(event.type)) return
+  const lineFor = streamLines(event, new Set(openWorkspaces().map((w) => w.combworkDir.toLowerCase())))
+  for (const [c, client] of sseClients) {
+    const line = lineFor(client)
     if (line === null) continue
-    // A client that stopped reading would make Hive hold every event for it: it is disconnected instead.
+    // A client that stopped reading would make Combwork hold every event for it: it is disconnected instead.
     if (c.writableLength > SSE_MAX_BUFFERED) {
       sseClients.delete(c)
       c.destroy()
@@ -4622,7 +4734,7 @@ async function startApiServerNow(retryInUse: boolean): Promise<AgentApiInfo> {
   const listening = new AbortController()
   apiListening = listening
   try {
-    // Runs with the Agent API off too, for the Hive Assistant's token alone (see handleApi).
+    // Runs with the Agent API off too, for the Combwork Assistant's token alone (see handleApi).
     const got = await listenWithRetry(() => http.createServer((req, res) => void handleApi(req, res)), port, '127.0.0.1', {
       retry: retryInUse,
       signal: listening.signal,
@@ -4639,13 +4751,13 @@ async function startApiServerNow(retryInUse: boolean): Promise<AgentApiInfo> {
     // Stopped while it was being tried again: whatever stopped it has the server and the discovery file now.
     if ((e as Error).name === 'AbortError') return apiInfo()
     const tries = (e as { tries?: number }).tries ?? 1
-    apiError = (e as NodeJS.ErrnoException).code === 'EADDRINUSE' ? `Port ${port} is already in use` : (e as Error).message
+    apiError = (e as NodeJS.ErrnoException).code === 'EADDRINUSE' ? say(API.http.portInUse, { port: String(port) }) : (e as Error).message
     log.warn(`Agent API failed to start: ${apiError}${tries > 1 ? ` (after ${tries} tries)` : ''}`)
     apiServer = null
   } finally {
     if (apiListening === listening) apiListening = null
   }
-  // Another app finds a running Hive's API by the discovery file (#620): there while the Agent API listens.
+  // Another app finds a running Combwork's API by the discovery file (#620): there while the Agent API listens.
   const info = apiInfo()
   if (info.running && info.url) await writeDiscovery({ url: info.url, port: apiPort(), version: app.getVersion(), api: API_VERSION })
   else await clearDiscovery()
@@ -4678,6 +4790,24 @@ export async function revokeViewer(id: string): Promise<AgentApiInfo> {
   return apiInfo()
 }
 
-onHiveEvent(broadcast)
-// A project agent's watch refused, under the watches' lock, while Hive is giving it a card in a slot (HI-2197).
+/**
+ * A project agent's launch whose token stopped working (it ended, or a new launch replaced it): its open event streams
+ * end, as a revoked viewer's do (HI-2416); a new request with that token is refused (401). Only that launch's: the next
+ * launch's streams, with its own token, stay open.
+ */
+function endLaunchStreams(ended: EndedLaunch): void {
+  for (const [c, client] of sseClients) {
+    const a = client.agent
+    if (!a || client.run !== ended.runId || a.agentId !== ended.agentId || a.projectPath.toLowerCase() !== ended.projectPath.toLowerCase()) continue
+    sseClients.delete(c)
+    c.end()
+  }
+}
+
+onCombworkEvent(broadcast)
+onAgentTokenEnded(endLaunchStreams)
+// A project agent's watch refused, under the watches' lock, while Combwork is giving it a card in a slot (HI-2197).
 onWatchPlacing(watchWhilePlaced)
+
+/** For unit tests: request parts whose refusals tests say through the canary (tests/agentTextApi.test.ts, HI-2436). */
+export const apiTextTestHooks = { notifyTarget, isolatedFor, lanePlacement, readUsageWatch, streamLines }

@@ -1,4 +1,4 @@
-// The log's writer thread (HI-1730): hive.log's and hooks.log's lines are queued on main and written by a thread of
+// The log's writer thread (HI-1730): combwork.log's and hooks.log's lines are queued on main and written by a thread of
 // their own, so a disk that holds writes up (a System Restore point freezing the profile's drive) holds that thread, not
 // main. Here, with the writer built and each of its writes held: logging returns at once, every line arrives once and in
 // order, the process's exit (flushLogs) writes what the writer hadn't, a writer that won't keep up has lines dropped and
@@ -12,7 +12,7 @@ import { tempDir } from './tempDir'
 
 /** A bound for a hung run (the waits are for conditions). */
 const HUNG_MS = 15_000
-const base = tempDir('hive-log-writer-')
+const base = tempDir('cw-log-writer-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -20,7 +20,7 @@ const logger = await import('../src/main/logger')
 const { BUSY, LOG_STATE_SLOTS, STOP, WRITTEN, writeBatch } = await import('../src/main/logWriter')
 const bundle = join(base, 'log-writer.cjs')
 const hooks = join(base, 'profile', 'logs', 'hooks.log')
-const hive = join(base, 'profile', 'logs', 'hive.log')
+const appLog = join(base, 'profile', 'logs', 'combwork.log')
 const lines = (f: string): string[] => (existsSync(f) ? readFileSync(f, 'utf8').split('\n').filter(Boolean) : [])
 
 beforeAll(async () => {
@@ -56,15 +56,15 @@ describe("the log's writer thread (HI-1730)", () => {
     expect(lines(hooks).at(-1)).toMatch(/after the exit$/)
   })
 
-  it("a writer that won't keep up: lines past the bound are dropped, and hive.log says how many", async () => {
+  it("a writer that won't keep up: lines past the bound are dropped, and combwork.log says how many", async () => {
     await logger.useLogWriter(bundle, 300)
     const was = logger.logLimits.waitingBytes
     logger.logLimits.waitingBytes = 2000
     try {
       for (let i = 0; i < 100; i++) logger.hookJournal(`bound ${i} ${'x'.repeat(40)}`)
-      await vi.waitFor(() => expect(lines(hive).some((l) => /\[logger\] \d+ log line\(s\) weren't written/.test(l))).toBe(true), { timeout: HUNG_MS })
+      await vi.waitFor(() => expect(lines(appLog).some((l) => /\[logger\] \d+ log line\(s\) weren't written/.test(l))).toBe(true), { timeout: HUNG_MS })
       const kept = lines(hooks).filter((l) => l.includes(' bound ')).length
-      const said = Number(/(\d+) log line\(s\) weren't written/.exec(lines(hive).find((l) => l.includes("weren't written")) ?? '')?.[1])
+      const said = Number(/(\d+) log line\(s\) weren't written/.exec(lines(appLog).find((l) => l.includes("weren't written")) ?? '')?.[1])
       expect(kept + said).toBe(100)
       expect(kept).toBeLessThan(100)
     } finally {

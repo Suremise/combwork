@@ -1,5 +1,5 @@
-// The task board (.hive/tasks) and removing projects: who may change what, card numbers and order, and what Hide,
-// Remove from Hive and Delete do with a project's cards, handovers and folder (and what restoring brings back).
+// The task board (.combwork/tasks) and removing projects: who may change what, card numbers and order, and what Hide,
+// Remove from Combwork and Delete do with a project's cards, handovers and folder (and what restoring brings back).
 // The board's own rules, with the workflow rules off (Settings → Advanced): enforced, agents' moves are intents (#1268,
 // tests/agentMoves.test.ts) and the user's and the Assistant's go through the card's rules (#1265, tests/gates.test.ts).
 import { execFileSync } from 'child_process'
@@ -13,7 +13,7 @@ import { boardLockKey, editCard, readCard, removeCard, writeCard, writeCardOutsi
 import { boardTestHooks } from '../src/main/boardStore'
 import { follow } from './followDoorbell'
 
-const base = tempDir('hive-tasks-')
+const base = tempDir('cw-tasks-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 // The Recycle Bin, for tests: gone.
 ;(electron.shell as unknown as { trashItem: (p: string) => Promise<void> }).trashItem = (p) => rm(p, { recursive: true, force: true })
@@ -45,13 +45,13 @@ const HUNG_MS = 10000
 
 function project(ws: string, name: string, agents: { id: string; name: string }[] = []): string {
   const p = join(ws, name)
-  mkdirSync(join(p, '.hive'), { recursive: true })
-  writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents }))
+  mkdirSync(join(p, '.combwork'), { recursive: true })
+  writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents }))
   return p
 }
 
 function handover(ws: string, file: string, projectName: string): void {
-  writeFileSync(join(ws, '.hive', 'shared', 'handovers', file), `# Title\n\n- **Project:** ${projectName}\n\nBody\n`)
+  writeFileSync(join(ws, '.combwork', 'shared', 'handovers', file), `# Title\n\n- **Project:** ${projectName}\n\nBody\n`)
 }
 
 async function open(path: string): Promise<WS> {
@@ -223,7 +223,7 @@ describe('task board', () => {
     })
   })
 
-  it('says what a change did, for the hive tools to confirm it', async () => {
+  it('says what a change did, for the Combwork tools to confirm it', async () => {
     const a = await run(() => tasks.createTask({ title: 'Said', project: 'alpha' }, agent))
     const b = await run(() => tasks.createTask({ title: 'Other', project: 'alpha' }, agent))
     const said: string[] = []
@@ -240,9 +240,9 @@ describe('task board', () => {
   })
 
   it("refuses a project agent moving another agent's card in Doing on to Review or Done; its own, and everyone else, may", async () => {
-    const projectJson = join(wsPath, 'alpha', '.hive', 'project.json')
+    const projectJson = join(wsPath, 'alpha', '.combwork', 'project.json')
     const saved = readFileSync(projectJson, 'utf8')
-    // Its id kept (#508): Hive never drops it, and without it the project's cards would be no project's.
+    // Its id kept (#508): Combwork never drops it, and without it the project's cards would be no project's.
     writeFileSync(projectJson, JSON.stringify({ version: 2, id: JSON.parse(saved).id, agents: [{ id: 'a1', name: 'Agent 1' }, { id: 'a2', name: 'Agent 2' }] }))
     const a1 = { kind: 'agent', name: 'Agent 1 (alpha)', self: { project: 'alpha', agentId: 'a1' }, scope: 'alpha' } as const
     const a2 = { kind: 'agent', name: 'Agent 2 (alpha)', self: { project: 'alpha', agentId: 'a2' }, scope: 'alpha' } as const
@@ -314,9 +314,9 @@ describe('task board', () => {
     expect(said).toEqual(['Given to Agent 1', 'Moved to Doing'])
 
     // Another agent's card, out of Doing (so nobody was working on it): taken, from each column, and said so.
-    const projectJson = join(wsPath, 'alpha', '.hive', 'project.json')
+    const projectJson = join(wsPath, 'alpha', '.combwork', 'project.json')
     const saved = readFileSync(projectJson, 'utf8')
-    // Its id kept (#508): Hive never drops it, and without it the project's cards would be no project's.
+    // Its id kept (#508): Combwork never drops it, and without it the project's cards would be no project's.
     writeFileSync(projectJson, JSON.stringify({ version: 2, id: JSON.parse(saved).id, agents: [{ id: 'a1', name: 'Agent 1' }, { id: 'a2', name: 'Agent 2' }] }))
     try {
       const other = { kind: 'agent', name: 'Agent 2 (alpha)', self: { project: 'alpha', agentId: 'a2' } } as const
@@ -375,7 +375,7 @@ describe('task board', () => {
   it('reads damaged card files safely', async () => {
     // Cards #1 to #3, so the reference to #3 is to a card that is there.
     for (const title of ['One', 'Two', 'Three']) await run(() => tasks.createTask({ title }, user))
-    // A card saved with fields of the wrong type (by an older Hive, a script, an export copied back).
+    // A card saved with fields of the wrong type (by an older Combwork, a script, an export copied back).
     await writeCard(w, 500, { title: 7, column: 'sideways', labels: 'x', blockedBy: ['a', 3] })
     const c = await run(() => tasks.getTask(500))
     expect(c.column).toBe('todo')
@@ -720,7 +720,7 @@ describe('card decisions', () => {
     await laterMs()
     expect(await notice()).toBeNull()
     await run(() => tasks.updateTask(n, { decision: 'Use the old API.' }, user))
-    expect(await notice()).toBe(`[Hive] #${n} has 1 new decision since you last read it: read the card (hive_read_task) at your next checkpoint.`)
+    expect(await notice()).toBe(`[CW] #${n} has 1 new decision since you last read it: read the card (cw_read_task) at your next checkpoint.`)
     // Read in full: not new any more. Its own records never are.
     noteCardRead(me, n)
     expect(await notice()).toBeNull()
@@ -731,7 +731,7 @@ describe('card decisions', () => {
     const mine = (await run(() => tasks.getTask(n))).decisions![0]
     await laterMs()
     await run(() => tasks.editDecision(n, mine.id, 'Use the old API, v2.', user))
-    expect(await notice()).toMatch(new RegExp(`^\\[Hive\\] #${n} has 1 new decision`))
+    expect(await notice()).toMatch(new RegExp(`^\\[CW\\] #${n} has 1 new decision`))
     expect(await notice({ projectPath: alpha, agentId: 'r1' }, 'Reviewer (alpha)')).toBeNull()
     // In Review with a reviewer: the reviewer hears of one recorded after its review began; the builder, out of Doing, doesn't.
     await run(() => tasks.updateTask(n, { column: 'review' }, coder))
@@ -766,15 +766,15 @@ describe('card decisions', () => {
   })
 
   it('the line for an agent waiting for the user names each card and how many (#401)', () => {
-    expect(decisionWakes.decisionLine(new Map([[7, { count: 1 }]]))).toBe('[Hive] #7 has 1 new decision from the user: read it (hive_read_task) and carry on from where you asked.')
-    expect(decisionWakes.decisionLine(new Map([[7, { count: 2 }]]))).toBe('[Hive] #7 has 2 new decisions from the user: read them (hive_read_task) and carry on from where you asked.')
-    expect(decisionWakes.decisionLine(new Map([[7, { count: 1 }], [9, { count: 3 }]]))).toBe('[Hive] #7 has 1 new decision, #9 has 3 new decisions from the user: read them (hive_read_task) and carry on from where you asked.')
+    expect(decisionWakes.decisionLine(new Map([[7, { count: 1 }]]))).toBe('[CW] #7 has 1 new decision from the user: read it (cw_read_task) and carry on from where you asked.')
+    expect(decisionWakes.decisionLine(new Map([[7, { count: 2 }]]))).toBe('[CW] #7 has 2 new decisions from the user: read them (cw_read_task) and carry on from where you asked.')
+    expect(decisionWakes.decisionLine(new Map([[7, { count: 1 }], [9, { count: 3 }]]))).toBe('[CW] #7 has 1 new decision, #9 has 3 new decisions from the user: read them (cw_read_task) and carry on from where you asked.')
   })
 
   it("the line for a card's reviewer asks it to read before its next verdict, never to carry on (HI-2261)", () => {
-    expect(decisionWakes.decisionLine(new Map([[7, { count: 1 }]]), new Set([7]))).toBe('[Hive] #7 has 1 new decision from the user: read it (hive_read_task) before your next verdict on it.')
-    expect(decisionWakes.decisionLine(new Map([[7, { count: 2 }]]), new Set([7]))).toBe('[Hive] #7 has 2 new decisions from the user: read them (hive_read_task) before your next verdict on it.')
-    expect(decisionWakes.decisionLine(new Map([[7, { count: 1 }], [9, { count: 1 }]]), new Set([7, 9]))).toBe('[Hive] #7 has 1 new decision, #9 has 1 new decision from the user: read them (hive_read_task) before your next verdict on them.')
+    expect(decisionWakes.decisionLine(new Map([[7, { count: 1 }]]), new Set([7]))).toBe('[CW] #7 has 1 new decision from the user: read it (cw_read_task) before your next verdict on it.')
+    expect(decisionWakes.decisionLine(new Map([[7, { count: 2 }]]), new Set([7]))).toBe('[CW] #7 has 2 new decisions from the user: read them (cw_read_task) before your next verdict on it.')
+    expect(decisionWakes.decisionLine(new Map([[7, { count: 1 }], [9, { count: 1 }]]), new Set([7, 9]))).toBe('[CW] #7 has 1 new decision, #9 has 1 new decision from the user: read them (cw_read_task) before your next verdict on them.')
     // A card of its own among them: the builder's line, as it has something to carry on with.
     expect(decisionWakes.decisionLine(new Map([[7, { count: 1 }], [9, { count: 1 }]]), new Set([7]))).toMatch(/and carry on from where you asked\.$/)
   })
@@ -789,7 +789,7 @@ describe('card decisions', () => {
     for (const n of [mine, theirs]) await run(() => tasks.updateTask(n, { column: 'todo' }, user))
   })
 
-  it('tells an agent waiting for the user of new decisions once each: not while it works, the user types there or a line of Hive waits (#401)', async () => {
+  it('tells an agent waiting for the user of new decisions once each: not while it works, the user types there or a line of Combwork waits (#401)', async () => {
     const me = { projectPath: alpha, agentId: 'a1' }
     const n = (await run(() => tasks.createTask({ title: 'Waiting for the user', project: 'alpha', column: 'doing', agent: 'a1' }, user))).number
     await laterMs()
@@ -804,7 +804,7 @@ describe('card decisions', () => {
     let typing = false
     let waiting = false
     decisionWakes.testHooks.settleMs = 600_000
-    // What the agent read of each line Hive typed (#650: it follows the doorbell with hive_inbox).
+    // What the agent read of each line Combwork typed (#650: it follows the doorbell with cw_inbox).
     const sent: string[] = []
     const send = vi.spyOn(sessions, 'sendPrompt').mockImplementation(async (p, id, text, guard) => {
       guard?.()
@@ -821,7 +821,7 @@ describe('card decisions', () => {
     ]
     try {
       const tell = (): Promise<void> => decisionWakes.tellNow(w, alpha, 'a1')
-      // Working, the user typing there, a line of Hive's not taken: nothing typed.
+      // Working, the user typing there, a line of Combwork's not taken: nothing typed.
       await tell()
       status = 'finished'
       typing = true
@@ -835,7 +835,7 @@ describe('card decisions', () => {
       await tell()
       expect(sent).toHaveLength(1)
       expect(sent[0]).toMatch(new RegExp(`#${n} has 2 new decisions`))
-      await expect.poll(async () => (await run(() => tasks.getTask(n))).history.some((h) => h.by === 'Hive' && h.what === 'Told Coder (alpha) of 2 new decisions'), { timeout: HUNG_MS }).toBe(true)
+      await expect.poll(async () => (await run(() => tasks.getTask(n))).history.some((h) => h.by === 'Combwork' && h.what === 'Told Coder (alpha) of 2 new decisions'), { timeout: HUNG_MS }).toBe(true)
       // Told once: not again, until another decision, which is told alone.
       await tell()
       expect(sent).toHaveLength(1)
@@ -899,7 +899,7 @@ describe('card decisions', () => {
     }
   })
 
-  it("hive_inbox gives out a decision line only while its decisions are still new to that agent: its card given to another meanwhile, it isn't (#649 round 3)", async () => {
+  it("cw_inbox gives out a decision line only while its decisions are still new to that agent: its card given to another meanwhile, it isn't (#649 round 3)", async () => {
     const deliveries = await import('../src/main/deliveries')
     const writer = await import('../src/main/lineWriter')
     const n = (await run(() => tasks.createTask({ title: 'Asked, then given away', project: 'alpha', column: 'doing', agent: 'a1' }, user))).number
@@ -962,11 +962,11 @@ describe('card decisions', () => {
     ]
     writer.testHooks.takeMs = 5000
     let release = (): void => undefined
-    const notes = async (): Promise<string[]> => (await run(() => tasks.getTask(n))).history.filter((h) => h.by === 'Hive' && h.what.startsWith('Told ')).map((h) => h.what)
+    const notes = async (): Promise<string[]> => (await run(() => tasks.getTask(n))).history.filter((h) => h.by === 'Combwork' && h.what.startsWith('Told ')).map((h) => h.what)
     try {
       // Typed: its doorbell, for one decision (#650).
       await decisionWakes.tellNow(w, alpha, 'a1')
-      expect(sent).toEqual([`[Hive] New in your inbox: 1 answer (#${n}) (m1). Call hive_inbox to read it, act on it, then ack it.`])
+      expect(sent).toEqual([`[CW] New in your inbox: 1 answer (#${n}) (m1). Call cw_inbox to read it, act on it, then ack it.`])
       // Its CLI takes the line and the agent reads its inbox (the receipt), whose save is held; a newer decision then.
       const held = new Promise<void>((r) => (release = r))
       let holding = false
@@ -996,7 +996,7 @@ describe('card decisions', () => {
       status = 'finished'
       await decisionWakes.tellNow(w, alpha, 'a1')
       expect(sent).toHaveLength(2)
-      expect(sent[1]).toBe(`[Hive] New in your inbox: 1 answer (#${n}) (m2). Call hive_inbox to read it, act on it, then ack it.`)
+      expect(sent[1]).toBe(`[CW] New in your inbox: 1 answer (#${n}) (m2). Call cw_inbox to read it, act on it, then ack it.`)
       taken = 2
       status = 'working'
       expect((await deliveries.readInbox(alpha, 'a1')).items.map((i) => i.text)).toEqual([expect.stringMatching(new RegExp(`#${n} has 1 new decision from the user`))])
@@ -1031,13 +1031,13 @@ describe('card decisions', () => {
     writer.testHooks.takeMs = 20
     try {
       await decisionWakes.tellNow(w, alpha, 'a1')
-      expect(sent).toEqual([`[Hive] New in your inbox: 1 answer (#${n}) (m1). Call hive_inbox to read it, act on it, then ack it.`])
+      expect(sent).toEqual([`[CW] New in your inbox: 1 answer (#${n}) (m1). Call cw_inbox to read it, act on it, then ack it.`])
       // Another decision before it reads, told again (the board's settle, its turn's end): the rung line covers it.
       await laterMs()
       await run(() => tasks.updateTask(n, { decision: 'Close on the counter.' }, assistant))
       await decisionWakes.tellNow(w, alpha, 'a1')
       expect(sent).toHaveLength(1)
-      expect((await deliveries.readInbox(alpha, 'a1')).items.map((i) => i.text)).toEqual([expect.stringMatching(new RegExp(`^\\[Hive\\] #${n} has 2 new decisions from the user`))])
+      expect((await deliveries.readInbox(alpha, 'a1')).items.map((i) => i.text)).toEqual([expect.stringMatching(new RegExp(`^\\[CW\\] #${n} has 2 new decisions from the user`))])
       expect((await deliveries.deliveriesOf(alpha, 'a1')).map((r) => `${r.id} ${r.state}`)).toEqual(['m1 received'])
     } finally {
       writer.testHooks.takeMs = undefined
@@ -1074,7 +1074,7 @@ describe('card decisions', () => {
     try {
       await decisionWakes.tellNow(w, alpha, 'a1')
       expect(saves).toBeGreaterThan(2)
-      expect(sent).toEqual([`[Hive] New in your inbox: 1 answer (#${n}) (m1). Call hive_inbox to read it, act on it, then ack it.`])
+      expect(sent).toEqual([`[CW] New in your inbox: 1 answer (#${n}) (m1). Call cw_inbox to read it, act on it, then ack it.`])
     } finally {
       deliveries.setBeforeSaveForTests(null)
       writer.testHooks.takeMs = undefined
@@ -1089,7 +1089,7 @@ describe('card decisions', () => {
     await run(() => tasks.updateTask(n, { decision: 'Blue.' }, assistant))
     let typing = false
     let refusedTyping = 0
-    // What happens as Hive types the line (before its guard's check), once.
+    // What happens as Combwork types the line (before its guard's check), once.
     let meanwhile: (() => Promise<void> | void) | null = null
     const sent: { to: string; text: string }[] = []
     decisionWakes.testHooks.settleMs = 30
@@ -1248,7 +1248,7 @@ describe('card decisions', () => {
   it('marks a decision recorded after work on the card started as new since start', () => {
     const card = { history: [{ at: '2026-10-07T10:00:00.000Z', by: 'You', what: 'Created in Todo' }] }
     expect(newSinceStart(card, { at: '2026-10-07T11:00:00.000Z' })).toBe(false)
-    const started = { history: [...card.history, { at: '2026-10-07T10:30:00.000Z', by: 'B5 (hive)', what: 'Moved to Doing' }] }
+    const started = { history: [...card.history, { at: '2026-10-07T10:30:00.000Z', by: 'B5 (alpha)', what: 'Moved to Doing' }] }
     expect(workStartedAt(started)).toBe(Date.parse('2026-10-07T10:30:00.000Z'))
     expect(newSinceStart(started, { at: '2026-10-07T10:20:00.000Z' })).toBe(false)
     expect(newSinceStart(started, { at: '2026-10-07T11:00:00.000Z' })).toBe(true)
@@ -1385,7 +1385,7 @@ describe("a project agent's board", () => {
   it('authorises every write on the card as it is under the board lock (a project change while a write waits)', async () => {
     const { fileLockDepth, withFileLock } = await import('../src/main/fsutil')
     const lock = boardLockKey(wsPath)
-    // Someone moves the card to beta while the agent's write waits for the board: another copy of Hive from before project
+    // Someone moves the card to beta while the agent's write waits for the board: another copy of Combwork from before project
     // ids (#508), without the id, which it doesn't keep.
     const toBeta = (x: number): void => {
       const { projectId: _id, ...c } = readCard(w, x)
@@ -1453,7 +1453,7 @@ describe("a project agent's board", () => {
       })
       expect([change, await noted]).toEqual([change, [kept]])
       expect((await run(() => tasks.getTask(x))).comments).toEqual([])
-      expect((await run(() => tasks.getTask(kept))).comments.map((c) => [c.by, c.text])).toEqual([['Hive', said]])
+      expect((await run(() => tasks.getTask(kept))).comments.map((c) => [c.by, c.text])).toEqual([['Combwork', said]])
       await run(() => tasks.deleteTask(x))
       await run(() => tasks.deleteTask(kept))
     }
@@ -1521,7 +1521,7 @@ describe('removing projects', () => {
     expect((await run(() => tasks.getTask(done.number))).archived).toBe(true)
   })
 
-  it('removes a project from Hive, packing its handovers and cards into its folder, and restores them', async () => {
+  it('removes a project from Combwork, packing its handovers and cards into its folder, and restores them', async () => {
     handover(wsPath, '2026-10-01-remove-me-plan.md', 'remove-me')
     handover(wsPath, '2026-10-01-remove-me-too-other.md', 'remove-me-too')
     handover(wsPath, '2026-10-01-keep-notes.md', 'keep')
@@ -1531,19 +1531,19 @@ describe('removing projects', () => {
     // "remove-me-too" starts with "remove-me": its handover isn't this project's.
     expect(info.handovers).toEqual(['handovers/2026-10-01-remove-me-plan.md'])
     await run(() => removal.removeProject(join(wsPath, 'remove-me'), 'remove'))
-    const packed = join(wsPath, 'remove-me', '.hive', 'removed')
+    const packed = join(wsPath, 'remove-me', '.combwork', 'removed')
     expect(readdirSync(join(packed, 'handovers'))).toEqual(['2026-10-01-remove-me-plan.md'])
     expect(existsSync(join(packed, 'cards.json'))).toBe(true)
-    expect(existsSync(join(wsPath, '.hive', 'shared', 'handovers', '2026-10-01-remove-me-plan.md'))).toBe(false)
-    expect(existsSync(join(wsPath, '.hive', 'shared', 'handovers', '2026-10-01-remove-me-too-other.md'))).toBe(true)
+    expect(existsSync(join(wsPath, '.combwork', 'shared', 'handovers', '2026-10-01-remove-me-plan.md'))).toBe(false)
+    expect(existsSync(join(wsPath, '.combwork', 'shared', 'handovers', '2026-10-01-remove-me-too-other.md'))).toBe(true)
     expect((await run(() => tasks.getTask(c.number))).archivedFor).toBe('project-removed')
     expect(w.hiddenProjects().find((h) => h.name === 'remove-me')?.mode).toBe('removed')
     // Its sessions' records go with the folder (#1061): written into it, out of the workspace's database.
-    expect(JSON.parse(readFileSync(join(wsPath, 'remove-me', '.hive', 'sessions.json'), 'utf8')).sessions.map((x: { id: string }) => x.id)).toEqual(['kept-session'])
+    expect(JSON.parse(readFileSync(join(wsPath, 'remove-me', '.combwork', 'sessions.json'), 'utf8')).sessions.map((x: { id: string }) => x.id)).toEqual(['kept-session'])
 
     const r = await run(() => removal.restoreProject('remove-me'))
     expect(r).toEqual({ handovers: 1, cards: 1 })
-    expect(existsSync(join(wsPath, '.hive', 'shared', 'handovers', '2026-10-01-remove-me-plan.md'))).toBe(true)
+    expect(existsSync(join(wsPath, '.combwork', 'shared', 'handovers', '2026-10-01-remove-me-plan.md'))).toBe(true)
     expect(existsSync(packed)).toBe(false)
     // The same card back, not a copy.
     expect((await run(() => tasks.getTask(c.number))).archived).toBe(false)
@@ -1576,7 +1576,7 @@ describe('removing projects', () => {
       expect(cards.map((x) => x.number).sort()).toEqual([2, 3])
       const second = cards.find((x) => x.title === 'Second')!
       expect(second.blockedBy).toEqual([cards.find((x) => x.title === 'First')!.number])
-      expect(existsSync(join(other, '.hive', 'shared', 'handovers', '2026-10-01-remove-me-too-other.md'))).toBe(true)
+      expect(existsSync(join(other, '.combwork', 'shared', 'handovers', '2026-10-01-remove-me-too-other.md'))).toBe(true)
     } finally {
       await disposeWorkspaceService(w3)
     }
@@ -1588,7 +1588,7 @@ describe('removing projects', () => {
     const keep = await run(() => tasks.createTask({ title: 'Stays', project: 'keep', links: [c.number] }, user))
     await run(() => removal.removeProject(join(wsPath, 'delete-me'), 'delete'))
     expect(existsSync(join(wsPath, 'delete-me'))).toBe(false)
-    expect(existsSync(join(wsPath, '.hive', 'shared', 'handovers', '2026-10-01-delete-me-x.md'))).toBe(false)
+    expect(existsSync(join(wsPath, '.combwork', 'shared', 'handovers', '2026-10-01-delete-me-x.md'))).toBe(false)
     await expect(run(() => tasks.getTask(c.number))).rejects.toThrow(/Unknown task/)
     expect((await run(() => tasks.getTask(keep.number))).links).toEqual([])
     expect(await names()).not.toContain('delete-me')
@@ -1602,21 +1602,21 @@ describe('removing projects', () => {
     git(p, 'add', 'a.txt')
     git(p, 'commit', '-q', '-m', 'a')
     const tree = join(`${wsPath}.worktrees`, 'gitproj', 'agent-2')
-    git(p, 'worktree', 'add', '-q', '-b', 'hive/agent-2', tree, 'main')
+    git(p, 'worktree', 'add', '-q', '-b', 'cw/agent-2', tree, 'main')
     writeFileSync(join(tree, 'b.txt'), 'b')
     git(tree, 'add', 'b.txt')
     git(tree, 'commit', '-q', '-m', 'b')
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a2', name: 'Agent 2', worktree: { path: tree, branch: 'hive/agent-2', base: 'main' } }] }))
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a2', name: 'Agent 2', worktree: { path: tree, branch: 'cw/agent-2', base: 'main' } }] }))
     await w.refresh()
     const info = await run(() => removal.removalInfo(p))
     expect(info.worktrees).toEqual([expect.objectContaining({ agent: 'Agent 2', ahead: 1 })])
     await expect(run(() => removal.removeProject(p, 'remove'))).rejects.toThrow(/Merge or discard the work in Agent 2's worktree/)
     expect(await names()).toContain('gitproj')
     // Merged: then the worktree and its branch go, and the project leaves.
-    git(p, 'merge', '-q', 'hive/agent-2')
+    git(p, 'merge', '-q', 'cw/agent-2')
     await run(() => removal.removeProject(p, 'remove'))
     expect(existsSync(tree)).toBe(false)
-    expect(git(p, 'branch', '--list', 'hive/agent-2').trim()).toBe('')
+    expect(git(p, 'branch', '--list', 'cw/agent-2').trim()).toBe('')
     expect(await names()).not.toContain('gitproj')
   })
 })
@@ -1634,13 +1634,13 @@ describe('removal and board under faults', () => {
     git(p, 'add', 'a.txt')
     git(p, 'commit', '-q', '-m', 'a')
     const tree = join(`${wsPath}.worktrees`, name, 'agent-2')
-    git(p, 'worktree', 'add', '-q', '-b', 'hive/agent-2', tree, 'main')
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a2', name: 'Agent 2', worktree: { path: tree, branch: 'hive/agent-2', base: 'main' } }] }))
+    git(p, 'worktree', 'add', '-q', '-b', 'cw/agent-2', tree, 'main')
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a2', name: 'Agent 2', worktree: { path: tree, branch: 'cw/agent-2', base: 'main' } }] }))
     return { p, tree }
   }
   beforeEach(async () => {
     wsPath = newWorkspacePath('ws-faults')
-    mkdirSync(join(wsPath, '.hive', 'shared', 'handovers'), { recursive: true })
+    mkdirSync(join(wsPath, '.combwork', 'shared', 'handovers'), { recursive: true })
     w = await open(wsPath)
   })
   afterEach(async () => disposeWorkspaceService(w))
@@ -1688,7 +1688,7 @@ describe('removal and board under faults', () => {
     const unrelated = `${wsPath}-unrelated-folder`
     mkdirSync(unrelated, { recursive: true })
     writeFileSync(join(unrelated, 'keep.txt'), 'not yours')
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a9', name: 'Odd', worktree: { path: unrelated, branch: 'x', base: 'main' } }] }))
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a9', name: 'Odd', worktree: { path: unrelated, branch: 'x', base: 'main' } }] }))
     await w.refresh()
     const r = await run(() => removal.removeProject(p, 'delete'))
     expect(existsSync(p)).toBe(false)
@@ -1713,7 +1713,7 @@ describe('removal and board under faults', () => {
       shell.trashItem = trash
     }
     expect(existsSync(p)).toBe(true)
-    expect(existsSync(join(wsPath, '.hive', 'shared', 'handovers', '2026-10-01-locked-notes.md'))).toBe(true)
+    expect(existsSync(join(wsPath, '.combwork', 'shared', 'handovers', '2026-10-01-locked-notes.md'))).toBe(true)
     expect((await run(() => tasks.getTask(c.number))).title).toBe('Stays')
     expect(await names()).toContain('locked')
   })
@@ -1741,7 +1741,7 @@ describe('removal and board under faults', () => {
     await w.projectIds({ fresh: true })
     expect((await run(() => removal.removalInfo(p))).handovers).toEqual([])
     await run(() => removal.removeProject(p, 'delete'))
-    expect(existsSync(join(wsPath, '.hive', 'shared', 'handovers', '2026-10-01-baz-qux-old-plan.md'))).toBe(true)
+    expect(existsSync(join(wsPath, '.combwork', 'shared', 'handovers', '2026-10-01-baz-qux-old-plan.md'))).toBe(true)
   })
 
   it('restores a packed handover beside a different note that took its name', async () => {
@@ -1750,10 +1750,10 @@ describe('removal and board under faults', () => {
     await w.refresh()
     await run(() => removal.removeProject(p, 'remove'))
     // Meanwhile another note gets the same name.
-    writeFileSync(join(wsPath, '.hive', 'shared', 'handovers', '2026-10-01-clash-plan.md'), '# A different plan\n\n- **Project:** clash\n')
+    writeFileSync(join(wsPath, '.combwork', 'shared', 'handovers', '2026-10-01-clash-plan.md'), '# A different plan\n\n- **Project:** clash\n')
     const r = await run(() => removal.restoreProject('clash'))
     expect(r.handovers).toBe(1)
-    const dirNow = join(wsPath, '.hive', 'shared', 'handovers')
+    const dirNow = join(wsPath, '.combwork', 'shared', 'handovers')
     expect(readFileSync(join(dirNow, '2026-10-01-clash-plan.md'), 'utf8')).toMatch(/A different plan/)
     expect(readFileSync(join(dirNow, '2026-10-01-clash-plan-restored.md'), 'utf8')).toMatch(/Body/)
   })
@@ -1854,9 +1854,9 @@ describe('removal and board under faults', () => {
         expect([started.card.column, started.card.agent]).toEqual(['doing', 'r1'])
         expect(started.card.history.at(-1)).toMatchObject({ by: 'Assistant', what: 'Moved to Doing' })
         // Launched with its doorbell (#650), and the task, read from the agent's inbox, says what to do.
-        expect(prompts.at(-1)).toMatch(new RegExp(`^\\[Hive\\] New in your inbox: 1 task \\(#${c.number}\\) \\(m\\d+\\)\\. Call hive_inbox to read it, act on it, then ack it\\.$`))
+        expect(prompts.at(-1)).toMatch(new RegExp(`^\\[CW\\] New in your inbox: 1 task \\(#${c.number}\\) \\(m\\d+\\)\\. Call cw_inbox to read it, act on it, then ack it\\.$`))
         expect((await deliveries.deliveriesOf(join(wsPath, 'resumer'), 'r1')).at(-1)?.body).toMatch(
-          new RegExp(`^Work on task #${c.number} from the Hive task board: Back from ${from}\n\nIt was in ${from === 'review' ? 'Review' : 'Done'} and is back in Doing for more work\\.\n\nAddress the latest review comment\\.$`)
+          new RegExp(`^Work on task #${c.number} from the Combwork task board: Back from ${from}\n\nIt was in ${from === 'review' ? 'Review' : 'Done'} and is back in Doing for more work\\.\n\nAddress the latest review comment\\.$`)
         )
         // Its agent finishes: Review, whatever it came from.
         const finished = await run(() => tasks.updateTask(c.number, { column: 'review' }, r1))
@@ -2048,7 +2048,7 @@ describe('removal and board under faults', () => {
       // Its prompt has just gone in; the agent's hook hasn't said it's working yet: still refused.
       await expect(run(() => startTask(b.number, { kind: 'agent', agentId: 'o1' }, user))).rejects.toThrow(/being given another card/)
       expect(prompts.length).toBe(1)
-      expect(prompts[0]).toMatch(new RegExp(`^\\[Hive\\] New in your inbox: 1 task \\(#${a.number}\\) `))
+      expect(prompts[0]).toMatch(new RegExp(`^\\[CW\\] New in your inbox: 1 task \\(#${a.number}\\) `))
       const second = await run(() => tasks.getTask(b.number))
       expect([second.column, second.agent, second.history.length]).toEqual(['todo', null, 1])
     } finally {
@@ -2060,26 +2060,26 @@ describe('removal and board under faults', () => {
 describe('task prompt', () => {
   const card = { number: 7, title: 'Fix it', description: 'The details.', blockedBy: [], comments: [] } as unknown as import('../src/shared/types').TaskCard
   // A card's start in its own words (#1292, #966 row 30, Darren's choice: only the card's start has a raw variant).
-  it("in its own words: the card's title, the user's note and its description, nothing of Hive's", async () => {
+  it("in its own words: the card's title, the user's note and its description, nothing of Combwork's", async () => {
     const { rawTaskPrompt } = await import('../src/shared/tasks')
     expect(rawTaskPrompt(card)).toBe('Fix it\n\nThe details.')
     expect(rawTaskPrompt(card, '  Only the tests. ')).toBe('Fix it\n\nOnly the tests.\n\nThe details.')
     expect(rawTaskPrompt({ title: ' Fix it ', description: '' }, ' ')).toBe('Fix it')
     const raw = rawTaskPrompt({ ...card, blockedBy: [3], context: ['docs/A.md'], comments: [{ at: '2026-10-01T10:00:00Z', by: 'You', text: 'x' }] } as never)
-    expect(raw).not.toMatch(/Hive task board|work-on-card|depends on|Read these first|hive_read_task/)
+    expect(raw).not.toMatch(/Combwork task board|work-on-card|depends on|Read these first|cw_read_task/)
   })
 
   it('says when a card is back for more work, and puts the note before the card', async () => {
     const { taskPrompt } = await import('../src/shared/tasks')
-    expect(taskPrompt(card, false)).toBe('Work on task #7 from the Hive task board: Fix it\n\nThe details.')
-    expect(taskPrompt(card, false, { from: 'todo', note: ' ' })).toBe('Work on task #7 from the Hive task board: Fix it\n\nThe details.')
+    expect(taskPrompt(card, false)).toBe('Work on task #7 from the Combwork task board: Fix it\n\nThe details.')
+    expect(taskPrompt(card, false, { from: 'todo', note: ' ' })).toBe('Work on task #7 from the Combwork task board: Fix it\n\nThe details.')
     expect(taskPrompt(card, false, { from: 'done', note: 'Only the tests.' })).toBe(
-      'Work on task #7 from the Hive task board: Fix it\n\nIt was in Done and is back in Doing for more work.\n\nOnly the tests.\n\nThe details.'
+      'Work on task #7 from the Combwork task board: Fix it\n\nIt was in Done and is back in Doing for more work.\n\nOnly the tests.\n\nThe details.'
     )
-    // With Hive's tools: the work-on-card skill says how to carry it through, and the comments are a read away.
-    expect(taskPrompt(card, true)).toBe('Work on task #7 from the Hive task board: Fix it\n\nThe details.\n\nUse the work-on-card skill.')
+    // With Combwork's tools: the work-on-card skill says how to carry it through, and the comments are a read away.
+    expect(taskPrompt(card, true)).toBe('Work on task #7 from the Combwork task board: Fix it\n\nThe details.\n\nUse the work-on-card skill.')
     const commented = { ...card, comments: [{ at: '2026-10-01T10:00:00Z', by: 'You', text: 'First thoughts.' }, { at: '2026-10-02T10:00:00Z', by: 'Reviewer (alpha)', text: 'Failed: the redirect loops.' }] }
-    expect(taskPrompt(commented, true)).toMatch(/The card has 2 comments: read them with hive_read_task\.$/)
+    expect(taskPrompt(commented, true)).toMatch(/The card has 2 comments: read them with cw_read_task\.$/)
     expect(taskPrompt(commented, true)).not.toContain('redirect loops')
   })
 
@@ -2090,16 +2090,16 @@ describe('task prompt', () => {
     expect(text.indexOf('Fix what the review found.')).toBeLessThan(text.indexOf('The details.'))
     expect(text).toContain('Its latest comment (Reviewer (alpha), 2026-10-02):\n\nFailed: the redirect loops.')
     expect(text).not.toContain('First thoughts.')
-    expect(text).toMatch(/read the rest with hive_read_task/)
+    expect(text).toMatch(/read the rest with cw_read_task/)
     // Without tools it still has the card and the feedback; a long comment is cut, saying so.
     const long = { ...back, comments: [{ at: '2026-10-02T10:00:00Z', by: 'You', text: 'x'.repeat(5000) }] }
-    expect(taskPrompt(long, false, { from: 'done' })).toMatch(/x{4000}… \(cut short: hive_read_task has it all\)$/)
+    expect(taskPrompt(long, false, { from: 'done' })).toMatch(/x{4000}… \(cut short: cw_read_task has it all\)$/)
   })
 
   // HI-2047 (HI-2009's K10): a running lane's builder is pointed at card-loop, not at work-on-card as well.
   it("names card-loop for a running lane's builder, work-on-card elsewhere", async () => {
     const { taskPrompt } = await import('../src/shared/tasks')
-    expect(taskPrompt(card, true, { inLane: true })).toBe("Work on task #7 from the Hive task board: Fix it\n\nThe details.\n\nUse the card-loop skill as this lane's builder.")
+    expect(taskPrompt(card, true, { inLane: true })).toBe("Work on task #7 from the Combwork task board: Fix it\n\nThe details.\n\nUse the card-loop skill as this lane's builder.")
     expect(taskPrompt(card, true, { inLane: true })).not.toContain('work-on-card')
     expect(taskPrompt(card, true, { inLane: false })).toMatch(/Use the work-on-card skill\.$/)
     expect(taskPrompt(card, false, { inLane: true })).not.toMatch(/card-loop|work-on-card/)
@@ -2181,7 +2181,7 @@ describe("an agent's cards on its session", () => {
       { number: 1, title: 'Inbox' },
       { number: c.number, title: 'Third' }
     ])
-    // A session Hive hasn't recorded isn't created.
+    // A session Combwork hasn't recorded isn't created.
     await recordCards(w, alpha, 'a1', 'unknown')
     expect((await w.sessionsFile(alpha)).sessions.some((s) => s.id === 'unknown')).toBe(false)
   })

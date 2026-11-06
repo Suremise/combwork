@@ -1,0 +1,358 @@
+{
+  "inbox.ack.acked": {
+    "text": "Acked {ids}.",
+    "note": "cw_inbox ack's reply: what it acked. ids: their ids (\"m12, m14\")."
+  },
+  "inbox.ack.none": {
+    "text": "Nothing acked.",
+    "note": "cw_inbox ack's reply when none of the ids was acked."
+  },
+  "inbox.ack.notReadBefore": {
+    "text": "Not read before: {ids}, not acked: ack {n, plural, one {it} other {them}} once you have acted on {n, plural, one {it} other {them}}.",
+    "note": "In cw_inbox ack's reply with read: true (#1531): ids it was asked to ack that the agent hadn't read, now in the read that follows. ids: their ids; n: how many."
+  },
+  "inbox.ack.notReadYet": {
+    "text": "Not read yet: {ids}: read {n, plural, one {it} other {them}} with cw_inbox first.",
+    "note": "In cw_inbox ack's reply: ids it was asked to ack that the agent hasn't read. ids: their ids; n: how many."
+  },
+  "inbox.ack.unknown": {
+    "text": "Not in your inbox: {ids}.",
+    "note": "In cw_inbox ack's reply: ids it was asked to ack that aren't the agent's deliveries. ids: those ids."
+  },
+  "inbox.again.launch": {
+    "text": "its session ended or restarted before it was read",
+    "note": "Why a delivery may repeat (#649), after the doorbell (inbox.offer.again), and in why it is uncertain (inbox.ended.uncertain)."
+  },
+  "inbox.again.restart": {
+    "text": "Combwork restarted while offering it",
+    "note": "Why a delivery may repeat (#649), after the doorbell (inbox.offer.again): Combwork stopped while it was being offered."
+  },
+  "inbox.again.typing": {
+    "text": "Combwork restarted while typing it",
+    "note": "Why a watch's wake may repeat (#649), after the doorbell (inbox.offer.again): Combwork stopped while typing it."
+  },
+  "inbox.cardEvents.counted": {
+    "text": "{n, plural, one {{count} change} other {{count} changes}}, read the card",
+    "note": "A card's events in one inbox item, counted (several changes to a watched card since the agent last read its inbox). n and count: how many."
+  },
+  "inbox.cardEvents.withMore": {
+    "text": "{body} (with {more} more {n, plural, one {change} other {changes}}: read the card)",
+    "note": "A card's events in one inbox item, led by the merge queue's return of the card while only comments came after it (HI-2087). body: the return's own line; n and more: how many events came after it."
+  },
+  "inbox.carried.notice": {
+    "text": "Your earlier conversation read {n, plural, one {a message} other {# messages}} it never acked ({ids}). cw_inbox shows {n, plural, one {it} other {them}} again now: act on {n, plural, one {it} other {them}}, then ack {n, plural, one {it} other {them}}.",
+    "note": "HI-2463: a conversation from before the rename started fresh; what the earlier one had received and not acked is shown again in the new one. After \"[CW] \". n: how many; ids: their delivery ids (\"m3, m7\")."
+  },
+  "inbox.create.badKey": {
+    "text": "Not a delivery Combwork can keep: its source or key is too long.",
+    "note": "Why a delivery isn't made: what names its producer is too long to keep."
+  },
+  "inbox.create.full": {
+    "text": "This project's deliveries are full (what waits for its agents and isn't acked): wait until they are received and acked, or cancel some.",
+    "note": "Why a delivery isn't made: its project's deliveries are full (the file's budget)."
+  },
+  "inbox.create.notSent": {
+    "text": "Not sent: {why}.",
+    "note": "Why a delivery the Assistant left is refused when it is made. why: inbox.refused.controlDown or .assistantEnded."
+  },
+  "inbox.create.projectFull": {
+    "text": "This project already has {max} deliveries waiting or not acked, the most Combwork keeps.",
+    "note": "Why a delivery isn't made: its project has as many live deliveries as Combwork keeps. max: that many."
+  },
+  "inbox.create.tooLong": {
+    "text": "It is too long to give an agent ({length} characters, at most {max}).",
+    "note": "Why a delivery isn't made: its text is too long. length: its length; max: the most a delivery holds."
+  },
+  "inbox.decisionEnded.agentGone": {
+    "text": "its agent has gone",
+    "note": "Why a line of new decisions was cancelled just before it was given: its agent was removed from the project."
+  },
+  "inbox.decisionEnded.nothingNew": {
+    "text": "nothing new to tell",
+    "note": "Why a line of new decisions was cancelled just before it was given: the agent has read them meanwhile, or its watch tells them."
+  },
+  "inbox.decisionEnded.workspaceClosed": {
+    "text": "its workspace was closed",
+    "note": "Why a line of new decisions (#401, a delivery) was cancelled just before it was given: its workspace closed."
+  },
+  "inbox.ended.cancelledBy": {
+    "text": "cancelled by {by}",
+    "note": "Why a delivery was cancelled, as its sender reads it. by: who cancelled it (the user, an agent by name)."
+  },
+  "inbox.ended.doorbellLost": {
+    "text": "its doorbell was lost before its CLI took it",
+    "note": "Why a delivery waits again, as its sender reads it: the line typed into its agent was lost before its CLI took it; it rings once more."
+  },
+  "inbox.ended.notAcked": {
+    "text": "received, never acked",
+    "note": "Why a delivery expired, as its sender reads it: its agent read it and never acked it."
+  },
+  "inbox.ended.notWanted": {
+    "text": "cancelled: no longer wanted",
+    "note": "Why a delivery was cancelled, as its sender reads it: what made it (its producer) no longer wants it given (#649)."
+  },
+  "inbox.ended.replaced": {
+    "text": "replaced by a newer one",
+    "note": "Why a delivery was cancelled, as its sender reads it: an action's newer delivery replaced it."
+  },
+  "inbox.ended.tooLong": {
+    "text": "cancelled: made again, it was too long to keep",
+    "note": "Why a delivery was cancelled, as its sender reads it: made again from its source just before it was given, it was too long (#649)."
+  },
+  "inbox.ended.uncertain": {
+    "text": "may not have reached it: {why}",
+    "note": "Why a delivery is uncertain (#649), as its sender reads it; it is offered once more. why: inbox.again.launch."
+  },
+  "inbox.ended.uncertainRestart": {
+    "text": "may not have reached it: Combwork stopped while offering it",
+    "note": "Why a delivery is uncertain (#649), as its sender reads it: Combwork stopped while it was being offered; it is offered once more."
+  },
+  "inbox.expired.late": {
+    "text": "not received in time",
+    "note": "Why a delivery expired, as its sender reads it: not read before its expiry."
+  },
+  "inbox.expired.otherConversation": {
+    "text": "its agent is in another conversation now",
+    "note": "Why a delivery for one conversation of its agent expired, as its sender reads it."
+  },
+  "inbox.expired.sessionEnded": {
+    "text": "the session it was for has ended",
+    "note": "Why a delivery for one launch of its agent expired, as its sender reads it."
+  },
+  "inbox.given.changed": {
+    "text": "what it was for changed meanwhile",
+    "note": "Why a delivery wanted now (a task, a handover's step) wasn't given: its caller no longer wants it."
+  },
+  "inbox.given.notTyped": {
+    "text": "Combwork could not type it",
+    "note": "Why a delivery wanted now (a task, a handover's step) wasn't given, when nothing more is known."
+  },
+  "inbox.load.failed": {
+    "text": "Could not read the deliveries ({error})",
+    "note": "Why a project's deliveries couldn't be read, from its file from before #1018. error: the system's error."
+  },
+  "inbox.loopEnded.notDue": {
+    "text": "no longer due",
+    "note": "Why a loop wake was cancelled just before it was given: the card moved on, the agent acted on it, or its own watch told it (#578)."
+  },
+  "inbox.loopEnded.otherAgent": {
+    "text": "it is another agent's wake now",
+    "note": "Why a loop wake was cancelled just before it was given: the card's roles changed (another reviewer), and that agent gets it instead."
+  },
+  "inbox.loopEnded.projectClosed": {
+    "text": "its project is no longer open",
+    "note": "Why a loop wake was cancelled just before it was given: its workspace closed, or its window opened another."
+  },
+  "inbox.loopEnded.unreadable": {
+    "text": "not a loop wake Combwork can read",
+    "note": "Why a loop wake (#405, a delivery) was cancelled just before it was given: what it was made from can't be read back."
+  },
+  "inbox.message.noText": {
+    "text": "text is required",
+    "note": "A message left for an agent refused: its text (the tool's argument, text) is empty."
+  },
+  "inbox.message.notRunning": {
+    "text": "{agent} isn't running.",
+    "note": "#530: a message left for an agent (cw_message_agent) refused: the agent isn't running. agent: its name."
+  },
+  "inbox.message.tooLong": {
+    "text": "A message is at most {max} characters (this one has {n}).",
+    "note": "A message left for an agent refused: too long. max: the most; n: its length."
+  },
+  "inbox.message.tooMany": {
+    "text": "{agent} already has {max} messages waiting, the most Combwork keeps for an agent: wait until they are delivered (cw_agent_activity), or cancel them.",
+    "note": "A message left for an agent refused: as many as Combwork keeps for it already wait. agent: its name; max: how many."
+  },
+  "inbox.noLine.cliAsks": {
+    "text": "its CLI shows a question for the user, which a line would answer",
+    "note": "Why Combwork could not type a line into an agent now (HI-1959), in the reply of the call that wanted it."
+  },
+  "inbox.noLine.folder": {
+    "text": "its folder is being changed ({what})",
+    "note": "Why Combwork could not type a line into an agent now (#646), in the reply of the call that wanted it. what: what is changing the agent's folder (a Git switch or pull)."
+  },
+  "inbox.noLine.hooksMissing": {
+    "text": "its CLI's hooks aren't reaching Combwork, so Combwork can't tell when it is free",
+    "note": "Why Combwork could not type a line into an agent now, in the reply of the call that wanted it."
+  },
+  "inbox.noLine.inputBlocked": {
+    "text": "something on its screen is taking its keys, and it waits for the user to answer it there",
+    "note": "Why Combwork could not type a line into an agent now (HI-2191), in the reply of the call that wanted it."
+  },
+  "inbox.noLine.launchTask": {
+    "text": "its CLI hasn't taken its launch's task yet",
+    "note": "Why Combwork could not type a line into an agent now, in the reply of the call that wanted it."
+  },
+  "inbox.noLine.lineWaiting": {
+    "text": "its CLI hasn't taken the line Combwork typed before",
+    "note": "Why Combwork could not type a line into an agent now, in the reply of the call that wanted it."
+  },
+  "inbox.noLine.notRunning": {
+    "text": "it isn't running",
+    "note": "Why Combwork could not type a line (a delivery given now, Deliver Now) into an agent, in the reply of the call that wanted it: the agent named."
+  },
+  "inbox.noLine.status": {
+    "text": "it is {status}",
+    "note": "Why Combwork could not type a line into an agent now, in the reply of the call that wanted it. status: the agent's status, as Combwork names it (working, starting…)."
+  },
+  "inbox.noLine.toolsWaiting": {
+    "text": "its Combwork tools haven't connected yet",
+    "note": "Why Combwork could not type a line into an agent now (#865), in the reply of the call that wanted it."
+  },
+  "inbox.noLine.typing": {
+    "text": "Combwork is already typing a line into it",
+    "note": "Why Combwork could not type a line into an agent now, in the reply of the call that wanted it."
+  },
+  "inbox.noLine.userTyping": {
+    "text": "the user has just typed in its terminal and may still be writing there",
+    "note": "Why Combwork could not type a line into an agent now, in the reply of the call that wanted it."
+  },
+  "inbox.noLine.wakeFirst": {
+    "text": "a watch's wake goes first",
+    "note": "Why Combwork could not type a line into an agent now (#1432): a watch's wake is being made for it, in the reply of the call that wanted it."
+  },
+  "inbox.noLine.watching": {
+    "text": "it is waiting on cards, and takes no new work until it is woken",
+    "note": "Why Combwork could not type a line into an agent now: it waits on a watch, in the reply of the call that wanted it."
+  },
+  "inbox.offer.again": {
+    "text": "({ids} again: {why}, so {n, plural, one {it} other {they}} may repeat.)",
+    "note": "After the doorbell: deliveries offered again, which the agent may have seen before. ids: their ids (\"m12, m14\"); why: why each is offered again, joined by \"; \" (inbox.again.*); n: how many."
+  },
+  "inbox.offer.watchOn": {
+    "text": "(Your watch is still on, {watch}: do what this asks, then end your turn, and Combwork wakes you when it changes.)",
+    "note": "After the doorbell, typed into an agent waiting on a watch: its watch carries on. watch: the watch's label, its first letter in lower case (\"waiting on HI-12\")."
+  },
+  "inbox.read.ackEach": {
+    "text": "Ack each with cw_inbox (ack: its ids) once you have acted on it.",
+    "note": "cw_inbox's last line, after what is new."
+  },
+  "inbox.read.newCount": {
+    "text": "{count} new:",
+    "note": "cw_inbox's first line, before one line per item (ids · sender · card: text). count: how many items."
+  },
+  "inbox.read.nothingNew": {
+    "text": "Nothing new.",
+    "note": "cw_inbox's reply when nothing is unread (before inbox.read.older, if any)."
+  },
+  "inbox.read.older": {
+    "text": "Received before, not acked yet: {ids}.",
+    "note": "In cw_inbox's reply: deliveries the agent read before and has not acked. ids: their ids (\"m12, m14\")."
+  },
+  "inbox.refused.assistantEnded": {
+    "text": "the Assistant's session that left it ended",
+    "note": "Why a delivery the Assistant left was refused, as its sender reads it."
+  },
+  "inbox.refused.controlDown": {
+    "text": "the user turned Settings → Assistant → Control down",
+    "note": "Why a delivery the Assistant left was refused, as its sender reads it: Control no longer lets it message agents."
+  },
+  "inbox.refused.noInbox": {
+    "text": "{name} has no inbox: turn on the Agent API",
+    "note": "Why an agent that can't read an inbox is given no delivery (#650's decision), as its sender sees it. name: the agent's name."
+  },
+  "inbox.relay.check": {
+    "text": "For you to check: {said} If it grants a change {asker} can't make itself (Done past its rules, no code, skipping its review), make it, within any conditions it sets, with the answer as the reason; otherwise nothing is needed.",
+    "note": "The Assistant's line when the user answered or approved an agent's question and nothing on the card says what is needed (HI-1734): Combwork never reads consent into a reply. said: what the user did (inbox.relay.said); asker: the asking agent's name."
+  },
+  "inbox.relay.decision": {
+    "text": "Recorded as the card's decision, whole: <<<{decision}>>>",
+    "note": "In the Assistant's line for the user's answer to an agent's question (HI-1734): the decision recorded on the card, never cut. After the reply (inbox.relay.reply), joined by \". \"."
+  },
+  "inbox.relay.declined": {
+    "text": "For your information: {said} The user declined: nothing is to be done for it.",
+    "note": "The Assistant's line when the user declined an agent's question (HI-1734): never worded as a grant. said: what the user did (inbox.relay.said)."
+  },
+  "inbox.relay.needed": {
+    "text": "This needs you: {said} {asker} can't {need, select, done {move it to Done} noCode {make it no code} unblock {unblock it} other {skip its review}} by itself. {outcome, select, approved {Their approval is a yes, within any conditions its reply sets} other {Do it only if the answer agrees, within any conditions it sets}}, with the answer as the reason (cw_update_task).",
+    "note": "The Assistant's line when the user answered or approved an agent's question on a card that needs what only the Assistant or the user can do (HI-1734). said: what the user did (inbox.relay.said); asker: the asking agent's name; need: done, noCode, unblock or skipReview; outcome: approved or answered."
+  },
+  "inbox.relay.reply": {
+    "text": "Their reply, whole: <<<{reply}>>>",
+    "note": "In the Assistant's line for the user's answer to an agent's question (HI-1734): the user's reply, never cut (a condition at its end must reach whoever acts on it)."
+  },
+  "inbox.relay.replyIsDecision": {
+    "text": "Their reply, whole, recorded as the card's decision too: <<<{reply}>>>",
+    "note": "In the Assistant's line for the user's answer to an agent's question: an approval's note, which is its reply and the card's decision too, said once (HI-2286)."
+  },
+  "inbox.relay.said": {
+    "text": "the user {outcome, select, approved {approved} declined {declined} other {answered}} {asker}'s question on {card}. The question, whole: <<<{question}>>>.{wrote, select, yes { {words}.} answered {} other { Nothing was written with it.}} (Both stay on the card: cw_read_task {card}.)",
+    "note": "What the user did with an agent's question, in the Assistant's line (HI-1734), after its opening (inbox.relay.declined, .needed, .check). asker: the asking agent's name; card: its card (HI-12); question: the question, whole; wrote: yes with words (the reply and decision: inbox.relay.reply, .decision), answered for an answer with none, no for a bare approval or decline."
+  },
+  "inbox.renamedNote": {
+    "text": "(Combwork has renamed the tools and commands agents use since this was written: its tools are cw_<tool> (mcp__{server}__cw_<tool> in full), and its progress command is cw-progress.)",
+    "note": "HI-2463, HI-2598, HI-2611: added once, by the names upgrade, after a stored line or message from Combwork that names an old tool or command outside what it quotes (one written before the rename). Its words are kept as written (they may be a person's or an agent's): this points at the current names, without listing the old ones. server: Combwork's MCP server's name."
+  },
+  "inbox.round.noCard": {
+    "text": "There is no card {card}.",
+    "note": "Why a message tied to a card's round (#652) isn't made. card: the card asked for (HI-12)."
+  },
+  "inbox.round.notInRound": {
+    "text": "{why}: a message tied to its round needs it in Doing or Review.",
+    "note": "Why a message tied to a card's round (#652) isn't made. why: why the card has no round under way (inbox.stale.*)."
+  },
+  "inbox.round.unreadable": {
+    "text": "Combwork couldn't read {card} now.",
+    "note": "Why a message tied to a card's round (#652) isn't made: the card can't be read now (its workspace closed). card: the card (HI-12)."
+  },
+  "inbox.save.dbReplaced": {
+    "text": "the workspace's database was replaced since these deliveries were read",
+    "note": "Why the deliveries couldn't be saved, in inbox.save.failed: an upgrade or a restore replaced the database."
+  },
+  "inbox.save.failed": {
+    "text": "Combwork couldn't save the deliveries ({error}): nothing changed.",
+    "note": "Why a change to deliveries (a message, a read, an ack, a cancel) failed. error: why the save failed (inbox.save.tooMany, .dbReplaced, or a system error)."
+  },
+  "inbox.save.tooMany": {
+    "text": "too many deliveries to keep in this project",
+    "note": "Why the deliveries couldn't be saved, in inbox.save.failed."
+  },
+  "inbox.stale.archived": {
+    "text": "{card} was archived",
+    "note": "Why a delivery tied to a card's round is stale (#652). card: the card (HI-12)."
+  },
+  "inbox.stale.done": {
+    "text": "{card} is done",
+    "note": "Why a delivery tied to a card's round is stale (#652). card: the card (HI-12)."
+  },
+  "inbox.stale.gone": {
+    "text": "{card} is gone",
+    "note": "Why a delivery tied to a card's round is stale (#652), as its sender reads it. card: the card (HI-12)."
+  },
+  "inbox.stale.left": {
+    "text": "{card} left Doing and Review",
+    "note": "Why a delivery tied to a card's round is stale (#652). card: the card (HI-12)."
+  },
+  "inbox.stale.passed": {
+    "text": "{card} passed review",
+    "note": "Why a delivery tied to a card's round is stale (#652). card: the card (HI-12)."
+  },
+  "inbox.stale.round": {
+    "text": "{card} is in round {round} now",
+    "note": "Why a delivery tied to a card's round is stale (#652): the card has moved to a later round. card: the card (HI-12); round: its round now."
+  },
+  "inbox.watchEnded.cancelled": {
+    "text": "cancelled: {why}",
+    "note": "Why a watch's wake (a delivery) was cancelled, as its record says it. why: inbox.watchEnded.*, or why the watch was ended (the log's words)."
+  },
+  "inbox.watchEnded.ended": {
+    "text": "its watch has ended",
+    "note": "Why a watch's wake was cancelled just before it was given: its watch has ended meanwhile."
+  },
+  "inbox.watchEnded.notSaved": {
+    "text": "cancelled: its watch couldn't be saved",
+    "note": "Why a watch's wake was cancelled as it was handed over: the watch could not be saved with it (it fires again)."
+  },
+  "inbox.watchEnded.replaced": {
+    "text": "its watch was replaced",
+    "note": "Why a watch's wake was cancelled: the agent set another watch (in inbox.watchEnded.cancelled)."
+  },
+  "inbox.watchEnded.repliesOff": {
+    "text": "the user's replies are no longer told",
+    "note": "#418, #1099: why a wake telling the Assistant a reply of the user's to an agent was cancelled: Settings → Assistant → Tell the Assistant when I reply to an agent was turned off."
+  },
+  "inbox.watchEnded.watchCancelled": {
+    "text": "its watch was cancelled",
+    "note": "Why a watch's wake was cancelled: the agent or the user cancelled the watch (in inbox.watchEnded.cancelled)."
+  }
+}

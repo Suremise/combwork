@@ -1,5 +1,5 @@
-// Hive's icon sizes don't change when an editor first loads Monaco's stylesheet (its Codicons base rule, the same as
-// the one Hive bundles, sets every icon to 16px). Each way Monaco first loads gets a fresh app: a Markdown preview
+// Combwork's icon sizes don't change when an editor first loads Monaco's stylesheet (its Codicons base rule, the same as
+// the one Combwork bundles, sets every icon to 16px). Each way Monaco first loads gets a fresh app: a Markdown preview
 // colouring a code block, the Changes tab's diff editor, and the Files tab's source editor. The activity bar's icons
 // stay 24px and other shell icons keep their sizes, before, while the editor shows and after leaving it, again and
 // again, in both themes, and they scale with the UI zoom; Monaco's own icons keep theirs. Dev build, throwaway
@@ -36,13 +36,13 @@ const SHELL = [
 async function launch(name) {
   const userData = path.join(lib.WORK, `icons-profile-${name}`)
   fs.rmSync(userData, { recursive: true, force: true })
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47896), HIVE_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47896), CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check(`${name}: no page errors`, false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 860 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('demo', { exact: true }).first().click()
   await lib.sleep(500)

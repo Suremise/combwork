@@ -1,0 +1,142 @@
+{
+  "mode.claude.acceptEdits.desc": {
+    "text": "Makes file edits in the working folder without asking; still asks before shell commands.",
+    "note": "What Claude Code's permission mode acceptEdits does, as agents and the Agent API read it (the window has its own message)."
+  },
+  "mode.claude.acceptEdits.label": {
+    "text": "Accept edits",
+    "note": "Claude Code's permission mode acceptEdits: its name, as agents and the Agent API read it (the window has its own message)."
+  },
+  "mode.claude.auto.desc": {
+    "text": "A safety classifier approves low-risk actions itself and only asks about risky ones.",
+    "note": "What Claude Code's permission mode auto does, as agents and the Agent API read it (the window has its own message)."
+  },
+  "mode.claude.auto.label": {
+    "text": "Auto",
+    "note": "Claude Code's permission mode auto: its name, as agents and the Agent API read it (the window has its own message)."
+  },
+  "mode.claude.autoMaybe": {
+    "text": "Claude Code may not offer Auto with {model}. If it doesn't, it runs in Manual (asking before edits and commands), and Combwork shows that mode.",
+    "note": "Without Claude Code's word on this model (model: its name), the guess from 2.1.286: Haiku doesn't run in Auto. Auto and Manual are the modes' names."
+  },
+  "mode.claude.autoUnsupported": {
+    "text": "Claude Code doesn't offer Auto with {model}: it runs in Manual instead (asking before edits and commands), and Combwork shows that mode.",
+    "note": "Claude Code said it won't run this model (model: its name) in Auto (its initialize reply, #129). Auto and Manual are the modes' names."
+  },
+  "mode.claude.bypassPermissions.desc": {
+    "text": "Never asks and allows everything — any edit, command or network call. Use only in disposable environments.",
+    "note": "What Claude Code's permission mode bypassPermissions does, as agents and the Agent API read it (the window has its own message)."
+  },
+  "mode.claude.bypassPermissions.label": {
+    "text": "Bypass permissions",
+    "note": "Claude Code's permission mode bypassPermissions: its name, as agents and the Agent API read it (the window has its own message)."
+  },
+  "mode.claude.dontAsk.desc": {
+    "text": "Never prompts. Anything not pre-approved is refused instead of asked about.",
+    "note": "What Claude Code's permission mode dontAsk does, as agents and the Agent API read it (the window has its own message)."
+  },
+  "mode.claude.dontAsk.label": {
+    "text": "Don't ask",
+    "note": "Claude Code's permission mode dontAsk: its name, as agents and the Agent API read it (the window has its own message)."
+  },
+  "mode.claude.manual.desc": {
+    "text": "Asks before file edits and shell commands unless you have pre-approved them.",
+    "note": "What Claude Code's permission mode manual does, as agents and the Agent API read it (the window has its own message)."
+  },
+  "mode.claude.manual.label": {
+    "text": "Manual",
+    "note": "Claude Code's permission mode manual: its name, as agents and the Agent API read it (the window has its own message)."
+  },
+  "mode.claude.plan.desc": {
+    "text": "Read-only: explores and proposes a plan, changes nothing until you approve.",
+    "note": "What Claude Code's permission mode plan does, as agents and the Agent API read it (the window has its own message)."
+  },
+  "mode.claude.plan.label": {
+    "text": "Plan",
+    "note": "Claude Code's permission mode plan: its name, as agents and the Agent API read it (the window has its own message)."
+  },
+  "mode.cliOwn.cliNote": {
+    "text": "Combwork passed no mode, so the CLI's own screen shows the one it is in.",
+    "note": "The CLI's own setting: why the CLI's own screen names the mode, not Combwork (shown with Combwork's mode badge while a session runs in it)."
+  },
+  "mode.cliOwn.desc": {
+    "text": "Combwork passes no permission mode: the CLI starts in the mode its own config sets, or its default. Combwork can't switch it in a running session.",
+    "note": "What the CLI's own setting (Combwork passes no mode) does, as agents and the Agent API read it (the window has its own message)."
+  },
+  "mode.cliOwn.label": {
+    "text": "The CLI's own setting",
+    "note": "The CLI's own setting, a permission choice every CLI offers (Combwork passes no mode): its name, as agents and the Agent API read it (the window has its own message)."
+  },
+  "mode.cliOwn.short": {
+    "text": "CLI's own",
+    "note": "The CLI's own setting: its short name, on its badge."
+  },
+  "mode.codex.approveForMe.desc": {
+    "text": "An automatic reviewer approves safe actions itself and only asks about ones it thinks are risky.",
+    "note": "What Codex's permission mode approve-for-me does, as agents and the Agent API read it (the window has its own message)."
+  },
+  "mode.codex.ask.desc": {
+    "text": "Reads and edits workspace files and runs commands in its sandbox; asks before internet access or edits outside the workspace.",
+    "note": "What Codex's permission mode ask does, as agents and the Agent API read it (the window has its own message)."
+  },
+  "mode.codex.fullAccess.desc": {
+    "text": "No sandbox and no approvals: edits anything and uses the internet without asking. Use only in disposable environments.",
+    "note": "What Codex's permission mode full-access does, as agents and the Agent API read it (the window has its own message)."
+  },
+  "mode.codex.fullAccess.label": {
+    "text": "Full access",
+    "note": "Codex's permission mode full-access: its name, as agents and the Agent API read it (the window has its own message)."
+  },
+  "mode.codex.readOnly.desc": {
+    "text": "Reads workspace files; asks before any edit or internet access.",
+    "note": "What Codex's permission mode read-only does, as agents and the Agent API read it (the window has its own message)."
+  },
+  "mode.codex.readOnly.label": {
+    "text": "Read only",
+    "note": "Codex's permission mode read-only: its name, as agents and the Agent API read it (the window has its own message)."
+  },
+  "mode.copilot.acceptEdits.cliNote": {
+    "text": "Copilot’s own footer still says Manual Approval: Combwork starts it with edits in its folder approved (an allow rule), which Copilot’s label doesn’t show.",
+    "note": "GitHub Copilot's permission mode accept-edits: why the CLI's own screen names another mode (shown with Combwork's mode badge while a session runs in it)."
+  },
+  "mode.copilot.acceptEdits.desc": {
+    "text": "Edits files in its folder without asking (not where the folder’s path has parentheses: Copilot can’t approve them there); still asks before other commands, other MCP tools, web access and changes outside its folder.",
+    "note": "What GitHub Copilot's permission mode accept-edits does, as agents and the Agent API read it (the window has its own message)."
+  },
+  "mode.copilot.acceptEdits.label": {
+    "text": "Accept edits",
+    "note": "GitHub Copilot's permission mode accept-edits: its name, as agents and the Agent API read it (the window has its own message)."
+  },
+  "mode.copilot.allowAll.desc": {
+    "text": "Approves every tool, path and web request without asking, in its folder and outside it.",
+    "note": "What GitHub Copilot's permission mode allow-all does, as agents and the Agent API read it (the window has its own message)."
+  },
+  "mode.copilot.allowAll.label": {
+    "text": "Allow all",
+    "note": "GitHub Copilot's permission mode allow-all: its name, as agents and the Agent API read it (the window has its own message)."
+  },
+  "mode.copilot.ask.desc": {
+    "text": "Reads files and runs harmless commands without asking; asks before edits, other commands, other MCP tools and web access.",
+    "note": "What GitHub Copilot's permission mode ask does, as agents and the Agent API read it (the window has its own message)."
+  },
+  "mode.copilot.ask.label": {
+    "text": "Ask",
+    "note": "GitHub Copilot's permission mode ask: its name, as agents and the Agent API read it (the window has its own message)."
+  },
+  "mode.copilot.autopilot.desc": {
+    "text": "Allow all, and it carries on by itself until the task is done (up to 5 continuations) without handing back to you. Once it has run, the session approves every tool, path and web request, also after you switch out of it. Use only where unattended changes are acceptable.",
+    "note": "What GitHub Copilot's permission mode autopilot does, as agents and the Agent API read it (the window has its own message)."
+  },
+  "mode.copilot.autopilot.label": {
+    "text": "Autopilot",
+    "note": "GitHub Copilot's permission mode autopilot: its name, as agents and the Agent API read it (the window has its own message)."
+  },
+  "mode.copilot.plan.desc": {
+    "text": "Plans the work and asks before changing anything.",
+    "note": "What GitHub Copilot's permission mode plan does, as agents and the Agent API read it (the window has its own message)."
+  },
+  "mode.copilot.plan.label": {
+    "text": "Plan",
+    "note": "GitHub Copilot's permission mode plan: its name, as agents and the Agent API read it (the window has its own message)."
+  }
+}

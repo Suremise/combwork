@@ -52,9 +52,9 @@ const chosen = () => run(() => sessions.leaseConversation(project, 'b1', 'l-card
 
 beforeAll(async () => {
   gitRepo(project)
-  commit(project, { '.gitignore': '.hive/\n', 'a.txt': 'a\n' }, 'first')
-  mkdirSync(join(project, '.hive'), { recursive: true })
-  const write = (id: string): void => writeFileSync(join(project, '.hive', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, id, agents: [{ id: 'b1', name: 'B1', provider: 'claude-code', workflowRole: 'builder' }] }))
+  commit(project, { '.gitignore': '.combwork/\n', 'a.txt': 'a\n' }, 'first')
+  mkdirSync(join(project, '.combwork'), { recursive: true })
+  const write = (id: string): void => writeFileSync(join(project, '.combwork', 'project.json'), JSON.stringify({ ...DEFAULT_PROJECT_CONFIG, id, agents: [{ id: 'b1', name: 'B1', provider: 'claude-code', workflowRole: 'builder' }] }))
   write('p1')
   await ws.open(wsPath)
   write((await ws.projectConfig(project)).id ?? 'p1')

@@ -1,0 +1,7 @@
+{
+  "prose|return|made a new worktree, leaving {}'s unused one as it is ({})": 1,
+  "prose|return|not checked": 1,
+  "prose|return|reused {} as it is (it keeps its work)": 1,
+  "prose|return|reused {}, already at {}": 1,
+  "prose|return|reused {}, brought up to {} at {}": 1
+}

@@ -1,5 +1,5 @@
 // Settings → Accounts & Connections (HI-980; HI-2107: the section's id still 'accounts'; on for everyone since HI-1774):
-// Add Account… makes the account's folder (its projects\ a junction to the CLI home's) and opens its sign-in in Hive's
+// Add Account… makes the account's folder (its projects\ a junction to the CLI home's) and opens its sign-in in Combwork's
 // terminal, nothing typed into it; once it ends, the row says who it is signed in as, and Set Up (HI-1826) runs the CLI
 // itself on the folder for its first-run screens. Turned on, it is this workspace's
 // default. A login changed in its folder while Settings is closed (as a /login in a pane would) is found by its watch
@@ -42,13 +42,13 @@ const check = (name, ok, extra = '') => {
   // Trust reads go ahead while this file is there; taken away, they wait (HI-1870: Checking… shown, for its screenshot).
   const trustGo = path.join(userData, 'trust-go')
   fs.writeFileSync(trustGo, '')
-  env.HIVE_TEST_HOLD_TRUST = trustGo
+  env.CW_TEST_HOLD_TRUST = trustGo
   fs.mkdirSync(path.dirname(conversation), { recursive: true })
   fs.writeFileSync(conversation, '{"kept":true}\n')
   // Each project with a Claude Code agent: "Needs set up" counts only projects a connection would be used in (HI-1871).
   const projectWithAgent = (dir) => {
-    fs.mkdirSync(path.join(dir, '.hive'), { recursive: true })
-    fs.writeFileSync(path.join(dir, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One', provider: 'claude-code' }] }))
+    fs.mkdirSync(path.join(dir, '.combwork'), { recursive: true })
+    fs.writeFileSync(path.join(dir, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One', provider: 'claude-code' }] }))
   }
   for (const w of [ws1, ws2]) projectWithAgent(path.join(w, 'alpha'))
   // `hold`: the fake's sign-in waits (for a browser that never comes) until its terminal is closed.
@@ -60,11 +60,11 @@ const check = (name, ok, extra = '') => {
   const { app, page } = await lib.launch({ userData, env, viewport: { width: 1400, height: 950 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
-    const invOn = (p) => (ch, ...a) => p.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const invOn = (p) => (ch, ...a) => p.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     const inv = invOn(page)
     await lib.openWorkspace(inv, page, ws1)
     const list = () => inv('connections:list')
-    const wsJson = (w) => JSON.parse(fs.readFileSync(path.join(w, '.hive', 'workspace.json'), 'utf8')).connections
+    const wsJson = (w) => JSON.parse(fs.readFileSync(path.join(w, '.combwork', 'workspace.json'), 'utf8')).connections
     const shots = async (name) => {
       while ((await page.locator('.toast').count()) > 0) await page.locator('.toast').first().locator('button').last().click()
       await page.mouse.move(5, 5)
@@ -138,13 +138,15 @@ const check = (name, ok, extra = '') => {
     check('Add Account… adds it', !!personal)
     const folder = personal ? path.join(accountsRoot, personal.id) : ''
     check('…its folder in the profile’s accounts folder, projects a junction to the CLI home’s', !!personal && fs.lstatSync(path.join(folder, 'projects')).isSymbolicLink() && fs.existsSync(path.join(folder, 'projects', 'C--work-alpha', 'kept.jsonl')))
-    check('…and opens its sign-in in a terminal of Hive’s', !!(await lib.until(async () => (await page.locator('.account-signin .task-terminal').count()) === 1, HUNG_MS)))
+    check('…and opens its sign-in in a terminal of Combwork’s', !!(await lib.until(async () => (await page.locator('.account-signin .task-terminal').count()) === 1, HUNG_MS)))
     const signed = await lib.until(async () => {
       const a = (await list()).connections.find((x) => x.id === personal?.id)
       return a?.accepted?.email === 'one@example.com' && a.observed?.loggedIn === true ? a : null
     }, HUNG_MS)
     check('once the sign-in ends, it is signed in as that login, taken on as its own', !!signed, JSON.stringify((await list()).connections))
-    check('…and its row says so', !!(await lib.until(async () => /Signed in/.test(await row('Personal').innerText().catch(() => '')) && /one@example\.com · max/.test(await row('Personal').innerText().catch(() => '')), HUNG_MS)))
+    // HI-2528: its card's fields, each in its own place: Signed in as, Plan (as the CLI names it, title-cased), State.
+    const fact = (name, which) => row(name).locator(`[data-fact="${which}"] .account-fact-value`).innerText().catch(() => '')
+    check('…and its row says so: signed in as its email, on its plan', !!(await lib.until(async () => /Signed in/.test(await fact('Personal', 'state')) && (await fact('Personal', 'email')) === 'one@example.com' && (await fact('Personal', 'plan')) === 'Max', HUNG_MS)), JSON.stringify({ email: await fact('Personal', 'email'), plan: await fact('Personal', 'plan'), state: await fact('Personal', 'state') }))
     check('…with its CLI and its icon', (await row('Personal').locator('.account-cli .provider-icon').count()) === 1 && /Claude Code/.test(await row('Personal').locator('.account-cli').innerText()))
     // A browser sign-in leaves the first-run screens unanswered (its .claude.json without the onboarding field): said.
     check('…and that it needs set up, Set Up primary, with what it is for', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="needed"]').count()) === 1, HUNG_MS)) && (await row('Personal').locator('[data-set-up].primary').count()) === 1 && /first-run questions/.test(await row('Personal').locator('[data-set-up-note]').innerText().catch(() => '')))
@@ -182,7 +184,7 @@ const check = (name, ok, extra = '') => {
     check('…and its row says so: On here', !!(await lib.until(async () => (await row('Personal').locator('[data-on-here] [role="switch"]').getAttribute('aria-checked')) === 'true', HUNG_MS)))
 
     // --- Set up for this workspace (HI-1870): on here, its CLI must trust the folders it would be used in too, read
-    // from its .claude.json (never written by Hive). Claude Code's trust of a folder covers those inside it (HI-1871),
+    // from its .claude.json (never written by Combwork). Claude Code's trust of a folder covers those inside it (HI-1871),
     // so Set Up asks once, in the workspace's folder; the fake records the trust answered there.
     const ws1Real = fs.realpathSync.native(ws1)
     const trustOf = async (invoke, id) => (await invoke('connections:list')).connections.find((a) => a.id === id)?.trust ?? null
@@ -227,11 +229,58 @@ const check = (name, ok, extra = '') => {
     fs.mkdirSync(path.join(ws1, 'delta'), { recursive: true })
     await inv('workspace:refresh')
     check('a project with no agent on this CLI isn’t counted', (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1 && JSON.stringify(await trustOf(inv, personal.id)) === JSON.stringify({ pending: [], unknown: false }))
+    // A Git repository in the trusted workspace folder (HI-2520): Claude Code asks for it anyway (a folder above a
+    // repository doesn't cover it), so it needs Set Up, at its own folder, not the workspace's again. Then removed.
+    // Made outside the workspace and moved in, complete, as a real project arrives (HI-2565): made in place, its
+    // project.json was written while Combwork, already taking the folder on, wrote its own.
+    const epsilon = path.join(ws1, 'epsilon')
+    const epsilonMade = path.join(path.dirname(ws1), 'epsilon-made')
+    fs.rmSync(epsilonMade, { recursive: true, force: true })
+    lib.gitProject(epsilonMade)
+    projectWithAgent(epsilonMade)
+    // A move refused while something has a file in it open for a moment (git's, the indexer) is tried again.
+    const movedIn = await lib.until(async () => {
+      try {
+        fs.renameSync(epsilonMade, epsilon)
+        return true
+      } catch (e) {
+        if (!['EPERM', 'EBUSY', 'EACCES'].includes(e.code)) throw e
+        return false
+      }
+    }, HUNG_MS)
+    check('a Git project moved into the trusted workspace folder', !!movedIn && fs.existsSync(path.join(epsilon, '.combwork', 'project.json')))
+    await inv('workspace:refresh')
+    check('a Git project in the trusted workspace folder: its agent put on it', await onPersonal(inv, epsilon))
+    const epsilonReal = fs.realpathSync.native(epsilon)
+    const gitTrust = await lib.until(async () => {
+      const t = await trustOf(inv, personal.id)
+      return t && !t.checking && t.pending.length ? t : null
+    }, HUNG_MS)
+    check('…it needs set up, naming it: the workspace folder’s trust doesn’t cover a repository', !!gitTrust && JSON.stringify(gitTrust.pending) === JSON.stringify([{ project: 'epsilon', folder: epsilonReal, git: true }]) && !!(await lib.until(async () => /epsilon/.test(await row('Personal').locator('[data-not-trusted]').innerText().catch(() => '')), HUNG_MS)), JSON.stringify(gitTrust))
+    check('…its Set Up would open in the repository’s own folder, not the workspace’s', !!gitTrust && gitTrust.setUpIn?.folder === epsilonReal && !gitTrust.setUpIn.workspace, JSON.stringify(gitTrust?.setUpIn))
+    await shots('git-not-covered')
+    // Removed as Explorer's Delete does, moved out in one step (HI-2563): deleted in place, a refresh could find it half
+    // gone and set it up again (its .combwork made anew), so the delete found its folder not empty. A move refused while
+    // something has a file in it open for a moment is tried again.
+    const epsilonGone = path.join(path.dirname(ws1), 'epsilon-removed')
+    const moved = await lib.until(async () => {
+      try {
+        fs.renameSync(epsilon, epsilonGone)
+        return true
+      } catch (e) {
+        if (!['EPERM', 'EBUSY', 'EACCES'].includes(e.code)) throw e
+        return false
+      }
+    }, HUNG_MS)
+    check('…moved out of the workspace', !!moved && !fs.existsSync(epsilon))
+    fs.rmSync(epsilonGone, { recursive: true, force: true })
+    await inv('workspace:refresh')
+    check('…removed, it is set up again', !!(await lib.until(async () => (await row('Personal').locator('[data-set-up-state="done"]').count()) === 1, HUNG_MS)))
 
     // --- Rename: the name only.
     await menuOf('Personal', 'Rename…')
-    await fillPrompt('Hive overnight')
-    check('Rename… changes its name, not its folder', !!(await lib.until(async () => (await list()).connections.some((a) => a.id === personal.id && a.name === 'Hive overnight'), HUNG_MS)) && fs.existsSync(folder))
+    await fillPrompt('Combwork overnight')
+    check('Rename… changes its name, not its folder', !!(await lib.until(async () => (await list()).connections.some((a) => a.id === personal.id && a.name === 'Combwork overnight'), HUNG_MS)) && fs.existsSync(folder))
 
     // --- A login changed with Settings closed (a /login in a pane): its watch finds it.
     await page.keyboard.press('Escape')
@@ -247,9 +296,9 @@ const check = (name, ok, extra = '') => {
     check('a login changed in its folder with Settings closed is found by itself', !!changed && changed.accepted?.email === 'one@example.com')
     await openSettings()
     await nav.click()
-    check('…and shown as changed, with what it was', !!(await lib.until(async () => /Login changed/.test(await row('Hive overnight').innerText().catch(() => '')) && /Now signed in as two@example\.com, was one@example\.com/.test(await row('Hive overnight').innerText().catch(() => '')), HUNG_MS)))
+    check('…and shown as changed, with what it was', !!(await lib.until(async () => /Login changed/.test(await row('Combwork overnight').innerText().catch(() => '')) && /Now signed in as two@example\.com, was one@example\.com/.test(await row('Combwork overnight').innerText().catch(() => '')), HUNG_MS)))
     await shots('changed')
-    await row('Hive overnight').getByRole('button', { name: 'Keep the New Login' }).click()
+    await row('Combwork overnight').getByRole('button', { name: 'Keep the New Login' }).click()
     await fillPrompt('Two')
     check('Keep the New Login takes it on, and offers a rename', !!(await lib.until(async () => (await list()).connections.some((a) => a.id === personal.id && a.accepted?.email === 'two@example.com' && a.name === 'Two'), HUNG_MS)))
 
@@ -291,8 +340,10 @@ const check = (name, ok, extra = '') => {
     await p2.waitForLoadState('domcontentloaded')
     await lib.appReady(p2)
     await lib.openWorkspace(invOn(p2), p2, ws2)
-    // A new workspace starts with the last account chosen as a default (Darren, 26 Oct): Personal.
-    check('a new workspace starts with the top of the order on (HI-1875), the one used there', JSON.stringify(wsJson(ws2)) === JSON.stringify({ 'claude-code': { on: [personal.id] } }), JSON.stringify(wsJson(ws2)))
+    // A new workspace starts with none on (HI-2650, Darren 6 Nov: nothing is turned on by itself); turned on there by hand.
+    check('a new workspace starts with none on (HI-2650)', wsJson(ws2) === undefined, JSON.stringify(wsJson(ws2)))
+    await invOn(p2)('connections:setOn', personal.id, true)
+    check('…Personal turned on there', !!(await lib.until(async () => JSON.stringify(wsJson(ws2)) === JSON.stringify({ 'claude-code': { on: [personal.id] } }), HUNG_MS)), JSON.stringify(wsJson(ws2)))
     // One connection, two workspaces (HI-1870): set up for the first one's folders, not yet for this one's.
     const alpha2 = fs.realpathSync.native(path.join(ws2, 'alpha'))
     check('its alpha’s agent put on it there too', await onPersonal(invOn(p2), path.join(ws2, 'alpha')))
@@ -327,6 +378,26 @@ const check = (name, ok, extra = '') => {
     check('…closed while Codex runs (asked, confirmed), its row then says it is set up', !!(await closeRunning(true)) && !!(await lib.until(async () => (await row('ChatGPT').locator('[data-set-up-state="done"]').count()) === 1, HUNG_MS)))
     await shots('codex-set-up')
 
+    // --- Its terminal in its own card (HI-2541): Set Up on the middle account opens under that account's row, above
+    // the next account, not under the whole list; scrolled into view, and kept there as its state is read again.
+    const middle = page.locator('.account-block').nth(1)
+    const middleId = await middle.getAttribute('data-account')
+    await middle.locator('[data-action="account-menu"]').click()
+    await page.locator('.menu .menu-item', { hasText: 'Set Up' }).first().click()
+    const panel = page.locator('.account-signin')
+    check('Set Up on the middle account opens its terminal in that account’s card', !!(await lib.until(async () => (await middle.locator('.account-signin .task-terminal').count()) === 1, HUNG_MS)) && (await panel.count()) === 1 && (await panel.getAttribute('data-terminal-of')) === middleId)
+    const boxes = async () => ({ row: await middle.locator('.account-row').boundingBox(), panel: await panel.boundingBox(), next: await page.locator('.account-block').nth(2).boundingBox() })
+    // Polled (HR1 on HI-2541): it scrolls in an effect after it renders, and the list may still be laying out.
+    const isPlaced = (b) => !!b.row && !!b.panel && !!b.next && b.panel.y >= b.row.y + b.row.height - 1 && b.panel.y + b.panel.height <= b.next.y + 1
+    const placed = await lib.until(async () => { const b = await boxes(); return isPlaced(b) ? b : null }, HUNG_MS)
+    check('…under its row and above the next account', !!placed, JSON.stringify(placed ?? (await boxes())))
+    const inView = () => panel.locator('.task-terminal').evaluate((el) => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight }).catch(() => false)
+    check('…scrolled into view', !!(await lib.until(inView, HUNG_MS)))
+    // Opening it re-reads the list (its row's sign-in state): the terminal stays in the card, nothing under the list.
+    check('…and stays there as the list is read again', !!(await lib.until(async () => (await list()).connections.find((a) => a.id === middleId)?.signingIn === true, HUNG_MS)) && (await middle.locator('.account-signin .task-terminal').count()) === 1 && (await page.locator('.accounts-settings > .account-signin').count()) === 0)
+    await shots('set-up-middle')
+    check('…closed, its card is as it was', !!(await closeRunning(true)) && !!(await lib.until(async () => (await panel.count()) === 0, HUNG_MS)))
+
     // --- A sign-in still waiting for its browser: Close asks, and Remove offers to close it (HI-1870).
     loginAs('held@example.com', true)
     await addVia('claude-code', 'Held')
@@ -354,6 +425,15 @@ const check = (name, ok, extra = '') => {
     await shots('after-remove')
   } catch (e) {
     check('the suite ran to its end', false, e.stack)
+    // What the test copy did with epsilon's project.json (HI-2565): its log's lines on it, in the suite's own log.
+    const logged = (() => {
+      try {
+        return fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8').split(/\r?\n/).filter((l) => /epsilon|project\.json/.test(l))
+      } catch {
+        return []
+      }
+    })()
+    if (logged.length) console.log(`Its log on epsilon and project.json:\n${logged.join('\n')}`)
   } finally {
     await app.close().catch(() => undefined)
   }
@@ -374,8 +454,8 @@ const check = (name, ok, extra = '') => {
   migCfg.recentWorkspaces = [migNew, migOld]
   fs.writeFileSync(migCfgFile, JSON.stringify(migCfg, null, 2))
   for (const [w, def] of [[migNew, 'a-max2'], [migOld, 'a-max1']]) {
-    fs.mkdirSync(path.join(w, '.hive'), { recursive: true })
-    fs.writeFileSync(path.join(w, '.hive', 'workspace.json'), JSON.stringify({ version: 1, connections: { 'claude-code': { on: ['a-max1', 'a-max2'], default: def } } }))
+    fs.mkdirSync(path.join(w, '.combwork'), { recursive: true })
+    fs.writeFileSync(path.join(w, '.combwork', 'workspace.json'), JSON.stringify({ version: 1, connections: { 'claude-code': { on: ['a-max1', 'a-max2'], default: def } } }))
   }
   const mig = await lib.launch({ userData: migProfile, env: migEnv, viewport: { width: 1200, height: 800 } })
   try {

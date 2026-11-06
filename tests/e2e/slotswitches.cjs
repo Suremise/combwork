@@ -1,5 +1,5 @@
 // P7's default-on switches turned off, in the app (#1563, tests/workflow/README.md's P7 table; slotcards and slotupgrade
-// have them on): Pair with Hive merges, each card in its own folder, fake Claude Code agents, a temp Git project whose
+// have them on): Pair with Combwork merges, each card in its own folder, fake Claude Code agents, a temp Git project whose
 // package-lock.json card 1 changes, the slots' setup a script that records each install:
 // - Slots are brought up to date before each card (G15) off: a lane of two cards in slot-a; card 2 starts there from
 //   the new target, and nothing is installed for it (slot-a's setup ran once, as it was made);
@@ -25,7 +25,7 @@ const slotA = path.join(root, 'slot-a')
 const hb2 = path.join(root, 'hb2')
 const setupLog = path.join(tools, 'setup.log')
 const PORT = Number(lib.port(47811))
-const identity = { name: 'Hive Slot Test', email: 'slots@example.com' }
+const identity = { name: 'Combwork Slot Test', email: 'slots@example.com' }
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -44,14 +44,14 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
 ;(async () => {
   for (const d of [userData, ws, `${ws}.worktrees`, tools]) fs.rmSync(d, { recursive: true, force: true })
   fs.mkdirSync(tools, { recursive: true })
-  lib.gitProject(alpha, { 'a.txt': 'a\n', 'package-lock.json': '{"v":1}\n', '.gitignore': '.hive/\n' })
+  lib.gitProject(alpha, { 'a.txt': 'a\n', 'package-lock.json': '{"v":1}\n', '.gitignore': '.combwork/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
   lib.git(alpha, ['branch', 'integration'])
   // The identity its commits use, in its git config: G12 reads it from git each time (HI-2266, HI-2283).
   lib.git(alpha, ['config', 'user.name', identity.name])
   lib.git(alpha, ['config', 'user.email', identity.email])
   const setup = path.join(tools, 'setup.js')
-  fs.writeFileSync(setup, `require('fs').appendFileSync(${JSON.stringify(setupLog)}, process.env.HIVE_SLOT + ' ' + require('fs').readFileSync('package-lock.json', 'utf8').trim() + '\\n')\n`)
+  fs.writeFileSync(setup, `require('fs').appendFileSync(${JSON.stringify(setupLog)}, process.env.CW_SLOT + ' ' + require('fs').readFileSync('package-lock.json', 'utf8').trim() + '\\n')\n`)
   const env = lib.fakeClaude(userData, home, [alpha, ws, slotA])
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
@@ -60,18 +60,18 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const h = await lib.launch({ userData, env: { ...env, HIVE_API_PORT: String(PORT), HIVE_TEST_TIPS: 'off' } })
+  const h = await lib.launch({ userData, env: { ...env, CW_API_PORT: String(PORT), CW_TEST_TIPS: 'off' } })
   const { app, page, inv } = h
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.waitForProvider(inv)
     await lib.openWorkspace(inv, page, ws)
     const until = (fn, ms) => lib.until(fn, ms, 250)
-    // Pair with Hive merges into integration (checked out nowhere), cards in slots, G15 off.
-    await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'hiveMerges', folder: 'slots', target: 'integration', style: 'merge', preChecks: [], mergeChecks: [], identity, okBefore: { mode: 'never', labels: [] }, slotsUpToDate: false } })
+    // Pair with Combwork merges into integration (checked out nowhere), cards in slots, G15 off.
+    await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'combworkMerges', folder: 'slots', target: 'integration', style: 'merge', preChecks: [], mergeChecks: [], identity, okBefore: { mode: 'never', labels: [] }, slotsUpToDate: false } })
     check('G15 (Slots are brought up to date before each card) is off', (await inv('workflow:form', alpha))?.options?.slotsUpToDate === false, JSON.stringify((await inv('workflow:form', alpha))?.options))
-    await inv('advanced:set', 'hive.slots.deleteMergedLines', false)
-    await inv('advanced:set', 'hive.slots.renameAdopted', false)
+    await inv('advanced:set', 'cw.slots.deleteMergedLines', false)
+    await inv('advanced:set', 'cw.slots.renameAdopted', false)
     await inv('project:updateConfig', alpha, { slots: { setup: `node "${setup}"` } })
     const b1 = await lib.addAgent(inv, alpha, { name: 'B1', workflowRole: 'builder' })
     const r1 = await lib.addAgent(inv, alpha, { name: 'R1', workflowRole: 'reviewer' })
@@ -84,8 +84,8 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     const tokenOf = async (id) => {
       const sessionId = await until(async () => (await live(id))?.sessionId, HUNG_MS)
       const launch = await until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
-      const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive : null
-      return hive ? JSON.parse(fs.readFileSync(hive.env.HIVE_API_TOKEN_FILE, 'utf8')).token : null
+      const server = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
+      return server ? JSON.parse(fs.readFileSync(server.env.CW_API_TOKEN_FILE, 'utf8')).token : null
     }
     const intent = async (token, n, name, body = {}) => {
       const res = await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${encodeURIComponent(`#${n}`)}/${name}`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -107,14 +107,14 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     const c1 = await create('Switch one')
     const c2 = await create('Switch two')
     const key = (await card(c1)).key.split('-')[0]
-    const line = (n, slug) => `hive/${key}/${key}-${n}-${slug}`
+    const line = (n, slug) => `cw/${key}/${key}-${n}-${slug}`
 
     // --- A lane of two cards in slot-a.
     const started = await inv('lanes:start', alpha, { builder: b1.id, reviewer: r1.id, cards: [c1, c2] })
     check('the lane is lent slot-a, and both agents start', started.slot === 'slot-a' && started.started.every((s) => s.how !== 'failed'), JSON.stringify(started))
     check("slot-a's setup ran as it was made", !!(await until(() => installs().length === 1, HUNG_MS)) && installs()[0] === 'slot-a {"v":1}', JSON.stringify(installs()))
     // An adopted worktree (as the upgrade carries an agent's own), free from here on.
-    lib.git(alpha, ['worktree', 'add', '-q', '-b', 'hive/hb2', hb2, 'integration'])
+    lib.git(alpha, ['worktree', 'add', '-q', '-b', 'cw/hb2', hb2, 'integration'])
     const carried = await inv('slots:test', alpha, { op: 'carry', agent: 'someone', slot: 'hb2', folder: hb2 })
     check('hb2 is adopted as a slot', !!carried?.id && (await inv('slots:test', alpha, { op: 'release', lease: carried.id, why: 'done' })) === true, JSON.stringify(carried))
     check('…and free, ready, under its own name', !!(await until(async () => (await slots()).some((s) => s.name === 'hb2' && s.state === 'ready' && !s.lease), HUNG_MS)), JSON.stringify(await slots()))
@@ -126,7 +126,7 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     check("card 1 starts in slot-a, on its line", s1.status === 200 && same(s1.body?.data?.folder, slotA) && !!(await until(() => branchIn(slotA) === line(c1, 'switch-one'), HUNG_MS)), JSON.stringify(s1.body))
     commitIn(slotA, { 'one.txt': 'one\n', 'package-lock.json': '{"v":2}\n' }, 'Switch one')
     check('B1 submits card 1; R1 passes it', (await intent(tb1, c1, 'submit', { summary: 'Switch one: ready' })).status === 200 && (await intent(tr1, c1, 'start-review')).status === 200 && (await intent(tr1, c1, 'verdict', { pass: true, comment: 'Switch one: passed' })).status === 200)
-    check("Hive's queue merges card 1: Done", !!(await until(async () => (await card(c1))?.column === 'done', HUNG_MS)), (await card(c1))?.column)
+    check("Combwork's queue merges card 1: Done", !!(await until(async () => (await card(c1))?.column === 'done', HUNG_MS)), (await card(c1))?.column)
 
     // --- Card 2 in slot-a: G15 off, nothing installed; card 1's merged line kept.
     const s2 = await intent(tb1, c2, 'start')
@@ -137,8 +137,8 @@ const installs = () => (fs.existsSync(setupLog) ? fs.readFileSync(setupLog, 'utf
     check('Rename adopted worktrees off: hb2, free, keeps its name and folder', (await slots()).some((s) => s.name === 'hb2' && same(s.folder, hb2)) && fs.existsSync(hb2), JSON.stringify(await slots()))
 
     // --- Both on: the next pass (a board change) deletes the line and renames hb2.
-    await inv('advanced:set', 'hive.slots.deleteMergedLines', true)
-    await inv('advanced:set', 'hive.slots.renameAdopted', true)
+    await inv('advanced:set', 'cw.slots.deleteMergedLines', true)
+    await inv('advanced:set', 'cw.slots.renameAdopted', true)
     await create('Switch three')
     check("turned on, card 1's merged line is deleted, and noted on card 1", !!(await until(async () => !hasLine(line(c1, 'switch-one')) && (await kinds(c1)).includes('LineDeleted'), HUNG_MS)), JSON.stringify(await kinds(c1)))
     check("…card 2's line, checked out in slot-a, is kept", hasLine(line(c2, 'switch-two')))

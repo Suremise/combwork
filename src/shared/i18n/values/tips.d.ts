@@ -1,6 +1,6 @@
 // Generated from locales/en/tips.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
-interface HiveMessageValues {
+interface CombworkMessageValues {
   'tips.activityTab.text': undefined
   'tips.activityTab.title': undefined
   'tips.activityWorkspace.text': undefined
@@ -23,6 +23,8 @@ interface HiveMessageValues {
   'tips.agentStates.title': undefined
   'tips.agentWorkflowRole.text': undefined
   'tips.agentWorkflowRole.title': undefined
+  'tips.agentsTempFolder.text': undefined
+  'tips.agentsTempFolder.title': undefined
   'tips.allKeysToCli.text': undefined
   'tips.allKeysToCli.title': undefined
   'tips.alwaysOnTop.text': undefined
@@ -121,6 +123,8 @@ interface HiveMessageValues {
   'tips.cardAttachments.title': undefined
   'tips.cardAttachmentsCleanup.text': undefined
   'tips.cardAttachmentsCleanup.title': undefined
+  'tips.cardAttachmentsFolders.text': undefined
+  'tips.cardAttachmentsFolders.title': undefined
   'tips.cardCost.text': { example: string | number }
   'tips.cardCost.title': undefined
   'tips.cardCostRounds.text': undefined
@@ -155,6 +159,12 @@ interface HiveMessageValues {
   'tips.codexSandboxConnections.title': undefined
   'tips.codexScriptCalls.text': undefined
   'tips.codexScriptCalls.title': undefined
+  'tips.combworkFolder.text': undefined
+  'tips.combworkFolder.title': undefined
+  'tips.combworkMerges.text': undefined
+  'tips.combworkMerges.title': undefined
+  'tips.combworkSkills.text': undefined
+  'tips.combworkSkills.title': undefined
   'tips.commandName': { command: string | number }
   'tips.compactFocus.text': { key: string | number }
   'tips.compactFocus.title': undefined
@@ -170,6 +180,8 @@ interface HiveMessageValues {
   'tips.connectionOrder.title': undefined
   'tips.connectionSetups.text': undefined
   'tips.connectionSetups.title': undefined
+  'tips.connectionTags.text': undefined
+  'tips.connectionTags.title': undefined
   'tips.connectionTrust.text': undefined
   'tips.connectionTrust.title': undefined
   'tips.connections.text': undefined
@@ -194,6 +206,10 @@ interface HiveMessageValues {
   'tips.designCheck.title': undefined
   'tips.developerConsole.text': undefined
   'tips.developerConsole.title': undefined
+  'tips.dialects.text': undefined
+  'tips.dialects.title': undefined
+  'tips.dialectsNewModel.text': undefined
+  'tips.dialectsNewModel.title': undefined
   'tips.editTemplates.text': undefined
   'tips.editTemplates.title': undefined
   'tips.fileLinks.text': undefined
@@ -236,12 +252,6 @@ interface HiveMessageValues {
   'tips.handoverSelf.title': undefined
   'tips.hardwareAcceleration.text': undefined
   'tips.hardwareAcceleration.title': undefined
-  'tips.hiveFolder.text': undefined
-  'tips.hiveFolder.title': undefined
-  'tips.hiveMerges.text': undefined
-  'tips.hiveMerges.title': undefined
-  'tips.hiveSkills.text': undefined
-  'tips.hiveSkills.title': undefined
   'tips.hooksMissing.text': undefined
   'tips.hooksMissing.title': undefined
   'tips.howDoYouWork.text': undefined
@@ -328,6 +338,8 @@ interface HiveMessageValues {
   'tips.messageReceipts.title': undefined
   'tips.modelFallbacks.text': undefined
   'tips.modelFallbacks.title': undefined
+  'tips.modelSwitched.text': undefined
+  'tips.modelSwitched.title': undefined
   'tips.modes.text': undefined
   'tips.modes.title': undefined
   'tips.moreAgents.text': { usual: number; most: number }
@@ -517,6 +529,8 @@ interface HiveMessageValues {
   'tips.versionControlTab.title': undefined
   'tips.viewerTokens.text': undefined
   'tips.viewerTokens.title': undefined
+  'tips.waitingOnPurpose.text': undefined
+  'tips.waitingOnPurpose.title': undefined
   'tips.workflowDefaults.text': undefined
   'tips.workflowDefaults.title': undefined
   'tips.workflowOptions.text': undefined

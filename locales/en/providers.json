@@ -29,7 +29,7 @@
   },
   "providers.autoCompact.estimate": {
     "defaultMessage": "an estimate: {unsure}",
-    "description": "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: it is an estimate, in brackets after the window. {unsure} lists why, clauses joined as a list (\"managed policies Hive can't read … could change it and Claude Code's settings.json couldn't be read (EACCES)\")."
+    "description": "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: it is an estimate, in brackets after the window. {unsure} lists why, clauses joined as a list (\"managed policies Combwork can't read … could change it and Claude Code's settings.json couldn't be read (EACCES)\")."
   },
   "providers.autoCompact.keyIn": {
     "defaultMessage": "{key} in {scope}",
@@ -52,28 +52,28 @@
     "description": "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: a settings file Claude Code reads, after \"in\" ({scope} in providers.autoCompact.keyIn, autoIn, disabledIn and envIn). The user's own settings file. settings.json is a file name: keep it."
   },
   "providers.autoCompact.unreadReason": {
-    "defaultMessage": "managed policies Hive can't read (such as Windows registry policies or your organisation's server-managed settings) could change it",
+    "defaultMessage": "managed policies Combwork can't read (such as Windows registry policies or your organisation's server-managed settings) could change it",
     "description": "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: why its default is an estimate. A clause, in a list of such reasons (providers.autoCompact.estimate)."
   },
   "providers.autoCompact.unreadable": {
     "defaultMessage": "couldn't be read ({why})",
-    "description": "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: a settings file Hive couldn't read (after its name). {why} says why (providers.autoCompact.why.*, or the system's message)."
+    "description": "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: a settings file Combwork couldn't read (after its name). {why} says why (providers.autoCompact.why.*, or the system's message)."
   },
   "providers.autoCompact.unsureFile.local": {
     "defaultMessage": "the project's .claude/settings.local.json {unsure}",
-    "description": "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: a settings file Claude Code reads that Hive can't be sure of, a clause (\"the project's .claude/settings.local.json couldn't be read (EACCES)\"). {unsure} says why (providers.autoCompact.unreadable). .claude/settings.local.json is a path: keep it."
+    "description": "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: a settings file Claude Code reads that Combwork can't be sure of, a clause (\"the project's .claude/settings.local.json couldn't be read (EACCES)\"). {unsure} says why (providers.autoCompact.unreadable). .claude/settings.local.json is a path: keep it."
   },
   "providers.autoCompact.unsureFile.managed": {
     "defaultMessage": "managed settings {unsure}",
-    "description": "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: a settings file Claude Code reads that Hive can't be sure of, a clause (\"managed settings couldn't be read (EACCES)\"). {unsure} says why (providers.autoCompact.unreadable). The managed settings an administrator gives Claude Code."
+    "description": "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: a settings file Claude Code reads that Combwork can't be sure of, a clause (\"managed settings couldn't be read (EACCES)\"). {unsure} says why (providers.autoCompact.unreadable). The managed settings an administrator gives Claude Code."
   },
   "providers.autoCompact.unsureFile.project": {
     "defaultMessage": "the project's .claude/settings.json {unsure}",
-    "description": "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: a settings file Claude Code reads that Hive can't be sure of, a clause (\"the project's .claude/settings.json couldn't be read (EACCES)\"). {unsure} says why (providers.autoCompact.unreadable). .claude/settings.json is a path: keep it."
+    "description": "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: a settings file Claude Code reads that Combwork can't be sure of, a clause (\"the project's .claude/settings.json couldn't be read (EACCES)\"). {unsure} says why (providers.autoCompact.unreadable). .claude/settings.json is a path: keep it."
   },
   "providers.autoCompact.unsureFile.user": {
     "defaultMessage": "Claude Code's settings.json {unsure}",
-    "description": "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: a settings file Claude Code reads that Hive can't be sure of, a clause (\"Claude Code's settings.json couldn't be read (EACCES)\"). {unsure} says why (providers.autoCompact.unreadable). The user's own settings file. settings.json is a file name: keep it."
+    "description": "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: a settings file Claude Code reads that Combwork can't be sure of, a clause (\"Claude Code's settings.json couldn't be read (EACCES)\"). {unsure} says why (providers.autoCompact.unreadable). The user's own settings file. settings.json is a file name: keep it."
   },
   "providers.autoCompact.unsureMode": {
     "defaultMessage": "may stop Claude Code reading some settings files",
@@ -81,15 +81,15 @@
   },
   "providers.autoCompact.unsureScope": {
     "defaultMessage": "{scope} {unsure}",
-    "description": "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: settings Hive can't be sure of, a clause. {scope} is a command-line option as typed, the clause's subject (--settings file.json, --setting-sources bogus, --safe-mode), {unsure} says why (couldn't be read…, providers.autoCompact.badSources, unsureMode)."
+    "description": "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: settings Combwork can't be sure of, a clause. {scope} is a command-line option as typed, the clause's subject (--settings file.json, --setting-sources bogus, --safe-mode), {unsure} says why (couldn't be read…, providers.autoCompact.badSources, unsureMode)."
   },
   "providers.autoCompact.why.notFile": {
     "defaultMessage": "it isn't a file",
-    "description": "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: why Hive couldn't read a settings file (providers.autoCompact.unreadable)."
+    "description": "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: why Combwork couldn't read a settings file (providers.autoCompact.unreadable)."
   },
   "providers.autoCompact.why.tooBig": {
     "defaultMessage": "it's over Claude Code's 2 MiB limit",
-    "description": "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: why Hive couldn't read a settings file (providers.autoCompact.unreadable). 2 MiB is the size limit: keep it."
+    "description": "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: why Combwork couldn't read a settings file (providers.autoCompact.unreadable). 2 MiB is the size limit: keep it."
   },
   "providers.claude.connections.setUp": {
     "defaultMessage": "Set Up runs Claude Code on this connection for its one-time first-run questions (its look, its notes) and to trust this workspace's folders. Answer them in the terminal.",
@@ -97,19 +97,19 @@
   },
   "providers.claude.hint.args": {
     "defaultMessage": "Claude Code refused an argument: check Extra arguments in Agent Settings and Settings → Claude Code.",
-    "description": "Why Claude Code didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown."
+    "description": "Why Claude Code didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Combwork's names: use them as shown."
   },
   "providers.claude.hint.broken": {
     "defaultMessage": "Claude Code looks broken or missing: reinstall or update it in Provider Setup.",
-    "description": "Why Claude Code didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown."
+    "description": "Why Claude Code didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Combwork's names: use them as shown."
   },
   "providers.claude.hint.model": {
     "defaultMessage": "Claude Code doesn't know this model: choose another in Agent Settings.",
-    "description": "Why Claude Code didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown."
+    "description": "Why Claude Code didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Combwork's names: use them as shown."
   },
   "providers.claude.hint.signIn": {
     "defaultMessage": "Claude Code isn't signed in: start it again and sign in in its terminal.",
-    "description": "Why Claude Code didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown."
+    "description": "Why Claude Code didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Combwork's names: use them as shown."
   },
   "providers.cmdTooLong": {
     "defaultMessage": "{file} has to run through cmd.exe, which takes a command line of at most {max, number} characters, and this launch needs about {length, number}. Set the CLI's path in Settings to its .exe (or install the standalone CLI), which has no such limit.",
@@ -120,40 +120,40 @@
     "description": "Settings → Accounts & Connections, above a Codex connection's Set Up terminal and on one that still needs it: what Set Up is for. Set Up names a button."
   },
   "providers.codex.developerUnread.agentMessage": {
-    "defaultMessage": "Codex couldn't say which developer_instructions this session gets, so Hive leaves yours as they are and adds none of its guidance this time: the agent has Hive's tools without it. Restart the agent to try again.",
-    "description": "The notice that a Codex agent started without Hive's guidance. developer_instructions is a Codex setting: keep it."
+    "defaultMessage": "Codex couldn't say which developer_instructions this session gets, so Combwork leaves yours as they are and adds none of its guidance this time: the agent has Combwork's tools without it. Restart the agent to try again.",
+    "description": "The notice that a Codex agent started without Combwork's guidance. developer_instructions is a Codex setting: keep it."
   },
   "providers.codex.developerUnread.agentTitle": {
-    "defaultMessage": "Hive's guidance is missing for this agent",
-    "description": "A notice as a Codex agent starts: Hive couldn't tell which of the user's own Codex instructions apply, so it added none of its guidance."
+    "defaultMessage": "Combwork's guidance is missing for this agent",
+    "description": "A notice as a Codex agent starts: Combwork couldn't tell which of the user's own Codex instructions apply, so it added none of its guidance."
   },
   "providers.codex.developerUnread.assistantMessage": {
-    "defaultMessage": "Codex couldn't say which developer_instructions this session gets, so Hive gives the Assistant its role alone this time, without them or Hive's guidance. Restart the Assistant to try again.",
-    "description": "The notice that the Hive Assistant on Codex got only its role. developer_instructions is a Codex setting: keep it."
+    "defaultMessage": "Codex couldn't say which developer_instructions this session gets, so Combwork gives the Assistant its role alone this time, without them or Combwork's guidance. Restart the Assistant to try again.",
+    "description": "The notice that the Combwork Assistant on Codex got only its role. developer_instructions is a Codex setting: keep it."
   },
   "providers.codex.developerUnread.assistantTitle": {
     "defaultMessage": "The Assistant started with its role only",
-    "description": "A notice as the Hive Assistant starts on Codex: Hive couldn't tell which of the user's own Codex instructions apply, so it gives the Assistant only its role."
+    "description": "A notice as the Combwork Assistant starts on Codex: Combwork couldn't tell which of the user's own Codex instructions apply, so it gives the Assistant only its role."
   },
   "providers.codex.hint.broken": {
     "defaultMessage": "Codex looks broken or not set up: check it in Provider Setup.",
-    "description": "Why Codex didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown."
+    "description": "Why Codex didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Combwork's names: use them as shown."
   },
   "providers.codex.hint.model": {
     "defaultMessage": "Codex doesn't know this model: choose another in Agent Settings.",
-    "description": "Why Codex didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown."
+    "description": "Why Codex didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Combwork's names: use them as shown."
   },
   "providers.codex.hint.settings": {
     "defaultMessage": "Codex refused its settings: check Extra arguments in Agent Settings and Settings → Codex, and your config.toml.",
-    "description": "Why Codex didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown."
+    "description": "Why Codex didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Combwork's names: use them as shown."
   },
   "providers.codex.hint.signIn": {
     "defaultMessage": "Codex isn't signed in: sign in in Provider Setup, then start it again.",
-    "description": "Why Codex didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown."
+    "description": "Why Codex didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Combwork's names: use them as shown."
   },
-  "providers.codex.nativeHive": {
-    "defaultMessage": "Your Codex config has an MCP server named hive, reached over HTTP ({file}). Codex merges it into Hive’s own hive server, and can’t start with both. Rename yours there to start Codex agents.",
-    "description": "Why a Codex agent didn't start: the user's own Codex config has an MCP server named hive. {file} is that config file's path. hive is the name of Hive's MCP server: keep it."
+  "providers.codex.nativeCombwork": {
+    "defaultMessage": "Your Codex config has an MCP server named combwork, reached over HTTP ({file}). Codex merges it into Combwork’s own combwork server, and can’t start with both. Rename yours there to start Codex agents.",
+    "description": "Why a Codex agent didn't start: the user's own Codex config has an MCP server named combwork. {file} is that config file's path. combwork is the name of Combwork's MCP server (HI-2463): keep it."
   },
   "providers.codex.sandbox.default": {
     "defaultMessage": "**Set up default sandbox** (recommended): commands run under two local Windows accounts Codex creates for them (`CodexSandboxOffline` and `CodexSandboxOnline`), with a firewall rule that keeps them offline unless you allow it. It isolates commands best. Windows asks for Administrator permission once.",
@@ -172,8 +172,8 @@
     "description": "Provider Setup and Settings → Providers: Codex runs commands in its non-admin sandbox (Windows), which can be upgraded."
   },
   "providers.codex.sandbox.setUp": {
-    "defaultMessage": "**Set up** opens Codex's sandbox setup, which offers two choices. With either, Codex agents in **Ask for approval** or **Approve for me** can edit files in their own folder (the project, or the agent's worktree) and run commands there without asking, and ask before going online or writing anywhere else. Hive's own features (status, file locks, handovers, shared notes) work the same with both.",
-    "description": "Provider Setup, under Codex's sandbox setup (Windows): what Set up does. **…** marks bold text: keep the marks. Set up is the button; Ask for approval and Approve for me are Codex's permission modes as Hive names them: use their names as shown."
+    "defaultMessage": "**Set up** opens Codex's sandbox setup, which offers two choices. With either, Codex agents in **Ask for approval** or **Approve for me** can edit files in their own folder (the project, or the agent's worktree) and run commands there without asking, and ask before going online or writing anywhere else. Combwork's own features (status, file locks, handovers, shared notes) work the same with both.",
+    "description": "Provider Setup, under Codex's sandbox setup (Windows): what Set up does. **…** marks bold text: keep the marks. Set up is the button; Ask for approval and Approve for me are Codex's permission modes as Combwork names them: use their names as shown."
   },
   "providers.codex.sandbox.setUpAction": {
     "defaultMessage": "Set up",
@@ -188,7 +188,7 @@
     "description": "Provider Setup's button: switches Codex to its default sandbox."
   },
   "providers.codex.storePwsh.fix": {
-    "defaultMessage": "To avoid it, replace the Store's PowerShell 7 with the installer's, in this order. First uninstall the Store one (Settings → Apps → Installed apps → PowerShell → Uninstall, or `Get-AppxPackage Microsoft.PowerShell | Remove-AppxPackage`): while it is there, winget takes it for the same app and installs nothing. Then install PowerShell 7 (`winget install --id Microsoft.PowerShell --source winget --installer-type wix`). Then restart Hive and its Codex agents: they keep their old PATH until they restart. Hive leaves your shell as it is.",
+    "defaultMessage": "To avoid it, replace the Store's PowerShell 7 with the installer's, in this order. First uninstall the Store one (Settings → Apps → Installed apps → PowerShell → Uninstall, or `Get-AppxPackage Microsoft.PowerShell | Remove-AppxPackage`): while it is there, winget takes it for the same app and installs nothing. Then install PowerShell 7 (`winget install --id Microsoft.PowerShell --source winget --installer-type wix`). Then restart Combwork and its Codex agents: they keep their old PATH until they restart. Combwork leaves your shell as it is.",
     "description": "Provider Setup (#585, #1512), under the warning about the Microsoft Store's PowerShell 7: what to do, in an order that must stay (uninstall the Store copy first, then install, then restart). `…` marks a command to type: keep it as it is. Settings → Apps → Installed apps is Windows 11's settings page: use Windows' own names for it in your language."
   },
   "providers.codex.storePwsh.label": {
@@ -209,7 +209,7 @@
   },
   "providers.codex.stray.more": {
     "defaultMessage": "{n, plural, one {# more} other {# more}}",
-    "description": "The last item of the files a stray .codex folder holds, in its warning (providers.codex.stray.message), after the first few: how many more files there are. Hive joins it to the list (\"a.log, b.log, c.log and 2 more\")."
+    "description": "The last item of the files a stray .codex folder holds, in its warning (providers.codex.stray.message), after the first few: how many more files there are. Combwork joins it to the list (\"a.log, b.log, c.log and 2 more\")."
   },
   "providers.codex.stray.title": {
     "defaultMessage": "A .codex folder here can stop Codex running commands",
@@ -217,27 +217,27 @@
   },
   "providers.copilot.hint.args": {
     "defaultMessage": "Copilot refused an argument: check Extra arguments in Agent Settings and Settings → GitHub Copilot.",
-    "description": "Why GitHub Copilot didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown."
+    "description": "Why GitHub Copilot didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Combwork's names: use them as shown."
   },
   "providers.copilot.hint.broken": {
     "defaultMessage": "Copilot looks broken or missing: check it in Provider Setup.",
-    "description": "Why GitHub Copilot didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown."
+    "description": "Why GitHub Copilot didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Combwork's names: use them as shown."
   },
   "providers.copilot.hint.mcp": {
-    "defaultMessage": "Copilot couldn't read the MCP configuration Hive gave it: start it again.",
-    "description": "Why GitHub Copilot didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown."
+    "defaultMessage": "Copilot couldn't read the MCP configuration Combwork gave it: start it again.",
+    "description": "Why GitHub Copilot didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Combwork's names: use them as shown."
   },
   "providers.copilot.hint.model": {
     "defaultMessage": "Copilot doesn't offer this model to this account (Copilot Free runs Auto only): choose another in Agent Settings.",
-    "description": "Why GitHub Copilot didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown."
+    "description": "Why GitHub Copilot didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Combwork's names: use them as shown."
   },
   "providers.copilot.hint.signIn": {
     "defaultMessage": "Copilot isn't signed in: sign in as Provider Setup shows, then start it again.",
-    "description": "Why GitHub Copilot didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Hive's names: use them as shown."
+    "description": "Why GitHub Copilot didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Combwork's names: use them as shown."
   },
   "providers.copilot.parens.message": {
     "defaultMessage": "Copilot can't approve edits in a folder whose path has parentheses, so this agent asks before each edit, as in Ask. Rename the folder to give it Accept edits.",
-    "description": "The notice that a GitHub Copilot agent asks before each edit. Ask and Accept edits are permission modes as Hive names them: use their names as shown."
+    "description": "The notice that a GitHub Copilot agent asks before each edit. Ask and Accept edits are permission modes as Combwork names them: use their names as shown."
   },
   "providers.copilot.parens.title": {
     "defaultMessage": "Copilot will ask before each edit",
@@ -256,11 +256,11 @@
     "description": "Provider Setup, under GitHub Copilot's Sign in: Copilot falls back to the GitHub CLI's sign-in. `…` marks a command: keep it."
   },
   "providers.copilot.signIn.ignored": {
-    "defaultMessage": "{n, plural, one {Copilot agents don’t get {variables} from Hive’s environment, so it doesn’t sign them in. For a token of Copilot’s own, set `COPILOT_GITHUB_TOKEN`.} other {Copilot agents don’t get {variables} from Hive’s environment, so they don’t sign them in. For a token of Copilot’s own, set `COPILOT_GITHUB_TOKEN`.}}",
-    "description": "Provider Setup, under GitHub Copilot's Sign in: environment variables with a GitHub token that Hive keeps from Copilot agents. {variables} lists them (joined with “or”), {n} is how many. `…` marks a variable name: keep it."
+    "defaultMessage": "{n, plural, one {Copilot agents don’t get {variables} from Combwork’s environment, so it doesn’t sign them in. For a token of Copilot’s own, set `COPILOT_GITHUB_TOKEN`.} other {Copilot agents don’t get {variables} from Combwork’s environment, so they don’t sign them in. For a token of Copilot’s own, set `COPILOT_GITHUB_TOKEN`.}}",
+    "description": "Provider Setup, under GitHub Copilot's Sign in: environment variables with a GitHub token that Combwork keeps from Copilot agents. {variables} lists them (joined with “or”), {n} is how many. `…` marks a variable name: keep it."
   },
   "providers.copilot.signIn.runs": {
-    "defaultMessage": "**Sign in** runs `copilot login` in a terminal: it opens GitHub in your browser to authorise Copilot. Hive never signs in for you.",
+    "defaultMessage": "**Sign in** runs `copilot login` in a terminal: it opens GitHub in your browser to authorise Copilot. Combwork never signs in for you.",
     "description": "Provider Setup, under GitHub Copilot's Sign in: what it does. **…** marks bold text and `…` a command: keep the marks and the command."
   },
   "providers.copilot.updateAnyway": {
@@ -269,7 +269,7 @@
   },
   "providers.copilot.updateManual": {
     "defaultMessage": "Update {provider} the way you installed it, then choose Check again.",
-    "description": "Provider Setup, under a newer GitHub Copilot that Hive can't update itself. {provider} is its name. Check again is the button in Provider Setup."
+    "description": "Provider Setup, under a newer GitHub Copilot that Combwork can't update itself. {provider} is its name. Check again is the button in Provider Setup."
   },
   "providers.copilot.updateModified": {
     "defaultMessage": "WinGet could not remove the old Copilot package. Its installed files may have changed since WinGet installed them, often because Copilot updated itself. Update anyway asks WinGet to replace them with --force. Stop Copilot agents first.",
@@ -321,7 +321,7 @@
   },
   "providers.readiness.notInstalled": {
     "defaultMessage": "{provider} is not installed.",
-    "description": "Provider Setup and Settings → Providers: Hive didn't find the coding agent's CLI. {provider} is its name (Claude Code)."
+    "description": "Provider Setup and Settings → Providers: Combwork didn't find the coding agent's CLI. {provider} is its name (Claude Code)."
   },
   "providers.readiness.signedOut": {
     "defaultMessage": "{provider} is not signed in.",
@@ -332,8 +332,8 @@
     "description": "Provider Setup and Settings → Providers: a newer version of the coding agent is out. {provider} is its name, {version} the version."
   },
   "providers.settings.hooksOff": {
-    "defaultMessage": "{source, select, inline {The --settings in Extra arguments} other {The settings file {file} (--settings in Extra arguments)}} turns off all hooks (disableAllHooks). Hive's hooks are how it knows what the agent is doing (its status, file locks, what it is told) and they carry its status line, so Hive doesn't start an agent without them. Take disableAllHooks out of those settings, or remove the --settings from Extra arguments in Agent Settings or Settings → Claude Code.",
-    "description": "Starting a Claude Code agent is refused: its settings turn Claude Code's hooks off. {source} is inline (settings written in the argument itself) or file; {file} is the file's path as the user wrote it. Keep --settings, disableAllHooks and the setting names as they are; \"Agent Settings\" and \"Settings → Claude Code\" are where to change it, as Hive shows them."
+    "defaultMessage": "{source, select, inline {The --settings in Extra arguments} other {The settings file {file} (--settings in Extra arguments)}} turns off all hooks (disableAllHooks). Combwork's hooks are how it knows what the agent is doing (its status, file locks, what it is told) and they carry its status line, so Combwork doesn't start an agent without them. Take disableAllHooks out of those settings, or remove the --settings from Extra arguments in Agent Settings or Settings → Claude Code.",
+    "description": "Starting a Claude Code agent is refused: its settings turn Claude Code's hooks off. {source} is inline (settings written in the argument itself) or file; {file} is the file's path as the user wrote it. Keep --settings, disableAllHooks and the setting names as they are; \"Agent Settings\" and \"Settings → Claude Code\" are where to change it, as Combwork shows them."
   },
   "providers.settings.noFile": {
     "defaultMessage": "there is no such file",
@@ -341,7 +341,7 @@
   },
   "providers.settings.noValue": {
     "defaultMessage": "The last --settings in Extra arguments has no value. Give it a settings file or inline JSON (--settings '''<file or JSON>'''), or remove it in Agent Settings or Settings → Claude Code.",
-    "description": "Starting a Claude Code agent is refused: its extra arguments end with --settings and nothing after it. Keep --settings as it is, and the straight quotes around <file or JSON>: each three apostrophes show one (ICU); the words file or JSON may be translated; \"Agent Settings\" and \"Settings → Claude Code\" are where to change it, as Hive shows them."
+    "description": "Starting a Claude Code agent is refused: its extra arguments end with --settings and nothing after it. Keep --settings as it is, and the straight quotes around <file or JSON>: each three apostrophes show one (ICU); the words file or JSON may be translated; \"Agent Settings\" and \"Settings → Claude Code\" are where to change it, as Combwork shows them."
   },
   "providers.settings.notAFile": {
     "defaultMessage": "it isn't a file",
@@ -352,12 +352,12 @@
     "description": "Starting a Claude Code agent is refused: its settings file isn't JSON. {file} is its path; {why} is the JSON parser's own words (English). Keep --settings and JSON as they are."
   },
   "providers.settings.notList": {
-    "defaultMessage": "{source, select, inline {The --settings in Extra arguments} other {The settings file {file} (--settings in Extra arguments)}} sets {key} to something other than a list, which stops Hive's hooks reaching it. Make it a list ([ … ]) or remove it in Agent Settings or Settings → Claude Code.",
-    "description": "Starting a Claude Code agent is refused: a hook allowlist in its settings isn't a list. {key} is the setting's name. {source} is inline (settings written in the argument itself) or file; {file} is the file's path as the user wrote it. Keep --settings and the setting names as they are; \"Agent Settings\" and \"Settings → Claude Code\" are where to change it, as Hive shows them. Keep [ … ] as it is."
+    "defaultMessage": "{source, select, inline {The --settings in Extra arguments} other {The settings file {file} (--settings in Extra arguments)}} sets {key} to something other than a list, which stops Combwork's hooks reaching it. Make it a list ([ … ]) or remove it in Agent Settings or Settings → Claude Code.",
+    "description": "Starting a Claude Code agent is refused: a hook allowlist in its settings isn't a list. {key} is the setting's name. {source} is inline (settings written in the argument itself) or file; {file} is the file's path as the user wrote it. Keep --settings and the setting names as they are; \"Agent Settings\" and \"Settings → Claude Code\" are where to change it, as Combwork shows them. Keep [ … ] as it is."
   },
   "providers.settings.notObject": {
     "defaultMessage": "{source, select, inline {The --settings in Extra arguments} other {The settings file {file} (--settings in Extra arguments)}} isn't a settings object ('{ … }'). Fix it or remove it in Agent Settings or Settings → Claude Code.",
-    "description": "Starting a Claude Code agent is refused: its settings aren't an object. {source} is inline (settings written in the argument itself) or file; {file} is the file's path as the user wrote it. Keep --settings and the setting names as they are; \"Agent Settings\" and \"Settings → Claude Code\" are where to change it, as Hive shows them. Keep { … } as it is."
+    "description": "Starting a Claude Code agent is refused: its settings aren't an object. {source} is inline (settings written in the argument itself) or file; {file} is the file's path as the user wrote it. Keep --settings and the setting names as they are; \"Agent Settings\" and \"Settings → Claude Code\" are where to change it, as Combwork shows them. Keep { … } as it is."
   },
   "providers.settings.tooLarge": {
     "defaultMessage": "it's over Claude Code's 2 MiB limit for settings files",
@@ -388,7 +388,7 @@
     "description": "A notice in a conversation, in the Sessions tab's transcript viewer and its Markdown export: the turn ended early. {reason} is the coding agent's own word for why (timeout), in English."
   },
   "providers.unknown": {
-    "defaultMessage": "Unknown provider \"{provider}\". It may need a newer version of Hive.",
-    "description": "An agent or a setting names a coding-agent CLI this version of Hive doesn't know, as when a newer Hive wrote it. {provider} is the id."
+    "defaultMessage": "Unknown provider \"{provider}\". It may need a newer version of Combwork.",
+    "description": "An agent or a setting names a coding-agent CLI this version of Combwork doesn't know, as when a newer Combwork wrote it. {provider} is the id."
   }
 }

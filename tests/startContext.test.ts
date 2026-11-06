@@ -10,7 +10,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import type { ProviderAdapter } from '../src/main/providers/types'
 
-const base = tempDir('hive-start-context-')
+const base = tempDir('cw-start-context-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -76,8 +76,8 @@ describe('the start context in the hook replies (#1065)', () => {
     })
 
   beforeAll(async () => {
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     vi.spyOn(providerService, 'refresh').mockResolvedValue([])
@@ -86,7 +86,7 @@ describe('the start context in the hook replies (#1065)', () => {
     sessions.inboxNotice = null
     sessions.startContext = async (_state, source) => {
       given.push(source)
-      return `[Hive] view (${source})`
+      return `[CW] view (${source})`
     }
   })
   afterAll(async () => {
@@ -100,12 +100,12 @@ describe('the start context in the hook replies (#1065)', () => {
     const replies = await replay(agent(codex), codexHooks.hooks)
     const named = codexHooks.hooks.map((b, i) => [b.hook_event_name, replies[i]?.hookSpecificOutput ? (replies[i]!.hookSpecificOutput as { additionalContext: string }).additionalContext : null])
     expect(named).toEqual([
-      ['SessionStart', '[Hive] view (startup)'],
+      ['SessionStart', '[CW] view (startup)'],
       ['UserPromptSubmit', null],
       ['PreCompact', null],
       ['PostCompact', null],
-      ['SessionStart', '[Hive] view (resume)'],
-      ['SessionStart', '[Hive] view (compact)'],
+      ['SessionStart', '[CW] view (resume)'],
+      ['SessionStart', '[CW] view (compact)'],
       ['UserPromptSubmit', null]
     ])
   })
@@ -116,10 +116,10 @@ describe('the start context in the hook replies (#1065)', () => {
     const replies = await replay(st, copilotHooks.hooks)
     expect(copilotHooks.hooks.map((b, i) => [b.hook_event_name, replies[i]])).toEqual([
       ['UserPromptSubmit', null],
-      ['SessionStart', { additionalContext: '[Hive] view (new)' }],
+      ['SessionStart', { additionalContext: '[CW] view (new)' }],
       ['Stop', null],
       ['PreCompact', null],
-      ['UserPromptSubmit', { additionalContext: '[Hive] view (compact)' }],
+      ['UserPromptSubmit', { additionalContext: '[CW] view (compact)' }],
       ['Stop', null],
       ['SessionEnd', null]
     ])

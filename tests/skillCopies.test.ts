@@ -1,26 +1,26 @@
-// Hive's skill copies per folder (#1431, SPEC §16.15 C row 15): Codex and Copilot read Hive's skills from copies in the
-// folder's .agents/skills, which Hive records (skill_copies) and removes only when its record and the copy's marker both
-// say Hive made it, the copy is unchanged since and no session of Hive's works there; Settings → Advanced says where
+// Combwork's skill copies per folder (#1431, SPEC §16.15 C row 15): Codex and Copilot read Combwork's skills from copies in the
+// folder's .agents/skills, which Combwork records (skill_copies) and removes only when its record and the copy's marker both
+// say Combwork made it, the copy is unchanged since and no session of Combwork's works there; Settings → Advanced says where
 // (Slots only, Everywhere, Never). The skills delivered are a choice (Skills → Delivered to agents), which the launch,
 // the copies and the guidance follow.
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import type { SkillCopyBook, SkillCopyRecord } from '../src/main/providers/types'
 
-const base = tempDir('hive-skill-copies-')
+const base = tempDir('cw-skill-copies-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 
-const { syncAgentsSkills, removeHiveCopies } = await import('../src/main/providers/common')
+const { syncAgentsSkills, removeCombworkCopies } = await import('../src/main/providers/common')
 const { contentHash } = await import('../src/main/fsutil')
 const { SKILLS_REMOVE_IDLE_COPIES } = await import('../src/shared/advanced')
 const { offNames, skillOff, withSkillDelivered } = await import('../src/shared/skillDelivery')
-const { boardSkillsLine, hiveInstructions } = await import('../src/shared/hiveGuidance')
+const { boardSkillsLine, combworkInstructions } = await import('../src/shared/combworkGuidance')
 
-/** A book kept in memory, as hive.db's table keeps it (by folder and skill, case-insensitively). */
+/** A book kept in memory, as combwork.db's table keeps it (by folder and skill, case-insensitively). */
 function memBook(): SkillCopyBook & { rows: Map<string, SkillCopyRecord & { folder: string }> } {
   const rows = new Map<string, SkillCopyRecord & { folder: string }>()
   const key = (folder: string, skill: string): string => `${folder.toLowerCase()}\n${skill.toLowerCase()}`
@@ -46,7 +46,7 @@ function world(...names: string[]) {
     writeFileSync(join(sourcePath, 'SKILL.md'), `# ${name}`)
     return { name, sourcePath }
   })
-  const copy = (folder: string, name: string): string => join(folder, '.agents', 'skills', `hive-${name}`)
+  const copy = (folder: string, name: string): string => join(folder, '.agents', 'skills', `cw-${name}`)
   return { root, project, slot, sources, copy }
 }
 
@@ -67,7 +67,7 @@ describe('delivery records (#1431)', () => {
     expect(existsSync(join(w.project, '.agents'))).toBe(false)
   })
 
-  it('an edited copy keeps its old record, and is never taken for Hive\'s own', async () => {
+  it('an edited copy keeps its old record, and is never taken for Combwork\'s own', async () => {
     const w = world('deploy')
     const book = memBook()
     await sync(w.slot, w.project, w.sources, book)
@@ -82,43 +82,61 @@ describe('delivery records (#1431)', () => {
 })
 
 describe('safe clean-up (#1431)', () => {
-  it("removes Hive's own unchanged copies, never a user's skill, an edited copy or a folder with a running session", async () => {
+  it("removes Combwork's own unchanged copies, never a user's skill, an edited copy or a folder with a running session", async () => {
     const w = world('deploy', 'notes', 'review')
     const book = memBook()
     await sync(w.slot, w.project, w.sources, book)
-    // The user's own skills: one of their own name, one using Hive's prefix.
-    for (const mine of ['mine', 'hive-theirs']) {
+    // The user's own skills: one of their own name, one using Combwork's prefix.
+    for (const mine of ['mine', 'cw-theirs']) {
       mkdirSync(join(w.slot, '.agents', 'skills', mine), { recursive: true })
       writeFileSync(join(w.slot, '.agents', 'skills', mine, 'SKILL.md'), `# ${mine}`)
     }
     writeFileSync(join(w.copy(w.slot, 'review'), 'SKILL.md'), '# review, edited')
 
-    // A session of Hive's works there: nothing goes.
-    expect(await removeHiveCopies(w.slot, w.project, book, () => true)).toEqual([])
+    // A session of Combwork's works there: nothing goes.
+    expect(await removeCombworkCopies(w.slot, w.project, book, () => true)).toEqual([])
     for (const s of ['deploy', 'notes', 'review']) expect(existsSync(w.copy(w.slot, s)), s).toBe(true)
 
-    // None now: Hive's two unchanged copies go, with their records; the edited one and the user's stay.
-    expect((await removeHiveCopies(w.slot, w.project, book, () => false)).sort()).toEqual(['deploy', 'notes'])
+    // None now: Combwork's two unchanged copies go, with their records; the edited one and the user's stay.
+    expect((await removeCombworkCopies(w.slot, w.project, book, () => false)).sort()).toEqual(['deploy', 'notes'])
     expect(existsSync(w.copy(w.slot, 'deploy'))).toBe(false)
     expect(existsSync(w.copy(w.slot, 'notes'))).toBe(false)
     expect(readFileSync(join(w.copy(w.slot, 'review'), 'SKILL.md'), 'utf8')).toBe('# review, edited')
     expect(readFileSync(join(w.slot, '.agents', 'skills', 'mine', 'SKILL.md'), 'utf8')).toBe('# mine')
-    expect(readFileSync(join(w.slot, '.agents', 'skills', 'hive-theirs', 'SKILL.md'), 'utf8')).toBe('# hive-theirs')
+    expect(readFileSync(join(w.slot, '.agents', 'skills', 'cw-theirs', 'SKILL.md'), 'utf8')).toBe('# cw-theirs')
     expect([...book.rows.values()].map((r) => r.skill)).toEqual(['review'])
     // Nothing of a swap is left beside them.
     expect(readdirSync(join(w.slot, '.agents', 'skills')).filter((f) => f.startsWith('.')).length).toBe(0)
   })
 
-  it("a marked copy from before records is Hive's when unchanged (recorded, then removed); one with an old marker isn't", async () => {
+  it("a marked copy from before records is Combwork's when unchanged (recorded, then removed); one with an old marker isn't", async () => {
     const w = world('deploy', 'legacy')
     // Made without a book (before records): marked, unrecorded.
     await sync(w.slot, w.project, w.sources)
     // A marker from before hashes: whether it changed can't be told.
-    writeFileSync(join(w.copy(w.slot, 'legacy'), '.hive-copy'), JSON.stringify({ source: 'x' }) + '\n')
+    writeFileSync(join(w.copy(w.slot, 'legacy'), '.combwork-copy'), JSON.stringify({ source: 'x' }) + '\n')
     const book = memBook()
-    expect(await removeHiveCopies(w.slot, w.project, book, () => false)).toEqual(['deploy'])
+    expect(await removeCombworkCopies(w.slot, w.project, book, () => false)).toEqual(['deploy'])
     expect(existsSync(w.copy(w.slot, 'legacy'))).toBe(true)
     expect(book.rows.size).toBe(0)
+  })
+
+  // old-name: begin old-copy-prefix
+  it('a folder under the old prefix (hive-<skill>) is never read or touched by delivery or clean-up: the names upgrade retires the old copies (HI-2594)', async () => {
+    const w = world('deploy')
+    const book = memBook()
+    await sync(w.slot, w.project, w.sources, book)
+    // As a build before the rename left one: the same copy, marked, under the old prefix.
+    const old = join(w.slot, '.agents', 'skills', 'hive-deploy')
+  // old-name: end old-copy-prefix
+    renameSync(w.copy(w.slot, 'deploy'), old)
+    const out = await sync(w.slot, w.project, w.sources, book)
+    expect(readFileSync(join(old, 'SKILL.md'), 'utf8')).toBe('# deploy')
+    expect(readFileSync(join(w.copy(w.slot, 'deploy'), 'SKILL.md'), 'utf8')).toBe('# deploy')
+    expect(out.deploy.revision).toBe(await contentHash(w.copy(w.slot, 'deploy')))
+    expect(await removeCombworkCopies(w.slot, w.project, book, () => false)).toEqual(['deploy'])
+    expect(existsSync(w.copy(w.slot, 'deploy'))).toBe(false)
+    expect(readFileSync(join(old, 'SKILL.md'), 'utf8')).toBe('# deploy')
   })
 
   it("records it can't read keep every copy; a record whose copy has gone is dropped", async () => {
@@ -126,10 +144,10 @@ describe('safe clean-up (#1431)', () => {
     const book = memBook()
     await sync(w.slot, w.project, w.sources, book)
     const broken: SkillCopyBook = { ...book, of: async () => Promise.reject(new Error('board closed')) }
-    expect(await removeHiveCopies(w.slot, w.project, broken, () => false)).toEqual([])
+    expect(await removeCombworkCopies(w.slot, w.project, broken, () => false)).toEqual([])
     expect(existsSync(w.copy(w.slot, 'deploy'))).toBe(true)
     rmSync(w.copy(w.slot, 'deploy'), { recursive: true })
-    expect(await removeHiveCopies(w.slot, w.project, book, () => false)).toEqual([])
+    expect(await removeCombworkCopies(w.slot, w.project, book, () => false)).toEqual([])
     expect(book.rows.size).toBe(0)
   })
 
@@ -142,13 +160,13 @@ describe('safe clean-up (#1431)', () => {
     const launch = (): Promise<unknown> => ((busy = true), sync(w.slot, w.project, w.sources, book))
     // The launch first: the clean-up, queued behind it, finds the folder busy and removes nothing.
     const first = launch()
-    const after = removeHiveCopies(w.slot, w.project, book, () => busy)
+    const after = removeCombworkCopies(w.slot, w.project, book, () => busy)
     await first
     expect(await after).toEqual([])
     // The clean-up asked first, the session live before it takes the lock (or after: then the launch behind it copies
     // again): either way the launch ends with its copy, recorded.
     busy = false
-    const cleanUp = removeHiveCopies(w.slot, w.project, book, () => busy)
+    const cleanUp = removeCombworkCopies(w.slot, w.project, book, () => busy)
     const second = launch()
     await cleanUp
     await second
@@ -163,7 +181,7 @@ describe('safe clean-up (#1431)', () => {
     let reading!: () => void
     const inside = new Promise<void>((r) => (reading = r))
     const slow: SkillCopyBook = { ...book, of: async (f) => (reading(), await gate, book.of(f)) }
-    const held = removeHiveCopies(w.slot, w.project, slow, () => busy)
+    const held = removeCombworkCopies(w.slot, w.project, slow, () => busy)
     await inside
     const third = launch()
     open()
@@ -181,17 +199,17 @@ describe('safe clean-up (#1431)', () => {
       const file = join(w.copy(w.slot, 'deploy'), 'SKILL.md')
       const book = memBook()
       const editing: SkillCopyBook = { ...book, record: async (...a) => (writeFileSync(file, '# deploy, my edit'), book.record(...a)) }
-      const removed = via === 'clean-up' ? await removeHiveCopies(w.slot, w.project, editing, () => false) : (await sync(w.slot, w.project, [], editing), [])
+      const removed = via === 'clean-up' ? await removeCombworkCopies(w.slot, w.project, editing, () => false) : (await sync(w.slot, w.project, [], editing), [])
       expect(removed, via).toEqual([])
       expect(readFileSync(file, 'utf8'), via).toBe('# deploy, my edit')
-      // Its record is at the revision before the edit: never taken for Hive's own again.
-      expect(await removeHiveCopies(w.slot, w.project, book, () => false), via).toEqual([])
+      // Its record is at the revision before the edit: never taken for Combwork's own again.
+      expect(await removeCombworkCopies(w.slot, w.project, book, () => false), via).toEqual([])
       expect(readFileSync(file, 'utf8'), via).toBe('# deploy, my edit')
       expect(readdirSync(join(w.slot, '.agents', 'skills')).filter((f) => f.startsWith('.')), via).toEqual([])
     }
   })
 
-  it('a skill switched off keeps its copy while another session of Hive\'s works in the folder, and loses it once none does', async () => {
+  it('a skill switched off keeps its copy while another session of Combwork\'s works in the folder, and loses it once none does', async () => {
     const w = world('deploy', 'notes')
     const book = memBook()
     await sync(w.slot, w.project, w.sources, book)
@@ -220,14 +238,14 @@ describe('the switch: Slots only, Everywhere, Never (#1431)', () => {
     expect([removesIn(slot, project, 'never'), removesIn(project, project, 'never')]).toEqual([false, false])
   })
 
-  it("in a workspace: the record is hive.db's, and each value removes the copies where it says, at a session's end and at start", async () => {
+  it("in a workspace: the record is combwork.db's, and each value removes the copies where it says, at a session's end and at start", async () => {
     const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
     const { advanced } = await import('../src/main/advanced')
     const { closeAllBoards } = await import('../src/main/boardStore')
     const { copyBook, initSkillCopies, removeCopiesIn, sessionEnded, sweepIdleCopies, idleCopies } = await import('../src/main/skillCopies')
     const w = world('deploy')
-    mkdirSync(join(w.project, '.hive'), { recursive: true })
-    writeFileSync(join(w.project, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
+    mkdirSync(join(w.project, '.combwork'), { recursive: true })
+    writeFileSync(join(w.project, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
     const ws = createWorkspaceService()
     await ws.open(w.root)
     const busy = new Set<string>()
@@ -299,11 +317,11 @@ describe('choosing the skills delivered (#1431)', () => {
     const { sessions } = await import('../src/main/sessions')
     const { closeAllBoards } = await import('../src/main/boardStore')
     const w = world()
-    mkdirSync(join(w.project, '.hive'), { recursive: true })
-    writeFileSync(join(w.project, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
+    mkdirSync(join(w.project, '.combwork'), { recursive: true })
+    writeFileSync(join(w.project, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
     for (const name of ['deploy', 'notes', 'helper']) {
-      mkdirSync(join(w.root, '.hive', 'skills', name), { recursive: true })
-      writeFileSync(join(w.root, '.hive', 'skills', name, 'SKILL.md'), `---\nname: ${name}\ndescription: The ${name} skill.\n${name === 'helper' ? 'metadata:\n  audience: assistant\n' : ''}---\n\n# ${name}\n`)
+      mkdirSync(join(w.root, '.combwork', 'skills', name), { recursive: true })
+      writeFileSync(join(w.root, '.combwork', 'skills', name, 'SKILL.md'), `---\nname: ${name}\ndescription: The ${name} skill.\n${name === 'helper' ? 'metadata:\n  audience: assistant\n' : ''}---\n\n# ${name}\n`)
     }
     const ws = createWorkspaceService()
     await ws.open(w.root)
@@ -320,9 +338,9 @@ describe('choosing the skills delivered (#1431)', () => {
       expect(await names()).toEqual([])
       expect(await names(ws.assistantHome)).toEqual(['helper'])
 
-      // The copies follow the launch's skills: the one switched off goes from Hive's copies at the next launch.
+      // The copies follow the launch's skills: the one switched off goes from Combwork's copies at the next launch.
       const book = memBook()
-      const all = ['deploy', 'notes'].map((name) => ({ name, sourcePath: join(w.root, '.hive', 'skills', name) }))
+      const all = ['deploy', 'notes'].map((name) => ({ name, sourcePath: join(w.root, '.combwork', 'skills', name) }))
       await sync(w.slot, w.project, all, book)
       await sync(w.slot, w.project, all.filter((s) => s.name !== 'notes'), book)
       expect([existsSync(w.copy(w.slot, 'deploy')), existsSync(w.copy(w.slot, 'notes'))]).toEqual([true, false])
@@ -334,17 +352,17 @@ describe('choosing the skills delivered (#1431)', () => {
   })
 
   it("the guidance names only the skills delivered: switching one off drops it from the session contract", () => {
-    const all = hiveInstructions('p')
+    const all = combworkInstructions('p')
     expect(all).toContain(boardSkillsLine())
     for (const skill of ['work-on-card', 'review-agent-work', 'card-loop', 'generalist']) {
       expect(all, skill).toContain(skill)
-      const without = hiveInstructions('p', 'agent', true, new Set([skill]))
+      const without = combworkInstructions('p', 'agent', true, new Set([skill]))
       expect(without, skill).not.toContain(skill)
     }
-    expect(hiveInstructions('p', 'agent', true, new Set(['handover']))).not.toMatch(/\bhandovers,/)
+    expect(combworkInstructions('p', 'agent', true, new Set(['handover']))).not.toMatch(/\bhandovers,/)
     expect(boardSkillsLine(new Set(['work-on-card']))).toMatch(/Asked to review or check a card, use review-agent-work/)
-    expect(boardSkillsLine(new Set(['work-on-card', 'review-agent-work', 'card-loop', 'handover', 'pick-up', 'workspace-note', 'merge-ready', 'split-work', 'use-hive-api', 'generalist']))).toBe("The board shows your project's cards, each named by its key (AM-12).")
+    expect(boardSkillsLine(new Set(['work-on-card', 'review-agent-work', 'card-loop', 'handover', 'pick-up', 'workspace-note', 'merge-ready', 'split-work', 'use-cw-api', 'generalist']))).toBe("The board shows your project's cards, each named by its key (AM-12).")
     // The Assistant's own skills aren't chosen here.
-    expect(hiveInstructions('', 'assistant', true, new Set(['handover']))).toBe(hiveInstructions('', 'assistant'))
+    expect(combworkInstructions('', 'assistant', true, new Set(['handover']))).toBe(combworkInstructions('', 'assistant'))
   })
 })

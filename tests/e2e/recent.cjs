@@ -18,7 +18,7 @@ const check = (name, ok, extra = '') => {
 ;(async () => {
   for (const d of [userData, wsA, wsB, wsC]) fs.rmSync(d, { recursive: true, force: true })
   for (const w of [wsA, wsB, wsC]) fs.mkdirSync(path.join(w, 'app'), { recursive: true })
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: lib.port(47932) } })
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_API_PORT: lib.port(47932) } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   const recent = async () => (await inv('workspace:recent')).map((r) => path.basename(r.path))
   const shot = (name, p = page) => p.screenshot({ path: path.join(lib.WORK, `recent-${name}.png`) })

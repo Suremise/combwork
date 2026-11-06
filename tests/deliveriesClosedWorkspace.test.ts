@@ -1,5 +1,5 @@
 // A closed workspace's deliveries (#1391): once a window closes it (switches away), its hosts' stores go from memory, so
-// the tick no longer rechecks them, each change of which leased its closed hive.db again, and nothing reads them again
+// the tick no longer rechecks them, each change of which leased its closed combwork.db again, and nothing reads them again
 // until a window opens it; a read the close caught isn't kept. They stay in its database and come back as it opens.
 import { mkdirSync, unlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -8,7 +8,7 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { junction } from './pathAliases'
 
-const base = tempDir('hive-deliveries-closed-')
+const base = tempDir('cw-deliveries-closed-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
@@ -30,8 +30,8 @@ function gate(): { held: Promise<void>; release: () => void } {
 describe("a closed workspace's deliveries", () => {
   beforeAll(async () => {
     for (const ws of [wsA, wsB]) {
-      mkdirSync(join(ws, 'proj', '.hive'), { recursive: true })
-      writeFileSync(join(ws, 'proj', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }] }))
+      mkdirSync(join(ws, 'proj', '.combwork'), { recursive: true })
+      writeFileSync(join(ws, 'proj', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }] }))
     }
     mkdirSync(join(base, 'profile'), { recursive: true })
     // No agent runs: nothing is typed, deliveries only wait.
@@ -50,13 +50,13 @@ describe("a closed workspace's deliveries", () => {
   const queued = async (): Promise<string> => {
     await w.open(wsA)
     await deliveries.loadsForTests()
-    const { id } = await deliveries.createDelivery(host, { agentId: 'b1', agentName: 'B1', conversation: null, kind: 'card-event', from: { kind: 'hive', name: 'Hive' }, card: 7, body: '[Hive] #7 is in Review.' })
+    const { id } = await deliveries.createDelivery(host, { agentId: 'b1', agentName: 'B1', conversation: null, kind: 'card-event', from: { kind: 'combwork', name: 'Combwork' }, card: 7, body: '[CW] #7 is in Review.' })
     await deliveries.settledForTests()
     expect(deliveries.deliveryNow(host, id)?.state).toBe('queued')
     return id
   }
 
-  it('go from memory as the window switches away: a tick, an offer or a load opens its hive.db no more, and they come back as it opens', async () => {
+  it('go from memory as the window switches away: a tick, an offer or a load opens its combwork.db no more, and they come back as it opens', async () => {
     const id = await queued()
 
     await w.open(wsB)

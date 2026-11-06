@@ -1,17 +1,16 @@
-// The Assistant's settings tools (#186) on a provider's prices (#315): null puts back Hive's prices as Settings' Reset to
-// defaults does, the shipped models removed from the table too; a table keeps them removed; Revert puts the removed list
-// back with the overrides, and is refused when it changed since.
+// The Assistant's settings tools (#186) on a provider's prices (#315): null puts back Combwork's prices as Settings' Reset to
+// defaults does, the shipped models removed from the table too; a table keeps them removed. Undo coverage is in assistantUndo.test.ts.
 import { describe, expect, it, vi } from 'vitest'
 import { config } from '../src/main/config'
-import * as assistant from '../src/main/assistantControl'
-import { applySetting, revertSetting } from '../src/main/settingsTools'
+import { applySetting } from '../src/main/settingsTools'
 import { inWorkspace } from '../src/main/workspace'
 import type { WorkspaceConfig } from '../src/shared/types'
-import { settingChangeTexts, settingEntry } from '../src/shared/settingsCatalog'
+import { settingChangeTexts, settingEntry, settingReadOnly } from '../src/shared/settingsCatalog'
+import { advanced } from '../src/main/advanced'
+import { AGENT_TEMP_FOLDER_ID, CARD_ATTACHMENT_FOLDERS_ID } from '../src/shared/advanced'
 
 const prices = settingEntry('codex.prices')!
 const mine = { 'gpt-7': { input: 1, cachedInput: 0.1, output: 5 } }
-const WS = 'C:\\hive-test\\settings-tools-ws'
 
 /** Runs with Codex's price table set to `own` overrides and `removed` shipped models, then puts the settings back. */
 async function withPrices(own: Record<string, unknown>, removed: string[], fn: () => Promise<void>): Promise<void> {
@@ -24,12 +23,6 @@ async function withPrices(own: Record<string, unknown>, removed: string[], fn: (
   }
 }
 
-/** Lists a change as the Agent API does, for Revert. */
-function listed(r: Awaited<ReturnType<typeof applySetting>>) {
-  const { oldText, newText } = settingChangeTexts(prices, r.old, r.new, r.removed)
-  return assistant.record(WS, { kind: 'setting', settingId: prices.id }, `Changed prices: ${oldText} → ${newText}`, undefined, { setting: { id: prices.id, path: 'Settings → Codex → API prices', old: r.old, new: r.new, ...(r.removed ? { removed: r.removed } : {}), oldText, newText } })
-}
-
 describe("the settings tools on a provider's prices", () => {
   it('null puts back the shipped models removed from the table, and says so', async () => {
     await withPrices(mine, ['gpt-5.5'], async () => {
@@ -37,7 +30,7 @@ describe("the settings tools on a provider's prices", () => {
       expect(r).toEqual({ old: mine, new: {}, removed: { old: ['gpt-5.5'], new: [] } })
       expect(config.settings.providers.codex.prices).toEqual({})
       expect('pricesRemoved' in config.settings.providers.codex).toBe(false)
-      expect(settingChangeTexts(prices, r.old, r.new, r.removed)).toEqual({ oldText: 'gpt-7: {"input":1,"cachedInput":0.1,"output":5}, gpt-5.5: removed', newText: "gpt-7: (none), gpt-5.5: Hive's price" })
+      expect(settingChangeTexts(prices, r.old, r.new, r.removed)).toEqual({ oldText: 'gpt-7: {"input":1,"cachedInput":0.1,"output":5}, gpt-5.5: removed', newText: "gpt-7: (none), gpt-5.5: Combwork's price" })
     })
   })
 
@@ -45,7 +38,7 @@ describe("the settings tools on a provider's prices", () => {
     await withPrices({}, ['gpt-5.5'], async () => {
       const r = await applySetting(prices, null, null)
       expect(r.removed).toEqual({ old: ['gpt-5.5'], new: [] })
-      expect(settingChangeTexts(prices, r.old, r.new, r.removed)).toEqual({ oldText: 'gpt-5.5: removed', newText: "gpt-5.5: Hive's price" })
+      expect(settingChangeTexts(prices, r.old, r.new, r.removed)).toEqual({ oldText: 'gpt-5.5: removed', newText: "gpt-5.5: Combwork's price" })
     })
   })
 
@@ -58,39 +51,35 @@ describe("the settings tools on a provider's prices", () => {
     })
   })
 
-  it('Revert of a reset puts back the overrides and the removed models', async () => {
-    await withPrices(mine, ['gpt-5.5'], async () => {
-      const action = listed(await applySetting(prices, null, null))
-      await revertSetting(WS, action.id)
-      expect(config.settings.providers.codex.prices).toEqual(mine)
-      expect(config.settings.providers.codex.pricesRemoved).toEqual(['gpt-5.5'])
-    })
+  // HI-2480 round 2: where agents may attach files from is a permission: the Assistant reads it and never sets it.
+  it("Card attachments: more folders is the user's: read and explained, never set by the Assistant, Combwork's or a workspace's", async () => {
+    for (const id of ['advanced.cw.cards.attachmentFolders', 'workspace.advanced.cw.cards.attachmentFolders']) {
+      const e = settingEntry(id)!
+      expect(e, id).toMatchObject({ sensitive: true })
+      expect(settingReadOnly(e), id).toMatch(/^It decides which folders agents, the Assistant and scripts may attach files to cards from: only the user can change it, in /)
+      await expect(applySetting(e, ['C:\\Evidence'], null), id).rejects.toMatchObject({ status: 403 })
+    }
+    expect(advanced.get(CARD_ATTACHMENT_FOLDERS_ID)).toEqual([])
+  })
+  // HI-2496: Agents' temp folder redirects every agent's file writes, the Assistant's own launch's too: the user's alone.
+  it("Agents' temp folder is the user's: read and explained, never set by the Assistant, Combwork's or a workspace's", async () => {
+    for (const id of ['advanced.cw.agents.tempFolder', 'workspace.advanced.cw.agents.tempFolder']) {
+      const e = settingEntry(id)!
+      expect(e, id).toMatchObject({ sensitive: true })
+      expect(settingReadOnly(e), id).toMatch(/^It decides where agents and the Assistant itself write their temporary files: only the user can change it, in /)
+      await expect(applySetting(e, ['D:\\agent-tmp'], null), id).rejects.toMatchObject({ status: 403 })
+    }
+    expect(advanced.get(AGENT_TEMP_FOLDER_ID)).toEqual([])
   })
 
-  it('…and is refused when the removed models changed since, keeping them', async () => {
-    await withPrices(mine, ['gpt-5.5'], async () => {
-      const action = listed(await applySetting(prices, null, null))
-      config.setProviderPrices('codex', {}, ['gpt-5.4'])
-      await expect(revertSetting(WS, action.id)).rejects.toThrow(/has changed since/)
-      expect(config.settings.providers.codex.pricesRemoved).toEqual(['gpt-5.4'])
-    })
-  })
 
-  it("Revert of a table edit leaves the removed models as they are then", async () => {
-    await withPrices(mine, ['gpt-5.5'], async () => {
-      const action = listed(await applySetting(prices, {}, null))
-      await revertSetting(WS, action.id)
-      expect(config.settings.providers.codex.prices).toEqual(mine)
-      expect(config.settings.providers.codex.pricesRemoved).toEqual(['gpt-5.5'])
-    })
-  })
 })
 
 describe('extra arguments with a bare "--" (#523)', () => {
   it("are refused when saved, the providers' and the Assistant's, and the settings stay as they were", () => {
     const was = structuredClone(config.settings)
     try {
-      const refused = 'Hive passes the task after "--"; remove it from extra arguments.'
+      const refused = 'Combwork passes the task after "--"; remove it from extra arguments.'
       expect(() => config.updateSettings({ providers: { 'claude-code': { extraArgs: '--allowedTools Read Bash --' } } } as never)).toThrow(refused)
       expect(() => config.updateSettings({ assistant: { providers: { codex: { extraArgs: '-- hello' } } } } as never)).toThrow(refused)
       expect(config.settings.providers['claude-code'].extraArgs).toBe(was.providers['claude-code'].extraArgs)
@@ -105,7 +94,7 @@ describe('extra arguments with a bare "--" (#523)', () => {
   })
 })
 
-describe("the settings tools on the copied files, Hive's slot default (HI-1765)", () => {
+describe("the settings tools on the copied files, Combwork's slot default (HI-1765)", () => {
   it('sets patterns, none and inherit, saved as Settings saves the level, the old and new values said', async () => {
     const e = settingEntry('workflow.git.slotCopy')!
     const was = config.settings.slotDefaults

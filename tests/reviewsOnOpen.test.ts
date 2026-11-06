@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-reviews-open-')
+const base = tempDir('cw-reviews-open-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace, WorkspaceService } = await import('../src/main/workspace')
@@ -23,7 +23,7 @@ const user = { kind: 'user' } as const
 const as = (agentId: string, name: string) => ({ kind: 'agent', name: `${name} (alpha)`, self: { project: 'alpha', agentId }, scope: 'alpha' }) as const
 const reviewer = as('r1', 'Reviewer')
 const third = as('t1', 'Third')
-const STOPPED = 'Hive: Review by Reviewer stopped: its session ended'
+const STOPPED = 'Combwork: Review by Reviewer stopped: its session ended'
 
 /** Holds a promise until `release()`: the moment a test closes or switches the workspace in. */
 function gate(): { held: Promise<void>; release: () => void } {
@@ -51,8 +51,8 @@ describe("a reviewer's mark a close left ends as the workspace opens again (#139
 
   beforeAll(async () => {
     for (const ws of [wsA, wsB, wsC, wsD]) {
-      mkdirSync(join(ws, 'alpha', '.hive'), { recursive: true })
-      writeFileSync(join(ws, 'alpha', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'c1', name: 'Coder' }, { id: 'r1', name: 'Reviewer' }, { id: 't1', name: 'Third' }] }))
+      mkdirSync(join(ws, 'alpha', '.combwork'), { recursive: true })
+      writeFileSync(join(ws, 'alpha', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'c1', name: 'Coder' }, { id: 'r1', name: 'Reviewer' }, { id: 't1', name: 'Third' }] }))
     }
     mkdirSync(join(base, 'profile'), { recursive: true })
     Object.assign(sessions, { liveFor: (p: string, id: string) => (running.has(`${p}#${id}`.toLowerCase()) ? ({ projectPath: p, agentId: id } as never) : null) })

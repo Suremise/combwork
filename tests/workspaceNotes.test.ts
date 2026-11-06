@@ -1,5 +1,5 @@
 // Workspace notes (#1433, #873, SPEC §16.10.7): one shared note per workspace, delivered inline at each launch after
-// Hive's guidance, on every CLI and in any folder; a project's own section reaches only its agents; bounded at 4 KB
+// Combwork's guidance, on every CLI and in any folder; a project's own section reaches only its agents; bounded at 4 KB
 // (Settings → Advanced), cut with a pointer; off with the note empty or the switch.
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -9,14 +9,14 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import type { LaunchContext } from '../src/main/providers/types'
 
-const base = tempDir('hive-workspace-notes-')
+const base = tempDir('cw-workspace-notes-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 const homes = { CODEX_HOME: process.env.CODEX_HOME, COPILOT_HOME: process.env.COPILOT_HOME }
 
 const { advanced } = await import('../src/main/advanced')
 const { appendedInstructions, claudeCode } = await import('../src/main/providers/claude/adapter')
 const { codex } = await import('../src/main/providers/codex/adapter')
-const { copilot, HIVE_TOOL_NAMES } = await import('../src/main/providers/copilot/adapter')
+const { copilot, toolNamesLine } = await import('../src/main/providers/copilot/adapter')
 const { DELIVER_WORKSPACE_NOTES, WORKSPACE_NOTES_MAX_ID, advancedDef, overrideId } = await import('../src/shared/advanced')
 const { overridesNow } = await import('../src/main/advancedValues')
 const { deliveredNotes, notesFor, WORKSPACE_NOTES_MAX, WORKSPACE_NOTES_PATH, workspaceNotesPath } = await import('../src/shared/workspaceNotes')
@@ -119,10 +119,10 @@ describe('the note and its sections', () => {
   })
 
   it('has its switches in Settings → Advanced, for sessions started afterwards, and a fixed path', () => {
-    expect(advancedDef(DELIVER_WORKSPACE_NOTES)).toMatchObject({ kind: 'boolean', default: true, applies: 'sessions', group: 'hive' })
+    expect(advancedDef(DELIVER_WORKSPACE_NOTES)).toMatchObject({ kind: 'boolean', default: true, applies: 'sessions', group: 'cw' })
     expect(advancedDef(WORKSPACE_NOTES_MAX_ID)).toMatchObject({ kind: 'number', default: 4096, unit: 'bytes', applies: 'sessions' })
     expect(WORKSPACE_NOTES_PATH).toBe('Workspace notes.md')
-    expect(workspaceNotesPath('D:\\ws\\')).toBe('D:\\ws\\.hive\\shared\\Workspace notes.md')
+    expect(workspaceNotesPath('D:\\ws\\')).toBe('D:\\ws\\.combwork\\shared\\Workspace notes.md')
   })
 })
 
@@ -131,8 +131,8 @@ function context(over: Partial<LaunchContext> = {}): LaunchContext {
   mkdirSync(cwd, { recursive: true })
   return {
     projectPath: cwd, agentId: 'a-1', executable: 'C:\\bin\\cli.exe', cwd, workspacePath: base, runId: `r-${Math.random()}`, sessionId: '0cb916db-26aa-40f2-86b5-1ba81b225fd2',
-    resume: false, name: '', skills: [], mcpServers: { hive: { command: 'node', args: ['hive-mcp.js'] } }, model: null, effort: null, permissionMode: null, extraArgs: [],
-    hookUrl: 'http://127.0.0.1:5000/hook?run=r1', hookAuthFile: join(base, 'auth.txt'), privateDir: join(base, `private-${Math.random()}`), guidance: 'Hive guidance', allowBackgroundSessions: false, use200kContext: false,
+    resume: false, name: '', skills: [], mcpServers: { combwork: { command: 'node', args: ['cw-mcp.js'] } }, model: null, effort: null, permissionMode: null, extraArgs: [],
+    hookUrl: 'http://127.0.0.1:5000/hook?run=r1', hookAuthFile: join(base, 'auth.txt'), privateDir: join(base, `private-${Math.random()}`), guidance: 'Combwork guidance', allowBackgroundSessions: false, use200kContext: false,
     env: { PATH: 'C:\\Windows' },
     ...over
   }
@@ -140,7 +140,7 @@ function context(over: Partial<LaunchContext> = {}): LaunchContext {
 
 const NOTES = deliveredNotes('Node is C:\\tools\\node22\\node.exe here.').text
 
-describe('delivered at launch, on every CLI, after Hive\'s guidance', () => {
+describe('delivered at launch, on every CLI, after Combwork\'s guidance', () => {
   it("Claude Code: appended to the system prompt from the launch's file, after the Assistant's role", () => {
     expect(appendedInstructions(context({ notes: NOTES }))).toBe(NOTES)
     expect(appendedInstructions(context({ notes: NOTES, instructions: 'You are in Planner mode.' }))).toBe(`You are in Planner mode.\n\n${NOTES}`)
@@ -152,7 +152,7 @@ describe('delivered at launch, on every CLI, after Hive\'s guidance', () => {
     expect(args(context({ notes: NOTES, resume: true, cliVersion: '2.1.305' })).join(' ')).toContain('--system-prompt-snapshot off')
   })
 
-  it("Claude Code: a conversation Hive gave instructions to before loses them on resume once they're off or emptied (HR5's rounds 1–2)", () => {
+  it("Claude Code: a conversation Combwork gave instructions to before loses them on resume once they're off or emptied (HR5's rounds 1–2)", () => {
     /** A launch's command: whether it renders the prompt fresh, and whether it appends. */
     const launch = (over: Partial<LaunchContext>) => {
       const args = claudeCode.buildCommand('C:\\bin\\claude.exe', context({ cliVersion: '2.1.305', mcpServers: {}, guidance: '', ...over })).args
@@ -160,7 +160,7 @@ describe('delivered at launch, on every CLI, after Hive\'s guidance', () => {
     }
     // Started with notes.
     expect(launch({ notes: NOTES })).toEqual({ fresh: false, appends: true })
-    // Resumed with notes switched off or emptied (none given now), the conversation's record saying Hive gave some before
+    // Resumed with notes switched off or emptied (none given now), the conversation's record saying Combwork gave some before
     // (SessionRecord.promptAdded, by whichever agent): nothing appended, and the prompt rendered fresh, without the old note.
     expect(launch({ resume: true, notes: '', promptAddedBefore: true })).toEqual({ fresh: true, appends: false })
     // A conversation never given any: left as Claude Code keeps it.
@@ -179,21 +179,21 @@ describe('delivered at launch, on every CLI, after Hive\'s guidance', () => {
   })
 
   it('Copilot: in its instruction file, after the guidance and the role', async () => {
-    const file = (ctx: LaunchContext): string => readFileSync(join(ctx.privateDir, 'instructions', '.github', 'instructions', 'hive.instructions.md'), 'utf8')
+    const file = (ctx: LaunchContext): string => readFileSync(join(ctx.privateDir, 'instructions', '.github', 'instructions', 'combwork.instructions.md'), 'utf8')
     const agent = context({ notes: NOTES })
     await copilot.prepareLaunch(agent)
-    // The guidance comes as the hive server's instructions (the switch on): the file has the tools' names and the notes.
-    expect(file(agent)).toBe(`---\napplyTo: '**'\n---\n${HIVE_TOOL_NAMES}\n\n${NOTES}\n`)
+    // The guidance comes as the combwork server's instructions (the switch on): the file has the tools' names and the notes.
+    expect(file(agent)).toBe(`---\napplyTo: '**'\n---\n${toolNamesLine()}\n\n${NOTES}\n`)
     expect(copilot.buildCommand('C:\\bin\\copilot.exe', agent).env?.COPILOT_CUSTOM_INSTRUCTIONS_DIRS).toBe(join(agent.privateDir, 'instructions'))
     const assistant = context({ notes: NOTES, instructions: 'You are in Planner mode.' })
     await copilot.prepareLaunch(assistant)
-    expect(file(assistant)).toBe(`---\napplyTo: '**'\n---\n${HIVE_TOOL_NAMES}\n\nYou are in Planner mode.\n\n${NOTES}\n`)
+    expect(file(assistant)).toBe(`---\napplyTo: '**'\n---\n${toolNamesLine()}\n\nYou are in Planner mode.\n\n${NOTES}\n`)
     const none = context()
     await copilot.prepareLaunch(none)
-    expect(file(none)).toBe(`---\napplyTo: '**'\n---\n${HIVE_TOOL_NAMES}\n`)
+    expect(file(none)).toBe(`---\napplyTo: '**'\n---\n${toolNamesLine()}\n`)
   })
 
-  it("Codex: in developer_instructions after the user's own and Hive's guidance; Codex unable to say, an agent's are left alone", async () => {
+  it("Codex: in developer_instructions after the user's own and Combwork's guidance; Codex unable to say, an agent's are left alone", async () => {
     const fake = join(__dirname, 'e2e', 'fake-codex', 'fake-codex.cmd')
     const home = join(base, 'developer-codex-home')
     const homeBefore = process.env.CODEX_HOME
@@ -208,11 +208,11 @@ describe('delivered at launch, on every CLI, after Hive\'s guidance', () => {
       return a ? (parseToml(a) as { developer_instructions: string }).developer_instructions : null
     }
     try {
-      expect(await developer({ notes: NOTES })).toBe(`Hive guidance\n\n${NOTES}`)
+      expect(await developer({ notes: NOTES })).toBe(`Combwork guidance\n\n${NOTES}`)
       writeFileSync(said, 'Mine.')
-      expect(await developer({ notes: NOTES })).toBe(`Mine.\n\nHive guidance\n\n${NOTES}`)
-      expect(await developer({ notes: NOTES, instructions: 'You are the Assistant.' })).toBe(`Mine.\n\nHive guidance\n\nYou are the Assistant.\n\n${NOTES}`)
-      // Hive's guidance off: the notes still come, after the user's own.
+      expect(await developer({ notes: NOTES })).toBe(`Mine.\n\nCombwork guidance\n\n${NOTES}`)
+      expect(await developer({ notes: NOTES, instructions: 'You are the Assistant.' })).toBe(`Mine.\n\nCombwork guidance\n\nYou are the Assistant.\n\n${NOTES}`)
+      // Combwork's guidance off: the notes still come, after the user's own.
       expect(await developer({ notes: NOTES, guidance: '' })).toBe(`Mine.\n\n${NOTES}`)
       writeFileSync(said, '!fail')
       expect(await developer({ notes: NOTES })).toBeNull()
@@ -232,8 +232,8 @@ describe("in a workspace: the launch's notes and the switch", () => {
     const { workspaceNotesFor } = await import('../src/main/workspaceNotes')
     const root = join(base, 'ws')
     for (const p of PROJECTS) {
-      mkdirSync(join(root, p, '.hive'), { recursive: true })
-      writeFileSync(join(root, p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+      mkdirSync(join(root, p, '.combwork'), { recursive: true })
+      writeFileSync(join(root, p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     }
     const ws = createWorkspaceService()
     await ws.open(root)
@@ -267,13 +267,13 @@ describe("in a workspace: the launch's notes and the switch", () => {
     }
   })
 
-  it("remembers that a conversation was given Hive's instructions with the conversation itself: any agent, a restart, many newer ones", async () => {
+  it("remembers that a conversation was given Combwork's instructions with the conversation itself: any agent, a restart, many newer ones", async () => {
     const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
     const { closeAllBoards } = await import('../src/main/boardStore')
     const root = join(base, 'ws-prompted')
     const proj = join(root, 'alpha')
-    mkdirSync(join(proj, '.hive'), { recursive: true })
-    writeFileSync(join(proj, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-first', name: 'First' }, { id: 'a-second', name: 'Second' }] }))
+    mkdirSync(join(proj, '.combwork'), { recursive: true })
+    writeFileSync(join(proj, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-first', name: 'First' }, { id: 'a-second', name: 'Second' }] }))
     const old = '7b1d2e3f-0000-4000-8000-000000000000'
     const open = async () => {
       const ws = createWorkspaceService()

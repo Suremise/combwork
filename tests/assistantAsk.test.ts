@@ -1,4 +1,4 @@
-// An agent's request for the Hive Assistant on a card (HI-1866, main/assistantAsk.ts, `hive_ask_assistant`): written as
+// An agent's request for the Combwork Assistant on a card (HI-1866, main/assistantAsk.ts, `cw_ask_assistant`): written as
 // the agent's comment with a history line, and given to the Assistant as a delivery from that agent quoting it whole.
 // Refused before anything is written: another project's card, a card archived or in Done, the Assistant unable to act
 // (Settings → Assistant → Control below changing cards), an agent-less caller, a text past a comment's limit. One that
@@ -10,7 +10,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-assistant-ask-')
+const base = tempDir('cw-assistant-ask-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -46,8 +46,8 @@ let k = 0
 async function open(): Promise<{ w: WS; card: number }> {
   const path = join(base, `ws-${++k}`)
   for (const [p, id] of [['alpha', 'b1'], ['beta', 'c1']]) {
-    mkdirSync(join(path, p, '.hive'), { recursive: true })
-    writeFileSync(join(path, p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id, name: id.toUpperCase() }] }))
+    mkdirSync(join(path, p, '.combwork'), { recursive: true })
+    writeFileSync(join(path, p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id, name: id.toUpperCase() }] }))
   }
   const w = createWorkspaceService()
   await w.open(path)
@@ -68,7 +68,7 @@ describe("an agent's request for the Assistant (HI-1866)", () => {
     const r = await ask(w, card, text)
     const c = await read(w, card)
     expect(c.comments.at(-1)).toMatchObject({ by: 'B1 (alpha)', text })
-    expect(c.history.at(-1)?.what).toMatch(/^Asked the Hive Assistant: "Please put the follow-up On Hold/)
+    expect(c.history.at(-1)?.what).toMatch(/^Asked the Assistant: "Please put the follow-up On Hold/)
     expect(c.column).toBe('doing')
     const got = asked(w)
     expect(got).toHaveLength(1)
@@ -100,7 +100,7 @@ describe("an agent's request for the Assistant (HI-1866)", () => {
     await nothingWritten()
     // Control at Look and advise: the Assistant can't change cards.
     assistant().control = 'look'
-    await expect(ask(w, card, 'Park it')).rejects.toSatisfy((e: unknown) => e instanceof AskRefused && e.status === 409 && /Ask the user instead \(hive_ask_user\)/.test(e.message))
+    await expect(ask(w, card, 'Park it')).rejects.toSatisfy((e: unknown) => e instanceof AskRefused && e.status === 409 && /Ask the user instead \(cw_ask_user\)/.test(e.message))
     await nothingWritten()
     assistant().control = 'projects'
     // An actor that isn't a project's agent.
@@ -111,7 +111,7 @@ describe("an agent's request for the Assistant (HI-1866)", () => {
     // In Done, and archived.
     await inWorkspace(w, () => tasks.updateTask(card, { column: 'done' }, user))
     const done = await read(w, card)
-    await expect(ask(w, card, 'Park it')).rejects.toSatisfy((e: unknown) => e instanceof AskRefused && /is in Done/.test(e.message) && /More work on it that the user asked for: move it back with hive_update_task \(column: doing\)\. Separate follow-up work goes on a new card/.test(e.message))
+    await expect(ask(w, card, 'Park it')).rejects.toSatisfy((e: unknown) => e instanceof AskRefused && /is in Done/.test(e.message) && /More work on it that the user asked for: move it back with cw_update_task \(column: doing\)\. Separate follow-up work goes on a new card/.test(e.message))
     expect((await read(w, card)).comments).toEqual(done.comments)
     const second = (await inWorkspace(w, () => tasks.createTask({ title: 'Old', project: 'alpha' }, user))).number
     await inWorkspace(w, () => tasks.archiveTask(second, true))
@@ -128,7 +128,7 @@ describe("an agent's request for the Assistant (HI-1866)", () => {
     // Checked as it is handed out: not given, and cancelled.
     expect((await deliveries.readInbox(w.assistantHome, 'assistant')).items).toEqual([])
     await vi.waitFor(() => expect(asked(w).map((r) => r.state)).toEqual(['cancelled']), { timeout: HUNG_MS })
-    await vi.waitFor(async () => expect((await read(w, card)).history.map((h) => h.what)).toContain("The Hive Assistant couldn't be told of B1 (alpha)'s request on this card: read it in the card's comments and act on it yourself if it needs doing"), { timeout: HUNG_MS })
+    await vi.waitFor(async () => expect((await read(w, card)).history.map((h) => h.what)).toContain("The Assistant couldn't be told of B1 (alpha)'s request on this card: read it in the card's comments and act on it yourself if it needs doing"), { timeout: HUNG_MS })
     // The notice follows the card's note, once its write has let go of the board's lock: the history can be read first.
     await vi.waitFor(() => expect(notice).toHaveBeenCalledWith(join(w.path!, 'alpha'), expect.anything(), expect.anything()), { timeout: HUNG_MS })
   })

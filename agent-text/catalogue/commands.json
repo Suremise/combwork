@@ -1,0 +1,12 @@
+{
+  "commands.run.gone": {
+    "text": "That command is no longer there.",
+    "note": "An error: the user ran one of their commands by hand (Settings → Commands, or the command palette), but it was deleted meanwhile.",
+    "audience": "both"
+  },
+  "commands.run.testCopy": {
+    "text": "This is a test copy of Combwork: it doesn't run your commands.",
+    "note": "An error in a test copy of Combwork (one the developers' tests start): it never runs the user's own commands.",
+    "audience": "both"
+  }
+}

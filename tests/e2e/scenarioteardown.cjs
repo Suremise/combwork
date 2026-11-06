@@ -1,9 +1,9 @@
-// A scenario whose agent leaves a command running through hive-progress (#542): on 10 Oct a Codex agent's command
-// (cmd → hive-progress → node) outlived its scenario, held the scenario's folder, and the next run in that lane crashed
-// removing it. The harness stops what its Hive started, and what still names the folder, by command line (never by
+// A scenario whose agent leaves a command running through cw-progress (#542): on 10 Oct a Codex agent's command
+// (cmd → cw-progress → node) outlived its scenario, held the scenario's folder, and the next run in that lane crashed
+// removing it. The harness stops what its Combwork started, and what still names the folder, by command line (never by
 // name), before it removes the folder; a folder still in use fails that one scenario, saying so, and nothing crashes.
 // Here the fake Claude Code's "progress-linger" leaves such a command (a lingering node under the session's own
-// hive-progress shim) and ends its turn; the same scenario then runs again in the same folder.
+// cw-progress shim) and ends its turn; the same scenario then runs again in the same folder.
 const fs = require('fs')
 const path = require('path')
 const lib = require('./lib.cjs')
@@ -54,8 +54,8 @@ const leftPid = () => pidIn(pidFile)
 const seen = []
 const scenario = {
   id: 'left-running',
-  title: 'An agent leaves a command running through hive-progress, and ends its turn (#542)',
-  prompt: 'Start a long command through hive-progress and end your turn without waiting for it.',
+  title: 'An agent leaves a command running through cw-progress, and ends its turn (#542)',
+  prompt: 'Start a long command through cw-progress and end your turn without waiting for it.',
   fake: 'progress-linger then work 1',
   // The fake's turn ends once the command's node runs (#1100); a real agent's may end before: waited for (within the scenario's limit).
   keepWaiting: async () => !leftPid(),
@@ -98,13 +98,13 @@ const scenario = {
     const r = await runScenario(scenario, 'fake', { workRoot, port: lib.port(47824), timeoutMs: 60000 })
     const pid = seen[run - 1]
     check(`run ${run}: the scenario ran (no error)`, !r.error, r.error)
-    check(`run ${run}: its agent left a command running through hive-progress`, r.checks.length === 1 && r.checks[0].ok === true, JSON.stringify(r.checks))
+    check(`run ${run}: its agent left a command running through cw-progress`, r.checks.length === 1 && r.checks[0].ok === true, JSON.stringify(r.checks))
     check(`run ${run}: the harness stopped what was left, and says so`, /process\(es\).*were stopped/.test(r.leftOver ?? ''), r.leftOver)
     check(`run ${run}: the command's node is no longer running`, !!pid && (await lib.until(() => !alive(pid), 10000)), String(pid))
     check(`run ${run}: the scenario's folder went`, !r.kept && !fs.existsSync(root), r.kept ?? root)
   }
   // HI-2217: what an agent leaves that names no scenario folder and whose parent has exited (a model's `find / …`) is
-  // in no tree and named by no command line: only its launch's job knows it, and the harness asks Hive for that.
+  // in no tree and named by no command line: only its launch's job knows it, and the harness asks Combwork for that.
   const hiddenPidFile = path.join(workRoot, 'left-unnamed-fake', 'claude-home', 'fake-hidden-linger.jsonl')
   const hiddenPid = () => pidIn(hiddenPidFile)
   let hidden = null

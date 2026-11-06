@@ -10,7 +10,7 @@ import { Icon, IconButton, Tooltip } from './ui'
  * The top of the Progress panel (#484): a card per merge going on (a slot its holder has taken), in its own colour, with who
  * holds it, which branch goes where, the holder's current step (its running progress), how long so far and left, and
  * who waits. It folds up to its first line (remembered per workspace); Release frees a holder that is stuck. These are
- * the merge slot's cards (agents merging under "The agent merges", the user's merges); Hive's merge queue has its own
+ * the merge slot's cards (agents merging under "The agent merges", the user's merges); Combwork's merge queue has its own
  * (ProgressQueue.tsx, #1356), with no Release.
  */
 
@@ -51,7 +51,7 @@ export function MergeCard({ slot: s, project, showProject, step, now, folded, on
   // Only taken slots get a card (Progress.tsx).
   const h = s.holder!
   // The holder's branch, when it is an agent working outside the project folder (its slot's card line, or its own
-  // worktree's branch, #1442): "hive/b1 → main".
+  // worktree's branch, #1442): "cw/b1 → main".
   const from = useStore((st) => (h.agentId ? (findProject(st, s.project)?.agents.find((a) => a.id === h.agentId)?.place.branch ?? null) : null))
   const late = h.until < now
   const left = h.until - now

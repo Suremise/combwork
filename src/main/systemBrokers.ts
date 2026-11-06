@@ -1,4 +1,5 @@
 import { join } from 'path'
+import { realPathAsync } from './places'
 
 /**
  * Windows' own processes that an agent's work starts and that outlive it without being its work (HI-2304), so they
@@ -74,4 +75,73 @@ export async function brokersOnly<P extends { path?: string }>(processes: readon
   const now = await running(names)
   if (!now || now.length) return null
   return found as { broker: SystemBroker; process: P }[]
+}
+
+/**
+ * Whether `inner` is `outer` or inside it (HI-2467: a broker's current folder in a slot), by real locations resolved
+ * off main's thread, without case or a trailing separator: slot-a holds slot-a\x, never slot-ab.
+ */
+export async function folderInside(outer: string, inner: string): Promise<boolean> {
+  const key = async (p: string): Promise<string> => (await realPathAsync(p)).toLowerCase().replace(/[\\/]+$/, '')
+  const [o, i] = await Promise.all([key(outer), key(inner)])
+  return i === o || i.startsWith(`${o}\\`)
+}
+
+/** The helper's `workingin` answer (HI-2467), each process by identity with its executable and current folder ("" unread). */
+export interface WorkingIn {
+  complete: boolean
+  processes: { pid: number; created: string; path: string; cwd: string }[]
+}
+
+/** A `workingin` answer as the helper gives it, or null when it is anything else (an error, cut short, malformed). */
+export function parseWorkingIn(r: unknown, max: number): WorkingIn | null {
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return null
+  const { complete, processes } = r as { complete?: unknown; processes?: unknown }
+  if (typeof complete !== 'boolean' || !Array.isArray(processes) || processes.length > max) return null
+  const out: WorkingIn['processes'] = []
+  for (const p of processes as unknown[]) {
+    if (!p || typeof p !== 'object') return null
+    const { id, path, cwd } = p as { id?: unknown; path?: unknown; cwd?: unknown }
+    const m = typeof id === 'string' ? /^([1-9]\d*):([1-9]\d*)$/.exec(id) : null
+    if (!m || typeof path !== 'string' || typeof cwd !== 'string') return null
+    const pid = Number(m[1])
+    if (!Number.isSafeInteger(pid)) return null
+    out.push({ pid, created: m[2], path, cwd })
+  }
+  return { complete, processes: out }
+}
+
+/**
+ * The known brokers working in a folder (HI-2467): Windows refuses to rename a folder that is a process's current
+ * folder, and an idle Sandbox broker keeps the one it was started in. `name`: its executable's name, as Windows gives
+ * it (WindowsSandboxServer; the first by name where several differ); `idle`: none of what they serve runs (true), some does (false), or it can't be told
+ * (null; always null for an answer that isn't whole, `complete` false). Only what was read in that one answer counts: a process counts when its path is a known broker's and its
+ * current folder is `folder` or inside it (`inside`). An unread path or folder, another executable, a folder elsewhere:
+ * not counted, never guessed. Null when none counts, or the answer is unusable: the caller says only that something
+ * holds the folder. `stands`: test copies' stand-in ids, whose path (read by the helper all the same) is taken as
+ * `standPath`. Never decides whether the folder can be lent (slots.ts quiet does): it only names what holds it.
+ */
+export async function brokersWorkingIn(answer: WorkingIn | null, folder: string, opts: { inside: (outer: string, inner: string) => boolean | Promise<boolean>; stands?: ReadonlySet<number> | null; standPath?: string; running: (names: readonly string[]) => Promise<readonly string[] | null> }): Promise<{ name: string; idle: boolean | null } | null> {
+  if (!answer) return null
+  const found: { broker: SystemBroker; path: string }[] = []
+  for (const p of answer.processes) {
+    const path = opts.stands?.has(p.pid) && p.path ? (opts.standPath ?? '') : p.path
+    const broker = brokerOf(path)
+    if (!broker || !p.cwd) continue
+    let inside = false
+    try {
+      inside = await opts.inside(folder, p.cwd)
+    } catch {
+      inside = false
+    }
+    if (inside) found.push({ broker, path })
+  }
+  if (!found.length) return null
+  const name = found.map((f) => (f.path.split(/[\\/]/).pop() ?? '').replace(/\.exe$/i, '')).filter(Boolean).sort()[0]
+  if (!name) return null
+  // An answer that leaves some out (HR1 on HI-2467): the broker it saw is named, its idleness never claimed.
+  if (!answer.complete) return { name, idle: null }
+  const active = [...new Set(found.flatMap((f) => f.broker.active))]
+  const now = await opts.running(active).catch(() => null)
+  return { name, idle: now ? !now.length : null }
 }

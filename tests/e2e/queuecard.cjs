@@ -1,11 +1,11 @@
 // The merge queue on the card, in the Git tab and in the Merge dialog (#1357, SPEC §16.9.2-3, OP-13): a project set to
-// "Hive merges" into `integration` (queueFixture.cjs), fake Claude Code agents acting by their own tokens.
+// "Combwork merges" into `integration` (queueFixture.cjs), fake Claude Code agents acting by their own tokens.
 // - a red check's return in the card's Work section: why (the check by name), its output's last lines, Show log
 //   (its run's log), Retry merge; a conflict's return with its files;
 // - Retry merge as the runtime allows it (HI-1667): once per revision after a return, asked so, then not offered and
 //   why; none while a follow-up waits for its reviewer, and why; after Remove from queue, asked with no such limit;
 // - the Git tab's Merge queue section: the queue now and its history (each card, revision, result or reason, when);
-// - the Merge dialog on a branch whose card Hive merges: the card's queue state, Merge disabled with why, Merge
+// - the Merge dialog on a branch whose card Combwork merges: the card's queue state, Merge disabled with why, Merge
 //   anyway (asks first) merging it and recorded on the card as an override;
 // - the project's options switched to "The agent merges" while a card is in its checks: its Work section and the Git
 //   tab's section still show it testing, then merged;
@@ -14,7 +14,7 @@
 //   For you request's "Show the files and commands" brings it into view.
 // Screenshots of each, both themes. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 // Dev build only (#1578): BD is a 0.9 worktree agent on purpose (the Merge dialog on an agent's branch), and the slow
-// and failing reads and the crash are test seams (HIVE_TEST_SLOW_IPC, _FAIL_IPC, _QUEUE_CRASH); the other cards'
+// and failing reads and the crash are test seams (CW_TEST_SLOW_IPC, _FAIL_IPC, _QUEUE_CRASH); the other cards'
 // builders are on slots, as 1.0 has them.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -34,7 +34,7 @@ const f = q.folderHelpers(fx)
 
 ;(async () => {
   q.prepare(fx)
-  let h = await q.startHive(fx, { port: PORT })
+  let h = await q.startCombwork(fx, { port: PORT })
   let crew = null
   try {
     const { page, inv } = h
@@ -225,7 +225,7 @@ const f = q.folderHelpers(fx)
     part = await openCard(late.n)
     check('…its Work section: merged (the merge line), no queue part left', !!(await until(async () => /Merged into integration as/.test(await text(dialog.locator('.card-work'))) && (await part.count()) === 0, HUNG_MS)), await text(dialog.locator('.card-work')))
     await closeCard()
-    // --- The Merge dialog on a branch whose card Hive merges (the options back to Hive merging).
+    // --- The Merge dialog on a branch whose card Combwork merges (the options back to Combwork merging).
     await inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx) })
     const dee = await q.agent(fx, h, 'BD', { worktree: true })
     const d = (await inv('tasks:create', { title: 'Dee', project: 'alpha' })).number
@@ -245,8 +245,8 @@ const f = q.folderHelpers(fx)
       await page.locator('.menu-item', { hasText: 'Merge…' }).click()
       await until(async () => (await merge.count()) === 1, HUNG_MS)
     }
-    // While the card's queue is still being read (HR3's round 1 finding 1): Merge stays off, nothing says Hive merges.
-    await h.app.evaluate(() => (process.env.HIVE_TEST_SLOW_IPC = 'worktrees:branchCards=4000*1'))
+    // While the card's queue is still being read (HR3's round 1 finding 1): Merge stays off, nothing says Combwork merges.
+    await h.app.evaluate(() => (process.env.CW_TEST_SLOW_IPC = 'worktrees:branchCards=4000*1'))
     await openMerge()
     const branchRead = async () => !!(await merge.locator('code').count()) && /Merges 1 commit/.test(await text(merge))
     check('Merge dialog, its card still being read: the branch read, Merge off, no note yet', !!(await until(branchRead, HUNG_MS)) && (await primary.isDisabled()) && (await note.count()) === 0 && (await anyway.count()) === 0, await text(merge))
@@ -255,21 +255,21 @@ const f = q.folderHelpers(fx)
     await until(async () => (await merge.count()) === 0, HUNG_MS)
     // Its read failing: said, Merge off, Retry reads it again.
     await h.app.evaluate(() => {
-      delete process.env.HIVE_TEST_SLOW_IPC
-      process.env.HIVE_TEST_FAIL_IPC = 'worktrees:branchCards*1'
+      delete process.env.CW_TEST_SLOW_IPC
+      process.env.CW_TEST_FAIL_IPC = 'worktrees:branchCards*1'
     })
     await openMerge()
     const failedNote = merge.locator('[data-queue-lookup="failed"]')
     check('…its card unread (the read failed): said, Merge off, no Merge anyway', !!(await until(async () => (await failedNote.count()) === 1 && (await branchRead()), HUNG_MS)) && (await primary.isDisabled()) && (await anyway.count()) === 0, await text(merge))
-    await h.app.evaluate(() => delete process.env.HIVE_TEST_FAIL_IPC)
+    await h.app.evaluate(() => delete process.env.CW_TEST_FAIL_IPC)
     await failedNote.getByRole('button', { name: 'Retry' }).click()
     // A plain merge of it is refused by main too, whatever a dialog thinks (a stale or pending state).
     const plain = await inv('agents:merge', fx.alpha, dee.id, { squash: false, message: 'plain', cleanup: false }).then(() => 'merged', (e) => String(e?.message ?? e))
-    check('…and a plain merge of the branch is refused, saying Hive merges it', new RegExp(`Hive merges ${deeKey} through the merge queue`).test(plain) && !lib.git(fx.alpha, ['log', '--format=%s', 'main']).includes('plain'), plain)
-    check('Merge dialog: the card Hive merges, not in the queue yet', !!(await until(async () => (await note.count()) === 1 && new RegExp(`Hive merges ${deeKey} through the merge queue`).test(await note.innerText()) && /once it is approved/.test(await note.innerText()), HUNG_MS)), await text(merge))
+    check('…and a plain merge of the branch is refused, saying Combwork merges it', new RegExp(`Combwork merges ${deeKey} through the merge queue`).test(plain) && !lib.git(fx.alpha, ['log', '--format=%s', 'main']).includes('plain'), plain)
+    check('Merge dialog: the card Combwork merges, not in the queue yet', !!(await until(async () => (await note.count()) === 1 && new RegExp(`Combwork merges ${deeKey} through the merge queue`).test(await note.innerText()) && /once it is approved/.test(await note.innerText()), HUNG_MS)), await text(merge))
     check('…Merge disabled, plainly (not the primary action), Merge anyway offered', !!(await until(async () => (await primary.isDisabled()) && !(await primary.evaluate((el) => el.classList.contains('primary'))) && (await anyway.count()) === 1 && !(await anyway.isDisabled()), HUNG_MS)))
     const heldTip = await lib.hoverTip(page, merge.locator('.tip-wrap:has([data-action="merge"])'), (t) => /through the merge queue/.test(t), HUNG_MS)
-    check("…its reason in Merge's tooltip", new RegExp(`Hive merges ${deeKey} through the merge queue`).test(heldTip), heldTip)
+    check("…its reason in Merge's tooltip", new RegExp(`Combwork merges ${deeKey} through the merge queue`).test(heldTip), heldTip)
     await page.mouse.move(5, 5)
     await shoot(merge, 'merge-dialog')
     await anyway.click()
@@ -291,18 +291,18 @@ const f = q.folderHelpers(fx)
   // listed file edited after; the Work section shows the state, and For you's request brings it into view.
   if (crew) {
     try {
-      h = await q.startHive(fx, { port: PORT, keepOptions: true, env: { HIVE_TEST_QUEUE_CRASH: 'afterFiles' } })
+      h = await q.startCombwork(fx, { port: PORT, keepOptions: true, env: { CW_TEST_QUEUE_CRASH: 'afterFiles' } })
       await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: f.options() })
-      await h.inv('advanced:set', 'hive.queue.checkedOutTarget', 'auto')
+      await h.inv('advanced:set', 'cw.queue.checkedOutTarget', 'auto')
       crew = { builder: await q.rejoin(fx, h, crew.builder), reviewer: await q.rejoin(fx, h, crew.reviewer) }
       let ended = false
       h.app.process().once('exit', () => (ended = true))
       q.steer(fx, 'pass')
       const steps = await q.approveBy(fx, h, crew.builder, crew.reviewer, 'Card stuck', { 'stuck.txt': 'stuck\n' }).then((r) => r.steps, (e) => String(e?.message ?? e))
-      check('needs you: Hive ended at the seam', !!(await until(() => ended, HUNG_MS)), JSON.stringify(steps))
+      check('needs you: Combwork ended at the seam', !!(await until(() => ended, HUNG_MS)), JSON.stringify(steps))
       await h.app.close().catch(() => {})
       fs.writeFileSync(path.join(fx.alpha, 'stuck.txt'), 'edited after the crash\n')
-      h = await q.startHive(fx, { port: PORT, keepOptions: true })
+      h = await q.startCombwork(fx, { port: PORT, keepOptions: true })
       const { page, inv } = h
       page.on('pageerror', (e) => check('no page errors (needs you)', false, e.message))
       await lib.fitWindow(h.app, page, { width: 1400, height: 900 })
@@ -345,22 +345,22 @@ const f = q.folderHelpers(fx)
       check('…settled and answered: merged', !!(await until(async () => (await h.card(c.number))?.column === 'done', HUNG_MS)))
       await h.app.close().catch(() => {})
 
-      // --- A stopped advance with commands (HR3's round 1 finding 3): Hive ended after the advance began, before it
+      // --- A stopped advance with commands (HR3's round 1 finding 3): Combwork ended after the advance began, before it
       // touched the files; the merge then put into the folder by hand (its files as merged, main where it was). The
       // journal says nothing was touched, the files say otherwise: §16.9.2's terminal state, with the command that
       // finishes it (main moved to the merge) and the one that undoes it (the files put back). Neither is run.
-      h = await q.startHive(fx, { port: PORT, keepOptions: true, env: { HIVE_TEST_QUEUE_CRASH: 'afterStarted' } })
+      h = await q.startCombwork(fx, { port: PORT, keepOptions: true, env: { CW_TEST_QUEUE_CRASH: 'afterStarted' } })
       crew = { builder: await q.rejoin(fx, h, crew.builder), reviewer: await q.rejoin(fx, h, crew.reviewer) }
       let ended2 = false
       h.app.process().once('exit', () => (ended2 = true))
       const steps2 = await q.approveBy(fx, h, crew.builder, crew.reviewer, 'Card cmd', { 'cmd.txt': 'cmd\n' }).then((r) => r.steps, (e) => String(e?.message ?? e))
-      check('commands: Hive ended once the advance began, before the files', !!(await until(() => ended2, HUNG_MS)), JSON.stringify(steps2))
+      check('commands: Combwork ended once the advance began, before the files', !!(await until(() => ended2, HUNG_MS)), JSON.stringify(steps2))
       await h.app.close().catch(() => {})
       const expected = q.head(fx, 'main')
-      const result = lib.git(fx.alpha, ['for-each-ref', '--format=%(objectname)', 'refs/hive/queue/']).trim().split(String.fromCharCode(10))[0].trim()
+      const result = lib.git(fx.alpha, ['for-each-ref', '--format=%(objectname)', 'refs/cw/queue/']).trim().split(String.fromCharCode(10))[0].trim()
       lib.git(fx.alpha, ['read-tree', '-m', '-u', expected, result])
       check('…the merge put into the folder by hand, main where it was', f.text('cmd.txt') === 'cmd\n' && q.head(fx, 'main') === expected)
-      h = await q.startHive(fx, { port: PORT, keepOptions: true })
+      h = await q.startCombwork(fx, { port: PORT, keepOptions: true })
       const p2 = h.page
       p2.on('pageerror', (e) => check('no page errors (commands)', false, e.message))
       await lib.fitWindow(h.app, p2, { width: 1400, height: 900 })
@@ -381,7 +381,7 @@ const f = q.folderHelpers(fx)
       const text = async (loc) => ((await loc.innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
       const work2 = s2.dialog.locator('.card-work-queue-stuck')
       const rows = work2.locator('.card-work-queue-command')
-      check('Work section: both commands, as Hive gives them, each with where to run it', !!(await until(async () => (await rows.count()) === 2, HUNG_MS)) && (await rows.locator('code').allInnerTexts()).join('\n') === [finish.command, undo.command].join('\n') && (await text(rows.first().locator('.faint'))).endsWith('To finish it, in alpha') && (await text(rows.nth(1).locator('.faint'))).endsWith('To undo it, in alpha') && (await rows.first().locator('.faint').getAttribute('title')) === fx.alpha && (await rows.nth(1).locator('.faint').getAttribute('title')) === st2.folder, await text(work2))
+      check('Work section: both commands, as Combwork gives them, each with where to run it', !!(await until(async () => (await rows.count()) === 2, HUNG_MS)) && (await rows.locator('code').allInnerTexts()).join('\n') === [finish.command, undo.command].join('\n') && (await text(rows.first().locator('.faint'))).endsWith('To finish it, in alpha') && (await text(rows.nth(1).locator('.faint'))).endsWith('To undo it, in alpha') && (await rows.first().locator('.faint').getAttribute('title')) === fx.alpha && (await rows.nth(1).locator('.faint').getAttribute('title')) === st2.folder, await text(work2))
       await rows.first().getByRole('button', { name: 'Copy the command to finish it' }).click()
       await rows.nth(1).getByRole('button', { name: 'Copy the command to undo it' }).click()
       const copied = await until(async () => {

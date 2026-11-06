@@ -8,7 +8,7 @@ import { withFileLock, writeTextAtomic, writeTextUnlessChanged } from '../src/ma
 import { createWorkspaceService, disposeWorkspaceService, type WorkspaceService } from '../src/main/workspace'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-bounds-')
+const base = tempDir('cw-bounds-')
 const dir = (...p: string[]): string => {
   const d = join(base, ...p)
   mkdirSync(d, { recursive: true })
@@ -71,8 +71,8 @@ describe('workspace boundaries', () => {
     const ws = dir('stale', 'ws')
     const proj = dir('stale', 'ws', 'proj')
     const worktree = dir('stale', 'ws.worktrees', 'proj-a')
-    dir('stale', 'ws', 'proj', '.hive')
-    writeFileSync(join(proj, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a', name: 'A', worktree: { path: worktree, branch: 'a', base: 'main' } }] }))
+    dir('stale', 'ws', 'proj', '.combwork')
+    writeFileSync(join(proj, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a', name: 'A', worktree: { path: worktree, branch: 'a', base: 'main' } }] }))
     const w = showing(ws)
     const reading = w.projectInfo(proj).catch(() => undefined)
     await w.close()

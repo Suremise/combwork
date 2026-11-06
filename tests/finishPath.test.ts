@@ -9,7 +9,7 @@ import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-finish-')
+const base = tempDir('cw-finish-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -39,12 +39,12 @@ let n = 0
 async function workspace(): Promise<{ w: WS; repo: string }> {
   const ws = join(base, `ws-${++n}`)
   const repo = join(ws, 'p')
-  mkdirSync(join(repo, '.hive'), { recursive: true })
-  writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }] }))
+  mkdirSync(join(repo, '.combwork'), { recursive: true })
+  writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }] }))
   git(repo, 'init', '-q', '-b', 'main')
   git(repo, 'config', 'user.name', 'Test')
   git(repo, 'config', 'user.email', 'test@example.com')
-  writeFileSync(join(repo, '.gitignore'), '.hive/\n')
+  writeFileSync(join(repo, '.gitignore'), '.combwork/\n')
   writeFileSync(join(repo, 'README.md'), 'hello\n')
   git(repo, 'add', '-A')
   git(repo, 'commit', '-qm', 'initial')
@@ -79,14 +79,14 @@ describe("a finish's handler (HI-2014)", () => {
     await runFinish(w, wf, repo, parent, finish)
     await runFinish(w, wf, repo, parent, finish)
     const card = await inWorkspace(w, () => tasks.getTask(dependent))
-    const notes = card.comments.filter((c) => c.hiveText?.id === 'tasks.history.startsWithout')
+    const notes = card.comments.filter((c) => c.appText?.id === 'tasks.history.startsWithout')
     expect(notes).toHaveLength(1)
-    expect(notes[0].hiveText).toMatchObject({ id: 'tasks.history.startsWithout', values: { reason: 'merged elsewhere' } })
+    expect(notes[0].appText).toMatchObject({ id: 'tasks.history.startsWithout', values: { reason: 'merged elsewhere' } })
     const steps = facts(w).facts(parent).filter((f) => f.kind === 'FinishStep').map((f) => (f.data as { step: string }).step)
     expect(steps.sort()).toEqual(['dependents', 'journal', 'lane', 'requests', 'wake'])
   })
 
-  // HR2's round 1: an effect made and Hive ending before its step is recorded. Each effect is found where it was made
+  // HR2's round 1: an effect made and Combwork ending before its step is recorded. Each effect is found where it was made
   // (the comment by its id, the wake by its move's action), so the run after the restart makes none again.
   it("a crash after the dependent's comment and the builder's wake, before their steps were recorded: run again, each once", async () => {
     const { w, repo } = await workspace()
@@ -94,14 +94,14 @@ describe("a finish's handler (HI-2014)", () => {
     const { parent, dependent, finish } = await overridden(w)
     // The effects as the first run made them, then the crash: no FinishStep written.
     const key = wf.store.cardByKey(`#${parent}`)!.key
-    await inWorkspace(w, () => tasks.commentAsHive(dependent, storedText(HISTORY.startsWithout, { card: key, reason: 'merged elsewhere' }), w, () => true, dependentNoteId(key, finish)))
+    await inWorkspace(w, () => tasks.commentAsCombwork(dependent, storedText(HISTORY.startsWithout, { card: key, reason: 'merged elsewhere' }), w, () => true, dependentNoteId(key, finish)))
     expect(facts(w).facts(parent).some((f) => f.kind === 'FinishStep')).toBe(false)
     await runFinish(w, wf, repo, parent, finish)
-    const notes = (await inWorkspace(w, () => tasks.getTask(dependent))).comments.filter((c) => c.hiveText?.id === 'tasks.history.startsWithout')
+    const notes = (await inWorkspace(w, () => tasks.getTask(dependent))).comments.filter((c) => c.appText?.id === 'tasks.history.startsWithout')
     expect(notes).toHaveLength(1)
     // Run once more (a second restart): still one, every step recorded once.
     await runFinish(w, wf, repo, parent, finish)
-    expect((await inWorkspace(w, () => tasks.getTask(dependent))).comments.filter((c) => c.hiveText?.id === 'tasks.history.startsWithout')).toHaveLength(1)
+    expect((await inWorkspace(w, () => tasks.getTask(dependent))).comments.filter((c) => c.appText?.id === 'tasks.history.startsWithout')).toHaveLength(1)
     const steps = facts(w).facts(parent).filter((f) => f.kind === 'FinishStep').map((f) => (f.data as { step: string }).step)
     expect(steps.sort()).toEqual(['dependents', 'journal', 'lane', 'requests', 'wake'])
   })
@@ -114,7 +114,7 @@ describe("a finish's handler (HI-2014)", () => {
     await inWorkspace(w, () => tasks.updateTask(parent, { column: 'done' }, user))
     const finish = facts(w).facts(parent).findLast((f) => f.kind === 'Finished')!.seq
     await runFinish(w, wf, repo, parent, finish)
-    expect((await inWorkspace(w, () => tasks.getTask(dependent))).comments.filter((c) => c.hiveText?.id === 'tasks.history.startsWithout')).toEqual([])
+    expect((await inWorkspace(w, () => tasks.getTask(dependent))).comments.filter((c) => c.appText?.id === 'tasks.history.startsWithout')).toEqual([])
   })
 
   it('a finish that is over (the card back out of Done) tells nobody, and its steps say they were superseded', async () => {
@@ -123,7 +123,7 @@ describe("a finish's handler (HI-2014)", () => {
     const { parent, dependent, finish } = await overridden(w)
     await inWorkspace(w, () => tasks.updateTask(parent, { column: 'todo' }, user))
     await runFinish(w, wf, repo, parent, finish)
-    expect((await inWorkspace(w, () => tasks.getTask(dependent))).comments.filter((c) => c.hiveText?.id === 'tasks.history.startsWithout')).toEqual([])
+    expect((await inWorkspace(w, () => tasks.getTask(dependent))).comments.filter((c) => c.appText?.id === 'tasks.history.startsWithout')).toEqual([])
     const outcomes = facts(w).facts(parent).filter((f) => f.kind === 'FinishStep').map((f) => (f.data as { outcome: string }).outcome)
     expect(outcomes.length).toBeGreaterThan(0)
     expect(new Set(outcomes)).toEqual(new Set(['superseded']))

@@ -2,8 +2,9 @@ import { app } from 'electron'
 import { randomUUID } from 'crypto'
 import { join } from 'path'
 import { rm } from 'original-fs/promises'
-import { HIVE_DIR, projectAgents } from '../shared/defaults'
-import { TEAM_PAUSE_LINE, type TeamPause } from '../shared/teamPause'
+import { CW_DIR, projectAgents } from '../shared/defaults'
+import { agentMsg, inDialectOf, say } from '../shared/agentText'
+import { teamPauseLine, type TeamPause } from '../shared/teamPause'
 import { emit } from './events'
 import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
@@ -11,29 +12,33 @@ import { inWorkspace, openWorkspaces, workspaceFor, type WorkspaceService } from
 
 /**
  * Pausing the team before an update (HI-2081, SPEC §16.10.9; HR1's design checks s8, s10 and s12). A workspace's pause
- * is held in memory, where every gate asks it (`pausedFor`, `teamPauseOf`): lane starts, the new conversations Hive
- * starts by itself, the reviewer pool, the merge queue's next entry, and the deliveries of Hive's own wakes
+ * is held in memory, where every gate asks it (`pausedFor`, `teamPauseOf`): lane starts, the new conversations Combwork
+ * starts by itself, the reviewer pool, the merge queue's next entry, and the deliveries of Combwork's own wakes
  * (`pauseHolds`, deliveries.ts' admission gate). The user's pause covers every open workspace with one id, and a
  * workspace opened while it lasts is held by it too; the Assistant's covers its own workspace only, and its resume takes
  * its workspace out of the user's pause, which ends with the last workspace it held. Pause and resume take each
  * workspace's lock, which the gates' final checks read under, so a change is never half seen. Each running agent is told
- * once per pause (TEAM_PAUSE_LINE). Rules off: the same hold.
+ * once per pause (teamPauseLine, in its dialect). Rules off: the same hold.
  *
- * Kept for this running Hive only (HI-2156, the Assistant's design call): a restart (an update, a reboot, a crash) ends
- * every agent a pause held, so Hive starts unpaused, and removes the files earlier builds saved a pause in.
+ * Kept for this running Combwork only (HI-2156, the Assistant's design call): a restart (an update, a reboot, a crash) ends
+ * every agent a pause held, so Combwork starts unpaused, and removes the files earlier builds saved a pause in.
  */
 
 const log = createLogger('teamPause')
 
-/** Where earlier builds saved a pause: each workspace's `.hive`, and the profile (with what a close left of them). */
+const T = {
+  noWorkspace: agentMsg({ id: 'notice.team.noWorkspace', text: 'No workspace is open', note: "HI-2081: a team pause refused: the window it was asked of has no workspace open." })
+}
+
+/** Where earlier builds saved a pause: each workspace's `.combwork`, and the profile (with what a close left of them). */
 const OLD_FILE = 'team-pause.json'
 const OLD_CLOSING_FILE = 'team-pause-closing.json'
 
-/** Each workspace's pause (by its .hive folder, lower case): none, not paused. */
+/** Each workspace's pause (by its .combwork folder, lower case): none, not paused. */
 const known = new Map<string, TeamPause>()
 /** The user's pause of every open workspace, while it lasts. */
 let all: TeamPause | null = null
-/** The workspaces resumed on their own from the user's pause (by their .hive): it no longer holds them. */
+/** The workspaces resumed on their own from the user's pause (by their .combwork): it no longer holds them. */
 const leftAll = new Set<string>()
 /** The workspaces whose old pause file was looked for in this run. */
 const cleared = new Set<string>()
@@ -44,16 +49,16 @@ const resumed = new Map<string, number>()
 /** Each workspace's lock: pause, resume and the gates' admission checks go one at a time. */
 const locks = new Map<string, Promise<unknown>>()
 
-/** A workspace's .hive folder, from its path (the same as its hiveDir, which a stand-in for one may not have). */
-const hiveOf = (ws: Pick<WorkspaceService, 'path'>): string => join(ws.path ?? '', HIVE_DIR)
-const keyOf = (ws: Pick<WorkspaceService, 'path'>): string => hiveOf(ws).toLowerCase()
+/** A workspace's .combwork folder, from its path (the same as its combworkDir, which a stand-in for one may not have). */
+const combworkOf = (ws: Pick<WorkspaceService, 'path'>): string => join(ws.path ?? '', CW_DIR)
+const keyOf = (ws: Pick<WorkspaceService, 'path'>): string => combworkOf(ws).toLowerCase()
 
 /** The user's pause of every open workspace, while it lasts. */
 export const appPause = (): TeamPause | null => all
 
-/** At start (HI-2156): the profile's files an earlier build saved a pause in, removed; Hive starts unpaused. */
+/** At start (HI-2156): the profile's files an earlier build saved a pause in, removed; Combwork starts unpaused. */
 export function clearSavedPauses(): void {
-  for (const f of [OLD_FILE, OLD_CLOSING_FILE]) void rm(join(app.getPath('userData'), f), { force: true }).catch((e) => log.warn('Removing a team pause an earlier Hive saved', e))
+  for (const f of [OLD_FILE, OLD_CLOSING_FILE]) void rm(join(app.getPath('userData'), f), { force: true }).catch((e) => log.warn('Removing a team pause an earlier version saved', e))
 }
 
 /**
@@ -65,7 +70,7 @@ export function teamPauseOf(ws: WorkspaceService | null | undefined): TeamPause 
   const k = keyOf(ws)
   if (!cleared.has(k)) {
     cleared.add(k)
-    void rm(join(hiveOf(ws), OLD_FILE), { force: true }).catch((e) => log.warn('Removing a team pause an earlier Hive saved', e))
+    void rm(join(combworkOf(ws), OLD_FILE), { force: true }).catch((e) => log.warn('Removing a team pause an earlier version saved', e))
   }
   const p = known.get(k)
   if (p) return p
@@ -121,7 +126,7 @@ async function tellAgents(ws: WorkspaceService, p: TeamPause): Promise<void> {
     projects.flatMap((proj) =>
       projectAgents(proj.config).flatMap((a) =>
         sessions.liveFor(proj.path, a.id)
-          ? [inWorkspace(ws, () => createDelivery(proj.path, { agentId: a.id, agentName: a.name, kind: 'control', from: { kind: 'hive', name: 'Hive' }, body: TEAM_PAUSE_LINE, source: 'team-pause', ref: p.pauseId, replace: true }))] // i18n-ignore: the product's name, as a delivery's sender
+          ? [inWorkspace(ws, () => createDelivery(proj.path, { agentId: a.id, agentName: a.name, kind: 'control', from: { kind: 'combwork', name: 'Combwork' }, body: inDialectOf({ projectPath: proj.path, agentId: a.id }, teamPauseLine), source: 'team-pause', ref: p.pauseId, replace: true }))] // i18n-ignore: the product's name, as a delivery's sender
           : []
       )
     )
@@ -134,7 +139,7 @@ async function tellAgents(ws: WorkspaceService, p: TeamPause): Promise<void> {
  * are told once a pause. Returns the pause.
  */
 export async function pauseTeam(ws: WorkspaceService, by: TeamPause['by'], pauseId: string = randomUUID()): Promise<TeamPause> {
-  if (!ws.path) throw new Error('No workspace is open') // i18n-ignore: an error for the log and the caller's reply
+  if (!ws.path) throw new Error(say(T.noWorkspace))
   const k = keyOf(ws)
   const p = await withLock(ws, () => {
     const was = teamPauseOf(ws)

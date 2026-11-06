@@ -1,0 +1,17 @@
+{
+  "console.cancelled": {
+    "text": "The recording was cancelled: the console stopped watching that source",
+    "note": "Why a developer console recording didn't start: meanwhile the window closed, picked another source or started another recording.",
+    "audience": "both"
+  },
+  "console.fileFull": {
+    "text": "The recording file took nothing more",
+    "note": "Why a developer console recording failed: writing to its file wrote nothing (the disk may be full).",
+    "audience": "both"
+  },
+  "console.tooMany": {
+    "text": "Too many developer consoles open at once",
+    "note": "An error opening a developer console window or starting a recording: Combwork already watches for as many as it allows. Closing one helps.",
+    "audience": "both"
+  }
+}

@@ -4,9 +4,12 @@
 // at the card's submitted revision; it is asked to write build.txt there and run `node test.js` there (which writes
 // ran.txt beside itself). Passes when both are in the copy and nothing of theirs is in the project folder (what is there
 // is named, with whose turn left it and its screen, #1546: a reviewer's shell starts in the project folder, and Haiku
-// once ran `node test.js` there before running it in its copy). An edit there
+// ran `node test.js` there before running it in its copy, 2 runs in 3 at RC4, HI-2640). So the Claude Code and Codex
+// reviewers are given what a reviewer is told: start review's own reply line, which names the copy and says their shell stays
+// in their folder (HI-2640; the suite's own words alone didn't, and its start review is the suite's call, not theirs).
+// An edit there
 // is never asked about (granted): a command may be (Claude Code's Accept edits and Copilot's ask before one), and is
-// answered Yes, counted in the output. What each CLI's own home has afterwards never names the copies folder (Hive
+// answered Yes, counted in the output. What each CLI's own home has afterwards never names the copies folder (Combwork
 // passes it on the command line only).
 // - Claude Code: Haiku, Accept edits, in the signed-in test home (CLAUDE_TEST_HOME: tokens).
 // - Codex: gpt-6-luna at low effort, Ask (workspace-write), in the Codex test home (tokens).
@@ -64,7 +67,7 @@ const parts = {
 if (parts.copilot) lib.skip(`${parts.copilot}: it builds the cards`)
 if (parts.claude && parts.codex) lib.skip(`${parts.claude}; ${parts.codex}`)
 
-/** An agent's Agent API token, from the file Hive keeps for it (agentTokens.ts). */
+/** An agent's Agent API token, from the file Combwork keeps for it (agentTokens.ts). */
 const tokenOf = (projectPath, agentId) => {
   const h = createHash('sha256').update(`${projectPath.toLowerCase()}#${agentId}`).digest('hex').slice(0, 16)
   const f = path.join(userData, 'agent-api', `${h}.json`)
@@ -80,7 +83,7 @@ const namingCopies = () => {
 ;(async () => {
   for (const d of [userData, ws, `${ws}.worktrees`, copilotDir]) fs.rmSync(d, { recursive: true, force: true })
   fs.rmSync(apiLog, { force: true })
-  lib.gitProject(alpha, { 'test.js': "require('fs').writeFileSync(require('path').join(__dirname, 'ran.txt'), 'ran in ' + __dirname)\n", '.gitignore': '.hive/\n' })
+  lib.gitProject(alpha, { 'test.js': "require('fs').writeFileSync(require('path').join(__dirname, 'ran.txt'), 'ran in ' + __dirname)\n", '.gitignore': '.combwork/\n' })
   lib.git(alpha, ['branch', '-M', 'main'])
   if (!parts.codex) lib.trustForCodex(alpha)
   lib.enableProviders(userData, ['claude-code', 'codex', 'copilot'])
@@ -102,19 +105,19 @@ const namingCopies = () => {
   const homeFiles = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => /^(config|settings)\.(json|toml)$|^\.claude\.json$/i.test(f)).map((f) => path.join(dir, f)) : [])
   const homesBefore = new Map([...homeFiles(CLAUDE_TEST_HOME), ...homeFiles(CODEX_HOME), ...homeFiles(path.join(copilotDir, 'copilot-home'))].map((f) => [f, fs.readFileSync(f, 'utf8')]))
 
-  const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: CLAUDE_TEST_HOME, CODEX_HOME, ...copilotEnv, HIVE_TEST_TIPS: 'off' }) })
+  const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env: lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: CLAUDE_TEST_HOME, CODEX_HOME, ...copilotEnv, CW_TEST_TIPS: 'off' }) })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1400, height: 850 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.waitForProvider(inv, 'copilot')
     if (!parts.codex) await lib.waitForProvider(inv, 'codex')
     await lib.openWorkspace(inv, page, ws)
     await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, folder: 'project' } })
     await inv('project:updateConfig', alpha, { copies: { size: 3 } })
-    // HI-2211: Hive's reviewer pool gives each card in Review outside a lane to a free reviewer and types it in (HI-2046),
+    // HI-2211: Combwork's reviewer pool gives each card in Review outside a lane to a free reviewer and types it in (HI-2046),
     // and a real CLI then reviews it on its own (RX approved its card before its start review here). The suite's steps are
     // each reviewer's, so the team is paused (HI-2081: nothing given out or told) before any agent starts: none is
     // running to be told of the pause, and the reviews and verdicts below are the agents' own calls, which it doesn't hold.
@@ -157,7 +160,7 @@ const namingCopies = () => {
       const s = await call(tb1, 'POST', `/v1/tasks/${encodeURIComponent(key)}/start`)
       fs.writeFileSync(path.join(alpha, `card-${i}.txt`), `${r.key}\n`)
       gitIn(alpha, 'add', '-A')
-      gitIn(alpha, 'commit', '-qm', `card ${n}`, '-m', `Hive-Card: ${key}`)
+      gitIn(alpha, 'commit', '-qm', `card ${n}`, '-m', `Combwork-Card: ${key}`)
       r.card = n
       r.revision = gitIn(alpha, 'rev-parse', 'HEAD')
       const sub = await call(tb1, 'POST', `/v1/tasks/${encodeURIComponent(key)}/submit`, { summary: `Card ${n} done.`, revision: r.revision })
@@ -194,7 +197,7 @@ const namingCopies = () => {
       const prompt =
         r.key === 'copilot'
           ? `write ${built} built then shell Set-Location '${folder}'; node test.js then say done`
-          : `Work only in the folder ${folder} (outside your own; you may use it). First create the file build.txt there containing the word built, with your file tools. Then run "node test.js" with that folder as the working directory. Reply done.`
+          : `Your review of a card has started. Combwork's reply: "${said}" Work only in that copy (outside your own folder; you may use it). First create the file build.txt there containing the word built, with your file tools. Then run "node test.js" in the copy. Reply done.`
       // Its turn waits on the real CLI answering: an environment failure in its session meanwhile is a SKIP (lib.cliStep).
       let asked = 0
       let askedBeforeEdit = false

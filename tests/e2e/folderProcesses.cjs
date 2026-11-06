@@ -1,6 +1,6 @@
-// What still runs of a test once its Hive has closed (#542): a command an agent started (Codex through the profile's
-// hive-progress shim, a shell command Claude Code ran in the folder) can outlive its session and hold the folder. Only
-// what is the test's own, never by name: what its Hive started (its process tree, taken before it closes, each by pid
+// What still runs of a test once its Combwork has closed (#542): a command an agent started (Codex through the profile's
+// cw-progress shim, a shell command Claude Code ran in the folder) can outlive its session and hold the folder. Only
+// what is the test's own, never by name: what its Combwork started (its process tree, taken before it closes, each by pid
 // and start time, so a reused pid is never taken), and what names its folder on the command line (a path boundary, so
 // `scenario` never takes `scenario-2`'s) and started after the test did.
 const fs = require('fs')
@@ -80,7 +80,7 @@ function descendantsIn(list, root) {
   return out
 }
 
-/** The process tree under `pid` (a test Hive's main process), to stop what of it is left once it closed. [] off Windows. */
+/** The process tree under `pid` (a test Combwork's main process), to stop what of it is left once it closed. [] off Windows. */
 function processTree(pid) {
   if (process.platform !== 'win32' || !pid) return []
   try {
@@ -93,15 +93,15 @@ function processTree(pid) {
 /** Of `tree` (processTree's), those still running as the same process (pid and start time): in `list`. */
 const stillRunning = (list, tree) => tree.filter((t) => list.some((p) => p.pid === t.pid && p.started === t.started)).map((t) => t.pid)
 
-/** A Windows FILETIME as text (100 ns since 1601: Hive's `created`) in ms since 1970; null if it isn't one. */
+/** A Windows FILETIME as text (100 ns since 1601: Combwork's `created`) in ms since 1970; null if it isn't one. */
 const filetimeMs = (created) => (/^\d+$/.test(String(created ?? '')) ? Number((BigInt(created) - 116444736000000000n) / 10000n) : null)
 
 /**
- * The processes Hive lists as left running by its agents (`session:leftovers`: AgentLeftovers, each process with its
+ * The processes Combwork lists as left running by its agents (`session:leftovers`: AgentLeftovers, each process with its
  * pid and `created`), as identities ({ pid, started }) of `list` (processes()): the same pid and start time within
  * endExactly's 1 ms, so a pid given to another process since is never one. HI-2217: what an agent's command left whose
  * parent has exited, and that names no test folder (a model's `find / …`), is in no process tree and named by no
- * command line: only its launch's job, Hive's, knows it.
+ * command line: only its launch's job, Combwork's, knows it.
  */
 function leftoverIdentities(list, leftovers) {
   const out = []
@@ -144,7 +144,7 @@ function suspendExactly(targets, resume = false) {
   if (process.platform !== 'win32' || !targets.length) return out
   const fn = resume ? 'NtResumeProcess' : 'NtSuspendProcess'
   const list = targets.map((t) => `${Number(t.pid)}:${Number(t.started)}`).join(',')
-  const ps = `Add-Type -TypeDefinition 'using System;using System.Runtime.InteropServices;public static class HiveSuspend{[DllImport("ntdll.dll")]public static extern int ${fn}(IntPtr h);}'; foreach ($t in '${list}'.Split(',')) { $id, $at = $t.Split(':'); try { $p = [Diagnostics.Process]::GetProcessById([int]$id); $h = $p.Handle; if ([Math]::Abs(([DateTimeOffset]$p.StartTime).ToUnixTimeMilliseconds() - [long]$at) -le 1) { $s = [HiveSuspend]::${fn}($h); if ($s -eq 0) { "ok $id" } else { "fail $id 0x{0:X8}" -f $s } } else { "fail $id another-process" } } catch { "fail $id gone" } }`
+  const ps = `Add-Type -TypeDefinition 'using System;using System.Runtime.InteropServices;public static class CombworkSuspend{[DllImport("ntdll.dll")]public static extern int ${fn}(IntPtr h);}'; foreach ($t in '${list}'.Split(',')) { $id, $at = $t.Split(':'); try { $p = [Diagnostics.Process]::GetProcessById([int]$id); $h = $p.Handle; if ([Math]::Abs(([DateTimeOffset]$p.StartTime).ToUnixTimeMilliseconds() - [long]$at) -le 1) { $s = [CombworkSuspend]::${fn}($h); if ($s -eq 0) { "ok $id" } else { "fail $id 0x{0:X8}" -f $s } } else { "fail $id another-process" } } catch { "fail $id gone" } }`
   let text = ''
   try {
     text = execFileSync('powershell.exe', ['-NoProfile', '-Command', ps], { encoding: 'utf8', env: baseEnv(), windowsHide: true })
@@ -219,7 +219,7 @@ function childrenFirst(list, targets) {
 }
 
 /**
- * Ends a test Hive from outside as a crash would (HI-2256): its main process `top` ({ pid, started }) first, then `rest`
+ * Ends a test Combwork from outside as a crash would (HI-2256): its main process `top` ({ pid, started }) first, then `rest`
  * (what it started, from `list`), children first. Ended children first, its main process outlived its process
  * tracker's helper: under load it saw the tracker stop and wrote its running marker again without its agents'
  * processes, which a crash never gets to do. Each by pid and start time (endExactly). Returns how many were ended, 0
@@ -233,7 +233,7 @@ function endAsCrash(list, top, rest) {
 
 /**
  * Stops the processes that are the test's own (above), each with its children: those naming `folder` that started at
- * or after `since`, and those of `tree` (processTree's, taken before its Hive closed) still running. Each is ended as
+ * or after `since`, and those of `tree` (processTree's, taken before its Combwork closed) still running. Each is ended as
  * the process it was when listed (endExactly), never by a pid alone, and children before their parents (childrenFirst);
  * what one started meanwhile is found by the next look (a few at most). Returns how many were ended.
  */
@@ -303,10 +303,10 @@ function endChildTree(child) {
   return now ? endTreeExactly({ pid: now.pid, started: now.started }, list) : 0
 }
 
-// --- Test copies of Hive that outlive their suite (HI-1453: one ran 12 h after its run, its parent gone).
+// --- Test copies of Combwork that outlive their suite (HI-1453: one ran 12 h after its run, its parent gone).
 
-/** Where a suite's test copies of Hive are recorded as they start: a line each in its work folder (lib.cjs). */
-const COPIES_FILE = '.hive-copies.jsonl'
+/** Where a suite's test copies of Combwork are recorded as they start: a line each in its work folder (lib.cjs). */
+const COPIES_FILE = '.cw-copies.jsonl'
 /** Records a copy started in `dir`: { pid, started } (its identity, as processes() lists it), and its profile. */
 function recordCopy(dir, copy) {
   fs.appendFileSync(path.join(dir, COPIES_FILE), `${JSON.stringify(copy)}\n`)
@@ -320,7 +320,7 @@ const listProcesses = () =>
 const exitedChild = (c) => c.exitCode != null || c.signalCode != null
 
 /**
- * Records the copy of Hive that `launcher` (the ChildProcess Playwright started, `from`: ms before it did) is, by the
+ * Records the copy of Combwork that `launcher` (the ChildProcess Playwright started, `from`: ms before it did) is, by the
  * identity it has (pid and start time), from the process tree alone: no command line is read. Playwright starts
  * Electron through `cmd.exe /c` on Windows, so `launcher` is that shell and the copy its child (launchedCopy).
  * The identity rests on the handle this process holds (HR5's round 3): Windows never gives a pid to another process
@@ -348,7 +348,7 @@ async function recordMainProcess(dir, launcher, from, profile = null, list = lis
 }
 
 /**
- * Of `list`, the copy of Hive the launcher with pid `launcher` started (recordMainProcess checks that pid is still its):
+ * Of `list`, the copy of Combwork the launcher with pid `launcher` started (recordMainProcess checks that pid is still its):
  * its child that started since (the shell's Electron), or, with none, the launcher itself. null when the launcher isn't
  * in the list, or started before `from` (a sanity check: not the process started then).
  */
@@ -398,14 +398,14 @@ function recordedCopies(dir, depth = 3) {
 const copiesIn = (list, copies) => list.filter((p) => copies.some((c) => c.pid === p.pid && Math.abs(p.started - c.started) <= 1))
 
 /**
- * A guess, for a report only, never for ending anything: processes that look like test copies of Hive with something in
+ * A guess, for a report only, never for ending anything: processes that look like test copies of Combwork with something in
  * one of `folders` (a profile flag on their command line, and the folder named on it). Command lines can't be read
  * reliably (each program splits its own), so such a process is listed for a person to look at.
  */
-const lookLikeCopies = (list, folders) => list.filter((p) => p.pid !== process.pid && /--(hive-test-profile|user-data-dir)=/i.test(p.commandLine ?? '') && folders.some((f) => namesFolder(p.commandLine, f)))
+const lookLikeCopies = (list, folders) => list.filter((p) => p.pid !== process.pid && /--(combwork-test-profile|user-data-dir)=/i.test(p.commandLine ?? '') && folders.some((f) => namesFolder(p.commandLine, f)))
 
 /**
- * Ends the test copies of Hive recorded in `folders` (recordCopy) that still run as the process recorded (its pid and
+ * Ends the test copies of Combwork recorded in `folders` (recordCopy) that still run as the process recorded (its pid and
  * start time), each with what it started, children first (endExactly); nothing else. `before` (ms): only copies started
  * before it (a sweep's, so a copy a runner that has just claimed the folder starts is never taken). Returns
  * { ended: how many processes were ended, unrecorded: what looks like a copy there but has no record (lookLikeCopies:

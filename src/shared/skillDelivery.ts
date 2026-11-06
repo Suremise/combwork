@@ -1,7 +1,7 @@
 import type { ProjectConfig, SkillDeliveryChoice, WorkspaceConfig } from './types'
 
 /**
- * Which Hive skills reach a project's agents (#1431, SPEC §16.15 C row 15): every valid one for their audience, unless
+ * Which Combwork skills reach a project's agents (#1431, SPEC §16.15 C row 15): every valid one for their audience, unless
  * the workspace or the project switched it off (Skills → Delivered to agents). The Assistant's skills aren't chosen
  * here: it always gets its own.
  */

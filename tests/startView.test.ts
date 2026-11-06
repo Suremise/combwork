@@ -13,7 +13,7 @@ import { utf8Bytes } from '../src/shared/metrics'
 import { START_VIEW_MAX_BYTES, startView, type StartViewInput, type ViewCard, type ViewEntry } from '../src/shared/startView'
 import type { LiveSessionState } from '../src/shared/types'
 
-const base = tempDir('hive-start-view-')
+const base = tempDir('cw-start-view-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -47,7 +47,7 @@ describe('the state view as text', () => {
         journal: { decisions: [entry(5, { summary: 'Darren: "Welcome back!" is the greeting', importance: 2 })], incidents: [entry(6, { kind: 'incident', summary: 'Merge of #10 failed its lint' })], onCards: [entry(7, { kind: 'plan', summary: 'Start #15 once #12 is Done' })], digestDue: '2026-W41' }
       })
     )
-    expect(v.split('\n')[0]).toMatch(/^\[Hive\] Where things stand, after a compaction \(2026-10-18 12:00 UTC\).*Check the live state before acting on it\.$/)
+    expect(v.split('\n')[0]).toMatch(/^\[CW\] Where things stand, after a compaction \(2026-10-18 12:00 UTC\).*Check the live state before acting on it\.$/)
     expect(v).toContain('Waiting on the user:\n- #14 (alpha, Todo) blocked: Which greeting does Darren want?\n- B3 (alpha) waits for the user: Allow Bash?')
     expect(v).toContain('Cards in Doing and Review:\n- #12 Doing · alpha · B1: Friendlier greeting\n- #13 Review · alpha · B2, reviewed by R1: Card 13')
     expect(v).toContain('Lanes running:\n- B1/R1 (alpha): on #12, active')
@@ -57,7 +57,7 @@ describe('the state view as text', () => {
     expect(v).toContain('Journal: on the cards in hand:\n- #7 2026-10-15 plan (alpha): Start #15 once #12 is Done')
     expect(v).toContain('Journal: recent incidents:\n- #6 2026-10-15 incident (alpha): Merge of #10 failed its lint')
     expect(v).toContain('2026-W41 has entries but no digest: write one (kind digest, digestOf "2026-W41"; the journal skill).')
-    expect(v.split('\n').at(-1)).toMatch(/hive_journal_recall/)
+    expect(v.split('\n').at(-1)).toMatch(/cw_journal_recall/)
   })
 
   it('leaves out empty sections, and says so when no agent runs', () => {
@@ -84,7 +84,7 @@ describe('the state view as text', () => {
     // Every section is there (each gets its first lines before any gets more), with a count of the rest.
     for (const title of ['Waiting on the user:', 'Cards in Doing and Review:', 'Lanes running:', 'Agents running:', 'Board:', 'Journal: recent decisions and plans:', 'Journal: on the cards in hand:', 'Journal: recent incidents:', 'Weekly digest:']) expect(v, title).toContain(`\n${title}\n`)
     expect(v).toMatch(/Waiting on the user:\n- Agent-0 \(p0\) waits for the user/)
-    expect(v).toMatch(/- \(\d+ more: hive_list_tasks and hive_list_projects\)/)
+    expect(v).toMatch(/- \(\d+ more: cw_list_tasks and cw_list_projects\)/)
     // Lines are whole: long text is clipped within its line.
     for (const line of v.split('\n')) expect(line.length).toBeLessThanOrEqual(300)
   })
@@ -106,7 +106,7 @@ describe('the state view as text', () => {
     expect(v).toContain('2026-W41 has entries but no digest')
     expect(v).toContain('Board:\n- alpha: 1 Doing, 100 Todo')
     // The crowded section still gets what is left, and says how many it left out.
-    expect(v).toMatch(/- \(\d+ more: hive_list_tasks and hive_list_projects\)/)
+    expect(v).toMatch(/- \(\d+ more: cw_list_tasks and cw_list_projects\)/)
     // ...up to its cap (#1078).
     expect((v.match(/blocked: r+/g) ?? []).length).toBe(10)
   })
@@ -174,7 +174,7 @@ describe('the state view as text', () => {
     expect(section.slice(6, 10).every((l) => l.includes('After 0.9.0'))).toBe(true)
     const shownDates = section.slice(6, 10).map((l) => after.find((c) => l.startsWith(`- #${c.number} `))!.updatedAt)
     expect(shownDates).toEqual([at(17), at(17), at(17), at(16)])
-    expect(section[10]).toBe('- (51 more On Hold: hive_list_tasks column hold)')
+    expect(section[10]).toBe('- (51 more On Hold: cw_list_tasks column hold)')
     // About 1.5K tokens at most, with every other section there.
     expect(utf8Bytes(v)).toBeLessThan(6000)
     for (const title of ['Cards in Doing and Review:', 'Agents running:', 'Board:', 'Journal: recent decisions and plans:']) expect(v, title).toContain(`\n${title}\n`)
@@ -203,19 +203,19 @@ describe('the state view as text', () => {
       })
     )
     expect(shown(v, 'Cards in Doing and Review:')).toBe(10)
-    expect(v).toContain('- (20 more: hive_list_tasks)')
+    expect(v).toContain('- (20 more: cw_list_tasks)')
     expect(shown(v, 'Lanes running:')).toBe(8)
-    expect(v).toContain('- (22 more: hive_lane list)')
+    expect(v).toContain('- (22 more: cw_lane list)')
     expect(shown(v, 'Agents running:')).toBe(8)
-    expect(v).toContain('- (22 more: hive_list_projects)')
+    expect(v).toContain('- (22 more: cw_list_projects)')
     expect(shown(v, 'Board:')).toBe(10)
   })
 
   it('counts left-out lines the usual way when some are not On Hold', () => {
     const v = startView(empty({ blocked: Array.from({ length: 12 }, (_, i) => card(i + 1, { column: i < 11 ? 'doing' : 'hold', blocked: 'Carry on?' })) }))
-    expect(v).toContain('- (2 more: hive_list_tasks and hive_list_projects)')
+    expect(v).toContain('- (2 more: cw_list_tasks and cw_list_projects)')
     const held = startView(empty({ blocked: Array.from({ length: 12 }, (_, i) => card(i + 1, { column: i < 9 ? 'doing' : 'hold', blocked: 'Carry on?' })) }))
-    expect(held).toContain('- (2 more On Hold: hive_list_tasks column hold)')
+    expect(held).toContain('- (2 more On Hold: cw_list_tasks column hold)')
   })
 })
 
@@ -235,9 +235,9 @@ describe('the state view in a workspace', () => {
   const live = [{ projectPath: alpha, agentId: 'b1', agentName: 'B1', status: 'working' }, { projectPath: alpha, agentId: 'r1', agentName: 'R1', status: 'waiting', statusMessage: 'Allow Bash?' }] as LiveSessionState[]
 
   beforeAll(async () => {
-    process.env.HIVE_TEST_TRASH_DIR = join(base, 'trash')
-    mkdirSync(join(alpha, '.hive'), { recursive: true })
-    writeFileSync(join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }] }))
+    process.env.CW_TEST_TRASH_DIR = join(base, 'trash')
+    mkdirSync(join(alpha, '.combwork'), { recursive: true })
+    writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     // Everything on (preferences too), then narrowed below.
@@ -251,7 +251,7 @@ describe('the state view in a workspace', () => {
     await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [cards.doing], by: 'B1' })
   })
   afterAll(async () => {
-    delete process.env.HIVE_TEST_TRASH_DIR
+    delete process.env.CW_TEST_TRASH_DIR
     await disposeWorkspaceService(w)
   })
 
@@ -327,18 +327,18 @@ describe('the state view in a workspace', () => {
       off.mockRestore()
     }
     expect(advanced.get<boolean>(ASSISTANT_START_VIEW)).toBe(true)
-    expect(await run(() => assistantStartView(w, live, 'startup'))).toMatch(/^\[Hive\] Where things stand/)
+    expect(await run(() => assistantStartView(w, live, 'startup'))).toMatch(/^\[CW\] Where things stand/)
   })
 
   it("is carried by Claude Code's SessionStart reply", () => {
-    expect(new ClaudeCodeAdapter().startContextReply('[Hive] view')).toEqual({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: '[Hive] view' } })
+    expect(new ClaudeCodeAdapter().startContextReply('[CW] view')).toEqual({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: '[CW] view' } })
   })
 
   it('with the journal off, a handover suggests it once, never again', async () => {
     await service.setJournalSettings(w, { enabled: false })
     expect(await service.journalSuggestion(w)).toBe(service.JOURNAL_SUGGESTION)
     expect(await service.journalSuggestion(w)).toBeNull()
-    expect(JSON.parse(readFileSync(join(wsPath, '.hive', 'workspace.json'), 'utf8')).journalSuggested).toBe(true)
+    expect(JSON.parse(readFileSync(join(wsPath, '.combwork', 'workspace.json'), 'utf8')).journalSuggested).toBe(true)
     await service.setJournalSettings(w, { enabled: true })
     expect(await service.journalSuggestion(w)).toBeNull()
   })

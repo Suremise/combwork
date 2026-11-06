@@ -1,0 +1,9 @@
+{
+  "prose|return|(and {} more)": 1,
+  "prose|return|conflicts not found in the part read": 1,
+  "prose|return|no text conflict": 1,
+  "prose|return|not read: {}": 1,
+  "prose|return|{}{} (read in part)": 1,
+  "prose|var|, line{} {}": 1,
+  "prose|var|{} and {}": 1
+}

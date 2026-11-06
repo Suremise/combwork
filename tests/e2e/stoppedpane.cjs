@@ -4,7 +4,7 @@
 // moment, so the window between is seen), before the session runs. A lane's end's quit says "its lane ended", the CLI
 // crashing "its CLI exited with code 1", and a failed start keeps its failed bar. Screenshots in both themes, Panes and
 // Tiles. The fake Claude Code; throwaway profile and workspace. Dev build only: a lane's end's quit is the test copies'
-// slots:test channel, and the held and refused starts their IPC test seams, which a packaged Hive refuses.
+// slots:test channel, and the held and refused starts their IPC test seams, which a packaged Combwork refuses.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
@@ -26,14 +26,14 @@ const check = (name, ok, extra = '') => {
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
   lib.gitProject(proj)
   const claude = lib.fakeClaude(userData, path.join(scratch, 'stoppedpane-claude-home'), [proj])
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, ...claude })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, ...claude })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1300, height: 860 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     await page.getByText('demo', { exact: true }).first().click()
     const agent = await lib.soloAgent(inv, proj)
@@ -89,7 +89,7 @@ const check = (name, ok, extra = '') => {
     await page.mouse.down()
     await page.mouse.move(box.x + box.width * 0.6, box.y + 60, { steps: 8 })
     await page.mouse.up()
-    const selection = () => page.evaluate((k) => window.__hiveTerminalSelection?.(k) ?? '', key)
+    const selection = () => page.evaluate((k) => window.__cwTerminalSelection?.(k) ?? '', key)
     check('…its scrollback still selected', !!(await lib.until(async () => (await selection()).trim().length > 0, HUNG_MS)), JSON.stringify(await selection()))
     // Right-click copies a selection in every pane (and clears it): the text selected, as it was.
     const selected = await selection()
@@ -108,11 +108,11 @@ const check = (name, ok, extra = '') => {
     await lib.until(async () => (await bar.count()) === 1, HUNG_MS)
 
     // --- Resume: the stopped look goes from the accepted click, before the session runs (its start held a moment).
-    await app.evaluate(() => { process.env.HIVE_TEST_SLOW_IPC = 'session:start=2500*1,session:resume=2500*1' })
+    await app.evaluate(() => { process.env.CW_TEST_SLOW_IPC = 'session:start=2500*1,session:resume=2500*1' })
     await bar.getByRole('button', { name: /Resume/ }).click()
     const notStopped = async () => (await host.evaluate((h) => h.classList.contains('dimmed'))) === false && !/Stopped/.test(await text(status)) && (await page.locator('.agent-pane .session-ended.stopped').count()) === 0 && (await header.locator('.state-mark.stopped').count()) === 0
     check('Resume: at once, no dimming, no Stopped label or bar, while it starts', !!(await lib.until(async () => !(await live()) && (await notStopped()), HUNG_MS)), JSON.stringify([await text(status), await text(bar)]))
-    await app.evaluate(() => { delete process.env.HIVE_TEST_SLOW_IPC })
+    await app.evaluate(() => { delete process.env.CW_TEST_SLOW_IPC })
     await lib.acceptClaudeTrust(inv, proj, agent.id).catch(() => {})
     check('…then it runs, still not stopped', !!(await lib.until(async () => (await live())?.status === 'ready' && (await notStopped()), HUNG_MS)))
     check('…the chip no longer says stopped, its mark not grey', !!(await lib.until(async () => !/stopped/.test(await text(chip)) && (await chip.locator('.state-mark.stopped').count()) === 0, HUNG_MS)), await text(chip))
@@ -127,11 +127,11 @@ const check = (name, ok, extra = '') => {
     check('a crash: "its CLI exited with code 1"', !!(await lib.until(async () => (await text(bar.locator('.grow'))).endsWith('· its CLI exited with code 1') && (await bar.getAttribute('data-stopped')) === 'crashed', HUNG_MS)), await text(bar))
     await shots('crashed')
 
-    // --- A start refused by Hive: the starting look ends with it, and the stopped one is back as it was.
-    await app.evaluate(() => { process.env.HIVE_TEST_FAIL_IPC = 'session:start*1' })
+    // --- A start refused by Combwork: the starting look ends with it, and the stopped one is back as it was.
+    await app.evaluate(() => { process.env.CW_TEST_FAIL_IPC = 'session:start*1' })
     await bar.getByRole('button', { name: 'New Session' }).click()
     check('a refused start: stopped again, its bar and dimming back', !!(await lib.until(async () => (await text(bar.locator('.grow'))).endsWith('· its CLI exited with code 1') && (await host.evaluate((h) => h.classList.contains('dimmed'))) && (await bar.getByRole('button', { name: 'New Session' }).isEnabled()), HUNG_MS)), await text(bar))
-    await app.evaluate(() => { delete process.env.HIVE_TEST_FAIL_IPC })
+    await app.evaluate(() => { delete process.env.CW_TEST_FAIL_IPC })
 
     // --- A launch that fails (the fake's --model fail-start): its failed bar, never Stopped, not dimmed.
     await lib.setLaunch(inv, proj, agent.id, { model: 'fail-start' })

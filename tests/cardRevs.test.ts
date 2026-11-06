@@ -10,7 +10,7 @@ import * as electron from 'electron'
 import type { TaskChanges, TaskCursor } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-card-revs-')
+const base = tempDir('cw-card-revs-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
@@ -30,7 +30,7 @@ const read = async (since: TaskCursor | null): Promise<Read> => {
 }
 const cursor = (r: Read): TaskCursor => ({ board: r.board, mark: r.mark! })
 const sent = (r: Read): number[] => r.cards.map((c) => c.number).sort((a, b) => a - b)
-/** Another connection to the board's file, as another Hive or a script has. */
+/** Another connection to the board's file, as another Combwork or a script has. */
 const other = (): DatabaseSync => new DatabaseSync(store.boardFile(wsPath))
 const rev = (db: DatabaseSync, n: number): number => (db.prepare('SELECT rev FROM cards WHERE number = ?').get(n) as { rev: number }).rev
 const mark = (db: DatabaseSync): number => (db.prepare('SELECT g FROM board_rev').get() as { g: number }).g
@@ -39,9 +39,9 @@ let a = 0
 let b = 0
 let c = 0
 beforeAll(async () => {
-  mkdirSync(join(wsPath, 'alpha', '.hive'), { recursive: true })
+  mkdirSync(join(wsPath, 'alpha', '.combwork'), { recursive: true })
   // Two agents, for cards held (the usage history's holds, HI-1748).
-  writeFileSync(join(wsPath, 'alpha', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'agent-1', name: 'Agent 1' }, { id: 'agent-2', name: 'Agent 2' }] }))
+  writeFileSync(join(wsPath, 'alpha', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'agent-1', name: 'Agent 1' }, { id: 'agent-2', name: 'Agent 2' }] }))
   w = createWorkspaceService()
   await w.open(wsPath)
   a = (await run(() => tasks.createTask({ title: 'A', project: 'alpha' }, user))).number
@@ -73,7 +73,7 @@ describe("a card's revision (HI-1715)", () => {
         expect([what, rev(db, a)]).toEqual([what, g + 1])
         expect(mark(db)).toBe(g + 1)
       }
-      // The raw rows taken out again: not all of them are of Hive's form (a card read with them would fail).
+      // The raw rows taken out again: not all of them are of Combwork's form (a card read with them would fail).
       for (const t of ['card_links', 'card_context', 'card_comments', 'card_decisions', 'card_holds']) db.exec(`DELETE FROM ${t} WHERE card = ${a}`)
     } finally {
       db.close()

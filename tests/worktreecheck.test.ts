@@ -23,7 +23,7 @@ afterEach(() => {
 type Tree = { path: string; branch: string; base: string }
 
 async function makeProject(main = 'main'): Promise<{ project: string; tree: (name: string) => Promise<Tree> }> {
-  root = tempDir('hive-wtcheck-')
+  root = tempDir('cw-wtcheck-')
   const project = join(root, 'project')
   run(root, 'init', '-q', '-b', main, project)
   for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) run(project, 'config', k, v)
@@ -33,7 +33,7 @@ async function makeProject(main = 'main'): Promise<{ project: string; tree: (nam
   return {
     project,
     tree: async (name) => {
-      const wt = { path: join(root, 'wt', name), branch: `hive/${name}`, base: main }
+      const wt = { path: join(root, 'wt', name), branch: `cw/${name}`, base: main }
       await createWorktree(project, wt.path, wt.branch, main)
       return wt
     }
@@ -99,6 +99,15 @@ describe('worktreeCheck', () => {
     run(m.project, 'update-ref', 'refs/remotes/origin/trunk', 'HEAD')
     run(m.project, 'symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/trunk')
     expect(await primaryBranch(m.project)).toBe('trunk')
+    // A tag named as origin's branch: still origin's default, by its whole ref (git's short name is remotes/origin/trunk, HI-2426).
+    run(m.project, 'tag', 'origin/trunk')
+    expect(await primaryBranch(m.project)).toBe('trunk')
+    // …and a tag named as a local branch: still that branch (refname:short lists it as heads/trunk).
+    run(m.project, 'tag', 'trunk')
+    expect(await primaryBranch(m.project)).toBe('trunk')
+    run(m.project, 'symbolic-ref', '-d', 'refs/remotes/origin/HEAD')
+    run(m.project, 'tag', 'master')
+    expect(await primaryBranch(m.project)).toBe('master')
     rmSync(root, { recursive: true, force: true })
     const n = await makeProject('develop')
     const wt = await n.tree('x')
@@ -110,9 +119,9 @@ describe('worktreeCheck', () => {
     expect((await worktreeCheck(p, { path: p, branch: 'main', base: 'main' })).removable).toBe(false)
     const plain = join(root, 'plain')
     mkdirSync(plain)
-    expect(await worktreeCheck(p, { path: plain, branch: 'hive/plain', base: 'main' })).toMatchObject({ removable: false, reason: "git doesn't list it as a worktree on hive/plain" })
+    expect(await worktreeCheck(p, { path: plain, branch: 'cw/plain', base: 'main' })).toMatchObject({ removable: false, reason: "git doesn't list it as a worktree on cw/plain" })
     const wt = await tree('other')
-    expect((await worktreeCheck(p, { ...wt, branch: 'hive/elsewhere' })).removable).toBe(false)
+    expect((await worktreeCheck(p, { ...wt, branch: 'cw/elsewhere' })).removable).toBe(false)
   })
 })
 
@@ -143,7 +152,7 @@ describe('removeCheckedWorktree', () => {
     const wt = await tree('moved')
     const check = await worktreeCheck(p, wt)
     commit(wt.path, 'new.txt')
-    expect(await removeCheckedWorktree(p, wt, check, 'main')).toEqual({ deleted: false, reason: 'hive/moved changed since it was checked' })
+    expect(await removeCheckedWorktree(p, wt, check, 'main')).toEqual({ deleted: false, reason: 'cw/moved changed since it was checked' })
     expect(existsSync(join(wt.path, 'new.txt'))).toBe(true)
     expect(hasBranch(p, wt.branch)).toBe(true)
   })
@@ -185,7 +194,7 @@ describe('removeCheckedWorktree', () => {
     // The branch moved instead.
     run(p, 'reset', '-q', '--hard', check.intoTip!)
     commit(wt.path, 'more.txt')
-    expect(await deleteCheckedBranch(p, wt, 'main', check.tip!, check.intoTip!)).toBe('hive/race changed since it was checked')
+    expect(await deleteCheckedBranch(p, wt, 'main', check.tip!, check.intoTip!)).toBe('cw/race changed since it was checked')
     expect(hasBranch(p, wt.branch)).toBe(true)
   })
 
@@ -208,7 +217,7 @@ describe('removeCheckedWorktree', () => {
   })
 })
 
-// Paths Hive was given by another name than git's (#389): GitHub's runner has its temp folder at C:\Users\RUNNER~1\…, and
+// Paths Combwork was given by another name than git's (#389): GitHub's runner has its temp folder at C:\Users\RUNNER~1\…, and
 // git lists worktrees by their real, long names. Compared by real paths, they are the same worktree; anything else still
 // isn't one.
 describe('paths by another name: an 8.3 short name or a junction (#389)', () => {
@@ -230,8 +239,8 @@ describe('paths by another name: an 8.3 short name or a junction (#389)', () => 
       // Still only what git lists, on its branch: not the project folder by its other name, a plain folder or a wrong branch.
       expect((await worktreeCheck(p, { path: proj, branch: 'main', base: 'main' })).removable).toBe(false)
       mkdirSync(join(root, 'wt', 'plain'))
-      expect(await worktreeCheck(proj, { path: join(wts, 'plain'), branch: 'hive/plain', base: 'main' })).toMatchObject({ removable: false, reason: "git doesn't list it as a worktree on hive/plain" })
-      expect((await worktreeCheck(proj, { ...named, branch: 'hive/elsewhere' })).removable).toBe(false)
+      expect(await worktreeCheck(proj, { path: join(wts, 'plain'), branch: 'cw/plain', base: 'main' })).toMatchObject({ removable: false, reason: "git doesn't list it as a worktree on cw/plain" })
+      expect((await worktreeCheck(proj, { ...named, branch: 'cw/elsewhere' })).removable).toBe(false)
       // Unmerged work still keeps it.
       commit(wt.path, 'w.txt')
       expect(await worktreeCheck(proj, named)).toMatchObject({ removable: false, reason: '1 commit not merged into main' })

@@ -23,7 +23,7 @@ const all: Combo[] = []
 for (const platform of ['git', 'none'] as const)
   for (const review of REVIEWS)
     for (const reviewers of [1, 2] as const)
-      for (const finish of (platform === 'git' ? ['hiveMerges', 'agentMerges', 'committed', 'notChecked'] : ['accept']) as Finisher[])
+      for (const finish of (platform === 'git' ? ['combworkMerges', 'agentMerges', 'committed', 'notChecked'] : ['accept']) as Finisher[])
         for (const folder of (platform === 'git' ? ['slots', 'project'] : ['project']) as FolderMode[])
           for (const kind of ['code', 'no-code'] as const) all.push({ platform, review, reviewers, finish, folder, kind })
 
@@ -191,7 +191,7 @@ describe('#1592: the OK before merging under not checked', () => {
     const ok = s.requests.find((r) => r.gate === 'okBefore')
     if (!applies) expect(ok).toBeUndefined()
     else {
-      expect(ok, 'Hive asks for the OK').toMatchObject({ kind: 'approve', for: 'user' })
+      expect(ok, 'Combwork asks for the OK').toMatchObject({ kind: 'approve', for: 'user' })
       refusedBy(await e.wf.reportMerge(card.key, B1), 'approval.given')
       moved(await e.wf.answer(card.key, ok!.request, 'approved'))
       expect(e.wakes.at(-1)).toMatchObject({ agent: 'B1', why: expect.stringContaining('approved: merge it and report the merge') })

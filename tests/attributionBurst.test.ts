@@ -10,7 +10,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-attribution-burst-')
+const base = tempDir('cw-attribution-burst-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -37,13 +37,13 @@ afterAll(async () => {
 const user = { kind: 'user' } as const
 const git = (cwd: string, args: string[], input?: string): string => execFileSync('git', args, { cwd, stdio: 'pipe', encoding: 'utf8', input, maxBuffer: 64 * 1024 * 1024 }).trim()
 
-/** `n` commits on a new branch from main, a file each, made at once with fast-import; `trailer(i)`: a commit's Hive-Card. */
+/** `n` commits on a new branch from main, a file each, made at once with fast-import; `trailer(i)`: a commit's Combwork-Card. */
 function manyCommits(repo: string, branch: string, n: number, trailer: (i: number) => string | null = () => null): void {
   const from = git(repo, ['rev-parse', 'main'])
   let s = ''
   for (let i = 0; i < n; i++) {
     const t = trailer(i)
-    const message = `work ${i}${t ? `\n\nHive-Card: ${t}` : ''}\n`
+    const message = `work ${i}${t ? `\n\nCombwork-Card: ${t}` : ''}\n`
     s += `commit refs/heads/${branch}\ncommitter T <t@t> ${1700000000 + i} +0000\ndata ${Buffer.byteLength(message)}\n${message}${i ? '' : `from ${from}\n`}M 100644 inline f/${i}.txt\ndata ${String(i).length + 1}\n${i}\n\n`
   }
   git(repo, ['fast-import', '--quiet'], s)
@@ -52,14 +52,14 @@ function manyCommits(repo: string, branch: string, n: number, trailer: (i: numbe
 /** A workspace whose project `p` is a git repository on main, worked in by its agents in the folder itself (Solo). */
 async function workspace(name: string): Promise<{ w: WS; repo: string }> {
   const repo = join(base, name, 'p')
-  mkdirSync(join(repo, '.hive'), { recursive: true })
+  mkdirSync(join(repo, '.combwork'), { recursive: true })
   git(repo, ['init', '-q', '-b', 'main'])
   for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) git(repo, ['config', k, v])
-  writeFileSync(join(repo, '.gitignore'), '.hive/\n')
+  writeFileSync(join(repo, '.gitignore'), '.combwork/\n')
   writeFileSync(join(repo, 'a.txt'), 'one\n')
   git(repo, ['add', '-A'])
   git(repo, ['commit', '-qm', 'initial'])
-  writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }, { id: 'a2', name: 'Other' }] }))
+  writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }, { id: 'a2', name: 'Other' }] }))
   const w = createWorkspaceService()
   await w.open(join(base, name))
   opened.push(w)

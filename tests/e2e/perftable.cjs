@@ -21,14 +21,14 @@ const check = (name, ok, extra = '') => {
   for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
   lib.gitProject(alpha)
   const claude = lib.fakeClaude(userData, path.join(lib.WORK, 'perftable-claude-home'), [alpha])
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47935), ...claude })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47935), ...claude })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
-  // A price for the fake model, so the cost is Hive's estimate: "≈ $…".
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
+  // A price for the fake model, so the cost is Combwork's estimate: "≈ $…".
   await inv('settings:setProviderPrices', 'claude-code', { 'claude-fake': { input: 1000, cachedInput: 100, cacheWrite: 1000, output: 1000 } })
   await lib.openWorkspace(inv, page, ws)
   const agent = await lib.addAgent(inv, alpha, { name: 'Coder' })

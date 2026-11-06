@@ -20,12 +20,12 @@ const HUNG_MS = 10000
 const CLI_HUNG_MS = 60000
 const check = (n, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${extra ? ` (${extra})` : ''}`)
 ;(async () => {
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, ...lib.ownClaudeHome('plan').env })
-  const app = await _electron.launch({ executablePath: process.env.HIVE_EXE || lib.ELECTRON, args: process.env.HIVE_EXE ? [] : [lib.ROOT], cwd: lib.ROOT, env })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, ...lib.ownClaudeHome('plan').env })
+  const app = await _electron.launch({ executablePath: process.env.CW_EXE || lib.ELECTRON, args: process.env.CW_EXE ? [] : [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => results.push(`PAGEERROR ${e.message}`))
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   const proj = path.join(ws, 'demo')
   await inv('workspace:open', ws); await sleep(800)
   await page.getByText('demo', { exact: true }).first().click()
@@ -72,7 +72,7 @@ const check = (n, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'}  ${n}
   await picker.waitFor({ timeout: HUNG_MS })
   const groups = await picker.locator('optgroup').evaluateAll((els) => els.map((e) => e.label))
   const savedModel = async () => (await inv('connections:list')).connectionRows.find((c) => c.account === account.id)?.model ?? ''
-  // The models Claude Code reports for this version and account (#125), else Hive's fallback list.
+  // The models Claude Code reports for this version and account (#125), else Combwork's fallback list.
   const catalog = (await inv('provider:info'))['claude-code']?.catalog
   const offered = (await picker.locator('select option').evaluateAll((os) => os.map((o) => o.value))).filter((v) => v && v !== 'custom')
   let first = 'claude-opus-5-5'
@@ -119,7 +119,7 @@ const check = (n, ok, extra = '') => results.push(`${ok ? 'PASS' : 'FAIL'}  ${n}
   check('Project Settings has no Claude Code page and no model picker (each connection has its own, HI-2107)', (await page.locator('.settings-nav .row', { hasText: 'Claude Code' }).count()) === 0 && (await page.locator('.setting .model-picker').count()) === 0)
   await page.screenshot({ path: path.join(shots, '4-project-settings.png') })
 
-  // Real session: the status line reaches Hive and prints nothing.
+  // Real session: the status line reaches Combwork and prints nothing.
   const agent = await lib.soloAgent(inv, proj)
   // Its own effort (Claude Code has no default effort of its own since HI-1774).
   await lib.setLaunch(inv, proj, agent.id, { effort: 'high' })

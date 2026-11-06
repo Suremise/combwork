@@ -1,6 +1,6 @@
 // Copilot's compactions (#454), from a real sample (tests/fixtures/copilot/compaction-1.0.98.jsonl: Copilot CLI 1.0.98
 // offline against the scripted model, a prompt, three file views, /compact, a prompt, /exit): counted in usage, shown in
-// the Sessions tab, and, as Copilot sends PreCompact but no hook at the end, its end read from events.jsonl ends Hive's
+// the Sessions tab, and, as Copilot sends PreCompact but no hook at the end, its end read from events.jsonl ends Combwork's
 // compacting status. An automatic compaction couldn't be made offline (#454's comment says what was tried).
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -55,10 +55,10 @@ describe("Copilot's compactions in its events (#454)", () => {
   })
 })
 
-const base = tempDir('hive-copilot-compaction-')
+const base = tempDir('cw-copilot-compaction-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
-describe("a Copilot compaction's end ends Hive's compacting status (#454)", () => {
+describe("a Copilot compaction's end ends Combwork's compacting status (#454)", () => {
   const wsPath = join(base, 'ws')
   const p = join(wsPath, 'alpha')
   let sessions: typeof import('../src/main/sessions').sessions
@@ -69,8 +69,8 @@ describe("a Copilot compaction's end ends Hive's compacting status (#454)", () =
     const workspace = await import('../src/main/workspace')
     ;({ sessions } = await import('../src/main/sessions'))
     const { providerService } = await import('../src/main/providerService')
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     const ws = workspace.createWorkspaceService()
     await ws.open(wsPath)
     run = (fn) => workspace.inWorkspace(ws, fn)

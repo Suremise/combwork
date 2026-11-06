@@ -34,7 +34,7 @@
   "worktrees.merge.sameBranch": "A pasta do projeto está no branch {branch}.",
   "worktrees.merge.staged": "A pasta do projeto tem alterações preparadas. Faça commit delas ou cancele a preparação antes do merge.",
   "worktrees.merge.targetElsewhere": "{branch} está em checkout em {folder}. Faça o merge lá ou, antes, mude essa pasta para outro branch.",
-  "worktrees.merge.targetMoved": "{branch} mudou enquanto o Hive fazia o merge nele. Nada foi mesclado: faça o merge de novo.",
+  "worktrees.merge.targetMoved": "{branch} mudou enquanto o Combwork fazia o merge nele. Nada foi mesclado: faça o merge de novo.",
   "worktrees.merge.uncommitted": "Nada foi mesclado: {files, plural, one {# arquivo no worktree está sem commit. Faça commit ou stash dele} other {# arquivos no worktree estão sem commit. Faça commit ou stash deles}} no worktree e depois faça o merge.",
   "worktrees.merge.unknownFiles": "(arquivos desconhecidos)",
   "worktrees.missing.noAgent": "Esse agente não existe mais.",

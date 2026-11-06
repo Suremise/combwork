@@ -1,5 +1,5 @@
 // The Assistant's journal and the usage history (usage.db) opened under another name for their workspace's folder (#1456,
-// as #1402 for hive.db): a junction or an 8.3 short name is another connection to the same file, which the window's close
+// as #1402 for combwork.db): a junction or an 8.3 short name is another connection to the same file, which the window's close
 // closes too, by the place the window recorded as it opened, never by what a spelling resolves to at the close. So a
 // junction removed or pointed at another workspace before the close neither keeps this one's open nor closes another's.
 import { existsSync, mkdirSync, rmSync, unlinkSync, writeFileSync } from 'fs'
@@ -11,7 +11,7 @@ import { junction, shortPath } from './pathAliases'
 import { moveFolder } from './moveFolder'
 import { DEFAULT_JOURNAL, type JournalSettings } from '../src/shared/journal'
 
-const base = tempDir('hive-assistant-aliases-')
+const base = tempDir('cw-assistant-aliases-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 ;(electron.shell as unknown as { trashItem: (f: string) => Promise<void> }).trashItem = async (f) => rmSync(f, { force: true })
 // The longest a wait here waits for what it waits on: a bound for a hung run (tests/README.md).
@@ -31,8 +31,8 @@ let n = 0
 /** A workspace with a project `p`. */
 function workspace(): string {
   const ws = join(base, `ws-${++n}`)
-  mkdirSync(join(ws, 'p', '.hive'), { recursive: true })
-  writeFileSync(join(ws, 'p', '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
+  mkdirSync(join(ws, 'p', '.combwork'), { recursive: true })
+  writeFileSync(join(ws, 'p', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
   return ws
 }
 async function open(ws: string): Promise<WS> {
@@ -52,7 +52,7 @@ function aliasOf(kind: 'junction' | '8.3', ws: string): { path: string; drop: ()
 }
 
 const all: JournalSettings = { ...DEFAULT_JOURNAL, scope: ['decision', 'plan', 'event', 'incident', 'insight', 'preference', 'moment'] }
-const home = (ws: string): string => join(ws, '.hive', 'assistant')
+const home = (ws: string): string => join(ws, '.combwork', 'assistant')
 /** The journal of the workspace at `ws` (by that spelling), opened by writing to it. */
 const useJournal = (ws: string): number => journal.writeEntry(home(ws), all, { kind: 'decision', summary: `Entry ${++n}` }, 'assistant')
 const journalOpen = (ws: string): boolean => journal.journalOpen(home(ws))
@@ -61,7 +61,7 @@ const useUsage = (ws: string): Promise<unknown> => usageHistory.storedSessions(w
 /** Whether the worker has the usage.db of the workspace really at `ws` open: it is only ever sent where a file really is. */
 const usageOpen = (ws: string): boolean => worker.openFiles().includes(usageFile(ws).toLowerCase())
 /** Whether the worker was sent a spelling under `alias` (never: the file where it really is). */
-const usageByAlias = (alias: string): boolean => worker.openFiles().some((f) => f.startsWith(join(alias, '.hive').toLowerCase()))
+const usageByAlias = (alias: string): boolean => worker.openFiles().some((f) => f.startsWith(join(alias, '.combwork').toLowerCase()))
 
 /** Nothing holds the folder: it can be moved (Windows refuses while a connection has a file in it open). */
 async function moves(ws: string): Promise<void> {

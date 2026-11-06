@@ -6,12 +6,12 @@
 // workspace's opening):
 // - **release**: a card's lease its card's current cycle doesn't use (Todo, Done, or another lease), ended in the write
 //   that reads the card; a lane's once the lane has ended. With the rules off too (data safety).
-// - **prepare**: the card's line `hive/<KEY>/<KEY>-<n>-<slug>` checked out in the slot from the target's head (G15: its
+// - **prepare**: the card's line `cw/<KEY>/<KEY>-<n>-<slug>` checked out in the slot from the target's head (G15: its
 //   dependencies installed again on a changed lock file), once the lease's builder is quiet (not in a turn, nothing
 //   typed or queued, no run or background task), as #1429's warming operation on the lent slot, under the folder's fence
 //   (#646: nothing typed into or started in it meanwhile) and the repository's lock for the switch; recorded as
 //   `SlotPrepared` for the cycle.
-// - **place**: the builder given the card there once quiet: claimed by this Hive (`PlacementClaimed`, taken over once
+// - **place**: the builder given the card there once quiet: claimed by this Combwork (`PlacementClaimed`, taken over once
 //   its process is gone), delivered once (its delivery's identity is the card's cycle and lease), recorded as
 //   `BuilderPlaced`.
 // - **delete**: a Done card's merged line (containment by key), under the repository's lock, never one checked out.
@@ -22,6 +22,7 @@
 // rules are enforced) it only releases: nothing is lent, prepared, placed or deleted, each step checking again after its
 // waits.
 
+import { agentMsg, inDefaultDialect, say } from '../shared/agentText'
 import { projectAgents } from '../shared/defaults'
 import { taskPrompt } from '../shared/tasks'
 import { agentWorkflowRole, buildsWork, takesCards } from '../shared/workflow/roles'
@@ -31,7 +32,7 @@ import { SLOTS_DELETE_MERGED, SLOTS_RENAME_ADOPTED } from '../shared/advanced'
 import { basename } from 'path'
 import type { AgentDef, LaneSlotInfo, LiveSessionState } from '../shared/types'
 import type { ResumeHold } from '../shared/agentFolders'
-import type { LaneRecord } from '../shared/lanes'
+import type { LaneRecord, LaneSlotHeld } from '../shared/lanes'
 import { app } from 'electron'
 import type { DatabaseSync } from 'node:sqlite'
 import { advanced } from './advanced'
@@ -39,13 +40,13 @@ import { exitBy } from './exitLog'
 import { legacyWorktree, rebindSession, slotHeldWords, slotsMigrated } from './agentFolders'
 import { boardRead } from './boardStore'
 import { deliveriesOf, deliverNow, launchWith } from './deliveries'
-import { onHiveEvent } from './events'
+import { onCombworkEvent } from './events'
 import { onLineFreed, whyNoLine } from './lineWriter'
 import { changingFolder, folderChanging, folderSteady } from './folderFence'
-import { samePlace } from './fsutil'
+import { containsPlace, samePlace } from './fsutil'
 import { samePath } from '../shared/movePaths'
 import { git } from './git'
-import { lanesWaitingForSlot, onLanesWritten, rawLanes, setLaneSlots, setLaneSlotWait } from './lanes'
+import { lanesWaitingForSlot, laneViewsChanged, onLanesWritten, rawLanes, setLaneSlotHeld, setLaneSlots, setLaneSlotWait } from './lanes'
 import { createLogger, userText } from './logger'
 import * as G from './platform/git'
 import { observer } from './platform/observe'
@@ -55,10 +56,11 @@ import { isResuming, onResumeEntry } from './restartResume'
 import { sessions } from './sessions'
 import { startBegun, startEnded, startWaits } from './agentStarts'
 import { holder, poolFor, setSlotFreed } from './slotsApp'
-import { quiet as quietFolder, refusalText, setBuilderCount, type Slot, type SlotLease, type SlotPool } from './slots'
+import { brokerWorkingIn } from './agentProcesses'
+import { processHeld, quiet as quietFolder, refusalText, setBuilderCount, type Slot, type SlotLease, type SlotPool, type SlotRefusal } from './slots'
 import { carriedOf, keptFor, keptGoing } from './slotMigration'
 import { getTask } from './tasks'
-import { HiveError } from './hiveError'
+import { CombworkError } from './combworkError'
 import { onAction } from './workflow/actionWorker'
 import { agentBusy } from './workflow/lineUpdates'
 import { withoutWriteFence, type CardRecord } from './workflow/factStore'
@@ -85,13 +87,13 @@ const START_GRACE_MS = 2 * 60 * 1000
 const KEEPS: ReadonlySet<StageId> = new Set<StageId>(['active', 'review', 'approved', 'merging', 'hold'])
 
 /**
- * Test copies (unpackaged) only: `HIVE_TEST_SLOT_CRASH=<point>` ends Hive at once there, no quit handler run, so a suite
+ * Test copies (unpackaged) only: `CW_TEST_SLOT_CRASH=<point>` ends Combwork at once there, no quit handler run, so a suite
  * shows what the next start recovers (HR1's #1438 rounds 1 and 2): `afterAction` (a slot action marked done, nothing of
  * it done), `inPrepare` (the line checked out, `SlotPrepared` not written), `inPlacement` (claimed, nothing delivered),
  * `inDeletion` (a merged line's ref removed, nothing checked or recorded after it).
  */
 function crashAt(point: 'afterAction' | 'inPrepare' | 'inPlacement' | 'inDeletion'): Promise<never> | null {
-  if (app.isPackaged || process.env.HIVE_TEST_SLOT_CRASH !== point) return null
+  if (app.isPackaged || process.env.CW_TEST_SLOT_CRASH !== point) return null
   exitBy('app.exit', `a test crash at a slot's ${point}`, () => app.exit(1)) // i18n-ignore: the exit log's reason
   return new Promise<never>(() => undefined)
 }
@@ -213,12 +215,31 @@ export async function leaseForStart(ws: WorkspaceService, projectPath: string, c
  * waits detached at the head of the line its last card worked to. No target: the slot keeps its own. Null when
  * recorded; why the start waits when that lease ended or changed hands meanwhile (agent-facing).
  */
+/** A card's slot's agent text (dialects, HI-2447): a start's waits, and why a builder isn't placed in its slot yet. */
+const T = {
+  leaseEnded: agentMsg({ id: 'slot.start.leaseEnded', text: "its slot's lease {lease} ended while the start took it: the start tries again", note: "A start's wait: the slot's lease ended between taking it and recording its target." }),
+  ownSlotWaits: agentMsg({ id: 'slot.start.ownSlotWaits', text: "{agent}'s own slot {slot}, its run still there, {because}: this start waits for it rather than take a second slot", note: "A start's wait (HI-1762): the builder's own run still writes in a slot that can't be taken over now. {because} is one of slot.takeover.*." }),
+  changed: agentMsg({ id: 'slot.takeover.changed', text: 'changed while it was taken over', note: 'As slot.takeover.gone: the slot changed while the start took it over, twice.' }),
+  notReady: agentMsg({ id: 'slot.place.notReady', text: "Combwork couldn't get {slot} ready: {error}", note: "Why a builder's start ended (a card's stall): its slot couldn't be prepared for the card. Kept, so said in the Default." }),
+  notReadyFor: agentMsg({ id: 'slot.place.notReadyFor', text: "Combwork couldn't get {slot} ready for {card}: {error}", note: "A card's notice and its builder's wake: its slot couldn't be prepared for it. Kept on the card, so said in the Default." }),
+  cantResume: agentMsg({ id: 'slot.place.cantResume', text: "Combwork can't give {card} to {agent} yet: its conversation in {slot} can't resume now ({why}).", note: "A card's notice and its builder's wake: the builder's conversation in its slot can't resume yet. {why} is one of slot.hold.*, or why the slot is held. Kept on the card, so said in the Default." }),
+  resumeEnded: agentMsg({ id: 'slot.place.resumeEnded', text: "its conversation in {slot} didn't resume ({tries} tries): {why}", note: "Why a builder's start ended (a card's stall): resuming its conversation failed every try. Kept, so said in the Default." }),
+  resumeFailed: agentMsg({ id: 'slot.place.resumeFailed', text: "Combwork couldn't resume {agent}'s conversation in {slot} for {card} (three tries): {why}. Resume {agent} from Sessions, or start it fresh, and Combwork gives it {card}.", note: "A card's notice and its builder's wake: resuming its conversation failed three times. Kept on the card, so said in the Default." }),
+  draining: agentMsg({ id: 'slot.hold.draining', text: 'its last session there is still ending', note: "Why a builder's conversation in its slot can't resume yet: the end of slot.place.cantResume." }),
+  otherWork: agentMsg({ id: 'slot.hold.otherWork', text: 'its slot {slot} holds other work now', note: 'As slot.hold.draining: the slot was lent for other work since.' }),
+  otherSlot: agentMsg({ id: 'slot.hold.otherSlot', text: 'its agent keeps another slot ({slot})', note: 'As slot.hold.draining: one agent, one slot (HI-1762).' }),
+  slotChanged: agentMsg({ id: 'slot.hold.changed', text: 'its slot {slot} changed since it ran', note: "As slot.hold.draining: the slot's checkout changed since the conversation ran there." }),
+  slotGone: agentMsg({ id: 'slot.hold.gone', text: 'its slot {slot} is gone', note: "As slot.hold.draining: the slot's folder is gone." }),
+  reviews: agentMsg({ id: 'slot.hold.reviews', text: 'its agent reviews now', note: 'As slot.hold.draining: the agent is reviewing.' }),
+  byHand: agentMsg({ id: 'slot.hold.byHand', text: 'its slot {slot} is free, for a Resume by hand', note: 'As slot.hold.draining: the slot is free, and the user resumes the conversation.' })
+}
+
 async function startServes(ws: WorkspaceService, projectPath: string, lease: string, builder: string, target: string | null): Promise<string | null> {
   if (!target) return null
   const pool = await poolFor(ws, projectPath)
   if (await pool.serves(lease, builder, target)) return null
   log.info(`lease ${lease} ended before its start recorded its target ${userText(target)}`)
-  return `its slot's lease ${lease} ended while the start took it: the start tries again` // i18n-ignore: agent-facing, a start's wait
+  return say(T.leaseEnded, { lease })
 }
 
 async function slotForStart(ws: WorkspaceService, projectPath: string, card: Pick<CardRecord, 'id' | 'lane'>, builder: string, o: { dry: boolean; target: string | null }): Promise<SlotForStart> {
@@ -252,6 +273,11 @@ async function slotForStart(ws: WorkspaceService, projectPath: string, card: Pic
   if ('lease' in written) return leaseAt(pool, written.lease)
   if (o.dry) return couldLend(pool, projectPath, builder)
   const r = await pool.lend(lane ? { lane, agent: builder } : { card: card.id, agent: builder }, { ...(o.target ? { target: o.target } : {}), install: false })
+  // A lane's start refused for its slot held (HI-2468): what holds it kept for the lane's status; any other end forgets it.
+  if (lane) {
+    const busy = !r.ok && r.refusal.why === 'busy' ? r.refusal : null
+    noteStartHeld(projectPath, lane, busy ? { held: heldOf(pool, busy), folder: pool.slots().find((s) => s.name === busy.slot)?.folder ?? null } : null)
+  }
   if (!r.ok) return { wait: refusalText(r.refusal, name) }
   log.info(`Lent ${userText(r.slot.name)} to ${userText(name(builder))} for ${lane ? `lane ${lane}` : `#${card.id}`} (lease ${r.lease.id})`)
   // Its carried lease kept for a card it has left ends now that this start holds its own (HI-1731).
@@ -266,7 +292,7 @@ async function slotForStart(ws: WorkspaceService, projectPath: string, card: Pic
  * left without a lease (stopLeaseSession: it now holds that one). That card no longer Active, the folder with no changes
  * not committed (unknown or dirty keeps it), its checkout (line and commit) read then; then, in the pool's write, all of it
  * again: the carried lease still open and still kept for that card, the card still not Active, `holding` still open, and
- * the slot still the same one (its name, folder and making, no operation or job on it: Hive's own line changes run as
+ * the slot still the same one (its name, folder and making, no operation or job on it: Combwork's own line changes run as
  * one) with the same checkout, read again from its ref files (HR4: anything changed keeps it). A refusal changes
  * nothing. The card's work is on its line, which stays; back in Active, its start lends it a slot on that line as for any
  * card. The slot isn't reused or removed while the builder's run still writes there (a slot with a writer isn't free);
@@ -332,19 +358,33 @@ interface Retry {
   drop: () => void
 }
 const retiring = new Map<string, Retry>()
+/**
+ * Lanes waiting for a slot whose only free slot was held (HI-2466: a session or a process in it, the lend's `busy`), by
+ * project: the pass looked at again as `retiring` is, the pause at most HELD_RETRY_MAX_MS, until the lane is lent one or
+ * no slot is held. What holds it can end with no event (a CLI's child process closing after its session ended): before,
+ * such a lane waited for a slot that had come free, and nothing looked again.
+ */
+const heldRetries = new Map<string, Retry>()
+/** The longest pause between a held slot's looks (HI-2466). */
+const HELD_RETRY_MAX_MS = 30_000
 const retireKey = (ws: WorkspaceService, projectPath: string): string => `${(ws.path ?? '').toLowerCase()}\n${projectPath.toLowerCase()}`
 
 /** A retirement found busy: another pass asked for after its pause, unless one already waits. */
 function retireLater(ws: WorkspaceService, projectPath: string): void {
+  passLater(retiring, ws, projectPath, 60_000)
+}
+
+/** Another pass of a project asked for after a pause that grows with each try (1 s, doubling, at most `maxMs`), unless one already waits. */
+function passLater(retries: Map<string, Retry>, ws: WorkspaceService, projectPath: string, maxMs: number): void {
   if (ended(ws)) return
   const key = retireKey(ws, projectPath)
-  let r = retiring.get(key)
-  if (r && r.life !== ws.lifetime) forget(key, r)
-  r = retiring.get(key)
+  let r = retries.get(key)
+  if (r && r.life !== ws.lifetime) forget(retries, key, r)
+  r = retries.get(key)
   if (!r) {
-    const made: Retry = { tries: 0, timer: null, life: ws.lifetime, drop: () => forget(key, made) }
+    const made: Retry = { tries: 0, timer: null, life: ws.lifetime, drop: () => forget(retries, key, made) }
     made.life.addEventListener('abort', made.drop, { once: true })
-    retiring.set(key, made)
+    retries.set(key, made)
     r = made
   }
   if (r.timer) return
@@ -354,16 +394,16 @@ function retireLater(ws: WorkspaceService, projectPath: string): void {
   r.timer = setTimeout(() => {
     at.timer = null
     if (!life.aborted) void settleSlotCards(ws, projectPath)
-  }, Math.min(60_000, 1000 * 2 ** (r.tries - 1)))
+  }, Math.min(maxMs, 1000 * 2 ** (r.tries - 1)))
   r.timer.unref?.()
 }
 
 /** A retry forgotten: its pass no longer waits, nor its lifetime's listener. */
-function forget(key: string, r: Retry): void {
+function forget(retries: Map<string, Retry>, key: string, r: Retry): void {
   if (r.timer) clearTimeout(r.timer)
   r.timer = null
   r.life.removeEventListener('abort', r.drop)
-  if (retiring.get(key) === r) retiring.delete(key)
+  if (retries.get(key) === r) retries.delete(key)
 }
 
 /** A project's retirement retry as it stands (tests), by its workspace's folder: its tries and whether a pass waits; null: none. */
@@ -372,11 +412,159 @@ export function retireWaitOf(wsPath: string, projectPath: string): { tries: numb
   return r ? { tries: r.tries, waiting: !!r.timer } : null
 }
 
+/** A project's held-slot retry as it stands (tests, HI-2466): its tries and whether a pass waits; null: none. */
+export function heldRetryOf(wsPath: string, projectPath: string): { tries: number; waiting: boolean } | null {
+  const r = heldRetries.get(`${wsPath.toLowerCase()}\n${projectPath.toLowerCase()}`)
+  return r ? { tries: r.tries, waiting: !!r.timer } : null
+}
+
 /** No retirement busy any more (the pass found none): its tries forgotten, a pass still waiting left to run. */
 function retiredNow(ws: WorkspaceService, projectPath: string): void {
+  settledNow(retiring, ws, projectPath)
+}
+
+/** A retry's cause gone (the pass found none): its tries forgotten, a pass still waiting left to run. */
+function settledNow(retries: Map<string, Retry>, ws: WorkspaceService, projectPath: string): void {
   const key = retireKey(ws, projectPath)
-  const r = retiring.get(key)
-  if (r && !r.timer) forget(key, r)
+  const r = retries.get(key)
+  if (r && !r.timer) forget(retries, key, r)
+}
+
+/**
+ * The free slot each lane waiting for one was last refused as held, and what holds it (HI-2466), by
+ * "<workspace>\n<lane>", with the lane's workspace, project (lower-cased) and id: for its status (lanes.ts' slotView).
+ * Set and cleared by its project's pass as it tries; owned by the workspace's lifetime (HI-2469).
+ */
+const laneHolds = new Map<string, LaneSlotHeld & { ws: string; project: string; lane: string; life: AbortSignal }>()
+const laneHoldKey = (wsPath: string, lane: string): string => `${wsPath.toLowerCase()}\n${lane}`
+const holdLifetimes = new Map<AbortSignal, { ws: WorkspaceService; drop: () => void }>()
+let holdGeneration = 0
+
+/** One listener per workspace lifetime, regardless of how many lanes are held. */
+function ownLaneHolds(ws: WorkspaceService, life: AbortSignal): void {
+  if (holdLifetimes.has(life)) return
+  const drop = (): void => {
+    for (const [key, h] of laneHolds) if (h.life === life) laneHolds.delete(key)
+    life.removeEventListener('abort', drop)
+    holdLifetimes.delete(life)
+  }
+  holdLifetimes.set(life, { ws, drop })
+  life.addEventListener('abort', drop, { once: true })
+}
+
+/** A removed project's holds and retry go too; other projects and windows keep theirs. */
+function pruneLaneHolds(): void {
+  for (const [life, { ws, drop }] of holdLifetimes) {
+    if (life.aborted || ws.lifetime !== life) {
+      drop()
+      continue
+    }
+    const projects = new Set(ws.info()?.projects.map((p) => p.path.toLowerCase()))
+    for (const [key, h] of laneHolds) {
+      if (h.life !== life || projects.has(h.project)) continue
+      laneHolds.delete(key)
+      const retryKey = `${h.ws}\n${h.project}`
+      const r = heldRetries.get(retryKey)
+      if (r?.life === life) forget(heldRetries, retryKey, r)
+    }
+  }
+}
+
+/** Lane `lane`'s held slot as its last try found it, or null (lanes.ts reads it into the lane's status). */
+export function laneSlotHeld(wsPath: string, lane: string): LaneSlotHeld | null {
+  const h = laneHolds.get(laneHoldKey(wsPath, lane))
+  return h ? { slot: h.slot, held: h.held, ...(h.agent ? { agent: h.agent } : {}), ...(h.broker ? { broker: h.broker } : {}), ...(h.idle !== undefined ? { idle: h.idle } : {}) } : null
+}
+
+/**
+ * A waiting lane's slot as its last lend found it held (HI-2466), still held now and the only one it could be lent: what
+ * holds it, as the lend would say it (a session in it, else a process: the pool's own look, slots.ts quiet, and HI-2467's
+ * broker seen working in it, looked at again each time); else null, and the lane's lend is tried. Never a lend, so a slot held for long writes no lease each time it is looked at.
+ */
+async function laneSlotStillHeld(ws: WorkspaceService, pool: SlotPool, lane: string): Promise<Extract<SlotRefusal, { why: 'busy' }> | null> {
+  const was = laneHolds.get(laneHoldKey(ws.path ?? '', lane))
+  if (!was) return null
+  const slots = pool.slots()
+  const free = (s: Slot): boolean => s.state === 'ready' && !s.op && !s.job && !s.writer && !s.warmError && !pool.openLease(s.name)
+  const slot = slots.find((s) => s.name === was.slot)
+  if (!slot || !free(slot) || slots.some((s) => s !== slot && free(s)) || slots.length < (await pool.size())) return null
+  if (sessions.liveStates().some((x) => !!x.cwd && containsPlace(slot.folder, x.cwd))) return { why: 'busy', slot: slot.name, held: 'session' } // i18n-ignore: a refusal's code (refusalText words it)
+  return (await quietFolder(slot.folder)) ? null : await processHeld(slot.name, slot.folder, brokerWorkingIn)
+}
+
+/** What holds a slot, as a lend's `busy` refusal says (HI-2466), with the agent whose session is in it, by name, where that is known. */
+function heldOf(pool: SlotPool, r: Extract<SlotRefusal, { why: 'busy' }>): LaneSlotHeld {
+  const held = r.held ?? 'process'
+  if (held !== 'session') return heldOfBusy(r)
+  const folder = pool.slots().find((s) => s.name === r.slot)?.folder
+  const s = folder ? sessions.liveStates().find((x) => !!x.cwd && containsPlace(folder, x.cwd)) : undefined
+  return { slot: r.slot, held, ...(s?.agentName ? { agent: s.agentName } : {}) }
+}
+
+/**
+ * The slot each lane's last start was refused as held (HI-2468: laneStarts' `refused`, as its builder ran), by
+ * "<project>\n<lane>", with when and the slot's folder: for that start's status. Bounded; forgotten by the lane's next
+ * lend that isn't so refused.
+ */
+const startHolds = new Map<string, { held: LaneSlotHeld; folder: string | null; at: number }>()
+const MAX_START_HOLDS = 200
+const startHoldKey = (projectPath: string, lane: string): string => `${projectPath.toLowerCase()}\n${lane}`
+function noteStartHeld(projectPath: string, lane: string, h: { held: LaneSlotHeld; folder: string | null } | null): void {
+  const key = startHoldKey(projectPath, lane)
+  startHolds.delete(key)
+  if (!h) return
+  startHolds.set(key, { ...h, at: Date.now() })
+  if (startHolds.size > MAX_START_HOLDS) startHolds.delete(startHolds.keys().next().value!)
+}
+
+/**
+ * What keeps lane `lane`'s start, refused for its slot (`start.slotAvailable`), from its slot (HI-2468), for its
+ * status; null when it can't be told (the status then says only that the start was refused). `since`: the try just
+ * made (its lend's `busy` refusal, kept by slotForStart, counts only from then); without, a look between tries.
+ * - its lend refused a free slot as held: what held it (a session, a process, the broker), looked at again between tries;
+ * - else, no slot free: the one its builder's own last run still holds (or the only one so held, no lease on it), as
+ *   its writer says: the programs it left running there, or that run not known to have ended (agentFolders' heldWriter).
+ * Never a lend, and never what decides the start: it is tried again as it always is.
+ */
+export async function startSlotHold(ws: WorkspaceService, projectPath: string, lane: string, builder: string, since?: number): Promise<LaneSlotHeld | null> {
+  const h = startHolds.get(startHoldKey(projectPath, lane))
+  if (h && since !== undefined && h.at >= since) return h.held
+  if (h?.folder && since === undefined) {
+    const folder = h.folder
+    const s = sessions.liveStates().find((x) => !!x.cwd && containsPlace(folder, x.cwd))
+    if (s) return { slot: h.held.slot, held: 'session', ...(s.agentName ? { agent: s.agentName } : {}) }
+    if (!(await quietFolder(folder))) return heldOfBusy(await processHeld(h.held.slot, folder, brokerWorkingIn))
+  }
+  return writerHold(ws, projectPath, builder)
+}
+
+/** The free slot (no lease on it) a run still holds as its writer (HI-2468): its builder's own, else the only one. */
+async function writerHold(ws: WorkspaceService, projectPath: string, builder: string): Promise<LaneSlotHeld | null> {
+  const pool = await poolFor(ws, projectPath)
+  // Its writer is what holds it (a job settling what the run left, or a warm-up, doesn't change that): no lease on it.
+  const held = pool.slots().filter((s) => !!s.writer && !pool.openLease(s.name))
+  const slot = held.find((s) => s.writer!.agent === builder) ?? (held.length === 1 ? held[0] : null)
+  if (!slot) {
+    log.info(`A start refused for its slot in ${userText(basename(projectPath))}: no slot held by a run's writer to name (${pool.slots().map((s) => `${userText(s.name)} ${s.state}${s.writer ? ' writer' : ''}${s.job ? ' job' : ''}${s.op ? ' op' : ''}${pool.openLease(s.name) ? ' leased' : ''}`).join(', ')})`)
+    return null
+  }
+  const { heldWriter } = await import('./agentFolders')
+  const w = await heldWriter(projectPath, slot.name)
+  if (!w) return null
+  const who = projectAgents(await ws.projectConfig(projectPath)).find((a) => a.id === w.agent)?.name ?? w.agent
+  const list = w.processes?.list ?? []
+  if (list.length) {
+    const more = list.length - 1 + (w.processes?.more ?? 0)
+    return { slot: slot.name, held: 'left', agent: who, program: list[0].name.replace(/\.exe$/i, ''), ...(more > 0 ? { more } : {}) }
+  }
+  const s = sessions.liveStates().find((x) => !!x.cwd && containsPlace(slot.folder, x.cwd))
+  if (s) return { slot: slot.name, held: 'session', ...(s.agentName ? { agent: s.agentName } : {}) }
+  return { slot: slot.name, held: 'lastRun', agent: who }
+}
+
+/** A `busy` refusal by a process as a lane's status carries it (HI-2467): the broker seen in it, else a process. */
+function heldOfBusy(r: Extract<SlotRefusal, { why: 'busy' }>): LaneSlotHeld {
+  return r.held === 'broker' && r.broker ? { slot: r.slot, held: 'broker', broker: r.broker.name, ...(r.broker.idle !== null ? { idle: r.broker.idle } : {}) } : { slot: r.slot, held: 'process' }
 }
 
 /** A start's end of its builder's left carried lease (endLeftCarried), its retry asked for when the slot was busy. */
@@ -409,7 +597,7 @@ async function carriedToHand(ws: WorkspaceService, projectPath: string, pool: Sl
 
 /**
  * Whether a slot its agent's Resume took can be left (handed to another line, or freed) without losing work (HI-1741):
- * no changes not committed, and its head either in the target or held by the branch it is on (a ref Hive keeps: a line
+ * no changes not committed, and its head either in the target or held by the branch it is on (a ref Combwork keeps: a line
  * is deleted only once its card is Done and merged, never while checked out). Detached and not merged, a HEAD naming a
  * ref that is gone, or anything unknown: null (kept). Its checkout as decided on, otherwise.
  */
@@ -470,12 +658,12 @@ function writtenSlotOf(projectPath: string, pool: SlotPool, builder: string): Sl
 /**
  * What a start does about the slot its builder's own run still writes in (HI-1762), keeping one agent to one slot:
  * `none` (there is none: lend as before), `lease` (taken over), `dry` (a dry start: it would be this one), or `wait`
- * (there is one, but it can't be taken over now: an operation or job on it, not ready, held by another Hive's run, or
+ * (there is one, but it can't be taken over now: an operation or job on it, not ready, held by another Combwork's run, or
  * it changed while it was taken; looked at again once): the start waits for it, never lent a second slot meanwhile. A
  * dry start and a real one ask the takeover's own conditions (SlotPool.writtenNotTakeable, HI-1787), so they agree.
  */
 async function startOnWritten(ws: WorkspaceService, projectPath: string, pool: SlotPool, builder: string, req: { card?: number; lane?: string; agent: string }, agentName: string, dry = false): Promise<{ none: true } | { lease: SlotLease } | { dry: Slot } | { wait: string }> {
-  const waitFor = (s: Slot, because: string): { wait: string } => ({ wait: `${agentName}'s own slot ${s.name}, its run still there, ${because}: this start waits for it rather than take a second slot` }) // i18n-ignore: agent-facing, a start's wait
+  const waitFor = (s: Slot, because: string): { wait: string } => ({ wait: say(T.ownSlotWaits, { agent: agentName, slot: s.name, because }) })
   for (let tries = 0; tries < 2; tries++) {
     const slot = writtenSlotOf(projectPath, pool, builder)
     if (!slot) return { none: true }
@@ -487,7 +675,7 @@ async function startOnWritten(ws: WorkspaceService, projectPath: string, pool: S
     if (taken) return { lease: taken }
   }
   const still = writtenSlotOf(projectPath, pool, builder)
-  return still ? waitFor(still, 'changed while it was taken over') : { none: true } // i18n-ignore: agent-facing, a start's wait
+  return still ? waitFor(still, say(T.changed)) : { none: true }
 }
 
 async function takeWritten(ws: WorkspaceService, projectPath: string, pool: SlotPool, builder: string, req: { card?: number; lane?: string; agent: string }, agentName: string): Promise<SlotLease | null> {
@@ -645,7 +833,7 @@ function until(projectPath: string, agentId: string, ok: () => boolean, over: ()
       if (over()) return finish(false)
       if (ok()) finish(true)
     }
-    const off = onHiveEvent((e) => {
+    const off = onCombworkEvent((e) => {
       if ((e.type === 'session-status' && e.state.agentId === agentId && e.state.projectPath.toLowerCase() === projectPath.toLowerCase()) || e.type === 'progress-changed') look()
     })
     // A restart resume of the agent settling (HI-1746: a placement waits while one will bring it back).
@@ -667,7 +855,7 @@ function until(projectPath: string, agentId: string, ok: () => boolean, over: ()
 
 // --- The pass.
 
-/** Each project's pass, one at a time in this Hive (another asked while one runs: once more after it). */
+/** Each project's pass, one at a time in this Combwork (another asked while one runs: once more after it). */
 const passes = new Map<string, { again: boolean; done: Promise<void> }>()
 /** Cycles being prepared or placed here now (`<project>#<card>#<seq>`): one at a time each. */
 const ensuring = new Set<string>()
@@ -676,15 +864,15 @@ const attempts = new Map<string, number>()
 /** Cycles whose preparation failed here (told once): tried again only by a restart or a new start. */
 const failed = new Set<string>()
 /**
- * Hive is quitting (`quitSlotCards`, #1628): no pass starts or goes on to its next step, no cycle is prepared or placed,
+ * Combwork is quitting (`quitSlotCards`, #1628): no pass starts or goes on to its next step, no cycle is prepared or placed,
  * and what one owed is the next start's pass (its workspace opening), as after a crash.
  */
 let quitting = false
 
-/** Nothing more is done for `ws` here: Hive is quitting, or the workspace closed or switched. */
+/** Nothing more is done for `ws` here: Combwork is quitting, or the workspace closed or switched. */
 const ended = (ws: WorkspaceService): boolean => quitting || ws.lifetime.aborted
 
-/** A step that failed: a warning, but for one cut short by Hive quitting (its boards closed under it), the next start's. */
+/** A step that failed: a warning, but for one cut short by Combwork quitting (its boards closed under it), the next start's. */
 function failedStep(what: string, e: unknown): void {
   if (quitting) log.info(`${what}: cut short by quitting (the next start does it)`)
   else log.warn(what, e)
@@ -704,13 +892,17 @@ export function settleSlotCards(ws: WorkspaceService, projectPath: string): Prom
     running.again = true
     return running.done
   }
+  // Admission owns the token: an earlier step may still be awaiting when the service stops (HI-2469).
+  const life = ws.lifetime
+  const generation = holdGeneration
+  const passIsCurrent = (): boolean => !ended(ws) && !life.aborted && ws.lifetime === life && generation === holdGeneration
   const pass = { again: false, done: Promise.resolve() }
   pass.done = withoutWriteFence(async () => {
     try {
       do {
         pass.again = false
-        await settleOnce(ws, projectPath).catch((e) => failedStep(`settling the slots of ${userText(projectPath)}`, e)) // i18n-ignore: a log line (failedStep logs it)
-      } while (pass.again && !ended(ws))
+        await settleOnce(ws, projectPath, life, generation).catch((e) => failedStep(`settling the slots of ${userText(projectPath)}`, e)) // i18n-ignore: a log line (failedStep logs it)
+      } while (pass.again && passIsCurrent())
     } finally {
       passes.delete(key)
     }
@@ -778,7 +970,7 @@ const quietWaits = new Set<string>()
 
 /**
  * HI-2115: the line git last found each slot on (finishedSlot), with the refs' token then. While lanes run, the slots'
- * settling looked at every finished card of the last DELETE_WITHIN_MS at each board change, a git each: most of Hive's
+ * settling looked at every finished card of the last DELETE_WITHIN_MS at each board change, a git each: most of Combwork's
  * git starts. HI-2183: the slot's, not each card's, so one refs move asks git once per slot, not once per finished card
  * it had (57 in 30 s after one merge). Bounded: the oldest go first.
  */
@@ -895,8 +1087,8 @@ export async function finishedSlot(projectPath: string, wf: Workflow, n: number,
   return detached
 }
 
-async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<void> {
-  if (!ws.path || ended(ws)) return
+async function settleOnce(ws: WorkspaceService, projectPath: string, life: AbortSignal, generation: number): Promise<void> {
+  if (!ws.path || ended(ws) || life.aborted || ws.lifetime !== life || generation !== holdGeneration) return
   const wf = await workflowFor(ws, projectPath).catch(() => null)
   if (!wf) return
   const pool = await poolFor(ws, projectPath)
@@ -912,7 +1104,7 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
   waitingForRepair.delete(projectPath.toLowerCase())
   // 0. Deletions begun and cut short (a crash between the ref's removal and its settling): settled first, as data safety,
   //    whatever the switches say and wherever the card is now: one may have left a checkout without its branch.
-  // Each step and each lease's turn begins only while Hive isn't quitting (#1628): one cut short is the next start's.
+  // Each step and each lease's turn begins only while Combwork isn't quitting (#1628): one cut short is the next start's.
   for (const { card: n, d } of unsettledDeletions(wf.store.factsOfKind([...DELETION_KINDS]))) {
     if (ended(ws)) return
     const card = cardOf(wf, n)
@@ -1007,8 +1199,8 @@ async function settleOnce(ws: WorkspaceService, projectPath: string): Promise<vo
     }
   }
   // 4. Lanes started from the window waiting for a slot.
-  if (ended(ws)) return
-  await startWaitingLanes(ws, projectPath, pool)
+  if (ended(ws) || life.aborted || ws.lifetime !== life || generation !== holdGeneration) return
+  await startWaitingLanes(ws, projectPath, pool, life, generation)
   // 5. Adopted slots, once free, renamed to generic names (#1441).
   if (ended(ws)) return
   await renameAdopted(ws, projectPath, pool)
@@ -1081,7 +1273,7 @@ async function prepare(ws: WorkspaceService, projectPath: string, first: Workflo
     if ('ok' in r) {
       await crashAt('inPrepare')
       const fact: FactData['SlotPrepared'] = { lease: l.id, line: st.line!, revision: r.revision }
-      await wf.write(card.card, null, 'hive', (w) => {
+      await wf.write(card.card, null, 'combwork', (w) => {
         const now = cycleIn(w.tx.facts(n))
         if (now?.seq === cycle.seq && now.started.lease === l.id && !now.prepared) w.fact('SlotPrepared', fact) // i18n-ignore: a fact's kind and codes, not text
       })
@@ -1092,12 +1284,15 @@ async function prepare(ws: WorkspaceService, projectPath: string, first: Workflo
     if ('error' in r) {
       failed.add(key)
       log.warn(`Slot ${userText(st.slot)} couldn't be prepared for #${n}: ${userText(r.error)}`)
-      startEnded(projectPath, builder, `#${n}`, { failed: `Hive couldn't get ${st.slot} ready: ${r.error}` }) // i18n-ignore: agent-facing (a card's stall)
-      await wf.write(card.card, null, 'hive', (w) => {
-        const english = `Hive couldn't get ${st.slot} ready for ${card.card.key}: ${r.error}` // i18n-ignore: agent-facing, and the notice's English
+      startEnded(projectPath, builder, `#${n}`, { failed: inDefaultDialect(() => say(T.notReady, { slot: st.slot, error: r.error })) })
+      await wf.write(card.card, null, 'combwork', (w) => {
+        const english = inDefaultDialect(() => say(T.notReadyFor, { slot: st.slot, card: card.card.key, error: r.error }))
         w.action('notify', { text: english, shown: workflowText(SLOT_NOTICES.notPrepared, { slot: st.slot, card: card.card.key, why: r.error }) })
         wf.wake(w, st.builder, english)
       })
+      // A lane's first card started with its brief on a stopped builder (HI-2558): that builder started with its brief
+      // now, as the step-by-step start would have, so it reads the wake and learns why.
+      void import('./laneStart').then((m) => m.briefAfterFailedPrepare(ws, projectPath, n, builder)).catch((e) => log.warn(`#${n}'s lane brief after its slot failed`, e))
       return null
     }
     // Not now (busy, not quiet at the boundary): looked at again at the next change.
@@ -1110,7 +1305,7 @@ async function prepare(ws: WorkspaceService, projectPath: string, first: Workflo
 const NOT_GIVEN: ReadonlySet<string> = new Set(['cancelled', 'refused', 'expired', 'stale'])
 
 /**
- * The builder given the card in its slot, once: when quiet, claimed by this Hive in a write (one another Hive holds is
+ * The builder given the card in its slot, once: when quiet, claimed by this Combwork in a write (one another Combwork holds is
  * left to it unless its process is gone), delivered with the cycle's identity, recorded as `BuilderPlaced`. A delivery
  * made before (a crash, an earlier pass) counts only while it was given or is still on its way under the deliveries' own
  * policy (queued, offered, or uncertain: offered once more when its agent runs, never made again here): its agent not
@@ -1118,13 +1313,13 @@ const NOT_GIVEN: ReadonlySet<string> = new Set(['cancelled', 'refused', 'expired
  * refused, expired, stale) is made again, as is one whose making failed (a refusal, a launch that couldn't start: it
  * throws, nothing is recorded, and the pass tries again).
  *
- * Its builder stopped (HI-1746: Hive quit between the card's start and its placement), the placement resumes the
+ * Its builder stopped (HI-1746: Combwork quit between the card's start and its placement), the placement resumes the
  * builder's newest conversation bound to the card's lease (sessions.leaseConversation), the card's prompt that launch's
  * own line; a new conversation only when there is none, or its transcript is gone. Never meanwhile:
  * - while this run's restart resume will bring the builder back (isResuming): it waits, then types it in (`typed`);
  * - while that conversation is held (resumeHold): it waits, the card told once, never an older or a new conversation;
  * - after RESUME_TRIES failed resumes of it: the card told, and it waits for the builder to run (the user's Resume, a
- *   start by hand), then types it in. A Hive started again tries again.
+ *   start by hand), then types it in. A Combwork started again tries again.
  * A start of the builder by another (the restart queue, the window's Resume All) wins over its own: refused, its
  * delivery not given, it is tried again and finds the builder running, so the card's prompt is given once.
  */
@@ -1194,8 +1389,8 @@ const slotFreed = new Set<(projectPath: string) => void>()
 /**
  * Resolves at the next change that may matter to a waiting placement: its builder's status, a run, its restart resume, a
  * slot of its project freed, or within 30 s; false once `over`. For a builder that can't take a line (HI-2191: whyNoLine),
- * also what ends each reason that changes no status: Hive's line there done with (typed, or its take checked), the pause
- * after the user typed there over (one timer, at its end), its folder steady again, its hive tools connected. `builder`:
+ * also what ends each reason that changes no status: Combwork's line there done with (typed, or its take checked), the pause
+ * after the user typed there over (one timer, at its end), its folder steady again, its Combwork tools connected. `builder`:
  * the pass waited for that, so it is looked at again once these listen (a change between the pass and them is not lost).
  * `stillHeld` (HI-2304): its slot is held by what another run left running there, so what frees it is the slot freed or
  * those processes changing (their run's leftovers told), not the clock: looked at again after HELD_LOOK_MS at most. Once
@@ -1219,7 +1414,7 @@ function nextLook(projectPath: string, agentId: string, over: () => boolean, bui
     quietTimer?.unref?.()
     const cwd = sessions.liveFor(projectPath, agentId)?.cwd
     if (folderChanging(cwd)) void folderSteady(cwd).then(() => finish())
-    if (sessions.hiveToolsWaiting(projectPath, agentId)) void sessions.hiveToolsSettled(projectPath, agentId).then(() => finish())
+    if (sessions.combworkToolsWaiting(projectPath, agentId)) void sessions.combworkToolsSettled(projectPath, agentId).then(() => finish())
     const finish = (): void => {
       if (done) return
       done = true
@@ -1231,7 +1426,7 @@ function nextLook(projectPath: string, agentId: string, over: () => boolean, bui
       clearTimeout(quietTimer)
       resolve(!over())
     }
-    const off = onHiveEvent((e) => {
+    const off = onCombworkEvent((e) => {
       if ((e.type === 'session-status' && same(e.state.projectPath, e.state.agentId)) || (!held && e.type === 'progress-changed') || (held && e.type === 'agent-leftovers' && e.leftovers.projectPath.toLowerCase() === projectPath.toLowerCase())) finish()
     })
     const offEntry = onResumeEntry((p, a) => {
@@ -1267,7 +1462,7 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
   const claim = now.cycle.claimed
   const mine = !!claim && claim.pid === me.pid && claim.started === me.started
   if (claim && !mine && (await holder.alive(claim.pid, claim.started)) !== false) return 'done'
-  const took = await wf.write(now.card, null, 'hive', (w) => {
+  const took = await wf.write(now.card, null, 'combwork', (w) => {
     const c = cycleIn(w.tx.facts(n))
     if (!c || c.seq !== cycle.seq || c.placed || (c.claimed?.seq ?? null) !== (claim?.seq ?? null)) return false
     if (!mine) w.fact('PlacementClaimed', { lease: l.id, pid: me.pid, started: me.started }) // i18n-ignore: a fact's kind and codes, not text
@@ -1275,7 +1470,7 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
   })
   if (!took) return 'done'
   await crashAt('inPlacement')
-  // The team paused (HI-2081): a lane's card (Hive's start, or its builder's) isn't given to its builder until it resumes;
+  // The team paused (HI-2081): a lane's card (Combwork's start, or its builder's) isn't given to its builder until it resumes;
   // a card the user started by hand still is. Asked again just before the launch or the line (below).
   const pausedLane = (): boolean => l.kind === 'lane' && !!teamPauseOf(ws)
   if (pausedLane()) return 'wait'
@@ -1299,13 +1494,13 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
     log.info(`#${n} waits for ${userText(agent.name)}'s conversation in ${userText(cycle.started.slot)}: held (${conv.hold.is})`)
     if (!track.told.has(told)) {
       track.told.add(told)
-      await tellCard(wf, now.card, cycle.started.builder, workflowText(SLOT_NOTICES.resumeHeld, { card: card.key ?? `#${n}`, agent: agent.name, slot: cycle.started.slot, why: holdWords(conv.hold) }), `Hive can't give ${card.key ?? `#${n}`} to ${agent.name} yet: its conversation in ${cycle.started.slot} can't resume now (${holdWords(conv.hold)}).`) // i18n-ignore: agent-facing, and the notice's English
+      await tellCard(wf, now.card, cycle.started.builder, workflowText(SLOT_NOTICES.resumeHeld, { card: card.key ?? `#${n}`, agent: agent.name, slot: cycle.started.slot, why: holdWords(conv.hold) }), inDefaultDialect(() => say(T.cantResume, { card: card.key ?? `#${n}`, agent: agent.name, slot: cycle.started.slot, why: holdWords(conv.hold) })))
     }
     return 'wait'
   }
   // Its resumes gave up: it waits for the builder to run (the user's Resume, a start by hand), then the card is typed in.
   if (!st && track.gaveUp) return 'wait'
-  // Its slot held by another run of this Hive's (HI-2304: what an ended run left running there, or a session there): a
+  // Its slot held by another run of this Combwork's (HI-2304: what an ended run left running there, or a session there): a
   // start would be refused only after its resume's preparation, a delivery made and called off at each look. It waits,
   // making nothing, for the slot to be freed, saying why once on the card, to its builder and on the agent.
   const held = !st ? await slotHeldWords(projectPath, cycle.started.slot, (id) => projectAgents(cfgNow).find((a) => a.id === id)?.name ?? id).catch(() => null) : null
@@ -1315,7 +1510,7 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
     if (!track.told.has(told)) {
       track.told.add(told)
       log.info(`#${n} waits for ${userText(cycle.started.slot)} to be freed before ${userText(agent.name)} resumes there: ${userText(held)}`)
-      await tellCard(wf, now.card, cycle.started.builder, workflowText(SLOT_NOTICES.resumeHeld, { card: card.key ?? `#${n}`, agent: agent.name, slot: cycle.started.slot, why: held }), `Hive can't give ${card.key ?? `#${n}`} to ${agent.name} yet: its conversation in ${cycle.started.slot} can't resume now (${held}).`) // i18n-ignore: agent-facing, and the notice's English
+      await tellCard(wf, now.card, cycle.started.builder, workflowText(SLOT_NOTICES.resumeHeld, { card: card.key ?? `#${n}`, agent: agent.name, slot: cycle.started.slot, why: held }), inDefaultDialect(() => say(T.cantResume, { card: card.key ?? `#${n}`, agent: agent.name, slot: cycle.started.slot, why: held })))
     }
     return 'held'
   }
@@ -1339,12 +1534,12 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
       // Another start of it won (the restart queue, Resume All): not this resume's failure; the next look finds it running.
       if (sessions.liveFor(projectPath, agentId) || sessions.pendingStart(projectPath, agentId)) throw e
       // Its slot not ready for it yet (a crashed run's processes not known ended, a setup under way): a wait, not a try.
-      if (e instanceof HiveError && e.kind === 'conflict') {
+      if (e instanceof CombworkError && e.kind === 'conflict') {
         log.info(`#${n} waits to resume ${userText(agent.name)}'s conversation in ${userText(cycle.started.slot)}: ${userText(e.message)}`)
         const told = 'refused'
         if (!track.told.has(told)) {
           track.told.add(told)
-          await tellCard(wf, now.card, cycle.started.builder, workflowText(SLOT_NOTICES.resumeHeld, { card: card.key ?? `#${n}`, agent: agent.name, slot: cycle.started.slot, why: e.message }), `Hive can't give ${card.key ?? `#${n}`} to ${agent.name} yet: its conversation in ${cycle.started.slot} can't resume now (${e.message}).`) // i18n-ignore: agent-facing, and the notice's English
+          await tellCard(wf, now.card, cycle.started.builder, workflowText(SLOT_NOTICES.resumeHeld, { card: card.key ?? `#${n}`, agent: agent.name, slot: cycle.started.slot, why: e.message }), inDefaultDialect(() => say(T.cantResume, { card: card.key ?? `#${n}`, agent: agent.name, slot: cycle.started.slot, why: e.message })))
         }
         throw new Waits()
       }
@@ -1354,8 +1549,8 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
         track.failures = 0
         const why = e instanceof Error ? e.message : String(e)
         log.warn(`#${n}: ${userText(agent.name)}'s conversation in ${userText(cycle.started.slot)} didn't resume (${tries} tries): ${userText(why)}`)
-        startEnded(projectPath, agentId, `#${n}`, { failed: `its conversation in ${cycle.started.slot} didn't resume (${tries} tries): ${why}` }) // i18n-ignore: agent-facing (a card's stall)
-        await tellCard(wf, now.card, cycle.started.builder, workflowText(SLOT_NOTICES.resumeFailed, { card: card.key ?? `#${n}`, agent: agent.name, slot: cycle.started.slot, why }), `Hive couldn't resume ${agent.name}'s conversation in ${cycle.started.slot} for ${card.key ?? `#${n}`} (three tries): ${why}. Resume ${agent.name} from Sessions, or start it fresh, and Hive gives it ${card.key ?? `#${n}`}.`) // i18n-ignore: agent-facing, and the notice's English
+        startEnded(projectPath, agentId, `#${n}`, { failed: inDefaultDialect(() => say(T.resumeEnded, { slot: cycle.started.slot, tries: String(tries), why })) })
+        await tellCard(wf, now.card, cycle.started.builder, workflowText(SLOT_NOTICES.resumeFailed, { card: card.key ?? `#${n}`, agent: agent.name, slot: cycle.started.slot, why }), inDefaultDialect(() => say(T.resumeFailed, { agent: agent.name, slot: cycle.started.slot, card: card.key ?? `#${n}`, why })))
         throw new GaveUp()
       }
       throw e
@@ -1377,15 +1572,16 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
         if (isPlacedHow(was)) how = was
       }
     } else {
-      const cardPrompt = (offer && offered.get(offerKey(projectPath, n)) === offer ? offer.prompt : null) ?? taskPrompt(card, !!sessions.hiveMcp(projectPath), { from: 'todo', attachments: await cardAttachments(ws, n), inLane: l.kind === 'lane' && !!l.lane })
+      const cardPrompt = (offer && offered.get(offerKey(projectPath, n)) === offer ? offer.prompt : null) ?? taskPrompt(card, !!sessions.combworkMcp(projectPath), { from: 'todo', attachments: await cardAttachments(ws, n), inLane: l.kind === 'lane' && !!l.lane })
       // Its lane's brief as it is now (HI-1795), after the card's own prompt (the window's or offered one kept whole): in
       // every placement of the lane's cards, whatever conversation works the card. Fixed with the delivery once made.
       // A read that fails is unknown, never "no brief": it throws, and the pass tries again (HR4's round 1).
       const brief = l.kind === 'lane' && l.lane ? briefOf((await rawLanes(ws)).find((x) => x.id === l.lane)) : null
       const prompt = brief ? `${cardPrompt}\n\n${brief}` : cardPrompt
       // How it is placed kept with it (HI-2134): a later pass finding it made records the placement as this one made it.
-      const nd = { agentId, agentName: agent.name, kind: 'task' as const, from: { kind: 'hive' as const, name: 'Hive' }, card: n, body: prompt, source: PLACEMENT, ref, meta: { how } } // i18n-ignore: who a delivery is from, as agents read it
-      // Its builder can't take a line now (HI-2191: its input blocked, a line of Hive's being typed, watching, working):
+      // agent-protocol: the sender is the product's name, Combwork
+      const nd = { agentId, agentName: agent.name, kind: 'task' as const, from: { kind: 'combwork' as const, name: 'Combwork' }, card: n, body: prompt, source: PLACEMENT, ref, meta: { how } } // i18n-ignore: who a delivery is from, as agents read it
+      // Its builder can't take a line now (HI-2191: its input blocked, a line of Combwork's being typed, watching, working):
       // it waits for that builder's next status (place's nextLook), making no delivery. One made and called off each
       // pass wrote the lane each time, which ran the next pass: HB3's every second. Said once for each reason.
       const busy = there ? whyNoLine(projectPath, agentId, 'free') : null
@@ -1411,7 +1607,7 @@ async function placeOnce(ws: WorkspaceService, projectPath: string, first: Workf
     if (e instanceof GaveUp || e instanceof Waits) return 'wait'
     throw e
   }
-  await wf.write(now.card, null, 'hive', (w) => {
+  await wf.write(now.card, null, 'combwork', (w) => {
     const c = cycleIn(w.tx.facts(n))
     if (c?.seq === cycle.seq && !c.placed) w.fact('BuilderPlaced', { lease: l.id, delivery, how }) // i18n-ignore: a fact's kind and codes, not text
   })
@@ -1431,7 +1627,7 @@ class BuilderBusy extends Waits {}
 
 /** A placement's notice on its card, and its builder woken with the English (as a preparation's failure is). */
 async function tellCard(wf: Workflow, card: Parameters<Workflow['write']>[0], builder: string, shown: ReturnType<typeof workflowText>, english: string): Promise<void> {
-  await wf.write(card, null, 'hive', (w) => {
+  await wf.write(card, null, 'combwork', (w) => {
     w.action('notify', { text: english, shown })
     wf.wake(w, builder, english)
   })
@@ -1441,20 +1637,20 @@ async function tellCard(wf: Workflow, card: Parameters<Workflow['write']>[0], bu
 function holdWords(h: ResumeHold): string {
   switch (h.is) {
     case 'draining':
-      return 'its last session there is still ending' // i18n-ignore: agent-facing
+      return say(T.draining)
     case 'after':
     case 'reused':
-      return `its slot ${h.slot} holds other work now` // i18n-ignore: agent-facing
+      return say(T.otherWork, { slot: h.slot })
     case 'holds':
-      return `its agent keeps another slot (${h.slot})` // i18n-ignore: agent-facing
+      return say(T.otherSlot, { slot: h.slot })
     case 'changed':
-      return `its slot ${h.slot} changed since it ran` // i18n-ignore: agent-facing
+      return say(T.slotChanged, { slot: h.slot })
     case 'gone':
-      return `its slot ${h.slot} is gone` // i18n-ignore: agent-facing
+      return say(T.slotGone, { slot: h.slot })
     case 'reviewer':
-      return 'its agent reviews now' // i18n-ignore: agent-facing
+      return say(T.reviews)
     case 'byHand':
-      return `its slot ${h.slot} is free, for a Resume by hand` // i18n-ignore: agent-facing
+      return say(T.byHand, { slot: h.slot })
   }
 }
 
@@ -1477,7 +1673,7 @@ export async function deleteMergedLine(ws: WorkspaceService, projectPath: string
   if (begun) return withRepoLock(projectPath, () => settleDeletion(projectPath, wf, card, n, begun), { quiet: true, project: projectPath }).catch(() => false)
   const s = wf.state(card)
   const c = cycleIn(wf.store.facts(n))
-  if (!c || s.stage !== 'done' || c.deleted || !s.started?.line?.startsWith('hive/')) return false
+  if (!c || s.stage !== 'done' || c.deleted || !s.started?.line?.startsWith('cw/')) return false
   if (!allowed()) return false
   const line = s.started.line
   const target = s.integrated?.target || s.started.target
@@ -1494,7 +1690,7 @@ export async function deleteMergedLine(ws: WorkspaceService, projectPath: string
       if (!before || before.some((w) => w.branch === line) || !allowed()) return false
       // The intent, durably, before anything is removed: from here a crash is settled by the next pass.
       const intent: FactData['LineDeleting'] = { line, revision: head }
-      const meant = await wf.write(card, null, 'hive', (w) => {
+      const meant = await wf.write(card, null, 'combwork', (w) => {
         const now = cycleIn(w.tx.facts(n))
         if (!now || now.seq !== c.seq || now.deleted || unsettledDeletions(w.tx.facts(n)).length) return false
         w.fact('LineDeleting', intent) // i18n-ignore: a fact's kind and codes, not text
@@ -1520,7 +1716,7 @@ async function settleDeletion(projectPath: string, wf: Workflow, card: CardRecor
   const head = await G.lineHead(projectPath, d.line)
   if (isUnknown(head)) return false
   if (head) {
-    await wf.write(card, null, 'hive', (w) => {
+    await wf.write(card, null, 'combwork', (w) => {
       if (unsettledDeletions(w.tx.facts(n)).some((x) => x.d.line === d.line)) w.fact('LineDeleteUndone', { ...d, why: 'notDeleted' }) // i18n-ignore: a fact's kind and codes, not text
     })
     return false
@@ -1528,7 +1724,7 @@ async function settleDeletion(projectPath: string, wf: Workflow, card: CardRecor
   const trees = await listWorktreesOrNull(projectPath).catch(() => null)
   if (!trees) return false
   if (trees.some((w) => w.branch === d.line)) {
-    // Checked out as it went (another Hive, a terminal): put back at the head the intent recorded, and checked.
+    // Checked out as it went (another Combwork, a terminal): put back at the head the intent recorded, and checked.
     const r = await git(projectPath, ['update-ref', `refs/heads/${d.line}`, d.revision, ''])
     const back = await G.lineHead(projectPath, d.line)
     if (!r.ok || isUnknown(back) || back !== d.revision) {
@@ -1536,13 +1732,13 @@ async function settleDeletion(projectPath: string, wf: Workflow, card: CardRecor
       return false
     }
     log.warn(`${userText(d.line)} was checked out as it was deleted: put back at ${d.revision.slice(0, 7)} and kept`)
-    await wf.write(card, null, 'hive', (w) => {
+    await wf.write(card, null, 'combwork', (w) => {
       if (unsettledDeletions(w.tx.facts(n)).some((x) => x.d.line === d.line)) w.fact('LineDeleteUndone', { ...d, why: 'checkedOut' }) // i18n-ignore: a fact's kind and codes, not text
     })
     return false
   }
   log.info(`Deleted ${userText(d.line)} (#${n}, merged)`)
-  await wf.write(card, null, 'hive', (w) => {
+  await wf.write(card, null, 'combwork', (w) => {
     if (unsettledDeletions(w.tx.facts(n)).some((x) => x.d.line === d.line)) w.fact('LineDeleted', { line: d.line, revision: d.revision, why: 'merged' }) // i18n-ignore: a fact's kind and codes, not text
   })
   return true
@@ -1582,6 +1778,11 @@ export async function settleRenames(pool: SlotPool): Promise<void> {
 }
 
 // --- Lanes.
+
+/** A slot's folder, by its name (HI-2558: whether a lane's idle builder already works in its slot). */
+export async function slotFolderOf(ws: WorkspaceService, projectPath: string, slot: string): Promise<string> {
+  return (await poolFor(ws, projectPath)).folderFor(slot)
+}
 
 /**
  * A lane's slot (#1438, §16.10.2), lent to its builder as Start Lane… starts it, before its agents start, and kept for the
@@ -1623,12 +1824,48 @@ async function lendLaneSlot(ws: WorkspaceService, projectPath: string, lane: str
  * its agents (its builder and reviewer now) started once (laneStart's, by their brief's delivery identity), then its
  * wait cleared. Only with the rules on; a lane ended or abandoned meanwhile isn't running, so it is never started.
  * Once none is free, no later lane is lent one, but a lane that needs none (only no-code cards, HI-2338) still starts.
+ * A lend refused because the free slot is held (HI-2466: a session or a process in it) is kept for the lane's status
+ * and tried again by a later pass (`heldRetries`), as nothing may say when what holds it has gone.
  */
-async function startWaitingLanes(ws: WorkspaceService, projectPath: string, pool: SlotPool): Promise<void> {
+async function startWaitingLanes(ws: WorkspaceService, projectPath: string, pool: SlotPool, life: AbortSignal, generation: number): Promise<void> {
+  const stopped = (): boolean => !workflowEnforced() || ended(ws) || life.aborted || ws.lifetime !== life || generation !== holdGeneration || !ws.info()?.projects.some((p) => samePlace(p.path, projectPath))
   const name = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.name
   const waiting = (await lanesWaitingForSlot(ws)).filter((l) => l.project.toLowerCase() === name?.toLowerCase()).sort((a, b) => a.slotWait!.since.localeCompare(b.slotWait!.since))
-  // The rules off, or Hive quitting (#1628): looked at again after each await, nothing more lent or started.
-  const stopped = (): boolean => !workflowEnforced() || ended(ws)
+  // The rules off, or Combwork quitting (#1628): looked at again after each await, nothing more lent or started.
+  if (stopped()) return
+  // Each lane's held slot as this pass finds it (HI-2466); the lanes no longer waiting forgotten. The window told of a change.
+  const wsPath = ws.path ?? ''
+  const project = projectPath.toLowerCase()
+  let holdsChanged = false
+  const setHold = (lane: string, h: LaneSlotHeld | null): void => {
+    if (stopped()) return
+    const key = laneHoldKey(wsPath, lane)
+    const was = laneHolds.get(key)
+    if (h ? was && was.slot === h.slot && was.held === h.held && was.agent === h.agent && was.broker === h.broker && was.idle === h.idle : !was) return
+    if (h) {
+      ownLaneHolds(ws, life)
+      laneHolds.set(key, { ...h, ws: wsPath.toLowerCase(), project, lane, life })
+    } else laneHolds.delete(key)
+    holdsChanged = true
+  }
+  const ids = new Set(waiting.map((l) => l.id))
+  for (const h of [...laneHolds.values()]) if (h.ws === wsPath.toLowerCase() && h.project === project && !ids.has(h.lane)) setHold(h.lane, null)
+  let held = false
+  try {
+    await lendWaiting(ws, projectPath, pool, waiting, stopped, (lane, r) => {
+      if (r?.why === 'busy') held = true
+      setHold(lane, r?.why === 'busy' ? heldOf(pool, r) : null)
+    })
+  } finally {
+    // A held slot looked at again after a pause, until it is lent or held no more; otherwise its tries forgotten.
+    if (held && !stopped()) passLater(heldRetries, ws, projectPath, HELD_RETRY_MAX_MS)
+    else if (!held) settledNow(heldRetries, ws, projectPath)
+    if (holdsChanged && !ended(ws)) laneViewsChanged(ws)
+  }
+}
+
+/** startWaitingLanes' lends and starts, in order: `tried` told each lane's lend (its refusal, or null once it has a slot). */
+async function lendWaiting(ws: WorkspaceService, projectPath: string, pool: SlotPool, waiting: LaneRecord[], stopped: () => boolean, tried: (lane: string, refusal: SlotRefusal | null) => void): Promise<void> {
   // No slot could be lent (HR1 on HI-2338): the lanes after it are visited only for those that need none, so an earlier
   // code lane keeps its place for the next free slot.
   let full = false
@@ -1659,18 +1896,30 @@ async function startWaitingLanes(ws: WorkspaceService, projectPath: string, pool
       }
     }
     if (stopped()) return
+    if (lease) tried(lane.id, null)
     if (!lease) {
+      // Its held slot still held, and no other to lend (HI-2466): left waiting with no lend tried, so a retry writes no
+      // lease that ends at once.
+      const still = await laneSlotStillHeld(ws, pool, lane.id)
+      if (stopped()) return
+      if (still) {
+        tried(lane.id, still)
+        full = true
+        continue
+      }
       const r = await pool.lend({ lane: lane.id, agent: lane.builder.id }, { install: false })
       if (!r.ok) {
+        tried(lane.id, r.refusal)
         full = true
         continue
       }
       lease = r.lease
+      tried(lane.id, null)
       log.info(`Lent ${userText(r.slot.name)} to lane ${lane.id}, which waited for a slot (lease ${r.lease.id})`)
       // Its carried lease kept for a card it has left ends now that the lane holds its own (HI-1731).
       await endLeftCarriedNow(ws, projectPath, pool, lane.builder.id, { lane: lane.id }, r.lease.id)
     }
-    // Hive quitting once a slot is lent (#1628): the lane keeps it and keeps waiting; the next start's pass starts it. The
+    // Combwork quitting once a slot is lent (#1628): the lane keeps it and keeps waiting; the next start's pass starts it. The
     // team paused (HI-2081): the same, until it resumes (its end is a board change, which passes again).
     const held = (): boolean => stopped() || !!teamPauseOf(ws)
     if (held()) return
@@ -1695,7 +1944,7 @@ function laneSlot(ws: WorkspaceService, lane: LaneRecord): LaneSlotInfo | null {
 }
 
 /**
- * A running lane's slot in hive.db (#1446): of `project`'s leases only (its slots' project id), the lane's own, else its
+ * A running lane's slot in combwork.db (#1446): of `project`'s leases only (its slots' project id), the lane's own, else its
  * builder's carried one (#1441: a 0.9 worktree adopted at the upgrade); none of the project's: null.
  */
 export function laneSlotIn(db: DatabaseSync, project: string, lane: Pick<LaneRecord, 'id' | 'builder'>): LaneSlotInfo | null {
@@ -1770,15 +2019,25 @@ export function startSlotCards(): void {
     return ws ? projectAgents(await ws.projectConfig(projectPath)).filter(builds).length : 0
   })
   setLaneSlots(laneSlot)
+  setLaneSlotHeld(laneSlotHeld)
+  // A lane's free slot held by a session (HI-2466): its agent's session ending or going idle may free it, so the
+  // project's pass looks again at once rather than at its next pause.
+  const offSessions = onCombworkEvent((e) => {
+    const where = e.type === 'session-exit' ? e.projectPath : e.type === 'session-status' && (e.state.status === 'ready' || e.state.status === 'finished') ? e.state.projectPath : null
+    if (!where) return
+    const ws = workspaceFor(where)
+    if (ws?.path && heldRetries.has(retireKey(ws, where))) void settleSlotCards(ws, where)
+  })
   setSlotFreed((ws, project) => {
     for (const l of slotFreed) l(project)
     void settleSlotCards(ws, project)
   })
   const offLanes = onLanesWritten(() => void settleAll().catch((e) => log.warn("settling the lanes' slots", e)))
-  // A workspace opening (Hive's start, a restart after a crash): what its cards are owed is done.
+  // A workspace opening (Combwork's start, a restart after a crash): what its cards are owed is done.
   const seen = new WeakSet<AbortSignal>()
-  const offOpen = onHiveEvent((e) => {
+  const offOpen = onCombworkEvent((e) => {
     if (e.type !== 'workspace-changed') return
+    pruneLaneHolds()
     for (const ws of openWorkspaces()) {
       if (!ws.path || seen.has(ws.lifetime)) continue
       seen.add(ws.lifetime)
@@ -1794,7 +2053,7 @@ export function startSlotCards(): void {
   // A board change (a card put back or Done outside the rules writes no slot action): its leases looked at, at most once
   // a second per workspace.
   let boardSoon: NodeJS.Timeout | null = null
-  const offBoard = onHiveEvent((e) => {
+  const offBoard = onCombworkEvent((e) => {
     // The team resuming (HI-2081) is one too: what waited for it is placed.
     if ((e.type !== 'tasks-changed' && e.type !== 'team-pause-changed') || boardSoon) return
     boardSoon = setTimeout(() => {
@@ -1807,6 +2066,8 @@ export function startSlotCards(): void {
   hourly.unref?.()
   stop = () => {
     offLanes()
+    offSessions()
+    setLaneSlotHeld(null)
     offOpen()
     offAdvanced()
     offBoard()
@@ -1820,12 +2081,15 @@ export function startSlotCards(): void {
 }
 
 export function stopSlotCards(): void {
+  holdGeneration++
+  for (const { drop } of [...holdLifetimes.values()]) drop()
+  for (const [key, r] of heldRetries) forget(heldRetries, key, r)
   stop?.()
   stop = null
 }
 
 /**
- * Hive quitting (index.ts quitNow, before its sessions stop, #1628): nothing asks for a pass any more and none starts, a
+ * Combwork quitting (index.ts quitNow, before its sessions stop, #1628): nothing asks for a pass any more and none starts, a
  * pass running ends at its next step, and this resolves once each has ended or after `withinMs`, before the boards close
  * (will-quit). No cycle is prepared or placed (no builder started) as the sessions stop; what a pass didn't get to is the
  * next start's pass, which settles every workspace as it opens. Never throws.

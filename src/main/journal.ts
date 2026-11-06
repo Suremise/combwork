@@ -11,13 +11,14 @@ import { createLogger, userText } from './logger'
 import { checkpointWhenIdle, checkpointsReleased } from './walCheckpoint'
 import { assertPlaceAdmitted, isAdmitted, ownerOf, refusedOpen } from './openingFence'
 import { trash } from './trash'
+import type { StoredText } from '../shared/types'
 
 const log = createLogger('journal')
 
 /**
- * The Assistant's journal (#989, #1031): a database of its own beside its home (`.hive/assistant/journal.db`), apart
+ * The Assistant's journal (#989, #1031): a database of its own beside its home (`.combwork/assistant/journal.db`), apart
  * from the board's. Entries are small and typed (a one-line summary, optional detail and why, a project, an importance,
- * links to cards, commits, notes and other entries, tags), written by the Assistant (its tools) and by Hive (facts:
+ * links to cards, commits, notes and other entries, tags), written by the Assistant (its tools) and by Combwork (facts:
  * lanes, merges, an unexpected close). Recall gives one-line rows, at most a few, ranked; an entry's detail is read one
  * at a time. Long details are kept compressed (Brotli); the full-text index (FTS5, contentless: the text is only in
  * `entries`; not `detail=column`, with which a contentless table's bm25 is always nought) is kept by triggers, which read a compressed detail through `journal_text()`, a function each connection gets. Everyday
@@ -30,8 +31,15 @@ export const JOURNAL_FILE = 'journal.db'
 /** A detail longer than this is kept compressed. */
 const COMPRESS_OVER = 1024
 
+// old-name: begin journal-old-source
+/** Combwork's own entries' source and tag before 1.1, which the names step converts (HI-2598). */
+const OLD_SOURCE = 'hive'
+// old-name: end journal-old-source
+
 export const JOURNAL_MIGRATIONS: Migration[] = [
   {
+    // Only ever run on a new journal (every older one has it already), so its source is Combwork's name now (HI-2611): a
+    // new journal never holds the old one, even until version 3. A journal 1.0 made has the old name or 'assistant'.
     version: 1,
     name: 'entries',
     up: (db) =>
@@ -45,7 +53,7 @@ export const JOURNAL_MIGRATIONS: Migration[] = [
           detail        TEXT,
           detail_z      BLOB,
           why           TEXT,
-          source        TEXT    NOT NULL CHECK (source IN ('hive', 'assistant')),
+          source        TEXT    NOT NULL CHECK (source IN ('combwork', 'assistant')),
           importance    INTEGER NOT NULL DEFAULT 1 CHECK (importance BETWEEN 0 AND 3),
           superseded_by INTEGER REFERENCES entries(id) ON DELETE SET NULL,
           digest_of     TEXT,
@@ -81,6 +89,81 @@ export const JOURNAL_MIGRATIONS: Migration[] = [
           INSERT INTO entries_fts(rowid, summary, detail, why) VALUES (new.id, new.summary, journal_text(new.detail, new.detail_z), coalesce(new.why, ''));
         END;
       `)
+  },
+  {
+    // Dialects (HI-2065, HI-2438): a summary Combwork writes keeps its message id and values beside its English, as card
+    // history keeps whatText (#845), so it can be said in each reader's dialect when it is read (5b, 6b). JSON of a
+    // StoredText; null for the Assistant's own entries, for Combwork's from before, and once the summary is edited.
+    version: 2,
+    name: 'summary text', // agent-protocol: a migration's name, recorded in schema_version
+    up: (db) => db.exec('ALTER TABLE entries ADD COLUMN summary_text TEXT')
+  },
+  {
+    // Names (HI-2598): Combwork's own entries had the old name as their source and tag; now 'combwork'. A CHECK can't be altered,
+    // so `entries` is made again (SQLite's way, lang_altertable.html#otheralter): every row and its id kept, so the
+    // contentless FTS index (by rowid, not rebuilt) stays right. The step runs in a transaction with foreign keys on,
+    // which can't be turned off there, and dropping `entries` would cascade into `links` and `tags`: they are kept aside
+    // first, dropped, and made again after it. Dropping a table fires no trigger, and its triggers go with it.
+    version: 3,
+    name: 'names: combwork', // agent-protocol: a migration's name, recorded in schema_version
+    up: (db) =>
+      db.exec(`
+        CREATE TEMP TABLE links_kept AS SELECT entry_id, type, ref FROM links;
+        CREATE TEMP TABLE tags_kept AS SELECT entry_id, tag FROM tags;
+        DROP TABLE links;
+        DROP TABLE tags;
+        CREATE TABLE entries_new (
+          id            INTEGER PRIMARY KEY,
+          at            TEXT    NOT NULL,
+          kind          TEXT    NOT NULL CHECK (kind IN (${JOURNAL_KINDS.map((k) => `'${k}'`).join(', ')})),
+          project       TEXT,
+          summary       TEXT    NOT NULL,
+          detail        TEXT,
+          detail_z      BLOB,
+          why           TEXT,
+          source        TEXT    NOT NULL CHECK (source IN ('combwork', 'assistant')),
+          importance    INTEGER NOT NULL DEFAULT 1 CHECK (importance BETWEEN 0 AND 3),
+          superseded_by INTEGER REFERENCES entries_new(id) ON DELETE SET NULL,
+          digest_of     TEXT,
+          updated_at    TEXT,
+          summary_text  TEXT
+        ) STRICT;
+        INSERT INTO entries_new (id, at, kind, project, summary, detail, detail_z, why, source, importance, superseded_by, digest_of, updated_at, summary_text)
+          SELECT id, at, kind, project, summary, detail, detail_z, why, CASE source WHEN '${OLD_SOURCE}' THEN 'combwork' ELSE source END, importance, superseded_by, digest_of, updated_at, summary_text FROM entries;
+        DROP TABLE entries;
+        ALTER TABLE entries_new RENAME TO entries;
+        CREATE INDEX entries_at ON entries(at);
+        CREATE INDEX entries_kind ON entries(kind, at);
+        CREATE INDEX entries_project ON entries(project, at);
+        CREATE INDEX entries_everyday ON entries(at) WHERE importance < ${KEPT_IMPORTANCE} AND kind <> 'digest';
+        CREATE TABLE links (
+          entry_id INTEGER NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+          type     TEXT    NOT NULL CHECK (type IN (${LINK_TYPES.map((k) => `'${k}'`).join(', ')})),
+          ref      TEXT    NOT NULL,
+          PRIMARY KEY (entry_id, type, ref)
+        ) STRICT, WITHOUT ROWID;
+        CREATE INDEX links_ref ON links(type, ref);
+        CREATE TABLE tags (
+          entry_id INTEGER NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+          tag      TEXT    NOT NULL,
+          PRIMARY KEY (entry_id, tag)
+        ) STRICT, WITHOUT ROWID;
+        CREATE INDEX tags_tag ON tags(tag);
+        INSERT INTO links (entry_id, type, ref) SELECT entry_id, type, ref FROM links_kept;
+        INSERT OR IGNORE INTO tags (entry_id, tag) SELECT entry_id, CASE tag WHEN '${OLD_SOURCE}' THEN 'combwork' ELSE tag END FROM tags_kept;
+        DROP TABLE links_kept;
+        DROP TABLE tags_kept;
+        CREATE TRIGGER entries_ai AFTER INSERT ON entries BEGIN
+          INSERT INTO entries_fts(rowid, summary, detail, why) VALUES (new.id, new.summary, journal_text(new.detail, new.detail_z), coalesce(new.why, ''));
+        END;
+        CREATE TRIGGER entries_ad AFTER DELETE ON entries BEGIN
+          DELETE FROM entries_fts WHERE rowid = old.id;
+        END;
+        CREATE TRIGGER entries_au AFTER UPDATE OF summary, detail, detail_z, why ON entries BEGIN
+          DELETE FROM entries_fts WHERE rowid = old.id;
+          INSERT INTO entries_fts(rowid, summary, detail, why) VALUES (new.id, new.summary, journal_text(new.detail, new.detail_z), coalesce(new.why, ''));
+        END;
+      `)
   }
 ]
 
@@ -105,7 +188,7 @@ function setup(db: DatabaseSync, isNew: boolean): void {
   db.function('journal_week', { deterministic: true }, (at) => isoWeek(new Date(String(at))))
 }
 
-const hiveVersion = (): string => {
+const appVersion = (): string => {
   try {
     return app.getVersion()
   } catch {
@@ -127,12 +210,12 @@ interface OpenJournal {
 const open = new Map<string, OpenJournal>()
 const keyOf = (file: string): string => file.toLowerCase()
 
-/** The journal file of an Assistant home (`<workspace>/.hive/assistant`). */
+/** The journal file of an Assistant home (`<workspace>/.combwork/assistant`). */
 export const journalFile = (home: string): string => join(home, JOURNAL_FILE)
 
 /**
  * Where a journal is, resolved once as a call enters and used for everything it does (#1456): the open one's file and
- * workspace as it opened, else where its spelling leads now and that file's workspace (null: in no `.hive`). Never
+ * workspace as it opened, else where its spelling leads now and that file's workspace (null: in no `.combwork`). Never
  * the spelling itself, which a junction pointed elsewhere meanwhile would take to another workspace's journal.
  */
 interface Located {
@@ -148,7 +231,7 @@ function located(home: string): Located {
 }
 
 /**
- * Journals being deleted (#1031 round 1), by their workspace's place (#1456: under any spelling; a file in no `.hive` by
+ * Journals being deleted (#1031 round 1), by their workspace's place (#1456: under any spelling; a file in no `.combwork` by
  * itself): nothing opens them meanwhile, so the file can go.
  */
 const deleting = new Set<string>()
@@ -171,7 +254,7 @@ function journalOf(home: string, at: Located = located(home)): Db {
 
 /**
  * Before a workspace's open lets its Assistant use the journal (HI-2200, as the board's HI-2199): while its file, as a
- * Hive that ended without quitting left it, can't be opened yet (another process still maps its `-shm`), waits for that,
+ * Combwork that ended without quitting left it, can't be opened yet (another process still maps its `-shm`), waits for that,
  * bounded (untilOpenable), instead of its first use failing. At once for a journal open already or a file closed
  * cleanly; ended when `signal` (the open's lifetime) aborts.
  */
@@ -182,7 +265,7 @@ export async function untilJournalOpenable(home: string, signal: AbortSignal): P
   const onWait = (e: Error): void => {
     waiting = true
     journalTestHooks.openableWait?.(home)
-    log.warn(`the journal ${userText(file)} can't be opened yet: ${userText(e.message)} (SQLite code ${(e as { errcode?: number }).errcode}; another process still maps its -shm, as just after a Hive ended without quitting): waiting up to ${OPENABLE_WAIT_MS / 1000} s`)
+    log.warn(`the journal ${userText(file)} can't be opened yet: ${userText(e.message)} (SQLite code ${(e as { errcode?: number }).errcode}; another process still maps its -shm, as just after a Combwork ended without quitting): waiting up to ${OPENABLE_WAIT_MS / 1000} s`)
   }
   const waited = await untilOpenable(file, { onWait, signal })
   if (waiting) log.info(`the journal ${userText(file)}: ${signal.aborted ? 'its wait ended with its open' : 'openable'} after ${Math.round(waited)} ms`)
@@ -192,11 +275,11 @@ export async function untilJournalOpenable(home: string, signal: AbortSignal): P
 export const journalTestHooks: { openableWait: ((home: string) => void) | null } = { openableWait: null }
 
 /** Opens the journal at `file`, where it really is (its backups beside it). */
-const openJournalDb = (file: string): Db => openDb(file, { migrations: JOURNAL_MIGRATIONS, hiveVersion: hiveVersion(), backupDir: join(dirname(file), 'backups'), setup, checkpointer: checkpointWhenIdle, onIoRetry: (e, ms) => log.warn(`opening the journal ${userText(file)}: ${userText(e.message)}, tried again in ${ms} ms`) })
+const openJournalDb = (file: string): Db => openDb(file, { migrations: JOURNAL_MIGRATIONS, appVersion: appVersion(), backupDir: join(dirname(file), 'backups'), setup, checkpointer: checkpointWhenIdle, onIoRetry: (e, ms) => log.warn(`opening the journal ${userText(file)}: ${userText(e.message)}, tried again in ${ms} ms`) })
 
 /**
  * Closes a home's journal (its workspace closed, or before it is deleted): every connection to it, however it was spelt
- * as it opened (#1456: one opened through a junction or an 8.3 name would otherwise hold the folder until Hive quits).
+ * as it opened (#1456: one opened through a junction or an 8.3 name would otherwise hold the folder until Combwork quits).
  * The workspace is `place`, its real location as its window opened it, else as this spelling's journal opened: never
  * what the spelling resolves to now, so a junction removed or pointed at another workspace since neither keeps this
  * one's journals open nor closes another's.
@@ -261,6 +344,8 @@ export interface EntryInput {
   tags?: string[]
   /** The period a digest sums up ("2026-W42"). */
   digestOf?: string | null
+  /** The summary as Combwork's message (its id and values), beside its English: a fact Combwork writes (dialects, HI-2438). */
+  summaryText?: StoredText | null
 }
 
 const oneLine = (s: string): string => s.replace(/\s+/g, ' ').trim()
@@ -325,7 +410,7 @@ function writeEntryUnless(home: string, settings: JournalSettings, input: EntryI
 }
 
 /**
- * Writes an entry into a journal whose workspace no window may hold now (#1395: the unexpected close Hive finds as it
+ * Writes an entry into a journal whose workspace no window may hold now (#1395: the unexpected close Combwork finds as it
  * starts, for each workspace of the last run): as writeEntry while a window holds it; else on a connection of its own,
  * opened, written and closed here (a transient open), never kept nor made the journal's, so a window opening the
  * workspace meanwhile keeps its own (pruned and shown once it is opened). Refused while the journal is being deleted.
@@ -356,6 +441,7 @@ function entryOf(settings: JournalSettings, input: EntryInput) {
     why: checkText('why', input.why, ENTRY_LIMITS.why),
     project: checkText('project', input.project, ENTRY_LIMITS.project),
     digestOf: checkText('digestOf', input.digestOf, 100),
+    summaryText: input.summaryText ? JSON.stringify(input.summaryText) : null,
     importance: checkImportance(input.importance),
     links: checkLinks(input.links),
     tags: checkTags(input.tags)
@@ -367,7 +453,7 @@ function entryOf(settings: JournalSettings, input: EntryInput) {
  * nothing (null) when an entry by `source` with this summary and detail is already linked to it.
  */
 function insertEntry(w: Db['writer'], e: ReturnType<typeof entryOf>, source: JournalSource, once: { type: LinkType; ref: string } | null = null): number | null {
-  const { kind, summary, detail, why, project, digestOf, importance, links, tags } = e
+  const { kind, summary, detail, why, project, digestOf, summaryText, importance, links, tags } = e
   const d = storedDetail(detail)
   return transaction(w, () => {
     if (once) {
@@ -376,8 +462,9 @@ function insertEntry(w: Db['writer'], e: ReturnType<typeof entryOf>, source: Jou
     }
     for (const l of links.filter((x) => x.type === 'entry')) if (!w.prepare('SELECT 1 FROM entries WHERE id = ?').get(Number(l.ref))) fail(`There is no entry ${l.ref} to link to.`)
     const r = w
-      .prepare('INSERT INTO entries (at, kind, project, summary, detail, detail_z, why, source, importance, digest_of) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(new Date().toISOString(), kind, project, summary, d.detail, d.z, why, source, importance, digestOf)
+      // agent-protocol: SQL
+      .prepare('INSERT INTO entries (at, kind, project, summary, detail, detail_z, why, source, importance, digest_of, summary_text) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(new Date().toISOString(), kind, project, summary, d.detail, d.z, why, source, importance, digestOf, summaryText)
     const n = Number(r.lastInsertRowid)
     const link = w.prepare('INSERT OR IGNORE INTO links (entry_id, type, ref) VALUES (?, ?, ?)')
     for (const l of links) link.run(n, l.type, l.ref)
@@ -528,7 +615,11 @@ export function updateEntry(home: string, settings: JournalSettings, id: number,
     sets.push(clause)
     args.push(value)
   }
-  if (patch.summary !== undefined) set('summary = ?', oneLine(checkText('summary', patch.summary, ENTRY_LIMITS.summary, true)!))
+  if (patch.summary !== undefined) {
+    set('summary = ?', oneLine(checkText('summary', patch.summary, ENTRY_LIMITS.summary, true)!))
+    // Edited: its words are the editor's now, no longer Combwork's message.
+    set('summary_text = ?', null)
+  }
   if (patch.kind !== undefined) {
     if (!JOURNAL_KINDS.includes(patch.kind as JournalKind)) fail(`kind is one of: ${JOURNAL_KINDS.join(', ')}.`)
     if (!inScope(settings, patch.kind as JournalKind)) fail(`The user's journal scope doesn't include ${patch.kind} entries (Settings → Assistant → Journal allows: ${settings.scope.join(', ') || 'none'}).`)
@@ -727,7 +818,7 @@ function filterSql(f: JournalFilter): { where: string[]; args: (string | number)
   }
   if (f.project === '') add('e.project IS NULL')
   else if (f.project) add('e.project = ? COLLATE NOCASE', f.project)
-  if (f.source === 'hive' || f.source === 'assistant') add('e.source = ?', f.source)
+  if (f.source === 'combwork' || f.source === 'assistant') add('e.source = ?', f.source)
   const since = isoOrFail('since', f.since)
   const until = isoOrFail('until', f.until)
   if (since) add('e.at >= ?', since)

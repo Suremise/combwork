@@ -18,7 +18,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-const project = () => JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'project.json'), 'utf8'))
+const project = () => JSON.parse(fs.readFileSync(path.join(alpha, '.combwork', 'project.json'), 'utf8'))
 const connectionOf = (id) => project().agents.find((a) => a.id === id)?.connection
 
 ;(async () => {
@@ -26,13 +26,13 @@ const connectionOf = (id) => project().agents.find((a) => a.id === id)?.connecti
   fs.mkdirSync(userData, { recursive: true })
   const env = lib.fakeClaude(userData, home, [alpha])
   lib.gitProject(alpha)
-  fs.mkdirSync(path.join(alpha, '.hive'), { recursive: true })
-  fs.writeFileSync(path.join(alpha, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-b1', name: 'CC-B1', provider: 'claude-code', workflowRole: 'builder' }, { id: 'a-b2', name: 'CC-B2', provider: 'claude-code', workflowRole: 'builder' }, { id: 'a-r1', name: 'CC-R1', provider: 'claude-code', workflowRole: 'reviewer' }] }))
+  fs.mkdirSync(path.join(alpha, '.combwork'), { recursive: true })
+  fs.writeFileSync(path.join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a-b1', name: 'CC-B1', provider: 'claude-code', workflowRole: 'builder' }, { id: 'a-b2', name: 'CC-B2', provider: 'claude-code', workflowRole: 'builder' }, { id: 'a-r1', name: 'CC-R1', provider: 'claude-code', workflowRole: 'reviewer' }] }))
 
   const { app, page } = await lib.launch({ userData, env, viewport: { width: 1400, height: 900 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     const themed = async (theme) => {
       await inv('settings:update', { appearance: { theme } })

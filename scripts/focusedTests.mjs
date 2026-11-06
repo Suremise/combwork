@@ -1,9 +1,9 @@
-// The hive project's focused-test runner (HI-1367): Hive's merge queue runs it as the project's focused.run, in the
+// This repository's focused-test runner (HI-1367): Combwork's merge queue runs it as the project's focused.run, in the
 // checkout to test (cwd), after its focused.pick (tests/e2e/affected.mjs --pick) chose the tests.
-//   HIVE_FOCUSED_TESTS    a JSON file: the test ids, an array of strings. A unit test is its repo path
+//   CW_FOCUSED_TESTS    a JSON file: the test ids, an array of strings. A unit test is its repo path
 //                         (tests/x.test.ts), an e2e suite its name (board).
-//   HIVE_FOCUSED_RESULTS  where it writes the results: one { test, result: passed|failed|skipped, why? } per id given.
-//   HIVE_FOCUSED_JOBS     at most this many workers at once (a whole number of 1 or more; 2 when unset).
+//   CW_FOCUSED_RESULTS  where it writes the results: one { test, result: passed|failed|skipped, why? } per id given.
+//   CW_FOCUSED_JOBS     at most this many workers at once (a whole number of 1 or more; 2 when unset).
 // The unit tests run in one Vitest run of those files (its JSON report gives each file's result); the suites in one
 // e2e run, `tests/e2e/run.mjs <suites> --build --record` (its run record gives each suite's: one skipped for the
 // environment, such as a real CLI's usage limit, is skipped, with why). Never the full set or the real tier as such:
@@ -21,7 +21,7 @@ const runContext = createRequire(import.meta.url)('../tests/e2e/runContext.cjs')
 /** A unit test's id: a test file under tests/, outside tests/e2e (tests/x.test.ts, tests/i18n/y.test.ts). */
 const UNIT_ID = /^tests\/(?:[^/]+\/)*[^/]+\.test\.ts$/
 
-/** HIVE_FOCUSED_JOBS: a whole number of 1 or more (2 when unset), or null when it is something else. */
+/** CW_FOCUSED_JOBS: a whole number of 1 or more (2 when unset), or null when it is something else. */
 export function parseJobs(value) {
   if (value === undefined || value === '') return 2
   return /^[1-9]\d*$/.test(String(value).trim()) ? Number(String(value).trim()) : null
@@ -176,8 +176,8 @@ async function runUnit(cwd, ids, jobs) {
 /** The e2e suites: one run of them, built and recorded, results from its run record. */
 async function runSuites(cwd, ids, jobs) {
   // Started as `npm run e2e` would be: the runner takes what it needs from its environment itself (the run context's
-  // allowlist for each suite, the shell's Hive variables for its Progress steps), less the queue's own variables.
-  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^HIVE_FOCUSED_/i.test(k)))
+  // allowlist for each suite, the shell's Combwork variables for its Progress steps), less the queue's own variables.
+  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^CW_FOCUSED_/i.test(k)))
   const r = await run(process.execPath, [join(cwd, 'tests', 'e2e', 'run.mjs'), ...ids, '--build', '--record', '--jobs', String(jobs)], { cwd, env, keep: true })
   const path = recordPathFrom(r.out)
   let record = null
@@ -191,10 +191,10 @@ async function runSuites(cwd, ids, jobs) {
 
 async function main() {
   const cwd = process.cwd()
-  const testsFile = process.env.HIVE_FOCUSED_TESTS
-  const resultsFile = process.env.HIVE_FOCUSED_RESULTS
+  const testsFile = process.env.CW_FOCUSED_TESTS
+  const resultsFile = process.env.CW_FOCUSED_RESULTS
   if (!testsFile || !resultsFile) {
-    console.error('HIVE_FOCUSED_TESTS and HIVE_FOCUSED_RESULTS must both be set')
+    console.error('CW_FOCUSED_TESTS and CW_FOCUSED_RESULTS must both be set')
     return 2
   }
   const write = (records) => {
@@ -211,8 +211,8 @@ async function main() {
   }
   const { SUITES } = await import(pathToFileURL(join(cwd, 'tests', 'e2e', 'suites.mjs')).href)
   const sorted = sortIds(ids, { cwd, suiteNames: SUITES.map((s) => s.name) })
-  const jobs = parseJobs(process.env.HIVE_FOCUSED_JOBS)
-  const refuse = sorted.problem ?? (jobs === null ? `HIVE_FOCUSED_JOBS is ${JSON.stringify(process.env.HIVE_FOCUSED_JOBS)}, not a whole number of 1 or more` : null)
+  const jobs = parseJobs(process.env.CW_FOCUSED_JOBS)
+  const refuse = sorted.problem ?? (jobs === null ? `CW_FOCUSED_JOBS is ${JSON.stringify(process.env.CW_FOCUSED_JOBS)}, not a whole number of 1 or more` : null)
   if (refuse) {
     console.error(`Nothing run: ${refuse}.`)
     const named = Array.isArray(ids) ? [...new Set(ids.filter((id) => typeof id === 'string' && id))] : []

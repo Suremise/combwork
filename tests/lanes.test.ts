@@ -6,29 +6,29 @@ import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
-import type { HiveEvent, TaskCard } from '../src/shared/types'
+import type { CombworkEvent, TaskCard } from '../src/shared/types'
 import { preferencesOf } from '../src/shared/workflow/preferences'
-import { allDone, keptLanes, laneLine, laneNextText, laneView, listedLanes, readLane, readLanes, laneCards, laneNumber, laneName, LANE_LINGER_MS, LANE_KEEP_MS, MAX_LANES, type LaneRecord } from '../src/shared/lanes'
+import { allDone, keptLanes, laneLine, laneNextText, laneView, listedLanes, readLane, readLanes, laneCards, laneNumber, laneName, LANE_LINGER_MS, LANE_KEEP_MS, MAX_LANES, type LaneRecord, type LaneSlotHeld } from '../src/shared/lanes'
 import { tempDir } from './tempDir'
 import { storeDocs } from './storeDocs'
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 10000
 
-const base = tempDir('hive-lanes-')
+const base = tempDir('cw-lanes-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const tasks = await import('../src/main/tasks')
 const lanes = await import('../src/main/lanes')
 
-/** Workflow rules off for one test (#1270: Hive owns the lane while they are on), on again after it. */
+/** Workflow rules off for one test (#1270: Combwork owns the lane while they are on), on again after it. */
 const { advanced } = await import('../src/main/advanced')
 const { ENFORCE } = await import('../src/main/workflow/service')
 const rulesOff = (): Promise<unknown> => advanced.set(ENFORCE, false)
 afterEach(async () => {
   await advanced.set(ENFORCE, true)
 })
-const { onHiveEvent } = await import('../src/main/events')
+const { onCombworkEvent } = await import('../src/main/events')
 const { saveTable } = await import('../src/main/storeTables')
 
 vi.setConfig({ testTimeout: 30_000 })
@@ -58,7 +58,7 @@ describe('a lane on slots (#1438)', () => {
   const cards = new Map([[1, card(1, 'done')], [2, card(2, 'todo')], [3, card(3, 'todo')]])
 
   it("its slot's details for the row's hover (#1446): lent or carried, its line, ready or preparing, waiting while preparing", () => {
-    const info = { name: 'slot-b', carried: false, line: 'hive/HI/HI-2-lane-hover', state: 'ready' as const, since: '2026-10-23T10:00:00.000Z' }
+    const info = { name: 'slot-b', carried: false, line: 'cw/HI/HI-2-lane-hover', state: 'ready' as const, since: '2026-10-23T10:00:00.000Z' }
     const v = laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: 'slot-b', waiting: false, info })
     expect([v.slot, v.slotInfo, v.status]).toEqual(['slot-b', info, null])
     // Its builder's carried slot (a 0.9 worktree, #1441): named the same way.
@@ -92,25 +92,60 @@ describe('a lane on slots (#1438)', () => {
     const waiting = laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: null, waiting: true })
     expect([waiting.state, waiting.status?.reason, waiting.slot]).toEqual(['paused', 'slot', null])
     expect(laneLine(waiting)).toContain('waiting for a slot')
-    const blocked = laneView(rec(), new Map([[1, card(1, 'doing', { blocked: 'Asked the user' })], [2, card(2, 'todo')], [3, card(3, 'todo')]]), undefined, null, undefined, null, undefined, null, null, { slot: null, waiting: true })
+    // HI-2466: its only free slot held: which, and by what.
+    const held = laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: null, waiting: true, held: { slot: 'slot-a', held: 'session', agent: 'CB1' } })
+    expect([held.state, held.status]).toEqual(['paused', { reason: 'slot', card: 2, slot: 'slot-a', held: 'session', agent: 'CB1' }])
+    expect(laneLine(held)).toContain("waiting for slot-a: CB1's session is still in it")
+    const process = laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: null, waiting: true, held: { slot: 'slot-a', held: 'process' } })
+    expect(laneLine(process)).toContain('waiting for slot-a: a process still has a file or folder in it open')
+    // HI-2467: Windows Sandbox's broker seen working in it, idle, a Sandbox running, or that not known.
+    const broker = (idle?: boolean) => laneLine(laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: null, waiting: true, held: { slot: 'slot-a', held: 'broker', broker: 'WindowsSandboxServer', ...(idle !== undefined ? { idle } : {}) } }))
+    expect(broker(true)).toContain("waiting for slot-a: a process still has a file or folder in it open: Windows Sandbox's broker (WindowsSandboxServer) is working in it, with no Sandbox running")
+    expect(broker(false)).toContain("Windows Sandbox's broker (WindowsSandboxServer) is working in it, with a Sandbox running")
+    expect(broker()).toContain("Windows Sandbox's broker (WindowsSandboxServer) is working in it")
+    expect(broker()).not.toMatch(/Sandbox running/)
+    const blocked =laneView(rec(), new Map([[1, card(1, 'doing', { blocked: 'Asked the user' })], [2, card(2, 'todo')], [3, card(3, 'todo')]]), undefined, null, undefined, null, undefined, null, null, { slot: null, waiting: true })
     expect(blocked.status?.reason).toBe('blocked')
     // Ended: no slot, no wait.
     const ended = laneView(rec({ state: 'ended', endedAt: '2026-10-09T11:00:00.000Z' }), cards, undefined, null, undefined, null, undefined, null, null, { slot: 'slot-b', waiting: true })
     expect([ended.slot, ended.status]).toEqual([null, null])
   })
 
-  it("hive_lane next says where the next card is built", () => {
+  it('HI-2468: a running builder\'s start refused for its slot held names the slot and what holds it; refused otherwise, as before', () => {
+    const view = (held?: LaneSlotHeld) => laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, null, undefined, { card: 2, why: 'refused', agent: 'B1', ...(held ? { held } : {}) })
+    // Still a start's wait (never a wait for a slot): the builder is B1, and the session in the slot its own field.
+    const session = view({ slot: 'slot-a', held: 'session', agent: 'CB1' })
+    expect(session.status).toEqual({ reason: 'startWait', card: 2, why: 'refused', agent: 'B1', slot: 'slot-a', held: 'session', heldBy: 'CB1' })
+    expect(laneLine(session)).toContain("#2 waits to start: its start was refused for now, slot-a still in use (CB1's session is still in it); Combwork tries again")
+    expect(laneLine(view({ slot: 'slot-a', held: 'process' }))).toContain('#2 waits to start: its start was refused for now, slot-a still in use (a process still has a file or folder in it open); Combwork tries again')
+    const broker = view({ slot: 'slot-a', held: 'broker', broker: 'WindowsSandboxServer', idle: false })
+    expect(broker.status).toMatchObject({ reason: 'startWait', why: 'refused', slot: 'slot-a', held: 'broker', broker: 'WindowsSandboxServer', idle: false })
+    expect(laneLine(broker)).toContain("slot-a still in use (a process still has a file or folder in it open: Windows Sandbox's broker (WindowsSandboxServer) is working in it, with a Sandbox running); Combwork tries again")
+    // No slot free, as its builder's own last run still holds it: what that run left there, or that it isn't known to have ended.
+    expect(laneLine(view({ slot: 'slot-a', held: 'left', agent: 'B1', program: 'node' }))).toContain("slot-a still in use (B1's last run left node running in it); Combwork tries again")
+    expect(laneLine(view({ slot: 'slot-a', held: 'left', agent: 'B1', program: 'node', more: 2 }))).toContain("slot-a still in use (B1's last run left node and 2 more running in it); Combwork tries again")
+    expect(view({ slot: 'slot-a', held: 'left', agent: 'B1', program: 'node', more: 2 }).status).toMatchObject({ held: 'left', heldBy: 'B1', program: 'node', more: 2 })
+    expect(laneLine(view({ slot: 'slot-a', held: 'lastRun', agent: 'B1' }))).toContain("slot-a still in use (B1's last run there isn't known to have ended); Combwork tries again")
+    // Refused for another reason, or nothing held any more: as before HI-2468.
+    const bare = view()
+    expect(bare.status).toEqual({ reason: 'startWait', card: 2, why: 'refused', agent: 'B1' })
+    expect(laneLine(bare)).toContain('#2 waits to start: its start was refused for now; Combwork tries again')
+    // A held slot kept with another reason (the builder busy) never shows: only a refused start says it.
+    expect(laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, null, undefined, { card: 2, why: 'busy', agent: 'B1', held: { slot: 'slot-a', held: 'process' } }).status).toEqual({ reason: 'startWait', card: 2, why: 'busy', agent: 'B1' })
+  })
+
+  it("cw_lane next says where the next card is built", () => {
     const v = laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: 'slot-b', waiting: false })
-    expect(laneNextText({ lane: v, next: { card: 2, title: 'Card 2', carryOn: false }, waits: null })).toBe('Next: #2 Card 2. Start it: it is built in slot-b, on a new branch Hive makes there.')
+    expect(laneNextText({ lane: v, next: { card: 2, title: 'Card 2', carryOn: false }, waits: null })).toBe('Next: #2 Card 2. Start it: it is built in slot-b, on a new branch Combwork makes there.')
     expect(laneNextText({ lane: v, next: { card: 2, title: 'Card 2', carryOn: true }, waits: null })).toBe('Carry on with #2 Card 2 in slot-b.')
     const none = laneView(rec(), cards)
     expect(laneNextText({ lane: none, next: { card: 2, title: 'Card 2', carryOn: false }, waits: null })).toBe('Next: #2 Card 2. Start it.')
   })
 
-  it('HI-2245: hive_lane next says to hand over a card carried on with commits past its submission, and nothing more without them', () => {
+  it('HI-2245: cw_lane next says to hand over a card carried on with commits past its submission, and nothing more without them', () => {
     const v = laneView(rec(), cards, undefined, null, undefined, null, undefined, null, null, { slot: 'slot-b', waiting: false })
     const u = [{ card: 2, count: 2, atLeast: false, since: 'ab30f52' }]
-    expect(laneNextText({ lane: v, next: { card: 2, title: 'Card 2', carryOn: true }, waits: null, unsubmitted: u })).toBe('Carry on with #2 Card 2 in slot-b. First hand it over: its line has 2 commits since its submission (ab30f52); hive_submit with followUp: true.')
+    expect(laneNextText({ lane: v, next: { card: 2, title: 'Card 2', carryOn: true }, waits: null, unsubmitted: u })).toBe('Carry on with #2 Card 2 in slot-b. First hand it over: its line has 2 commits since its submission (ab30f52); cw_submit with followUp: true.')
     // Another card's fact isn't this one's; with none, the reply is as before.
     expect(laneNextText({ lane: v, next: { card: 2, title: 'Card 2', carryOn: true }, waits: null, unsubmitted: [{ ...u[0], card: 3 }] })).toBe('Carry on with #2 Card 2 in slot-b.')
     expect(laneNextText({ lane: v, next: { card: 2, title: 'Card 2', carryOn: true }, waits: null, unsubmitted: [] })).toBe('Carry on with #2 Card 2 in slot-b.')
@@ -256,7 +291,7 @@ describe('which lanes are listed and kept', () => {
 })
 
 describe("a card loop's rounds and wait when the request doesn't say (#412, HI-1766: workflow options)", () => {
-  it("the project's, else the workspace's, else Hive's, else 10 rounds and 6 hours; values out of range are passed over", () => {
+  it("the project's, else the workspace's, else Combwork's, else 10 rounds and 6 hours; values out of range are passed over", () => {
     const of = (levels: Parameters<typeof preferencesOf>[1]) => {
       const v = preferencesOf('git', levels).values
       return { rounds: v.loopRounds, waitHours: v.loopWaitHours }
@@ -274,17 +309,17 @@ describe('the lanes service', () => {
   type WS = ReturnType<typeof createWorkspaceService>
   let w: WS
   const wsPath = join(base, 'ws')
-  const events: HiveEvent[] = []
+  const events: CombworkEvent[] = []
   let off: () => void
   const user = { kind: 'user' } as const
   beforeAll(async () => {
     const p = join(wsPath, 'alpha')
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }, { id: 'b2', name: 'B2' }, { id: 'g1', name: 'G1', workflowRole: 'generalist' }] }))
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }, { id: 'b2', name: 'B2' }, { id: 'g1', name: 'G1', workflowRole: 'generalist' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     lanes.startLanes()
-    off = onHiveEvent((e) => e.type === 'lanes-changed' && events.push(e))
+    off = onCombworkEvent((e) => e.type === 'lanes-changed' && events.push(e))
   })
   afterAll(async () => {
     off()
@@ -413,7 +448,7 @@ describe('the lanes service', () => {
     await lanes.endLane(w, abandoned.id, { abandoned: true })
     await expect(lanes.laneNext(w, 'alpha', 'b2')).rejects.toThrow(`Your lane ${abandoned.id} was abandoned: don't start it again; ask the user if there is more to do.`)
     // An agent that had no lane: as before.
-    await expect(lanes.laneNext(w, 'alpha', 'g1')).rejects.toThrow('No running lane of yours: start one with hive_lane start, or ask the user')
+    await expect(lanes.laneNext(w, 'alpha', 'g1')).rejects.toThrow('No running lane of yours: start one with cw_lane start, or ask the user')
   })
 
   it('a lane reviewed by the pool (#1443): kept with its row, nobody joins it, its builder keeps it; a reviewer named makes it one per lane', async () => {
@@ -508,8 +543,8 @@ describe('the lanes service', () => {
   it('follows the board: paused while blocked, ended once every card is Done, and the window is told', async () => {
     const [c1, c2] = [await make('F1'), await make('F2')]
     const l = (await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c1.number, c2.number], by: 'B1 (alpha)' })).lane
-    const told = (fn: (x: Extract<HiveEvent, { type: 'lanes-changed' }>) => boolean) => until(() => events.some((e) => e.type === 'lanes-changed' && fn(e)), HUNG_MS)
-    const mine = (e: Extract<HiveEvent, { type: 'lanes-changed' }>) => e.lanes.find((x) => x.id === l.id)
+    const told = (fn: (x: Extract<CombworkEvent, { type: 'lanes-changed' }>) => boolean) => until(() => events.some((e) => e.type === 'lanes-changed' && fn(e)), HUNG_MS)
+    const mine = (e: Extract<CombworkEvent, { type: 'lanes-changed' }>) => e.lanes.find((x) => x.id === l.id)
     expect(await told((e) => mine(e)?.state === 'active')).toBe(true)
     await run(() => tasks.updateTask(c1.number, { column: 'doing', blocked: 'Asked the user' }, user))
     expect(await told((e) => mine(e)?.state === 'paused' && mine(e)?.pausedOn === c1.number)).toBe(true)

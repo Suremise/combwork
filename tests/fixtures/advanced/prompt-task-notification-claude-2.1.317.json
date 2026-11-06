@@ -1,0 +1,23 @@
+{
+ "about": "Claude Code 2.1.317: its UserPromptSubmit hook for a prompt the user sent, then for the turn it started by itself when that prompt's background Bash command ended (HI-2410). Recorded with claude -p in a new CLAUDE_CONFIG_DIR (a made-up API key), --settings hooks saving their input, against a local stand-in model API that ran one background Bash (sleep 3 && echo done) and then replied; no sign-in, nothing sent to a real model. The two carry the same fields: only the prompt text tells the task's wake apart. Paths and the session id replaced.",
+ "hooks": [
+  {
+   "session_id": "00000000-0000-4000-8000-000000000001",
+   "transcript_path": "C:\\home\\projects\\C--work-alpha\\00000000-0000-4000-8000-000000000001.jsonl",
+   "cwd": "C:\\work\\alpha",
+   "prompt_id": "d21dd4df-3b65-4907-9904-2d25f3670aad",
+   "permission_mode": "bypassPermissions",
+   "hook_event_name": "UserPromptSubmit",
+   "prompt": "run a background task"
+  },
+  {
+   "session_id": "00000000-0000-4000-8000-000000000001",
+   "transcript_path": "C:\\home\\projects\\C--work-alpha\\00000000-0000-4000-8000-000000000001.jsonl",
+   "cwd": "C:\\work\\alpha",
+   "prompt_id": "10136e13-9051-42ff-9eca-db9df8ca64f2",
+   "permission_mode": "bypassPermissions",
+   "hook_event_name": "UserPromptSubmit",
+   "prompt": "<task-notification>\n<task-id>bfrybgkuv</task-id>\n<tool-use-id>toolu_probe1</tool-use-id>\n<output-file>C:\\work\\tasks\\bfrybgkuv.output</output-file>\n<status>completed</status>\n<summary>Background command \"Wait a little\" completed (exit code 0)</summary>\n</task-notification>"
+  }
+ ]
+}

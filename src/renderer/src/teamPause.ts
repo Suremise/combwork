@@ -64,7 +64,7 @@ export function initTeamPause(): void {
       void refreshTeamPause()
     }, 1000)
   }
-  window.hive.onEvent((e) => {
+  window.combwork.onEvent((e) => {
     if (e.type === 'team-pause-changed' || e.type === 'workspace-changed') void refreshTeamPause()
     else if ((e.type === 'session-status' || e.type === 'progress-changed' || e.type === 'tasks-changed') && anyPaused()) later()
   })

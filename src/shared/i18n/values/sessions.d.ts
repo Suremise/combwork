@@ -1,6 +1,6 @@
 // Generated from locales/en/sessions.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
-interface HiveMessageValues {
+interface CombworkMessageValues {
   'sessions.archive.failed': undefined
   'sessions.archive.message': undefined
   'sessions.archive.title': undefined
@@ -73,8 +73,8 @@ interface HiveMessageValues {
   'sessions.compaction.title': undefined
   'sessions.compaction.tokens': { before: string | number; after: string | number; next: string; freed: string | number; when: string | number }
   'sessions.delete.button': undefined
+  'sessions.delete.detailCombwork': { cli: string | number }
   'sessions.delete.detailExternal': { cli: string | number }
-  'sessions.delete.detailHive': { cli: string | number }
   'sessions.delete.failed': { kind: string }
   'sessions.delete.message': { name: string | number }
   'sessions.delete.title': { kind: string }

@@ -13,7 +13,7 @@ const log = createLogger('codexLog')
  * Codex waiting to retry its model request (HI-1972). Codex 0.164.0 shows nothing of it (its screen says "Working", its
  * rollout and hooks are silent): its only record is a row in its log database, `logs_2.sqlite` in its CODEX_HOME,
  * `target` codex_core::responses_retry, `thread_id` the conversation, its message "stream disconnected - retrying
- * sampling request (1/5 in 399.9997619s)... last status: 429 Too Many Requests". Hive reads the newest such row of a
+ * sampling request (1/5 in 399.9997619s)... last status: 429 Too Many Requests". Combwork reads the newest such row of a
  * session's turn there, read-only, in a worker of its own (codexLogWorker.ts: main's thread never waits on that file);
  * the row's target and the message's pattern are Settings → Advanced's (codex.retry.*), so a Codex that words it
  * otherwise can be followed without a release.
@@ -199,7 +199,7 @@ export function parseRetry(row: LogRow, pattern: RegExp, sinceMs: number, now = 
   return { at: iso, since: iso, retryAt: seconds === null ? null : new Date(at + Math.round(seconds * 1000)).toISOString(), attempt, max, status }
 }
 
-/** Codex's newest wait to retry in conversation `sessionId` since `since` (ms), or null (none, or Hive can't tell). */
+/** Codex's newest wait to retry in conversation `sessionId` since `since` (ms), or null (none, or Combwork can't tell). */
 export async function codexRetryWait(q: { sessionId: string; env: NodeJS.ProcessEnv; since: number }): Promise<RetryWait | null> {
   const home = codexHomeOf(q.env)
   const got = await thread.ask({ file: join(home, 'logs_2.sqlite'), thread: q.sessionId, target: advanced.get<string>('codex.retry.logTarget'), sinceSec: Math.floor(q.since / 1000) })

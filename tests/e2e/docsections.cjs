@@ -1,8 +1,8 @@
-// Documents by section (#817), through the real Agent API and hive-mcp.js: a project agent outlines and reads its own
+// Documents by section (#817), through the real Agent API and cw-mcp.js: a project agent outlines and reads its own
 // project's Markdown in the folder it works in (its worktree's copy), not another project's (403, as its sessions);
 // the workspace token reads any project's (the project folder's copy) and shared notes (shared:<path>); a section by
 // slug or text comes with its subsections; a repeated heading is ambiguous (409, listing both slugs) and an unknown one
-// lists the closest (404); paths outside the project (.., a junction out of it), into .hive or .git, or not Markdown are
+// lists the closest (404); paths outside the project (.., a junction out of it), into .combwork or .git, or not Markdown are
 // refused before anything is read. The agent runs the fake Claude Code. Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR.
 // Dev build only (#1580): it starts this checkout's Electron itself, and Alfie is a 0.9 worktree agent
@@ -50,14 +50,14 @@ const PLAN = (copy) => `# Plan (${copy})\n\nIntro.\n\n## Core contracts\n\nThe c
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1300, height: 800 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
 
     // An agent in a worktree of alpha: its copy of the plan differs from the project folder's.
@@ -81,8 +81,8 @@ const PLAN = (copy) => `# Plan (${copy})\n\nIntro.\n\n## Core contracts\n\nThe c
     }
     const launch = await lib.until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
     if (!launch) throw new Error("the agent's launch wasn't recorded: the rest needs its token")
-    const mcpEnv = JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.hive.env
-    const agentToken = JSON.parse(fs.readFileSync(mcpEnv.HIVE_API_TOKEN_FILE, 'utf8')).token
+    const mcpEnv = JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork.env
+    const agentToken = JSON.parse(fs.readFileSync(mcpEnv.CW_API_TOKEN_FILE, 'utf8')).token
     const workspaceToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
     const call = async (token, p) => {
       const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { headers: { Authorization: `Bearer ${token}` } })
@@ -126,7 +126,7 @@ const PLAN = (copy) => `# Plan (${copy})\n\nIntro.\n\n## Core contracts\n\nThe c
     for (const [what, p, status] of [
       ['outside the project (..)', '../beta/docs/PLAN.md', 400],
       ['through a junction out of it', 'beta-link/docs/PLAN.md', 400],
-      ["in Hive's own folder", '.hive/project.json', 400],
+      ["in Combwork's own folder", '.combwork/project.json', 400],
       ["in git's", '.git/description.md', 400],
       ['not Markdown', 'notes.txt', 400],
       ['an absolute path', path.join(beta, 'docs', 'PLAN.md'), 400],
@@ -143,15 +143,15 @@ const PLAN = (copy) => `# Plan (${copy})\n\nIntro.\n\n## Core contracts\n\nThe c
     check("…and the project folder's copy (not a worktree's)", r.status === 200 && r.body.headings[0].text === 'Plan (alpha)', JSON.stringify(r.body).slice(0, 200))
     r = await outline(workspaceToken, { path: 'docs/PLAN.md' })
     check('a project file with no project and no agent: project is required', r.status === 400 && /project is required/.test(r.body.error), JSON.stringify(r))
-    // A junction inside the project into its .hive (#817 round 2): refused by where it leads, not only by its name.
-    fs.mkdirSync(path.join(alpha, '.hive', 'private'), { recursive: true })
-    fs.writeFileSync(path.join(alpha, '.hive', 'private', 'SECRET.md'), '# Private\n\nHIVE SECRET\n')
-    fs.symlinkSync(path.join(alpha, '.hive', 'private'), path.join(alpha, 'alias'), 'junction')
+    // A junction inside the project into its .combwork (#817 round 2): refused by where it leads, not only by its name.
+    fs.mkdirSync(path.join(alpha, '.combwork', 'private'), { recursive: true })
+    fs.writeFileSync(path.join(alpha, '.combwork', 'private', 'SECRET.md'), '# Private\n\nCW SECRET\n')
+    fs.symlinkSync(path.join(alpha, '.combwork', 'private'), path.join(alpha, 'alias'), 'junction')
     fs.symlinkSync(path.join(alpha, '.git'), path.join(alpha, 'git-alias'), 'junction')
     fs.writeFileSync(path.join(alpha, '.git', 'NOTE.md'), '# Git\n\nGIT SECRET\n')
-    for (const p of ['alias/SECRET.md', 'git-alias/NOTE.md', '.hive/private/SECRET.md']) {
+    for (const p of ['alias/SECRET.md', 'git-alias/NOTE.md', '.combwork/private/SECRET.md']) {
       r = await section(workspaceToken, { path: p, heading: '#private', project: 'alpha' })
-      check(`a path into .hive or .git by another name (${p}): refused, nothing read`, r.status === 400 && !/(HIVE|GIT) SECRET/.test(JSON.stringify(r.body)), JSON.stringify(r))
+      check(`a path into .combwork or .git by another name (${p}): refused, nothing read`, r.status === 400 && !/(CW|GIT) SECRET/.test(JSON.stringify(r.body)), JSON.stringify(r))
     }
     const note = '# Design\n\n## Extraction lanes\n\nLanes.\n\n## Review\n\nReview.\n'
     await fetch(`http://127.0.0.1:${PORT}/v1/shared/file?path=${encodeURIComponent('plans/design.md')}`, { method: 'PUT', headers: { Authorization: `Bearer ${workspaceToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ content: note }) })
@@ -160,29 +160,29 @@ const PLAN = (copy) => `# Plan (${copy})\n\nIntro.\n\n## Core contracts\n\nThe c
     r = await outline(agentToken, { path: 'shared:../outside.md' })
     check('a shared path outside the notes: refused', r.status === 400, JSON.stringify(r))
 
-    // --- Through hive-mcp.js, as the agent's tools: lean text.
+    // --- Through cw-mcp.js, as the agent's tools: lean text.
     const tool = (name, args) => {
-      const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], {
+      const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
         input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) + '\n',
-        env: lib.childEnv({ HIVE_API_URL: `http://127.0.0.1:${PORT}`, HIVE_WORKSPACE: ws, HIVE_API_TOKEN_FILE: lib.tokenFile(agentToken), HIVE_PROJECT: 'alpha', HIVE_AGENT_ID: agent.id }),
+        env: lib.childEnv({ CW_API_URL: `http://127.0.0.1:${PORT}`, CW_WORKSPACE: ws, CW_API_TOKEN_FILE: lib.tokenFile(agentToken), CW_PROJECT: 'alpha', CW_AGENT_ID: agent.id }),
         timeout: 60000
       }).toString()
       const res = JSON.parse(out.split('\n')[0]).result
       return { text: res.content[0].text, isError: !!res.isError }
     }
-    let t = tool('hive_doc_outline', { path: 'docs/PLAN.md' })
-    check('hive_doc_outline: a line per heading with its [slug] and size', !t.isError && t.text.startsWith('docs/PLAN.md: 5 headings, ') && t.text.includes('\n  ## Core contracts [core-contracts] ') && t.text.endsWith('hive_read_section reads one as #<slug>.'), t.text)
-    t = tool('hive_doc_outline', { path: 'docs/PLAN.md', depth: 1 })
+    let t = tool('cw_doc_outline', { path: 'docs/PLAN.md' })
+    check('cw_doc_outline: a line per heading with its [slug] and size', !t.isError && t.text.startsWith('docs/PLAN.md: 5 headings, ') && t.text.includes('\n  ## Core contracts [core-contracts] ') && t.text.endsWith('cw_read_section reads one as #<slug>.'), t.text)
+    t = tool('cw_doc_outline', { path: 'docs/PLAN.md', depth: 1 })
     check('…depth=1: the top level only', !t.isError && !t.text.includes('Core contracts') && t.text.includes('# Plan (worktree)'), t.text)
-    t = tool('hive_doc_outline', { path: 'docs/PLAN.md', from: 'project', depth: 1 })
+    t = tool('cw_doc_outline', { path: 'docs/PLAN.md', from: 'project', depth: 1 })
     check('…from: "project": the project folder’s copy, not its worktree’s (#818)', !t.isError && t.text.includes('# Plan (alpha)'), t.text)
-    t = tool('hive_read_section', { path: 'docs/PLAN.md' })
-    check('hive_read_section with no heading: the whole document', !t.isError && t.text.startsWith('docs/PLAN.md (') && t.text.includes('## Setup'), t.text.slice(0, 200))
-    t = tool('hive_read_section', { path: 'docs/PLAN.md', heading: 'errors' })
-    check('hive_read_section: where it is, then its text', !t.isError && t.text.startsWith('docs/PLAN.md#errors (') && t.text.endsWith('### Errors\n\nErrors.'), t.text)
-    t = tool('hive_read_section', { path: 'docs/IDS.md', heading: 'setup' })
-    check('hive_read_section: an id two headings carry is an error listing both, never the first', t.isError && t.text.includes('#setup (First, line 7)') && t.text.includes('#setup-1 (Second, line 11)') && !t.text.includes('One.'), t.text)
-    t = tool('hive_read_section', { path: 'shared:plans/design.md', heading: 'nothing like it' })
+    t = tool('cw_read_section', { path: 'docs/PLAN.md' })
+    check('cw_read_section with no heading: the whole document', !t.isError && t.text.startsWith('docs/PLAN.md (') && t.text.includes('## Setup'), t.text.slice(0, 200))
+    t = tool('cw_read_section', { path: 'docs/PLAN.md', heading: 'errors' })
+    check('cw_read_section: where it is, then its text', !t.isError && t.text.startsWith('docs/PLAN.md#errors (') && t.text.endsWith('### Errors\n\nErrors.'), t.text)
+    t = tool('cw_read_section', { path: 'docs/IDS.md', heading: 'setup' })
+    check('cw_read_section: an id two headings carry is an error listing both, never the first', t.isError && t.text.includes('#setup (First, line 7)') && t.text.includes('#setup-1 (Second, line 11)') && !t.text.includes('One.'), t.text)
+    t = tool('cw_read_section', { path: 'shared:plans/design.md', heading: 'nothing like it' })
     check('…an unknown heading is an error naming the closest', t.isError && /Closest: /.test(t.text), t.text)
 
     // --- Two workspaces open (#817 round 2): an agent's and the Assistant's shared notes and projects are their own
@@ -195,7 +195,7 @@ const PLAN = (copy) => `# Plan (${copy})\n\nIntro.\n\n## Core contracts\n\nThe c
     const page2 = await next
     await page2.waitForLoadState('domcontentloaded')
     await lib.appReady(page2)
-    await page2.evaluate((p) => window.hive.invoke('workspace:open', p), ws2)
+    await page2.evaluate((p) => window.combwork.invoke('workspace:open', p), ws2)
     const other = `${path.basename(ws2)}/gamma`
     const put = await fetch(`http://127.0.0.1:${PORT}/v1/shared/file?path=secret.md&workspace=${encodeURIComponent(path.basename(ws2))}`, { method: 'PUT', headers: { Authorization: `Bearer ${workspaceToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ content: '# Secret\n\n## Other workspace\n\nWS2 SECRET\n' }) })
     check('the second workspace has a note', put.status === 200, String(put.status))

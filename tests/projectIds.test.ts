@@ -12,29 +12,30 @@ import { tempDir } from './tempDir'
 import { readCardIn, writeCardOutside } from './boardDb'
 import { storeDocs } from './storeDocs'
 
-const base = tempDir('hive-projectids-')
+const base = tempDir('cw-projectids-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { configTestHooks, createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const tasks = await import('../src/main/tasks')
 const lanes = await import('../src/main/lanes')
 const { movePlan, repairMove } = await import('../src/main/workspaceMove')
+const { atomicTestHooks } = await import('../src/main/fsutil')
 
 vi.setConfig({ testTimeout: 30_000 })
-/** Bounds a wait for Hive's folder watcher: only a hung watcher takes this long. */
+/** Bounds a wait for Combwork's folder watcher: only a hung watcher takes this long. */
 const HUNG_MS = 15_000
 
 const user = { kind: 'user' } as const
 const readCard = (ws: string, n: number): Record<string, unknown> => readCardIn(ws, n)
-const projectJson = (p: string): Record<string, unknown> => JSON.parse(readFileSync(join(p, '.hive', 'project.json'), 'utf8'))
+const projectJson = (p: string): Record<string, unknown> => JSON.parse(readFileSync(join(p, '.combwork', 'project.json'), 'utf8'))
 /** The ids read again now (the workspace reuses what it read for a second), so a folder renamed just now is seen. */
 const reread = async (w: { projectIds: (o: { fresh: true }) => Promise<unknown> }): Promise<void> => void (await w.projectIds({ fresh: true }))
 
 function project(ws: string, name: string, extra: Record<string, unknown> = {}, sessions: { agentId: string }[] = []): string {
   const p = join(ws, name)
-  mkdirSync(join(p, '.hive'), { recursive: true })
-  writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [], ...extra }))
-  writeFileSync(join(p, '.hive', 'sessions.json'), JSON.stringify({ version: 1, sessions: sessions.map((s, i) => ({ id: `s${i}`, provider: 'claude-code', createdAt: '2026-10-01T00:00:00.000Z', ...s })) }))
+  mkdirSync(join(p, '.combwork'), { recursive: true })
+  writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [], ...extra }))
+  writeFileSync(join(p, '.combwork', 'sessions.json'), JSON.stringify({ version: 1, sessions: sessions.map((s, i) => ({ id: `s${i}`, provider: 'claude-code', createdAt: '2026-10-01T00:00:00.000Z', ...s })) }))
   return p
 }
 
@@ -63,25 +64,25 @@ describe('orphanNames', () => {
   const r = (name: string, ...agents: string[]) => ({ name, agents })
   const projects = [
     { name: 'website', agents: new Set(['a-claude', 'a-wb1']) },
-    { name: 'hive', agents: new Set(['a-hb1']) }
+    { name: 'acme', agents: new Set(['a-hb1']) }
   ]
 
   it("gives a name's records to the one project whose agents worked on them, the agentless ones too", () => {
-    expect(orphanNames([r('hive-website', 'a-claude'), r('hive-website'), r('hive', 'a-hb1'), r('')], ['website', 'hive'], projects)).toEqual([{ from: 'hive-website', to: 'website' }])
+    expect(orphanNames([r('acme-website', 'a-claude'), r('acme-website'), r('acme', 'a-hb1'), r('')], ['website', 'acme'], projects)).toEqual([{ from: 'acme-website', to: 'website' }])
   })
 
   it("leaves a name alone when its records' agents are no project's, or more than one's", () => {
-    expect(orphanNames([r('gone', 'a-nobody'), r('gone')], ['website', 'hive'], projects)).toEqual([])
-    expect(orphanNames([r('mixed', 'a-claude'), r('mixed', 'a-hb1')], ['website', 'hive'], projects)).toEqual([])
+    expect(orphanNames([r('gone', 'a-nobody'), r('gone')], ['website', 'acme'], projects)).toEqual([])
+    expect(orphanNames([r('mixed', 'a-claude'), r('mixed', 'a-hb1')], ['website', 'acme'], projects)).toEqual([])
   })
 
   it('a project Repair is moving from that name takes them, whatever their agents', () => {
-    expect(orphanNames([r('old', 'a-hb1')], ['website', 'hive'], projects, [{ from: 'OLD', to: 'website' }])).toEqual([{ from: 'old', to: 'website' }])
+    expect(orphanNames([r('old', 'a-hb1')], ['website', 'acme'], projects, [{ from: 'OLD', to: 'website' }])).toEqual([{ from: 'old', to: 'website' }])
   })
 
   it("never takes a name that is the workspace's (a hidden or removed project's), nor one shown as gone", () => {
-    expect(orphanNames([r('Parked', 'a-claude')], ['website', 'hive', 'parked'], projects)).toEqual([])
-    expect(orphanNames([r(goneProject('site'), 'a-claude')], ['website', 'hive'], projects)).toEqual([])
+    expect(orphanNames([r('Parked', 'a-claude')], ['website', 'acme', 'parked'], projects)).toEqual([])
+    expect(orphanNames([r(goneProject('site'), 'a-claude')], ['website', 'acme'], projects)).toEqual([])
   })
 })
 
@@ -121,18 +122,18 @@ describe('a workspace', () => {
   beforeAll(async () => {
     project(wsPath, 'alpha', { agents: [{ id: 'a1', name: 'A1', provider: 'claude-code' }, { id: 'r1', name: 'R1', provider: 'claude-code' }] })
     project(wsPath, 'beta')
-    // Renamed from old-site while Hive was closed, before projects had ids (as hive-website → website): its agent
+    // Renamed from old-site while Combwork was closed, before projects had ids (as acme-website → website): its agent
     // Claude was removed since, but its sessions are still the project's.
     project(wsPath, 'site', {}, [{ agentId: 'a-claude' }])
     // A card saved before ids, by a project of the workspace: it gets the id when the workspace opens.
-    mkdirSync(join(wsPath, '.hive', 'tasks'), { recursive: true })
+    mkdirSync(join(wsPath, '.combwork', 'tasks'), { recursive: true })
     const old = (n: number, name: string, agent: string | null, archived = false): void =>
-      writeFileSync(join(wsPath, '.hive', 'tasks', `${n}.json`), JSON.stringify({ number: n, title: `Old ${n}`, description: '', project: name, agent, ...(agent ? { agentName: 'Claude' } : {}), column: 'done', order: n, labels: [], blocked: null, blockedBy: [], links: [], comments: [], history: [], archived, createdAt: '2026-10-01T00:00:00.000Z', createdBy: 'You', updatedAt: '2026-10-01T00:00:00.000Z' }))
+      writeFileSync(join(wsPath, '.combwork', 'tasks', `${n}.json`), JSON.stringify({ number: n, title: `Old ${n}`, description: '', project: name, agent, ...(agent ? { agentName: 'Claude' } : {}), column: 'done', order: n, labels: [], blocked: null, blockedBy: [], links: [], comments: [], history: [], archived, createdAt: '2026-10-01T00:00:00.000Z', createdBy: 'You', updatedAt: '2026-10-01T00:00:00.000Z' }))
     old(1, 'beta', null)
     old(2, 'old-site', 'a-claude', true)
     old(3, 'old-site', null, true)
     old(4, 'old-site', 'a-claude')
-    writeFileSync(join(wsPath, '.hive', 'tasks', 'board.json'), JSON.stringify({ version: 1, next: 5 }))
+    writeFileSync(join(wsPath, '.combwork', 'tasks', 'board.json'), JSON.stringify({ version: 1, next: 5 }))
     w = createWorkspaceService()
     await w.open(wsPath)
   })
@@ -145,9 +146,9 @@ describe('a workspace', () => {
     expect(ids.byPath.get(join(wsPath, 'alpha').toLowerCase())).toBe(alpha)
     expect(new Set([...ids.byId.keys()]).size).toBe(3)
     // Read again: the same ids, nothing written.
-    const before = readFileSync(join(wsPath, 'alpha', '.hive', 'project.json'), 'utf8')
+    const before = readFileSync(join(wsPath, 'alpha', '.combwork', 'project.json'), 'utf8')
     expect((await w.projectIds({ fresh: true })).byId.get(alpha as string)).toBe(join(wsPath, 'alpha'))
-    expect(readFileSync(join(wsPath, 'alpha', '.hive', 'project.json'), 'utf8')).toBe(before)
+    expect(readFileSync(join(wsPath, 'alpha', '.combwork', 'project.json'), 'utf8')).toBe(before)
   })
 
   it("stamps the cards with their project's id once; one under a name no project has is left as it was", async () => {
@@ -161,7 +162,7 @@ describe('a workspace', () => {
     const file = readCard(wsPath, c.number)
     expect(Object.keys(file).slice(0, 5)).toEqual(['number', 'title', 'description', 'project', 'projectId'])
     expect(file.projectId).toBe(projectJson(join(wsPath, 'alpha')).id)
-    // Not part of the card as Hive shows it (the Agent API, the board).
+    // Not part of the card as Combwork shows it (the Agent API, the board).
     expect('projectId' in c).toBe(false)
     expect('projectId' in (await run(() => tasks.getTask(c.number)))).toBe(false)
   })
@@ -246,7 +247,7 @@ describe('a saved id decides; nothing is lost on the way (#508 round 2)', () => 
   const wsPath = join(base, 'ws2')
   let w: ReturnType<typeof createWorkspaceService>
   const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
-  const tasksDir = join(wsPath, '.hive', 'tasks')
+  const tasksDir = join(wsPath, '.combwork', 'tasks')
   const legacy = (n: number, name: string, extra: Record<string, unknown> = {}): void =>
     writeFileSync(join(tasksDir, `${n}.json`), JSON.stringify({ number: n, title: `Legacy ${n}`, description: '', project: name, agent: null, column: 'todo', order: n, labels: [], blocked: null, blockedBy: [], links: [], comments: [], history: [], archived: false, createdAt: '2026-10-01T00:00:00.000Z', createdBy: 'You', updatedAt: '2026-10-01T00:00:00.000Z', ...extra }))
   const alphaAgent = { kind: 'agent', name: 'X (alpha)', scope: 'alpha', self: { project: 'alpha', agentId: 'x1' } } as const
@@ -261,12 +262,12 @@ describe('a saved id decides; nothing is lost on the way (#508 round 2)', () => 
     mkdirSync(tasksDir, { recursive: true })
     legacy(1, 'alpha', { custom: { kept: true } })
     legacy(2, 'beta')
-    // Saved before ids under a project renamed since (site was old-site), with a field this Hive doesn't know.
+    // Saved before ids under a project renamed since (site was old-site), with a field this Combwork doesn't know.
     legacy(3, 'old-site', { agent: 'a-old', agentName: 'Old', custom: 'mine' })
     writeFileSync(join(tasksDir, 'board.json'), JSON.stringify({ version: 1, next: 4 }))
     // A lane saved before ids, and one under old-site.
     const lane = (id: string, name: string, builder: string) => ({ id, project: name, name: null, builder: { id: builder, name: builder }, reviewer: null, cards: [1], rounds: 5, waitMinutes: 120, state: 'active', startedBy: 'x', startedAt: '2026-10-09T10:00:00.000Z', updatedAt: '2026-10-09T10:00:00.000Z', endedAt: null, mergeCommit: null })
-    writeFileSync(join(wsPath, '.hive', 'lanes.json'), JSON.stringify({ version: 1, lanes: [lane('lane-a', 'alpha', 'a1'), lane('lane-o', 'old-site', 'a-old')] }))
+    writeFileSync(join(wsPath, '.combwork', 'lanes.json'), JSON.stringify({ version: 1, lanes: [lane('lane-a', 'alpha', 'a1'), lane('lane-o', 'old-site', 'a-old')] }))
     w = createWorkspaceService()
     await w.open(wsPath)
   })
@@ -275,8 +276,8 @@ describe('a saved id decides; nothing is lost on the way (#508 round 2)', () => 
   it('stamping gives each card its id once, every field kept; the files as they were are kept in the import backup (#1017)', async () => {
     expect(await tasks.stampCardProjects(w)).toBe(2)
     // The cards' files as they were before the move, kept as they were.
-    const kept = readdirSync(join(wsPath, '.hive')).find((f) => f.startsWith('tasks.imported-'))!
-    const before1 = JSON.parse(readFileSync(join(wsPath, '.hive', kept, '1.json'), 'utf8'))
+    const kept = readdirSync(join(wsPath, '.combwork')).find((f) => f.startsWith('tasks.imported-'))!
+    const before1 = JSON.parse(readFileSync(join(wsPath, '.combwork', kept, '1.json'), 'utf8'))
     expect(before1).toMatchObject({ project: 'alpha', custom: { kept: true } })
     expect(readCard(wsPath, 1)).toEqual({ ...before1, projectId: projectJson(join(wsPath, 'alpha')).id })
     expect(readCard(wsPath, 2).projectId).toBe(projectJson(join(wsPath, 'beta')).id)
@@ -287,14 +288,14 @@ describe('a saved id decides; nothing is lost on the way (#508 round 2)', () => 
   })
 
   it('lanes saved before ids get their project’s id when stamped, once; lanes.json kept as it was in the import backup (#1018)', async () => {
-    const before = readFileSync(join(wsPath, '.hive', 'lanes.json'), 'utf8')
+    const before = readFileSync(join(wsPath, '.combwork', 'lanes.json'), 'utf8')
     expect(await lanes.stampLaneProjects(w)).toBe(1)
     const saved = storeDocs<{ id: string; projectId?: string }>(wsPath, 'lanes')
     expect(saved.find((l) => l.id === 'lane-a')?.projectId).toBe(projectJson(join(wsPath, 'alpha')).id)
     expect(saved.find((l) => l.id === 'lane-o')?.projectId).toBeUndefined()
-    const backup = readdirSync(join(wsPath, '.hive')).find((f) => f.startsWith('lanes.json.imported-'))!
-    expect(readFileSync(join(wsPath, '.hive', backup), 'utf8')).toBe(before)
-    expect(existsSync(join(wsPath, '.hive', 'lanes.json'))).toBe(false)
+    const backup = readdirSync(join(wsPath, '.combwork')).find((f) => f.startsWith('lanes.json.imported-'))!
+    expect(readFileSync(join(wsPath, '.combwork', backup), 'utf8')).toBe(before)
+    expect(existsSync(join(wsPath, '.combwork', 'lanes.json'))).toBe(false)
     expect(await lanes.stampLaneProjects(w)).toBe(0)
   })
 
@@ -357,9 +358,9 @@ describe('a saved id decides; nothing is lost on the way (#508 round 2)', () => 
   })
 
   it('a project renamed while the window is open tells the board, so it reads its cards again', async () => {
-    const { onHiveEvent } = await import('../src/main/events')
+    const { onCombworkEvent } = await import('../src/main/events')
     const seen: string[] = []
-    const off = onHiveEvent((e) => {
+    const off = onCombworkEvent((e) => {
       if (e.type === 'tasks-changed') seen.push(e.workspacePath)
     })
     try {
@@ -380,9 +381,9 @@ describe('a project seen missing between reads, then at another folder, tells th
     project(wsPath, 'mu')
     const w = createWorkspaceService()
     await w.open(wsPath)
-    const { onHiveEvent } = await import('../src/main/events')
+    const { onCombworkEvent } = await import('../src/main/events')
     const seen: string[] = []
-    const off = onHiveEvent((e) => {
+    const off = onCombworkEvent((e) => {
       if (e.type === 'tasks-changed') seen.push(e.workspacePath)
     })
     try {
@@ -410,9 +411,9 @@ describe('what the workspace remembers of projects a read missed is bounded (#55
     WorkspaceService.absentIdsKept = 2
     const w = createWorkspaceService()
     await w.open(wsPath)
-    const { onHiveEvent } = await import('../src/main/events')
+    const { onCombworkEvent } = await import('../src/main/events')
     const seen: string[] = []
-    const off = onHiveEvent((e) => {
+    const off = onCombworkEvent((e) => {
       if (e.type === 'tasks-changed') seen.push(e.workspacePath)
     })
     try {
@@ -424,7 +425,7 @@ describe('what the workspace remembers of projects a read missed is bounded (#55
         await w.projectIds({ fresh: true })
       }
       expect(w.lastSeenCount()).toBe(1 + 2)
-      // p1, missed longest ago, is forgotten: back under another name it is a project Hive hasn't seen.
+      // p1, missed longest ago, is forgotten: back under another name it is a project Combwork hasn't seen.
       seen.length = 0
       await moveFolder(join(base, 'ws-bound-out1'), join(wsPath, 'p1-back'))
       await w.projectIds({ fresh: true })
@@ -529,7 +530,7 @@ describe('what the workspace remembers of projects a read missed is bounded (#55
   }
 
   // HI-2045: a refresh that listed a project before it was deleted (the root watcher's, 250 ms after its folder appeared)
-  // found no project.json when it read it, and made the project again (`.hive` with its sessions and archive folders).
+  // found no project.json when it read it, and made the project again (`.combwork` with its sessions and archive folders).
   it("a refresh that listed a project before it was deleted doesn't make its folder again", async () => {
     const wsPath = join(base, 'ws-deleted-in-refresh')
     project(wsPath, 'keep')
@@ -562,7 +563,7 @@ describe('what the workspace remembers of projects a read missed is bounded (#55
     }
   })
 
-  // HI-2045 (HR2's round 1): deleted later, once `.hive` is there and before its folders and project.json are made, the
+  // HI-2045 (HR2's round 1): deleted later, once `.combwork` is there and before its folders and project.json are made, the
   // project isn't made again either: each is made only inside a folder that is there.
   it("a project deleted while it is being set up isn't made again by its folders or its project.json", async () => {
     const wsPath = join(base, 'ws-deleted-in-setup')
@@ -573,7 +574,7 @@ describe('what the workspace remembers of projects a read missed is bounded (#55
       await w.refreshesSettled()
       const gone = join(wsPath, 'gone')
       mkdirSync(gone)
-      // Its exclusion from git starts beside the folders: the project goes then, after `.hive` was made.
+      // Its exclusion from git starts beside the folders: the project goes then, after `.combwork` was made.
       const exclude = w.ensureGitExclude.bind(w)
       w.ensureGitExclude = async (p: string) => {
         if (p.toLowerCase() === gone.toLowerCase()) rmSync(gone, { recursive: true, force: true })
@@ -582,6 +583,108 @@ describe('what the workspace remembers of projects a read missed is bounded (#55
       await expect(w.ensureProject(gone)).rejects.toMatchObject({ code: 'ENOENT' })
       expect(existsSync(gone)).toBe(false)
     } finally {
+      await disposeWorkspaceService(w)
+    }
+  })
+
+  // HI-2542: a project.json written after set up found none (a project copied in, its folder seen first; the accounts
+  // suite's epsilon) is kept with its agents, never replaced by the default.
+  it("a project.json written while a project is set up isn't replaced by the default", async () => {
+    const wsPath = join(base, 'ws-config-in-setup')
+    project(wsPath, 'keep')
+    const w = createWorkspaceService()
+    await w.open(wsPath)
+    try {
+      await w.refreshesSettled()
+      const copied = join(wsPath, 'copied')
+      mkdirSync(copied)
+      const theirs = JSON.stringify({ version: 2, agents: [{ id: 'a-one', name: 'One', provider: 'claude-code' }] })
+      // After set up found no project.json, before it writes the default: the project's own arrives then.
+      let held = 0
+      configTestHooks.beforeDefaultConfig = async (p) => {
+        if (p.toLowerCase() !== copied.toLowerCase()) return
+        held++
+        writeFileSync(join(copied, '.combwork', 'project.json'), theirs)
+        writeFileSync(join(copied, '.combwork', 'project.json.bak'), theirs)
+      }
+      await w.ensureProject(copied)
+      expect(held).toBe(1)
+      expect(projectJson(copied)).toEqual(JSON.parse(theirs))
+      expect(JSON.parse(readFileSync(join(copied, '.combwork', 'project.json.bak'), 'utf8'))).toEqual(JSON.parse(theirs))
+      expect(readdirSync(join(copied, '.combwork')).filter((n) => n.endsWith('.tmp'))).toEqual([])
+      // Its agent is there to change, as agents:update found it gone before.
+      expect((await w.updateAgent(copied, 'a-one', { name: 'Uno' })).name).toBe('Uno')
+    } finally {
+      delete configTestHooks.beforeDefaultConfig
+      await disposeWorkspaceService(w)
+    }
+  })
+
+  // HI-2563: a project.json written from outside while one of Combwork's own changes to it runs (a new project's id, its
+  // connections' migration: each read under the lock, then written) is read again, never written over with the value
+  // read before it (the accounts suite's epsilon on RC3: its default, an id and the migration's stamp, its agent gone).
+  it("a project.json written while a change to it runs isn't written over", async () => {
+    const wsPath = join(base, 'ws-config-in-change')
+    project(wsPath, 'keep')
+    const w = createWorkspaceService()
+    await w.open(wsPath)
+    try {
+      await w.refreshesSettled()
+      const taken = join(wsPath, 'taken')
+      mkdirSync(taken)
+      await w.ensureProject(taken)
+      const theirs = { version: 2, agents: [{ id: 'a-one', name: 'One', provider: 'claude-code' }] }
+      // After the change read the default, before it writes: the project's own arrives then, written in place.
+      let held = 0
+      configTestHooks.beforeConfigWrite = async (p) => {
+        if (p.toLowerCase() !== taken.toLowerCase() || held++) return
+        writeFileSync(join(taken, '.combwork', 'project.json'), JSON.stringify(theirs))
+      }
+      const seen: unknown[][] = []
+      await w.mutateProjectConfig(taken, (cfg) => (seen.push(cfg.agents ?? []), { id: 'p-0123456789ab' }), { existing: true })
+      // Run again on the file as written then: both the change and the project's own agent are kept.
+      expect(held).toBe(2)
+      expect(seen.map((a) => a.length)).toEqual([0, 1])
+      expect(projectJson(taken)).toMatchObject({ id: 'p-0123456789ab', agents: theirs.agents })
+      expect((await w.updateAgent(taken, 'a-one', { name: 'Uno' })).name).toBe('Uno')
+    } finally {
+      configTestHooks.beforeConfigWrite = undefined
+      await disposeWorkspaceService(w)
+    }
+  })
+
+  // HI-2563, as on RC3: the change's rename refused (EPERM) while the project's own project.json is written over the file,
+  // then tried again. It is read again rather than landing on what was written.
+  it("a project.json written while a change's rename is refused isn't written over", async () => {
+    const wsPath = join(base, 'ws-config-in-rename')
+    project(wsPath, 'keep')
+    const w = createWorkspaceService()
+    await w.open(wsPath)
+    try {
+      await w.refreshesSettled()
+      const taken = join(wsPath, 'taken')
+      mkdirSync(taken)
+      await w.ensureProject(taken)
+      const file = join(taken, '.combwork', 'project.json')
+      const theirs = { version: 2, agents: [{ id: 'a-one', name: 'One', provider: 'claude-code' }] }
+      let refused = 0
+      const { rename } = await import('original-fs/promises')
+      atomicTestHooks.renameOnce = async (from, to) => {
+        if (to.toLowerCase() === file.toLowerCase() && !refused) {
+          refused++
+          writeFileSync(file, JSON.stringify(theirs))
+          throw Object.assign(new Error('EPERM: operation not permitted, rename'), { code: 'EPERM' })
+        }
+        await rename(from, to)
+      }
+      const seen: number[] = []
+      await w.mutateProjectConfig(taken, (cfg) => (seen.push((cfg.agents ?? []).length), { id: 'p-0123456789ab' }), { existing: true })
+      expect(refused).toBe(1)
+      expect(seen).toEqual([0, 1])
+      expect(projectJson(taken)).toMatchObject({ id: 'p-0123456789ab', agents: theirs.agents })
+      expect(readdirSync(join(taken, '.combwork')).filter((n) => n.endsWith('.tmp'))).toEqual([])
+    } finally {
+      delete atomicTestHooks.renameOnce
       await disposeWorkspaceService(w)
     }
   })
@@ -657,12 +760,12 @@ describe('what the workspace remembers of projects a read missed is bounded (#55
   })
 })
 
-describe('merge holds Hive closed under are told in their project now (#508 round 3)', () => {
+describe('merge holds Combwork closed under are told in their project now (#508 round 3)', () => {
   const holdsFile = async (ws: string): Promise<string> => {
     const { hashText } = await import('../src/main/fsutil')
     return join(base, 'profile', 'merge-slots', `${hashText(ws.toLowerCase())}.json`)
   }
-  const hold = (projectPath: string, extra: Record<string, unknown> = {}) => ({ projectPath, branch: 'hive/a1', agentId: 'a1', agentName: 'Builder', runId: 'old-run', cards: [1], since: 1, until: 2, ...extra })
+  const hold = (projectPath: string, extra: Record<string, unknown> = {}) => ({ projectPath, branch: 'cw/a1', agentId: 'a1', agentName: 'Builder', runId: 'old-run', cards: [1], since: 1, until: 2, ...extra })
   const writeHolds = async (ws: string, holds: object[]): Promise<string> => {
     const file = await holdsFile(ws)
     mkdirSync(join(base, 'profile', 'merge-slots'), { recursive: true })
@@ -672,9 +775,9 @@ describe('merge holds Hive closed under are told in their project now (#508 roun
   /** What recovery told: each warning's place and text. */
   const recover = async (ws: string): Promise<{ source?: string; message?: string }[]> => {
     const { recoverMergeSlots } = await import('../src/main/mergeSlotHost')
-    const { onHiveEvent } = await import('../src/main/events')
+    const { onCombworkEvent } = await import('../src/main/events')
     const seen: { source?: string; message?: string }[] = []
-    const off = onHiveEvent((e) => {
+    const off = onCombworkEvent((e) => {
       if (e.type === 'toast') seen.push({ source: e.toast.source, message: e.toast.message })
     })
     try {
@@ -731,7 +834,7 @@ describe('merge holds Hive closed under are told in their project now (#508 roun
     await checkMoved(w)
     const id = (await w.projectIds()).byPath.get(alpha.toLowerCase())
     await disposeWorkspaceService(w)
-    const file = await writeHolds(from, [hold(alpha, { projectId: id }), hold(alpha, { runId: 'legacy-run', branch: 'hive/old' })])
+    const file = await writeHolds(from, [hold(alpha, { projectId: id }), hold(alpha, { runId: 'legacy-run', branch: 'cw/old' })])
     const before = readFileSync(file, 'utf8')
     const to = `${from}-moved`
     await moveFolder(from, to)
@@ -752,7 +855,7 @@ describe('a workspace moved with a project renamed (#1305): Working on by the na
   it('the plan names the project as it is called now, and Repair marks it so, never its old name', async () => {
     const before = join(base, 'Scratch')
     const wsPath = join(base, 'Tools')
-    // juniper, now dialect: moved with its workspace (Scratch → Tools) and renamed while Hive was closed.
+    // juniper, now dialect: moved with its workspace (Scratch → Tools) and renamed while Combwork was closed.
     project(wsPath, 'dialect', { lastPath: join(before, 'juniper') })
     const w = createWorkspaceService()
     await w.open(wsPath)

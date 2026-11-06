@@ -1,4 +1,4 @@
-// Writes THIRD_PARTY_NOTICES.md (made by thirdPartyNotices.mjs): the licence of every package that ships inside Hive.
+// Writes THIRD_PARTY_NOTICES.md (made by thirdPartyNotices.mjs): the licence of every package that ships inside Combwork.
 // Run by `npm run build`; commit the result. Written only when its content changed (line endings aside), with the endings
 // the file on disk already has, so a build leaves an unchanged notice alone (licenseText.mjs, #148).
 // `--check` writes nothing and exits 1 when the committed file is out of date (#386; tests/licenses.test.ts checks the same

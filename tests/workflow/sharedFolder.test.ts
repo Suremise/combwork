@@ -64,8 +64,89 @@ describe('workflow scenarios, several agents in one folder', () => {
     moved(await e.wf.start(c.key, B3))
     commit(e.project, { 'b3.txt': 'no trailer\n' }, 'b3')
     const r = refusedBy(await e.wf.submit(b.key, B2, { summary: 'B' }), 'submit.trailer')
-    expect(r.next).toContain(`git commit --amend --no-edit --trailer "Hive-Card: ${b.key}"`)
+    expect(r.next).toContain(`git commit --amend --no-edit --trailer "Combwork-Card: ${b.key}"`)
     expect(e.store.folderCommits(e.project).at(-1)).toMatchObject({ card: null, how: 'unattributed' })
+  })
+
+  it("HI-2562: a card whose only commit names no card, another card's agent in the folder → submit.trailer with that commit, not submit.empty; amended, it submits", async () => {
+    const e = (env = setup({ ...preset('git', 'pair'), finish: 'committed', folder: 'project', slotsUpToDate: false, preChecks: [], mergeChecks: [], target: '' }))
+    const [old, a, b] = ['Old', 'A', 'B'].map((t) => e.wf.createCard({ title: t }))
+    // A commit naming no card from before B started isn't B's to amend.
+    moved(await e.wf.start(old.key, B3))
+    moved(await e.wf.start(a.key, B1))
+    commit(e.project, { 'old.txt': 'o\n' }, 'old')
+    await attributeFolder(e.wf)
+    moved(await e.wf.start(b.key, B2))
+    // B's work, its key in the subject as Codex wrote it, but no trailer.
+    const b1 = commit(e.project, { 'README.md': 'usage\n' }, `docs: add usage (${b.key})`)
+    const r = refusedBy(await e.wf.submit(b.key, B2, { summary: 'B' }), 'submit.trailer')
+    expect(r.values).toMatchObject({ card: b.key, commit: b1.slice(0, 7), at: 'head' })
+    expect(r.next).toContain(`git commit --amend --no-edit --trailer "Combwork-Card: ${b.key}"`)
+    sh(e.project, 'commit', '-q', '--amend', '--no-edit', '--trailer', `Combwork-Card: ${b.key}`)
+    const amended = sh(e.project, 'rev-parse', 'HEAD')
+    moved(await e.wf.submit(b.key, B2, { summary: 'B' }))
+    expect(e.wf.state(b).latest).toMatchObject({ revision: amended, commits: [amended] })
+  })
+
+  it("HI-2562: every rule off (no submit.trailer), two cards in the folder, the card's commit names none → submit.trailer, not submit.empty; amended, it submits", async () => {
+    const e = (env = setup({ platform: 'git' }))
+    const [a, b] = ['A', 'B'].map((t) => e.wf.createCard({ title: t }))
+    moved(await e.wf.start(a.key, B1))
+    moved(await e.wf.start(b.key, B2))
+    expect(e.wf.rulesetOf(b, e.wf.state(b)).guards.submit).not.toContain('submit.trailer')
+    const b1 = commit(e.project, { 'README.md': 'usage\n' }, 'docs: add usage')
+    expect(refusedBy(await e.wf.submit(b.key, B2, { summary: 'B' }), 'submit.trailer').values).toMatchObject({ card: b.key, commit: b1.slice(0, 7), at: 'head' })
+    sh(e.project, 'commit', '-q', '--amend', '--no-edit', '--trailer', `Combwork-Card: ${b.key}`)
+    moved(await e.wf.submit(b.key, B2, { summary: 'B' }))
+  })
+
+  // old-name: begin old-trailer
+  it('HI-2588: a commit with only the Hive-Card trailer from before 1.1 names no card (two cards in the folder); Combwork-Card names it', async () => {
+    const e = (env = setup({ platform: 'git' }))
+    const [a, b] = ['A', 'B'].map((t) => e.wf.createCard({ title: t }))
+    moved(await e.wf.start(a.key, B1))
+    moved(await e.wf.start(b.key, B2))
+    // Historical data on purpose: the trailer Hive wrote before 1.1, which Combwork no longer reads.
+    const old = commit(e.project, { 'old.txt': 'o\n' }, `from before 1.1\n\nHive-Card: ${b.key}\n`)
+  // old-name: end old-trailer
+    await attributeFolder(e.wf)
+    expect(e.store.folderCommits(e.project).find((x) => x.sha === old)).toMatchObject({ card: null, how: 'unattributed' })
+    expect(refusedBy(await e.wf.submit(b.key, B2, { summary: 'B' }), 'submit.trailer').next).toContain(`--trailer "Combwork-Card: ${b.key}"`)
+    sh(e.project, 'commit', '-q', '--amend', '--no-edit', '--trailer', `Combwork-Card: ${b.key}`)
+    const amended = sh(e.project, 'rev-parse', 'HEAD')
+    moved(await e.wf.submit(b.key, B2, { summary: 'B' }))
+    expect(e.wf.state(b).latest).toMatchObject({ revision: amended, commits: [amended] })
+    expect(e.wf.state(a).latest ?? null).toBeNull()
+  })
+
+  const RULES: [string, Parameters<typeof setup>[0]][] = [
+    ['Pair', { ...preset('git', 'pair'), finish: 'committed', folder: 'project', slotsUpToDate: false, preChecks: [], mergeChecks: [], target: '' }],
+    ['every rule off', { platform: 'git' }]
+  ]
+  for (const [name, opts] of RULES) {
+    it(`HI-2562 (HR1's round 1), ${name}: the card's untrailered commit with another card's commit after it → submit.trailer saying not to amend or rebase, and HEAD is left as it is`, async () => {
+      const e = (env = setup(opts))
+      const [a, b] = ['A', 'B'].map((t) => e.wf.createCard({ title: t }))
+      moved(await e.wf.start(a.key, B1))
+      moved(await e.wf.start(b.key, B2))
+      const b1 = commit(e.project, { 'README.md': 'usage\n' }, 'docs: add usage')
+      const a1 = commit(e.project, { 'a.txt': 'a\n' }, 'a', { trailer: a.key })
+      const r = refusedBy(await e.wf.submit(b.key, B2, { summary: 'B' }), 'submit.trailer')
+      expect(r.values).toMatchObject({ card: b.key, commit: b1.slice(0, 7), at: 'older' })
+      expect(r.next).not.toContain('--amend')
+      expect(r.next).toContain('cw_cannot_within_rules')
+      expect(sh(e.project, 'rev-parse', 'HEAD')).toBe(a1)
+    })
+  }
+
+  it("HI-2562: nothing committed since it started, only an older commit naming no card → still submit.empty", async () => {
+    const e = (env = setup({ ...preset('git', 'pair'), finish: 'committed', folder: 'project', slotsUpToDate: false, preChecks: [], mergeChecks: [], target: '' }))
+    const [a, b] = ['A', 'B'].map((t) => e.wf.createCard({ title: t }))
+    moved(await e.wf.start(a.key, B1))
+    commit(e.project, { 'a.txt': 'a\n' }, 'a')
+    moved(await e.wf.start(b.key, B2))
+    await attributeFolder(e.wf)
+    refusedBy(await e.wf.submit(b.key, B2, { summary: 'B' }), 'submit.empty')
   })
 
   it("HI-2287: a card started in the folder while a submit's attribution reads → it reads again, and the card's own commit is submitted", async () => {
@@ -112,7 +193,7 @@ describe('workflow scenarios, several agents in one folder', () => {
     sh(e.project, 'checkout', '-q', '-b', 'side2')
     const y1 = commit(e.project, { 'y1.txt': 'y\n' }, 'y1')
     sh(e.project, 'checkout', '-q', 'main')
-    sh(e.project, 'merge', '-q', '--no-ff', '-m', 'merge side2', '-m', `Hive-Card: ${b.key}`, 'side2')
+    sh(e.project, 'merge', '-q', '--no-ff', '-m', 'merge side2', '-m', `Combwork-Card: ${b.key}`, 'side2')
     const merge2 = sh(e.project, 'rev-parse', 'HEAD')
     await attributeFolder(e.wf)
     expect(rows().slice(2)).toEqual([{ sha: merge2, card: b.id, how: 'trailer' }])

@@ -35,13 +35,13 @@ const check = (name, ok, extra = '') => {
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47865), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47865), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const home = (await inv('workspace:refresh')).assistant.path
   const until = async (fn, ms = 10000) => {
@@ -51,7 +51,7 @@ const check = (name, ok, extra = '') => {
     return v
   }
   const live = async (proj, id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === proj.toLowerCase() && s.agentId === id)
-  const textAt = (key, text) => page.evaluate(([k, t]) => window.__hiveTerminalTextAt(k, t), [key, text])
+  const textAt = (key, text) => page.evaluate(([k, t]) => window.__cwTerminalTextAt(k, t), [key, text])
   const hostTitle = () => page.evaluate(() => [...document.querySelectorAll('.terminal-host[title]')].map((h) => h.getAttribute('title')).join('|'))
   const dialog = page.locator('.dialog[role="dialog"]').first()
   const dialogTitle = () => dialog.locator('.task-title-input').inputValue().catch(() => '')
@@ -74,7 +74,7 @@ const check = (name, ok, extra = '') => {
     await until(async () => String(await inv('pty:buffer', key)).includes(`Done: ${prompt}`), HUNG_MS)
   }
   /** A terminal's cell width in pixels. */
-  const cellWidth = (key) => page.evaluate((k) => window.__hiveTerminalState(k).cols && document.querySelector(`.terminal-host[data-pty="${CSS.escape(k)}"] .xterm-screen`).getBoundingClientRect().width / window.__hiveTerminalState(k).cols, key)
+  const cellWidth = (key) => page.evaluate((k) => window.__cwTerminalState(k).cols && document.querySelector(`.terminal-host[data-pty="${CSS.escape(k)}"] .xterm-screen`).getBoundingClientRect().width / window.__cwTerminalState(k).cols, key)
   /** Hovers `text` in a terminal (`skip` characters into it); the terminal's title once a link answers (empty if none). */
   const hover = async (key, text, skip = 0) => {
     const found = await textAt(key, text)

@@ -48,13 +48,13 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   cfg.settings.notifications = { ...cfg.settings.notifications, desktopNotifications: false, chimeEnabled: false }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('alpha', { exact: true }).first().click()
   await lib.waitForProvider(inv)
@@ -148,7 +148,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
     if (r.status !== 200) check(`lane of ${builder} starts`, false, JSON.stringify(r))
     return r.body?.lane?.id
   }
-  // B1 quiet first (idle, nothing of Hive's being typed into it or waiting to be): the board set-up above sends it card
+  // B1 quiet first (idle, nothing of Combwork's being typed into it or waiting to be): the board set-up above sends it card
   // events, and taking them as its lane starts would make its new conversation owed (or leave it as it is, mid-turn).
   check('B1 is quiet before its lane starts', !!(await until(async () => lib.agentQuiet(PORT, 'alpha', await live(b1.id), tr), 45000)), JSON.stringify(await live(b1.id)))
   const l1 = await startLane('B1', 'R1', 'lanes and loops', lane1)
@@ -263,7 +263,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
     const done = await until(async () => (await kept()) === rows && (await edgeSays()).now === String(rows), HUNG_MS)
     check(`the drag ${what} is kept and drawn (${rows} shown)`, !!done, JSON.stringify({ was, dy, kept: await kept(), says: await edgeSays(), box: b, now: await edge.boundingBox() }))
   }
-  const kept = () => page.evaluate((w) => window.hive.invoke('ui:get').then((ui) => ui.panes?.[`progress-lanes-rows:${w.toLowerCase()}`] ?? null), ws)
+  const kept = () => page.evaluate((w) => window.combwork.invoke('ui:get').then((ui) => ui.panes?.[`progress-lanes-rows:${w.toLowerCase()}`] ?? null), ws)
   // Its floor (HI-1673, Darren): with more lanes than six, a drag never shows fewer than six.
   check('the splitter ranges from six (the floor) to the lanes there are', (await edgeMin()) === 6 && (await edgeSays()).max === '7', JSON.stringify({ min: await edgeMin(), says: await edgeSays() }))
   // Dragged up by just under one: seven, kept.
@@ -551,7 +551,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   check("without that record, the merged lane says its cards weren't recorded, not where the board has them now", !!(await until(async () => /\bunrecorded\b/.test(await seg4()) && /\breview\b/.test(await seg1()), HUNG_MS)) && !/\breview\b/.test(await seg4()), JSON.stringify([await seg4(), await seg1()]))
   check('…its count unknown, and no current card', /–\/2/.test(await row4.locator('.progress-lane-top').innerText()) && (await row4.locator('.progress-lane-current').count()) === 0, await row4.locator('.progress-lane-top').innerText())
   await row4.locator(`.lane-seg[data-card="${n2}"]`).hover()
-  check('…and its hover says so', !!(await until(async () => /not recorded: the lane ended before Hive kept where its cards were/.test((await page.locator('.tip').allInnerTexts()).join(' ')), HUNG_MS)))
+  check('…and its hover says so', !!(await until(async () => /not recorded: the lane ended before Combwork kept where its cards were/.test((await page.locator('.tip').allInnerTexts()).join(' ')), HUNG_MS)))
   await page.mouse.move(5, 5)
   await until(async () => (await page.locator('.tip').count()) === 0, HUNG_MS)
   await list.evaluate((el) => (el.scrollTop = el.scrollHeight))
@@ -559,7 +559,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
 
   // --- The user's order (#568). Running: l7, l6, l3, l2, l1 (five show); then l4 and l5, finished.
   const rowOf = (id) => section.locator(`.progress-lane[data-lane="${id}"]`)
-  const savedOrder = () => page.evaluate((w) => window.hive.invoke('ui:get').then((ui) => ui.laneOrder?.[w.toLowerCase()] ?? null), ws)
+  const savedOrder = () => page.evaluate((w) => window.combwork.invoke('ui:get').then((ui) => ui.laneOrder?.[w.toLowerCase()] ?? null), ws)
   const said = () => section.locator('.progress-lanes-said').innerText()
   const ordered = async (ids) => !!(await until(async () => (await order()).join() === ids.join(), HUNG_MS))
   const scrollTop = () => list.evaluate((el) => el.scrollTop)
@@ -703,9 +703,9 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   await page.mouse.move(5, 5)
   await shoot('lanes-reordered')
 
-  // --- Hive restarted: the workspace's lanes chosen (five) are kept (#569).
+  // --- Combwork restarted: the workspace's lanes chosen (five) are kept (#569).
   await app.close().catch(() => undefined)
-  // The lanes' agents were in running lanes: Hive offers to resume them (its restart record), in a notice that can cover
+  // The lanes' agents were in running lanes: Combwork offers to resume them (its restart record), in a notice that can cover
   // the lane menu (HI-1809: Usual Order's click timed out under it). Answered Don't Resume, below, until the record is
   // gone (nothing left to offer) and no offer shows.
   const restartRecord = path.join(userData, 'restart.json')
@@ -716,7 +716,7 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   page2.on('pageerror', (e) => check('no page errors after the restart', false, e.message))
   await lib.fitWindow(app2, page2, { width: 1400, height: 850 })
   await lib.appReady(page2)
-  const inv2 = (ch, ...a) => page2.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv2 = (ch, ...a) => page2.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   if (!(await page2.evaluate((n) => document.title.includes(n), path.basename(ws)))) await lib.openWorkspace(inv2, page2, ws)
   if (offered) {
     const dontResume = page2.locator('.toast').getByRole('button', { name: "Don't Resume", exact: true })
@@ -747,11 +747,11 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   await page2.locator(`.progress-lane[data-lane="${l3}"] .progress-lane-top`).click({ button: 'right' })
   await page2.locator('.menu[role="menu"] .menu-item', { hasText: 'Usual Order' }).click()
   const usualOrder = [l8, l7, l3, l2, l1, l4, l5, l6]
-  const saved2 = () => page2.evaluate((w) => window.hive.invoke('ui:get').then((ui) => ui.laneOrder?.[w.toLowerCase()] ?? null), ws)
+  const saved2 = () => page2.evaluate((w) => window.combwork.invoke('ui:get').then((ui) => ui.laneOrder?.[w.toLowerCase()] ?? null), ws)
   check('Usual Order puts the lanes back, and keeps no order', !!(await until(async () => (await order2()).join() === usualOrder.join() && (await saved2()) === null, HUNG_MS)), JSON.stringify({ order: await order2(), saved: await saved2() }))
 
   // --- A lane's queued list change in the Lanes tab (HI-2151): B10's lane, its first card in flight, changed to add a
-  // card and reorder the rest, so Hive queues it behind that card. The tab says what it will do under the lane's bar;
+  // card and reorder the rest, so Combwork queues it behind that card. The tab says what it will do under the lane's bar;
   // once that card is Done the change applies and the line goes.
   const panel2 = page2.locator('.progress-panel')
   const b10 = await lib.addAgent(inv2, alpha, { name: 'B10' })

@@ -1,0 +1,619 @@
+{
+  "lane.args.cardsMax": {
+    "placeholders": {
+      "max": "plain"
+    }
+  },
+  "lane.args.cardsNone": {
+    "placeholders": {}
+  },
+  "lane.args.cardsNumbers": {
+    "placeholders": {}
+  },
+  "lane.args.cardsRepeat": {
+    "placeholders": {}
+  },
+  "lane.args.numberRange": {
+    "placeholders": {
+      "what": "plain",
+      "max": "plain"
+    }
+  },
+  "lane.card.blocked": {
+    "placeholders": {}
+  },
+  "lane.card.round": {
+    "placeholders": {
+      "round": "plain"
+    }
+  },
+  "lane.change.earlierAbandoned": {
+    "placeholders": {
+      "id": "plain"
+    }
+  },
+  "lane.change.earlierEnded": {
+    "placeholders": {
+      "id": "plain"
+    }
+  },
+  "lane.change.joined": {
+    "placeholders": {
+      "line": "plain"
+    }
+  },
+  "lane.change.started": {
+    "placeholders": {
+      "line": "plain"
+    }
+  },
+  "lane.change.updated": {
+    "placeholders": {
+      "line": "plain"
+    }
+  },
+  "lane.column.doing": {
+    "placeholders": {}
+  },
+  "lane.column.done": {
+    "placeholders": {}
+  },
+  "lane.column.gone": {
+    "placeholders": {}
+  },
+  "lane.column.hold": {
+    "placeholders": {}
+  },
+  "lane.column.passed": {
+    "placeholders": {}
+  },
+  "lane.column.review": {
+    "placeholders": {}
+  },
+  "lane.column.todo": {
+    "placeholders": {}
+  },
+  "lane.column.unrecorded": {
+    "placeholders": {}
+  },
+  "lane.end.abandoned": {
+    "placeholders": {
+      "line": "plain"
+    }
+  },
+  "lane.end.ended": {
+    "placeholders": {
+      "line": "plain"
+    }
+  },
+  "lane.join.first": {
+    "placeholders": {
+      "builder": "plain"
+    }
+  },
+  "lane.journal.fact": {
+    "placeholders": {
+      "named": "select",
+      "name": "plain",
+      "state": "select",
+      "commit": "plain",
+      "who": "plain",
+      "cards": "plain"
+    }
+  },
+  "lane.line.named": {
+    "placeholders": {
+      "pair": "plain",
+      "name": "plain",
+      "state": "plain",
+      "cards": "plain",
+      "rounds": "plain",
+      "wait": "plain",
+      "id": "plain"
+    }
+  },
+  "lane.line.noReviewer": {
+    "placeholders": {}
+  },
+  "lane.line.pair": {
+    "placeholders": {
+      "builder": "plain",
+      "reviewer": "plain",
+      "project": "plain"
+    }
+  },
+  "lane.line.pairInSlot": {
+    "placeholders": {
+      "builder": "plain",
+      "reviewer": "plain",
+      "project": "plain",
+      "slot": "plain"
+    }
+  },
+  "lane.line.pool": {
+    "placeholders": {}
+  },
+  "lane.line.text": {
+    "placeholders": {
+      "pair": "plain",
+      "state": "plain",
+      "cards": "plain",
+      "rounds": "plain",
+      "wait": "plain",
+      "id": "plain"
+    }
+  },
+  "lane.list.none": {
+    "placeholders": {}
+  },
+  "lane.list.noneListed": {
+    "placeholders": {}
+  },
+  "lane.next.afterQueue": {
+    "placeholders": {
+      "card": "plain",
+      "n": "plural"
+    }
+  },
+  "lane.next.allDone": {
+    "placeholders": {}
+  },
+  "lane.next.carryOn": {
+    "placeholders": {
+      "card": "plain",
+      "also": "plain"
+    }
+  },
+  "lane.next.carryOnIn": {
+    "placeholders": {
+      "card": "plain",
+      "slot": "plain",
+      "also": "plain"
+    }
+  },
+  "lane.next.nothingElse": {
+    "placeholders": {}
+  },
+  "lane.next.start": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "lane.next.startIn": {
+    "placeholders": {
+      "card": "plain",
+      "slot": "plain"
+    }
+  },
+  "lane.next.waits": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "lane.refused.allDone": {
+    "placeholders": {
+      "cards": "plain",
+      "n": "plural"
+    }
+  },
+  "lane.refused.applyNow.changedMeanwhile": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "lane.refused.applyNow.endedMeanwhile": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "lane.refused.applyNow.inATurn": {
+    "placeholders": {
+      "agent": "plain",
+      "status": "select"
+    }
+  },
+  "lane.refused.applyNow.inReview": {
+    "placeholders": {
+      "card": "plain",
+      "where": "select"
+    }
+  },
+  "lane.refused.applyNow.notPutBack": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "lane.refused.applyNow.uncommitted": {
+    "placeholders": {
+      "card": "plain",
+      "agent": "plain"
+    }
+  },
+  "lane.refused.end.abandon": {
+    "placeholders": {}
+  },
+  "lane.refused.end.movedOn": {
+    "placeholders": {}
+  },
+  "lane.refused.end.notDone": {
+    "placeholders": {
+      "cards": "plain"
+    }
+  },
+  "lane.refused.end.notOurs": {
+    "placeholders": {}
+  },
+  "lane.refused.generalist": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "lane.refused.joinNoLane": {
+    "placeholders": {
+      "builder": "plain"
+    }
+  },
+  "lane.refused.joinPool": {
+    "placeholders": {
+      "builder": "plain"
+    }
+  },
+  "lane.refused.keptChanging": {
+    "placeholders": {}
+  },
+  "lane.refused.next.abandoned": {
+    "placeholders": {
+      "lane": "plain"
+    }
+  },
+  "lane.refused.next.ended": {
+    "placeholders": {
+      "lane": "plain"
+    }
+  },
+  "lane.refused.next.none": {
+    "placeholders": {}
+  },
+  "lane.refused.noLaneToPlace": {
+    "placeholders": {
+      "builder": "plain",
+      "project": "plain"
+    }
+  },
+  "lane.refused.poolReviewer": {
+    "placeholders": {}
+  },
+  "lane.refused.selfReview": {
+    "placeholders": {}
+  },
+  "lane.refused.unknownBuilder": {
+    "placeholders": {}
+  },
+  "lane.refused.unknownPair": {
+    "placeholders": {}
+  },
+  "lane.refused.unknownReviewer": {
+    "placeholders": {}
+  },
+  "lane.refused.unknownReviewer.has": {
+    "placeholders": {
+      "name": "plain",
+      "project": "plain",
+      "reviewer": "plain"
+    }
+  },
+  "lane.refused.unknownReviewer.none": {
+    "placeholders": {
+      "name": "plain",
+      "project": "plain"
+    }
+  },
+  "lane.refused.unknownReviewer.pool": {
+    "placeholders": {
+      "name": "plain",
+      "project": "plain"
+    }
+  },
+  "lane.reorder.itsBranch": {
+    "placeholders": {}
+  },
+  "lane.reorder.putBackWhy": {
+    "placeholders": {
+      "by": "plain"
+    }
+  },
+  "lane.start.applied": {
+    "placeholders": {
+      "card": "plain",
+      "line": "plain",
+      "builder": "plain"
+    }
+  },
+  "lane.start.carried": {
+    "placeholders": {
+      "builder": "plain",
+      "lane": "plain",
+      "what": "select"
+    }
+  },
+  "lane.start.leftOut": {
+    "placeholders": {
+      "cards": "plain",
+      "n": "plural"
+    }
+  },
+  "lane.start.queued": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "lane.start.stays": {
+    "placeholders": {
+      "cards": "plain",
+      "n": "plural"
+    }
+  },
+  "lane.state.abandoned": {
+    "placeholders": {}
+  },
+  "lane.state.activeAllPassed": {
+    "placeholders": {}
+  },
+  "lane.state.activeOn": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "lane.state.ended": {
+    "placeholders": {}
+  },
+  "lane.state.endedMerged": {
+    "placeholders": {
+      "commit": "plain"
+    }
+  },
+  "lane.state.paused": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "lane.state.pausedRoundLimit": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "lane.status.aCard": {
+    "placeholders": {}
+  },
+  "lane.status.aDependency": {
+    "placeholders": {}
+  },
+  "lane.status.anAgent": {
+    "placeholders": {}
+  },
+  "lane.status.blocked": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "lane.status.blockedWhy": {
+    "placeholders": {
+      "card": "plain",
+      "why": "plain"
+    }
+  },
+  "lane.status.checkCopy": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "lane.status.fresh.failed": {
+    "placeholders": {
+      "agent": "plain",
+      "why": "plain"
+    }
+  },
+  "lane.status.fresh.failedBare": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "lane.status.fresh.timeout": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "lane.status.fresh.uncertain": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "lane.status.fresh.waits": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "lane.status.hold": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "lane.status.hooks": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "lane.status.itsAgent": {
+    "placeholders": {}
+  },
+  "lane.status.itsBuilder": {
+    "placeholders": {}
+  },
+  "lane.status.itsSlot": {
+    "placeholders": {}
+  },
+  "lane.status.lineUpdate": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "lane.status.listChanges": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "lane.status.merging": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "lane.status.notMerged": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "lane.status.preparing": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "lane.status.reviewer": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "lane.status.roundLimit": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "lane.status.slot": {
+    "placeholders": {}
+  },
+  "lane.status.slotHeld": {
+    "placeholders": {
+      "slot": "plain",
+      "held": "select",
+      "agent": "plain",
+      "broker": "plain",
+      "idle": "select"
+    }
+  },
+  "lane.status.stale": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "lane.status.start.busy": {
+    "placeholders": {
+      "card": "plain",
+      "agent": "plain"
+    }
+  },
+  "lane.status.start.dependencies": {
+    "placeholders": {
+      "card": "plain",
+      "waitsFor": "plain"
+    }
+  },
+  "lane.status.start.failed": {
+    "placeholders": {
+      "card": "plain",
+      "agent": "plain"
+    }
+  },
+  "lane.status.start.queued": {
+    "placeholders": {
+      "card": "plain",
+      "agent": "plain"
+    }
+  },
+  "lane.status.start.refused": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "lane.status.start.refusedHeld": {
+    "placeholders": {
+      "card": "plain",
+      "slot": "plain",
+      "held": "select",
+      "heldBy": "plain",
+      "program": "plain",
+      "more": "plural",
+      "broker": "plain",
+      "idle": "select"
+    }
+  },
+  "lane.status.start.watching": {
+    "placeholders": {
+      "card": "plain",
+      "agent": "plain"
+    }
+  },
+  "lane.status.teamPause": {
+    "placeholders": {}
+  },
+  "lane.status.you": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "lane.store.damaged": {
+    "placeholders": {
+      "error": "plain"
+    }
+  },
+  "lane.store.readFailed": {
+    "placeholders": {
+      "error": "plain"
+    }
+  },
+  "lane.tell.listChanged": {
+    "placeholders": {
+      "cards": "plain"
+    }
+  },
+  "lane.tell.reordered": {
+    "placeholders": {
+      "by": "plain",
+      "card": "plain",
+      "line": "plain",
+      "cards": "plain"
+    }
+  },
+  "lane.wait.hours": {
+    "placeholders": {
+      "n": "plain"
+    }
+  },
+  "lane.wait.minutes": {
+    "placeholders": {
+      "n": "plain"
+    }
+  },
+  "lane.warn.fresh": {
+    "placeholders": {
+      "items": "plain"
+    }
+  },
+  "lane.warn.freshItem": {
+    "placeholders": {
+      "card": "plain",
+      "ago": "plain",
+      "who": "plain"
+    }
+  },
+  "lane.warn.shared": {
+    "placeholders": {
+      "items": "plain"
+    }
+  },
+  "lane.warn.sharedItem": {
+    "placeholders": {
+      "card": "plain",
+      "builder": "plain",
+      "lane": "plain"
+    }
+  }
+}

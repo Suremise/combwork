@@ -32,7 +32,7 @@ const check = (name, ok, extra = '') => {
 const id = (n) => `0f5c2a8e-2222-4333-8444-5555666${String(n).padStart(5, '0')}`
 const at = (h) => new Date(Date.UTC(2026, 9, 4, h, 0, 0)).toISOString()
 const old = new Date(Date.UTC(2026, 9, 4, 0, 0, 0))
-/** A Claude Code transcript (Hive's backup of it, or the CLI's own). */
+/** A Claude Code transcript (Combwork's backup of it, or the CLI's own). */
 const claudeLines = (sid, h, text) =>
   [
     { type: 'user', sessionId: sid, timestamp: at(h), message: { role: 'user', content: text } },
@@ -61,7 +61,7 @@ const write = (file, text) => {
   // Written long ago: a transcript changed in the last few seconds counts as still being written.
   fs.utimesSync(file, old, old)
 }
-const backup = (sid) => path.join(alpha, '.hive', 'sessions', `${sid}.jsonl`)
+const backup = (sid) => path.join(alpha, '.combwork', 'sessions', `${sid}.jsonl`)
 const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '04', `rollout-2026-10-04T${String(h).padStart(2, '0')}-00-00-${sid}.jsonl`)
 
 ;(async () => {
@@ -78,13 +78,13 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47923), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47923), CLAUDE_CONFIG_DIR: claudeHome, CODEX_HOME: codexHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 950 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const live = async (agentId) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === agentId)
   await page.getByText('alpha', { exact: true }).first().click()
@@ -117,10 +117,10 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
     rec(C.gone, 'Gone session', 5, { agentId: claude.id, agentName: 'Claude' }),
     rec(C.coder, 'Coder work', 4, { agentId: 'a-0c0de00', agentName: 'Coder' }),
     rec(C.codex, 'Codex work', 9, { agent: 'codex', agentId: codexette.id, agentName: 'Codexette', transcriptPath: rolloutFile(C.codex, 9) }),
-    // A guardian review adopted before Hive told sub-sessions apart: its record doesn't say so.
+    // A guardian review adopted before Combwork told sub-sessions apart: its record doesn't say so.
     rec(C.adopted, 'Adopted review', 5, { agent: 'codex', transcriptPath: rolloutFile(C.adopted, 5) }),
     // A session in a worktree, with a guardian review there.
-    rec(C.wt, 'Worktree work', 1, { agent: 'codex', agentId: codexette.id, agentName: 'Codexette', cwd: wtDir, branch: 'hive/spike', transcriptPath: rolloutFile(C.wt, 1) })
+    rec(C.wt, 'Worktree work', 1, { agent: 'codex', agentId: codexette.id, agentName: 'Codexette', cwd: wtDir, branch: 'cw/spike', transcriptPath: rolloutFile(C.wt, 1) })
   )
   putSessions(alpha, file)
   write(backup(C.tray), claudeLines(C.tray, 10, 'Fix the tray icon'))
@@ -145,7 +145,7 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
   const german = Object.assign({}, ...fs.readdirSync(DE).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(DE, f), 'utf8'))))
   const base = (await inv('app:info')).language
   /** The window shown in a language, as main sends a change of language (i18nlive's way). */
-  const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language })
+  const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
   const archivedBox = () => page.locator('.sessions-filters label').innerText().catch(() => '')
   const narrowShots = async (name, el) => {
     const width = await list.evaluate((e) => e.style.width)
@@ -171,17 +171,17 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
     await inv('settings:update', { appearance: { theme: 'dark' } })
     await list.evaluate((e, w) => (e.style.width = w), width)
   }
-  // The whole list's first read held (its session:list, asked before Hive's own), so the note stays while it is shot.
+  // The whole list's first read held (its session:list, asked before Combwork's own), so the note stays while it is shot.
   await app.evaluate(() => {
-    process.env.HIVE_TEST_SLOW_IPC = 'session:list=20000*1'
+    process.env.CW_TEST_SLOW_IPC = 'session:list=20000*1'
   })
   await page.locator('.tab', { hasText: 'Sessions' }).click()
   const note = page.locator('.sessions-scope[data-loading="others"]')
-  check('the note shows while the sessions started outside Hive are read', !!(await lib.until(async () => (await note.count()) === 1, HUNG_MS)))
+  check('the note shows while the sessions started outside Combwork are read', !!(await lib.until(async () => (await note.count()) === 1, HUNG_MS)))
   await narrowShots('loading', note)
   check('…and goes once they are read', !!(await lib.until(async () => (await note.count()) === 0, HELD_LIST_HUNG_MS)))
   await app.evaluate(() => {
-    delete process.env.HIVE_TEST_SLOW_IPC
+    delete process.env.CW_TEST_SLOW_IPC
   })
   const tree = page.locator('.sessions-tree')
   const row = (name) => page.locator('.sessions-tree .session-row', { hasText: name })
@@ -355,7 +355,7 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
     return tip
   }
   const why = await tipFor(blocked)
-  check('…with the reason as its tooltip', /Neither Claude Code nor Hive has its transcript/.test(why), why)
+  check('…with the reason as its tooltip', /Neither Claude Code nor Combwork has its transcript/.test(why), why)
   await branch('Codex').first().click()
   await lib.until(async () => (await names()).includes('Review rm'), 5000)
   await row('Review rm').click()
@@ -363,9 +363,9 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
   const subWhy = await tipFor(blocked)
   check('…because it is a sub-session', /guardian review Codex ran for another session/.test(subWhy), subWhy)
   await page.screenshot({ path: path.join(lib.WORK, 'sessiontree-2-cant-resume.png') })
-  const refused = await page.evaluate(([folder, sid, agentId]) => window.hive.invoke('session:start', folder, { resumeId: sid, agentId }).then(() => 'started', (e) => String(e.message ?? e)), [alpha, C.g1, codexette.id])
+  const refused = await page.evaluate(([folder, sid, agentId]) => window.combwork.invoke('session:start', folder, { resumeId: sid, agentId }).then(() => 'started', (e) => String(e.message ?? e)), [alpha, C.g1, codexette.id])
   check('main refuses to resume a sub-session too', /not a conversation: it can't be resumed/.test(refused), refused)
-  const refusedOld = await page.evaluate(([folder, sid, agentId]) => window.hive.invoke('session:start', folder, { resumeId: sid, agentId }).then(() => 'started', (e) => String(e.message ?? e)), [alpha, C.adopted, codexette.id])
+  const refusedOld = await page.evaluate(([folder, sid, agentId]) => window.combwork.invoke('session:start', folder, { resumeId: sid, agentId }).then(() => 'started', (e) => String(e.message ?? e)), [alpha, C.adopted, codexette.id])
   check('…and one adopted before sub-sessions were told apart', /not a conversation: it can't be resumed/.test(refusedOld), refusedOld)
 
   // --- Delete all on the Claude agent: the running session and a backup another program holds are skipped.
@@ -392,7 +392,7 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
   await lib.until(async () => !(await names()).includes('Tray fixes'), 8000)
   const after = await names()
   check('the rest are gone; the running and held ones stay', !after.includes('Tray fixes') && !after.includes('Gone session') && after.includes('Old notes') && after.includes('Running now'), JSON.stringify(after))
-  check("Hive's copy of a deleted one is in the Recycle Bin, the held one's is kept", !fs.existsSync(backup(C.tray)) && fs.existsSync(backup(C.notes)))
+  check("Combwork's copy of a deleted one is in the Recycle Bin, the held one's is kept", !fs.existsSync(backup(C.tray)) && fs.existsSync(backup(C.notes)))
   check("…the suite's trash folder in a test copy (#414)", lib.trashed(backup(C.tray)).length === 1)
   check("the CLI's own transcripts are untouched", fs.existsSync(terminalFile) && fs.existsSync(rolloutFile(C.codex, 9)))
   holder.kill()
@@ -415,7 +415,7 @@ const rolloutFile = (sid, h) => path.join(codexHome, 'sessions', '2026', '10', '
   const archived = await names()
   check('the archived session and its sub-sessions leave the tree', !archived.includes('Codex work') && !archived.includes('Review rm'), JSON.stringify(archived))
   check('the guardian review whose session isn’t listed stays', archived.includes('Lost review'))
-  check('it is archived in Hive', sessionsOf(alpha).sessions.find((s) => s.id === C.codex)?.archived === true)
+  check('it is archived in Combwork', sessionsOf(alpha).sessions.find((s) => s.id === C.codex)?.archived === true)
   await page.getByText('Archived', { exact: true }).click()
   await lib.until(async () => (await names()).includes('Codex work'), 5000)
   check('Archived shows it again, with its sub-sessions', (await names()).includes('Codex work') && (await names()).includes('Review rm'))

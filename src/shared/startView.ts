@@ -1,10 +1,12 @@
 /**
- * The Assistant's state view (#1032): what Hive gives the Assistant at each session start and after each compaction
+ * The Assistant's state view (#1032): what Combwork gives the Assistant at each session start and after each compaction
  * (Claude Code sends SessionStart then too), while its journal is on. The board, lanes and agents in brief, what waits
  * on the user, and the few journal entries relevant now, within a hard budget, so its context stays small (#989's
  * decision). Pure: main gathers the input (main/startView.ts). Agent-facing, so English.
  */
 
+import { NOTICE_PREFIX } from './doorbell'
+import { agentMsg, say, type AgentMsg } from './agentText'
 import { utf8Bytes as bytes } from './metrics'
 import { cardRef } from './projectKeys'
 
@@ -114,20 +116,91 @@ const clip = (s: string, n: number, maxBytes = Infinity): string => {
 }
 
 
-const COLUMN: Record<string, string> = { todo: 'Todo', doing: 'Doing', review: 'Review', passed: 'Passed', hold: 'On hold', done: 'Done' }
-const columnName = (c: string): string => COLUMN[c] ?? c
+/** The view's words (dialects, HI-2065): said in the chain of the session it is for (the Assistant's). */
+const A = {
+  head: agentMsg({
+    id: 'startView.head',
+    text: 'Where things stand, {source, select, compact {after a compaction} resume {on resuming} other {at session start}} ({when} UTC): a snapshot from the board, lanes, agents and your journal. Check the live state before acting on it.',
+    note: "The state view's first line, after the fixed \"[CW] \" (#1032). source: compact, resume or start (Claude Code's SessionStart source; clear and startup are a start). when: the time, \"2026-10-18 12:00\"."
+  }),
+  foot: agentMsg({
+    id: 'startView.foot',
+    text: 'More with cw_journal_recall (small first; cw_journal_entry for one in full): the journal skill says how.',
+    note: "The state view's last line (#1032): the view is a snapshot within a budget, and recall is how to get more."
+  }),
+  waiting: agentMsg({ id: 'startView.section.waiting', text: 'Waiting on the user:', note: "A section's title: blocked cards and agents asking the user." }),
+  decisions: agentMsg({ id: 'startView.section.decisions', text: 'Journal: recent decisions and plans:', note: "A section's title: the journal's recent decision and plan entries." }),
+  active: agentMsg({ id: 'startView.section.active', text: 'Cards in Doing and Review:', note: "A section's title: the cards in hand." }),
+  onCards: agentMsg({ id: 'startView.section.onCards', text: 'Journal: on the cards in hand:', note: "A section's title: journal entries linked to the cards in Doing or Review." }),
+  incidents: agentMsg({ id: 'startView.section.incidents', text: 'Journal: recent incidents:', note: "A section's title: the journal's recent incidents." }),
+  lanes: agentMsg({ id: 'startView.section.lanes', text: 'Lanes running:', note: "A section's title." }),
+  agents: agentMsg({ id: 'startView.section.agents', text: 'Agents running:', note: "A section's title: running agents, by project." }),
+  board: agentMsg({ id: 'startView.section.board', text: 'Board:', note: "A section's title: each project's open cards per column." }),
+  digest: agentMsg({ id: 'startView.section.digest', text: 'Weekly digest:', note: "A section's title: a week the journal has no digest of." }),
+  moreWaiting: agentMsg({ id: 'startView.more.waiting', text: '{n} more: cw_list_tasks and cw_list_projects', note: "In place of the Waiting on the user lines that don't fit (#1078). n: how many." }),
+  moreHold: agentMsg({ id: 'startView.more.hold', text: '{n} more On Hold: cw_list_tasks column hold', note: "In place of the Waiting on the user lines that don't fit, when all of them are On Hold cards (#1078). n: how many." }),
+  moreDecisions: agentMsg({ id: 'startView.more.decisions', text: '{n} more: cw_journal_recall kinds decision, plan', note: "In place of the section's lines that don't fit. n: how many." }),
+  moreActive: agentMsg({ id: 'startView.more.active', text: '{n} more: cw_list_tasks', note: "In place of the section's lines that don't fit. n: how many." }),
+  moreOnCards: agentMsg({ id: 'startView.more.onCards', text: '{n} more: cw_journal_recall with link card', note: "In place of the section's lines that don't fit. n: how many." }),
+  moreIncidents: agentMsg({ id: 'startView.more.incidents', text: '{n} more: cw_journal_recall kinds incident', note: "In place of the section's lines that don't fit. n: how many." }),
+  moreLanes: agentMsg({ id: 'startView.more.lanes', text: '{n} more: cw_lane list', note: "In place of the section's lines that don't fit. n: how many." }),
+  moreAgents: agentMsg({ id: 'startView.more.agents', text: '{n} more: cw_list_projects', note: "In place of the section's lines that don't fit. n: how many." }),
+  moreBoard: agentMsg({ id: 'startView.more.board', text: '{n} more: cw_list_tasks', note: "In place of the section's lines that don't fit. n: how many." }),
+  column: agentMsg({
+    id: 'startView.column',
+    text: '{column, select, todo {Todo} doing {Doing} review {Review} passed {Passed} hold {On hold} done {Done} other {{column}}}',
+    note: "A column's name in the view's lines. column: its id."
+  }),
+  card: agentMsg({
+    id: 'startView.line.card',
+    text: '{card} {column} · {project}{hasAgent, select, yes { · {agent}} other {}}{hasReviewer, select, yes {, reviewed by {reviewer}} other {}}: {title}',
+    note: 'A card in Doing or Review. card: its key or number; column: its name; agent, reviewer: names (hasAgent, hasReviewer: yes when there is one); title: its title, cut short.'
+  }),
+  blocked: agentMsg({
+    id: 'startView.line.blocked',
+    text: '{card} ({project}, {column}{hasAgent, select, yes {, {agent}} other {}}) blocked: {reason}',
+    note: "A blocked card waiting on the user. reason: the card's blocked reason, cut short."
+  }),
+  asking: agentMsg({
+    id: 'startView.line.asking',
+    text: '{agent} ({project}) {status, select, signin {needs signing in} other {waits for the user}}{hasAsking, select, yes {: {asking}} other {}}',
+    note: 'An agent waiting on the user. status: signin when it needs signing in. asking: what it asks (hasAsking: yes when known), cut short.'
+  }),
+  lane: agentMsg({
+    id: 'startView.line.lane',
+    text: '{builder}{hasReviewer, select, yes {/{reviewer}} other {}} ({project}): {at, select, paused {paused on {card}} card {on {card}, {state}} other {{state}}}',
+    note: "A running lane. at: paused (paused on card), card (working on card) or other; state: the lane's state (active, waiting…)."
+  }),
+  boardCount: agentMsg({ id: 'startView.board.count', text: '{n} {column}', note: "A project's cards in one column, in the Board section. column: its name." }),
+  boardNone: agentMsg({ id: 'startView.board.none', text: 'no open cards', note: 'A project with no cards in Doing, Review, Passed or Todo.' }),
+  agentsNone: agentMsg({ id: 'startView.agents.none', text: 'none', note: 'The Agents running section when no agent runs.' }),
+  digestLine: agentMsg({
+    id: 'startView.digest',
+    text: '{week} has entries but no digest: write one (kind digest, digestOf "{week}"; the journal skill).',
+    note: 'A week with journal entries but no digest. week: "2026-W41".'
+  })
+}
 
-const cardLine = (c: ViewCard): string => `- ${cardRef(c.number)} ${columnName(c.column)} · ${c.project}${c.agent ? ` · ${c.agent}` : ''}${c.reviewer ? `, reviewed by ${c.reviewer}` : ''}: ${clip(c.title, TITLE)}`
+const columnName = (c: string): string => say(A.column, { column: c })
 
+const yes = (v: unknown): string => (v ? 'yes' : 'no')
+
+const cardLine = (c: ViewCard): string => `- ${say(A.card, { card: cardRef(c.number), column: columnName(c.column), project: c.project, hasAgent: yes(c.agent), agent: c.agent ?? '', hasReviewer: yes(c.reviewer), reviewer: c.reviewer ?? '', title: clip(c.title, TITLE) })}`
+
+// agent-protocol: a journal entry's id, date, kind and project, and its summary as written: no wording of Combwork's.
 const entryLine = (e: ViewEntry): string => `- #${e.id} ${e.at.slice(0, 10)} ${e.kind}${e.project ? ` (${e.project})` : ''}${e.importance >= 2 ? ' !' : ''}: ${clip(e.summary, SUMMARY)}`
 
-const laneLine = (l: ViewLane): string => `- ${l.builder}${l.reviewer ? `/${l.reviewer}` : ''} (${l.project}): ${l.state === 'paused' && l.pausedOn ? `paused on ${cardRef(l.pausedOn)}` : l.current ? `on ${cardRef(l.current)}, ${l.state}` : l.state}`
+const laneLine = (l: ViewLane): string => {
+  const at = l.state === 'paused' && l.pausedOn ? 'paused' : l.current ? 'card' : 'other'
+  const card = at === 'paused' ? cardRef(l.pausedOn!) : at === 'card' ? cardRef(l.current!) : ''
+  return `- ${say(A.lane, { builder: l.builder, hasReviewer: yes(l.reviewer), reviewer: l.reviewer ?? '', project: l.project, at, card, state: l.state })}`
+}
 
 interface Section {
   title: string
   lines: string[]
   /** Said in place of the lines that don't fit; a function gets how many of the lines are shown. */
-  more: string | ((shown: number) => string)
+  more: AgentMsg | ((shown: number) => string)
 }
 
 /**
@@ -143,13 +216,14 @@ const urgency = (c: ViewCard): number => (c.column !== 'hold' ? 0 : DECIDE.test(
  * left out; they are shown in reading order.
  */
 export function startView(v: StartViewInput): string {
-  const when = `${v.now.toISOString().slice(0, 16).replace('T', ' ')} UTC`
-  const why = v.source === 'compact' ? 'after a compaction' : v.source === 'resume' ? 'on resuming' : 'at session start'
-  const head = `[Hive] Where things stand, ${why} (${when}): a snapshot from the board, lanes, agents and your journal. Check the live state before acting on it.`
-  const foot = 'More with hive_journal_recall (small first; hive_journal_entry for one in full): the journal skill says how.'
+  const when = v.now.toISOString().slice(0, 16).replace('T', ' ')
+  const source = v.source === 'compact' ? 'compact' : v.source === 'resume' ? 'resume' : 'start'
+  // agent-protocol: NOTICE_PREFIX is the fixed prefix of what Combwork types into a session.
+  const head = `${NOTICE_PREFIX}${say(A.head, { source, when })}`
+  const foot = say(A.foot)
 
-  const cards = v.blocked.map((c) => ({ hold: c.column === 'hold', line: `- ${cardRef(c.number)} (${c.project}, ${columnName(c.column)}${c.agent ? `, ${c.agent}` : ''}) blocked: ${clip(c.blocked ?? '', REASON)}` }))
-  const asking = v.agents.filter((a) => a.status === 'waiting' || a.status === 'signin').map((a) => ({ hold: false, line: `- ${a.name} (${a.project}) ${a.status === 'signin' ? 'needs signing in' : 'waits for the user'}${a.asking ? `: ${clip(a.asking, REASON)}` : ''}` }))
+  const cards = v.blocked.map((c) => ({ hold: c.column === 'hold', line: `- ${say(A.blocked, { card: cardRef(c.number), project: c.project, column: columnName(c.column), hasAgent: yes(c.agent), agent: c.agent ?? '', reason: clip(c.blocked ?? '', REASON) })}` }))
+  const asking = v.agents.filter((a) => a.status === 'waiting' || a.status === 'signin').map((a) => ({ hold: false, line: `- ${say(A.asking, { agent: a.name, project: a.project, status: a.status === 'signin' ? 'signin' : 'other', hasAsking: yes(a.asking), asking: a.asking ? clip(a.asking, REASON) : '' })}` }))
   // Within its cap, as it always was (#1078: a small board's view doesn't change); past it, agents asking now first, then
   // blocked cards by urgency, the most recently changed first within each.
   const rank = [...v.blocked.keys()].sort((i, j) => {
@@ -162,27 +236,29 @@ export function startView(v: StartViewInput): string {
   // What the left-out lines are: all On Hold cards (the usual case on a big board) point at that column's listing.
   const waitingMore = (shown: number): string => {
     const left = waitingItems.slice(shown)
-    return left.every((w) => w.hold) ? `${left.length} more On Hold: hive_list_tasks column hold` : `${left.length} more: hive_list_tasks and hive_list_projects`
+    return say(left.every((w) => w.hold) ? A.moreHold : A.moreWaiting, { n: left.length })
   }
   const byProject = new Map<string, ViewAgent[]>()
   for (const a of v.agents) byProject.set(a.project, [...(byProject.get(a.project) ?? []), a])
+  // agent-protocol: a project's name, then its running agents' names and states (ids), joined.
   const agents = [...byProject].map(([p, list]) => `- ${p}: ${list.map((a) => `${a.name} ${a.status}`).join(', ')}`)
   const board = v.counts.map((p) => {
-    const parts = ['doing', 'review', 'passed', 'todo'].filter((c) => p.columns[c]).map((c) => `${p.columns[c]} ${columnName(c)}`)
-    return `- ${p.project}: ${parts.length ? parts.join(', ') : 'no open cards'}`
+    const parts = ['doing', 'review', 'passed', 'todo'].filter((c) => p.columns[c]).map((c) => say(A.boardCount, { n: p.columns[c], column: columnName(c) }))
+    return `- ${p.project}: ${parts.length ? parts.join(', ') : say(A.boardNone)}`
   })
-  const digest = v.journal.digestDue ? [`- ${v.journal.digestDue} has entries but no digest: write one (kind digest, digestOf "${v.journal.digestDue}"; the journal skill).`] : []
+  const digest = v.journal.digestDue ? [`- ${say(A.digestLine, { week: v.journal.digestDue })}`] : []
 
   const S = {
-    waiting: { title: 'Waiting on the user:', lines: waiting, more: waitingMore },
-    decisions: { title: 'Journal: recent decisions and plans:', lines: v.journal.decisions.map(entryLine), more: 'hive_journal_recall kinds decision, plan' },
-    active: { title: 'Cards in Doing and Review:', lines: v.active.map(cardLine), more: 'hive_list_tasks' },
-    onCards: { title: 'Journal: on the cards in hand:', lines: v.journal.onCards.map(entryLine), more: 'hive_journal_recall with link card' },
-    incidents: { title: 'Journal: recent incidents:', lines: v.journal.incidents.map(entryLine), more: 'hive_journal_recall kinds incident' },
-    lanes: { title: 'Lanes running:', lines: v.lanes.map(laneLine), more: 'hive_lane list' },
-    agents: { title: 'Agents running:', lines: agents.length ? agents : ['- none'], more: 'hive_list_projects' },
-    board: { title: 'Board:', lines: board, more: 'hive_list_tasks' },
-    digest: { title: 'Weekly digest:', lines: digest, more: '' }
+    waiting: { title: say(A.waiting), lines: waiting, more: waitingMore },
+    decisions: { title: say(A.decisions), lines: v.journal.decisions.map(entryLine), more: A.moreDecisions },
+    active: { title: say(A.active), lines: v.active.map(cardLine), more: A.moreActive },
+    onCards: { title: say(A.onCards), lines: v.journal.onCards.map(entryLine), more: A.moreOnCards },
+    incidents: { title: say(A.incidents), lines: v.journal.incidents.map(entryLine), more: A.moreIncidents },
+    lanes: { title: say(A.lanes), lines: v.lanes.map(laneLine), more: A.moreLanes },
+    agents: { title: say(A.agents), lines: agents.length ? agents : [`- ${say(A.agentsNone)}`], more: A.moreAgents },
+    board: { title: say(A.board), lines: board, more: A.moreBoard },
+    // At most one line, so never a "more" line: it borrows the board's.
+    digest: { title: say(A.digest), lines: digest, more: A.moreBoard }
   } satisfies Record<string, Section>
   const priority: (keyof typeof S)[] = ['waiting', 'decisions', 'active', 'digest', 'onCards', 'incidents', 'lanes', 'agents', 'board']
   const order: (keyof typeof S)[] = ['waiting', 'active', 'lanes', 'agents', 'board', 'decisions', 'onCards', 'incidents', 'digest']
@@ -192,7 +268,7 @@ export function startView(v: StartViewInput): string {
   const lines = new Map<Key, string[]>(priority.map((k) => [k, S[k].lines.map((l) => clip(l, LINE, LINE_BYTES))]))
   const moreLine = (k: Key, left: number): string => {
     const more: Section['more'] = S[k].more
-    return typeof more === 'function' ? `- (${more(lines.get(k)!.length - left)})` : `- (${left} more: ${more})`
+    return `- (${typeof more === 'function' ? more(lines.get(k)!.length - left) : say(more, { n: left })})`
   }
   const maxLines = (k: Key): number => (k in MAX_LINES ? MAX_LINES[k as keyof typeof MAX_LINES] : Infinity)
   // What a section costs with its first n lines: its title, those lines, and a "more" line for the rest (none at 0).

@@ -1,5 +1,5 @@
 // A launch's side of the workflow, as its metrics count it (HI-2049): its part in the running lanes as it launches,
-// which wins over its own role, taken once; and a tool list its hive server reports later counts on that launch's side,
+// which wins over its own role, taken once; and a tool list its combwork server reports later counts on that launch's side,
 // never on the side of the launch that took its place.
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -8,11 +8,11 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { launchWorkflow } from '../src/shared/workflow/roles'
 
-const base = tempDir('hive-launchworkflow-')
+const base = tempDir('cw-launchworkflow-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 // A test copy on its CLI test home (tests/cliHomes.ts), as an e2e run is: its agents start with no connection.
-process.env.HIVE_USER_DATA = join(base, 'profile')
-process.env.HIVE_TEST_CLI_HOME_CONNECTION = '1'
+process.env.CW_USER_DATA = join(base, 'profile')
+process.env.CW_TEST_CLI_HOME_CONNECTION = '1'
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const { sessions } = await import('../src/main/sessions')
@@ -20,7 +20,7 @@ const { providerService } = await import('../src/main/providerService')
 const { config } = await import('../src/main/config')
 
 const wsPath = join(base, 'ws')
-const p = join(wsPath, 'amberlight')
+const p = join(wsPath, 'ambrosia')
 const s = sessions as unknown as { live: Map<string, { workflow?: string; state: { runId: string } }>; runs: Map<string, string> }
 let w: ReturnType<typeof createWorkspaceService>
 const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
@@ -65,9 +65,9 @@ describe('the side a launch is counted on', () => {
   const enabled = config.settings.providers['claude-code'].enabled
   const laneParts = sessions.laneParts
   beforeAll(async () => {
-    mkdirSync(join(wsPath, '.hive'), { recursive: true })
-    mkdirSync(join(p, '.hive'), { recursive: true })
-    writeFileSync(join(p, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'amb1', name: 'AMB1', provider: 'claude-code', workflowRole: 'either' }, { id: 'amb2', name: 'AMB2', provider: 'claude-code', workflowRole: 'generalist' }] }))
+    mkdirSync(join(wsPath, '.combwork'), { recursive: true })
+    mkdirSync(join(p, '.combwork'), { recursive: true })
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'amb1', name: 'AMB1', provider: 'claude-code', workflowRole: 'either' }, { id: 'amb2', name: 'AMB2', provider: 'claude-code', workflowRole: 'generalist' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     providerService.info = ((pid: string) => ({ provider: pid, found: true, path: join(base, 'no-cli.exe') })) as never
@@ -119,7 +119,7 @@ describe('the side a launch is counted on', () => {
     sessions.laneParts = async () => ['builder']
     let sides: Record<string, string> = {}
     const second = await launchSide('amb1', (runId) => {
-      // The first launch's hive server reports late (its CLI restarted meanwhile): unknown, not the builder launch's.
+      // The first launch's combwork server reports late (its CLI restarted meanwhile): unknown, not the builder launch's.
       sides = { first: sessions.launchSide(p, 'amb1', first.runId), second: sessions.launchSide(p, 'amb1', runId), none: sessions.launchSide(p, 'amb1', null), other: sessions.launchSide(p, 'nobody', runId) }
     })
     expect(second.runId).not.toBe(first.runId)

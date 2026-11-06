@@ -144,14 +144,14 @@ export async function releaseSlotLease(ws: WorkspaceService, projectPath: string
 /** Why project removal keeps a folder (#1447), the clauses the dialog and its result show. */
 const K = {
   home: msg({ id: 'main.removal.folder.home', defaultMessage: 'left as it is: its conversations resume there', description: "Remove Project (#1447): an old reviewer folder (a reviewer's own worktree from before 1.0) stays where it is. A clause." }),
-  notHives: msg({ id: 'main.removal.folder.notHives', defaultMessage: "left as it is: it isn't in Hive's worktrees folder for the project", description: "Remove Project (#1447): a slot whose folder Hive didn't make (outside <workspace>.worktrees/<project>) stays. A clause." }),
+  notCombwork: msg({ id: 'main.removal.folder.notCombwork', defaultMessage: "left as it is: it isn't in Combwork's worktrees folder for the project", description: "Remove Project (#1447): a slot whose folder Combwork didn't make (outside <workspace>.worktrees/<project>) stays. A clause." }),
   copyLeased: msg({ id: 'main.removal.folder.copyLeased', defaultMessage: 'a review uses it now', description: "Remove Project (#1447): a review copy is kept because a review or check uses it. A clause." }),
-  copyBusy: msg({ id: 'main.removal.folder.copyBusy', defaultMessage: 'Hive is setting it up or removing it now', description: "Remove Project (#1447): a review copy is kept because one of Hive's steps holds it. A clause." }),
-  outsideDelete: msg({ id: 'main.removal.folder.outsideDelete', defaultMessage: "it isn't in Hive's worktrees folder for the project, and would be left without its repository: release its slot and move or remove it first", description: "Why Delete can't go ahead (#1447): a slot outside <workspace>.worktrees/<project> (one Hive didn't make) would keep its files but lose the repository Delete sends to the Recycle Bin. Release its slot is a command in the agent's menu (Release Slot…). A clause." }),
+  copyBusy: msg({ id: 'main.removal.folder.copyBusy', defaultMessage: 'Combwork is setting it up or removing it now', description: "Remove Project (#1447): a review copy is kept because one of Combwork's steps holds it. A clause." }),
+  outsideDelete: msg({ id: 'main.removal.folder.outsideDelete', defaultMessage: "it isn't in Combwork's worktrees folder for the project, and would be left without its repository: release its slot and move or remove it first", description: "Why Delete can't go ahead (#1447): a slot outside <workspace>.worktrees/<project> (one Combwork didn't make) would keep its files but lose the repository Delete sends to the Recycle Bin. Release its slot is a command in the agent's menu (Release Slot…). A clause." }),
   notTrashed: msg({ id: 'main.removal.folder.notTrashed', defaultMessage: "{path} couldn't be moved to the Recycle Bin: {why}", description: "A warning after Delete (#1447): one of the project's slots, copies or old folders ({path}) couldn't go to the Recycle Bin ({why}: the system's message)." }),
-  notForgotten: msg({ id: 'main.removal.folder.notForgotten', defaultMessage: "Hive's record of the project's slots couldn't all be cleared: {why}", description: "A warning after Delete (#1447): the project's slot or copy records stayed in Hive's database ({why}: the system's message)." }),
-  heldNow: msg({ id: 'main.removal.folder.heldNow', defaultMessage: "one of Hive's steps or a session took it up meanwhile", description: "Why Delete can't go ahead (#1447): between the dialog's check and Delete's start, one of the project's slots or copies was taken up (set up, renamed, a session started in it, a review copy leased), or a new one made. A clause." }),
-  deleting: msg({ id: 'main.removal.folder.deleting', defaultMessage: 'another Delete of this project holds its slots', description: "Why Delete can't go ahead (#1447): another Hive window or process is deleting the same project now. A clause." }),
+  notForgotten: msg({ id: 'main.removal.folder.notForgotten', defaultMessage: "Combwork's record of the project's slots couldn't all be cleared: {why}", description: "A warning after Delete (#1447): the project's slot or copy records stayed in Combwork's database ({why}: the system's message)." }),
+  heldNow: msg({ id: 'main.removal.folder.heldNow', defaultMessage: "one of Combwork's steps or a session took it up meanwhile", description: "Why Delete can't go ahead (#1447): between the dialog's check and Delete's start, one of the project's slots or copies was taken up (set up, renamed, a session started in it, a review copy leased), or a new one made. A clause." }),
+  deleting: msg({ id: 'main.removal.folder.deleting', defaultMessage: 'another Delete of this project holds its slots', description: "Why Delete can't go ahead (#1447): another Combwork window or process is deleting the same project now. A clause." }),
   notHeld: msg({ id: 'main.removal.folder.notHeld', defaultMessage: '{n, plural, one {# slot or copy was} other {# slots or copies were}} taken up by another step, and left', description: "A warning's reason after Delete (#1447): records of the project's slots or copies Delete didn't hold, so it didn't delete them. Follows main.removal.folder.notForgotten's colon." }),
   copyHeld: msg({ id: 'main.removal.folder.copyHeld', defaultMessage: 'it is in use ({by})', description: "Remove Project (#1447): a review copy is kept because something runs in it ({by}: what, in English). A clause." })
 }
@@ -163,7 +163,7 @@ type Removal = { of: ProjectFolderOf; path: string; kept: string | null; blocksD
  * preview). Each slot goes through its pool's guarded clean-up (the archive command, then the guards: no session,
  * process, card being merged, uncommitted file or unmerged commit), its lease ended first only when nothing would be
  * kept (a carried slot with work keeps its lease and folder); each copy through its pool's. Never a folder outside
- * `<Workspace>.worktrees/<Project>/` (one Hive didn't make), nor a retired home: those stay, listed.
+ * `<Workspace>.worktrees/<Project>/` (one Combwork didn't make), nor a retired home: those stay, listed.
  */
 export async function removeFolders(ws: WorkspaceService, projectPath: string, apply: boolean): Promise<Removal[]> {
   const root = join(ws.worktreesRoot, basename(projectPath))
@@ -181,7 +181,7 @@ export async function removeFolders(ws: WorkspaceService, projectPath: string, a
       continue
     }
     if (!containsPlace(root, f.folder)) {
-      kept(tr(K.notHives))
+      kept(tr(K.notCombwork))
       continue
     }
     try {
@@ -215,7 +215,7 @@ export async function removeFolders(ws: WorkspaceService, projectPath: string, a
 
 /**
  * What stops Delete (#1447, HR1's round 1), by folder key: a slot or home outside `<Workspace>.worktrees/<Project>/` (not
- * Hive's to delete, and it would be left without its repository), or a slot or copy one of Hive's steps holds (an
+ * Combwork's to delete, and it would be left without its repository), or a slot or copy one of Combwork's steps holds (an
  * operation, a job, a writer). None: Delete may go ahead.
  */
 export async function deleteBlocks(ws: WorkspaceService, projectPath: string, folders?: ProjectFolder[]): Promise<Map<string, string>> {
@@ -244,13 +244,13 @@ export async function deleteBlocks(ws: WorkspaceService, projectPath: string, fo
  * Delete's reservation of the project's slots and copies (#1447, HR1's round 2), in one write against the rows as they
  * are then: refused, nothing written, if one is held (an operation, a job, a writer, a copy's lease not freed), if a row
  * is there the plan didn't list (made since) or at another folder than it checked (relinked since), or if another
- * Delete holds them; else `token` (this Hive's, held by
+ * Delete holds them; else `token` (this Combwork's, held by
  * `holder`) becomes every listed row's operation and the project's reservation is recorded, so nothing begins on them
  * and no slot or copy is made until it ends (`trashFolders`, or `releaseDelete`). Null once held, else the folders
  * that refused it.
  */
 export async function reserveDelete(ws: WorkspaceService, id: string, folders: ProjectFolder[], token: string, holder: Holder): Promise<{ busy: string[]; deleting: boolean } | null> {
-  // Each row as the plan checked it, by name and folder: a row relinked since (another Hive's Repair) refuses it too, so
+  // Each row as the plan checked it, by name and folder: a row relinked since (another Combwork's Repair) refuses it too, so
   // the folders Delete recycles are the ones it checked and holds (HR1's round 3).
   const checked = (kind: 'slot' | 'copy'): Map<string, string> => new Map(folders.filter((f) => f.of.kind === kind).map((f) => [f.name.toLowerCase(), f.folder]))
   const slots = checked('slot')

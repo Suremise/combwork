@@ -27,7 +27,7 @@ afterEach(() => {
 
 /** A tree of its own, with these files (path relative to it → content). */
 function tree(files: Record<string, string>): string {
-  const root = tempDir('hive-i18n-cat-')
+  const root = tempDir('cw-i18n-cat-')
   roots.push(root)
   for (const [rel, text] of Object.entries(files)) {
     mkdirSync(dirname(join(root, rel)), { recursive: true })
@@ -50,16 +50,16 @@ const SOURCE = [
 ].join('\n')
 
 describe('the English catalogues and typed values (i18n:extract)', () => {
-  it("are up to date with Hive's source", () => {
+  it("are up to date with Combwork's source", () => {
     const drift = extractDrift(ROOT) as string[]
     expect(drift, 'out of date: run npm run i18n:extract and commit the result').toEqual([])
   })
 
-  it("every message in Hive's source names its area and has a note for translators", () => {
+  it("every message in Combwork's source names its area and has a note for translators", () => {
     expect(messageProblems(extractMessages(ROOT))).toEqual([])
   })
 
-  it.runIf(hasNativeCli())("reading without the CLI (no native binding) finds the same messages as formatjs extract, in Hive's source and a fixture", () => {
+  it.runIf(hasNativeCli())("reading without the CLI (no native binding) finds the same messages as formatjs extract, in Combwork's source and a fixture", () => {
     expect(sorted(extractWithJs(ROOT))).toBe(sorted(extractWithCli(ROOT)))
     const root = tree({ 'src/renderer/src/Panel.tsx': SOURCE })
     expect(sorted(extractWithJs(root))).toBe(sorted(extractWithCli(root)))
@@ -157,7 +157,7 @@ describe('the English catalogues and typed values (i18n:extract)', () => {
       'progress.d': { defaultMessage: 'No values' }
     }) as string
     expect(dts.split('\n').slice(2)).toEqual([
-      'interface HiveMessageValues {',
+      'interface CombworkMessageValues {',
       "  'progress.a': { n: number; name: string | number }",
       "  'progress.b': { at: Date | number; who: string }",
       "  'progress.c': { n: number }",
@@ -193,7 +193,7 @@ describe('the blocking check of the translations (i18n:check)', () => {
     if (why) expect(problems.join('\n')).toMatch(why)
   })
 
-  it("Hive's translations pass, both ways", () => {
+  it("Combwork's translations pass, both ways", () => {
     for (const js of [false, true]) {
       const { results } = checkTranslations(ROOT, { js }) as { results: Record<string, string[]> }
       expect(Object.keys(results).length).toBeGreaterThan(0)
@@ -203,7 +203,7 @@ describe('the blocking check of the translations (i18n:check)', () => {
 
   it("a deliberately broken translation fails the command CI's npm test runs, and a missing one doesn't", () => {
     // English and the one language it breaks (HI-2021): the check runs once per language, and every language's own pass
-    // is "Hive's translations pass" above. The whole tree, run four times, took over 20 s under a loaded machine.
+    // is "Combwork's translations pass" above. The whole tree, run four times, took over 20 s under a loaded machine.
     const root = tree({})
     for (const code of ['en', 'pl']) cpSync(join(ROOT, 'locales', code), join(root, 'locales', code), { recursive: true })
     expect(script('i18nCheck.mjs', '--root', root).status).toBe(0)

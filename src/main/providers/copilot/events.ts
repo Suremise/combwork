@@ -144,14 +144,14 @@ export function eventsDetails(text: string, memo: CopilotDetailsMemo = copilotDe
         else if (d.hookType === 'userPromptSubmitted') prompted()
         break
       case 'hook.end':
-        // Its Stop hook answered, when (#648): Hive counts them against the Stops it got (unheardStop).
+        // Its Stop hook answered, when (#648): Combwork counts them against the Stops it got (unheardStop).
         if (d.hookType === 'agentStop' && typeof r.timestamp === 'string') (out.stopsAnswered ??= []).push(r.timestamp)
         break
       case 'user.message':
         prompted()
         break
       case 'session.compaction_complete':
-        // Copilot sends PreCompact but no hook at the end (1.0.98, #454): this ends Hive's compacting status.
+        // Copilot sends PreCompact but no hook at the end (1.0.98, #454): this ends Combwork's compacting status.
         if (typeof r.timestamp === 'string') out.compactedAt = r.timestamp
         break
       case 'session.error': {
@@ -438,15 +438,15 @@ export function parseEvents(text: string, sessionId: string, title: string | nul
 /** How the Sessions tab shows Copilot's tools: Claude Code's names where they do the same. */
 const TOOL_NAMES: Record<string, string> = {
   powershell: 'PowerShell',
-  bash: 'Bash', // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
-  view: 'Read', // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
-  edit: 'Edit', // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
-  create: 'Write', // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
-  grep: 'Grep', // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
-  glob: 'Glob', // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
+  bash: 'Bash', // i18n-ignore: a tool's name, as agents read it (cw_agent_activity)
+  view: 'Read', // i18n-ignore: a tool's name, as agents read it (cw_agent_activity)
+  edit: 'Edit', // i18n-ignore: a tool's name, as agents read it (cw_agent_activity)
+  create: 'Write', // i18n-ignore: a tool's name, as agents read it (cw_agent_activity)
+  grep: 'Grep', // i18n-ignore: a tool's name, as agents read it (cw_agent_activity)
+  glob: 'Glob', // i18n-ignore: a tool's name, as agents read it (cw_agent_activity)
   web_fetch: 'WebFetch',
-  ask_user: 'Question', // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
-  task: 'Agent' // i18n-ignore: a tool's name, as agents read it (hive_agent_activity)
+  ask_user: 'Question', // i18n-ignore: a tool's name, as agents read it (cw_agent_activity)
+  task: 'Agent' // i18n-ignore: a tool's name, as agents read it (cw_agent_activity)
 }
 
 /** One line describing a tool call, e.g. the command's description or the file it edits. */
@@ -680,7 +680,7 @@ export async function readWorkspace(home: string, sessionId: string): Promise<Co
  * (an events.jsonl with something in it; the CLI makes a folder for every launch, also one that ends before a prompt).
  */
 export async function listCopilotSessions(home: string, folder: string, skip?: (id: string) => boolean): Promise<ExternalSession[]> {
-  // Copilot records the cwd as it was given; Hive may spell the folder another way now (a junction, an 8.3 name, #493).
+  // Copilot records the cwd as it was given; Combwork may spell the folder another way now (a junction, an 8.3 name, #493).
   const here = placeMatcher(folder)
   let ids: string[]
   try {

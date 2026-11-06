@@ -6,10 +6,10 @@ import { join } from 'path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { dropIndex, moveAgentTo, pageAgents, pageEndIndex, projectAgents, swapAgentsIn } from '../src/shared/defaults'
-import type { HiveEvent, ProjectConfig } from '../src/shared/types'
+import type { CombworkEvent, ProjectConfig } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-order-')
+const base = tempDir('cw-order-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const ids = (list: { id: string }[]): string => list.map((a) => a.id).join('')
@@ -45,7 +45,7 @@ describe('agent order', () => {
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const { moveAgent, swapAgents } = await import('../src/main/projectAgents')
-const { onHiveEvent } = await import('../src/main/events')
+const { onCombworkEvent } = await import('../src/main/events')
 
 // The longest a test waits for what it is waiting on: a bound for a hung run, never how long it should take.
 const HUNG_MS = 10000
@@ -54,13 +54,13 @@ describe('saving the order', () => {
   let w: ReturnType<typeof createWorkspaceService>
   const wsPath = join(base, 'ws')
   const alpha = join(wsPath, 'alpha')
-  const file = join(alpha, '.hive', 'project.json')
+  const file = join(alpha, '.combwork', 'project.json')
   beforeAll(async () => {
-    mkdirSync(join(alpha, '.hive'), { recursive: true })
+    mkdirSync(join(alpha, '.combwork'), { recursive: true })
     const agents = [
       { id: 'a1', name: 'Agent 1', model: 'opus' },
       { id: 'a2', name: 'Agent 2' },
-      { id: 'a3', name: 'Agent 3', worktree: { path: join(base, 'wt'), branch: 'hive/three', base: 'main' } }
+      { id: 'a3', name: 'Agent 3', worktree: { path: join(base, 'wt'), branch: 'cw/three', base: 'main' } }
     ]
     writeFileSync(file, JSON.stringify({ version: 2, agents, worktreeSetup: 'npm ci' }))
     w = createWorkspaceService()
@@ -73,7 +73,7 @@ describe('saving the order', () => {
     expect(await inWorkspace(w, () => moveAgent(alpha, 'a3', 0))).toEqual(['a3', 'a1', 'a2'])
     const cfg = saved()
     expect(cfg.agents.map((a: { id: string }) => a.id)).toEqual(['a3', 'a1', 'a2'])
-    expect(cfg.agents[0].worktree.branch).toBe('hive/three')
+    expect(cfg.agents[0].worktree.branch).toBe('cw/three')
     expect(cfg.agents[1]).toMatchObject({ name: 'Agent 1', model: 'opus' })
     expect(cfg.worktreeSetup).toBe('npm ci')
   })
@@ -95,7 +95,7 @@ describe('saving the order', () => {
     const cfg = saved()
     expect(cfg.agents.map((a: { id: string }) => a.id)).toEqual([before[2], before[1], before[0]])
     expect(cfg.agents[1].model).toBe('haiku')
-    expect(cfg.agents.find((a: { id: string }) => a.id === 'a3').worktree.branch).toBe('hive/three')
+    expect(cfg.agents.find((a: { id: string }) => a.id === 'a3').worktree.branch).toBe('cw/three')
     await expect(inWorkspace(w, () => swapAgents(alpha, 'a1', 'gone'))).rejects.toThrow(/no longer exists/)
   })
 
@@ -115,11 +115,11 @@ describe('saving the order', () => {
       return { live: null, restartNeeded: false, agents: projectAgents(cfg).map((a) => ({ ...a, live: null, restartNeeded: false, resume: null, place: { folder: p, is: 'project' as const, name: null, branch: null } })) }
     }
     // Each order reported, and whether every move had saved by then. While the moves are made, a report may be a move
-    // behind project.json (#1229: a refresh that read it just before a move's file landed, as Hive records that save, is
-    // what Hive knew), never further back than one before it; once all have saved, only the last order.
+    // behind project.json (#1229: a refresh that read it just before a move's file landed, as Combwork records that save, is
+    // what Combwork knew), never further back than one before it; once all have saved, only the last order.
     const reported: { order: string; settled: boolean }[] = []
     let settled = false
-    const off = onHiveEvent((e: HiveEvent) => {
+    const off = onCombworkEvent((e: CombworkEvent) => {
       const p = e.type === 'workspace-changed' ? e.workspace?.projects.find((x) => x.path === alpha) : undefined
       if (p) reported.push({ order: p.agents.map((a) => a.id).join(','), settled })
     })

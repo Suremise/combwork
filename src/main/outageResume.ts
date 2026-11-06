@@ -1,12 +1,14 @@
 import { OUTAGE_CHECK_FIRST_SECONDS, OUTAGE_CHECK_MOST_SECONDS, OUTAGE_RESUME, OUTAGE_RESUMES_PER_HOUR, OUTAGE_WAIT_MINUTES, outageCheckUrlId } from '../shared/advanced'
 import { formatTime } from '../shared/dates'
+import { agentMsg, inDialectOf, say, type AgentMsg, type AgentValues } from '../shared/agentText'
+import { ASSISTANT_AGENT_ID } from '../shared/assistant'
 import { msg, tr } from '../shared/i18n'
 import type { LiveSessionState } from '../shared/types'
 import { getAccount } from './accounts'
 import { advanced } from './advanced'
 import { noteForAssistant } from './assistantNotes'
 import { deliverNow } from './deliveries'
-import { onHiveEvent, toast } from './events'
+import { onCombworkEvent, toast } from './events'
 import { createLogger } from './logger'
 import { clock, connectionDropped, OutageResume, reachable, type OutageAgent, type OutageHost } from './outageCore'
 import { progress, progressGate } from './progressService'
@@ -15,7 +17,7 @@ import { workspaceOf } from './workspace'
 import { pausedFor } from './teamPause'
 
 /**
- * Resuming agents after a connection drops (HI-1612, SPEC §6.3). Off by default (Settings → Advanced, Hive's "Resume
+ * Resuming agents after a connection drops (HI-1612, SPEC §6.3). Off by default (Settings → Advanced, Combwork's "Resume
  * agents after a connection drops"). An agent whose turn ended on a connection error (its CLI's words, as the failed
  * turn keeps them, found by the CLI's pattern and not by the one for a usage limit, a sign-in or "overloaded") waits
  * for its CLI's API host to answer, checked with a request that never holds main's thread, backing off; once it
@@ -26,19 +28,27 @@ import { pausedFor } from './teamPause'
  * the wait.
  */
 const log = createLogger('outage')
-const HIVE = { kind: 'hive', name: 'Hive' } as const // i18n-ignore: the product's name, as a delivery's sender
+const COMBWORK = { kind: 'combwork', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
 
 const M = {
-  waiting: msg({ id: 'session.status.waitingForConnection', defaultMessage: 'Waiting for the connection…', description: "An agent's status while Hive waits for its CLI's connection to come back, to resume it (Settings → Advanced, Resume agents after a connection drops)." }),
-  progressTitle: msg({ id: 'main.outage.progressTitle', defaultMessage: '{agent}: waiting for the connection', description: "A Progress panel run's title while Hive waits for an agent's connection to come back, to resume it. {agent} is the agent's name." }),
+  waiting: msg({ id: 'session.status.waitingForConnection', defaultMessage: 'Waiting for the connection…', description: "An agent's status while Combwork waits for its CLI's connection to come back, to resume it (Settings → Advanced, Resume agents after a connection drops)." }),
+  progressTitle: msg({ id: 'main.outage.progressTitle', defaultMessage: '{agent}: waiting for the connection', description: "A Progress panel run's title while Combwork waits for an agent's connection to come back, to resume it. {agent} is the agent's name." }),
   progressWaiting: msg({ id: 'main.outage.progressWaiting', defaultMessage: 'the connection to come back', description: 'What a Progress panel run waits for, after "Waiting for": the connection of an agent whose turn a dropped connection ended.' }),
-  resumedSummary: msg({ id: 'main.outage.resumedSummary', defaultMessage: 'Resumed: the connection dropped at {dropped} and came back at {back}.', description: "A Progress panel run's summary: Hive resumed an agent once its connection came back. {dropped} and {back} are times of day." }),
-  gaveUpTitle: msg({ id: 'main.outage.gaveUpTitle', defaultMessage: "{agent}'s connection keeps dropping", description: "A notice's title: an agent's connection dropped again after Hive had resumed it several times in an hour, so Hive stopped resuming it. {agent} is the agent's name." }),
-  gaveUpBody: msg({ id: 'main.outage.gaveUpBody', defaultMessage: "{n, plural, one {It was resumed once in the past hour} other {It was resumed # times in the past hour}} and stopped again, so Hive won't resume it again by itself. This PC's network may not have recovered: try renewing its network adapter's addresses (ipconfig /renew), flushing DNS (ipconfig /flushdns) or restarting the PC, then resume it.", description: 'The notice that Hive stopped resuming an agent whose connection kept dropping. {n} is how many times it was resumed in the past hour. ipconfig /renew and ipconfig /flushdns are Windows commands: keep them.' }),
-  timedOutTitle: msg({ id: 'main.outage.timedOutTitle', defaultMessage: "{agent}'s connection didn't come back", description: "A notice's title: Hive waited for an agent's connection to come back, to resume it, and gave up. {agent} is the agent's name." }),
-  timedOutBody: msg({ id: 'main.outage.timedOutBody', defaultMessage: "Hive waited {minutes, plural, one {# minute} other {# minutes}} and stopped waiting. If other apps can reach the internet, this PC's network may not have recovered: try renewing its network adapter's addresses (ipconfig /renew), flushing DNS (ipconfig /flushdns) or restarting the PC, then resume it.", description: 'The notice that Hive stopped waiting for an agent\'s connection. {minutes} is how long it waited. ipconfig /renew and ipconfig /flushdns are Windows commands: keep them.' }),
-  gaveUpStatus: msg({ id: 'session.status.connectionKeepsDropping', defaultMessage: 'Stopped: its connection keeps dropping', description: "An agent's status once Hive stopped resuming it: its connection dropped again after several resumes in an hour." }),
-  timedOutStatus: msg({ id: 'session.status.connectionNotBack', defaultMessage: "Stopped: its connection didn't come back", description: "An agent's status once Hive stopped waiting for its connection to come back." })
+  resumedSummary: msg({ id: 'main.outage.resumedSummary', defaultMessage: 'Resumed: the connection dropped at {dropped} and came back at {back}.', description: "A Progress panel run's summary: Combwork resumed an agent once its connection came back. {dropped} and {back} are times of day." }),
+  gaveUpTitle: msg({ id: 'main.outage.gaveUpTitle', defaultMessage: "{agent}'s connection keeps dropping", description: "A notice's title: an agent's connection dropped again after Combwork had resumed it several times in an hour, so Combwork stopped resuming it. {agent} is the agent's name." }),
+  gaveUpBody: msg({ id: 'main.outage.gaveUpBody', defaultMessage: "{n, plural, one {It was resumed once in the past hour} other {It was resumed # times in the past hour}} and stopped again, so Combwork won't resume it again by itself. This PC's network may not have recovered: try renewing its network adapter's addresses (ipconfig /renew), flushing DNS (ipconfig /flushdns) or restarting the PC, then resume it.", description: 'The notice that Combwork stopped resuming an agent whose connection kept dropping. {n} is how many times it was resumed in the past hour. ipconfig /renew and ipconfig /flushdns are Windows commands: keep them.' }),
+  timedOutTitle: msg({ id: 'main.outage.timedOutTitle', defaultMessage: "{agent}'s connection didn't come back", description: "A notice's title: Combwork waited for an agent's connection to come back, to resume it, and gave up. {agent} is the agent's name." }),
+  timedOutBody: msg({ id: 'main.outage.timedOutBody', defaultMessage: "Combwork waited {minutes, plural, one {# minute} other {# minutes}} and stopped waiting. If other apps can reach the internet, this PC's network may not have recovered: try renewing its network adapter's addresses (ipconfig /renew), flushing DNS (ipconfig /flushdns) or restarting the PC, then resume it.", description: 'The notice that Combwork stopped waiting for an agent\'s connection. {minutes} is how long it waited. ipconfig /renew and ipconfig /flushdns are Windows commands: keep them.' }),
+  gaveUpStatus: msg({ id: 'session.status.connectionKeepsDropping', defaultMessage: 'Stopped: its connection keeps dropping', description: "An agent's status once Combwork stopped resuming it: its connection dropped again after several resumes in an hour." }),
+  timedOutStatus: msg({ id: 'session.status.connectionNotBack', defaultMessage: "Stopped: its connection didn't come back", description: "An agent's status once Combwork stopped waiting for its connection to come back." })
+}
+
+/** What the Assistant is told (agent messages, said in its dialect). */
+const A = {
+  resumed: agentMsg({ id: 'notice.outage.resumed', text: "{agent}'s connection dropped at {dropped}; it came back at {back} and Combwork resumed it.", note: "HI-1612: the Assistant's notice that an agent's dropped connection came back and Combwork resumed it. agent: its name; dropped, back: times of day (notice.outage.clock)." }),
+  gaveUp: agentMsg({ id: 'notice.outage.gaveUp', text: "{agent}'s connection dropped again after {resumes} resumes in an hour: Combwork stopped resuming it. The PC's network may not have recovered; the user was told the likely fixes (ipconfig /renew, ipconfig /flushdns, a restart).", note: "HI-1612: the Assistant's notice that Combwork stopped resuming an agent whose connection kept dropping. agent: its name; resumes: how many in the past hour. ipconfig /renew and /flushdns are Windows commands." }),
+  timedOut: agentMsg({ id: 'notice.outage.timedOut', text: "{agent}'s connection didn't come back within {minutes} minutes: Combwork stopped waiting. The user was told the likely fixes.", note: "HI-1612: the Assistant's notice that Combwork stopped waiting for an agent's connection. agent: its name; minutes: how long it waited." }),
+  after: agentMsg({ id: 'notice.outage.after', text: '(Settings → Advanced: Resume agents after a connection drops.)', note: "HI-1612: what ends the Assistant's connection notices: the setting that turns these resumes on and off." })
 }
 
 /** An agent of a launch, as the wait names it. */
@@ -65,10 +75,11 @@ function nameOf(a: OutageAgent): string {
 /** Each waiting agent's Progress run. */
 const runs = new Map<string, { id: string; caller: Parameters<typeof progress.start>[0] }>()
 
-/** A line for the Assistant (agents resumed together come in one notice: assistantNotes.ts). */
-function tellAssistant(a: OutageAgent, line: string): void {
+/** A line for the Assistant (agents resumed together come in one notice: assistantNotes.ts), said in its dialect. */
+function tellAssistant(a: OutageAgent, line: AgentMsg, values: () => AgentValues): void {
   if (a.assistant) return
-  noteForAssistant(a.projectPath, line, '(Settings → Advanced: Resume agents after a connection drops.)') // i18n-ignore: the Assistant's inbox (agent-facing, English)
+  const said = inDialectOf({ projectPath: workspaceOf(a.projectPath).assistantHome, agentId: ASSISTANT_AGENT_ID }, () => ({ line: say(line, values()), after: say(A.after) }))
+  noteForAssistant(a.projectPath, said.line, said.after)
 }
 
 function startRun(a: OutageAgent): void {
@@ -97,7 +108,7 @@ function finishRun(a: OutageAgent, body: Record<string, unknown>): void {
   }
 }
 
-const hiveHost: OutageHost = {
+const combworkHost: OutageHost = {
   on: () => advanced.get<boolean>(OUTAGE_RESUME) === true,
   dropped: (provider, words) => connectionDropped(provider, words, (id) => advanced.pattern(id)),
   reachable: (a) => reachable(a.baseUrl ?? advanced.get<string>(outageCheckUrlId(a.provider))),
@@ -106,6 +117,7 @@ const hiveHost: OutageHost = {
     return !!st && st.runId === a.runId && st.failedTurn?.since === a.turn
   },
   waiting(a) {
+    // agent-text: M
     sessions.connectionWait(a.projectPath, a.agentId, a.runId, M.waiting)
     startRun(a)
   },
@@ -114,7 +126,7 @@ const hiveHost: OutageHost = {
     switch (end.kind) {
       case 'resumed':
         finishRun(a, { ok: true, summary: tr(M.resumedSummary, { dropped: formatTime(end.droppedAt), back: formatTime(end.backAt) }) })
-        tellAssistant(a, `${name}'s connection dropped at ${clock(end.droppedAt)}; it came back at ${clock(end.backAt)} and Hive resumed it.`) // i18n-ignore: the Assistant's inbox (agent-facing, English)
+        tellAssistant(a, A.resumed, () => ({ agent: name, dropped: clock(end.droppedAt), back: clock(end.backAt) }))
         break
       case 'cancelled':
         sessions.connectionWait(a.projectPath, a.agentId, a.runId, null)
@@ -128,16 +140,16 @@ const hiveHost: OutageHost = {
         const title = tr(gaveUp ? M.gaveUpTitle : M.timedOutTitle, { agent: name })
         const body = gaveUp ? tr(M.gaveUpBody, { n: end.resumes }) : tr(M.timedOutBody, { minutes: end.minutes })
         toast('warning', title, body, undefined, a.projectPath)
-        tellAssistant(a, gaveUp ? `${name}'s connection dropped again after ${end.resumes} resumes in an hour: Hive stopped resuming it. The PC's network may not have recovered; the user was told the likely fixes (ipconfig /renew, ipconfig /flushdns, a restart).` : `${name}'s connection didn't come back within ${end.minutes} minutes: Hive stopped waiting. The user was told the likely fixes.`) // i18n-ignore: the Assistant's inbox (agent-facing, English)
+        tellAssistant(a, gaveUp ? A.gaveUp : A.timedOut, (): AgentValues => (end.kind === 'gaveUp' ? { agent: name, resumes: String(end.resumes) } : { agent: name, minutes: String(end.minutes) }))
         break
       }
     }
   },
   async resume(a, note) {
     // Not while its team is paused (HI-2081): a turn carried on is work, which waits for the team to resume.
-    const still = (): boolean => hiveHost.stillStopped(a) && !pausedFor(a.projectPath)
+    const still = (): boolean => combworkHost.stillStopped(a) && !pausedFor(a.projectPath)
     if (!still()) return false
-    return !!(await deliverNow(a.projectPath, { agentId: a.agentId, kind: 'control', from: HIVE, body: note, source: 'connection-back', ref: `${a.runId}@${a.turn}`, forRun: a.runId }, still).catch(() => null))
+    return !!(await deliverNow(a.projectPath, { agentId: a.agentId, kind: 'control', from: COMBWORK, body: note, source: 'connection-back', ref: `${a.runId}@${a.turn}`, forRun: a.runId }, still).catch(() => null))
   },
   now: () => Date.now(),
   later(fn, ms) {
@@ -157,12 +169,12 @@ let outage: OutageResume | null = null
  * Starts following agents' failed turns (once): a session's status with a new failed turn may start a wait, one
  * without it (a new turn) or a launch's exit ends one, and the switch turned off ends them all.
  */
-export function startOutageResume(host: OutageHost = hiveHost): OutageResume {
+export function startOutageResume(host: OutageHost = combworkHost): OutageResume {
   if (outage) return outage
   const o = new OutageResume(host)
   outage = o
   const seen = new Map<string, string>()
-  onHiveEvent((ev) => {
+  onCombworkEvent((ev) => {
     if (ev.type === 'session-status') {
       const st = ev.state
       if (!st.projectPath) return

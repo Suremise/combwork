@@ -3,7 +3,7 @@
 // with nothing written; Add Agent offers Role in the workflow (Builder · Reviewer · Either, guessed from the name until
 // chosen) and an agent added as a reviewer is offered as a lane's reviewer only; Agent Settings shows the guess, the
 // free-text role as Note, and saving stores the role; an agent changed to Either is in both lists; the project hover's
-// table shows each role; the Assistant's hive tools set a role (and add an agent with one) and refuse one that isn't a
+// table shows each role; the Assistant's Combwork tools set a role (and add an agent with one) and refuse one that isn't a
 // role; project agents have neither tool (only the Assistant changes agents).
 // Screenshots of Add Agent, Agent Settings and the hover in both themes. Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR.
@@ -43,14 +43,14 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
   cfg.settings.notifications = { ...cfg.settings.notifications, desktopNotifications: false, chimeEnabled: false }
   cfg.settings.agentApi = { ...cfg.settings.agentApi, enabled: true }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, HIVE_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: String(PORT), CLAUDE_CONFIG_DIR: claudeHome, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1400, height: 900 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     await page.getByText('alpha', { exact: true }).first().click()
     const token = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
@@ -58,7 +58,7 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
       const r = await fetch(`http://127.0.0.1:${PORT}${route}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
       return { status: r.status, body: await r.json().catch(() => null) }
     }
-    const saved = () => JSON.parse(fs.readFileSync(path.join(alpha, '.hive', 'project.json'), 'utf8')).agents
+    const saved = () => JSON.parse(fs.readFileSync(path.join(alpha, '.combwork', 'project.json'), 'utf8')).agents
     const roles = async () => Object.fromEntries((await api('GET', '/v1/projects/alpha')).body.agents.map((a) => [a.name, a.workflowRole]))
     // Back to the project's Session tab from the board.
     const toSession = async () => {
@@ -169,32 +169,32 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     }
     await inv('settings:update', { appearance: { theme: 'dark' } })
 
-    // --- The hive tools: the Assistant (Control: projects) sets a role and adds an agent with one; a value that isn't a
+    // --- The Combwork tools: the Assistant (Control: projects) sets a role and adds an agent with one; a value that isn't a
     // role is refused; project agents have neither tool (assistantChange: only the Assistant changes agents).
     const home = (await inv('workspace:refresh')).assistant.path
     await inv('session:start', home, { agentId: 'assistant' })
     const asTokenFile = path.join(userData, 'assistant-api', `${createHash('sha256').update(ws.toLowerCase()).digest('hex').slice(0, 16)}.json`)
     check('the Assistant starts, with its token', !!(await until(async () => fs.existsSync(asTokenFile), HUNG_MS)))
     const mcp = (method, params, role) => {
-      const extra = role === 'assistant' ? { HIVE_ROLE: 'assistant', HIVE_ASSISTANT_CONTROL: 'projects', HIVE_API_TOKEN_FILE: asTokenFile, HIVE_API_TOKEN: '', HIVE_PROJECT: '' } : { HIVE_API_TOKEN_FILE: path.join(userData, 'agent-api.json'), HIVE_PROJECT: 'alpha', HIVE_AGENT_ID: 'a-hb1' }
-      const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'hive-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) + '\n', env: lib.childEnv({ HIVE_API_URL: `http://127.0.0.1:${PORT}`, HIVE_WORKSPACE: ws, ...extra }), timeout: 60000 }).toString()
+      const extra = role === 'assistant' ? { CW_ROLE: 'assistant', CW_ASSISTANT_CONTROL: 'projects', CW_API_TOKEN_FILE: asTokenFile, CW_API_TOKEN: '', CW_PROJECT: '' } : { CW_API_TOKEN_FILE: path.join(userData, 'agent-api.json'), CW_PROJECT: 'alpha', CW_AGENT_ID: 'a-hb1' }
+      const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) + '\n', env: lib.childEnv({ CW_API_URL: `http://127.0.0.1:${PORT}`, CW_WORKSPACE: ws, ...extra }), timeout: 60000 }).toString()
       return JSON.parse(out.split('\n')[0]).result
     }
     const tool = (name, args, role = 'assistant') => {
       const r = mcp('tools/call', { name, arguments: args }, role)
       return { text: r.content[0].text, isError: !!r.isError }
     }
-    const set = tool('hive_update_agent', { project: 'alpha', agent: 'HB1', workflowRole: 'either' })
-    check("the Assistant's hive_update_agent sets HB1 to either", !set.isError && saved().find((a) => a.name === 'HB1')?.workflowRole === 'either', JSON.stringify(set))
-    const bad = tool('hive_update_agent', { project: 'alpha', agent: 'HB1', workflowRole: 'boss' })
+    const set = tool('cw_update_agent', { project: 'alpha', agent: 'HB1', workflowRole: 'either' })
+    check("the Assistant's cw_update_agent sets HB1 to either", !set.isError && saved().find((a) => a.name === 'HB1')?.workflowRole === 'either', JSON.stringify(set))
+    const bad = tool('cw_update_agent', { project: 'alpha', agent: 'HB1', workflowRole: 'boss' })
     check('…a value that is not a role is refused, nothing changed', bad.isError && /builder", "reviewer", "either" or "generalist/.test(bad.text) && saved().find((a) => a.name === 'HB1')?.workflowRole === 'either', JSON.stringify(bad))
-    const added = tool('hive_add_agent', { project: 'alpha', name: 'Pal', workflowRole: 'either' })
-    check('hive_add_agent with workflowRole: either', !added.isError && saved().find((a) => a.name === 'Pal')?.workflowRole === 'either', JSON.stringify(added))
-    const listed = tool('hive_list_projects', {})
-    check('hive_list_projects gives each agent its role', /HB1 \[claude-code, either\]/.test(listed.text) && /Checker \[claude-code, reviewer\]/.test(listed.text), listed.text)
+    const added = tool('cw_add_agent', { project: 'alpha', name: 'Pal', workflowRole: 'either' })
+    check('cw_add_agent with workflowRole: either', !added.isError && saved().find((a) => a.name === 'Pal')?.workflowRole === 'either', JSON.stringify(added))
+    const listed = tool('cw_list_projects', {})
+    check('cw_list_projects gives each agent its role', /HB1 \[claude-code, either\]/.test(listed.text) && /Checker \[claude-code, reviewer\]/.test(listed.text), listed.text)
     // --- A generalist (HI-686): added with the role, never offered by Start Lane, shown in the hover.
-    const gen = tool('hive_add_agent', { project: 'alpha', name: 'Gen', workflowRole: 'generalist' })
-    check('hive_add_agent with workflowRole: generalist', !gen.isError && saved().find((a) => a.name === 'Gen')?.workflowRole === 'generalist', JSON.stringify(gen))
+    const gen = tool('cw_add_agent', { project: 'alpha', name: 'Gen', workflowRole: 'generalist' })
+    check('cw_add_agent with workflowRole: generalist', !gen.isError && saved().find((a) => a.name === 'Gen')?.workflowRole === 'generalist', JSON.stringify(gen))
     await page.getByRole('button', { name: 'Task Board' }).click()
     const l4 = await laneLists()
     check("Start Lane: a generalist is neither a lane's builder nor its reviewer", !l4.builders.includes('Gen') && !l4.reviewers.includes('Gen') && l4.builders.includes('HB1'), JSON.stringify(l4))
@@ -214,16 +214,16 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     await shoot('agent-settings-generalist', () => gSettings)
     await gSettings.getByRole('button', { name: 'Cancel' }).click()
     const agentTools = mcp('tools/list', {}, 'agent').tools
-    check('a project agent has neither hive_update_agent nor hive_add_agent', agentTools.length > 0 && !agentTools.some((t) => t.name === 'hive_update_agent' || t.name === 'hive_add_agent'), JSON.stringify(agentTools.map((t) => t.name)))
+    check('a project agent has neither cw_update_agent nor cw_add_agent', agentTools.length > 0 && !agentTools.some((t) => t.name === 'cw_update_agent' || t.name === 'cw_add_agent'), JSON.stringify(agentTools.map((t) => t.name)))
     // HI-2229: each role's most used tools are marked to be sent in full where a CLI defers tools; the rest aren't.
     const full = (list) => list.filter((t) => t._meta?.['anthropic/alwaysLoad'] === true).map((t) => t.name).sort().join(',')
-    check("a project agent's hive_inbox, hive_list_tasks and hive_read_task are marked to load in full, no other", full(agentTools) === 'hive_inbox,hive_list_tasks,hive_read_task', full(agentTools))
+    check("a project agent's cw_inbox, cw_list_tasks and cw_read_task are marked to load in full, no other", full(agentTools) === 'cw_inbox,cw_list_tasks,cw_read_task', full(agentTools))
     const assistantTools = mcp('tools/list', {}, 'assistant').tools
-    check("…the Assistant's, and its hive_agent_activity and hive_project_status", full(assistantTools) === 'hive_agent_activity,hive_inbox,hive_list_tasks,hive_project_status,hive_read_task', full(assistantTools))
-    const guessed = tool('hive_read_task', { key: 'AL-1' }, 'agent')
-    check('a call with a guessed argument is refused as before, and told what the tool takes, naming no value', guessed.isError && /is not a card number/.test(guessed.text) && /hive_read_task takes number \(required\).*; missing: number; not: key\./.test(guessed.text) && !guessed.text.includes('AL-1'), guessed.text)
-    const noProject = tool('hive_project_status', {})
-    check("the Assistant's hive_project_status with no project says what to pass", noProject.isError && /project is required: a project's name, as hive_list_projects lists them/.test(noProject.text), noProject.text)
+    check("…the Assistant's, and its cw_agent_activity and cw_project_status", full(assistantTools) === 'cw_agent_activity,cw_inbox,cw_list_tasks,cw_project_status,cw_read_task', full(assistantTools))
+    const guessed = tool('cw_read_task', { key: 'AL-1' }, 'agent')
+    check('a call with a guessed argument is refused as before, and told what the tool takes, naming no value', guessed.isError && /is not a card number/.test(guessed.text) && /cw_read_task takes number \(required\).*; missing: number; not: key\./.test(guessed.text) && !guessed.text.includes('AL-1'), guessed.text)
+    const noProject = tool('cw_project_status', {})
+    check("the Assistant's cw_project_status with no project says what to pass", noProject.isError && /project is required: a project's name, as cw_list_projects lists them/.test(noProject.text), noProject.text)
   } finally {
     await app.close().catch(() => undefined)
   }

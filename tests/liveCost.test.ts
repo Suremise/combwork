@@ -10,7 +10,7 @@ import * as electron from 'electron'
 import { DEFAULT_SETTINGS } from '../src/shared/defaults'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-livecost-')
+const base = tempDir('cw-livecost-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { config } = await import('../src/main/config')
@@ -34,7 +34,7 @@ beforeAll(() => {
     { type: 'cost-state', timestamp: '2026-10-11T09:00:02Z', totalCostUSD: 9 }
   ]
   writeFileSync(transcript, lines.map((l) => JSON.stringify(l)).join('\n') + '\n')
-  // A million input tokens of GPT-6.1 Sol in a Codex rollout: $2 at Hive's price.
+  // A million input tokens of GPT-6.1 Sol in a Codex rollout: $2 at Combwork's price.
   const usage = { input_tokens: 1_000_000, cached_input_tokens: 0, output_tokens: 0 }
   const codex = [
     { timestamp: '2026-10-11T09:00:00Z', type: 'turn_context', payload: { model: 'gpt-6.1-sol' } },
@@ -157,7 +157,7 @@ describe("a live session's cost follows Session costs (#436)", () => {
 })
 
 describe('a session that ran on a server connection (HI-1772)', () => {
-  // A server's model (no price of Hive's) with the $9 Claude Code reported for it, priced as a Claude model.
+  // A server's model (no price of Combwork's) with the $9 Claude Code reported for it, priced as a Claude model.
   const serverTranscript = join(base, 'server-session.jsonl')
   type UsageFor = (projectPath: string, path: string, sessionId: string, provider: string, o?: { reportsIgnored?: boolean }) => Promise<{ costUsd: number | null; inputTokens: number } | null>
   const usageFor = (o?: { reportsIgnored?: boolean }) => (sessions as unknown as { usageFor: UsageFor }).usageFor(project, serverTranscript, 'server-session', 'claude-code', o)

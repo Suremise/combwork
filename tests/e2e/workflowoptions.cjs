@@ -3,7 +3,7 @@
 // Checks, Merging, Where cards are built, Card loops, Stages; None: Review, Checks, The work, Card loops, Stages; File
 // locks and Card loops options since HI-1766, File locks shown with slots too), each worded as an outcome with one sentence on what it does and where its value comes from. Each preset
 // (and All off) previews what it sets and why, marking what it would change, before Use fills the form: Pair (the agent
-// merges), Pair (Hive merges, G9's checks and install), Team (#1361's note). A contradiction shows its reason under both
+// merges), Pair (Combwork merges, G9's checks and install), Team (#1361's note). A contradiction shows its reason under both
 // rows as it is chosen and keeps Save off; those the form can't reach are refused when pasted, as a save is. Save… lists
 // what changes and the running lane keeping the old rules; a stage rename alone applies now; a save after another change
 // (the Assistant's tool, another window) is refused as changed meanwhile and the section reloads. Inherit, Copy as JSON
@@ -12,7 +12,7 @@
 // rebase: Same change carries the pass over, Exact revision only makes it stale (S9). Screenshots in both themes, in
 // German and in Polish. Dev build, throwaway profiles and workspaces; the fake Claude Code for G4's agents.
 // Dev build only (#1578): it starts this checkout's Electron itself, writes the board's tables, and holds a read with a
-// test seam (HIVE_TEST_SLOW_IPC); its queue's builders are on slots, as 1.0 has them.
+// test seam (CW_TEST_SLOW_IPC); its queue's builders are on slots, as 1.0 has them.
 const lib = require('./lib.cjs')
 const q = require('./queueFixture.cjs')
 const { _electron } = require('playwright-core')
@@ -32,9 +32,9 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 
-/** Writes to the workspace's board from outside Hive, as another process would (the upgrade's marks, a lane's rows). */
+/** Writes to the workspace's board from outside Combwork, as another process would (the upgrade's marks, a lane's rows). */
 function board(sql, ...args) {
-  const db = new DatabaseSync(path.join(ws, '.hive', 'hive.db'), { timeout: 5000 })
+  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })
   try {
     db.prepare(sql).run(...args)
   } finally {
@@ -97,33 +97,33 @@ async function theForm(page, app, inv) {
   // Its own commit identity: G12 shows it (never the machine's global one).
   for (const [k, v] of [['user.name', 'Pat Builder'], ['user.email', 'pat@example.invalid']]) lib.git(project, ['config', k, v])
   // As the upgrade leaves a project: today's way of working (Not checked, a reviewer agent: it has one), no preset.
-  fs.mkdirSync(path.join(project, '.hive'), { recursive: true })
+  fs.mkdirSync(path.join(project, '.combwork'), { recursive: true })
   const upgraded = { review: 'agent', reviewers: 1, noSelfReview: true, preChecks: [], sameness: 'change', finish: 'notChecked', style: 'merge', target: '', strict: false, mergeChecks: [], okBefore: { mode: 'never', labels: [] }, folder: 'project', identity: null, stopOwnRuns: false, dependenciesDone: false, slotsUpToDate: false, sharedFolderWarning: false, excluded: ['node_modules', '.venv'], commands: {} }
-  fs.writeFileSync(path.join(project, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1 (reviewer)' }], workflow: { platform: 'git', preset: null, options: upgraded } }))
+  fs.writeFileSync(path.join(project, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1 (reviewer)' }], workflow: { platform: 'git', preset: null, options: upgraded } }))
   // A project without version control, for None's groups and the contradictions only it can have.
   fs.mkdirSync(notes, { recursive: true })
   fs.writeFileSync(path.join(notes, 'README.md'), '# Notes\n')
   // Its preset chosen, so the presets notice names only web.
-  fs.mkdirSync(path.join(notes, '.hive'), { recursive: true })
-  fs.writeFileSync(path.join(notes, '.hive', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [], workflow: { platform: 'none', preset: 'solo', options: {} } }))
+  fs.mkdirSync(path.join(notes, '.combwork'), { recursive: true })
+  fs.writeFileSync(path.join(notes, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [], workflow: { platform: 'none', preset: 'solo', options: {} } }))
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_TEST_TIPS: 'off' })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_TEST_TIPS: 'off' })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   try {
     const page = await app.firstWindow()
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.fitWindow(app, page, { width: 1400, height: 950 })
     await lib.appReady(page)
-    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
     await lib.openWorkspace(inv, page, ws)
     const f = await theForm(page, app, inv)
     const { section, row, groups, choice, preview, save, reasons, values, dialog, applyChoice, saveAll, reopen, discard, themes } = f
-    const projectJson = (p = project) => JSON.parse(fs.readFileSync(path.join(p, '.hive', 'project.json'), 'utf8'))
+    const projectJson = (p = project) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 'project.json'), 'utf8'))
     const saved = () => projectJson().workflow?.options ?? {}
 
     // A board made by 1.0 has no notice; one upgraded from 0.9 (cards from before it) has, once.
@@ -146,13 +146,16 @@ async function theForm(page, app, inv) {
       globalThis.__presetsCalls = 0
       handlers.set('workflow:presetsNotice', (...x) => (globalThis.__presetsCalls++, h(...x)))
     })
-    const status = (agentId, s) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'session-status', state: { provider: 'claude-code', runId: `wo-${agentId}`, projectPath: project, agentId, cwd: project, sessionId: '', status: s, runtime: { lifecycle: s === 'stopped' ? 'stopped' : 'running', maintenance: null, attention: null, composer: 'free' }, startedAt: new Date().toISOString(), launchSignature: '', unseen: false } })
+    const status = (agentId, s) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'session-status', state: { provider: 'claude-code', runId: `wo-${agentId}`, projectPath: project, agentId, cwd: project, sessionId: '', status: s, runtime: { lifecycle: s === 'stopped' ? 'stopped' : 'running', maintenance: null, attention: null, composer: 'free' }, startedAt: new Date().toISOString(), launchSignature: '', unseen: false } })
     const running = page.locator('.project-row', { hasText: 'web' }).locator('.agent-count')
     for (const s of ['ready', 'working', 'waiting', 'working']) for (const a of ['b1', 'r1']) await status(a, s)
     // Main knows nothing of these made-up runs, so a workspace refresh meanwhile (a project.json write's) drops them: they
-    // go on reporting, as running agents do, until the row shows them (HI-1774: it raced that refresh).
+    // go on reporting, as running agents do, until the row shows them (HI-1774: it raced that refresh). The count is read
+    // without Playwright's wait (HI-2639): a refresh between count() and innerText() removed it, and innerText() then
+    // waited 30 s for it while nothing reported the runs again.
     const twoShown = !!(await lib.until(async () => {
-      if ((await running.count()) === 1 && (await running.innerText()).trim() === '2') return true
+      const shown = await running.allInnerTexts()
+      if (shown.length === 1 && shown[0].trim() === '2') return true
       for (const a of ['b1', 'r1']) await status(a, 'working')
       return false
     }, HUNG_MS))
@@ -162,7 +165,7 @@ async function theForm(page, app, inv) {
     check('agents changing state don’t read the presets notice again, and it stays', twoShown && noneShown && presetsCalls === 0 && (await notice.count()) === 1, `two running shown: ${twoShown}, then none: ${noneShown}, calls: ${presetsCalls}`)
     // The answer's board write held a while, and the workspace changed meanwhile (#1464): the notice's reload then reads
     // the board before the answer is on it, and must not show it again.
-    await app.evaluate(() => { process.env.HIVE_TEST_SLOW_IPC = 'workflow:presetsNoticeSaid=3000*1' })
+    await app.evaluate(() => { process.env.CW_TEST_SLOW_IPC = 'workflow:presetsNoticeSaid=3000*1' })
     await notice.getByRole('button', { name: 'Choose…' }).click()
     await inv('workspace:refresh')
     const workflowTab = page.locator('.git-sections [data-section="workflow"]')
@@ -181,13 +184,13 @@ async function theForm(page, app, inv) {
     check('…ArrowLeft back to Workflow, its form shown again', !!(await lib.until(async () => (await workflowTab.getAttribute('aria-selected')) === 'true' && (await focusedSection()) === 'workflow' && (await panelFor()) === 'workflow' && (await section.locator('.workflow-group[data-group="review"]').isVisible().catch(() => false)), HUNG_MS)))
     await themes('section-tabs', page.locator('.git-head'))
     check('the notice is gone, and answered for good',!!(await lib.until(async () => (await notice.count()) === 0 && (await inv('workflow:presetsNotice')) === null, HUNG_MS)), `notice shown: ${await notice.count()}, presetsNotice: ${JSON.stringify(await inv('workflow:presetsNotice'))}`)
-    await app.evaluate(() => { delete process.env.HIVE_TEST_SLOW_IPC })
+    await app.evaluate(() => { delete process.env.CW_TEST_SLOW_IPC })
 
     // --- The form as the upgrade left it: in groups, no preset, each option worded as an outcome with its origin.
     check('Git’s groups, in order', JSON.stringify(await groups()) === JSON.stringify(['presets', 'team', 'review', 'checks', 'merging', 'where', 'slots', 'loops', 'stages']), JSON.stringify(await groups()))
     const inGroup = async (g) => section.locator(`.workflow-group[data-group="${g}"] .workflow-option`).evaluateAll((els) => els.map((e) => e.getAttribute('data-option')))
     const layout = { review: await inGroup('review'), checks: await inGroup('checks'), merging: await inGroup('merging'), where: await inGroup('where'), loops: await inGroup('loops'), stages: await inGroup('stages') }
-    check('each group has its options (G4 and G17 in Review, G17 with a reviewer agent; G9 and G8 hidden while the agent doesn’t merge through Hive; G15 only with slots)', JSON.stringify(layout) === JSON.stringify({ review: ['review', 'reviewers', 'reviewerMode', 'noSelfReview', 'sameness', 'okBefore'], checks: ['preChecks'], merging: ['finish', 'style', 'target', 'dependenciesDone'], where: ['folder', 'identity', 'stopOwnRuns', 'sharedFolderWarning', 'fileLocks'], loops: ['loopWakes', 'loopRounds', 'loopWaitHours', 'loopStepWaitMinutes'], stages: ['stageNames'] }), JSON.stringify(layout))
+    check('each group has its options (G4 and G17 in Review, G17 with a reviewer agent; G9 and G8 hidden while the agent doesn’t merge through Combwork; G15 only with slots)', JSON.stringify(layout) === JSON.stringify({ review: ['review', 'reviewers', 'reviewerMode', 'noSelfReview', 'sameness', 'okBefore'], checks: ['preChecks'], merging: ['finish', 'style', 'target', 'dependenciesDone'], where: ['folder', 'identity', 'stopOwnRuns', 'sharedFolderWarning', 'fileLocks'], loops: ['loopWakes', 'loopRounds', 'loopWaitHours', 'loopStepWaitMinutes'], stages: ['stageNames'] }), JSON.stringify(layout))
     check('no Version control row: the header has the choice', (await section.locator('.workflow-platform').count()) === 0)
     check('no preset chosen', (await section.locator('.workflow-preset-now').innerText()).trim() === 'No preset chosen')
     check('every preset is offered, with All off', JSON.stringify(await section.locator('.workflow-choice').evaluateAll((els) => els.map((e) => e.getAttribute('data-choice')))) === JSON.stringify(['solo', 'pairAgent', 'pair', 'team', 'allOff']))
@@ -211,7 +214,7 @@ async function theForm(page, app, inv) {
     await themes('preview', preview)
     await preview.locator('[data-action="use-choice"]').click()
     check('Use: the agent merges', !!(await lib.until(async () => (await row('finish').locator('select').inputValue()) === 'agentMerges', HUNG_MS)))
-    check('…each card in its own folder (a slot lent per card or lane), G1 read as before it’s merged', (await row('folder').locator('select').inputValue()) === 'slots' && (await row('folder').innerText()).includes('a slot Hive lends to the card or its lane') && !(await row('folder').innerText()).includes('worktree') && (await row('review').innerText()).startsWith('Work is reviewed before it’s merged'))
+    check('…each card in its own folder (a slot lent per card or lane), G1 read as before it’s merged', (await row('folder').locator('select').inputValue()) === 'slots' && (await row('folder').innerText()).includes('a slot Combwork lends to the card or its lane') && !(await row('folder').innerText()).includes('worktree') && (await row('review').innerText()).startsWith('Work is reviewed before it’s merged'))
     check('…the shared-folder warning not shown with each card in its own folder', (await row('sharedFolderWarning').count()) === 0)
     check('…no push after merging while the agent merges (G18: only the merge queue pushes)', (await row('pushTarget').count()) === 0)
     check('…the quick checks from its scripts, with their commands', JSON.stringify(await values('preChecks')) === JSON.stringify(['typecheck', 'npm run typecheck', 'lint', 'npm run lint']), JSON.stringify(await values('preChecks')))
@@ -222,7 +225,7 @@ async function theForm(page, app, inv) {
     await save.click()
     await dialog.waitFor({ timeout: HUNG_MS })
     const said = await dialog.innerText()
-    check('the warning lists what changes, each option old → new, from the next card', said.includes('apply from the next card') && said.includes('Who merges: Not checked → The agent merges, Hive checks') && said.includes('Where cards are built: Everyone in the project folder → Each card in its own folder'), said)
+    check('the warning lists what changes, each option old → new, from the next card', said.includes('apply from the next card') && said.includes('Who merges: Not checked → The agent merges, Combwork checks') && said.includes('Where cards are built: Everyone in the project folder → Each card in its own folder'), said)
     check('…and lists the running lane, which keeps the old rules', said.includes('keeps the old rules') && said.includes('Builder B1'), said)
     await themes('save', dialog)
     await dialog.getByRole('button', { name: 'Save', exact: true }).click()
@@ -256,8 +259,8 @@ async function theForm(page, app, inv) {
     await themes('contradiction', row('finish'))
     await row('folder').locator('select').selectOption('project')
     check('resolved: the reasons go, Save is on', !!(await lib.until(async () => (await reasons('finish')).length === 0 && (await reasons('folder')).length === 0 && (await save.isEnabled()), HUNG_MS)))
-    await row('finish').locator('select').selectOption('hiveMerges')
-    check('Hive merges in the project folder: under both rows', !!(await lib.until(() => both('mergeNeedsSlots', 'finish', 'folder'), HUNG_MS)) && (await save.isDisabled()))
+    await row('finish').locator('select').selectOption('combworkMerges')
+    check('Combwork merges in the project folder: under both rows', !!(await lib.until(() => both('mergeNeedsSlots', 'finish', 'folder'), HUNG_MS)) && (await save.isDisabled()))
     await discard()
     await row('reviewers').locator('select').selectOption('2')
     await row('review').locator('select').selectOption('you')
@@ -303,6 +306,15 @@ async function theForm(page, app, inv) {
     const copied = await lib.until(() => page.evaluate(() => window.__copied), HUNG_MS)
     const parsed = copied ? JSON.parse(copied) : null
     check('Copy as JSON gives the version control, the preset and every option', parsed?.platform === 'git' && parsed?.preset === 'pairAgent' && parsed?.options.finish === 'agentMerges' && 'style' in parsed.options, String(copied))
+    // Pop-ups stay while the window isn't focused (a test window never is), stacked at the bottom right over Paste JSON…
+    // (HI-2639: under load its pop-up was there before the click): its own shown, then every one closed, as you would.
+    const popups = page.locator('.toast.popup')
+    await popups.filter({ hasText: 'Workflow options copied' }).waitFor({ timeout: HUNG_MS })
+    check('…saying so in a pop-up; the pop-ups closed, nothing covers Paste JSON…', !!(await lib.until(async () => {
+      if ((await popups.count()) === 0) return true
+      await popups.first().locator('.popup-close').click({ timeout: 2000 }).catch(() => undefined)
+      return false
+    }, HUNG_MS)), (await popups.allInnerTexts()).join(' | '))
     const pasteIn = async (json) => {
       await section.getByRole('button', { name: 'Paste JSON…' }).click()
       const d = page.locator('.dialog', { hasText: 'Paste Workflow Options' })
@@ -320,14 +332,14 @@ async function theForm(page, app, inv) {
     check('a good paste fills the form, to save', (await row('target').locator('input').inputValue()) === 'release')
     await discard()
 
-    // --- Pair (Hive merges, #1355): Hive merges, G9's checks suggested from the scripts with their commands, the install.
+    // --- Pair (Combwork merges, #1355): Combwork merges, G9's checks suggested from the scripts with their commands, the install.
     await applyChoice('pair')
-    check('Pair: Hive merges into the repository’s own default branch, by name (master here)', (await row('finish').locator('select').inputValue()) === 'hiveMerges' && (await row('target').locator('input').inputValue()) === 'master', await row('target').locator('input').inputValue())
+    check('Pair: Combwork merges into the repository’s own default branch, by name (master here)', (await row('finish').locator('select').inputValue()) === 'combworkMerges' && (await row('target').locator('input').inputValue()) === 'master', await row('target').locator('input').inputValue())
     check('…G9 in Checks: the quick checks from its scripts, with their commands', JSON.stringify(await inGroup('checks')) === JSON.stringify(['preChecks', 'mergeChecks', 'focusedTests', 'mergeInstall']) && JSON.stringify(await values('mergeChecks')) === JSON.stringify(['typecheck', 'npm run typecheck', 'lint', 'npm run lint']), JSON.stringify(await values('mergeChecks')))
-    check('…G8 shown in Merging while Hive merges', (await inGroup('merging')).includes('strict'))
-    // G18 (#1179): pushing the target after a merge, shown while Hive merges, off in the preset; switched on and saved.
+    check('…G8 shown in Merging while Combwork merges', (await inGroup('merging')).includes('strict'))
+    // G18 (#1179): pushing the target after a merge, shown while Combwork merges, off in the preset; switched on and saved.
     const push = row('pushTarget').locator('[role="switch"]')
-    check('…G18 shown in Merging while Hive merges, off', (await inGroup('merging')).includes('pushTarget') && (await push.getAttribute('aria-checked')) === 'false')
+    check('…G18 shown in Merging while Combwork merges, off', (await inGroup('merging')).includes('pushTarget') && (await push.getAttribute('aria-checked')) === 'false')
     await push.click()
     await themes('push', row('pushTarget'))
     // G6's third value (#1184): offered by name, chosen, and saved below.
@@ -335,13 +347,13 @@ async function theForm(page, app, inv) {
     check('…G6 offers Merge commit, Squash and Rebase and fast-forward', JSON.stringify(styles) === JSON.stringify(['Merge commit', 'Squash', 'Rebase and fast-forward']), JSON.stringify(styles))
     await row('style').locator('select').selectOption('rebase')
     await themes('rebase', row('style'))
-    await themes('hivemerges', row('mergeChecks'))
+    await themes('cwmerges', row('mergeChecks'))
     // File locks (HI-1766) stays with each card in a slot: agents can still share the project folder outside one.
     check('File locks is shown with slots too, saying where it applies', (await row('folder').locator('select').inputValue()) === 'slots' && (await row('fileLocks').locator('[data-note="file-locks"]').count()) === 1)
     await themes('filelocks-slots', row('fileLocks'))
     await row('mergeInstall').locator('select').selectOption('always')
     await saveAll()
-    check('saved: Hive merges, the merge checks, the install and the push after merging, in project.json', !!(await lib.until(async () => saved().finish === 'hiveMerges' && JSON.stringify(saved().mergeChecks) === JSON.stringify(['typecheck', 'lint']) && saved().mergeInstall === 'always' && saved().pushTarget === true && saved().style === 'rebase', HUNG_MS)), JSON.stringify(saved()))
+    check('saved: Combwork merges, the merge checks, the install and the push after merging, in project.json', !!(await lib.until(async () => saved().finish === 'combworkMerges' && JSON.stringify(saved().mergeChecks) === JSON.stringify(['typecheck', 'lint']) && saved().mergeInstall === 'always' && saved().pushTarget === true && saved().style === 'rebase', HUNG_MS)), JSON.stringify(saved()))
     for (let i = (await row('mergeChecks').locator('.workflow-check').count()) - 1; i >= 0; i--) await row('mergeChecks').locator('.workflow-check').nth(i).getByRole('button', { name: 'Remove' }).click()
     check('with no merge checks, the install row is not shown', !!(await lib.until(async () => (await row('mergeInstall').count()) === 0, HUNG_MS)))
     await discard()
@@ -403,13 +415,13 @@ async function theForm(page, app, inv) {
     check('saved: every rule off, no preset; the stage name kept', !!(await lib.until(async () => projectJson().workflow?.preset === null && saved().review === 'none' && saved().finish === 'notChecked' && saved().folder === 'project' && saved().stageNames?.review === 'Checking', HUNG_MS)), JSON.stringify(projectJson().workflow))
 
     // --- With the rules not enforced, the section says so and still saves.
-    await inv('advanced:set', 'hive.workflow.enforce', false)
+    await inv('advanced:set', 'cw.workflow.enforce', false)
     await reopen()
     check('with Workflow rules are enforced off, the section says so', !!(await lib.until(async () => (await section.locator('.workflow-note').count()) > 0 && (await section.innerText()).includes('aren’t enforced'), HUNG_MS)))
     await row('style').locator('select').selectOption('squash')
     await saveAll()
     check('…and still saves', !!(await lib.until(async () => saved().style === 'squash', HUNG_MS)))
-    await inv('advanced:set', 'hive.workflow.enforce', null)
+    await inv('advanced:set', 'cw.workflow.enforce', null)
 
     // --- A reviewer agent chosen from All off (#1508): "Nobody reviews their own work", held on while one reviews, is
     // turned on in the draft too, so it saves, the warning listing both.
@@ -428,7 +440,7 @@ async function theForm(page, app, inv) {
     await dialog.waitFor({ state: 'detached', timeout: HUNG_MS })
     check('#1508: saved, a reviewer agent and nobody reviews their own work, one reviewer', !!(await lib.until(() => saved().review === 'agent' && saved().noSelfReview === true && (saved().reviewers ?? 1) === 1, HUNG_MS)), JSON.stringify(projectJson().workflow))
 
-    // --- Set in the window on their own and saved (#1483), each before only by a preset or at Hive's level: G1b two
+    // --- Set in the window on their own and saved (#1483), each before only by a preset or at Combwork's level: G1b two
     // reviewers, G12 the project's identity, G13 stop own runs, G14 on the project's own row. From the reviewer agent
     // just saved.
     const without = (o, key) => JSON.stringify(Object.fromEntries(Object.entries(o).filter(([k]) => k !== key).sort(([a], [b]) => a.localeCompare(b))))
@@ -472,8 +484,8 @@ async function theForm(page, app, inv) {
     await themes('none', section.locator('.workflow-group[data-group="review"]'))
     check('…its Card loops from the defaults, Default as their origin', (await row('loopWakes').locator('.workflow-origin').innerText()).includes('Default') && (await row('fileLocks').locator('.workflow-origin').innerText()).includes('Default'))
     await themes('none-loops', section.locator('.workflow-group[data-group="loops"]'))
-    const noneBase = { hiveWorkflow: 1, platform: 'none', preset: null, options: {} }
-    const merging = await pasteIn({ ...noneBase, options: { finish: 'hiveMerges' } })
+    const noneBase = { combworkWorkflow: 1, platform: 'none', preset: null, options: {} }
+    const merging = await pasteIn({ ...noneBase, options: { finish: 'combworkMerges' } })
     check('None: a merge pasted is refused, merging needs Git', !!(await lib.until(async () => (await merging.innerText()).includes('Merging needs Git'), HUNG_MS)), await merging.innerText())
     await merging.locator('textarea').fill(JSON.stringify({ ...noneBase, options: { folder: 'slots' } }))
     await merging.getByRole('button', { name: 'Try Again' }).click()
@@ -500,7 +512,7 @@ async function theForm(page, app, inv) {
     check('N6: dependencies done switched on None’s form alone, saved', n6.ok, n6.said)
     // notes as it was (Solo, nothing of its own), which the late reads below start from; the form reads it again.
     await inv('workflow:setOptions', notes, { preset: 'solo', options: {} })
-    await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'workflow-changed', workspacePath: ws, projectPath: notes })
+    await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'workflow-changed', workspacePath: ws, projectPath: notes })
     check('notes back to Solo, the form with it', !!(await lib.until(async () => projectJson(notes).workflow?.preset === 'solo' && (await row('review').locator('select').inputValue()) === 'none' && (await row('excluded').locator('input').inputValue()) === 'node_modules, .venv', HUNG_MS)), JSON.stringify(projectJson(notes).workflow))
 
     // --- Reads answering late (HR5's round 1): a reload never replaces an edit made while it waited, an older read never
@@ -530,7 +542,7 @@ async function theForm(page, app, inv) {
         s.held = s.held.filter((y) => y.p !== x)
       }, p)
     const heldFor = (p) => app.evaluate((_, x) => globalThis.__wf.held.filter((y) => y.p === x).length, p)
-    const changedElsewhere = (p) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'workflow-changed', workspacePath: ws, projectPath: p })
+    const changedElsewhere = (p) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'workflow-changed', workspacePath: ws, projectPath: p })
     // After a release, a read of the window's own answered after it: the held answer has been taken (or dropped) by then.
     const fence = (p) => inv('workflow:form', p)
     // An edit made while a reload waits stays.
@@ -594,7 +606,7 @@ async function theForm(page, app, inv) {
     const speak = async (code) => {
       const dir = path.join(lib.ROOT, 'locales', code)
       messages = code === 'en' ? null : Object.assign({}, ...fs.readdirSync(dir).filter((x) => x.endsWith('.json')).map((x) => JSON.parse(fs.readFileSync(path.join(dir, x), 'utf8'))))
-      await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', ev), { type: 'language-changed', language: messages ? { ...base, code, locale: code, messages } : base })
+      await app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language: messages ? { ...base, code, locale: code, messages } : base })
     }
     /**
      * The save's dialog opened in the window's language (#1489): its title, message, what changes (Merge style, its
@@ -649,7 +661,7 @@ async function theForm(page, app, inv) {
   q.prepare(fx)
   let h = null
   try {
-    h = await q.startHive(fx, { port: lib.port(47857), keepOptions: true })
+    h = await q.startCombwork(fx, { port: lib.port(47857), keepOptions: true })
     await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { finish: 'agentMerges', mergeChecks: [] }) })
     await h.page.getByText('alpha', { exact: true }).first().click()
     await h.page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
@@ -658,7 +670,7 @@ async function theForm(page, app, inv) {
     const sameness = async (value) => {
       await g.row('sameness').locator('select').selectOption(value)
       await g.saveAll()
-      return lib.until(() => JSON.parse(fs.readFileSync(path.join(fx.alpha, '.hive', 'project.json'), 'utf8')).workflow?.options?.sameness === value, HUNG_MS)
+      return lib.until(() => JSON.parse(fs.readFileSync(path.join(fx.alpha, '.combwork', 'project.json'), 'utf8')).workflow?.options?.sameness === value, HUNG_MS)
     }
     const reviewer = await q.agent(fx, h, 'R1')
     check('G4: Same change saved from the tab', !!(await sameness('change')))

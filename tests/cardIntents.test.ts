@@ -12,7 +12,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-intents-')
+const base = tempDir('cw-intents-')
 mkdirSync(join(base, 'profile'), { recursive: true })
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -40,7 +40,7 @@ const toolReplies = await import('../src/shared/toolReplies')
 const { checksView, intentText } = toolReplies
 const { armIntentWatch } = await import('../src/main/intentWatch')
 const watches = await import('../src/main/watches')
-const { AGENT_ONLY_TOOLS, ASSISTANT_ONLY_TOOLS, HIVE_TOOLS, INTENT_TOOLS, assistantTools } = await import('../src/shared/assistantTools')
+const { AGENT_ONLY_TOOLS, ASSISTANT_ONLY_TOOLS, CW_TOOLS, INTENT_TOOLS, assistantTools } = await import('../src/shared/assistantTools')
 
 advanced.load(join(base, 'profile'))
 type WS = ReturnType<typeof createWorkspaceService>
@@ -66,16 +66,16 @@ async function workspace(options: object = PAIR): Promise<{ w: WS; repo: string;
   const ws = join(base, `ws-${++n}`)
   const repo = join(ws, 'p')
   const wt = join(ws, 'p-card')
-  mkdirSync(join(repo, '.hive'), { recursive: true })
+  mkdirSync(join(repo, '.combwork'), { recursive: true })
   writeFileSync(join(repo, 'a.txt'), 'one\n')
   git(repo, 'init', '-q', '-b', 'main')
   for (const [k, v] of [['user.name', 'Test'], ['user.email', 'test@example.com'], ['core.autocrlf', 'false']]) git(repo, 'config', k, v)
-  writeFileSync(join(repo, '.gitignore'), '.hive/\n')
+  writeFileSync(join(repo, '.gitignore'), '.combwork/\n')
   git(repo, 'add', '-A')
   git(repo, 'commit', '-qm', 'initial')
   git(repo, 'worktree', 'add', '-q', '-b', 'card', wt, 'main')
   const agents = [{ id: 'a1', name: 'Builder', worktree: { path: wt, branch: 'card', base: 'main' } }, { id: 'a2', name: 'Reviewer' }, { id: 'a3', name: 'Other' }]
-  writeFileSync(join(repo, '.hive', 'project.json'), JSON.stringify({ version: 2, agents, workflow: { platform: 'git', preset: null, options } }))
+  writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents, workflow: { platform: 'git', preset: null, options } }))
   const w = createWorkspaceService()
   await w.open(ws)
   opened.push(w)
@@ -157,6 +157,60 @@ describe('a card by intent (#1267)', () => {
     for (const once of ['Started', 'Integrated']) expect(k.filter((x) => x === once)).toHaveLength(1)
     expect(k.filter((x) => x === 'Verdict')).toHaveLength(2)
     expect(k.filter((x) => x === 'Submitted')).toHaveLength(2)
+  })
+
+  it("another agent's start of a review in progress is refused, naming who and since when; free once it stops, and the user takes it over (HI-2487)", async () => {
+    const running = new Set(['a2', 'a3'])
+    service.setAgentRunning((_p, a) => running.has(a))
+    try {
+      const { w, wt } = await workspace()
+      const card = await create(w)
+      await act(w, card, builder, { kind: 'start' })
+      commit(wt, 'r.txt')
+      await act(w, card, builder, { kind: 'submit', summary: 'Ready' })
+      await act(w, card, reviewer, { kind: 'startReview' })
+      // a3, on a stale wake: refused, naming a2 and how long it has reviewed, and nothing written.
+      const before = kinds(w, card).length
+      const err = (await act(w, card, other, { kind: 'startReview' }).then(
+        () => ({}),
+        (e: unknown) => e
+      )) as { refusal?: { rule: string; message: string; next: string; change?: string } }
+      expect(err.refusal).toMatchObject({ rule: 'review.inProgress', message: "Reviewer is reviewing p-1's submission 3, and has been for less than a minute.", next: "Leave it to Reviewer: don't review p-1 or give it a verdict." })
+      expect(err.refusal?.change).toMatch(/Only the user takes a review over/)
+      expect(kinds(w, card).slice(before)).toEqual(['Refused'])
+      // Nor by a verdict that would start it in the same write (the board's patch, #1268).
+      expect(await refused(inWorkspace(w, () => tasks.updateTask(card, { review: 'passed' }, other)))).toBe('review.inProgress')
+      // Its own start again goes through (a follow-up's renewed review).
+      expect(await refused(act(w, card, reviewer, { kind: 'startReview' }))).toBeNull()
+      // a2's session stopped: the review is free again.
+      running.delete('a2')
+      expect(await refused(act(w, card, other, { kind: 'startReview' }))).toBeNull()
+      // The user's start always takes it over, a3's review running; then it is the user's, a3's start again refused (HR1's round 1).
+      expect(await refused(act(w, card, user, { kind: 'startReview' }))).toBeNull()
+      expect(await refused(act(w, card, other, { kind: 'startReview' }))).toBe('review.inProgress')
+      // With the rules off, nothing refuses it.
+      running.add('a2')
+      await advanced.set(ENFORCE, false)
+      expect(await refused(act(w, card, reviewer, { kind: 'startReview' }))).toBeNull()
+    } finally {
+      service.setAgentRunning(null)
+    }
+  })
+
+  it("a review in progress whose reviewer left the project, or gave its verdict, doesn't hold another's start (HI-2487)", async () => {
+    service.setAgentRunning(() => true)
+    try {
+      const { w, wt } = await workspace()
+      const card = await create(w)
+      await act(w, card, builder, { kind: 'start' })
+      commit(wt, 'g.txt')
+      await act(w, card, builder, { kind: 'submit', summary: 'Ready' })
+      await act(w, card, reviewer, { kind: 'startReview' })
+      await w.mutateProjectConfig(join(w.path!, 'p'), (cfg) => ({ agents: (cfg.agents ?? []).filter((a: { id: string }) => a.id !== 'a2') }))
+      expect(await refused(act(w, card, other, { kind: 'startReview' }))).toBeNull()
+    } finally {
+      service.setAgentRunning(null)
+    }
   })
 
   it("an agent's plain number is refused, naming the key and #N forms (S48); #N and the key aren't", async () => {
@@ -269,7 +323,7 @@ describe('a card by intent (#1267)', () => {
     commit(wt, 'w.txt')
     const submitted = await act(w, card, builder, { kind: 'submit', summary: 'Ready' })
     const armed = await armIntentWatch(w, 'a1', submitted.card, { submit: true, failed: false })
-    expect(armed).toMatch(/^Hive watches \S+.* for its review .*, up to .+: end your turn, and it wakes you\.$/)
+    expect(armed).toMatch(/^Combwork watches \S+.* for its review .*, up to .+: end your turn, and it wakes you\.$/)
     expect(watches.watchFor(repo, 'a1')).toMatchObject({ cards: [card], column: 'passed', changes: ['verdict', 'column', 'comment'] })
     // Its reply says so.
     expect(intentText({ ...submitted.done, watch: armed! })).toContain(armed!)
@@ -298,7 +352,7 @@ describe('a card by intent (#1267)', () => {
     const { runCheck } = await import('../src/main/workflow/checks')
     const { sessions } = await import('../src/main/sessions')
     const deliveries = await import('../src/main/deliveries')
-    // Both agents watching and ready for a wake; each wake Hive makes is recorded.
+    // Both agents watching and ready for a wake; each wake Combwork makes is recorded.
     const liveFor = sessions.liveFor
     Object.assign(sessions, { liveFor: (p: string, id: string) => (id === 'a1' || id === 'a2' ? ({ projectPath: repo, agentId: id, status: 'watching', runId: `r-${id}` } as never) : liveFor.call(sessions, p, id)) })
     const made = vi.spyOn(deliveries, 'createDelivery')
@@ -334,12 +388,54 @@ describe('a card by intent (#1267)', () => {
     }
   })
 
+  // HI-2487: HR1's watch on HI-2444 from its design check, set again after HR2 had started its review, woke it with "in
+  // Review" and it started a review of its own. A reviewer's watch on a card another reviews now leaves it, saying who.
+  it("a reviewer's watch on a card another agent reviews ends on that card, saying who reviews it; a watch for Done keeps it (HI-2487)", async () => {
+    const { w, repo, wt } = await workspace()
+    const card = await create(w)
+    const later = await create(w, 'Later')
+    const { readCondition } = await import('../src/shared/watch')
+    const { sessions } = await import('../src/main/sessions')
+    const deliveries = await import('../src/main/deliveries')
+    const liveFor = sessions.liveFor
+    Object.assign(sessions, { liveFor: (p: string, id: string) => (id === 'a2' ? ({ projectPath: repo, agentId: id, status: 'watching', runId: `r-${id}` } as never) : liveFor.call(sessions, p, id)) })
+    const made = vi.spyOn(deliveries, 'createDelivery')
+    const wakes = (): string[] => made.mock.calls.filter((c) => c[1].agentId === 'a2' && c[1].source === 'watch').map((c) => c[1].body)
+    const settle = watches.testHooks.settleMs
+    watches.testHooks.settleMs = 0
+    try {
+      await act(w, card, builder, { kind: 'start' })
+      commit(wt, 'x.txt')
+      await act(w, card, builder, { kind: 'submit', summary: 'Ready' })
+      await act(w, card, other, { kind: 'startReview' })
+      // a2 (a reviewer by its name) watches it with another card, for comments: the card leaves its watch, the other stays.
+      await inWorkspace(w, () => watches.registerWatch(w, repo, 'a2', readCondition({ cards: [card, later], changes: ['comment', 'column'] }) as never))
+      await watches.evaluateWatches(w)
+      await vi.waitFor(() => expect(watches.watchFor(repo, 'a2')?.cards).toEqual([later]), { timeout: 10_000 })
+      const board = await inWorkspace(w, () => tasks.getTask(card, w))
+      expect(board.history.at(-1)?.what).toBe("Ended Reviewer (p)'s watch on it: Other reviews it")
+      await watches.cancelWatch(w, repo, 'a2')
+      // A watch for its Done keeps it.
+      await inWorkspace(w, () => watches.registerWatch(w, repo, 'a2', readCondition({ cards: [card], column: 'done' }) as never))
+      await watches.evaluateWatches(w)
+      await watches.settled()
+      expect(watches.watchFor(repo, 'a2')?.cards).toEqual([card])
+      // Never woken with the card "in Review" as if it were its own to review.
+      expect(wakes().some((b) => /is in Review/.test(b) && !/reviewed by/.test(b))).toBe(false)
+    } finally {
+      made.mockRestore()
+      Object.assign(sessions, { liveFor })
+      watches.testHooks.settleMs = settle
+      for (const a of ['a1', 'a2']) await watches.cancelWatch(w, repo, a)
+    }
+  })
+
   it("a code card's read names its checks before review and how to run one, until it is past review (HI-2276)", async () => {
     const { w, repo, wt } = await workspace({ ...PAIR, preChecks: ['typecheck', 'lint'], commands: { typecheck: 'npm run typecheck', lint: 'npm run lint' } })
     const wf = (await service.workflowFor(w, repo))!
     const card = await create(w)
     const key = wf.store.card(card).key
-    const line = { checks: ['typecheck', 'lint'], checksHint: `before review: run one with hive-progress --check <name> --card "${key}" (--isolated: in a check copy at the card's revision; work-on-card)` }
+    const line = { checks: ['typecheck', 'lint'], checksHint: `before review: run one with cw-progress --check <name> --card "${key}" (--isolated: in a check copy at the card's revision; work-on-card)` }
     expect(wf.checksOf(`#${card}`)).toEqual(line)
     await act(w, card, builder, { kind: 'start' })
     expect(wf.checksOf(`#${card}`)).toEqual(line)
@@ -378,7 +474,7 @@ describe('a card by intent (#1267)', () => {
     expect(watches.watchFor(repo, 'a1')).toBeNull()
   })
 
-  it("a lane's builder starting its lane's card itself is told what Hive's start would have: card-loop and the brief (HI-2092)", async () => {
+  it("a lane's builder starting its lane's card itself is told what Combwork's start would have: card-loop and the brief (HI-2092)", async () => {
     const { w } = await workspace()
     const [card, loose, others] = [await create(w), await create(w), await create(w)]
     await lanes.startLane(w, { project: 'p', builder: 'a1', reviewer: 'a2', cards: [card], by: 'Assistant', brief: 'Run the lanestages suite only.' })
@@ -487,7 +583,7 @@ describe('a card by intent (#1267)', () => {
     }
   })
 
-  it('a posted design keeps its name and deadline when Hive opens the workspace again (#1382, finding 1: restart)', async () => {
+  it('a posted design keeps its name and deadline when Combwork opens the workspace again (#1382, finding 1: restart)', async () => {
     const { w } = await workspace()
     const card = await inLane(w)
     const posted = await act(w, card, builder, design('Plan'))
@@ -535,7 +631,7 @@ describe('a card by intent (#1267)', () => {
   /** How long a condition here may take before the test has hung (a template's load under load takes seconds), never a wait. */
   const HUNG = { timeout: 15_000 }
   const agentIds = (w: WS) => inWorkspace(w, async () => (await w.projectConfig(join(w.path!, 'p'))).agents.map((a) => a.id))
-  /** The ways a2 leaves the project: Hive's removal, a template's load replacing every agent, a change of project.json. */
+  /** The ways a2 leaves the project: Combwork's removal, a template's load replacing every agent, a change of project.json. */
   const leaving: [string, (w: WS, p: string) => Promise<unknown>][] = [
     ['removeAgent', (w, p) => inWorkspace(w, () => projectAgents.removeAgent(p, 'a2', { deleteWorktree: false }))],
     [
@@ -545,8 +641,8 @@ describe('a card by intent (#1267)', () => {
           // Its agents' CLI turned on and found, as a template's load checks.
           config.settings.providers['claude-code'].enabled = true
           providerService.info = ((id: string) => ({ provider: id, found: true })) as never
-          mkdirSync(join(w.path!, '.hive', 'templates'), { recursive: true })
-          writeFileSync(join(w.path!, '.hive', 'templates', `solo-${n}.json`), JSON.stringify({ version: 2, name: 'Solo', layout: 'auto', agents: [{ name: `Solo${n}`, role: 'builder', provider: 'claude-code' }] }))
+          mkdirSync(join(w.path!, '.combwork', 'templates'), { recursive: true })
+          writeFileSync(join(w.path!, '.combwork', 'templates', `solo-${n}.json`), JSON.stringify({ version: 2, name: 'Solo', layout: 'auto', agents: [{ name: `Solo${n}`, role: 'builder', provider: 'claude-code' }] }))
           return templates.loadTemplate(p, 'workspace', `solo-${n}.json`, await agentIds(w))
         })
     ],
@@ -635,7 +731,7 @@ describe('a card by intent (#1267)', () => {
     expect(await refused(act(w, card, builder, design('Plan v2')))).toBe('loop.noReviewer')
   })
 
-  it("Hive's removal of a lane's reviewer abandons its lane: the card's last reviewer is its reviewer again (#1382)", async () => {
+  it("Combwork's removal of a lane's reviewer abandons its lane: the card's last reviewer is its reviewer again (#1382)", async () => {
     const { w, card, p } = await reviewedByA2()
     await lanes.startLane(w, { project: 'p', builder: 'a1', reviewer: 'a3', cards: [card], by: 'Builder (p)' })
     await inWorkspace(w, () => projectAgents.removeAgent(p, 'a3', { deleteWorktree: false }))
@@ -857,12 +953,12 @@ describe("the intents' routes and tools (#1267)", () => {
     expect(intentText({ ok: true, card: '#3', from: '', to: '', warnings: ["b.ts is another agent's"] })).toBe("#3: done.\nWarning: b.ts is another agent's")
     // Start review's files (#1444): each as git's letter and its path, never [object Object].
     expect(intentText({ ok: true, card: '#3', from: 'review', to: 'review', data: { files: [{ path: 'greet.js', status: 'M' }, { path: 'test.js', status: 'A' }] } })).toBe('#3: still review. files: M greet.js, A test.js')
-    // What's next, as the hive tools (#1530).
-    expect(intentText({ ok: true, card: 'HI-12', from: 'review', to: 'review', next: { step: 'intents', intents: ['verdict'] } })).toBe('HI-12: still review. Next on it: hive_verdict.')
+    // What's next, as the Combwork tools (#1530).
+    expect(intentText({ ok: true, card: 'HI-12', from: 'review', to: 'review', next: { step: 'intents', intents: ['verdict'] } })).toBe('HI-12: still review. Next on it: cw_verdict.')
   })
 
   it("a card's checks (HI-2276): the names as data, a fixed hint with <name>; never a command built from a name", () => {
-    const hint = (iso: boolean) => `before review: run one with hive-progress --check <name> --card "AL-1"${iso ? " (--isolated: in a check copy at the card's revision; work-on-card)" : ' (work-on-card)'}`
+    const hint = (iso: boolean) => `before review: run one with cw-progress --check <name> --card "AL-1"${iso ? " (--isolated: in a check copy at the card's revision; work-on-card)" : ' (work-on-card)'}`
     expect(checksView(['quick'], 'AL-1', true)).toEqual({ checks: ['quick'], checksHint: hint(true) })
     expect(checksView(['quick', 'tests'], 'AL-1', false)).toEqual({ checks: ['quick', 'tests'], checksHint: hint(false) })
     expect(checksView([], 'AL-1', true)).toBeNull()
@@ -871,15 +967,15 @@ describe("the intents' routes and tools (#1267)", () => {
     expect(checksView(names, 'AL-1', true)).toEqual({ checks: names, checksHint: hint(true) })
   })
 
-  it('every agent has the intent tools, Codex too (#913: enabled_tools is HIVE_TOOLS); the Assistant at Control agents, never start_card', () => {
-    for (const t of [...INTENT_TOOLS, 'hive_start_card']) {
-      expect(HIVE_TOOLS).toContain(t)
+  it('every agent has the intent tools, Codex too (#913: enabled_tools is CW_TOOLS); the Assistant at Control agents, never start_card', () => {
+    for (const t of [...INTENT_TOOLS, 'cw_start_card']) {
+      expect(CW_TOOLS).toContain(t)
       expect(ASSISTANT_ONLY_TOOLS).not.toContain(t)
     }
-    expect(AGENT_ONLY_TOOLS).toContain('hive_start_card')
-    expect(assistantTools('look')).not.toContain('hive_verdict')
+    expect(AGENT_ONLY_TOOLS).toContain('cw_start_card')
+    expect(assistantTools('look')).not.toContain('cw_verdict')
     expect(assistantTools('agents')).toEqual(expect.arrayContaining(INTENT_TOOLS))
-    expect(assistantTools('projects')).not.toContain('hive_start_card')
+    expect(assistantTools('projects')).not.toContain('cw_start_card')
   })
 })
 
@@ -899,7 +995,7 @@ describe("a lane's card put back or reordered on the board says the lane keeps i
 
   it("put back's reply on a lane's card carries the note as a line of its own; a loose card's doesn't", () => {
     const note = laneOrderNote({ id: 'lane-3f2a', builder: 'Coder', cards: [1] })
-    expect(note).toBe("#1 is on Coder's lane (lane-3f2a), which keeps its own order and takes it in that order. To change it: hive_lane start with its cards in the new order (applyNow: true to apply it now).")
+    expect(note).toBe("#1 is on Coder's lane (lane-3f2a), which keeps its own order and takes it in that order. To change it: cw_lane start with its cards in the new order (applyNow: true to apply it now).")
     expect(intentText({ ok: true, card: 'AL-1', from: 'active', to: 'todo', warnings: [note] }).split('\n')).toEqual(['AL-1: active → todo.', `Warning: ${note}`])
     expect(laneOrderNote({ id: 'lane-3f2a', builder: 'Coder', cards: [1, 2] })).toMatch(/^#1, #2 are on Coder's lane \(lane-3f2a\), which keeps its own order and takes them in that order/)
   })
@@ -907,6 +1003,6 @@ describe("a lane's card put back or reordered on the board says the lane keeps i
   it("reorder's reply names the lane for its cards, by their keys; with none on a lane, one line as before", () => {
     expect(reorderText({ column: 'todo', top: [2, 1], count: 2, names: { 1: 'AL-1', 2: 'AL-2' } })).toBe('Todo now starts AL-2, AL-1.')
     const text = reorderText({ column: 'todo', top: [2, 1], count: 2, names: { 1: 'AL-1', 2: 'AL-2' }, lanes: [{ id: 'lane-3f2a', builder: 'Coder', cards: [2, 1] }] })
-    expect(text.split('\n')).toEqual(['Todo now starts AL-2, AL-1.', "AL-2, AL-1 are on Coder's lane (lane-3f2a), which keeps its own order and takes them in that order. To change it: hive_lane start with its cards in the new order (applyNow: true to apply it now)."])
+    expect(text.split('\n')).toEqual(['Todo now starts AL-2, AL-1.', "AL-2, AL-1 are on Coder's lane (lane-3f2a), which keeps its own order and takes them in that order. To change it: cw_lane start with its cards in the new order (applyNow: true to apply it now)."])
   })
 })

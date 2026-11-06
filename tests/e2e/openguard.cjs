@@ -1,7 +1,7 @@
 // One workspace operation at a time per window (HI-1694, HR2's round 1 finding). A window's open claims it where the open
 // begins to change it, after any folder picker or agents' stop: a request that outlasted one of those, or a second open,
 // or a close, while another holds the window is refused, saying why; the window keeps the open it was doing, and the
-// opening view shows it until it is done. The open is held part way (main's mkdir in its .hive folder waits), and the
+// opening view shows it until it is done. The open is held part way (main's mkdir in its .combwork folder waits), and the
 // folder picker is a stand-in that answers when the suite says. Dev build, throwaway profile and workspaces.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -20,7 +20,7 @@ const check = (name, ok, extra = '') => {
 ;(async () => {
   for (const d of [userData, wsA, wsB]) fs.rmSync(d, { recursive: true, force: true })
   for (const w of [wsA, wsB]) fs.mkdirSync(path.join(w, 'app'), { recursive: true })
-  const { app, page, inv } = await lib.launch({ userData, env: { HIVE_API_PORT: lib.port(47797) } })
+  const { app, page, inv } = await lib.launch({ userData, env: { CW_API_PORT: lib.port(47797) } })
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   try {
     // A folder picker that answers when the suite says, and the open of A held at its first folder made in A.
@@ -40,7 +40,7 @@ const check = (name, ok, extra = '') => {
     /** Starts an IPC call in the window, its outcome kept under `key` (ok, or its error's text). */
     const start = (key, ch, ...args) => page.evaluate(([k, c, a]) => {
       window.__guard = window.__guard ?? {}
-      window.hive.invoke(c, ...a).then(() => (window.__guard[k] = { ok: true }), (e) => (window.__guard[k] = { error: String(e) }))
+      window.combwork.invoke(c, ...a).then(() => (window.__guard[k] = { ok: true }), (e) => (window.__guard[k] = { error: String(e) }))
     }, [key, ch, args])
     const outcome = (key) => page.evaluate((k) => window.__guard?.[k] ?? null, key)
 

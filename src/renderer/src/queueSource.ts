@@ -8,7 +8,7 @@ import { PROGRESS_TABS } from '@shared/progressTabs'
 /**
  * Where the window's merge queues come from (#1356): every project's `queue:list` (#1353's model), read when the
  * workspace or its projects change, again for a project when main says its queue changed (`queue-changed`), and for
- * all of them when the board changes (a card starting or finishing under Hive merges changes which queues show).
+ * all of them when the board changes (a card starting or finishing under Combwork merges changes which queues show).
  */
 
 const NO_QUEUES: QueueView[] = []
@@ -74,7 +74,7 @@ export function queueChangedEvent(projectPath: string): void {
   schedule(projectPath.toLowerCase(), 150, () => void loadProject(projectPath))
 }
 
-/** The board changed (`tasks-changed`): which queues show may have (a card started or finished under Hive merges). */
+/** The board changed (`tasks-changed`): which queues show may have (a card started or finished under Combwork merges). */
 export function queueBoardChanged(): void {
   if (get().settings?.general.progressPanel === false) return
   schedule('*', 1000, loadAll)

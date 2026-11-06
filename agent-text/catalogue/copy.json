@@ -1,0 +1,174 @@
+{
+  "copy.assign.noLauncher": {
+    "text": "its check copy's job takes no launcher now",
+    "note": "Why cw-progress's launcher wasn't put in its check copy's job: it has one already, or no job."
+  },
+  "copy.assign.noLease": {
+    "text": "no such check copy lease",
+    "note": "Why cw-progress's launcher wasn't put in its check copy's job: the lease it named isn't this agent's."
+  },
+  "copy.assign.notOwn": {
+    "text": "that process isn't one of this agent's own",
+    "note": "Why cw-progress's launcher wasn't put in its check copy's job: the process isn't the agent's (HR1's #1435 round 1)."
+  },
+  "copy.assign.notPut": {
+    "text": "the check's launcher couldn't be put in its check copy's job",
+    "note": "Why cw-progress's launcher wasn't put in its check copy's job: Windows refused it."
+  },
+  "copy.assign.returned": {
+    "text": "its check copy was returned",
+    "note": "Why cw-progress's launcher wasn't put in its check copy's job: the copy was given back meanwhile."
+  },
+  "copy.error.checkout": {
+    "text": "git checkout: {error}",
+    "note": "A copy's reset error: `git checkout` of the revision failed. {error} is git's first line, else failed."
+  },
+  "copy.error.clean": {
+    "text": "git clean: {error}",
+    "note": "A copy's reset error: `git clean` failed. {error} is git's first line, else failed."
+  },
+  "copy.error.closed": {
+    "text": "the workspace closed",
+    "note": "Why a copy wasn't set up, or an isolated check's copy wasn't leased: its workspace closed."
+  },
+  "copy.error.interrupted": {
+    "text": "its reset was interrupted",
+    "note": "A check or review copy's error, kept on the copy, when its reset was taken over from a Combwork that is gone (#1435)."
+  },
+  "copy.error.notListed": {
+    "text": "its folder is there but git does not list it as a worktree",
+    "note": "A copy's error: its folder exists but isn't a worktree git knows, so Combwork leaves it alone."
+  },
+  "copy.error.setupExit": {
+    "text": "its setup exited with code {code}",
+    "note": "A copy's setup error: its setup command failed. {code} is its exit code."
+  },
+  "copy.error.setupNoStart": {
+    "text": "its setup couldn't start: {command}",
+    "note": "A copy's setup error: its setup command couldn't be started. {command} is the command."
+  },
+  "copy.error.setupNotEnded": {
+    "text": "processes its setup started could not be ended",
+    "note": "A copy's setup error: its setup command ended, but processes it started are still running."
+  },
+  "copy.error.setupTimedOut": {
+    "text": "its setup ran out of time",
+    "note": "A copy's setup error: its setup command reached its time limit."
+  },
+  "copy.error.worktreeAdd": {
+    "text": "git worktree add: {error}",
+    "note": "A copy's setup error: `git worktree add` failed. {error} is git's first line, else failed."
+  },
+  "copy.held.job": {
+    "text": "its run's processes ({job})",
+    "note": "What holds a returned copy back from being freed: processes of the run that had it. {job} is their job's id. The end of copy.refusal.stillInUse and of \"held back by …\"."
+  },
+  "copy.held.process": {
+    "text": "a process with a file or folder open in it",
+    "note": "What holds a copy back from being freed or removed: a process has something open in its folder."
+  },
+  "copy.inUse.all": {
+    "text": "the pool's {size} {count, plural, =1 {copy is} other {copies are}} in use",
+    "note": "Why a reviewer waits for a review copy (HI-1764): every copy is in use. {size} is the pool's size as digits; {count} the same number, choosing the plural."
+  },
+  "copy.inUse.longest": {
+    "text": "{all}; the longest lent, {copy}, for {time} (a {kind} of {card})",
+    "note": "copy.inUse.all, then the copy lent longest: {time} is copy.inUse.minutes, {kind} the lease's kind (review or check), {card} the card's key."
+  },
+  "copy.inUse.minutes": {
+    "text": "{n} min",
+    "note": "How long, in whole minutes: in copy.inUse.returned and copy.inUse.longest."
+  },
+  "copy.inUse.returned": {
+    "text": "{all}; {copy}, returned {ago} ago, is {held, select, yes {held back by {by}} other {being freed}}",
+    "note": "copy.inUse.all, then the copy likely to come free first: one given back, and what still holds it ({by}: copy.held.*, a run or an agent), else being freed. {ago} is copy.inUse.minutes."
+  },
+  "copy.isolated.noLease": {
+    "text": "no check copy could be leased",
+    "note": "cw-progress --isolated's refusal: no check copy could be lent, for another reason."
+  },
+  "copy.isolated.noSupervisor": {
+    "text": "Combwork's process supervisor isn't running, so an isolated check can't be run",
+    "note": "cw-progress --isolated's refusal: Combwork can't run the check in a job of its own (#1435)."
+  },
+  "copy.isolated.notLeased": {
+    "text": "no check copy could be leased: {error}",
+    "note": "cw-progress --isolated's refusal: leasing its check copy failed. {error} is why."
+  },
+  "copy.isolated.setupFailed": {
+    "text": "{copy}'s setup failed ({error}), so nothing was run",
+    "note": "cw-progress --isolated's refusal: its check copy's setup failed."
+  },
+  "copy.isolated.stillInUse": {
+    "text": "a check copy ({copy} is still in use by {by})",
+    "note": "What cw-progress --isolated waits for: a check copy, the one it would get still held. {by} says by what."
+  },
+  "copy.isolated.waitCopy": {
+    "text": "a check copy",
+    "note": "What cw-progress --isolated waits for (\"waiting for a check copy\"): none is free yet."
+  },
+  "copy.isolated.waitSetup": {
+    "text": "a check copy to be set up",
+    "note": "What cw-progress --isolated waits for: its check copy is being set up."
+  },
+  "copy.refusal.noCopy": {
+    "text": "no check copy free: the pool's {size} {count, plural, =1 {copy is} other {copies are}} in use",
+    "note": "Why no check or review copy was lent (#1435): every copy is in use. {size} is the pool's size as digits; {count} the same number, choosing the plural."
+  },
+  "copy.refusal.off": {
+    "text": "review copies are off (Settings → Advanced, Reviewers review in review copies)",
+    "note": "Why a reviewer gets no review copy: the advanced setting is off. Names the setting as the window shows it."
+  },
+  "copy.refusal.returned": {
+    "text": "its lease of {copy} was returned while the copy was being set up",
+    "note": "Why a copy was not lent: the lease was given back during its setup."
+  },
+  "copy.refusal.setupFailed": {
+    "text": "{copy}'s setup failed: {error}",
+    "note": "Why a copy was not lent: its setup failed. {error} is why (copy.error.*, git's or the command's)."
+  },
+  "copy.refusal.stillInUse": {
+    "text": "{copy} is still in use by {by}",
+    "note": "Why a copy was not lent: the copy is still held. {by} says by what (copy.held.*, a run, an agent)."
+  },
+  "copy.review.ended": {
+    "text": "the review ended",
+    "note": "Why a reviewer gets no review copy: its review ended while the copy was set up. The end of copy.review.none."
+  },
+  "copy.review.leaseFailed": {
+    "text": "it couldn't be leased: {error}",
+    "note": "Why a reviewer gets no review copy: leasing it failed. The end of copy.review.none."
+  },
+  "copy.review.noRevision": {
+    "text": "the card has no submitted revision",
+    "note": "Why a reviewer gets no review copy: nothing was submitted to review. The end of copy.review.none."
+  },
+  "copy.review.none": {
+    "text": "No review copy ({why}): review the builder's work read-only from where you are.",
+    "note": "Start review's reply, or a later message, when the reviewer gets no review copy. {why} is why."
+  },
+  "copy.review.notGoing": {
+    "text": "the review is not going",
+    "note": "Why a reviewer gets no review copy: its review of the card has ended or not started. The end of copy.review.none."
+  },
+  "copy.review.ready": {
+    "text": "{named, select, yes {{card}'s review copy is ready. } other {}}Review in {folder} at {revision}: read and run commands there. Your session and its shell stay in your own folder, so change into the copy in each command.",
+    "note": "A reviewer's review copy (#1435): in start review's reply, or its later message (which names the card first). {revision} is the submission's first 12 characters."
+  },
+  "copy.review.settingUp": {
+    "text": "one is being set up",
+    "note": "Why a reviewer waits for a review copy: its copy is being set up. The end of copy.review.waiting."
+  },
+  "copy.review.stalled": {
+    "text": "{card}'s review by {agent} has waited {minutes} min for a review copy: {why}.",
+    "note": "Why a card in Review is stalled (HI-1764), in a lane watch and the Agent API's stalled: its reviewer is kept from reviewing. {minutes} is whole minutes."
+  },
+  "copy.review.waiting": {
+    "text": "Waiting for a review copy ({why}): Combwork tells you when one is ready, with its folder. Meanwhile git can show the submission from where you are.",
+    "note": "Start review's reply while no review copy is free yet. {why} is why (copy.inUse.*, copy.refusal.*)."
+  },
+  "copy.review.workflowOff": {
+    "text": "workflow rules aren't enforced (Settings → Advanced, Workflow rules are enforced)",
+    "note": "Why a reviewer gets no review copy: the advanced setting is off. Names the setting as the window shows it."
+  }
+}

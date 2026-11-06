@@ -1,4 +1,4 @@
-// Purge… (#1138): everything Hive keeps per session goes as the preview listed it, for a session, a project or the
+// Purge… (#1138): everything Combwork keeps per session goes as the preview listed it, for a session, a project or the
 // workspace; the CLIs' files, running sessions and the usage history stay, so totals never change; and what changes
 // between the preview and the removal (a session resumed, viewed, given a new copy, its CLI copy back or gone) is left
 // alone.
@@ -9,7 +9,7 @@ import * as electron from 'electron'
 import type { PurgeTarget, SessionUsage } from '../src/shared/types'
 import { tempDir } from './tempDir'
 
-const base = tempDir('hive-purge-')
+const base = tempDir('cw-purge-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 // The Recycle Bin, as a folder of the test's: what went there can be told from what was deleted for good.
 const bin = join(base, 'bin')
@@ -46,13 +46,13 @@ const write = (file: string, text: string): void => {
   mkdirSync(join(file, '..'), { recursive: true })
   writeFileSync(file, text)
 }
-const active = (id: string, host = p): string => join(host, '.hive', 'sessions', `${id}.jsonl`)
-const archived = (id: string, host = p): string => join(host, '.hive', 'archive', `${id}.jsonl`)
-const attachments = (id: string, host = p): string => join(host, '.hive', 'attachments', id)
+const active = (id: string, host = p): string => join(host, '.combwork', 'sessions', `${id}.jsonl`)
+const archived = (id: string, host = p): string => join(host, '.combwork', 'archive', `${id}.jsonl`)
+const attachments = (id: string, host = p): string => join(host, '.combwork', 'attachments', id)
 const records = async (host = p) => (await run(() => workspace.sessionsFile(host))).sessions
 const binCount = (): number => readdirSync(bin).length
 
-/** A session of Hive's with a backup and an attachment; `inCli`: the CLI still has its transcript. */
+/** A session of Combwork's with a backup and an attachment; `inCli`: the CLI still has its transcript. */
 async function session(inCli: boolean, opts: { host?: string; archived?: boolean } = {}): Promise<string> {
   const host = opts.host ?? p
   const id = newId()
@@ -99,10 +99,10 @@ const reasons = (r: { skipped: { reason: string }[] }): string => r.skipped.map(
 describe('Purge', () => {
   beforeAll(async () => {
     for (const host of [p, other]) {
-      mkdirSync(join(host, '.hive'), { recursive: true })
-      writeFileSync(join(host, '.hive', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'c1', name: 'Agent 1' }] }))
+      mkdirSync(join(host, '.combwork'), { recursive: true })
+      writeFileSync(join(host, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'c1', name: 'Agent 1' }] }))
     }
-    mkdirSync(join(wsPath, '.hive'), { recursive: true })
+    mkdirSync(join(wsPath, '.combwork'), { recursive: true })
     w = createWorkspaceService()
     await w.open(wsPath)
     cliLookup.mockImplementation(lookup)
@@ -110,7 +110,7 @@ describe('Purge', () => {
   // Each test starts from no sessions, so what Purge does is only to the test's own.
   beforeEach(async () => {
     for (const host of [p, other]) {
-      for (const d of ['archive', 'sessions', 'attachments']) rmSync(join(host, '.hive', d), { recursive: true, force: true })
+      for (const d of ['archive', 'sessions', 'attachments']) rmSync(join(host, '.combwork', d), { recursive: true, force: true })
       await w.mutateSessions(host, (f) => {
         f.sessions = []
         f.deleted = []
@@ -129,7 +129,7 @@ describe('Purge', () => {
     await disposeWorkspaceService(w)
   })
 
-  it("lists every file of Hive's with its size, and removes exactly that to the Recycle Bin; the CLI's copy and the totals stay", async () => {
+  it("lists every file of Combwork's with its size, and removes exactly that to the Recycle Bin; the CLI's copy and the totals stay", async () => {
     const kept = await session(true)
     const arch = await session(true, { archived: true })
     const before = [await totalTokens(kept), await totalTokens(arch)]
@@ -171,16 +171,16 @@ describe('Purge', () => {
     const dead = newId()
     write(active(dead) + '.gz', 'gz')
     write(join(attachments(dead), 'b.txt'), 'b')
-    write(join(p, '.hive', 'attachments', 'run-abc', 'c.txt'), 'c')
-    // Not Hive's per session: left alone.
-    write(join(p, '.hive', 'sessions', 'notes.txt'), 'mine')
+    write(join(p, '.combwork', 'attachments', 'run-abc', 'c.txt'), 'c')
+    // Not Combwork's per session: left alone.
+    write(join(p, '.combwork', 'sessions', 'notes.txt'), 'mine')
     const { preview, result } = await purgeWith(project)
     expect(preview.running).toBe(1)
     expect(preview.items.some((i) => i.sessionId === live)).toBe(false)
     expect(preview.items.map((i) => i.kind).sort()).toEqual(['leftover-backup', 'orphan-attachments', 'orphan-attachments'])
     expect(result.skipped).toEqual([])
-    expect([existsSync(active(live)), existsSync(attachments(live)), existsSync(active(dead) + '.gz'), existsSync(attachments(dead)), existsSync(join(p, '.hive', 'attachments', 'run-abc'))]).toEqual([true, true, false, false, false])
-    expect(existsSync(join(p, '.hive', 'sessions', 'notes.txt'))).toBe(true)
+    expect([existsSync(active(live)), existsSync(attachments(live)), existsSync(active(dead) + '.gz'), existsSync(attachments(dead)), existsSync(join(p, '.combwork', 'attachments', 'run-abc'))]).toEqual([true, true, false, false, false])
+    expect(existsSync(join(p, '.combwork', 'sessions', 'notes.txt'))).toBe(true)
   })
 
   it("removes a session's leftover spare and half-made copies with it", async () => {
@@ -190,7 +190,7 @@ describe('Purge', () => {
     const { preview, result } = await purgeWith(project)
     expect(preview.items.filter((i) => i.kind === 'leftover-backup').length).toBe(2)
     expect(result.skipped).toEqual([])
-    expect(readdirSync(join(p, '.hive', 'sessions'))).toEqual([])
+    expect(readdirSync(join(p, '.combwork', 'sessions'))).toEqual([])
   })
 
   it("drops old kept usage once the usage history has it, and the totals don't change", async () => {
@@ -286,14 +286,14 @@ describe('Purge', () => {
     expect(existsSync(active(id))).toBe(false)
   })
 
-  it("a session whose last copy is open in Hive is left alone; one the view reads from the CLI's copy is purged", async () => {
+  it("a session whose last copy is open in Combwork is left alone; one the view reads from the CLI's copy is purged", async () => {
     const last = await session(false)
     const cliHas = await session(true)
     setViewing(7, 'v1', p, last)
     setViewing(7, 'v2', p, cliHas)
     try {
       const { result } = await purgeWith(project)
-      expect(reasons(result)).toMatch(/open in Hive/)
+      expect(reasons(result)).toMatch(/open in Combwork/)
       expect([existsSync(active(last)), existsSync(attachments(last)), (await records()).some((r) => r.id === last)]).toEqual([true, true, true])
       expect([existsSync(active(cliHas)), existsSync(attachments(cliHas))]).toEqual([false, false])
     } finally {
@@ -358,7 +358,7 @@ describe('Purge', () => {
     expect([existsSync(active(id)), existsSync(active(later)), existsSync(attachments(later))]).toEqual([false, true, true])
   })
 
-  it("only Hive's plain files go from an attachments folder: a folder inside stays, and so does the folder", async () => {
+  it("only Combwork's plain files go from an attachments folder: a folder inside stays, and so does the folder", async () => {
     const id = await session(true)
     mkdirSync(join(attachments(id), 'inner'))
     const { preview, result } = await purgeWith(project, { permanent: true })
@@ -418,7 +418,7 @@ describe('Purge', () => {
   })
 
   it('a spare a crash left as the only copy is kept and counted, never purged as a leftover', async () => {
-    // Hive stopped in a delete between moving the backup and removing the record: only <backup>.spare is left.
+    // Combwork stopped in a delete between moving the backup and removing the record: only <backup>.spare is left.
     const id = await session(false)
     renameSync(active(id), active(id) + '.spare')
     const { preview, result } = await purgeWith(project, { permanent: true })
@@ -433,7 +433,7 @@ describe('Purge', () => {
     const { preview, result } = await purgeWith(project)
     expect([preview.recoverable, preview.items.filter((i) => i.kind === 'leftover-backup').length]).toEqual([0, 1])
     expect(result).toMatchObject({ deleted: 1, skipped: [] })
-    expect(readdirSync(join(p, '.hive', 'sessions'))).toEqual([])
+    expect(readdirSync(join(p, '.combwork', 'sessions'))).toEqual([])
   })
 
   it('a preview is applied once, and an unknown one is refused', async () => {

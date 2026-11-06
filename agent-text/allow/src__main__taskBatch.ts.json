@@ -1,0 +1,14 @@
+{
+  "prose|call|A batch sets column, position, blocked, labels, addLabels, removeLabels or agent on its cards: {} goes on one card (cw_update_task).": 1,
+  "prose|call|Give what to change on the cards: column, position, blocked, labels, addLabels, removeLabels or agent.": 1,
+  "prose|call|Unknown column \"{}\": {}.": 1,
+  "prose|call|Unknown position \"{}\": top or bottom.": 1,
+  "prose|call|blocked is the reason as text, or empty to clear it.": 1,
+  "prose|call|labels is a list of text.": 1,
+  "prose|call|labels replaces each card's labels: give it alone, or addLabels and removeLabels to change only those.": 1,
+  "prose|call|no change": 1,
+  "prose|call|override goes with column: it is the reason for moving the cards across their rules.": 1,
+  "prose|call|override is { \"reason\": \"<why>\" }, the reason not empty.": 1,
+  "prose|call|{} is a list of text.": 1,
+  "prose|prop:text|Refused": 1
+}

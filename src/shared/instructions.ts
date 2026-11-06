@@ -1,9 +1,12 @@
 // One instructions file for every provider in a project: AGENTS.md, which Codex (and most other CLIs) read
 // themselves, imported into the files of CLIs that don't (Claude Code: an "@AGENTS.md" line in CLAUDE.md).
 
+import { agentMsg, say } from './agentText'
 import type { ProviderDescriptor } from './providers'
 
 export const SHARED_INSTRUCTIONS = 'AGENTS.md'
+
+const STARTER = agentMsg({ id: 'contract.instructions.starter', text: 'Instructions for every agent in this project.', note: "A new AGENTS.md's first line under the project's name, when Combwork makes the CLIs share one and none had any." })
 
 export interface InstructionsFile {
   provider: string
@@ -43,7 +46,7 @@ export function shareInstructions(files: InstructionsFile[], shared: string | nu
   const importers = files.filter((f) => f.importLine)
   if (agents === null) {
     const source = importers.find((f) => f.content?.trim())
-    agents = source?.content ?? `# ${projectName}\n\nInstructions for every agent in this project.\n`
+    agents = source?.content ?? `# ${projectName}\n\n${say(STARTER)}\n`
     writes[SHARED_INSTRUCTIONS] = agents
     if (source) {
       writes[source.file] = `${source.importLine}\n`

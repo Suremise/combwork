@@ -8,9 +8,9 @@ import { gitFixText, gitOldText, gitProblemEnglish, gitProblemText } from '../..
 import { folderBusy, folderBusyData, gitStatusText, gitStatusTip, headText, identityWarnings, type GitRepoSummary } from '../../src/shared/gitRepo'
 import { gitignoreName, initAbout, type GitInitCheck } from '../../src/shared/gitInit'
 import { englishText } from '../../src/shared/advanced'
-import { hiveVcsText } from '../../src/shared/hiveVcsText'
+import { combworkVcsText } from '../../src/shared/combworkVcsText'
 
-// #804: the `git` area (the Git tab, Initialise repository, the .hive notice, and what the shared git modules say). Its
+// #804: the `git` area (the Git tab, Initialise repository, the .combwork notice, and what the shared git modules say). Its
 // messages are read from the English catalogue (tests/i18nCatalogues.test.ts checks it is current); the sentences that
 // were glued together or pluralised by hand read as they did in English; and what main's errors carry stays English
 // whatever the window's language, as agents read it too.
@@ -91,10 +91,10 @@ describe('the git area', () => {
 
 describe('git missing or too old', () => {
   it('reads as before in English, and how to fix it', () => {
-    expect(gitProblemText({ state: 'missing' })).toBe("Git isn't installed (or isn't on Hive's PATH)")
-    expect(gitProblemText({ state: 'old', version: '2.16.0' })).toBe('Git 2.16.0 is too old for Hive (it needs 2.38 or later)')
+    expect(gitProblemText({ state: 'missing' })).toBe("Git isn't installed (or isn't on Combwork's PATH)")
+    expect(gitProblemText({ state: 'old', version: '2.16.0' })).toBe('Git 2.16.0 is too old for Combwork (it needs 2.38 or later)')
     expect(gitFixText({ state: 'old', version: '2.30.0' })).toBe('Update Git for Windows to 2.38 or later, then Check again in Provider Setup.')
-    expect(gitFixText({ state: 'missing' })).toBe('Install Git for Windows (2.38 or later), or add the folder holding git.exe to your PATH, then Check again in Provider Setup (no need to restart Hive).')
+    expect(gitFixText({ state: 'missing' })).toBe('Install Git for Windows (2.38 or later), or add the folder holding git.exe to your PATH, then Check again in Provider Setup (no need to restart Combwork).')
   })
 
   it("lists what an older git loses, by how old it is", () => {
@@ -102,14 +102,14 @@ describe('git missing or too old', () => {
     expect(gitOldText('2.37.0')).toBe(`With Git 2.37.0: ${base}.`)
     expect(gitOldText('2.29.0')).toBe(`With Git 2.29.0: ${base}; moving a workspace can't repair its worktrees.`)
     expect(gitOldText('2.26.0')).toBe(`With Git 2.26.0: ${base}; Remove All and loading a template keep the branches of the worktrees they remove; moving a workspace can't repair its worktrees.`)
-    expect(gitOldText('2.16.0')).toBe("Hive's git commands fail with Git 2.16.0: worktrees, merging, the Version Control tab's Git sections and the unmerged counts don't work.")
+    expect(gitOldText('2.16.0')).toBe("Combwork's git commands fail with Git 2.16.0: worktrees, merging, the Version Control tab's Git sections and the unmerged counts don't work.")
   })
 
   it("stays English for the main process's errors, whatever the window's language", () => {
     setLanguage(PSEUDO_LANGUAGE, {})
-    expect(gitProblemText({ state: 'missing' })).not.toBe("Git isn't installed (or isn't on Hive's PATH)")
-    expect(gitProblemEnglish({ state: 'missing' })).toBe("Git isn't installed (or isn't on Hive's PATH)")
-    expect(gitProblemEnglish({ state: 'old', version: '2.16.0' })).toBe('Git 2.16.0 is too old for Hive (it needs 2.38 or later)')
+    expect(gitProblemText({ state: 'missing' })).not.toBe("Git isn't installed (or isn't on Combwork's PATH)")
+    expect(gitProblemEnglish({ state: 'missing' })).toBe("Git isn't installed (or isn't on Combwork's PATH)")
+    expect(gitProblemEnglish({ state: 'old', version: '2.16.0' })).toBe('Git 2.16.0 is too old for Combwork (it needs 2.38 or later)')
     expect(gitProblemEnglish({ state: 'old', version: '2.30.0' })).toBeNull()
     expect(gitProblemEnglish({ state: 'ok', version: '2.45.0' })).toBeNull()
   })
@@ -137,7 +137,7 @@ describe('the sentences once built by hand read as before, in English', () => {
       'On main',
       'Git is cherry-picking: finish or abort it in a terminal.',
       'Tracks origin/main: 1 commit to push, nothing to pull.',
-      'As of the last fetch, 5m ago. Hive never fetches by itself.',
+      'As of the last fetch, 5m ago. Combwork never fetches by itself.',
       'Click for Version Control → Branches & remotes.'
     ])
     expect(gitStatusTip(summary({ upstream: { name: 'origin/main', remote: 'origin', ahead: 3, behind: 2 }, remotes: ['origin'] }), null)).toContain('Tracks origin/main: 3 commits to push, 2 commits to pull.')
@@ -157,21 +157,21 @@ describe('the sentences once built by hand read as before, in English', () => {
     expect(gitignoreName('minimal')).toBe('a minimal .gitignore')
     expect(gitignoreName('dotnet')).toBe('a .NET .gitignore')
     expect(initAbout('alpha', check({ resume: true, empty: true, hasGitignore: true }))).toBe(
-      'alpha is a git repository with no commits yet, and worktrees need one. This keeps its .hive out of git and commits nothing yet (an empty first commit) as the first commit. Its own .gitignore is kept.'
+      'alpha is a git repository with no commits yet, and worktrees need one. This keeps its .combwork out of git and commits nothing yet (an empty first commit) as the first commit. Its own .gitignore is kept.'
     )
     expect(initAbout('alpha', check({ hasGitignore: true, parentRepo: 'D:\\ws' }))).toBe(
-      'Makes alpha a git repository on a branch called main, keeps its .hive out of git, and commits everything in the folder as the first commit, so agents can work in worktrees at once. Its own .gitignore is kept. It is inside the git repository in D:\\ws: a repository inside another is usually a mistake, and that one will no longer see the files here as its own.'
+      'Makes alpha a git repository on a branch called main, keeps its .combwork out of git, and commits everything in the folder as the first commit, so agents can work in worktrees at once. Its own .gitignore is kept. It is inside the git repository in D:\\ws: a repository inside another is usually a mistake, and that one will no longer see the files here as its own.'
     )
   })
 
-  it('the .hive notice', () => {
-    expect(hiveVcsText({ state: 'excluded', tracked: 1 })?.title).toBe('1 file in .hive is committed to git')
-    expect(hiveVcsText({ state: 'not-excluded', tracked: 3 })?.detail).toBe(
-      "Excluding .hive keeps new files out of git, but these were committed before, so git still tracks them and commits their changes. Run `git rm -r --cached .hive` in the project folder, then commit: the files stay on disk. Hive couldn't exclude .hive either: a rule in a .gitignore may bring it back."
+  it('the .combwork notice', () => {
+    expect(combworkVcsText({ state: 'excluded', tracked: 1 })?.title).toBe('1 file in .combwork is committed to git')
+    expect(combworkVcsText({ state: 'not-excluded', tracked: 3 })?.detail).toBe(
+      "Excluding .combwork keeps new files out of git, but these were committed before, so git still tracks them and commits their changes. Run `git rm -r --cached .combwork` in the project folder, then commit: the files stay on disk. Combwork couldn't exclude .combwork either: a rule in a .gitignore may bring it back."
     )
-    expect(tr(m('git.hiveVcs.titleSentence'), { title: 'X' })).toBe('X.')
-    expect(tr(m('git.hiveVcs.untrackTitle'), { count: 1 })).toBe('Untrack this file?')
-    expect(tr(m('git.hiveVcs.untrackTitle'), { count: 4 })).toBe('Untrack these 4 files?')
+    expect(tr(m('git.combworkVcs.titleSentence'), { title: 'X' })).toBe('X.')
+    expect(tr(m('git.combworkVcs.untrackTitle'), { count: 1 })).toBe('Untrack this file?')
+    expect(tr(m('git.combworkVcs.untrackTitle'), { count: 4 })).toBe('Untrack these 4 files?')
     expect(tr(m('git.init.commitsAs'), { name: 'A', email: 'a@b' })).toBe('Commits as A <a@b>.')
   })
 

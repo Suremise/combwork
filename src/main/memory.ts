@@ -4,7 +4,7 @@ import { getHeapStatistics, setHeapSnapshotNearHeapLimit } from 'v8'
 import { createLogger } from './logger'
 
 /**
- * The main process's memory (#1005, after #988's out-of-memory crash): a line in hive.log at start, every 5 minutes and
+ * The main process's memory (#1005, after #988's out-of-memory crash): a line in combwork.log at start, every 5 minutes and
  * as the process exits, a warning when the used heap passes 70% and 85% of its limit, and, when Settings → Advanced
  * says so, a heap snapshot written as the heap nears its limit, so the next such crash shows what filled it.
  */
@@ -39,7 +39,7 @@ const mb = (n: number): number => Math.round(n / MB)
 
 /** The memory line: "heap 512 of 600 MB used (limit 4096 MB, 13%); external 20 MB, array buffers 5 MB, rss 900 MB". */
 export function memoryLine(m: MemoryNow = memoryNow()): string {
-  return `heap ${mb(m.used)} of ${mb(m.total)} MB used (limit ${mb(m.limit)} MB, ${Math.round((m.used / m.limit) * 100)}%); external ${mb(m.external)} MB, array buffers ${mb(m.arrayBuffers)} MB, rss ${mb(m.rss)} MB` // i18n-ignore: hive.log's memory line, for the maintainer, in English
+  return `heap ${mb(m.used)} of ${mb(m.total)} MB used (limit ${mb(m.limit)} MB, ${Math.round((m.used / m.limit) * 100)}%); external ${mb(m.external)} MB, array buffers ${mb(m.arrayBuffers)} MB, rss ${mb(m.rss)} MB` // i18n-ignore: combwork.log's memory line, for the maintainer, in English
 }
 
 /** How many of HEAP_WARN_AT the used heap is past. */
@@ -53,23 +53,23 @@ export function logMemory(why: string, m: MemoryNow = memoryNow()): void {
   const now = heapLevel(m)
   const rose = now > level
   level = now
-  const line = rose ? `Memory, ${why}: past ${HEAP_WARN_AT[now - 1] * 100}% of the heap limit: ${memoryLine(m)}` : `Memory, ${why}: ${memoryLine(m)}` // i18n-ignore: hive.log's memory line, for the maintainer, in English
+  const line = rose ? `Memory, ${why}: past ${HEAP_WARN_AT[now - 1] * 100}% of the heap limit: ${memoryLine(m)}` : `Memory, ${why}: ${memoryLine(m)}` // i18n-ignore: combwork.log's memory line, for the maintainer, in English
   if (rose) log.warn(line)
   else log.info(line)
   recent.push(`${new Date().toISOString()} ${rose ? 'WARN ' : ''}${line}`)
   if (recent.length > RECENT) recent.shift()
 }
 
-/** Logs the memory line now (Hive is starting) and every 5 minutes. */
+/** Logs the memory line now (Combwork is starting) and every 5 minutes. */
 export function startMemoryLog(): void {
-  logMemory('at start') // i18n-ignore: hive.log's memory line, for the maintainer, in English
+  logMemory('at start') // i18n-ignore: combwork.log's memory line, for the maintainer, in English
   setInterval(() => logMemory('every 5 min'), MEMORY_EVERY_MS).unref()
 }
 
 /** The last memory lines logged, oldest first. */
 export const recentMemoryLines = (): string[] => [...recent]
 
-/** The folder heap snapshots are written to: `heap` in Hive's profile. */
+/** The folder heap snapshots are written to: `heap` in Combwork's profile. */
 export const heapSnapshotsDir = (profile: string): string => join(profile, 'heap')
 
 export type HeapSnapshot = { file: string; at: number; bytes: number }
@@ -95,7 +95,7 @@ export function heapSnapshots(dir: string): HeapSnapshot[] {
   return found.sort((a, b) => b.at - a.at)
 }
 
-/** Deletes the oldest snapshots in `dir` so `keep` are left. Hive's own diagnostics, in its profile: not to the Recycle Bin, where gigabytes would stay. */
+/** Deletes the oldest snapshots in `dir` so `keep` are left. Combwork's own diagnostics, in its profile: not to the Recycle Bin, where gigabytes would stay. */
 export function pruneHeapSnapshots(dir: string, keep: number): void {
   for (const s of heapSnapshots(dir).slice(keep)) {
     try {
@@ -110,7 +110,7 @@ export function pruneHeapSnapshots(dir: string, keep: number): void {
 let snapshotsOn = false
 
 /**
- * Settings → Advanced → Save a memory snapshot if Hive is about to run out of memory: Node writes one heap snapshot as the
+ * Settings → Advanced → Save a memory snapshot if Combwork is about to run out of memory: Node writes one heap snapshot as the
  * main process nears its heap limit, before the crash. Node writes it to its diagnostic folder, which only its command
  * line sets, or else the working folder: so the main process works in the snapshots' folder (nothing in main relies on
  * its working folder; what it starts is given its own). Older snapshots go first, so the folder keeps at most two.
@@ -138,7 +138,7 @@ export function memoryDiagnostics(profile: string): string[] {
   const kept = heapSnapshots(dir)
   return [
     `- Now: ${memoryLine()}`,
-    `- Memory snapshots: ${snapshotsOn ? 'on' : 'off'}; ${kept.length ? `${kept.length} in \`${dir}\`, the newest from ${new Date(kept[0].at).toISOString()} (${mb(kept[0].bytes)} MB): they hold what Hive had in memory, so never attached` : 'none kept'}`, // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
+    `- Memory snapshots: ${snapshotsOn ? 'on' : 'off'}; ${kept.length ? `${kept.length} in \`${dir}\`, the newest from ${new Date(kept[0].at).toISOString()} (${mb(kept[0].bytes)} MB): they hold what Combwork had in memory, so never attached` : 'none kept'}`, // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
     ...(recent.length ? ['- Logged:', ...recent.map((l) => `  - ${l}`)] : [])
   ]
 }

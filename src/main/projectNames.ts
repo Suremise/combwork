@@ -1,10 +1,10 @@
 import { existsSync } from 'original-fs'
 import { basename, dirname, join, resolve } from 'path'
-import { HIVE_DIR } from '../shared/defaults'
+import { CW_DIR } from '../shared/defaults'
 import { isProjectId } from '../shared/projectIds'
 import { readKeptJson, retryWhileSaving, withFileLock, writeKeptJson } from './fsutil'
 import { msg } from '../shared/i18n'
-import { hiveError } from './hiveError'
+import { combworkError } from './combworkError'
 import { createLogger, userText } from './logger'
 import type { ProjectSeen, WorkspaceService } from './workspace'
 
@@ -14,8 +14,8 @@ const log = createLogger('projectNames')
 const CLOSED = msg({ id: 'worktrees.names.closed', defaultMessage: 'The workspace was closed or switched: nothing was changed.', description: "An error: the workspace closed, or another opened in its window, while a project's name was being recorded; nothing changed." })
 
 /**
- * The workspace's record of its projects' names, by their stable ids (#514), in `.hive/project-names.json` (a kept file):
- * each project's folder name as Hive last saw it and its earlier ones, and every rename Hive saw, numbered. It is the
+ * The workspace's record of its projects' names, by their stable ids (#514), in `.combwork/project-names.json` (a kept file):
+ * each project's folder name as Combwork last saw it and its earlier ones, and every rename Combwork saw, numbered. It is the
  * workspace's, not the project's: a copied folder (given an id of its own) brings none of it along. Renames are found by
  * id (a project seen under another name than its record's), so two projects that swapped names are two renames, never
  * copies. What keeps a project by its name or path follows each rename from it (projectRename.ts), and the records
@@ -44,7 +44,7 @@ const MAX_RENAMES = 500
 const MAX_FORMER = 50
 const MAX_PROJECTS = 1000
 
-const fileOf = (wsPath: string): string => join(wsPath, HIVE_DIR, 'project-names.json')
+const fileOf = (wsPath: string): string => join(wsPath, CW_DIR, 'project-names.json')
 const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase()
 const empty = (): NameJournal => ({ version: 1, seq: 0, projects: {}, renames: [] })
 const name = (v: unknown): v is string => typeof v === 'string' && !!v && v.length <= 255 && !/[\\/\0]/.test(v)
@@ -120,7 +120,7 @@ export async function noteNames(ws: WorkspaceService, seen: ProjectSeen[]): Prom
       const had = j.projects[s.id]
       if (!had) {
         const last = !s.copy && s.lastPath && same(resolve(dirname(s.lastPath)), resolve(dirname(s.path))) ? basename(s.lastPath) : null
-        const moved = !!last && !same(last, folder) && !existsSync(join(dirname(s.path), last, HIVE_DIR, 'project.json'))
+        const moved = !!last && !same(last, folder) && !existsSync(join(dirname(s.path), last, CW_DIR, 'project.json'))
         j.projects[s.id] = { name: folder, former: moved ? [last!] : [] }
         if (moved) added.push({ seq: ++j.seq, batch, id: s.id, from: last!, to: folder, at })
         changed = true
@@ -172,7 +172,7 @@ export function ownerOfName(ws: WorkspaceService, folder: string): string | null
 }
 
 /**
- * Records that a project once had a folder name, though Hive never saw it renamed (#514): Repair found what was saved
+ * Records that a project once had a folder name, though Combwork never saw it renamed (#514): Repair found what was saved
  * under that name and gave it to the project (#508). In the record before anything else moves, so what is kept under
  * that name (handovers, kept comparisons) is given to the project however often that fails, and after a restart.
  */
@@ -182,14 +182,14 @@ export async function noteFormerName(ws: WorkspaceService, id: string, folder: s
   const life = ws.lifetime
   const gone = (): boolean => life.aborted || ws.lifetime !== life || ws.path !== path
   await retryWhileSaving(() => withFileLock(fileOf(path), async () => {
-    if (gone()) throw hiveError(CLOSED, undefined, { kind: 'conflict' })
+    if (gone()) throw combworkError(CLOSED, undefined, { kind: 'conflict' })
     const j = readJournal(await readKeptJson<unknown>(fileOf(path), null, { unsettled: 'throw' }))
-    if (gone()) throw hiveError(CLOSED, undefined, { kind: 'conflict' })
+    if (gone()) throw combworkError(CLOSED, undefined, { kind: 'conflict' })
     const now = ws.projectIdsNow().byId.get(id)
     const p = j.projects[id] ?? (now ? (j.projects[id] = { name: basename(now), former: [] }) : null)
-    if (!p) throw hiveError(msg({ id: 'worktrees.names.projectGone', defaultMessage: 'That project is no longer in the workspace.', description: "An error: the project whose name was being recorded was removed from the workspace meanwhile." }), undefined, { kind: 'notFound' })
+    if (!p) throw combworkError(msg({ id: 'worktrees.names.projectGone', defaultMessage: 'That project is no longer in the workspace.', description: "An error: the project whose name was being recorded was removed from the workspace meanwhile." }), undefined, { kind: 'notFound' })
     if (same(p.name, folder) || p.former.some((n) => same(n, folder))) return remember(ws, life, j)
-    // The oldest of its names: it had it before any Hive saw it renamed from.
+    // The oldest of its names: it had it before any Combwork saw it renamed from.
     p.former = [...p.former.slice(0, MAX_FORMER - 1), folder]
     await writeKeptJson(fileOf(path), j)
     remember(ws, life, j)

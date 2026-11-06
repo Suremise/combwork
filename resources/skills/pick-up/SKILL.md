@@ -11,9 +11,9 @@ A handover describes the state when it was written. Others may have committed, t
 
 ## 1. Read the right handover
 
-- A handover the user names: `hive_read_shared_note` with its path (`hive_list_shared_notes` lists them).
-- Otherwise the latest for this project: `hive_read_latest_handover`.
-- No hive tool listed: look for `HANDOVER.md` in the project root, or ask the user where it is.
+- A handover the user names: `cw_read_shared_note` with its path (`cw_list_shared_notes` lists them).
+- Otherwise the latest for this project: `cw_read_latest_handover`.
+- No Combwork tool listed: look for `HANDOVER.md` in the project root, or ask the user where it is.
 
 Its header says which project, agent and session wrote it, and when.
 
@@ -22,7 +22,7 @@ Its header says which project, agent and session wrote it, and when.
 Check only what the next step depends on:
 
 - **Code**: the branch and `git status`; `git log` since the handover's date. Are the commits it names there, and is there newer work?
-- **Cards** it mentions: `hive_read_task` (`latestComment: true` is often enough). Where are they now, and what was said since?
+- **Cards** it mentions: `cw_read_task` (`latestComment: true` is often enough). Where are they now, and what was said since?
 - **Decisions and questions** it lists as open: has the user answered them since (a newer comment or note)?
 - **Checks**: re-run one only when the handover reports a failure you are about to work on, or the code it covers changed since.
 
@@ -35,4 +35,4 @@ If the handover and the current state disagree in a way that changes the plan, s
 
 ## No handover
 
-Say so. Offer to build a picture from `git log`, uncommitted changes, the project's cards (`hive_list_tasks`) and the shared notes instead.
+Say so. Offer to build a picture from `git log`, uncommitted changes, the project's cards (`cw_list_tasks`) and the shared notes instead.

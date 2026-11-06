@@ -195,7 +195,7 @@ export function TipPopup() {
           </button>
         </div>
         <button className="link tip-off" onClick={() => void turnOffTips()}>
-          {tr(msg({ id: 'tips.ui.off', defaultMessage: "Don't show tips", description: 'A link on the tip card: turns off the tip when Hive starts.' }))}
+          {tr(msg({ id: 'tips.ui.off', defaultMessage: "Don't show tips", description: 'A link on the tip card: turns off the tip when Combwork starts.' }))}
         </button>
       </div>
       <IconButton icon="close" action="close-tip" title={tr(msg({ id: 'tips.ui.close', defaultMessage: 'Close', description: 'Closes the tip card or Help → Tips.' }))} onClick={closeTip} />
@@ -230,7 +230,7 @@ export function TipsDialog() {
       <div className="tips-top">
         <SearchInput autoFocus placeholder={tr(msg({ id: 'tips.ui.search', defaultMessage: 'Search tips', description: "Placeholder of Help → Tips' search box." }))} value={query} onChange={setQuery} />
         <label className="flex muted tips-switch">
-          <Switch checked={on} label={tr(msg({ id: 'tips.ui.showOnStart', defaultMessage: 'Show a tip when Hive starts', description: 'A switch in Help → Tips: shows a tip of the day when Hive starts (the same as Settings → General → Show a tip when Hive starts).' }))} onChange={(v) => void call('settings:update', { general: { showTips: v } }).then((s) => set({ settings: s }))} /> {tr(msg({ id: 'tips.ui.showOnStart', defaultMessage: 'Show a tip when Hive starts', description: 'A switch in Help → Tips: shows a tip of the day when Hive starts (the same as Settings → General → Show a tip when Hive starts).' }))}
+          <Switch checked={on} label={tr(msg({ id: 'tips.ui.showOnStart', defaultMessage: 'Show a tip when Combwork starts', description: 'A switch in Help → Tips: shows a tip of the day when Combwork starts (the same as Settings → General → Show a tip when Combwork starts).' }))} onChange={(v) => void call('settings:update', { general: { showTips: v } }).then((s) => set({ settings: s }))} /> {tr(msg({ id: 'tips.ui.showOnStart', defaultMessage: 'Show a tip when Combwork starts', description: 'A switch in Help → Tips: shows a tip of the day when Combwork starts (the same as Settings → General → Show a tip when Combwork starts).' }))}
         </label>
       </div>
       <div className="tips-list">

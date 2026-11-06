@@ -20,7 +20,7 @@ const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
-// Git in the test repositories, waiting out the Hive under test's own git (lib.git, #199).
+// Git in the test repositories, waiting out the Combwork under test's own git (lib.git, #199).
 const git = (cwd, ...a) => lib.git(cwd, a)
 
 ;(async () => {
@@ -36,13 +36,13 @@ const git = (cwd, ...a) => lib.git(cwd, a)
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: lib.port(47897), CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47897), CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const until = async (fn, ms = 10000) => {
     const t = Date.now()
@@ -61,7 +61,7 @@ const git = (cwd, ...a) => lib.git(cwd, a)
 
   const key = lib.ptyKey(alpha, two.id)
   const screen = async () => lib.plainText(await inv('pty:buffer', key).catch(() => ''))
-  // What the agent and Hive's branch check say, for a failed check's log line.
+  // What the agent and Combwork's branch check say, for a failed check's log line.
   const state = async () => {
     const s = await live(two.id)
     const b = (await inv('agents:branchStatuses')).find((x) => x.agentId === two.id)?.status
@@ -70,7 +70,7 @@ const git = (cwd, ...a) => lib.git(cwd, a)
 
   /**
    * A prompt to the agent, and the end of its turn, each step checked (#662): the fake echoes the prompt as it takes it
-   * ("> turn n"), prints "Done: turn n" as the turn ends, and Hive marks it finished once the Stop arrives: that turn's
+   * ("> turn n"), prints "Done: turn n" as the turn ends, and Combwork marks it finished once the Stop arrives: that turn's
    * finished (since the prompt), not the last turn's still showing.
    */
   let turns = 0
@@ -168,7 +168,7 @@ const git = (cwd, ...a) => lib.git(cwd, a)
   await until(async () => (await dialog.locator('input[type=radio]').count()) === 2, 5000)
   const choice = (name) => dialog.locator('label.choice', { hasText: name }).locator('input[type=radio]')
   const remove = dialog.locator('label', { hasText: 'Remove the worktree' }).locator('input[type=checkbox]')
-  const move = dialog.locator('label', { hasText: /^\s*Move hive\// }).locator('input[type=checkbox]')
+  const move = dialog.locator('label', { hasText: /^\s*Move cw\// }).locator('input[type=checkbox]')
   check('the dialog defaults to Merge', (await choice('Merge').first().isChecked()) && !(await choice('Squash').isChecked()))
   check('and keeps the worktree', !(await remove.isChecked()))
   check('Merge has no branch move', (await move.count()) === 0)
@@ -188,7 +188,7 @@ const git = (cwd, ...a) => lib.git(cwd, a)
   check('and merges cleanly', next.ok && fs.existsSync(path.join(alpha, 'e.ts')), JSON.stringify(next))
   check('the worktree and agent are still there', fs.existsSync(wt) && (await lib.paneHeader(page, 'Two').count()) === 1)
 
-  // Not while the agent is in the middle of a task: Merge… is disabled (its count still shows), and Hive refuses.
+  // Not while the agent is in the middle of a task: Merge… is disabled (its count still shows), and Combwork refuses.
   fs.writeFileSync(path.join(wt, 'f.ts'), 'export const f = 6\n')
   const working = await lib.sendPrompt(inv, key, 'work 6', { submitted: async () => (await live(two.id))?.status === 'working', waitMs: HUNG_MS })
   check('the agent is working', working > 0, await state())

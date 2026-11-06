@@ -1,13 +1,13 @@
 // The merge queue in the app (#1348, SPEC §16.9): one host per open workspace, project and target, running the
 // target's entries (its IntegrationRequested facts) one at a time on #1360's runner. A host is started by an `enqueue`
 // action (the runtime writes one with each IntegrationRequested) and, as a workspace opens, for every target with open
-// entries; it takes the target's lease (or finds another Hive running it, and leaves it), recovers its own target's
-// entries first (an advance a crash interrupted), then drains: test merge in the runner's folder, merge checks as Hive's
+// entries; it takes the target's lease (or finds another Combwork running it, and leaves it), recovers its own target's
+// entries first (an advance a crash interrupted), then drains: test merge in the runner's folder, merge checks as Combwork's
 // runs (#1349, on the runner's recording spawn), the compare-and-swap advance under the repository lock (#1347) with the
 // lease checked inside it. When the queue is empty, paused, or the workspace closes, it releases its runner.
 //
-// The card's ruleset decides (§16.6.5): an entry whose card started under Hive merges is merged even after the project's
-// options moved to another finisher. With workflow rules off (`hive.workflow.enforce`), nothing runs to an advance: open
+// The card's ruleset decides (§16.6.5): an entry whose card started under Combwork merges is merged even after the project's
+// options moved to another finisher. With workflow rules off (`cw.workflow.enforce`), nothing runs to an advance: open
 // entries pause `rulesOff` (once an advance has begun, recovery finishes it), and carry on when the rules are on again.
 // A target checked out in a folder is advanced there by the journaled update (#1351, §16.9.2), with that folder fenced
 // (folderFence.ts) and paused while an agent builds in it; asked first (For you) while Settings → Advanced, Merge into a
@@ -16,14 +16,14 @@
 // Each host keeps the step its entry is at and the check running now (#1353), for the queue's model
 // (queueControls.ts), and tells the window of each change (`queue-changed`).
 //
-// A host that finds another Hive running its target watches that runner's process (#1455, S50): once it is gone, with
+// A host that finds another Combwork running its target watches that runner's process (#1455, S50): once it is gone, with
 // entries still open, the host runs again here and takes the lease over (the runner's own rule: only a gone process).
 
 import { basename, join } from 'path'
 import { app } from 'electron'
 import { detect } from '../platform/registry'
 import { boardRead, boardReadOnly, boardWrite, onBoardUpgraded } from '../boardStore'
-import { onHiveEvent } from '../events'
+import { onCombworkEvent } from '../events'
 import { exitBy } from '../exitLog'
 import { git, withGitRoute } from '../git'
 import { createLogger, userText } from '../logger'
@@ -68,11 +68,11 @@ interface Host {
 
 const hosts = new Map<string, Host>()
 
-/** How often a host whose target another Hive runs looks at that runner's process: the runners' renewal period. */
+/** How often a host whose target another Combwork runs looks at that runner's process: the runners' renewal period. */
 let holderMs = 30_000
 let holderProbe: ProcessProbe | null = null
 /**
- * A watch of another Hive's runner (watchHolder): the host it is for, and its next look. It stays registered while it
+ * A watch of another Combwork's runner (watchHolder): the host it is for, and its next look. It stays registered while it
  * looks (its probe awaited), so a second run finding the lease held meanwhile keeps it rather than starting another.
  */
 interface HolderWatch {
@@ -80,7 +80,7 @@ interface HolderWatch {
   timer: NodeJS.Timeout | null
   ended: boolean
 }
-/** The targets another Hive runs that this Hive watches, by host key: one watch each. */
+/** The targets another Combwork runs that this Combwork watches, by host key: one watch each. */
 const holderWatches = new Map<string, HolderWatch>()
 
 /** Ends a watch: its timer cleared, its entry removed (only its own: a newer watch under the key is left). */
@@ -162,7 +162,7 @@ export function kickQueue(ws: WorkspaceService, projectPath: string, target: str
   return host.running
 }
 
-/** This profile's name, as another Hive's panel says who runs a queue ("run by Hive-Dev"). */
+/** This profile's name, as another Combwork's panel says who runs a queue ("run by Combwork-Dev"). */
 export const profileName = (): string => basename(app.getPath('userData'))
 
 /** Tells the workspace's window that a target's queue changed (its model: queueControls.ts), for the panel and the card. */
@@ -171,8 +171,8 @@ export function queueChanged(ws: WorkspaceService, projectPath: string, target: 
 }
 
 /**
- * What this Hive's host of a target is doing now: running (a run going), the entry's step and the check's run. Nothing
- * running here: all null (another Hive may run it: its lease says).
+ * What this Combwork's host of a target is doing now: running (a run going), the entry's step and the check's run. Nothing
+ * running here: all null (another Combwork may run it: its lease says).
  */
 export function queueLive(ws: WorkspaceService, projectPath: string, target: string): { running: boolean; now: QueueStepInfo | null; run: string | null } {
   const h = ws.path ? hosts.get(hostKey(ws.path, projectPath, target)) : undefined
@@ -181,7 +181,7 @@ export function queueLive(ws: WorkspaceService, projectPath: string, target: str
 }
 
 /**
- * What this Hive's hosts of a project's queues are doing now, as a token (HI-1683): the same token, the same `queueLive`
+ * What this Combwork's hosts of a project's queues are doing now, as a token (HI-1683): the same token, the same `queueLive`
  * for each of its targets, so a queue view made then is still current as far as they go.
  */
 export function queueHostsStamp(ws: WorkspaceService, projectPath: string): string {
@@ -269,7 +269,7 @@ async function runHost(h: Host): Promise<void> {
 }
 
 /**
- * Watches the runner another Hive has of a host's target (#1455, S50), by the process its lease names: once that is
+ * Watches the runner another Combwork has of a host's target (#1455, S50), by the process its lease names: once that is
  * gone (`alive` false: a reused pid counts as gone), or the lease is no one's, the host runs again here, which takes the
  * lease over. A runner whose process can't be checked counts as running, as acquire takes it.
  *
@@ -299,7 +299,7 @@ function watchHolder(h: Host, wf: Workflow): void {
     if (!alive(h)) return endWatch(key, w)
     if (!gone || h.running) return schedule()
     endWatch(key, w)
-    log.info(`The merge queue for ${userText(h.target)} in ${userText(basename(h.projectPath))}: its runner${lease ? ` (${userText(lease.profile)}, process ${lease.pid})` : ''} has gone, so this Hive runs it`)
+    log.info(`The merge queue for ${userText(h.target)} in ${userText(basename(h.projectPath))}: its runner${lease ? ` (${userText(lease.profile)}, process ${lease.pid})` : ''} has gone, so this Combwork runs it`)
     void kickQueue(h.ws, h.projectPath, h.target)
   }
   const schedule = (): void => {
@@ -310,7 +310,7 @@ function watchHolder(h: Host, wf: Workflow): void {
   schedule()
 }
 
-/** The queue's config for a host's run: the runner's folder, lease, git and spawn; the repository lock; Hive's checks. */
+/** The queue's config for a host's run: the runner's folder, lease, git and spawn; the repository lock; Combwork's checks. */
 function queueConfig(h: Host, runner: QueueRunner): QueueConfig {
   const checks = appQueueChecks(h.ws, h.projectPath, (file, args, opts) => runner.spawnNow('check', file, args, opts), (run) => {
     h.run = run
@@ -341,7 +341,7 @@ function queueConfig(h: Host, runner: QueueRunner): QueueConfig {
     checkedOutTarget: () => (advanced.get(QUEUE_CHECKED_OUT_TARGET) === 'auto' ? 'auto' : 'ask'),
     runCheck: checks.runCheck,
     install: checks.install,
-    // G20 (HI-1367): the pick at the result runs as a check does; its tests and results files in Hive's own folder.
+    // G20 (HI-1367): the pick at the result runs as a check does; its tests and results files in Combwork's own folder.
     focused: {
       env: () => childEnv(),
       pickTimeoutMs: () => Math.max(10, Number(advanced.get(FOCUSED_PICK_SECONDS)) || 180) * 1000,
@@ -358,26 +358,26 @@ function queueConfig(h: Host, runner: QueueRunner): QueueConfig {
   return cfg
 }
 
-/** The points of an advance a test copy can crash at (HIVE_TEST_QUEUE_CRASH), in the journal's order (#1351, S34d). */
+/** The points of an advance a test copy can crash at (CW_TEST_QUEUE_CRASH), in the journal's order (#1351, S34d). */
 const CRASH_POINTS: QueueHook[] = ['afterStarted', 'beforeFiles', 'afterFiles', 'beforeRef', 'afterAdvance', 'inRollback', 'afterRollback']
 let raced = false
 
 /**
- * Test copies (unpackaged) only. `HIVE_TEST_QUEUE_CRASH=<point>` ends Hive at once at that point of an advance (S33c,
+ * Test copies (unpackaged) only. `CW_TEST_QUEUE_CRASH=<point>` ends Combwork at once at that point of an advance (S33c,
  * S34d: the next start's recovery reads the journal); no quit handler runs, nothing is released.
- * `HIVE_TEST_QUEUE_RACE=beforeRef` moves the target, as another git client would, just before the swap (a rollback).
+ * `CW_TEST_QUEUE_RACE=beforeRef` moves the target, as another git client would, just before the swap (a rollback).
  */
 function testHooks(projectPath: string, target: string): QueueHooks {
   const hooks: QueueHooks = {}
-  const crash = process.env.HIVE_TEST_QUEUE_CRASH
+  const crash = process.env.CW_TEST_QUEUE_CRASH
   const point = CRASH_POINTS.find((p) => p === crash)
   if (point) hooks[point] = () => (exitBy('app.exit', `a test crash at the merge queue's ${point}`, () => app.exit(1)), new Promise<void>(() => undefined))
-  if (process.env.HIVE_TEST_QUEUE_RACE === 'beforeRef' && point !== 'beforeRef') {
+  if (process.env.CW_TEST_QUEUE_RACE === 'beforeRef' && point !== 'beforeRef') {
     hooks.beforeRef = async () => {
-      // Once per run of Hive: the entry tested again on the moved target then merges.
+      // Once per run of Combwork: the entry tested again on the moved target then merges.
       if (raced) return
       raced = true
-      // A commit on the target made outside Hive (an empty one, on its tree), the ref moved to it.
+      // A commit on the target made outside Combwork (an empty one, on its tree), the ref moved to it.
       const head = await git(projectPath, ['rev-parse', `refs/heads/${target}`])
       const made = head.ok ? await git(projectPath, ['-c', 'user.name=Race', '-c', 'user.email=race@example.invalid', 'commit-tree', `${head.out.trim()}^{tree}`, '-p', head.out.trim(), '-m', 'race']) : null
       if (made?.ok) await git(projectPath, ['update-ref', `refs/heads/${target}`, made.out.trim(), head.out.trim()])
@@ -388,12 +388,12 @@ function testHooks(projectPath: string, target: string): QueueHooks {
 
 /**
  * What makes an agent build in a folder (§16.9.2): the files agents hold locks on there, and the folders of the runs
- * going there (an agent's, the Assistant's or a script's; not Hive's own). Null when there are none: an idle agent, or one
+ * going there (an agent's, the Assistant's or a script's; not Combwork's own). Null when there are none: an idle agent, or one
  * whose session lives there but works in a review copy, holds no lock and runs nothing there.
  */
 function folderBuilders(ws: WorkspaceService, folder: string): string[] | null {
   const locked = sessions.locksIn(folder)
-  const runs = ws.path ? progress.list(ws.path).filter((r) => r.source !== 'hive' && (r.state === 'running' || (r.state === 'stale' && r.staleReason === 'quiet')) && !!r.folder && inFolder(r.folder, folder)) : []
+  const runs = ws.path ? progress.list(ws.path).filter((r) => r.source !== 'combwork' && (r.state === 'running' || (r.state === 'stale' && r.staleReason === 'quiet')) && !!r.folder && inFolder(r.folder, folder)) : []
   const what = [...new Set([...locked, ...runs.map((r) => r.folder!)])]
   return what.length ? what : null
 }
@@ -405,27 +405,27 @@ async function pauseForRulesOff(wf: Workflow, q: MergeQueue, target: string): Pr
   await wf.locked(() => wf.store.setQueuePause(target, { reason: 'rulesOff', card: first.card.key }, true)) // i18n-ignore: a pause reason's code, not text
 }
 
-/** A card's test merge's ref (`refs/hive/queue/<key>`), once its entry has an outcome. */
+/** A card's test merge's ref (`refs/cw/queue/<key>`), once its entry has an outcome. */
 async function dropQueuePin(projectPath: string, cardKey: string): Promise<void> {
   const key = cardKey.replace(/[^A-Za-z0-9._-]/g, '-')
-  await git(projectPath, ['update-ref', '-d', `refs/hive/queue/${key}`])
-  // Its entries' strict updates (#1352: `refs/hive/queue/<entry>`, `AM-12/e7` as `AM-12-e7`).
-  const r = await git(projectPath, ['for-each-ref', '--format=%(refname)', `refs/hive/queue/${key}-e*`])
+  await git(projectPath, ['update-ref', '-d', `refs/cw/queue/${key}`])
+  // Its entries' strict updates (#1352: `refs/cw/queue/<entry>`, `AM-12/e7` as `AM-12-e7`).
+  const r = await git(projectPath, ['for-each-ref', '--format=%(refname)', `refs/cw/queue/${key}-e*`])
   for (const ref of r.ok ? r.out.split(/\r?\n/).filter(Boolean) : []) await git(projectPath, ['update-ref', '-d', ref])
 }
 
 /**
- * The submissions' pins (`refs/hive/cards/<key>/<n>`, §16.9.3) of the project's cards that are archived, or gone:
+ * The submissions' pins (`refs/cw/cards/<key>/<n>`, §16.9.3) of the project's cards that are archived, or gone:
  * removed. A pin keeps what was reviewed until its card is archived.
  */
 export async function prunePins(wf: Workflow, projectPath: string): Promise<void> {
-  const r = await git(projectPath, ['for-each-ref', '--format=%(refname)', 'refs/hive/cards/'])
+  const r = await git(projectPath, ['for-each-ref', '--format=%(refname)', 'refs/cw/cards/'])
   if (!r.ok) return
-  const keys = new Set(r.out.split(/\r?\n/).map((l) => /^refs\/hive\/cards\/([^/]+)\//.exec(l.trim())?.[1]).filter((k): k is string => !!k))
+  const keys = new Set(r.out.split(/\r?\n/).map((l) => /^refs\/cw\/cards\/([^/]+)\//.exec(l.trim())?.[1]).filter((k): k is string => !!k))
   for (const key of keys) {
     const card = wf.store.cardByKey(key)
     if (card && !wf.store.isArchived(card.id)) continue
-    const refs = r.out.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.startsWith(`refs/hive/cards/${key}/`))
+    const refs = r.out.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.startsWith(`refs/cw/cards/${key}/`))
     for (const ref of refs) await git(projectPath, ['update-ref', '-d', ref])
   }
 }
@@ -440,14 +440,14 @@ function openTargets(wf: Workflow): string[] {
     const e = openEntry(wf.state(f.card))
     if (e && e.id === d.entry) out.add(d.target)
   }
-  // A target whose push an earlier merge still owes (G18, #1179: Hive stopped before it, or it was refused) runs too.
+  // A target whose push an earlier merge still owes (G18, #1179: Combwork stopped before it, or it was refused) runs too.
   for (const t of seen) if (pushOwedOf(wf.store.meta(pushOwedKey(t)))) out.add(t)
   return [...out]
 }
 
 /**
  * Starts the hosts of a workspace's projects that have open entries (as it opens, its board upgraded, or the rules back
- * on). A board that takes no writes (waiting for its upgrade to 1.0, or a newer Hive's) has nothing to run: the upgrade
+ * on). A board that takes no writes (waiting for its upgrade to 1.0, or a newer Combwork's) has nothing to run: the upgrade
  * starts them (#1621).
  */
 async function startOpen(ws: WorkspaceService, resumeRulesOff = false): Promise<void> {
@@ -500,7 +500,7 @@ export function startQueueHosts(): void {
     if (wf) await wf.platformOf(wf.store.card(a.card)).perform('pin', a.payload)
   })
   const seen = new WeakSet<AbortSignal>()
-  const off = onHiveEvent((e) => {
+  const off = onCombworkEvent((e) => {
     // The team resuming (HI-2081): its queues go on with what waited, as when the rules are turned on again.
     if (e.type === 'team-pause-changed') {
       const ws = e.pause ? null : openWorkspaces().find((w) => w.path?.toLowerCase() === e.workspacePath.toLowerCase())
@@ -531,7 +531,7 @@ export function startQueueHosts(): void {
   // A workspace closing: its runners released first (their processes ended; from then on every write their runs try is
   // refused by the fence, so a check ended by the close never returns its card), then its runs waited for, briefly.
   const closing = async (path: string): Promise<void> => {
-    // Its watches of other Hives' runners end with it (a reopened workspace's hosts watch afresh).
+    // Its watches of other Combworks' runners end with it (a reopened workspace's hosts watch afresh).
     endWatches(path)
     await releaseQueueRunners((r) => !!r.cfg.workspace && r.cfg.workspace.toLowerCase() === path.toLowerCase())
     const runs = [...hosts.values()].filter((h) => h.wsPath.toLowerCase() === path.toLowerCase() && h.running).map((h) => h.running)
@@ -549,7 +549,7 @@ export function startQueueHosts(): void {
   }
 }
 
-/** Stops listening (Hive quitting; tests). Runs going on finish; their runners are released by quit (releaseQueueRunners). */
+/** Stops listening (Combwork quitting; tests). Runs going on finish; their runners are released by quit (releaseQueueRunners). */
 export function stopQueueHosts(): void {
   stopHosts?.()
   stopHosts = null

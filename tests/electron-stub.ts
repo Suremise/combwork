@@ -1,4 +1,4 @@
-// Unit tests run in plain Node: Hive's modules get this instead of Electron (no binary download in CI).
+// Unit tests run in plain Node: Combwork's modules get this instead of Electron (no binary download in CI).
 /* eslint-disable typescript/no-extraneous-class -- stand-ins for Electron's classes */
 import { tempRoot } from './tempDir'
 

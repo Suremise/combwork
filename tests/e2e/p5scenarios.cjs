@@ -1,16 +1,16 @@
-// P5's scenarios first proven in the app (#1358, SPEC §16.18; their cores in #1349 and #1350): a project set to "Hive
+// P5's scenarios first proven in the app (#1358, SPEC §16.18; their cores in #1349 and #1350): a project set to "Combwork
 // merges" into `main` checked out in the project folder (queueFixture.cjs), fake Claude Code agents acting by their own
-// tokens, the Assistant off, and a Hive that sees no global git config (the machine's identity can't stand in for the
+// tokens, the Assistant off, and a Combwork that sees no global git config (the machine's identity can't stand in for the
 // repository's).
 // - S13: the queue's warm worktree has a package installed; a change uses it without declaring it in package.json; the
 //   install runs from scratch (the project's setup command), the check fails, main doesn't move;
 // - S4: two approved changes, each fine alone and broken together: the second's merge checks fail, main doesn't move,
 //   the card is returned with the output, in the Merges tab and on the card;
 // - S47: no identity → paused, said in the panel, merged once the user sets one and resumes; a commit-msg hook rejecting
-//   Hive's merge commit → returned with its output; a stand-in signer that waits → paused "signing waits for you", the
+//   Combwork's merge commit → returned with its output; a stand-in signer that waits → paused "signing waits for you", the
 //   signer ended, merged once signing is off and the queue resumed;
 // - S57(e): the user's decision recorded on the card while its merge checks run: nothing advances, back to Review;
-// - S14 under Hive merges (G10): a release card waits on For you (Approve), unqueued; the OK given, merged.
+// - S14 under Combwork merges (G10): a release card waits on For you (Approve), unqueued; the OK given, merged.
 // Screenshots of each, both themes. Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -34,17 +34,17 @@ const slash = (p) => p.replace(/\\/g, '/')
 ;(async () => {
   q.prepare(fx)
   // The project's packages (S13): left-pad declared and used; node_modules ignored. main only: the target.
-  for (const [file, text] of Object.entries({ 'package.json': '{"dependencies":{"left-pad":"1"}}\n', 'index.js': "require('left-pad')\n", '.gitignore': '.hive/\nnode_modules/\n' })) fs.writeFileSync(path.join(fx.alpha, file), text)
+  for (const [file, text] of Object.entries({ 'package.json': '{"dependencies":{"left-pad":"1"}}\n', 'index.js': "require('left-pad')\n", '.gitignore': '.combwork/\nnode_modules/\n' })) fs.writeFileSync(path.join(fx.alpha, file), text)
   lib.git(fx.alpha, ['-c', 'user.name=t', '-c', 'user.email=t@t', 'add', '-A'])
   lib.git(fx.alpha, ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'packages'])
   // The setup command: node_modules from package.json's dependencies, from scratch (as npm ci would).
   const install = path.join(fx.tools, 'install.js')
   fs.writeFileSync(install, "const fs = require('fs'); fs.rmSync('node_modules', { recursive: true, force: true }); for (const d of Object.keys(JSON.parse(fs.readFileSync('package.json', 'utf8')).dependencies || {})) fs.mkdirSync('node_modules/' + d, { recursive: true })\n")
-  // No global or system git config for this Hive: the repository's identity (the fixture's, until S47 removes it) is all
+  // No global or system git config for this Combwork: the repository's identity (the fixture's, until S47 removes it) is all
   // the queue can use.
   const noGlobal = path.join(fx.tools, 'empty.gitconfig')
   fs.writeFileSync(noGlobal, '')
-  const h = await q.startHive(fx, { port: PORT, env: { GIT_CONFIG_GLOBAL: noGlobal, GIT_CONFIG_NOSYSTEM: '1' }, keepOptions: true })
+  const h = await q.startCombwork(fx, { port: PORT, env: { GIT_CONFIG_GLOBAL: noGlobal, GIT_CONFIG_NOSYSTEM: '1' }, keepOptions: true })
   const { page, inv } = h
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -139,7 +139,7 @@ const slash = (p) => p.replace(/\\/g, '/')
     q.restoreCheck(fx)
     q.steer(fx, 'pass')
 
-    // --- S47 (a): no identity for the repository (and none on the machine for this Hive): paused, said in the panel.
+    // --- S47 (a): no identity for the repository (and none on the machine for this Combwork): paused, said in the panel.
     await inv('workflow:setOptions', fx.alpha, { preset: null, options: f.options({ identity: null, mergeInstall: 'onManifestChange' }) })
     lib.git(fx.alpha, ['config', '--unset', 'user.name'])
     lib.git(fx.alpha, ['config', '--unset', 'user.email'])
@@ -158,9 +158,9 @@ const slash = (p) => p.replace(/\\/g, '/')
     lib.git(fx.alpha, ['config', 'user.name', fx.identity.name])
     lib.git(fx.alpha, ['config', 'user.email', fx.identity.email])
 
-    // --- S47 (b): a commit-msg hook that rejects Hive's merge commit (its trailers): returned with the hook's output.
+    // --- S47 (b): a commit-msg hook that rejects Combwork's merge commit (its trailers): returned with the hook's output.
     const hook = path.join(fx.alpha, '.git', 'hooks', 'commit-msg')
-    fs.writeFileSync(hook, '#!/bin/sh\nif grep -q "Hive-Card" "$1"; then echo "message rejected by policy: no Hive trailers here" >&2; exit 1; fi\nexit 0\n')
+    fs.writeFileSync(hook, '#!/bin/sh\nif grep -q "Combwork-Card" "$1"; then echo "message rejected by policy: no card trailers here" >&2; exit 1; fi\nexit 0\n')
     const beforeHook = head()
     const hooked = await q.approve(fx, h, reviewer, 'Hooked', { 'hook.txt': 'hook\n' })
     const fh = await returned(hooked.n)
@@ -173,7 +173,7 @@ const slash = (p) => p.replace(/\\/g, '/')
     fs.rmSync(hook)
 
     // --- S47 (c): a stand-in signer that waits as a pinentry would: paused "signing waits for you" within the bound.
-    await inv('advanced:set', 'hive.queue.signSeconds', 5)
+    await inv('advanced:set', 'cw.queue.signSeconds', 5)
     const pidFile = path.join(fx.tools, 'signer.pid')
     const waiter = path.join(fx.tools, 'wait.js')
     fs.writeFileSync(waiter, `require('fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid)); setInterval(() => {}, 1000)\n`)
@@ -209,7 +209,7 @@ const slash = (p) => p.replace(/\\/g, '/')
     lib.git(fx.alpha, ['config', '--unset', 'commit.gpgsign'])
     await tab.card('main').locator('[data-action="resume"]').click()
     check('…signing off and the queue resumed: merged', await done(n), JSON.stringify(await h.kinds(n)))
-    await inv('advanced:set', 'hive.queue.signSeconds', null)
+    await inv('advanced:set', 'cw.queue.signSeconds', null)
 
     // --- S57(e): the user records a decision on the card while its merge checks run: no advance, back to review.
     q.steer(fx, 'wait')
@@ -225,7 +225,7 @@ const slash = (p) => p.replace(/\\/g, '/')
     check('…the checks end, nothing advances: its pass no longer holds, back to Review', !!(await waitHung(async () => (await column(decided.n)) === 'review')) && head() === beforeDecision && !(await h.kinds(decided.n)).includes('Integrated'), JSON.stringify(await h.kinds(decided.n)))
     q.steer(fx, 'pass')
 
-    // --- S14 under Hive merges (G10): a release card under "your OK for release" waits on For you (Approve), unqueued.
+    // --- S14 under Combwork merges (G10): a release card under "your OK for release" waits on For you (Approve), unqueued.
     await inv('workflow:setOptions', fx.alpha, { preset: null, options: f.options({ mergeInstall: 'onManifestChange', okBefore: { mode: 'labels', labels: ['release'] } }) })
     const rn = (await inv('tasks:create', { title: 'Release notes', project: 'alpha', labels: ['release'] })).number
     const rb = await q.agent(fx, h, `B${rn}`)

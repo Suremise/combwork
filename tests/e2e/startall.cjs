@@ -2,7 +2,7 @@
 // Archive and Start New and Remove All for every agent in its Agents ▾ menu, each saying how many agents it acts on
 // ("Stop (2)", #275, also in the Session menu and the palette), the same agents its question lists, following agents as
 // they start and stop; the state line ("1 waiting · 2 working", #974); folding at narrow widths (icons, then Agents ▾'s
-// actions in ⋯, then Active, the status to one count, then Resume and Stop, one row at any width, #1051); Explorer, Terminal and Project Settings in the ⋯ menu; the Session menu and the palette have both new
+// actions in ⋯, then Active, the status to one count, then Resume and Stop, one row at any width, #1051); Explorer, Terminal and Remove Project… in the ⋯ menu, with their keys (HI-2551); the Session menu and the palette have both new
 // actions; the Project menu lists every tab and Project Settings; the session toolbar's summary chip counts the agents. Three agents run the fake Claude Code (fake-claude/): one working, one idle,
 // one stopped. Start New (All) asks once (the working one flagged), Cancel changes nothing, and then every agent has a
 // new session with the old ones kept; Archive and Start New (All) archives each agent's session and starts fresh ones.
@@ -38,13 +38,15 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
   const PORT = lib.port(47884)
-  const env = lib.hiveEnv({ HIVE_USER_DATA: userData, HIVE_API_PORT: PORT, CLAUDE_CONFIG_DIR: claudeHome })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: PORT, CLAUDE_CONFIG_DIR: claudeHome })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
   const page = await app.firstWindow()
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.appReady(page)
-  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.hive.invoke(c, ...x), [ch, a])
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
+  /** The open menu's rows, `label=keys` ('-' a separator), as keys.cjs reads them (HI-2551: ⋯'s entries show their keys). */
+  const menuRows = () => page.locator('.menu').last().evaluate((m) => [...m.children].map((c) => (c.classList.contains('menu-sep') ? '-' : `${c.querySelector('.menu-label, :scope > span:not(.menu-key)')?.textContent.trim() ?? c.textContent.trim()}=${c.querySelector('.menu-key')?.textContent.trim() ?? ''}`)))
   await lib.openWorkspace(inv, page, ws)
   const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
   const until = async (fn, ms = 20000) => {
@@ -54,7 +56,7 @@ const check = (name, ok, extra = '') => {
     return v
   }
   const type = async (id, text) => {
-    // Typed again if a wake of Hive's disturbed it (lib.typeLine, #1560).
+    // Typed again if a wake of Combwork's disturbed it (lib.typeLine, #1560).
     await lib.typeLine(inv, lib.ptyKey(alpha, id), claudeHome, null, text, { live: () => live(id) })
   }
   // Starts an agent (trusting its folder) and has one exchange, so it has a conversation.
@@ -156,7 +158,7 @@ const check = (name, ok, extra = '') => {
   }, HUNG_MS)), JSON.stringify(await focusState()))
   await page.evaluate(() => document.activeElement?.blur())
   // Narrower: the actions turn to icons (named for screen readers and in their tooltips) and the title gives way; at the
-  // narrowest window Hive supports (900 px, sidebar and rails open), every action is inside the header, on screen and
+  // narrowest window Combwork supports (900 px, sidebar and rails open), every action is inside the header, on screen and
   // the thing under its own centre, in both themes. With the Assistant's panel open too, Agents ▾'s actions go into ⋯.
   // Every action found and read in one evaluation in the page, so a refold (the Assistant opening) can't leave a stale or
   // detached control between the two (a locator's evaluateAll queries first, then evaluates).
@@ -194,7 +196,8 @@ const check = (name, ok, extra = '') => {
   check('900 px: Start New opens its question', !!(await lib.until(async () => (await asked.count()) === 1, 5000)))
   await asked.getByRole('button', { name: 'Cancel' }).click()
   await page.locator('.project-header').getByRole('button', { name: 'More actions' }).click()
-  const narrowItems = (await page.locator('.menu .menu-item').allInnerTexts()).map((t) => t.trim())
+  await lib.until(async () => (await page.locator('.menu .menu-item').count()) > 0, 5000)
+  const narrowItems = (await menuRows()).map((r) => r.split('=')[0])
   check('900 px: ⋯ opens with Explorer and Terminal first', JSON.stringify(narrowItems.slice(0, 2)) === JSON.stringify(['Explorer', 'Terminal']), JSON.stringify(narrowItems))
   await page.keyboard.press('Escape')
   // Squeezed further (#1051), the header stays one row: Agents ▾'s actions, then Active, go into ⋯ and the status keeps
@@ -210,7 +213,7 @@ const check = (name, ok, extra = '') => {
   }
   const oneRow = () => page.locator('.project-header').evaluate((el) => el.getBoundingClientRect().height < 48)
   const statusText = () => page.locator('.project-header .badge-text').innerText().catch(() => '')
-  const toggleProgress = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('hive:event', { type: 'menu-command', command: 'progress.toggle', args: [] }))
+  const toggleProgress = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', { type: 'menu-command', command: 'progress.toggle', args: [] }))
   // The Progress panel open at 900 px: the header about 265 px.
   await page.evaluate(() => document.activeElement?.blur())
   await toggleProgress()
@@ -243,11 +246,24 @@ const check = (name, ok, extra = '') => {
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
   await lib.until(async () => (await page.locator('.project-header .agents-menu').count()) === 1, 5000)
 
-  // --- ⋯: Explorer, Terminal, Project Settings, Remove Project… (Changes is a tab).
+  // --- ⋯: Explorer, Terminal, Remove Project… (Changes is a tab; Project Settings is More ▾'s, HI-2551), each with its
+  // command's keys where it has some: Terminal's by default, and a key given to Remove Project shows too.
   await page.locator('.project-header').getByRole('button', { name: 'More actions' }).click()
-  const items = (await page.locator('.menu .menu-item').allInnerTexts()).map((t) => t.trim())
-  check('⋯ has Explorer, Terminal, Project Settings and Remove Project…, without Changes', JSON.stringify(items) === JSON.stringify(['Explorer', 'Terminal', 'Project Settings', 'Remove Project…']), JSON.stringify(items))
+  await lib.until(async () => (await page.locator('.menu .menu-item').count()) > 0, 5000)
+  const items = await menuRows()
+  check('⋯ has Explorer, Terminal (Ctrl+Shift+`) and Remove Project…, without Changes or Project Settings', JSON.stringify(items) === JSON.stringify(['Explorer=', 'Terminal=Ctrl+Shift+`', '-', 'Remove Project…=']), JSON.stringify(items))
+  await page.screenshot({ path: path.join(lib.WORK, 'startall-project-menu.png') })
   await page.keyboard.press('Escape')
+  await lib.until(async () => (await page.locator('.menu').count()) === 0, 5000)
+  await inv('settings:setKeybinding', 'project.remove', 'Ctrl+Alt+Shift+R')
+  await lib.until(async () => (await inv('settings:get')).keybindings['project.remove'] === 'Ctrl+Alt+Shift+R', HUNG_MS)
+  await page.locator('.project-header').getByRole('button', { name: 'More actions' }).click()
+  await lib.until(async () => (await page.locator('.menu .menu-item').count()) > 0, 5000)
+  const rebound = await menuRows()
+  check("…a key given to Remove Project shows on it (the user's overrides apply)", rebound.at(-1) === 'Remove Project…=Ctrl+Alt+Shift+R', JSON.stringify(rebound))
+  await page.keyboard.press('Escape')
+  await lib.until(async () => (await page.locator('.menu').count()) === 0, 5000)
+  await inv('settings:setKeybinding', 'project.remove', undefined)
 
   // --- Menus: the Project menu lists every tab in the strip's order; the Session menu has both new actions.
   const menuItems = async (name) => {
@@ -383,10 +399,10 @@ const check = (name, ok, extra = '') => {
   const archiveDialog = page.locator('.dialog', { hasText: 'Archive and start new for all agents?' })
   await lib.agentsMenuRun(page, 'Archive and Start New (3)')
   await archiveDialog.waitFor({ timeout: 5000 })
-  const archiveText = await archiveDialog.innerText()
+  const arcappText = await archiveDialog.innerText()
   const archiveTable = await tableOf(archiveDialog)
   check('Archive lists them as a table too, saying each session is archived', archiveTable.rows.Worker?.[3]?.text === 'Stopped (will be interrupted), then its session archived, then a new one' && Object.keys(archiveTable.rows).length === 3, JSON.stringify(archiveTable.rows))
-  check('Archive asks once, listing the agents with sessions, the working one flagged', /Worker — Working.*\(will be interrupted\)/.test(archiveText) && /Idle — /.test(archiveText) && /Stopped — /.test(archiveText) && /\.hive\/archive/.test(archiveText), archiveText)
+  check('Archive asks once, listing the agents with sessions, the working one flagged', /Worker — Working.*\(will be interrupted\)/.test(arcappText) && /Idle — /.test(arcappText) && /Stopped — /.test(arcappText) && /\.combwork\/archive/.test(arcappText), arcappText)
   await archiveDialog.getByRole('button', { name: 'Archive and start new' }).click()
   const renewed = await until(async () => {
     const l = await Promise.all([w, i, s].map((a) => live(a.id)))
@@ -396,7 +412,7 @@ const check = (name, ok, extra = '') => {
   const after = await sessions()
   const archivedIds = Object.values(current).filter((id) => after.some((x) => x.id === id && x.archived))
   check("each agent's session was archived", archivedIds.length === 3, JSON.stringify(after.map((x) => [x.id.slice(0, 8), x.archived])))
-  check('in .hive/archive', fs.existsSync(path.join(alpha, '.hive', 'archive')) && fs.readdirSync(path.join(alpha, '.hive', 'archive'), { recursive: true }).length > 0)
+  check('in .combwork/archive', fs.existsSync(path.join(alpha, '.combwork', 'archive')) && fs.readdirSync(path.join(alpha, '.combwork', 'archive'), { recursive: true }).length > 0)
   check('no failure notice', (await page.locator('.toast.error').count()) === 0)
 
   // --- The counts follow the agents (#275): Idle and Stopped stop (after an exchange, so each has a session to resume).

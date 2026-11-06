@@ -1,12 +1,12 @@
-// The window's health for hive.log (HI-1775): its long tasks, and where it is, sent to main, which logs them (and a
+// The window's health for combwork.log (HI-1775): its long tasks, and where it is, sent to main, which logs them (and a
 // hang's start and end with them: rendererWatch.ts). Long animation frames where the browser has them (each says which
 // scripts ran in it, so a line names what was busy), else long tasks.
 import { LONG_TASK_MS, MAX_DURING, MAX_SCRIPTS, MAX_TASKS, type LongTask, type WindowWhere } from '@shared/windowHealth'
 import { marksBetween } from './pageMarks'
 import { findProject, useStore } from './store'
 
-/** The preload's bridge: none where a component renders outside Hive's window (a unit test). */
-const bridge = (): Window['hive'] | undefined => (typeof window === 'undefined' ? undefined : window.hive)
+/** The preload's bridge: none where a component renders outside Combwork's window (a unit test). */
+const bridge = (): Window['combwork'] | undefined => (typeof window === 'undefined' ? undefined : window.combwork)
 
 /** The dialogs open, by title, the newest last (Modal says when one opens and closes). */
 const dialogs: { title: string }[] = []
@@ -74,7 +74,7 @@ const scriptsOf = (scripts: readonly FrameScript[] | undefined): string[] =>
   [...(scripts ?? [])]
     .sort((a, b) => b.duration - a.duration)
     .slice(0, MAX_SCRIPTS)
-    // i18n-ignore: hive.log, in English (main logs what this names)
+    // i18n-ignore: combwork.log, in English (main logs what this names)
     .map((x) => `${x.sourceFunctionName || x.invoker || 'script'}${x.sourceURL ? ` in ${x.sourceURL.split(/[?#]/)[0].split(/[\\/]/).pop()}` : ''} ${Math.round(x.duration)} ms`)
 
 let pending: { task: LongTask; complete: () => void }[] = []
@@ -98,8 +98,8 @@ let started = false
 export function startWindowHealth(): void {
   if (started) return
   started = true
-  // A test copy's probes read the marks too (unlimited, where hive.log's lines are rate-limited).
-  if (bridge()?.commitWatch) (window as unknown as { __hivePageMarks?: typeof marksBetween }).__hivePageMarks = marksBetween
+  // A test copy's probes read the marks too (unlimited, where combwork.log's lines are rate-limited).
+  if (bridge()?.commitWatch) (window as unknown as { __cwPageMarks?: typeof marksBetween }).__cwPageMarks = marksBetween
   // Where it is: its view, project, tab and panels as they change (a dialog says so itself).
   useStore.subscribe((s, was) => {
     if (s.activity !== was.activity || s.selectedProject !== was.selectedProject || s.projectTabs !== was.projectTabs || s.assistantOpen !== was.assistantOpen || s.inboxOpen !== was.inboxOpen || s.paletteOpen !== was.paletteOpen || s.workspace !== was.workspace) whereChanged()
