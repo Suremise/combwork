@@ -209,8 +209,8 @@ export async function closeWorkspace(): Promise<void> {
 
 export async function createProject(): Promise<void> {
   if (!get().workspace) return notify('warning', tr(msg({ id: 'actions.project.noWorkspace', defaultMessage: 'Open a workspace first', description: "A warning: a project can't be created without an open workspace." })))
-  // Its key (#1221): suggested from the name as it is typed, until the user types one; checked as it changes.
-  const held = keysHeld()
+  // Its key (#1221): suggested from the name as it is typed, until the user types one; checked as it changes, against the
+  // keys the board has now (HI-2653): a dialog opened before the board's first read is checked once it lands.
   let key = ''
   const name = await prompt({
     title: tr(msg({ id: 'actions.project.newTitle', defaultMessage: 'New Project', description: 'Title of the New Project dialog.' })),
@@ -228,9 +228,9 @@ export async function createProject(): Promise<void> {
     second: {
       label: tr(msg({ id: 'actions.project.key', defaultMessage: 'Key', description: "The New Project dialog: the label of the project's key box (2–4 letters, such as AM, that its cards are named by: AM-12)." })),
       hint: (k) => (normalKey(k) ? tr(msg({ id: 'actions.project.keyHint', defaultMessage: 'Its cards are named {first}, {second} and so on. You can change the key later in Project Settings.', description: 'Under the key box of the New Project dialog. {first} and {second} are the first two card names with the key typed, such as AM-1 and AM-2.' }), { first: `${normalKey(k)}-1`, second: `${normalKey(k)}-2` }) : ''),
-      follow: (v) => (v.trim() ? suggestKey(v.trim(), '', held) : ''),
+      follow: (v) => (v.trim() ? suggestKey(v.trim(), '', keysHeld()) : ''),
       // Left empty, Combwork suggests one, as for a folder opened.
-      validate: (k) => (k.trim() ? keyProblemText(k, '', held) : null),
+      validate: (k) => (k.trim() ? keyProblemText(k, '', keysHeld()) : null),
       set: (k) => (key = k)
     }
   })

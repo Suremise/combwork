@@ -93,6 +93,15 @@ export function Dialogs() {
     if ((dialog?.kind === 'choice' || dialog?.kind === 'prompt') && dialog.select) setPicked(dialog.select.initial)
   }, [dialog, setActionError])
 
+  // The second box's check and suggestion follow the projects' keys (HI-2653): a New Project dialog opened before the
+  // board's first read landed checks the key typed again once it has, and a suggestion not typed over is made again.
+  const projectKeys = useStore((s) => s.projectKeys)
+  useEffect(() => {
+    if (dialog?.kind === 'prompt' && dialog.second && !secondOwn) setSecond(dialog.second.follow(value))
+    // Only when the keys change: typing in either box already updates the suggestion.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectKeys])
+
   if (!dialog) return null
   const close = (result: boolean | string | null): void => {
     closeDialog()

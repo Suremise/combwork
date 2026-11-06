@@ -1,5 +1,6 @@
 // Project keys in the window (#1221): New Project… suggests a key from the name as it is typed and checks the one typed
-// (its form, another project's key, one beginning another's), each with its reason, and creates the project with it;
+// (its form, another project's key, one beginning another's), each with its reason, and creates the project with it; a
+// key typed before the window has the projects' keys is checked once it has them (HI-2653: the reads held);
 // Project Settings changes it, saying the old one stays, and lists the old key after; the board's search and the command
 // palette find cards by key (any case), by a project's key alone (AM-) and by the old key; Depends on takes a key. Both
 // themes' screenshots of the dialog and the settings row. Dev build, throwaway profile and workspace; no CLI is started.
@@ -35,9 +36,21 @@ const check = (name, ok, extra = '') => {
     await lib.fitWindow(app, page, { width: 1400, height: 900 })
     await lib.appReady(page)
     const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
+    // The window's reads of the projects' keys are held until released (HI-2653): under a full set's load the New Project
+    // dialog opened before the board's first read had them, and checked the key typed against none.
+    await app.evaluate(({ ipcMain }) => {
+      const handlers = ipcMain._invokeHandlers
+      const h = handlers.get('project:keys')
+      globalThis.__keysHold = { on: true, held: [] }
+      handlers.set('project:keys', (...x) => (globalThis.__keysHold.on ? new Promise((r) => globalThis.__keysHold.held.push(() => r(h(...x)))) : h(...x)))
+    })
+    const heldKeyReads = () => app.evaluate(() => globalThis.__keysHold.held.length)
+    const releaseKeys = () => app.evaluate(() => {
+      globalThis.__keysHold.on = false
+      for (const r of globalThis.__keysHold.held.splice(0)) r()
+    })
     await lib.openWorkspace(inv, page, ws)
     const keyOf = async (name) => (await inv('project:keys')).find((k) => path.basename(k.projectPath) === name) ?? null
-    check('the workspace’s project has its key (hilltop: HI)', !!(await lib.until(async () => (await keyOf('hilltop'))?.key === 'HI', HUNG_MS)), JSON.stringify(await inv('project:keys')))
     const themes = async (name, target) => {
       for (const theme of ['dark', 'light']) {
         await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
@@ -67,6 +80,12 @@ const check = (name, ok, extra = '') => {
     const textOf = (loc) => loc.innerText({ timeout: 500 }).catch(() => '')
     await name.fill('web-app')
     check('the key follows the name typed: a suggestion, saying how its cards will be named', !!(await lib.until(async () => (await key.inputValue()) === 'WE' && /WE-1, WE-2/.test(await textOf(hint)), HUNG_MS)), await boxes())
+    // A key typed while the window hasn't the keys yet is checked once it has them, with nothing typed again (HI-2653).
+    await key.fill('hi')
+    const heldBefore = !!(await lib.until(async () => (await heldKeyReads()) > 0, HUNG_MS))
+    await releaseKeys()
+    check('the workspace’s project has its key (hilltop: HI)', !!(await lib.until(async () => (await keyOf('hilltop'))?.key === 'HI', HUNG_MS)), JSON.stringify(await inv('project:keys')))
+    check('a key typed before the projects’ keys were read is checked once they are: another project’s key', heldBefore && !!(await lib.until(async () => /HI is another project’s key/.test(await textOf(error)) && (await key.getAttribute('aria-invalid')) === 'true', HUNG_MS)), `held reads seen: ${heldBefore}, ${await boxes()}`)
     for (const [typed, why, what] of [
       ['hi', /HI is another project’s key/, "another project's key"],
       ['HIV', /HIV and HI, another project’s key, begin alike/, 'one beginning another'],
