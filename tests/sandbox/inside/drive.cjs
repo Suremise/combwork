@@ -191,6 +191,26 @@ const windowText = async () => {
 const bodyText = () => page.evaluate(() => document.body.innerText)
 const statusWarnings = () => page.$$eval('.statusbar .status-item.warn', els => els.map(e => (e.innerText || e.getAttribute('title') || '').trim()))
 
+/** The project's kept Git options in the kept workspace's project.json, in the folder named (the release before's or .combwork). */
+const keptGitOptions = (tree) => readJson(path.join(KEPT_WS, 'demo', tree, 'project.json'))?.workflow?.kept?.git?.options ?? null
+
+/**
+ * Mark's end: its screenshot, then the release before quit, then the project's Git workflow options as that release
+ * writes them (its merges, its commit message; HI-2598), for the upgrade to convert to Combwork's. Written only once it
+ * has quit (HI-2645): a running app saves its project.json again (the open's own writes), over a write made behind it.
+ */
+async function beforeUpgrade(made) {
+  await shot('before-upgrade')
+  if (!made) return
+  await app.close()
+  app = undefined
+  const pj = path.join(KEPT_WS, 'demo', TREE_BEFORE, 'project.json')
+  const cfg = readJson(pj) ?? {}
+  fs.writeFileSync(pj, JSON.stringify({ ...cfg, workflow: { platform: 'none', preset: null, options: {}, kept: { git: { preset: null, options: { ...OLD_GIT_OPTIONS } } } } }, null, 2) + '\n')
+  const o = keptGitOptions(TREE_BEFORE)
+  check('4.values-written', "Before the upgrade: the project's kept Git options as the release before writes them, written once it has quit", o?.finish === OLD_GIT_OPTIONS.finish && o?.commitMessage === OLD_GIT_OPTIONS.commitMessage, JSON.stringify(readJson(pj)?.workflow ?? null))
+}
+
 const steps = {
   async 'first-run'() {
     await launch()
@@ -342,27 +362,20 @@ const steps = {
     const made = await until(async () => fs.existsSync(path.join(KEPT_WS, TREE_BEFORE, OLD_DB)) && fs.existsSync(path.join(KEPT_WS, 'demo', TREE_BEFORE, 'project.json')), 30_000)
     let card = null
     if (made) card = await inv('tasks:create', { title: KEPT_CARD, project: 'demo', description: `The plan: ${path.join(KEPT_WS, TREE_BEFORE, 'shared', 'plan.md')}` }).catch((e) => ({ error: String(e) }))
-    // Stored values under the old names (HI-2598): the project's Git workflow options as the release before writes them
-    // (its merges, its commit message), for the upgrade to convert to Combwork's.
-    if (made) {
-      const pj = path.join(KEPT_WS, 'demo', TREE_BEFORE, 'project.json')
-      const cfg = readJson(pj) ?? {}
-      fs.writeFileSync(pj, JSON.stringify({ ...cfg, workflow: { platform: 'none', preset: null, options: {}, kept: { git: { preset: null, options: { ...OLD_GIT_OPTIONS } } } } }, null, 2) + '\n')
-    }
     // A skill copy as the release before marks it (HI-2587), for the upgrade to rename its marker.
     fs.mkdirSync(path.join(KEPT_WS, COPY), { recursive: true })
     fs.writeFileSync(path.join(KEPT_WS, COPY, 'SKILL.md'), '---\nname: cw-sandbox-check\n---\n')
     fs.writeFileSync(path.join(KEPT_WS, COPY, OLD_COPY_MARKER), JSON.stringify({ source: 'sandbox', hash: 'h' }) + '\n')
     res.facts.keptWorkspace = { made: !!made, card, tree: TREE_BEFORE, logs: fs.readdirSync(path.join(PROFILE, 'logs')).filter((n) => n.endsWith('.log')) }
     check('4.workspace-made', `Before the upgrade: a workspace with a project and a card, in ${TREE_BEFORE}, its board ${OLD_DB}, the log ${OLD_LOG}`, !!made && typeof card?.number === 'number' && res.facts.keptWorkspace.logs.includes(OLD_LOG), JSON.stringify(res.facts.keptWorkspace))
-    if (FROM_RC) return void (await shot('before-upgrade'))
+    if (FROM_RC) return void (await beforeUpgrade(made))
     // Advanced overrides under the release before's old ids (HI-2518), one at each level: Combwork's own (advanced.json
     // in the profile) and the workspace's own (its workspace.json), for the upgrade to bring back under cw.*.
     const setAdv = (id, value, scope) => inv('advanced:set', id, value, scope).then(() => null, (e) => String(e))
     res.facts.advancedSet = { app: await setAdv(ADV.app.old, ADV.app.value), workspace: made ? await setAdv(ADV.ws.old, ADV.ws.value, 'workspace') : 'no workspace' }
     const advSaved = await until(async () => readJson(path.join(PROFILE, 'advanced.json'))?.values?.[ADV.app.old] === ADV.app.value && readJson(path.join(KEPT_WS, OLD_DIR, 'workspace.json'))?.advanced?.[ADV.ws.old] === ADV.ws.value, 10_000)
     check('4.advanced-saved', `Before the upgrade: ${ADV.app.old} = ${ADV.app.value} in advanced.json and the workspace's own ${ADV.ws.old} = ${ADV.ws.value}`, advSaved, JSON.stringify({ set: res.facts.advancedSet, file: readJson(path.join(PROFILE, 'advanced.json'))?.values, ws: readJson(path.join(KEPT_WS, OLD_DIR, 'workspace.json'))?.advanced }))
-    await shot('before-upgrade')
+    await beforeUpgrade(made)
   },
 
   // Scenario 8 (HI-2460): a Windows notification from the installed app, under its own app ID: Windows records an app
@@ -581,8 +594,10 @@ const steps = {
     res.facts.keptCard = card ? { number: card.number, description: card.description } : cards
     check('4.workspace-card', 'Its card is on the board, its path now into .combwork', !!card && card.description === `The plan: ${path.join(KEPT_WS, '.combwork', 'shared', 'plan.md')}`, JSON.stringify(res.facts.keptCard))
     // HI-2598: the stored values converted once: the project's kept Git options, and the card's facts' actors.
-    const keptGit = readJson(path.join(KEPT_WS, 'demo', '.combwork', 'project.json'))?.workflow?.kept?.git?.options ?? null
-    check('4.values-options', "The project's kept Git options say Combwork's (combworkMerges, Combwork's commit message), no old value left", keptGit?.finish === 'combworkMerges' && keptGit?.commitMessage === 'combwork', JSON.stringify(keptGit))
+    // Waited for (HI-2645): the open converts it in its own time, and a read as it is renamed into place reads nothing.
+    const converted = (o) => o?.finish === 'combworkMerges' && o?.commitMessage === 'combwork'
+    const keptGit = (await until(async () => { const o = keptGitOptions('.combwork'); return converted(o) && o }, 15_000)) || keptGitOptions('.combwork')
+    check('4.values-options', "The project's kept Git options say Combwork's (combworkMerges, Combwork's commit message), no old value left", converted(keptGit), JSON.stringify(keptGit ?? readJson(path.join(KEPT_WS, 'demo', '.combwork', 'project.json'))?.workflow ?? null))
     const facts = card ? await inv('tasks:facts', card.number).catch(() => null) : null
     check('4.values-facts', "No fact of the card made before names the old app as its actor", Array.isArray(facts) && !facts.some((x) => x.actor === OLD_ACTOR || x.data?.by === OLD_ACTOR), JSON.stringify(facts?.map((x) => [x.kind, x.actor])))
     // HI-2587: the names upgrade. The board's file and its copies, the log, the workspace's files, the skill copy's marker:
