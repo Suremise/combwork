@@ -788,8 +788,8 @@ const OWNER_NUDGE = {
 function showOwnerNudge(which) {
   ownerNudge = { which, selected: 2 }
   nudgeLog({ shown: true, prompt: which })
-  const [title, question] = OWNER_NUDGE[which]
-  out(`\r\n■ Usage limit reached.\r\n\r\n\r\n  ${title}\r\n  ${question}\r\n\r\n\r\n  1. Yes (y)\r\n› 2. No (default) (n)\r\n\r\n  enter select · esc back\r\n`)
+  const [title, asks] = OWNER_NUDGE[which]
+  out(`\r\n■ Usage limit reached.\r\n\r\n\r\n  ${title}\r\n  ${asks}\r\n\r\n\r\n  1. Yes (y)\r\n› 2. No (default) (n)\r\n\r\n  enter select · esc back\r\n`)
 }
 /** A key read while it shows: every one logged; "y" or "1" asks the owner, "n", "2" or Esc doesn't, Enter takes the selected one. */
 function ownerNudgeKey(ch) {
