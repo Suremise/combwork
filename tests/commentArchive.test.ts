@@ -55,7 +55,7 @@ async function close(w: WS): Promise<void> {
 }
 
 /** `count` comments, numbered from `from`: "c0", "c1"… (with ids unless `ids` is false). */
-const comments = (count: number, from = 0, ids = true): Record<string, string>[] =>
+const comments = (count: number, from = 0, ids = true): { at: string; by: string; text: string; id?: string }[] =>
   Array.from({ length: count }, (_, i) => ({ at: new Date(Date.UTC(2026, 0, 1, 0, 0, from + i)).toISOString(), by: 'someone', text: `c${from + i}`, ...(ids ? { id: `id${from + i}` } : {}) }))
 
 /** A card in alpha with these comments saved on it. */
