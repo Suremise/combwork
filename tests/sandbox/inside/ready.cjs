@@ -66,4 +66,10 @@ function viewReady(view, count, ms = 20_000, every = 250) {
  */
 const pickBridge = (wanted, has) => wanted.find((n) => Array.isArray(has) && has.includes(n)) ?? null
 
-module.exports = { sleep, until, sameFolder, workspaceSetUp, VIEWS, viewReady, pickBridge }
+/**
+ * The releases a log says started, each "<name> <version>" once, in the order first seen: `re` (global) captures a start
+ * line's app name and version. By name too (HI-2645): a release candidate can carry the version of the release before.
+ */
+const releasesStarted = (log, re) => [...new Set([...String(log ?? '').matchAll(re)].map((m) => `${m[1]} ${m[2]}`))]
+
+module.exports = { sleep, until, sameFolder, workspaceSetUp, VIEWS, viewReady, pickBridge, releasesStarted }

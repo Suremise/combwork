@@ -41,7 +41,7 @@ const OLD_BACKUP_PREFIX = 'hive-'
 const OLD_ADV = { app: 'hive.mcp.replySeconds', ws: 'hive.progress.lanesShown' }
 const OLD_GIT_OPTIONS = { finish: 'hiveMerges', commitMessage: 'hive' }
 const OLD_ACTOR = 'hive'
-const OLD_START_LINE = /\b(?:Hive|Combwork) (\S+) starting/g
+const OLD_START_LINE = /\b(Hive|Combwork) (\S+) starting/g
 const OLD_NAME_RE = /hive/i
 // The notice an RC showed when it ran from 1.0's folders (removed by HI-2594): a 1.1 must never show it.
 const OLD_FALLBACK_NOTICE = "Hive Desktop's data folders"
@@ -81,7 +81,9 @@ const save = () => fs.writeFileSync(path.join(OUT, `${prefix}.json`), JSON.strin
 // Each check has a stable id ("<scenario>.<what>"): the host's report requires the ids each step must produce.
 const check = (id, name, ok, detail) => { res.checks.push({ id, scenario: Number(String(id).split('.')[0]) || 0, name, ok: !!ok, detail: ok ? undefined : String(detail ?? '').slice(0, 1500) }); save() }
 // When what it reads is ready: conditions Combwork says are met, each bounded (ready.cjs, unit-tested in Combwork's npm test).
-const { until, workspaceSetUp, VIEWS, viewReady, pickBridge } = require(path.join(__dirname, 'ready.cjs'))
+const { until, workspaceSetUp, VIEWS, viewReady, pickBridge, releasesStarted } = require(path.join(__dirname, 'ready.cjs'))
+// The names upgrade's record's version (src/main/nameUpgrade.ts NAMES_VERSION; a unit test holds them equal).
+const NAMES_VERSION = 4
 const ps = cmd => execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', cmd], { encoding: 'utf8', timeout: 60_000 }).trim()
 const readConfig = () => { try { return JSON.parse(fs.readFileSync(path.join(PROFILE, 'config.json'), 'utf8')) } catch { return null } }
 
@@ -592,12 +594,14 @@ const steps = {
     check('4.board-backups', "The board's copies in backups take Combwork's names", !res.facts.names.backups.some((n) => n.startsWith(OLD_BACKUP_PREFIX)), JSON.stringify(res.facts.names.backups))
     let log = ''
     try { log = fs.readFileSync(path.join(PROFILE, 'logs', 'combwork.log'), 'utf8') } catch { /* below */ }
-    check('4.log-file', `The log is combwork.log, with the release before's lines in it (its start line and this one's); no ${OLD_LOG} left`, !res.facts.names.logs.includes(OLD_LOG) && new Set([...log.matchAll(OLD_START_LINE)].map((m) => m[1])).size >= 2, JSON.stringify(res.facts.names.logs))
+    // Each release's start line by its name and version (HI-2645): an RC can carry the version of the release before.
+    res.facts.releasesStarted = releasesStarted(log, OLD_START_LINE)
+    check('4.log-file', `The log is combwork.log, with the release before's lines in it (its start line and this one's); no ${OLD_LOG} left`, !res.facts.names.logs.includes(OLD_LOG) && res.facts.releasesStarted.length >= 2, JSON.stringify({ logs: res.facts.names.logs, started: res.facts.releasesStarted }))
     let gitignore = ''
     try { gitignore = fs.readFileSync(path.join(dir, '.gitignore'), 'utf8') } catch { /* below */ }
     check('4.workspace-files', "The workspace's .gitignore is Combwork's, for combwork.db, keeping the names upgrade's record out", /\(added by Combwork, #1017\)/.test(gitignore.split(/\r?\n/)[0]) && /^combwork\.db\r?$/m.test(gitignore) && /^combwork-names\.json\r?$/m.test(gitignore) && !gitignore.split(/\r?\n/).some((l) => l.startsWith(OLD_DB)), gitignore.slice(0, 600))
     check('4.copy-marker', "The project's skill copy has Combwork's marker (.combwork-copy), its content as it was", res.facts.names.copy.includes('.combwork-copy') && !res.facts.names.copy.includes(OLD_COPY_MARKER) && readJson(path.join(KEPT_WS, COPY, '.combwork-copy'))?.hash === 'h', JSON.stringify(res.facts.names.copy))
-    check('4.names-done', 'The names upgrade recorded itself done (.combwork\\combwork-names.json)', readJson(path.join(dir, 'combwork-names.json'))?.version === 3, JSON.stringify(res.facts.names.combwork))
+    check('4.names-done', 'The names upgrade recorded itself done (.combwork\\combwork-names.json)', readJson(path.join(dir, 'combwork-names.json'))?.version === NAMES_VERSION,JSON.stringify(res.facts.names.combwork))
     const oldNames = [...res.facts.names.combwork, ...res.facts.names.logs].filter((n) => n.toLowerCase().startsWith(OLD_NAME.toLowerCase()))
     check('4.no-old-names', "No file under the old names left in the workspace's .combwork or the profile's logs", oldNames.length === 0, JSON.stringify(oldNames))
     if (!FROM_RC) {
@@ -613,7 +617,8 @@ const steps = {
       check('4.advanced-kept', `The advanced overrides come back under cw.*: ${ADV.app.now} = ${ADV.app.value} (advanced.json rewritten, nothing under ${ADV.app.old}) and the workspace's own ${ADV.ws.now} = ${ADV.ws.value}`, !!rewritten && state?.values?.[ADV.app.now] === ADV.app.value && !(ADV.app.old in (state?.values ?? {})) && state?.workspace?.[ADV.ws.now] === ADV.ws.value && !(ADV.ws.old in (state?.workspace ?? {})), JSON.stringify(res.facts.advancedAfter))
       const old = await api(`/v1/settings/${encodeURIComponent(`advanced.${ADV.app.old}`)}`).catch((e) => ({ error: String(e) }))
       res.facts.advancedOldId = old
-      check('4.advanced-old-id', `An agent naming the old id (advanced.${ADV.app.old}) is told the new one`, JSON.stringify(old).includes(`use advanced.${ADV.app.now}`), JSON.stringify(old))
+      // No aliases (SPEC, the cw. ids; HI-2598 dropped HI-2518's "renamed: use …"): the old id is answered as any id that isn't a setting.
+      check('4.advanced-old-id', `An agent naming the old id (advanced.${ADV.app.old}) is told there is no such setting, its value not read`, typeof old?.error === 'string' && old.error.startsWith(`No setting "advanced.${ADV.app.old}"`) && !('value' in (old ?? {})), JSON.stringify(old))
     }
     await shot('after-upgrade-light')
     await theme('dark')

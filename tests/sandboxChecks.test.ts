@@ -498,6 +498,28 @@ test('the driver talks to the new app as window.combwork, and to the release bef
   assert.ok(/s\.drive\(n, `\$\{n\}\. change settings`, 'mark'/.test(fs.readFileSync(path.join(SANDBOX, 'checks.cjs'), 'utf8')))
 })
 
+// Scenario 4's names checks against what the upgrade does now (HI-2645, RC4's run): the log's start lines told apart by
+// name as well as version, the names record's version, and an old advanced id answered as no setting (SPEC: the cw. ids).
+test("the driver's names checks expect what the names upgrade and the settings tools do now", () => {
+  const root = path.resolve(__dirname, '..')
+  const drive = fs.readFileSync(path.join(SANDBOX, 'inside', 'drive.cjs'), 'utf8')
+  const startLine = new RegExp(/const OLD_START_LINE = \/(.+)\/g\r?\n/.exec(drive)?.[1] ?? '^$', 'g')
+  // An RC carrying 1.0's version: its start line and the release before's are still two releases.
+  const log = `[a] ${OLD_DIR} 1.0.0 starting (Electron 38)\n[b] ${OLD_DIR} 1.0.0 starting (Electron 38)\n[c] Combwork 1.0.0 starting (Electron 39)\n[d] Combwork 1.0.0 starting (Electron 39)\n`
+  assert.deepStrictEqual(ready.releasesStarted(log, startLine), [`${OLD_DIR} 1.0.0`, 'Combwork 1.0.0'])
+  // From an RC (scenario 10): both Combwork's, told apart by version; only one release started is one.
+  assert.deepStrictEqual(ready.releasesStarted('Combwork 1.1.0-rc.2 starting\nCombwork 1.1.0 starting\n', startLine), ['Combwork 1.1.0-rc.2', 'Combwork 1.1.0'])
+  assert.deepStrictEqual(ready.releasesStarted('Combwork 1.1.0 starting\nCombwork 1.1.0 starting\n', startLine), ['Combwork 1.1.0'])
+  assert.deepStrictEqual(ready.releasesStarted(undefined, startLine), [])
+  // The record's version is the names upgrade's own.
+  const names = fs.readFileSync(path.join(root, 'src', 'main', 'nameUpgrade.ts'), 'utf8')
+  assert.strictEqual(/const NAMES_VERSION = (\d+)/.exec(drive)?.[1], /export const NAMES_VERSION = (\d+)/.exec(names)?.[1], "drive.cjs's NAMES_VERSION is nameUpgrade.ts's")
+  // The old id's answer is the settings tools' "no setting" one, which the driver's check starts with.
+  const tools = fs.readFileSync(path.join(root, 'src', 'main', 'settingsTools.ts'), 'utf8')
+  assert.ok(tools.includes(`text: 'No setting "{id}": `), 'settingsTools answers an unknown id with No setting "<id>"')
+  assert.ok(drive.includes('old.error.startsWith(`No setting "advanced.${ADV.app.old}"`)'), 'the driver expects that answer for the old id')
+})
+
 test('every view marker the driver waits for is in Combwork\'s window: its classes and attributes in the renderer, its text in English', () => {
   const root = path.resolve(__dirname, '..')
   const english = fs.readdirSync(path.join(root, 'locales', 'en')).map((f) => fs.readFileSync(path.join(root, 'locales', 'en', f), 'utf8')).join('\n')
