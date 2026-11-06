@@ -538,5 +538,7 @@
   "tips.workspaceNotes.text": "Workspace notes, przypięta na górze Notatek wspólnych, jest na to, co dotyczy tego komputera, np. pełną ścieżkę. Każdy agent dostaje ją przy starcie, w każdym folderze, więc nie trzeba tego wpisywać do commitowanego AGENTS.md. Sekcja z nazwą projektu w nagłówku należy tylko do tego projektu.",
   "tips.workspaceNotes.title": "Notatki o tym komputerze dla każdego agenta",
   "tips.modelSwitched.title": "Agent na innym modelu jest oznaczony",
-  "tips.modelSwitched.text": "Jeśli agent trafi na inny model, niż dało mu połączenie (propozycja Codex tańszego modelu blisko Twojego limitu albo /model), jego stopka oznacza model ostrzeżeniem, a Aktywność pokazuje Model zmieniony. Uruchom agenta ponownie, aby wrócić."
+  "tips.modelSwitched.text": "Jeśli agent trafi na inny model, niż dało mu połączenie (propozycja Codex tańszego modelu blisko Twojego limitu albo /model), jego stopka oznacza model ostrzeżeniem, a Aktywność pokazuje Model zmieniony. Uruchom agenta ponownie, aby wrócić.",
+  "tips.waitingOnPurpose.title": "Karta, która celowo czeka",
+  "tips.waitingOnPurpose.text": "Karta w Aktywne czeka na spokojny moment albo na odpowiedź? Kliknij ją prawym przyciskiem, Oznacz jako czekającą…, i napisz dlaczego: Combwork przestaje zgłaszać ją jako utkniętą, dopóki tego nie wyłączysz albo nie opuści Aktywne. Jej agent dalej działa."
 }

@@ -14,6 +14,10 @@ import { workspaceOf, type WorkspaceService } from './workspace'
 import { config } from './config'
 import { pausedFor, resumedAt } from './teamPause'
 import { IDLE_WATCH_STALL_MS, idleWatchReason, nothingWaitsOn } from '../shared/idleWatch'
+import { agentMsg, say } from '../shared/agentText'
+
+/** Why a lane's next card is stalled once the cards it depends on are Done (HI-2618). Agent-facing. */
+const DEPS_DONE = agentMsg({ id: 'stall.laneNext.depsDone', text: "{card} is the lane's next card: the last of the cards it depends on went Done {minutes} min ago, and {doing}", note: "The Agent API's and lane watches' stalled (HI-2618): a lane's next card whose dependencies are all Done, not started since. card: its key; minutes: how long since the last of them went Done; doing: what its builder does, a sentence (\"B1 is only watching without starting it.\")." })
 
 /**
  * Why a card is stalled, in one place (the Agent API's `stalled`, and lane watches, #531): a Doing card nobody works on
@@ -142,7 +146,7 @@ export function laneNextWaitReason(c: Pick<TaskCard, 'number' | 'key' | 'column'
   const min = Math.round((now - since) / 60_000)
   const name = (x: { number: number; key?: string }): string => x.key ?? `#${x.number}`
   const doing = `${builder.name} ${builder.status === null ? "isn't running" : builder.status === 'watching' ? 'is only watching' : 'is idle'} without starting it.` // i18n-ignore: agent-facing (the Agent API's stalled)
-  if (ready > prior) return `${name(c)} is the lane's next card: the last of the cards it depends on went Done ${min} min ago, and ${doing}` // i18n-ignore: agent-facing (the Agent API's stalled)
+  if (ready > prior) return say(DEPS_DONE, { card: name(c), minutes: String(min), doing })
   return before ? `${name(c)} is the lane's next card: ${name(before)} went Done ${min} min ago, and ${doing}` : `${name(c)} is the lane's first card: the lane started ${min} min ago, and ${doing}` // i18n-ignore: agent-facing (the Agent API's stalled)
 }
 
@@ -211,6 +215,9 @@ function ownQuestionOpen(wsPath: string, c: TaskCard, agentId: string): boolean 
  * check (stepWaitMs: its project's workflow option Design check wait, HI-1766).
  */
 export function cardStall(c: TaskCard, agentNow: StallAgent | null, wsPath: string | null, lane?: LaneOrderView | null, stepWaitMs = LOOP_STEP_WAIT_MINUTES * 60_000, returned?: { at: string } | null, stale?: { since: string; approved: string | null; current: string | null } | null): string | null {
+  // Waiting on purpose (HI-2618: HB3 held HI-2590 for a quiet window and was reported stalled four times): what it
+  // waits for is said on the card, never a stall, until it is cleared or the card leaves Doing.
+  if (c.waitingFor && c.column === 'doing') return null
   // Its team paused (HI-2081): its agents parking (idle, stopped, not watching) is what was asked of them, never a stall.
   // Once it resumes the usual checks apply again, each timed one counted from the resume too (HR1's s12 check): it needs
   // its own wait since then as well as since what it times.

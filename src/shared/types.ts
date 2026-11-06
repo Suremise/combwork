@@ -1182,6 +1182,11 @@ export interface TaskCard {
   labels: string[]
   /** Why it can't go on, when it can't (shown in red in any column). */
   blocked: string | null
+  /**
+   * Waiting on purpose (HI-2618), only in Doing: why, who marked it and when. Its agent works on (nothing is stopped); the
+   * stall checks leave it alone until it is cleared or the card leaves Doing. Absent when it isn't.
+   */
+  waitingFor?: TaskWaiting
   /** Cards that have to be done first. */
   blockedBy: number[]
   /** Related cards. */
@@ -1346,6 +1351,14 @@ export interface TaskHold {
   to?: string
 }
 
+/** A card in Doing waiting on purpose (TaskCard.waitingFor, HI-2618). */
+export interface TaskWaiting {
+  reason: string
+  /** Who marked it (the user, the Assistant, an agent's name). */
+  by: string
+  at: string
+}
+
 /** An agent reviewing a card (TaskCard.review). */
 export interface TaskReview {
   /** The reviewing agent's id in the card's project, and its name then. */
@@ -1378,6 +1391,11 @@ export interface TaskPatch {
   /** Labels taken off where present, keeping the others (#1131). */
   removeLabels?: string[]
   blocked?: string | null
+  /**
+   * Marks a card in Doing as waiting on purpose, with why (HI-2618: held for a quiet window); '' or null clears it. Only
+   * its own agent, the user or the Assistant. Combwork reports it as stalled for nothing while it waits.
+   */
+  waitingFor?: string | null
   blockedBy?: number[]
   links?: number[]
   /** The doc sections to read first (#818), replacing the list; [] clears it. */

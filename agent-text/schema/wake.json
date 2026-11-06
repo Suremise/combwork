@@ -330,6 +330,12 @@
       "what": "plain"
     }
   },
+  "wake.lane.depsReady": {
+    "placeholders": {
+      "card": "plain",
+      "deps": "plain"
+    }
+  },
   "wake.lane.ended": {
     "placeholders": {
       "merged": "select",

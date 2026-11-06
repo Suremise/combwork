@@ -1010,5 +1010,11 @@
   "board.workQueue.stuckRef": "{target} is at",
   "board.workQueue.testing": "Testing now: {step}",
   "board.workQueue.unreadRef": "not read",
-  "board.workflows": "Workflows"
+  "board.workflows": "Workflows",
+  "board.card.waitingMark": "Waiting",
+  "board.card.waitingTip": "Waiting: {reason} (marked by {by}). Combwork doesn’t report it as stalled meanwhile.",
+  "board.dialog.waiting": "Waiting",
+  "board.dialog.waitingPlaceholder": "Why it waits on purpose (empty: not waiting). It isn’t reported as stalled; its agent keeps running.",
+  "board.menu.clearWaiting": "Clear Waiting",
+  "board.menu.markWaiting": "Mark as Waiting…"
 }

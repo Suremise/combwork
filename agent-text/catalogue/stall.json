@@ -39,6 +39,10 @@
     "text": "{reviewer} is waiting for {other}, before {card} in the lane, while {builder} waits on the review of {card}: each has waited on the other for {waited}.",
     "note": "A lane deadlocked: its reviewer waits for a card before this one in the lane, while its builder waits for this card's verdict. waited: a duration (stall.duration.*)."
   },
+  "stall.laneNext.depsDone": {
+    "text": "{card} is the lane's next card: the last of the cards it depends on went Done {minutes} min ago, and {doing}",
+    "note": "The Agent API's and lane watches' stalled (HI-2618): a lane's next card whose dependencies are all Done, not started since. card: its key; minutes: how long since the last of them went Done; doing: what its builder does, a sentence (\"B1 is only watching without starting it.\")."
+  },
   "stall.loop.designWait": {
     "text": "{builder} posted a design on {card} for its reviewer to check and has waited {waited}: nobody has answered it, and it hasn't gone ahead as posted (cw_loop_step proceed).",
     "note": "#1382: the builder posted a design for its reviewer to check before building; nobody answered, and it didn't go ahead once its wait was over. waited: a duration (stall.duration.*)."

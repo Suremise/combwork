@@ -90,6 +90,9 @@ interface CombworkMessageValues {
   'tasks.error.unknownReview': { review: string | number }
   'tasks.error.unknownTask': { card: string | number }
   'tasks.error.verdictNotYours': { agent: string | number; card: string | number }
+  'tasks.error.waitingNotActive': { card: string | number; active: string | number }
+  'tasks.error.waitingNotYours': { card: string | number }
+  'tasks.error.waitingTooLong': { max: number }
   'tasks.history.answerTold': { agent: string | number }
   'tasks.history.answerUntold': { agent: string | number }
   'tasks.history.answerUntoldNeed': { agent: string | number; action: string }
@@ -134,6 +137,7 @@ interface CombworkMessageValues {
   'tasks.history.movedBottom': { column: string }
   'tasks.history.movedTop': { column: string }
   'tasks.history.noDependencies': undefined
+  'tasks.history.notWaiting': undefined
   'tasks.history.notified': { event: string; lane: string | number; hasWhy: string; why: string | number }
   'tasks.history.placed': { place: number; column: string }
   'tasks.history.queueReturned': { reason: string; target: string | number; check: string | number; files: string }
@@ -162,6 +166,7 @@ interface CombworkMessageValues {
   'tasks.history.toWorkspace': undefined
   'tasks.history.unarchived': undefined
   'tasks.history.unblocked': undefined
+  'tasks.history.waiting': { reason: string | number }
   'tasks.history.watchEnded': { watcher: string | number; why: string; agent: string | number }
   'tasks.skipped.movedColumn': { column: string }
   'tasks.skipped.movedProject': undefined

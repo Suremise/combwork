@@ -397,6 +397,14 @@ function cardMenu(c: TaskCard, readOnly: string | null): MenuEntry[] {
           ...(c.column === 'todo' && c.project ? [{ label: tr(msg({ id: 'board.menu.startLane', defaultMessage: 'Start Lane with It…', description: "Menu item on a Todo card (right-click): opens Start Lane with this card first in the lane's list (a lane: a builder and a reviewer working through cards in turn). Glossary: lane." })), icon: 'list-ordered', disabled: !!readOnly, onClick: () => openLaneStart(c.project, [c.number]) }] : []),
           // What runs on it now (HI-1743), for a card in progress.
           ...(cardHasActivity(c) ? [{ label: tr(ACTIVITY), icon: 'type-hierarchy', onClick: () => void openCardActivity(c) }] : []),
+          // Waiting on purpose (HI-2618): marked with why in the card dialog's Waiting box, or cleared at once.
+          ...(c.column === 'doing'
+            ? [
+                c.waitingFor
+                  ? { label: tr(msg({ id: 'board.menu.clearWaiting', defaultMessage: 'Clear Waiting', description: "Menu item on a card in Active that waits on purpose (right-click, HI-2618): clears that mark, so Combwork reports it as stalled again if nobody gets on with it." })), icon: 'watch', disabled: !!readOnly, onClick: () => void change(c.number, { waitingFor: null }) }
+                  : { label: tr(msg({ id: 'board.menu.markWaiting', defaultMessage: 'Mark as Waiting…', description: "Menu item on a card in Active (right-click, HI-2618): opens the card's dialog to say why it waits on purpose (held for a quiet window, say), so Combwork doesn't report it as stalled meanwhile." })), icon: 'watch', disabled: !!readOnly, onClick: () => set({ taskOpen: c.number }) }
+              ]
+            : []),
           { separator: true },
           { header: true, label: tr(msg({ id: 'board.menu.moveTo', defaultMessage: 'Move to', description: "A heading in a card's right-click menu, above the board columns it can move to." })) },
           ...TASK_COLUMNS.filter((x) => x.id !== c.column).map((x) => ({ label: tr(COLUMN_TEXT[x.id].label), icon: 'arrow-right', disabled: !!readOnly, onClick: () => (x.id === 'doing' ? moveToDoing({ n: c.number, project: c.project, agent: c.agent }) : void moveCard(c, x.id)) })),
@@ -444,6 +452,8 @@ const ARCHIVE = msg({ id: 'board.card.archive', defaultMessage: 'Archive', descr
 const NEEDS_PROJECT = msg({ id: 'board.dialog.needsProject', defaultMessage: 'Give it a project first: its agent works there.', description: "Why a card with no project can't be started (a tooltip, and the Start dialog)." })
 /** The card dialog's Blocked field (its label and the box's name). */
 const BLOCKED_FIELD = msg({ id: 'board.dialog.blocked', defaultMessage: 'Blocked', description: "A field label in the card dialog: why the card can't go on (empty: it isn't blocked)." })
+/** The card dialog's Waiting field (HI-2618): its label and the box's name. */
+const WAITING_FIELD = msg({ id: 'board.dialog.waiting', defaultMessage: 'Waiting', description: "A field label in the card dialog, for a card in Active (HI-2618): why it waits on purpose (empty: it isn't). Not the same as Blocked." })
 /** No agent has the card. */
 const NOBODY_YET = msg({ id: 'board.dialog.nobodyYet', defaultMessage: 'Nobody yet', description: "No agent has the card: the card dialog's agent choice, and a choice of the Move to Doing dialog." })
 /** Start the card (the Start and Move to Doing dialogs' button). */
@@ -637,6 +647,7 @@ const CardTile = memo(function CardTile({
   )
   const blockedTip = c.blocked ? tr(msg({ id: 'board.card.blockedTip', defaultMessage: 'Blocked: {reason}', description: "Tooltip on a blocked card: why it can't go on ({reason}, in the user's or an agent's own words)." }), { reason: c.blocked }) : ''
   const blockedLabel = tr(msg({ id: 'board.card.blocked', defaultMessage: 'Blocked', description: "Accessible name of a folded card's blocked mark (a card that can't go on)." }))
+  const waitingTip = c.waitingFor ? tr(msg({ id: 'board.card.waitingTip', defaultMessage: 'Waiting: {reason} (marked by {by}). Combwork doesn’t report it as stalled meanwhile.', description: "Tooltip on a card in Active that waits on purpose (HI-2618): why ({reason}, in the user's or an agent's own words) and who marked it ({by}: the user (\"You\"), the Assistant or an agent's name)." }), { reason: c.waitingFor.reason, by: c.waitingFor.by }) : ''
   const stalledText = stalled ? tr(msg({ id: 'board.card.stalled', defaultMessage: 'Stalled: {why}', description: 'On a stalled card (and its tooltip when folded): nobody is getting on with it, and why ({why}, a sentence).' }), { why: stalled }) : ''
   const props = {
     className: cx('task-card', folded && 'folded', c.blocked && 'blocked', finished && 'finished', stalled && !c.blocked && 'stalled'),
@@ -663,6 +674,13 @@ const CardTile = memo(function CardTile({
               <Tooltip content={blockedTip}>
                 <span className="task-flag blocked" aria-label={blockedLabel}>
                   <Icon name="circle-slash" />
+                </span>
+              </Tooltip>
+            )}
+            {c.waitingFor && c.column === 'doing' && (
+              <Tooltip content={waitingTip}>
+                <span className="task-flag waiting" aria-label={tr(msg({ id: 'board.card.waitingMark', defaultMessage: 'Waiting', description: "Accessible name of a folded card's waiting mark (HI-2618: it waits on purpose)." }))}>
+                  <Icon name="watch" />
                 </span>
               </Tooltip>
             )}
@@ -707,6 +725,15 @@ const CardTile = memo(function CardTile({
             <div className="task-blocked">
               <Icon name="circle-slash" />
               <span className="task-note-text">{c.blocked}</span>
+            </div>
+          </Tooltip>
+        )}
+        {/* Waiting on purpose (HI-2618): quiet, not red; why on hover too. */}
+        {c.waitingFor && c.column === 'doing' && (
+          <Tooltip block content={waitingTip}>
+            <div className="task-waiting">
+              <Icon name="watch" />
+              <span className="task-note-text">{c.waitingFor.reason}</span>
             </div>
           </Tooltip>
         )}
@@ -1827,6 +1854,7 @@ export function TaskDialog() {
   const [column, setColumn] = useState<TaskColumn>('todo')
   const [labels, setLabels] = useState('')
   const [blocked, setBlocked] = useState('')
+  const [waiting, setWaiting] = useState('')
   const [blockedBy, setBlockedBy] = useState('')
   const [links, setLinks] = useState('')
   // Its doc sections to read first (#818), one reference a line.
@@ -1888,6 +1916,7 @@ export function TaskDialog() {
     setColumn(c?.column ?? 'todo')
     setLabels(c?.labels.join(', ') ?? '')
     setBlocked(c?.blocked ?? '')
+    setWaiting(c?.waitingFor?.reason ?? '')
     setBlockedBy(c ? refsText(c.blockedBy) : '')
     setLinks(c ? refsText(c.links) : '')
     setContext(c?.context?.join('\n') ?? '')
@@ -1899,6 +1928,7 @@ export function TaskDialog() {
       column: c?.column ?? 'todo',
       labels: c?.labels.join(', ') ?? '',
       blocked: c?.blocked ?? '',
+      waiting: c?.waitingFor?.reason ?? '',
       blockedBy: c ? refsText(c.blockedBy) : '',
       links: c ? refsText(c.links) : '',
       context: c?.context?.join('\n') ?? ''
@@ -1987,6 +2017,7 @@ export function TaskDialog() {
       if (column !== was.column && !hold) patch.column = column
       if (labels !== was.labels) patch.labels = labelList
       if (blocked !== was.blocked) patch.blocked = blocked.trim() || null
+      if (waiting !== was.waiting) patch.waitingFor = waiting.trim() || null
       if (blockedBy !== was.blockedBy) patch.blockedBy = refs(blockedBy)
       if (links !== was.links) patch.links = refs(links)
       if (context !== was.context) patch.context = splitDocRefs(context)
@@ -2272,6 +2303,24 @@ export function TaskDialog() {
               if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) e.preventDefault()
             }}
           />
+          {/* Waiting on purpose (HI-2618), a card in Active only. */}
+          {card && card.column === 'doing' && (
+            <>
+              <label>{tr(WAITING_FIELD)}</label>
+              <textarea
+                className="input task-blocked-input"
+                rows={1}
+                aria-label={tr(WAITING_FIELD)}
+                placeholder={tr(msg({ id: 'board.dialog.waitingPlaceholder', defaultMessage: 'Why it waits on purpose (empty: not waiting). It isn’t reported as stalled; its agent keeps running.', description: "Placeholder of the card dialog's Waiting box (HI-2618), for a card in Active: why it waits on purpose (held for a quiet window, an answer from someone). Combwork then doesn't report it as stalled, and nothing is stopped. Empty means it isn't waiting." }))}
+                value={waiting}
+                readOnly={ro}
+                onChange={(e) => setWaiting(e.target.value.replace(/\s*[\r\n]+\s*/g, ' '))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) e.preventDefault()
+                }}
+              />
+            </>
+          )}
           <label>{tr(msg({ id: 'board.dialog.dependsOn', defaultMessage: 'Depends on', description: 'A field label in the card dialog: the cards to finish before this one.' }))}</label>
           <input className="input" placeholder={tr(msg({ id: 'board.dialog.dependsOnPlaceholder', defaultMessage: 'Cards to finish first, e.g. AM-3 AM-5', description: "Placeholder of the card dialog's Depends on box: cards by name (AM-3 AM-5 are examples: a project key, a hyphen and a number; #3 works too)." }))} value={blockedBy} readOnly={ro} onChange={(e) => setBlockedBy(e.target.value)} />
           <label>{tr(msg({ id: 'board.dialog.related', defaultMessage: 'Related', description: 'A field label in the card dialog: related cards.' }))}</label>

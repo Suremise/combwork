@@ -161,6 +161,7 @@ const T = {
   'updateTask.arg.addLabels': agentMsg({ id: 'tool.updateTask.arg.addLabels', text: 'Added; others kept.' }),
   'updateTask.arg.removeLabels': agentMsg({ id: 'tool.updateTask.arg.removeLabels', text: 'Taken off; others kept.' }),
   'updateTask.arg.decision': agentMsg({ id: 'tool.updateTask.arg.decision', text: "The user's decision in a sentence, recorded as theirs. Never your own choice. Combwork normally tells the card's agent." }),
+  'updateTask.arg.waitingFor': agentMsg({ id: 'tool.updateTask.arg.waitingFor', text: "Its own card in Doing waits on purpose, and why (a quiet window, an answer from someone): it isn't reported as stalled meanwhile. '' clears it; leaving Doing does too.", note: 'HI-2618: cw_update_task waitingFor.' }),
   'updateTask.arg.kind': agentMsg({ id: 'tool.updateTask.arg.kind', text: "Its kind changed: only with override (the user's reason)." }),
   'updateTask.arg.confirmKind': agentMsg({ id: 'tool.updateTask.arg.confirmKind', text: "Answers an agent's no-code proposal: true no-code, false code. As the user says." }),
   'updateTask.arg.answers': agentMsg({ id: 'tool.updateTask.arg.answers', text: "With decision: the forYou request ids the user's words answer (questions only)." }),
@@ -1127,6 +1128,7 @@ const tools: Tool[] = [
         links: cardsArg(say(T['updateTask.arg.links'])),
         context: contextArg,
         decision: { type: 'string', description: say(T['updateTask.arg.decision']) },
+        waitingFor: { type: 'string', description: say(T['updateTask.arg.waitingFor']) },
         attachments: attachmentsArg('comment'),
         ...(ASSISTANT
           ? {
@@ -1142,7 +1144,7 @@ const tools: Tool[] = [
     },
     run: async (a) => {
       const body: Record<string, unknown> = { reply: 'short' }
-      for (const k of ['comment', 'column', 'position', 'before', 'blocked', 'title', 'description', 'project', 'agent', 'labels', 'addLabels', 'removeLabels', 'blockedBy', 'links', 'context', 'decision', 'review', 'override', 'kind', 'confirmKind', 'skipReview', 'answers', 'attachments']) if (a[k] !== undefined) body[k] = a[k]
+      for (const k of ['comment', 'column', 'position', 'before', 'blocked', 'waitingFor', 'title', 'description', 'project', 'agent', 'labels', 'addLabels', 'removeLabels', 'blockedBy', 'links', 'context', 'decision', 'review', 'override', 'kind', 'confirmKind', 'skipReview', 'answers', 'attachments']) if (a[k] !== undefined) body[k] = a[k]
       const text = changedText((await api('PATCH', `/v1/tasks/${enc(String(a.number))}`, body)) as TaskChange)
       // #1346 item 8: an Assistant with its journal on recorded six decisions and wrote none of them down.
       return ASSISTANT && JOURNAL && typeof a.decision === 'string' && a.decision.trim() ? `${text}\n${say(T['updateTask.reply.journalNote'])}` : text

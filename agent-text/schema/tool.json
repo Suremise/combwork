@@ -743,6 +743,9 @@
   "tool.updateTask.arg.title": {
     "placeholders": {}
   },
+  "tool.updateTask.arg.waitingFor": {
+    "placeholders": {}
+  },
   "tool.updateTask.description": {
     "placeholders": {}
   },

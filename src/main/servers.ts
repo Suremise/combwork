@@ -2942,7 +2942,7 @@ function taskPatch(body: any): TaskPatch {
   const out: TaskPatch = {}
   // Archiving is the user's (#351), one card or a batch: no call of the Agent API's makes it.
   if (body?.archived !== undefined) throw new HttpError(403, say(API.card.onlyUserArchives))
-  for (const k of ['title', 'description', 'project', 'blocked'] as const) if (body?.[k] !== undefined) out[k] = body[k] === null ? (null as never) : String(body[k])
+  for (const k of ['title', 'description', 'project', 'blocked', 'waitingFor'] as const) if (body?.[k] !== undefined) out[k] = body[k] === null ? (null as never) : String(body[k])
   if (body?.agent !== undefined) out.agent = body.agent ? String(body.agent) : null
   if (body?.column !== undefined) out.column = columnParam(body.column)
   if (body?.before !== undefined) out.before = body.before === null ? null : Number(String(cardRefIn(body.before)).replace(/^#/, ''))

@@ -106,6 +106,8 @@ interface CombworkMessageValues {
   'board.card.stageInProject': { project: string | number; stage: string | number }
   'board.card.stalled': { why: string | number }
   'board.card.stalledMark': undefined
+  'board.card.waitingMark': undefined
+  'board.card.waitingTip': { reason: string | number; by: string | number }
   'board.card.workspace': undefined
   'board.cards.count': { n: number }
   'board.chip.card': { card: string | number; title: string | number; decisions: number }
@@ -288,6 +290,8 @@ interface CombworkMessageValues {
   'board.dialog.starting': undefined
   'board.dialog.titlePlaceholder': undefined
   'board.dialog.tryAgain': undefined
+  'board.dialog.waiting': undefined
+  'board.dialog.waitingPlaceholder': undefined
   'board.dialog.write': undefined
   'board.discard.answer': undefined
   'board.discard.changes': undefined
@@ -563,7 +567,9 @@ interface CombworkMessageValues {
   'board.leftOut.title': { card: string | number }
   'board.links.archivedTitle': { card: string | number; title: string | number; column: string | number }
   'board.links.title': { card: string | number; title: string | number; column: string | number }
+  'board.menu.clearWaiting': undefined
   'board.menu.delete': undefined
+  'board.menu.markWaiting': undefined
   'board.menu.moveTo': undefined
   'board.menu.nextRound': undefined
   'board.menu.open': undefined

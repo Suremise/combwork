@@ -662,6 +662,10 @@
   "tool.updateTask.arg.title": {
     "text": "About 70 characters; detail goes in the description."
   },
+  "tool.updateTask.arg.waitingFor": {
+    "text": "Its own card in Doing waits on purpose, and why (a quiet window, an answer from someone): it isn't reported as stalled meanwhile. '' clears it; leaving Doing does too.",
+    "note": "HI-2618: cw_update_task waitingFor."
+  },
   "tool.updateTask.description": {
     "text": "Change a card of your project and/or comment on it. Moves are the intent tools' (cw_start_card, cw_submit, cw_verdict…): a column here is taken as one, and the reply names it."
   },
