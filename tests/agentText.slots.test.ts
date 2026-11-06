@@ -83,8 +83,8 @@ const IN_USE: { held: Held; was: string; values: string[] }[] = [
 ]
 type Answer = Parameters<typeof reviewCopyText>[0]
 const ANSWERS: { a: Answer; card?: string; was: string; values: string[] }[] = [
-  { a: { is: 'ready', copy: 'copy-1', folder: 'C:/w/copies/copy-1', revision: '0123456789abcdef' }, was: "Review in C:/w/copies/copy-1 at 0123456789ab: read and run commands there, with it as their working directory; your session and its shell stay in your own folder, so a command that doesn't change into the copy first runs in your folder.", values: ['C:/w/copies/copy-1', '0123456789ab'] },
-  { a: { is: 'ready', copy: 'copy-1', folder: 'C:/w/copies/copy-1', revision: '0123456789abcdef' }, card: 'HI-12', was: "HI-12's review copy is ready. Review in C:/w/copies/copy-1 at 0123456789ab: read and run commands there, with it as their working directory; your session and its shell stay in your own folder, so a command that doesn't change into the copy first runs in your folder.", values: ['HI-12', 'C:/w/copies/copy-1', '0123456789ab'] },
+  { a: { is: 'ready', copy: 'copy-1', folder: 'C:/w/copies/copy-1', revision: '0123456789abcdef' }, was: "Review in C:/w/copies/copy-1 at 0123456789ab: read and run commands there. Your session and its shell stay in your own folder, so change into the copy in each command.", values: ['C:/w/copies/copy-1', '0123456789ab'] },
+  { a: { is: 'ready', copy: 'copy-1', folder: 'C:/w/copies/copy-1', revision: '0123456789abcdef' }, card: 'HI-12', was: "HI-12's review copy is ready. Review in C:/w/copies/copy-1 at 0123456789ab: read and run commands there. Your session and its shell stay in your own folder, so change into the copy in each command.", values: ['HI-12', 'C:/w/copies/copy-1', '0123456789ab'] },
   { a: { is: 'waiting', why: 'w' }, was: 'Waiting for a review copy (w): Combwork tells you when one is ready, with its folder. Meanwhile git can show the submission from where you are.', values: ['w'] },
   { a: { is: 'none', why: 'n' }, was: "No review copy (n): review the builder's work read-only from where you are.", values: ['n'] }
 ] as never

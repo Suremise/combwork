@@ -251,7 +251,7 @@ describe('start review leases a copy; the review ends, it is returned', () => {
     expect(head(a.folder)).toBe(submitted)
     expect(head(w.project)).not.toBe(submitted)
     expect(leaseOf(w, 12, R1.id)).toMatchObject({ kind: 'review', revision: submitted, ref: '3', returned: null })
-    expect(reviewCopyText(a)).toBe(`Review in ${a.folder} at ${submitted.slice(0, 12)}: read and run commands there, with it as their working directory; your session and its shell stay in your own folder, so a command that doesn't change into the copy first runs in your folder.`)
+    expect(reviewCopyText(a)).toBe(`Review in ${a.folder} at ${submitted.slice(0, 12)}: read and run commands there. Your session and its shell stay in your own folder, so change into the copy in each command.`)
     expect(w.notes).toEqual([{ card: 12, id: 'tasks.history.reviewCopyLeased', values: { agent: 'R1', copy: 'copy-1', revision: submitted.slice(0, 12) } }])
     const again = await w.rc.start(12, R1)
     expect(again).toEqual(a)

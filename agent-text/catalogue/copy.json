@@ -152,7 +152,7 @@
     "note": "Why a reviewer gets no review copy: its review of the card has ended or not started. The end of copy.review.none."
   },
   "copy.review.ready": {
-    "text": "{named, select, yes {{card}'s review copy is ready. } other {}}Review in {folder} at {revision}: read and run commands there, with it as their working directory; your session and its shell stay in your own folder, so a command that doesn't change into the copy first runs in your folder.",
+    "text": "{named, select, yes {{card}'s review copy is ready. } other {}}Review in {folder} at {revision}: read and run commands there. Your session and its shell stay in your own folder, so change into the copy in each command.",
     "note": "A reviewer's review copy (#1435): in start review's reply, or its later message (which names the card first). {revision} is the submission's first 12 characters."
   },
   "copy.review.settingUp": {
