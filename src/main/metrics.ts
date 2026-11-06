@@ -44,7 +44,7 @@ import { CW_DIR } from '../shared/defaults'
  * a bucket and its series in their typed tables since #1212, storeTables.ts, so a save writes the buckets that changed, the hour under way, and appends a new
  * one; `.combwork/metrics/metrics.json` before, moved in by the first save), which is git-ignored and machine-local. Every dimension comes from a fixed set (route templates, Combwork's tool names, provider ids), each
  * bucket has caps on projects and series, the store has a cap on buckets whichever way the clock moves, and what is
- * saved has a size cap (hours folded into days before anything goes, HI-2628): what doesn't fit is dropped and counted. The saved file is untrusted input: size-checked before it
+ * saved has a size cap (the database's, HI-2628): what doesn't fit is dropped and counted. The saved file is untrusted input: size-checked before it
  * is read and checked field by field. Nothing stores a prompt, a body, a token, a URL or a path.
  *
  * Work is recorded against the workspace it started in: a MetricsHandle (its store and lifetime) is taken before any
@@ -66,8 +66,8 @@ export const METRICS_LIMITS = {
   buckets: 7 * 24 + 31 + 2,
   /**
    * What is saved in the workspace's database, measured as the buckets' JSON (what its rows hold, HI-2628): past this the
-   * oldest hours are folded into their days first, then the oldest days go. A workspace as busy as HIVE's (6 to 12 agents)
-   * keeps its 30 days in about 5 MB; every bucket at its series cap would be about 90 MB, so this is the bound.
+   * oldest buckets go. A workspace as busy as HIVE's (6 to 12 agents) keeps its 30 days in about 5 MB; every bucket at
+   * its series cap would be about 90 MB, so this is the bound.
    */
   storeBytes: 32 * 1024 * 1024,
   /** metrics.json from before #1019 (written under this cap): a bigger one isn't read. */
@@ -162,6 +162,23 @@ const WORKFLOWS = new Set<string>(['builder', 'reviewer', 'either', 'none'])
 const workflowOf = (v: unknown): GuidanceSeries['workflow'] => (typeof v === 'string' && WORKFLOWS.has(v) ? (v as LaunchWorkflow) : 'unknown')
 const OUTCOMES = new Set(['ok', 'client-error', 'denied', 'server-error', 'cancelled', 'waiting'])
 const OTHER = '(other)'
+/**
+ * A family's overflow series (HI-2628 round 1): where a fold puts a series a full day has no room for, its labels
+ * "(other)" but its role, outcome, mode or workflow side kept, so a part has at most 30 API, 8 tool and 10 guidance ones.
+ */
+const overflowKey = {
+  api: (role: string, outcome: string): string => `${OTHER} ${OTHER} ${role} ${outcome}`,
+  mcp: (role: string, mode: string, outcome: string): string => `${OTHER} ${role} ${mode} ${outcome}`,
+  guidance: (role: string, workflow: string): string => `${OTHER} ${role} ${workflow}`
+}
+type Family = keyof PartData
+/**
+ * Whether a series counts against its bucket's series cap: those with labels do. Catalog series (a role and a workflow
+ * side, at most 10 a part) and those whose labels are all "(other)" (overflowKey's, at most 48 a part) are bounded by
+ * what they are keyed by, so they never take the room of a labelled one, however they are recorded, folded or read back.
+ */
+const counted = (family: Family, key: string): boolean => family !== 'catalog' && !key.startsWith(family === 'api' ? `${OTHER} ${OTHER} ` : `${OTHER} `)
+const countedIn = (p: PartData): number => (['api', 'mcp', 'guidance'] as const).reduce((n, f) => n + Object.keys(p[f]).filter((k) => counted(f, k)).length, 0)
 const inSet = (set: Set<string>, v: unknown): string => (typeof v === 'string' && set.has(v) ? v : OTHER)
 /** The longest project label kept as it is; a longer name gets a bounded label of its own (projectLabel). */
 const LABEL_MAX = 128
@@ -223,7 +240,8 @@ function readPart(v: unknown, b: Bucket, owner: string): PartData {
       if (so) fn(so)
     }
   }
-  const room = (): boolean => (b.series < METRICS_LIMITS.series ? (b.series++, true) : (drop(b, owner), false))
+  // A series that counts takes room under the cap; one that doesn't (counted) is read whatever the cap.
+  const room = (family: Family, key: string): boolean => (!counted(family, key) ? true : b.series < METRICS_LIMITS.series ? (b.series++, true) : (drop(b, owner), false))
   each(o.api, (s) => {
     const t = readTimed(s)
     const bytes = readCounts(s, ['requestBytes', 'responseBytes'] as const)
@@ -233,7 +251,7 @@ function readPart(v: unknown, b: Bucket, owner: string): PartData {
     const route = inSet(ROUTES, s.route)
     const method = inSet(METHODS, s.method)
     const key = `${method} ${route} ${role} ${outcome}`
-    const had = part.api[key] ?? (room() ? (part.api[key] = { route, method, role, outcome, ...emptyTimed(), requestBytes: 0, responseBytes: 0 }) : null)
+    const had = part.api[key] ?? (room('api', key) ? (part.api[key] = { route, method, role, outcome, ...emptyTimed(), requestBytes: 0, responseBytes: 0 }) : null)
     if (!had) return
     mergeTimed(had, t)
     had.requestBytes += bytes.requestBytes
@@ -245,7 +263,7 @@ function readPart(v: unknown, b: Bucket, owner: string): PartData {
     if (!t || !sizes || (s.role !== 'agent' && s.role !== 'assistant') || (s.mode !== 'compact' && s.mode !== 'detail') || (s.outcome !== 'ok' && s.outcome !== 'error')) return
     const tool = inSet(TOOLS, s.tool)
     const key = `${tool} ${s.role} ${s.mode} ${s.outcome}`
-    const had = part.mcp[key] ?? (room() ? (part.mcp[key] = { tool, role: s.role, mode: s.mode, outcome: s.outcome, ...emptyTimed(), chars: 0, bytes: 0 }) : null)
+    const had = part.mcp[key] ?? (room('mcp', key) ? (part.mcp[key] = { tool, role: s.role, mode: s.mode, outcome: s.outcome, ...emptyTimed(), chars: 0, bytes: 0 }) : null)
     if (!had) return
     mergeTimed(had, t)
     had.chars += sizes.chars
@@ -260,7 +278,7 @@ function readPart(v: unknown, b: Bucket, owner: string): PartData {
     const workflow = workflowOf(s.workflow)
     const dialect = typeof s.dialect === 'string' && /^[0-9a-f]{1,64}$/.test(s.dialect) ? s.dialect : undefined
     const key = guidanceKey(provider, s.role, workflow, dialect)
-    const g = part.guidance[key] ?? (room() ? (part.guidance[key] = emptyGuidance(provider, s.role, workflow, dialect)) : null)
+    const g = part.guidance[key] ?? (room('guidance', key) ? (part.guidance[key] = emptyGuidance(provider, s.role, workflow, dialect)) : null)
     if (g) for (const k of GUIDANCE_COUNTS) g[k] += c[k]
   })
   each(o.catalog, (s) => {
@@ -269,7 +287,7 @@ function readPart(v: unknown, b: Bucket, owner: string): PartData {
     if (!c || (s.role !== 'agent' && s.role !== 'assistant') || c.charStarts > c.starts || c.partStarts > c.charStarts || c.partToolsChars > c.toolsChars || c.descriptionChars + c.paramChars > c.partToolsChars) return
     const workflow = workflowOf(s.workflow)
     const key = `${s.role} ${workflow}`
-    const g = part.catalog[key] ?? (room() ? (part.catalog[key] = emptyCatalog(s.role, workflow)) : null)
+    const g = part.catalog[key] ?? (room('catalog', key) ? (part.catalog[key] = emptyCatalog(s.role, workflow)) : null)
     if (g) for (const k of CATALOG_COUNTS) g[k] += c[k]
   })
   return part
@@ -381,11 +399,6 @@ class Store {
    * nothing before it counts as observed. 0: none.
    */
   evictedThrough = 0
-  /**
-   * Hours folded into their days early to keep what is saved under its cap (HI-2628), through this time: before it, only
-   * days are kept (hourly detail went, the totals didn't). 0: none.
-   */
-  foldedThrough = 0
   /** The last project rename (#514, projectNames.ts's number) its measurements follow: saved with them, so one is applied once. */
   renamesApplied = 0
   private timer: NodeJS.Timeout | null = null
@@ -463,7 +476,7 @@ class Store {
       const saved = readTable(this.workspace, 'metrics')
       if (saved.meta.has('imported')) {
         const num = (k: string): unknown => (saved.meta.has(k) ? JSON.parse(saved.meta.get(k)!) : undefined)
-        this.fromSaved({ buckets: saved.docs, observed: num('observed'), evictedThrough: num('evictedThrough'), foldedThrough: num('foldedThrough'), renamesApplied: num('renamesApplied') })
+        this.fromSaved({ buckets: saved.docs, observed: num('observed'), evictedThrough: num('evictedThrough'), renamesApplied: num('renamesApplied') })
         if (existsSync(this.file)) {
           log.warn("A metrics.json was found after the metrics moved into the workspace database (an older Hive's): kept as a backup, not read")
           keepAsBackup(this.file)
@@ -521,7 +534,6 @@ class Store {
     }
     this.observed = readStretches(data.observed)
     this.evictedThrough = count(data.evictedThrough) ?? 0
-    this.foldedThrough = count(data.foldedThrough) ?? 0
     this.renamesApplied = count(data.renamesApplied) ?? 0
   }
 
@@ -609,10 +621,9 @@ class Store {
   }
 
   /**
-   * Keeps what is saved under its cap (HI-2628; in UTF-8 bytes of the buckets' JSON, as their rows hold it), losing detail
-   * before history: the oldest day's hours (all but the hour under way) are folded into that day, day by day, then, only
-   * hours under way left, the oldest buckets go, all of them if need be; then the oldest observation (it is small: this
-   * is only for a tiny cap). Each trim is logged, with what it folded and dropped and the times they covered.
+   * Keeps what is saved under its cap (HI-2628; in UTF-8 bytes of the buckets' JSON, as their rows hold it): the oldest
+   * buckets go first, all of them if need be, the time they covered no longer observed (evicted); then the oldest
+   * observation (it is small: this is only for a tiny cap). Each trim is logged, with what it dropped and the time it covered.
    */
   private fit(now: number): void {
     const cap = METRICS_LIMITS.storeBytes
@@ -620,55 +631,26 @@ class Store {
     const size = new Map<Bucket, number>(this.buckets.map((b) => [b, bytes(b)]))
     let held = 0
     for (const n of size.values()) held += n
-    // The buckets, and what is saved beside them (observation, the marks).
-    const total = (): number => held + bytes(this.observed) + 64
+    // The buckets as a list, and what is saved beside them (observation, the marks): measured as metrics.json's text was.
+    const total = (): number => held + this.buckets.length + bytes(this.observed) + 128
     const before = total()
     if (before <= cap) return
-    const current = Math.floor(now / HOUR) * HOUR
-    const end = (b: Bucket): number => b.start + (b.span === 'day' ? DAY : HOUR)
-    const folded = { hours: 0, from: Infinity, to: 0 }
     const dropped = { hours: 0, days: 0, from: Infinity, to: 0 }
+    this.buckets.sort((x, y) => x.start - y.start)
     while (total() > cap && (this.buckets.length > 0 || this.observed.length > 0)) {
-      this.buckets.sort((x, y) => x.start - y.start)
-      const oldest = this.buckets.find((b) => b.span === 'hour' && b.start !== current)
-      if (oldest) {
-        // Hourly detail goes before any day: the oldest day's hours, folded into it.
-        const dayStart = Math.floor(oldest.start / DAY) * DAY
-        const hours = new Set(this.buckets.filter((b) => b.span === 'hour' && b.start !== current && Math.floor(b.start / DAY) * DAY === dayStart))
-        let day = this.buckets.find((b) => b.span === 'day' && b.start === dayStart)
-        if (!day) {
-          day = newBucket(dayStart, 'day')
-          this.buckets.push(day)
-        }
-        held -= size.get(day) ?? 0
-        for (const h of hours) {
-          mergeBucket(day, h)
-          held -= size.get(h)!
-          folded.from = Math.min(folded.from, h.start)
-          folded.to = Math.max(folded.to, end(h))
-        }
-        folded.hours += hours.size
-        this.buckets = this.buckets.filter((b) => !hours.has(b))
-        size.set(day, bytes(day))
-        held += size.get(day)!
-        this.foldedThrough = Math.max(this.foldedThrough, folded.to)
-      } else if (this.buckets.length) {
-        // Only days (and the hour under way) left: the oldest goes, history and its observation with it.
+      if (this.buckets.length) {
         const b = this.buckets.shift()!
         this.evicted(b, now)
         held -= size.get(b)!
         if (b.span === 'day') dropped.days++
         else dropped.hours++
         dropped.from = Math.min(dropped.from, b.start)
-        dropped.to = Math.max(dropped.to, end(b))
+        dropped.to = Math.max(dropped.to, b.start + (b.span === 'day' ? DAY : HOUR))
       } else this.observed.shift()
     }
     const iso = (t: number): string => new Date(t).toISOString()
-    const what = [
-      ...(folded.hours ? [`${folded.hours} hours folded into their days (${iso(folded.from)} to ${iso(folded.to)})`] : []), // i18n-ignore: a line in the app's own log, which stays English
-      ...(dropped.days || dropped.hours ? [`${dropped.days} days and ${dropped.hours} hours dropped (${iso(dropped.from)} to ${iso(dropped.to)})`] : []) // i18n-ignore: a line in the app's own log, which stays English
-    ]
-    log.warn(`Performance history over its size limit (${before} bytes, limit ${cap}): ${what.join('; ') || 'observation trimmed'}; ${total()} bytes kept`) // i18n-ignore: a line in the app's own log, which stays English
+    const what = dropped.days || dropped.hours ? `${dropped.days} days and ${dropped.hours} hours dropped (${iso(dropped.from)} to ${iso(dropped.to)})` : 'observation trimmed' // i18n-ignore: a line in the app's own log, which stays English
+    log.warn(`Performance history over its size limit (${before} bytes, limit ${cap}): ${what}; ${total()} bytes kept`) // i18n-ignore: a line in the app's own log, which stays English
   }
 
   private async write(): Promise<void> {
@@ -688,7 +670,6 @@ class Store {
       await saveTable(this.workspace, 'metrics', rows, {
         observed: JSON.stringify(this.observed),
         evictedThrough: this.evictedThrough ? String(this.evictedThrough) : null,
-        foldedThrough: this.foldedThrough ? String(this.foldedThrough) : null,
         renamesApplied: this.renamesApplied ? String(this.renamesApplied) : null,
         // The first save after metrics.json was read moves it in: marked in the same transaction, then the file kept.
         ...(importing ? { imported: JSON.stringify({ at: new Date(now).toISOString(), rows: rows.length, file: this.file }) } : {})
@@ -713,7 +694,6 @@ class Store {
     this.buckets = []
     this.observed = []
     this.evictedThrough = 0
-    this.foldedThrough = 0
     this.renamesApplied = 0
     this.importing = false
     this.unreadable = false
@@ -728,7 +708,6 @@ class Store {
     this.buckets = []
     this.observed = []
     this.evictedThrough = 0
-    this.foldedThrough = 0
     this.sealed = true
     this.dirty = true
     this.touch(clock.now())
@@ -742,46 +721,47 @@ function mergeBucket(a: Bucket, b: Bucket, capped = true): void {
       drop(a, p)
       continue
     }
-    mergePart(a, (a.projects[p] ??= emptyPart()), part, capped, p)
+    mergePart(a, (a.projects[p] ??= emptyPart()), part, capped)
   }
-  mergePart(a, a.workspace, b.workspace, capped, '')
+  mergePart(a, a.workspace, b.workspace, capped)
   mergeTimed(a.skills.scans, b.skills.scans)
   for (const k of SKILL_COUNTS) a.skills[k] += b.skills[k]
   for (const [owner, n] of Object.entries(b.droppedBy)) drop(a, owner, n)
 }
 
-/** Adds part b's series into part a of bucket a, each new series within the bucket's cap (unless summing for a query). */
-function mergePart(bucket: Bucket, a: PartData, b: PartData, capped: boolean, owner: string): void {
-  const room = (): boolean => {
-    if (!capped || bucket.series < METRICS_LIMITS.series) {
-      bucket.series++
-      return true
-    }
-    drop(bucket, owner)
-    return false
+/**
+ * Adds part b's series into part a of bucket a (folding hours into a day; a query's sum, uncapped). A series new to a
+ * full bucket isn't dropped (HI-2628 round 1: two hours' different series can be more than a day holds): it goes into its
+ * family's overflow series, its labels "(other)" and the rest kept (overflowKey), so the day's totals stay whole.
+ */
+function mergePart(bucket: Bucket, a: PartData, b: PartData, capped: boolean): void {
+  // Into the series of key k, made (counted against the cap) if new; with no room, into its overflow series, made if new.
+  const into = <T>(family: Family, map: Record<string, T>, k: string, over: string, make: (overflow: boolean) => T): T => {
+    const had = map[k]
+    if (had) return had
+    const overflow = capped && counted(family, k) && bucket.series >= METRICS_LIMITS.series
+    const key = overflow ? over : k
+    if (!map[key] && counted(family, key)) bucket.series++
+    return (map[key] ??= make(overflow))
   }
   for (const [k, v] of Object.entries(b.api)) {
-    const t = a.api[k] ?? (room() ? (a.api[k] = { ...v, ...emptyTimed(), requestBytes: 0, responseBytes: 0 }) : null)
-    if (!t) continue
+    const t = into('api', a.api, k, overflowKey.api(v.role, v.outcome), (o) => ({ ...v, ...(o ? { route: OTHER, method: OTHER } : {}), ...emptyTimed(), requestBytes: 0, responseBytes: 0 }))
     mergeTimed(t, v)
     t.requestBytes += v.requestBytes
     t.responseBytes += v.responseBytes
   }
   for (const [k, v] of Object.entries(b.mcp)) {
-    const t = a.mcp[k] ?? (room() ? (a.mcp[k] = { ...v, ...emptyTimed(), chars: 0, bytes: 0 }) : null)
-    if (!t) continue
+    const t = into('mcp', a.mcp, k, overflowKey.mcp(v.role, v.mode, v.outcome), (o) => ({ ...v, ...(o ? { tool: OTHER } : {}), ...emptyTimed(), chars: 0, bytes: 0 }))
     mergeTimed(t, v)
     t.chars += v.chars
     t.bytes += v.bytes
   }
   for (const [k, v] of Object.entries(b.guidance)) {
-    const t = a.guidance[k] ?? (room() ? (a.guidance[k] = emptyGuidance(v.provider, v.role, v.workflow, v.dialect)) : null)
-    if (!t) continue
+    const t = into('guidance', a.guidance, k, overflowKey.guidance(v.role, v.workflow), (o) => (o ? emptyGuidance(OTHER, v.role, v.workflow) : emptyGuidance(v.provider, v.role, v.workflow, v.dialect)))
     for (const f of GUIDANCE_COUNTS) t[f] += v[f] ?? 0
   }
   for (const [k, v] of Object.entries(b.catalog)) {
-    const t = a.catalog[k] ?? (room() ? (a.catalog[k] = emptyCatalog(v.role, v.workflow)) : null)
-    if (!t) continue
+    const t = into('catalog', a.catalog, k, k, () => emptyCatalog(v.role, v.workflow))
     for (const f of CATALOG_COUNTS) t[f] += v[f]
   }
 }
@@ -904,12 +884,12 @@ export function applyMetricsRenames(h: MetricsHandle | null, batch: { from: stri
     for (const [a] of moves) {
       const part = bucket.projects[a]
       // Its series leave with it; merging counts those the new name hasn't (so the bucket's count stays true).
-      if (part) bucket.series -= Object.keys(part.api).length + Object.keys(part.mcp).length + Object.keys(part.guidance).length + Object.keys(part.catalog).length
+      if (part) bucket.series -= countedIn(part)
       delete bucket.projects[a]
       delete bucket.droppedBy[a]
     }
     moves.forEach(([, b], i) => {
-      if (parts[i]) mergePart(bucket, (bucket.projects[b] ??= emptyPart()), parts[i], false, b)
+      if (parts[i]) mergePart(bucket, (bucket.projects[b] ??= emptyPart()), parts[i], false)
       if (dropped[i]) bucket.droppedBy[b] = (bucket.droppedBy[b] ?? 0) + dropped[i]
     })
   }
@@ -945,14 +925,16 @@ function partOf(b: Bucket, project: string | null): PartData | null {
 const ownerOf = (project: string | null): string => (project ? (projectLabel(project) ?? UNTRACKED) : '')
 
 /** A series in a part, made if there is room in the bucket (else dropped, and counted against its owner). */
-function series<T>(b: Bucket, owner: string, map: Record<string, T>, key: string, make: () => T): T | null {
+function series<T>(b: Bucket, owner: string, family: Family, map: Record<string, T>, key: string, make: () => T): T | null {
   const had = map[key]
   if (had) return had
-  if (b.series >= METRICS_LIMITS.series) {
-    drop(b, owner)
-    return null
+  if (counted(family, key)) {
+    if (b.series >= METRICS_LIMITS.series) {
+      drop(b, owner)
+      return null
+    }
+    b.series++
   }
-  b.series++
   return (map[key] = make())
 }
 
@@ -979,7 +961,7 @@ export function recordApi(h: MetricsHandle | null, project: string | null, r: { 
     if (!part) return at.store.changed()
     const route = inSet(ROUTES, r.route)
     const method = inSet(METHODS, r.method)
-    const s = series(at.b, ownerOf(project), part.api, `${method} ${route} ${r.role} ${r.outcome}`, () => ({ route, method, role: r.role, outcome: r.outcome, ...emptyTimed(), requestBytes: 0, responseBytes: 0 }))
+    const s = series(at.b, ownerOf(project), 'api', part.api, `${method} ${route} ${r.role} ${r.outcome}`, () => ({ route, method, role: r.role, outcome: r.outcome, ...emptyTimed(), requestBytes: 0, responseBytes: 0 }))
     if (s) {
       addTiming(s, r.ms)
       s.requestBytes += Math.max(0, Math.floor(r.requestBytes))
@@ -1011,7 +993,7 @@ export function recordMcp(h: MetricsHandle | null, project: string | null, role:
     }
     const tool = inSet(TOOLS, e.tool)
     const outcome = e.ok ? 'ok' : 'error'
-    const s = series(at.b, ownerOf(project), part.mcp, `${tool} ${role} ${e.mode} ${outcome}`, () => ({ tool, role, mode: e.mode as McpSeries['mode'], outcome, ...emptyTimed(), chars: 0, bytes: 0 }))
+    const s = series(at.b, ownerOf(project), 'mcp', part.mcp, `${tool} ${role} ${e.mode} ${outcome}`, () => ({ tool, role, mode: e.mode as McpSeries['mode'], outcome, ...emptyTimed(), chars: 0, bytes: 0 }))
     if (s) {
       addTiming(s, ms)
       s.chars += chars
@@ -1052,7 +1034,7 @@ export function recordCatalog(h: MetricsHandle | null, project: string | null, r
       return true
     }
     const side = workflowOf(workflow)
-    const s = series(at.b, ownerOf(project), part.catalog, `${role} ${side}`, () => emptyCatalog(role, side))
+    const s = series(at.b, ownerOf(project), 'catalog', part.catalog, `${role} ${side}`, () => emptyCatalog(role, side))
     if (s) {
       s.starts++
       s.tools += tools
@@ -1085,7 +1067,7 @@ export function recordLaunch(h: MetricsHandle | null, project: string | null, g:
     const provider = inSet(PROVIDER_IDS, g.provider)
     const workflow = workflowOf(g.workflow)
     const dialect = g.dialect || undefined
-    const s = series(at.b, ownerOf(project), part.guidance, guidanceKey(provider, g.role, workflow, dialect), () => emptyGuidance(provider, g.role, workflow, dialect))
+    const s = series(at.b, ownerOf(project), 'guidance', part.guidance, guidanceKey(provider, g.role, workflow, dialect), () => emptyGuidance(provider, g.role, workflow, dialect))
     if (s) {
       s.launches++
       for (const f of GUIDANCE_COUNTS) if (f !== 'launches') s[f] += Math.max(0, Math.floor(g[f]))
@@ -1253,16 +1235,13 @@ export function queryMetrics(w: WorkspaceService, q: MetricsQuery): Omit<Metrics
   // Stretches that touch the range (one that starts as it ends is the observation made now).
   const inRangeStretches = observed.filter(([a, b]) => b >= from && a <= to)
   const evictedThrough = h?.store.evictedThrough ?? 0
-  // Hours folded early (HI-2628): only where hours would still be kept by age, and past what was removed.
-  const foldedThrough = Math.min(h?.store.foldedThrough ?? 0, to)
   const coverage: MetricsCoverage = {
     rangeMs: to - from,
     observedMs: overlap(observed, from, to),
     observedSince: inRangeStretches.length ? new Date(Math.max(from, inRangeStretches[0][0])).toISOString() : null,
     stretches: inRangeStretches.length,
     // The storage's own fact (no project's): history it removed for space, if any of it was in the range.
-    ...(evictedThrough > from ? { evictedThrough: new Date(Math.min(evictedThrough, to)).toISOString() } : {}),
-    ...(foldedThrough > from && foldedThrough > now - METRICS_LIMITS.hourlyDays * DAY && foldedThrough > evictedThrough ? { foldedThrough: new Date(foldedThrough).toISOString() } : {})
+    ...(evictedThrough > from ? { evictedThrough: new Date(Math.min(evictedThrough, to)).toISOString() } : {})
   }
   const notFilteredText = [
     ...(f.provider ? [NOT_FILTERED.provider] : []),
@@ -1278,7 +1257,7 @@ export function queryMetrics(w: WorkspaceService, q: MetricsQuery): Omit<Metrics
   // A sum isn't capped like a bucket: it is bounded by the buckets it adds, which are.
   const sum = newBucket(from, 'hour')
   for (const b of inRange) {
-    for (const [name, p] of partsOf(b)) mergePart(sum, name ? (sum.projects[name] ??= emptyPart()) : sum.workspace, p, false, name)
+    for (const [name, p] of partsOf(b)) mergePart(sum, name ? (sum.projects[name] ??= emptyPart()) : sum.workspace, p, false)
     mergeTimed(sum.skills.scans, b.skills.scans)
     for (const k of SKILL_COUNTS) sum.skills[k] += b.skills[k]
   }
@@ -1286,7 +1265,7 @@ export function queryMetrics(w: WorkspaceService, q: MetricsQuery): Omit<Metrics
   if (q.scope.kind === 'project') {
     // Projects are folder names, matched as the API matches them (case-insensitively); its drops are its own.
     const part = emptyPart()
-    for (const [name, pt] of Object.entries(sum.projects)) mergePart(sum, part, pt, false, name)
+    for (const [name, pt] of Object.entries(sum.projects)) mergePart(sum, part, pt, false)
     // Its own losses, bucket by bucket (each bucket's owners are its own, never capped again by the sum); others' and
     // untracked ones are not this project's to see: only whether some couldn't be attributed.
     let dropped = 0

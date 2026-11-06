@@ -261,7 +261,7 @@ describe('saving', () => {
     await disposeWorkspaceService(w)
   })
 
-  it('what is saved stays under its cap: the oldest hours are folded into their days before anything goes (HI-2628)', async () => {
+  it('what is saved stays under its cap: the oldest buckets go first', async () => {
     const { w, path } = await open()
     const saved = { ...metrics.METRICS_LIMITS }
     try {
@@ -272,12 +272,8 @@ describe('saving', () => {
       }
       await metrics.flushMetrics()
       expect(savedBytes(path)).toBeLessThanOrEqual(20_000)
-      const kept = metricsSaved(path)!.buckets as { start: number; span: string }[]
+      const kept = metricsSaved(path)!.buckets as { start: number }[]
       expect(Math.max(...kept.map((b) => b.start))).toBe(T0 + 99 * HOUR - ((T0 + 99 * HOUR) % HOUR))
-      // Days for the oldest, nothing lost: every request is still counted, and nothing was evicted.
-      expect(kept.some((b) => b.span === 'day')).toBe(true)
-      const r = metrics.queryMetrics(w, { scope: { kind: 'workspace' }, from: new Date(T0 - DAY).toISOString() })
-      expect([sumApi(Object.values(r.projects)).count, r.coverage.evictedThrough]).toEqual([500, undefined])
     } finally {
       Object.assign(metrics.METRICS_LIMITS, saved)
       await disposeWorkspaceService(w)

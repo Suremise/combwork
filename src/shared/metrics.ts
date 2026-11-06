@@ -273,11 +273,6 @@ export interface MetricsCoverage {
    * the range: nothing before it is available, so it isn't counted as observed either.
    */
   evictedThrough?: string
-  /**
-   * Hours folded into their days early to keep the metrics under their size limit (HI-2628), through this time (ISO), when
-   * that is in the range and hours would otherwise still be kept: before it there are days only, their totals whole.
-   */
-  foldedThrough?: string
 }
 
 export interface MetricsReport {

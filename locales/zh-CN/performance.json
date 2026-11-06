@@ -283,7 +283,6 @@
   "performance.compare.usePart.title": "使用 {project} 的部分？",
   "performance.coverage.dropped": "{n, plural, other {# 项测量数据}}未保留（某个上限已满），因此总计可能偏低。",
   "performance.coverage.evicted": "为使性能历史不超过大小上限，{when} 之前的历史记录已被移除：此前的数据都不可用。",
-  "performance.coverage.folded": "为使性能历史不超过大小上限，{when} 之前的逐小时明细已合并为按天记录：总数完整，但只能按天查看。",
   "performance.coverage.full": "全程都有记录。",
   "performance.coverage.none": "在此时间范围内 Combwork 没有记录此工作区，因此没有可显示的内容（是没有数据，而不是零）。",
   "performance.coverage.partial": "记录了其中的 {duration}（{percent}）{sinceShown, select, yes {，自 {since} 起} other {}}{stretches, plural, =0 {} =1 {} other {，分为 # 段}}：在此之前以及空档期间（Combwork 已关闭、记录已关闭、重置）没有任何记录。",

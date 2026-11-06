@@ -1135,10 +1135,6 @@
     "defaultMessage": "History up to {when} was removed to keep the performance history under its size limit: nothing before then is available.",
     "description": "At the top of the Performance page. {when} is a date and time."
   },
-  "performance.coverage.folded": {
-    "defaultMessage": "Hourly detail up to {when} was folded into days to keep the performance history under its size limit: the totals are whole, but only by day.",
-    "description": "At the top of the Performance page, when hours were merged into whole days early to save space (nothing lost but the hour-by-hour breakdown). {when} is a date and time."
-  },
   "performance.coverage.full": {
     "defaultMessage": "Recorded throughout.",
     "description": "At the top of the Performance page, when Combwork recorded the whole range."

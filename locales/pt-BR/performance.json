@@ -283,7 +283,6 @@
   "performance.compare.usePart.title": "Usar a parte do projeto {project}?",
   "performance.coverage.dropped": "{n, plural, =0 {# medições não guardadas} one {# medição não guardada} other {# medições não guardadas}} (um limite estava cheio), então os totais podem estar baixos.",
   "performance.coverage.evicted": "O histórico até {when} foi removido para manter o histórico de desempenho abaixo do limite de tamanho: nada antes disso está disponível.",
-  "performance.coverage.folded": "O detalhe por hora até {when} foi agrupado em dias para manter o histórico de desempenho abaixo do limite de tamanho: os totais estão completos, mas só por dia.",
   "performance.coverage.full": "Registrado o tempo todo.",
   "performance.coverage.none": "O Combwork não estava registrando este espaço de trabalho neste intervalo, então não há nada para mostrar (sem dados, não zero).",
   "performance.coverage.partial": "Registrado durante {duration} dele ({percent}){sinceShown, select, yes {, desde {since}} other {}}{stretches, plural, =0 {} =1 {} other {, em # trechos}}: antes disso e nos intervalos (Combwork fechado, registro desativado, uma redefinição) nada foi visto.",

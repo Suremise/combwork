@@ -1,6 +1,7 @@
 // HI-2628: the performance history's size cap is the database's, not the old metrics.json's. A workspace as busy as
-// HIVE's keeps its 30 days (hours for 7, then days); over the cap the oldest hours are folded into their days before any
-// day goes; every trim is logged, and reports say what it did (coverage.foldedThrough, coverage.evictedThrough).
+// HIVE's keeps its 30 days (hours for 7, then days); over the cap the oldest buckets go, each trim logged and reported
+// (coverage.evictedThrough); and folding a week's hours into a day keeps every total, even when the day's series are
+// more than its cap (the rest go into "(other)" overflow series).
 import { mkdirSync, rmSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
@@ -63,7 +64,7 @@ const requests = (w: ReturnType<typeof createWorkspaceService>, from: number) =>
   return { count: Object.values(r.projects).flatMap((p) => p.api).reduce((k, s) => k + s.count, 0), coverage: r.coverage }
 }
 
-describe('HI-2628: the size cap folds before it drops', () => {
+describe('HI-2628: 30 days kept, trims logged, folds keep their totals', () => {
   it('a workspace as busy as HIVE (hundreds of series an hour, 30 days) keeps its 30 days: hours for 7, then days', async () => {
     const { w, path } = await open()
     // HIVE's busiest hours hold about 200 series (6 parts): here every hour has 8 projects x (12 routes + 24 tools x 2 roles).
@@ -96,89 +97,77 @@ describe('HI-2628: the size cap folds before it drops', () => {
     expect(hours.length).toBeGreaterThanOrEqual(7 * 24 - 1)
     expect(days[0].start).toBeLessThanOrEqual(now - 29 * DAY)
     expect(days.length).toBeGreaterThanOrEqual(22)
-    // Nothing trimmed for space: nothing logged, nothing evicted or folded early.
+    // Nothing trimmed for space: nothing logged, nothing evicted; every request of the last 29 days still counted.
     expect(lines).toEqual([])
     const { count, coverage } = requests(w, now - 29 * DAY)
-    expect(count).toBeGreaterThan(0)
-    expect([coverage.evictedThrough, coverage.foldedThrough]).toEqual([undefined, undefined])
+    expect(count).toBeGreaterThanOrEqual(8 * ROUTES.length * 29 * 24)
+    expect(count).toBeLessThanOrEqual(8 * ROUTES.length * 30 * 24)
+    expect(coverage.evictedThrough).toBeUndefined()
     await disposeWorkspaceService(w)
   }, 120_000)
 
-  it('a tiny cap folds hours into their days first (logged, reported), and drops the oldest days only past that', async () => {
+  it('over the cap the oldest buckets go, days before hours: logged, and reported as removed', async () => {
     const { w, path } = await open()
-    const start = T0 - 3 * DAY
-    for (let h = 0; h <= 3 * 24; h++) {
+    // 10 days: the oldest 3 are days by now, the rest hours.
+    const start = T0 - 10 * DAY
+    for (let h = 0; h <= 10 * 24; h++) {
       now = start + h * HOUR
       for (const r of ROUTES.slice(0, 4)) metrics.recordApi(metrics.metricsHandle(w), 'alpha', api(r))
     }
     await metrics.flushMetrics()
-    const full = savedBytes(path)
-    const all = requests(w, start - DAY).count
-    expect(all).toBe(4 * (3 * 24 + 1))
     expect(lines).toEqual([])
+    const before = buckets(path)
+    expect(before.filter((b) => b.span === 'day').length).toBeGreaterThanOrEqual(3)
 
-    // A third of what it holds: hours folded into days, every request still counted.
-    metrics.METRICS_LIMITS.storeBytes = Math.floor(full / 3)
+    metrics.METRICS_LIMITS.storeBytes = Math.floor(savedBytes(path) * 0.8)
     metrics.recordApi(metrics.metricsHandle(w), 'alpha', api(ROUTES[0]))
     await metrics.flushMetrics()
     expect(savedBytes(path)).toBeLessThanOrEqual(metrics.METRICS_LIMITS.storeBytes)
-    let kept = buckets(path)
-    expect(kept.some((b) => b.span === 'day')).toBe(true)
-    expect(kept.filter((b) => b.span === 'hour').map((b) => b.start)).toContain(Math.floor(now / HOUR) * HOUR)
-    let r = requests(w, start - DAY)
-    expect(r.count).toBe(all + 1)
-    expect(r.coverage.evictedThrough).toBeUndefined()
-    expect(r.coverage.foldedThrough).toBeDefined()
-    expect(Date.parse(r.coverage.foldedThrough!)).toBeGreaterThan(start)
-    expect(lines).toHaveLength(1)
-    expect(lines[0]).toMatch(/^Performance history over its size limit \(\d+ bytes, limit \d+\): \d+ hours folded into their days \(\S+ to \S+\); \d+ bytes kept$/)
-
-    // Too small for even the days: the oldest days go (evicted, logged), the newest kept.
-    lines.length = 0
-    const oneDay = Math.max(...kept.filter((b) => b.span === 'day').map((b) => Buffer.byteLength(JSON.stringify(b))))
-    metrics.METRICS_LIMITS.storeBytes = 2 * oneDay + 2000
-    metrics.recordApi(metrics.metricsHandle(w), 'alpha', api(ROUTES[0]))
-    await metrics.flushMetrics()
-    expect(savedBytes(path)).toBeLessThanOrEqual(metrics.METRICS_LIMITS.storeBytes)
-    kept = buckets(path)
+    const kept = buckets(path)
+    // The oldest went (the days first, as the oldest), the newest stayed.
+    expect(kept.filter((b) => b.span === 'day')).toEqual([])
+    expect(kept[0].start).toBeGreaterThan(before[0].start)
     expect(kept.at(-1)!.start).toBe(Math.floor(now / HOUR) * HOUR)
-    r = requests(w, start - DAY)
-    expect(r.count).toBeLessThan(all + 2)
-    expect(r.coverage.evictedThrough).toBeDefined()
+    const r = requests(w, start - DAY)
+    expect(Date.parse(r.coverage.evictedThrough!)).toBe(kept[0].start)
     expect(lines).toHaveLength(1)
-    expect(lines[0]).toMatch(/: (\d+ hours folded into their days \(\S+ to \S+\); )?[1-9]\d* days and \d+ hours dropped \(\S+ to \S+\); \d+ bytes kept$/)
+    expect(lines[0]).toMatch(/^Performance history over its size limit \(\d+ bytes, limit \d+\): [1-9]\d* days and \d+ hours dropped \(\S+ to \S+\); \d+ bytes kept$/)
+    expect(lines[0]).toContain(`(${new Date(before[0].start).toISOString()} to ${new Date(kept[0].start).toISOString()})`)
     // Kept across a reopen; cleared by a reset.
     await w.close()
     await metrics.flushMetrics()
     await w.open(path)
     expect(requests(w, start - DAY).coverage.evictedThrough).toBe(r.coverage.evictedThrough)
     metrics.resetMetrics(w)
-    expect([requests(w, start - DAY).coverage.foldedThrough, requests(w, start - DAY).coverage.evictedThrough]).toEqual([undefined, undefined])
+    expect(requests(w, start - DAY).coverage.evictedThrough).toBeUndefined()
     await disposeWorkspaceService(w)
   })
 
-  it('hours folded early are reported until they would have been folded by age anyway, and kept across a reopen', async () => {
+  it('a week-old day whose hours had more different series than a day holds keeps every total, in "(other)" overflow series', async () => {
     const { w, path } = await open()
-    for (let h = 0; h < 30; h++) {
-      now = T0 + h * HOUR
-      for (const r of ROUTES) metrics.recordApi(metrics.metricsHandle(w), 'alpha', api(r))
+    // Two hours of one day, 1,440 series each and none in common: 60 projects x 12 routes x two roles, other roles in the second.
+    const day = T0 - 8 * DAY
+    const roles = [['agent', 'assistant'], ['api', 'viewer']] as const
+    for (const [i, pair] of roles.entries()) {
+      now = day + i * HOUR
+      for (let p = 0; p < 60; p++) for (const r of ROUTES) for (const role of pair) metrics.recordApi(metrics.metricsHandle(w), `project-${p}`, { ...api(r), role })
     }
-    await metrics.flushMetrics()
-    metrics.METRICS_LIMITS.storeBytes = Math.floor(savedBytes(path) / 2)
-    metrics.recordApi(metrics.metricsHandle(w), 'alpha', api(ROUTES[0]))
-    await metrics.flushMetrics()
-    const folded = requests(w, T0 - DAY).coverage.foldedThrough
-    expect(folded).toBeDefined()
-    Object.assign(metrics.METRICS_LIMITS, saved)
+    now = T0
+    const report = () => metrics.queryMetrics(w, { scope: { kind: 'workspace' }, from: new Date(day - DAY).toISOString(), to: new Date(day + DAY).toISOString() })
+    const total = (r: ReturnType<typeof report>) => Object.values(r.projects).flatMap((p) => p.api).reduce((k, s) => k + s.count, 0)
+    let r = report()
+    // Folded into its day (a week old), over the day's series cap: nothing dropped, the rest under "(other)".
+    expect([total(r), r.dropped]).toEqual([2 * 1440, 0])
+    const other = Object.values(r.projects).flatMap((p) => p.api).filter((s) => s.route === '(other)')
+    expect(other.length).toBeGreaterThan(0)
+    expect(other.every((s) => s.method === '(other)' && (s.role === 'api' || s.role === 'viewer'))).toBe(true)
+    // Saved and read back the same: the overflow series are read past the cap too.
     await w.close()
     await metrics.flushMetrics()
+    expect(buckets(path).map((b) => b.span)).toEqual(['day'])
     await w.open(path)
-    expect(requests(w, T0 - DAY).coverage.foldedThrough).toBe(folded)
-    // A range from then on doesn't mention it.
-    expect(requests(w, Date.parse(folded!)).coverage.foldedThrough).toBeUndefined()
-    // A week on, those hours would be days by now: not said any more.
-    now = Date.parse(folded!) + 7 * DAY + HOUR
-    expect(requests(w, T0 - DAY).coverage.foldedThrough).toBeUndefined()
+    r = report()
+    expect([total(r), r.dropped]).toEqual([2 * 1440, 0])
     await disposeWorkspaceService(w)
   })
 })
