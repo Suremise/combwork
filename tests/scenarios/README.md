@@ -160,6 +160,8 @@ npm run scenarios -- --provider codex --repeat 3 --budget 2                     
 npm run scenarios -- --provider claude-code --model haiku --budget 2            # model trials: opt-in
 npm run scenarios -- --provider codex --model gpt-5.6-luna --budget 2           # Codex, in its test home
 npm run scenarios -- --only work-on-card,review-card --keep                     # some scenarios, keeping their folders
+npm run scenarios -- --provider codex --random 3                                # a release's model trial: 3 at random, its seed printed
+npm run scenarios -- --provider codex --random 3 --seed 1234                    # the same pick again (or --only <the ids it printed>)
 npm run scenarios -- --dialect "Opus 5.5 v2.json" --provider claude-code --model opus --repeat 2   # a dialect's trial
 node tests/scenarios/measure.cjs              # what sessions are given about Combwork, measured from real launches
 ```
