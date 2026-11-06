@@ -15,7 +15,10 @@
 // any pattern of words: an allowance names where it is. The list's own file is the one place read as allowances, not
 // searched (its entries name the text they allow).
 //
-// `node tests/oldNames.mjs` prints what fails, by file (the inventory a sweep works from); `--json` prints it as JSON.
+// `node tests/oldNames.mjs` (npm run check:names) prints what fails in the whole tree, by file: the inventory a sweep
+// works from; `--json` prints it as JSON. The merge checks run `--diff` (Darren's decision on HI-2617, 6 Nov): only the
+// lines and paths a change adds since its target, which the merge queue gives as CW_CHECK_BASE (`--base <ref>` locally;
+// with neither it says so and passes). checkDiffNames says what passes there.
 import { execFileSync } from 'child_process'
 import { readFileSync } from 'fs'
 import { createRequire } from 'module'
@@ -183,6 +186,67 @@ export function checkRepoNames(root) {
   return checkNames({ files: repoFiles(root), read, allow })
 }
 
+/** A line of a change's own that may name the old name: an `old-name: <why>` comment on it (not a region's begin or end). */
+const LINE_MARKER = /old-name: (?!begin |end )\S/
+
+/**
+ * The names check of a change (Darren's decision on HI-2617, 6 Nov): only the lines it adds since `base` (its merge base
+ * with HEAD; the working tree, so uncommitted lines count too, and files new and not ignored whole) and the paths it
+ * adds. A hit there fails unless:
+ * - its file is one of oldNamesAllow.json's `diffFiles`: the upgrade code that must name the old paths, and the
+ *   detector itself;
+ * - the whole-tree allowances place it (a listed region, string, file or path; the released CHANGELOG sections; the
+ *   AGENTS.md rename line);
+ * - or the line carries an `old-name: <why>` comment, for a legitimate old-name input elsewhere.
+ * `node tests/oldNames.mjs` (no --diff) is still the whole tree's report.
+ */
+export function checkDiffNames(root, base) {
+  const allow = JSON.parse(readFileSync(join(root, ALLOW_FILE), 'utf8'))
+  const git = (...args) => execFileSync('git', args, { cwd: root, env: baseEnv(), encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 })
+  const from = git('merge-base', base, 'HEAD').trim()
+  const diffFiles = new Set((allow.diffFiles ?? []).map((e) => e.file))
+  // The lines each file adds, by its line numbers now.
+  const added = new Map()
+  let file = null
+  for (const line of git('diff', '-U0', '--no-color', '--no-ext-diff', '--no-renames', '--diff-filter=AM', from, '--').split('\n')) {
+    const m = /^\+\+\+ b\/(.*)$/.exec(line)
+    if (m) file = m[1].replace(/\r$/, '')
+    else if (line.startsWith('+++ ')) file = null
+    const h = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/.exec(line)
+    if (h && file) {
+      const set = added.get(file) ?? new Set()
+      for (let i = 0, n = h[2] === undefined ? 1 : Number(h[2]); i < n; i++) set.add(Number(h[1]) + i)
+      added.set(file, set)
+    }
+  }
+  const newFiles = new Set(git('diff', '--name-only', '--no-renames', '--diff-filter=A', from, '--').split('\n').map((l) => l.trim()).filter(Boolean))
+  for (const f of git('ls-files', '-z', '-o', '--exclude-standard').split('\0').filter(Boolean)) {
+    newFiles.add(f)
+    added.set(f, 'all')
+  }
+  const read = (f) => {
+    try {
+      return readFileSync(join(root, f))
+    } catch (e) {
+      if (e?.code === 'ENOENT') return null
+      throw e
+    }
+  }
+  const hits = []
+  for (const f of [...new Set([...added.keys(), ...newFiles])].sort()) {
+    if (diffFiles.has(f)) continue
+    const lines = added.get(f) ?? new Set()
+    const buf = read(f)
+    const text = buf ? textOf(buf).split('\n') : []
+    for (const h of checkNames({ files: [f], read, allow }).hits) {
+      if (h.line === 0 ? !newFiles.has(f) : lines !== 'all' && !lines.has(h.line)) continue
+      if (h.line && LINE_MARKER.test(text[h.line - 1] ?? '')) continue
+      hits.push(h)
+    }
+  }
+  return { base: from, hits }
+}
+
 /** The hits by file, most first, as lines: `<file> (<n>)` then `  <line>: <text>` for each. */
 export function inventory(hits) {
   const by = new Map()
@@ -190,7 +254,19 @@ export function inventory(hits) {
   return [...by].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0])).flatMap(([f, hs]) => [`${f} (${hs.length})`, ...hs.map((h) => `  ${h.line}: ${h.text}`)])
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1] && process.argv.includes('--diff')) {
+  // check:repo's: the merge queue gives the target's head (CW_CHECK_BASE); locally, --base <ref>.
+  const root = join(fileURLToPath(import.meta.url), '..', '..')
+  const at = process.argv.indexOf('--base')
+  const base = (at > 0 ? process.argv[at + 1] : null) || process.env.CW_CHECK_BASE
+  if (!base) console.log('names check of a change: skipped, no base (the merge queue gives CW_CHECK_BASE; locally: node tests/oldNames.mjs --diff --base <target>)')
+  else {
+    const { base: from, hits } = checkDiffNames(root, base)
+    for (const l of inventory(hits)) console.log(l)
+    if (hits.length) console.log(`${hits.length} added line(s) or path(s) name the old name since ${from.slice(0, 9)}: reword them, or mark a legitimate old-name input with an \`old-name: <why>\` comment on its line (tests/oldNames.mjs)`)
+    process.exitCode = hits.length ? 1 : 0
+  }
+} else if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const root = join(fileURLToPath(import.meta.url), '..', '..')
   const { hits, problems } = checkRepoNames(root)
   if (process.argv.includes('--json')) console.log(JSON.stringify({ hits, problems }, null, 1))

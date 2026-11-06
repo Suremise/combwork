@@ -12,5 +12,26 @@
   "paths": [],
   "history": [
     { "file": "CHANGELOG.md", "from": "## 1.0.0 — 2026-11-03", "why": "The released sections, history as published." }
+  ],
+  "diffFiles": [
+    {"file": "build/installer.nsh", "why": "The upgrade's code, which must name the old paths and values it converts (Darren's decision on HI-2617)."},
+    {"file": "build/legacyUpgrade.ps1", "why": "The upgrade's code, which must name the old paths and values it converts (Darren's decision on HI-2617)."},
+    {"file": "src/main/boardFileMove.ts", "why": "The upgrade's code, which must name the old paths and values it converts (Darren's decision on HI-2617)."},
+    {"file": "src/main/combworkFolder.ts", "why": "The upgrade's code, which must name the old paths and values it converts (Darren's decision on HI-2617)."},
+    {"file": "src/main/combworkMove.ts", "why": "The upgrade's code, which must name the old paths and values it converts (Darren's decision on HI-2617)."},
+    {"file": "src/main/combworkMoveWorker.ts", "why": "The upgrade's code, which must name the old paths and values it converts (Darren's decision on HI-2617)."},
+    {"file": "src/main/nameUpgrade.ts", "why": "The upgrade's code, which must name the old paths and values it converts (Darren's decision on HI-2617)."},
+    {"file": "src/main/nameUpgradeFiles.ts", "why": "The upgrade's code, which must name the old paths and values it converts (Darren's decision on HI-2617)."},
+    {"file": "src/main/nameUpgradeProfile.ts", "why": "The upgrade's code, which must name the old paths and values it converts (Darren's decision on HI-2617)."},
+    {"file": "src/main/nameUpgradeProjects.ts", "why": "The upgrade's code, which must name the old paths and values it converts (Darren's decision on HI-2617)."},
+    {"file": "src/main/nameUpgradeValues.ts", "why": "The upgrade's code, which must name the old paths and values it converts (Darren's decision on HI-2617)."},
+    {"file": "src/main/profileFolders.ts", "why": "The upgrade's code, which must name the old paths and values it converts (Darren's decision on HI-2617)."},
+    {"file": "src/main/schema/namesStep.ts", "why": "The upgrade's code, which must name the old paths and values it converts (Darren's decision on HI-2617)."},
+    {"file": "src/main/schema/valuesStep.ts", "why": "The upgrade's code, which must name the old paths and values it converts (Darren's decision on HI-2617)."},
+    {"file": "src/main/storedNames.ts", "why": "The upgrade's code, which must name the old paths and values it converts (Darren's decision on HI-2617)."},
+    {"file": "src/shared/combworkFolderMove.ts", "why": "The upgrade's code, which must name the old paths and values it converts (Darren's decision on HI-2617)."},
+    {"file": "tests/oldNames.mjs", "why": "The detector itself (Darren's decision on HI-2617)."},
+    {"file": "tests/oldNames.test.ts", "why": "The detector itself (Darren's decision on HI-2617)."},
+    {"file": "tests/sandbox/clean.cjs", "why": "The detector itself (Darren's decision on HI-2617)."}
   ]
 }

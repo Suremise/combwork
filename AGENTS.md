@@ -31,7 +31,7 @@ npm run typecheck      # tsc for main/preload/shared and renderer
 npm test               # vitest unit tests (tests/); CI runs them on push/PR
 npm run lint           # oxlint, fails on warnings
 npm run check:repo     # the repo-wide checks a merge runs: i18n guard, tests that scan every file (under a minute)
-npm run check:names    # the old name's guard (HI-2617): every hit outside tests/oldNamesAllow.json, by file; joins check:repo when the rename's last sweep clears it
+npm run check:names    # the old name in the whole tree (HI-2617), by file; check:repo checks only what a change adds (node tests/oldNames.mjs --diff --base <target>)
 npm run e2e            # end-to-end suites (tests/e2e) against the dev build; -- <suites> --build --record (tests/e2e/README.md)
 npm run test:clean     # remove what tests left in %LOCALAPPDATA%\combwork-test (--dry-run lists only)
 npm run scenarios      # agents and Combwork's skills and rules, and what Combwork costs in them (tests/scenarios/README.md)

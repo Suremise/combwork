@@ -2,13 +2,13 @@
 // where tests/oldNamesAllow.json places it, every entry there still places one, and what Combwork generates by default
 // names it nowhere. `node tests/oldNames.mjs` lists what fails, by file.
 import { execFileSync } from 'child_process'
-import { mkdirSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { dirname, join } from 'path'
 import { describe, expect, it } from 'vitest'
 import { tempDir } from './tempDir'
 // @ts-expect-error: a plain .mjs module without types
-import { ALLOW_FILE, checkNames, checkRepoNames, inventory, nameHits, textOf } from './oldNames.mjs'
+import { ALLOW_FILE, checkDiffNames, checkNames, checkRepoNames, inventory, nameHits, textOf } from './oldNames.mjs'
 import { ASSISTANT_GITIGNORE, BOARD_GITIGNORE, HANDOVER_README, WORKSPACE_README } from '../src/main/workspace'
 import { COPIES_EXCLUDE_COMMENT } from '../src/main/providers/common'
 import { LAUNCH_README } from '../src/main/providers/claude/adapter'
@@ -145,10 +145,53 @@ describe("the old name's allowances (HI-2617)", () => {
     }
   })
 })
+
+describe("the names check of a change (Darren's decision on HI-2617)", () => {
+  it('fails only what the change adds: a line, a new path; passes the lines it keeps, a diffFiles file, a marked line', () => {
+    const repo = tempDir('cw-oldnames-diff-')
+    try {
+      const git = (...args: string[]) => execFileSync('git', ['-c', 'core.autocrlf=false', '-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd: repo, env: baseEnv(), encoding: 'utf8' })
+      git('init', '-q')
+      mkdirSync(join(repo, 'tests'), { recursive: true })
+      mkdirSync(join(repo, 'src'), { recursive: true })
+      const allow = { diffFiles: [{ file: 'src/upgrade.ts', why: 'the upgrade' }], history: [{ file: 'CHANGELOG.md', from: '## 1.0.0', why: 'released' }] }
+      writeFileSync(join(repo, ALLOW_FILE), JSON.stringify(allow))
+      writeFileSync(join(repo, 'src/a.ts'), 'const kept = ".hive"\n')
+      writeFileSync(join(repo, 'src/upgrade.ts'), 'export {}\n')
+      writeFileSync(join(repo, 'CHANGELOG.md'), '## Unreleased\n## 1.0.0\n- old\n')
+      git('add', '.')
+      git('commit', '-q', '-m', 'base')
+      const base = git('rev-parse', 'HEAD').trim()
+      writeFileSync(join(repo, 'src/a.ts'), 'const kept = ".hive"\nconst added = "Hive"\nconst marked = ".hive" // old-name: the input folder\nconst clean = "archive"\n')
+      writeFileSync(join(repo, 'src/upgrade.ts'), 'export const OLD = ".hive"\n')
+      writeFileSync(join(repo, 'CHANGELOG.md'), '## Unreleased\n- Hive now\n## 1.0.0\n- old\n- Hive then\n')
+      writeFileSync(join(repo, 'src/hive-new.ts'), 'export {}\n')
+      git('add', '.')
+      git('commit', '-q', '-m', 'the change')
+      // New and not committed: counted whole.
+      writeFileSync(join(repo, 'src/loose.ts'), 'const x = "myHive"\n')
+      const { base: from, hits } = checkDiffNames(repo, base)
+      expect(from).toBe(base)
+      expect(hits.map((h: Hit) => `${h.file}:${h.line}`)).toEqual(['CHANGELOG.md:2', 'src/a.ts:2', 'src/hive-new.ts:0', 'src/loose.ts:1'])
+    } finally {
+      rmSync(repo, { recursive: true, force: true })
+    }
+  })
+
+  it("each diffFiles entry is a file of the repository, and check:repo runs the change's check", () => {
+    const allow = JSON.parse(readFileSync(join(__dirname, '..', ALLOW_FILE), 'utf8')) as { diffFiles: { file: string; why: string }[] }
+    expect(allow.diffFiles.length).toBeGreaterThan(0)
+    for (const e of allow.diffFiles) {
+      expect(existsSync(join(__dirname, '..', e.file)), e.file).toBe(true)
+      expect(e.why, e.file).toBeTruthy()
+    }
+    expect(JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8')).scripts['check:repo']).toContain('node tests/oldNames.mjs --diff')
+  })
+})
 // old-name: end truth-table
 
-// The repository itself is `npm run check:names` (node tests/oldNames.mjs), outside check:repo until the rename's last
-// sweep clears what it lists (the user's decision on HI-2617): that sweep's last card moves it into check:repo.
+// The whole tree is `npm run check:names` (node tests/oldNames.mjs), the report sweep 3 works from; check:repo runs the
+// change's check, `--diff` (Darren's decision on HI-2617, 6 Nov).
 describe('the old name in what Combwork generates (HI-2617)', () => {
   it('appears in nothing Combwork generates by default: the files it writes, the default settings and configs', () => {
     const generated: Record<string, string> = {
