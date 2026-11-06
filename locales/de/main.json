@@ -53,6 +53,7 @@
   "main.connections.launch.deleted": "Die für {agent} gewählte Verbindung gibt es nicht mehr. Wähle in den Agent-Einstellungen eine andere.",
   "main.connections.launch.noKey": "{name} hat keinen Schlüssel. Füge unter Einstellungen → Konten & Verbindungen einen hinzu und starte dann {agent}.",
   "main.connections.launch.none": "In diesem Arbeitsbereich ist kein Konto für {cli} eingeschaltet. Füge eines unter Einstellungen → Konten & Verbindungen hinzu, melde es an und starte dann {agent} erneut.",
+  "main.connections.launch.offHere": "{n, plural, one {Das Konto für {cli}, {names}, ist in diesem Arbeitsbereich ausgeschaltet.} other {Die Konten für {cli}, {names}, sind in diesem Arbeitsbereich ausgeschaltet.}} Schalte eines unter Einstellungen → Konten & Verbindungen mit „In diesem Arbeitsbereich eingeschaltet“ ein und starte dann {agent} erneut.",
   "main.connections.launch.offNoDefault": "Das Konto von {agent}, {name}, ist in diesem Arbeitsbereich ausgeschaltet, und kein anderes Konto für {cli} ist eingeschaltet. Schalte eines unter Einstellungen → Konten & Verbindungen ein.",
   "main.connections.launch.otherProvider": "Die für {agent} gewählte Verbindung gehört zu einer anderen CLI. Wähle in den Agent-Einstellungen eine Verbindung für {cli}.",
   "main.connections.launch.signedOut": "{name} ist abgemeldet. Melde das Konto unter Einstellungen → Konten & Verbindungen erneut an und starte dann {agent}.",

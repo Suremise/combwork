@@ -538,10 +538,14 @@ test("scenario 9 makes Claude Code's folder, as its first run would, before it a
   assert.ok(made > 0 && at('fs.mkdirSync(claudeHome, { recursive: true })') > made, 'clean makes %USERPROFILE%\\.claude')
   assert.ok(at('fake-claude-install.ps1') < made, 'after installing the fake')
   assert.ok(made < at("inv('connections:add', 'claude-code'"), 'before adding the connection')
-  // Then on in the workspace it opens (On here), before the agent it starts there.
-  const on = at("inv('connections:setOn', account.id, true)")
+  // Then on in the workspace it opens, as a user does (HI-2650: nothing on by itself): the empty project's Turn On Here,
+  // clicked after the workspace opens and before the agent it starts there; never turned on behind the window's back.
+  const on = at('[data-turn-on-here="${account.id}"]')
   assert.ok(on > at("inv('workspace:open', ws)") && on < at("inv('agents:add', proj"), 'the account is turned on in the new workspace before its agent is added')
-  assert.ok(fs.readFileSync(path.join(root, 'src', 'shared', 'api.ts'), 'utf8').includes("'connections:setOn'"), 'connections:setOn is an IPC channel')
+  assert.ok(!clean.includes("inv('connections:setOn'"), 'not through the IPC channel')
+  const renderer = fs.readFileSync(path.join(root, 'src', 'renderer', 'src', 'components', 'ConnectionChoice.tsx'), 'utf8')
+  assert.ok(renderer.includes('data-turn-on-here={choice.id}') && renderer.includes('data-off-here={choice.kind}') && renderer.includes("call('connections:setOn', id, true)"), 'the banner has the button the driver clicks, and it turns the account on')
+  assert.ok(fs.readFileSync(path.join(root, 'src', 'renderer', 'src', 'views', 'ProjectView.tsx'), 'utf8').includes('<NoConnectionBanner where="empty" />'), "it is on the empty project's card")
   // The folder is the one Combwork looks for: Claude Code's home without CLAUDE_CONFIG_DIR, which a user's environment hasn't.
   const adapter = fs.readFileSync(path.join(root, 'src', 'main', 'providers', 'claude', 'adapter.ts'), 'utf8')
   assert.ok(adapter.includes("return process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude')"), "Claude Code's home is ~/.claude")

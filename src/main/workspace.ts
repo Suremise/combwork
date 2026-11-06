@@ -2077,16 +2077,8 @@ export async function disposeWorkspaceService(w: WorkspaceService): Promise<void
   services.delete(w)
 }
 
-/**
- * What a new workspace's workspace.json gets beyond the defaults (HI-980: its accounts, from accounts.ts), once ready
- * (HI-1875: after the connections' one-time order move, so it is never seeded from the order before it).
- */
-let newWorkspaceExtras: () => Promise<Partial<WorkspaceConfig>> = async () => ({})
-export function setNewWorkspaceExtras(fn: () => Promise<Partial<WorkspaceConfig>>): void {
-  newWorkspaceExtras = fn
-}
-/** A new workspace's settings: the defaults and those extras (only when it is made, never when one is opened). */
-const newWorkspaceConfig = async (): Promise<WorkspaceConfig> => ({ ...structuredClone(DEFAULT_WORKSPACE_CONFIG), ...(await newWorkspaceExtras()) })
+/** A new workspace's settings: the defaults (only when it is made, never when one is opened); no connection is on (HI-2650). */
+const newWorkspaceConfig = async (): Promise<WorkspaceConfig> => structuredClone(DEFAULT_WORKSPACE_CONFIG)
 
 /** Runs fn with `workspace` standing for w. */
 export function inWorkspace<T>(w: WorkspaceService, fn: () => T): T {

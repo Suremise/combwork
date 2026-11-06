@@ -6,6 +6,7 @@
   "connections.choice.noneHere": "此工作区中没有已启用的账号。请在“设置”→“账号与连接”中添加一个。",
   "connections.choice.notInstalled": "{cli} 未安装",
   "connections.choice.offHere": "{name}（其账号在此处已停用：将使用其 CLI 的第一个可用连接运行）",
+  "connections.choice.offHereAll": "此工作区中没有已启用的账号：{n, plural, other {{names} 在此已停用。}}请在“设置”→“账号与连接”中用“在此工作区中启用”启用其中一个。",
   "connections.choice.pick": "选择连接",
   "connections.choice.removed": "已移除的连接（将使用其 CLI 的第一个可用连接运行）",
   "connections.choice.unavailable": "{name}——{why}",

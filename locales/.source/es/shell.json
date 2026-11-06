@@ -317,6 +317,7 @@
   "shell.search.clear": "Clear",
   "shell.setup.checkAgain": "Check again",
   "shell.setup.connections": "{n, plural, =0 {{cli} signs in per account, and none is on in this workspace yet: add one and sign it in.} one {{cli} signs in per account: # is on in this workspace.} other {{cli} signs in per account: # are on in this workspace.}}",
+  "shell.setup.connectionsOff": "{cli} signs in per account, and none is on in this workspace: {n, plural, one {{names} is off here.} other {{names} are off here.}} Turn one on with On here.",
   "shell.setup.docs": "{provider} docs",
   "shell.setup.done": "{what} You can close this window.",
   "shell.setup.found": "<b>{provider} {version}</b> <muted>— found via {source}</muted>",

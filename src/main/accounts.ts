@@ -7,7 +7,7 @@ import type { AgentDef, AgentInfo, AppConfig, Account, Connection, ConnectionDef
 import { CW_DIR } from '../shared/defaults'
 import { readKeptJson, withFileLock } from './fsutil'
 import { baseValues, cliDefaults, connectionFor, COPILOT_ACCOUNT, homeAccount, seamAccountId, type AccountStore } from '../shared/connectionDefaults'
-import { acceptable, accountState, baseConnection, cleanTag, connectionsOn, TAG_MAX, launchValues, movedInGroup, resolveAgentConnection, type AgentConnection, type ConnectionPatch, type ConnectionRow, type ConnectionTrust, type ConnectionUser, movedConnection, topOfOrder, valuesOf, workspaceAccounts, switchedOn, type ConnectionsView } from '../shared/accounts'
+import { acceptable, accountState, baseConnection, cleanTag, connectionsOn, TAG_MAX, launchValues, movedInGroup, resolveAgentConnection, type AgentConnection, type ConnectionPatch, type ConnectionRow, type ConnectionTrust, type ConnectionUser, movedConnection, valuesOf, workspaceAccounts, switchedOn, type ConnectionsView } from '../shared/accounts'
 import { ASSISTANT_NAME } from '../shared/assistant'
 import { profileFolder } from '../shared/appName'
 import { localProfileInUse } from './profileFolders'
@@ -27,7 +27,7 @@ import { git } from './git'
 import { withoutAccountEnv } from './providers/common'
 import { providerService } from './providerService'
 import { modelCaps } from '../shared/models'
-import { openWorkspaces, setConnectionGuard, setNewWorkspaceExtras, workspace, workspaceOf } from './workspace'
+import { openWorkspaces, setConnectionGuard, workspace, workspaceOf } from './workspace'
 import { dropKeysExcept, keyInfo, loadKeys, removeKey, withKey } from './keyStore'
 import { coverageView } from './keyCoverage'
 import { aliasModels, MODEL_ALIASES, originOf, parseBaseUrl, serverDefaultModel, withRemote } from '../shared/serverConnection'
@@ -1629,17 +1629,14 @@ async function saveChoice(fn: (cfg: WorkspaceConfig) => WorkspaceConfig['connect
   syncWatches()
 }
 
-/** Turns an account on or off in the asking window's workspace (on, with no default yet: it becomes the default). */
+/** Turns an account on or off in the asking window's workspace only (which is used follows the order, HI-1875). */
 export async function setAccountOn(id: string, on: boolean): Promise<void> {
   const a = mustGet(id)
-  let chosen: string | null = null
   await saveChoice((c) => {
     const next = switchedOn(workspaceAccounts(c, a.provider, list()), id, on, list())
-    chosen = next.default
     // Only which are on (HI-2106): which is used follows the order.
     return { ...c.connections, [a.provider]: { on: next.on } }
   })
-  if (chosen) noteLastUsed(a.provider, chosen)
 }
 
 /**
@@ -1694,25 +1691,6 @@ export async function migrateConnectionOrder(): Promise<void> {
     log.info(`connections: preference order begins with each CLI's most recent workspace default (HI-1875): ${[...tops].map(([p, id]) => `${p} ${id}`).join(', ')}`)
     emit({ type: 'connections-changed' })
   }
-}
-
-/** The account a new workspace starts with (Darren, 26 Oct): the last chosen as a default, or launched on (HI-1755). */
-export function noteLastUsed(id: ProviderId, accountId: string): void {
-  if (config.get().lastUsedConnection?.[id] === accountId) return
-  config.update((c) => (c.lastUsedConnection = { ...c.lastUsedConnection, [id]: accountId }))
-}
-
-/**
- * A new workspace's accounts (only when it is made: opening one never turns an account on): the top of each CLI's
- * preference order, on (HI-1875: the Default). Undefined with none.
- */
-export function newWorkspaceAccounts(): WorkspaceConfig['connections'] | undefined {
-  const out: NonNullable<WorkspaceConfig['connections']> = {}
-  for (const p of PROVIDERS) {
-    const top = topOfOrder(p.id, list())
-    if (top) out[p.id] = { on: [top] }
-  }
-  return Object.keys(out).length ? out : undefined
 }
 
 /**
@@ -1770,6 +1748,7 @@ export function connectionReadyAgain(id: string): void {
 
 const LAUNCH = {
   none: msg({ id: 'main.connections.launch.none', defaultMessage: 'No {cli} account is on in this workspace. Add one in Settings → Accounts & Connections and sign it in, then start {agent} again.', description: "Starting an agent ({agent}, its name) is refused: its workspace has no account on for its coding agent CLI ({cli}: \"Claude Code\"). Settings → Accounts & Connections names a section." }),
+  offHere: msg({ id: 'main.connections.launch.offHere', defaultMessage: "{n, plural, one {{cli}'s account, {names}, is off in this workspace.} other {{cli}'s accounts, {names}, are off in this workspace.}} Turn one on with On here in Settings → Accounts & Connections, then start {agent} again.", description: "Starting an agent ({agent}, its name) is refused (HI-2650): its coding agent CLI ({cli}: \"Claude Code\") has accounts, but none is on in this workspace. {names}: their names, joined (\"Work and Personal\"); {n}: how many. On here is the switch on each account's row in Settings → Accounts & Connections." }),
   offNoDefault: msg({ id: 'main.connections.launch.offNoDefault', defaultMessage: "{agent}'s account, {name}, is off in this workspace, and no other {cli} account is on. Turn one on in Settings → Accounts & Connections.", description: "Starting an agent ({agent}) is refused: the connection chosen for it ({name}) is off in this workspace and there's no default to use instead. {cli} is the coding agent CLI." }),
   deleted: msg({ id: 'main.connections.launch.deleted', defaultMessage: "The connection chosen for {agent} no longer exists. Choose another in its Agent Settings.", description: 'Starting an agent ({agent}) is refused: the connection chosen for it was removed. Agent Settings names a dialog.' }),
   changedAgain: msg({ id: 'main.connections.launch.changedAgain', defaultMessage: "{agent}'s connection was changed again while it was starting. Start it again.", description: "Starting an agent ({agent}, its name) failed: the connection chosen for it was changed while it was starting, and again while Combwork started it once more on the new choice. A connection is how a coding agent CLI signs in or reaches its model (Settings → Accounts & Connections)." }),
@@ -1858,6 +1837,9 @@ export async function connectionForLaunch(o: { provider: ProviderId; workspaceCo
   if (!choice.ok) {
     if (choice.why === 'none' && testHomeSeam(caps.homeEnv)) return null
     const name = choice.wanted ? (getConnection(choice.wanted)?.name ?? choice.wanted) : ''
+    // None on here, but the CLI has accounts (HI-2650): they are off here, never "add one".
+    const off = choice.why === 'none' ? list().filter((a) => a.provider === o.provider) : []
+    if (off.length) throw combworkError(LAUNCH.offHere, { agent: o.agentName, cli, n: off.length, names: fmt.list(off.map((a) => a.name)) }, { kind: 'conflict' })
     throw combworkError(LAUNCH[choice.why], { agent: o.agentName, cli, name }, { kind: 'conflict' })
   }
   // A test home's account (the seam): the CLI's own home, as before connections.
@@ -1879,7 +1861,6 @@ export async function connectionForLaunch(o: { provider: ProviderId; workspaceCo
       if (!a || !same()) {
         throw combworkError(NO_ACCOUNT, undefined, { kind: 'notFound' })
       }
-      noteLastUsed(o.provider, id)
       return {
         id,
         name: a.name,
@@ -1898,7 +1879,6 @@ export async function connectionForLaunch(o: { provider: ProviderId; workspaceCo
     if (observed?.missing) await assertUsable(a)
     if (observed?.loggedIn === false) throw combworkError(LAUNCH.signedOut, { name: a.name, agent: o.agentName }, { kind: 'conflict' })
     const note = choice.note ?? (observed?.loggedIn === null ? 'unknownLogin' : accountState(a) === 'changed' ? 'loginChanged' : undefined)
-    noteLastUsed(o.provider, id)
     return {
       id,
       name: a.name,
@@ -1995,10 +1975,6 @@ export function connectionOnHere(id: string, cli: ProviderId, projectPath: strin
   return !!ws.path && !!workspaceAccounts(ws.config, cli, list())?.on.includes(id)
 }
 
-/**
- * Connections' part of Combwork's start (index.ts; nothing runs as this module loads, which other modules import): a new
- * workspace starts with the last-used connections, and the watches follow the open workspaces and their choices.
- */
 /** The connections' one-time order move under way or done (HI-1875 round 1): what depends on the order waits for it. */
 let orderReady: Promise<void> = Promise.resolve()
 
@@ -2008,7 +1984,7 @@ export function startConnectionOrder(): Promise<void> {
   return orderReady
 }
 
-/** Resolves once the connections' order is final: before it, a launch or a new workspace would use the old one. */
+/** Resolves once the connections' order is final: before it, a launch would use the old one. */
 export const connectionOrderReady = (): Promise<void> => orderReady
 
 /** Returns once the order is final (index.ts waits for it before workspaces open and the Agent API starts). */
@@ -2016,13 +1992,8 @@ export function initConnections(): Promise<void> {
   // No agent is given a connection that is gone or being removed (HI-2107).
   setConnectionGuard(connectionAssignable)
   // The most recent workspace default becomes the top of its CLI's preference order, once (HI-1875); what depends on
-  // the order (a launch on a connection, a new workspace's seeding) waits for it.
+  // the order (a launch on a connection) waits for it. A new workspace starts with none on (HI-2650, Darren 6 Nov).
   const ready = startConnectionOrder()
-  setNewWorkspaceExtras(async () => {
-    await connectionOrderReady()
-    const connections = newWorkspaceAccounts()
-    return connections ? { connections } : {}
-  })
   onCombworkEvent((e) => {
     if (e.type !== 'workspace-changed') return
     syncWatches()

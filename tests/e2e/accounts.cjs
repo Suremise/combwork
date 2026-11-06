@@ -340,8 +340,10 @@ const check = (name, ok, extra = '') => {
     await p2.waitForLoadState('domcontentloaded')
     await lib.appReady(p2)
     await lib.openWorkspace(invOn(p2), p2, ws2)
-    // A new workspace starts with the last account chosen as a default (Darren, 26 Oct): Personal.
-    check('a new workspace starts with the top of the order on (HI-1875), the one used there', JSON.stringify(wsJson(ws2)) === JSON.stringify({ 'claude-code': { on: [personal.id] } }), JSON.stringify(wsJson(ws2)))
+    // A new workspace starts with none on (HI-2650, Darren 6 Nov: nothing is turned on by itself); turned on there by hand.
+    check('a new workspace starts with none on (HI-2650)', wsJson(ws2) === undefined, JSON.stringify(wsJson(ws2)))
+    await invOn(p2)('connections:setOn', personal.id, true)
+    check('…Personal turned on there', !!(await lib.until(async () => JSON.stringify(wsJson(ws2)) === JSON.stringify({ 'claude-code': { on: [personal.id] } }), HUNG_MS)), JSON.stringify(wsJson(ws2)))
     // One connection, two workspaces (HI-1870): set up for the first one's folders, not yet for this one's.
     const alpha2 = fs.realpathSync.native(path.join(ws2, 'alpha'))
     check('its alpha’s agent put on it there too', await onPersonal(invOn(p2), path.join(ws2, 'alpha')))
