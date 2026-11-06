@@ -17,20 +17,20 @@ const probe = (over: Record<string, unknown> = {}) => ({
   ...over
 })
 const folders: { path: string; kind: AvPathKind; unsafe?: string }[] = [
-  { path: 'D:\\Development\\ACME', kind: 'workspace' },
-  { path: 'D:\\Development\\ACME.worktrees', kind: 'worktrees' },
+  { path: 'D:\\Projects\\ACME', kind: 'workspace' },
+  { path: 'D:\\Projects\\ACME.worktrees', kind: 'worktrees' },
   { path: 'C:\\Users\\Dev\\AppData\\Local\\combwork-test', kind: 'tests' }
 ]
 const now = new Date('2026-10-06T18:00:00Z')
 type Admin = { at: string; exclusions: string[]; devDrives?: Record<string, 'trusted' | 'untrusted' | 'no'> }
-const status = (raw: unknown, opts: { added?: string[]; adminCheck?: Admin; folders?: typeof folders } = {}) => statusOf('D:\\Development\\ACME', parseProbe(raw), opts.folders ?? folders, { added: opts.added ?? [], adminCheck: opts.adminCheck ?? null, now })
+const status = (raw: unknown, opts: { added?: string[]; adminCheck?: Admin; folders?: typeof folders } = {}) => statusOf('D:\\Projects\\ACME', parseProbe(raw), opts.folders ?? folders, { added: opts.added ?? [], adminCheck: opts.adminCheck ?? null, now })
 const GUARDED = ['C:\\Users\\Dev', 'C:\\Users\\Dev\\AppData\\Roaming', 'C:\\Users\\Dev\\AppData\\Local', 'C:\\Windows', 'C:\\Program Files', 'C:\\ProgramData', 'C:\\Users\\Public']
 
 describe('antivirus (#316)', () => {
   it('reads the probe: Defender’s hidden list, or one that isn’t a list of paths, is unknown, never empty', () => {
     expect(parseProbe(probe()).exclusions).toBeNull()
     expect(parseProbe(probe({ exclusions: null })).exclusions).toBeNull()
-    expect(parseProbe(probe({ exclusions: 'D:\\Development' })).exclusions).toEqual(['D:\\Development'])
+    expect(parseProbe(probe({ exclusions: 'D:\\Projects' })).exclusions).toEqual(['D:\\Projects'])
     expect(parseProbe(probe({ exclusions: [] })).exclusions).toEqual([])
     expect(parseProbe(probe({ exclusions: 42 })).exclusions).toBeNull()
     expect(parseProbe(probe({ exclusions: ['D:\\A', 7] })).exclusions).toBeNull()
@@ -47,10 +47,10 @@ describe('antivirus (#316)', () => {
   })
 
   it('an exclusion covers its folder and what is inside it, in any case, but not a sibling with a longer name or a variable', () => {
-    expect(covered('D:\\Development\\ACME', ['d:\\development\\acme\\'])).toBe(true)
-    expect(covered('D:\\Development\\ACME.worktrees', ['D:\\Development'])).toBe(true)
-    expect(covered('D:\\Development\\ACME.worktrees', ['D:\\Development\\ACME'])).toBe(false)
-    expect(covered('D:/Development/ACME', ['D:\\Development\\ACME'])).toBe(true)
+    expect(covered('D:\\Projects\\ACME', ['d:\\projects\\acme\\'])).toBe(true)
+    expect(covered('D:\\Projects\\ACME.worktrees', ['D:\\Projects'])).toBe(true)
+    expect(covered('D:\\Projects\\ACME.worktrees', ['D:\\Projects\\ACME'])).toBe(false)
+    expect(covered('D:/Projects/ACME', ['D:\\Projects\\ACME'])).toBe(true)
     // The 6 Oct manual entry kept "$env:LOCALAPPDATA" literally: it matches nothing.
     expect(covered('C:\\Users\\Dev\\AppData\\Local\\combwork-test', ['$env:LOCALAPPDATA\\combwork-test', '%LOCALAPPDATA%\\combwork-test'])).toBe(false)
     expect(normPath('D:\\A\\B\\')).toBe('d:\\a\\b')
@@ -88,7 +88,7 @@ describe('antivirus (#316)', () => {
     const s = status(probe())
     expect([s.scan, s.realTime, s.exclusionsFrom, s.slowed]).toEqual(['defender', true, null, true])
     expect(s.paths.map((p) => [p.kind, p.state, p.devDrive])).toEqual([['workspace', 'unknown', 'no'], ['worktrees', 'unknown', 'no'], ['tests', 'unknown', 'no']])
-    expect(s.offerKey).toBe('c:\\users\\dev\\appdata\\local\\combwork-test|d:\\development\\acme|d:\\development\\acme.worktrees')
+    expect(s.offerKey).toBe('c:\\users\\dev\\appdata\\local\\combwork-test|d:\\projects\\acme|d:\\projects\\acme.worktrees')
   })
 
   it('an unsafe folder is listed but never offered or counted', () => {
@@ -97,18 +97,18 @@ describe('antivirus (#316)', () => {
   })
 
   it('a visible list says which folders are excluded; all of them excluded is not slowed', () => {
-    const some = status(probe({ exclusions: ['D:\\Development\\ACME'] }))
+    const some = status(probe({ exclusions: ['D:\\Projects\\ACME'] }))
     expect([some.exclusionsFrom, some.paths.map((p) => p.state), some.slowed]).toEqual(['live', ['excluded', 'not-excluded', 'not-excluded'], true])
-    const all = status(probe({ exclusions: ['D:\\Development', 'C:\\Users\\Dev\\AppData\\Local\\combwork-test'] }))
+    const all = status(probe({ exclusions: ['D:\\Projects', 'C:\\Users\\Dev\\AppData\\Local\\combwork-test'] }))
     expect([all.paths.every((p) => p.state === 'excluded'), all.slowed, all.offerKey]).toEqual([true, false, ''])
   })
 
   it('with the list hidden: what Combwork added counts as excluded (unconfirmed), and an administrator check is used', () => {
     const added = status(probe(), { added: folders.map((f) => f.path.toUpperCase()) })
     expect([added.paths.map((p) => [p.state, p.addedByCombwork]), added.slowed]).toEqual([[['added', true], ['added', true], ['added', true]], false])
-    const checked = status(probe(), { adminCheck: { at: '2026-10-06T17:00:00Z', exclusions: ['D:\\Development\\ACME'] } })
+    const checked = status(probe(), { adminCheck: { at: '2026-10-06T17:00:00Z', exclusions: ['D:\\Projects\\ACME'] } })
     expect([checked.exclusionsFrom, checked.adminCheckedAt, checked.paths.map((p) => p.state)]).toEqual(['admin-check', '2026-10-06T17:00:00Z', ['excluded', 'not-excluded', 'not-excluded']])
-    expect(status(probe({ exclusions: [] }), { adminCheck: { at: 'x', exclusions: ['D:\\Development'] } }).paths[0].state).toBe('not-excluded')
+    expect(status(probe({ exclusions: [] }), { adminCheck: { at: 'x', exclusions: ['D:\\Projects'] } }).paths[0].state).toBe('not-excluded')
   })
 
   it('Dev Drive: ReFS is only a maybe; only a trusted Dev Drive (checked with administrator rights) in performance mode isn’t slowed', () => {
@@ -136,26 +136,26 @@ describe('antivirus (#316)', () => {
   })
 
   it('an elevated change: declined, failing to start, refused by Defender or by policy, or done', () => {
-    const ws = 'D:\\Development\\ACME'
-    const trees = 'D:\\Development\\ACME.worktrees'
+    const ws = 'D:\\Projects\\ACME'
+    const trees = 'D:\\Projects\\ACME.worktrees'
     expect(changeOutcome('add', { started: false, cancelled: true }, null).outcome).toBe('refused')
     expect(changeOutcome('add', { started: false, error: 'boom' }, null)).toMatchObject({ outcome: 'error', message: expect.stringContaining('boom') })
     expect(changeOutcome('add', { started: true }, null).outcome).toBe('error')
     expect(changeOutcome('add', { started: true }, { ok: false, error: 'Operation failed with the following error: 0x800106ba', requested: [ws], listed: true, exclusions: [] }).outcome).toBe('policy')
     expect(changeOutcome('add', { started: true }, { ok: false, error: 'Something else', requested: [ws], listed: true, exclusions: [] }).outcome).toBe('error')
-    const done = changeOutcome('add', { started: true }, { ok: true, requested: [ws, trees], listed: true, exclusions: ['d:\\development\\acme', trees, 'E:\\Other'] })
-    expect(done).toMatchObject({ outcome: 'done', added: [ws, trees], exclusions: ['d:\\development\\acme', trees, 'E:\\Other'] })
+    const done = changeOutcome('add', { started: true }, { ok: true, requested: [ws, trees], listed: true, exclusions: ['d:\\projects\\acme', trees, 'E:\\Other'] })
+    expect(done).toMatchObject({ outcome: 'done', added: [ws, trees], exclusions: ['d:\\projects\\acme', trees, 'E:\\Other'] })
     // Accepted but not listed afterwards: a policy keeps local exclusions from applying; only what is listed counts as added.
     expect(changeOutcome('add', { started: true }, { ok: true, requested: [ws, trees], listed: true, exclusions: [ws] })).toMatchObject({ outcome: 'policy', added: [ws] })
     expect(changeOutcome('remove', { started: true }, { ok: true, requested: [ws], listed: true, exclusions: ['E:\\Other'] })).toMatchObject({ outcome: 'done', removed: [ws] })
     expect(changeOutcome('remove', { started: true }, { ok: true, requested: [ws], listed: true, exclusions: [ws] }).outcome).toBe('policy')
-    expect(changeOutcome('check', { started: true }, { ok: true, listed: true, exclusions: 'D:\\Development', devDrives: { D: 'This is a trusted developer volume.', z: 'x', E: 'Access is denied' } })).toMatchObject({ outcome: 'done', exclusions: ['D:\\Development'], devDrives: { D: 'trusted' } })
+    expect(changeOutcome('check', { started: true }, { ok: true, listed: true, exclusions: 'D:\\Projects', devDrives: { D: 'This is a trusted developer volume.', z: 'x', E: 'Access is denied' } })).toMatchObject({ outcome: 'done', exclusions: ['D:\\Projects'], devDrives: { D: 'trusted' } })
   })
 
   it('pre-existing exclusions are the user’s: Add asks only for what isn’t covered, and only what Defender lists afterwards counts as Combwork’s', () => {
     // The elevated script found the workspace's parent already excluded: it asked for nothing.
-    expect(changeOutcome('add', { started: true }, { ok: true, requested: [], listed: true, exclusions: ['D:\\Development'] })).toMatchObject({ outcome: 'done', message: expect.stringContaining('already'), exclusions: ['D:\\Development'] })
-    expect(changeOutcome('add', { started: true }, { ok: true, requested: [], listed: true, exclusions: ['D:\\Development'] }).added).toBeUndefined()
+    expect(changeOutcome('add', { started: true }, { ok: true, requested: [], listed: true, exclusions: ['D:\\Projects'] })).toMatchObject({ outcome: 'done', message: expect.stringContaining('already'), exclusions: ['D:\\Projects'] })
+    expect(changeOutcome('add', { started: true }, { ok: true, requested: [], listed: true, exclusions: ['D:\\Projects'] }).added).toBeUndefined()
     // A partial failure: Defender listed one of the two before failing.
     const partial = changeOutcome('add', { started: true }, { ok: false, error: 'Something else', requested: ['D:\\A', 'D:\\B'], listed: true, exclusions: ['D:\\A'] })
     expect([partial.outcome, partial.added]).toEqual(['error', ['D:\\A']])
@@ -192,7 +192,7 @@ describe('antivirus: Defender’s hidden-list answer (#316 round 3)', () => {
 describe('antivirus: Combwork’s exclusions of folders that are gone (#1389)', () => {
   const OLD = 'E:\\Old\\ACME'
   const gone = (raw: unknown, opts: { added?: string[]; adminCheck?: Admin; missing: string[] }) =>
-    statusOf('D:\\Development\\ACME', parseProbe(raw), folders, { added: opts.added ?? [], adminCheck: opts.adminCheck ?? null, now, missing: opts.missing }).gone
+    statusOf('D:\\Projects\\ACME', parseProbe(raw), folders, { added: opts.added ?? [], adminCheck: opts.adminCheck ?? null, now, missing: opts.missing }).gone
 
   it('with Defender’s list known, only those it lists itself; with it hidden, every one Combwork recorded, unconfirmed', () => {
     const added = [OLD, 'E:\\Old\\ACME.worktrees', 'F:\\Gone']
@@ -207,7 +207,7 @@ describe('antivirus: Combwork’s exclusions of folders that are gone (#1389)', 
   })
 
   it('never the workspace’s own folders, a folder twice, one that exists, nor without Defender', () => {
-    expect(goneExclusions(['D:\\Development\\ACME', OLD, 'e:\\old\\acme\\'], folders, null)).toEqual([{ path: OLD, state: 'added' }])
+    expect(goneExclusions(['D:\\Projects\\ACME', OLD, 'e:\\old\\acme\\'], folders, null)).toEqual([{ path: OLD, state: 'added' }])
     // Only what the caller found missing: an existing folder Combwork excluded is the workspace's business, not here.
     expect(gone(probe(), { added: [OLD, 'E:\\There'], missing: [OLD] })?.map((g) => g.path)).toEqual([OLD])
     expect(gone(probe({ defender: { antivirus: true, realTime: true, mode: 'Passive' } }), { added: [OLD], missing: [OLD] })).toBeUndefined()
@@ -215,8 +215,8 @@ describe('antivirus: Combwork’s exclusions of folders that are gone (#1389)', 
 })
 
 describe('antivirus: moving Combwork’s exclusions with a moved workspace (#1302)', () => {
-  // The workspace moved from D:\Development\ACME to E:\Work\ACME: the new folders and the old, as moveDefenderPlan probes them.
-  const OLD = ['D:\\Development\\ACME', 'D:\\Development\\ACME.worktrees']
+  // The workspace moved from D:\Projects\ACME to E:\Work\ACME: the new folders and the old, as moveDefenderPlan probes them.
+  const OLD = ['D:\\Projects\\ACME', 'D:\\Projects\\ACME.worktrees']
   const moved: typeof folders = [
     { path: 'E:\\Work\\ACME', kind: 'workspace' },
     { path: 'E:\\Work\\ACME.worktrees', kind: 'worktrees' },
@@ -258,7 +258,7 @@ describe('antivirus: moving Combwork’s exclusions with a moved workspace (#130
     const p = plan(probe({ exclusions: OLD }), { added: [OLD[0]] })
     expect([p.remove, p.theirs]).toEqual([[OLD[0]], [OLD[1]]])
     // An entry for a folder holding the old ones may cover the new ones too: not stale, nothing to say or do.
-    const parent = plan(probe({ exclusions: ['D:\\Development'] }))
+    const parent = plan(probe({ exclusions: ['D:\\Projects'] }))
     expect([parent.remove, parent.add, parent.theirs, parent.old.map((x) => x.state)]).toEqual([[], [], [], ['excluded', 'excluded']])
     // Combwork's record of an entry Defender no longer lists: nothing to remove, so nothing to move.
     expect(plan(probe({ exclusions: [] }), { added: OLD })).toMatchObject({ remove: [], add: [] })

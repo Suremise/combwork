@@ -2206,7 +2206,7 @@ describe("watcher-stopped: what a stopped Monitor's pipeline left is the CLI's, 
   const tail = { pid: 126080, name: 'tail.exe', label: 'tail -n +1 -F checks.log', created: '134383469320616428', parent: 38292 }
   const grep = { pid: 40376, name: 'grep.exe', label: 'grep --line-buffered -E FAIL|ERROR|DONE|PASS|passed|failed|complete', created: '134383469320700319', parent: 191456 }
   // A later command of its own (its `until … done &` loop): Claude Code's bash wrapper, its label cut.
-  const loop = { pid: 178324, name: 'bash.exe', label: 'bash -c "source /c/Users/Darren/AppData/Local/combwork-test/claude/shell-snapshots/…', created: '134383469784723750', parent: 62048 }
+  const loop = { pid: 178324, name: 'bash.exe', label: 'bash -c "source /c/Users/tester/AppData/Local/combwork-test/claude/shell-snapshots/…', created: '134383469784723750', parent: 62048 }
   const run = (tools: unknown[], processes: Proc[], more = 0, extra: object = {}) => ({ tools, leftovers: [{ projectPath: 'C:\\w\\alpha', agentId: 'a-1', agentName: 'Coder', processes, more }], ...extra })
 
   it('credits the CLI with tail and grep only when the agent stopped that Monitor (TaskStop worked) and they are its stages', () => {
