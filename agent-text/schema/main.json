@@ -170,6 +170,14 @@
       "agent": "plain"
     }
   },
+  "main.connections.launch.offHere": {
+    "placeholders": {
+      "n": "plural",
+      "cli": "plain",
+      "names": "plain",
+      "agent": "plain"
+    }
+  },
   "main.connections.launch.offNoDefault": {
     "placeholders": {
       "agent": "plain",

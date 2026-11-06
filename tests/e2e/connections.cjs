@@ -126,7 +126,7 @@ const launchedIn = (id) => lines(path.join(accountsRoot, id, 'fake-launches.json
     const offRefused = await failure(inv('session:start', alpha, { agentId: 'a-one' }))
     check("…an agent's start is refused saying Max 1 is off here, never to add one", /account, Max 1, is off in this workspace\. Turn one on with On here/.test(offRefused ?? ''), offRefused ?? 'started')
     const alphaBanner = page.locator('[data-connection-setup="project"]')
-    await page.locator('.sidebar .tree-item', { hasText: 'alpha' }).first().click().catch(() => undefined)
+    await page.getByText('alpha', { exact: true }).first().click({ timeout: HUNG_MS })
     check("…the project's banner says so and offers Turn On Here", !!(await lib.until(async () => (await alphaBanner.getAttribute('data-off-here').catch(() => null)) === 'one' && /Max 1, your Claude Code account, is off in this workspace/.test(await alphaBanner.innerText()) && (await alphaBanner.locator(`[data-turn-on-here="${max1.id}"]`).count()) === 1, HUNG_MS)), await alphaBanner.innerText().catch(() => ''))
     // Another workspace, open in its own window, with its own choice: none on (turned on and off there).
     const p3Next = app.waitForEvent('window')
@@ -141,7 +141,7 @@ const launchedIn = (id) => lines(path.join(accountsRoot, id, 'fake-launches.json
     await inv3('connections:setOn', max1.id, false)
     const ws3Before = JSON.stringify(wsJson(ws3).connections)
     // The project with no agents: its empty card offers Turn On Here on Max 1.
-    await page.locator('.sidebar .tree-item', { hasText: 'gamma' }).first().click()
+    await page.getByText('gamma', { exact: true }).first().click({ timeout: HUNG_MS })
     const empty = page.locator('.session-empty-card [data-connection-setup="empty"]')
     check('a project with no agents: its empty card says Max 1 is off here, with Turn On Here', !!(await lib.until(async () => (await empty.getAttribute('data-off-here').catch(() => null)) === 'one' && /Max 1, your Claude Code account, is off in this workspace, so a new agent can't start/.test(await empty.innerText()), HUNG_MS)), await empty.innerText().catch(() => ''))
     await shots('off-here-empty')
@@ -157,7 +157,7 @@ const launchedIn = (id) => lines(path.join(accountsRoot, id, 'fake-launches.json
     await inv('connections:setOn', max1.id, false)
     const max2 = await connect('Max 2', 'two@example.com')
     // Two off here: Choose in Settings, naming both.
-    await page.locator('.sidebar .tree-item', { hasText: 'alpha' }).first().click().catch(() => undefined)
+    await page.getByText('alpha', { exact: true }).first().click({ timeout: HUNG_MS })
     check("several off here: the project's banner names them and offers Choose in Settings", !!(await lib.until(async () => (await alphaBanner.getAttribute('data-off-here').catch(() => null)) === 'several' && /Max 1 and Max 2 are off in this workspace/.test(await alphaBanner.innerText()) && (await alphaBanner.locator('[data-open-connections]', { hasText: 'Choose in Settings' }).count()) === 1, HUNG_MS)), await alphaBanner.innerText().catch(() => ''))
     await shots('off-here-several')
     await inv('connections:setOn', max1.id, true)

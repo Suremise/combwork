@@ -174,6 +174,11 @@
     "note": "Starting an agent ({agent}, its name) is refused: its workspace has no account on for its coding agent CLI ({cli}: \"Claude Code\"). Settings → Accounts & Connections names a section.",
     "audience": "both"
   },
+  "main.connections.launch.offHere": {
+    "text": "{n, plural, one {{cli}'s account, {names}, is off in this workspace.} other {{cli}'s accounts, {names}, are off in this workspace.}} Turn one on with On here in Settings → Accounts & Connections, then start {agent} again.",
+    "note": "Starting an agent ({agent}, its name) is refused (HI-2650): its coding agent CLI ({cli}: \"Claude Code\") has accounts, but none is on in this workspace. {names}: their names, joined (\"Work and Personal\"); {n}: how many. On here is the switch on each account's row in Settings → Accounts & Connections.",
+    "audience": "both"
+  },
   "main.connections.launch.offNoDefault": {
     "text": "{agent}'s account, {name}, is off in this workspace, and no other {cli} account is on. Turn one on in Settings → Accounts & Connections.",
     "note": "Starting an agent ({agent}) is refused: the connection chosen for it ({name}) is off in this workspace and there's no default to use instead. {cli} is the coding agent CLI.",

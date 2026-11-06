@@ -480,7 +480,7 @@ const steps = {
     // The account turned on in this workspace as a user does (HI-2650): nothing is turned on by itself, so the project,
     // with no agent yet, says the account is off here and offers Turn On Here on its empty card, which the user clicks.
     await page.locator('.activity-btn[aria-label="Projects"]').click({ timeout: 5000 }).catch(() => {})
-    await page.locator('.sidebar .tree-item', { hasText: 'demo' }).first().click({ timeout: 10_000 }).catch(() => {})
+    await page.getByText('demo', { exact: true }).first().click({ timeout: 10_000 }).catch(() => {})
     const offHere = page.locator('.session-empty-card [data-connection-setup="empty"][data-off-here="one"]')
     const offered = await until(async () => (await offHere.count()) > 0 && /Sandbox, your Claude Code account, is off in this workspace/.test(await offHere.innerText()), 20_000)
     res.facts.offHere = await offHere.innerText().catch((e) => String(e.message))
