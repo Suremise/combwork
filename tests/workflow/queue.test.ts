@@ -111,7 +111,7 @@ describe('the merge queue', () => {
     const [o] = await e.queue({ runCheck: async (_n, _c, _f, ctx) => (seen.push(ctx.env), { ok: true, output: '' }) }).drain('main')
     expect(o).toMatchObject({ outcome: 'integrated' })
     expect(seen.length).toBeGreaterThan(0)
-    for (const env of seen) expect(env).toEqual({ CW_CHECK_BASE: before })
+    for (const given of seen) expect(given).toEqual({ CW_CHECK_BASE: before })
   })
 
   it('S7: a hand merge of an approved card is observed → Done (outside); the queue drops the entry; the lane counts it', async () => {
