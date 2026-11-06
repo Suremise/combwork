@@ -94,7 +94,7 @@ English, it is as German developers say it.
 | agent | Agent (der), Agenten | Put the noun before a name (above). |
 | provider | Anbieter | |
 | session | Sitzung | |
-| the Assistant | der Assistent | Its only name: the full English name *Hive Assistant* went with the rename (HI-2458). |
+| the Assistant | der Assistent | Its only name: the full English name it had before went with the rename (HI-2458). |
 | persona | Persona, Personas | |
 | task board / board | Aufgabenboard / Board | *Board* alone in running text. |
 | card | Karte | Never *Aufgabe* for a card; *Aufgaben* only in *Aufgabenboard* and the *Tasks* tab („Aufgaben“), and for work given to an agent (below). |

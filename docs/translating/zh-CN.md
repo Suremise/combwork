@@ -73,7 +73,7 @@ The words Chinese uses for Combwork's terms ([glossary.md](glossary.md)). Use th
 | provider | 提供方 | Claude Code, Codex or Copilot. |
 | session | 会话 | |
 | turn (an agent's: a prompt and its work until it stops) | 回合 | “上一回合”, “回合结束后切换”. Never 本轮 / 一轮 / 轮次, which are a card loop's round. *In turn* / *take turns* (one after another) is 轮流 / 依次. |
-| the Assistant | 助手 | Its only name: the full English name *Hive Assistant* went with the rename (HI-2458). |
+| the Assistant | 助手 | Its only name: the full English name it had before went with the rename (HI-2458). |
 | persona / mode (the Assistant's) | 人设 / 模式 | |
 | role (an agent's) | 角色 | |
 | task board / board | 任务看板 / 看板 | The *Tasks* tab is “任务”. |

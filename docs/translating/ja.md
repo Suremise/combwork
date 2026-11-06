@@ -75,7 +75,7 @@ The words Japanese uses for Combwork's terms ([glossary.md](glossary.md)). Use t
 | agent | エージェント | |
 | provider | プロバイダー | Claude Code, Codex or Copilot. |
 | session | セッション | |
-| the Assistant | アシスタント | Its only name: the full English name *Hive Assistant* went with the rename (HI-2458). |
+| the Assistant | アシスタント | Its only name: the full English name it had before went with the rename (HI-2458). |
 | persona | ペルソナ | |
 | task board / board | タスクボード / ボード | The *Tasks* tab is 「タスク」. |
 | card | カード | Never 「タスク」 for a card in running text. |

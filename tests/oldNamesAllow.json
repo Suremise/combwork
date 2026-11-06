@@ -1,11 +1,26 @@
 {
   "regions": [
+    { "file": "README.md", "id": "readme-09-folder", "why": "The 0.9.3 upgrade's backup step names the old data folder the user backs up (upgrade input, HI-2631)." },
+    { "file": "docs/ARCHITECTURE.md", "id": "arch-folder-move", "why": "The folder move's code map: it names the old folder it renames (upgrade input, HI-2631)." },
+    { "file": "docs/SPEC.md", "id": "spec-upgrade-inputs", "why": "§4.1.1 and §4.1.2, the folder move and the names upgrade: the old folders, files, refs, keys and values they convert (upgrade input, HI-2631)." },
+    { "file": "docs/SPEC.md", "id": "spec-profile-folders", "why": "§4.3's profile folders: 1.0's profile folder names, which the installer and the profile step move (upgrade input, HI-2631)." },
+    { "file": "docs/USER_GUIDE.md", "id": "guide-upgrade", "why": "The user guide's folder move and names upgrade sections: the old folder and files a user may look for (upgrade input, HI-2631)." },
+    { "file": "docs/USER_GUIDE.md", "id": "guide-mcp-zip", "why": "An MCP zip made before the rename: the definition's old file name and variable the user must change (upgrade input, HI-2631)." },
+    { "file": "docs/USER_GUIDE.md", "id": "guide-rename", "why": "The rename's one entry in Upgrading: the app's former name, once (the Assistant on HI-2631)." },
+    { "file": "docs/USER_GUIDE.md", "id": "guide-data-folders", "why": "Troubleshooting: 1.0's data folders by path, which a user may look for (upgrade input, HI-2631)." },
+    { "file": "CHANGELOG.md", "id": "changelog-rename", "why": "Unreleased's rename entries (HI-2458 to HI-2463): the former name once, and the old folders, paths and names the upgrade converts (the Assistant on HI-2631)." },
+    { "file": "CHANGELOG.md", "id": "changelog-rename-2", "why": "Unreleased's later rename entries (HI-2517 to HI-2591): the old ids, files, headers, trailers, branches and values they convert (upgrade input, HI-2631)." },
+    { "file": "tests/scenarios/BASELINE.md", "id": "baseline-run-records", "why": "The dated scenario run records from 1 November 2026 back: evidence as recorded (history, HI-2631). New records go above the region." },
     { "file": "tests/oldNames.mjs", "id": "detector", "why": "The guard's own pattern and the ordinary words it passes (HI-2617)." },
     { "file": "tests/oldNames.test.ts", "id": "truth-table", "why": "The guard's truth table and planted cases (HI-2617)." },
     { "file": "tests/sandbox/clean.cjs", "id": "clean-install-detector", "why": "The clean-install check's pattern (HI-2592), the one place its search names it." },
     { "file": "tests/e2e/evidence.cjs", "id": "HI-2622-board-lookup", "why": "Temporary: the board lookup still also reads the 1.0 board's file until the user has installed RC4; HI-2622 removes this entry (the Assistant's comment on HI-2617)." }
   ],
   "strings": [
+    { "file": "docs/SPEC.md", "text": "The hive project", "why": "The repository's board project, named as it is (AGENTS.md)." },
+    { "file": "docs/SPEC.md", "text": "the hive project", "why": "The repository's board project, named as it is (AGENTS.md)." },
+    { "file": "docs/SPEC.md", "text": "`hive/…`", "why": "Branches made before 1.1, named as they are (AGENTS.md)." },
+    { "file": "docs/SPEC.md", "text": "HB1…HR6 in hive", "why": "OP-20's quote of #1123's example, naming the repository's board project (AGENTS.md)." },
     { "file": "AGENTS.md", "text": "Combwork (named Hive before 1.1) is a Windows desktop app (Electron + TypeScript + React) for running coding agents (Claude Code, Codex) across the projects in a workspace. **You are probably running inside Combwork right now**, developing Combwork itself. The repository and its board project are still `hive` (`HI-` keys, older `hive/…` branches; new ones are `cw/…`): name those as they are. Code names say Combwork since HI-2591; only the upgrade's inputs keep the old names. History keeps the old name: commits and their `Hive-Card` trailers, and the CHANGELOG's sections before 1.1.0.", "why": "The rename line: what the old name still names, and why." }
   ],
   "files": [],

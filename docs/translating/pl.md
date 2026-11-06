@@ -89,7 +89,7 @@ The words Polish uses for Combwork's terms ([glossary.md](glossary.md)). Use the
 | agent | agent | *agenta, agentowi, agenci, agentów*. |
 | provider | dostawca | Claude Code, Codex or Copilot. |
 | session | sesja | |
-| the Assistant | Asystent | Capitalised, as a name: „zapytaj Asystenta”. Its only name: the full English name *Hive Assistant* went with the rename (HI-2458). |
+| the Assistant | Asystent | Capitalised, as a name: „zapytaj Asystenta”. Its only name: the full English name it had before went with the rename (HI-2458). |
 | persona | persona | *persony*. |
 | task board / board | tablica zadań / tablica | The *Tasks* tab is the „Zadania” tab („zakładka Zadania”). |
 | card | karta | Feminine: „karta jest zablokowana”, „karta utknęła”. Never „zadanie” for a card in running text. |
