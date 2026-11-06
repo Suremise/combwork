@@ -317,6 +317,7 @@
   "shell.search.clear": "Effacer",
   "shell.setup.checkAgain": "Vérifier à nouveau",
   "shell.setup.connections": "{n, plural, =0 {{cli} se connecte par compte, et aucun n’est encore activé dans cet espace de travail : ajoutes-en un et connecte-le.} one {{cli} se connecte par compte : # est activé dans cet espace de travail.} many {{cli} se connecte par compte : # sont activés dans cet espace de travail.} other {{cli} se connecte par compte : # sont activés dans cet espace de travail.}}",
+  "shell.setup.connectionsOff": "{cli} se connecte par compte, et aucun n’est activé dans cet espace de travail : {n, plural, one {{names} est désactivé ici.} many {{names} sont désactivés ici.} other {{names} sont désactivés ici.}} Actives-en un avec « Activée dans cet espace de travail ».",
   "shell.setup.docs": "Documentation {provider}",
   "shell.setup.done": "{what} Tu peux fermer cette fenêtre.",
   "shell.setup.found": "<b>{provider} {version}</b> <muted>— source : {source}</muted>",

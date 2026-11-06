@@ -64,6 +64,7 @@ interface CombworkMessageValues {
   'main.connections.launch.deleted': { agent: string | number }
   'main.connections.launch.noKey': { name: string | number; agent: string | number }
   'main.connections.launch.none': { cli: string | number; agent: string | number }
+  'main.connections.launch.offHere': { n: number; cli: string | number; names: string | number; agent: string | number }
   'main.connections.launch.offNoDefault': { agent: string | number; name: string | number; cli: string | number }
   'main.connections.launch.otherProvider': { agent: string | number; cli: string | number }
   'main.connections.launch.signedOut': { name: string | number; agent: string | number }

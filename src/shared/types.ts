@@ -671,7 +671,7 @@ export interface AppConfig {
   connections?: Connection[]
   /** One-time changes to this file (HI-2106): `accounts1`, its connections became accounts, and their defaults connections. */
   migrations?: { accounts1?: AccountsMigration }
-  /** Per provider: the account last chosen as a workspace's default (or launched on). Since HI-1875 only its migration's. */
+  /** Legacy (no longer written since HI-2650): per provider, the account last chosen as a workspace's default (or launched on). */
   lastUsedConnection?: Partial<Record<ProviderId, string>>
   /** HI-1875's one-time move (the most recently used default to the top of each CLI's order) is done. */
   connectionOrderMigrated?: true

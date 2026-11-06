@@ -67,6 +67,26 @@ export function offeredConnections(view: ConnectionsView | null, settings: Param
 }
 
 /**
+ * What to offer where nothing can start here for want of a connection (HI-2650, Darren 6 Nov: nothing is turned on by
+ * itself): the accounts that are off in this workspace, never turned on until the user clicks.
+ * - Eligible: Combwork's accounts (not a CLI's own home) whose CLI the view lists (on in Settings, with connections), not
+ *   a test copy's CLI on its test home, and not on here. `cli`: that CLI's only (a project's agents' CLI).
+ * - With no `cli`, those of an installed CLI first (`ready`), so the offer is one that can start; else all of them.
+ * - `one`: exactly one: Turn On Here on it. `several`: Choose in Settings. `none`: none at all, add one (as before).
+ */
+export type OffHereChoice = { kind: 'one'; id: string; name: string; cli: ProviderId } | { kind: 'several'; names: string[]; cli?: ProviderId } | { kind: 'none'; cli?: ProviderId }
+
+export function offHereChoice(view: Pick<ConnectionsView, 'connections' | 'homes' | 'order' | 'providers' | 'testHome' | 'workspace'>, ready: CliReady, cli?: ProviderId): OffHereChoice {
+  const eligible = orderedAccounts(view).filter((a) => !a.home && view.providers.includes(a.provider) && !view.testHome.includes(a.provider) && (!cli || a.provider === cli) && !view.workspace[a.provider]?.on.includes(a.id))
+  const installed = eligible.filter((a) => ready(a.provider) === 'yes')
+  const offer = !cli && installed.length ? installed : eligible
+  if (!offer.length) return { kind: 'none', ...(cli ? { cli } : {}) }
+  if (offer.length === 1) return { kind: 'one', id: offer[0].id, name: offer[0].name, cli: offer[0].provider }
+  const clis = [...new Set(offer.map((a) => a.provider))]
+  return { kind: 'several', names: offer.map((a) => a.name), ...(clis.length === 1 ? { cli: clis[0] } : {}) }
+}
+
+/**
  * Whether a CLI can run a new agent now, as Combwork's detection says (decision A: on and installed): `yes`, installed;
  * `no`, not found; `checking`, not known yet (detection under way).
  */

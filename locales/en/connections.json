@@ -27,6 +27,10 @@
     "defaultMessage": "{name} (its account is off here: its CLI's first usable connection runs it)",
     "description": "A choice of connection that is chosen but on an account turned off in this workspace ({name}: the connection's name) (HI-2108): the agent runs on its CLI's first usable connection instead."
   },
+  "connections.choice.offHereAll": {
+    "defaultMessage": "No account is on in this workspace: {n, plural, one {{names} is off here.} other {{names} are off here.}} Turn one on with On here in Settings → Accounts & Connections.",
+    "description": "Under the choice of connection (HI-2650) when no account is on in this workspace but some exist, all off here. {names}: their names, joined (\"Work and Personal\"); {n}: how many. On here is the switch on each account's row in Settings → Accounts & Connections."
+  },
   "connections.choice.pick": {
     "defaultMessage": "Choose a connection",
     "description": "The first choice of connection when none is chosen yet (HI-2108)."
