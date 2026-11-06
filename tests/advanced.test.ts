@@ -206,12 +206,14 @@ describe('advanced.json', () => {
     expect(parseAdvancedFile('{"values":{},"madeFor":{"claude-code.trust.prompt":{"version":"1","value":"x"}}}')).toMatchObject({ madeFor: {} })
   })
 
+  // old-name: begin old-advanced-ids
   it("Combwork's own settings have cw.* ids; an old hive.* id is no setting now, listed as unknown (HI-2518, HI-2598)", () => {
     expect(ADVANCED_DEFS.filter((d) => d.id.startsWith('hive.'))).toEqual([])
     for (const d of ADVANCED_DEFS) expect(d.id.startsWith(`${d.group}.`), d.id).toBe(true)
     // The names upgrade renames them in the profile before advanced.json is read (storedNames.test.ts): nothing reads one after.
     const read = parseAdvancedFile(JSON.stringify({ format: 1, values: { 'hive.mcp.replySeconds': 600, 'cw.progress.lanesShown': 0 } }))
     expect(read).toEqual({ values: { 'hive.mcp.replySeconds': 600, 'cw.progress.lanesShown': 0 }, madeFor: {}, unknown: ['hive.mcp.replySeconds'] })
+  // old-name: end old-advanced-ids
   })
 })
 

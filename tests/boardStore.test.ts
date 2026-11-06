@@ -381,7 +381,9 @@ function leaveStub(ws: string, next: number): string {
   const stub = join(ws, '.combwork', 'tasks')
   mkdirSync(stub, { recursive: true })
   writeFileSync(join(stub, 'board.json'), JSON.stringify({ version: 1, next }, null, 2) + '\n')
+  // old-name: begin v09-stub-readme
   writeFileSync(join(stub, 'README.txt'), 'The task board moved to .combwork/hive.db in Hive 0.9 (#1017).\r\n')
+  // old-name: end v09-stub-readme
   return stub
 }
 

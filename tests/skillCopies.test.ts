@@ -121,12 +121,14 @@ describe('safe clean-up (#1431)', () => {
     expect(book.rows.size).toBe(0)
   })
 
+  // old-name: begin old-copy-prefix
   it('a folder under the old prefix (hive-<skill>) is never read or touched by delivery or clean-up: the names upgrade retires the old copies (HI-2594)', async () => {
     const w = world('deploy')
     const book = memBook()
     await sync(w.slot, w.project, w.sources, book)
     // As a build before the rename left one: the same copy, marked, under the old prefix.
     const old = join(w.slot, '.agents', 'skills', 'hive-deploy')
+  // old-name: end old-copy-prefix
     renameSync(w.copy(w.slot, 'deploy'), old)
     const out = await sync(w.slot, w.project, w.sources, book)
     expect(readFileSync(join(old, 'SKILL.md'), 'utf8')).toBe('# deploy')

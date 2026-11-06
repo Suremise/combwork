@@ -180,7 +180,9 @@ describe('a workspace', () => {
   const OLD_HANDOVER = '---\nname: handover\ndescription: An older handover skill.\n---\n\nOld text.\n'
   const OLD_OVERSEER = '---\nname: Overseer\ndescription: A lighthouse keeper.\nicon: 🗼\n---\n\nYou keep the light.\n'
   const OLD_COORDINATOR = '---\nname: Coordinator\ndescription: An older coordinator.\nicon: 🧭\n---\n\nOld text.\n'
+  // old-name: begin old-skill
   const OLD_USE_HIVE_API = '---\nname: use-hive-api\ndescription: Hive\'s HTTP API.\n---\n\nAs shipped.\n'
+  // old-name: end old-skill
   let mod: typeof import('../src/main/bundled')
   let wsMod: typeof import('../src/main/workspace')
   let skills: typeof import('../src/main/skills')
@@ -203,10 +205,12 @@ describe('a workspace', () => {
     writeFileSync(join(base, 'old-coordinator.md'), OLD_COORDINATOR)
     oldCoordinator = await contentHash(join(base, 'old-coordinator.md'))
     history.modes.coordinator = [oldCoordinator, ...history.modes.coordinator]
+    // old-name: begin old-skill-history
     // A use-hive-api an earlier version "shipped" before the skill was renamed use-cw-api (HI-2463).
     mkdirSync(join(base, 'old-use-hive-api'), { recursive: true })
     writeFileSync(join(base, 'old-use-hive-api', 'SKILL.md'), OLD_USE_HIVE_API)
     history.skills['use-hive-api'] = [...(history.skills['use-hive-api'] ?? []), await contentHash(join(base, 'old-use-hive-api'))]
+    // old-name: end old-skill-history
     vi.resetModules()
     vi.doMock('../src/main/bundledHistory.json', () => ({ default: history }))
     mod = await import('../src/main/bundled')
@@ -327,6 +331,7 @@ describe('a workspace', () => {
     }
   })
 
+  // old-name: begin old-skill-retired
   it('a skill shipped under a new name (HI-2463: use-hive-api is use-cw-api) goes as the names upgrade opens the workspace (HI-2611): a copy Combwork shipped goes, an edited one stays', async () => {
     const make = (ws: string, text: string) => {
       const dir = join(ws, '.combwork', 'skills', 'use-hive-api')
@@ -345,6 +350,7 @@ describe('a workspace', () => {
         expect(readFileSync(join(ws, '.combwork', 'skills', 'use-cw-api', 'SKILL.md'), 'utf8')).toBe(readFileSync(join(RES, 'skills', 'use-cw-api', 'SKILL.md'), 'utf8'))
         const m = JSON.parse(readFileSync(join(ws, '.combwork', 'bundled.json'), 'utf8'))
         expect(m.skills['use-hive-api'], ws).toBeUndefined()
+  // old-name: end old-skill-retired
       } finally {
         await wsMod.disposeWorkspaceService(w)
       }

@@ -108,7 +108,7 @@ vi.mock('../src/main/tasks', () => ({
   CW_LANE_START: { kind: 'agent', name: 'Combwork' },
   getTask: async (n: number, w?: { board?: Record<number, unknown> }) => {
     state.onGetTask?.()
-    if (!w) return { number: n, key: `HI-${n}`, title: `Another workspace's card ${n}`, project: 'hive', column: 'todo', archived: false }
+    if (!w) return { number: n, key: `HI-${n}`, title: `Another workspace's card ${n}`, project: 'demo', column: 'todo', archived: false }
     if (w.board) {
       if (!w.board[n]) throw new Error(`Unknown card #${n}`)
       return w.board[n]

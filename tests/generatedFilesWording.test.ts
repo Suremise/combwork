@@ -1,4 +1,4 @@
-// The files Combwork writes into projects and workspaces say Combwork (HI-2580), and what Hive wrote in them before 1.1
+// The files Combwork writes into projects and workspaces say Combwork (HI-2580), and what 1.0 wrote in them before 1.1
 // is rewritten once by the names upgrade (HI-2587, nameUpgradeFiles.ts and nameUpgradeProjects.ts), never recognised
 // afterwards: the .combwork folder's README and .gitignore (its board lines for combwork.db too), the comments in a
 // repository's info/exclude, and each launch folder's README.txt. A file the user wrote is left byte for byte.
@@ -14,6 +14,7 @@ import { upgradedGitignore, upgradedMcpDefinition, upgradedReadme } from '../src
 import { upgradedExclude } from '../src/main/nameUpgradeProjects'
 import { EXCLUDE_COMMENT } from '../src/shared/combworkFolderMove'
 
+// old-name: begin old-generated-files
 /** Hive's .combwork/.gitignore before #1106 added the usage history's lines. */
 const OLD_GITIGNORE = "# The task board's database and what moving it from files left (added by Hive, #1017)\nhive.db\nhive.db-*\nbackups/\n"
 const USAGE = '# What each session used: the usage history (#1106)\nusage.db\nusage.db-*\n'
@@ -105,5 +106,6 @@ describe('the comments in info/exclude', () => {
     writeFileSync(exclude, "# Hive's copies of workspace skills for Codex and Copilot (added by Hive)\n/.agents/skills/hive-*/\n/.agents/skills/.hive-*/\n")
     await excludeCopies(dir)
     expect(readFileSync(exclude, 'utf8')).toContain(COPIES_EXCLUDE_COMMENT)
+// old-name: end old-generated-files
   })
 })

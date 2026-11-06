@@ -30,9 +30,11 @@ describe('the Activity tabs\' kept views (HI-2610)', () => {
 
   it('moves the views kept before 1.1 once, a view under the new key staying', () => {
     const s = memory({
+      // old-name: begin old-activity-keys
       'hive.activity.d:\\a': JSON.stringify({ tab: 'old-a' }),
       'hive.activity.workspace:d:\\ws': JSON.stringify({ forCard: 7 }),
       'hive.activity.d:\\b': JSON.stringify({ tab: 'old-b' }),
+      // old-name: end old-activity-keys
       'combwork.activity.d:\\b': JSON.stringify({ tab: 'new-b' }),
       'other.key': 'x'
     })

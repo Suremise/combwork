@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { freshReasonOf, SESSION_NAMES } from '../src/shared/sessionFresh'
 
+// old-name: begin old-folder-moves
 const moves = [{ from: 'C:\\ws\\alpha\\.hive', to: 'C:\\ws\\alpha\\.combwork' }]
 
 describe('freshReasonOf', () => {
@@ -28,5 +29,6 @@ describe('freshReasonOf', () => {
     // A sibling whose name only starts like the moved folder's.
     expect(freshReasonOf({ names: SESSION_NAMES, agentId: 'b1', cwd: 'C:\\ws\\alpha\\.hiveish' }, moves)).toBeNull()
     expect(freshReasonOf({ names: SESSION_NAMES, agentId: 'b1', cwd: 'C:\\ws\\alpha\\.hive\\x' }, [])).toBeNull()
+// old-name: end old-folder-moves
   })
 })

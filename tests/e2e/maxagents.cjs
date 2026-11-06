@@ -37,8 +37,10 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
   const soloOptions = { review: 'none', dependenciesDone: true, maxAgents: 1 }
   fs.writeFileSync(path.join(solo, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'a-s1', name: 'SO-B1', workflowRole: 'builder', provider: 'claude-code' }], workflow: { platform: 'none', preset: 'solo', options: soloOptions } }))
   // Agents per project from before HI-2001: Settings → Advanced's (advanced.json) and this workspace's own.
+  // old-name: begin old-agents-setting
   fs.writeFileSync(path.join(userData, 'advanced.json'), JSON.stringify({ format: 1, values: { 'hive.agents.perProject': 16 } }))
   fs.writeFileSync(path.join(ws, '.combwork', 'workspace.json'), JSON.stringify({ advanced: { 'hive.agents.perProject': 5 } }))
+  // old-name: end old-agents-setting
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([ws, solo, assistantHome].map((p) => p.toLowerCase())))
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')
@@ -69,7 +71,9 @@ const until = (fn) => lib.until(fn, HUNG_MS, 150)
     check("Combwork's Agents per project (16) is Maximum agents in Combwork's workflow defaults, for None and Git", !!(await until(async () => (await levelMax('global', 'none')) === 16 && (await levelMax('global', 'git')) === 16)), JSON.stringify([await levelMax('global', 'none'), await levelMax('global', 'git')]))
     check("…and the workspace's own (5) in the workspace's", (await levelMax('workspace', 'none')) === 5 && (await levelMax('workspace', 'git')) === 5, JSON.stringify([await levelMax('workspace', 'none'), await levelMax('workspace', 'git')]))
     const advancedValues = () => JSON.parse(fs.readFileSync(path.join(userData, 'advanced.json'), 'utf8')).values ?? {}
+    // old-name: begin old-agents-setting-gone
     check('…and gone from advanced.json', !!(await until(() => !('hive.agents.perProject' in advancedValues()))), JSON.stringify(advancedValues()))
+    // old-name: end old-agents-setting-gone
 
     // --- On Solo: the Assistant, through the Agent API, keeps to Maximum agents (1); so does the user (HI-2058).
     const live = async (project, agentId) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === project.toLowerCase() && s.agentId === agentId && s.status !== 'stopped') ?? null

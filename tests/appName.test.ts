@@ -34,11 +34,13 @@ describe('the app name (#443, HI-2458)', () => {
     expect(pkg.name).toBe('combwork')
   })
 
+  // old-name: begin old-profile-folders
   it("names the profile folders Combwork and Combwork-Dev (HI-2461), set in main rather than taken from productName; Hive's and Hive-Dev's only the names upgrade's input (HI-2594)", () => {
     expect(profileFolder(true)).toBe('Combwork')
     expect(profileFolder(false)).toBe('Combwork-Dev')
     expect(oldProfileFolder(true)).toBe('Hive')
     expect(oldProfileFolder(false)).toBe('Hive-Dev')
+  // old-name: end old-profile-folders
     const index = read('src/main/index.ts')
     expect(index).toContain('chooseProfile(roamingParent, oldProfileFolder(packaged), profileFolder(packaged))')
     expect(index).toContain("else chooseProfiles(app.getPath('appData'), process.env.LOCALAPPDATA || join(app.getPath('home'), 'AppData', 'Local'), app.isPackaged)")

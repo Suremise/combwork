@@ -262,8 +262,10 @@ describe('what Compare says about its measures', () => {
 })
 
 describe('Performance exports', () => {
+  // old-name: begin old-metrics-export
   it("1.0's export (hive-metrics/1) is refused, saying what it is; a benchmark under another schema id is no Combwork file (HI-2611)", () => {
-    expect(parseArtifact(exportFile({ requests: { alpha: 24 } }).replace('combwork-metrics/1', 'hive-metrics/1'), WS)).toMatchObject({ error: 'It is a Performance export from Hive 1.0, which Combwork doesn’t import. Export again from Combwork to compare.' })
+    expect(parseArtifact(exportFile({ requests: { alpha: 24 } }).replace('combwork-metrics/1', 'hive-metrics/1'), WS)).toMatchObject({ error: 'It is a Performance export from version 1.0, which Combwork doesn’t import. Export again from Combwork to compare.' })
+  // old-name: end old-metrics-export
     expect(parseArtifact(fixture('baseline').replace('combwork-benchmark/1', 'other-benchmark/1'), WS)).toMatchObject({ error: expect.stringMatching(/isn’t a Combwork benchmark/) })
   })
 

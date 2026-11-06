@@ -110,7 +110,9 @@ describe('delivery records (#647)', () => {
   })
 
   // HR1's round 1 on HI-2463: Combwork's text quotes people and agents (a relayed answer between <<< >>>, a card's latest
+  // old-name: begin old-line-prefix
   // comment, a lane's brief): never rewritten. Only a leading "[Hive] " becomes "[CW] ", and one naming an old tool or
+  // old-name: end old-line-prefix
   // command gets a note on how the names map.
   it('lists again what an earlier conversation received and never acked, once carried to a fresh one (HI-2463)', () => {
     const carried = rec({ id: 'm3', seq: 3, state: 'received', received: at, carriedFrom: 'old-conversation' })

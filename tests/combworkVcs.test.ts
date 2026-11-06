@@ -70,7 +70,9 @@ describe('.combwork kept out of version control (#345)', () => {
   it('takes an entry 1.0 wrote, before 1.1, as its own, adding nothing (HI-2575)', async () => {
     const p = folder('project')
     mkdirSync(join(p, '.git', 'info'), { recursive: true })
+    // old-name: begin old-exclude-line
     const old = '# Hive project metadata (added by Hive)\n/.combwork/\n'
+    // old-name: end old-exclude-line
     writeFileSync(join(p, '.git', 'info', 'exclude'), old)
     expect((await ensureCombworkExcluded(p))?.added).toBe(false)
     expect(readFileSync(join(p, '.git', 'info', 'exclude'), 'utf8')).toBe(old)

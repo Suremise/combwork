@@ -38,6 +38,7 @@ describe("the merge's commit message (G19)", () => {
     expect(branchMessage(['Combwork-Card: RE-229'], card.title)).toBe(card.title)
   })
 
+  // old-name: begin old-trailers
   it("HI-2588, HI-2594: Combwork writes no Hive- trailer, and reads none: a branch's commit from before 1.1 keeps its words, as any other line", () => {
     // Historical data on purpose: the trailer Hive wrote before 1.1.
     expect(branchMessage(['Fix it\n\nHive-Card: RE-229\nHive-Revision: abc\nCo-Authored-By: Someone <x@y>'], card.title)).toBe('Fix it\n\nHive-Card: RE-229\nHive-Revision: abc\nCo-Authored-By: Someone <x@y>')
@@ -46,6 +47,7 @@ describe("the merge's commit message (G19)", () => {
     for (const m of made) {
       expect(m).toMatch(/^Combwork-Card: RE-229$/m)
       expect(m).not.toMatch(/^Hive-/m)
+  // old-name: end old-trailers
     }
   })
 
@@ -94,7 +96,9 @@ describe('the merge queue writes the message the project chose (G19)', () => {
     const s = e.wf.state(c)
     expect(s.stage).toBe('done')
     expect(body(e)).toBe('CI: drop the nightly run\n\nStress tests run on manual dispatch.')
+    // old-name: begin old-trailer-none
     expect(body(e)).not.toMatch(new RegExp(`${c.key}|Combwork-|Hive-`))
+    // old-name: end old-trailer-none
     expect(parents(e)).toBe(1)
     // Attributed by the queue's own record of what it merged, not by a trailer.
     expect(s.integrated?.result).toBe(sh(e.project, 'rev-parse', 'main').trim())
@@ -109,6 +113,7 @@ describe('the merge queue writes the message the project chose (G19)', () => {
     expect(parents(e)).toBe(2)
   })
 
+  // old-name: begin old-trailer-squash
   it("HI-2594: the branch's own, squash, a commit from before 1.1 with Hive-Card: its words carried as they are, read as nothing, and the branch's commit keeps them", async () => {
     const e = merging({ style: 'squash', commitMessage: 'branch' })
     // Historical data on purpose: a branch commit with the trailer Hive wrote before 1.1.
@@ -127,6 +132,7 @@ describe('the merge queue writes the message the project chose (G19)', () => {
     expect((await e.queue().drain('main')).map((o) => o.outcome)).toEqual(['integrated'])
     expect(body(e)).toBe('Its own message')
     expect(body(e)).not.toMatch(new RegExp(`${c.key}|Combwork-|Hive-|private`))
+  // old-name: end old-trailer-squash
   })
 
   it("Combwork's, chosen: the card's key and title with its trailers, as before", async () => {

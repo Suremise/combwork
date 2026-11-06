@@ -189,7 +189,7 @@ function readCards(tasksDir) {
 function evidence({ tasksDir, cards, testRoot = runContext.TEST_ROOT, label = 'combwork-test' } = {}) {
   const load = () => {
     if (cards) return { ok: true, cards }
-    if (!tasksDir) return { ok: false, why: "no board was found (the workspace's .combwork\\hive.db or .combwork\\tasks, up from this repository's main checkout)" }
+    if (!tasksDir) return { ok: false, why: "no board was found (the workspace's board in .combwork, up from this repository's main checkout)" }
     return readCards(tasksDir)
   }
   /** Rules over one look (get: the cards, read when asked). */

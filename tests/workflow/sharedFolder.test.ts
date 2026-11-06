@@ -100,6 +100,7 @@ describe('workflow scenarios, several agents in one folder', () => {
     moved(await e.wf.submit(b.key, B2, { summary: 'B' }))
   })
 
+  // old-name: begin old-trailer
   it('HI-2588: a commit with only the Hive-Card trailer from before 1.1 names no card (two cards in the folder); Combwork-Card names it', async () => {
     const e = (env = setup({ platform: 'git' }))
     const [a, b] = ['A', 'B'].map((t) => e.wf.createCard({ title: t }))
@@ -107,6 +108,7 @@ describe('workflow scenarios, several agents in one folder', () => {
     moved(await e.wf.start(b.key, B2))
     // Historical data on purpose: the trailer Hive wrote before 1.1, which Combwork no longer reads.
     const old = commit(e.project, { 'old.txt': 'o\n' }, `from before 1.1\n\nHive-Card: ${b.key}\n`)
+  // old-name: end old-trailer
     await attributeFolder(e.wf)
     expect(e.store.folderCommits(e.project).find((x) => x.sha === old)).toMatchObject({ card: null, how: 'unattributed' })
     expect(refusedBy(await e.wf.submit(b.key, B2, { summary: 'B' }), 'submit.trailer').next).toContain(`--trailer "Combwork-Card: ${b.key}"`)

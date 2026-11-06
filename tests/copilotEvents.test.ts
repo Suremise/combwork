@@ -298,7 +298,9 @@ describe('Copilot conversation', () => {
     expect(items[0]).toMatchObject({ kind: 'user', text: 'Reply with only the word OK.', images: [] })
     expect(items[1]).toMatchObject({ kind: 'assistant', text: 'OK' })
     const mcp = items[3].kind === 'tool' ? items[3].tool : null
+    // old-name: begin recorded-copilot-call
     expect(mcp).toMatchObject({ name: 'hive · hive_ping', result: 'pong MARKER-MCP-RESULT', isError: false })
+    // old-name: end recorded-copilot-call
     const write = items[6].kind === 'tool' ? items[6].tool : null
     expect(write).toMatchObject({ name: 'Write', summary: 'hello.txt', isError: false })
     expect(write?.input).toContain('file_text: hi')
