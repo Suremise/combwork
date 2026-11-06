@@ -1,6 +1,6 @@
 // Screenshot cases for the `workspace` area (#807): the status bar's plan limits tooltip of GitHub issue #1 (hovered,
 // and under the pseudo-locale checked to read wholly translated: every line a message, no English word but the data),
-// the status bar, the Workspace Overview (and its failed refresh), the Documentation view, the built-in hive MCP
+// the status bar, the Workspace Overview (and its failed refresh), the Documentation view, the built-in Combwork MCP
 // server's page, Settings → Workspace (storage, antivirus, hidden projects), a project's Storage and Clean Up, Remove
 // Project, the update dialog and the Changes tab's Unused worktrees. Reached for the i18nshots route (#756's design,
 // section 4) with locale-independent means only: IPC failures (CW_TEST_FAIL_IPC), events sent as main sends them,

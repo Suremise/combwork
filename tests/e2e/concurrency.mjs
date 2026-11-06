@@ -72,7 +72,7 @@ const AGENT_SHELL = {
   CW_PROGRESS_DATA: join(RUN, 'leaked-progress'),
   CW_API_URL: 'http://127.0.0.1:9',
   CW_API_TOKEN: 'leaked-token',
-  CW_PROJECT: 'hive',
+  CW_PROJECT: 'app',
   CLAUDE_CONFIG_DIR: join(RUN, 'leaked-claude'),
   ELECTRON_RUN_AS_NODE: '1',
   CW_TEST_SLOW_IPC: 'tasks:list=1'
@@ -190,7 +190,7 @@ async function heavyRound(k, worktrees) {
       reports.push({ method: req.method, url: req.url, body: body ? JSON.parse(body) : {} })
       res.setHeader('Content-Type', 'application/json')
       if (req.method === 'POST' && req.url === '/v1/progress') res.end(JSON.stringify({ id: `r${reports.length}` }))
-      else if (req.method === 'GET' && req.url === '/v1/projects/hive/merge-slot') res.end(JSON.stringify({ project: 'hive', branch: 'main', holder: { kind: 'agent', name: 'HB', cards: [] }, waiting: [] }))
+      else if (req.method === 'GET' && req.url === '/v1/projects/app/merge-slot') res.end(JSON.stringify({ project: 'app', branch: 'main', holder: { kind: 'agent', name: 'HB', cards: [] }, waiting: [] }))
       else res.end('{}')
     })
   })
@@ -257,7 +257,7 @@ async function heavyRound(k, worktrees) {
 
     // The merge slot holder's run goes first (#558). The only slot is this checker's; two runs wait for it, then the
     // run of the agent that holds the merge slot (HB, says the stand-in) asks last and takes it when it is let go.
-    const single = { ...env, CW_TEST_HEAVY_SLOTS: '1', CW_PROJECT: 'hive' }
+    const single = { ...env, CW_TEST_HEAVY_SLOTS: '1', CW_PROJECT: 'app' }
     const run = (i, agent, started) => start({ name: `${agent}, worktree ${i + 1}`, cwd: worktrees[i], script: 'tests/e2e/run.mjs', args, env: { ...single, CW_AGENT: agent }, started })
     const slotFile = () => readdirSync(pool).find((f) => /^slot-\d+\.json$/.test(f))
     let gate = await trySlot(pool, { slots: 1, what: 'the checker', root })
@@ -418,7 +418,7 @@ async function packagedNothingCheck(wt) {
   const built = join(wt, 'out', 'main', 'index.js')
   check('the second worktree has no dev build yet', !existsSync(built), built)
   const work = join(RUN, 'packaged-work', 'e2e')
-  const r = await start({ name: 'packaged, nothing runnable', cwd: wt, script: 'tests/e2e/run.mjs', args: ['cardloop', 'wakepaste-codex', '--build', '--record', '--no-progress'], polluted: false, env: { CW_EXE: join(RUN, 'no-such', 'Hive.exe'), CW_E2E_DIR: work } })
+  const r = await start({ name: 'packaged, nothing runnable', cwd: wt, script: 'tests/e2e/run.mjs', args: ['cardloop', 'wakepaste-codex', '--build', '--record', '--no-progress'], polluted: false, env: { CW_EXE: join(RUN, 'no-such', 'Combwork.exe'), CW_E2E_DIR: work } })
   check(`${r.name}: fails (nothing was tested)`, r.code === 1, `exit ${r.code}\n${r.out.slice(-800)}`)
   check(`${r.name}: makes no dev build`, !/^Building \(the dev build/m.test(r.out) && !/No dev build/.test(r.out) && !existsSync(built), r.out.slice(0, 800))
   const logs = /Logs: `?([^`\r\n]+?)`?$/m.exec(r.out)?.[1]?.trim()

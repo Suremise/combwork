@@ -142,7 +142,7 @@ const captured = (trigger) => lib.until(() => capturesOf(trigger).find((c) => c.
     check('unknown on: an ordinary turn ends', !!(await prompts.say('work 1')))
     check('unknown on: a turn whose hook has a new field ends', !!(await prompts.say('newfield')))
     const unknown = await captured('unknown')
-    check('unknown on: a capture is saved, naming the field', !!unknown && unknown.header.capture.what === "hook UserPromptSubmit with fields Combwork doesn't know: hive_test_new_field", JSON.stringify(unknown?.header?.capture ?? captures().map((c) => c.header?.capture)))
+    check('unknown on: a capture is saved, naming the field', !!unknown && unknown.header.capture.what === "hook UserPromptSubmit with fields Combwork doesn't know: cw_test_new_field", JSON.stringify(unknown?.header?.capture ?? captures().map((c) => c.header?.capture)))
     // Written after any capture the ordinary turn or the repeated stop would have made.
     check("…and the ordinary turn's hooks made none (every field of the fake's is known)", capturesOf('unknown').length === 1, JSON.stringify(capturesOf('unknown').map((c) => c.header.capture.what)))
     check('the safeguard stop again at once made no second capture', capturesOf('safeguard').length === 1, JSON.stringify(captures().map((c) => c.name)))

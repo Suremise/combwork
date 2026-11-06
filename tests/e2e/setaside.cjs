@@ -1,4 +1,4 @@
-// Cards an older Hive saved after the board moved to its database (#1017's downgrade), set aside, and their review
+// Cards an older version saved after the board moved to its database (#1017's downgrade), set aside, and their review
 // (#1044, Darren's decision on #1017: the only way they reach the board): the notice offers Review…, whose dialog lists
 // each card (its old number, whether it is free, who made it, a preview); Add to Board keeps a free old number, gives a
 // taken one the next free number, with a history line by Repair; Discard… asks, then sends the file to the trash. The
@@ -35,14 +35,14 @@ const olderCard = (number, fields) =>
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)
-    // The board as 0.9 keeps it: #1 and #2, and the stub an older Hive reads.
+    // The board as 0.9 keeps it: #1 and #2, and the stub an older version reads.
     const one = await inv('tasks:create', { title: 'On the board', project: 'alpha' })
     const two = await inv('tasks:create', { title: 'Links to #1', project: 'alpha' })
     await inv('tasks:update', two.number, { links: [one.number] })
     const stub = path.join(ws, '.combwork', 'tasks')
     check('the stub is there for older versions', fs.existsSync(path.join(stub, 'board.json')))
 
-    // Another workspace meanwhile; then an older Hive saves three files in the stub: a card with a free number, one
+    // Another workspace meanwhile; then an older version saves three files in the stub: a card with a free number, one
     // whose number the board has, and a damaged one.
     await lib.openWorkspace(inv, page, other)
     const free = Number(JSON.parse(fs.readFileSync(path.join(stub, 'board.json'), 'utf8')).next)

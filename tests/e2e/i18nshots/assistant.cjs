@@ -336,7 +336,7 @@ module.exports = {
     { name: 'project-menu', open: projectMenu, close: closeMenu },
     { name: 'projects-rail', open: projectsRail, close: expandRail },
     { name: 'templates-failed', open: templatesFailed, close: retryTemplates },
-    { name: 'templates-hive', open: combworkTemplates },
+    { name: 'templates-combwork', open: combworkTemplates },
     { name: 'templates', open: templates },
     { name: 'template-editor', open: templateEditor, close: closeEditor },
     { name: 'template-load', open: templateLoad, close: cancelDialog },

@@ -13,7 +13,7 @@
 //   holds its command line's task after SessionStart until the test makes fake-launch-go-<agent> (#712: a CLI ready but
 //   not yet on its task). Each prompt sends UserPromptSubmit, is written to the transcript, "works"
 //   (1 s, or N seconds for "work N"), and ends with a reply and Stop. "newfield": its UserPromptSubmit carries a
-//   top-level field Claude Code doesn't send (hive_test_new_field: true), as a CLI update adding one would (#698). "edit <file>" first sends PreToolUse for
+//   top-level field Claude Code doesn't send (cw_test_new_field: true), as a CLI update adding one would (#698). "edit <file>" first sends PreToolUse for
 //   an Edit of that file and records the tool call. "background N" starts a background command that ends after
 //   N seconds; its task notification then starts a turn by itself, as in Claude Code. "subagent N" (once or more)
 //   launches a subagent in the background that finishes after N seconds, told the same way (#1584). "pad N" adds N KB to the
@@ -137,6 +137,7 @@ const { randomUUID } = require('crypto')
 const { spawn } = require('child_process')
 const { callOwnTool, connectOwnServer, parseToolStep, isDoorbell, doorbellIsWork, inboxRows } = require('../fake-bridge.cjs')
 const { shellStderrFile } = require('./shellStderr.cjs')
+const oldRelease = require('./oldRelease.cjs')
 
 const args = process.argv.slice(2)
 if (args[0] === '--version') {
@@ -266,14 +267,10 @@ if (!home) {
 }
 
 /**
- * A variable's 1.1 name (`CW_*`, HI-2463) given what an older Hive sets (`HIVE_*`): a 0.9 or 1.0 Hive launches this fake
- * in upgradelane (HI-2506). The launch's own environment, and its MCP server's, read either way.
+ * The launch's environment, and its MCP server's, by current names (CW_*). An old release's names are read only in
+ * old-release mode (oldRelease.cjs: upgradelane's 0.9 build, HI-2614); a current launch given them stops (below).
  */
-const cwEnv = (env) => {
-  const out = { ...env }
-  for (const [k, v] of Object.entries(env ?? {})) if (k.startsWith('HIVE_') && out[`CW_${k.slice(5)}`] === undefined) out[`CW_${k.slice(5)}`] = v
-  return out
-}
+const cwEnv = (env) => oldRelease.envOf(env)
 for (const [k, v] of Object.entries(cwEnv(process.env))) if (process.env[k] === undefined) process.env[k] = v
 
 // Options that take a value, so the first task (the last plain argument) can be told apart.
@@ -284,6 +281,20 @@ for (let i = 0; i < args.length; i++) {
   if (WITH_VALUE.has(args[i])) opts[args[i]] = args[++i]
   else if (args[i].startsWith('--')) opts[args[i]] = true
   else firstPrompt = args[i]
+}
+// A current launch given an old release's names (HI-2614) stops, naming them, so no current test passes on them.
+if (!oldRelease.on()) {
+  let servers = {}
+  try {
+    servers = opts['--mcp-config'] ? (JSON.parse(fs.readFileSync(opts['--mcp-config'], 'utf8')).mcpServers ?? {}) : {}
+  } catch {
+    servers = {}
+  }
+  const found = oldRelease.oldDialectIn(process.env, servers)
+  if (found.length) {
+    console.error(`fake-claude: a current launch with an old release's names (${found.join(', ')}); only upgradelane's old release uses them (HI-2614)`)
+    process.exit(2)
+  }
 }
 if (opts['--model'] === 'fail-start') {
   console.error("error: option '--model <model>' argument 'fail-start' is invalid.")
@@ -313,7 +324,7 @@ function runMode() {
 // Agent API token Combwork gave it.
 // A server connection's (HI-1772): its ANTHROPIC_* variables too, a dummy key among them (a disposable test log).
 // Its dialect's file (HI-2443: CW_DIALECT_FILE, CW_DIALECT), which cw-progress in its shell reads.
-const launchEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('CLAUDE_CODE_') || k.startsWith('ANTHROPIC_') || k.startsWith('HIVE_API_TOKEN') || k.startsWith('CW_API_TOKEN') || k.startsWith('CW_DIALECT') || k === 'CW_AGENT' || k === 'CLAUDE_CONFIG_DIR'))
+const launchEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('CLAUDE_CODE_') || k.startsWith('ANTHROPIC_') || k.startsWith('CW_API_TOKEN') || k.startsWith('CW_DIALECT') || k === 'CW_AGENT' || k === 'CLAUDE_CONFIG_DIR'))
 // The agent's own token, as its launch's file held it at the start (HI-2262: the session has the file, never the token
 // in its environment; read now, as the file goes when the run ends). Null without one.
 const launchToken = (() => {
@@ -623,7 +634,7 @@ async function runPrompt(text, enter = null) {
   out(BUSY)
   busyDrawn = writes
   write({ type: 'user', uuid: randomUUID(), message: { role: 'user', content: text } })
-  await hook('UserPromptSubmit', { prompt: text, ...(/\bnewfield\b/i.test(text) ? { hive_test_new_field: true } : {}) })
+  await hook('UserPromptSubmit', { prompt: text, ...(/\bnewfield\b/i.test(text) ? { cw_test_new_field: true } : {}) })
   if (/\bnetdown\b/i.test(text)) {
     const said = 'API Error: Connection refused — a firewall or proxy may be blocking it (ECONNREFUSED)'
     write({ type: 'assistant', requestId: `req_${randomUUID().slice(0, 8)}`, message: { model: '<synthetic>', content: [{ type: 'text', text: said }] }, isApiErrorMessage: true })
@@ -868,18 +879,14 @@ function readSkillRef(name, file) {
   write({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: numbered, is_error: text === null }] } })
 }
 
-/**
- * The launch's own MCP server: `combwork` (HI-2463), or `hive` as a 0.9 or 1.0 Hive names it (upgradelane runs a released
- * 0.9 Hive with this fake, HI-2506). Null with neither.
- */
+/** The launch's own MCP server, `combwork` (an old release's only in old-release mode: oldRelease.cjs). Null without one. */
 function ownServer() {
-  const servers = JSON.parse(fs.readFileSync(opts['--mcp-config'], 'utf8')).mcpServers ?? {}
-  return servers.combwork ?? servers.hive ?? null
+  return oldRelease.serverOf(JSON.parse(fs.readFileSync(opts['--mcp-config'], 'utf8')).mcpServers ?? {})
 }
 
 /** Calls a Combwork tool through the launch's own Combwork MCP server; the call and its reply go in the transcript. */
 async function ownCall(tool, input) {
-  const id = `toolu_hive_${randomUUID().slice(0, 8)}`
+  const id = `toolu_cw_${randomUUID().slice(0, 8)}`
   write({ type: 'assistant', requestId: `req_${id}`, message: { model, content: [{ type: 'tool_use', id, name: `mcp__combwork__${tool}`, input }], usage: { input_tokens: 10, output_tokens: 5 } } })
   let r
   try {

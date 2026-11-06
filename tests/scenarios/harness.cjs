@@ -170,8 +170,8 @@ function retainedObserved(observed, tokens) {
  * (a Codex code-mode script's exec_command result carries the file as `"output":"---\r\nname: x\r\n…"`), so the result
  * is also matched with escaped line breaks and quotes turned back into real ones.
  */
-/** A skill copy's folder prefix, as a pattern: cw-<name> since HI-2463, hive-<name> before, or none (HI-2560). */
-const COPY_PREFIX = '(?:hive-|cw-)?'
+/** A skill copy's folder prefix, as a pattern: cw-<name>, or none (HI-2560). */
+const COPY_PREFIX = '(?:cw-)?'
 function observeTranscript(items, skillNames, skillRefs = new Map()) {
   // `cwd`: the folder a command ran in, where its CLI recorded it apart from the command (a Codex Shell's, HI-2264).
   const tools = items.filter((x) => x.kind === 'tool').map((x) => ({ name: x.tool.name, summary: x.tool.summary, input: String(x.tool.input ?? ''), isError: x.tool.isError, result: String(x.tool.result ?? ''), ...(x.tool.cwd ? { cwd: String(x.tool.cwd) } : {}) }))

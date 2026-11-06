@@ -143,7 +143,7 @@ const check = (name, ok, extra = '') => {
     await page.keyboard.press('Control+,')
     await page.locator('.settings-nav .row', { hasText: 'Advanced' }).click()
     await page.locator('.advanced-list').waitFor({ timeout: HUNG_MS })
-    check("Advanced no longer lists the Assistant's servers' switch", (await page.locator('.advanced-row[data-advanced="hive.assistant.otherMcpServers"]').count()) === 0)
+    check("Advanced no longer lists the Assistant's servers' switch", (await page.locator('.advanced-row[data-advanced="cw.assistant.otherMcpServers"]').count()) === 0)
   } catch (e) {
     check('the suite ran to its end', false, e?.stack ?? String(e))
   } finally {

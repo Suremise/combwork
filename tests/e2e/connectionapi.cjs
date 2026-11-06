@@ -103,8 +103,8 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     await inv('session:start', alpha, { agentId: 'a-one' })
     const sessionId = await lib.until(async () => (await live(alpha, 'a-one'))?.sessionId, HUNG_MS)
     const launch = await lib.until(() => lines(path.join(accountsRoot, max1.id, 'fake-launches.jsonl')).find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
-    const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
-    const agentToken = hive ? JSON.parse(fs.readFileSync(hive.env.CW_API_TOKEN_FILE, 'utf8')).token : null
+    const server = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
+    const agentToken = server ? JSON.parse(fs.readFileSync(server.env.CW_API_TOKEN_FILE, 'utf8')).token : null
     check("One's own Agent API token found", !!agentToken)
     const mine = await api('GET', '/v1/connections?details=true', null, agentToken)
     const ids = claude(mine.body?.connections).map((c) => c.id).sort()

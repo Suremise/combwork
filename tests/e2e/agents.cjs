@@ -18,7 +18,7 @@ const setupDir = path.join(scratch, 'agents setup')
 for (const d of [userData, ws, wtRoot, setupDir]) fs.rmSync(d, { recursive: true, force: true })
 fs.mkdirSync(setupDir, { recursive: true })
 const setupScript = path.join(setupDir, 'setup.cjs')
-fs.writeFileSync(setupScript, "console.log('HIVE-SETUP-RAN ' + JSON.stringify(process.argv.slice(2)))\n")
+fs.writeFileSync(setupScript, "console.log('CW-SETUP-RAN ' + JSON.stringify(process.argv.slice(2)))\n")
 const proj = path.join(ws, 'demo')
 fs.mkdirSync(proj, { recursive: true })
 // Git in the test repository, waiting out the Combwork under test's own git (lib.git, #199).
@@ -83,12 +83,12 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   // The worktree's setup command runs first, in the agent's terminal.
   const buf3 = (await lib.until(async () => {
     const b = await inv('pty:buffer', `session:${proj.toLowerCase()}#${a3.id}`)
-    return b.includes('HIVE-SETUP-RAN') ? b : null
+    return b.includes('CW-SETUP-RAN') ? b : null
   }, 20000)) ?? (await inv('pty:buffer', `session:${proj.toLowerCase()}#${a3.id}`))
-  check('setup command ran in the agent terminal', buf3.includes('HIVE-SETUP-RAN'))
+  check('setup command ran in the agent terminal', buf3.includes('CW-SETUP-RAN'))
   // Its quoted path with a space and its quoted argument reached the program as typed (#1454).
   const flat3 = lib.plainText(buf3).replace(/[ ]+/g, '')
-  check('setup command with a quoted path ran as typed', flat3.includes('HIVE-SETUP-RAN["twowords"]'), flat3.slice(flat3.indexOf('HIVE-SETUP-RAN'), flat3.indexOf('HIVE-SETUP-RAN') + 60))
+  check('setup command with a quoted path ran as typed', flat3.includes('CW-SETUP-RAN["twowords"]'), flat3.slice(flat3.indexOf('CW-SETUP-RAN'), flat3.indexOf('CW-SETUP-RAN') + 60))
   await lib.acceptClaudeTrust(inv, proj, a3.id, 25000)
   // Both sessions up (past starting: the CLI's SessionStart arrived).
   const up = (ids) => lib.until(async () => {

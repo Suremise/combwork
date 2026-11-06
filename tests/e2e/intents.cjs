@@ -81,8 +81,8 @@ const git = (...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.n
       return launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
     }
     const tokenOf = async (id) => {
-      const hive = await combworkOf(id)
-      return hive ? JSON.parse(fs.readFileSync(hive.env.CW_API_TOKEN_FILE, 'utf8')).token : null
+      const server = await combworkOf(id)
+      return server ? JSON.parse(fs.readFileSync(server.env.CW_API_TOKEN_FILE, 'utf8')).token : null
     }
     const tokens = { builder: await tokenOf(builder.id), reviewer: await tokenOf(reviewer.id), second: await tokenOf(second.id) }
     check('each agent has its own token', !!tokens.builder && !!tokens.reviewer && !!tokens.second && new Set([tokens.builder, tokens.reviewer, tokens.second]).size === 3)

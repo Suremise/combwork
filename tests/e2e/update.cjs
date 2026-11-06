@@ -33,7 +33,7 @@ const deferred = () => {
 }
 const server = http.createServer(async (req, res) => {
   if (!release) { res.writeHead(404); return res.end('Not Found') }
-  const name = `Hive-Setup-${release.version}.exe`
+  const name = `Combwork-Setup-${release.version}.exe`
   if (req.url.startsWith('/latest.yml')) {
     const sha512 = crypto.createHash('sha512').update(release.file).digest('base64')
     res.writeHead(200, { 'Content-Type': 'text/yaml' })

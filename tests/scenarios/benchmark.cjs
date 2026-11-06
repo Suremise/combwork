@@ -182,7 +182,7 @@ function placeOf(x, reports, { before, after }) {
  * The subject apart from the other agents (HI-2186), each from its own series or log lines, never one as the total less
  * the other. `subject`: { kind: 'assistant' | 'agent', agentId, snapshots ({ before, after }: each metrics snapshot's
  * request, { start, end }), complete (the metrics' coverage was whole), roster: [{ id, name, workflowRole }], lanes (the
- * run's, for builder and reviewer) }. `observed.allCombworkCalls`, `observed.mcpLists` and `observed.mcpReports`: the hive
+ * run's, for builder and reviewer) }. `observed.allCombworkCalls`, `observed.mcpLists` and `observed.mcpReports`: Combwork's
  * servers' test log.
  *
  * The log is used only when it says, for every served call and tool list in it, on which side of each snapshot Combwork took

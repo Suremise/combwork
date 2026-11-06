@@ -118,8 +118,8 @@ async function waitFor(fn, ms = 15000) {
   r = await api('GET', '/v1/shared', { 'X-Combwork-Workspace': encodeURIComponent(wsB) })
   check('API: X-Combwork-Workspace names the workspace of a workspace-wide call', r.status === 200, JSON.stringify(r))
   // HI-2588: the header's name before 1.1 is renamed outright, not an alias: naming B with it names nothing.
-  r = await api('GET', '/v1/shared', { 'X-Hive-Workspace': encodeURIComponent(wsB) })
-  check('API: …and the old X-Hive-Workspace is not read (400, which workspace?)', r.status === 400, JSON.stringify(r))
+  r = await api('GET', '/v1/shared', { 'X-Other-Workspace': encodeURIComponent(wsB) })
+  check('API: …and a header other than X-Combwork-Workspace is not read (400, which workspace?)', r.status === 400, JSON.stringify(r))
   r = await api('GET', '/v1/shared')
   check('API: workspace-wide calls ask which workspace when several are open (400)', r.status === 400, JSON.stringify(r))
   r = await api('GET', '/v1/shared?workspace=windows-ws-b')

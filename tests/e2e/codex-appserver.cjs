@@ -181,7 +181,7 @@ async function client(port) {
       ws.send(JSON.stringify({ id, method, params }))
     })
   try {
-    await call('initialize', { clientInfo: { name: 'hive-e2e', title: 'Combwork e2e', version: '0' }, capabilities: null })
+    await call('initialize', { clientInfo: { name: 'cw-e2e', title: 'Combwork e2e', version: '0' }, capabilities: null })
   } catch (e) {
     ws.close()
     throw e
@@ -268,17 +268,17 @@ async function client(port) {
       const done = await lib.until(() => c.seen('turn/completed', () => true, n), HUNG_MS)
       const typed = c.events.slice(n).find((e) => e.method === 'item/completed' && e.params?.item?.type === 'userMessage')
       check('a typed turn comes as identified turn/started and turn/completed', !!c.seen('turn/started', () => true, n) && !!done?.params?.turn?.id, JSON.stringify({ status: done?.params?.turn?.status, events: methods(c.events.slice(n)) }))
-      check("…its user message has the TUI's own clientId", !!typed?.params?.item?.clientId && typed.params.item.clientId !== 'hive-m1', JSON.stringify(typed?.params?.item))
+      check("…its user message has the TUI's own clientId", !!typed?.params?.item?.clientId && typed.params.item.clientId !== 'cw-m1', JSON.stringify(typed?.params?.item))
       await ui.ready('after the typed turn')
       // The draft in the prompt before Combwork's turn starts (else a draft arriving late would pass without testing it).
       await ui.typeShown('DRAFT kept')
       const h1 = seenHooks.length
       const m = c.events.length
-      const started = await c.call('turn/start', { threadId, clientUserMessageId: 'hive-m1', input: text('[CW] New in your inbox: 1 message (m1). Reply with just: two') })
+      const started = await c.call('turn/start', { threadId, clientUserMessageId: 'cw-m1', input: text('[CW] New in your inbox: 1 message (m1). Reply with just: two') })
       const combworkDone = await lib.until(() => c.seen('turn/completed', (e) => e.params.turn.id === started.result?.turn?.id, m), HUNG_MS)
       const own = c.events.slice(m).find((e) => e.method === 'item/completed' && e.params?.item?.type === 'userMessage')
       check('a turn Combwork starts comes as identified turn events too, with the id turn/start answered', !!combworkDone && combworkDone.params.turn.status === 'completed', JSON.stringify(started.error ?? combworkDone?.params?.turn?.status))
-      check("…its user message has Combwork's clientUserMessageId", own?.params?.item?.clientId === 'hive-m1', JSON.stringify(own?.params?.item?.clientId))
+      check("…its user message has Combwork's clientUserMessageId", own?.params?.item?.clientId === 'cw-m1', JSON.stringify(own?.params?.item?.clientId))
       check('…the TUI shows it, and the draft the user is typing stays in its prompt', !!(await lib.until(() => /New in your inbox: 1 message \(m1\)/.test(ui.screen()) && /DRAFT kept/.test(ui.screen()), 15000)), ui.screen().split('\n').filter(Boolean).slice(-6).join(' | '))
       check("…and Combwork's hooks run for it too", !!(await lib.until(() => ['UserPromptSubmit', 'Stop'].every((h) => seenHooks.slice(h1).includes(h)), 20000)), JSON.stringify(seenHooks.slice(h1)))
       // Clear the draft (Ctrl+U), as the user would.
@@ -287,7 +287,7 @@ async function client(port) {
 
     await step('turn/interrupt', async () => {
       const n = c.events.length
-      const long = await c.call('turn/start', { threadId, clientUserMessageId: 'hive-long', input: text('Run this shell command and wait for it: Start-Sleep -Seconds 30. Then reply with just: slept') })
+      const long = await c.call('turn/start', { threadId, clientUserMessageId: 'cw-long', input: text('Run this shell command and wait for it: Start-Sleep -Seconds 30. Then reply with just: slept') })
       const id = long.result?.turn?.id
       await lib.until(() => c.seen('item/started', (e) => /command|approval/i.test(JSON.stringify(e.params?.item?.type ?? '')), n) || c.events.slice(n).find((e) => e.id !== undefined), HUNG_MS)
       const intr = await c.call('turn/interrupt', { threadId, turnId: id })
@@ -299,7 +299,7 @@ async function client(port) {
     await step('an approval request', async () => {
       await ui.ready('before the next step')
       const n = c.events.length
-      await c.call('turn/start', { threadId, clientUserMessageId: 'hive-approve', input: text('Create a file named approved.txt containing hi in the current folder with a shell command.') })
+      await c.call('turn/start', { threadId, clientUserMessageId: 'cw-approve', input: text('Create a file named approved.txt containing hi in the current folder with a shell command.') })
       const asked = await lib.until(() => c.events.slice(n).find((e) => e.id !== undefined && /requestApproval/.test(e.method)), HUNG_MS)
       check("an approval request reaches Combwork's client", !!asked, JSON.stringify(c.events.slice(n).map((e) => e.method)))
       check('…and the TUI asks it', !!(await lib.until(() => /Would you like to run|Yes, proceed/.test(ui.screen()), 20000)), ui.screen().split('\n').filter(Boolean).slice(-6).join(' | '))
@@ -316,7 +316,7 @@ async function client(port) {
       const again = await c.call('thread/resume', { threadId })
       console.log(`(rejoining: the thread is ${JSON.stringify(again.result?.thread?.status ?? again.error)})`)
       const n = c.events.length
-      const t = await c.call('turn/start', { threadId, clientUserMessageId: 'hive-again', input: text('Reply with just: rejoined') })
+      const t = await c.call('turn/start', { threadId, clientUserMessageId: 'cw-again', input: text('Reply with just: rejoined') })
       const done = await lib.until(() => c.seen('turn/completed', (e) => e.params.turn.id === t.result?.turn?.id, n), HUNG_MS)
       check('a new connection rejoins the thread and gets its turn events', !again.error && done?.params?.turn?.status === 'completed', JSON.stringify(again.error ?? t.error ?? { status: done?.params?.turn?.status, events: methods(c.events.slice(n)) }))
     })

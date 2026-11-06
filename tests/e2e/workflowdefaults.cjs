@@ -91,7 +91,7 @@ const check = (name, ok, extra = '') => {
     check('Settings → Version Control has two tabs, in order, the workspace’s named after it, Combwork defaults first chosen', !!(await lib.until(async () => JSON.stringify(await tabs()) === JSON.stringify([{ id: 'workflow.defaults', name: 'Combwork defaults', selected: true }, { id: 'workflow.workspaceDefaults', name: 'Workspace defaults (workflowdefaults-ws)', selected: false }]), HUNG_MS)), JSON.stringify(await tabs()))
     check('…the intro line above them, saying the order', (await text(group.locator(':scope > p'))).includes('A project’s own options'), await text(group.locator(':scope > p')))
     check('…and Combwork defaults shows only its own form and line', !!(await lib.until(async () => JSON.stringify(await shownParts()) === JSON.stringify({ panels: ['workflow.defaults'], levels: ['global'] }), HUNG_MS)) && (await text(group.locator('[role="tabpanel"][data-setting="workflow.defaults"] > .s-text > .s-desc').first())).startsWith('For every workspace'), JSON.stringify(await shownParts()))
-    await shots('tabs-hive', group.locator('h2'))
+    await shots('tabs-combwork', group.locator('h2'))
     // The keyboard: the selected tab is the one in the Tab order; an arrow selects and focuses the next.
     await tab('workflow.defaults').focus()
     await page.keyboard.press('ArrowRight')
@@ -175,8 +175,8 @@ const check = (name, ok, extra = '') => {
     // --- Combwork's defaults, under the workspace's: the section's other tab.
     await settingsSection('Version Control')
     check('Settings opens Version Control on the tab last chosen, Workspace defaults', !!(await lib.until(async () => (await selectedTab()) === 'workflow.workspaceDefaults', HUNG_MS)), String(await selectedTab()))
-    const hive = page.locator('.workflow-level[data-level="global"]')
-    const combworkRow = (option) => hive.locator(`.workflow-option[data-option="${option}"]`)
+    const globalLevel = page.locator('.workflow-level[data-level="global"]')
+    const combworkRow = (option) => globalLevel.locator(`.workflow-option[data-option="${option}"]`)
     // A draft in the workspace's tab (not saved) stays through switching and a save of Combwork's (HR5's HI-1768 check), its
     // tab marked meanwhile, and is discarded after.
     const unsaved = async () => group.locator('[role="tab"]').evaluateAll((els) => els.filter((e) => e.querySelector('[data-unsaved]')).map((e) => e.getAttribute('data-setting-tab')))
@@ -188,7 +188,7 @@ const check = (name, ok, extra = '') => {
     await shots('tabs-unsaved', group.locator('h2'))
     await combworkRow('dependenciesDone').locator('[role="switch"], input[type="checkbox"]').first().click()
     check('both drafts: both tabs marked', !!(await lib.until(async () => (await unsaved()).join() === 'workflow.defaults,workflow.workspaceDefaults', HUNG_MS)), JSON.stringify(await unsaved()))
-    await hive.locator('[data-action="save"]').click()
+    await globalLevel.locator('[data-action="save"]').click()
     await dialog.waitFor({ timeout: HUNG_MS })
     await dialog.getByRole('button', { name: 'Save', exact: true }).click()
     await dialog.waitFor({ state: 'detached', timeout: HUNG_MS })
@@ -206,18 +206,18 @@ const check = (name, ok, extra = '') => {
     // Maximum agents at Combwork's level (HI-2058): staged as typed, and saved in Combwork's settings, not the workspace's.
     const combworkMax = combworkRow('maxAgents').locator('input')
     await combworkMax.fill('20')
-    check('Maximum agents typed at Combwork’s level: Save lights before the box loses focus', !!(await lib.until(async () => hive.locator('[data-action="save"]').isEnabled(), HUNG_MS)))
-    await hive.locator('[data-action="save"]').click()
+    check('Maximum agents typed at Combwork’s level: Save lights before the box loses focus', !!(await lib.until(async () => globalLevel.locator('[data-action="save"]').isEnabled(), HUNG_MS)))
+    await globalLevel.locator('[data-action="save"]').click()
     await dialog.waitFor({ timeout: HUNG_MS })
     await dialog.getByRole('button', { name: 'Save', exact: true }).click()
     await dialog.waitFor({ state: 'detached', timeout: HUNG_MS })
     const combworkLevel = () => JSON.parse(fs.readFileSync(path.join(userData, 'config.json'), 'utf8')).settings?.workflow
-    check('…saved in Combwork’s settings, the workspace’s own 18 kept', !!(await lib.until(async () => combworkLevel()?.git?.maxAgents === 20, HUNG_MS)) && wsJson().workflow?.git?.maxAgents === 18, JSON.stringify({ hive: combworkLevel(), workspace: wsJson().workflow }))
-    await shots('hive', hive.locator('.workflow-level-head'))
+    check('…saved in Combwork’s settings, the workspace’s own 18 kept', !!(await lib.until(async () => combworkLevel()?.git?.maxAgents === 20, HUNG_MS)) && wsJson().workflow?.git?.maxAgents === 18, JSON.stringify({ combwork: combworkLevel(), workspace: wsJson().workflow }))
+    await shots('combwork', globalLevel.locator('.workflow-level-head'))
     // Combwork's files copied into new slots (HI-1765), with Git's options: the default, .env*, until set here.
-    const combworkCopy = hive.locator('[data-slot-default="copy"][data-level="global"]')
+    const combworkCopy = globalLevel.locator('[data-slot-default="copy"][data-level="global"]')
     check('Combwork’s level has the files copied into new slots, at the default, .env*', !!(await lib.until(async () => (await combworkCopy.locator('.workflow-origin').getAttribute('data-origin').catch(() => '')) === 'default' && (await text(combworkCopy)).includes('.env*'), HUNG_MS)), await text(combworkCopy))
-    await shots('hive-copy', combworkCopy)
+    await shots('combwork-copy', combworkCopy)
     // Changed elsewhere (the settings tool, another window) while open: the row follows (HR5's round 1), and so does the
     // workspace's, inheriting it, then its own changed elsewhere.
     const copyOf = async (l) => ({ origin: await l.locator('.workflow-origin').getAttribute('data-origin').catch(() => ''), field: await l.locator('textarea').inputValue().catch(() => ''), text: await text(l) })

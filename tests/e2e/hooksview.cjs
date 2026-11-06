@@ -138,11 +138,11 @@ const check = (name, ok, extra = '') => {
     for (const a of [cl, cx]) {
       const h = await inv('session:hooks', alpha, a.id)
       const rows = h?.listing.rows ?? []
-      const hive = rows.filter((r) => r.source === 'combwork')
+      const own = rows.filter((r) => r.source === 'combwork')
       const user = rows.filter((r) => r.source === 'user')
-      check(`${a.name}: Combwork's hooks listed as passed and observed`, hive.length >= 5 && hive.every((r) => r.status === 'passed' && r.observed) && hive.some((r) => r.event === 'PreToolUse'), JSON.stringify(hive.map((r) => [r.event, r.status])))
+      check(`${a.name}: Combwork's hooks listed as passed and observed`, own.length >= 5 && own.every((r) => r.status === 'passed' && r.observed) && own.some((r) => r.event === 'PreToolUse'), JSON.stringify(own.map((r) => [r.event, r.status])))
       check(`${a.name}: the user's hook listed, not observed by Combwork`, user.length === 1 && !user[0].observed && /user-(claude|codex)-stop/.test(user[0].command) && user[0].status === (a === cx ? 'trusted' : 'unverified'), JSON.stringify(user))
-      check(`${a.name}: no command shows Combwork's token, run id or auth file`, !rows.some((r) => /Bearer [0-9a-f]{16}|run=[0-9a-f]{6}|hook-auth/.test(r.command)), JSON.stringify(hive.map((r) => r.command)))
+      check(`${a.name}: no command shows Combwork's token, run id or auth file`, !rows.some((r) => /Bearer [0-9a-f]{16}|run=[0-9a-f]{6}|hook-auth/.test(r.command)), JSON.stringify(own.map((r) => r.command)))
       const fired = h?.fired ?? []
       check(`${a.name}: what fired has a lock block with its reason`, fired.some((f) => f.event === 'PreToolUse' && f.response === 'blocked' && /Holder is editing x.txt/.test(f.why ?? '')), JSON.stringify(fired.map((f) => [f.event, f.response, f.ledger])))
       check(`${a.name}: …and a hook the turn ledger ignored, with why, apart from Combwork's reply`, fired.some((f) => f.ledger === 'ignored' && !!f.ledgerWhy), JSON.stringify(fired.map((f) => [f.event, f.response, f.ledger, f.ledgerWhy])))

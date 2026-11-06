@@ -111,13 +111,13 @@ const starts = () => lines(started)
 
     const claudeToken = async (id) => {
       const l = await claudeLaunch(id)
-      const hive = JSON.parse(fs.readFileSync(l.opts['--mcp-config'], 'utf8')).mcpServers.combwork
-      return JSON.parse(fs.readFileSync(hive.env.CW_API_TOKEN_FILE, 'utf8')).token
+      const server = JSON.parse(fs.readFileSync(l.opts['--mcp-config'], 'utf8')).mcpServers.combwork
+      return JSON.parse(fs.readFileSync(server.env.CW_API_TOKEN_FILE, 'utf8')).token
     }
     const codexToken = async (id) => {
       const l = await codexOf(id)
-      const hive = fromCodexTable(l.args.find((a) => a.startsWith('mcp_servers.combwork=')).slice('mcp_servers.combwork='.length))
-      return JSON.parse(fs.readFileSync(hive.env.CW_API_TOKEN_FILE, 'utf8')).token
+      const server = fromCodexTable(l.args.find((a) => a.startsWith('mcp_servers.combwork=')).slice('mcp_servers.combwork='.length))
+      return JSON.parse(fs.readFileSync(server.env.CW_API_TOKEN_FILE, 'utf8')).token
     }
     const call = async (token, method, p, body) => {
       const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })

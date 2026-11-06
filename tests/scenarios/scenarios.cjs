@@ -880,7 +880,7 @@ const TODO = [
 async function todoCards(c) {
   for (const t of TODO) await c.card(t.key, { title: t.title, description: `Some background first.\n\n${'Context that only the full card has. '.repeat(8)}\n\nAcceptance: ${t.phrase}.` })
 }
-/** Every hive reply of these tools, as one text. */
+/** Every Combwork reply of these tools, as one text. */
 const replies = (o, ...tools) => tools.flatMap((t) => combworkReplies(o, t).map((x) => x.result)).join('\n')
 /** A small, harmless edit to a skill, inside the measured window (scenario beforeLaunch). */
 const editSkill = (c, name) => require('fs').appendFileSync(require('path').join(c.skillsDir, name, 'SKILL.md'), '\n<!-- edited for the skill-changed scenario -->\n')
@@ -1050,7 +1050,7 @@ const timedWaits = (c, rel) => require('../../scripts/testWaits.mjs').findWaits(
 const testsPass = (c) => require('child_process').spawnSync(process.execPath, ['--test'], { cwd: c.alpha, env: require('../e2e/runContext.cjs').baseEnv(), encoding: 'utf8', timeout: 60000 }).status === 0
 /** The tool calls that ran the test suite. */
 /** A test run through cw-progress with a title of its own (#251), not the command line by default. */
-const titled = (t) => /(?:cw|hive)-progress(\.cmd)?\s+--title(\s+|=)\S/.test(t.input)
+const titled = (t) => /cw-progress(\.cmd)?\s+--title(\s+|=)\S/.test(t.input)
 const testRuns = (o) => o.tools.filter((t) => !/^(Write|Edit|MultiEdit|Read)$/i.test(t.name) && /npm(\.cmd)? (run )?test\b|node test\.js/.test(t.input))
 /** Whether the session's contract was the one with long commands wrapped (`on`) or not, by its measured size. */
 /** How many worktrees git lists for the scenario's project (its own folder included). */
@@ -1361,7 +1361,7 @@ module.exports.SCENARIOS = [
     id: 'decision-while-waiting',
     title: "An agent that asked the user and ended its turn is told of the decision recorded for it (#401): it reads it and carries on",
     files: { 'greeting.txt': 'Hello\n' },
-    // Its card, already in Doing (as on hive-website #392: it asked part-way through the work).
+    // Its card, already in Doing (as on a website project's card: it asked part-way through the work).
     async setup(c) {
       await c.card('a', { title: 'Friendlier greeting', column: 'doing', agent: 'coder', description: 'Change greeting.txt to a friendlier greeting. The user picks it: before changing anything, ask them in your reply whether they want "Hi there!" or "Welcome back!", then end your turn and wait for their answer. Don\'t choose yourself.' })
     },
@@ -2083,7 +2083,7 @@ module.exports.SCENARIOS = [
     fake: 'work 1',
     expect: (o) => [
       ['its guidance said to run long commands through cw-progress', contractWas(o, true), String(o.measures?.coreChars)],
-      ['ran the tests through cw-progress', testRuns(o).some((t) => /(?:cw|hive)-progress/.test(t.input)), testRuns(o).map((t) => t.input).join(' | ')],
+      ['ran the tests through cw-progress', testRuns(o).some((t) => /cw-progress/.test(t.input)), testRuns(o).map((t) => t.input).join(' | ')],
       ['gave the run a title for the user (#251)', testRuns(o).some(titled), testRuns(o).map((t) => t.input).join(' | ')],
       ['changed nothing on the board', !o.combworkCalls.some((x) => /cw_(create|update|reorder)_task/.test(x.tool))]
     ],
@@ -2097,7 +2097,7 @@ module.exports.SCENARIOS = [
     fake: 'work 1',
     expect: (o) => [
       ['its guidance said to run long commands through cw-progress', contractWas(o, true), String(o.measures?.coreChars)],
-      ['ran the tests through cw-progress', testRuns(o).some((t) => /(?:cw|hive)-progress/.test(t.input)), testRuns(o).map((t) => t.input).join(' | ')],
+      ['ran the tests through cw-progress', testRuns(o).some((t) => /cw-progress/.test(t.input)), testRuns(o).map((t) => t.input).join(' | ')],
       ['gave the run a title for the user (#251)', testRuns(o).some(titled), testRuns(o).map((t) => t.input).join(' | ')]
     ],
     fakeSkips: ['ran the tests through cw-progress', 'gave the run a title for the user (#251)']
@@ -2147,7 +2147,7 @@ module.exports.SCENARIOS = [
     expect: (o) => [
       ["its guidance said to use cw-progress only when asked", contractWas(o, false), String(o.measures?.coreChars)],
       ['ran the tests', testRuns(o).length > 0],
-      ["didn't use cw-progress", !o.tools.some((t) => /(?:cw|hive)-progress/.test(t.input)), testRuns(o).map((t) => t.input).join(' | ')]
+      ["didn't use cw-progress", !o.tools.some((t) => /cw-progress/.test(t.input)), testRuns(o).map((t) => t.input).join(' | ')]
     ],
     fakeSkips: ['ran the tests']
   },
@@ -2284,9 +2284,9 @@ module.exports.SCENARIOS = [
       // A read of the whole file: the Read tool without a range, or a shell command that prints it all.
       const whole = onDoc.filter((t) => (/^Read$/i.test(t.name) ? !/\b(limit|offset)\b/.test(t.input) : /bash|shell|powershell|exec|command/i.test(t.name) && /\b(cat|type|Get-Content|gc|more|less)\b/i.test(t.input) && !/-(TotalCount|Tail|First|Head)\b|\| *(head|Select-Object|Select-String|findstr|grep)/i.test(t.input)))
       // Only part of it: the Combwork tools by section (any CLI), or a range or search (Claude Code reads lines, #817's card).
-      const hive = ran(o, 'cw_doc_outline').length + ran(o, 'cw_read_section').length
+      const parts = ran(o, 'cw_doc_outline').length + ran(o, 'cw_read_section').length
       return [
-        ['read only part of it: its outline and section, or a range', hive > 0 || (onDoc.length > 0 && whole.length === 0), `${o.combworkCalls.map((x) => x.tool).join(',')} | ${onDoc.map((t) => t.name).join(',')}`],
+        ['read only part of it: its outline and section, or a range', parts > 0 || (onDoc.length > 0 && whole.length === 0), `${o.combworkCalls.map((x) => x.tool).join(',')} | ${onDoc.map((t) => t.name).join(',')}`],
         ["didn't read the whole file", whole.length === 0, whole.map((t) => `${t.name} ${t.input.slice(0, 120)}`).join(' | ')],
         ['answered from the section (7 tries, 90 seconds)', /\b7\b|seven/i.test(o.finalReply) && /\b90\b|ninety/i.test(o.finalReply), o.finalReply.slice(0, 200)]
       ]
@@ -3272,7 +3272,7 @@ module.exports.SCENARIOS = [
       await inReview(c, false, 'greet.js returns "Hello, <name>", trimmed. Its check is node test.js.')
       c.copyLeases = new Set()
     },
-    // The review copies Combwork lends Coder while it works (a CLI may show a tool's reply only in part: Codex calls the hive
+    // The review copies Combwork lends Coder while it works (a CLI may show a tool's reply only in part: Codex calls Combwork's
     // tools from its own code tool, whose output it shortens).
     async during(c) {
       for (const v of (await c.inv('copies:list', c.alpha).catch(() => [])) ?? []) if (v.lease?.kind === 'review' && v.lease.agent === c.agents.coder.id) c.copyLeases.add(v.folder)
@@ -3352,7 +3352,7 @@ module.exports.SCENARIOS = [
     expect: (o, c) => {
       const fs = require('fs')
       const ranAt = fs.existsSync(c.checkLog) ? fs.readFileSync(c.checkLog, 'utf8').split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l)) : []
-      const isolated = runs(o, '--isolated').filter((t) => /(?:cw|hive)-progress[^\n]*--check\s+quick/.test(t.input))
+      const isolated = runs(o, '--isolated').filter((t) => /cw-progress[^\n]*--check\s+quick/.test(t.input))
       const inCopy = ranAt.filter((r) => /[\\/]copies[\\/]/i.test(r.cwd))
       // What it does is the check, not which skill it read: Claude Code found --isolated without reading work-on-card (#1444).
       return [
@@ -3735,17 +3735,17 @@ module.exports.SCENARIOS = [
     role: 'assistant',
     control: 'agents',
     async setup(c) {
-      await c.card('r', { title: 'Pick the app icon', description: 'Coder asked the user which icon to use: A (a bee), B (a honeycomb) or C (a hive cell).', agent: 'coder', column: 'doing' })
+      await c.card('r', { title: 'Pick the app icon', description: 'Coder asked the user which icon to use: A (a bee), B (a honeycomb) or C (a hexagon).', agent: 'coder', column: 'doing' })
       await c.inv('settings:update', { general: { userName: 'Darren' } })
     },
     // What Combwork types into the Assistant's card watch when the user (Settings → General → Your name: Darren) answers Coder in its pane.
-    prompt: (c) => `[CW] Darren replied to Coder on #${c.cards.r}: "C, the hive cell". Your card watch has ended: carry on (cw_read_task for the card, cw_agent_activity for the agent).`,
-    fake: (c) => `skill coordinate-agents then cw cw_update_task {"number":${c.cards.r},"decision":"The app icon is C, the hive cell."}`,
+    prompt: (c) => `[CW] Darren replied to Coder on #${c.cards.r}: "C, the hexagon". Your card watch has ended: carry on (cw_read_task for the card, cw_agent_activity for the agent).`,
+    fake: (c) => `skill coordinate-agents then cw cw_update_task {"number":${c.cards.r},"decision":"The app icon is C, the hexagon."}`,
     expect: (o, c) => {
-      const decided = ran(o, 'cw_update_task').some((x) => cardIs(o, argsOf(x).number, c.cards.r) && /hive cell|\bC\b/i.test(String(argsOf(x).decision ?? '')))
+      const decided = ran(o, 'cw_update_task').some((x) => cardIs(o, argsOf(x).number, c.cards.r) && /hexagon|\bC\b/i.test(String(argsOf(x).decision ?? '')))
       const decisions = (o.cards.r?.decisions ?? []).map((d) => d.text)
       return [
-        ["recorded the answer as the card's decision", decided && decisions.some((t) => /hive cell|\bC\b/i.test(t)), decisions.join(' | ')],
+        ["recorded the answer as the card's decision", decided && decisions.some((t) => /hexagon|\bC\b/i.test(t)), decisions.join(' | ')],
         ["didn't ask the user again", called(o, 'cw_notify').length === 0],
         ["didn't type it into Coder (it has it)", called(o, 'cw_prompt_agent').length === 0]
       ]
@@ -3803,7 +3803,7 @@ module.exports.SCENARIOS = [
       const n = await c.card('s', { title: 'Pick the app icon', description: 'The app needs an icon and its colour.', agent: 'coder', column: 'doing' })
       await c.startAgent('coder')
       c.asked = []
-      for (const text of ['Which icon: the bee, the honeycomb or the hive cell?', 'Which colour: amber or blue?']) {
+      for (const text of ['Which icon: the bee, the honeycomb or the hexagon?', 'Which colour: amber or blue?']) {
         const r = await c.as('coder', 'POST', `/v1/tasks/%23${n}/ask`, { kind: 'decide', text })
         if (r.status !== 200) throw new Error(`ask: ${JSON.stringify(r.body)}`)
       }
@@ -5295,7 +5295,7 @@ module.exports.SCENARIOS.push(
     mode: 'qa-triager',
     files: { 'banner.js': BANNER_JS },
     async setup(c) {
-      await c.card('p', { title: 'Save banner: plural for 0 cards', description: 'banner.js: plural() gives "card" for 0; use "cards" for every n but 1.', column: 'passed', agent: 'coder', comments: ['Done: plural() is n === 1 ? "" : "s" now, on branch hive/coder (not merged yet). Ready for review.', 'Review round 1: PASSED.'] })
+      await c.card('p', { title: 'Save banner: plural for 0 cards', description: 'banner.js: plural() gives "card" for 0; use "cards" for every n but 1.', column: 'passed', agent: 'coder', comments: ['Done: plural() is n === 1 ? "" : "s" now, on branch cw/coder (not merged yet). Ready for review.', 'Review round 1: PASSED.'] })
     },
     prompt: `In alpha: ${BANNER_REPORT}`,
     fake: (c) => `skill triage-report then cw cw_update_task {"number":"AL-${c.cards.p}","comment":"Reported again by the user: \\"Saved 0 card\\" after saving an empty board (a screenshot of the banner). This card's fix covers it once merged."}`,

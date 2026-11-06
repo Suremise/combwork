@@ -75,7 +75,7 @@ async function queue(ctx) {
 
 const BILLING = 'billing-portal-frontend'
 const billingDir = (ctx) => path.join(ctx.workspace, BILLING)
-const IDENTITY = { name: 'Hive Queue Test', email: 'queue@example.com' }
+const IDENTITY = { name: 'Combwork Queue Test', email: 'queue@example.com' }
 
 /** Shows a project (Focus Project, the command notifications run with its folder) and waits for its title. */
 async function showProject(ctx, dir) {

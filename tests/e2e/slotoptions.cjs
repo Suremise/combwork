@@ -196,17 +196,17 @@ function board(sql, ...args) {
     await until(async () => !('setup' in (projectJson().slots ?? {})), HUNG_MS)
     // The copied files (HI-1765): the project's own back to inherited, from Combwork's slot default (Settings → Workflow
     // defaults), then the workspace's set to none in its Workspace defaults (Settings → Version Control), over Combwork's; the project's own none over both.
-    await inv('slots:setLevelDefault', 'global', 'copy', '.env*\nconfig/hive.json')
+    await inv('slots:setLevelDefault', 'global', 'copy', '.env*\nconfig/app.json')
     const copyOrigin = slotsGroup.locator('[data-slot-option="copy"] .workflow-origin')
     await slotsGroup.locator('[data-action="inherit-copy"]').click()
-    check('the copied files inherit Combwork’s slot default, From Combwork defaults', !!(await until(async () => !('copy' in (projectJson().slots ?? {})) && (await copyOrigin.getAttribute('data-origin')) === 'global' && (await copyOrigin.innerText()).includes('config/hive.json'), HUNG_MS)), `${JSON.stringify(projectJson().slots)} ${await copyOrigin.innerText().catch(() => '')}`)
+    check('the copied files inherit Combwork’s slot default, From Combwork defaults', !!(await until(async () => !('copy' in (projectJson().slots ?? {})) && (await copyOrigin.getAttribute('data-origin')) === 'global' && (await copyOrigin.innerText()).includes('config/app.json'), HUNG_MS)), `${JSON.stringify(projectJson().slots)} ${await copyOrigin.innerText().catch(() => '')}`)
     await shot('copy-global', slotsGroup.locator('[data-slot-option="copy"]'))
     await page.keyboard.press('Control+,')
     // The workspace's part of Settings → Version Control (HI-1768), its own tab since HI-1837.
     await page.locator('.settings-nav .row', { hasText: 'Version Control' }).first().click()
     await page.locator('[role="tab"][data-setting-tab="workflow.workspaceDefaults"]').click()
     const wsCopy = page.locator('[data-slot-default="copy"][data-level="workspace"]')
-    check('Settings → Version Control’s Workspace defaults have the copied files, inheriting Combwork’s', !!(await until(async () => (await wsCopy.locator('.workflow-origin').getAttribute('data-origin').catch(() => '')) === 'global' && (await wsCopy.innerText()).includes('config/hive.json'), HUNG_MS)), await wsCopy.innerText().catch(() => ''))
+    check('Settings → Version Control’s Workspace defaults have the copied files, inheriting Combwork’s', !!(await until(async () => (await wsCopy.locator('.workflow-origin').getAttribute('data-origin').catch(() => '')) === 'global' && (await wsCopy.innerText()).includes('config/app.json'), HUNG_MS)), await wsCopy.innerText().catch(() => ''))
     const wsJson = () => JSON.parse(fs.readFileSync(path.join(fx.ws, '.combwork', 'workspace.json'), 'utf8'))
     await wsCopy.locator('[data-action="none-copy"]').click()
     check('…set to none there, saved in workspace.json', !!(await until(async () => wsJson().slotDefaults?.copy === '' && (await wsCopy.locator('.workflow-origin').getAttribute('data-origin')) === 'none', HUNG_MS)), JSON.stringify(wsJson().slotDefaults))

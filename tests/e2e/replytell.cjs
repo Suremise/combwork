@@ -89,7 +89,7 @@ const check = (name, ok, extra = '') => {
 
   // The Assistant watches the card; the user types in Builder's pane without sending: nothing.
   check("the Assistant watches the Builder's card", !!(await watchCard()))
-  await type(alpha, builder.id, 'C, the hive', false)
+  await type(alpha, builder.id, 'C, the corner', false)
   await lib.sleep(2500) // A fixed wait on purpose: this checks that keystrokes without Enter tell nothing.
   check('keystrokes without Enter: no wake', wakes().length === 0, JSON.stringify(wakes()))
   // The user sends the answer: one wake, with its first line, naming the agent and the card.
@@ -97,7 +97,7 @@ const check = (name, ok, extra = '') => {
   check('the reply wakes the Assistant', !!(await until(async () => wakes().length >= 1, 20000)))
   await lib.sleep(2000) // A fixed wait on purpose: this checks that a second line does NOT come.
   const w1 = wakes()
-  check('…once, with the reply, the agent and the card', w1.length === 1 && w1[0].startsWith(`[CW] User replied to Builder on ${named}: "C, the hive cell"`), JSON.stringify(w1))
+  check('…once, with the reply, the agent and the card', w1.length === 1 && w1[0].startsWith(`[CW] User replied to Builder on ${named}: "C, the corner cell"`), JSON.stringify(w1))
   await until(async () => (await idle(home, 'assistant')) && (await idle(alpha, builder.id)), 20000)
 
   // A line Combwork types into Builder (a task the Assistant gives it, then watches its card) isn't the user's.

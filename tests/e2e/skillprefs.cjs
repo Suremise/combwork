@@ -25,7 +25,7 @@ const skillsTab = async (page, name) => {
   await lib.openMoreTab(page, 'Skills')
   const pick = page.locator('.skill-provider-pick select')
   await lib.until(async () => (await pick.count()) === 1, 10000)
-  return { pick, hive: page.locator('.skill-group-toggle', { hasText: 'Combwork' }).first(), provider: page.locator('.skill-provider-toggle') }
+  return { pick, combwork: page.locator('.skill-group-toggle', { hasText: 'Combwork' }).first(), provider: page.locator('.skill-provider-toggle') }
 }
 
 ;(async () => {
@@ -52,7 +52,7 @@ const skillsTab = async (page, name) => {
 
   const a = await skillsTab(page, 'alpha')
   await a.pick.selectOption('codex')
-  await a.hive.click()
+  await a.combwork.click()
   const b = await skillsTab(page2, 'beta')
   await b.provider.click()
   const [ka, kb] = [alpha.toLowerCase(), beta.toLowerCase()]
@@ -82,7 +82,7 @@ const skillsTab = async (page, name) => {
   for (const w of app.windows().slice(1)) await w.close().catch(() => undefined)
   await lib.openWorkspace(inv, page, wsA)
   const a2 = await skillsTab(page, 'alpha')
-  check('restarted: alpha shows Codex, Combwork’s skills folded', (await a2.pick.inputValue()) === 'codex' && (await a2.hive.getAttribute('aria-expanded')) === 'false', JSON.stringify({ pick: await a2.pick.inputValue(), hive: await a2.hive.getAttribute('aria-expanded') }))
+  check('restarted: alpha shows Codex, Combwork’s skills folded', (await a2.pick.inputValue()) === 'codex' && (await a2.combwork.getAttribute('aria-expanded')) === 'false', JSON.stringify({ pick: await a2.pick.inputValue(), combwork: await a2.combwork.getAttribute('aria-expanded') }))
   await lib.openWorkspace(inv, page, wsB)
   const b2 = await skillsTab(page, 'beta')
   check('restarted: beta shows Claude Code, its skills open', (await b2.pick.inputValue()) === 'claude-code' && (await b2.provider.getAttribute('aria-expanded')) === 'true', JSON.stringify({ pick: await b2.pick.inputValue(), provider: await b2.provider.getAttribute('aria-expanded') }))

@@ -79,7 +79,7 @@ async function advancedTab(ctx, group) {
  */
 async function advancedNotes(ctx) {
   const { page } = ctx
-  fs.writeFileSync(await advancedFile(ctx), `${JSON.stringify({ format: 1, values: { 'cw.mcp.replySeconds': 5, 'codex.ready.placeholder': 'zzz nothing like it', 'hive.not.a.value': 1 }, madeFor: {} }, null, 2)}\n`)
+  fs.writeFileSync(await advancedFile(ctx), `${JSON.stringify({ format: 1, values: { 'cw.mcp.replySeconds': 5, 'codex.ready.placeholder': 'zzz nothing like it', 'cw.not.a.value': 1 }, madeFor: {} }, null, 2)}\n`)
   await openSection(ctx, 'advanced')
   await advancedTab(ctx, 'cw')
   await shown(ctx, page.locator('.advanced-row.invalid[data-advanced="cw.mcp.replySeconds"]'), 'the value that is not valid')

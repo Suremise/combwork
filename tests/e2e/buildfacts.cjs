@@ -14,7 +14,7 @@ const HUNG_MS = 10000
 const PORT = Number(lib.port(47938))
 const userData = path.join(lib.WORK, 'buildfacts-profile')
 const ws = path.join(lib.WORK, 'buildfacts-ws')
-const repo = path.join(ws, 'hive')
+const repo = path.join(ws, 'app')
 const markers = path.join(ws, '.combwork', 'builds')
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -28,7 +28,7 @@ const check = (name, ok, extra = '') => {
  */
 function fakeBuild(api) {
   const src = `import { recordDist } from ${JSON.stringify(pathToFileURL(path.join(lib.ROOT, 'scripts', 'buildFact.mjs')).href)}
-const line = await recordDist({ root: ${JSON.stringify(repo)}, lines: [${JSON.stringify(`Installer: ${path.join(repo, 'dist', 'Hive-Setup-9.9.9-rc.1.exe')}`)}], kind: 'baseline' })
+const line = await recordDist({ root: ${JSON.stringify(repo)}, lines: [${JSON.stringify(`Installer: ${path.join(repo, 'dist', 'Combwork-Setup-9.9.9-rc.1.exe')}`)}], kind: 'baseline' })
 console.log(line ?? 'nothing recorded')`
   const env = { ...lib.baseEnv(), CW_WORKSPACE: ws, ...(api ? { CW_API_URL: api.url, CW_API_TOKEN_FILE: lib.tokenFile(api.token) } : {}) }
   return execFileSync(process.execPath, ['--input-type=module', '-e', src], { cwd: lib.ROOT, env, encoding: 'utf8' }).trim()
@@ -62,7 +62,7 @@ const builds = async (inv) => (await inv('journal:browse', { source: 'combwork' 
     check('the journal has it as a fact by Combwork', !!rows && rows[0].summary === `Built Combwork 9.9.9-rc.1 (baseline) from ${head().slice(0, 8)} on main` && rows[0].source === 'combwork', JSON.stringify(rows))
     check('…with no marker left', !fs.existsSync(markers) || fs.readdirSync(markers).length === 0)
     const entry = rows ? await inv('journal:entry', rows[0].id) : null
-    check("its detail names the installer, and it links the commit", !!entry && entry.detail.includes('Hive-Setup-9.9.9-rc.1.exe') && entry.links.some((l) => l.type === 'commit' && l.ref === head()), JSON.stringify(entry))
+    check("its detail names the installer, and it links the commit", !!entry && entry.detail.includes('Combwork-Setup-9.9.9-rc.1.exe') && entry.links.some((l) => l.type === 'commit' && l.ref === head()), JSON.stringify(entry))
 
     // The Assistant view's Journal shows it, marked as Combwork's.
     await page.locator('.activity-btn[aria-label="Assistant"]').click()
@@ -99,7 +99,7 @@ const builds = async (inv) => (await inv('journal:browse', { source: 'combwork' 
     check('in German, Journal → Timeline shows both builds in German', !!(await lib.until(async () => (await german.count()) === 2, HUNG_MS)), await page.locator('.journal').innerText().catch(() => ''))
     await german.first().locator('.journal-row-main').click()
     const detail = page.locator('.journal-entry .journal-detail')
-    check("…and the entry's detail too", !!(await lib.until(async () => /^Installer: .*Hive-Setup-9\.9\.9-rc\.1\.exe\s+Gebaut: /.test(await detail.innerText().catch(() => '')), HUNG_MS)), await detail.innerText().catch(() => ''))
+    check("…and the entry's detail too", !!(await lib.until(async () => /^Installer: .*Combwork-Setup-9\.9\.9-rc\.1\.exe\s+Gebaut: /.test(await detail.innerText().catch(() => '')), HUNG_MS)), await detail.innerText().catch(() => ''))
     await page.screenshot({ path: path.join(lib.WORK, 'buildfacts-journal-de.png') })
   } catch (e) {
     check('no unexpected error', false, e.stack)

@@ -279,7 +279,7 @@ const pids = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim
         const now = receipt()
         return now?.state === 'live' && now.total === 1 && now.members?.[0]?.pid === pid ? now : null
       }, HUNG_MS)
-      check(`${part}: its keeper outlives it and writes "live", only the broker, as that helper for the gone Combwork`, !!r && r.helper === helper && r.hive === `${row?.pid}:${row?.started}` && r.members[0].created === member?.created && lib.identify([helperPid]).length === 1, JSON.stringify(receipt()))
+      check(`${part}: its keeper outlives it and writes "live", only the broker, as that helper for the gone Combwork`, !!r && r.helper === helper && r.app === `${row?.pid}:${row?.started}` && r.members[0].created === member?.created && lib.identify([helperPid]).length === 1, JSON.stringify(receipt()))
       return { pid, keeper }
     }
 

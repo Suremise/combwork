@@ -145,13 +145,13 @@ const PLAN = (copy) => `# Plan (${copy})\n\nIntro.\n\n## Core contracts\n\nThe c
     check('a project file with no project and no agent: project is required', r.status === 400 && /project is required/.test(r.body.error), JSON.stringify(r))
     // A junction inside the project into its .combwork (#817 round 2): refused by where it leads, not only by its name.
     fs.mkdirSync(path.join(alpha, '.combwork', 'private'), { recursive: true })
-    fs.writeFileSync(path.join(alpha, '.combwork', 'private', 'SECRET.md'), '# Private\n\nHIVE SECRET\n')
+    fs.writeFileSync(path.join(alpha, '.combwork', 'private', 'SECRET.md'), '# Private\n\nCW SECRET\n')
     fs.symlinkSync(path.join(alpha, '.combwork', 'private'), path.join(alpha, 'alias'), 'junction')
     fs.symlinkSync(path.join(alpha, '.git'), path.join(alpha, 'git-alias'), 'junction')
     fs.writeFileSync(path.join(alpha, '.git', 'NOTE.md'), '# Git\n\nGIT SECRET\n')
     for (const p of ['alias/SECRET.md', 'git-alias/NOTE.md', '.combwork/private/SECRET.md']) {
       r = await section(workspaceToken, { path: p, heading: '#private', project: 'alpha' })
-      check(`a path into .combwork or .git by another name (${p}): refused, nothing read`, r.status === 400 && !/(HIVE|GIT) SECRET/.test(JSON.stringify(r.body)), JSON.stringify(r))
+      check(`a path into .combwork or .git by another name (${p}): refused, nothing read`, r.status === 400 && !/(CW|GIT) SECRET/.test(JSON.stringify(r.body)), JSON.stringify(r))
     }
     const note = '# Design\n\n## Extraction lanes\n\nLanes.\n\n## Review\n\nReview.\n'
     await fetch(`http://127.0.0.1:${PORT}/v1/shared/file?path=${encodeURIComponent('plans/design.md')}`, { method: 'PUT', headers: { Authorization: `Bearer ${workspaceToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ content: note }) })

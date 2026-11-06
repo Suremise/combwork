@@ -96,7 +96,7 @@ const OWN = /\b(?:its|your|their|an agent's) (?:own )?(?:git )?worktree\b|\bown 
         return ['ready', 'finished'].includes(s?.status) ? s : null
       }, HUNG_MS)
     const claudeLaunches = () => lines(path.join(claudeHome, 'fake-launches.jsonl'))
-    /** The hive server a Claude Code agent's running session was given (its --mcp-config). */
+    /** Combwork's server a Claude Code agent's running session was given (its --mcp-config). */
     const serverOf = async (id) => {
       const sessionId = (await live(id))?.sessionId
       const launch = await until(() => claudeLaunches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
@@ -137,7 +137,7 @@ const OWN = /\b(?:its|your|their|an agent's) (?:own )?(?:git )?worktree\b|\bown 
     check("B1's work-on-card has the slot lines (work and check in the slot; --isolated)", SLOT_LINE.test(work1) && ISOLATED.test(work1), work1.slice(0, 200))
     const b1Server = await serverOf(b1.id)
     const told1 = instructionsOf(b1Server)
-    check("…and its hive server's instructions the contract's slot line", CONTRACT.test(told1), told1.slice(0, 300))
+    check("…and its Combwork server's instructions the contract's slot line", CONTRACT.test(told1), told1.slice(0, 300))
     delivered.push(['B1 work-on-card', work1], ['B1 card-loop', pluginSkill(b1.id, 'card-loop')], ['B1 merge-ready', pluginSkill(b1.id, 'merge-ready')], ['B1 contract', told1])
 
     // B1's work in the slot, submitted, for R1's review.

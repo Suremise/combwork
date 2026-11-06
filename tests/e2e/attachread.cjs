@@ -2,7 +2,7 @@
 // read HI-1702's evidence: the document tools refuse .combwork, and it rightly didn't go round Combwork to the files). A fake
 // Claude Code builder (B1) attaches a probe, its results (over a page long, a character of several bytes at the page's
 // end) and a screenshot to its card, and submits; a fake Codex reviewer (R1) and a fake Claude Code one (E1, either) each
-// start a review, which leases each a review copy, and call cw_read_attachment through their launch's own hive MCP
+// start a review, which leases each a review copy, and call cw_read_attachment through their launch's own Combwork MCP
 // server: the probe whole, the results in pages from the offset each reply names (from 0 to its size), the screenshot by
 // its path. An agent of another project (X in beta) asking for the same card is told there is no such card. Dev build,
 // throwaway profile, workspace, CLAUDE_CONFIG_DIR and CODEX_HOME.
@@ -80,7 +80,7 @@ const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0
     for (const [p, a] of [[alpha, b1], [alpha, r1], [alpha, e1], [beta, x]]) await inv('session:start', p, { agentId: a.id })
     check('the agents start', !!(await ready(alpha, b1.id)) && !!(await ready(alpha, r1.id)) && !!(await ready(alpha, e1.id)) && !!(await ready(beta, x.id)))
 
-    // The hive API as B1 (its token, from its launch's combwork server), to build and attach as a builder does.
+    // Combwork's API as B1 (its token, from its launch's combwork server), to build and attach as a builder does.
     const lines = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l)) : [])
     const b1Launch = await until(async () => {
       const sid = (await live(alpha, b1.id))?.sessionId

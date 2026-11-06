@@ -212,7 +212,7 @@ function writeProject(dir, cfg) {
     const initDialog = page.locator('.dialog').filter({ has: page.locator('[data-git-init-form]') })
     await until(async () => (await initDialog.count()) === 1, HUNG_MS)
     await initDialog.locator('#git-init-gitignore').selectOption('none').catch(() => undefined)
-    if (await initDialog.locator('#git-init-name').count()) await initDialog.locator('#git-init-name').fill('Hive Test')
+    if (await initDialog.locator('#git-init-name').count()) await initDialog.locator('#git-init-name').fill('Combwork Test')
     if (await initDialog.locator('#git-init-email').count()) await initDialog.locator('#git-init-email').fill('test@example.com')
     await initDialog.getByRole('button', { name: 'Initialise', exact: true }).click()
     check('initialised, the switch to Git warns first: the running lane and the card in flight keep their rules', !!(await until(async () => {

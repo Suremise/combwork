@@ -36,9 +36,9 @@ const LABELS = ['On Hold', 'Todo', 'Active', 'Review', 'Approved', 'Done']
   page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.fitWindow(app, page, { width: 1500, height: 800 })
   await lib.appReady(page)
-  // HI-2588: the preload bridge is window.combwork, renamed outright: window.hive is gone.
-  const bridge = await page.evaluate(() => ({ combwork: typeof window.combwork?.invoke, hive: typeof window.hive }))
-  check('the preload bridge is window.combwork, and window.hive is not there', bridge.combwork === 'function' && bridge.hive === 'undefined', JSON.stringify(bridge))
+  // HI-2588: the preload bridge is window.combwork, and no other global offers Combwork's invoke.
+  const bridge = await page.evaluate(() => ({ combwork: typeof window.combwork?.invoke, others: Object.keys(window).filter((k) => k !== 'combwork' && typeof window[k]?.invoke === 'function' && typeof window[k]?.on === 'function') }))
+  check('the preload bridge is window.combwork, and no other global is one', bridge.combwork === 'function' && bridge.others.length === 0, JSON.stringify(bridge))
   let inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
   await lib.openWorkspace(inv, page, ws)
   const until = (fn, ms = 10000) => lib.until(fn, ms)

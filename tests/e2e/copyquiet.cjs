@@ -65,8 +65,8 @@ const lines = (file) => {
     const token = async (id) => {
       const sessionId = (await live(id))?.sessionId
       const l = await until(() => lines(path.join(home, 'fake-launches.jsonl')).findLast((x) => x.sessionId === sessionId && x.opts['--mcp-config']), HUNG_MS)
-      const hive = JSON.parse(fs.readFileSync(l.opts['--mcp-config'], 'utf8')).mcpServers.combwork
-      return JSON.parse(fs.readFileSync(hive.env.CW_API_TOKEN_FILE, 'utf8')).token
+      const server = JSON.parse(fs.readFileSync(l.opts['--mcp-config'], 'utf8')).mcpServers.combwork
+      return JSON.parse(fs.readFileSync(server.env.CW_API_TOKEN_FILE, 'utf8')).token
     }
     const call = async (t, method, p, body) => {
       const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { method, headers: { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })

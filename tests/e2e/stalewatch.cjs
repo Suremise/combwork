@@ -23,7 +23,7 @@ const beta = path.join(ws, 'beta')
 const slotA = path.join(`${ws}.worktrees`, 'alpha', 'slot-a')
 const slotB = path.join(`${ws}.worktrees`, 'alpha', 'slot-b')
 const PORT = Number(lib.port(47707))
-const identity = { name: 'Hive Stale Watch Test', email: 'stalewatch@example.com' }
+const identity = { name: 'Combwork Stale Watch Test', email: 'stalewatch@example.com' }
 let failed = 0
 const check = (name, ok, extra = '') => {
   lib.checked(ok)

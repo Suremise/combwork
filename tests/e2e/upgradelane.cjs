@@ -102,7 +102,8 @@ function driver(app, page) {
   fs.mkdirSync(devProfile, { recursive: true })
   fs.mkdirSync(oldProfile, { recursive: true })
   lib.fakeClaude(devProfile, spareHome)
-  const claude = lib.fakeClaude(oldProfile, claudeHome, [alpha])
+  // The 0.9 build's profile alone runs the fake in old-release mode (its names before 1.1: oldRelease.cjs, HI-2614).
+  const claude = lib.fakeClaude(oldProfile, claudeHome, [alpha], { oldRelease: true })
   // Closing a Combwork with agents running asks first: not here (cardloop's set-up).
   for (const profile of [devProfile, oldProfile]) {
     const file = path.join(profile, 'config.json')

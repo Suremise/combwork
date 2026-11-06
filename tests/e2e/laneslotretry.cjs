@@ -38,7 +38,7 @@ const shots = at('shots')
 const alpha = path.join(ws, 'alpha')
 const slotA = path.join(`${ws}.worktrees`, 'alpha', 'slot-a')
 const PORT = Number(lib.port(47790))
-const identity = { name: 'Hive Slot Retry Test', email: 'slotretry@example.com' }
+const identity = { name: 'Combwork Slot Retry Test', email: 'slotretry@example.com' }
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++

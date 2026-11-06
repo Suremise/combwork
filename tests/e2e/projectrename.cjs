@@ -1,7 +1,7 @@
 // A project folder renamed (#508): cards name their project by its stable id, so they follow it. Before: alpha with an
 // agent (Builder) and three of its cards (Doing, Todo, archived), and two archived cards saved before projects had ids
 // under "old-site", a project renamed to site since (its agent Claude was removed, but its sessions are site's: as the
-// nine hive-website cards were after website's rename on 10 Oct). Combwork is closed, alpha renamed to gamma, Combwork opened
+// nine of a project's cards were after website's rename on 10 Oct). Combwork is closed, alpha renamed to gamma, Combwork opened
 // again: the cards are gamma's at once, with Builder (not "(removed)"), archived ones too; the banner offers Repair…,
 // whose plan gives old-site's cards to site; Repair does it, once, and the banner goes. Then a project renamed while
 // Combwork runs: its card follows it. Screenshots of the board, the Repair dialog and the archive in both themes. Dev build,

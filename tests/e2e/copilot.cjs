@@ -1,7 +1,7 @@
 // Combwork running GitHub Copilot agents end to end with the real Copilot CLI, offline, against the scripted stand-in model
 // (fake-copilot-api.cjs: BYOK with COPILOT_OFFLINE, no sign-in, no credits). Two agents in a quiet test copy, A in Ask
 // and B in Copilot's default, Accept edits: the folder trust question, statuses from Copilot's hooks (working, a
-// permission dialog, a question, finished), a file lock that refuses the other agent's edit, the hive MCP tools and edits
+// permission dialog, a question, finished), a file lock that refuses the other agent's edit, Combwork's MCP tools and edits
 // in B's folder with no prompt (an edit outside it still asks), a prompt queued while B works, a workspace skill through
 // Copilot's skill tool, Shift+Tab to Plan and back, Esc on a dialog ending the turn (the transcript's abort), the
 // Sessions tab's transcript and usage, and resume. Copilot runs in a home of the suite's own, with a fake profile folder and the GitHub CLI's login hidden
@@ -157,17 +157,17 @@ const check = (name, ok, extra = '') => {
     check('a.ts edited by A', fs.readFileSync(path.join(proj, 'a.ts'), 'utf8').includes('probed'))
     check('A: lets a.ts go at the end of its turn', !((await live(a.id))?.lockedFiles ?? []).length, JSON.stringify((await live(a.id))?.lockedFiles))
 
-    // B: a Combwork tool, with no prompt in any mode (--allow-tool=hive, #468): it reaches Combwork's Agent API.
+    // B: a Combwork tool, with no prompt in any mode (--allow-tool=combwork, #468): it reaches Combwork's Agent API.
     check('B: starts in Accept edits, Copilot’s default', (await live(b.id))?.permissionMode === 'accept-edits', (await live(b.id))?.permissionMode)
     await send(b.id, 'cw cw_list_projects then say Listed.', ['working', 'waiting'])
     const combworkTurn = await timeline(b.id)
-    check('B: a hive tool runs without asking, and the turn finishes', combworkTurn.finished && !combworkTurn.asked, combworkTurn.seen.join(' → '))
+    check('B: a Combwork tool runs without asking, and the turn finishes', combworkTurn.finished && !combworkTurn.asked, combworkTurn.seen.join(' → '))
     check('B: …no tool dialog on its screen', !/Do you want to use this tool\?/.test(await screen(b.id)))
     const listed = fs.readFileSync(apiLog, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l))
     check('Copilot offered the Combwork tools, named combwork-<tool>', listed.some((r) => (r.tools ?? []).includes('combwork-cw_list_projects')), JSON.stringify(listed[0]?.tools ?? []))
     check("Combwork's guidance reached Copilot's system prompt (the combwork server's instructions)", listed.some((r) => /use the Combwork tools/i.test(r.system ?? '')))
     const bScreen = await screen(b.id)
-    check('B: the hive tool ran, and not refused', /cw_list_projects/.test(bScreen) && !/✗\s*cw_list_projects/.test(bScreen), bScreen.split('\n').filter((l) => /cw_list_projects/.test(l)).join(' | '))
+    check('B: the Combwork tool ran, and not refused', /cw_list_projects/.test(bScreen) && !/✗\s*cw_list_projects/.test(bScreen), bScreen.split('\n').filter((l) => /cw_list_projects/.test(l)).join(' | '))
 
     // B: Accept edits approves an edit in its folder (--allow-tool=write(<folder>/**)), and a new file in it.
     await send(b.id, 'edit README.md demo edited-by-b then write notes.txt from B then say Edited.', ['working', 'waiting'])
