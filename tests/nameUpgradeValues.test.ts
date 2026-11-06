@@ -132,7 +132,7 @@ describe("the names upgrade's stored values (HI-2598)", () => {
     const file = join(base, `export${++n}.combwork-template.json`)
     const t = template('hiveMerges') as Record<string, unknown>
     json(file, { ...t, workflow: { git: { preset: null, options: { finish: 'hiveMerges', folder: 'slots' } } } })
-    await expect(readImport(file)).rejects.toThrow(/exported from Hive 1\.0, whose workflow settings Combwork doesn't import/)
+    await expect(readImport(file)).rejects.toThrow(/exported from version 1\.0, whose workflow settings Combwork doesn't import/)
     const now = join(base, `export${++n}.combwork-template.json`)
     json(now, { ...t, workflow: { git: { preset: null, options: { finish: 'combworkMerges', folder: 'slots' } } } })
     expect((await readImport(now)).workflow?.git?.options).toEqual({ finish: 'combworkMerges', folder: 'slots' })

@@ -122,7 +122,7 @@ describe('a conversation from before the rename (HI-2463)', () => {
       // The record keeps the folder it ran in: Claude Code files its transcript by that, so it stays readable.
       expect((await run(() => ws.sessionRecord(project, '00000000-0000-4000-8000-000000000006')))?.cwd).toBe(slot)
       await vi.runAllTimersAsync()
-      expect(told.toasts.map((t) => t.body)).toEqual([expect.stringMatching(/^1 conversation started fresh: its folder moved with \.hive to \.combwork/)])
+      expect(told.toasts.map((t) => t.body)).toEqual([expect.stringMatching(/^1 conversation started fresh: its folder moved to \.combwork with the old data folders/)])
     } finally {
       vi.useRealTimers()
     }

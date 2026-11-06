@@ -478,7 +478,7 @@ describe('while the upgrade waits, nothing needing combwork.db starts or writes 
     const ws = await board09()
     const w = await open(ws)
     expect(inWorkspace(w, () => store.upgradeWaiting(ws))).toBe(true)
-    await expect(inWorkspace(w, () => sessions.start(join(ws, 'p'), { agentId: 'a1' }))).rejects.toThrow('This workspace is from Hive 0.9: upgrade it to 1.0 before starting agents')
+    await expect(inWorkspace(w, () => sessions.start(join(ws, 'p'), { agentId: 'a1' }))).rejects.toThrow('This workspace is from version 0.9: upgrade it to 1.0 before starting agents')
     expect(sessions.agentsIn(ws)).toBe(0)
     // The Assistant's home is in the workspace: refused the same way.
     await expect(inWorkspace(w, () => sessions.start(join(ws, '.combwork', 'assistant'), { agentId: 'assistant' }))).rejects.toThrow('upgrade it to 1.0 before starting agents')
