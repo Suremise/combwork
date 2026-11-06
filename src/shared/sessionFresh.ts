@@ -11,7 +11,7 @@ export const SESSION_NAMES = 2 as const
 /**
  * Why a conversation starts fresh:
  * - `renamed`: launched by Combwork before HI-2463, it remembers the old names of the tools agents use.
- * - `moved` (HI-2462): it ran in a folder inside a `.hive` that moved to `.combwork`.
+ * - `moved` (HI-2462): it ran in a folder inside a pre-1.1 data folder that moved to `.combwork`.
  */
 export type FreshReason = 'renamed' | 'moved'
 

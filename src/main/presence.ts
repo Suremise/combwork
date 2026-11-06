@@ -6,7 +6,7 @@ import { basename, join } from 'path'
  * The workspace presence marker (#1207, SPEC §16.17): from 1.0 every Combwork with a workspace open keeps
  * `.combwork/open/<profile>.json` (its pid and a heartbeat), removed as it closes. A marker whose heartbeat is older than
  * STALE_MS, or whose process is gone, is stale (a Combwork that crashed). Migrations and the merge queue's lock read it as a
- * second sign that another Combwork has the workspace open, beside SQLite's lock (a 0.9 Hive writes none).
+ * second sign that another Combwork has the workspace open, beside SQLite's lock (a 0.9 build writes none).
  */
 
 export const PRESENCE_DIR = 'open'

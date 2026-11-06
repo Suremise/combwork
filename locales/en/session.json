@@ -428,8 +428,8 @@
     "description": "A notice's title (HI-2609): an agent's coding agent now runs another model than Combwork started it with (its connection's). {agent} is the agent."
   },
   "session.movedFresh.body": {
-    "defaultMessage": "{n, plural, one {# conversation} other {# conversations}} started fresh: {n, plural, one {its folder} other {their folders}} moved with .hive to .combwork, so {n, plural, one {it} other {they}} can't continue there. The earlier ones are kept in Sessions to read.",
-    "description": "The notice after a workspace's .hive folders moved to .combwork (HI-2462): conversations that ran in a folder inside one started new conversations instead of resuming. {n} counts them. Keep .hive and .combwork as they are; Sessions is a tab of the window."
+    "defaultMessage": "{n, plural, one {# conversation} other {# conversations}} started fresh: {n, plural, one {its folder} other {their folders}} moved to .combwork with the old data folders, so {n, plural, one {it} other {they}} can't continue there. The earlier ones are kept in Sessions to read.",
+    "description": "The notice after a workspace's old data folders moved to .combwork (HI-2462): conversations that ran in a folder inside one started new conversations instead of resuming. {n} counts them. Keep .combwork as it is; Sessions is a tab of the window."
   },
   "session.newConversation.didntStop": {
     "defaultMessage": "It didn't stop, so no new conversation was started.",

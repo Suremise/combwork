@@ -464,7 +464,7 @@ export function enabledProviders(settings: Pick<AppSettings, 'providers'> | null
 }
 
 /**
- * A 0.9 default provider left to Hive (#474), as `settings.defaultProvider` keeps it: only the migration reads that
+ * A 0.9 default provider left to the app (#474), as `settings.defaultProvider` keeps it: only the migration reads that
  * setting (decision A, HI-2132). Automatic's pick lives on as autoProvider, the last resort for an agent with no CLI.
  */
 export const AUTO_PROVIDER = 'auto'

@@ -361,7 +361,7 @@
   },
   "main.nameUpgrade.what.board": {
     "text": "the board's file",
-    "note": "What the names upgrade was renaming when it failed (service.nameUpgrade.failed): the task board's database file, hive.db to combwork.db.",
+    "note": "What the names upgrade was renaming when it failed (service.nameUpgrade.failed): the task board's database file, renamed combwork.db.",
     "audience": "both"
   },
   "main.nameUpgrade.what.files": {
@@ -371,7 +371,7 @@
   },
   "main.nameUpgrade.what.projects": {
     "text": "the projects' settings, templates, skill copies, git exclude lines and refs",
-    "note": "What the names upgrade was renaming when it failed (service.nameUpgrade.failed): values in the projects' project.json settings and templates (HI-2598), markers in Combwork's copies of skills in projects, comment lines in git's exclude files, and git refs Combwork keeps (refs/hive/… to refs/cw/…).",
+    "note": "What the names upgrade was renaming when it failed (service.nameUpgrade.failed): values in the projects' project.json settings and templates (HI-2598), markers in Combwork's copies of skills in projects, comment lines in git's exclude files, and git refs Combwork keeps (moved to refs/cw/…).",
     "audience": "both"
   },
   "main.outage.gaveUpBody": {

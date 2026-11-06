@@ -479,7 +479,7 @@
   "assistant.template.badPairs": "Jego pary wykonawców i recenzentów wskazują agentów, których nie ma, albo jednego agenta dwa razy.",
   "assistant.template.badRole": "Rola agenta {name} w przepływie pracy nie jest builder, reviewer, either ani generalist.",
   "assistant.template.badToken": "{name} używa {token}: nazwa agenta może zawierać tylko '{key}' (klucz projektu) i '{n}' (jego numer wśród agentów o tej nazwie).",
-  "assistant.template.from09": "Ten szablon pochodzi z Hive 0.9 i nie da się go wczytać w 1.0. Utwórz go ponownie z agentów przez „Zapisz szablon…”.",
+  "assistant.template.from09": "Ten szablon pochodzi z wersji 0.9 i nie da się go wczytać w 1.0. Utwórz go ponownie z agentów przez „Zapisz szablon…”.",
   "assistant.template.longNote": "Notatka agenta {name} ma więcej niż {max, number} znaków.",
   "assistant.template.newer": "Utworzyła go nowsza wersja Combwork: zaktualizuj Combwork, aby go użyć.",
   "assistant.template.noAgents": "Nie ma żadnych agentów.",

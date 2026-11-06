@@ -111,7 +111,7 @@
   "tips.boardSetAside.title": "Tarjetas creadas por una versión anterior de Combwork",
   "tips.boardStages.text": "Las columnas del tablero son las etapas que crean tus opciones del flujo de trabajo: Fusionando va bajo Aprobado mientras Combwork fusiona, y una etapa que nadie usa se oculta. Pide al Asistente que cambie el nombre de una, por ejemplo “llama Construyendo a En curso en web”: un nombre no cambia ninguna regla.",
   "tips.boardStages.title": "El tablero muestra las etapas de tu flujo de trabajo",
-  "tips.boardUpgrade.text": "Combwork guarda el tablero 0.9 que actualizó a 1.0. Ayuda → Restaurar la copia de seguridad del tablero 0.9… lo devuelve, tras guardar una copia del tablero tal como está, para que Hive 0.9 pueda cambiarlo de nuevo.",
+  "tips.boardUpgrade.text": "Combwork guarda el tablero 0.9 que actualizó a 1.0. Ayuda → Restaurar la copia de seguridad del tablero 0.9… lo devuelve, tras guardar una copia del tablero tal como está, para que la versión 0.9 pueda cambiarlo de nuevo.",
   "tips.boardUpgrade.title": "Volver a 0.9 después de actualizar",
   "tips.branchCards.text": "En Control de versiones → Ramas y remotos, una rama en la que trabaja una tarjeta muestra la tarjeta y su etapa, y en Revisión la versión en revisión. Haz clic en la tarjeta para abrirla.",
   "tips.branchCards.title": "Mira para qué tarjeta es una rama",

@@ -168,10 +168,10 @@ const RENAMED_FRESH = {
   body: msg({ id: 'session.renamedFresh.body', defaultMessage: "{n, plural, one {# conversation} other {# conversations}} started fresh: Combwork renamed the tools agents use, so a conversation from before can't continue. The earlier ones are kept in Sessions to read.", description: 'The notice after the update that renamed what agents see (HI-2463). {n} counts the conversations that started fresh instead of resuming. Sessions is a tab of the window: keep it as the window names it.' })
 }
 
-/** The notice for conversations whose folder moved with a `.hive` folder to `.combwork` (HI-2462). */
+/** The notice for conversations whose folder moved with a pre-1.1 data folder to `.combwork` (HI-2462). */
 const MOVED_FRESH = {
   title: RENAMED_FRESH.title,
-  body: msg({ id: 'session.movedFresh.body', defaultMessage: "{n, plural, one {# conversation} other {# conversations}} started fresh: {n, plural, one {its folder} other {their folders}} moved with .hive to .combwork, so {n, plural, one {it} other {they}} can't continue there. The earlier ones are kept in Sessions to read.", description: 'The notice after a workspace\'s .hive folders moved to .combwork (HI-2462): conversations that ran in a folder inside one started new conversations instead of resuming. {n} counts them. Keep .hive and .combwork as they are; Sessions is a tab of the window.' })
+  body: msg({ id: 'session.movedFresh.body', defaultMessage: "{n, plural, one {# conversation} other {# conversations}} started fresh: {n, plural, one {its folder} other {their folders}} moved to .combwork with the old data folders, so {n, plural, one {it} other {they}} can't continue there. The earlier ones are kept in Sessions to read.", description: 'The notice after a workspace\'s old data folders moved to .combwork (HI-2462): conversations that ran in a folder inside one started new conversations instead of resuming. {n} counts them. Keep .combwork as it is; Sessions is a tab of the window.' })
 }
 
 /** The statuses in which a CLI's exit key cancels a turn (or its dialog) rather than arming its exit (HI-2272). */
@@ -1883,11 +1883,11 @@ class SessionManager {
     if (opts.agentId && !this.switchResuming.has(liveId(projectPath, opts.agentId))) this.switches.get(liveId(projectPath, opts.agentId))?.cancel('started by hand') // i18n-ignore: for the log
     if (opts.resumeId !== undefined) assertSessionId(opts.resumeId)
     const agentId = opts.agentId || (await this.soleAgent(projectPath))
-    // HI-2463: a conversation Combwork launched before what agents see was renamed remembers the hive_* tools, [Hive] and
-    // hive-progress, so it isn't resumed: a new one starts instead, as Start Fresh does, and the old one stays in Sessions
+    // HI-2463: a conversation Combwork launched before what agents see was renamed remembers the tools' old names and
+    // the old progress reporter, so it isn't resumed: a new one starts instead, as Start Fresh does, and the old one stays in Sessions
     // to read. The first prompt this start was given (a restart's note: its card, round and lane) goes to the new one.
     // Every resume comes here (a restart's, Resume All, a manual one, a lane's or a card's placement, the Assistant's).
-    // HI-2462: so is one whose folder was inside a `.hive` that moved to `.combwork`: Claude Code files its transcript by
+    // HI-2462: so is one whose folder was inside a pre-1.1 data folder that moved to `.combwork`: Claude Code files its transcript by
     // that folder, and Combwork neither starts it in a folder that is gone nor copies the CLI's files; the transcript
     // stays readable where it was recorded.
     const freshWhy = opts.resumeId ? await this.freshReason(projectPath, opts.resumeId) : null

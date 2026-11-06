@@ -287,7 +287,7 @@ export const ORPHAN_NOTICE = 'cw.processes.orphanNotice'
 
 /**
  * Settings Combwork no longer lists but keeps in advanced.json as they are, never listed as unknown, read once more where a
- * workspace still needs to move them to its own settings (their hive.* ids renamed by the names upgrade, HI-2598):
+ * workspace still needs to move them to its own settings (their pre-1.1 ids renamed by the names upgrade, HI-2598):
  * `cw.assistant.otherMcpServers` (HI-1472, each workspace's Assistant MCP choices); `cw.agents.perProject` (#562), Agents per project, Maximum agents in the workflow defaults
  * since HI-2001 (main's migrateAgentsPerProject moves it, then drops it).
  */
@@ -426,7 +426,7 @@ const FOOTER_SAMPLES: Record<string, AdvancedSample> = {
   'claude-code.manual': { from: `${FIX}/screen-claude-2.1.296-idle.txt`, version: '2.1.296', text: '⏸ manual mode on · ? for shortcuts' }, // i18n-ignore: a CLI's recorded text (#367)
   'claude-code.acceptEdits': { from: `${FIX}/advanced/footer-claude-2.1.296-acceptEdits.txt`, version: '2.1.296', text: '⏵⏵ accept edits on (shift+tab to cycle)' }, // i18n-ignore: a CLI's recorded text (#367)
   'claude-code.plan': { from: `${FIX}/advanced/footer-claude-2.1.296-plan.txt`, version: '2.1.296', text: '⏸ plan mode on (shift+tab to cycle)' }, // i18n-ignore: a CLI's recorded text (#367)
-  'claude-code.auto': { from: `${FIX}/screen-claude-2.1.296-hive-idle.txt`, version: '2.1.296', text: '⏵⏵ auto mode on (shift+tab to cycle)' }, // i18n-ignore: a CLI's recorded text (#367)
+  'claude-code.auto': { from: `${FIX}/screen-claude-2.1.296-auto-idle.txt`, version: '2.1.296', text: '⏵⏵ auto mode on (shift+tab to cycle)' }, // i18n-ignore: a CLI's recorded text (#367)
   'claude-code.bypassPermissions': { from: `${FIX}/advanced/footer-claude-2.1.296-bypassPermissions.txt`, version: '2.1.296', text: '⏵⏵ bypass permissions on (shift+tab to cycle)' }, // i18n-ignore: a CLI's recorded text (#367)
   'claude-code.dontAsk': { from: `${FIX}/advanced/footer-claude-2.1.296-dontAsk.txt`, version: '2.1.296', text: "⏵⏵ don't ask on (shift+tab to cycle)" }, // i18n-ignore: a CLI's recorded text (#367)
   'copilot.ask': { from: `${FIX}/advanced/ready-copilot-1.0.95.txt`, version: '1.0.95', text: '· Interactive · Manual Approval ·' }, // i18n-ignore: a CLI's recorded text (#367)
@@ -1937,8 +1937,10 @@ const SOURCES: readonly AdvancedSource[] = [
     flags: 'm',
     applies: 'now',
     samples: [
+      // old-name: begin recorded-input-box
       { from: `${FIX}/advanced/input-ascii-claude-2.1.312.txt`, version: '2.1.312', text: `${'─'.repeat(113)} demo ─\n> a draft typed and left there, long enough to wrap onto rows of its own hive wake line typed and not sent\n${'─'.repeat(120)}`, shows: "Its input box where the terminal doesn't say it shows Unicode: \">\" its prompt mark, and the session's name in its top rule" }, // i18n-ignore: a CLI's recorded text (#367)
       { from: `${FIX}/advanced/input-claude-2.1.312.txt`, version: '2.1.312', text: `${'─'.repeat(120)}\n❯ hive wake line typed and not sent\n${'─'.repeat(120)}` }] // i18n-ignore: a CLI's recorded text (#367)
+      // old-name: end recorded-input-box
   },
   {
     id: 'claude-code.prompt.clearKeySeconds',
@@ -2319,7 +2321,7 @@ const SOURCES: readonly AdvancedSource[] = [
     kind: 'list',
     default: ['activity', 'project-name'],
     applies: 'sessions',
-    samples: [{ from: `${FIX}/codex-startup-0.160.0.json`, version: '0.160.0', text: ']0;⠹ hive-codex-setup', shows: "Codex's title with its activity spinner, from the title items Combwork gave its setup task" }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [{ from: `${FIX}/codex-startup-0.160.0.json`, version: '0.160.0', text: ']0;⠹ demo-codex-setup', shows: "Codex's title with its activity spinner, from the title items Combwork gave its setup task" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: 'codex.hooks.timeoutSeconds',
@@ -2444,7 +2446,7 @@ const SOURCES: readonly AdvancedSource[] = [
     max: 300,
     unit: 's',
     applies: 'sessions',
-    samples: [{ from: `${FIX}/advanced/mcp-get-codex-0.163.0-native-hive.json`, version: '0.163.0', text: '"startup_timeout_sec": 10.0', shows: "Codex taking the combwork server's startup_timeout_sec from Combwork's -c override over a native server named hive with its own (codex mcp get hive --json)" }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [{ from: `${FIX}/advanced/mcp-get-codex-0.163.0-native-old-name.json`, version: '0.163.0', text: '"startup_timeout_sec": 10.0', shows: "Codex taking the combwork server's startup_timeout_sec from Combwork's -c override over a native server with Combwork's 1.0 name and its own (codex mcp get <that name> --json)" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: drawnWaitId('codex'),
@@ -2872,7 +2874,7 @@ const SOURCES: readonly AdvancedSource[] = [
     default: true,
     applies: 'sessions',
     override: true,
-    samples: [{ from: `${FIX}/codex-startup-0.160.0.json`, version: '0.160.0', text: ']0;⠹ hive-codex-setup', shows: "Codex's title with its activity spinner, from the title items Combwork gave it" }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [{ from: `${FIX}/codex-startup-0.160.0.json`, version: '0.160.0', text: ']0;⠹ demo-codex-setup', shows: "Codex's title with its activity spinner, from the title items Combwork gave it" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: overrideId('copilot', 'noAutoUpdate'),

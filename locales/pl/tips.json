@@ -111,7 +111,7 @@
   "tips.boardSetAside.title": "Karty utworzone przez starszy Combwork",
   "tips.boardStages.text": "Kolumny tablicy to etapy, które tworzą opcje przepływu pracy: Scalanie stoi pod Zatwierdzone, gdy scala Combwork, a nieużywany etap jest ukryty. Poproś Asystenta o zmianę nazwy, na przykład „w projekcie web zmień nazwę Aktywne na Budowa”: nazwa nie zmienia żadnej reguły.",
   "tips.boardStages.title": "Tablica pokazuje etapy Twojego przepływu pracy",
-  "tips.boardUpgrade.text": "Combwork zachowuje tablicę z 0.9, którą uaktualnił do 1.0. Pomoc → Przywróć kopię zapasową tablicy z 0.9… przywraca ją po zachowaniu kopii tablicy w obecnym stanie, aby Hive 0.9 mógł ją znowu zmieniać.",
+  "tips.boardUpgrade.text": "Combwork zachowuje tablicę z 0.9, którą uaktualnił do 1.0. Pomoc → Przywróć kopię zapasową tablicy z 0.9… przywraca ją po zachowaniu kopii tablicy w obecnym stanie, aby wersja 0.9 mogła ją znowu zmieniać.",
   "tips.boardUpgrade.title": "Powrót do 0.9 po uaktualnieniu",
   "tips.branchCards.text": "W Kontroli wersji → Gałęzie i zdalne repozytoria gałąź, na której pracuje karta, pokazuje tę kartę i jej etap, a w etapie Recenzja – recenzowaną rewizję. Kliknij kartę, aby ją otworzyć.",
   "tips.branchCards.title": "Zobacz, do której karty należy gałąź",

@@ -130,7 +130,7 @@ export function projectOwnPreferences(platform: PlatformId, cfg: Pick<ProjectCon
 }
 
 /**
- * Settings → Advanced → Agents per project (`hive.agents.perProject`, #562) before HI-2001: Combwork's (advanced.json, kept
+ * Settings → Advanced → Agents per project (its pre-1.1 id, #562) before HI-2001: Combwork's (advanced.json, kept
  * there as LEGACY_ADVANCED until main moves it) and a workspace's own (workspace.json's `advanced`). Each becomes its
  * level's Maximum agents, for None and Git.
  */

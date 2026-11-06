@@ -1212,7 +1212,7 @@ export interface SlotRenamer {
  * The `cw-*` entries in a folder's `.agents/skills` (where Combwork puts its skill copies; git-ignored, so the guards
  * don't count them), by name: folders, and links or anything else with that name too (never followed). None only when
  * the skills folder is proved absent; any other error reading it throws, so the slot is kept (cantCheck) rather than
- * removed unseen. Any other folder there (a `hive-*` one included, after the names upgrade: HI-2594) isn't ignored, and
+ * removed unseen. Any other folder there (one under the old name included, after the names upgrade: HI-2594) isn't ignored, and
  * keeps the slot as an untracked file does.
  */
 async function combworkSkillFolders(folder: string): Promise<string[]> {

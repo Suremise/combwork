@@ -172,20 +172,20 @@
     "description": "An error merging from the Merge dialog: the branch picked and the target are the same ({branch})."
   },
   "main.combworkMove.bothBody": {
-    "defaultMessage": "Combwork uses .combwork and leaves .hive as it is. Move anything you still need out of .hive yourself.",
-    "description": "The warning's text (HI-2462): which of the two folders Combwork uses, and that it never changes the other. Keep .hive and .combwork as they are."
+    "defaultMessage": "Combwork uses .combwork and leaves the old data folder as it is. Move anything you still need out of it yourself.",
+    "description": "The warning's text (HI-2462): which of the two folders Combwork uses, and that it never changes the other (the old one, from before 1.1). Keep .combwork as it is."
   },
   "main.combworkMove.bothTitle": {
-    "defaultMessage": "{folder} has both a .hive and a .combwork folder",
-    "description": "A warning's title as a workspace opens (HI-2462): the folder {folder} has Combwork's folder under both its old name (.hive) and its new one (.combwork). Keep .hive and .combwork as they are."
+    "defaultMessage": "{folder} has both an old data folder and a .combwork folder",
+    "description": "A warning's title as a workspace opens (HI-2462): the folder {folder} has Combwork's folder under both its name from before 1.1 and its new one (.combwork). Keep .combwork as it is."
   },
   "main.combworkMove.linkBody": {
     "defaultMessage": "It is a link to another folder, or the project is a link to a folder outside the workspace, so Combwork leaves it as it is. To use it, rename it .combwork yourself with Combwork closed.",
-    "description": "The warning's text (HI-2462): why the .hive folder wasn't renamed, and how the user can do it. Keep .hive and .combwork as they are."
+    "description": "The warning's text (HI-2462): why the old data folder wasn't renamed, and how the user can do it. Keep .combwork as it is."
   },
   "main.combworkMove.linkTitle": {
-    "defaultMessage": "{folder}'s .hive folder wasn't moved",
-    "description": "A warning's title as a workspace opens (HI-2462): the folder {folder}'s .hive wasn't renamed .combwork. Keep .hive and .combwork as they are."
+    "defaultMessage": "{folder}'s old data folder wasn't moved",
+    "description": "A warning's title as a workspace opens (HI-2462): the folder {folder}'s data folder from before 1.1 wasn't renamed .combwork. Keep .combwork as it is."
   },
   "main.combworkMove.what.cards": {
     "defaultMessage": "the paths in cards",
@@ -928,12 +928,12 @@
     "description": "A line of Repair's report, after a workspace or project moved to another folder (the moved-workspace banner): renamed projects stay Working on. Working on is how the sidebar marks projects: use its name as shown. {projects} lists them; {n} is how many."
   },
   "main.nameUpgrade.boardBothBody": {
-    "defaultMessage": "Combwork uses combwork.db and leaves hive.db as it is.",
-    "description": "The warning's text (HI-2587): which of the two files Combwork uses; it never changes the other. Keep hive.db and combwork.db as they are."
+    "defaultMessage": "Combwork uses combwork.db and leaves the old board file as it is.",
+    "description": "The warning's text (HI-2587): which of the two files Combwork uses; it never changes the other (the old one, from before 1.1). Keep combwork.db as it is."
   },
   "main.nameUpgrade.boardBothTitle": {
-    "defaultMessage": "{folder} has both hive.db and combwork.db",
-    "description": "A warning's title as a workspace opens (HI-2587): its folder {folder} holds the task board's database under both its old name and its new one. Keep hive.db and combwork.db as they are (file names)."
+    "defaultMessage": "{folder} has both the old board file and combwork.db",
+    "description": "A warning's title as a workspace opens (HI-2587): its folder {folder} holds the task board's database under both its name from before 1.1 and its new one. Keep combwork.db as it is (a file name)."
   },
   "main.nameUpgrade.boardLeftBody": {
     "defaultMessage": "The board opens from combwork.db. Combwork doesn't delete this file: it may hold changes from before the rename.",
@@ -941,15 +941,15 @@
   },
   "main.nameUpgrade.boardLeftTitle": {
     "defaultMessage": "{file} was left as it is",
-    "description": "A warning's title as a workspace opens (HI-2587): an SQLite log or journal of the board's old file (hive.db) still holds data, beside the board's new file; {file} is its path."
+    "description": "A warning's title as a workspace opens (HI-2587): an SQLite log or journal of the board's old file (from before 1.1) still holds data, beside the board's new file; {file} is its path."
   },
   "main.nameUpgrade.profileTitle": {
     "defaultMessage": "Combwork can't start",
-    "description": "The title of an error box as Combwork starts: it couldn't convert its settings files from Hive's names (service.nameUpgrade.profileFailed)."
+    "description": "The title of an error box as Combwork starts: it couldn't convert its settings files from the old names (service.nameUpgrade.profileFailed)."
   },
   "main.nameUpgrade.what.board": {
     "defaultMessage": "the board's file",
-    "description": "What the names upgrade was renaming when it failed (service.nameUpgrade.failed): the task board's database file, hive.db to combwork.db."
+    "description": "What the names upgrade was renaming when it failed (service.nameUpgrade.failed): the task board's database file, renamed combwork.db."
   },
   "main.nameUpgrade.what.files": {
     "defaultMessage": "the workspace's settings, templates, .gitignore, README and MCP definitions",
@@ -957,7 +957,7 @@
   },
   "main.nameUpgrade.what.projects": {
     "defaultMessage": "the projects' settings, templates, skill copies, git exclude lines and refs",
-    "description": "What the names upgrade was renaming when it failed (service.nameUpgrade.failed): values in the projects' project.json settings and templates (HI-2598), markers in Combwork's copies of skills in projects, comment lines in git's exclude files, and git refs Combwork keeps (refs/hive/… to refs/cw/…)."
+    "description": "What the names upgrade was renaming when it failed (service.nameUpgrade.failed): values in the projects' project.json settings and templates (HI-2598), markers in Combwork's copies of skills in projects, comment lines in git's exclude files, and git refs Combwork keeps (moved to refs/cw/…)."
   },
   "main.notify.answered": {
     "defaultMessage": "Answered",
@@ -1092,12 +1092,12 @@
     "description": "A notice (HI-1756): how much of a plan's usage limit is used ({share}: \"85%\") on one connection, a sign-in the user named ({connection}: \"Max 1\"). The limit is a rolling window of {hours} hours (the 5-hour one), the weekly one, or another the provider names itself ({label}, in English as the provider says it)."
   },
   "main.profileMove.refused": {
-    "defaultMessage": "Combwork's data from before it was renamed is in {from}, and Combwork couldn't rename that folder to {to}: {reason}. Nothing was changed or lost. Close any copy of Hive or Combwork that is still running, then start Combwork again.",
-    "description": "The text of an error box at start (HI-2594): Combwork's data folder from Hive Desktop (the app's old name, keep it) couldn't be renamed to Combwork's. {from} and {to} are folder paths; {reason} says why, in English (e.g. \"it couldn't be renamed (EBUSY)\"). Hive and Combwork are the app's old and new names: keep them."
+    "defaultMessage": "Combwork's data from before it was renamed is in {from}, and Combwork couldn't rename that folder to {to}: {reason}. Nothing was changed or lost. Close any copy of Combwork, or of its 1.0 version, that is still running, then start Combwork again.",
+    "description": "The text of an error box at start (HI-2594): Combwork's data folder from version 1.0 (from before the app was renamed) couldn't be renamed to Combwork's. {from} and {to} are folder paths; {reason} says why, in English (e.g. \"it couldn't be renamed (EBUSY)\")."
   },
   "main.profileMove.refusedTitle": {
     "defaultMessage": "Combwork couldn't move its data folder",
-    "description": "The title of an error box at start (HI-2594): Combwork's data folder from before (named Hive, the app's old name) has to be renamed to Combwork's before Combwork can start, and the rename failed. Nothing was lost."
+    "description": "The title of an error box at start (HI-2594): Combwork's data folder from before (named after the app's old name) has to be renamed to Combwork's before Combwork can start, and the rename failed. Nothing was lost."
   },
   "main.profileMove.signInBody": {
     "defaultMessage": "Since its data moved to the Combwork folder, {names} {n, plural, one {shows} other {show}} signed out. Sign in again in Settings → Accounts & Connections.",

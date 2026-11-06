@@ -403,7 +403,7 @@
   "shell.tip.app.quitAll": "Zamknij wszystkie okna ({n}) i zatrzymaj agentów we wszystkich obszarach roboczych",
   "shell.tip.help.devConsole": "Co każde CLI wysyła do Combwork i jak Combwork to odczytał, w osobnym oknie",
   "shell.tip.help.improveTranslation": "Jak poprawić tłumaczenie lub dodać język, na GitHubie",
-  "shell.tip.help.restoreBoard09": "Przywraca tablicę do stanu sprzed uaktualnienia do 1.0, aby wrócić do Hive 0.9",
+  "shell.tip.help.restoreBoard09": "Przywraca tablicę do stanu sprzed uaktualnienia do 1.0, aby wrócić do wersji 0.9",
   "shell.tip.window.closeQuit": "Zamknij okno i zakończ Combwork",
   "shell.tip.window.closeSeveral": "Zamknij to okno i zatrzymaj agentów jego obszaru roboczego",
   "shell.tip.window.closeToTray": "Zamknij okno; Combwork dalej działa w zasobniku",

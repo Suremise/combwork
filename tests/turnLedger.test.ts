@@ -606,8 +606,8 @@ describe("the adapters' turn ids, Stop replies and idle screens", () => {
     expect(turn('※ recap: the work is merged\n❯ ')).toBeNull()
     // As Combwork's own terminal renders it (#648's real check: its input marked ">", its spinner with no "esc to interrupt"):
     // a reply held for seconds ("✢ Embellishing…"), and once done.
-    expect(turn(screen('screen-claude-2.1.296-hive-working.txt'))).toBe('working')
-    expect(turn(screen('screen-claude-2.1.296-hive-idle.txt'))).toBe('idle')
+    expect(turn(screen('screen-claude-2.1.296-auto-working.txt'))).toBe('working')
+    expect(turn(screen('screen-claude-2.1.296-auto-idle.txt'))).toBe('idle')
     expect(claudeCode.turnScreen('2.1.291')).toBeNull()
     expect(claudeCode.turnScreen(null)).toBeNull()
   })

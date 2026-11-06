@@ -40,11 +40,11 @@ export const NAMES_VERSION = 4
 export type WorkspaceStep = 'board' | 'files' | 'projects'
 
 const M = {
-  failed: msg({ id: 'service.nameUpgrade.failed', defaultMessage: "Combwork couldn't finish renaming {what} from Hive's names to Combwork's: {error} Open the workspace again to finish. Nothing was lost.", description: "An error opening a workspace (HI-2587): a step of the one-time upgrade of the names Hive stored (files, settings) to Combwork's failed; the next open tries again. {what} is what it was renaming (main.nameUpgrade.what.*); {error} says why, a sentence." }),
+  failed: msg({ id: 'service.nameUpgrade.failed', defaultMessage: "Combwork couldn't finish renaming {what} from the old names to Combwork's: {error} Open the workspace again to finish. Nothing was lost.", description: "An error opening a workspace (HI-2587): a step of the one-time upgrade of the names the app stored before 1.1 (files, settings) to Combwork's failed; the next open tries again. {what} is what it was renaming (main.nameUpgrade.what.*); {error} says why, a sentence." }),
   what: {
-    board: msg({ id: 'main.nameUpgrade.what.board', defaultMessage: "the board's file", description: "What the names upgrade was renaming when it failed (service.nameUpgrade.failed): the task board's database file, hive.db to combwork.db." }),
+    board: msg({ id: 'main.nameUpgrade.what.board', defaultMessage: "the board's file", description: "What the names upgrade was renaming when it failed (service.nameUpgrade.failed): the task board's database file, renamed combwork.db." }),
     files: msg({ id: 'main.nameUpgrade.what.files', defaultMessage: "the workspace's settings, templates, .gitignore, README and MCP definitions", description: 'What the names upgrade was renaming when it failed (service.nameUpgrade.failed): files in the workspace\'s .combwork folder (its workspace.json settings and its templates, HI-2598). Keep .gitignore, README and MCP as they are.' }),
-    projects: msg({ id: 'main.nameUpgrade.what.projects', defaultMessage: "the projects' settings, templates, skill copies, git exclude lines and refs", description: "What the names upgrade was renaming when it failed (service.nameUpgrade.failed): values in the projects' project.json settings and templates (HI-2598), markers in Combwork's copies of skills in projects, comment lines in git's exclude files, and git refs Combwork keeps (refs/hive/… to refs/cw/…)." })
+    projects: msg({ id: 'main.nameUpgrade.what.projects', defaultMessage: "the projects' settings, templates, skill copies, git exclude lines and refs", description: "What the names upgrade was renaming when it failed (service.nameUpgrade.failed): values in the projects' project.json settings and templates (HI-2598), markers in Combwork's copies of skills in projects, comment lines in git's exclude files, and git refs Combwork keeps (moved to refs/cw/…)." })
   } satisfies Record<WorkspaceStep, Msg<string>>
 }
 

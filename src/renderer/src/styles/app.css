@@ -2348,7 +2348,7 @@ textarea.input {
     border-top: 1px solid var(--border-subtle);
   }
 }
-/* Cards made by an older Hive, set aside (#1044). */
+/* Cards made by an older version, set aside (#1044). */
 .set-aside-list {
   list-style: none;
   margin: 8px 0 0;

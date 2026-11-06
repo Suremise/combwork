@@ -448,7 +448,7 @@
     "description": "A tip's title (glossary 2.2: stage; 2.1: workflow)."
   },
   "tips.boardUpgrade.text": {
-    "defaultMessage": "Combwork keeps the 0.9 board it upgraded to 1.0. Help → Restore the 0.9 Board Backup… puts it back, after keeping a copy of the board as it is, so Hive 0.9 can change it again.",
+    "defaultMessage": "Combwork keeps the 0.9 board it upgraded to 1.0. Help → Restore the 0.9 Board Backup… puts it back, after keeping a copy of the board as it is, so version 0.9 can change it again.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.boardUpgrade.title": {
@@ -1857,7 +1857,7 @@
   },
   "tips.slotsAdopted.title": {
     "defaultMessage": "Your agents' worktrees are slots now",
-    "description": "A tip's title, after upgrading from Hive 0.9. A slot is a working folder (a worktree) Combwork lends to a card or a lane."
+    "description": "A tip's title, after upgrading from version 0.9. A slot is a working folder (a worktree) Combwork lends to a card or a lane."
   },
   "tips.sortTables.text": {
     "defaultMessage": "Click a column's header in Combwork's tables (shortcuts, Performance, Storage, the Overviews) to sort by it, again for the other way. Combwork remembers each table's sort and rows per page.",

@@ -83,7 +83,7 @@ const ACTIVITIES: { id: Activity; icon: string; label: Msg; command: string }[] 
   { id: 'dialects', icon: 'symbol-string', label: M.dialects, command: 'view.dialects' },
   { id: 'templates', icon: 'library', label: M.templates, command: 'view.templates' },
   { id: 'mcp', icon: 'plug', label: M.mcp, command: 'view.mcp' },
-  // The Assistant's own mark (#979: the queen's crown on a hive cell, not a robot), drawn by AssistantMark.
+  // The Assistant's own mark (#979: the queen's crown on a honeycomb cell, not a robot), drawn by AssistantMark.
   { id: 'assistant', icon: ASSISTANT_ICON, label: M.assistant, command: 'view.assistant' }
 ]
 

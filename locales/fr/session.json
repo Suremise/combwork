@@ -106,7 +106,7 @@
   "session.modeOffer.title": "Nouveau mode d’autorisation : {modes}",
   "session.model.switched": "{cli} utilise maintenant {running}, pas {launched}, que lui donnait sa connexion. Redémarre l’agent pour revenir à {launched}.",
   "session.model.switchedTitle": "{agent} utilise un autre modèle",
-  "session.movedFresh.body": "{n, plural, one {# conversation a recommencé} other {# conversations ont recommencé}} de zéro : {n, plural, one {son dossier a été déplacé} other {leurs dossiers ont été déplacés}} avec .hive vers .combwork, donc {n, plural, one {elle ne peut pas} other {elles ne peuvent pas}} continuer là-bas. Les précédentes restent dans Sessions, à relire.",
+  "session.movedFresh.body": "{n, plural, one {# conversation a recommencé} other {# conversations ont recommencé}} de zéro : {n, plural, one {son dossier a été déplacé} other {leurs dossiers ont été déplacés}} vers .combwork avec les anciens dossiers de données, donc {n, plural, one {elle ne peut pas} other {elles ne peuvent pas}} continuer là-bas. Les précédentes restent dans Sessions, à relire.",
   "session.newConversation.didntStop": "L’agent ne s’est pas arrêté : aucune nouvelle conversation n’a été démarrée.",
   "session.newConversation.notRunning": "L’agent ne tourne pas.",
   "session.newConversation.pending": "L’agent vient de recevoir un prompt que sa CLI n’a pas encore pris.",

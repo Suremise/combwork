@@ -183,7 +183,7 @@ export async function openTable<T>(workspacePath: string, store: StoreName, scop
       if (got) log.info(`moved ${written} ${store} entr${written === 1 ? 'y' : 'ies'} from ${userText(file)} into the workspace database`)
     }
     if (existsSync(file)) {
-      if (!first) log.warn(`${userText(file)} was found after the ${store} moved into the workspace database (an older Hive's, or a rename refused before): kept as a backup, not read`)
+      if (!first) log.warn(`${userText(file)} was found after the ${store} moved into the workspace database (an older version's, or a rename refused before): kept as a backup, not read`)
       keepAsBackup(file)
     }
     return true

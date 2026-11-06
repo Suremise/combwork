@@ -38,7 +38,7 @@ function withoutCardTrailers(m: string): string {
 /**
  * The branch's own message (G19, the branch's own): one commit's message as it is; several, each one's in turn, oldest
  * first, the first one's subject the commit's subject (as git's own squash message joins them). `Combwork-` trailers left
- * out (a pre-1.1 `Hive-` one is kept as written). A branch with no message of its own (only merges) takes the card's title, with no key.
+ * out (a pre-1.1 one under the old name is kept as written). A branch with no message of its own (only merges) takes the card's title, with no key.
  */
 export function branchMessage(messages: string[], title: string): string {
   const own = messages.map(withoutCardTrailers).filter(Boolean)

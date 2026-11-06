@@ -1,8 +1,8 @@
 {
   "freshResume.confirm": "Commencer une nouvelle conversation",
   "freshResume.detail": "{assistant, select, yes {L’Assistant commence une nouvelle conversation à la place, et l’ancienne reste dans ses conversations, à relire.} other {{agent} commence une nouvelle conversation à la place. Elle poursuit le travail de l’agent (sa surveillance, ses messages et ses tâches), et l’ancienne conversation reste dans Sessions, à relire.}}",
-  "freshResume.message": "{why, select, moved {Cette conversation s’est déroulée dans un dossier déplacé avec .hive vers .combwork, donc elle ne peut pas continuer là-bas.} other {Cette conversation a commencé avant que Combwork renomme les outils qu’utilisent les agents, donc elle ne peut pas continuer.}}",
+  "freshResume.message": "{why, select, moved {Cette conversation s’est déroulée dans un dossier déplacé vers .combwork avec son ancien dossier de données, donc elle ne peut pas continuer là-bas.} other {Cette conversation a commencé avant que Combwork renomme les outils qu’utilisent les agents, donc elle ne peut pas continuer.}}",
   "freshResume.short": "commence une nouvelle conversation",
-  "freshResume.tip": "{why, select, moved {Commence une nouvelle conversation : « {session} » s’est déroulée dans un dossier déplacé avec .hive vers .combwork, donc elle ne peut pas continuer} other {Commence une nouvelle conversation : « {session} » date d’avant que Combwork renomme les outils qu’utilisent les agents, donc elle ne peut pas continuer}}",
+  "freshResume.tip": "{why, select, moved {Commence une nouvelle conversation : « {session} » s’est déroulée dans un dossier déplacé vers .combwork avec son ancien dossier de données, donc elle ne peut pas continuer} other {Commence une nouvelle conversation : « {session} » date d’avant que Combwork renomme les outils qu’utilisent les agents, donc elle ne peut pas continuer}}",
   "freshResume.title": "Commencer une nouvelle conversation ?"
 }

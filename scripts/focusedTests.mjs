@@ -1,4 +1,4 @@
-// The hive project's focused-test runner (HI-1367): Combwork's merge queue runs it as the project's focused.run, in the
+// This repository's focused-test runner (HI-1367): Combwork's merge queue runs it as the project's focused.run, in the
 // checkout to test (cwd), after its focused.pick (tests/e2e/affected.mjs --pick) chose the tests.
 //   CW_FOCUSED_TESTS    a JSON file: the test ids, an array of strings. A unit test is its repo path
 //                         (tests/x.test.ts), an e2e suite its name (board).

@@ -403,7 +403,7 @@
   "shell.tip.app.quitAll": "{n}個のウィンドウをすべて閉じ、すべてのワークスペースのエージェントを停止します",
   "shell.tip.help.devConsole": "各CLIがCombworkに送る内容と、Combworkによる解釈を並べて、別のウィンドウに表示します",
   "shell.tip.help.improveTranslation": "GitHubで翻訳を修正する方法、言語を追加する方法",
-  "shell.tip.help.restoreBoard09": "Hive 0.9に戻るため、ボードを1.0へのアップグレード前の状態に戻します",
+  "shell.tip.help.restoreBoard09": "バージョン0.9に戻るため、ボードを1.0へのアップグレード前の状態に戻します",
   "shell.tip.window.closeQuit": "ウィンドウを閉じてCombworkを終了します",
   "shell.tip.window.closeSeveral": "このウィンドウを閉じ、そのワークスペースのエージェントを停止します",
   "shell.tip.window.closeToTray": "ウィンドウを閉じます。Combworkはトレイで実行し続けます",

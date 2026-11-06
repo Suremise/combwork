@@ -106,7 +106,7 @@
   "session.modeOffer.title": "权限模式已改为{modes}",
   "session.model.switched": "{cli} 现在使用 {running}，而不是其连接指定的 {launched}。重启智能体即可回到 {launched}。",
   "session.model.switchedTitle": "{agent} 正在使用另一个模型",
-  "session.movedFresh.body": "{n, plural, other {# 个对话}}已重新开始：它们的文件夹随 .hive 移动到了 .combwork，因此无法在那里继续。之前的对话保留在会话历史中，可以阅读。",
+  "session.movedFresh.body": "{n, plural, other {# 个对话}}已重新开始：它们的文件夹随旧数据文件夹移动到了 .combwork，因此无法在那里继续。之前的对话保留在会话历史中，可以阅读。",
   "session.newConversation.didntStop": "它没有停止，因此没有开始新对话。",
   "session.newConversation.notRunning": "它未在运行。",
   "session.newConversation.pending": "它的 CLI 尚未接收刚刚给它的提示词。",

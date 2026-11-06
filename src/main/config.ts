@@ -57,7 +57,7 @@ class ConfigStore {
   private listeners = new Set<(s: AppSettings, prev: AppSettings) => void>()
   /** Checks a change of settings must pass before it is saved (onSettingsCheck); one throwing refuses the whole change. */
   private checks = new Set<(next: AppSettings, prev: AppSettings) => void>()
-  /** The file on disk is from an older Hive (config version 1): keep a copy before the first save replaces it. */
+  /** The file on disk is from an older version (config version 1): keep a copy before the first save replaces it. */
   private backupBeforeSave = false
 
   get path(): string {

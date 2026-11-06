@@ -69,7 +69,7 @@
   "performance.compare.error.benchmarkOnProject": "Ein Szenario-Benchmark gehört zu seinem eigenen Test-Arbeitsbereich, nicht zu einem deiner Projekte: Vergleiche ihn in der Ansicht „Leistung“ (Aktivitätsleiste) mit ausgewähltem ganzen Arbeitsbereich.",
   "performance.compare.error.exportIsOwn": "Er enthält die eigene Arbeit des Arbeitsbereichs: Vergleiche ihn mit ausgewählter „Eigene Arbeit des Arbeitsbereichs“.",
   "performance.compare.error.exportIsWhole": "Er gehört zum ganzen Arbeitsbereich: Vergleiche ihn mit ausgewähltem ganzen Arbeitsbereich.",
-  "performance.compare.error.from10": "Das ist ein Leistungsexport aus Hive 1.0, den Combwork nicht importiert. Exportiere ihn erneut aus Combwork, um zu vergleichen.",
+  "performance.compare.error.from10": "Das ist ein Leistungsexport aus Version 1.0, den Combwork nicht importiert. Exportiere ihn erneut aus Combwork, um zu vergleichen.",
   "performance.compare.error.holdsOther": "Er gibt an, zum Projekt {project} zu gehören, enthält aber auch Daten {other, select, projects {anderer Projekte} other {der eigenen Arbeit des Arbeitsbereichs}}: nicht importiert.",
   "performance.compare.error.invalidBenchmark": "Das ist kein gültiger Szenario-Benchmark (kein Lauf, keine Fixtures-Version oder keine Szenarien).",
   "performance.compare.error.invalidExport": "Das ist kein gültiger Leistungsexport (kein Bericht, kein Geltungsbereich oder keine Projekte).",

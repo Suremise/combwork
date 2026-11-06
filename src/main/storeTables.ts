@@ -203,7 +203,7 @@ function deleteByKey(db: ReturnType<typeof workspaceDb>['writer'], store: TableS
  * the file as the store always has and gives its entries, null only when there is no file; one that can't be read now
  * throws, and nothing is marked, so the next open tries again. They go into the tables in one transaction with the mark
  * that they did (`<store>.imported`), and the file is renamed `<file>.imported-<time>`, kept as a backup. A file found
- * after that (a rename refused before, or one an older Hive wrote since) is renamed the same way, unread. While the
+ * after that (a rename refused before, or one an older version wrote since) is renamed the same way, unread. While the
  * upgrade to 1.0 waits, nothing is moved: the store reads what the file has (`store_rows`).
  */
 export async function openTable(workspacePath: string, store: TableStore, file: string, readFile: () => Promise<{ docs: unknown[]; meta?: Record<string, string> } | null>): Promise<TableData> {
@@ -228,7 +228,7 @@ export async function openTable(workspacePath: string, store: TableStore, file: 
     }))
   }
   if (existsSync(file)) {
-    if (!first) log.warn(`${userText(file)} was found after the ${store} moved into the workspace database (an older Hive's, or a rename refused before): kept as a backup, not read`)
+    if (!first) log.warn(`${userText(file)} was found after the ${store} moved into the workspace database (an older version's, or a rename refused before): kept as a backup, not read`)
     keepAsBackup(file)
   }
   return readTable(path, store)

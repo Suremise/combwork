@@ -1,8 +1,8 @@
 {
   "freshResume.confirm": "Start New Conversation",
   "freshResume.detail": "{assistant, select, yes {The Assistant starts a new conversation instead, and the old one stays in its conversations to read.} other {{agent} starts a new conversation instead. It carries on the agent's work (its watch, messages and tasks), and the old conversation stays in Sessions to read.}}",
-  "freshResume.message": "{why, select, moved {This conversation ran in a folder that moved with .hive to .combwork, so it can't continue there.} other {This conversation started before Combwork renamed the tools agents use, so it can't continue.}}",
+  "freshResume.message": "{why, select, moved {This conversation ran in a folder that moved to .combwork with its old data folder, so it can't continue there.} other {This conversation started before Combwork renamed the tools agents use, so it can't continue.}}",
   "freshResume.short": "starts a new conversation",
-  "freshResume.tip": "{why, select, moved {Starts a new conversation: \"{session}\" ran in a folder that moved with .hive to .combwork, so it can't continue} other {Starts a new conversation: \"{session}\" is from before Combwork renamed the tools agents use, so it can't continue}}",
+  "freshResume.tip": "{why, select, moved {Starts a new conversation: \"{session}\" ran in a folder that moved to .combwork with its old data folder, so it can't continue} other {Starts a new conversation: \"{session}\" is from before Combwork renamed the tools agents use, so it can't continue}}",
   "freshResume.title": "Start a new conversation?"
 }

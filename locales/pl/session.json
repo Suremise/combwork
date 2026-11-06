@@ -106,7 +106,7 @@
   "session.modeOffer.title": "Zmieniono tryb uprawnień na {modes}",
   "session.model.switched": "{cli} używa teraz {running}, a nie {launched}, który dało mu połączenie. Uruchom agenta ponownie, aby wrócić do {launched}.",
   "session.model.switchedTitle": "Agent {agent} używa innego modelu",
-  "session.movedFresh.body": "{n, plural, one {# rozmowa zaczęła} few {# rozmowy zaczęły} many {# rozmów zaczęło} other {# rozmowy zaczęło}} się od nowa: {n, plural, one {jej folder został przeniesiony} other {ich foldery zostały przeniesione}} razem z .hive do .combwork, więc nie {n, plural, one {może} other {mogą}} tam być kontynuowane. Wcześniejsze zostają w Sesjach do przeczytania.",
+  "session.movedFresh.body": "{n, plural, one {# rozmowa zaczęła} few {# rozmowy zaczęły} many {# rozmów zaczęło} other {# rozmowy zaczęło}} się od nowa: {n, plural, one {jej folder został przeniesiony} other {ich foldery zostały przeniesione}} do .combwork razem ze starymi folderami danych, więc nie {n, plural, one {może} other {mogą}} tam być kontynuowane. Wcześniejsze zostają w Sesjach do przeczytania.",
   "session.newConversation.didntStop": "Agent się nie zatrzymał, więc nie rozpoczęto nowej rozmowy.",
   "session.newConversation.notRunning": "Agent nie działa.",
   "session.newConversation.pending": "Agent właśnie dostał prompt, który nie trafił jeszcze do jego CLI.",

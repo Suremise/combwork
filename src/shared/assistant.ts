@@ -21,7 +21,7 @@ export const ASSISTANT_NAME = 'Assistant'
 export const MODES_DIR = 'modes'
 /**
  * Where they were until 0.9.3, when modes were called personas (#1084): moved to MODES_DIR as the workspace opens, and
- * still read while there is no MODES_DIR (an older Hive may make it again), in 0.9.3 only.
+ * still read while there is no MODES_DIR (an older version may make it again), in 0.9.3 only.
  */
 export const LEGACY_MODES_DIR = 'personas'
 /** The mode (a file in MODES_DIR) new conversations use unless Settings or the workspace chooses another (#259). */

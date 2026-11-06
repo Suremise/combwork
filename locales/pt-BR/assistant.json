@@ -479,7 +479,7 @@
   "assistant.template.badPairs": "Os pares de executores e revisores citam agentes que ele não tem, ou um agente duas vezes.",
   "assistant.template.badRole": "O papel de {name} no fluxo de trabalho não é builder, reviewer, either nem generalist.",
   "assistant.template.badToken": "{name} usa {token}: o nome de um agente só pode ter '{key}' (a chave do projeto) e '{n}' (o número dele entre os agentes com esse nome).",
-  "assistant.template.from09": "Este modelo é do Hive 0.9 e não pode ser carregado no 1.0. Recrie-o a partir dos seus agentes com “Salvar modelo…”.",
+  "assistant.template.from09": "Este modelo é da versão 0.9 e não pode ser carregado no 1.0. Recrie-o a partir dos seus agentes com “Salvar modelo…”.",
   "assistant.template.longNote": "A nota do agente {name} passa de {max, number} caracteres.",
   "assistant.template.newer": "Ele foi feito por uma versão mais nova do Combwork: atualize o Combwork para usá-lo.",
   "assistant.template.noAgents": "Ele não tem agentes.",

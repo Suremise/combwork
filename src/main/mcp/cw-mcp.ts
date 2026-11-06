@@ -810,7 +810,7 @@ const tools: Tool[] = [
       // The card as Combwork names it (#1219): its key ("HI-12"), whichever way the agent gave it.
       const tied = r.round && r.card ? say(T['messageAgent.reply.tied'], { card: named(r, () => cardRef(r.card!)), round: String(r.round) }) : ''
       if (r.typed) return say(T['messageAgent.reply.told'], { agent: who, id: String(r.id), tied, watching: r.status === 'watching' ? 'yes' : 'no' })
-      // Only the ways the carrying-on switches leave on for it (#1497); an older Hive's reply has no tells: all three.
+      // Only the ways the carrying-on switches leave on for it (#1497); an older version's reply has no tells: all three.
       return messageQueuedText({ who, id: String(r.id), tied, status: String(r.status), queued: r.queued ?? 0, tells: r.tells ?? INBOX_SWITCHES })
     }
   },

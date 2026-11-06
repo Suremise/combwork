@@ -389,7 +389,7 @@ interface State {
   setupOpen: ProviderId | true | false
   /** Repair… for a moved workspace (#146), and the move whose banner was hidden (until Combwork restarts). */
   moveRepairOpen: boolean
-  /** The Review… dialog for cards an older Hive saved (#1044). */
+  /** The Review… dialog for cards an older version saved (#1044). */
   setAsideOpen: boolean
   moveBannerHidden: string | null
   shortcutsOpen: boolean

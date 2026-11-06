@@ -454,7 +454,7 @@ class Store {
         const num = (k: string): unknown => (saved.meta.has(k) ? JSON.parse(saved.meta.get(k)!) : undefined)
         this.fromSaved({ buckets: saved.docs, observed: num('observed'), evictedThrough: num('evictedThrough'), renamesApplied: num('renamesApplied') })
         if (existsSync(this.file)) {
-          log.warn("A metrics.json was found after the metrics moved into the workspace database (an older Hive's): kept as a backup, not read")
+          log.warn("A metrics.json was found after the metrics moved into the workspace database (an older version's): kept as a backup, not read")
           keepAsBackup(this.file)
         }
         return

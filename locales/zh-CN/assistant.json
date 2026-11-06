@@ -479,7 +479,7 @@
   "assistant.template.badPairs": "其中的构建者与评审者配对引用了它没有的智能体，或重复引用了同一个智能体。",
   "assistant.template.badRole": "{name} 在工作流程中的角色不是 builder、reviewer、either 或 generalist。",
   "assistant.template.badToken": "{name} 使用了 {token}：智能体名称只能包含 '{key}'（项目的键）和 '{n}'（它在同名智能体中的编号）。",
-  "assistant.template.from09": "此模板来自 Hive 0.9，无法在 1.0 中加载。请用“保存模板…”从你的智能体重新创建。",
+  "assistant.template.from09": "此模板来自 0.9 版，无法在 1.0 中加载。请用“保存模板…”从你的智能体重新创建。",
   "assistant.template.longNote": "智能体 {name} 的备注超过 {max, number} 个字符。",
   "assistant.template.newer": "它由更新版本的 Combwork 创建：请更新 Combwork 后再使用。",
   "assistant.template.noAgents": "其中没有智能体。",

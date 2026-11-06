@@ -24,7 +24,9 @@ export const METRICS_EXPORT_SCHEMA = 'combwork-metrics/1'
  * A Performance export's id as 1.0 wrote it: not imported (HI-2611, Darren's decision: no 1.0 export is kept), only
  * recognised, so the refusal says what it is.
  */
+// old-name: begin metrics-export-schema
 const OLD_METRICS_EXPORT_SCHEMA = 'hive-metrics/1'
+// old-name: end metrics-export-schema
 
 /** Bounds on what is read and kept: an artifact is checked as untrusted input. */
 // scenarios: 200 since #1444 took the set past 100 (the last ones were dropped from benchmarks).
@@ -98,7 +100,7 @@ const M = {
   // Why a file isn't imported.
   tooLarge: msg({ id: 'performance.compare.error.tooLarge', defaultMessage: 'It is over {mb, number} MB.', description: 'Why a file is not imported to Performance → Compare: it is larger than {mb} MB.' }),
   notJson: msg({ id: 'performance.compare.error.notJson', defaultMessage: 'It isn’t JSON.', description: 'Why a file is not imported to Performance → Compare.' }),
-  from10: msg({ id: 'performance.compare.error.from10', defaultMessage: 'It is a Performance export from Hive 1.0, which Combwork doesn’t import. Export again from Combwork to compare.', description: 'Why a file is not imported to Performance → Compare (HI-2611): it was exported by Hive 1.0, the app before it was renamed Combwork. Keep "Hive 1.0" as it is.' }),
+  from10: msg({ id: 'performance.compare.error.from10', defaultMessage: 'It is a Performance export from version 1.0, which Combwork doesn’t import. Export again from Combwork to compare.', description: 'Why a file is not imported to Performance → Compare (HI-2611): it was exported by version 1.0, from before the app was renamed Combwork.' }),
   notCombwork: msg({ id: 'performance.compare.error.notCombwork', defaultMessage: 'It isn’t a Combwork benchmark or Performance export.', description: 'Why a file is not imported to Performance → Compare.' }),
   benchmarkOnProject: msg({ id: 'performance.compare.error.benchmarkOnProject', defaultMessage: 'A scenario benchmark is its own test workspace’s, not one of your projects: compare it in the Performance view (activity bar), with the whole workspace selected.', description: "Why a scenario benchmark (a test run's measurements) is not imported on a project's Performance page." }),
   benchmarkOnOwn: msg({ id: 'performance.compare.error.benchmarkOnOwn', defaultMessage: 'A scenario benchmark is its whole test workspace’s, not the workspace’s own work: compare it with the whole workspace selected.', description: 'Why a scenario benchmark is not imported to Performance → Compare with "Workspace\'s own work" selected.' }),
@@ -1062,7 +1064,7 @@ const avg = (xs: Sample[], f: (s: Sample) => number): number => (xs.length ? xs.
 /** Measures that mean more failures or more work when they grow: a growth is a regression, whatever the size did. */
 const FAILURE_KEYS = ['combworkCallErrors', 'toolErrors', 'apiFailed', 'apiCancelled', 'repeatedCalls', 'combworkCalls']
 
-/** Why a sample is left out: Combwork's own reasons as messages, the harness's own words (or an older Hive's) as written. */
+/** Why a sample is left out: Combwork's own reasons as messages, the harness's own words (or an older version's) as written. */
 const SAMPLE_PROBLEMS = [M.tooManyChecks, M.invalidCheck, M.checkTwice, M.checksNotList, M.countsDiffer, M.failedNoCheck, M.noCheckRan, M.didntComplete]
 const sampleProblem = (reason: string): TextPart => SAMPLE_PROBLEMS.find((m) => m.defaultMessage === reason) ?? reason
 

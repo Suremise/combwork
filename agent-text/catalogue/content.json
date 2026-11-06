@@ -365,8 +365,8 @@
     "audience": "both"
   },
   "content.templates.importFrom10": {
-    "text": "It is an agent template exported from Hive 1.0, whose workflow settings Combwork doesn't import. Make the template again in Combwork.",
-    "note": "An error importing a template (HI-2611): the file was exported by Hive 1.0, the app before it was renamed Combwork, and holds workflow settings under its old names. Keep \"Hive 1.0\" as it is.",
+    "text": "It is an agent template exported from version 1.0, whose workflow settings Combwork doesn't import. Make the template again in Combwork.",
+    "note": "An error importing a template (HI-2611): the file was exported by version 1.0, from before the app was renamed Combwork, and holds workflow settings under their old names.",
     "audience": "both"
   },
   "content.templates.importNotJson": {

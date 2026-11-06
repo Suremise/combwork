@@ -63,7 +63,7 @@ export default defineConfig({
           'wal-checkpoint-worker': resolve(__dirname, 'src/main/walCheckpointWorker.ts'),
           // Codex's log's worker thread (HI-1972).
           'codex-log-worker': resolve(__dirname, 'src/main/codexLogWorker.ts'),
-          // The .hive → .combwork move's card rewrite (HI-2462).
+          // The 1.0 data folders' move to .combwork: its card rewrite (HI-2462).
           'cw-move-worker': resolve(__dirname, 'src/main/combworkMoveWorker.ts')
         }
       }

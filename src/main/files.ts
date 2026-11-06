@@ -290,7 +290,7 @@ export async function linkFiles(projectPath: string, rels: string[]): Promise<(s
       try {
         if (typeof rel !== 'string') return null
         if (await isFile(rel)) return await spelledOnDisk(projectPath, rel)
-        // A path into a .hive folder that moved leads to it in .combwork (HI-2462), and one into the old images folder to
+        // A path into a pre-1.1 data folder that moved leads to it in .combwork (HI-2462), and one into the old images folder to
         // the file where it is now, in attachments (#387).
         const ws = workspaceFor(projectPath)?.path
         const to = await followMovedLink(join(projectPath, rel), ws ? [ws] : [], movedAttachment)

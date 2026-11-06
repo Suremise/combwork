@@ -20,7 +20,9 @@ export interface ActivityView extends ActivityFilter {
 
 const PREFIX = 'combwork.activity.'
 /** The views' keys before 1.1 (HI-2610): the names upgrade's input here, read only by upgradeActivityViews. */
+// old-name: begin activity-prefix
 const OLD_PREFIX = 'hive.activity.'
+// old-name: end activity-prefix
 
 // A project's by its path; the workspace level's by its workspace (workspaceActivityKey).
 const key = (project: string): string => `${PREFIX}${project.toLowerCase()}`

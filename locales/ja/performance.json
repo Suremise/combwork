@@ -69,7 +69,7 @@
   "performance.compare.error.benchmarkOnProject": "シナリオのベンチマークはそのテスト用ワークスペースのもので、どのプロジェクトのものでもありません。「パフォーマンス」ビュー（アクティビティバー）でワークスペース全体を選んで比較してください。",
   "performance.compare.error.exportIsOwn": "ワークスペース自体の作業のものです。「ワークスペース自体の作業」を選んで比較してください。",
   "performance.compare.error.exportIsWhole": "ワークスペース全体のものです。ワークスペース全体を選んで比較してください。",
-  "performance.compare.error.from10": "Hive 1.0のパフォーマンスのエクスポートです。Combworkはこれをインポートしません。比較するには、Combworkからもう一度エクスポートしてください。",
+  "performance.compare.error.from10": "バージョン1.0のパフォーマンスのエクスポートです。Combworkはこれをインポートしません。比較するには、Combworkからもう一度エクスポートしてください。",
   "performance.compare.error.holdsOther": "{project}のものとされていますが、{other, select, projects {ほかのプロジェクト} other {ワークスペース自体の作業}}のデータも含んでいるため、インポートしませんでした。",
   "performance.compare.error.invalidBenchmark": "有効なシナリオのベンチマークではありません（実行、フィクスチャのバージョン、シナリオのいずれかがありません）。",
   "performance.compare.error.invalidExport": "有効なパフォーマンスのエクスポートではありません（レポート、範囲、プロジェクトのいずれかがありません）。",

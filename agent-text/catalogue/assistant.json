@@ -30,8 +30,8 @@
     "audience": "both"
   },
   "assistant.template.from09": {
-    "text": "This template is from Hive 0.9 and can't be loaded in 1.0. Recreate it from your agents with Save as Template.",
-    "note": "Why a template file can't be used: Hive 0.9 made it (its agents had worktrees of their own; 1.0's don't). Save as Template is a command: as Combwork names it.",
+    "text": "This template is from version 0.9 and can't be loaded in 1.0. Recreate it from your agents with Save as Template.",
+    "note": "Why a template file can't be used: version 0.9 made it (its agents had worktrees of their own; 1.0's don't). Save as Template is a command: as Combwork names it.",
     "audience": "both"
   },
   "assistant.template.longNote": {

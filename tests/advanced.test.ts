@@ -555,7 +555,7 @@ describe('the adapters and the combwork MCP server use them', () => {
     expect(claudeCode.safeguardAsk!(ask, screen('advanced/safeguard-prompt-claude-2.1.296.txt'))).toBe(true)
     expect(claudeCode.safeguardAsk!(ask, screen('screen-claude-2.1.296-idle.txt'))).toBe(false)
     // #696: each mode's footer, from the screens recorded in it.
-    const claudeScreens = { manual: 'screen-claude-2.1.296-idle.txt', acceptEdits: 'advanced/footer-claude-2.1.296-acceptEdits.txt', plan: 'advanced/footer-claude-2.1.296-plan.txt', auto: 'screen-claude-2.1.296-hive-idle.txt', bypassPermissions: 'advanced/footer-claude-2.1.296-bypassPermissions.txt', dontAsk: 'advanced/footer-claude-2.1.296-dontAsk.txt' }
+    const claudeScreens = { manual: 'screen-claude-2.1.296-idle.txt', acceptEdits: 'advanced/footer-claude-2.1.296-acceptEdits.txt', plan: 'advanced/footer-claude-2.1.296-plan.txt', auto: 'screen-claude-2.1.296-auto-idle.txt', bypassPermissions: 'advanced/footer-claude-2.1.296-bypassPermissions.txt', dontAsk: 'advanced/footer-claude-2.1.296-dontAsk.txt' }
     for (const [mode, file] of Object.entries(claudeScreens)) expect(claudeCode.footerMode!(screen(file)), file).toBe(mode)
     const copilotScreens = { ask: 'advanced/ready-copilot-1.0.95.txt', 'allow-all': 'advanced/footer-copilot-1.0.95-allow-all.txt', plan: 'advanced/footer-copilot-1.0.95-plan.txt', autopilot: 'advanced/footer-copilot-1.0.95-autopilot.txt' }
     for (const [mode, file] of Object.entries(copilotScreens)) expect(copilot.footerMode!(screen(file), 'plan'), file).toBe(mode)
