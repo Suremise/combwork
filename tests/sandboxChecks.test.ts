@@ -480,6 +480,24 @@ test('a view counts as loaded only on its own loaded markers, however long its l
   assert.deepStrictEqual(ready.VIEWS.map((v: Json) => v.slug), ['workspace-overview', 'task-board', 'shared-notes', 'skills', 'mcp-servers', 'assistant'])
 })
 
+// The driver's preload bridge (HI-2645): the new app's window.combwork, and only for the mark step (which drives the release
+// before the upgrade) that release's own as well, never in its place when the window has both.
+test('the driver talks to the new app as window.combwork, and to the release before only in its mark step', () => {
+  assert.strictEqual(ready.pickBridge(['combwork', 'old'], ['combwork']), 'combwork')
+  assert.strictEqual(ready.pickBridge(['combwork', 'old'], ['old']), 'old')
+  assert.strictEqual(ready.pickBridge(['combwork', 'old'], ['old', 'combwork']), 'combwork')
+  assert.strictEqual(ready.pickBridge(['combwork'], ['old']), null)
+  assert.strictEqual(ready.pickBridge(['combwork'], []), null)
+  assert.strictEqual(ready.pickBridge(['combwork'], undefined), null)
+  const drive = fs.readFileSync(path.join(SANDBOX, 'inside', 'drive.cjs'), 'utf8')
+  const preload = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'preload', 'index.ts'), 'utf8')
+  assert.ok(preload.includes("contextBridge.exposeInMainWorld('combwork', bridge)"), 'the preload bridge is window.combwork')
+  assert.ok(drive.includes("const BRIDGES = step === 'mark' ? ['combwork', OLD_BRIDGE] : ['combwork']"), 'only mark may use the old bridge')
+  assert.ok(/const OLD_BRIDGE = '\w+'/.test(drive) && !/window\.combwork\.invoke/.test(drive), 'every call goes through the bridge picked at launch')
+  // The step the checks run on the release before, before the upgrade, is mark (checks.cjs).
+  assert.ok(/s\.drive\(n, `\$\{n\}\. change settings`, 'mark'/.test(fs.readFileSync(path.join(SANDBOX, 'checks.cjs'), 'utf8')))
+})
+
 test('every view marker the driver waits for is in Combwork\'s window: its classes and attributes in the renderer, its text in English', () => {
   const root = path.resolve(__dirname, '..')
   const english = fs.readdirSync(path.join(root, 'locales', 'en')).map((f) => fs.readFileSync(path.join(root, 'locales', 'en', f), 'utf8')).join('\n')

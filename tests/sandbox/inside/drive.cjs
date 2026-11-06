@@ -45,6 +45,8 @@ const OLD_START_LINE = /\b(?:Hive|Combwork) (\S+) starting/g
 const OLD_NAME_RE = /hive/i
 // The notice an RC showed when it ran from 1.0's folders (removed by HI-2594): a 1.1 must never show it.
 const OLD_FALLBACK_NOTICE = "Hive Desktop's data folders"
+// 1.0's preload bridge (window.hive; HI-2588 renamed it window.combwork), which the mark step drives before the upgrade (HI-2645).
+const OLD_BRIDGE = 'hive'
 // old-name: end drive-inputs
 // The installed app (HI-2460): Combwork's when it is installed, else the 1.0 app's (before an upgrade). Its
 // profile: Combwork's folder when it is there, else 1.0's own (before the upgrade moves it).
@@ -79,13 +81,17 @@ const save = () => fs.writeFileSync(path.join(OUT, `${prefix}.json`), JSON.strin
 // Each check has a stable id ("<scenario>.<what>"): the host's report requires the ids each step must produce.
 const check = (id, name, ok, detail) => { res.checks.push({ id, scenario: Number(String(id).split('.')[0]) || 0, name, ok: !!ok, detail: ok ? undefined : String(detail ?? '').slice(0, 1500) }); save() }
 // When what it reads is ready: conditions Combwork says are met, each bounded (ready.cjs, unit-tested in Combwork's npm test).
-const { until, workspaceSetUp, VIEWS, viewReady } = require(path.join(__dirname, 'ready.cjs'))
+const { until, workspaceSetUp, VIEWS, viewReady, pickBridge } = require(path.join(__dirname, 'ready.cjs'))
 const ps = cmd => execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', cmd], { encoding: 'utf8', timeout: 60_000 }).trim()
 const readConfig = () => { try { return JSON.parse(fs.readFileSync(path.join(PROFILE, 'config.json'), 'utf8')) } catch { return null } }
 
 let app
 let page
-const inv = (channel, ...args) => page.evaluate(([c, a]) => window.combwork.invoke(c, ...a), [channel, args])
+// The preload bridge the step talks to (HI-2645): the new app's window.combwork. Only mark drives the release before
+// (1.0, or an RC from before HI-2588 in scenario 10), so only it may use that release's own bridge.
+const BRIDGES = step === 'mark' ? ['combwork', OLD_BRIDGE] : ['combwork']
+let bridge
+const inv = (channel, ...args) => page.evaluate(([b, c, a]) => window[b].invoke(c, ...a), [bridge, channel, args])
 
 /** Combwork instances already running from the install folder (the installer's --force-run starts one): closed by PID. */
 function closeRunningApp() {
@@ -99,6 +105,9 @@ async function launch(opts = {}) {
   page = await app.firstWindow({ timeout: 90_000 })
   page.on('pageerror', e => { (res.facts.pageErrors ||= []).push(String(e.message).slice(0, 300)) })
   await page.waitForSelector('.app .workbench', { timeout: 90_000 })
+  bridge = pickBridge(BRIDGES, await page.evaluate((names) => names.filter((n) => typeof window[n]?.invoke === 'function'), BRIDGES))
+  res.facts.bridge = bridge
+  if (!bridge) throw new Error(`the window has no preload bridge the ${step} step uses (window.${BRIDGES.join(' or window.')})`)
   res.facts.launchMs = Date.now() - t0
   // Ready once every provider check has finished (as Combwork's e2e lib does).
   await until(async () => Object.values(await inv('provider:info')).every(i => !i.checking), 60_000)
