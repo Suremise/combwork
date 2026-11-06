@@ -1243,8 +1243,12 @@ export class WorkspaceService {
     return (this.wsConfig.hiddenProjects ?? []).map((h) => ({ ...h, present: existsSync(join(this.path!, h.name)) }))
   }
 
-  /** Sets the workspace's own value of an advanced setting a workspace can set (#367), or removes it (null: Combwork's again). */
-  async setAdvanced(id: string, raw: unknown): Promise<void> {
+  /**
+   * Sets the workspace's own value of an advanced setting a workspace can set (#367), or removes it (null: Combwork's again).
+   * check sees the workspace's own values the change replaces, in the save's turn (it can refuse it, nothing written);
+   * it returns those it saved (HI-2654: the settings in memory change only once written, HI-2651).
+   */
+  async setAdvanced(id: string, raw: unknown, check?: (now: WorkspaceConfig['advanced']) => void): Promise<WorkspaceConfig['advanced']> {
     if (!this.path) throw combworkError(M.noWorkspace, undefined, { kind: 'conflict' })
     const def = advancedDef(id)
     if (!def?.workspace) throw combworkError(msg({ id: 'service.workspace.advancedNotHere', defaultMessage: "{setting} can't be set for a workspace.", description: 'An error: the advanced setting {setting} (its title, or its id) has no value of its own for a workspace, only for Combwork.' }), { setting: def?.text.title ?? id }, { kind: 'invalid' })
@@ -1256,12 +1260,19 @@ export class WorkspaceService {
       value = checked.value
     }
     // Worked out from the settings as saved (HI-2651): during the open, those it reads, not the defaults before them.
+    let saved: WorkspaceConfig['advanced']
+    let checked = false
     await this.saveWorkspaceConfigWith((c) => {
+      // The save works the change out again once written: checked only the first time, before anything is written.
+      if (!checked) check?.(c.advanced)
+      checked = true
       const own = { ...c.advanced }
       if (value === undefined) delete own[id]
       else own[id] = value
-      return { advanced: Object.keys(own).length ? own : undefined }
+      saved = Object.keys(own).length ? own : undefined
+      return { advanced: saved }
     })
+    return saved
   }
 
   /** Leaves a project folder out of the workspace (mode says how), or takes it back (null). */

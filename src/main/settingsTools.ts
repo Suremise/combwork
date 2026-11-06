@@ -1,6 +1,6 @@
 import { basename } from 'path'
 import type { SettingsPatch } from '../shared/api'
-import type { EffortOption, FallbackModel, ModelPrice, ProjectConfig, ProviderId, SlotDefaults } from '../shared/types'
+import type { EffortOption, FallbackModel, ModelPrice, ProjectConfig, ProviderId, SlotDefaults, WorkspaceConfig } from '../shared/types'
 import { modelCaps } from '../shared/models'
 import { advancedDef, advancedTakes } from '../shared/advanced'
 import { agentMsg, say } from '../shared/agentText'
@@ -282,12 +282,14 @@ export async function applySetting(
     let old: unknown
     let next: unknown
     if (change.advanced.scope === 'workspace') {
-      // Changed as it is checked: nothing awaited between the guard and the change (setAdvanced changes it at once).
-      old = now()
-      guard?.(old)
-      const done = workspace.setAdvanced(change.advanced.id, change.advanced.value)
-      next = now()
-      await done
+      // In the save's turn (HI-2654): the guard sees the value it replaces, and the new one is the one saved, as the
+      // settings in memory change only once written (HI-2651).
+      const at = (own: WorkspaceConfig['advanced']): unknown => settingValue(e, config.settings, null, { ...workspace.config, advanced: own }, advanced.overrides())
+      const saved = await workspace.setAdvanced(change.advanced.id, change.advanced.value, (own) => {
+        old = at(own)
+        guard?.(old)
+      })
+      next = at(saved)
       emit({ type: 'advanced-changed' })
     } else {
       // In the change's turn among advanced.json's changes: the value it checks is the one it replaces (#367 round 4).
