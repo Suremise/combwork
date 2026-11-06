@@ -34,8 +34,11 @@ $roamComb = Join-Path $env:APPDATA 'Combwork'
 $locComb = Join-Path $env:LOCALAPPDATA 'Combwork'
 $mark = 'sandbox-mark.txt'
 $record = 'profile-move.json'
-# The error box's title (main.profileMove.refusedTitle, in English: the Sandbox's language).
+# The error box's title (main.profileMove.refusedTitle, in English: the Sandbox's language). On Windows Electron's
+# dialog.showErrorBox captions its box "Error" and shows the title as the box's heading (HI-2648): the check reads the
+# heading inside the box, not the window's caption.
 $refusedTitle = "couldn't move its data folder"
+$refusedCaption = 'Error'
 # The log lines of the sign-in check after a move (profileNotices.ts): one per check, and the notices' phase ending.
 $checkLine = 'profile: after the move, '
 $doneLine = 'profile: start notices done'
@@ -72,6 +75,16 @@ function Launch([string]$exe, [string]$stderr) {
 }
 # The title of a process's main window, read fresh ('' while it has none).
 function TitleOf($p) { $g = Get-Process -Id $p.Id -ErrorAction SilentlyContinue; if ($g -and $g.MainWindowHandle -ne 0) { $g.MainWindowTitle } else { '' } }
+# The texts inside a process's main window (an error box's heading and text, its button), as UI Automation reads them,
+# joined by ' | ' ('' while it has no window).
+function TextsOf($p) {
+  $g = Get-Process -Id $p.Id -ErrorAction SilentlyContinue
+  if (-not $g -or $g.MainWindowHandle -eq 0) { return '' }
+  Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
+  $root = [Windows.Automation.AutomationElement]::FromHandle($g.MainWindowHandle)
+  $all = $root.FindAll([Windows.Automation.TreeScope]::Descendants, [Windows.Automation.Condition]::TrueCondition)
+  (@($all | ForEach-Object { $_.Current.Name } | Where-Object { $_ }) -join ' | ')
+}
 # A process of this script's holding a file open with no sharing until told to let go (C:\out\<name>.release), saying
 # when it holds it (C:\out\<name>.ready): asserted before the case goes on.
 function Holding([string]$name, [string]$file) {
@@ -156,13 +169,19 @@ try {
   $localBefore = Listing $locOld
   $p = Launch $combExe 'C:\out\s11-refused-stderr.txt'
   WaitFor { $p.HasExited -or (TitleOf $p) } 'Combwork shows a window or ends'
-  $title = TitleOf $p
-  $res.facts.refusedTitle = $title
-  if ($title) { Shot 's11-refused' }
+  $caption = TitleOf $p
+  $res.facts.refusedCaption = $caption
+  # The box's heading is in it as soon as its caption is: read until it is (bounded), so a box still drawing isn't read empty.
+  $texts = ''
+  if ($caption) {
+    try { WaitFor { $script:texts = $(try { TextsOf $p } catch { "unread: $($_.Exception.Message)" }); $script:texts -like "*$refusedTitle*" -or $p.HasExited } "the error box's heading `"...$refusedTitle`"" 30 } catch { }
+    Shot 's11-refused'
+  }
+  $res.facts.refusedTexts = $texts
   CloseApp $p $combExe
   $res.facts.refusedExit = $p.ExitCode
   $res.facts.refusedStderr = $(try { [IO.File]::ReadAllText('C:\out\s11-refused-stderr.txt') } catch { "unread: $($_.Exception.Message)" })
-  Check '11.refused' "Started with the local folder held: the start is refused, an error box (`"...$refusedTitle`") naming the folder, then exit 1" ($title -like "*$refusedTitle*" -and $p.ExitCode -eq 1 -and $res.facts.refusedStderr.Contains($locOld)) "title '$title'; exit $($p.ExitCode); stderr $($res.facts.refusedStderr)"
+  Check '11.refused' "Started with the local folder held: the start is refused, an error box (captioned `"$refusedCaption`", headed `"...$refusedTitle`") naming the folder, then exit 1" ($caption -eq $refusedCaption -and $texts -like "*$refusedTitle*" -and $texts.Contains($locOld) -and $p.ExitCode -eq 1 -and $res.facts.refusedStderr.Contains($locOld)) "caption '$caption'; box '$texts'; exit $($p.ExitCode); stderr $($res.facts.refusedStderr)"
   $roamingAfter = Listing $roamComb
   $localAfter = Listing $locOld
   Check '11.refused-unchanged' 'Nothing made under Combwork: no %LOCALAPPDATA%\Combwork, 1.0''s local folder and %APPDATA%\Combwork as they were' (-not (Test-Path $locComb) -and $roamingAfter -eq $roamingBefore -and $localAfter -eq $localBefore) "$(Folders); roaming before [$roamingBefore] after [$roamingAfter]; local before [$localBefore] after [$localAfter]"
