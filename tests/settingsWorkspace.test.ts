@@ -150,6 +150,18 @@ describe("a workspace's card loops, as its workflow defaults (#412, HI-1766)", a
         const own = await applySetting(entryOf('workspace.advanced.cw.progress.lanesShown'), 6, null)
         expect([own.old, own.new]).toEqual([null, 6])
         expect(settingDetail(entryOf('workspace.advanced.cw.progress.lanesShown'), null)).toMatchObject({ value: '6 lanes', default: 'inherit' })
+        // The workspace's own, in its save's turn (HI-2654): changes queued together each report the value they replaced
+        // and the one they left, and a guard sees the value it would replace, refusing with nothing written.
+        const lanes = entryOf('workspace.advanced.cw.progress.lanesShown')
+        const [x, y] = await Promise.all([applySetting(lanes, 7, null), applySetting(lanes, 8, null)])
+        expect([x.old, x.new, y.old, y.new]).toEqual([6, 7, 7, 8])
+        const queued = applySetting(lanes, 9, null)
+        const refused = applySetting(lanes, 6, null, (current) => {
+          if (current !== 8) throw new Error(`It has changed since (it is ${String(current)} now).`)
+        })
+        await queued
+        await expect(refused).rejects.toThrow('It has changed since (it is 9 now).')
+        await applySetting(lanes, 6, null)
         await applySetting(entryOf('advanced.cw.mcp.replySeconds'), null, null)
         expect(JSON.parse(readFileSync(join(profile, 'advanced.json'), 'utf8')).values).toEqual({})
         // The developer setting (its own catalogue entry) is kept in advanced.json too: an unreadable file refuses it, nothing changed.
