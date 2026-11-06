@@ -178,8 +178,11 @@ export interface ProjectSeen {
   copy: boolean
 }
 
-/** For unit tests (#1382): an agent leaving the project, its change about to wait for the board's lock. */
-export const configTestHooks: { beforeBoardRetry?: (projectPath: string) => void; beforeConfigWrite?: (projectPath: string) => Promise<void>; beforeDefaultConfig?: (projectPath: string) => Promise<void>; afterConfigSeen?: (projectPath: string) => Promise<void> } = {}
+/**
+ * For unit tests (#1382): an agent leaving the project, its change about to wait for the board's lock. HI-2651: an open
+ * holding its folder, about to read workspace.json (beforeSettingsRead), and a save of it waiting for that read.
+ */
+export const configTestHooks: { beforeBoardRetry?: (projectPath: string) => void; beforeConfigWrite?: (projectPath: string) => Promise<void>; beforeDefaultConfig?: (projectPath: string) => Promise<void>; afterConfigSeen?: (projectPath: string) => Promise<void>; beforeSettingsRead?: (workspacePath: string) => Promise<void>; saveWaitsForRead?: () => void } = {}
 
 /** A file's version as its stat says (HI-2563): its inode, size and time changed; '' when it isn't there or can't be read. */
 async function keptStamp(path: string): Promise<string> {
@@ -326,6 +329,12 @@ export class WorkspaceService {
   movedFrom: string | null = null
   /** The open under way in this window, its folder and its run (HI-2141), or null. */
   private opening: { path: string; run: Promise<WorkspaceInfo> } | null = null
+  /**
+   * Its open holds the folder (its path set) but hasn't read workspace.json yet (HI-2651): its settings are still the
+   * defaults close() left, so a save now would write them over the workspace's own. Saves wait for `settingsRead`.
+   */
+  private settingsPending = false
+  private settingsRead = gate(true)
   private ids: (ProjectIdIndex & { key: string; at: number }) | null = null
   /**
    * Where each project id was last seen while this workspace is open, kept when a read misses it: a read part way through
@@ -417,6 +426,11 @@ export class WorkspaceService {
     return this.wsConfig
   }
 
+  /** Whether its open hasn't read workspace.json yet (HI-2651): `config` is still the defaults, not its own. */
+  get readingSettings(): boolean {
+    return this.settingsPending
+  }
+
   /** The place its window recorded as it opened (#1395): its real location, lower-cased; null while none is open. */
   get openPlace(): string | null {
     return this.place
@@ -471,6 +485,9 @@ export class WorkspaceService {
       folderMove = await moveFolders(abs, { stillOurs: () => this.generation === openGen })
       // Launches wait until this open has moved its MCP settings (HI-1472): the path is the workspace's from now on.
       this.mcpMoving = gate()
+      // Nothing saves its settings until they are read (HI-2651): from here other code sees the path.
+      this.settingsPending = true
+      this.settingsRead = gate()
       this.path = abs
       this.place = placeKey(abs)
       // Its databases are kept open from now on, by this place (#1395); a save's lease doesn't close the database now it
@@ -509,7 +526,9 @@ export class WorkspaceService {
     const moveOpts = { signal: this.life.signal, stillOurs: () => this.generation === openGen && this.path === abs }
     const fresh = !existsSync(join(abs, CW_DIR))
     await this.ensureWorkspaceStructure()
+    await configTestHooks.beforeSettingsRead?.(abs)
     this.wsConfig = loadedConfig(await readKeptJson(join(this.combworkDir, 'workspace.json'), {}, { holder: this }))
+    this.settingsReadNow()
     // Its open point's commands hold its agents back until they are done (HI-1954): reserved here, before anything hears
     // of the open (the recent list, workspace-changed, onOpened), so no start slips in ahead of them.
     this.openGate = this.wsConfig.commands?.onOpen.run.length && WorkspaceService.runsCommands() ? new OpenGate(this.generation, this.life.signal) : null
@@ -700,6 +719,8 @@ export class WorkspaceService {
     this.goneSaid.clear()
     this.unusedRoots.clear()
     this.wsConfig = structuredClone(DEFAULT_WORKSPACE_CONFIG)
+    // A save waiting for an open that ended before its read writes nothing (settingsToSave).
+    this.settingsReadNow()
     // A new lifetime only once it is fully closed: work started while it was closing (its path still set) belongs to the
     // aborted one, so nothing can be admitted for a workspace that is going away.
     this.life = new AbortController()
@@ -724,7 +745,32 @@ export class WorkspaceService {
   /** workspace.json saves, one after another, so an older one can't land after a newer one. */
   private savingConfig: Promise<void> = Promise.resolve()
 
+  /** Its open's read of workspace.json is done (or the open ended before it): saves waiting for it go on. */
+  private settingsReadNow(): void {
+    this.settingsPending = false
+    this.settingsRead.done()
+  }
+
+  /**
+   * The settings a save started now writes (HI-2651): this workspace's object as it is (another workspace opened
+   * meanwhile has its own), or, while its open hasn't read workspace.json yet, the one read, once it is; null when that
+   * open ended first, so nothing is written over the file with the defaults close() left.
+   */
+  private settingsToSave(): Promise<WorkspaceConfig | null> {
+    if (!this.settingsPending) return Promise.resolve(this.wsConfig)
+    const generation = this.generation
+    configTestHooks.saveWaitsForRead?.()
+    return this.settingsRead.promise.then(() => (this.generation === generation && this.path ? this.wsConfig : null))
+  }
+
+  /**
+   * Saves workspace.json as the settings are in memory, changed there already. Refused while its open hasn't read the
+   * file (HI-2651): a change made then was made to the defaults, and the read replaces them. A change to save goes
+   * through saveWorkspaceConfigWith, worked out from the settings as they are when it is written.
+   */
   saveWorkspaceConfig(): Promise<void> {
+    // i18n-ignore: internal, a caller's mistake, never shown
+    if (this.settingsPending) return Promise.reject(new Error("workspace.json saved as it is before its open read it: save the change with saveWorkspaceConfigWith"))
     // This workspace's file and settings object (another workspace opened meanwhile has its own).
     const file = join(this.combworkDir, 'workspace.json')
     const data = this.wsConfig
@@ -740,15 +786,18 @@ export class WorkspaceService {
   /**
    * Saves workspace.json with a change (worked out from the settings as they are when it is written) that takes effect
    * only once it is saved: a save that fails leaves the settings as they were, so whatever it marks done (#514's
-   * renamesApplied) is done again next time.
+   * renamesApplied) is done again next time. One started while the open is reading the file waits for that read, and
+   * one whose open ended first writes nothing (HI-2651).
    */
   saveWorkspaceConfigWith(change: (c: WorkspaceConfig) => Partial<WorkspaceConfig>): Promise<void> {
     const file = join(this.combworkDir, 'workspace.json')
-    const data = this.wsConfig
+    const settings = this.settingsToSave()
     this.configSaves++
     let text: string | null = null
     const run = this.savingConfig
       .then(async () => {
+        const data = await settings
+        if (!data) return
         const next = { ...data, ...change(data) }
         text = JSON.stringify(next, null, 2) + '\n'
         await writeKeptJson(file, next, { holder: this })
@@ -1199,25 +1248,30 @@ export class WorkspaceService {
     if (!this.path) throw combworkError(M.noWorkspace, undefined, { kind: 'conflict' })
     const def = advancedDef(id)
     if (!def?.workspace) throw combworkError(msg({ id: 'service.workspace.advancedNotHere', defaultMessage: "{setting} can't be set for a workspace.", description: 'An error: the advanced setting {setting} (its title, or its id) has no value of its own for a workspace, only for Combwork.' }), { setting: def?.text.title ?? id }, { kind: 'invalid' })
-    const own = { ...this.wsConfig.advanced }
-    if (raw === null || raw === undefined) delete own[id]
-    else {
+    let value: unknown = undefined
+    if (raw !== null && raw !== undefined) {
       const checked = checkAdvanced(def, raw)
       // agent-text: checkAdvanced
       if ('error' in checked) throw new CombworkError(checked.errorText, { kind: 'invalid' })
-      own[id] = checked.value
+      value = checked.value
     }
-    if (Object.keys(own).length) this.wsConfig.advanced = own
-    else delete this.wsConfig.advanced
-    await this.saveWorkspaceConfig()
+    // Worked out from the settings as saved (HI-2651): during the open, those it reads, not the defaults before them.
+    await this.saveWorkspaceConfigWith((c) => {
+      const own = { ...c.advanced }
+      if (value === undefined) delete own[id]
+      else own[id] = value
+      return { advanced: Object.keys(own).length ? own : undefined }
+    })
   }
 
   /** Leaves a project folder out of the workspace (mode says how), or takes it back (null). */
   async setHidden(name: string, mode: HiddenProject['mode'] | null): Promise<void> {
-    const rest = (this.wsConfig.hiddenProjects ?? []).filter((h) => h.name.toLowerCase() !== name.toLowerCase())
-    this.wsConfig.hiddenProjects = mode ? [...rest, { name, mode, at: new Date().toISOString() }] : rest
-    if (!this.wsConfig.hiddenProjects.length) delete this.wsConfig.hiddenProjects
-    await this.saveWorkspaceConfig()
+    const at = new Date().toISOString()
+    await this.saveWorkspaceConfigWith((c) => {
+      const rest = (c.hiddenProjects ?? []).filter((h) => h.name.toLowerCase() !== name.toLowerCase())
+      const hidden = mode ? [...rest, { name, mode, at }] : rest
+      return { hiddenProjects: hidden.length ? hidden : undefined }
+    })
   }
 
   isProjectPath(p: string): boolean {
@@ -1896,14 +1950,16 @@ export class WorkspaceService {
    */
   private flagDuplicateNames(projects: ProjectInfo[]): void {
     const all = projects.flatMap((p) => p.agents.map((a) => ({ project: p.name, path: p.path, name: a.name, id: a.id })))
+    // What it said is in the settings, not read yet during the open (HI-2651): its own refresh after the read says it.
+    if (this.settingsPending) return
     const dups = duplicateAgentNames(all)
     const now = dups.map((d) => d.name.toLowerCase()).sort()
     const before = this.wsConfig.flaggedAgentNames ?? []
     if (now.length === before.length && now.every((n, i) => n === before[i])) return
-    // In memory at once, so a refresh close behind this one doesn't say them again.
+    // In memory at once, so a refresh close behind this one doesn't say them again; the save sets it too.
     if (now.length) this.wsConfig.flaggedAgentNames = now
     else delete this.wsConfig.flaggedAgentNames
-    void this.saveWorkspaceConfig().catch((e) => log.warn('remembering the shared agent names', e))
+    void this.saveWorkspaceConfigWith(() => ({ flaggedAgentNames: now.length ? now : undefined })).catch((e) => log.warn('remembering the shared agent names', e))
     // No name shared any more: the notice's Rename… no longer applies (HI-2320).
     if (!now.length) resolveOffers((o) => o === `names:${this.path?.toLowerCase()}`, tr(OUTCOME.namesDiffer))
     const fresh = dups.filter((d) => !before.includes(d.name.toLowerCase()))
