@@ -4,7 +4,10 @@
 // at the card's submitted revision; it is asked to write build.txt there and run `node test.js` there (which writes
 // ran.txt beside itself). Passes when both are in the copy and nothing of theirs is in the project folder (what is there
 // is named, with whose turn left it and its screen, #1546: a reviewer's shell starts in the project folder, and Haiku
-// once ran `node test.js` there before running it in its copy). An edit there
+// ran `node test.js` there before running it in its copy, 2 runs in 3 at RC4, HI-2640). So the Claude Code and Codex
+// reviewers are given what a reviewer is told: start review's own reply line, which names the copy and says their shell stays
+// in their folder (HI-2640; the suite's own words alone didn't, and its start review is the suite's call, not theirs).
+// An edit there
 // is never asked about (granted): a command may be (Claude Code's Accept edits and Copilot's ask before one), and is
 // answered Yes, counted in the output. What each CLI's own home has afterwards never names the copies folder (Combwork
 // passes it on the command line only).
@@ -194,7 +197,7 @@ const namingCopies = () => {
       const prompt =
         r.key === 'copilot'
           ? `write ${built} built then shell Set-Location '${folder}'; node test.js then say done`
-          : `Work only in the folder ${folder} (outside your own; you may use it). First create the file build.txt there containing the word built, with your file tools. Then run "node test.js" with that folder as the working directory. Reply done.`
+          : `Your review of a card has started. Combwork's reply: "${said}" Work only in that copy (outside your own folder; you may use it). First create the file build.txt there containing the word built, with your file tools. Then run "node test.js" in the copy. Reply done.`
       // Its turn waits on the real CLI answering: an environment failure in its session meanwhile is a SKIP (lib.cliStep).
       let asked = 0
       let askedBeforeEdit = false

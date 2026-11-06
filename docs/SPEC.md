@@ -4619,7 +4619,8 @@ for a day go hourly (Remove idle slots after a day).
 - **Start review** (the old `review: "start"` or `cw_start_review`: any path that sets the card's review mark for an
   agent) leases a copy for the card's latest submission (`kind: review`, `ref` its submission), only for a session
   granted the folder (else nothing: it reviews the builder's folder read-only). Ready within 2 s, the reply names it
-  ("Review in … at <revision>: read and run commands there, with it as their working directory; your session stays where it is": in `changes` of a short
+  ("Review in … at <revision>: read and run commands there, with it as their working directory; your session and its shell stay in your own folder, so a command that doesn't
+  change into the copy first runs in your folder": in `changes` of a short
   reply, `reviewCopy` of a whole card or of an intent's `data`). A first copy's setup takes longer, so otherwise it
   replies "Waiting for a review copy (why): Combwork tells you when one is ready", the card's history says *R1 is waiting for
   a review copy* (the window's text, a message), and once leased the reviewer is told in its inbox (a message from
