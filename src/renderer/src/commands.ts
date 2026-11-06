@@ -678,7 +678,7 @@ const COMMAND_DEFS: CommandDef[] = [
     name: msg({ id: 'shell.command.help.restoreBoard09', defaultMessage: 'Restore the 0.9 Board Backup…', description: "A command (the Help menu, the command palette), in the Help category: puts back the copy of the workspace's board Combwork kept when it upgraded the board to 1.0, for going back to Hive 0.9. The … says it asks first: keep it." }),
     category: 'help',
     when: () => hasWorkspace() && !!get().boardState?.backup09,
-    tip: () => tr(msg({ id: 'shell.tip.help.restoreBoard09', defaultMessage: 'Puts back the board as it was before its upgrade to 1.0, to go back to Combwork 0.9', description: 'What a command does, on hover in the menus.' })),
+    tip: () => tr(msg({ id: 'shell.tip.help.restoreBoard09', defaultMessage: 'Puts back the board as it was before its upgrade to 1.0, to go back to Hive 0.9', description: 'What a command does, on hover in the menus.' })),
     run: () => void restoreBoard09()
   },
   { id: 'help.diagnostics', name: msg({ id: 'shell.command.help.diagnostics', defaultMessage: 'Copy Diagnostics…', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Help category. The … says it opens a dialog first: keep it.' }), category: 'help', run: () => set({ diagnosticsOpen: true }) },

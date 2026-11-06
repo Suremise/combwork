@@ -478,7 +478,7 @@ describe('while the upgrade waits, nothing needing combwork.db starts or writes 
     const ws = await board09()
     const w = await open(ws)
     expect(inWorkspace(w, () => store.upgradeWaiting(ws))).toBe(true)
-    await expect(inWorkspace(w, () => sessions.start(join(ws, 'p'), { agentId: 'a1' }))).rejects.toThrow('This workspace is from Combwork 0.9: upgrade it to 1.0 before starting agents')
+    await expect(inWorkspace(w, () => sessions.start(join(ws, 'p'), { agentId: 'a1' }))).rejects.toThrow('This workspace is from Hive 0.9: upgrade it to 1.0 before starting agents')
     expect(sessions.agentsIn(ws)).toBe(0)
     // The Assistant's home is in the workspace: refused the same way.
     await expect(inWorkspace(w, () => sessions.start(join(ws, '.combwork', 'assistant'), { agentId: 'assistant' }))).rejects.toThrow('upgrade it to 1.0 before starting agents')
@@ -588,7 +588,7 @@ describe('while the upgrade waits, nothing needing combwork.db starts or writes 
       expect(await inWorkspace(w, () => repairStages(w))).toEqual({ unmarked: 0, repaired: [], failed: 0 })
       metrics.recordApi(metrics.metricsHandle(w), null, { route: '/v1/tasks', method: 'GET', role: 'agent', outcome: 'ok', requestBytes: 1, responseBytes: 1, ms: 1 })
       await metrics.metricsHandle(w)!.store.save()
-      expect(lines.filter((l) => /no such table|readonly database|Could not save the performance metrics|bringing builders|from Combwork 0\.9|repairing the stages/i.test(l))).toEqual([])
+      expect(lines.filter((l) => /no such table|readonly database|Could not save the performance metrics|bringing builders|from Hive 0\.9|repairing the stages/i.test(l))).toEqual([])
       expect(readTable(ws, 'metrics').docs).toEqual([])
       await inWorkspace(w, () => store.upgradeBoard(w))
       expect(store.boardWaits(w)).toBe(false)

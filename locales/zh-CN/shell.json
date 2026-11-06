@@ -403,7 +403,7 @@
   "shell.tip.app.quitAll": "关闭全部 {n} 个窗口，并停止所有工作区中的智能体",
   "shell.tip.help.devConsole": "在单独的窗口中，并排显示每个 CLI 发给 Combwork 的内容和 Combwork 对其的解读",
   "shell.tip.help.improveTranslation": "了解如何在 GitHub 上修正翻译或添加语言",
-  "shell.tip.help.restoreBoard09": "将看板恢复到升级到 1.0 之前的状态，以便回到 Combwork 0.9",
+  "shell.tip.help.restoreBoard09": "将看板恢复到升级到 1.0 之前的状态，以便回到 Hive 0.9",
   "shell.tip.window.closeQuit": "关闭窗口并退出 Combwork",
   "shell.tip.window.closeSeveral": "关闭此窗口，并停止其工作区的智能体",
   "shell.tip.window.closeToTray": "关闭窗口；Combwork 继续在托盘中运行",

@@ -448,7 +448,7 @@
     "description": "A tip's title (glossary 2.2: stage; 2.1: workflow)."
   },
   "tips.boardUpgrade.text": {
-    "defaultMessage": "Combwork keeps the 0.9 board it upgraded to 1.0. Help → Restore the 0.9 Board Backup… puts it back, after keeping a copy of the board as it is, so a 0.9 Combwork can change it again.",
+    "defaultMessage": "Combwork keeps the 0.9 board it upgraded to 1.0. Help → Restore the 0.9 Board Backup… puts it back, after keeping a copy of the board as it is, so Hive 0.9 can change it again.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
   },
   "tips.boardUpgrade.title": {

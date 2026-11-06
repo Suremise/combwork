@@ -111,7 +111,7 @@
   "tips.boardSetAside.title": "Cards made by an older Combwork",
   "tips.boardStages.text": "The board’s columns are the stages your workflow options make: Merging sits under Approved while Combwork merges, and a stage nobody uses is hidden. Ask the Assistant to rename one, such as “call Active Building in web”: a name changes no rule.",
   "tips.boardStages.title": "The board shows your workflow’s stages",
-  "tips.boardUpgrade.text": "Combwork keeps the 0.9 board it upgraded to 1.0. Help → Restore the 0.9 Board Backup… puts it back, after keeping a copy of the board as it is, so a 0.9 Combwork can change it again.",
+  "tips.boardUpgrade.text": "Combwork keeps the 0.9 board it upgraded to 1.0. Help → Restore the 0.9 Board Backup… puts it back, after keeping a copy of the board as it is, so Hive 0.9 can change it again.",
   "tips.boardUpgrade.title": "Back to 0.9 after the upgrade",
   "tips.branchCards.text": "In Version Control → Branches & remotes, a branch a card works on shows the card and its stage, and in Review the revision under review. Click the card to open it.",
   "tips.branchCards.title": "See which card a branch is for",

@@ -1616,7 +1616,7 @@
     "description": "What a command does, on hover in the menus."
   },
   "shell.tip.help.restoreBoard09": {
-    "defaultMessage": "Puts back the board as it was before its upgrade to 1.0, to go back to Combwork 0.9",
+    "defaultMessage": "Puts back the board as it was before its upgrade to 1.0, to go back to Hive 0.9",
     "description": "What a command does, on hover in the menus."
   },
   "shell.tip.window.closeQuit": {

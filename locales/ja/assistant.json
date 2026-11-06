@@ -479,7 +479,7 @@
   "assistant.template.badPairs": "ビルダーとレビュアーの組み合わせに、テンプレートにないエージェントか、同じエージェントが2回含まれています。",
   "assistant.template.badRole": "{name}のワークフローでの役割がbuilder、reviewer、either、generalistのいずれでもありません。",
   "assistant.template.badToken": "{name}に{token}が含まれています。エージェント名に使えるのは'{key}'（プロジェクトのキー）と'{n}'（その名前のエージェントの中での番号）だけです。",
-  "assistant.template.from09": "このテンプレートはCombwork 0.9で作られたため、1.0では読み込めません。「テンプレートを保存…」でエージェントから作り直してください。",
+  "assistant.template.from09": "このテンプレートはHive 0.9で作られたため、1.0では読み込めません。「テンプレートを保存…」でエージェントから作り直してください。",
   "assistant.template.longNote": "エージェント{name}のメモが{max, number}文字を超えています。",
   "assistant.template.newer": "新しいバージョンのCombworkで作られています。使うにはCombworkを更新してください。",
   "assistant.template.noAgents": "エージェントがありません。",

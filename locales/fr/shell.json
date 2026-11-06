@@ -403,7 +403,7 @@
   "shell.tip.app.quitAll": "Fermer les {n} fenêtres et arrêter les agents de tous les espaces de travail",
   "shell.tip.help.devConsole": "Ce que chaque CLI envoie à Combwork, à côté de ce que Combwork en a compris, dans une fenêtre à part",
   "shell.tip.help.improveTranslation": "Comment corriger une traduction, ou ajouter une langue, sur GitHub",
-  "shell.tip.help.restoreBoard09": "Remet le tableau tel qu’il était avant sa mise à niveau vers 1.0, pour revenir à Combwork 0.9",
+  "shell.tip.help.restoreBoard09": "Remet le tableau tel qu’il était avant sa mise à niveau vers 1.0, pour revenir à Hive 0.9",
   "shell.tip.window.closeQuit": "Fermer la fenêtre et quitter Combwork",
   "shell.tip.window.closeSeveral": "Fermer cette fenêtre et arrêter les agents de son espace de travail",
   "shell.tip.window.closeToTray": "Fermer la fenêtre ; Combwork continue de tourner dans la zone de notification",

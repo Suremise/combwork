@@ -2423,7 +2423,7 @@ const SOURCES: readonly AdvancedSource[] = [
     max: 3600,
     unit: 's',
     applies: 'sessions',
-    samples: [{ from: `${FIX}/advanced/mcp-list-codex-0.162.1.json`, version: '0.162.1', text: '"tool_timeout_sec": 900.0', shows: "Codex reading the combwork server's tool_timeout_sec from Hive's -c override (codex mcp list --json)" }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [{ from: `${FIX}/advanced/mcp-list-codex-0.162.1.json`, version: '0.162.1', text: '"tool_timeout_sec": 900.0', shows: "Codex reading the combwork server's tool_timeout_sec from Combwork's -c override (codex mcp list --json)" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: 'codex.mcp.startupTimeoutSeconds',
@@ -2436,7 +2436,7 @@ const SOURCES: readonly AdvancedSource[] = [
     max: 300,
     unit: 's',
     applies: 'sessions',
-    samples: [{ from: `${FIX}/advanced/mcp-get-codex-0.163.0-native-hive.json`, version: '0.163.0', text: '"startup_timeout_sec": 10.0', shows: "Codex taking the combwork server's startup_timeout_sec from Hive's -c override over a native server named hive with its own (codex mcp get hive --json)" }] // i18n-ignore: a CLI's recorded text (#367)
+    samples: [{ from: `${FIX}/advanced/mcp-get-codex-0.163.0-native-hive.json`, version: '0.163.0', text: '"startup_timeout_sec": 10.0', shows: "Codex taking the combwork server's startup_timeout_sec from Combwork's -c override over a native server named hive with its own (codex mcp get hive --json)" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: drawnWaitId('codex'),

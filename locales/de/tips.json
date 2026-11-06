@@ -111,7 +111,7 @@
   "tips.boardSetAside.title": "Karten aus einer älteren Version von Combwork",
   "tips.boardStages.text": "Die Spalten des Boards sind die Phasen, die deine Workflow-Optionen ergeben: „Wird gemergt“ steht unter „Genehmigt“, solange Combwork mergt, und eine Phase, die niemand nutzt, ist ausgeblendet. Bitte den Assistenten, eine umzubenennen, etwa „nenne In Arbeit in web Bauen“: Ein Name ändert keine Regel.",
   "tips.boardStages.title": "Das Board zeigt die Phasen deines Workflows",
-  "tips.boardUpgrade.text": "Combwork bewahrt das 0.9-Board auf, das es auf 1.0 aktualisiert hat. „Hilfe“ → „0.9-Board-Sicherung wiederherstellen…“ stellt es wieder her, nachdem eine Kopie des Boards in seinem jetzigen Zustand aufbewahrt wurde, damit ein Combwork 0.9 es wieder ändern kann.",
+  "tips.boardUpgrade.text": "Combwork bewahrt das 0.9-Board auf, das es auf 1.0 aktualisiert hat. „Hilfe“ → „0.9-Board-Sicherung wiederherstellen…“ stellt es wieder her, nachdem eine Kopie des Boards in seinem jetzigen Zustand aufbewahrt wurde, damit Hive 0.9 es wieder ändern kann.",
   "tips.boardUpgrade.title": "Zurück zu 0.9 nach der Aktualisierung",
   "tips.branchCards.text": "In Versionsverwaltung → Branches & Remotes zeigt ein Branch, an dem eine Karte arbeitet, die Karte und ihre Phase, im Review auch die Revision im Review. Klicke auf die Karte, um sie zu öffnen.",
   "tips.branchCards.title": "Sieh, zu welcher Karte ein Branch gehört",

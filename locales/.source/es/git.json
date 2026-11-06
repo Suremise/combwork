@@ -247,7 +247,6 @@
   "git.switch.message": "The project folder leaves {current} for {branch}. Uncommitted changes come along when they don't clash with {branch}; if they do, git refuses and nothing changes.",
   "git.switch.tip": "Switch the project folder to {branch}",
   "git.switch.title": "Switch {project} to {branch}?",
-  "git.tab.sections": "Git",
   "git.tags.about": "{onBranch, select, yes {Tags the commit the project folder has checked out ({branch}). With a message, it's an annotated tag.} other {Tags the commit the project folder has checked out. With a message, it's an annotated tag.}}",
   "git.tags.busy": "Tagging…",
   "git.tags.create": "Create tag…",

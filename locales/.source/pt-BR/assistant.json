@@ -479,7 +479,7 @@
   "assistant.template.badPairs": "Its pairs of builders and reviewers name agents it doesn’t have, or an agent twice.",
   "assistant.template.badRole": "{name}'s role in the workflow isn't builder, reviewer, either or generalist.",
   "assistant.template.badToken": "{name} uses {token}: an agent’s name may only hold '{key}' (the project’s key) and '{n}' (its number among the agents with that name).",
-  "assistant.template.from09": "This template is from Combwork 0.9 and can't be loaded in 1.0. Recreate it from your agents with Save as Template.",
+  "assistant.template.from09": "This template is from Hive 0.9 and can't be loaded in 1.0. Recreate it from your agents with Save as Template.",
   "assistant.template.longNote": "The note of agent {name} is over {max, number} characters.",
   "assistant.template.newer": "It was made by a newer version of Combwork: update Combwork to use it.",
   "assistant.template.noAgents": "It has no agents.",

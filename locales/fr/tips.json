@@ -111,7 +111,7 @@
   "tips.boardSetAside.title": "Cartes créées par une ancienne version de Combwork",
   "tips.boardStages.text": "Les colonnes du tableau sont les étapes que créent tes options du flux de travail : Fusion en cours se place sous Validé tant que Combwork fusionne, et une étape que personne n’utilise est masquée. Demande à l’Assistant d’en renommer une, par exemple « renomme En cours en Construction dans web » : un nom ne change aucune règle.",
   "tips.boardStages.title": "Le tableau montre les étapes de ton flux de travail",
-  "tips.boardUpgrade.text": "Combwork conserve le tableau 0.9 qu’il a mis à niveau vers 1.0. Aide → Restaurer la sauvegarde du tableau 0.9… le remet en place, après avoir conservé une copie du tableau tel qu’il est, pour qu’un Combwork 0.9 puisse de nouveau le modifier.",
+  "tips.boardUpgrade.text": "Combwork conserve le tableau 0.9 qu’il a mis à niveau vers 1.0. Aide → Restaurer la sauvegarde du tableau 0.9… le remet en place, après avoir conservé une copie du tableau tel qu’il est, pour que Hive 0.9 puisse de nouveau le modifier.",
   "tips.boardUpgrade.title": "Revenir à 0.9 après la mise à niveau",
   "tips.branchCards.text": "Dans Gestion de versions → Branches et dépôts distants, une branche sur laquelle travaille une carte montre la carte et son étape, et en Relecture la révision en relecture. Clique sur la carte pour l’ouvrir.",
   "tips.branchCards.title": "Vois à quelle carte une branche correspond",
