@@ -90,12 +90,11 @@ function citedBy(rel, cards, children = [], label = 'combwork-test') {
   return null
 }
 
-// old-name: begin HI-2622-board-lookup
 /**
- * The workspace's board for the repository at root, found up from its main checkout: its database (.combwork\hive.db, Hive 0.9
- * and later, #1017; .hive\hive.db until a 1.1 has opened the workspace, HI-2462) or, before that, its cards folder
- * (.combwork\tasks); null when there is none. A workspace moved to the
- * database keeps a stub tasks folder for older versions: the database is looked for first, so the stub never counts.
+ * The workspace's board for the repository at root, found up from its main checkout: its database (.combwork\combwork.db,
+ * #1017) or, before that, its cards folder (.combwork\tasks); null when there is none. Current names only (HI-2622): a
+ * workspace no 1.1 has opened yet has no board here until it is opened. A workspace moved to the database keeps a stub
+ * tasks folder for older versions: the database is looked for first, so the stub never counts.
  */
 function findBoard(root) {
   let dir
@@ -105,25 +104,15 @@ function findBoard(root) {
     dir = root
   }
   for (;;) {
-    // Its folder is .combwork from 1.1 (HI-2462), .hive in a workspace no 1.1 has opened yet (the installed 1.0's).
-    // Its file is combwork.db once a build with the names upgrade (HI-2587) has opened it, hive.db before (the installed
-    // Combwork's, which the developer's own workspace may still be on).
-    for (const folder of ['.combwork', '.hive']) {
-      for (const name of ['combwork.db', 'hive.db']) {
-        const db = path.join(dir, folder, name)
-        if (fs.existsSync(db)) return db
-      }
-    }
-    for (const folder of ['.combwork', '.hive']) {
-      const tasks = path.join(dir, folder, 'tasks')
-      if (fs.existsSync(path.join(tasks, 'board.json'))) return tasks
-    }
+    const db = path.join(dir, '.combwork', 'combwork.db')
+    if (fs.existsSync(db)) return db
+    const tasks = path.join(dir, '.combwork', 'tasks')
+    if (fs.existsSync(path.join(tasks, 'board.json'))) return tasks
     const up = path.dirname(dir)
     if (up === dir) return null
     dir = up
   }
 }
-// old-name: end HI-2622-board-lookup
 
 /** A card that may cite evidence: neither Done nor archived, with its words (title, description, comments) as pathText. */
 const citing = (c) => (!c || c.archived || c.column === 'done' ? null : { number: c.number, text: pathText([c.title, c.description, ...(c.comments ?? []).map((m) => m.text)].join('\n')) })
