@@ -1,6 +1,6 @@
 # Release Notes
 
-## Unreleased
+## 1.1.0 — 2026-11-06
 
 <!-- old-name: begin changelog-upgrade -->
 **Combwork, formerly called Hive Desktop**, and agents can now be given words tuned to their model: **dialects**. Another open-source app with the old name runs coding agents too, and names around agent tools with bees in them are crowded, so the app has a name of its own. The honeycomb icon and the colours stay.

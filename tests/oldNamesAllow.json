@@ -8,7 +8,7 @@
     { "file": "docs/USER_GUIDE.md", "id": "guide-mcp-zip", "why": "An MCP zip made before the rename: the definition's old file name and variable the user must change (upgrade input, HI-2631)." },
     { "file": "docs/USER_GUIDE.md", "id": "guide-rename", "why": "The rename's one entry in Upgrading: the app's former name, once (the Assistant on HI-2631)." },
     { "file": "docs/USER_GUIDE.md", "id": "guide-data-folders", "why": "Troubleshooting: 1.0's data folders by path, which a user may look for (upgrade input, HI-2631)." },
-    { "file": "CHANGELOG.md", "id": "changelog-upgrade", "why": "Unreleased's note before updating from 1.0 (HI-2484): the former name once, and the old folder, variables and tools a user must change." },
+    { "file": "CHANGELOG.md", "id": "changelog-upgrade", "why": "1.1.0's note before updating from 1.0 (HI-2484): the former name once, and the old folder, variables and tools a user must change." },
     { "file": "CHANGELOG.md", "id": "changelog-rename", "why": "Unreleased's rename entries (HI-2458 to HI-2463): the former name once, and the old folders, paths and names the upgrade converts (the Assistant on HI-2631)." },
     { "file": "CHANGELOG.md", "id": "changelog-rename-2", "why": "Unreleased's later rename entries (HI-2517 to HI-2591): the old ids, files, headers, trailers, branches and values they convert (upgrade input, HI-2631)." },
     { "file": "tests/scenarios/BASELINE.md", "id": "baseline-run-records", "why": "The dated scenario run records from 1 November 2026 back: evidence as recorded (history, HI-2631). New records go above the region." },
