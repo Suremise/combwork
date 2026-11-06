@@ -5,11 +5,13 @@ const { _electron } = require('playwright-core')
 const fs = require('fs'), path = require('path')
 const scratch = lib.WORK, userData = path.join(scratch, 'about-profile')
 fs.rmSync(userData, { recursive: true, force: true })
-// A log as after an upgrade: a run of Hive 0.3.1 (before 1.1, read as an older version's: HI-2594) with a card title
+// A log as after an upgrade: a run of 0.3.1 (before 1.1, read as an older version's: HI-2594) with a card title
 // in it, then a run of Combwork that marks, with a secret and the home folder in it. Copy Diagnostics takes all three out.
 fs.mkdirSync(path.join(userData, 'logs'), { recursive: true })
 fs.writeFileSync(path.join(userData, 'logs', 'combwork.log'), [
+  // old-name: begin old-log-line
   '2026-10-01T09:00:00.000Z [INFO] [main] Hive 0.3.1 starting (Electron 44.5.1)',
+  // old-name: end old-log-line
   '2026-10-01T09:01:00.000Z [INFO] [tasks] #1 created by You: Legacy confidential takeover notes',
   '2026-10-02T09:00:00.000Z [INFO] [main] Combwork 1.1.0 starting (Electron 44.5.1; your text marked)',
   `2026-10-02T09:00:01.000Z [INFO] [test] token=SECRETVALUE123 at ${path.join(require('os').homedir(), 'x')}`,
@@ -64,7 +66,9 @@ const becomes = async (fn) => !!(await lib.until(fn, HUNG_MS))
   let shown = ''
   for (let i = 0; i < 50 && !/### Log/.test(shown); i++) { await sleep(200); shown = await preview.innerText().catch(() => '') }
   check('Copy Diagnostics shows a preview', /## Combwork diagnostics/.test(shown) && /### Coding agents/.test(shown) && /### Counts/.test(shown) && /### Log \(last 50 lines\)/.test(shown), shown.slice(0, 200))
+  // old-name: begin old-log-label
   check('headed Combwork, with the running version labelled Combwork', /^## Combwork diagnostics\n\n- \*\*Combwork\*\* \d+\.\d+\.\d+\S* \(/.test(shown) && !/\*\*Hive\*\*/.test(shown), shown.slice(0, 200))
+  // old-name: end old-log-label
   check('with the secret and home folder taken out', !shown.includes('SECRETVALUE123') && shown.includes('token=<redacted>') && !shown.toLowerCase().includes(require('os').homedir().toLowerCase()))
   check("and the older version's card title", !shown.includes('takeover') && shown.includes('[tasks] <message left out: logged by an older version of Combwork>'))
   await page.screenshot({ path: path.join(scratch, 'about-3-diagnostics.png') })

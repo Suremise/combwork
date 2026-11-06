@@ -3,7 +3,7 @@ import { cx } from '../util'
 
 /**
  * The Combwork Assistant's own mark (#399): the workspace's overseer, so it gets a glyph of its own rather than an agent's
- * dot: a hive cell with a crown in it, the queen of the hive (Darren's pick of three). Drawn in the codicons' style
+ * dot: a honeycomb cell with a crown in it, the queen bee's (Darren's pick of three). Drawn in the codicons' style
  * (16 px, one colour, `currentColor`). With `status`, it is the Assistant's status icon: the mark in the status's colour
  * (the agents' dot colours), filled while it runs something, outlined while it doesn't, with the agents' status dot as a
  * badge on its corner (the same `dot` classes, so it reads like an agent's status everywhere else, not by colour alone).

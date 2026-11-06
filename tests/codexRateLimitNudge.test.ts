@@ -230,7 +230,7 @@ describe("a Codex launch's arguments: the offer turned off (HI-2609)", () => {
     try {
       const ctx = {
         projectPath: home, agentId: 'a-1', executable: 'C:\\bin\\codex.exe', cwd: 'C:\\work\\alpha', workspacePath: home, runId: 'r', sessionId: '',
-        resume: false, name: '', skills: [], mcpServers: {}, model: 'gpt-6-astra', effort: null, permissionMode: null, extraArgs, hookUrl: 'http://127.0.0.1:1/hook?run=r', hookAuthFile: 'C:/hive/hook-auth/r.txt', privateDir: 'C:/hive/launches/r', guidance: '', env: {}, allowBackgroundSessions: false, use200kContext: false
+        resume: false, name: '', skills: [], mcpServers: {}, model: 'gpt-6-astra', effort: null, permissionMode: null, extraArgs, hookUrl: 'http://127.0.0.1:1/hook?run=r', hookAuthFile: 'C:/cw/hook-auth/r.txt', privateDir: 'C:/cw/launches/r', guidance: '', env: {}, allowBackgroundSessions: false, use200kContext: false
       }
       return codex.buildCommand(ctx.executable, ctx as never).args
     } finally {

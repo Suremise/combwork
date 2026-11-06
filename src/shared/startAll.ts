@@ -35,7 +35,7 @@ export function archiveTarget(agent: Pick<BatchAgent, 'live' | 'resume'>): strin
 }
 
 /**
- * Each agent's session to archive (`archiveTarget`), as Hive keeps it: agents with none, or whose stopped session is
+ * Each agent's session to archive (`archiveTarget`), as Combwork keeps it: agents with none, or whose stopped session is
  * gone or archived meanwhile, are left out (they have nothing to archive and keep what they have).
  */
 export function sessionsToArchive<A extends BatchAgent>(agents: readonly A[], sessions: readonly BatchSession[]): { agent: A; sessionId: string }[] {

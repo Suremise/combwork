@@ -491,7 +491,7 @@ export interface CombworkRequests {
   'journal:deleteEntry': (id: number) => boolean
   'journal:forgetPreview': (filter: JournalFilter) => JournalForgetPreview
   'journal:forget': (filter: JournalFilter, token: string) => JournalForgetResult
-  /** Cards an older Hive saved, set aside for review (#1044): listed, added to the board, discarded (by file name). */
+  /** Cards an older version saved, set aside for review (#1044): listed, added to the board, discarded (by file name). */
   'tasks:setAside': () => SetAsideCard[]
   'tasks:addSetAside': (file: string) => TaskCard
   'tasks:discardSetAside': (file: string) => void

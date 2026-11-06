@@ -1359,7 +1359,7 @@ export function BoardToolbar({
   useLanguage()
   const readOnly = readOnlyReason(useStore((s) => s.boardState?.readOnly))
   const count = useStore((s) => (s.tasks ?? NO_TASKS).filter((c) => c.archived && (project === null || c.project.toLowerCase() === project.toLowerCase())).length)
-  // How many cards an older Hive saved are set aside (#1044): the ⋯ menu offers them while any are. Read again as the board
+  // How many cards an older version saved are set aside (#1044): the ⋯ menu offers them while any are. Read again as the board
   // changes, and as their dialog closes: a discard there changes no card, so the board alone wouldn't say (HI-1860).
   const tasks = useStore((s) => s.tasks)
   const asideOpen = useStore((s) => s.setAsideOpen)

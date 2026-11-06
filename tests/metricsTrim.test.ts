@@ -1,5 +1,5 @@
 // HI-2628: the performance history's size cap is the database's, not the old metrics.json's. A workspace as busy as
-// HIVE's keeps its 30 days (hours for 7, then days); over the cap the oldest buckets go, each trim logged and reported
+// Combwork's own keeps its 30 days (hours for 7, then days); over the cap the oldest buckets go, each trim logged and reported
 // (coverage.evictedThrough); and folding a week's hours into a day keeps every total, even when the day's series are
 // more than its cap (the rest go into "(other)" overflow series).
 import { mkdirSync, rmSync } from 'fs'
@@ -65,9 +65,9 @@ const requests = (w: ReturnType<typeof createWorkspaceService>, from: number) =>
 }
 
 describe('HI-2628: 30 days kept, trims logged, folds keep their totals', () => {
-  it('a workspace as busy as HIVE (hundreds of series an hour, 30 days) keeps its 30 days: hours for 7, then days', async () => {
+  it('a workspace as busy as the one developing Combwork (hundreds of series an hour, 30 days) keeps its 30 days: hours for 7, then days', async () => {
     const { w, path } = await open()
-    // HIVE's busiest hours hold about 200 series (6 parts): here every hour has 8 projects x (12 routes + 24 tools x 2 roles).
+    // Combwork's own workspace's busiest hours hold about 200 series (6 parts): here every hour has 8 projects x (12 routes + 24 tools x 2 roles).
     const tools = CW_TOOLS.slice(0, 24)
     const start = T0 - 30 * DAY
     for (let h = 0; h < 30 * 24; h++) {

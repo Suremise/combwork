@@ -206,12 +206,16 @@ describe('advanced.json', () => {
     expect(parseAdvancedFile('{"values":{},"madeFor":{"claude-code.trust.prompt":{"version":"1","value":"x"}}}')).toMatchObject({ madeFor: {} })
   })
 
-  it("Combwork's own settings have cw.* ids; an old hive.* id is no setting now, listed as unknown (HI-2518, HI-2598)", () => {
+  it("Combwork's own settings have cw.* ids; an old id from before 1.1 is no setting now, listed as unknown (HI-2518, HI-2598)", () => {
+    // old-name: begin old-advanced-ids-1
     expect(ADVANCED_DEFS.filter((d) => d.id.startsWith('hive.'))).toEqual([])
+    // old-name: end old-advanced-ids-1
     for (const d of ADVANCED_DEFS) expect(d.id.startsWith(`${d.group}.`), d.id).toBe(true)
     // The names upgrade renames them in the profile before advanced.json is read (storedNames.test.ts): nothing reads one after.
+    // old-name: begin old-advanced-ids-2
     const read = parseAdvancedFile(JSON.stringify({ format: 1, values: { 'hive.mcp.replySeconds': 600, 'cw.progress.lanesShown': 0 } }))
     expect(read).toEqual({ values: { 'hive.mcp.replySeconds': 600, 'cw.progress.lanesShown': 0 }, madeFor: {}, unknown: ['hive.mcp.replySeconds'] })
+    // old-name: end old-advanced-ids-2
   })
 })
 
@@ -555,7 +559,7 @@ describe('the adapters and the combwork MCP server use them', () => {
     expect(claudeCode.safeguardAsk!(ask, screen('advanced/safeguard-prompt-claude-2.1.296.txt'))).toBe(true)
     expect(claudeCode.safeguardAsk!(ask, screen('screen-claude-2.1.296-idle.txt'))).toBe(false)
     // #696: each mode's footer, from the screens recorded in it.
-    const claudeScreens = { manual: 'screen-claude-2.1.296-idle.txt', acceptEdits: 'advanced/footer-claude-2.1.296-acceptEdits.txt', plan: 'advanced/footer-claude-2.1.296-plan.txt', auto: 'screen-claude-2.1.296-hive-idle.txt', bypassPermissions: 'advanced/footer-claude-2.1.296-bypassPermissions.txt', dontAsk: 'advanced/footer-claude-2.1.296-dontAsk.txt' }
+    const claudeScreens = { manual: 'screen-claude-2.1.296-idle.txt', acceptEdits: 'advanced/footer-claude-2.1.296-acceptEdits.txt', plan: 'advanced/footer-claude-2.1.296-plan.txt', auto: 'screen-claude-2.1.296-auto-idle.txt', bypassPermissions: 'advanced/footer-claude-2.1.296-bypassPermissions.txt', dontAsk: 'advanced/footer-claude-2.1.296-dontAsk.txt' }
     for (const [mode, file] of Object.entries(claudeScreens)) expect(claudeCode.footerMode!(screen(file)), file).toBe(mode)
     const copilotScreens = { ask: 'advanced/ready-copilot-1.0.95.txt', 'allow-all': 'advanced/footer-copilot-1.0.95-allow-all.txt', plan: 'advanced/footer-copilot-1.0.95-plan.txt', autopilot: 'advanced/footer-copilot-1.0.95-autopilot.txt' }
     for (const [mode, file] of Object.entries(copilotScreens)) expect(copilot.footerMode!(screen(file), 'plan'), file).toBe(mode)

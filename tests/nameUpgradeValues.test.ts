@@ -27,7 +27,7 @@ const OLD_NAME = 'hive'
 const OLD_REPLY = 'hive.mcp.replySeconds'
 const OLD_DIR = '.hive'
 /** The refusal of a 1.0 export (its text is HI-2625's, with the message). */
-const OLD_EXPORT_REFUSED = /exported from Hive 1\.0, whose workflow settings Combwork doesn't import/
+const OLD_EXPORT_REFUSED = /exported from version 1\.0, whose workflow settings Combwork doesn't import/
 // old-name: end nameUpgradeValues-inputs
 
 let n = 0

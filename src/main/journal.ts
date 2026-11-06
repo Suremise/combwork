@@ -31,10 +31,15 @@ export const JOURNAL_FILE = 'journal.db'
 /** A detail longer than this is kept compressed. */
 const COMPRESS_OVER = 1024
 
+// old-name: begin journal-old-source
+/** Combwork's own entries' source and tag before 1.1, which the names step converts (HI-2598). */
+const OLD_SOURCE = 'hive'
+// old-name: end journal-old-source
+
 export const JOURNAL_MIGRATIONS: Migration[] = [
   {
     // Only ever run on a new journal (every older one has it already), so its source is Combwork's name now (HI-2611): a
-    // new journal never holds Hive's, even until version 3. A journal 1.0 made has source IN ('hive', 'assistant').
+    // new journal never holds the old one, even until version 3. A journal 1.0 made has the old name or 'assistant'.
     version: 1,
     name: 'entries',
     up: (db) =>
@@ -94,7 +99,7 @@ export const JOURNAL_MIGRATIONS: Migration[] = [
     up: (db) => db.exec('ALTER TABLE entries ADD COLUMN summary_text TEXT')
   },
   {
-    // Names (HI-2598): Combwork's own entries were source 'hive', tagged 'hive'; now 'combwork'. A CHECK can't be altered,
+    // Names (HI-2598): Combwork's own entries had the old name as their source and tag; now 'combwork'. A CHECK can't be altered,
     // so `entries` is made again (SQLite's way, lang_altertable.html#otheralter): every row and its id kept, so the
     // contentless FTS index (by rowid, not rebuilt) stays right. The step runs in a transaction with foreign keys on,
     // which can't be turned off there, and dropping `entries` would cascade into `links` and `tags`: they are kept aside
@@ -124,7 +129,7 @@ export const JOURNAL_MIGRATIONS: Migration[] = [
           summary_text  TEXT
         ) STRICT;
         INSERT INTO entries_new (id, at, kind, project, summary, detail, detail_z, why, source, importance, superseded_by, digest_of, updated_at, summary_text)
-          SELECT id, at, kind, project, summary, detail, detail_z, why, CASE source WHEN 'hive' THEN 'combwork' ELSE source END, importance, superseded_by, digest_of, updated_at, summary_text FROM entries;
+          SELECT id, at, kind, project, summary, detail, detail_z, why, CASE source WHEN '${OLD_SOURCE}' THEN 'combwork' ELSE source END, importance, superseded_by, digest_of, updated_at, summary_text FROM entries;
         DROP TABLE entries;
         ALTER TABLE entries_new RENAME TO entries;
         CREATE INDEX entries_at ON entries(at);
@@ -145,7 +150,7 @@ export const JOURNAL_MIGRATIONS: Migration[] = [
         ) STRICT, WITHOUT ROWID;
         CREATE INDEX tags_tag ON tags(tag);
         INSERT INTO links (entry_id, type, ref) SELECT entry_id, type, ref FROM links_kept;
-        INSERT OR IGNORE INTO tags (entry_id, tag) SELECT entry_id, CASE tag WHEN 'hive' THEN 'combwork' ELSE tag END FROM tags_kept;
+        INSERT OR IGNORE INTO tags (entry_id, tag) SELECT entry_id, CASE tag WHEN '${OLD_SOURCE}' THEN 'combwork' ELSE tag END FROM tags_kept;
         DROP TABLE links_kept;
         DROP TABLE tags_kept;
         CREATE TRIGGER entries_ai AFTER INSERT ON entries BEGIN

@@ -678,7 +678,7 @@ export function migrateConfig(cfg: AppConfig, raw?: Record<string, any>): AppCon
 
 /**
  * The settings as 0.1.x reads them: `claude` mirrors Claude Code's provider settings, so going back to
- * an older Hive keeps them. Newer versions ignore it.
+ * an older version keeps them. Newer versions ignore it.
  */
 export function withLegacySettings(cfg: AppConfig): AppConfig & { settings: AppSettings & { claude: Record<string, unknown> } } {
   const c = cfg.settings.providers[CLAUDE_CODE] ?? defaultProviderSettings(providerDescriptor(CLAUDE_CODE))

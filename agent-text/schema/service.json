@@ -675,7 +675,8 @@
   },
   "service.nameUpgrade.boardOrphan": {
     "placeholders": {
-      "file": "plain"
+      "file": "plain",
+      "old": "plain"
     }
   },
   "service.nameUpgrade.failed": {

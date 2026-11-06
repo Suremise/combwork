@@ -479,7 +479,7 @@
   "assistant.template.badPairs": "Die Paare aus Bearbeitern und Reviewern in der Vorlage nennen Agenten, die sie nicht hat, oder einen Agenten zweimal.",
   "assistant.template.badRole": "Die Rolle von {name} im Workflow ist weder builder noch reviewer noch either noch generalist.",
   "assistant.template.badToken": "{name} verwendet {token}: Der Name eines Agenten darf nur '{key}' (den Projektschlüssel) und '{n}' (seine Nummer unter den Agenten mit diesem Namen) enthalten.",
-  "assistant.template.from09": "Diese Vorlage stammt aus Hive 0.9 und kann in 1.0 nicht geladen werden. Erstelle sie mit „Agenten als Vorlage speichern…“ aus deinen Agenten neu.",
+  "assistant.template.from09": "Diese Vorlage stammt aus Version 0.9 und kann in 1.0 nicht geladen werden. Erstelle sie mit „Agenten als Vorlage speichern…“ aus deinen Agenten neu.",
   "assistant.template.longNote": "Die Notiz von Agent {name} ist länger als {max, number} Zeichen.",
   "assistant.template.newer": "Die Vorlage wurde mit einer neueren Version von Combwork erstellt: Aktualisiere Combwork, um sie zu verwenden.",
   "assistant.template.noAgents": "Die Vorlage hat keine Agenten.",

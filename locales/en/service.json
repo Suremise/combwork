@@ -188,24 +188,24 @@
     "description": "An error of Clean Up Now (Project Settings → Storage, HI-1842): the list of archived cards' files it showed expired, was used already, or belongs to a workspace closed since; nothing was removed."
   },
   "service.combworkMove.busy": {
-    "defaultMessage": "Another Combwork is moving this workspace's .hive folders to .combwork ({profile}). Open it again once it has finished.",
-    "description": "An error opening a workspace (HI-2462): another copy of the app ({profile}: its profile folder's name) is renaming the workspace's .hive folders to .combwork now. Keep .hive and .combwork as they are."
+    "defaultMessage": "Another Combwork is moving this workspace's old data folders to .combwork ({profile}). Open it again once it has finished.",
+    "description": "An error opening a workspace (HI-2462): another copy of the app ({profile}: its profile folder's name) is renaming the workspace's old data folders to .combwork now. Keep .combwork as it is."
   },
   "service.combworkMove.closed": {
-    "defaultMessage": "The workspace was closed while Combwork was moving its .hive folders to .combwork. Open it again to finish.",
-    "description": "An error opening a workspace (HI-2462): it was closed, or another was opened in its window, during the rename of its .hive folders to .combwork. Keep .hive and .combwork as they are."
+    "defaultMessage": "The workspace was closed while Combwork was moving its old data folders to .combwork. Open it again to finish.",
+    "description": "An error opening a workspace (HI-2462): it was closed, or another was opened in its window, during the rename of its old data folders to .combwork. Keep .combwork as it is."
   },
   "service.combworkMove.locked": {
-    "defaultMessage": "Combwork couldn't move {folder} to .combwork: a program has a file in it open. Close that program (or the other Combwork or Hive using this workspace), then open the workspace again. Nothing was lost.",
-    "description": "An error opening a workspace (HI-2462): its .hive folder, renamed .combwork in this version, couldn't be renamed because a file in it is open. {folder} is the folder. Keep .hive and .combwork as they are (folder names)."
+    "defaultMessage": "Combwork couldn't move {folder} to .combwork: a program has a file in it open. Close that program (or another Combwork, or a 1.0 copy, using this workspace), then open the workspace again. Nothing was lost.",
+    "description": "An error opening a workspace (HI-2462): its old data folder, renamed .combwork in this version, couldn't be renamed because a file in it is open. {folder} is the folder. A 1.0 copy: the app's version 1.0, from before it was renamed. Keep .combwork as it is (a folder name)."
   },
   "service.combworkMove.otherOpen": {
-    "defaultMessage": "This workspace is open in another Combwork or Hive ({profile}). Close it there, then open it here: Combwork moves its .hive folders to .combwork first.",
-    "description": "An error opening a workspace (HI-2462): another copy of the app ({profile}: its profile folder's name) has it open, so its .hive folders can't be renamed .combwork now. Keep .hive and .combwork as they are."
+    "defaultMessage": "This workspace is open in another Combwork or a 1.0 copy ({profile}). Close it there, then open it here: Combwork moves its old data folders to .combwork first.",
+    "description": "An error opening a workspace (HI-2462): another copy of the app ({profile}: its profile folder's name; a 1.0 copy: the app's version 1.0, from before it was renamed) has it open, so its old data folders can't be renamed .combwork now. Keep .combwork as it is."
   },
   "service.combworkMove.phaseFailed": {
-    "defaultMessage": "Combwork moved this workspace's .hive folders to .combwork, but couldn't finish updating {what}: {error} Open the workspace again to finish.",
-    "description": "An error opening a workspace (HI-2462): its .hive folders were renamed .combwork, but a step after that failed; the next open finishes it. {what} is what it was updating (main.combworkMove.what.*); {error} says why, a sentence. Keep .hive and .combwork as they are."
+    "defaultMessage": "Combwork moved this workspace's old data folders to .combwork, but couldn't finish updating {what}: {error} Open the workspace again to finish.",
+    "description": "An error opening a workspace (HI-2462): its old data folders were renamed .combwork, but a step after that failed; the next open finishes it. {what} is what it was updating (main.combworkMove.what.*); {error} says why, a sentence. Keep .combwork as it is."
   },
   "service.combworkVcs.cantList": {
     "defaultMessage": "Git couldn't list the files it tracks in .combwork.",
@@ -796,16 +796,16 @@
     "description": "An error opening a workspace (HI-2587): the task board database, renamed combwork.db in this version, still had changes in its SQLite log beside it, so it was left as it is. {file} and {log} are file paths. Keep combwork.db as it is (a file name)."
   },
   "service.nameUpgrade.boardOrphan": {
-    "defaultMessage": "The workspace's board file is missing, but {file} beside where it was holds changes that may be the only copy of them. Combwork won't start an empty board over it. Close Combwork, put the board's file back as hive.db beside it (from .combwork\\backups or another copy), then open the workspace again.",
-    "description": "An error opening a workspace (HI-2587): no task board database is there, but an SQLite log or journal of the old one (hive.db) is, holding data. {file} is its path. Keep hive.db and .combwork\\backups as they are (file and folder names)."
+    "defaultMessage": "The workspace's board file is missing, but {file} beside where it was holds changes that may be the only copy of them. Combwork won't start an empty board over it. Close Combwork, put the board's file back beside it under its old name, {old} (from .combwork\\backups or another copy), then open the workspace again.",
+    "description": "An error opening a workspace (HI-2587): no task board database is there, but an SQLite log or journal of the old one is, holding data. {file} is its path; {old} is the board file's name from before 1.1. Keep .combwork\\backups as it is (a folder name)."
   },
   "service.nameUpgrade.failed": {
-    "defaultMessage": "Combwork couldn't finish renaming {what} from Hive's names to Combwork's: {error} Open the workspace again to finish. Nothing was lost.",
-    "description": "An error opening a workspace (HI-2587): a step of the one-time upgrade of the names Hive stored (files, settings) to Combwork's failed; the next open tries again. {what} is what it was renaming (main.nameUpgrade.what.*); {error} says why, a sentence."
+    "defaultMessage": "Combwork couldn't finish renaming {what} from the old names to Combwork's: {error} Open the workspace again to finish. Nothing was lost.",
+    "description": "An error opening a workspace (HI-2587): a step of the one-time upgrade of the names the app stored before 1.1 (files, settings) to Combwork's failed; the next open tries again. {what} is what it was renaming (main.nameUpgrade.what.*); {error} says why, a sentence."
   },
   "service.nameUpgrade.profileFailed": {
-    "defaultMessage": "Combwork couldn't convert {files} from Hive's names to Combwork's: another program may have {n, plural, one {it} other {them}} open. Close that program and start Combwork again. Nothing was changed.",
-    "description": "An error box as Combwork starts, after an update from Hive: a settings file couldn't be rewritten with Combwork's names (HI-2598), so Combwork doesn't start rather than lose the settings. {files} lists the files' paths; {n} is how many."
+    "defaultMessage": "Combwork couldn't convert {files} from the old names to Combwork's: another program may have {n, plural, one {it} other {them}} open. Close that program and start Combwork again. Nothing was changed.",
+    "description": "An error box as Combwork starts, after an update from 1.0: a settings file couldn't be rewritten with Combwork's names (HI-2598), so Combwork doesn't start rather than lose the settings. {files} lists the files' paths; {n} is how many."
   },
   "service.providers.keysStopped": {
     "defaultMessage": "{task}: Combwork stopped typing into it, as {why}. Finish it in the terminal.",

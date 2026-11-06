@@ -183,7 +183,7 @@ export async function cardBatch<T>(ws: WorkspaceService, fn: () => Promise<T>): 
 }
 
 
-/** A card as saved, with anything missing or of the wrong type made safe (a card from an older Hive or an export may lack fields). */
+/** A card as saved, with anything missing or of the wrong type made safe (a card from an older version or an export may lack fields). */
 function clean(raw: Partial<TaskCard> & { projectId?: unknown }, n: number, ids?: ProjectIdIndex, key?: string): TaskCard {
   const nums = (v: unknown): number[] => (Array.isArray(v) ? v.filter((x): x is number => Number.isInteger(x) && x > 0) : [])
   const strs = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [])
@@ -697,7 +697,7 @@ function withProject(raw: Record<string, unknown>, project: string, projectId: s
 }
 
 /**
- * Each card names its project by id too (#508), once: a card saved before ids (or by an older Hive, which leaves the id
+ * Each card names its project by id too (#508), once: a card saved before ids (or by an older version, which leaves the id
  * out) whose name is a project of the workspace gets that project's id, and a card whose project was renamed or moved
  * since gets its name now. A card with an id no project has (its project removed or gone) is left as it is, and so is one
  * saved before ids under a name no project has (Repair can give those to their project). In one board change, every
@@ -790,7 +790,7 @@ export function moveOrphanCards(ws: WorkspaceService, m: { from: string; to: str
 /** The start of a set-aside card's description the Review… dialog shows. */
 const PREVIEW_CHARS = 600
 
-/** A set-aside file's card as the older Hive saved it, or null when it isn't one. */
+/** A set-aside file's card as the older version saved it, or null when it isn't one. */
 function setAsideDoc(text: string | null): Record<string, unknown> | null {
   if (text === null) return null
   try {
@@ -802,7 +802,7 @@ function setAsideDoc(text: string | null): Record<string, unknown> | null {
 }
 
 /**
- * The cards an older Hive saved after the board moved to its database, set aside in `.combwork/tasks.set-aside` (#1017's
+ * The cards an older version saved after the board moved to its database, set aside in `.combwork/tasks.set-aside` (#1017's
  * downgrade, #1044): what the Review… dialog lists, oldest number first. A file that isn't a card is listed as unreadable.
  */
 export async function setAsideCards(ws: WorkspaceService = workspace): Promise<SetAsideCard[]> {
@@ -845,7 +845,7 @@ export function addSetAsideCard(ws: WorkspaceService, file: string): Promise<Tas
     const n = hasCard(ws, was) ? await nextNumber(ws) : was
     const now = new Date().toISOString()
     const c = clean(raw, n, ids)
-    // Every field the older Hive stored is kept (#1044 round 1: its own fields, past holds for its cost), Combwork's own
+    // Every field the older version stored is kept (#1044 round 1: its own fields, past holds for its cost), Combwork's own
     // fields as read (round 2: one of the wrong type gets its safe default, as on any read, so it can't stop the card
     // coming back; the original stays in the Recycle Bin): but its number, place, history and date. A review under way
     // there isn't one here (saveCard ends its reviewer's hold).
@@ -862,7 +862,7 @@ export function addSetAsideCard(ws: WorkspaceService, file: string): Promise<Tas
     } as TaskCard
     await saveCard(ws, n, card)
     setAsideAdded(ws, file, entry.text!)
-    log.info(`#${n} added from ${SET_ASIDE} (made in an older Hive as #${was}): ${userText(card.title)}`)
+    log.info(`#${n} added from ${SET_ASIDE} (made in an older version as #${was}): ${userText(card.title)}`)
     changed(ws)
     return clean(card, n, ids)
   })

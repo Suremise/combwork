@@ -101,7 +101,9 @@ describe('the places that took an error for an absence', () => {
   it("the profile's run marker and its progress history: held, the start is refused; missing, nothing to do", () => {
     const p = fresh()
     expect(upgradeProfileFiles(p)).toEqual([])
+    // old-name: begin old-run-marker
     writeFileSync(join(p, 'running.json'), JSON.stringify({ version: 1, hive: '1.0.0' }))
+    // old-name: end old-run-marker
     hold(join(p, 'running.json'))
     expect(upgradeProfileFiles(p)).toEqual([join(p, 'running.json')])
     const q = fresh()

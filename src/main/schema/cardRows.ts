@@ -3,10 +3,10 @@ import type { DatabaseSync, SQLInputValue, StatementSync } from 'node:sqlite'
 /**
  * A card's document as rows of the 1.0 tables (#1208, schema in v1_0.ts), and back, byte for byte: the card JSON
  * contract. `composeCard(decomposeCard(n, doc))` stringifies to exactly `JSON.stringify(doc)` for any document a card's
- * row holds today, so every reader (the Agent API, Export Board, a 0.9.3 Hive reading an export) sees the same card.
+ * row holds today, so every reader (the Agent API, Export Board, 0.9.3 reading an export) sees the same card.
  *
  * - Each field the board knows goes to its typed column or child table when it has the form Combwork writes; anything else
- *   (a field Combwork doesn't know, or a known one of another type: an older Hive's, a hand-edited export's) is kept as JSON
+ *   (a field Combwork doesn't know, or a known one of another type: an older version's, a hand-edited export's) is kept as JSON
  *   in the card's `extra`, and read from there.
  * - The keys' order is Combwork's canonical order (CARD_KEYS) with optional fields present when they have a value; a card
  *   saved in another order or with a field missing keeps its exact key list in `layout` (null for the canonical one).

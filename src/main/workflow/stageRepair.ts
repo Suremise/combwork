@@ -34,7 +34,7 @@ export async function repairStages(ws: WorkspaceService): Promise<StageRepair> {
   const path = ws.path
   if (!path) return out
   // A board waiting for its upgrade to 1.0 is read-only: left alone, quietly, and repaired once it is upgraded, when the
-  // opening's steps run again (HI-1714: it warned "This board is from Hive 0.9" at each open).
+  // opening's steps run again (HI-1714: it warned that the board was from 0.9 at each open).
   if (boardWaits(ws)) return out
   const life = ws.lifetime
   const alive = (): boolean => !life.aborted && ws.lifetime === life && ws.path === path

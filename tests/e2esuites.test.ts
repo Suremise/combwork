@@ -1532,13 +1532,15 @@ describe('the Combworks a suite starts (lib.cjs testExecutable, keepPackagedQuie
   it("this checkout's Electron is the dev build; its dist and the test folders' are packaged; the installed Combwork and any other are refused", () => {
     expect(lib.testExecutable(lib.ELECTRON)).toBe('dev')
     expect(lib.testExecutable(lib.PACKAGED_EXE)).toBe('packaged')
+    // old-name: begin old-executables
     // A 0.9 build's executable (Hive.exe) in a checkout's dist, as boardupgrade and upgradelane start it.
     expect(lib.testExecutable(join(lib.ROOT, 'dist', 'win-unpacked', 'Hive.exe'))).toBe('packaged')
     expect(lib.testExecutable(join(process.env.LOCALAPPDATA ?? '', 'combwork-test', 'builds', 'Combwork.exe'))).toBe('packaged')
-    // Combwork's install (HI-2460) and Hive Desktop's from before.
+    // Combwork's install (HI-2460) and 1.0's from before.
     expect(() => lib.testExecutable(join(process.env.LOCALAPPDATA ?? '', 'Programs', 'Combwork', 'Combwork.exe'))).toThrow(/never start the installed Combwork/)
     expect(() => lib.testExecutable(join(process.env.LOCALAPPDATA ?? '', 'Programs', 'Hive', 'Hive.exe'))).toThrow(/never start the installed Combwork/)
     expect(() => lib.testExecutable(join(process.env.LOCALAPPDATA ?? '', 'programs', 'hive', 'Hive.exe'))).toThrow(/never start the installed Combwork/)
+    // old-name: end old-executables
     expect(() => lib.testExecutable('C:\\Elsewhere\\Combwork.exe')).toThrow(/never C:\\Elsewhere\\Combwork\.exe/)
     // Started hidden: no window is shown before keepPackagedQuiet reaches it.
     expect(lib.PACKAGED_ARGS).toContain('--hidden')
@@ -2209,8 +2211,10 @@ describe('the run context: what a test starts gets only the allowlist and its ow
     expect(Object.keys(ctx.baseEnv(parent)).every((k) => ctx.ALLOW.includes(k.toUpperCase()))).toBe(true)
   })
 
-  it("no child gets the user's Combworks' cw-progress shims on its PATH (nor a 1.0 profile's, Hive-Dev): they run the installed Combwork.exe (#1253)", () => {
+  it("no child gets the user's Combworks' cw-progress shims on its PATH (nor a 1.0 profile's): they run the installed Combwork.exe (#1253)", () => {
+    // old-name: begin old-shims-1
     const shell = { APPDATA: 'C:\\Users\\x\\AppData\\Roaming', Path: 'C:\\Windows;C:\\Users\\x\\AppData\\Roaming\\Combwork\\bin;C:\\tools;c:\\users\\x\\appdata\\roaming\\hive-dev\\bin\\;C:\\Users\\x\\AppData\\Roaming\\Combwork\\bin-other' }
+    // old-name: end old-shims-1
     for (const env of [ctx.baseEnv(shell), ctx.childEnv({}, shell), ctx.combworkEnv({ CW_USER_DATA: 'C:\\p' }, shell)]) {
       expect(env.Path).toBe('C:\\Windows;C:\\tools;C:\\Users\\x\\AppData\\Roaming\\Combwork\\bin-other')
     }

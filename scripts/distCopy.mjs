@@ -51,7 +51,7 @@ export function provenanceProblem(before, after) {
   return changed.length ? `the ${changed.join(', ')} changed while it was built (${changed.map((k) => `${before[k]} → ${after[k]}`).join('; ')})` : null
 }
 
-/** The installer's file name for a version: electron-builder.yml's artifactName (Combwork since HI-2458; Hive-Setup before). */
+/** The installer's file name for a version: electron-builder.yml's artifactName (Combwork-Setup since HI-2458). */
 export const installerName = (version) => `Combwork-Setup-${version}.exe`
 
 /** The files `npm run dist` makes for a version that belong with the installer; build-info.json last. */

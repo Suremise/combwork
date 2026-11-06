@@ -1,6 +1,6 @@
 // The scenario benchmarks in the test area, converted once to 1.1's names (HI-2605): a step of npm run test:move-area
-// (tests/moveTestArea.mjs), after the move or on its own once the area is moved. Before 1.1 a benchmark said
-// "hive-benchmark/1", and until HI-2591 its call measures were hiveCalls and hiveCallErrors; Performance → Compare reads
+// (tests/moveTestArea.mjs), after the move or on its own once the area is moved. Before 1.1 a benchmark had
+// OLD_SCHEMA, and until HI-2591 its call measures were RENAMED_FIELDS' old names; Performance → Compare reads
 // only the new names (HI-2587: benchmarks are dev artifacts, converted here, not read under two names), so a pass
 // comparing with a baseline saved before (the rel-110-* ones) needs this.
 //
@@ -29,7 +29,9 @@ function processAlive(pid) {
 }
 
 /** A benchmark's schema before 1.1, and since (src/shared/benchmark.ts BENCHMARK_SCHEMA). */
+// old-name: begin old-benchmark-schema
 export const OLD_SCHEMA = 'hive-benchmark/1'
+// old-name: end old-benchmark-schema
 export const NEW_SCHEMA = 'combwork-benchmark/1'
 /** Where the originals are kept, in the test area. */
 export const BACKUP = 'benchmark-schema-backup'
@@ -54,7 +56,9 @@ export function benchmarkFiles(area) {
  * written before it (every run before 2026-11-05 21:06, the 1.1 ones too) have the old names, which Compare doesn't
  * read: their call measures show as not measured, so a scenario compares as incomplete.
  */
+// old-name: begin old-benchmark-fields
 export const RENAMED_FIELDS = { hiveCalls: 'combworkCalls', hiveCallErrors: 'combworkCallErrors' }
+// old-name: end old-benchmark-fields
 
 const SCHEMA_RE = new RegExp(`("schema"\\s*:\\s*)"${OLD_SCHEMA.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}"`)
 const FIELD_RE = new RegExp(`"(${Object.keys(RENAMED_FIELDS).join('|')})"(\\s*:)`, 'g')
@@ -73,7 +77,7 @@ function renamed(value) {
 }
 
 /**
- * text converted to 1.1's benchmark: its top-level schema "hive-benchmark/1" made "combwork-benchmark/1", and the
+ * text converted to 1.1's benchmark: its top-level schema OLD_SCHEMA made "combwork-benchmark/1", and the
  * fields RENAMED_FIELDS names renamed; nothing else changes (each replaced in the text, every other byte kept). Returns
  * { text } when converted, { skip: why } when there is nothing to convert, or { error: why } when it isn't safe to.
  */

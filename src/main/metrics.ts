@@ -66,7 +66,7 @@ export const METRICS_LIMITS = {
   buckets: 7 * 24 + 31 + 2,
   /**
    * What is saved in the workspace's database, measured as the buckets' JSON (what its rows hold, HI-2628): past this the
-   * oldest buckets go. A workspace as busy as HIVE's (6 to 12 agents) keeps its 30 days in about 5 MB; every bucket at
+   * oldest buckets go. A workspace as busy as Combwork's own (6 to 12 agents) keeps its 30 days in about 5 MB; every bucket at
    * its series cap would be about 90 MB, so this is the bound.
    */
   storeBytes: 32 * 1024 * 1024,
@@ -490,7 +490,7 @@ class Store {
         const num = (k: string): unknown => (saved.meta.has(k) ? JSON.parse(saved.meta.get(k)!) : undefined)
         this.fromSaved({ buckets: saved.docs, observed: num('observed'), evictedThrough: num('evictedThrough'), renamesApplied: num('renamesApplied') })
         if (existsSync(this.file)) {
-          log.warn("A metrics.json was found after the metrics moved into the workspace database (an older Hive's): kept as a backup, not read")
+          log.warn("A metrics.json was found after the metrics moved into the workspace database (an older version's): kept as a backup, not read")
           keepAsBackup(this.file)
         }
         return

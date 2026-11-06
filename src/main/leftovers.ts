@@ -13,11 +13,11 @@ const TEMP = /^(.+)\.\d+-[0-9a-f]+\.tmp$/i
 const BEFORE_IDS = /^(.+)\.before-ids\.bak$/i
 /** A temp file older than this can't be a write still under way, in this Combwork or another. */
 export const TEMP_AGE_MS = 24 * 60 * 60 * 1000
-/** A migration's copy is kept a week after it was made (an older Hive's workspace, just migrated, keeps it a while). */
+/** A migration's copy is kept a week after it was made (an older version's workspace, just migrated, keeps it a while). */
 export const BAK_AGE_MS = 7 * 24 * 60 * 60 * 1000
 /** What a store's move into the workspace database kept (#1017, #1018): `<name>.imported-<ISO time, ':' and '.' as '-'>`. */
 const IMPORTED = /^(.+)\.imported-(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z$/
-/** Such a backup goes to the Recycle Bin two weeks after the move (#1111): time enough to go back to an older Hive. */
+/** Such a backup goes to the Recycle Bin two weeks after the move (#1111): time enough to go back to an older version. */
 export const IMPORTED_AGE_MS = 14 * 24 * 60 * 60 * 1000
 
 /** What a move's backup was, and when its name says it was made; null for any other name. */

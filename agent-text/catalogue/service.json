@@ -175,28 +175,28 @@
     "audience": "both"
   },
   "service.combworkMove.busy": {
-    "text": "Another Combwork is moving this workspace's .hive folders to .combwork ({profile}). Open it again once it has finished.",
-    "note": "An error opening a workspace (HI-2462): another copy of the app ({profile}: its profile folder's name) is renaming the workspace's .hive folders to .combwork now. Keep .hive and .combwork as they are.",
+    "text": "Another Combwork is moving this workspace's old data folders to .combwork ({profile}). Open it again once it has finished.",
+    "note": "An error opening a workspace (HI-2462): another copy of the app ({profile}: its profile folder's name) is renaming the workspace's old data folders to .combwork now. Keep .combwork as it is.",
     "audience": "both"
   },
   "service.combworkMove.closed": {
-    "text": "The workspace was closed while Combwork was moving its .hive folders to .combwork. Open it again to finish.",
-    "note": "An error opening a workspace (HI-2462): it was closed, or another was opened in its window, during the rename of its .hive folders to .combwork. Keep .hive and .combwork as they are.",
+    "text": "The workspace was closed while Combwork was moving its old data folders to .combwork. Open it again to finish.",
+    "note": "An error opening a workspace (HI-2462): it was closed, or another was opened in its window, during the rename of its old data folders to .combwork. Keep .combwork as it is.",
     "audience": "both"
   },
   "service.combworkMove.locked": {
-    "text": "Combwork couldn't move {folder} to .combwork: a program has a file in it open. Close that program (or the other Combwork or Hive using this workspace), then open the workspace again. Nothing was lost.",
-    "note": "An error opening a workspace (HI-2462): its .hive folder, renamed .combwork in this version, couldn't be renamed because a file in it is open. {folder} is the folder. Keep .hive and .combwork as they are (folder names).",
+    "text": "Combwork couldn't move {folder} to .combwork: a program has a file in it open. Close that program (or another Combwork, or a 1.0 copy, using this workspace), then open the workspace again. Nothing was lost.",
+    "note": "An error opening a workspace (HI-2462): its old data folder, renamed .combwork in this version, couldn't be renamed because a file in it is open. {folder} is the folder. A 1.0 copy: the app's version 1.0, from before it was renamed. Keep .combwork as it is (a folder name).",
     "audience": "both"
   },
   "service.combworkMove.otherOpen": {
-    "text": "This workspace is open in another Combwork or Hive ({profile}). Close it there, then open it here: Combwork moves its .hive folders to .combwork first.",
-    "note": "An error opening a workspace (HI-2462): another copy of the app ({profile}: its profile folder's name) has it open, so its .hive folders can't be renamed .combwork now. Keep .hive and .combwork as they are.",
+    "text": "This workspace is open in another Combwork or a 1.0 copy ({profile}). Close it there, then open it here: Combwork moves its old data folders to .combwork first.",
+    "note": "An error opening a workspace (HI-2462): another copy of the app ({profile}: its profile folder's name; a 1.0 copy: the app's version 1.0, from before it was renamed) has it open, so its old data folders can't be renamed .combwork now. Keep .combwork as it is.",
     "audience": "both"
   },
   "service.combworkMove.phaseFailed": {
-    "text": "Combwork moved this workspace's .hive folders to .combwork, but couldn't finish updating {what}: {error} Open the workspace again to finish.",
-    "note": "An error opening a workspace (HI-2462): its .hive folders were renamed .combwork, but a step after that failed; the next open finishes it. {what} is what it was updating (main.combworkMove.what.*); {error} says why, a sentence. Keep .hive and .combwork as they are.",
+    "text": "Combwork moved this workspace's old data folders to .combwork, but couldn't finish updating {what}: {error} Open the workspace again to finish.",
+    "note": "An error opening a workspace (HI-2462): its old data folders were renamed .combwork, but a step after that failed; the next open finishes it. {what} is what it was updating (main.combworkMove.what.*); {error} says why, a sentence. Keep .combwork as it is.",
     "audience": "both"
   },
   "service.combworkVcs.cantList": {
@@ -710,13 +710,13 @@
     "audience": "both"
   },
   "service.nameUpgrade.boardOrphan": {
-    "text": "The workspace's board file is missing, but {file} beside where it was holds changes that may be the only copy of them. Combwork won't start an empty board over it. Close Combwork, put the board's file back as hive.db beside it (from .combwork\\backups or another copy), then open the workspace again.",
-    "note": "An error opening a workspace (HI-2587): no task board database is there, but an SQLite log or journal of the old one (hive.db) is, holding data. {file} is its path. Keep hive.db and .combwork\\backups as they are (file and folder names).",
+    "text": "The workspace's board file is missing, but {file} beside where it was holds changes that may be the only copy of them. Combwork won't start an empty board over it. Close Combwork, put the board's file back beside it under its old name, {old} (from .combwork\\backups or another copy), then open the workspace again.",
+    "note": "An error opening a workspace (HI-2587): no task board database is there, but an SQLite log or journal of the old one is, holding data. {file} is its path; {old} is the board file's name from before 1.1. Keep .combwork\\backups as it is (a folder name).",
     "audience": "both"
   },
   "service.nameUpgrade.failed": {
-    "text": "Combwork couldn't finish renaming {what} from Hive's names to Combwork's: {error} Open the workspace again to finish. Nothing was lost.",
-    "note": "An error opening a workspace (HI-2587): a step of the one-time upgrade of the names Hive stored (files, settings) to Combwork's failed; the next open tries again. {what} is what it was renaming (main.nameUpgrade.what.*); {error} says why, a sentence.",
+    "text": "Combwork couldn't finish renaming {what} from the old names to Combwork's: {error} Open the workspace again to finish. Nothing was lost.",
+    "note": "An error opening a workspace (HI-2587): a step of the one-time upgrade of the names the app stored before 1.1 (files, settings) to Combwork's failed; the next open tries again. {what} is what it was renaming (main.nameUpgrade.what.*); {error} says why, a sentence.",
     "audience": "both"
   },
   "service.providers.noSetup": {

@@ -913,7 +913,7 @@
   },
   "workspace.opening.adoption": {
     "defaultMessage": "Adopting its cards and projects…",
-    "description": "A step of upgrading a Hive 0.9 workspace to 1.0: its projects get their workflow options and its cards are taken on by 1.0's workflow (or marked as from before 1.0)."
+    "description": "A step of upgrading a 0.9 workspace to 1.0: its projects get their workflow options and its cards are taken on by 1.0's workflow (or marked as from before 1.0)."
   },
   "workspace.opening.projects": {
     "defaultMessage": "Reading its projects…",
@@ -921,7 +921,7 @@
   },
   "workspace.opening.slots": {
     "defaultMessage": "Adopting its agents' worktrees as slots…",
-    "description": "A step of upgrading a Hive 0.9 workspace to 1.0: each agent's own worktree becomes a slot (a working folder Combwork lends to cards)."
+    "description": "A step of upgrading a 0.9 workspace to 1.0: each agent's own worktree becomes a slot (a working folder Combwork lends to cards)."
   },
   "workspace.opening.title": {
     "defaultMessage": "Opening {name}",
@@ -929,11 +929,11 @@
   },
   "workspace.opening.upgrade": {
     "defaultMessage": "Upgrading its board. The 0.9 board is kept as a backup.",
-    "description": "A step of upgrading a Hive 0.9 workspace to 1.0: its task board is converted to 1.0's format, after a copy of it as it was is kept."
+    "description": "A step of upgrading a 0.9 workspace to 1.0: its task board is converted to 1.0's format, after a copy of it as it was is kept."
   },
   "workspace.opening.upgradingTitle": {
     "defaultMessage": "Upgrading {name} to Combwork 1.0",
-    "description": "The heading of the view Combwork shows while it upgrades a workspace made by Hive 0.9 ({name}: its folder name), after the user said yes to the upgrade."
+    "description": "The heading of the view Combwork shows while it upgrades a workspace made by version 0.9 ({name}: its folder name), after the user said yes to the upgrade."
   },
   "workspace.opening.wait": {
     "defaultMessage": "Another workspace can be opened in this window once this is done.",

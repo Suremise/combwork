@@ -451,12 +451,14 @@ export function openDb(file: string, opts: OpenOptions): Db {
 }
 
 /**
- * `schema_version`'s column of the version that ran each step, `hive_version` before 1.1, renamed `app_version` (HI-2587):
+ * `schema_version`'s column of the version that ran each step, named after the old name before 1.1, renamed `app_version` (HI-2587):
  * in its own transaction, once (a file that has it already, or no table yet, needs nothing).
  */
 export function renameVersionColumn(db: DatabaseSync): void {
   const cols = (db.prepare("SELECT name FROM pragma_table_info('schema_version')").all() as { name: string }[]).map((c) => c.name) // i18n-ignore: SQL
+  // old-name: begin version-column
   if (cols.includes('hive_version') && !cols.includes('app_version')) transaction(db, () => db.exec('ALTER TABLE schema_version RENAME COLUMN hive_version TO app_version'))
+  // old-name: end version-column
 }
 
 function openDbNow(file: string, opts: OpenOptions): Db {

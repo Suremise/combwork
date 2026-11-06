@@ -33,10 +33,10 @@ const OLD_BACKUP = /^hive-(v\d|before-)/
 
 const M = {
   notFolded: msg({ id: 'service.nameUpgrade.boardNotFolded', defaultMessage: "Combwork couldn't rename the board's file {file} to combwork.db: its log {log} still holds changes after it was closed. Close any other program using the workspace, then open it again. Nothing was lost.", description: 'An error opening a workspace (HI-2587): the task board database, renamed combwork.db in this version, still had changes in its SQLite log beside it, so it was left as it is. {file} and {log} are file paths. Keep combwork.db as it is (a file name).' }),
-  orphan: msg({ id: 'service.nameUpgrade.boardOrphan', defaultMessage: "The workspace's board file is missing, but {file} beside where it was holds changes that may be the only copy of them. Combwork won't start an empty board over it. Close Combwork, put the board's file back as hive.db beside it (from .combwork\\backups or another copy), then open the workspace again.", description: "An error opening a workspace (HI-2587): no task board database is there, but an SQLite log or journal of the old one (hive.db) is, holding data. {file} is its path. Keep hive.db and .combwork\\backups as they are (file and folder names)." }),
-  bothTitle: msg({ id: 'main.nameUpgrade.boardBothTitle', defaultMessage: '{folder} has both hive.db and combwork.db', description: "A warning's title as a workspace opens (HI-2587): its folder {folder} holds the task board's database under both its old name and its new one. Keep hive.db and combwork.db as they are (file names)." }),
-  bothBody: msg({ id: 'main.nameUpgrade.boardBothBody', defaultMessage: 'Combwork uses combwork.db and leaves hive.db as it is.', description: 'The warning\'s text (HI-2587): which of the two files Combwork uses; it never changes the other. Keep hive.db and combwork.db as they are.' }),
-  leftTitle: msg({ id: 'main.nameUpgrade.boardLeftTitle', defaultMessage: '{file} was left as it is', description: "A warning's title as a workspace opens (HI-2587): an SQLite log or journal of the board's old file (hive.db) still holds data, beside the board's new file; {file} is its path." }),
+  orphan: msg({ id: 'service.nameUpgrade.boardOrphan', defaultMessage: "The workspace's board file is missing, but {file} beside where it was holds changes that may be the only copy of them. Combwork won't start an empty board over it. Close Combwork, put the board's file back beside it under its old name, {old} (from .combwork\\backups or another copy), then open the workspace again.", description: "An error opening a workspace (HI-2587): no task board database is there, but an SQLite log or journal of the old one is, holding data. {file} is its path; {old} is the board file's name from before 1.1. Keep .combwork\\backups as it is (a folder name)." }),
+  bothTitle: msg({ id: 'main.nameUpgrade.boardBothTitle', defaultMessage: '{folder} has both the old board file and combwork.db', description: "A warning's title as a workspace opens (HI-2587): its folder {folder} holds the task board's database under both its name from before 1.1 and its new one. Keep combwork.db as it is (a file name)." }),
+  bothBody: msg({ id: 'main.nameUpgrade.boardBothBody', defaultMessage: 'Combwork uses combwork.db and leaves the old board file as it is.', description: 'The warning\'s text (HI-2587): which of the two files Combwork uses; it never changes the other (the old one, from before 1.1). Keep combwork.db as it is.' }),
+  leftTitle: msg({ id: 'main.nameUpgrade.boardLeftTitle', defaultMessage: '{file} was left as it is', description: "A warning's title as a workspace opens (HI-2587): an SQLite log or journal of the board's old file (from before 1.1) still holds data, beside the board's new file; {file} is its path." }),
   leftBody: msg({ id: 'main.nameUpgrade.boardLeftBody', defaultMessage: "The board opens from combwork.db. Combwork doesn't delete this file: it may hold changes from before the rename.", description: 'The warning\'s text (HI-2587). Keep combwork.db as it is (a file name).' })
 }
 
@@ -114,7 +114,7 @@ export async function moveBoardFile(dir: string, checkpoint: (file: string) => P
   }
   const kept = await leftovers(dir)
   if (kept.length) {
-    if (!present(newFile)) throw combworkError(M.orphan, { file: kept[0] }, { kind: 'conflict' })
+    if (!present(newFile)) throw combworkError(M.orphan, { file: kept[0], old: OLD_DB_FILE }, { kind: 'conflict' })
     for (const f of kept) {
       log.warn(`${userText(f)} holds data beside ${NEW_DB_FILE}: left as it is`)
       warnOnce(`left:${f.toLowerCase()}`, tr(M.leftTitle, { file: f }), tr(M.leftBody))

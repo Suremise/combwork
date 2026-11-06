@@ -79,7 +79,7 @@ const PASS_ENV = {
   CW_TEST_PROGRESS_TIMINGS: "where the Progress panel's suite timings are kept (tests/progressReport.mts)",
   CW_PROGRESS_CHECK_DEV: "1: packaged-progress checks the dev build's cw-progress",
   CW_EXE: 'plan and lib.launch run this packaged Combwork executable instead of the dev build (the Sandbox upgrade checks, #1227)',
-  CW_E2E_V09: "boardupgrade's 0.9 Hive: a 0.9.x win-unpacked folder (else the main checkout's dist/win-unpacked, when it is 0.9.x)",
+  CW_E2E_V09: "boardupgrade's 0.9 build: a 0.9.x win-unpacked folder (else the main checkout's dist/win-unpacked, when it is 0.9.x)",
   REPLYSIZE_OUT: "replysize's report file, in the work folder"
 }
 
@@ -118,7 +118,9 @@ function apply(env, vars) {
  */
 /** The profile folders whose `bin` holds the user's shims: Combwork's, and a 1.0's from before HI-2461 (kept out too). */
 const SHIM_PROFILES = ['Combwork', 'Combwork-Dev']
+// old-name: begin old-shim-profiles
 const OLD_SHIM_PROFILES = ['Hive', 'Hive-Dev']
+// old-name: end old-shim-profiles
 function withoutCombworkShims(env, parent) {
   if (!parent.APPDATA) return env
   const shims = [...SHIM_PROFILES, ...OLD_SHIM_PROFILES].map((p) => path.win32.join(parent.APPDATA, p, 'bin').toLowerCase())

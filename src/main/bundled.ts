@@ -257,7 +257,7 @@ export async function syncBundled(opts: { fresh?: boolean } = {}): Promise<void>
  * Until 0.9.3 the modes were personas, in .combwork/personas (#1084): the folder is moved to .combwork/modes as it is, the
  * user's edits and the copies bundled.json tracks with it, as the workspace opens (before its folders are watched, which
  * would hold them). One that can't be moved now (a file in it open) is used where it is (workspace.modesDir) and moved
- * the next time; one an older Hive made again beside .combwork/modes is left alone.
+ * the next time; one an older version made again beside .combwork/modes is left alone.
  */
 async function moveLegacyModes(): Promise<void> {
   const from = join(workspace.combworkDir, LEGACY_MODES_DIR)

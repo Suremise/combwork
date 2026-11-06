@@ -132,7 +132,7 @@ const extras = (t: Pick<AgentTemplate, 'suggestedPreset' | 'reviewerMode' | 'pai
   ...(t.workflowDropped?.length ? { workflowDropped: t.workflowDropped } : {})
 })
 
-/** Whether a template file's content is Hive 0.9's: a version under 1.0's (#1436). */
+/** Whether a template file's content is 0.9's: a version under 1.0's (#1436). */
 const isV09 = (raw: unknown): boolean => {
   const v = raw && typeof raw === 'object' ? (raw as { version?: unknown }).version : undefined
   return typeof v === 'number' && Number.isInteger(v) && v >= 1 && v < TEMPLATE_VERSION
@@ -145,7 +145,7 @@ function combworkEntry(h: CombworkTemplate): TemplateEntry {
 }
 
 /**
- * One template as listed, or null for a file of Hive 0.9's (#1436: 1.0 doesn't use them; the upgrade keeps a copy
+ * One template as listed, or null for a file of 0.9's (#1436: 1.0 doesn't use them; the upgrade keeps a copy
  * with the 0.9 backup, and the file stays as it is, never listed, loaded, changed or deleted here).
  */
 async function readOne(d: TemplateDest, file: string): Promise<TemplateEntry | null> {
@@ -420,9 +420,9 @@ export async function readImport(path: string): Promise<AgentTemplate> {
   } catch {
     throw refusal(msg({ id: 'content.templates.importNotJson', defaultMessage: "It isn't a Combwork agent template (not JSON).", description: "An error importing a template: the file isn't JSON." }))
   }
-  // A 1.0 export whose sections hold Hive's values (`finish: 'hiveMerges'`): refused, never converted (HI-2611, Darren's
+  // A 1.0 export whose sections hold 1.0's values (its finish's old value): refused, never converted (HI-2611, Darren's
   // decision): only a workspace's own templates are upgraded, once (nameUpgradeValues.ts).
-  if (upgradedTemplate(raw)) throw refusal(msg({ id: 'content.templates.importFrom10', defaultMessage: "It is an agent template exported from Hive 1.0, whose workflow settings Combwork doesn't import. Make the template again in Combwork.", description: 'An error importing a template (HI-2611): the file was exported by Hive 1.0, the app before it was renamed Combwork, and holds workflow settings under its old names. Keep "Hive 1.0" as it is.' }))
+  if (upgradedTemplate(raw)) throw refusal(msg({ id: 'content.templates.importFrom10', defaultMessage: "It is an agent template exported from version 1.0, whose workflow settings Combwork doesn't import. Make the template again in Combwork.", description: 'An error importing a template (HI-2611): the file was exported by version 1.0, from before the app was renamed Combwork, and holds workflow settings under their old names.' }))
   const t = readTemplate(raw)
   // agent-text: readTemplate
   if (!isAgentTemplate(t)) throw new TemplateError(t)

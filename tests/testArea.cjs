@@ -1,6 +1,6 @@
 // The test area (HI-2590): %LOCALAPPDATA%\combwork-test, where the tests keep their profiles, the signed-in Claude Code
 // and Codex test homes, the scenario baselines and results, the e2e lanes and logs, the Sandbox reports and the runs' temp
-// folders (tests/README.md). Before 1.1 it was hive-test: npm run test:move-area (tests/moveTestArea.mjs) moves it once,
+// folders (tests/README.md). Before 1.1 it had another name: npm run test:move-area (tests/moveTestArea.mjs) moves it once,
 // one way. OLD_NAME is that move's source and this guard's, and nothing else's: no test reads or writes the old folder.
 // The guard (assertReady) refuses a test run while the move is still to do or unfinished, so a run never starts a new,
 // signed-out test home beside the old one, nor runs with trust entries half rewritten. The runners call it as they start
@@ -13,7 +13,9 @@ const path = require('path')
 /** The test area's folder name in %LOCALAPPDATA%. */
 const NAME = 'combwork-test'
 /** Its name before 1.1: the move's source, and only that. */
+// old-name: begin old-name
 const OLD_NAME = 'hive-test'
+// old-name: end old-name
 /** In the test area while a move is unfinished (written in the old folder before the rename, so it moves with it). */
 const MARKER = '.move-in-progress.json'
 

@@ -7,8 +7,8 @@ const path = require('path')
 const { execFileSync } = require('child_process')
 const { sessionsOf } = require('./storeDocs.cjs')
 const scratch = lib.WORK
-const userData = path.join(scratch, 'cxhive-profile')
-const ws = path.join(scratch, 'cxhive-ws')
+const userData = path.join(scratch, 'cxcw-profile')
+const ws = path.join(scratch, 'cxcw-ws')
 const proj = path.join(ws, 'demo')
 const codexHome = lib.CODEX_HOME
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))

@@ -10,7 +10,7 @@ import { agentMsg, say, type AgentMsg } from './agentText'
  * a lane is made of, how it reads against the board now (its cards, the current one, paused or not), which lanes are
  * listed, and how a Combwork tool says so. Pure, so the service, the Agent API and tests share it.
  *
- * A lane is bookkeeping, never a gate: a loop runs the same without one (an older Hive, a failed registration), and a
+ * A lane is bookkeeping, never a gate: a loop runs the same without one (an older version, a failed registration), and a
  * solo agent working a card has none.
  */
 

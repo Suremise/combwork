@@ -824,7 +824,9 @@ const watchCommitBursts = (app) => {
  * fence: never started, whatever the dialect of the fakes, HI-2614).
  */
 const INSTALL_FOLDER = 'Combwork'
+// old-name: begin old-install-folder
 const OLD_INSTALL_FOLDER = 'Hive'
+// old-name: end old-install-folder
 const INSTALLED = [INSTALL_FOLDER, OLD_INSTALL_FOLDER].flatMap((n) => [path.join(process.env.LOCALAPPDATA ?? '', 'Programs', n), path.join(process.env.PROGRAMFILES ?? 'C:\\Program Files', n)])
 /** This checkout's packaged build's executable (npm run dist): Combwork.exe since HI-2460. */
 const PACKAGED_EXE = path.join(ROOT, 'dist', 'win-unpacked', 'Combwork.exe')

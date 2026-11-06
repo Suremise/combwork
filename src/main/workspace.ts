@@ -113,7 +113,7 @@ const USAGE_IGNORE = '# What each session used: the usage history (#1106)\nusage
 
 /**
  * A .combwork/.gitignore's text with the usage history's lines added, or null to leave it as it is: one Combwork didn't
- * write is the user's, and one that has them already needs nothing. Hive's, from before 1.1, has Combwork's head by then
+ * write is the user's, and one that has them already needs nothing. One from before 1.1 has Combwork's head by then
  * (the names upgrade at the open, HI-2587: nameUpgradeFiles.ts).
  */
 export function withUsageIgnore(text: string): string | null {
@@ -143,7 +143,7 @@ usage.db
 usage.db-*
 ${NAMES_IGNORE}`
 
-/** The Assistant's home's .gitignore (HI-2580: before 1.1 it said Hive; nothing reads it back). */
+/** The Assistant's home's .gitignore (HI-2580: before 1.1 it said the old name; nothing reads it back). */
 // agent-protocol: a .gitignore's fixed text for git and whoever opens the file, not words said to an agent
 export const ASSISTANT_GITIGNORE = "# Combwork Assistant: this machine's sessions (added by Combwork)\n*\n" // i18n-ignore: the Assistant's .gitignore, a file in the workspace
 
@@ -464,7 +464,7 @@ export class WorkspaceService {
       }
       await this.close()
       this.generation++
-      // Its `.hive` folders, and its projects', move to `.combwork` (HI-2462, combworkMove.ts) before the window holds the
+      // Its pre-1.1 data folders, and its projects', move to `.combwork` (HI-2462, combworkMove.ts) before the window holds the
       // folder: nothing of it is admitted, read or written until they have (a settings change at start looks at every
       // open workspace). A move that can't be done refuses the open, the folder not this window's.
       const openGen = this.generation
@@ -712,7 +712,7 @@ export class WorkspaceService {
     await whenAll([join(h, 'shared', 'handovers'), join(h, 'skills'), join(h, 'mcp')].map((d) => mkdir(d, { recursive: true })))
     const hr = join(h, 'shared', 'handovers', 'README.md')
     await whenAll([
-      // A new workspace has nothing of Hive's: its names upgrade recorded done, under the move's lock (HI-2587).
+      // A new workspace has nothing from before 1.1: its names upgrade recorded done, under the move's lock (HI-2587).
       existsSync(join(h, 'workspace.json')) ? undefined : newWorkspaceConfig().then((c) => writeKeptJson(join(h, 'workspace.json'), c)).then(() => (this.path ? recordNewWorkspace(this.path) : undefined)),
       existsSync(join(h, 'README.md')) ? undefined : writeFile(join(h, 'README.md'), WORKSPACE_README),
       // The board's database and what its move from files left (#1017) are this machine's: kept out of git if the workspace is a repository.
@@ -927,7 +927,7 @@ export class WorkspaceService {
 
   /**
    * The Combwork Assistant's own MCP choices (HI-1472), once per workspace: none in a new workspace; in one from before, the
-   * servers on in the workspace when the old Advanced switch (`hive.assistant.otherMcpServers`, kept for this) was on,
+   * servers on in the workspace when the old Advanced switch (its pre-1.1 id, kept for this) was on,
    * so what it got still runs, else none. A list already there (an empty one too) is the user's and stays. Worked out as
    * it is saved, so a choice made meanwhile wins.
    */
@@ -1352,7 +1352,7 @@ export class WorkspaceService {
   /** Creates <project>/.combwork with defaults and excludes it from git. Idempotent. */
   /**
    * The folder move's late phases (HI-2462, combworkMove.ts): the cards' paths, rewritten in a worker, and each moved
-   * project's agents' folders that were inside its old `.hive` (slots, copies, homes) recorded at their new place.
+   * project's agents' folders that were inside its old data folder (slots, copies, homes) recorded at their new place.
    */
   private async finishFolderMove(o: MoveOptions = {}): Promise<void> {
     const path = this.path
@@ -1378,7 +1378,7 @@ export class WorkspaceService {
     // Its set-up recorded once it is done (HI-2564), as of now.
     const gen = this.generation
     const ticket = ++this.rootTickets
-    // A project that came into the open workspace with a `.hive` of its own (copied in, restored): moved first (HI-2462),
+    // A project that came into the open workspace with a pre-1.1 data folder of its own (copied in, restored): moved first (HI-2462),
     // so a fresh `.combwork` never strands its settings. The open's own move did every project there was then.
     if (this.path && !this.isAssistantHome(projectPath) && (await classify(this.path, projectPath, 'project')) === 'planned') {
       const moved = await moveFolders(this.path, { only: projectPath })
@@ -1811,7 +1811,7 @@ export class WorkspaceService {
     if (before === why) return
     this.platformOffers.set(key, why)
     // Nothing to say now (switched, or the folder back as it was): the notice said before goes (HI-1905: a project
-    // switched to Git right after Initialise repository… kept "Hive goes on treating it as … None").
+    // switched to Git right after Initialise repository… kept "… goes on treating it as … None").
     if (!why) {
       if (before) resolveOffer(`platform:${key}`, tr(M.platformSettled))
       return

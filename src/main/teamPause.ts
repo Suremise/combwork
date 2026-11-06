@@ -58,7 +58,7 @@ export const appPause = (): TeamPause | null => all
 
 /** At start (HI-2156): the profile's files an earlier build saved a pause in, removed; Combwork starts unpaused. */
 export function clearSavedPauses(): void {
-  for (const f of [OLD_FILE, OLD_CLOSING_FILE]) void rm(join(app.getPath('userData'), f), { force: true }).catch((e) => log.warn('Removing a team pause an earlier Hive saved', e))
+  for (const f of [OLD_FILE, OLD_CLOSING_FILE]) void rm(join(app.getPath('userData'), f), { force: true }).catch((e) => log.warn('Removing a team pause an earlier version saved', e))
 }
 
 /**
@@ -70,7 +70,7 @@ export function teamPauseOf(ws: WorkspaceService | null | undefined): TeamPause 
   const k = keyOf(ws)
   if (!cleared.has(k)) {
     cleared.add(k)
-    void rm(join(combworkOf(ws), OLD_FILE), { force: true }).catch((e) => log.warn('Removing a team pause an earlier Hive saved', e))
+    void rm(join(combworkOf(ws), OLD_FILE), { force: true }).catch((e) => log.warn('Removing a team pause an earlier version saved', e))
   }
   const p = known.get(k)
   if (p) return p

@@ -17,7 +17,7 @@ export function logsDir(): string {
   return join(app.getPath('userData'), 'logs')
 }
 
-/** The app's own log, `combwork.log` (HI-2587: `hive.log` before), kept to MAX_BYTES and one older copy. */
+/** The app's own log, `combwork.log` (HI-2587: named after the old name before), kept to MAX_BYTES and one older copy. */
 export const LOG_FILE = 'combwork.log'
 
 let logsMoved = false
@@ -42,8 +42,8 @@ function file(name: string): string {
 }
 
 /**
- * The log's files from before 1.1 renamed (HI-2587, the names upgrade, nameUpgrade.ts): `hive.log` → `combwork.log` and
- * `hive.1.log` → `combwork.1.log`, each only while its new name isn't there. One that can't be renamed (held by another
+ * The log's files from before 1.1 renamed (HI-2587, the names upgrade, nameUpgrade.ts): its two files (the log and its older copy)
+ * take `combwork.log` and `combwork.1.log`, each only while its new name isn't there. One that can't be renamed (held by another
  * program), whose new name is there already, or either of which can't be looked at (access denied: never taken for
  * absent, HI-2612, so a current log is never renamed over), stays where it is, never read: Help → Open Logs Folder shows
  * it, and the next start tries again. Never throws (a log mustn't): what it left for a reason other than a taken name,
@@ -51,7 +51,9 @@ function file(name: string): string {
  */
 export function moveOldLogs(dir: string): string[] {
   const left: string[] = []
+  // old-name: begin old-logs
   for (const [from, to] of [['hive.log', LOG_FILE], ['hive.1.log', LOG_FILE.replace(/\.log$/, '.1.log')]]) {
+  // old-name: end old-logs
     try {
       if (present(join(dir, from)) && !present(join(dir, to))) renameSync(join(dir, from), join(dir, to))
     } catch (e) {

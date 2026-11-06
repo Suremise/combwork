@@ -200,7 +200,7 @@ interface CombworkMessageValues {
   'service.metrics.notTransport': undefined
   'service.metrics.sharedNumbers': undefined
   'service.nameUpgrade.boardNotFolded': { file: string | number; log: string | number }
-  'service.nameUpgrade.boardOrphan': { file: string | number }
+  'service.nameUpgrade.boardOrphan': { file: string | number; old: string | number }
   'service.nameUpgrade.failed': { what: string | number; error: string | number }
   'service.nameUpgrade.profileFailed': { files: string | number; n: number }
   'service.providers.keysStopped': { task: string | number; why: string | number }

@@ -111,7 +111,7 @@
   "tips.boardSetAside.title": "Cartões criados por um Combwork mais antigo",
   "tips.boardStages.text": "As colunas do quadro são as etapas que suas opções do fluxo de trabalho criam: Em merge fica sob Aprovado enquanto o Combwork faz o merge, e uma etapa que ninguém usa fica oculta. Peça ao Assistente para renomear uma, como “chame Fazendo de Construindo no projeto web”: um nome não muda nenhuma regra.",
   "tips.boardStages.title": "O quadro mostra as etapas do seu fluxo de trabalho",
-  "tips.boardUpgrade.text": "O Combwork guarda o quadro 0.9 que atualizou para 1.0. Ajuda → Restaurar o backup do quadro 0.9… o traz de volta, depois de guardar uma cópia do quadro como está, para que o Hive 0.9 possa alterá-lo de novo.",
+  "tips.boardUpgrade.text": "O Combwork guarda o quadro 0.9 que atualizou para 1.0. Ajuda → Restaurar o backup do quadro 0.9… o traz de volta, depois de guardar uma cópia do quadro como está, para que a versão 0.9 possa alterá-lo de novo.",
   "tips.boardUpgrade.title": "Voltar ao 0.9 depois de atualizar",
   "tips.branchCards.text": "Em Controle de versão → Branches e remotes, um branch em que um cartão trabalha mostra o cartão e a etapa dele, e em Revisão a versão em revisão. Clique no cartão para abri-lo.",
   "tips.branchCards.title": "Veja de qual cartão é um branch",

@@ -94,7 +94,7 @@ export const CW_RUNS = 'Combwork (merge queue)' // i18n-ignore: a run's stored n
 export const slotRunsName = (slot: string): string => `Combwork (slot ${slot})` // i18n-ignore: a run's stored name, which agents read too
 /**
  * The stored name of a review or check copy's warming runs (#1435) when no lease names its agent: one name for the pool
- * (HI-1710: it was "Hive (copy copy-1)", a filter entry a copy, which the window showed as "copy copy").
+ * (HI-1710: it was "<app name> (copy copy-1)", a filter entry a copy, which the window showed as "copy copy").
  */
 // agent-protocol: a run's stored name, which the window words in its language
 export const COPIES_RUNS = 'Combwork (review copies)' // i18n-ignore: a run's stored name, which agents read too

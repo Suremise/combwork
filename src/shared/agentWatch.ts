@@ -211,7 +211,7 @@ function partOf(a: Pick<WatchedAgent, 'name' | 'project'>, ev: AgentEvent, now: 
 export const REPLY_CHARS = 120
 export const replyFirstLine = (text: string): string => clipChars(text.split('\n').map((l) => l.trim()).find(Boolean) ?? '', REPLY_CHARS)
 
-/** The user's reply to an agent, for a wake line (#418): "User replied to B1 on #399: "C, the hive cell"", by its name (#426). */
+/** The user's reply to an agent, for a wake line (#418): "User replied to B1 on #399: "C, the honeycomb cell"", by its name (#426). */
 export function replyPart(agentName: string, where: string, text: string, max = REPLY_CHARS, user = DEFAULT_USER_NAME): string {
   return say(T.replied, { user, agent: agentName, where: where ? ` ${where}` : '', quote: max > 0 ? `: "${clipChars(text, max)}"` : '' })
 }

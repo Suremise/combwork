@@ -1253,13 +1253,13 @@ export interface ArchiveBatch {
 }
 
 /**
- * A card an older Hive saved after the board moved to its database (#1017), set aside in `.combwork/tasks.set-aside` for the
- * user to review (#1044): added as a new card or discarded. Its fields are as the older Hive saved them.
+ * A card an older version saved after the board moved to its database (#1017), set aside in `.combwork/tasks.set-aside` for the
+ * user to review (#1044): added as a new card or discarded. Its fields are as the older version saved them.
  */
 export interface SetAsideCard {
   /** Its file's name in the set-aside folder: what Add and Discard name. */
   file: string
-  /** The number the older Hive gave it (from the file's name), or null. */
+  /** The number the older version gave it (from the file's name), or null. */
   number: number | null
   /** Whether that number is free on the board: Add keeps it, else gives the next free one. */
   free: boolean

@@ -111,7 +111,7 @@
   "tips.boardSetAside.title": "旧版 Combwork 创建的卡片",
   "tips.boardStages.text": "看板的列是工作流程选项产生的阶段：Combwork 负责合并时，“合并中”位于“已批准”之下；没有人使用的阶段会隐藏。可以让助手重命名某个阶段，例如“把 web 里的进行中改名为构建中”：名称不会改变任何规则。",
   "tips.boardStages.title": "看板显示你的工作流程的阶段",
-  "tips.boardUpgrade.text": "Combwork 会保留它升级到 1.0 的 0.9 看板。“帮助”→“恢复 0.9 看板备份…”会先保留看板当前的副本，再将其放回，以便 Hive 0.9 可以再次更改它。",
+  "tips.boardUpgrade.text": "Combwork 会保留它升级到 1.0 的 0.9 看板。“帮助”→“恢复 0.9 看板备份…”会先保留看板当前的副本，再将其放回，以便 0.9 版可以再次更改它。",
   "tips.boardUpgrade.title": "升级后回到 0.9",
   "tips.branchCards.text": "在“版本控制”→“分支与远程仓库”中，卡片正在使用的分支会显示该卡片及其阶段，评审中还会显示正在评审的修订版本。点击卡片即可打开。",
   "tips.branchCards.title": "查看分支属于哪张卡片",

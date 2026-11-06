@@ -212,7 +212,7 @@ describe('refused, nothing lost', () => {
     const other = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], { stdio: 'ignore', windowsHide: true })
     try {
       json(join(ws, OLD_DIR, 'open', 'Combwork-1234.json'), { pid: other.pid, profile: 'Combwork', appVersion: '1.0.0', startedAt: new Date().toISOString(), heartbeat: new Date().toISOString() })
-      await expect(moveFolders(ws)).rejects.toThrow(/open in another Combwork or Hive \(Combwork\)/)
+      await expect(moveFolders(ws)).rejects.toThrow(/open in another Combwork or a 1\.0 copy \(Combwork\)/)
       expect(existsSync(join(ws, OLD_DIR, OLD_DB))).toBe(true)
       expect(existsSync(join(ws, 'alpha', OLD_DIR))).toBe(true)
     } finally {

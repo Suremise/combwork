@@ -170,8 +170,8 @@ const chooseProfiles = (roamingParent: string, localParent: string, packaged: bo
  * A test copy only writes it to stderr: it never shows a window.
  */
 function refuseStart(e: ProfileMoveRefused): never {
-  const title = tr(msg({ id: 'main.profileMove.refusedTitle', defaultMessage: "Combwork couldn't move its data folder", description: "The title of an error box at start (HI-2594): Combwork's data folder from before (named Hive, the app's old name) has to be renamed to Combwork's before Combwork can start, and the rename failed. Nothing was lost." }))
-  const text = tr(msg({ id: 'main.profileMove.refused', defaultMessage: "Combwork's data from before it was renamed is in {from}, and Combwork couldn't rename that folder to {to}: {reason}. Nothing was changed or lost. Close any copy of Hive or Combwork that is still running, then start Combwork again.", description: "The text of an error box at start (HI-2594): Combwork's data folder from Hive Desktop (the app's old name, keep it) couldn't be renamed to Combwork's. {from} and {to} are folder paths; {reason} says why, in English (e.g. \"it couldn't be renamed (EBUSY)\"). Hive and Combwork are the app's old and new names: keep them." }), { from: e.from, to: e.to, reason: e.reason })
+  const title = tr(msg({ id: 'main.profileMove.refusedTitle', defaultMessage: "Combwork couldn't move its data folder", description: "The title of an error box at start (HI-2594): Combwork's data folder from before (named after the app's old name) has to be renamed to Combwork's before Combwork can start, and the rename failed. Nothing was lost." }))
+  const text = tr(msg({ id: 'main.profileMove.refused', defaultMessage: "Combwork's data from before it was renamed is in {from}, and Combwork couldn't rename that folder to {to}: {reason}. Nothing was changed or lost. Close any copy of Combwork, or of its 1.0 version, that is still running, then start Combwork again.", description: "The text of an error box at start (HI-2594): Combwork's data folder from version 1.0 (from before the app was renamed) couldn't be renamed to Combwork's. {from} and {to} are folder paths; {reason} says why, in English (e.g. \"it couldn't be renamed (EBUSY)\")." }), { from: e.from, to: e.to, reason: e.reason })
   process.stderr.write(`${title}: ${e.message}\n`) // i18n-ignore: a line for whoever started it from a shell
   if (!testQuiet()) {
     try {
@@ -199,8 +199,8 @@ startExitLog()
 const unconverted = upgradeProfileFiles(app.getPath('userData'))
 if (unconverted.length) {
   setLanguageBeforeReady()
-  const title = tr(msg({ id: 'main.nameUpgrade.profileTitle', defaultMessage: "Combwork can't start", description: "The title of an error box as Combwork starts: it couldn't convert its settings files from Hive's names (service.nameUpgrade.profileFailed)." }))
-  const text = tr(msg({ id: 'service.nameUpgrade.profileFailed', defaultMessage: "Combwork couldn't convert {files} from Hive's names to Combwork's: another program may have {n, plural, one {it} other {them}} open. Close that program and start Combwork again. Nothing was changed.", description: "An error box as Combwork starts, after an update from Hive: a settings file couldn't be rewritten with Combwork's names (HI-2598), so Combwork doesn't start rather than lose the settings. {files} lists the files' paths; {n} is how many." }), { files: fmt.list(unconverted, 'unit'), n: unconverted.length })
+  const title = tr(msg({ id: 'main.nameUpgrade.profileTitle', defaultMessage: "Combwork can't start", description: "The title of an error box as Combwork starts: it couldn't convert its settings files from the old names (service.nameUpgrade.profileFailed)." }))
+  const text = tr(msg({ id: 'service.nameUpgrade.profileFailed', defaultMessage: "Combwork couldn't convert {files} from the old names to Combwork's: another program may have {n, plural, one {it} other {them}} open. Close that program and start Combwork again. Nothing was changed.", description: "An error box as Combwork starts, after an update from 1.0: a settings file couldn't be rewritten with Combwork's names (HI-2598), so Combwork doesn't start rather than lose the settings. {files} lists the files' paths; {n} is how many." }), { files: fmt.list(unconverted, 'unit'), n: unconverted.length })
   if (!testQuiet()) {
     try {
       dialog.showErrorBox(title, text)
@@ -208,7 +208,7 @@ if (unconverted.length) {
       // nothing more can be told before the app is ready
     }
   }
-  exitBy('process.exit', "Combwork couldn't convert its profile's files from Hive's names", () => process.exit(1))
+  exitBy('process.exit', "Combwork couldn't convert its profile's files from the old names", () => process.exit(1))
 }
 
 // Hardware acceleration off (#676): Settings → Advanced's value, read from advanced.json before the app is ready, or
@@ -240,7 +240,7 @@ startCrashDumps()
 
 // Windows ties the taskbar icon and notification name/icon to this ID. Dev and test builds run as
 // electron.exe, so they get their own ID; sharing it made Windows show Electron's icon for Combwork.
-// Combwork's (HI-2460): Hive Desktop's was com.hive.desktop (.dev), which its installer removes.
+// Combwork's (HI-2460): 1.0 had its own (and .dev), which its installer removes (build/installer.nsh).
 const APP_ID = app.isPackaged ? 'it.surmise.combwork' : 'it.surmise.combwork.dev'
 app.setAppUserModelId(APP_ID)
 if (!app.isPackaged && process.platform === 'win32') registerDevAppId()
@@ -983,7 +983,7 @@ function showCorrupt(file: string, aside: string, restored: boolean): void {
     file
   )
 }
-/** What the board says as it moves the cards' files into its database, or finds cards an older Hive saved (#1017). */
+/** What the board says as it moves the cards' files into its database, or finds cards an older version saved (#1017). */
 onBoardNotice((path, n) => {
   if (n.kind === 'imported') {
     if (!n.damaged.length) return
@@ -1022,7 +1022,7 @@ app.whenReady().then(async () => {
     if (!SERVABLE_EXT.test(p) || insideArchive(p) || !workspace.isAllowedPath(p)) return new Response('Not found', { status: 404 }) // i18n-ignore: an HTTP reply to the window, never shown
     // Read with original-fs, never Electron's file: loader, which would open an archive on the path and keep it (#246, #261).
     let st = await stat(p).catch(() => null)
-    // A path into a .hive folder that moved serves the file in .combwork (HI-2462), and one into the old images folder
+    // A path into a pre-1.1 data folder that moved serves the file in .combwork (HI-2462), and one into the old images folder
     // the file where it is now, in attachments (#387).
     const moved = st ? null : await followMovedLink(p, openWorkspaces().flatMap((w) => (w.path ? [w.path] : [])), movedAttachment)
     if (moved && workspace.isAllowedPath(moved)) {

@@ -43,7 +43,7 @@ const log = createLogger('board')
  */
 
 export const DB_FILE = 'combwork.db'
-/** The folder the cards' files were in before (#1017), and what an older Hive still looks at. */
+/** The folder the cards' files were in before (#1017), and what an older version still looks at. */
 const TASKS = 'tasks'
 
 /** The group of the 1.0 upgrade's steps (#1207): every P3 step that changes the schema is in it. */
@@ -313,7 +313,7 @@ export const BOARD_MIGRATIONS: Migration[] = [
     }
   },
   {
-    // HI-2587, the names upgrade: what the board kept under Hive's names takes Combwork's (comments' `hive_text` column,
+    // HI-2587, the names upgrade: what the board kept under the old names takes Combwork's (comments' old text column,
     // the 0.9 import's record's old version key). In the 1.0 group, near its end: a board 1.0 or an RC upgraded takes it
     // unasked (as HI-1718's later steps), a 0.9 board with its upgrade.
     version: 25,
@@ -322,13 +322,15 @@ export const BOARD_MIGRATIONS: Migration[] = [
     up: (db) => {
       // Only with 1.0's tables (a board made before them, its group not run, has no comments' column to rename).
       const cols = (db.prepare("SELECT name FROM pragma_table_info('card_comments')").all() as { name: string }[]).map((c) => c.name) // i18n-ignore: SQL
+      // old-name: begin board-names-step
       if (cols.includes('hive_text')) for (const sql of NAMES_STEP.ddl) db.exec(sql)
       db.exec("UPDATE board_meta SET value = json_remove(json_set(value, '$.appVersion', json_extract(value, '$.hiveVersion')), '$.hiveVersion') WHERE key = 'imported' AND json_valid(value) AND json_type(value, '$.hiveVersion') IS NOT NULL") // i18n-ignore: SQL
+      // old-name: end board-names-step
     }
   },
   {
     // HI-2598, the names upgrade's stored values (its design HI-2598/s9 §2): what 1.0 and the release candidates stored
-    // under Hive's names (a fact's actor, who merges, the rulesets compiled from it, a lane's builder, Combwork's own
+    // under the old names (a fact's actor, who merges, the rulesets compiled from it, a lane's builder, Combwork's own
     // deliveries…) takes Combwork's, once (schema/valuesStep.ts). The 1.0 group's last step: taken unasked as 25 is.
     version: 26,
     name: VALUES_STEP.name,
@@ -414,8 +416,8 @@ export function onBoardNotice(fn: (path: string, n: BoardNotice) => void): void 
 const M = {
   noWorkspace: msg({ id: 'board.error.noWorkspace', defaultMessage: 'No workspace is open', description: 'An error: the task board needs an open workspace, and there is none.' }),
   newer: msg({ id: 'board.error.newer', defaultMessage: 'This board was saved by a newer version of Combwork. It is shown read-only: update Combwork to change it.', description: "An error: the workspace's task board was saved by a newer Combwork, whose format this version doesn't know; cards can be read but not changed." }),
-  upgradeFirst: msg({ id: 'board.error.upgradeFirst', defaultMessage: "This board is from Hive 0.9: it is read-only until it is upgraded to 1.0 (Upgrade… on the board's banner).", description: "An error: the workspace's task board hasn't been upgraded to 1.0's format yet (the user was asked and said not now), so cards can be read but not changed. Upgrade… is the button on the banner above the board." }),
-  upgradeFirstStart: msg({ id: 'board.error.upgradeFirstStart', defaultMessage: 'This workspace is from Hive 0.9: upgrade it to 1.0 before starting agents (Upgrade… on the banner at the top of the window).', description: "An error: an agent (or the Assistant) can't start while the workspace's data waits for its upgrade to 1.0's format (the user said Not Now): Combwork couldn't record its session. Upgrade… is the button on the banner at the top of the window." }),
+  upgradeFirst: msg({ id: 'board.error.upgradeFirst', defaultMessage: "This board is from version 0.9: it is read-only until it is upgraded to 1.0 (Upgrade… on the board's banner).", description: "An error: the workspace's task board hasn't been upgraded to 1.0's format yet (the user was asked and said not now), so cards can be read but not changed. Upgrade… is the button on the banner above the board." }),
+  upgradeFirstStart: msg({ id: 'board.error.upgradeFirstStart', defaultMessage: 'This workspace is from version 0.9: upgrade it to 1.0 before starting agents (Upgrade… on the banner at the top of the window).', description: "An error: an agent (or the Assistant) can't start while the workspace's data waits for its upgrade to 1.0's format (the user said Not Now): Combwork couldn't record its session. Upgrade… is the button on the banner at the top of the window." }),
   stopAgentsFirst: msg({ id: 'board.error.stopAgentsFirst', defaultMessage: "Stop this workspace's agents and its Assistant first: once the 0.9 board is back, Combwork can't record them.", description: "An error from Help → Restore the 0.9 Board Backup…: agents of the workspace are running or starting; the board put back is read-only in this Combwork, so their sessions couldn't be recorded. Nothing was changed." }),
   inUse: msg({ id: 'board.error.inUse', defaultMessage: 'Another Combwork has this workspace open: close it first.', description: "An error: the board can't be upgraded to 1.0 (or its 0.9 backup put back) while another copy of Combwork (an older version, or another profile) has the workspace open. Nothing was changed." }),
   noBackup: msg({ id: 'board.error.noBackup', defaultMessage: 'There is no 0.9 board backup to put back: this board was never upgraded to 1.0 here.', description: "An error from Help → Restore the 0.9 Board Backup…: no copy of the board from before its upgrade to 1.0 is kept in the workspace." }),
@@ -543,11 +545,11 @@ function finishMove(b: Board, combwork: string, record: Imported): void {
   if (record.pendingRename) setMeta(b.db.writer, 'imported', JSON.stringify({ ...record, pendingRename: false }))
 }
 
-/** Where cards an older Hive saved in the stub are set aside, intact, for the user to review (Darren, 17 Oct). */
+/** Where cards an older version saved in the stub are set aside, intact, for the user to review (Darren, 17 Oct). */
 export const SET_ASIDE = `${TASKS}.set-aside`
 
 /**
- * The numbers of the cards set aside for the user to review (#1044; those an older Hive saved in the stub 0.9 to 1.0
+ * The numbers of the cards set aside for the user to review (#1044; those an older version saved in the stub 0.9 to 1.0
  * left, which the names upgrade sets aside: nameUpgradeFiles.ts moveOldStub, HI-2594) are never given to new cards: the
  * next number is moved past them at each open, in the board's own write. Reads only the set-aside folder.
  */
@@ -565,7 +567,7 @@ function keepSetAsideNumbers(b: Board, combwork: string): void {
 
 /** Tells the user cards an older version saved were set aside (the names upgrade, HI-2594): the board's notice. */
 export function tellSetAside(path: string, cards: number): void {
-  log.info(`${cards} card file(s) an older Hive saved set aside in ${SET_ASIDE}`)
+  log.info(`${cards} card file(s) an older version saved set aside in ${SET_ASIDE}`)
   notify(path, { kind: 'setAside', cards, folder: SET_ASIDE })
 }
 
@@ -629,7 +631,7 @@ export function setAsideAdded(ws: WorkspaceService, file: string, text: string):
   afterBoardWrite(ws, () => removeAdded(dir, file))
 }
 
-/** A set-aside file whose card is on the board goes to the Recycle Bin (#1044 round 1): the older Hive's copy stays recoverable. */
+/** A set-aside file whose card is on the board goes to the Recycle Bin (#1044 round 1): the older version's copy stays recoverable. */
 function removeAdded(dir: string, file: string): void {
   const p = join(dir, file)
   // Once: a listing while its move is under way leaves it to that move.
@@ -782,7 +784,7 @@ const FAMILY = DB_FILE.replace(/\.db$/, '')
 /** Where Restore the 0.9 Board Backup keeps the 1.0 file it replaces: never pruned either. */
 const RESTORE_FAMILY = `${FAMILY}-before-restore`
 
-/** Another profile's Combwork has the workspace open, by its presence marker (a 1.0 Hive; a 0.9 one shows by SQLite's lock). */
+/** Another profile's Combwork has the workspace open, by its presence marker (1.0's; a 0.9 build shows by SQLite's lock). */
 class OtherCombworkError extends Error {
   constructor() {
     super('another Combwork has the workspace open (its presence marker is fresh)') // i18n-ignore: for the log; the user sees M.inUse
@@ -803,7 +805,7 @@ function upgradeAnswer(p: PendingGroup): 'yes' | 'no' | null {
 
 /**
  * For the S60 suite (unpackaged builds only): CW_TEST_UPGRADE_HOLD=<ms>;<file> keeps the upgrade's exclusive lock that
- * long once its steps are committed, after writing <file>, so the suite can start a 0.9 Hive during the upgrade. Main's
+ * long once its steps are committed, after writing <file>, so the suite can start a 0.9 build during the upgrade. Main's
  * thread waits meanwhile, as it would on a slow disk.
  */
 function holdForTest(): void {
@@ -1900,7 +1902,7 @@ const copy09 = (path: string): { file: string; version: number; at: string } | u
  * The workspace database's generation (#1207 round 2): a number that changes each time its file is replaced under the
  * services (the upgrade to 1.0, Restore the 0.9 Board Backup), whose caches were read from the file before. What a
  * service read in an older generation is stale: it reads again, and a save made from it is refused (`saveStore`'s guard),
- * so nothing written meanwhile (by a 0.9 Hive while the upgrade waited) is overwritten from an old snapshot.
+ * so nothing written meanwhile (by a 0.9 build while the upgrade waited) is overwritten from an old snapshot.
  */
 /** By the workspace's place (#1395: a store loaded through another spelling of its folder is the same database's). */
 const generations = new Map<string, number>()
@@ -2041,7 +2043,7 @@ export async function upgradeBoard(ws: WorkspaceService): Promise<{ backup: stri
 /**
  * Help → Restore the 0.9 Board Backup… (SPEC §16.17): the board as it is now copied aside first (kept for good), then the
  * copy made before its upgrade to 1.0 put back in its place, and the board opened again: read-only in this Combwork (its
- * upgrade waiting again), writable for a 0.9 Hive. Nothing is deleted. Refused while another Combwork has the workspace open:
+ * upgrade waiting again), writable for a 0.9 build. Nothing is deleted. Refused while another Combwork has the workspace open:
  * it would go on with the 1.0 file under the copy put back. Replies with the copy of the 1.0 board.
  */
 export async function restoreBoardBackup(ws: WorkspaceService, agentsRunning: () => number): Promise<{ saved: string; restored: string }> {
@@ -2053,7 +2055,7 @@ export async function restoreBoardBackup(ws: WorkspaceService, agentsRunning: ()
     // Opened first: an open is what upgrades it (a test copy's answer), and so makes its copy.
     const version = schemaVersion(boardOf(path).db.reader)
     const kept = copy09(path)
-    // The file itself, not only its name: a 0.9 board, which a 0.9 Hive can change again.
+    // The file itself, not only its name: a 0.9 board, which a 0.9 build can change again.
     if (!kept || !(fileSchemaVersion(kept.file) < FIRST_10)) throw combworkError(M.noBackup, undefined, { kind: 'conflict' })
     // The board put back takes no writes here: an agent running on would go unrecorded. Starts are refused from then on.
     if (agentsRunning() > 0) throw combworkError(M.stopAgentsFirst, undefined, { kind: 'conflict' })
@@ -2098,7 +2100,7 @@ export async function restoreBoardBackup(ws: WorkspaceService, agentsRunning: ()
 
 /**
  * Exports the board to plain files (Export Board to JSON): a folder with `<n>.json` for each card, exactly as the cards'
- * files were before 0.9 (so an older Hive can read them), with board.json and archive-batches.json. Returns how many cards.
+ * files were before 0.9 (so an older version can read them), with board.json and archive-batches.json. Returns how many cards.
  */
 export async function exportBoard(ws: WorkspaceService, dir: string, mask: <T>(v: T) => T = (v) => v): Promise<number> {
   // Its cards, next number and batches as one snapshot of the board.

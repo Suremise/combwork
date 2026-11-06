@@ -73,7 +73,7 @@ const check = (name, ok, extra = '') => {
   check('the card has a key of its project', /^[A-Z]{2,4}-\d+$/.test(named), named)
   await inv('tasks:update', n, { column: 'doing', agent: agent.id })
   // What it does when Combwork's line comes: reads the card's decisions, as work-on-card says.
-  fs.writeFileSync(path.join(claudeHome, 'fake-wakes-Asker.txt'), `cw cw_read_task {"number":${n}}\nhive cw_read_task {"number":${n}}\nhive cw_read_task {"number":${n}}\n`)
+  fs.writeFileSync(path.join(claudeHome, 'fake-wakes-Asker.txt'), `cw cw_read_task {"number":${n}}\ncw cw_read_task {"number":${n}}\ncw cw_read_task {"number":${n}}\n`)
   await inv('session:start', alpha, { agentId: agent.id })
   check('the agent starts', !!(await until(() => idle(agent.id), HUNG_MS)))
   // Its own turns, typed once it takes prompts and waited for to their end (#729: an idle wait returned before the fake,

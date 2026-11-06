@@ -27,7 +27,7 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 const until = (fn, ms) => lib.until(fn, ms, 200)
-/** A template file as Hive 0.9 wrote it: version 1, an agent with a worktree of its own. */
+/** A template file as version 0.9 wrote it: version 1, an agent with a worktree of its own. */
 const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10:00:00.000Z', layout: 'columns2', agents: [{ name: 'Tree', provider: 'claude-code', worktree: true }, { name: 'Folder', role: 'reviewer', provider: 'claude-code', worktree: false }] }, null, 2)
 
 ;(async () => {
@@ -133,7 +133,7 @@ const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10
     }, old)
     const wsBefore = JSON.stringify(listed(path.join(ws, '.combwork', 'templates')))
     await sidebar.locator('[aria-label="Import Template…"]').click()
-    check('importing a 0.9 template is refused, saying why', !!(await until(async () => (await page.locator('.toast').allInnerTexts()).some((t) => /Could not import the template[\s\S]*This template is from Hive 0\.9 and can't be loaded in 1\.0\. Recreate it from your agents with Save as Template\./.test(t)), HUNG_MS)) && JSON.stringify(listed(path.join(ws, '.combwork', 'templates'))) === wsBefore, (await page.locator('.toast').allInnerTexts()).join(' | '))
+    check('importing a 0.9 template is refused, saying why', !!(await until(async () => (await page.locator('.toast').allInnerTexts()).some((t) => /Could not import the template[\s\S]*This template is from version 0\.9 and can't be loaded in 1\.0\. Recreate it from your agents with Save as Template\./.test(t)), HUNG_MS)) && JSON.stringify(listed(path.join(ws, '.combwork', 'templates'))) === wsBefore, (await page.locator('.toast').allInnerTexts()).join(' | '))
 
     // --- Team 3×3 into alpha from the view: six agents named from its key, paired, in a grid, none in a worktree.
     const branches = lib.git(alpha, ['branch', '--list'])

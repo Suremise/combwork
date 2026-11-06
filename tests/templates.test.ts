@@ -86,7 +86,7 @@ describe('the template format', () => {
     const ok = { version: TEMPLATE_VERSION, name: 'T', savedAt: 'x', layout: 'mosaic', agents: [{ name: 'A', provider: 'claude-code', role: 'either', note: '  a   b ', extra: 1, worktree: true }] }
     expect(readTemplate(ok)).toEqual({ version: TEMPLATE_VERSION, name: 'T', savedAt: '', layout: 'auto', agents: [{ name: 'A', role: 'either', note: 'a b', provider: 'claude-code' }] })
     // 0.9's templates pinned agents to worktrees: refused, saying how to make one again (#1436).
-    expect(readTemplate({ ...ok, version: 1 })).toBe("This template is from Hive 0.9 and can't be loaded in 1.0. Recreate it from your agents with Save as Template.")
+    expect(readTemplate({ ...ok, version: 1 })).toBe("This template is from version 0.9 and can't be loaded in 1.0. Recreate it from your agents with Save as Template.")
     expect(readTemplate({ ...ok, version: TEMPLATE_VERSION + 1 })).toMatch(/newer version of Combwork/)
     expect(readTemplate({ ...ok, version: undefined })).toMatch(/no version/)
     expect(readTemplate({ ...ok, agents: [] })).toMatch(/no agents/)
@@ -755,8 +755,8 @@ describe('saving and loading templates', () => {
     await expect(run(() => templates.importTemplate(f('notjson.json', '{ nope'), where))).rejects.toThrow(/not JSON/)
     await expect(run(() => templates.importTemplate(f('newer.json', JSON.stringify({ ...good, version: TEMPLATE_VERSION + 1 })), where))).rejects.toThrow(/newer version of Combwork/)
     // 0.9's, with its worktree agents: refused, saying how to make one again (#1436); nothing written.
-    await expect(run(() => templates.inspectImport(f('old.json', JSON.stringify({ ...good, version: 1, agents: [{ name: 'A', provider: 'claude-code', worktree: true }] }))))).rejects.toThrow(/from Hive 0\.9 and can't be loaded in 1\.0/)
-    await expect(run(() => templates.importTemplate(join(dir, 'old.json'), where))).rejects.toThrow(/from Hive 0\.9/)
+    await expect(run(() => templates.inspectImport(f('old.json', JSON.stringify({ ...good, version: 1, agents: [{ name: 'A', provider: 'claude-code', worktree: true }] }))))).rejects.toThrow(/from version 0\.9 and can't be loaded in 1\.0/)
+    await expect(run(() => templates.importTemplate(join(dir, 'old.json'), where))).rejects.toThrow(/from version 0\.9/)
     await expect(run(() => templates.importTemplate(f('many.json', JSON.stringify({ ...good, agents: Array.from({ length: 25 }, (_, i) => ({ name: `A${i}`, provider: 'claude-code' })) })), where))).rejects.toThrow(/up to 24/)
     await expect(run(() => templates.importTemplate(f('big.json', JSON.stringify({ ...good, pad: 'x'.repeat(300 * 1024) })), where))).rejects.toThrow(/over 256 KB/)
     await expect(run(() => templates.importTemplate(join(dir, 'missing.json'), where))).rejects.toThrow(/isn't there/)

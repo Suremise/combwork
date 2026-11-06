@@ -69,7 +69,7 @@
   "performance.compare.error.benchmarkOnProject": "Um benchmark de cenários é do próprio espaço de trabalho de teste dele, não de um dos seus projetos: compare-o na visualização Desempenho (barra de atividades), com o espaço de trabalho inteiro selecionado.",
   "performance.compare.error.exportIsOwn": "É do trabalho próprio do espaço de trabalho: compare-o com “Trabalho próprio do espaço de trabalho” selecionado.",
   "performance.compare.error.exportIsWhole": "É do espaço de trabalho inteiro: compare-o com o espaço de trabalho inteiro selecionado.",
-  "performance.compare.error.from10": "É uma exportação de desempenho do Hive 1.0, que o Combwork não importa. Exporte novamente pelo Combwork para comparar.",
+  "performance.compare.error.from10": "É uma exportação de desempenho da versão 1.0, que o Combwork não importa. Exporte novamente pelo Combwork para comparar.",
   "performance.compare.error.holdsOther": "Diz ser do projeto {project}, mas também contém dados {other, select, projects {de outros projetos} other {do trabalho próprio do espaço de trabalho}}: não foi importado.",
   "performance.compare.error.invalidBenchmark": "Não é um benchmark de cenários válido (sem execução, versão de fixtures ou cenários).",
   "performance.compare.error.invalidExport": "Não é uma exportação de desempenho válida (sem relatório, escopo ou projetos).",

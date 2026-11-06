@@ -84,7 +84,7 @@
   "content.templates.fenced": "Eine Vorlage wird in dieses Projekt geladen",
   "content.templates.gone": "Diese Vorlage gibt es nicht mehr.",
   "content.templates.combworkOnly": "Combworks eigene Vorlagen können nicht geändert werden: Dupliziere eine in den Arbeitsbereich oder ein Projekt, um sie zu ändern.",
-  "content.templates.importFrom10": "Das ist eine aus Hive 1.0 exportierte Agentenvorlage, deren Workflow-Einstellungen Combwork nicht importiert. Erstelle die Vorlage in Combwork neu.",
+  "content.templates.importFrom10": "Das ist eine aus Version 1.0 exportierte Agentenvorlage, deren Workflow-Einstellungen Combwork nicht importiert. Erstelle die Vorlage in Combwork neu.",
   "content.templates.importNotJson": "Das ist keine Combwork-Agentenvorlage (kein JSON).",
   "content.templates.importTooLarge": "Das ist keine Combwork-Agentenvorlage (über {kb} KB).",
   "content.templates.loading": "In dieses Projekt wird bereits eine Vorlage geladen.",

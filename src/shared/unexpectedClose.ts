@@ -32,7 +32,7 @@ export interface RunMarker {
   /** When that Combwork started, and when it last wrote the marker (ISO). */
   startedAt: string
   lastSeen: string
-  /** The version of Combwork that wrote it (HI-2587: `hive` before 1.1, renamed by the names upgrade at start). */
+  /** The version of Combwork that wrote it (HI-2587: the old name before 1.1, renamed by the names upgrade at start). */
   app: string
   /** The workspaces it had open. */
   workspaces: string[]

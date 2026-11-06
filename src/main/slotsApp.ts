@@ -1,6 +1,6 @@
 // The slot pool in the app (#1429, slots.ts): one pool per open workspace and project, on the workspace's board (its
 // writes inside boardWrite, so they wait for and join the board's other changes), keyed by the project's id so a rename
-// keeps its slots. A slot's setup, installs and archive command run as Hive's own runs, attributed to "Hive (slot
+// keeps its slots. A slot's setup, installs and archive command run as Combwork's own runs, attributed to "Combwork (slot
 // <name>)" in the Progress panel, each in the job its operation recorded on the slot, on Combwork's process supervisor
 // (shared with agents' launches and the merge queue): with no supervisor nothing runs, and a job counts as settled only
 // once its processes are seen ended. Each run gets a session command's environment plus the slot's own (CW_SLOT,

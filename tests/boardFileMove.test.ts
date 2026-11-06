@@ -139,7 +139,7 @@ describe('the board file move', () => {
     await moveBoardFile(dir, checkpoint)
     expect(readFileSync(join(dir, OLD_DB_FILE)).equals(before)).toBe(true)
     expect(readFileSync(join(dir, `${OLD_DB_FILE}-wal`), 'utf8')).toBe('old log')
-    expect(told.toasts.map((t) => t.title).join()).toContain(`both ${OLD_DB_FILE} and combwork.db`)
+    expect(told.toasts.map((t) => t.title).join()).toMatch(/both the old board file and combwork\.db/)
   })
 
   it('a leftover log holding data beside combwork.db: kept as it is, a warning, the board opens', async () => {

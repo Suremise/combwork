@@ -456,7 +456,7 @@ async function deliverSkill(s: LaunchContext['skills'][number], dest: string, fo
 
 /** The comment above Combwork's copies' lines in a repository's info/exclude (HI-2580). */
 export const COPIES_EXCLUDE_COMMENT = "# Combwork's copies of workspace skills for Codex and Copilot (added by Combwork)" // i18n-ignore: a line in git's exclude file, which stays English
-/** How that comment starts: Combwork's own (Hive's, from before 1.1, says Combwork's by then: the names upgrade, HI-2587). */
+/** How that comment starts: Combwork's own (one from before 1.1 says Combwork's by then: the names upgrade, HI-2587). */
 const COPIES_COMMENT_HEAD = "# Combwork's copies of workspace skills" // i18n-ignore: a line in git's exclude file, which stays English
 
 /** Keeps Combwork's copies (and a swap's dot-folders) out of git, in the repository's info/exclude. */

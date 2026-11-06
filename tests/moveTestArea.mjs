@@ -1,5 +1,5 @@
 // npm run test:move-area [-- --dry-run] [--from <folder> --to <folder>] (HI-2590): moves the test area from
-// %LOCALAPPDATA%\hive-test, its name before 1.1, to %LOCALAPPDATA%\combwork-test (tests/testArea.cjs), once and one way.
+// The test area under its name before 1.1 (OLD_NAME, tests/testArea.cjs) to %LOCALAPPDATA%\combwork-test (tests/testArea.cjs), once and one way.
 // Run by the developer or a release, at a time no test runs; never by a test run (they refuse until it is done).
 //
 // - It refuses while a runner holds a slot, a lane, a build lock or a Codex home lock in the old folder, or a process's
@@ -17,7 +17,9 @@
 //   and a file's backup is written once); one that finds the old folder with a stale marker (the rename never happened)
 //   starts over. CW_MOVE_FAIL_AFTER=<n> (only this script reads it, for proving that) stops it after the n-th rewrite.
 // - Then it reports both test homes' sign-ins (claude auth status, codex login status: read only), removes the old
+// old-name: begin old-updater-caches
 //   update suite's download caches (%LOCALAPPDATA%\hive-test-updater*, throwaway), and prints the Defender lines.
+// old-name: end old-updater-caches
 // - Then, and on a rerun once the area is moved, the scenario benchmarks' schema is converted to 1.1's
 //   (convertBenchmarks.mjs, HI-2605); --dry-run says how many it would convert.
 // --from and --to move another folder (a copy, to prove the move on); the rewrites then also replace the real old
@@ -268,7 +270,9 @@ if (main) {
     if (!opt('--from')) {
       const local = dirname(real.old)
       for (const n of readdirSync(local)) {
+        // old-name: begin old-updater-match
         if (!/^hive-test-updater(-[\w-]+)?$/i.test(n)) continue
+        // old-name: end old-updater-match
         try {
           if (statSync(join(local, n)).isDirectory()) rmSync(join(local, n), { recursive: true, force: true })
           console.log(`Removed the old update suite's download cache ${n}.`)

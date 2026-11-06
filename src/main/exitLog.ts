@@ -23,7 +23,7 @@ export function exitBy(how: ExitWay, caller: string, act: () => void): void {
 }
 
 /**
- * The one way out that isn't logged: a start refused before its profile folder is chosen (HI-2594, a move of Hive's
+ * The one way out that isn't logged: a start refused before its profile folder is chosen (HI-2594, a move of 1.0's
  * folder it couldn't make; index.ts says why on stderr and in an error box). The log is in the profile: a line written
  * then would make Electron's default profile folder, Combwork's, which the next start would take for the profile.
  */

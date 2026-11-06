@@ -1,8 +1,8 @@
 {
   "freshResume.confirm": "新しい会話を開始",
   "freshResume.detail": "{assistant, select, yes {代わりにアシスタントが新しい会話を開始します。以前の会話はアシスタントの会話一覧に残っていて読めます。} other {代わりに{agent}が新しい会話を開始します。エージェントの作業（監視、メッセージ、タスク）はそのまま引き継がれ、以前の会話はセッション履歴に残っていて読めます。}}",
-  "freshResume.message": "{why, select, moved {この会話は.hiveとともに.combworkに移動したフォルダーで実行されていたため、そこでは続けられません。} other {この会話はCombworkがエージェントの使うツールの名前を変える前に始まったため、続けられません。}}",
+  "freshResume.message": "{why, select, moved {この会話は古いデータフォルダーとともに.combworkに移動したフォルダーで実行されていたため、そこでは続けられません。} other {この会話はCombworkがエージェントの使うツールの名前を変える前に始まったため、続けられません。}}",
   "freshResume.short": "新しい会話を開始",
-  "freshResume.tip": "{why, select, moved {新しい会話を開始します：「{session}」は.hiveとともに.combworkに移動したフォルダーで実行されていたため、続けられません} other {新しい会話を開始します：「{session}」はCombworkがエージェントの使うツールの名前を変える前の会話のため、続けられません}}",
+  "freshResume.tip": "{why, select, moved {新しい会話を開始します：「{session}」は古いデータフォルダーとともに.combworkに移動したフォルダーで実行されていたため、続けられません} other {新しい会話を開始します：「{session}」はCombworkがエージェントの使うツールの名前を変える前の会話のため、続けられません}}",
   "freshResume.title": "新しい会話を開始しますか？"
 }

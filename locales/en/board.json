@@ -677,7 +677,7 @@
   },
   "board.costs.outsideRow": {
     "defaultMessage": "Before its rounds",
-    "description": "A row of the card's cost-by-round table (card dialog, Work section): what its agents used holding it before its work began under Hive 1.0's rules (a card taken on at the upgrade). Keep it short."
+    "description": "A row of the card's cost-by-round table (card dialog, Work section): what its agents used holding it before its work began under 1.0's rules (a card taken on at the upgrade). Keep it short."
   },
   "board.costs.overhead": {
     "defaultMessage": "Overhead",
@@ -1316,11 +1316,11 @@
     "description": "An error: the workspace's task board database couldn't be opened or its cards couldn't be moved into it; {error} says why (from the system, often in English). Nothing was lost: the cards are still where they were."
   },
   "board.error.upgradeFirst": {
-    "defaultMessage": "This board is from Hive 0.9: it is read-only until it is upgraded to 1.0 (Upgrade… on the board's banner).",
+    "defaultMessage": "This board is from version 0.9: it is read-only until it is upgraded to 1.0 (Upgrade… on the board's banner).",
     "description": "An error: the workspace's task board hasn't been upgraded to 1.0's format yet (the user was asked and said not now), so cards can be read but not changed. Upgrade… is the button on the banner above the board."
   },
   "board.error.upgradeFirstStart": {
-    "defaultMessage": "This workspace is from Hive 0.9: upgrade it to 1.0 before starting agents (Upgrade… on the banner at the top of the window).",
+    "defaultMessage": "This workspace is from version 0.9: upgrade it to 1.0 before starting agents (Upgrade… on the banner at the top of the window).",
     "description": "An error: an agent (or the Assistant) can't start while the workspace's data waits for its upgrade to 1.0's format (the user said Not Now): Combwork couldn't record its session. Upgrade… is the button on the banner at the top of the window."
   },
   "board.export.command": {
@@ -2701,7 +2701,7 @@
   },
   "board.queue.pause.mergeChoice": {
     "defaultMessage": "{card} is the first card to merge since the upgrade to Combwork 1.0: choose how Combwork merges this project (merge style and commit message) in For you, or in Version Control → Workflow.",
-    "description": "Why a merge queue is paused, on its card in the Progress panel (HI-1697): a project from before Hive 1.0 reached the merge queue for the first time ({card}: its key), and nobody chose its merge style and commit message (workflow options' names, glossary 2.6), so it waits for the user. For you is the list of what waits on the user (glossary 2.3); Version Control → Workflow is a place in Combwork."
+    "description": "Why a merge queue is paused, on its card in the Progress panel (HI-1697): a project from before 1.0 reached the merge queue for the first time ({card}: its key), and nobody chose its merge style and commit message (workflow options' names, glossary 2.6), so it waits for the user. For you is the list of what waits on the user (glossary 2.3); Version Control → Workflow is a place in Combwork."
   },
   "board.queue.pause.needsYou": {
     "defaultMessage": "Needs you: Combwork stopped part way and changes nothing more on its own. Open the card for its state and the commands that finish or undo it.",
@@ -2940,7 +2940,7 @@
     "description": "Under \"The 0.9 board is back\": {file} is the file the board as it was before the restore was saved to."
   },
   "board.restore09.message": {
-    "defaultMessage": "Combwork keeps a copy of the board as it is now, then puts back the copy made before its upgrade to 1.0 ({when}). Changes made since are only in the kept copy. The board is then read-only here: quit this Combwork and open the workspace in Hive 0.9 to carry on.",
+    "defaultMessage": "Combwork keeps a copy of the board as it is now, then puts back the copy made before its upgrade to 1.0 ({when}). Changes made since are only in the kept copy. The board is then read-only here: quit this Combwork and open the workspace in version 0.9 to carry on.",
     "description": "The confirmation before restoring the 0.9 board backup. {when} is when the backup was made (a date and time)."
   },
   "board.restore09.none": {
@@ -3668,16 +3668,16 @@
     "description": "Under the upgrade dialog's text: the upgrade is refused while another copy of Combwork has the workspace open; declining leaves the board readable but not changeable in this Combwork, and no agent (nor the Assistant) can start."
   },
   "board.upgrade.askMessage": {
-    "defaultMessage": "Combwork 1.0 needs to upgrade this workspace's data. Hive 0.9 can then no longer open it; a backup of the board is kept, and Help → Restore the 0.9 Board Backup… puts it back. Back up first: there's no going back to 0.9.3 once your agents' worktrees become slots.",
-    "description": "The upgrade dialog's text: why (Hive 1.0 keeps the workspace's data in a new format), then what follows: Hive 0.9 can't open the board any more, and a copy of the board as it was is kept; but the agents' own worktrees become slots (working folders Combwork lends to cards), which Hive 0.9.3 can't use again, so the user should back up first. Help → Restore the 0.9 Board Backup… is a command in the Help menu: keep its name as Combwork shows it. Keep 0.9.3 as it is (a version)."
+    "defaultMessage": "Combwork 1.0 needs to upgrade this workspace's data. Version 0.9 can then no longer open it; a backup of the board is kept, and Help → Restore the 0.9 Board Backup… puts it back. Back up first: there's no going back to 0.9.3 once your agents' worktrees become slots.",
+    "description": "The upgrade dialog's text: why (1.0 keeps the workspace's data in a new format), then what follows: version 0.9 can't open the board any more, and a copy of the board as it was is kept; but the agents' own worktrees become slots (working folders Combwork lends to cards), which 0.9.3 can't use again, so the user should back up first. Help → Restore the 0.9 Board Backup… is a command in the Help menu: keep its name as Combwork shows it. Keep 0.9.3 as it is (a version)."
   },
   "board.upgrade.askTitle": {
     "defaultMessage": "Upgrade this workspace's board to 1.0?",
-    "description": "Title of the dialog Combwork shows on opening a workspace whose task board was saved by Hive 0.9: Hive 1.0 keeps the board in a new format, and asks before converting it."
+    "description": "Title of the dialog Combwork shows on opening a workspace whose task board was saved by version 0.9: 1.0 keeps the board in a new format, and asks before converting it."
   },
   "board.upgrade.banner": {
-    "defaultMessage": "This workspace is from Hive 0.9: until it is upgraded to 1.0, its board is read-only here and its agents can't start.",
-    "description": "A banner at the top of the window while the workspace's upgrade to Hive 1.0's format waits (the user said Not Now): cards can be read but not changed, and no agent (nor the Assistant) can start, as Combwork couldn't record its session. Also the tooltip of what is disabled meanwhile: the board's add-card buttons, dragging cards, the card dialog's changes, and New Session and Resume."
+    "defaultMessage": "This workspace is from version 0.9: until it is upgraded to 1.0, its board is read-only here and its agents can't start.",
+    "description": "A banner at the top of the window while the workspace's upgrade to 1.0's format waits (the user said Not Now): cards can be read but not changed, and no agent (nor the Assistant) can start, as Combwork couldn't record its session. Also the tooltip of what is disabled meanwhile: the board's add-card buttons, dragging cards, the card dialog's changes, and New Session and Resume."
   },
   "board.upgrade.bannerButton": {
     "defaultMessage": "Upgrade…",
@@ -3685,7 +3685,7 @@
   },
   "board.upgrade.done": {
     "defaultMessage": "Board upgraded to 1.0",
-    "description": "A notification after the workspace's board was converted to Hive 1.0's format."
+    "description": "A notification after the workspace's board was converted to 1.0's format."
   },
   "board.upgrade.doneDetail": {
     "defaultMessage": "The 0.9 board is kept: Help → Restore the 0.9 Board Backup… puts it back.",
@@ -3701,7 +3701,7 @@
   },
   "board.upgrade.upgrade": {
     "defaultMessage": "Upgrade",
-    "description": "The upgrade dialog's button: converts the board to Hive 1.0's format."
+    "description": "The upgrade dialog's button: converts the board to 1.0's format."
   },
   "board.upgrade.upgrading": {
     "defaultMessage": "Upgrading…",
@@ -3833,7 +3833,7 @@
   },
   "board.work.preWorkflow": {
     "defaultMessage": "Before 1.0: this card has no work record.",
-    "description": "The card dialog's Work section for a card from before Hive 1.0: Combwork records no work for it and invents none. Glossary: before 1.0."
+    "description": "The card dialog's Work section for a card from before 1.0: Combwork records no work for it and invents none. Glossary: before 1.0."
   },
   "board.work.projectFolder": {
     "defaultMessage": "The project folder",

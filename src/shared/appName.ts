@@ -1,5 +1,5 @@
 /**
- * The app's displayed name (HI-2458, after #443's "Hive Desktop"): the window title, About, the status bar's version,
+ * The app's displayed name (HI-2458, after #443's first name): the window title, About, the status bar's version,
  * the tray, the installer and shortcuts (package.json's productName), and the window's sentences ("Combwork couldn't…").
  * Only what the user sees: what agents see (the Combwork tools, the doorbell, guidance, the Agent API) still says Combwork until
  * HI-2463, and the app ID, exe and folders move on HI-2460, HI-2461 and HI-2462.

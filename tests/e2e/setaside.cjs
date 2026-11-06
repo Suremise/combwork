@@ -51,7 +51,9 @@ const olderCard = (number, fields) =>
     await lib.openWorkspace(inv, page, other)
     fs.mkdirSync(stub)
     fs.writeFileSync(path.join(stub, 'board.json'), JSON.stringify({ version: 1, next: free }, null, 2) + '\n')
+    // old-name: begin v09-stub-readme
     fs.writeFileSync(path.join(stub, 'README.txt'), 'The board is in hive.db since 0.9.\n')
+    // old-name: end v09-stub-readme
     fs.rmSync(path.join(ws, '.combwork', 'combwork-names.json'), { force: true })
     fs.writeFileSync(path.join(stub, `${free}.json`), olderCard(free, { title: 'Made in the older Combwork', description: 'Written **while** the workspace was open in 0.8.\n\nIt has a second paragraph.', labels: ['old'], comments: [{ at: '2026-10-05T09:31:00.000Z', by: 'You', text: 'A comment from then', id: 'c1' }] }))
     fs.writeFileSync(path.join(stub, `${one.number}.json`), olderCard(one.number, { title: 'Also made as #1', createdBy: 'Assistant', column: 'review' }))
