@@ -7,14 +7,18 @@
 //   denied or a held file as for an absence. Use fsPresence's present()/lstatOrNull().
 // - Each `catch` clause, and the function given to `.catch(f)` or as `.then(ok, f)`'s second:
 //   1. a rethrow: its body (a block) ends in `throw`, with no return, continue or break anywhere in it;
-//   2. for `.catch`/`.then`, fsPresence's ifAbsent(): the binding imported from src/main/fsPresence, and not declared
-//      again anywhere in the file (a local or shadowing ifAbsent, or one from another module, isn't it);
+//   2. for `.catch`/`.then`, a call of fsPresence's ifAbsent(): its callee resolved by the parser's scopes to the import
+//      from src/main/fsPresence (a parameter, local, named function expression, class or catch binding of that name
+//      where it is called, or one from another module, isn't it);
 //   3. an exception in tests/presenceAllow.json: the file, the function it is in and the finding's whole text (whitespace
 //      as one space), with why. Each excepts one finding, and one that excepts none fails as stale, so the list only
 //      shrinks. Whether such a handler really passes the failure on is for its reviewer and the I/O-failure tests
 //      (tests/upgradeIoFailures.test.ts), not this rule.
 // SCOPE names a file, or `file#function` for one function of a file whose other code the rule doesn't hold to.
 import { parse } from '@babel/parser'
+import traverseModule from '@babel/traverse'
+
+const traverse = traverseModule.default ?? traverseModule
 
 /** What the rule holds to: the upgrade's steps and their presence helpers, and the test area's code. */
 export const SCOPE = [
@@ -98,31 +102,13 @@ function rethrows(body) {
   return own(body, (n) => n.type === 'ReturnStatement' || n.type === 'ContinueStatement' || n.type === 'BreakStatement').length === 0
 }
 
-/** How many times each name is declared in a file (variables, functions, classes, parameters, catch bindings), imports not counted. */
-function declaredNames(program) {
-  const count = new Map()
-  const add = (name) => count.set(name, (count.get(name) ?? 0) + 1)
-  const pattern = (p) => {
-    p = bare(p)
-    if (!p) return
-    if (p.type === 'Identifier') add(p.name)
-    else if (p.type === 'ObjectPattern') for (const pr of p.properties) pattern(pr.type === 'RestElement' ? pr.argument : pr.value)
-    else if (p.type === 'ArrayPattern') for (const el of p.elements) pattern(el)
-    else if (p.type === 'AssignmentPattern') pattern(p.left)
-    else if (p.type === 'RestElement') pattern(p.argument)
-    else if (p.type === 'TSParameterProperty') pattern(p.parameter)
-  }
-  walk(program, (n) => {
-    if (n.type === 'VariableDeclarator') pattern(n.id)
-    if ((n.type === 'FunctionDeclaration' || n.type === 'ClassDeclaration') && n.id) add(n.id.name)
-    if (isFunction(n)) for (const p of n.params) pattern(p)
-    if (n.type === 'CatchClause' && n.param) pattern(n.param)
-  })
-  return count
-}
-
-/** The local names fsPresence's ifAbsent has in a file: imported from FS_PRESENCE (resolved from the file's folder), never declared again there. */
-function ifAbsentBindings(file, program) {
+/**
+ * The calls of fsPresence's ifAbsent in a file: each `ifAbsent(…)` whose callee, as the parser's own scopes resolve it
+ * (@babel/traverse), is bound by an import of `ifAbsent` from FS_PRESENCE (resolved from the file's folder, under any
+ * alias). Any other binding of that name where the call is (a parameter, a local, a named function expression, a
+ * class, a catch binding, a require) is a different function, and its call isn't one of these.
+ */
+function ifAbsentCalls(file, ast) {
   const dir = file.split('/').slice(0, -1)
   const resolve = (spec) => {
     if (typeof spec !== 'string' || !spec.startsWith('.')) return null
@@ -133,13 +119,20 @@ function ifAbsentBindings(file, program) {
     }
     return parts.join('/').replace(/\.[cm]?[jt]s$/, '')
   }
-  const declared = declaredNames(program)
-  const names = new Set()
-  for (const n of program.body) {
-    if (n.type !== 'ImportDeclaration' || resolve(n.source.value) !== FS_PRESENCE) continue
-    for (const sp of n.specifiers) if (sp.type === 'ImportSpecifier' && (sp.imported.name ?? sp.imported.value) === 'ifAbsent' && !declared.has(sp.local.name)) names.add(sp.local.name)
-  }
-  return names
+  const calls = new Set()
+  traverse(ast, {
+    CallExpression(path) {
+      const callee = path.node.callee
+      if (callee.type !== 'Identifier') return
+      const binding = path.scope.getBinding(callee.name)
+      const spec = binding?.path
+      if (binding?.kind !== 'module' || !spec?.isImportSpecifier()) return
+      const imported = spec.node.imported
+      if ((imported.name ?? imported.value) !== 'ifAbsent' || resolve(spec.parent.source.value) !== FS_PRESENCE) return
+      calls.add(path.node)
+    }
+  })
+  return calls
 }
 
 /** The names of every named function a node is in, outermost first. */
@@ -165,10 +158,10 @@ export function presenceFindings(file, src) {
   const ast = parse(src, { sourceType: 'unambiguous', plugins: ['typescript'], allowReturnOutsideFunction: true, allowAwaitOutsideFunction: true })
   const out = []
   const named = new Set()
-  const ifAbsent = ifAbsentBindings(file, ast.program)
+  const ifAbsent = ifAbsentCalls(file, ast)
   const handler = (arg, call, parents, kind) => {
     const fn = bare(arg)
-    if (isCall(fn) && bare(fn.callee)?.type === 'Identifier' && ifAbsent.has(bare(fn.callee).name)) return
+    if (ifAbsent.has(fn)) return
     if (isFunction(fn) && rethrows(fn.body)) return
     out.push(finding(file, src, arg, parents, `${kind}: not a rethrow or fsPresence's ifAbsent`, `${calleeName(call.callee.object)}${kind}(`))
   }

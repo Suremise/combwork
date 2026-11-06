@@ -88,6 +88,15 @@ describe('the presence-check rule (HI-2617)', () => {
     fails("import { ifAbsent } from './fsPresence'\nfunction f() { const ifAbsent = (v) => () => v; return readFile(p).catch(ifAbsent(null)) }", HANDLER('.catch'))
     fails("import { ifAbsent } from './fsPresence'\nawait readFile(p).catch(ifAbsent)", HANDLER('.catch'))
     fails("const { ifAbsent } = require('./fsPresence')\nawait readFile(p).catch(ifAbsent(null))", HANDLER('.catch'))
+    // HR1's round 4: a named function expression's own name, where its body calls it.
+    fails("import { ifAbsent } from './fsPresence'\nexport const reviewProbe = function ifAbsent(value) { if (arguments.length) return () => null; return readFile(p).catch(ifAbsent(null)) }", HANDLER('.catch'))
+    // And every other binding of the name where it is called: a class, a catch binding, a block's let, a function's own.
+    fails("import { ifAbsent } from './fsPresence'\nconst C = class ifAbsent { static m() { return readFile(p).catch(ifAbsent(null)) } }", HANDLER('.catch'))
+    fails("import { ifAbsent } from './fsPresence'\ntry { x() } catch (ifAbsent) { await readFile(p).catch(ifAbsent(null)); throw ifAbsent }", HANDLER('.catch'))
+    fails("import { ifAbsent } from './fsPresence'\nif (a) { let ifAbsent = (v) => () => v; await readFile(p).catch(ifAbsent(null)) }", HANDLER('.catch'))
+    fails("import { ifAbsent } from './fsPresence'\nfunction g() { function ifAbsent(v) { return () => v } return readFile(p).catch(ifAbsent(null)) }", HANDLER('.catch'))
+    // The import stays the one used outside the place that shadows it.
+    expect(rules("import { ifAbsent } from './fsPresence'\nfunction g(ifAbsent) { return ifAbsent }\nconst t = await readFile(p).catch(ifAbsent(null))")).toEqual([])
   })
 
   it('excepts one finding by its file, function and whole text; never a fragment, another function or a second copy, and fails a stale one', () => {
@@ -146,6 +155,11 @@ describe('presence checks in the repository (HI-2617)', () => {
     const b = checkPresence({ scope: ['src/main/combworkMove.ts'], read: () => copy, exceptions: moves })
     expect(b.findings.map((f: Finding) => `${f.fn} ${f.rule}`)).toEqual([`excludeMoveLock2 ${CATCH}`])
     expect(b.problems).toEqual([])
+    // HR1's round 4, in the real file (which imports fsPresence's ifAbsent): a named function expression of that name.
+    const shadow = `${readRepo('src/main/combworkMove.ts')}\nexport const reviewProbe = function ifAbsent(value) { if (arguments.length) return () => null; return readFile(p).catch(ifAbsent(null)); };\n`
+    const c = checkPresence({ scope: ['src/main/combworkMove.ts'], read: () => shadow, exceptions: moves })
+    expect(c.findings.map((f: Finding) => `${f.fn} ${f.rule}`)).toEqual([`reviewProbe ${HANDLER('.catch')}`])
+    expect(c.problems).toEqual([])
   })
 
   it("fails moveOldLogs' old existsSync and empty catch planted back into it (logger.ts, by its function)", () => {
