@@ -934,12 +934,18 @@ describe('RELEASING.md on the 1.0 path', () => {
   it("gives the baseline its own prerequisites and lighter checks, the full ones before a proper release", () => {
     const path = section('The 1.0 path')
     expect(path).toMatch(/It waits for the last phase's checks card \(#1539\), the translation review \(#1126\) and #1582[^\n]*Electron's CVE fix \(#1503\) comes before the RC \(#1541\), not the baseline/)
-    expect(path).toMatch(/\*\*Its checks are lighter than a release's\*\*[^\n]*a \*\*smoke run\*\*: Claude Code and Codex each run the key scenarios once, with no repeats, no Haiku and no Copilot\. The full trials, the full e2e set and the real tier come before a proper release/)
+    // HI-2655: the model trials are a release's, 3 to 5 scenarios picked at random; the full e2e set and the real tier come later.
+    expect(path).toMatch(/\*\*Its checks are lighter than a release's\*\*[^\n]*with the model trials as a release's: 3 to 5 scenarios picked at random, once each \(What a release checks\)\. The full e2e set and the real tier come before a proper release/)
+    const checks = section('What a release checks')
+    expect(checks).toMatch(/\*\*3 to 5 scenarios picked at random\*\* from the trial set, once each, with no repeats \(`npm run scenarios -- --provider <provider> --random 3`/)
+    expect(checks).toMatch(/The release card names the seed or the ids/)
+    expect(checks).toMatch(/The full set on every provider is not a release step/)
+    expect(readFileSync(join(ROOT, 'AGENTS.md'), 'utf8')).toMatch(/The full set is for guidance-wide changes only \(HI-2010, HI-2011, HI-2012\); a publishable RC gets 3 to 5 scenarios picked at random/)
     expect(path).toMatch(/`npm run dist -- --kind baseline` \(asked\)/)
     // #1534: where each build is recorded.
     expect(path).toMatch(/also goes into the Combwork Assistant's journal as Combwork's entry[^\n]*\*\*Settings → Advanced → Record builds in the journal\*\* turns it off/)
     expect(section('What a release checks')).toMatch(/unlike the baseline's lighter checks/)
-    for (const copy of ['.claude', '.agents']) expect(readFileSync(join(ROOT, copy, 'skills', 'release-combwork', 'SKILL.md'), 'utf8')).toMatch(/Its checks are lighter than an uploaded release's \(the model trials a smoke run: RELEASING says which\)/)
+    for (const copy of ['.claude', '.agents']) expect(readFileSync(join(ROOT, copy, 'skills', 'release-combwork', 'SKILL.md'), 'utf8')).toMatch(/Its checks are lighter than an uploaded release's \(the model trial is a release's, 3 to 5 scenarios picked at random: RELEASING, What a release checks\)/)
   })
   it("lists every publishing step as the user's OK, which release-combwork and AGENTS.md point to without repeating", () => {
     const ok = section("The user's OK")
