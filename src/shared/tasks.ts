@@ -178,6 +178,11 @@ const ST = {
     text: "{agent} is watching {card} but hasn't started reviewing it{state, select, silent { (it shows working, but has been silent for {silentMinutes} min: state unknown)} busy { (it is working on something else)} other {}}: in Review for {waited}.",
     note: "A card waiting in Review: its reviewer watches it but hasn't started. state: silent (it shows working, but has said nothing for silentMinutes), busy (working on something else) or none. waited: a duration (stall.duration.*)."
   }),
+  reviewGiven: agentMsg({
+    id: 'stall.review.given',
+    text: "{card} was given to {agent} to review {given} ago, and it hasn't started reviewing it{state, select, busy { (it is working on something else)} other {}}: in Review for {waited}.",
+    note: "HI-2636: a card waiting in Review that Combwork's reviewer pool gave to a reviewer, which hasn't started its review (watching it or not). given: how long ago it was given; waited: how long it has been in Review (both durations, stall.duration.*). state: busy (working on something else) or none."
+  }),
   noVerdict: agentMsg({ id: 'stall.review.noVerdict', text: '{agent} started reviewing {card} but has given no verdict, and has only been watching it for {waited}.', note: 'A card in Review: its reviewer started the review, then went back to watching without a verdict. waited: a duration (stall.duration.*).' }),
   laneOrder: agentMsg({
     id: 'stall.lane.orderWait',
@@ -321,15 +326,27 @@ export function inReviewSince(card: Pick<TaskCard, 'history'>): string | null {
  * cards already in Review for five hours). `watchers`: the agents with a card watch, and its cards, and how each is now
  * (its status, and how long it has been silent when its state is unknown, #648: #642's reviewer showed working, silent
  * for 37 min, and was said to be watching). Null otherwise.
+ *
+ * Only the agent that owes the review counts (HI-2636: a builder only watching a pool card for Done was named, while the
+ * pool's reviewer given it sat idle): `owed`, its lane's reviewer, or the reviewer the pool gave its latest submission
+ * (with when, `givenAt`: stalled whether it watches or not); null when nobody owes it yet (the pool hasn't given it).
+ * Unknown (undefined), a watcher counts only when `reviews` says it may review (its workflow role), never its builder.
  */
-export function reviewWaitReason(card: Pick<TaskCard, 'number' | 'column' | 'archived' | 'project' | 'agent' | 'review' | 'blocked' | 'history'>, watchers: { name: string; project: string; agentId: string; cards: number[]; status?: string; silentMinutes?: number }[], now = Date.now(), tr?: Tr): string | null {
+export function reviewWaitReason(card: Pick<TaskCard, 'number' | 'column' | 'archived' | 'project' | 'agent' | 'review' | 'blocked' | 'history'>, watchers: ReviewWatcher[], now = Date.now(), tr?: Tr, owed?: ReviewOwed | null, reviews?: (agentId: string) => boolean): string | null {
   if (card.archived || card.column !== 'review' || card.review || card.blocked) return null
   const since = inReviewSince(card)
   const ms = since ? now - Date.parse(since) : NaN
   if (!(ms >= REVIEW_WAIT_STALL_MS)) return null
-  const w = watchers.find((x) => x.project.toLowerCase() === card.project.toLowerCase() && x.agentId !== card.agent && x.cards.includes(card.number))
-  if (!w) return null
   const min = Math.round(ms / 60_000)
+  const w = reviewWaiter(card, watchers, owed, reviews)
+  // Given by the pool (HI-2636, main's check only: the window doesn't know): stalled watching it or not, once it has had
+  // its own wait since it was given (the pool gives a card late when every reviewer was busy).
+  const givenMs = owed?.givenAt ? now - Date.parse(owed.givenAt) : NaN
+  if (Number.isFinite(givenMs) && !tr) {
+    if (givenMs < REVIEW_WAIT_STALL_MS) return null
+    return say(ST.reviewGiven, { card: cardName(card), agent: owed!.name, given: minutesText(Math.round(givenMs / 60_000)), state: (w?.status ?? owed!.status) === 'working' ? 'busy' : 'none', waited: minutesText(min) })
+  }
+  if (!w) return null
   if (tr) {
     const values = { agent: w.name, card: cardLabel(card), waited: durationText(min * 60_000, tr) }
     if (w.silentMinutes !== undefined) return tr(msg({ id: 'board.stalled.reviewWaitSilent', defaultMessage: "{agent} is watching {card} but hasn't started reviewing it (it shows working, but has been silent for {silent}: state unknown): in Review for {waited}.", description: "Why a card waiting in Review is stalled: its reviewer watches it but hasn't started, and Combwork can't tell what the reviewer is doing. {agent} is the reviewer's name, {card} the card’s name: its key, such as AM-12, or #12 for a card with none, {silent} minutes, {waited} how long it has waited (\"40 min\", \"2 h 5 min\"). {silent} is a duration too, written like {waited}." }), { ...values, silent: durationText(w.silentMinutes * 60_000, tr) })
@@ -338,6 +355,53 @@ export function reviewWaitReason(card: Pick<TaskCard, 'number' | 'column' | 'arc
   }
   const state = w.silentMinutes !== undefined ? 'silent' : w.status === 'working' ? 'busy' : 'none'
   return say(ST.reviewWait, { agent: w.name, card: cardName(card), state, silentMinutes: String(w.silentMinutes ?? ''), waited: minutesText(min) })
+}
+
+/** An agent with a card watch, as the review stalls read it: its cards, and how it is now. */
+export interface ReviewWatcher {
+  name: string
+  project: string
+  agentId: string
+  cards: number[]
+  status?: string
+  silentMinutes?: number
+}
+
+/**
+ * Who owes a card's review (HI-2636): its lane's reviewer, or the reviewer the pool gave its latest submission, with when
+ * (`givenAt`) and how it is now (`status`, when it runs).
+ */
+export interface ReviewOwed {
+  agentId: string
+  name: string
+  givenAt?: string
+  status?: string
+}
+
+/**
+ * Who owes a card's review as the window knows it (HI-2636), as main's reviewDueOf has it: its lane's reviewer; on a
+ * pool lane's current card, the reviewer the pool gave it (none yet, or another of its cards: nobody, never a watcher);
+ * a card in no lane while workflow rules are on (`rulesOn`), which the pool gives out too, nobody (the window doesn't
+ * know whom: main's stall says it). Undefined (any watcher that may review) only with the rules off. `agents`: the
+ * card's project's agents now; one gone owes nothing.
+ */
+export function laneReviewOwed(card: Pick<TaskCard, 'number'>, lane: LaneOrderView | null | undefined, agents: { id: string; name: string }[], rulesOn: boolean): ReviewOwed | null | undefined {
+  const named = (a: { id: string; name: string } | undefined): ReviewOwed | null => (a ? { agentId: a.id, name: a.name } : null)
+  if (lane?.reviewer) return named(agents.find((a) => a.id === lane.reviewer))
+  if (lane?.poolReviewing) {
+    const { card: current, name } = lane.poolReviewing
+    return current === card.number && name ? named(agents.find((a) => a.name === name)) : null
+  }
+  return rulesOn ? null : undefined
+}
+
+/**
+ * The watcher a review's wait stall names (reviewWaitReason): the agent owing the review, when it watches the card; with
+ * nobody owing it (null), none; unknown (undefined), another agent than the card's own watching it that may review.
+ */
+export function reviewWaiter<W extends ReviewWatcher>(card: Pick<TaskCard, 'number' | 'project' | 'agent'>, watchers: W[], owed?: ReviewOwed | null, reviews?: (agentId: string) => boolean): W | null {
+  if (owed === null) return null
+  return watchers.find((x) => x.project.toLowerCase() === card.project.toLowerCase() && x.agentId !== card.agent && x.cards.includes(card.number) && (owed ? x.agentId === owed.agentId : !reviews || reviews(x.agentId))) ?? null
 }
 
 /** Whole minutes as the Agent API's stall reasons say them: "40 min", "5 h 5 min", "2 h". */
@@ -416,6 +480,11 @@ export interface LaneOrderView {
    * stalled; once none is, its stall counts from when the last of them went Done (`readyAt`).
    */
   due?: { card: number; open: string[]; readyAt: string | null }
+  /**
+   * A lane reviewed by the pool (HI-2636, the window's: LaneInfo.poolReview): its current card, and the reviewer the pool
+   * gave it or that reviews it now, by name (null: nobody yet). The only owner of that card's review the window knows.
+   */
+  poolReviewing?: { card: number | null; name: string | null }
   /** In the lane's order; `movedAt`: when it last came into its column (columnSince), where known. */
   cards: { number: number; column: string; key?: string; movedAt?: string | null }[]
 }

@@ -117,13 +117,15 @@ export function useLaneOf(): (c: Pick<TaskCard, 'number' | 'project'>) => LaneOr
   const tasks = useStore((s) => s.tasks)
   return useMemo(() => {
     const byNumber = new Map(tasks.map((t) => [t.number, t]))
-    const running = raw.filter((l) => (l.state === 'active' || l.state === 'paused') && l.reviewer)
+    // A pool's lane too (HI-2636): its card's review is owed to the reviewer the pool gave it, never any watcher.
+    const running = raw.filter((l) => (l.state === 'active' || l.state === 'paused') && (l.reviewer || l.pool))
     return (c) => {
       const l = running.find((x) => x.project.toLowerCase() === c.project.toLowerCase() && x.cards.some((y) => y.number === c.number))
       if (!l) return null
       return {
         builder: l.builder.id,
         reviewer: l.reviewer?.id ?? null,
+        ...(l.pool ? { poolReviewing: { card: l.current, name: l.poolReview?.reviewing ?? null } } : {}),
         cards: l.cards.map((y) => {
           const t = byNumber.get(y.number)
           return { number: y.number, column: t?.column ?? y.column, movedAt: t ? columnSince(t) : null, ...(t?.key ? { key: t.key } : {}) }

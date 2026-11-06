@@ -715,6 +715,33 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
   }
   const { workflowFor } = await import('../src/main/workflow/service')
   const { loopReviewerOf } = await import('../src/main/loopReviewer')
+  const { reviewDueOf } = await import('../src/main/cardStall')
+
+  it('a pool card waiting in Review is owed by the reviewer the pool gave it, nobody before (HI-2636)', async () => {
+    await loopWakes.clearLoopWakes()
+    // A pool lane is the lane's; the review rules are WORKFLOW's (HI-2428's test, below).
+    const { w, alpha } = await open({ ...WORKFLOW, agents: POOL.agents })
+    fake(alpha)
+    const c = (await inWorkspace(w, () => tasks.createTask({ title: 'Pool review', project: 'alpha' }, user))).number
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: null, pool: true, cards: [c], by: 'B1 (alpha)' })
+    const intent = (who: typeof b1, i: Parameters<typeof runCardIntent>[2]) => inWorkspace(w, () => runCardIntent({ n: c, plain: false }, who, i))
+    await intent(b1, { kind: 'start' })
+    await intent(b1, { kind: 'submit', summary: 'Ready', paths: ['a.txt'] })
+    const now = () => inWorkspace(w, () => tasks.getTask(c, w))
+    expect((await now()).column).toBe('review')
+    // Not given out yet: nobody owes it, so no watcher (a builder watching it for Done) is named.
+    expect(await reviewDueOf(w, await now())).toEqual({ owed: null })
+    // Given to R1 (the pool's own write, as reviewerPool.ts makes it: its pass isn't running here).
+    const wf = (await workflowFor(w, alpha))!
+    const submission = wf.store.facts(c).findLast((f) => f.kind === 'Submitted')!.seq
+    await wf.write(wf.store.card(c), null, 'combwork', (x) => void x.fact('ReviewerAssigned', { reviewer: 'r1', submission }))
+    const givenAt = wf.store.facts(c).findLast((f) => f.kind === 'ReviewerAssigned')!.at
+    expect(await reviewDueOf(w, await now())).toMatchObject({ owed: { agentId: 'r1', name: 'R1', givenAt } })
+    // Its review started: the check can't stall it on the wait, so nothing is read.
+    await intent(r1, { kind: 'startReview' })
+    expect(await reviewDueOf(w, await now())).toBeUndefined()
+    await disposeWorkspaceService(w)
+  })
 
   it.each(['ok', 'gaps'] as const)("a pool design's %s answer before any submission wakes its builder, with no watch (HI-2325)", async (step) => {
     await loopWakes.clearLoopWakes()
