@@ -19,8 +19,8 @@
  * folder (not a drive root), which is mapped read-only at C:\build. This checkout's tests folder (the scripts in
  * tests\sandbox\inside and the e2e fake CLIs) and its playwright-core are mapped read-only too; Node is this one's folder.
  * --server (or WSB_SERVER) is the server's server.js; by default the copy Combwork installed from the MCP catalogue in the
- * workspace holding <repo> (<workspace>\.combwork\mcp\windows-sandbox), else a combwork-mcp checkout beside <repo>
- * (<repo>\..\mcp\servers\windows-sandbox). The server keeps its run folders in %LOCALAPPDATA%\combwork-test\sandbox.
+ * workspace holding <repo>'s main checkout (<workspace>\.combwork\mcp\windows-sandbox; from a worktree, the workspace
+ * its main checkout is in, HI-2644), else a combwork-mcp checkout beside that checkout (<main>\..\mcp\servers\windows-sandbox). The server keeps its run folders in %LOCALAPPDATA%\combwork-test\sandbox.
  * --git: the clean install's git project (scenario 9) needs Git, which a fresh Windows hasn't got: this machine's Git for
  * Windows is mapped read-only at C:\tools\git (by default the folder of the git.exe on the PATH).
  * Exit code: 0 all checks passed, 1 a check failed (or a Sandbox's cleanup wasn't confirmed), 2 not run (also when the
@@ -36,7 +36,7 @@ const { execFileSync } = require('child_process')
 const { server } = require('./client.cjs')
 const { stopConfirmed, list, hostProblem, SAC_QUERY, sacState } = require('./wsb.cjs')
 const { evaluate, markdown, verdict, KINDS } = require('./report.cjs')
-const { childEnv } = require('../e2e/runContext.cjs')
+const { childEnv, baseEnv } = require('../e2e/runContext.cjs')
 
 /**
  * The names the build gives the app (HI-2458, HI-2460): productName (its Installed-apps name), the shortcuts' name and the
@@ -55,9 +55,24 @@ const REPO = path.resolve(__dirname, '..', '..')
 const SANDBOX_ROOT = path.join(process.env.LOCALAPPDATA || os.homedir(), 'combwork-test', 'sandbox')
 /** Where the scripts that run inside the Sandbox (tests\sandbox\inside) are there: this checkout's tests folder is mapped at C:\tools\combwork-tests. */
 const INSIDE = 'C:\\tools\\combwork-tests\\sandbox\\inside'
-/** Where the windows-sandbox server.js is looked for without --server or WSB_SERVER: the workspace's installed copy, a combwork-mcp checkout beside the repo. */
+/**
+ * The main checkout of the repo at `dir` (HI-2644): a worktree's (a slot in <workspace>.worktrees) is the folder holding its
+ * common .git, which sits in the workspace; `dir` itself when it is the main checkout, or git can't say (no git, not a repo, bare).
+ */
+function mainCheckout(dir) {
+  let common
+  try {
+    common = execFileSync('git', ['-C', dir, 'rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8', windowsHide: true, timeout: 10_000, stdio: ['ignore', 'pipe', 'ignore'], env: baseEnv() }).trim()
+  } catch { return dir }
+  return common && path.basename(common).toLowerCase() === '.git' ? path.dirname(path.resolve(common)) : dir
+}
+/**
+ * Where the windows-sandbox server.js is looked for without --server or WSB_SERVER: the installed copy in the workspace
+ * holding the repo's main checkout, then a combwork-mcp checkout beside it (from a worktree, its main checkout's workspace).
+ */
 function serverCandidates(repo) {
-  return [path.join(repo, '..', '.combwork', 'mcp', 'windows-sandbox', 'server.js'), path.join(repo, '..', 'mcp', 'servers', 'windows-sandbox', 'server.js')]
+  const main = mainCheckout(repo)
+  return [path.join(main, '..', '.combwork', 'mcp', 'windows-sandbox', 'server.js'), path.join(main, '..', 'mcp', 'servers', 'windows-sandbox', 'server.js')]
 }
 
 // The installer's name: Combwork-Setup since HI-2458, 1.0's before (a previous release's, kept in dist); and where 1.0's
@@ -480,4 +495,4 @@ if (require.main === module) {
   main(process.argv.slice(2)).then(code => { process.exitCode = code }, e => { log('ERROR:', e.stack || e); process.exitCode = 2 })
 }
 // For tests.
-module.exports = { buildRoot, plan, main, serverCandidates, inSandbox, sacState, blockedReason, cmpVersion, setLogSink: fn => { logSink = fn } }
+module.exports = { buildRoot, plan, main, serverCandidates, mainCheckout, inSandbox, sacState, blockedReason, cmpVersion, setLogSink: fn => { logSink = fn } }
