@@ -43,8 +43,8 @@ import { CW_DIR } from '../shared/defaults'
  * days, then folded into days, kept 30 days, and saved (debounced) in the workspace's database (#1019: `.combwork/combwork.db`,
  * a bucket and its series in their typed tables since #1212, storeTables.ts, so a save writes the buckets that changed, the hour under way, and appends a new
  * one; `.combwork/metrics/metrics.json` before, moved in by the first save), which is git-ignored and machine-local. Every dimension comes from a fixed set (route templates, Combwork's tool names, provider ids), each
- * bucket has caps on projects and series, the store has a cap on buckets whichever way the clock moves, and the file
- * has a size cap: what doesn't fit is dropped and counted. The saved file is untrusted input: size-checked before it
+ * bucket has caps on projects and series, the store has a cap on buckets whichever way the clock moves, and what is
+ * saved has a size cap (hours folded into days before anything goes, HI-2628): what doesn't fit is dropped and counted. The saved file is untrusted input: size-checked before it
  * is read and checked field by field. Nothing stores a prompt, a body, a token, a URL or a path.
  *
  * Work is recorded against the workspace it started in: a MetricsHandle (its store and lifetime) is taken before any
@@ -64,7 +64,13 @@ export const METRICS_LIMITS = {
   series: 2000,
   /** Buckets in a store: the hours of a week and the days of a month, with a little room. */
   buckets: 7 * 24 + 31 + 2,
-  /** What is saved (measured as metrics.json's text was): past this the oldest buckets go; a bigger metrics.json from before isn't read. */
+  /**
+   * What is saved in the workspace's database, measured as the buckets' JSON (what its rows hold, HI-2628): past this the
+   * oldest hours are folded into their days first, then the oldest days go. A workspace as busy as HIVE's (6 to 12 agents)
+   * keeps its 30 days in about 5 MB; every bucket at its series cap would be about 90 MB, so this is the bound.
+   */
+  storeBytes: 32 * 1024 * 1024,
+  /** metrics.json from before #1019 (written under this cap): a bigger one isn't read. */
   fileBytes: 2 * 1024 * 1024,
   /** How long changes wait before they are saved. */
   saveDelayMs: 30_000,
@@ -371,10 +377,15 @@ class Store {
    */
   private sealed = true
   /**
-   * History removed to keep the file under its cap (not by age): through this time, what was recorded is gone, so
+   * History removed to keep what is saved under its cap (not by age): through this time, what was recorded is gone, so
    * nothing before it counts as observed. 0: none.
    */
   evictedThrough = 0
+  /**
+   * Hours folded into their days early to keep what is saved under its cap (HI-2628), through this time: before it, only
+   * days are kept (hourly detail went, the totals didn't). 0: none.
+   */
+  foldedThrough = 0
   /** The last project rename (#514, projectNames.ts's number) its measurements follow: saved with them, so one is applied once. */
   renamesApplied = 0
   private timer: NodeJS.Timeout | null = null
@@ -430,7 +441,7 @@ class Store {
   }
 
   /**
-   * A bucket removed for space (the file's cap, the bucket count), not by age: what it held is gone, so the time it
+   * A bucket removed for space (the size cap, the bucket count), not by age: what it held is gone, so the time it
    * covered (up to now) is no longer observed, and reports say history before then is unavailable.
    */
   private evicted(b: Bucket, now: number): void {
@@ -452,7 +463,7 @@ class Store {
       const saved = readTable(this.workspace, 'metrics')
       if (saved.meta.has('imported')) {
         const num = (k: string): unknown => (saved.meta.has(k) ? JSON.parse(saved.meta.get(k)!) : undefined)
-        this.fromSaved({ buckets: saved.docs, observed: num('observed'), evictedThrough: num('evictedThrough'), renamesApplied: num('renamesApplied') })
+        this.fromSaved({ buckets: saved.docs, observed: num('observed'), evictedThrough: num('evictedThrough'), foldedThrough: num('foldedThrough'), renamesApplied: num('renamesApplied') })
         if (existsSync(this.file)) {
           log.warn("A metrics.json was found after the metrics moved into the workspace database (an older Hive's): kept as a backup, not read")
           keepAsBackup(this.file)
@@ -510,6 +521,7 @@ class Store {
     }
     this.observed = readStretches(data.observed)
     this.evictedThrough = count(data.evictedThrough) ?? 0
+    this.foldedThrough = count(data.foldedThrough) ?? 0
     this.renamesApplied = count(data.renamesApplied) ?? 0
   }
 
@@ -596,22 +608,76 @@ class Store {
     }
   }
 
+  /**
+   * Keeps what is saved under its cap (HI-2628; in UTF-8 bytes of the buckets' JSON, as their rows hold it), losing detail
+   * before history: the oldest day's hours (all but the hour under way) are folded into that day, day by day, then, only
+   * hours under way left, the oldest buckets go, all of them if need be; then the oldest observation (it is small: this
+   * is only for a tiny cap). Each trim is logged, with what it folded and dropped and the times they covered.
+   */
+  private fit(now: number): void {
+    const cap = METRICS_LIMITS.storeBytes
+    const bytes = (v: unknown): number => Buffer.byteLength(JSON.stringify(v), 'utf8')
+    const size = new Map<Bucket, number>(this.buckets.map((b) => [b, bytes(b)]))
+    let held = 0
+    for (const n of size.values()) held += n
+    // The buckets, and what is saved beside them (observation, the marks).
+    const total = (): number => held + bytes(this.observed) + 64
+    const before = total()
+    if (before <= cap) return
+    const current = Math.floor(now / HOUR) * HOUR
+    const end = (b: Bucket): number => b.start + (b.span === 'day' ? DAY : HOUR)
+    const folded = { hours: 0, from: Infinity, to: 0 }
+    const dropped = { hours: 0, days: 0, from: Infinity, to: 0 }
+    while (total() > cap && (this.buckets.length > 0 || this.observed.length > 0)) {
+      this.buckets.sort((x, y) => x.start - y.start)
+      const oldest = this.buckets.find((b) => b.span === 'hour' && b.start !== current)
+      if (oldest) {
+        // Hourly detail goes before any day: the oldest day's hours, folded into it.
+        const dayStart = Math.floor(oldest.start / DAY) * DAY
+        const hours = new Set(this.buckets.filter((b) => b.span === 'hour' && b.start !== current && Math.floor(b.start / DAY) * DAY === dayStart))
+        let day = this.buckets.find((b) => b.span === 'day' && b.start === dayStart)
+        if (!day) {
+          day = newBucket(dayStart, 'day')
+          this.buckets.push(day)
+        }
+        held -= size.get(day) ?? 0
+        for (const h of hours) {
+          mergeBucket(day, h)
+          held -= size.get(h)!
+          folded.from = Math.min(folded.from, h.start)
+          folded.to = Math.max(folded.to, end(h))
+        }
+        folded.hours += hours.size
+        this.buckets = this.buckets.filter((b) => !hours.has(b))
+        size.set(day, bytes(day))
+        held += size.get(day)!
+        this.foldedThrough = Math.max(this.foldedThrough, folded.to)
+      } else if (this.buckets.length) {
+        // Only days (and the hour under way) left: the oldest goes, history and its observation with it.
+        const b = this.buckets.shift()!
+        this.evicted(b, now)
+        held -= size.get(b)!
+        if (b.span === 'day') dropped.days++
+        else dropped.hours++
+        dropped.from = Math.min(dropped.from, b.start)
+        dropped.to = Math.max(dropped.to, end(b))
+      } else this.observed.shift()
+    }
+    const iso = (t: number): string => new Date(t).toISOString()
+    const what = [
+      ...(folded.hours ? [`${folded.hours} hours folded into their days (${iso(folded.from)} to ${iso(folded.to)})`] : []),
+      ...(dropped.days || dropped.hours ? [`${dropped.days} days and ${dropped.hours} hours dropped (${iso(dropped.from)} to ${iso(dropped.to)})`] : [])
+    ]
+    log.warn(`Performance history over its size limit (${before} bytes, limit ${cap}): ${what.join('; ') || 'observation trimmed'}; ${total()} bytes kept`) // i18n-ignore: a line in the app's own log, which stays English
+  }
+
   private async write(): Promise<void> {
     if (!this.dirty || this.unreadable || this.waiting()) return
     this.dirty = false
     this.roll(clock.now())
     try {
       const now = clock.now()
-      const json = (): string => JSON.stringify({ version: 1, buckets: this.buckets, observed: this.observed, ...(this.evictedThrough ? { evictedThrough: this.evictedThrough } : {}), ...(this.renamesApplied ? { renamesApplied: this.renamesApplied } : {}) })
-      let text = json()
-      // Over the file's cap (in UTF-8 bytes, as it is read back): the oldest buckets go first, all of them if need be,
-      // so Combwork never writes a file it would refuse to load.
-      // Then, the buckets all gone, the oldest observation (it is small: this is only for a tiny cap).
-      while (Buffer.byteLength(text, 'utf8') > METRICS_LIMITS.fileBytes && (this.buckets.length > 0 || this.observed.length > 0)) {
-        if (this.buckets.length) this.evicted(this.buckets.sort((x, y) => x.start - y.start).shift()!, now)
-        else this.observed.shift()
-        text = json()
-      }
+      this.fit(now)
       // A row a bucket, by its span and start: one leaving the front moves no other (#1019, #1212).
       const rows = this.buckets
       const importing = this.importing
@@ -622,6 +688,7 @@ class Store {
       await saveTable(this.workspace, 'metrics', rows, {
         observed: JSON.stringify(this.observed),
         evictedThrough: this.evictedThrough ? String(this.evictedThrough) : null,
+        foldedThrough: this.foldedThrough ? String(this.foldedThrough) : null,
         renamesApplied: this.renamesApplied ? String(this.renamesApplied) : null,
         // The first save after metrics.json was read moves it in: marked in the same transaction, then the file kept.
         ...(importing ? { imported: JSON.stringify({ at: new Date(now).toISOString(), rows: rows.length, file: this.file }) } : {})
@@ -646,6 +713,7 @@ class Store {
     this.buckets = []
     this.observed = []
     this.evictedThrough = 0
+    this.foldedThrough = 0
     this.renamesApplied = 0
     this.importing = false
     this.unreadable = false
@@ -660,6 +728,7 @@ class Store {
     this.buckets = []
     this.observed = []
     this.evictedThrough = 0
+    this.foldedThrough = 0
     this.sealed = true
     this.dirty = true
     this.touch(clock.now())
@@ -1184,13 +1253,16 @@ export function queryMetrics(w: WorkspaceService, q: MetricsQuery): Omit<Metrics
   // Stretches that touch the range (one that starts as it ends is the observation made now).
   const inRangeStretches = observed.filter(([a, b]) => b >= from && a <= to)
   const evictedThrough = h?.store.evictedThrough ?? 0
+  // Hours folded early (HI-2628): only where hours would still be kept by age, and past what was removed.
+  const foldedThrough = Math.min(h?.store.foldedThrough ?? 0, to)
   const coverage: MetricsCoverage = {
     rangeMs: to - from,
     observedMs: overlap(observed, from, to),
     observedSince: inRangeStretches.length ? new Date(Math.max(from, inRangeStretches[0][0])).toISOString() : null,
     stretches: inRangeStretches.length,
     // The storage's own fact (no project's): history it removed for space, if any of it was in the range.
-    ...(evictedThrough > from ? { evictedThrough: new Date(Math.min(evictedThrough, to)).toISOString() } : {})
+    ...(evictedThrough > from ? { evictedThrough: new Date(Math.min(evictedThrough, to)).toISOString() } : {}),
+    ...(foldedThrough > from && foldedThrough > now - METRICS_LIMITS.hourlyDays * DAY && foldedThrough > evictedThrough ? { foldedThrough: new Date(foldedThrough).toISOString() } : {})
   }
   const notFilteredText = [
     ...(f.provider ? [NOT_FILTERED.provider] : []),

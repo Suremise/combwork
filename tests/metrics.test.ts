@@ -261,19 +261,23 @@ describe('saving', () => {
     await disposeWorkspaceService(w)
   })
 
-  it('what is saved stays under its cap: the oldest buckets go first', async () => {
+  it('what is saved stays under its cap: the oldest hours are folded into their days before anything goes (HI-2628)', async () => {
     const { w, path } = await open()
     const saved = { ...metrics.METRICS_LIMITS }
     try {
-      metrics.METRICS_LIMITS.fileBytes = 20_000
+      metrics.METRICS_LIMITS.storeBytes = 20_000
       for (let h = 0; h < 100; h++) {
         now = T0 + h * HOUR
         for (let p = 0; p < 5; p++) metrics.recordApi(metrics.metricsHandle(w), `p${p}`, api())
       }
       await metrics.flushMetrics()
       expect(savedBytes(path)).toBeLessThanOrEqual(20_000)
-      const kept = metricsSaved(path)!.buckets as { start: number }[]
+      const kept = metricsSaved(path)!.buckets as { start: number; span: string }[]
       expect(Math.max(...kept.map((b) => b.start))).toBe(T0 + 99 * HOUR - ((T0 + 99 * HOUR) % HOUR))
+      // Days for the oldest, nothing lost: every request is still counted, and nothing was evicted.
+      expect(kept.some((b) => b.span === 'day')).toBe(true)
+      const r = metrics.queryMetrics(w, { scope: { kind: 'workspace' }, from: new Date(T0 - DAY).toISOString() })
+      expect([sumApi(Object.values(r.projects)).count, r.coverage.evictedThrough]).toEqual([500, undefined])
     } finally {
       Object.assign(metrics.METRICS_LIMITS, saved)
       await disposeWorkspaceService(w)
@@ -703,7 +707,7 @@ describe('cost', () => {
     const heap = Buffer.byteLength(JSON.stringify(metrics.metricsHandle(w)!.store.buckets))
     if (process.env.MEASURE) console.log(`recordApi: ${perCallUs.toFixed(2)} µs a call; a bucket at its ${metrics.METRICS_LIMITS.series}-series cap: ${(size / 1024).toFixed(0)} KB on disk, ${(heap / 1024).toFixed(0)} KB as JSON in memory`)
     expect(perCallUs).toBeLessThan(50)
-    expect(size).toBeLessThanOrEqual(metrics.METRICS_LIMITS.fileBytes)
+    expect(size).toBeLessThanOrEqual(metrics.METRICS_LIMITS.storeBytes)
     await disposeWorkspaceService(w)
   }, 60_000)
 })
@@ -780,7 +784,7 @@ describe('round 3: names, drops, saved expiry, byte cap, unmeasured copies', () 
     const { w, path } = await open()
     const saved = { ...metrics.METRICS_LIMITS }
     try {
-      metrics.METRICS_LIMITS.fileBytes = 4600
+      metrics.METRICS_LIMITS.storeBytes = 4600
       for (let h = 0; h < 6; h++) {
         now = T0 + h * HOUR
         for (let p = 0; p < 4; p++) metrics.recordApi(metrics.metricsHandle(w), `日本語プロジェクト-${p}`, api())
@@ -788,7 +792,7 @@ describe('round 3: names, drops, saved expiry, byte cap, unmeasured copies', () 
       await metrics.flushMetrics()
       expect(savedBytes(path)).toBeLessThanOrEqual(4600)
       // One bucket bigger than the whole cap: nothing is kept rather than an over-cap file.
-      metrics.METRICS_LIMITS.fileBytes = 200
+      metrics.METRICS_LIMITS.storeBytes = 200
       metrics.recordApi(metrics.metricsHandle(w), '🐝🐝🐝', api())
       await metrics.flushMetrics()
       expect(savedBytes(path)).toBeLessThanOrEqual(200)
@@ -1367,7 +1371,7 @@ describe('#116 round 2: observation boundaries, evicted history, unreadable sess
     const saved = { ...metrics.METRICS_LIMITS }
     try {
       // The probe: a tiny cap, one request, a minute observed, saved.
-      metrics.METRICS_LIMITS.fileBytes = 500
+      metrics.METRICS_LIMITS.storeBytes = 500
       metrics.recordApi(metrics.metricsHandle(w), null, api())
       at(1)
       cov(w)

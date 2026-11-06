@@ -95,7 +95,8 @@ const M = {
   coverageFull: msg({ id: 'performance.coverage.full', defaultMessage: 'Recorded throughout.', description: 'At the top of the Performance page, when Combwork recorded the whole range.' }),
   dropped: msg({ id: 'performance.coverage.dropped', defaultMessage: '{n, plural, one {# measurement} other {# measurements}} not kept (a limit was full), so totals may be low.', description: 'At the top of the Performance page, when measurements were lost.' }),
   unattributed: msg({ id: 'performance.coverage.unattributed', defaultMessage: 'Some measurements couldn’t be attributed to a project: this project’s may be more than shown.', description: "At the top of a project's Performance page." }),
-  evicted: msg({ id: 'performance.coverage.evicted', defaultMessage: 'History up to {when} was removed to keep the metrics file under its size limit: nothing before then is available.', description: 'At the top of the Performance page. {when} is a date and time.' }),
+  evicted: msg({ id: 'performance.coverage.evicted', defaultMessage: 'History up to {when} was removed to keep the performance history under its size limit: nothing before then is available.', description: 'At the top of the Performance page. {when} is a date and time.' }),
+  folded: msg({ id: 'performance.coverage.folded', defaultMessage: 'Hourly detail up to {when} was folded into days to keep the performance history under its size limit: the totals are whole, but only by day.', description: 'At the top of the Performance page, when hours were merged into whole days early to save space (nothing lost but the hour-by-hour breakdown). {when} is a date and time.' }),
   minutes: msg({ id: 'performance.duration.minutes', defaultMessage: '{m, number} min', description: 'A length of time in minutes ("40 min"), on the Performance page.' }),
   hours: msg({ id: 'performance.duration.hours', defaultMessage: '{h, number} h', description: 'A length of time in whole hours ("3 h"), on the Performance page.' }),
   hoursMinutes: msg({ id: 'performance.duration.hoursMinutes', defaultMessage: '{h, number} h {m, number} min', description: 'A length of time in hours and minutes ("3 h 10 min"), on the Performance page.' }),
@@ -555,6 +556,7 @@ function Coverage({ report }: { report: MetricsReport }) {
         )}
         {report.scope.kind === 'project' && report.lossesUnattributed && <span className="warn-text"> {tr(M.unattributed)}</span>}
         {c.evictedThrough && <span className="warn-text"> {tr(M.evicted, { when: when(c.evictedThrough) })}</span>}
+        {c.foldedThrough && <span className="warn-text"> {tr(M.folded, { when: when(c.foldedThrough) })}</span>}
       </p>
       {report.filters.notFiltered.length > 0 && (
         <ul className="perf-notes">

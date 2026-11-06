@@ -285,6 +285,7 @@ interface CombworkMessageValues {
   'performance.compare.usePart.title': { project: string | number }
   'performance.coverage.dropped': { n: number }
   'performance.coverage.evicted': { when: string | number }
+  'performance.coverage.folded': { when: string | number }
   'performance.coverage.full': undefined
   'performance.coverage.none': undefined
   'performance.coverage.partial': { duration: string | number; percent: string | number; sinceShown: string; since: string | number; stretches: number }
