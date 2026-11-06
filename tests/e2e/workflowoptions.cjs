@@ -306,6 +306,15 @@ async function theForm(page, app, inv) {
     const copied = await lib.until(() => page.evaluate(() => window.__copied), HUNG_MS)
     const parsed = copied ? JSON.parse(copied) : null
     check('Copy as JSON gives the version control, the preset and every option', parsed?.platform === 'git' && parsed?.preset === 'pairAgent' && parsed?.options.finish === 'agentMerges' && 'style' in parsed.options, String(copied))
+    // Pop-ups stay while the window isn't focused (a test window never is), stacked at the bottom right over Paste JSON…
+    // (HI-2639: under load its pop-up was there before the click): its own shown, then every one closed, as you would.
+    const popups = page.locator('.toast.popup')
+    await popups.filter({ hasText: 'Workflow options copied' }).waitFor({ timeout: HUNG_MS })
+    check('…saying so in a pop-up; the pop-ups closed, nothing covers Paste JSON…', !!(await lib.until(async () => {
+      if ((await popups.count()) === 0) return true
+      await popups.first().locator('.popup-close').click({ timeout: 2000 }).catch(() => undefined)
+      return false
+    }, HUNG_MS)), await page.locator('.popups').innerText().catch(() => ''))
     const pasteIn = async (json) => {
       await section.getByRole('button', { name: 'Paste JSON…' }).click()
       const d = page.locator('.dialog', { hasText: 'Paste Workflow Options' })
