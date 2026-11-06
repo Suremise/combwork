@@ -22,6 +22,11 @@ const { REQUIRED } = require('./report.cjs')
 
 const CONVENTION_FILES = ['CLAUDE.md', 'CLAUDE.local.md', 'AGENTS.md', '.mcp.json']
 const CONVENTION_DIRS = ['.claude', '.agents', '.codex']
+// old-name: begin compare-workspace-inputs
+/** A 1.0 workspace's folder, before 1.1 opens it, and the prefix of 1.0's own copies of its skills. */
+const OLD_DIR = '.hive'
+const OLD_SKILL_PREFIX = 'hive-'
+// old-name: end compare-workspace-inputs
 
 // A missing folder or file is empty or absent; any other failure to read it is an error, never "none".
 const names = dir => { try { return fs.readdirSync(dir, { withFileTypes: true }) } catch (e) { if (e.code === 'ENOENT') return []; throw new Error(`can't read ${dir}: ${e.code || e.message}`, { cause: e }) } }
@@ -51,9 +56,9 @@ function inventory(ws) {
   let st
   try { st = fs.statSync(ws) } catch (e) { throw new Error(`The workspace ${ws} can't be read: ${e.code || e.message}`, { cause: e }) }
   if (!st.isDirectory()) throw new Error(`The workspace ${ws} is not a folder`)
-  // .combwork from 1.1 (HI-2462); .hive in a workspace no 1.1 has opened yet.
-  const h = ['.combwork', '.hive'].map((f) => path.join(ws, f)).find((d) => exists(path.join(d, 'workspace.json')))
-  if (!h) throw new Error(`${ws} is not a Combwork workspace (no .combwork\\workspace.json or .hive\\workspace.json)`)
+  // .combwork from 1.1 (HI-2462); 1.0's folder in a workspace no 1.1 has opened yet.
+  const h = ['.combwork', OLD_DIR].map((f) => path.join(ws, f)).find((d) => exists(path.join(d, 'workspace.json')))
+  if (!h) throw new Error(`${ws} is not a Combwork workspace (no .combwork\\workspace.json or ${OLD_DIR}\\workspace.json)`)
   const workspaceJson = readJson(path.join(h, 'workspace.json'))
   const bundled = readJson(path.join(h, 'bundled.json'), { optional: true })
   const skills = dirs(path.join(h, 'skills'))
@@ -65,7 +70,7 @@ function inventory(ws) {
       name,
       conventionFiles: CONVENTION_FILES.filter(f => exists(path.join(p, f))),
       conventionDirs: CONVENTION_DIRS.filter(d => exists(path.join(p, d))),
-      ownSkills: [...new Set([...dirs(path.join(p, '.claude', 'skills')), ...dirs(path.join(p, '.agents', 'skills'))])].filter(s => !s.startsWith('hive-'))
+      ownSkills: [...new Set([...dirs(path.join(p, '.claude', 'skills')), ...dirs(path.join(p, '.agents', 'skills'))])].filter(s => !s.startsWith(OLD_SKILL_PREFIX))
     }
   })
   // Where each skill and mode came from (Combwork's bundled set, or the workspace's own): separate from the set comparison.

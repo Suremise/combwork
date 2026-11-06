@@ -9,10 +9,14 @@
  * The one exception: a run kind in meta.notRun ({ kind: { reason, installer } }) wasn't checked at all (its installer
  * was refused by an App Control policy before anything could run). Its checks are left out and, unless another check
  * failed, the report is NOT RUN with that reason.
- * Scenario 9 (HI-2592, run kind clean) is the rename's acceptance test: its scan (clean.cjs) must find no "hive" anywhere.
+ * Scenario 9 (HI-2592, run kind clean) is the rename's acceptance test: its scan (clean.cjs) must find the old name nowhere.
  * Scenario 11 (HI-2602, run kind profile-move): the profile move the installer couldn't make, made by the app at start.
  */
 const { cleanChecks, hitsMarkdown } = require('./clean.cjs')
+// old-name: begin report-inputs
+/** The 1.0 app's names: a meta from before HI-2458 names no app, and what the installer removes runs its exe. */
+const OLD_APP = { productName: 'Hive Desktop', shortcutName: 'Hive Desktop', exeName: 'Hive' }
+// old-name: end report-inputs
 const SCENARIOS = {
   1: 'Fresh install and first launch',
   2: 'First run with no coding-agent CLIs',
@@ -24,7 +28,7 @@ const SCENARIOS = {
   8: "The installer's edge cases over the previous release, and a notification under the new app ID",
   9: 'A clean install used as a new user would, then searched: no trace of the old name anywhere (HI-2592)',
   10: 'Upgrade from a 1.1 release candidate (--previous-rc, e.g. RC2), running, as its updater runs the installer (--updated /S --force-run): the names upgrade (HI-2587) moves only what is still old',
-  11: "The profile move the installer couldn't make (a file in %LOCALAPPDATA%\\Hive held as it ran): the app refuses to start while it is held, then moves it itself (HI-2602)"
+  11: "The profile move the installer couldn't make (a file in 1.0's local profile folder held as it ran): the app refuses to start while it is held, then moves it itself (HI-2602)"
 }
 const KINDS = ['fresh', 'upgrade', 'manual', 'edges', 'clean', 'upgrade-rc', 'profile-move']
 /** The names upgrade's checks after an upgrade (HI-2587), from 1.0 and from a release candidate alike. */
@@ -60,12 +64,12 @@ const REQUIRED = {
 const EDGE_IDS = ['8.wait', '8.wait-unchanged', '8.continues', '8.refuses', '8.refuses-unchanged', '8.running', '8.running-unchanged', '8.uninstall-fails', '8.uninstall-fails-unchanged', '8.moved-at-start', '8.moved-at-start-installed']
 
 /** The profile move's checks profile-move.ps1 must record (HI-2602), in its order. */
-const PROFILE_MOVE_IDS = ['11.hive-profile', '11.installer-held', '11.refused', '11.refused-unchanged', '11.moved', '11.record', '11.sign-in-checked', '11.sign-in-once']
+const PROFILE_MOVE_IDS = ['11.old-profile', '11.installer-held', '11.refused', '11.refused-unchanged', '11.moved', '11.record', '11.sign-in-checked', '11.sign-in-once']
 
 /** An upgrade over the previous release (scenario n, its files' prefix pre): the drivers' checks (HI-2460's too) and shots. */
 function overPrevious(n, pre, fromRc = false) {
   // From a release candidate (HI-2587): its profile, .combwork and cw.* ids are moved already, so only what a 1.1 RC
-  // still keeps under Hive's names is checked, besides what every upgrade keeps.
+  // still keeps under the old names is checked, besides what every upgrade keeps.
   if (fromRc) {
     return {
       drivers: {
@@ -93,7 +97,7 @@ const inStart = l => /Start Menu\\Programs$/i.test(l.folder)
 /** Whether a shortcut's target is `<name>.exe` in its own install folder (Programs\\<name>). */
 const exeIn = (target, name) => new RegExp(`\\\\${name}\\\\${name}\\.exe$`, 'i').test(String(target))
 
-/** Shortcuts as a short text: "Hive Desktop (Desktop, Start menu)". */
+/** Shortcuts as a short text: "Combwork (Desktop, Start menu)". */
 const describeShortcuts = list => list.map(l => `${l.name} (${inDesktop(l) ? 'Desktop' : inStart(l) ? 'Start menu' : l.folder})`).join(', ') || 'none'
 
 function evaluate(meta, files) {
@@ -122,7 +126,7 @@ function evaluate(meta, files) {
   }
   const version = meta.installerVersion
   // The build's names (checks.cjs appNames: HI-2458's productName, HI-2460's shortcut and exe).
-  const app = meta.app || { productName: 'Hive Desktop', shortcutName: 'Hive Desktop', exeName: 'Hive' }
+  const app = meta.app || OLD_APP
   let asarNote = null
 
   const unknown = ran.filter(k => !KINDS.includes(k))
@@ -140,7 +144,7 @@ function evaluate(meta, files) {
     if (st) {
       const e = entriesOf(st)
       add(1, `One Installed-apps entry: "${app.productName} ${version}"`, e.length === 1 && e[0].displayName === `${app.productName} ${version}`, JSON.stringify(e.map(x => x.displayName)))
-      add(1, `Installed in %LOCALAPPDATA%\\Programs\\${app.exeName} (${app.exeName}.exe, Uninstall ${app.exeName}.exe)`, st.installDir?.hiveExe && st.installDir?.uninstaller && st.installDir?.exe === `${app.exeName}.exe`, JSON.stringify(st.installDir))
+      add(1, `Installed in %LOCALAPPDATA%\\Programs\\${app.exeName} (${app.exeName}.exe, Uninstall ${app.exeName}.exe)`, st.installDir?.hasExe && st.installDir?.uninstaller && st.installDir?.exe === `${app.exeName}.exe`, JSON.stringify(st.installDir))
       const l = shortcutsOf(st)
       add(1, `Shortcuts named "${app.shortcutName}" on the Desktop and in the Start menu`, l.length >= 2 && l.every(x => x.name === app.shortcutName && exeIn(x.target, app.exeName)) && l.some(inDesktop) && l.some(inStart), describeShortcuts(l))
     }
@@ -172,24 +176,24 @@ function evaluate(meta, files) {
     const newSt = need(n, `${pre}-new-state`)
     if (newRun) {
       add(n, `The new build installs over it, running, with ${newRun.arguments} (${newRun.seconds} s)`, newRun.exitCode === 0, `exit ${newRun.exitCode}`)
-      add(n, `--force-run starts ${app.exeName}.exe after the install`, newRun.hiveRunning === true && [].concat(newRun.running || []).includes('combwork'), `running: ${JSON.stringify(newRun.running)}`)
-      add(n, 'Hive Desktop no longer runs', ![].concat(newRun.running || []).includes('hive'), `running: ${JSON.stringify(newRun.running)}`)
+      add(n, `--force-run starts ${app.exeName}.exe after the install`, newRun.installedRunning === true && [].concat(newRun.running || []).includes('combwork'), `running: ${JSON.stringify(newRun.running)}`)
+      add(n, 'The 1.0 app no longer runs', ![].concat(newRun.running || []).includes('old'), `running: ${JSON.stringify(newRun.running)}`)
     }
     if (newSt) {
       const e = entriesOf(newSt)
-      // HI-2460: Hive Desktop's entry gone, one of the new app's: "nobody ends up with both installed".
+      // HI-2460: the 1.0 app's entry gone, one of the new app's: "nobody ends up with both installed".
       // Its key is the new app ID's (it.surmise.combwork's APP_GUID), whatever the display name says.
-      add(n, `One Installed-apps entry after the upgrade: "${app.productName} ${version}", Combwork's own (${COMBWORK_GUID}), no Hive Desktop`, e.length === 1 && e[0].displayName === `${app.productName} ${version}` && String(e[0].key).toLowerCase() === COMBWORK_GUID, `before: ${JSON.stringify(prevNames)}; after: ${JSON.stringify(e.map(x => x.displayName))}`)
+      add(n, `One Installed-apps entry after the upgrade: "${app.productName} ${version}", Combwork's own (${COMBWORK_GUID}), none of the 1.0 app's`, e.length === 1 && e[0].displayName === `${app.productName} ${version}` && String(e[0].key).toLowerCase() === COMBWORK_GUID, `before: ${JSON.stringify(prevNames)}; after: ${JSON.stringify(e.map(x => x.displayName))}`)
       const l = shortcutsOf(newSt)
       add(n, `Shortcuts: only "${app.shortcutName}", starting ${app.exeName}.exe, on the Desktop and in the Start menu (before: ${describeShortcuts(shortcutsOf(prevSt))})`, l.length >= 2 && l.every(x => x.name === app.shortcutName && exeIn(x.target, app.exeName)) && l.some(inDesktop) && l.some(inStart), describeShortcuts(l))
       const ins = newSt.installs || {}
-      add(n, `Installed in %LOCALAPPDATA%\\Programs\\${app.exeName}; Hive Desktop's folder gone`, ins.combwork?.hiveExe === true && ins.hive?.exists === false, JSON.stringify(ins))
+      add(n, `Installed in %LOCALAPPDATA%\\Programs\\${app.exeName}; the 1.0 app's folder gone`, ins.combwork?.hasExe === true && ins.old?.exists === false, JSON.stringify(ins))
       add(n, `The installed app code is the new build's (app.asar ${String(ins.combwork?.appAsarSha256).slice(0, 12)}…)`, !!ins.combwork?.appAsarSha256, JSON.stringify(ins.combwork))
       const pr = newSt.profiles || {}
-      add(n, 'The profile folders moved: %APPDATA%\\Combwork and %LOCALAPPDATA%\\Combwork, no Hive folders left', pr.roamingCombwork?.exists && pr.localCombwork?.exists && !pr.roamingHive?.exists && !pr.localHive?.exists, JSON.stringify({ roaming: [pr.roamingCombwork?.exists, pr.roamingHive?.exists], local: [pr.localCombwork?.exists, pr.localHive?.exists] }))
+      add(n, 'The profile folders moved: %APPDATA%\\Combwork and %LOCALAPPDATA%\\Combwork, none of the 1.0 app\'s left', pr.roamingCombwork?.exists && pr.localCombwork?.exists && !pr.roamingOld?.exists && !pr.localOld?.exists, JSON.stringify({ roaming: [pr.roamingCombwork?.exists, pr.roamingOld?.exists], local: [pr.localCombwork?.exists, pr.localOld?.exists] }))
       add(n, "The installer's record is in %LOCALAPPDATA%\\Combwork", /"by"\s*:\s*"installer"/.test(String(pr.localCombwork?.record)), String(pr.localCombwork?.record))
       const run = [].concat(newSt.run || [])
-      add(n, "Hive Desktop's Launch at login removed by the installer", !run.some(v => /\\Hive\.exe/i.test(v.command)), JSON.stringify(run))
+      add(n, "The 1.0 app's Launch at login removed by the installer", !run.some(v => String(v.command).toLowerCase().includes(`\\${OLD_APP.exeName}.exe`.toLowerCase())), JSON.stringify(run))
     }
     driver(kind, `${pre}-notify`)
     const after = driver(kind, `${pre}-after`)
@@ -209,7 +213,7 @@ function evaluate(meta, files) {
 
   if (ran.includes('clean')) {
     const run = need(9, 's9-run')
-    if (run) add(9, `Silent install (/S) on a Windows that never had Hive or Combwork (${run.seconds} s)`, run.exitCode === 0, `exit ${run.exitCode}`)
+    if (run) add(9, `Silent install (/S) on a Windows that never had Combwork or the app before it (${run.seconds} s)`, run.exitCode === 0, `exit ${run.exitCode}`)
     driver('clean', 's9')
     const scan = need(9, 's9-scan')
     if (scan) {
@@ -220,7 +224,7 @@ function evaluate(meta, files) {
 
   if (ran.includes('profile-move')) {
     const prev = need(11, 's11-prev-run')
-    if (prev) add(11, `Hive Desktop 1.0 installs (${prev.seconds} s)`, prev.exitCode === 0, `exit ${prev.exitCode}`)
+    if (prev) add(11, `The 1.0 app installs (${prev.seconds} s)`, prev.exitCode === 0, `exit ${prev.exitCode}`)
     const m = need(11, 's11-profile')
     if (m) {
       if (m.completed !== true) add(11, 'profile-move.ps1 finished', false, 'it stopped before the end')
@@ -236,7 +240,7 @@ function evaluate(meta, files) {
   const passed = checks.filter(c => c.ok).length
   const differences = asarNote ? [asarNote] : []
   if ((ran.includes('upgrade') || ran.includes('manual')) && meta.previousVersion === meta.installerVersion) {
-    differences.push(`The previous release and this build both say **${meta.installerVersion}**: the in-app updater (no downgrades, only newer versions) would not offer this build, so the upgrade check is a reinstall over it, run by hand with the updater's arguments. The "Hive Desktop updated to …" notice can't show.`)
+    differences.push(`The previous release and this build both say **${meta.installerVersion}**: the in-app updater (no downgrades, only newer versions) would not offer this build, so the upgrade check is a reinstall over it, run by hand with the updater's arguments. The previous release's "updated to …" notice can't show.`)
   }
   const s1 = files.s1
   if (s1?.facts?.gitMissing || files['s1-state']?.git === false) differences.push('**No Git** on a fresh machine: Combwork shows its Git warning (status bar "Git", Provider Setup "Git not found"). Expected; a fresh-install difference.')

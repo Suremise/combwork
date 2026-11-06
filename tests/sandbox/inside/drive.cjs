@@ -2,7 +2,7 @@
  * Runs inside the Sandbox, as the user, with the host's Node, Combwork's own playwright-core and Combwork's tests folder (this
  * file's, tests\sandbox\inside, is in it) mapped read-only by the Sandbox checks (tests\sandbox\checks.cjs):
  *   C:\tools\node\node.exe C:\tools\combwork-tests\sandbox\inside\drive.cjs <step> <prefix>
- * Drives the installed app (Combwork, or Hive Desktop before an upgrade, and its real profile: see CW_EXE and PROFILE below) with Playwright's
+ * Drives the installed app (Combwork, or the 1.0 app before an upgrade, and its real profile: see CW_EXE and PROFILE below) with Playwright's
  * _electron, as Combwork's e2e suites do, and writes C:\out\<prefix>.json ({ step, checks: [{ id, scenario, name, ok, detail }],
  * facts, shots, completed }) and window PNGs C:\out\<prefix>-<name>.png. completed is true only once the whole step ran
  * (the file is saved as it goes, so an interrupted step leaves a record without it). Network off, fake CLIs only.
@@ -12,13 +12,13 @@
  *                 Provider Setup's "Check again" finds it without restarting Combwork
  *   workspace     scenario 6: a new workspace in the fresh install (its .combwork, views and status), for the fresh-install comparison
  *   mark          scenario 4, before the upgrade: change two settings (user name, theme), and two Advanced
- *                 overrides under the old hive.* ids (Combwork's own and a workspace's own, HI-2518)
+ *                 overrides under 1.0's old ids (Combwork's own and a workspace's own, HI-2518)
  *   after-upgrade scenario 4, after it: those settings kept, the Advanced overrides under cw.* (an old id refused,
  *                 naming the new one), the version, a screenshot
  *   clean         scenario 9 (HI-2592): a new user's first session on a clean install: first run, Claude Code on and an
  *                 account (the fake), a workspace with a git project, an agent started briefly (its `set` kept), a card,
  *                 Settings, Copy Diagnostics, Export Board, quit. Keeps what the window showed and what it copied for
- *                 clean-scan.cjs, which then searches it all for "hive".
+ *                 clean-scan.cjs, which then searches it all for the old name.
  */
 const fs = require('fs')
 const path = require('path')
@@ -27,12 +27,33 @@ const { _electron } = require(process.env.PW_CORE || 'C:\\tools\\playwright')
 
 const [step, prefix] = process.argv.slice(2)
 const OUT = 'C:\\out'
-// The installed app (HI-2460): Combwork's when it is installed, else Hive Desktop's (1.0, before an upgrade). Its
-// profile: Combwork's folder when it is there, else Hive's (1.0's own, before the upgrade moves it).
+// old-name: begin drive-inputs
+// 1.0's names, as the release before leaves them for the upgrade: the app's (its install and profile folders) and its
+// exe; the workspace's folder, its board and log files, its skill copies' marker and its board copies' prefix; the
+// advanced ids and stored values it writes; its log's start line; the name in any case, for what must be gone.
+const OLD_NAME = 'Hive'
+const OLD_EXE = 'Hive.exe'
+const OLD_DIR = '.hive'
+const OLD_DB = 'hive.db'
+const OLD_LOG = 'hive.log'
+const OLD_COPY_MARKER = '.hive-copy'
+const OLD_BACKUP_PREFIX = 'hive-'
+const OLD_ADV = { app: 'hive.mcp.replySeconds', ws: 'hive.progress.lanesShown' }
+const OLD_GIT_OPTIONS = { finish: 'hiveMerges', commitMessage: 'hive' }
+const OLD_ACTOR = 'hive'
+const OLD_START_LINE = /\b(?:Hive|Combwork) (\S+) starting/g
+const OLD_NAME_RE = /hive/i
+// The notice an RC showed when it ran from 1.0's folders (removed by HI-2594): a 1.1 must never show it.
+const OLD_FALLBACK_NOTICE = "Hive Desktop's data folders"
+// old-name: end drive-inputs
+// The installed app (HI-2460): Combwork's when it is installed, else the 1.0 app's (before an upgrade). Its
+// profile: Combwork's folder when it is there, else 1.0's own (before the upgrade moves it).
 const COMBWORK_EXE = path.join(process.env.LOCALAPPDATA, 'Programs', 'Combwork', 'Combwork.exe')
-const HIVE1_EXE = path.join(process.env.LOCALAPPDATA, 'Programs', 'Hive', 'Hive.exe')
-const CW_EXE = fs.existsSync(COMBWORK_EXE) ? COMBWORK_EXE : HIVE1_EXE
-const PROFILE = [path.join(process.env.APPDATA, 'Combwork'), path.join(process.env.APPDATA, 'Hive')].find((p) => fs.existsSync(p)) ?? path.join(process.env.APPDATA, CW_EXE === COMBWORK_EXE ? 'Combwork' : 'Hive')
+const OLD_APP_EXE = path.join(process.env.LOCALAPPDATA, 'Programs', OLD_NAME, OLD_EXE)
+const CW_EXE = fs.existsSync(COMBWORK_EXE) ? COMBWORK_EXE : OLD_APP_EXE
+const PROFILE = [path.join(process.env.APPDATA, 'Combwork'), path.join(process.env.APPDATA, OLD_NAME)].find((p) => fs.existsSync(p)) ?? path.join(process.env.APPDATA, CW_EXE === COMBWORK_EXE ? 'Combwork' : OLD_NAME)
+/** Whether a command starts 1.0's exe (its install folder's). */
+const startsOld = (command) => String(command).toLowerCase().includes(`\\${OLD_EXE}`.toLowerCase())
 // A file the upgrade must carry across in the local profile folder (accounts live there), written before it.
 const LOCAL_MARK = 'sandbox-mark.txt'
 // A connection's Claude Code home in the local folder (HI-2520): its folder trust must arrive as it was, nothing more
@@ -43,13 +64,13 @@ const MARK = { userName: 'Sandbox Check', theme: 'light' }
 // Scenario 4's workspace, made before the upgrade and opened after it (HI-2506), and its card.
 const KEPT_WS = path.join(process.env.USERPROFILE, 'Workspaces', 'Kept')
 const KEPT_CARD = 'Made before the upgrade'
-// Scenario 4's advanced overrides (HI-2518): set under the release before's hive.* ids, read back under cw.* after.
-const ADV = { app: { old: 'hive.mcp.replySeconds', now: 'cw.mcp.replySeconds', value: 600 }, ws: { old: 'hive.progress.lanesShown', now: 'cw.progress.lanesShown', value: 6 } }
+// Scenario 4's advanced overrides (HI-2518): set under the release before's old ids, read back under cw.* after.
+const ADV = { app: { old: OLD_ADV.app, now: 'cw.mcp.replySeconds', value: 600 }, ws: { old: OLD_ADV.ws, now: 'cw.progress.lanesShown', value: 6 } }
 // Scenario 9 (HI-2587): the upgrade from a 1.1 release candidate (RC2), already partly converted (its profile, .combwork
 // and cw.* ids), its files' prefix s10 (scenario 10; 9 is HI-2592's clean install). What 1.0 needs moving that an RC has done already isn't checked there.
 const FROM_RC = (prefix || '').startsWith('s10')
-// The workspace's folder as the release before made it: .hive in 1.0, .combwork in an RC.
-const TREE_BEFORE = FROM_RC ? '.combwork' : '.hive'
+// The workspace's folder as the release before made it: 1.0's own, or .combwork in an RC.
+const TREE_BEFORE = FROM_RC ? '.combwork' : OLD_DIR
 // A skill copy the release before made in the project (its marker, HI-2587), for the upgrade to rename.
 const COPY = path.join('demo', '.agents', 'skills', 'cw-sandbox-check')
 const readJson = (file) => { try { return JSON.parse(fs.readFileSync(file, 'utf8')) } catch { return null } }
@@ -57,7 +78,7 @@ const res = { step, prefix, at: new Date().toISOString(), checks: [], facts: {},
 const save = () => fs.writeFileSync(path.join(OUT, `${prefix}.json`), JSON.stringify(res, null, 2))
 // Each check has a stable id ("<scenario>.<what>"): the host's report requires the ids each step must produce.
 const check = (id, name, ok, detail) => { res.checks.push({ id, scenario: Number(String(id).split('.')[0]) || 0, name, ok: !!ok, detail: ok ? undefined : String(detail ?? '').slice(0, 1500) }); save() }
-// When what it reads is ready: conditions Combwork says are met, each bounded (ready.cjs, unit-tested in hive's npm test).
+// When what it reads is ready: conditions Combwork says are met, each bounded (ready.cjs, unit-tested in Combwork's npm test).
 const { until, workspaceSetUp, VIEWS, viewReady } = require(path.join(__dirname, 'ready.cjs'))
 const ps = cmd => execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', cmd], { encoding: 'utf8', timeout: 60_000 }).trim()
 const readConfig = () => { try { return JSON.parse(fs.readFileSync(path.join(PROFILE, 'config.json'), 'utf8')) } catch { return null } }
@@ -67,7 +88,7 @@ let page
 const inv = (channel, ...args) => page.evaluate(([c, a]) => window.combwork.invoke(c, ...a), [channel, args])
 
 /** Combwork instances already running from the install folder (the installer's --force-run starts one): closed by PID. */
-function closeRunningHive() {
+function closeRunningApp() {
   const out = ps(`$p = Get-CimInstance Win32_Process -Filter "Name='${path.basename(CW_EXE)}'" | Where-Object { $_.ExecutablePath -eq '${CW_EXE.replace(/'/g, "''")}' }; foreach ($x in $p) { $g = Get-Process -Id $x.ProcessId -ErrorAction SilentlyContinue; if ($g -and $g.MainWindowHandle -ne 0) { [void]$g.CloseMainWindow() } }; Start-Sleep -Seconds 3; $p = Get-CimInstance Win32_Process -Filter "Name='${path.basename(CW_EXE)}'" | Where-Object { $_.ExecutablePath -eq '${CW_EXE.replace(/'/g, "''")}' }; foreach ($x in $p) { Stop-Process -Id $x.ProcessId -Force -ErrorAction SilentlyContinue }; @($p).Count`)
   return Number(out) || 0
 }
@@ -123,10 +144,10 @@ async function providerSetup() {
   return (await until(async () => (await dialog.count()) === 1, 10_000)) ? dialog : null
 }
 
-/** HKCU's Run values that start Hive.exe or Combwork.exe (Launch at login): [{ name, command }]. */
+/** HKCU's Run values that start 1.0's exe or Combwork.exe (Launch at login): [{ name, command }]. */
 function runValues() {
   try {
-    const out = ps("$k = 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run'; if (Test-Path $k) { $i = Get-Item $k; @($i.Property | ForEach-Object { [ordered]@{ name = $_; command = [string]$i.GetValue($_) } } | Where-Object { $_.command -match 'Hive\\.exe|Combwork\\.exe' }) | ConvertTo-Json -Compress }")
+    const out = ps("$k = 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run'; if (Test-Path $k) { $i = Get-Item $k; @($i.Property | ForEach-Object { [ordered]@{ name = $_; command = [string]$i.GetValue($_) } } | Where-Object { $_.command -match '" + OLD_EXE.replace('.', '\\.') + "|Combwork\\.exe' }) | ConvertTo-Json -Compress }")
     if (!out) return []
     const v = JSON.parse(out)
     return Array.isArray(v) ? v : [v]
@@ -220,8 +241,8 @@ const steps = {
 
     // The stand-in installer: the e2e fake Claude Code copied into the user's programs, on the user PATH (registry).
     res.facts.install = ps('& C:\\tools\\combwork-tests\\sandbox\\inside\\fake-claude-install.ps1')
-    const hivePath = await app.evaluate(() => process.env.PATH || process.env.Path || '')
-    check('3.user-path', 'The new folder is on the user PATH, not on Combwork\'s own PATH yet', !hivePath.toLowerCase().includes('fakeclaude'), hivePath.slice(0, 300))
+    const appPath = await app.evaluate(() => process.env.PATH || process.env.Path || '')
+    check('3.user-path', 'The new folder is on the user PATH, not on Combwork\'s own PATH yet', !appPath.toLowerCase().includes('fakeclaude'), appPath.slice(0, 300))
     if (dialog) await dialog.locator('button', { hasText: 'Check again' }).click()
     const found = dialog && await until(async () => { const i = (await inv('provider:info'))['claude-code']; return i && !i.checking && i.found && i }, 30_000)
     res.facts.after = found || (await inv('provider:info'))['claude-code']
@@ -287,49 +308,49 @@ const steps = {
   async mark() {
     await launch()
     res.facts.version = (await api('/v1/health')).version
-    // Launch at login on too (HI-2460): 1.0 registers its Hive.exe, which the upgrade replaces with Combwork.exe.
+    // Launch at login on too (HI-2460): 1.0 registers its own exe, which the upgrade replaces with Combwork.exe.
     await inv('settings:update', { general: { userName: MARK.userName, launchAtLogin: true }, appearance: { theme: MARK.theme } })
     const saved = await until(async () => { const c = readConfig(); return c?.settings?.general?.userName === MARK.userName && c.settings.general.launchAtLogin === true && c.settings.appearance?.theme === MARK.theme && c }, 10_000)
     check('4.settings-saved', `Before the upgrade: user name "${MARK.userName}", the ${MARK.theme} theme and Launch at login saved`, saved, JSON.stringify(readConfig()?.settings?.general))
     // 1.0's own folders and its Launch at login (HI-2460, HI-2461): an RC has moved them already.
     if (!FROM_RC) {
       // Something in the local profile folder (where accounts live), for the upgrade to carry across.
-      const local = path.join(process.env.LOCALAPPDATA, 'Hive')
+      const local = path.join(process.env.LOCALAPPDATA, OLD_NAME)
       fs.mkdirSync(local, { recursive: true })
       fs.writeFileSync(path.join(local, LOCAL_MARK), 'kept across the upgrade')
       fs.mkdirSync(path.join(local, TRUST_HOME), { recursive: true })
       fs.writeFileSync(path.join(local, TRUST_HOME, '.claude.json'), JSON.stringify(TRUST_JSON, null, 2))
       res.facts.runBefore = runValues()
-      check('4.login-registered', 'Before the upgrade: Launch at login starts Hive.exe', res.facts.runBefore.some((v) => /\\Hive\.exe/i.test(v.command)), JSON.stringify(res.facts.runBefore))
+      check('4.login-registered', "Before the upgrade: Launch at login starts 1.0's exe", res.facts.runBefore.some((v) => startsOld(v.command)), JSON.stringify(res.facts.runBefore))
     }
-    // A workspace the release before makes in .hive (HI-2462, HI-2506): a project and a card naming a note by its path,
+    // A workspace the release before makes in its own folder (HI-2462, HI-2506): a project and a card naming a note by its path,
     // for the upgrade's first open to move to .combwork.
     fs.mkdirSync(path.join(KEPT_WS, 'demo'), { recursive: true })
     fs.writeFileSync(path.join(KEPT_WS, 'demo', 'README.md'), '# demo\n')
     await inv('workspace:open', KEPT_WS)
-    const made = await until(async () => fs.existsSync(path.join(KEPT_WS, TREE_BEFORE, 'hive.db')) && fs.existsSync(path.join(KEPT_WS, 'demo', TREE_BEFORE, 'project.json')), 30_000)
+    const made = await until(async () => fs.existsSync(path.join(KEPT_WS, TREE_BEFORE, OLD_DB)) && fs.existsSync(path.join(KEPT_WS, 'demo', TREE_BEFORE, 'project.json')), 30_000)
     let card = null
     if (made) card = await inv('tasks:create', { title: KEPT_CARD, project: 'demo', description: `The plan: ${path.join(KEPT_WS, TREE_BEFORE, 'shared', 'plan.md')}` }).catch((e) => ({ error: String(e) }))
-    // Stored values under Hive's names (HI-2598): the project's Git workflow options as the release before writes them
-    // ("Hive merges", Hive's commit message), for the upgrade to convert to Combwork's.
+    // Stored values under the old names (HI-2598): the project's Git workflow options as the release before writes them
+    // (its merges, its commit message), for the upgrade to convert to Combwork's.
     if (made) {
       const pj = path.join(KEPT_WS, 'demo', TREE_BEFORE, 'project.json')
       const cfg = readJson(pj) ?? {}
-      fs.writeFileSync(pj, JSON.stringify({ ...cfg, workflow: { platform: 'none', preset: null, options: {}, kept: { git: { preset: null, options: { finish: 'hiveMerges', commitMessage: 'hive' } } } } }, null, 2) + '\n')
+      fs.writeFileSync(pj, JSON.stringify({ ...cfg, workflow: { platform: 'none', preset: null, options: {}, kept: { git: { preset: null, options: { ...OLD_GIT_OPTIONS } } } } }, null, 2) + '\n')
     }
     // A skill copy as the release before marks it (HI-2587), for the upgrade to rename its marker.
     fs.mkdirSync(path.join(KEPT_WS, COPY), { recursive: true })
     fs.writeFileSync(path.join(KEPT_WS, COPY, 'SKILL.md'), '---\nname: cw-sandbox-check\n---\n')
-    fs.writeFileSync(path.join(KEPT_WS, COPY, '.hive-copy'), JSON.stringify({ source: 'sandbox', hash: 'h' }) + '\n')
+    fs.writeFileSync(path.join(KEPT_WS, COPY, OLD_COPY_MARKER), JSON.stringify({ source: 'sandbox', hash: 'h' }) + '\n')
     res.facts.keptWorkspace = { made: !!made, card, tree: TREE_BEFORE, logs: fs.readdirSync(path.join(PROFILE, 'logs')).filter((n) => n.endsWith('.log')) }
-    check('4.workspace-made', `Before the upgrade: a workspace with a project and a card, in ${TREE_BEFORE}, its board hive.db, the log hive.log`, !!made && typeof card?.number === 'number' && res.facts.keptWorkspace.logs.includes('hive.log'), JSON.stringify(res.facts.keptWorkspace))
+    check('4.workspace-made', `Before the upgrade: a workspace with a project and a card, in ${TREE_BEFORE}, its board ${OLD_DB}, the log ${OLD_LOG}`, !!made && typeof card?.number === 'number' && res.facts.keptWorkspace.logs.includes(OLD_LOG), JSON.stringify(res.facts.keptWorkspace))
     if (FROM_RC) return void (await shot('before-upgrade'))
-    // Advanced overrides under the release before's hive.* ids (HI-2518), one at each level: Combwork's own (advanced.json
+    // Advanced overrides under the release before's old ids (HI-2518), one at each level: Combwork's own (advanced.json
     // in the profile) and the workspace's own (its workspace.json), for the upgrade to bring back under cw.*.
     const setAdv = (id, value, scope) => inv('advanced:set', id, value, scope).then(() => null, (e) => String(e))
     res.facts.advancedSet = { app: await setAdv(ADV.app.old, ADV.app.value), workspace: made ? await setAdv(ADV.ws.old, ADV.ws.value, 'workspace') : 'no workspace' }
-    const advSaved = await until(async () => readJson(path.join(PROFILE, 'advanced.json'))?.values?.[ADV.app.old] === ADV.app.value && readJson(path.join(KEPT_WS, '.hive', 'workspace.json'))?.advanced?.[ADV.ws.old] === ADV.ws.value, 10_000)
-    check('4.advanced-saved', `Before the upgrade: ${ADV.app.old} = ${ADV.app.value} in advanced.json and the workspace's own ${ADV.ws.old} = ${ADV.ws.value}`, advSaved, JSON.stringify({ set: res.facts.advancedSet, file: readJson(path.join(PROFILE, 'advanced.json'))?.values, ws: readJson(path.join(KEPT_WS, '.hive', 'workspace.json'))?.advanced }))
+    const advSaved = await until(async () => readJson(path.join(PROFILE, 'advanced.json'))?.values?.[ADV.app.old] === ADV.app.value && readJson(path.join(KEPT_WS, OLD_DIR, 'workspace.json'))?.advanced?.[ADV.ws.old] === ADV.ws.value, 10_000)
+    check('4.advanced-saved', `Before the upgrade: ${ADV.app.old} = ${ADV.app.value} in advanced.json and the workspace's own ${ADV.ws.old} = ${ADV.ws.value}`, advSaved, JSON.stringify({ set: res.facts.advancedSet, file: readJson(path.join(PROFILE, 'advanced.json'))?.values, ws: readJson(path.join(KEPT_WS, OLD_DIR, 'workspace.json'))?.advanced }))
     await shot('before-upgrade')
   },
 
@@ -373,9 +394,9 @@ const steps = {
     for (const [k, v] of Object.entries(process.env)) {
       if (/^path$/i.test(k)) {
         const parts = String(v).split(';').filter(Boolean)
-        dropped.push(...parts.filter((x) => /hive/i.test(x)))
-        env[k] = [...parts.filter((x) => !/hive/i.test(x)), gitCmd, fakeBin].join(';')
-      } else if (/hive/i.test(k) || /hive/i.test(String(v))) dropped.push(k)
+        dropped.push(...parts.filter((x) => OLD_NAME_RE.test(x)))
+        env[k] = [...parts.filter((x) => !OLD_NAME_RE.test(x)), gitCmd, fakeBin].join(';')
+      } else if (OLD_NAME_RE.test(k) || OLD_NAME_RE.test(String(v))) dropped.push(k)
       else env[k] = v
     }
     res.facts.harnessEnvLeftOut = dropped
@@ -506,7 +527,7 @@ const steps = {
   },
 
   async 'after-upgrade'() {
-    res.facts.closedForceRun = closeRunningHive()
+    res.facts.closedForceRun = closeRunningApp()
     await launch()
     res.facts.version = (await api('/v1/health')).version
     const c = readConfig()
@@ -520,56 +541,56 @@ const steps = {
     // 1.0's folders, its record and its Launch at login (HI-2460, HI-2461): an RC moved them already.
     if (!FROM_RC) {
       const localNew = path.join(process.env.LOCALAPPDATA, 'Combwork')
-      check('4.local-moved', 'The local folder moved with its data: %LOCALAPPDATA%\\Combwork, no %LOCALAPPDATA%\\Hive', fs.existsSync(path.join(localNew, LOCAL_MARK)) && !fs.existsSync(path.join(process.env.LOCALAPPDATA, 'Hive')), fs.readdirSync(process.env.LOCALAPPDATA).filter((n) => /hive|combwork/i.test(n)).join(', '))
+      check('4.local-moved', "The local folder moved with its data: %LOCALAPPDATA%\\Combwork, none of 1.0's", fs.existsSync(path.join(localNew, LOCAL_MARK)) && !fs.existsSync(path.join(process.env.LOCALAPPDATA, OLD_NAME)), fs.readdirSync(process.env.LOCALAPPDATA).filter((n) => OLD_NAME_RE.test(n) || /combwork/i.test(n)).join(', '))
       let trustAfter = null
       try { trustAfter = JSON.parse(fs.readFileSync(path.join(localNew, TRUST_HOME, '.claude.json'), 'utf8')) } catch { /* below */ }
       const trustEntries = (j) => Object.entries(j?.projects ?? {}).map(([k, v]) => [k, v?.hasTrustDialogAccepted])
       check('4.trust-kept', "A connection home's Claude Code folder trust moved as it was: trusted stays trusted, untrusted stays untrusted, nothing added", JSON.stringify(trustEntries(trustAfter)) === JSON.stringify(trustEntries(TRUST_JSON)), JSON.stringify(trustAfter))
-      check('4.roaming-moved', 'The roaming folder moved: no %APPDATA%\\Hive left', !fs.existsSync(path.join(process.env.APPDATA, 'Hive')), fs.readdirSync(process.env.APPDATA).filter((n) => /hive|combwork/i.test(n)).join(', '))
+      check('4.roaming-moved', "The roaming folder moved: none of 1.0's left", !fs.existsSync(path.join(process.env.APPDATA, OLD_NAME)), fs.readdirSync(process.env.APPDATA).filter((n) => OLD_NAME_RE.test(n) || /combwork/i.test(n)).join(', '))
       let rec = null
       try { rec = JSON.parse(fs.readFileSync(path.join(localNew, 'profile-move.json'), 'utf8')) } catch { /* below */ }
       res.facts.record = rec
-      check('4.record', "The installer's record arrived with the local folder (v 1, by installer)", rec?.v === 1 && rec.by === 'installer' && /\\Hive$/i.test(String(rec.from)), JSON.stringify(rec))
-      // Its Launch at login: written for Combwork.exe at start (loginItem.ts), Hive Desktop's removed by the installer.
+      check('4.record', "The installer's record arrived with the local folder (v 1, by installer)", rec?.v === 1 && rec.by === 'installer' && String(rec.from).toLowerCase().endsWith(`\\${OLD_NAME}`.toLowerCase()), JSON.stringify(rec))
+      // Its Launch at login: written for Combwork.exe at start (loginItem.ts), the 1.0 app's removed by the installer.
       const runs = await until(async () => { const v = runValues(); return v.some((x) => /\\Combwork\.exe/i.test(x.command)) && v }, 15_000)
       res.facts.runAfter = runs || runValues()
-      check('4.login-moved', 'Launch at login starts Combwork.exe, and nothing starts Hive.exe', !!runs && !runs.some((x) => /\\Hive\.exe/i.test(x.command)), JSON.stringify(res.facts.runAfter))
-      const fallback = await page.locator('.toast', { hasText: "Hive Desktop's data folders" }).count()
+      check('4.login-moved', "Launch at login starts Combwork.exe, and nothing starts 1.0's exe", !!runs && !runs.some((x) => startsOld(x.command)), JSON.stringify(res.facts.runAfter))
+      const fallback = await page.locator('.toast', { hasText: OLD_FALLBACK_NOTICE }).count()
       check('4.no-fallback', 'No notice that Combwork runs from its old folders', fallback === 0, `${fallback} such notice(s)`)
     }
-    // The workspace made before the upgrade, opened (again, or restored at start): its .hive folders moved to .combwork,
+    // The workspace made before the upgrade, opened (again, or restored at start): its 1.0 folders moved to .combwork,
     // its board and the card's path with them (HI-2462, HI-2506).
     await inv('workspace:open', KEPT_WS).catch(() => undefined)
-    const movedNow = () => fs.existsSync(path.join(KEPT_WS, '.combwork', 'combwork.db')) && !fs.existsSync(path.join(KEPT_WS, '.hive')) && fs.existsSync(path.join(KEPT_WS, 'demo', '.combwork', 'project.json')) && !fs.existsSync(path.join(KEPT_WS, 'demo', '.hive'))
+    const movedNow = () => fs.existsSync(path.join(KEPT_WS, '.combwork', 'combwork.db')) && !fs.existsSync(path.join(KEPT_WS, OLD_DIR)) && fs.existsSync(path.join(KEPT_WS, 'demo', '.combwork', 'project.json')) && !fs.existsSync(path.join(KEPT_WS, 'demo', OLD_DIR))
     const moved = await until(async () => movedNow(), 30_000)
     res.facts.keptWorkspaceAfter = fs.existsSync(KEPT_WS) ? fs.readdirSync(KEPT_WS) : null
-    check('4.workspace-moved', "The workspace from before opens with its .hive folders moved to .combwork (the workspace's and the project's)", !!moved, JSON.stringify(res.facts.keptWorkspaceAfter))
+    check('4.workspace-moved', "The workspace from before opens with its 1.0 folders moved to .combwork (the workspace's and the project's)", !!moved, JSON.stringify(res.facts.keptWorkspaceAfter))
     const cards = await inv('tasks:list').catch((e) => ({ error: String(e) }))
     const card = Array.isArray(cards) ? cards.find((x) => x.title === KEPT_CARD) : null
     res.facts.keptCard = card ? { number: card.number, description: card.description } : cards
     check('4.workspace-card', 'Its card is on the board, its path now into .combwork', !!card && card.description === `The plan: ${path.join(KEPT_WS, '.combwork', 'shared', 'plan.md')}`, JSON.stringify(res.facts.keptCard))
     // HI-2598: the stored values converted once: the project's kept Git options, and the card's facts' actors.
     const keptGit = readJson(path.join(KEPT_WS, 'demo', '.combwork', 'project.json'))?.workflow?.kept?.git?.options ?? null
-    check('4.values-options', "The project's kept Git options say Combwork's (combworkMerges, Combwork's commit message), no Hive value left", keptGit?.finish === 'combworkMerges' && keptGit?.commitMessage === 'combwork', JSON.stringify(keptGit))
+    check('4.values-options', "The project's kept Git options say Combwork's (combworkMerges, Combwork's commit message), no old value left", keptGit?.finish === 'combworkMerges' && keptGit?.commitMessage === 'combwork', JSON.stringify(keptGit))
     const facts = card ? await inv('tasks:facts', card.number).catch(() => null) : null
-    check('4.values-facts', "No fact of the card made before names Hive as its actor", Array.isArray(facts) && !facts.some((x) => x.actor === 'hive' || x.data?.by === 'hive'), JSON.stringify(facts?.map((x) => [x.kind, x.actor])))
+    check('4.values-facts', "No fact of the card made before names the old app as its actor", Array.isArray(facts) && !facts.some((x) => x.actor === OLD_ACTOR || x.data?.by === OLD_ACTOR), JSON.stringify(facts?.map((x) => [x.kind, x.actor])))
     // HI-2587: the names upgrade. The board's file and its copies, the log, the workspace's files, the skill copy's marker:
     // Combwork's names, nothing of the old left, the record written; from 1.0 and from an RC alike.
     const dir = path.join(KEPT_WS, '.combwork')
     const listed = (d) => (fs.existsSync(d) ? fs.readdirSync(d) : [])
     res.facts.names = { combwork: listed(dir), backups: listed(path.join(dir, 'backups')), logs: listed(path.join(PROFILE, 'logs')), copy: listed(path.join(KEPT_WS, COPY)) }
-    check('4.board-file', 'The board is .combwork\\combwork.db, with the card made before; no hive.db or its sidecars left', res.facts.names.combwork.includes('combwork.db') && !res.facts.names.combwork.some((n) => n.startsWith('hive.db')) && !!card, JSON.stringify(res.facts.names.combwork))
-    check('4.board-backups', "The board's copies in backups take Combwork's names", !res.facts.names.backups.some((n) => n.startsWith('hive-')), JSON.stringify(res.facts.names.backups))
+    check('4.board-file', `The board is .combwork\\combwork.db, with the card made before; no ${OLD_DB} or its sidecars left`, res.facts.names.combwork.includes('combwork.db') && !res.facts.names.combwork.some((n) => n.startsWith(OLD_DB)) && !!card, JSON.stringify(res.facts.names.combwork))
+    check('4.board-backups', "The board's copies in backups take Combwork's names", !res.facts.names.backups.some((n) => n.startsWith(OLD_BACKUP_PREFIX)), JSON.stringify(res.facts.names.backups))
     let log = ''
     try { log = fs.readFileSync(path.join(PROFILE, 'logs', 'combwork.log'), 'utf8') } catch { /* below */ }
-    check('4.log-file', "The log is combwork.log, with the release before's lines in it (its start line and this one's); no hive.log left", !res.facts.names.logs.includes('hive.log') && new Set([...log.matchAll(/\b(?:Hive|Combwork) (\S+) starting/g)].map((m) => m[1])).size >= 2, JSON.stringify(res.facts.names.logs))
+    check('4.log-file', `The log is combwork.log, with the release before's lines in it (its start line and this one's); no ${OLD_LOG} left`, !res.facts.names.logs.includes(OLD_LOG) && new Set([...log.matchAll(OLD_START_LINE)].map((m) => m[1])).size >= 2, JSON.stringify(res.facts.names.logs))
     let gitignore = ''
     try { gitignore = fs.readFileSync(path.join(dir, '.gitignore'), 'utf8') } catch { /* below */ }
-    check('4.workspace-files', "The workspace's .gitignore is Combwork's, for combwork.db, keeping the names upgrade's record out", /\(added by Combwork, #1017\)/.test(gitignore.split(/\r?\n/)[0]) && /^combwork\.db\r?$/m.test(gitignore) && /^combwork-names\.json\r?$/m.test(gitignore) && !/^hive\.db/m.test(gitignore), gitignore.slice(0, 600))
-    check('4.copy-marker', "The project's skill copy has Combwork's marker (.combwork-copy), its content as it was", res.facts.names.copy.includes('.combwork-copy') && !res.facts.names.copy.includes('.hive-copy') && readJson(path.join(KEPT_WS, COPY, '.combwork-copy'))?.hash === 'h', JSON.stringify(res.facts.names.copy))
+    check('4.workspace-files', "The workspace's .gitignore is Combwork's, for combwork.db, keeping the names upgrade's record out", /\(added by Combwork, #1017\)/.test(gitignore.split(/\r?\n/)[0]) && /^combwork\.db\r?$/m.test(gitignore) && /^combwork-names\.json\r?$/m.test(gitignore) && !gitignore.split(/\r?\n/).some((l) => l.startsWith(OLD_DB)), gitignore.slice(0, 600))
+    check('4.copy-marker', "The project's skill copy has Combwork's marker (.combwork-copy), its content as it was", res.facts.names.copy.includes('.combwork-copy') && !res.facts.names.copy.includes(OLD_COPY_MARKER) && readJson(path.join(KEPT_WS, COPY, '.combwork-copy'))?.hash === 'h', JSON.stringify(res.facts.names.copy))
     check('4.names-done', 'The names upgrade recorded itself done (.combwork\\combwork-names.json)', readJson(path.join(dir, 'combwork-names.json'))?.version === 3, JSON.stringify(res.facts.names.combwork))
-    const oldNames = [...res.facts.names.combwork.filter((n) => /^hive/i.test(n)), ...res.facts.names.logs.filter((n) => /^hive/i.test(n))]
-    check('4.no-old-names', "No file under Hive's names left in the workspace's .combwork or the profile's logs", oldNames.length === 0, JSON.stringify(oldNames))
+    const oldNames = [...res.facts.names.combwork, ...res.facts.names.logs].filter((n) => n.toLowerCase().startsWith(OLD_NAME.toLowerCase()))
+    check('4.no-old-names', "No file under the old names left in the workspace's .combwork or the profile's logs", oldNames.length === 0, JSON.stringify(oldNames))
     if (!FROM_RC) {
       // The advanced overrides made before (HI-2518): read back under their cw.* ids, in the app (Settings' state, the Agent
       // API's settings read) and on disk (advanced.json rewritten at once; workspace.json at its next save, so not checked),
@@ -594,7 +615,7 @@ const steps = {
 ;(async () => {
   try {
     if (!steps[step]) throw new Error(`unknown step ${step}`)
-    if (step !== 'after-upgrade') res.facts.closedBefore = closeRunningHive()
+    if (step !== 'after-upgrade') res.facts.closedBefore = closeRunningApp()
     await steps[step]()
     res.completed = true
   } catch (e) {

@@ -11,7 +11,7 @@ import { NEW_ID, OLD_ID, upgradedAdvancedIds, upgradedOptions, upgradedRunName }
  *
  * - **Stored values** (HI-2598, its design HI-2598/s9 §5; upgradeProfileFiles): config.json's workflow defaults, commands
  *   and Agent API switch, advanced.json's ids, and each workspace's kept progress runs, before anything reads them.
- * - **The profile folders** (HI-2594): Hive's `Hive` (`Hive-Dev`) moved to Combwork's where the installer hasn't
+ * - **The profile folders** (HI-2594): 1.0's `Hive` (`Hive-Dev`) moved to Combwork's where the installer hasn't
  *   (profileFolders.ts chooseProfile, before userData is set); a move it can't make refuses the start.
  * - **The run marker** (`running.json`, lastRun.ts): the version that wrote it, `hive` before 1.1, is `app`. Rewritten
  *   before the last run's marker is read (checkLastRun), so a 1.0 or RC run that ended without quitting is still told;

@@ -10,14 +10,16 @@
 
 const FLAG = 'CW_FAKE_OLD_RELEASE'
 /** The environment's prefix, the launch's MCP server and the tools' prefix, as a release before 1.1 names them. */
+// old-name: begin oldRelease-inputs
 const OLD_ENV = 'HIVE_'
 const OLD_SERVER = 'hive'
 const OLD_TOOL = /^hive_[a-z_]+$/
+// old-name: end oldRelease-inputs
 
 /** Whether this launch is the old release's (its wrapper set the flag). */
 const on = (env = process.env) => env[FLAG] === '1'
 
-/** What a current launch has of the old dialect: its `HIVE_*` variables, or its old server without a current one. Empty: none. */
+/** What a current launch has of the old dialect: its variables under the old prefix (`OLD_ENV`), or its old server without a current one. Empty: none. */
 function oldDialectIn(env, servers) {
   const found = Object.keys(env ?? {}).filter((k) => k.startsWith(OLD_ENV))
   if (servers && servers[OLD_SERVER] && !servers.combwork) found.push(`its MCP server "${OLD_SERVER}"`)
@@ -25,7 +27,7 @@ function oldDialectIn(env, servers) {
 }
 
 /**
- * An environment with each variable of the old release's (`HIVE_X`) under its current name (`CW_X`) too, where that is
+ * An environment with each variable of the old release's (`OLD_ENV` + `X`) under its current name (`CW_X`) too, where that is
  * unset. Old mode only: in current mode the environment is returned as it is.
  */
 function envOf(env, mode = on()) {
@@ -35,11 +37,11 @@ function envOf(env, mode = on()) {
   return out
 }
 
-/** The launch's own MCP server: `combwork`, or in old mode the old release's `hive`. Null with neither. */
+/** The launch's own MCP server: `combwork`, or in old mode the old release's (`OLD_SERVER`). Null with neither. */
 const serverOf = (servers, mode = on()) => servers?.combwork ?? (mode ? servers?.[OLD_SERVER] : null) ?? null
 
 /**
- * A scripted step's tool name: a current one (`cw_*`) always; an old release's (`hive_*`) in old mode only. Null for
+ * A scripted step's tool name: a current one (`cw_*`) always; an old release's (`OLD_TOOL`) in old mode only. Null for
  * one that isn't a tool name; throws for an old one in current mode, so a current test never passes on it.
  */
 function toolName(name, mode = on()) {

@@ -9,7 +9,11 @@ import { cardsTestHooks, rewriteCards } from '../src/main/combworkMoveWorker'
 import { tempDir } from './tempDir'
 
 const WS = 'D:\\ws'
-const MOVES = [{ from: `${WS}\\.hive`, to: `${WS}\\.combwork` }]
+// old-name: begin combworkMoveWorker-inputs
+/** 1.0's folder, the move's input. */
+const OLD_DIR = '.hive'
+// old-name: end combworkMoveWorker-inputs
+const MOVES = [{ from: `${WS}\\${OLD_DIR}`, to: `${WS}\\.combwork` }]
 
 function board(): string {
   const file = join(tempDir('cw-moveworker-'), 'combwork.db')
@@ -18,9 +22,9 @@ function board(): string {
   db.exec('CREATE TABLE cards (number INTEGER PRIMARY KEY, description TEXT NOT NULL) STRICT')
   db.exec('CREATE TABLE card_comments (card INTEGER NOT NULL, ord INTEGER NOT NULL, text TEXT, PRIMARY KEY (card, ord)) STRICT')
   db.exec('CREATE TABLE card_context (card INTEGER NOT NULL, ord INTEGER NOT NULL, ref TEXT NOT NULL, PRIMARY KEY (card, ord)) STRICT')
-  db.prepare('INSERT INTO cards VALUES (1, ?)').run(`Old ${WS}\\.hive\\shared\\a.md`)
-  db.prepare('INSERT INTO card_comments VALUES (1, 0, ?)').run(`Old ${WS}\\.hive\\attachments\\x.png`)
-  db.prepare('INSERT INTO card_context VALUES (1, 0, ?)').run('.hive/shared/a.md#h')
+  db.prepare('INSERT INTO cards VALUES (1, ?)').run(`Old ${WS}\\${OLD_DIR}\\shared\\a.md`)
+  db.prepare('INSERT INTO card_comments VALUES (1, 0, ?)').run(`Old ${WS}\\${OLD_DIR}\\attachments\\x.png`)
+  db.prepare('INSERT INTO card_context VALUES (1, 0, ?)').run(`${OLD_DIR}/shared/a.md#h`)
   db.close()
   return file
 }
@@ -50,9 +54,9 @@ describe("the move's card rewrite and a user's edits", () => {
     let edited = 0
     cardsTestHooks.beforeBatch = () => {
       if (edited++) return
-      user.prepare('UPDATE cards SET description = ? WHERE number = 1').run(`A user's edit, ${WS}\\.hive\\shared\\a.md`)
-      user.prepare('UPDATE card_comments SET text = ? WHERE card = 1').run(`Edited comment ${WS}\\.hive\\attachments\\x.png`)
-      user.prepare('UPDATE card_context SET ref = ? WHERE card = 1').run('.hive/shared/b.md#k')
+      user.prepare('UPDATE cards SET description = ? WHERE number = 1').run(`A user's edit, ${WS}\\${OLD_DIR}\\shared\\a.md`)
+      user.prepare('UPDATE card_comments SET text = ? WHERE card = 1').run(`Edited comment ${WS}\\${OLD_DIR}\\attachments\\x.png`)
+      user.prepare('UPDATE card_context SET ref = ? WHERE card = 1').run(`${OLD_DIR}/shared/b.md#k`)
     }
     expect(rewriteCards({ file, moves: MOVES, workspaceMoved: true })).toMatchObject({ ok: true })
     user.close()

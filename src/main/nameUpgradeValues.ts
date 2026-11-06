@@ -11,7 +11,7 @@ import { OLD_ID, NEW_ID, upgradedAdvancedIds, upgradedOptions } from './storedNa
  * The names upgrade's stored values in the settings files a workspace and its projects keep (HI-2598, its design
  * HI-2598/s9 §4): the workflow options' old values (`finish: 'hiveMerges'`, `commitMessage: 'hive'`) in project.json
  * (its options and each kept platform's), in workspace.json's defaults and in every template's sections; workspace.json's
- * command refs to Hive's own list (`scope: 'hive'`), and its advanced values under their `hive.*` ids. Each is pure on
+ * command refs to 1.0's own list (`scope: 'hive'`), and its advanced values under their `hive.*` ids. Each is pure on
  * the parsed file (`upgraded*`, null when nothing is old), and a file is written only when it changed, as Combwork's own
  * writer writes it (writeKeptJson), under the lock its changes take. A file that doesn't parse is left as it is: its
  * load recovers it as it would any damaged file.
@@ -44,7 +44,7 @@ export function upgradedProjectConfig(raw: unknown): Obj | null {
   return { ...raw, workflow: { ...w, ...(options ? { options } : {}), ...(kept ? { kept } : {}) } }
 }
 
-/** A point's refs (workspace.json's commands.onOpen and onClose) with Hive's scope as Combwork's, each once; null when none is old. */
+/** A point's refs (workspace.json's commands.onOpen and onClose) with 1.0's scope as Combwork's, each once; null when none is old. */
 function upgradedPoint(point: unknown): Obj | null {
   if (!isObj(point) || !Array.isArray(point.run) || !point.run.some((r) => isObj(r) && r.scope === OLD_ID)) return null
   const run: unknown[] = []

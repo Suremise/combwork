@@ -7,7 +7,7 @@ import { NEW_ID, NEW_NAME, OLD_ID, OLD_NAME, optionValue, ruleId, upgradedAdvanc
 
 /**
  * The board's step of the names upgrade for stored values (HI-2598, its design HI-2598/s9 §2; boardStore.ts
- * BOARD_MIGRATIONS version 26): what 1.0 and the 1.1 release candidates stored under Hive's names in combwork.db takes
+ * BOARD_MIGRATIONS version 26): what 1.0 and the 1.1 release candidates stored under the old names in combwork.db takes
  * Combwork's, once, in the migration's transaction. Only what is still old changes: on a board converted already, or
  * made by 1.1, it changes nothing. Identities and codes only (a fact's actor, a merge's `by`, a refusal's rule, the
  * workflow options' values and the rulesets compiled from them, a lane's builder and starter, a history line's `by`, a
