@@ -526,6 +526,29 @@ test("the driver's names checks expect what the names upgrade and the settings t
   assert.ok(drive.includes('old.error.startsWith(`No setting "advanced.${ADV.app.old}"`)'), 'the driver expects that answer for the old id')
 })
 
+// Scenario 9's first run of Claude Code (HI-2646): Combwork adds a connection only once Claude Code's own folder is there,
+// never making it (accounts.ts, main.accounts.noHome), and a real first run makes it. The driver makes that folder, the one
+// Claude Code's adapter names, after installing the fake and before adding the connection.
+test("scenario 9 makes Claude Code's folder, as its first run would, before it adds the connection", () => {
+  const root = path.resolve(__dirname, '..')
+  const drive = fs.readFileSync(path.join(SANDBOX, 'inside', 'drive.cjs'), 'utf8')
+  const clean = drive.slice(drive.indexOf('async clean()'))
+  const at = (s: string): number => clean.indexOf(s)
+  const made = at("const claudeHome = path.join(process.env.USERPROFILE, '.claude')")
+  assert.ok(made > 0 && at('fs.mkdirSync(claudeHome, { recursive: true })') > made, 'clean makes %USERPROFILE%\\.claude')
+  assert.ok(at('fake-claude-install.ps1') < made, 'after installing the fake')
+  assert.ok(made < at("inv('connections:add', 'claude-code'"), 'before adding the connection')
+  // Then on in the workspace it opens (On here), before the agent it starts there.
+  const on = at("inv('connections:setOn', account.id, true)")
+  assert.ok(on > at("inv('workspace:open', ws)") && on < at("inv('agents:add', proj"), 'the account is turned on in the new workspace before its agent is added')
+  assert.ok(fs.readFileSync(path.join(root, 'src', 'shared', 'api.ts'), 'utf8').includes("'connections:setOn'"), 'connections:setOn is an IPC channel')
+  // The folder is the one Combwork looks for: Claude Code's home without CLAUDE_CONFIG_DIR, which a user's environment hasn't.
+  const adapter = fs.readFileSync(path.join(root, 'src', 'main', 'providers', 'claude', 'adapter.ts'), 'utf8')
+  assert.ok(adapter.includes("return process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude')"), "Claude Code's home is ~/.claude")
+  // Combwork's refusal stays: it never makes the CLI's own folder.
+  assert.ok(fs.readFileSync(path.join(root, 'src', 'main', 'accounts.ts'), 'utf8').includes("id: 'main.accounts.noHome'"))
+})
+
 test('every view marker the driver waits for is in Combwork\'s window: its classes and attributes in the renderer, its text in English', () => {
   const root = path.resolve(__dirname, '..')
   const english = fs.readdirSync(path.join(root, 'locales', 'en')).map((f) => fs.readFileSync(path.join(root, 'locales', 'en', f), 'utf8')).join('\n')

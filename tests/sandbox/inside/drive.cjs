@@ -411,6 +411,13 @@ const steps = {
     ps(`$p = [Environment]::GetEnvironmentVariable('Path', 'User'); if (-not (($p -split ';') -contains '${gitCmd}')) { [Environment]::SetEnvironmentVariable('Path', ((@($p, '${gitCmd}') | Where-Object { $_ }) -join ';'), 'User') }`)
     res.facts.fakeClaude = ps('& C:\\tools\\combwork-tests\\sandbox\\inside\\fake-claude-install.ps1')
     const fakeBin = path.join(process.env.LOCALAPPDATA, 'FakeClaude', 'bin')
+    // Then Claude Code run once, as a new user does after installing it (HI-2646): its first run makes its folder,
+    // %USERPROFILE%\.claude, which Combwork needs before it adds a connection and never makes itself (accounts.ts,
+    // main.accounts.noHome). The fake runs only in a test folder (CLAUDE_CONFIG_DIR), so the folder is made in its place.
+    const claudeHome = path.join(process.env.USERPROFILE, '.claude')
+    const hadHome = fs.existsSync(claudeHome)
+    fs.mkdirSync(claudeHome, { recursive: true })
+    res.facts.claudeFirstRun = { home: claudeHome, there: hadHome }
     // Combwork starts with a user's environment: this script's, less what the checks themselves put in it (the mapped
     // tests folder's path), which no user has. What was left out is recorded.
     const env = {}
@@ -469,6 +476,10 @@ const steps = {
         res.facts[`view ${view.name}`] = String(e.message).slice(0, 300)
       }
     }
+
+    // The account turned on in this workspace, as a user does with its On here switch (Settings → Accounts & Connections;
+    // HI-2646): each workspace chooses which are on, and one added before the workspace was made is on in none.
+    if (account?.id) res.facts.accountOn = await inv('connections:setOn', account.id, true).then(() => true, (e) => String(e))
 
     // An agent, started briefly: its first task is `set`, which the fake runs in the session's shell (fake-shell.jsonl).
     const agent = await inv('agents:add', proj, { provider: 'claude-code' }).catch((e) => ({ error: String(e) }))
