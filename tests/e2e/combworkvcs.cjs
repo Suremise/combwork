@@ -33,7 +33,7 @@ const excludeOf = (p) => {
   lib.gitProject(repo)
   // .combwork committed with add -A, before Combwork ever excluded it.
   fs.mkdirSync(path.join(committed, '.combwork'), { recursive: true })
-  fs.writeFileSync(path.join(committed, '.combwork', 'notes.md'), 'kept by an old Hive')
+  fs.writeFileSync(path.join(committed, '.combwork', 'notes.md'), 'kept by an older version')
   lib.gitProject(committed)
   lib.enableProviders(userData)
   const { app, page, inv } = await lib.launch({ userData, viewport: { width: 1300, height: 800 } })

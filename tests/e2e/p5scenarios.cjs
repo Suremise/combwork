@@ -160,7 +160,7 @@ const slash = (p) => p.replace(/\\/g, '/')
 
     // --- S47 (b): a commit-msg hook that rejects Combwork's merge commit (its trailers): returned with the hook's output.
     const hook = path.join(fx.alpha, '.git', 'hooks', 'commit-msg')
-    fs.writeFileSync(hook, '#!/bin/sh\nif grep -q "Combwork-Card" "$1"; then echo "message rejected by policy: no Hive trailers here" >&2; exit 1; fi\nexit 0\n')
+    fs.writeFileSync(hook, '#!/bin/sh\nif grep -q "Combwork-Card" "$1"; then echo "message rejected by policy: no card trailers here" >&2; exit 1; fi\nexit 0\n')
     const beforeHook = head()
     const hooked = await q.approve(fx, h, reviewer, 'Hooked', { 'hook.txt': 'hook\n' })
     const fh = await returned(hooked.n)

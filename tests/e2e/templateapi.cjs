@@ -66,8 +66,8 @@ const cfgOf = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 'proje
     const tokenOf = async (p, id) => {
       const sessionId = await until(async () => (await live(p, id))?.sessionId, HUNG_MS)
       const launch = await until(() => launches().find((l) => l.sessionId === sessionId && l.opts['--mcp-config']), HUNG_MS)
-      const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
-      return hive ? JSON.parse(fs.readFileSync(hive.env.CW_API_TOKEN_FILE, 'utf8')).token : null
+      const server = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
+      return server ? JSON.parse(fs.readFileSync(server.env.CW_API_TOKEN_FILE, 'utf8')).token : null
     }
     const list = (p, token) => api('GET', `/v1/projects/${p}/templates`, undefined, token)
     const plan = (p, body, token) => api('POST', `/v1/projects/${p}/templates/plan`, body, token)

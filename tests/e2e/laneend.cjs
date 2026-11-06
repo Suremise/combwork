@@ -18,7 +18,7 @@ const home = at('claude-home')
 const alpha = path.join(ws, 'alpha')
 const slotA = path.join(`${ws}.worktrees`, 'alpha', 'slot-a')
 const PORT = Number(lib.port(47796))
-const identity = { name: 'Hive Lane End Test', email: 'laneend@example.com' }
+const identity = { name: 'Combwork Lane End Test', email: 'laneend@example.com' }
 let failed = 0
 const check = (name, ok, extra = '') => {
   lib.checked(ok)

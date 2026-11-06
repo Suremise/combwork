@@ -118,7 +118,7 @@ const check = (name, ok, extra = '') => {
     const patched = await api('PATCH', `/v1/projects/demo/agents/Builder`, { mcpServers: ['notes'] })
     check('the API gives Builder only notes', patched.status === 200 && JSON.stringify(patched.body?.mcpServers) === '["notes"]', JSON.stringify(patched))
     check('and the running Builder needs a restart for it', !!(await lib.until(async () => (await inv('workspace:refresh')).projects.find((p) => p.name === 'demo').agents.find((a) => a.id === builder.id)?.restartNeeded, HUNG_MS)))
-    const bad = await api('PATCH', `/v1/projects/demo/agents/Builder`, { mcpServers: ['hive'] })
+    const bad = await api('PATCH', `/v1/projects/demo/agents/Builder`, { mcpServers: ['combwork'] })
     check('the Combwork MCP server is not one to choose', bad.status === 400 && /always given/.test(bad.body?.error ?? ''), JSON.stringify(bad))
     const back = await api('PATCH', `/v1/projects/demo/agents/Builder`, { mcpServers: ['*'] })
     check('["*"] gives it all again', back.status === 200 && !('mcpServers' in (back.body ?? {})), JSON.stringify(back.body))

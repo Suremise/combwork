@@ -1,5 +1,5 @@
 // Combwork's guidance for agents (#1285, #966 row 13: cw.guidance, on by default), on a fake Claude Code session
-// (fake-claude/), so nothing signs in or spends tokens. The hive MCP server each launch was given (its --mcp-config, as
+// (fake-claude/), so nothing signs in or spends tokens. Combwork's MCP server each launch was given (its --mcp-config, as
 // Combwork wrote it) is started here as Claude Code would start it and asked to initialize:
 // - on: it answers with Combwork's guidance as its instructions;
 // - off (Settings → Advanced, from the next session): the same server, Combwork's tools still there, answers with none.
@@ -143,9 +143,9 @@ function packagesRequired(entry) {
 
     // ---- On (the default): the guidance as the server's instructions.
     const on = await combworkServer()
-    check('the launch has the hive server', !!on?.command, JSON.stringify(on))
+    check("the launch has Combwork's server", !!on?.command, JSON.stringify(on))
     const withGuidance = await initialize(on)
-    check("on: the hive server answers with Combwork's guidance as its instructions", typeof withGuidance?.instructions === 'string' && /cw_inbox|Combwork/.test(withGuidance.instructions), JSON.stringify(withGuidance).slice(0, 300))
+    check("on: Combwork's server answers with Combwork's guidance as its instructions", typeof withGuidance?.instructions === 'string' && /cw_inbox|Combwork/.test(withGuidance.instructions), JSON.stringify(withGuidance).slice(0, 300))
 
     // ---- The canary dialect (HI-2065): the same server given a dialect file with every catalogue text in markers. Its
     // instructions must come through the catalogue whole: a word outside the markers bypassed it.
@@ -182,7 +182,7 @@ function packagesRequired(entry) {
     // ---- Off: the same server, its tools still there, no instructions.
     await inv('advanced:set', GUIDANCE, false)
     const off = await combworkServer()
-    check('off: the launch still has the hive server (Combwork\'s tools)', !!off?.command && off.env?.CW_GUIDANCE === '0', JSON.stringify(off?.env ?? {}).slice(0, 300))
+    check("off: the launch still has Combwork's server (its tools)", !!off?.command && off.env?.CW_GUIDANCE === '0', JSON.stringify(off?.env ?? {}).slice(0, 300))
     const without = await initialize(off)
     check('…which answers with no instructions', !!without && !('instructions' in without), JSON.stringify(without).slice(0, 300))
     await inv('advanced:set', GUIDANCE, true)

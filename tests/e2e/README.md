@@ -489,6 +489,10 @@ credential goes in. It writes `report.md` (pass or fail per check, with screensh
   `lib.launch` starts that packaged exe instead of the dev build, saying so in the suite's log; `boardupgrade`'s
   step 8 needs an unpackaged build's upgrade hold, so it says NOT RUN there. The Sandbox maps Node, Git and the checkout
   read-only as tool folders; #1227's card has the script.
+  The 0.9 build hands the fake Claude Code its names from before 1.1 (`HIVE_*` variables, a `hive` server, `hive_*`
+  tools): only `upgradelane`'s 0.9 profile runs the fake in old-release mode (`lib.fakeClaude(…, { oldRelease: true })`,
+  `fake-claude/fake-claude-old-release.cmd`, `fake-claude/oldRelease.cjs`, HI-2614). Every other launch is current, and
+  the fakes refuse those names there, so no current suite passes on them.
 - **The queue suites on a packaged build** (#1578; S54 and S55 among them, for #1449 and #1539): `queueFixture.cjs`
   starts Combwork through `lib.launch`, so `CW_EXE` runs them on the build named. A packaged build refuses the test
   copies' channels (`agents:testLegacy`, which makes 0.9 worktree agents, and `slots:test`) and ignores the

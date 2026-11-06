@@ -49,11 +49,11 @@ const queueFolders = () =>
   q.prepare(fx)
   const fxB = q.otherProfile(fx, 'b')
   const profileA = path.basename(fx.userData)
-  const hives = []
+  const copies = []
   try {
     // --- A opens the workspace, a card is approved and its check starts: A runs the queue.
     const a = await q.startCombwork(fx, { port: PORT })
-    hives.push(a)
+    copies.push(a)
     a.page.on('pageerror', (e) => check('no page errors (A)', false, e.message))
     const reviewer = await q.agent(fx, a, 'R1')
     check('the reviewer has its token', !!reviewer.token)
@@ -68,7 +68,7 @@ const queueFolders = () =>
 
     // --- B opens the same workspace: it doesn't run the queue, and says who does.
     const b = await q.startCombwork(fxB, { port: await freePort(), keepOptions: true })
-    hives.push(b)
+    copies.push(b)
     b.page.on('pageerror', (e) => check('no page errors (B)', false, e.message))
     await lib.fitWindow(b.app, b.page, { width: 1400, height: 900 })
     const viewB = async () => (await b.inv('queue:list', fx.alpha, 'integration'))[0]
@@ -86,7 +86,7 @@ const queueFolders = () =>
     const aPid = await a.app.evaluate(() => process.pid)
     const launcher = a.app.process()
     await a.app.evaluate(({ app }) => app.exit(1)).catch(() => undefined)
-    hives.shift()
+    copies.shift()
     check("A's main process has exited", !!(await waitHung(() => !alive(aPid))))
     // Its launcher too, once the main process is gone (it has nothing left to close).
     if (launcher.pid !== aPid && alive(launcher.pid)) launcher.kill()
@@ -105,7 +105,7 @@ const queueFolders = () =>
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {
-    for (const h of hives) await h.app.close().catch(() => undefined)
+    for (const h of copies) await h.app.close().catch(() => undefined)
   }
   console.log(`screenshots: ${fx.shots}`)
   process.exit(failed ? 1 : 0)

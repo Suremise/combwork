@@ -291,8 +291,8 @@ const check = (name, ok, extra = '') => {
   const asCoder = async (p, method = 'GET', body) => {
     const res = await fetch(`http://127.0.0.1:${PORT}${p}`, { method, headers: { Authorization: `Bearer ${coderToken}`, 'X-Combwork-Workspace': encodeURIComponent(ws), 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
     const notice = res.headers.get('x-combwork-notice')
-    // HI-2588: renamed outright: the name before 1.1 is never sent.
-    if (res.headers.has('x-hive-notice')) oldNotice = true
+    // HI-2588: X-Combwork-Notice is the only notice header a reply carries.
+    for (const k of res.headers.keys()) if (/notice/i.test(k) && k !== 'x-combwork-notice') oldNotice = true
     return { status: res.status, notice: notice ? decodeURIComponent(notice) : null }
   }
   await inv('tasks:update', n, { agent: coder.id })
@@ -332,7 +332,7 @@ const check = (name, ok, extra = '') => {
   const moved = await asCoder(`/v1/tasks/${n}`, 'PATCH', { column: 'review', reply: 'short' })
   check('moving the card to Review with a decision unread: that reply flags it', moved.status === 200 && moved.notice === `[CW] ${named} has 1 new decision since you last read it: read the card (cw_read_task) at your next checkpoint.`, JSON.stringify(moved))
   check('…and once out of its hands, its next replies say nothing more', (await asCoder('/v1/projects/alpha')).notice === null)
-  check('no reply carried the old X-Hive-Notice header (HI-2588)', !oldNotice)
+  check('no reply carried a notice header other than X-Combwork-Notice (HI-2588)', !oldNotice)
 
   await app.close()
   console.log(failed ? `\n${failed} check(s) failed` : '\nAll checks passed')

@@ -228,8 +228,8 @@ const check = (name, ok, extra = '') => {
     const selected = await lib.until(async () => ((await combworkSelection())?.includes(TEXT) ? await combworkSelection() : null), HUNG_MS, 100)
     check("Shift+drag makes Combwork's selection", !!selected, JSON.stringify(await combworkSelection()))
     await page.keyboard.press('Control+c')
-    const hive = await lib.until(async () => ((await copied()).length > n ? await copied() : null), HUNG_MS, 100)
-    check("Ctrl+C copies Combwork's selection", !!hive && hive[n].includes(TEXT), JSON.stringify(hive))
+    const own = await lib.until(async () => ((await copied()).length > n ? await copied() : null), HUNG_MS, 100)
+    check("Ctrl+C copies Combwork's selection", !!own && own[n].includes(TEXT), JSON.stringify(own))
     // Copilot takes its input in order: once it has answered a prompt typed after the Ctrl+C, a Ctrl+C it got would show.
     const since = (await live())?.statusSince
     const turnOver = async () => { const l = await live(); return l?.status === 'finished' && l.statusSince !== since }

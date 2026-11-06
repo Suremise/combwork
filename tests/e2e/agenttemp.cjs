@@ -86,7 +86,7 @@ const allAt = (temp, dir) => ['TEMP', 'TMP', 'TMPDIR'].every((n) => Object.keys(
     check('both agents start with the setting empty', !!(await ready(proj, clara.id)) && !!(await ready(proj, cody.id)))
     const c0 = claudeLaunches(proj).at(-1)
     const x0 = codexLaunches().at(-1)
-    check("empty: Clara's TEMP and TMP are Combwork's own, and its inherited CLAUDE_CODE_TMPDIR stays", same(c0?.temp?.TEMP, env.TEMP) && same(c0?.temp?.TMP, env.TMP) && same(c0?.env?.CLAUDE_CODE_TMPDIR, inherited), JSON.stringify({ temp: c0?.temp, tmpdir: c0?.env?.CLAUDE_CODE_TMPDIR, hive: [env.TEMP, env.TMP] }))
+    check("empty: Clara's TEMP and TMP are Combwork's own, and its inherited CLAUDE_CODE_TMPDIR stays", same(c0?.temp?.TEMP, env.TEMP) && same(c0?.temp?.TMP, env.TMP) && same(c0?.env?.CLAUDE_CODE_TMPDIR, inherited), JSON.stringify({ temp: c0?.temp, tmpdir: c0?.env?.CLAUDE_CODE_TMPDIR, combwork: [env.TEMP, env.TMP] }))
     check("empty: Cody's TEMP and TMP are Combwork's own", same(x0?.temp?.TEMP, env.TEMP) && same(x0?.temp?.TMP, env.TMP), JSON.stringify(x0?.temp))
     check('empty: no folder is made', !fs.existsSync(tempRoot))
 

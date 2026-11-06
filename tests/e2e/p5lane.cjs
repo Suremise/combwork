@@ -77,7 +77,7 @@ const ancestor = (x, y) => {
     await strictRow.scrollIntoViewIfNeeded()
     await strictRow.locator('[role="switch"], input[type="checkbox"]').first().click()
     // Combwork's commit message chosen too (G19: Pair's is the branch's own since HI-1997): this lane's merges are checked by their trailers.
-    await form.locator('.workflow-option[data-option="commitMessage"] select').selectOption('hive')
+    await form.locator('.workflow-option[data-option="commitMessage"] select').selectOption('combwork')
     await form.getByRole('button', { name: 'Save…' }).click()
     const save = page.locator('.dialog', { hasText: 'Save Workflow Options' })
     await save.waitFor({ timeout: HUNG_MS })
@@ -136,8 +136,8 @@ const ancestor = (x, y) => {
     const tokenOf = async (id) => {
       const sessionId = await waitHung(async () => (await live(id))?.sessionId)
       const launch = await waitHung(() => q.launches(fx).filter((l) => l.sessionId === sessionId && l.opts['--mcp-config']).at(-1))
-      const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
-      return hive ? JSON.parse(fs.readFileSync(hive.env.CW_API_TOKEN_FILE, 'utf8')).token : null
+      const server = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
+      return server ? JSON.parse(fs.readFileSync(server.env.CW_API_TOKEN_FILE, 'utf8')).token : null
     }
     /** The agents' tokens after a lane start, once both run again. */
     const retoken = async () => {

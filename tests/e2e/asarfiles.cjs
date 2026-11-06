@@ -140,9 +140,9 @@ const deleteFromOutside = (file) => {
         img.addEventListener('error', () => r('refused'))
         img.src = u
       }),
-    `hive-img://img/${encodeURIComponent(path.join(alpha, 'plain.png'))}`
+    `other-img://img/${encodeURIComponent(path.join(alpha, 'plain.png'))}`
   )
-  check('… and by the old hive-img: scheme it is not shown', oldScheme === 'refused', oldScheme)
+  check('… and by a scheme that isn\'t combwork-img: it is not shown', oldScheme === 'refused', oldScheme)
   const missingShown = await show(path.join(artDir, 'missing.png'))
   check('… and a missing one is refused', missingShown === 'refused', missingShown)
   const artRead = await inv('file:read', path.join(artDir, 'notes.md')).catch((e) => `error: ${e}`)

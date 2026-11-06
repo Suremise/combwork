@@ -1,5 +1,5 @@
 // A workspace board's cards read and written by a test on a connection of its own, whichever form its file has (#1209):
-// Hive 1.0's tables, through src/main/schema/cardRows.ts (the card JSON contract; Node runs it as it is, its types
+// 1.0's tables, through src/main/schema/cardRows.ts (the card JSON contract; Node runs it as it is, its types
 // stripped, and it imports nothing), or 0.9's, a row per card holding its JSON document (a board waiting for its upgrade).
 
 /** The 1.0 card rows' module, loaded when first needed. */

@@ -97,7 +97,7 @@ const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10
   check("…its agents: builders on Claude Code, each paired with a reviewer on Codex, named from the selected project's key", team.length === 6 && /^[A-Z]{2,4}-B1$/.test(team[0][0]) && /^Builder\s+paired: [A-Z]{2,4}-R1$/.test(team[0][1]) && team[0][2] === 'Claude Code' && /^Reviewer\s+paired: [A-Z]{2,4}-B3$/.test(team[5][1]) && team[5][2] === 'Codex', JSON.stringify(team))
     // Its preset as its workflow (HI-1910: Combwork's own carry their preset's sections), shown under None | Git.
     check('…and the preset it carries, as its workflow', /From the preset Team\./.test(await detail.innerText()))
-    await shoot('hive-templates', () => page)
+    await shoot('combwork-templates', () => page)
 
     // --- Export… and Duplicate… of Combwork's own, clicked (HR3's round 1, 2), while the workspace has another template in
     // a file of the same name: the Combwork one is the one exported and copied; the workspace's is left as it is.
@@ -126,7 +126,7 @@ const v09 = (name) => JSON.stringify({ version: 1, name, savedAt: '2026-10-01T10
     await until(async () => (await detail.count()) === 1, HUNG_MS)
 
     // --- A 0.9 file imported: refused, saying why; nothing written.
-    const old = path.join(files, 'old.hive-template.json')
+    const old = path.join(files, 'old.combwork-template.json')
     fs.writeFileSync(old, v09('From 0.9'))
     await app.evaluate(({ dialog }, f) => {
       dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [f] })

@@ -379,7 +379,7 @@ function within(root, p) {
 /**
  * Empties a folder of your own so a rerun starts clean (#304), from Node: nobody needs a shell delete on a computed path
  * (`rm -rf "$(…)"`, which Claude Code can't check, so it asks, and unattended it denies). Only a probe's or a suite's
- * own folder: inside a Claude Code scratchpad (`<temp>\claude\…\scratchpad\<x>`), a `hive…` folder in the temp folder
+ * own folder: inside a Claude Code scratchpad (`<temp>\claude\…\scratchpad\<x>`), a `cw…` folder in the temp folder
  * (or inside one), or inside combwork-test's `scratch` or `e2e` (not its lanes or logs, which the runners own). Never one of
  * those areas itself, a CLI test home or a folder holding one (as written or as it really is), anything with a link on
  * its path (the roots and the folders above them included) or a link itself, a file,

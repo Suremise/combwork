@@ -32,7 +32,7 @@ const env = (codexHome = home) => lib.childEnv({ CODEX_HOME: codexHome, PATH: li
 const toml = (s) => JSON.stringify(s)
 
 /** Combwork's form of a hook (-c hooks.<event>=[{ matcher, hooks = [{ type, command, timeout }] }]). */
-const combworkHook = (event, matcher) => ['-c', `hooks.${event}=[{ ${matcher ? `matcher = ${toml(matcher)}, ` : ''}hooks = [{ type = "command", command = ${toml(`echo hive-${event}`)}, timeout = 5 }] }]`]
+const combworkHook = (event, matcher) => ['-c', `hooks.${event}=[{ ${matcher ? `matcher = ${toml(matcher)}, ` : ''}hooks = [{ type = "command", command = ${toml(`echo cw-${event}`)}, timeout = 5 }] }]`]
 
 /** Codex's app server's hooks/list for the project, given `args` (in `codexHome`): its hooks, each with its source, command and trust. */
 function hooksList(args, codexHome = home) {
@@ -67,7 +67,7 @@ function hooksList(args, codexHome = home) {
         } else if (m.id === 2) done(m.error ? { error: JSON.stringify(m.error) } : { hooks: (m.result?.data ?? []).flatMap((e) => e.hooks ?? []) })
       }
     })
-    send({ id: 1, method: 'initialize', params: { clientInfo: { name: 'hive-e2e', version: '1' } } })
+    send({ id: 1, method: 'initialize', params: { clientInfo: { name: 'cw-e2e', version: '1' } } })
   })
 }
 const brief = (r) => (r.error ? r.error : JSON.stringify(r.hooks.map((h) => ({ source: h.source, command: h.command, trust: h.trustStatus }))))
@@ -78,7 +78,7 @@ const brief = (r) => (r.error ? r.error : JSON.stringify(r.hooks.map((h) => ({ s
   fs.mkdirSync(proj, { recursive: true })
   const config = path.join(home, 'config.toml')
   fs.writeFileSync(config, ['[[hooks.Stop]]', '[[hooks.Stop.hooks]]', 'type = "command"', 'command = "echo user-Stop"', '[[hooks.PreToolUse]]', 'matcher = "*"', '[[hooks.PreToolUse.hooks]]', 'type = "command"', 'command = "echo user-PreToolUse"', ''].join('\n'))
-  const hive = [...combworkHook('Stop'), ...combworkHook('PreToolUse', '*')]
+  const combwork = [...combworkHook('Stop'), ...combworkHook('PreToolUse', '*')]
   const user = (r) => (r.hooks ?? []).filter((h) => h.source === 'user')
   const ours = (r) => (r.hooks ?? []).filter((h) => h.source === 'sessionFlags')
 
@@ -90,15 +90,15 @@ const brief = (r) => (r.error ? r.error : JSON.stringify(r.hooks.map((h) => ({ s
   check("…and trusts them once their config's hooks.state says so", user(trusted).length === 2 && user(trusted).every((h) => h.trustStatus === 'trusted'), brief(trusted))
 
   // With Combwork's hooks for the same events: both sets, each under its own key.
-  const both = await hooksList(hive)
+  const both = await hooksList(combwork)
   check("Combwork's hooks for the same events are listed beside the user's, not in their place", user(both).length === 2 && ours(both).length === 2, brief(both))
   check("…each under its own key: the user's config's, and the session flags'", user(both).every((h) => !h.key.startsWith(SESSION_FLAGS)) && ours(both).every((h) => h.key.startsWith(SESSION_FLAGS)), brief(both))
-  check('…the commands as each gave them', user(both).map((h) => h.command).sort().join() === 'echo user-PreToolUse,echo user-Stop' && ours(both).map((h) => h.command).sort().join() === 'echo hive-PreToolUse,echo hive-Stop', brief(both))
+  check('…the commands as each gave them', user(both).map((h) => h.command).sort().join() === 'echo user-PreToolUse,echo user-Stop' && ours(both).map((h) => h.command).sort().join() === 'echo cw-PreToolUse,echo cw-Stop', brief(both))
 
   // With Combwork's trust table too (its own session-flags keys only): the user's trust survives.
   const table = Object.fromEntries(ours(both).map((h) => [h.key, { trusted_hash: h.currentHash }]))
   const state = `hooks.state={ ${Object.entries(table).map(([k, v]) => `${toml(k)} = { trusted_hash = ${toml(v.trusted_hash)} }`).join(', ')} }`
-  const withState = await hooksList([...hive, '-c', state])
+  const withState = await hooksList([...combwork, '-c', state])
   check("with Combwork's hooks.state table, the user's hooks stay trusted", user(withState).length === 2 && user(withState).every((h) => h.trustStatus === 'trusted'), brief(withState))
   check("…and Combwork's are trusted by their own records", ours(withState).length === 2 && ours(withState).every((h) => h.trustStatus === 'trusted'), brief(withState))
 
@@ -111,7 +111,7 @@ const brief = (r) => (r.error ? r.error : JSON.stringify(r.hooks.map((h) => ({ s
     fs.mkdirSync(path.join(home, n), { recursive: true })
     fs.symlinkSync(path.join(home, n), path.join(conn, n), 'junction')
   }
-  const inConnection = await hooksList(['-c', 'cli_auth_credentials_store="file"', ...hive, '-c', state], conn)
+  const inConnection = await hooksList(['-c', 'cli_auth_credentials_store="file"', ...combwork, '-c', state], conn)
   check("in a connection's new home, with the file store, Combwork's hooks are trusted by their own records", ours(inConnection).length === 2 && ours(inConnection).every((h) => h.trustStatus === 'trusted'), brief(inConnection))
   check("…and the user's own hooks (their home's config) aren't the connection's", user(inConnection).length === 0, brief(inConnection))
 

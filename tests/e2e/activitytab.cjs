@@ -122,7 +122,7 @@ function transcript(sid, startMin) {
     check('nothing past: no earlier card, no earlier session', !/earlier card|Building the earlier/.test(await list.innerText()))
     const titles = async () => page.locator('.activity-row.act-process .activity-row-title').allInnerTexts()
     check("the command as given: a cmd /c wrapper shows what it runs, never 'cmd d s c'", (await titles()).some((t) => /^node -e "?setTimeout/.test(t)) && !(await titles()).some((t) => t.startsWith('cmd d s c')), JSON.stringify(await titles()))
-    check("the agent's own plumbing is hidden: no CLI, no terminal host, no cw-mcp.js; the processes it left running show", !(await titles()).some((t) => /fake-claude\.cjs|powershell|hive-mcp/.test(t)) && (await titles()).filter((t) => /linger/.test(t)).length === 2, JSON.stringify(await titles()))
+    check("the agent's own plumbing is hidden: no CLI, no terminal host, no cw-mcp.js; the processes it left running show", !(await titles()).some((t) => /fake-claude\.cjs|powershell|cw-mcp/.test(t)) && (await titles()).filter((t) => /linger/.test(t)).length === 2, JSON.stringify(await titles()))
     check("a process's command line shows with its token masked", !(await list.innerText()).includes(GH))
     check('no spinner anywhere; working is a pulse', (await page.locator('.activity-tab .spin, .activity-tab .codicon-loading').count()) === 0 && (await page.locator('.activity-tab .activity-pulse').count()) > 0)
 

@@ -107,7 +107,7 @@ function mcp(config, msgs) {
 
   // --- The reviewer starts its review with its own Combwork tools.
   const started = await say(reviewer.id, `boardreview ${n} start`)
-  check('the hive tools take review start', started?.status === 200 && started.body?.changes?.includes('Started reviewing'), JSON.stringify(started))
+  check("Combwork's tools take review start", started?.status === 200 && started.body?.changes?.includes('Started reviewing'), JSON.stringify(started))
   const r1 = await card(n)
   check('the card stays in Review with the agent that did the work', r1.column === 'review' && r1.agent === coder.id, JSON.stringify({ column: r1.column, agent: r1.agent }))
   check('and is marked as reviewed by the reviewer', r1.review?.agent === reviewer.id && r1.review?.agentName === 'Reviewer', JSON.stringify(r1.review))

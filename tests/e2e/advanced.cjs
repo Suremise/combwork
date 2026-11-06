@@ -1,4 +1,4 @@
-// Advanced settings (#367): Settings → Advanced's list (on tabs since HI-1839: Combwork (HI-2517; Hive before), then each CLI from the
+// Advanced settings (#367): Settings → Advanced's list (on tabs since HI-1839: Combwork (HI-2517), then each CLI from the
 // descriptors with its icon, a CLI turned off dimmed but chosen, only a tab's own values in it, remembered; filters
 // counting per tab, landing on a tab with matches or a searched id's own, a click meanwhile not remembered, a tab with
 // none saying so; the developer features switch first, a value not
@@ -33,7 +33,7 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
   fs.mkdirSync(userData, { recursive: true })
   const claudeEnv = lib.fakeClaude(userData, claudeHome)
   // An override made for an older Claude Code, one that isn't valid, and one this Combwork doesn't know.
-  fs.writeFileSync(file, JSON.stringify({ format: 1, values: { 'claude-code.trust.prompt': 'trust (this|the) folder', 'cw.mcp.replySeconds': 'soon', 'hive.someday': 1 }, madeFor: { 'claude-code.trust.prompt': { version: '2.1.0', value: 'trust (this|the) folder' } } }, null, 2))
+  fs.writeFileSync(file, JSON.stringify({ format: 1, values: { 'claude-code.trust.prompt': 'trust (this|the) folder', 'cw.mcp.replySeconds': 'soon', 'cw.someday': 1 }, madeFor: { 'claude-code.trust.prompt': { version: '2.1.0', value: 'trust (this|the) folder' } } }, null, 2))
 
   const env = lib.combworkEnv({ CW_USER_DATA: userData, ...claudeEnv })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
@@ -91,7 +91,7 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     check('Show developer features is first, under its advanced.json name', (await first.getAttribute('data-advanced')) === 'cw.showDeveloperFeatures')
     const row = (id) => list.locator(`.advanced-row[data-advanced="${id}"]`)
     check('a value not valid in advanced.json is listed so, and the default used', /Not valid, so Combwork uses the default/.test(await row('cw.mcp.replySeconds').innerText()) && (await row('cw.mcp.replySeconds').locator('input').inputValue()) === '300')
-    check("an id this Combwork doesn't know is named, not used", /hive\.someday, which this Combwork doesn't know/.test(await list.innerText()))
+    check("an id this Combwork doesn't know is named, not used", /cw\.someday, which this Combwork doesn't know/.test(await list.innerText()))
     const trust = row('claude-code.trust.prompt')
     await tab('claude-code').click()
     check('an override made for another Claude Code is flagged once the installed one is known', !!(await lib.until(async () => /Made for Claude Code 2\.1\.0; 2\.1\.999 is installed now/.test(await trust.innerText()), HUNG_MS)), await trust.innerText())
@@ -242,7 +242,7 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     check('…emptied, it goes from advanced.json: the system Temp', !!(await lib.until(() => !('cw.agents.tempFolder' in readFile().values), HUNG_MS)), JSON.stringify(readFile().values))
 
     // Agents per project and its note moved to Version Control → Workflow (HI-2001): maxagents and agents24.
-    check('Agents per project is no longer listed', (await page.locator('.advanced-row[data-advanced="hive.agents.perProject"]').count()) === 0)
+    check('Agents per project is no longer listed', (await page.locator('.advanced-row[data-advanced="cw.agents.perProject"]').count()) === 0)
 
     // --- Remembered (HI-1839): Codex chosen, Settings reopened on it.
     await tab('codex').click()
@@ -321,7 +321,7 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     await list.getByLabel('Modified only').uncheck()
     await page.locator('.setting', { hasText: 'Reset all settings' }).getByRole('button', { name: 'Reset' }).click()
     await page.locator('[role="dialog"]').getByRole('button', { name: 'Reset' }).click()
-    check('Reset all settings clears advanced.json (keeping ids this Combwork doesn\'t know)', !!(await lib.until(() => JSON.stringify(readFile().values) === '{"hive.someday":1}', HUNG_MS)), JSON.stringify(readFile().values))
+    check('Reset all settings clears advanced.json (keeping ids this Combwork doesn\'t know)', !!(await lib.until(() => JSON.stringify(readFile().values) === '{"cw.someday":1}', HUNG_MS)), JSON.stringify(readFile().values))
     check("…and the list shows the defaults, the workspace's own kept", !!(await lib.until(async () => (await row('codex.trust.prompt').locator('.modified').count()) === 0 && JSON.parse(fs.readFileSync(wsFile, 'utf8')).advanced?.['cw.progress.lanesShown'] === 2, HUNG_MS)))
   } finally {
     await app.close()

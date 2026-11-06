@@ -4,8 +4,8 @@ const path = require('path')
 const http = require('http'), { spawn } = require('child_process')
 const tree = [{ relPath: 'handovers', name: 'handovers', isDir: true, children: [
   { relPath: 'handovers/README.md', name: 'README.md', isDir: false },
-  { relPath: 'handovers/2026-09-28-hive-initial-build.md', name: '2026-09-28-hive-initial-build.md', isDir: false },
-  { relPath: 'handovers/2026-09-29-hive-image-paste.md', name: '2026-09-29-hive-image-paste.md', isDir: false },
+  { relPath: 'handovers/2026-09-28-app-initial-build.md', name: '2026-09-28-app-initial-build.md', isDir: false },
+  { relPath: 'handovers/2026-09-29-app-image-paste.md', name: '2026-09-29-app-image-paste.md', isDir: false },
   { relPath: 'handovers/2026-09-30-mcp-server-work.md', name: '2026-09-30-mcp-server-work.md', isDir: false }
 ] }]
 const srv = http.createServer((req, res) => {
@@ -33,7 +33,7 @@ srv.listen(0, async () => {
     { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18' } },
     { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'cw_read_latest_handover', arguments: {} } }
   ]
-  for (const project of ['hive', 'mcp', 'other']) {
+  for (const project of ['app', 'mcp', 'other']) {
     const r = await run(project, msgs)
     const init = r.find((x) => x.id === 1), call = r.find((x) => x.id === 2)
     console.log(`--- ${project}`)

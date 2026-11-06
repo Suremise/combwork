@@ -26,7 +26,7 @@ const beta = path.join(ws, 'beta')
 const assistantHome = path.join(ws, '.combwork', 'assistant')
 const otherWs = path.join(lib.WORK, 'activityworkspace-other-ws')
 const PORT = Number(lib.port(47797))
-const identity = { name: 'Hive Activity Test', email: 'activityworkspace@example.com' }
+const identity = { name: 'Combwork Activity Test', email: 'activityworkspace@example.com' }
 const same = (a, b) => !!a && !!b && path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase()
 let failed = 0
 const check = (name, ok, extra = '') => {

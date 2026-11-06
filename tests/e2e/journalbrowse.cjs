@@ -216,7 +216,7 @@ function seed(cards, secondKey) {
     await app.evaluate(() => {
       process.env.CW_TEST_SLOW_IPC = 'journal:browse=3000*1'
     })
-    await view.locator('.journal-source').selectOption('hive')
+    await view.locator('.journal-source').selectOption('combwork')
     check('while a new filter is read, the old rows are dimmed and Forget waits', !!(await lib.until(async () => (await view.locator('.journal-scroll.pending').count()) === 1 && (await view.locator('.journal-forget').isDisabled()) && (await rows.count()) === 4, HUNG_MS)), String(await rows.count()))
     check('…then its own rows, and Forget', !!(await lib.until(async () => (await rows.count()) === 1 && (await view.locator('.journal-scroll.pending').count()) === 0 && !(await view.locator('.journal-forget').isDisabled()), HUNG_MS)))
     await app.evaluate(() => {
@@ -252,7 +252,7 @@ function seed(cards, secondKey) {
     await view.locator('.journal-kind').selectOption('plan')
     check('the kind filter', !!(await lib.until(async () => JSON.stringify(await summaries()) === JSON.stringify(['Ship the journal browser (edited)', 'Build the timeline first, then the entry pane']), HUNG_MS)), JSON.stringify(await summaries()))
     await view.locator('.journal-kind').selectOption('')
-    await view.locator('.journal-source').selectOption('hive')
+    await view.locator('.journal-source').selectOption('combwork')
     check('the source filter: only Combwork\'s facts', !!(await lib.until(async () => (await rows.count()) === 1 && /Journal browser/.test(await rows.first().innerText()), HUNG_MS)), JSON.stringify(await summaries()))
     await view.locator('.journal-source').selectOption('')
     await view.locator('.journal-project').selectOption('alpha')

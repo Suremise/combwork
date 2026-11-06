@@ -72,7 +72,7 @@ const busyLines = () => lines().filter((l) => l.includes('[main] The main proces
       const req = process.getBuiltinModule('module').createRequire(process.cwd() + '/package.json')
       const ofs = req('original-fs')
       const net = req('net')
-      const name = String.raw`\\.\pipe\hive-stalls-` + process.pid
+      const name = String.raw`\\.\pipe\cw-stalls-` + process.pid
       const socks = []
       const server = net.createServer((s) => socks.push(s))
       await new Promise((r) => server.listen(name, r))

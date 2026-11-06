@@ -238,7 +238,7 @@ const check = (name, ok, extra = '') => {
   const saved = await inv('ui:get')
   const savedPick = saved.skillsProvider ?? {}
   check('the provider shown is remembered for the project', (await pick.inputValue()) === 'codex' && savedPick[proj.toLowerCase()] === 'codex', JSON.stringify({ value: await pick.inputValue(), savedPick }))
-  check('…and which groups are open', (await combworkToggle.getAttribute('aria-expanded')) === 'false' && (await providerToggle.getAttribute('aria-expanded')) === 'true' && JSON.stringify(saved.skillsFold?.[proj.toLowerCase()]) === JSON.stringify({ hive: false, provider: true }), JSON.stringify(saved.skillsFold))
+  check('…and which groups are open', (await combworkToggle.getAttribute('aria-expanded')) === 'false' && (await providerToggle.getAttribute('aria-expanded')) === 'true' && JSON.stringify(saved.skillsFold?.[proj.toLowerCase()]) === JSON.stringify({ combwork: false, provider: true }), JSON.stringify(saved.skillsFold))
 
   // A local skill is edited in place (not preview) and can be deleted there.
   const localRow = page.locator('.skill-provider').first().locator('.skill-row', { hasText: 'lint-rules' })

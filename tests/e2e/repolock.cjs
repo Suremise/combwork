@@ -59,12 +59,12 @@ async function agentWithWork(inv, project, name) {
   fs.writeFileSync(path.join(alpha, '.git', 'hooks', 'pre-merge-commit'), `#!/bin/sh\necho started > "${slash(started)}"\nwhile [ -f "${slash(hold)}" ]; do sleep 0.1; done\nexit 0\n`)
   for (const p of [profileA, profileB]) lib.enableProviders(p)
 
-  const hives = []
+  const apps = []
   try {
     const a = await lib.launch({ userData: profileA, env: { CW_API_PORT: lib.port(47844) } })
-    hives.push(a.app)
+    apps.push(a.app)
     const b = await lib.launch({ userData: profileB, env: { CW_API_PORT: await freePort() } })
-    hives.push(b.app)
+    apps.push(b.app)
     for (const [h, ws] of [[a, wsA], [b, wsB]]) {
       h.page.on('pageerror', (e) => check('no page errors', false, e.message))
       await lib.openWorkspace(h.inv, h.page, ws)
@@ -115,7 +115,7 @@ async function agentWithWork(inv, project, name) {
     check('suite ran', false, e?.stack ?? String(e))
   } finally {
     fs.rmSync(hold, { force: true })
-    for (const app of hives) await app.close().catch(() => undefined)
+    for (const app of apps) await app.close().catch(() => undefined)
   }
   console.log(failed ? `\n${failed} FAILED` : '\nALL PASS')
   process.exit(failed ? 1 : 0)

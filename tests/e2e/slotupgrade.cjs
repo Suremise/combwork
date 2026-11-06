@@ -34,7 +34,7 @@ const meTree = path.join(`${ws}.worktrees`, 'solo', 'me')
 const others = [2, 3, 4, 5, 6].map((n) => ({ n, tree: path.join(root, `hb${n}`) }))
 const hr2 = path.join(root, 'hr2')
 const PORT = Number(lib.port(47937))
-const identity = { name: 'Hive Slot Test', email: 'slots@example.com' }
+const identity = { name: 'Combwork Slot Test', email: 'slots@example.com' }
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -118,8 +118,8 @@ const isIn = (dir, rev, ref) => {
   const tokenOf = async (p, id) => {
     const sessionId = await until(async () => (await live(p, id))?.sessionId, HUNG_MS)
     const launch = await until(() => launches().filter((l) => l.sessionId === sessionId && l.opts['--mcp-config'] && fs.existsSync(l.opts['--mcp-config'])).at(-1), HUNG_MS)
-    const hive = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
-    return hive ? JSON.parse(fs.readFileSync(hive.env.CW_API_TOKEN_FILE, 'utf8')).token : null
+    const server = launch ? JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
+    return server ? JSON.parse(fs.readFileSync(server.env.CW_API_TOKEN_FILE, 'utf8')).token : null
   }
   const intent = async (token, n, name, body = {}) => {
     const res = await fetch(`http://127.0.0.1:${PORT}/v1/tasks/${encodeURIComponent(`#${n}`)}/${name}`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })

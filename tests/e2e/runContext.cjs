@@ -111,14 +111,17 @@ function apply(env, vars) {
 
 /**
  * PATH without the folders of the cw-progress shims the user's copies of Combwork install (`%APPDATA%\Combwork\bin`, `Combwork-Dev\bin`,
- * and before HI-2461 `Hive\bin`, `Hive-Dev\bin`),
+ * and a 1.0's under its profile folders from before the rename, OLD_SHIM_PROFILES: a fence, HI-2614),
  * which an agent's session has on its PATH (#1253): they run the installed Combwork.exe (or the main checkout's dev build), so
  * a test's `cw-progress` would start another Combwork than its own, and report to the user's. A test Combwork puts its own
  * shims on its sessions' PATH.
  */
+/** The profile folders whose `bin` holds the user's shims: Combwork's, and a 1.0's from before HI-2461 (kept out too). */
+const SHIM_PROFILES = ['Combwork', 'Combwork-Dev']
+const OLD_SHIM_PROFILES = ['Hive', 'Hive-Dev']
 function withoutCombworkShims(env, parent) {
   if (!parent.APPDATA) return env
-  const shims = ['Hive', 'Hive-Dev', 'Combwork', 'Combwork-Dev'].map((p) => path.win32.join(parent.APPDATA, p, 'bin').toLowerCase())
+  const shims = [...SHIM_PROFILES, ...OLD_SHIM_PROFILES].map((p) => path.win32.join(parent.APPDATA, p, 'bin').toLowerCase())
   const same = (d) => path.win32.normalize(d).replace(/[\\/]+$/, '').toLowerCase()
   for (const k of Object.keys(env)) {
     if (k.toUpperCase() === 'PATH') env[k] = env[k].split(';').filter((d) => !shims.includes(same(d))).join(';')

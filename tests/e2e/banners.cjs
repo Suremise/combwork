@@ -31,7 +31,7 @@ const check = (name, ok, extra = '') => {
   fs.rmSync(notifyLog, { force: true })
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase(), beta.toLowerCase()]))
   lib.enableProviders(userData)
-  // A profile from 0.3.x, with "Only when Hive is in the background" off.
+  // A profile from 0.3.x, with its notifications for the background only off.
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   cfg.version = 5

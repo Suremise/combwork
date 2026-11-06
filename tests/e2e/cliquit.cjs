@@ -50,7 +50,7 @@ const check = (name, ok, extra = '') => {
       if (c.provider === 'claude-code') await lib.acceptClaudeTrust(inv, proj, agent.id)
       const ready = await lib.until(async () => (await live(agent.id))?.status === 'ready', HUNG_MS, 300)
       check(`${c.name} starts and is at its prompt`, !!ready, lib.plainText(await inv('pty:buffer', key).catch(() => '')).slice(-400))
-      // Its hive tools connected: Combwork types nothing into a CLI before then (sessions.combworkToolsSettled).
+      // Its Combwork tools connected: Combwork types nothing into a CLI before then (sessions.combworkToolsSettled).
       await lib.until(() => lib.combworkToolsConnected(userData, agent.id), HUNG_MS, 300)
       const version = (await live(agent.id))?.cliVersion ?? null
       const since = Math.max(0, lib.combworkLogLines(userData).length - 1) // the last element is the empty one after the final newline

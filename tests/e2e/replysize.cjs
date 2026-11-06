@@ -54,7 +54,7 @@ const prose = (seed, n) => {
   // Once (4 Oct 2026) the page closed during a workspace switch, with nothing in Combwork's log: say what happened, if again.
   page.on('crash', () => console.log(`PAGE CRASHED ${new Date().toISOString()}`))
   page.on('close', () => console.log(`PAGE CLOSED ${new Date().toISOString()}`))
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.on('close', () => console.log(`HIVE WINDOW CLOSING ${new Date().toISOString()}`)))
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.on('close', () => console.log(`CW WINDOW CLOSING ${new Date().toISOString()}`)))
   await lib.fitWindow(app, page, { width: 1400, height: 850 })
   await lib.appReady(page)
   const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])

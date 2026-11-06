@@ -4,6 +4,7 @@
 // it does for a real CLI. Used by fake-claude and fake-codex for their "cw", "boardmove", "boardreview" and
 // "boardcomment" steps.
 const { spawn } = require('child_process')
+const { toolName } = require('./fake-claude/oldRelease.cjs')
 
 /**
  * Calls `tool` with `args` on the Combwork MCP server `server` ({ command, args, env }): initialize, tools/list, the call,
@@ -107,11 +108,12 @@ function fromCodexTable(text) {
 
 /**
  * Parses a scripted "cw TOOL {json}" step's arguments: the JSON object after the tool's name (no " then " in it), or
- * none. A tool by its 1.1 name (cw_*, HI-2463), or by a 0.9 release's name for it (hive_*: upgradelane runs that release, HI-2506).
+ * none. A tool by its current name (cw_*); an old release's only in old-release mode, refused otherwise (oldRelease.cjs
+ * toolName, HI-2614).
  */
 function parseToolStep(step) {
-  const m = /\bcw\s+((?:cw|hive)_[a-z_]+)(?:\s+(\{.*\}))?/i.exec(step)
-  if (!m) return null
+  const m = /\bcw\s+([a-z]+_[a-z_]+)(?:\s+(\{.*\}))?/i.exec(step)
+  if (!m || !toolName(m[1])) return null
   let args = {}
   try {
     args = m[2] ? JSON.parse(m[2]) : {}

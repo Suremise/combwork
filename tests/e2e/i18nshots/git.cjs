@@ -272,7 +272,7 @@ module.exports = {
     { name: 'add-remote-form', open: addRemote, close: cancelDialog },
     { name: 'identity-form', open: identityForm, close: cancelDialog },
     { name: 'status-bar', open: statusBar },
-    { name: 'hive-notice', open: combworkNotice },
+    { name: 'combwork-notice', open: combworkNotice },
     { name: 'untrack-dialog', open: untrackDialog, close: closeLast }
   ]
 }

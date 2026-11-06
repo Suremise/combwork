@@ -95,7 +95,7 @@ const stamped = (text) => (fs.existsSync(stampLog) ? fs.readFileSync(stampLog, '
       const def = await lib.addAgent(inv, proj, { name: `Codex ${mode}`, ...small, permissionMode: mode })
       const key = lib.ptyKey(proj, def.id)
       const out = (record[mode] = {})
-      await lib.cliStep(`${mode}: hive and stamp`, { session: key }, async () => {
+      await lib.cliStep(`${mode}: combwork and stamp`, { session: key }, async () => {
         await inv('session:start', proj, { agentId: def.id })
         const ready = await lib.until(async () => ['ready', 'waiting'].includes((await live(proj, def.id))?.status) && (await live(proj, def.id)), 90000, 500)
         check(`${mode}: ready`, ready?.status === 'ready', JSON.stringify(ready && { status: ready.status, msg: ready.statusMessage }))
@@ -119,7 +119,7 @@ const stamped = (text) => (fs.existsSync(stampLog) ? fs.readFileSync(stampLog, '
         }
         // Combwork's reply on screen, which can come after the hook or the log write that ended the wait above; Codex asking
         // about a Combwork tool instead ends it too, and fails below.
-        const hive = await lib.until(async () => {
+        const own = await lib.until(async () => {
           const w = await live(proj, def.id)
           if (w?.status === 'waiting' && /combwork/.test(w.statusMessage ?? '')) return 'asked'
           return LISTED.test(await screen(key)) ? 'shown' : null
@@ -127,14 +127,14 @@ const stamped = (text) => (fs.existsSync(stampLog) ? fs.readFileSync(stampLog, '
         const l = await live(proj, def.id)
         out.stampCall = end ?? 'no outcome'
         out.stampRan = stamped(mode)
-        out.combworkCall = hive === 'shown' ? 'called, with its reply' : hive === 'asked' ? `Codex asked: ${l?.statusMessage}` : null
+        out.combworkCall = own === 'shown' ? 'called, with its reply' : own === 'asked' ? `Codex asked: ${l?.statusMessage}` : null
         out.waitingMessage = l?.status === 'waiting' ? (l.statusMessage ?? '') : null
         // Codex's automatic reviewer looked at the call (Approve for me).
         out.reviewed = /Reviewing approval request/.test(await screen(key))
         out.screenEnd = (await screen(key)).slice(-1500)
         fs.writeFileSync(path.join(scratch, `mcpapproval-${mode}.txt`), (await screen(key)).slice(-6000))
         await page.screenshot({ path: path.join(scratch, `mcpapproval-${mode}.png`) })
-        check(`${mode}: Combwork's tool ran without Codex asking`, hive === 'shown', out.combworkCall ?? out.screenEnd.slice(-400))
+        check(`${mode}: Combwork's tool ran without Codex asking`, own === 'shown', out.combworkCall ?? out.screenEnd.slice(-400))
         check(`${mode}: stamp's call came to an outcome`, !!end, out.screenEnd.slice(-400))
         if (end === 'asked') {
           check(`${mode}: Codex asks about stamp's tool, not Combwork's`, /mcp__stamp__stamp/.test(out.waitingMessage) && !/combwork/.test(out.waitingMessage), out.waitingMessage)
@@ -143,7 +143,7 @@ const stamped = (text) => (fs.existsSync(stampLog) ? fs.readFileSync(stampLog, '
       })
       await inv('session:stop', proj, def.id)
       await lib.until(async () => !(await live(proj, def.id)), 30000, 500)
-      console.log(`INFO ${mode}: stamp ${record[mode].stampCall}; hive ${JSON.stringify(record[mode].combworkCall)}`)
+      console.log(`INFO ${mode}: stamp ${record[mode].stampCall}; combwork ${JSON.stringify(record[mode].combworkCall)}`)
     }
     // Asked in the modes where Codex asks before an MCP tool runs: read-only and Ask (on-request).
     for (const mode of ['read-only', 'ask']) check(`${mode}: Codex asks before stamp's tool runs`, record[mode].stampCall === 'asked', record[mode].stampCall)
@@ -215,7 +215,7 @@ const stamped = (text) => (fs.existsSync(stampLog) ? fs.readFileSync(stampLog, '
       check('…and the note is not written while it asks', !fs.existsSync(note))
       // The native server named combwork was read (its folder's Codex config), and Combwork's approvals won over its own.
       const combworkLog = fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8')
-      check("…with the folder's own Codex config approving every hive tool (read: Combwork's log names it)", /Codex has an MCP server named combwork in .*\.codex[\\/]config\.toml⁩?: Combwork's own server is used instead/.test(combworkLog), combworkLog.split('\n').filter((line) => /named combwork/.test(line)).slice(-2).join(' / '))
+      check("…with the folder's own Codex config approving every Combwork tool (read: Combwork's log names it)", /Codex has an MCP server named combwork in .*\.codex[\\/]config\.toml⁩?: Combwork's own server is used instead/.test(combworkLog), combworkLog.split('\n').filter((line) => /named combwork/.test(line)).slice(-2).join(' / '))
       if (typeof asking === 'object' && asking) {
         // Cancel the tool call (Esc, as its question says): the turn ends and nothing is written.
         await inv('pty:write', akey, '\x1b')

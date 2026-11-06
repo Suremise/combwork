@@ -1,7 +1,7 @@
-// A doorbell only once the hive tools are there (#865): a resumed Claude Code is ready at its SessionStart before its
+// A doorbell only once Combwork's tools are there (#865): a resumed Claude Code is ready at its SessionStart before its
 // combwork MCP server has connected, and a doorbell then is a turn that can't call cw_inbox. The launch's combwork server
 // tells Combwork when the CLI has connected it (POST /v1/launch/connected, with the launch's own token); until then Combwork
-// types no line into the session, at most Settings → Advanced → "hive tools: wait to connect" from when it became ready.
+// types no line into the session, at most Settings → Advanced → "Combwork tools: wait to connect" from when it became ready.
 // On fake Claude Code (fake-claude/), which connects the real combwork server as it starts, or holds it back while
 // fake-mcp-hold-<agent> is in its home until the test makes fake-mcp-go-<agent>:
 // 1. Resumed with its connection held: a message waits (no doorbell), and once it connects, one doorbell rings and the

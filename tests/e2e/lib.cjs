@@ -235,13 +235,18 @@ function ownClaudeHome(name) {
  * Claude Code config folder in which the fake trusts `trusted` (so it asks nothing), and returns the variables to start
  * Combwork with: { CLAUDE_CONFIG_DIR }. A config written before (a 0.1 one, settings of the suite's) is kept.
  */
-function fakeClaude(userData, home, trusted = []) {
+/**
+ * Points a profile's Claude Code at the fake (fake-claude/), its home made afresh with the folders it trusts. `oldRelease`:
+ * the old-release wrapper instead (fake-claude-old-release.cmd, oldRelease.cjs), for upgradelane's released 0.9 build
+ * alone (HI-2614); every other profile gets the current fake, which refuses an old release's names.
+ */
+function fakeClaude(userData, home, trusted = [], { oldRelease = false } = {}) {
   enableProviders(userData)
   const file = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(file, 'utf8'))
   cfg.settings = cfg.settings ?? {}
   cfg.settings.providers = cfg.settings.providers ?? {}
-  cfg.settings.providers['claude-code'] = { checkUpdatesOnLaunch: false, ...cfg.settings.providers['claude-code'], executablePath: path.join(__dirname, 'fake-claude', 'fake-claude.cmd') }
+  cfg.settings.providers['claude-code'] = { checkUpdatesOnLaunch: false, ...cfg.settings.providers['claude-code'], executablePath: path.join(__dirname, 'fake-claude', oldRelease ? 'fake-claude-old-release.cmd' : 'fake-claude.cmd') }
   fs.writeFileSync(file, JSON.stringify(cfg, null, 2))
   fs.rmSync(home, { recursive: true, force: true })
   fs.mkdirSync(home, { recursive: true })
@@ -815,9 +820,12 @@ const watchCommitBursts = (app) => {
 
 /**
  * The copies a suite may never start (#1253): the installed app (the one hosting the agents, with its own profile and app
- * ID), Combwork's (HI-2460) and Hive Desktop's from before.
+ * ID), Combwork's (HI-2460), and a 1.0 still installed under its folder from before the rename (OLD_INSTALL_FOLDER, a
+ * fence: never started, whatever the dialect of the fakes, HI-2614).
  */
-const INSTALLED = ['Combwork', 'Hive'].flatMap((n) => [path.join(process.env.LOCALAPPDATA ?? '', 'Programs', n), path.join(process.env.PROGRAMFILES ?? 'C:\\Program Files', n)])
+const INSTALL_FOLDER = 'Combwork'
+const OLD_INSTALL_FOLDER = 'Hive'
+const INSTALLED = [INSTALL_FOLDER, OLD_INSTALL_FOLDER].flatMap((n) => [path.join(process.env.LOCALAPPDATA ?? '', 'Programs', n), path.join(process.env.PROGRAMFILES ?? 'C:\\Program Files', n)])
 /** This checkout's packaged build's executable (npm run dist): Combwork.exe since HI-2460. */
 const PACKAGED_EXE = path.join(ROOT, 'dist', 'win-unpacked', 'Combwork.exe')
 /** A folder's path as compared: real (a junction resolved), lower case, no trailing separator. */
@@ -1137,8 +1145,8 @@ async function sendPrompt(inv, key, text, { submitted, ready = null, tries = 3, 
 /**
  * Whether Combwork's log in a test profile (CW_USER_DATA) says an agent's Combwork tools connected (#865), at or after
  * `since` (a line count from combworkLogLines, so a relaunch's own connect is waited for): a ready() for sendPrompt into a
- * just-started Claude Code, as Combwork itself types nothing before it (sessions.combworkToolsSettled). A build from before
- * HI-2584 (a packaged suite's older build) logged it as "hive tools": both are read.
+ * just-started Claude Code, as Combwork itself types nothing before it (sessions.combworkToolsSettled). The current line
+ * only (HI-2614): a packaged suite needs a build of this source (npm run dist).
  */
 const combworkLogLines = (userData) => {
   try {
@@ -1147,7 +1155,7 @@ const combworkLogLines = (userData) => {
     return []
   }
 }
-const combworkToolsConnected = (userData, agentId, since = 0) => combworkLogLines(userData).slice(since).some((l) => l.includes(`⁨${agentId}⁩'s Combwork tools connected`) || l.includes(`⁨${agentId}⁩'s hive tools connected`))
+const combworkToolsConnected = (userData, agentId, since = 0) => combworkLogLines(userData).slice(since).some((l) => l.includes(`⁨${agentId}⁩'s Combwork tools connected`))
 
 /**
  * The longest a fake Claude Code's prompt waits to be taken, or its turn to end: a bound for a hung run, never how long

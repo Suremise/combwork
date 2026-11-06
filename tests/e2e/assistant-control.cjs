@@ -71,7 +71,7 @@ const check = (name, ok, extra = '') => {
   const token = JSON.parse(fs.readFileSync(tokenFile, 'utf8')).token
   // In its launch's private folder in Combwork's user data, not the project (#345).
   const mcp = JSON.parse(fs.readFileSync(path.join(lib.launchDir(userData, (await live(home, 'assistant')).runId), 'mcp.json'), 'utf8')).mcpServers.combwork
-  check("the Assistant's hive tools use its token and role", mcp?.env.CW_API_TOKEN_FILE === tokenFile && mcp.env.CW_ROLE === 'assistant' && mcp.env.CW_ASSISTANT_CONTROL === 'projects', JSON.stringify(mcp?.env))
+  check("the Assistant's Combwork tools use its token and role", mcp?.env.CW_API_TOKEN_FILE === tokenFile && mcp.env.CW_ROLE === 'assistant' && mcp.env.CW_ASSISTANT_CONTROL === 'projects', JSON.stringify(mcp?.env))
   // Its skills: the workspace's skills for the Assistant (coordinate-agents and the shared ones), none for agents only.
   const assistantSkills = fs.readdirSync(path.join(home, '.combwork', 'launch-assistant', 'plugin', 'skills')).sort()
   // use-cw-api is for both (HI-2012): its tools.md, the Combwork tools' detail, is copied with it.
@@ -263,7 +263,7 @@ const check = (name, ok, extra = '') => {
   }).toString()
   const toolReply = JSON.parse(viaTool.split('\n')[0]).result
   const asAssistant = (await inv('assistant:actions')).some((x) => x.ok && x.text === 'Activated alpha')
-  check("its hive tools act as the Assistant with the Agent API on", !toolReply?.isError && asAssistant, JSON.stringify(toolReply).slice(0, 300))
+  check("its Combwork tools act as the Assistant with the Agent API on", !toolReply?.isError && asAssistant, JSON.stringify(toolReply).slice(0, 300))
 
   // The task board: the Assistant adds and starts cards, and moves one to Done without a question.
   const added2 = await api('POST', '/v1/tasks', { title: 'Write the README', project: 'alpha', description: 'work 1' })

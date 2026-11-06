@@ -134,13 +134,13 @@ function helpers(h) {
     if (!s) return null
     if (a.provider === 'codex') {
       const l = await until(() => codexLaunches().findLast((x) => x.args.some((y) => y.includes(s.runId))), HUNG_MS)
-      const hive = l ? fromCodexTable(l.args.find((x) => x.startsWith('mcp_servers.combwork=')).slice('mcp_servers.combwork='.length)) : null
-      return hive ? JSON.parse(fs.readFileSync(hive.env.CW_API_TOKEN_FILE, 'utf8')).token : null
+      const server = l ? fromCodexTable(l.args.find((x) => x.startsWith('mcp_servers.combwork=')).slice('mcp_servers.combwork='.length)) : null
+      return server ? JSON.parse(fs.readFileSync(server.env.CW_API_TOKEN_FILE, 'utf8')).token : null
     }
     // The newest: a resumed conversation keeps its id, and an earlier launch's files are gone.
     const l = await until(() => claudeLaunches().findLast((x) => x.sessionId === s.sessionId && x.opts['--mcp-config'] && fs.existsSync(x.opts['--mcp-config'])), HUNG_MS)
-    const hive = l ? JSON.parse(fs.readFileSync(l.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
-    return hive ? JSON.parse(fs.readFileSync(hive.env.CW_API_TOKEN_FILE, 'utf8')).token : null
+    const server = l ? JSON.parse(fs.readFileSync(l.opts['--mcp-config'], 'utf8')).mcpServers.combwork : null
+    return server ? JSON.parse(fs.readFileSync(server.env.CW_API_TOKEN_FILE, 'utf8')).token : null
   }
   /** An agent's intent on a card, its token read afresh each time (a restarted session has a new one). */
   const intent = async (p, a, n, name, body = {}) => {
@@ -405,10 +405,10 @@ function helpers(h) {
     await h.page.mouse.move(5, 5)
     const agentChoices = () => x.panel.locator('select[aria-label="Agent"] option').allInnerTexts().catch(() => [])
     // HI-1710: the copy's set-up run is its reviewer's (no "Combwork (copy …)" entry), and no entry is listed twice.
-    const hives = ['Combwork (slot slot-a)', 'Combwork (slot slot-b)']
+    const slots = ['Combwork (slot slot-a)', 'Combwork (slot slot-b)']
     const combworkNamed = async () => {
       const now = await agentChoices()
-      return hives.every((c) => now.includes(c)) && !now.some((c) => c.startsWith('Combwork (copy')) && new Set(now).size === now.length
+      return slots.every((c) => now.includes(c)) && !now.some((c) => c.startsWith('Combwork (copy')) && new Set(now).size === now.length
     }
     check("the Runs tab's Agent filter names the slots' runs as Combwork's, and the copy's as its reviewer's", !!(await until(combworkNamed, HUNG_MS)), JSON.stringify(await agentChoices()))
     await x.shoot('runs', x.panel)
