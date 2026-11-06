@@ -1,8 +1,8 @@
 // S54, P4's RC scenario end to end (#1287, SPEC §16.18, §16.19.1), as 1.0 builds it (#1573: §16.10's slots, no worktree
 // agents): "Pair (the agent merges)", the Assistant off, on fake Claude Code agents acting by their own tokens (their
 // Combwork tools' calls), B1 added in the project folder. The project's options are set through Version Control → Workflow
-// (#1278); a lane is started from the board (#1280), lent a slot that B1 then works in. Card 1: the builder starts it
-// on its line in the slot (the next card's start refused meanwhile: one card at a time), commits, runs the quick check
+// (#1278); a lane is started from the board (#1280), lent a slot that B1 then works in. Card 1: Combwork starts it with
+// the lane's brief (HI-2558), and the builder's own start of it finds it on its line in the slot (the next card's start refused meanwhile: one card at a time), commits, runs the quick check
 // through cw-progress --check (counted), submits; the reviewer starts its review and passes it; the builder merges
 // it (a merge commit) and reports the merge, which done.contained checks: Done, and only then does the next card start,
 // on a line of its own from main (card 1's, merged, deleted). Cards 2 and 3 are squash-merged in a row: card 3 starts
@@ -231,7 +231,9 @@ const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, 
       check(`the window shows the stage before ${name}.png`, !!(await until(async () => (await top.count()) === 1 && (await ready()), HUNG_MS)), await topText())
       await page.screenshot({ path: path.join(shots, `${name}.png`) })
     }
-    await shoot('1-lane-started', async () => (await onBoard('Todo', c1)) && /B1 \/ R1/.test(await topText()))
+    // Card 1 arrives with the lane's brief (HI-2558): Combwork starts it on B1 as the lane starts, never the brief first.
+    check('card 1 is started by Combwork as the lane starts (HI-2558)', !!(await until(async () => (await kinds(c1)).includes('Started') && (await card(c1)).column === 'doing', HUNG_MS)), JSON.stringify(await kinds(c1)))
+    await shoot('1-lane-started', async () => (await onBoard('Active', c1)) && (await onBoard('Todo', c2)) && /B1 \/ R1/.test(await topText()))
 
     // --- Card 1: built on its line in the slot, checked, submitted, reviewed and passed; merged (a merge commit) and reported.
     const main0 = git(alpha, 'rev-parse', 'main')

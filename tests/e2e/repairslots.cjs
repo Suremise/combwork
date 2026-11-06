@@ -121,7 +121,10 @@ const isIn = (dir, rev, ref) => {
     await start(wsOf(before))
     const alpha = path.join(wsOf(before), 'alpha')
     await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'combworkMerges', folder: 'slots', target: 'integration', style: 'merge', preChecks: [], mergeChecks: [], identity, okBefore: { mode: 'never', labels: [] } } })
+    // Blocked as the lane starts, so it isn't due then: Combwork would start a lane's first card due on its stopped
+    // builder with the brief (HI-2558), prepared and placed at once. Unblocked once B2 is in its turn (below).
     const c1 = (await inv('tasks:create', { title: 'Moved along', project: 'alpha' })).number
+    await inv('tasks:update', c1, { blocked: 'not yet (repairslots)' })
     const key = (await card(c1)).key
     const hb1 = await until(async () => (await inv('slots:list', alpha)).find((s) => s.name === 'hb1' && s.lease?.kind === 'carried'), HUNG_MS)
     check('hb1 is B1’s carried slot', !!hb1, JSON.stringify(await inv('slots:list', alpha)))
@@ -137,6 +140,7 @@ const isIn = (dir, rev, ref) => {
     // preparation is still owed as Combwork closes, and runs after Repair (HI-1791: in slot-a's new folder).
     await lib.typeLine(inv, lib.ptyKey(alpha, 'b2'), home, null, 'holduntil repairslots-never', { live: () => live(alpha, 'b2') })
     check('…B2 in its turn', !!(await until(async () => (await live(alpha, 'b2'))?.status === 'working', HUNG_MS)))
+    await inv('tasks:update', c1, { blocked: null })
     const s1 = await intent(tb2Before, c1, 'start')
     check(`${key} starts in slot-a`, s1.status === 200 && same(s1.body?.data?.folder, slotA), JSON.stringify(s1.body))
     check('…its preparation owed as Combwork closes (B2 busy)', !(await inv('tasks:facts', c1)).some((f) => f.kind === 'SlotPrepared') && (await live(alpha, 'b2'))?.status === 'working', JSON.stringify((await inv('tasks:facts', c1)).map((f) => f.kind)))
