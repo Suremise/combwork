@@ -20,7 +20,7 @@
 // (tests/e2e/lanes.mjs, #707; --no-wait fails at once instead).
 // --budget N (USD, API-equivalent, above 0, default 2) stops a model run once the scenarios so far cost that much, or
 // as soon as a trial reports no cost (the spend can't be checked then; --allow-unknown-cost goes on anyway); --only runs
-// some; --keep leaves each scenario's profile and workspace; --repeat N runs each N times (samples, for spread);
+// some; --random N picks N of them at random, printing its seed (--seed S picks the same again); --keep leaves each scenario's profile and workspace; --repeat N runs each N times (samples, for spread);
 // --save-baseline NAME keeps this run's benchmark as a named baseline (an older one of that name is kept, not
 // overwritten). Results go to %LOCALAPPDATA%\combwork-test\scenarios\results (the newest 30 fake runs and, counted apart,
 // the newest 30 model trials are kept, besides those a card cites and those a run still writes into: runner.json,
@@ -71,6 +71,7 @@ const runContext = require('../e2e/runContext.cjs')
 const { runScenario, dialectForRun, dialectRecord, sourceFingerprint, claudeSignedIn, environmentAdvice, CLAUDE_TEST_HOME, PROVIDERS } = require('./harness.cjs')
 const { copilotInstalled } = require('../e2e/fake-copilot-api.cjs')
 const { SCENARIOS, FIXTURES_VERSION } = require('./scenarios.cjs')
+const { parseRandom, parseSeed, pickRandom } = require('./randomPick.cjs')
 const { benchmarkOf, pruneResults, saveBaseline, resultsFolder, releaseResults, writeResults, parseBudget, budgetGate, spendText } = require('./benchmark.cjs')
 
 const argv = process.argv.slice(2)
@@ -90,6 +91,14 @@ try {
 }
 const allowUnknownCost = argv.includes('--allow-unknown-cost')
 const only = arg('only', '')?.split(',').filter(Boolean)
+// --random N (HI-2655): N of the scenarios (of --only's, if given) picked at random, seeded (--seed S picks the same again).
+let random = null
+try {
+  random = argv.includes('--random') ? { count: parseRandom(arg('random', '')), seed: parseSeed(arg('seed', '')) } : null
+} catch (e) {
+  console.error(e.message)
+  process.exit(2)
+}
 const keep = argv.includes('--keep')
 const repeats = Math.max(1, Math.min(20, Number(arg('repeat', '1')) || 1))
 const baselineName = arg('save-baseline', '')
@@ -130,7 +139,9 @@ if (notSignedIn) {
   process.exit(0)
 }
 
-const chosen = SCENARIOS.filter((s) => !only?.length || only.includes(s.id))
+const listed = SCENARIOS.filter((s) => !only?.length || only.includes(s.id))
+const chosen = random ? pickRandom(listed, random.count, random.seed) : listed
+if (random) console.log(`Picked ${chosen.length} of ${listed.length} at random (seed ${random.seed}): ${chosen.map((s) => s.id).join(', ')}. Again: --random ${random.count} --seed ${random.seed}${only?.length ? ` --only ${only.join(',')}` : ''}, or --only ${chosen.map((s) => s.id).join(',')}`)
 // More than a few scenarios (or --repeat) is a heavy run: it waits for a test slot, as the e2e runner's do
 // (tests/e2e/slots.mjs), so runs on this machine don't slow each other until tests time out; a few fake runs in all
 // take the side slot, else a heavy one. A real model's run (a model trial) takes none of those, only a model trial's
@@ -285,7 +296,7 @@ const metaNow = (complete) => ({
   source: sourceAtStart,
   ...(complete ? {} : { incomplete: `${results.length} of ${trials.length} trials` }),
   guidance: results.find((r) => r.guidance?.atStart)?.guidance.atStart.revision ?? null,
-  provider, model: model ?? '(default)', effort: effort ?? '(default)', mode: PROVIDERS[provider].mode, ...(dialect ? { dialect: dialectRecord(dialect) } : {}), repeats, budgetUsd: budget, when: new Date().toISOString(), spentUsd: Math.round(spent * 1000) / 1000, unknownCostTrials })
+  provider, model: model ?? '(default)', effort: effort ?? '(default)', mode: PROVIDERS[provider].mode, ...(dialect ? { dialect: dialectRecord(dialect) } : {}), ...(random ? { random: { ...random, picked: chosen.map((s) => s.id) } } : {}), repeats, budgetUsd: budget, when: new Date().toISOString(), spentUsd: Math.round(spent * 1000) / 1000, unknownCostTrials })
 // Each trial's result written as it ends (#1457): a run cut short keeps what it had.
 // Should even that fail (the folder kept going, or another error), the run goes on: what it has stays in memory and the
 // next trial's write tries again; the writes at the end fail the run.
@@ -368,6 +379,7 @@ save(
     `# Scenarios: ${provider}${model ? ` (${model})` : ''}${repeats > 1 ? `, ${repeats} samples each` : ''}`,
     '',
     `Fixtures v${FIXTURES_VERSION}; source ${meta.source.head}${meta.source.dirty ? ` + changes ${meta.source.dirty}` : ''}; guidance ${meta.guidance}; CLI ${cli}; ${meta.when}; spent ${spendText(meta)}.`,
+    ...(random ? ['', `Picked at random: ${random.count} with seed ${random.seed} (again: --random ${random.count} --seed ${random.seed}).`] : []),
     ...(dialect ? ['', `Dialect: ${dialect.path} (${dialect.overrides} override(s)), chain ${dialect.files.join(' → ')}, hash ${dialect.hash || '(the Default)'}.`] : []),
     '',
     '| Scenario | Result | Checks | Skills read | Combwork tools | Combwork’s cost | Provider cost, time |',
