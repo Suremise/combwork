@@ -446,7 +446,9 @@ text files in the install folder, `%APPDATA%\Combwork`, `%LOCALAPPDATA%\Combwork
 logs, the shortcuts, the registry (the app's keys whole, and every HKCU entry naming it that wasn't there before
 the install), the agent's environment (`set` in its session), the window's text on each page visited, the Copy
 Diagnostics text and the exported board. It passes with no hit; each hit is listed with its place and text. app.asar is
-the one exception: its hits (the upgrade code that knows the 1.0 names) are counted in the report, never failed. Its git
+the one exception: its hits (the upgrade code that knows the 1.0 names) are counted in the report, never failed. The
+bundled code beside it (the JavaScript in `app.asar.unpacked\out`) is named, never read (HI-2647): which code may name
+the old name is the repository's name guard's job (`tests/oldNames.mjs`), not this check's. Its git
 project uses this machine's Git for Windows, mapped read-only (`--git <its folder>`, by default the one on the PATH).
 Then the profile move the installer couldn't make (scenario 11, `--only profile-move`, HI-2602;
 `tests/sandbox/inside/profile-move.ps1`): 1.0 installed and run once, a file in its local profile folder held

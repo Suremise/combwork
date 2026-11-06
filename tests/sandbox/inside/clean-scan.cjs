@@ -4,14 +4,14 @@
  *   C:\tools\node\node.exe C:\tools\combwork-tests\sandbox\inside\clean-scan.cjs scan <prefix>       after drive.cjs clean
  * baseline keeps what HKCU says of the old name before anything is installed (C:\out\<prefix>-reg-before.txt), so the scan
  * counts only what the install and the app added. scan searches every place of ../clean.cjs CATEGORIES for the old name and
- * writes C:\out\<prefix>-scan.json ({ places: { <id>: { scanned, count, hits, unread, why? } }, asar, skipped, at }; skipped: what couldn't be read, which fails its place), which
+ * writes C:\out\<prefix>-scan.json ({ places: { <id>: { scanned, count, hits, unread, why? } }, asar, code, skipped, at }; skipped: what couldn't be read, which fails its place), which
  * the host's report turns into checks (report.cjs, clean.cjs cleanChecks). What the driver kept for it: C:\out\<prefix>.json
  * (its facts: the workspace and the export's folder), <prefix>-window.json, -diagnostics.txt and -agent-env.txt.
  */
 const fs = require('fs')
 const path = require('path')
 const { execFileSync } = require('child_process')
-const { tally, scanText, scanTree, newRegistryHits } = require(path.join(__dirname, '..', 'clean.cjs'))
+const { tally, scanText, scanTree, isBundledCode, newRegistryHits } = require(path.join(__dirname, '..', 'clean.cjs'))
 const { COMBWORK_GUID } = require(path.join(__dirname, '..', 'report.cjs'))
 
 // The third argument, a folder for what it reads and writes in place of C:\out, is for trying it outside a Sandbox.
@@ -43,9 +43,10 @@ function scan() {
   const local = process.env.LOCALAPPDATA
   const install = path.join(local, 'Programs', 'Combwork')
 
-  // The install folder: names and text files (Electron's, Chromium's and the native modules' binaries named only),
-  // and every exe's version info (what Explorer and Task Manager show).
-  if (!scanTree(t, 'install', install)) why.install = `${install} isn't there`
+  // The install folder: names and text files (Electron's, Chromium's and the native modules' binaries named only; the
+  // bundled code named only, its contents the repository's name guard's, HI-2647), and every exe's version info (what
+  // Explorer and Task Manager show).
+  if (!scanTree(t, 'install', install, { code: isBundledCode })) why.install = `${install} isn't there`
   const versions = ps(`Get-ChildItem -LiteralPath '${install}' -Recurse -Filter *.exe -ErrorAction SilentlyContinue | ForEach-Object { $_.VersionInfo | Select-Object FileName, CompanyName, FileDescription, ProductName, ProductVersion, OriginalFilename, InternalName, LegalCopyright } | ConvertTo-Json -Compress`)
   for (const v of [].concat(versions.trim() ? JSON.parse(versions) : [])) scanText(t, 'install', `${v.FileName} (version info)`, JSON.stringify(v))
 
@@ -106,10 +107,10 @@ function scan() {
   if (!facts.exportDir || !scanTree(t, 'export', facts.exportDir, { binary: 'scan' })) why.export = `no exported board (${facts.exportDir ?? 'the driver named none'})`
 
   for (const [k, w] of Object.entries(why)) t.places[k].why = w
-  const res = { at: new Date().toISOString(), places: t.places, asar: t.asar, skipped: t.skipped.slice(0, 200) }
+  const res = { at: new Date().toISOString(), places: t.places, asar: t.asar, code: t.code, skipped: t.skipped.slice(0, 200) }
   fs.writeFileSync(out('scan.json'), JSON.stringify(res, null, 2))
   const counts = Object.entries(t.places).map(([k, p]) => `${k} ${p.count}/${p.scanned}`).join(', ')
-  console.log(`hits/searched: ${counts}; app.asar ${t.asar.reduce((s, a) => s + a.count, 0)}`)
+  console.log(`hits/searched: ${counts}; app.asar ${t.asar.reduce((s, a) => s + a.count, 0)}; bundled code named only ${t.code}`)
 }
 
 if (mode === 'baseline') {
