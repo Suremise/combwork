@@ -111,6 +111,18 @@ describe("the old name's allowances (HI-2617)", () => {
     ])
   })
 
+  it("places a diffFiles file whole, as the change's check does, and never calls one stale (the Assistant's call on HI-2625)", () => {
+    const allow = {
+      regions: [{ file: 'src/up.ts', id: 'input', why: '' }],
+      diffFiles: [{ file: 'src/up.ts', why: 'the upgrade' }, { file: 'src/clean.ts', why: 'the upgrade' }, { file: 'gone.ts', why: '' }]
+    }
+    const files = { 'src/up.ts': `const a = "Hive"\n${mark('begin', 'input')}\nconst OLD = ".hive"\n${mark('end', 'input')}\n`, 'src/clean.ts': 'clean', 'src/other.ts': 'hive' }
+    const { hits, problems } = check(files, allow)
+    expect(hits.map((h) => `${h.file}:${h.line}`)).toEqual(['src/other.ts:1'])
+    // The region inside it still places its own hit, so it isn't stale either.
+    expect(problems).toEqual(["diffFiles[2]: gone.ts isn't a file of the repository"])
+  })
+
   it('a history entry places only what follows its line', () => {
     const { hits } = check({ 'CHANGELOG.md': '## Unreleased\r\n- Hive\r\n## 1.0.0 — 2026-11-03\r\n- Hive\r\n' }, { history: [{ file: 'CHANGELOG.md', from: '## 1.0.0 — 2026-11-03', why: '' }] })
     expect(hits.map((h) => h.line)).toEqual([2])

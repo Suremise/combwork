@@ -10,6 +10,9 @@
 // - files: { file, why }, a recorded fixture named whole: what a CLI wrote, kept as it was.
 // - paths: { path, why }, a tracked path that names it (a recorded fixture's name).
 // - history: { file, from, why }, everything in the file from the line `from` on (CHANGELOG.md's released sections).
+// - diffFiles: { file, why }, the upgrade code that must name the old paths and values it converts, and the detector
+//   itself: placed whole, here as in the change's check (the Assistant's call on HI-2625: one list, one rule). Never
+//   stale: the change's check needs each one, its file clean or not.
 //
 // Every entry must still place at least one hit, or it fails as stale: the list only shrinks. No folder is exempt, nor
 // any pattern of words: an allowance names where it is. The list's own file is the one place read as allowances, not
@@ -107,8 +110,9 @@ export function checkNames({ files, read, allow }) {
   const whole = entries('files')
   const paths = entries('paths')
   const history = entries('history')
+  const upgrade = entries('diffFiles')
   const listed = new Set(files)
-  for (const e of [...regions, ...strings, ...whole, ...history]) if (!listed.has(e.file)) problems.push(`${e.key}: ${e.file} isn't a file of the repository`)
+  for (const e of [...regions, ...strings, ...whole, ...history, ...upgrade]) if (!listed.has(e.file)) problems.push(`${e.key}: ${e.file} isn't a file of the repository`)
   for (const e of paths) if (!listed.has(e.path)) problems.push(`${e.key}: ${e.path} isn't a file of the repository`)
 
   for (const file of files) {
@@ -148,6 +152,7 @@ export function checkNames({ files, read, allow }) {
       for (let i = s.indexOf(e.text); e.text && i >= 0; i = s.indexOf(e.text, i + 1)) strSpans.push({ from: i, to: i + e.text.length, entry: e })
     }
     const wholeEntry = whole.find((e) => e.file === file)
+    const upgradeEntry = upgrade.find((e) => e.file === file)
     const hist = history.find((e) => e.file === file)
     let histFrom = Infinity
     if (hist) {
@@ -161,7 +166,8 @@ export function checkNames({ files, read, allow }) {
         wholeEntry ||
         (h.at >= histFrom && hist) ||
         spans.find((r) => r.from <= h.at && end <= r.to)?.entry ||
-        strSpans.find((r) => r.from <= h.at && end <= r.to)?.entry
+        strSpans.find((r) => r.from <= h.at && end <= r.to)?.entry ||
+        upgradeEntry
       if (by) used.add(by.key)
       else hits.push({ file, ...lineOf(s, h.at, h.match.length) })
     }
