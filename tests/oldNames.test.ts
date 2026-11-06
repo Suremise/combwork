@@ -8,13 +8,14 @@ import { dirname, join } from 'path'
 import { describe, expect, it } from 'vitest'
 import { tempDir } from './tempDir'
 // @ts-expect-error: a plain .mjs module without types
-import { ALLOW_FILE, checkDiffNames, checkNames, checkRepoNames, inventory, nameHits, textOf } from './oldNames.mjs'
+import { ALLOW_FILE, checkDiffNames, checkNames, checkRepoNames, diffPath, inventory, nameHits, textOf } from './oldNames.mjs'
 import { ASSISTANT_GITIGNORE, BOARD_GITIGNORE, HANDOVER_README, WORKSPACE_README } from '../src/main/workspace'
 import { COPIES_EXCLUDE_COMMENT } from '../src/main/providers/common'
 import { LAUNCH_README } from '../src/main/providers/claude/adapter'
 import { DEFAULT_APP_CONFIG, DEFAULT_PROJECT_CONFIG, DEFAULT_SETTINGS, DEFAULT_WORKSPACE_CONFIG } from '../src/shared/defaults'
 
 const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
+const { oldNameHits } = createRequire(import.meta.url)('./sandbox/clean.cjs') as { oldNameHits: (text: string) => { at: number; match: string }[] }
 /** A region's marker line, put together so the cases below aren't markers of this file. */
 const mark = (kind: 'begin' | 'end', id: string): string => ['// old-name:', kind, id].join(' ')
 
@@ -34,6 +35,19 @@ describe("the old name's detector (HI-2617)", () => {
   it('passes the ordinary words that hold its letters: archive in all its forms, chive, chives, beehive', () => {
     const not = ['archive', 'Archive', 'ARCHIVE', 'archived', 'Archived', 'archives', 'archiving', 'archiver', 'unarchive', 'Unarchived', 'insideArchive', 'boardarchive', 'ARCHIVE_DIR', 'désarchiver', 'chive', 'chives', 'Chives', 'CHIVES', 'beehive', 'Beehive', 'BEEHIVES', 'a chive.', '']
     for (const n of not) expect(nameHits(n), n).toEqual([])
+  })
+
+  it('is the clean-install check\'s matcher too: both find the same hits in the same cases (HI-2633)', () => {
+    const cases = [
+      'hive', 'Hive', 'HIVE', 'hIvE', '.hive', 'hive.db', 'HIVE_DIR', 'CW_HIVE', 'myHive', "Hive's", 'hives', 'hive2', '2hive', 'xhive', 'XHIVE', 'myhive', 'myhive_inbox',
+      'cw-hive-mcp', 'getHive()', 'x/hive', 'arcHive', 'ArcHIVE', 'beeHive', 'chivey', 'archHive',
+      'archive', 'Archive', 'ARCHIVE', 'archived', 'unarchive', 'ARCHIVE_DIR', 'désarchiver', 'chive', 'chives', 'CHIVES', 'beehive', 'BEEHIVES', 'Combwork', 'hiv e', '',
+      'the Hive app, archive, hive.log'
+    ]
+    const at = (hs: { at: number; match: string }[]) => hs.map((h) => [h.at, h.match])
+    for (const c of cases) expect(at(oldNameHits(c)), c).toEqual(at(nameHits(c)))
+    for (const c of ['xhive', 'XHIVE', 'myhive']) expect(oldNameHits(c), c).toHaveLength(1)
+    expect(oldNameHits('archive')).toEqual([])
   })
 
   it('reads UTF-16 by its BOM, and binary content as bytes', () => {
@@ -188,6 +202,39 @@ describe("the names check of a change (Darren's decision on HI-2617)", () => {
     } finally {
       rmSync(repo, { recursive: true, force: true })
     }
+  })
+
+  it('checks a path with a space or a non-ASCII letter, changed or new, its lines and its name (HI-2633)', () => {
+    const repo = tempDir('cw-oldnames-paths-')
+    try {
+      const git = (...args: string[]) => execFileSync('git', ['-c', 'core.autocrlf=false', '-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd: repo, env: baseEnv(), encoding: 'utf8' })
+      git('init', '-q')
+      mkdirSync(join(repo, 'tests'), { recursive: true })
+      mkdirSync(join(repo, 'src'), { recursive: true })
+      writeFileSync(join(repo, ALLOW_FILE), '{}')
+      for (const f of ['src/a b.ts', 'src/café.ts', 'src/plain.ts']) writeFileSync(join(repo, f), 'one\n')
+      git('add', '.')
+      git('commit', '-q', '-m', 'base')
+      const base = git('rev-parse', 'HEAD').trim()
+      for (const f of ['src/a b.ts', 'src/café.ts']) writeFileSync(join(repo, f), 'one\nconst x = "Hive"\n')
+      // Lines that read like a file's header, in a hunk ("--- a/x", "+++ b/x"): still lines of plain.ts, not a file.
+      writeFileSync(join(repo, 'src/plain.ts'), '-- a/src/a b.ts\n++ b/src/a b.ts\nconst z = "xhive"\n')
+      writeFileSync(join(repo, 'src/né hive.ts'), 'hive\n')
+      writeFileSync(join(repo, 'src/new space.ts'), '\nconst y = "myhive"\n')
+      git('add', '.')
+      git('commit', '-q', '-m', 'the change')
+      const { hits } = checkDiffNames(repo, base)
+      expect(hits.map((h: Hit) => `${h.file}:${h.line}`).sort()).toEqual(['src/a b.ts:2', 'src/café.ts:2', 'src/new space.ts:2', 'src/né hive.ts:0', 'src/né hive.ts:1', 'src/plain.ts:3'])
+    } finally {
+      rmSync(repo, { recursive: true, force: true })
+    }
+  })
+
+  it("reads git's quoted header paths", () => {
+    expect(diffPath('b/src/a b.ts\t')).toBe('src/a b.ts')
+    expect(diffPath('"b/src/caf\\303\\251.ts"')).toBe('src/café.ts')
+    expect(diffPath('"b/src/say \\"x\\".ts"')).toBe('src/say "x".ts')
+    expect(diffPath('/dev/null')).toBeNull()
   })
 
   it("each diffFiles entry is a file of the repository, and check:repo runs the change's check", () => {

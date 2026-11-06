@@ -11,9 +11,8 @@
     { "file": "CHANGELOG.md", "id": "changelog-rename", "why": "Unreleased's rename entries (HI-2458 to HI-2463): the former name once, and the old folders, paths and names the upgrade converts (the Assistant on HI-2631)." },
     { "file": "CHANGELOG.md", "id": "changelog-rename-2", "why": "Unreleased's later rename entries (HI-2517 to HI-2591): the old ids, files, headers, trailers, branches and values they convert (upgrade input, HI-2631)." },
     { "file": "tests/scenarios/BASELINE.md", "id": "baseline-run-records", "why": "The dated scenario run records from 1 November 2026 back: evidence as recorded (history, HI-2631). New records go above the region." },
-    { "file": "tests/oldNames.mjs", "id": "detector", "why": "The guard's own pattern and the ordinary words it passes (HI-2617)." },
+    { "file": "tests/oldNameMatch.cjs", "id": "detector", "why": "The guard's own pattern and the ordinary words it passes (HI-2617), shared with the clean-install check (HI-2633)." },
     { "file": "tests/oldNames.test.ts", "id": "truth-table", "why": "The guard's truth table and planted cases (HI-2617)." },
-    { "file": "tests/sandbox/clean.cjs", "id": "clean-install-detector", "why": "The clean-install check's pattern (HI-2592), the one place its search names it." },
     { "file": "tests/e2e/evidence.cjs", "id": "HI-2622-board-lookup", "why": "Temporary: the board lookup still also reads the 1.0 board's file until the user has installed RC4; HI-2622 removes this entry (the Assistant's comment on HI-2617)." },
     {"file": "tests/combworkMoveWorker.test.ts", "id": "combworkMoveWorker-inputs", "why": "1.0's folder name, the input of the move's card rewrite (HI-2462)."},
     {"file": "tests/combworkMove10.test.ts", "id": "combworkMove10-inputs", "why": "1.0's folder, board file and the schema names and app name as 1.0 had them: what a 1.0.0 workspace and its schema looked like (HI-2462, HI-2587)."},
@@ -84,6 +83,7 @@
     {"file": "src/main/schema/valuesStep.ts", "why": "The upgrade's code, which must name the old paths and values it converts (Darren's decision on HI-2617)."},
     {"file": "src/main/storedNames.ts", "why": "The upgrade's code, which must name the old paths and values it converts (Darren's decision on HI-2617)."},
     {"file": "src/shared/combworkFolderMove.ts", "why": "The upgrade's code, which must name the old paths and values it converts (Darren's decision on HI-2617)."},
+    {"file": "tests/oldNameMatch.cjs", "why": "The detector itself (Darren's decision on HI-2617; one matcher for both guards, HI-2633)."},
     {"file": "tests/oldNames.mjs", "why": "The detector itself (Darren's decision on HI-2617)."},
     {"file": "tests/oldNames.test.ts", "why": "The detector itself (Darren's decision on HI-2617)."},
     {"file": "tests/sandbox/clean.cjs", "why": "The detector itself (Darren's decision on HI-2617)."}

@@ -28,46 +28,13 @@ import { createRequire } from 'module'
 import { join } from 'path'
 import { fileURLToPath } from 'url'
 
-const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs')
+const require = createRequire(import.meta.url)
+const { baseEnv } = require('./e2e/runContext.cjs')
 
 export const ALLOW_FILE = 'tests/oldNamesAllow.json'
 
-// old-name: begin detector
-/** Every place the name appears, in any case, as a word or joined to anything (myHive, HIVE_DIR, hive2, xhive, hives). */
-const NAME = /hive/gi
-/**
- * The ordinary words that hold its letters, and only these: archive in all its forms (Archived, unarchive, ARCHIVE_DIR,
- * boardarchive, désarchiver), chive and chives, beehive and beehives. Each is the text just before the letters and just
- * after them. The letters are in one case, all lower or all upper, as the word's are: arcHive, beeHive or ArcHIVE (a
- * capital where a word joins) is a hit.
- */
-const ORDINARY = {
-  lower: [
-    { before: /[Aa]rc$/, after: /^/ },
-    { before: /(?:^|[^A-Za-z])[Cc]$/, after: /^s?(?![A-Za-z])/ },
-    { before: /(?:^|[^A-Za-z])[Bb]ee$/, after: /^s?(?![A-Za-z])/ }
-  ],
-  upper: [
-    { before: /ARC$/, after: /^/ },
-    { before: /(?:^|[^A-Za-z])C$/, after: /^S?(?![A-Za-z])/ },
-    { before: /(?:^|[^A-Za-z])BEE$/, after: /^S?(?![A-Za-z])/ }
-  ]
-}
-// old-name: end detector
-
-/** The hits in a text: [{ at, match }]. */
-export function nameHits(text) {
-  const s = String(text ?? '')
-  const out = []
-  for (const m of s.matchAll(NAME)) {
-    const words = m[0] === m[0].toLowerCase() ? ORDINARY.lower : m[0] === m[0].toUpperCase() ? ORDINARY.upper : []
-    const before = s.slice(Math.max(0, m.index - 4), m.index)
-    const after = s.slice(m.index + 4, m.index + 6)
-    if (words.some((w) => w.before.test(before) && w.after.test(after))) continue
-    out.push({ at: m.index, match: m[0] })
-  }
-  return out
-}
+/** The hits in a text: [{ at, match }], by the matcher the clean-install check shares (tests/oldNameMatch.cjs). */
+export const { nameHits } = require('./oldNameMatch.cjs')
 
 /** A file's text: UTF-16 by its BOM, else UTF-8; binary content (a NUL in its first 8 KB) as Latin-1, so a name in it is still found. */
 export function textOf(buf) {
@@ -192,6 +159,29 @@ export function checkRepoNames(root) {
   return checkNames({ files: repoFiles(root), read, allow })
 }
 
+/**
+ * The path a diff's `+++ ` header names, without its `b/`: unquoted from git's C-style quoting ("b/caf\303\251.txt",
+ * octal bytes as UTF-8), and without the tab git adds after a name holding a space. null for /dev/null.
+ */
+export function diffPath(header) {
+  let s = header.replace(/\r$/, '')
+  if (s.startsWith('"')) {
+    const bytes = []
+    const esc = { a: 7, b: 8, t: 9, n: 10, v: 11, f: 12, r: 13, '"': 34, '\\': 92 }
+    let i = 1
+    for (; i < s.length && s[i] !== '"'; i++) {
+      if (s[i] !== '\\') bytes.push(...Buffer.from(s[i], 'utf8'))
+      else if (/[0-7]/.test(s[i + 1] ?? '')) {
+        bytes.push(parseInt(s.slice(i + 1, i + 4), 8))
+        i += 3
+      } else bytes.push(esc[s[++i]] ?? s.charCodeAt(i))
+    }
+    s = Buffer.from(bytes).toString('utf8')
+  } else s = s.replace(/\t$/, '')
+  if (s === '/dev/null') return null
+  return s.startsWith('b/') ? s.slice(2) : s
+}
+
 /** A line of a change's own that may name the old name: an `old-name: <why>` comment on it (not a region's begin or end). */
 const LINE_MARKER = /old-name: (?!begin |end )\S/
 
@@ -211,24 +201,37 @@ export function checkDiffNames(root, base) {
   const git = (...args) => execFileSync('git', args, { cwd: root, env: baseEnv(), encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 })
   const from = git('merge-base', base, 'HEAD').trim()
   const diffFiles = new Set((allow.diffFiles ?? []).map((e) => e.file))
-  // The lines each file adds, by its line numbers now.
-  const added = new Map()
-  let file = null
-  for (const line of git('diff', '-U0', '--no-color', '--no-ext-diff', '--no-renames', '--diff-filter=AM', from, '--').split('\n')) {
-    const m = /^\+\+\+ b\/(.*)$/.exec(line)
-    if (m) file = m[1].replace(/\r$/, '')
-    else if (line.startsWith('+++ ')) file = null
-    const h = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/.exec(line)
-    if (h && file) {
-      const set = added.get(file) ?? new Set()
-      for (let i = 0, n = h[2] === undefined ? 1 : Number(h[2]); i < n; i++) set.add(Number(h[1]) + i)
-      added.set(file, set)
+  // The files it adds and changes, by name as git has them (-z: a space, a quote or a non-ASCII letter kept as it is,
+  // HI-2633). A new file, committed or not, is searched whole, its name too.
+  const names = (filter) => git('diff', '--name-only', '-z', '--no-renames', `--diff-filter=${filter}`, from, '--').split('\0').filter(Boolean)
+  const newFiles = new Set([...names('A'), ...git('ls-files', '-z', '-o', '--exclude-standard').split('\0').filter(Boolean)])
+  const added = new Map([...newFiles].map((f) => [f, 'all']))
+  // The lines each changed file adds, by its line numbers now, from its hunks' headers.
+  const changed = names('M').filter((f) => !newFiles.has(f))
+  const hunks = (out, set, only) => {
+    let file = only
+    // In a file's header (from its `diff --git` line to its first hunk), not in a hunk, where an added "++ x" reads the same.
+    let header = false
+    for (const line of out.split('\n')) {
+      if (line.startsWith('diff --git ')) {
+        header = true
+        if (!only) file = null
+      } else if (line.startsWith('@@')) header = false
+      if (!only && header && line.startsWith('+++ ')) file = diffPath(line.slice(4))
+      const h = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/.exec(line)
+      if (!h || !file) continue
+      const lines = set.get(file) ?? new Set()
+      for (let i = 0, n = h[2] === undefined ? 1 : Number(h[2]); i < n; i++) lines.add(Number(h[1]) + i)
+      set.set(file, lines)
     }
   }
-  const newFiles = new Set(git('diff', '--name-only', '--no-renames', '--diff-filter=A', from, '--').split('\n').map((l) => l.trim()).filter(Boolean))
-  for (const f of git('ls-files', '-z', '-o', '--exclude-standard').split('\0').filter(Boolean)) {
-    newFiles.add(f)
-    added.set(f, 'all')
+  const diff = (...paths) => git('-c', 'core.quotePath=false', 'diff', '-U0', '--no-color', '--no-ext-diff', '--no-renames', '--diff-filter=M', from, '--', ...paths)
+  const parsed = new Map()
+  if (changed.length) hunks(diff(), parsed, null)
+  for (const f of changed) {
+    // A name its header didn't give back as it is (some character git still quotes): that file's diff alone.
+    if (!parsed.has(f)) hunks(diff(f), parsed, f)
+    added.set(f, parsed.get(f) ?? new Set())
   }
   const read = (f) => {
     try {
