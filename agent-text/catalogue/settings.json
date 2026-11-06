@@ -935,8 +935,8 @@
     "audience": "both"
   },
   "settings.advanced.codex.screen.idleQuestion.desc": {
-    "text": "The title of a question Codex shows by itself between turns, sending no hook (its offer of a cheaper model near the account's limit), in the lines it drew last. While it shows with one of its choices (Screen: question's choice), the agent waits for you and Combwork types nothing into it, since Enter would answer it. Wrong, a wake's Enter can answer the question.",
-    "note": "What the advanced setting \"Screen: question while idle\" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-2609). \"Screen: question's choice\" is another advanced setting's title: keep it as translated there.",
+    "text": "The titles of the questions Codex shows by itself between turns, sending no hook (its offer of a cheaper model near the account's limit, and its offers to ask your workspace's owner for more credits or a higher limit once a workspace reaches its limit), in the lines it drew last. While one shows with one of its choices (Screen: question's choice), the agent waits for you and Combwork types nothing into it, since a key or Enter would answer it. Wrong, a wake typed into the question can answer it.",
+    "note": "What the advanced setting \"Screen: question while idle\" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-2609, HI-2619). \"Screen: question's choice\" is another advanced setting's title: keep it as translated there.",
     "audience": "both"
   },
   "settings.advanced.codex.screen.idleQuestion.title": {
@@ -945,8 +945,8 @@
     "audience": "both"
   },
   "settings.advanced.codex.screen.idleQuestionChoice.desc": {
-    "text": "One of the choices of that question (Screen: question while idle), as Codex numbers it. Both must show, near the bottom of its screen and not in its input, for the question to count, so the same words in the conversation don't stop Combwork typing.",
-    "note": "What the advanced setting \"Screen: question's choice\" is for (Settings → Advanced, HI-2609). \"Screen: question while idle\" is another advanced setting's title: keep it as translated there.",
+    "text": "One of the choices of those questions (Screen: question while idle), as Codex numbers it. Both must show, near the bottom of its screen and not in its input, for the question to count, so the same words in the conversation don't stop Combwork typing.",
+    "note": "What the advanced setting \"Screen: question's choice\" is for (Settings → Advanced, HI-2609, HI-2619). \"Screen: question while idle\" is another advanced setting's title: keep it as translated there.",
     "audience": "both"
   },
   "settings.advanced.codex.screen.idleQuestionChoice.title": {

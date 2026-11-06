@@ -152,16 +152,21 @@ const SELECTED_ROW = /^›\s*\d+\.\s/
 const VIEW_ROW_ABOVE = /^\s+\d+\.\s|^\s{4,}\S/
 /** How many choices a view's rows above its selected row may take (a bound: Codex's views have a few). */
 const VIEW_ROWS_MOST = 12
-/** How far above its first choice a choice view's title may be: its title, its question line and a blank line. */
-const VIEW_TITLE_ABOVE = 4
+/**
+ * How far above its first choice a choice view's title may be (HI-2619): its title and question, which Codex wraps to the
+ * pane and cuts at 8 lines, and the 2 blank lines it leaves before the choices (0.166.0's snapshots of these views).
+ */
+const VIEW_TITLE_ABOVE = 10
 /**
  * The question Codex shows by itself between turns, sending no hook (HI-2609, 0.166.0: "Approaching rate limits", its
- * offer of a cheaper model with that choice selected, which Enter takes): its title (codex.screen.idleQuestion) and one
- * of its choices (codex.screen.idleQuestionChoice), read by the view's own layout. Such a view replaces the input while
+ * offer of a cheaper model with that choice selected, which Enter takes; HI-2619: at a workspace's credit or usage limit,
+ * "You've reached your workspace credit limit" or "Usage limit reached", whose "1. Yes (y)" asks the workspace's owner,
+ * a key typed reaching outside the PC): its title (codex.screen.idleQuestion) and one of its choices
+ * (codex.screen.idleQuestionChoice), read by the view's own layout. Such a view replaces the input while
  * it shows, so it is the last thing drawn: the last line Codex marks with "›" in its first column is the view's selected
  * row ("› 1. Switch to …", whichever choice is selected), the choices above it (not selected, or a choice's text
- * wrapped) go up to the view's first choice, and the title starts a paragraph of its own just above that (its title, its
- * question, a blank line); one of its choices is in the view. Anything else is no question (HR2's round 1): an input
+ * wrapped) go up to the view's first choice, and the title starts a paragraph of its own just above that (its title and
+ * its question, however Codex wraps them to the pane, then blank lines); one of its choices is in the view. Anything else is no question (HR2's round 1): an input
  * line last (the view gone, or leftovers of one above it), the words in a reply or a prompt above the input, or typed
  * into the input however it wraps or is numbered (a first line "› 1. …" has nothing of the view above it, and a draft's
  * other lines follow its "›"). Null when none shows.
@@ -176,16 +181,21 @@ export function codexIdleQuestion(screen: string): string | null {
   while (first > 0 && row - first < VIEW_ROWS_MOST && VIEW_ROW_ABOVE.test(lines[first - 1])) first--
   const title = advanced.pattern('codex.screen.idleQuestion')
   const choice = advanced.pattern('codex.screen.idleQuestionChoice')
-  // Its title: a line just above its first choice, starting a paragraph, with only the view's own lines (indented text,
-  // blank lines) between: no conversation item ("•"), no prompt or input ("›").
-  for (let t = first - 1; t >= Math.max(0, first - VIEW_TITLE_ABOVE); t--) {
-    if (!/^(\s|$)/.test(lines[t])) return null
-    const asked = title.exec(lines[t])?.[0]
-    if (!asked) continue
-    if (t > 0 && lines[t - 1].trim()) return null
-    return lines.slice(first, row + IDLE_QUESTION_LINES).some((l) => choice.test(l)) ? asked.trim() : null
-  }
-  return null
+  // Its header: the paragraph just above its first choice, after the blank lines Codex leaves there: its title, then its
+  // question, each word-wrapped to the pane (HI-2619, HR1's round 1: the title too). A paragraph of its own (a blank line
+  // or the screen's top above it), of the view's own indented lines only: no conversation item ("•"), no prompt or input ("›").
+  let end = first - 1
+  while (end >= 0 && first - end <= VIEW_TITLE_ABOVE && !lines[end].trim()) end--
+  if (end < 0 || !lines[end].trim()) return null
+  let start = end
+  while (start > 0 && first - start < VIEW_TITLE_ABOVE && lines[start - 1].trim()) start--
+  if (start > 0 && lines[start - 1].trim()) return null
+  const header = lines.slice(start, end + 1)
+  if (header.some((l) => !/^\s/.test(l))) return null
+  // Read as Codex wrote it, its lines joined again; the title begins on the header's first line.
+  const asked = title.exec(header.map((l) => l.trim()).join(' '))
+  if (!asked || asked.index >= header[0].trim().length) return null
+  return lines.slice(first, row + IDLE_QUESTION_LINES).some((l) => choice.test(l)) ? asked[0].trim() : null
 }
 /**
  * Whether Codex's input still holds `command`, unrun (#363): the input is the last line Codex marks with "›", and holds
@@ -607,7 +617,8 @@ export class CodexAdapter implements ProviderAdapter {
   busyScreen(screen: string): boolean {
     return codexHoldsInput(screen)
   }
-  // Its offer of a cheaper model near the account's limit (HI-2609): the agent waits for the user, and nothing is typed.
+  // Its offer of a cheaper model near the account's limit (HI-2609), its prompts at a workspace's limit (HI-2619): the
+  // agent waits for the user, and nothing is typed.
   idleQuestion(screen: string): string | null {
     return codexIdleQuestion(screen)
   }

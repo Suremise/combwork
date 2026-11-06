@@ -54,7 +54,9 @@
 //   (tests/fixtures/advanced/ratelimit-nudge-codex-0.166.0.txt) in place of its input, its first choice selected. Every key
 //   read while it shows is logged in fake-nudge.jsonl in CODEX_HOME; Enter takes the selected choice (its rollout's
 //   thread_settings_applied names gpt-6-luna), "2" or Esc keeps the model. With -c notice.hide_rate_limit_model_nudge=true
-//   it isn't shown (logged as hidden). "switchmodel M": its rollout's thread_settings_applied names M, as /model does.
+//   it isn't shown (logged as hidden). "creditnudge", "usagenudge" (HI-2619): after the turn, its prompt at a workspace's
+//   credit or usage limit ("Notify owner?", "Request increase?"), "2. No (default)" selected, keys logged there too (with
+//   its prompt): "y", "1" or Enter on Yes ask the owner, "n", "2", Esc or Enter on No don't; nothing hides it. "switchmodel M": its rollout's thread_settings_applied names M, as /model does.
 //   With fake-turn-context.txt in CODEX_HOME, each turn's rollout has a turn_context naming its -m model.
 const fs = require('fs')
 const path = require('path')
@@ -682,6 +684,8 @@ async function runPrompt(text) {
       await key(['g'])
     } else if (step === 'nudge') {
       nudgeAfter = true
+    } else if (step === 'creditnudge' || step === 'usagenudge') {
+      nudgeAfter = step === 'creditnudge' ? 'credits' : 'usage'
     } else if (/^switchmodel \S+$/.test(step)) {
       switchModel(step.slice('switchmodel '.length))
     } else if (step === 'ratelimited') {
@@ -724,15 +728,19 @@ async function runPrompt(text) {
   if (late) await hook('PostToolUse', late)
   busy = false
   if (nudgeAfter) {
+    const which = nudgeAfter
     nudgeAfter = false
-    return showNudge()
+    return which === true ? showNudge() : showOwnerNudge(which)
   }
   promptLine()
 }
 
 const promptLine = () => out('\r\n› Ask Codex to do anything\r\n')
 
-/** A "nudge" step this turn: its offer of a cheaper model shows once the turn is over (HI-2609). */
+/**
+ * A "nudge" step this turn (true): its offer of a cheaper model shows once the turn is over (HI-2609); "creditnudge" or
+ * "usagenudge" ('credits', 'usage'): its prompt at a workspace's limit (HI-2619).
+ */
 let nudgeAfter = false
 /** Its offer showing: the choice selected (1: switch). */
 let nudge = null
@@ -767,6 +775,34 @@ function nudgeKey(ch) {
   promptLine()
 }
 
+/** Its prompt at a workspace's limit showing (HI-2619): which one, and the choice selected (2: No). */
+let ownerNudge = null
+const OWNER_NUDGE = {
+  credits: ["You've reached your workspace credit limit", 'Your workspace is out of credits. Ask your workspace owner to add more. Notify owner?'],
+  usage: ['Usage limit reached', 'Request a limit increase from your owner to continue using codex. Request increase?']
+}
+/**
+ * Its prompt once a workspace member's turn failed at the workspace's limit, drawn in place of its input as Codex 0.166.0
+ * draws it (tests/fixtures/advanced/credit-limit-nudge-codex-0.166.0.txt), "No" selected. No launch argument hides it.
+ */
+function showOwnerNudge(which) {
+  ownerNudge = { which, selected: 2 }
+  nudgeLog({ shown: true, prompt: which })
+  const [title, asks] = OWNER_NUDGE[which]
+  out(`\r\n■ Usage limit reached.\r\n\r\n\r\n  ${title}\r\n  ${asks}\r\n\r\n\r\n  1. Yes (y)\r\n› 2. No (default) (n)\r\n\r\n  enter select · esc back\r\n`)
+}
+/** A key read while it shows: every one logged; "y" or "1" asks the owner, "n", "2" or Esc doesn't, Enter takes the selected one. */
+function ownerNudgeKey(ch) {
+  nudgeLog({ key: ch, prompt: ownerNudge.which })
+  const answer = ch === 'y' || ch === '1' || (ch === '\r' && ownerNudge.selected === 1) ? 'ask-owner' : ch === 'n' || ch === '2' || ch === '\x1b' || ch === '\r' ? 'no' : null
+  if (!answer) return
+  nudgeLog({ answer, prompt: ownerNudge.which })
+  ownerNudge = null
+  out('\x1b[2J\x1b[H')
+  if (answer === 'ask-owner') out('\r\n• Workspace owner notified.\r\n')
+  promptLine()
+}
+
 let line = ''
 let ctrlC = 0
 if (process.stdin.isTTY) process.stdin.setRawMode(true)
@@ -778,6 +814,10 @@ process.stdin.on('data', (data) => {
   for (const ch of keys) {
     if (nudge) {
       nudgeKey(ch)
+      continue
+    }
+    if (ownerNudge) {
+      ownerNudgeKey(ch)
       continue
     }
     if (onKey?.(ch)) continue
