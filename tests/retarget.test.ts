@@ -79,11 +79,12 @@ describe('the retarget preview (HI-2680)', () => {
     expect(await store.boardWrite(w, async () => wf.putBack(`#${busy.number}`, 'user'))).toMatchObject({ ok: true })
     writeFileSync(join(repo, 'left.txt'), 'left\n')
     const lc = await card(w, 'Lane card')
-    await lanes.startLane(w, { project: 'p', builder: 'r1', reviewer: 'b1', cards: [lc.number], by: 'You' })
+    // A builder builds and a reviewer reviews (HI-2664 refuses a lane's parts the other way round).
+    await lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [lc.number], by: 'You' })
     const p = await inWorkspace(w, () => retarget.retargetPreview(w, repo, '1.1.0', '1.2.0'))
     expect(p.cards.move.map((c) => c.number)).toEqual([free.number])
     expect(p.cards.keep).toEqual(expect.arrayContaining([expect.objectContaining({ number: busy.number, why: 'work' }), expect.objectContaining({ number: started.number, why: 'started' })]))
-    expect(p.lanes).toEqual([expect.objectContaining({ builder: 'R1' })])
+    expect(p.lanes).toEqual([expect.objectContaining({ builder: 'B1' })])
     // The tab's check shows it while the target changes.
     const check = await inWorkspace(w, () => form.checkWorkflowChange(w, repo, { preset: 'pair', options: { ...pair, target: '1.2.0', otherTargets: ['main', '1.1.0'] } }))
     expect(check.retarget?.cards.move.map((c) => c.number)).toEqual([free.number])

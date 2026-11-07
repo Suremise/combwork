@@ -45,11 +45,12 @@ export const TEMPLATE_CARRIED = [
 ] as const satisfies readonly OptionKey[]
 
 /**
- * The project's own facts, never carried: the branch its work merges into and pushing it, the checks' commands, the
- * merge commit's message (set per workspace) and None's excluded folders. The identity's name and email aren't carried
- * either: `identity` is, as on or off only, made from the loading project's own git identity.
+ * The project's own facts, never carried: the branch its work merges into, the other branches it can (HI-2556), and
+ * pushing it, the checks' commands, the merge commit's message (set per workspace) and None's excluded folders. The
+ * identity's name and email aren't carried either: `identity` is, as on or off only, made from the loading project's own
+ * git identity.
  */
-export const TEMPLATE_NOT_CARRIED = ['target', 'targetOwn', 'pushTarget', 'commands', 'commitMessage', 'excluded'] as const satisfies readonly OptionKey[]
+export const TEMPLATE_NOT_CARRIED = ['target', 'targetOwn', 'otherTargets', 'pushTarget', 'commands', 'commitMessage', 'excluded'] as const satisfies readonly OptionKey[]
 
 export type CarriedKey = (typeof TEMPLATE_CARRIED)[number]
 
