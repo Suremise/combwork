@@ -112,18 +112,25 @@ export const WORKER_ONLY_TOOLS: readonly string[] = [...INTENT_TOOLS.filter((t) 
 /**
  * A project agent's tools by its side of the workflow (HI-2664, Darren 7 Nov: "Approve HI-2664 … role filtering in this
  * card"): a builder is never offered a reviewer's moves, nor a reviewer a builder's; an agent on both sides (`either`)
- * or neither (a generalist, an Independent agent) gets both. The side is its launch's (launchWorkflow: its part in its
- * project's running lanes, else its own role), fixed for the session: a change restarts it (sessions.ts).
+ * or neither (a generalist, an Independent agent) gets both. The side is its saved role's alone (HR3's round 1: a lane
+ * never narrows an either-role agent, nor gives a role the other side's tools; a lane's builder builds and its reviewer
+ * reviews, as lanes.ts checks), fixed for the session: a role change restarts it (sessions.ts).
  */
 export type ToolSide = 'builder' | 'reviewer' | 'both'
 /** A reviewer's moves: a builder is never offered them. */
 export const REVIEWER_ONLY_TOOLS: readonly string[] = ['cw_start_review', 'cw_verdict', 'cw_request_builder', 'cw_focused_skip']
 /** A builder's moves: a reviewer is never offered them. */
 export const BUILDER_ONLY_TOOLS: readonly string[] = ['cw_start_card', 'cw_submit', 'cw_put_back', 'cw_declare_paths', 'cw_cannot_within_rules', 'cw_merge_slot', 'cw_report_merge', 'cw_reorder_tasks', 'cw_update_tasks']
-/** A launch's side as its tools follow it: builder, reviewer, else both. */
-export const toolSideOf = (workflow: string | null | undefined): ToolSide => (workflow === 'builder' || workflow === 'reviewer' ? workflow : 'both')
+/** An agent's side as its tools follow it, from its workflow role: builder, reviewer, else both. */
+export const toolSideOf = (role: string | null | undefined): ToolSide => (role === 'builder' || role === 'reviewer' ? role : 'both')
 /** The tools a side isn't offered (nothing for both, or a side not known). */
 export const hiddenForSide = (side: string | null | undefined): readonly string[] => (side === 'builder' ? REVIEWER_ONLY_TOOLS : side === 'reviewer' ? BUILDER_ONLY_TOOLS : [])
+/**
+ * Whether a session launched with `side`'s tools can do a part's work (HI-2664, HR3's round 1): a running agent whose role
+ * changed keeps the tools it launched with until it restarts, and is given no work needing the new ones meanwhile. No side
+ * (not running, or launched without Combwork's tools): nothing to keep it from.
+ */
+export const sideAllows = (side: string | null | undefined, part: 'builder' | 'reviewer'): boolean => !side || side === 'both' || side === part
 
 /** Tools only the Assistant has (project agents don't get them). cw_wait_for_agents isn't one: an agent waits on its project's agents too (#416). */
 export const ASSISTANT_ONLY_TOOLS = ['cw_agent_activity', 'cw_list_providers', 'cw_list_settings', 'cw_read_setting', ...ASSISTANT_AGENT_TOOLS, ...ASSISTANT_SLOT_TOOLS, ...ASSISTANT_TEAM_TOOLS, ...ASSISTANT_TEMPLATE_TOOLS, ...ASSISTANT_CONNECTION_TOOLS, ...ASSISTANT_UNDO_TOOLS, ...ASSISTANT_PROJECT_TOOLS, ...ASSISTANT_SETTINGS_TOOLS, ...JOURNAL_TOOLS]

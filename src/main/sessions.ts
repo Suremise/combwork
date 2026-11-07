@@ -21,7 +21,7 @@ import { ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/assistant'
 import { formatDateTime } from '../shared/dates'
 import { formatSize } from '../shared/units'
 import { backgroundTaskMinutes } from '../shared/tasks'
-import { assistantTools, hiddenForSide, isReservedServerName, toolSideOf, TOOLS_SERVER } from '../shared/assistantTools'
+import { assistantTools, isReservedServerName, sideAllows, toolSideOf, TOOLS_SERVER } from '../shared/assistantTools'
 import { CW_DIR, isCompacting, agentPtyKey, assertSessionId, cliRename, isSessionId, launchedWithOf, projectAgents, resumeRecord, transcriptWarnLimit } from '../shared/defaults'
 import { defaultPurpose, legacySetupPending, legacyWorktree, namedFolders, type StoredAgent, resumeHold, resumeHome, shownPlace, slotAt, type FolderFacts, type FolderPurpose, type NamedFolder, type FolderSlot, type ResumeHold } from '../shared/agentFolders'
 import { holdText } from '../shared/sessionResume'
@@ -449,6 +449,8 @@ interface LiveSession {
   workflow?: LaunchWorkflow
   /** The side its Combwork tools were offered for (HI-2664, its CW_SIDE): null without Combwork's tools. */
   side?: string | null
+  /** A restart for its new side is on its way (restartForSide): asked again, it isn't queued twice. */
+  sideRestart?: boolean
   /** When this launch first became ready (or watching, or finished), in ms (#865). */
   readyAt?: number
   /**
@@ -1727,10 +1729,10 @@ class SessionManager {
     const combwork = this.combworkMcp(projectPath, agent?.id)
     // Its instructions name only the skills the session gets (#1431).
     if (combwork) mcpServers[TOOLS_SERVER] = skillsOff.length ? { ...combwork, env: { ...combwork.env, CW_SKILLS_OFF: skillsOff.sort().join(',') } } : combwork
-    // A project agent's side of the workflow (HI-2664): its tools follow it. Part of the signature, so a change of its role
-    // or of its part in a running lane asks for a restart (switchSide restarts it at a safe point).
+    // A project agent's side of the workflow (HI-2664): its tools follow its saved role, never its lanes (HR3's round 1).
+    // Part of the signature, so a role change asks for a restart (restartForSide restarts it).
     if (mcpServers[TOOLS_SERVER] && !assistant && forAgent) {
-      const side = toolSideOf(launchWorkflow(agentWorkflowRole(forAgent), await this.laneParts(projectPath, forAgent.id).catch(() => [])))
+      const side = toolSideOf(agentWorkflowRole(forAgent))
       mcpServers[TOOLS_SERVER] = { ...mcpServers[TOOLS_SERVER], env: { ...mcpServers[TOOLS_SERVER].env, CW_SIDE: side } }
     }
 
@@ -2490,38 +2492,42 @@ class SessionManager {
    * HI-1755's own. Either joins a switch already waiting (one quit), each kept apart (dropUsageMove).
    */
   /**
-   * A running agent whose side of the workflow changed since it launched (HI-2664, Darren's decision: its role, or its part
-   * in a running lane), restarted to load its new tool list, resuming its conversation, as a connection switch does:
-   * - `ifIdle` (a role saved in Agent Settings): an idle agent at once; a busy one is `busy`, and the window asks first;
-   * - `atSafePoint`: when its turn is over (the user said so, or a lane gave it tools it lacked);
-   * - `widenOnly` (a lane change): only when it gains tools; one that only loses some carries on (a call is refused).
-   * 'same': its side is as it launched (or it has no Combwork tools); 'notRunning': nothing to restart.
+   * A running agent whose role changed its side of the workflow since it launched (HI-2664, Darren's decision), restarted
+   * to load its new tool list, resuming its conversation, as a connection switch does. Every role change runs it
+   * (projectAgents.updateAgent: Agent Settings, the Agent API, the Assistant's cw_update_agent):
+   * - `ifIdle`: an idle agent at once; a busy one is `busy` (the window asks first; the Agent API's reply says so);
+   * - `atSafePoint`: when its turn is over (the user chose Restart When Its Turn Is Over).
+   * Until it has restarted (Later, a busy agent, a restart that failed), it keeps its old tools and is given no work that
+   * needs the new ones (`sideAllows`). 'same': its side is as it launched (or it has no Combwork tools); 'notRunning':
+   * nothing to restart.
    */
-  async restartForSide(projectPath: string, agentId: string, o: { when: 'ifIdle' | 'atSafePoint'; widenOnly?: boolean }): Promise<'restarting' | 'busy' | 'same' | 'notRunning'> {
+  async restartForSide(projectPath: string, agentId: string, o: { when: 'ifIdle' | 'atSafePoint' }): Promise<'restarting' | 'busy' | 'same' | 'notRunning'> {
     projectPath = workspace.assertSessionHost(projectPath)
     if (workspace.isAssistantHome(projectPath)) return 'same'
     const l = this.live.get(liveId(projectPath, agentId))
     if (!l || l.state.status === 'stopped') return 'notRunning'
     if (!l.side) return 'same'
     const { agent } = await this.agentDef(projectPath, agentId)
-    const now = toolSideOf(launchWorkflow(agentWorkflowRole(agent), await this.laneParts(projectPath, agentId).catch(() => [])))
+    const now = toolSideOf(agentWorkflowRole(agent))
     if (now === l.side) return 'same'
-    const widens = hiddenForSide(l.side).some((t) => !hiddenForSide(now).includes(t))
-    if (o.widenOnly && !widens) return 'same'
+    // Asked again (the window's question after the change's own): one restart, already on its way.
+    if (l.sideRestart) return 'restarting'
     const busy = l.state.status === 'working' || l.state.turn?.state === 'running'
     if (o.when === 'ifIdle' && busy) return 'busy'
     log.info(`${userText(this.label(l.state))}: its side of the workflow changed (${l.side} → ${now}), restarting it ${busy ? 'once its turn is over' : 'now'}`)
     const r = this.switchAtSafePoint(projectPath, agentId)
-    return r === 'notRunning' ? 'notRunning' : 'restarting'
+    if (r === 'notRunning') return 'notRunning'
+    l.sideRestart = true
+    return 'restarting'
   }
 
-  /** Lanes changed (started, joined, ended): a running agent of the workspace given tools it lacks is restarted at its turn's end. */
-  async lanesChangedFor(workspacePath: string): Promise<void> {
-    for (const l of [...this.live.values()]) {
-      const st = l.state
-      if (!st.agentId || st.status === 'stopped' || workspace.isAssistantHome(st.projectPath) || !samePlace(workspaceFor(st.projectPath)?.path ?? '', workspacePath)) continue
-      await this.restartForSide(st.projectPath, st.agentId, { when: 'atSafePoint', widenOnly: true }).catch((e) => log.warn(`${userText(this.label(st))}: its side couldn't be checked`, e))
-    }
+  /**
+   * Whether a running agent's session has the tools of a part of the workflow (HI-2664, HR3's round 1): false while its
+   * role has changed and it hasn't restarted to load them. Not running: true (it launches with its role's).
+   */
+  sideAllows(projectPath: string, agentId: string, part: 'builder' | 'reviewer'): boolean {
+    const l = this.live.get(liveId(projectPath, agentId))
+    return !l || l.state.status === 'stopped' || sideAllows(l.side, part)
   }
 
   switchAtSafePoint(projectPath: string, agentId: string, usage?: UsageIntent): 'queued' | 'waiting' | 'notRunning' {
@@ -2952,6 +2958,7 @@ class SessionManager {
     state.launchSignature = this.signature({ ...eff, skillHashes: record.settled })
     // The side its tools are offered for (HI-2664), to tell when a role or lane change needs it restarted.
     l.side = (eff.mcpServers[TOOLS_SERVER]?.env?.CW_SIDE as string | undefined) ?? null
+    l.sideRestart = false
     // Its dialect chain (HI-2443): each layer's file, "model unknown", and the guidance revision as said in it, where a
     // dialect is set (a text overridden, or a file picked). Speaking the Default, its record is as before, but for
     // "model unknown" (decision Q4), said compactly: the status every agent reads carries it (replysize).

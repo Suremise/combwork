@@ -285,6 +285,11 @@
       "project": "plain"
     }
   },
+  "lane.refused.oldTools": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
   "lane.refused.poolReviewer": {
     "placeholders": {}
   },

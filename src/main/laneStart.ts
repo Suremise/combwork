@@ -599,6 +599,8 @@ export async function startWaitingLane(ws: WorkspaceService, projectPath: string
   const builder = agents.find((a) => a.id === lane.builder.id)
   const reviewer = lane.reviewer ? (agents.find((a) => a.id === lane.reviewer!.id) ?? null) : null
   if (!builder || !buildsWork(agentWorkflowRole(builder)) || (lane.reviewer && !reviewer)) return false
+  // Made a builder (or reviewer) while running and not restarted since (HI-2664): not its part's tools yet, so it waits.
+  if (!sessions.sideAllows(projectPath, builder.id, 'builder') || (reviewer && !sessions.sideAllows(projectPath, reviewer.id, 'reviewer'))) return false
   const cards = await laneCards(ws, basename(projectPath), lane.cards)
   if (over()) return false
   const platform = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.platform?.id

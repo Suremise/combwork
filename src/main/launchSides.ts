@@ -1,10 +1,10 @@
 /**
  * A launch's side of the workflow for its metrics (HI-2049, shared/workflow/roles.ts launchWorkflow): its parts in its
  * project's running lanes, which the session manager can't read itself (lanes.ts reads the board). Here, as
- * handOverCheck.ts is.
+ * handOverCheck.ts is; and the lanes' check that an agent's running session has a part's tools (HI-2664).
  */
 import { basename } from 'path'
-import { laneParts } from './lanes'
+import { laneParts, setPartToolsCheck } from './lanes'
 import { sessions } from './sessions'
 import { workspaceOf } from './workspace'
 
@@ -18,4 +18,6 @@ export function startLaunchSides(): void {
     const ws = workspaceOf(projectPath)
     return ws.isAssistantHome(projectPath) ? [] : laneParts(ws, basename(projectPath), agentId)
   }
+  // The other way (HI-2664): a lane part only for an agent whose running session has its tools.
+  setPartToolsCheck((projectPath, agentId, part) => sessions.sideAllows(projectPath, agentId, part))
 }

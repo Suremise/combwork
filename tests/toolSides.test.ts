@@ -5,7 +5,7 @@
 import { readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
-import { ASSISTANT_ONLY_TOOLS, BUILDER_ONLY_TOOLS, CW_TOOLS, REVIEWER_ONLY_TOOLS, WORKER_ONLY_TOOLS, hiddenForSide, toolSideOf } from '../src/shared/assistantTools'
+import { ASSISTANT_ONLY_TOOLS, BUILDER_ONLY_TOOLS, CW_TOOLS, REVIEWER_ONLY_TOOLS, WORKER_ONLY_TOOLS, hiddenForSide, sideAllows, toolSideOf } from '../src/shared/assistantTools'
 
 const SKILLS = join(__dirname, '..', 'resources', 'skills')
 const read = (...p: string[]): string => readFileSync(join(SKILLS, ...p), 'utf8')
@@ -27,11 +27,27 @@ describe('tools by side (HI-2664)', () => {
     expect(BUILDER_ONLY_TOOLS.filter((t) => REVIEWER_ONLY_TOOLS.includes(t))).toEqual([])
   })
 
-  it("a launch's side: builder, reviewer, else both (either, none, unknown)", () => {
-    expect(['builder', 'reviewer', 'either', 'none', 'unknown', undefined].map(toolSideOf)).toEqual(['builder', 'reviewer', 'both', 'both', 'both', 'both'])
+  it("an agent's side is its role's: builder, reviewer, else both (either, generalist, independent, unknown)", () => {
+    expect(['builder', 'reviewer', 'either', 'generalist', 'independent', 'unknown', undefined].map(toolSideOf)).toEqual(['builder', 'reviewer', 'both', 'both', 'both', 'both', 'both'])
     expect(hiddenForSide('builder')).toEqual(REVIEWER_ONLY_TOOLS)
     expect(hiddenForSide('reviewer')).toEqual(BUILDER_ONLY_TOOLS)
     expect([hiddenForSide('both'), hiddenForSide(undefined), hiddenForSide('nonsense')]).toEqual([[], [], []])
+  })
+
+  // HR3's round 1: lanes never narrow an either-role agent's tools, nor give a role the other side's.
+  it("its lanes don't change its side: the side takes the role alone", () => {
+    expect(toolSideOf.length).toBe(1)
+    expect(readFileSync(join(__dirname, '../src/main/sessions.ts'), 'utf8')).toMatch(/const side = toolSideOf\(agentWorkflowRole\(forAgent\)\)/)
+  })
+
+  it("a session launched with a side does only that side's part until it restarts (a role changed meanwhile)", () => {
+    expect(sideAllows('builder', 'builder')).toBe(true)
+    expect(sideAllows('builder', 'reviewer')).toBe(false)
+    expect(sideAllows('reviewer', 'builder')).toBe(false)
+    expect(sideAllows('reviewer', 'reviewer')).toBe(true)
+    expect([sideAllows('both', 'builder'), sideAllows('both', 'reviewer')]).toEqual([true, true])
+    // Not running, or launched without Combwork's tools: nothing to keep it from (it launches with its role's).
+    expect([sideAllows(null, 'reviewer'), sideAllows(undefined, 'builder')]).toEqual([true, true])
   })
 
   for (const side of ['builder', 'reviewer'] as const) {

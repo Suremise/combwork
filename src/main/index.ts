@@ -1391,8 +1391,6 @@ app.whenReady().then(async () => {
     cancelPendingQuit
   })
   onCombworkEvent((e) => {
-    // Lanes changed (HI-2664): a running agent given a side whose tools it lacks restarts at its turn's end to load them.
-    if (e.type === 'lanes-changed') void sessions.lanesChangedFor(e.workspacePath)
     if (e.type === 'session-status' || e.type === 'session-exit') checkPendingQuit()
     // A window opened or closed its workspace: remember it for the next start.
     if (e.type === 'workspace-changed') saveWindowsSoon()

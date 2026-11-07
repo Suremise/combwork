@@ -4883,19 +4883,25 @@ repeating them (#533) [note §8].
   Combwork tools' enum take it.
 - **Tools by side** [HI-2664, Darren's 7 Nov decisions (02:25 and 02:30, the card's): "Changing role should maybe require a
   restart of the session to load different tools"] **Built**: a project agent's combwork server is told its side,
-  `CW_SIDE` in its env (`effective()`): `toolSideOf(launchWorkflow(role, laneParts))`, builder, reviewer or `both`
-  (either, generalist, a lane giving it both parts). `cw-mcp.ts` leaves out `hiddenForSide(side)`
+  `CW_SIDE` in its env (`effective()`): `toolSideOf(role)`, its saved role's alone, builder, reviewer or `both` (either,
+  generalist, independent). Its lanes never change it (HR3's round 1): a lane's builder builds and its reviewer reviews
+  (lanes.ts), so a lane never needs the other side's tools, and an either-role agent keeps both sets on any lane. The
+  metrics' launch side (`launchWorkflow`, HI-2049) stays apart. `cw-mcp.ts` leaves out `hiddenForSide(side)`
   (`shared/assistantTools.ts`): a builder `REVIEWER_ONLY_TOOLS` (cw_start_review, cw_verdict, cw_request_builder,
   cw_focused_skip), a reviewer `BUILDER_ONLY_TOOLS` (cw_start_card, cw_submit, cw_put_back, cw_declare_paths,
   cw_cannot_within_rules, cw_merge_slot, cw_report_merge, cw_reorder_tasks, cw_update_tasks). The Assistant is offered
   none of `WORKER_ONLY_TOOLS` (the intent tools but cw_ask_user, and cw_focused_skip); it keeps cw_release_slot and its
   Control-level tools. Measured on the bridge (replysize): both sides 38 tools, 24.7 KB; builder 34, 22.8 KB; reviewer 29,
   19.7 KB; the Assistant 50, 37.9 KB (was 41.5). The side is in the launch signature, so a change shows "restart needed";
-  `sessions.restartForSide` restarts through `switchAtSafePoint` (same conversation): after a role saved in Agent
-  Settings, `ifIdle` restarts an idle agent at once and answers `busy` for a working one, and the window asks first
-  (Restart When Its Turn Is Over → `atSafePoint`; Later: its old tools until it restarts). A `lanes-changed` event
-  restarts, at its turn's end, a running agent the change gives tools it lacks (`widenOnly`); one only losing tools
-  carries on, its calls refused as before. No session-contract sentence. Hiding tools a project's workflow settings make
+  `sessions.restartForSide` restarts through `switchAtSafePoint` (same conversation), once however often asked: every role
+  change runs it (`projectAgents.updateAgent`: Agent Settings, the Agent API, the Assistant's cw_update_agent), `ifIdle`
+  restarting an idle agent at once and answering `busy` for a working one. The window then asks (Restart When Its Turn
+  Is Over → `atSafePoint`; Later: its old tools until it restarts); the Agent API's reply says which
+  (`api.done.updatedAgent`). **Until it has restarted** (Later, busy, a restart that failed) a running agent keeps the
+  tools it launched with and is given no work needing the new ones (`sessions.sideAllows`, from its launch's `CW_SIDE`):
+  the reviewer pool doesn't count it free (`idle`), a lane start or join naming it for that part is refused, `409`,
+  saying to restart it first (`lane.refused.oldTools`), and a lane waiting for a slot waits on (`startWaitingLane`).
+  No session-contract sentence. Hiding tools a project's workflow settings make
   unusable, with live list updates, is HI-2694 (split off, Darren 7 Nov).
 - **Templates v2 and Combwork's own** [#1436] **Built [#1436]**: `TEMPLATE_VERSION` 2 (`shared/templates.ts`). Each agent
   `role: WorkflowRole` (none given: #1430's guess) and an optional `note` (the agent's free text); `worktree` is gone,

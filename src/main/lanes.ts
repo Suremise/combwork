@@ -102,6 +102,7 @@ const A = {
   itsBranch: agentMsg({ id: 'lane.reorder.itsBranch', text: 'its branch', note: "In place of {line}: where a put-back card's work stays, when its branch's name isn't known." }),
   putBackWhy: agentMsg({ id: 'lane.reorder.putBackWhy', text: 'Put back by a lane reorder applied now ({by})', note: "The reason recorded on a card put back by a reorder applied now (HI-1995), stored on the card's facts; {by} is who reordered." }),
   independent: agentMsg({ id: 'lane.refused.independent', text: "{agent} is Independent: it takes no part in the workflow (its own role, or its connection launches it without Combwork's tools), so it is never a lane's builder or reviewer. Choose a builder, a reviewer or an either-role agent.", note: "cw_lane's refusal (HI-2670): an Independent agent is never a lane's builder or reviewer." }),
+  oldTools: agentMsg({ id: 'lane.refused.oldTools', text: "{agent}'s role changed while it was running, and it still has its old role's tools: it can't take this part of the lane until it restarts. Restart it first (its pane says it needs a restart), then try again.", note: "cw_lane's refusal (HI-2664): an agent keeps the tools it launched with until it restarts, so a lane part needing its new role's tools waits for that." }),
   generalist: agentMsg({ id: 'lane.refused.generalist', text: "{agent} is a generalist: it takes no side in the workflow, so it is never a lane's builder or reviewer. Choose a builder, a reviewer or an either-role agent.", note: "cw_lane's refusal (HI-686): a generalist agent is never a lane's builder or reviewer." }),
   sharedItem: agentMsg({ id: 'lane.warn.sharedItem', text: "{card} is also in {builder}'s lane ({lane})", note: "One card of a start's list another builder's running lane lists too (HI-1821); {lane} is that lane's id. Joined with \"; \" into lane.warn.shared's {items}." }),
   shared: agentMsg({ id: 'lane.warn.shared', text: "Warning: {items}. A card belongs to one lane: ask the Assistant or the user to take it out of one of them (a builder's own cw_lane start never takes a card off its lane).", note: "cw_lane start's warning (HI-1821, HI-2169): cards on two lanes; {items} are lane.warn.sharedItem's." }),
@@ -916,6 +917,25 @@ async function refuseGeneralist(ws: WorkspaceService, project: string, ids: read
 }
 
 /**
+ * Whether an agent's running session has a lane part's tools (HI-2664): the session manager's (sessions.sideAllows), set
+ * by launchSides.ts, as laneParts is the other way. Until set (unit tests of the lanes alone): every one has.
+ */
+let partToolsLoaded: (projectPath: string, agentId: string, part: 'builder' | 'reviewer') => boolean = () => true
+export function setPartToolsCheck(f: typeof partToolsLoaded): void {
+  partToolsLoaded = f
+}
+
+/**
+ * An agent whose role changed while it ran and that hasn't restarted since keeps its old side's tools (HI-2664, HR3's
+ * round 1): never given a lane part it can't do yet. Refused before anything changes, saying to restart it first.
+ */
+function refuseOldTools(ws: WorkspaceService, project: string, parts: readonly { agent: { id: string; name: string } | null | undefined; part: 'builder' | 'reviewer' }[]): void {
+  if (!ws.path) return
+  const projectPath = join(ws.path, project)
+  for (const { agent, part } of parts) if (agent && !partToolsLoaded(projectPath, agent.id, part)) throw new LaneError(409, say(A.oldTools, { agent: agent.name }))
+}
+
+/**
  * A card in two lanes (HI-1821): the open cards (not Done, archived or gone) of a builder's start that another builder's
  * running lane of the project lists, or has in its queued list, as a warning for the start's reply; null: none. The
  * card's agent decides whose it is (a lane never takes another agent's card); a card leaves a lane by the Assistant's,
@@ -1190,6 +1210,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   if (reviewer && reviewer.id === builder.id) throw new LaneError(400, say(A.selfReview))
   if (reviewer && s.pool) throw new LaneError(400, say(A.poolReviewer))
   await refuseGeneralist(ws, s.project, [builder.id, reviewer?.id])
+  refuseOldTools(ws, s.project, [{ agent: builder, part: 'builder' }, { agent: reviewer, part: 'reviewer' }])
   // A named reviewer makes it one reviewer per lane; the pool, none of its own (#1443).
   const pool = s.pool ? true : reviewer ? false : undefined
   // Rounds and wait the start doesn't give (#412): the project's workflow options as they resolve now (HI-1766).
@@ -1371,6 +1392,7 @@ export async function joinLane(ws: WorkspaceService, j: { project: string; build
   if (!reviewer || !builder) throw new LaneError(404, say(A.unknownPair))
   if (reviewer.id === builder.id) throw new LaneError(400, say(A.selfReview))
   await refuseGeneralist(ws, j.project, [builder.id, reviewer.id])
+  refuseOldTools(ws, j.project, [{ agent: reviewer, part: 'reviewer' }])
   const found = await mutate(ws, (lanes, checks, also) => {
     if (j.commit) checks.push(j.commit)
     const l = lanes.find((x) => running(x) && same(x.project, j.project) && x.builder.id === builder.id)
