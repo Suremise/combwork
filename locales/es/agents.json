@@ -321,7 +321,7 @@
   "agents.picker.showOlder": "Mostrar versiones anteriores",
   "agents.place.short": "{is, select, slot {en {name}} carried {reservado: {name}} home {carpeta antigua: {name}} other {worktree de 0.9: {name}}}",
   "agents.place.tip": "{is, select, slot {Trabaja en {name}: {path}} carried {Trabaja en {name}, el slot reservado para él: {path}} home {Trabaja en su carpeta antigua {name}: {path}} other {Trabaja en su worktree de 0.9 {name}: {path}}}",
-  "agents.provider.compactDeclared": "{provider} compacta automáticamente a unos {at, number}, el contexto declarado del modelo local{why, select, none {} other { ({why})}}{estimate, select, none {} other { ({estimate})}}",
+  "agents.provider.compactDeclared": "{provider} compacta automáticamente a unos {at, number}: una estimación, el contexto declarado del modelo local {window, number} menos su presupuesto de salida {output, number} y un margen de {buffer, number} tokens{why, select, none {} other { ({why})}}{estimate, select, none {} other { ({estimate})}}",
   "agents.provider.compactDeclaredCap": "una estimación: se supone que una ventana de autocompactación configurada también queda limitada por el contexto declarado",
   "agents.provider.compactDefault": "{provider} compacta automáticamente a unos {at, number} de forma predeterminada (su configuración puede cambiarlo)",
   "agents.provider.compactDefaultFor": "{provider} compacta automáticamente a unos {at, number}, su valor predeterminado para esta ventana{why, select, none {} other { ({why})}}{estimate, select, none {} other { ({estimate})}}",

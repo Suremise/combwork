@@ -224,12 +224,12 @@ const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '')
     await lib.sendPrompt(inv, lib.ptyKey(alpha, 'a-two'), 'window 65536', { submitted: async () => (await live('a-two'))?.contextWindow === 65536 })
     const reported = await lib.hoverTip(page, ctxItem, (t) => /Context size 65,536 tokens \(set on Ollama\)$/m.test(t), HUNG_MS)
     check('…once Claude Code reports its window, no longer an estimate', /Context size 65,536 tokens \(set on Ollama\)$/m.test(reported) && !/an estimate until/.test(reported), reported)
-    check('…where it compacts: at the declared context, none of a Claude model’s reserve', /compacts by itself at about 65,536, the local model’s declared context/.test(reported), reported)
+    check('…where it compacts: an estimate, its declared context less its output budget and the buffer (65,536 − 6,000 − 13,000)', /compacts by itself at about 46,536: an estimate, the local model’s declared context 65,536 less its output budget 6,000 and a 13,000-token buffer/.test(reported), reported)
     // The tooltip itself, in both themes (HR1's round 1).
     for (const theme of ['dark', 'light']) {
       await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
       await page.mouse.move(5, 5)
-      await lib.hoverTip(page, ctxItem, (t) => /declared context/.test(t), HUNG_MS)
+      await lib.hoverTip(page, ctxItem, (t) => /declared context 65,536/.test(t), HUNG_MS)
       await page.screenshot({ path: path.join(lib.WORK, `connections-server-limits-tooltip-${theme}.png`) })
     }
     await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))

@@ -194,16 +194,24 @@ describe("a model's limits in the window (HI-2682)", () => {
     expect(launchedWindow(limits, null, 'somebody-else')).toBeNull()
   })
 
-  it("where a local model compacts: at its declared window, none of a Claude model's reserve; capped and percentage said; off kept; Claude unchanged (HR1, round 1)", () => {
-    expect(autoCompactLine('claude-code', 32768, { window: null, source: null }, tr, { declared: true })).toBe('Claude Code compacts by itself at about 32,768, the local model’s declared context')
-    expect(autoCompactLine('claude-code', 32768, { window: 200000, source: 'autoCompactWindow in your settings' }, tr, { declared: true })).toBe('Claude Code compacts by itself at about 32,768, the local model’s declared context (autoCompactWindow in your settings) (an estimate: an auto-compact window set too is taken as capped by the declared context)')
-    expect(autoCompactLine('claude-code', 32768, { window: null, percent: 80, source: 'CLAUDE_AUTOCOMPACT_PCT_OVERRIDE' }, tr, { declared: true })).toMatch(/at about 26,214, the local model’s declared context \(CLAUDE_AUTOCOMPACT_PCT_OVERRIDE, at 80% of it\)/)
-    expect(autoCompactLine('claude-code', 32768, { window: 'off', source: 'DISABLE_AUTO_COMPACT' }, tr, { declared: true })).toMatch(/doesn't compact by itself: auto-compaction is off \(DISABLE_AUTO_COMPACT\)/)
+  it("where a local model compacts: its declared context less its output budget (at most 20K) and a 13K buffer, an estimate, as Claude Code 2.1.319 did in the probe; capped and percentage said; off kept; Claude unchanged", () => {
+    // The probe: 32,768 declared, 4,096 output: compacted at 19,447, not at 12,401 (HI-2682).
+    const line = autoCompactLine('claude-code', 32768, { window: null, source: null }, tr, { declared: { output: 4096 } })
+    expect(line).toBe('Claude Code compacts by itself at about 15,672: an estimate, the local model’s declared context 32,768 less its output budget 4,096 and a 13,000-token buffer')
+    expect(15672).toBeGreaterThan(12401)
+    expect(15672).toBeLessThan(19447)
+    // An output budget over Claude Code's usual reserve: only 20,000 of it kept free.
+    expect(autoCompactLine('claude-code', 200000, { window: null, source: null }, tr, { declared: { output: 64000 } })).toMatch(/at about 167,000: an estimate, the local model’s declared context 200,000 less its output budget 20,000/)
+    expect(autoCompactLine('claude-code', 32768, { window: 200000, source: 'autoCompactWindow in your settings' }, tr, { declared: { output: 4096 } })).toMatch(/at about 15,672.*\(autoCompactWindow in your settings\) \(an estimate: an auto-compact window set too is taken as capped by the declared context\)$/)
+    expect(autoCompactLine('claude-code', 32768, { window: null, percent: 40, source: 'CLAUDE_AUTOCOMPACT_PCT_OVERRIDE' }, tr, { declared: { output: 4096 } })).toMatch(/at about 13,107: an estimate.*\(CLAUDE_AUTOCOMPACT_PCT_OVERRIDE, at 40% of it\)/)
+    expect(autoCompactLine('claude-code', 32768, { window: 'off', source: 'DISABLE_AUTO_COMPACT' }, tr, { declared: { output: 4096 } })).toMatch(/doesn't compact by itself: auto-compaction is off \(DISABLE_AUTO_COMPACT\)/)
+    // A context smaller than the room kept: no figure.
+    expect(autoCompactLine('claude-code', 16000, { window: null, source: null }, tr, { declared: { output: 4000 } })).toBeNull()
     // A Claude model's (not declared): its reserve, as before, nothing at 32K.
     expect(autoCompactLine('claude-code', 32768, { window: null, source: null }, tr)).toBeNull()
     expect(autoCompactLine('claude-code', 200000, { window: null, source: null }, tr)).toMatch(/at about 167,000, its default for this window/)
     // Through contextLines, as the footer calls it.
-    expect(contextLines({ provider: 'claude-code', contextTokens: 1000, contextWindow: 32768 }, { window: null, source: null }, tr, { declared: true }).at(-1)).toBe('Claude Code compacts by itself at about 32,768, the local model’s declared context')
+    expect(contextLines({ provider: 'claude-code', contextTokens: 1000, contextWindow: 32768 }, { window: null, source: null }, tr, { declared: { output: 8192 } }).at(-1)).toMatch(/^Claude Code compacts by itself at about 11,576: an estimate/)
   })
 
   it("the meter's lines say each value's source, an estimate until reported, a switch, a fallback, or why none was used", () => {

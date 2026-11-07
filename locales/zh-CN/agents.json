@@ -321,7 +321,7 @@
   "agents.picker.showOlder": "显示旧版本",
   "agents.place.short": "{is, select, slot {在 {name}} carried {保留：{name}} home {主目录：{name}} other {0.9 工作树：{name}}}",
   "agents.place.tip": "{is, select, slot {在 {name} 中工作：{path}} carried {在为其保留的槽位 {name} 中工作：{path}} home {在已退役的主目录 {name} 中工作：{path}} other {在其 0.9 工作树 {name} 中工作：{path}}}",
-  "agents.provider.compactDeclared": "{provider} 在约 {at, number} 个 Token（本地模型声明的上下文）时自动压缩{why, select, none {} other {（{why}）}}{estimate, select, none {} other {（{estimate}）}}",
+  "agents.provider.compactDeclared": "{provider} 在约 {at, number} 个 Token 时自动压缩：这是估计值，即本地模型声明的上下文 {window, number} 减去其输出预算 {output, number} 和 {buffer, number} 个 Token 的缓冲{why, select, none {} other {（{why}）}}{estimate, select, none {} other {（{estimate}）}}",
   "agents.provider.compactDeclaredCap": "估计值：假定另外设置的自动压缩窗口受声明的上下文限制",
   "agents.provider.compactDefault": "{provider} 默认在约 {at, number} 个 Token 时自动压缩（可在其设置中更改）",
   "agents.provider.compactDefaultFor": "{provider} 在约 {at, number} 个 Token 时自动压缩，这是它对此窗口的默认值{why, select, none {} other {（{why}）}}{estimate, select, none {} other {（{estimate}）}}",
