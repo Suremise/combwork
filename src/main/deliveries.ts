@@ -52,7 +52,7 @@ import { pausedFor } from './teamPause'
 import { pauseHolds } from '../shared/teamPause'
 import { isAdmitted, refusedOpen } from './openingFence'
 import { cardRef } from '../shared/projectKeys'
-import { scopeOfHost, withCardNames } from './projectKeys'
+import { scopeOfHost, withCardNames } from './projectKeys'
 import { saidError } from './combworkError'
 
 /**

@@ -1,7 +1,7 @@
 import type { DeliverySender, DeliveryState } from '../shared/deliveries'
 import { createDelivery, cancelDeliveries, deliveryNow, offerNow, roundNow, TooManyWaiting, waitingCount } from './deliveries'
 import { sessions } from './sessions'
-import { agentMsg } from '../shared/agentText'
+import { agentMsg } from '../shared/agentText'
 import { saidError } from './combworkError'
 
 const T = {

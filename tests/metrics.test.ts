@@ -1758,7 +1758,8 @@ describe('HI-2553: failures by kind, their reasons, and the tool list by provide
 
   describe("HI-2691: the services' errors on Agent API paths keep their agent message's id, with statuses and text as before", () => {
     // An agent message as the catalogue has it (its id and English): what say() and saidError() read of it.
-    const catalogue = Object.assign({}, ...readdirSync(join(import.meta.dirname, '..', 'agent-text', 'catalogue')).map((f) => JSON.parse(readFileSync(join(import.meta.dirname, '..', 'agent-text', 'catalogue', f), 'utf8')))) as Record<string, { text: string }>
+    // The areas of the messages these tests name (named files: no scan of the folder).
+    const catalogue = Object.assign({}, ...['api', 'inbox', 'notice', 'wake'].map((a) => JSON.parse(readFileSync(join(import.meta.dirname, '..', 'agent-text', 'catalogue', `${a}.json`), 'utf8')))) as Record<string, { text: string }>
     const agentMsgOf = (id: string) => ({ id, text: catalogue[id].text })
     const KIND_STATUS = { invalid: 400, forbidden: 403, notFound: 404, conflict: 409 } as const
     afterEach(async () => (await import('../src/shared/agentText')).setChainResolver(null))
@@ -1834,9 +1835,9 @@ describe('HI-2553: failures by kind, their reasons, and the tool list by provide
       for (const [id, values, want] of cases) {
         const m = agentMsgOf(id)
         const before = apiErrorReply(new Error(say(m, values)))
-        const now = apiErrorReply(new SaidError(m, values))
-        expect([id, now.status, now.body.error]).toEqual([id, before.status, before.body.error])
-        if (want) expect(now.status).toBe(want)
+        const after = apiErrorReply(new SaidError(m, values))
+        expect([id, after.status, after.body.error]).toEqual([id, before.status, before.body.error])
+        if (want) expect(after.status).toBe(want)
         expect(metrics.reasonOf(new SaidError(m, values))).toBe(`agent:${id}`)
       }
     })

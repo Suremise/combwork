@@ -4960,5 +4960,5 @@ onWatchPlacing(watchWhilePlaced)
 /** A route's handler by its method and template (HI-2681: tests run a route's real errors through metrics.ts reasonOf). */
 const routeHandler = (method: string, template: string): Handler | undefined => routes.find((r) => r.method === method && r.template === template)?.handler
 /** Runs fn as a project agent's request (HI-2691: tests run its routes' real errors), as serveApi's caller scope does. */
-const asAgent = <T>(workspace: string, projectPath: string, agentId: string, fn: () => T): T => callerStore.run({ kind: 'agent', runId: 'test', workspace, projectPath, agentId }, () => inRequestScope({ projectPath, agentId }, fn))
+const asAgent = <T>(workspacePath: string, projectPath: string, agentId: string, fn: () => T): T => callerStore.run({ kind: 'agent', runId: 'test', workspace: workspacePath, projectPath, agentId }, () => inRequestScope({ projectPath, agentId }, fn))
 export const apiTextTestHooks = { notifyTarget, isolatedFor, lanePlacement, readUsageWatch, streamLines, routeHandler, asAgent, httpFrom }

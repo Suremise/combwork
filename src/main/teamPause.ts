@@ -8,7 +8,7 @@ import { teamPauseLine, type TeamPause } from '../shared/teamPause'
 import { emit } from './events'
 import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
-import { inWorkspace, openWorkspaces, workspaceFor, type WorkspaceService } from './workspace'
+import { inWorkspace, openWorkspaces, workspaceFor, type WorkspaceService } from './workspace'
 import { saidError } from './combworkError'
 
 /**
