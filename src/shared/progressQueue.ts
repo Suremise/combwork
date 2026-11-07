@@ -114,7 +114,8 @@ export const justMerged = (v: QueueView, now: number): QueueRecent[] => v.recent
  * None with an old Git ruleset's cards in flight) the old queue stays, controllable, until its last outcome is seen.
  */
 export function queueShown(v: QueueView, now: number): boolean {
-  return !!v.testing || v.queued.length > 0 || !!v.paused || !!v.runBy || v.inFlight.length > 0 || v.combworkMerges || shownReturns(v, now).length > 0 || justMerged(v, now).length > 0
+  // HI-2679: a target behind another of its project's (or one whose heads can't be read) shows too, with nothing queued.
+  return !!v.testing || v.queued.length > 0 || !!v.paused || !!v.runBy || v.inFlight.length > 0 || v.combworkMerges || shownReturns(v, now).length > 0 || justMerged(v, now).length > 0 || !!v.forward?.behind.some((b) => b.commits !== 0)
 }
 
 /** The queues that show, by project (its name) then target. */

@@ -15,7 +15,7 @@ import { CombworkError } from '../combworkError'
 import { fmt, msg, tr } from '../../shared/i18n'
 import { withValues } from '../../shared/advanced'
 import { forwardOf } from '../../shared/workflow/compile'
-import { projectTargets } from './targets'
+import { branchExists, projectTargets } from './targets'
 import { isRefusal } from './runtime'
 import { basename, join } from 'path'
 import { existsSync } from 'original-fs'
@@ -38,7 +38,7 @@ import { workflowEnforced, workflowFor } from './service'
 import type { Workflow } from './runtime'
 import type { CardRecord, QueuePause } from './factStore'
 import { MERGE_CHOICE_KEY, QUEUE_ADVANCE_GATE, type Fact, type FactData } from '../../shared/workflow/facts'
-import { HISTORY_MAX, RECENT_MAX, RETURN_SEEN_SHOWN_MS, RETURNS_MAX, type BranchQueueCard, type QueueRecent, type QueueResumed, type QueueView } from '../../shared/workflow/queue'
+import { HISTORY_MAX, RECENT_MAX, RETURN_SEEN_SHOWN_MS, RETURNS_MAX, type BranchQueueCard, type QueueForward, type QueueRecent, type QueueResumed, type QueueView } from '../../shared/workflow/queue'
 
 /**
  * The targets of a project's queues: every target a card was queued for, and any paused one, in that order; for the
@@ -122,8 +122,52 @@ async function makeViews(ws: WorkspaceService, projectPath: string, target: stri
   const wf = await workflowFor(ws, projectPath)
   if (!wf) return []
   const scope = window ? await queueScope(wf, projectPath) : undefined
-  const also = scope ? [...scope.inFlight.keys(), ...(scope.current ? [scope.current] : [])] : []
-  return (target ? [target] : queueTargets(wf, also)).map((t) => queueView(ws, wf, projectPath, t, scope))
+  // HI-2679: the window's listing has each of the project's targets that exists, so a destination with nothing queued
+  // yet has its card (its reminder and its Bring up to date… button).
+  const targets = window && scope?.current ? await existingTargets(ws, projectPath) : []
+  const also = scope ? [...scope.inFlight.keys(), ...(scope.current ? [scope.current] : []), ...targets] : []
+  const views = (target ? [target] : queueTargets(wf, also)).map((t) => queueView(ws, wf, projectPath, t, scope))
+  if (window && targets.length > 1) for (const v of views) if (targets.includes(v.target)) v.forward = await forwardOfTarget(projectPath, v.target, targets)
+  return views
+}
+
+/** The project's targets that exist now (HI-2679): Work merges into and the others listed; none without a Git workflow. */
+async function existingTargets(ws: WorkspaceService, projectPath: string): Promise<string[]> {
+  const t = await projectTargets(ws, projectPath).catch(() => null)
+  if (!t) return []
+  const out: string[] = []
+  for (const b of [t.default, ...t.others]) if ((await branchExists(projectPath, b)) === true) out.push(b)
+  return out
+}
+
+/** A target's forward merges (HI-2679): the project's other targets, and how far behind each it is. */
+async function forwardOfTarget(projectPath: string, to: string, targets: readonly string[]): Promise<QueueForward> {
+  const others = targets.filter((b) => b !== to)
+  const behind: QueueForward['behind'] = []
+  for (const from of others) behind.push({ from, commits: await commitsBehind(projectPath, from, to) })
+  return { others, behind }
+}
+
+/** Counts kept by the two heads they were read at (HI-2679): at most BEHIND_KEPT, the oldest dropped. */
+const behindKept = new Map<string, number>()
+const BEHIND_KEPT = 64
+
+/**
+ * How many commits along `from`'s first-parent history `to` lacks (HI-2679), by `git rev-list --count --first-parent`,
+ * kept by both heads (a git process only when either moved); null when a head can't be read.
+ */
+export async function commitsBehind(projectPath: string, from: string, to: string): Promise<number | null> {
+  const [a, b] = [await G.lineHead(projectPath, from), await G.lineHead(projectPath, to)]
+  if (!a || !b || isUnknown(a) || isUnknown(b)) return null
+  const key = [projectPath.toLowerCase(), a, b].join('\n') // i18n-ignore: a key, never shown
+  const had = behindKept.get(key)
+  if (had !== undefined) return had
+  const r = await git(projectPath, ['rev-list', '--count', '--first-parent', `${b}..${a}`])
+  const n = r.ok ? Number(r.out.trim()) : NaN
+  if (!Number.isInteger(n)) return null
+  behindKept.set(key, n)
+  while (behindKept.size > BEHIND_KEPT) behindKept.delete(behindKept.keys().next().value!)
+  return n
 }
 
 /**
@@ -444,7 +488,8 @@ export async function forwardMerge(ws: WorkspaceService, projectPath: string, fr
     const by = actor.kind === 'assistant' ? 'assistant' : 'user'
     const base = await G.mergeBase(projectPath, source as string, dest as string)
     const made = await createTask({ title: tr(FORWARD_TEXT.title, { from, to }), description: tr(FORWARD_TEXT.description, { from, to, source: (source as string).slice(0, 12), by: tr(by === 'user' ? FORWARD_TEXT.byUser : FORWARD_TEXT.byAssistant) }), project: basename(projectPath), labels: ['forward'] }, actor, { ...(guard ? { commit: guard } : {}) })
-    const ruleset = forwardOf(wf.currentRuleset(), to)
+    // Stored by the start's own write, which records it.
+    const ruleset = forwardOf(wf.currentRuleset(false), to)
     const r = await runIntent(wf, made.number, actor, (x) => x.forwardStart(made.number, { from, to, source: source as string, base: base && !isUnknown(base) ? base : (dest as string) }, by, ruleset, guard), undefined, guard)
     if (isRefusal(r.reply)) throw new ForwardRefused({ lines: [r.reply.message] }, { kind: 'conflict' })
     queueChanged(ws, projectPath, to)

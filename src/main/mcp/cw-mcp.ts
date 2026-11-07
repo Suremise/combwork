@@ -129,6 +129,8 @@ const T = {
   'lane.arg.applyNow': agentMsg({ id: 'tool.lane.arg.applyNow', text: 'start: a changed list applies now, not after the card in flight.' }),
   'lane.arg.lane': agentMsg({ id: 'tool.lane.arg.lane', text: 'end: the lane id.' }),
   'queue.arg.target': agentMsg({ id: 'tool.queue.arg.target', text: 'The target branch.' }),
+  'queue.arg.from': agentMsg({ id: 'tool.queue.arg.from', text: 'forward: the branch to bring in; target is the one brought up to date. Both the project\'s targets.' }),
+  'queue.reply.forward': agentMsg({ id: 'tool.queue.reply.forward', text: "{upToDate, select, yes {{to} has everything of {from} already: nothing queued.} other {{queued, select, yes {Queued {card}: bringing {to} up to date with {from} through {to}'s queue.} other {{card} is bringing {to} up to date with {from} already.}}}", note: 'HI-2679: cw_queue forward\'s reply.' }),
   'queue.arg.reason': agentMsg({ id: 'tool.queue.arg.reason', text: "remove, retry: the user's reason, recorded with the override." }),
   'releaseSlot.arg.slot': agentMsg({ id: 'tool.releaseSlot.arg.slot', text: 'release: the slot, by name (slot-b, hb2).' }),
   'releaseSlot.arg.kind': agentMsg({ id: 'tool.releaseSlot.arg.kind', text: 'release: which, when the slot is both.' }),
@@ -972,10 +974,10 @@ const tools: Tool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ASSISTANT ? ['list', 'pause', 'resume', 'remove', 'retry'] : ['list'] },
+        action: { type: 'string', enum: ASSISTANT ? ['list', 'pause', 'resume', 'remove', 'retry', 'forward'] : ['list'] },
         ...(ASSISTANT ? { project: projectArg } : {}),
         target: { type: 'string', description: say(T['queue.arg.target']) },
-        ...(ASSISTANT ? { card: cardArg, reason: { type: 'string', description: say(T['queue.arg.reason']) } } : {})
+        ...(ASSISTANT ? { card: cardArg, reason: { type: 'string', description: say(T['queue.arg.reason']) }, from: { type: 'string', description: say(T['queue.arg.from']) } } : {})
       },
       required: ['action']
     },
@@ -989,6 +991,11 @@ const tools: Tool[] = [
       const where = { ...(project !== undefined ? { project } : {}), ...(a.target !== undefined ? { target: a.target } : {}) }
       if (a.action === 'pause') return queueText((await api('POST', '/v1/queue/pause', where)) as QueuePublic)
       if (a.action === 'resume') return queueResumedText((await api('POST', '/v1/queue/resume', where)) as { resumed: boolean; queue: QueuePublic })
+      // HI-2679: bring `target` up to date with `from` (a forward merge through target's queue).
+      if (a.action === 'forward') {
+        const r = (await api('POST', '/v1/queue/forward', { project, from: a.from, to: a.target })) as { upToDate: boolean; key: string | null; card: number | null; queued: boolean; from: string; to: string }
+        return say(T['queue.reply.forward'], { upToDate: r.upToDate ? 'yes' : 'no', queued: r.queued ? 'yes' : 'no', card: r.key ?? (r.card !== null ? `#${r.card}` : ''), from: r.from, to: r.to })
+      }
       if (a.action !== 'remove' && a.action !== 'retry') throw new Error(say(T['queue.error.action.assistant']))
       return intentText((await api('POST', `/v1/queue/${a.action}`, { card: a.card, reason: a.reason })) as IntentDone)
     }
