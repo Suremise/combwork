@@ -6010,7 +6010,9 @@ class SessionManager {
     if (d.costUsd != null && !onServer) l.reportedCost = d.costUsd
     const reported = d.costUsd != null && !onServer && !usesOwnPrices(st.provider, config.settings)
     const modelSwitch = this.modelSwitchOf(l, d)
-    const next = { autoCompact, effort: d.effort ?? st.effort, modelName: d.modelName ?? st.modelName, modelId: d.modelId ?? st.modelId, modelSwitch, costUsd: reported ? d.costUsd : st.costUsd, costEstimated: reported ? false : st.costEstimated, planMode: d.planMode ?? st.planMode, permissionMode: d.permissionMode && !isCliOwnMode(l.launchMode) ? d.permissionMode : st.permissionMode, contextWindow: d.contextWindow ?? st.contextWindow }
+    // A window is the model's that reported it (HI-2682, HR1 round 1): another model reported without one has none yet.
+    const window = d.contextWindow ?? (d.modelId && st.modelId && d.modelId !== st.modelId ? undefined : st.contextWindow)
+    const next = { autoCompact, effort: d.effort ?? st.effort, modelName: d.modelName ?? st.modelName, modelId: d.modelId ?? st.modelId, modelSwitch, costUsd: reported ? d.costUsd : st.costUsd, costEstimated: reported ? false : st.costEstimated, planMode: d.planMode ?? st.planMode, permissionMode: d.permissionMode && !isCliOwnMode(l.launchMode) ? d.permissionMode : st.permissionMode, contextWindow: window }
     if (
       next.effort === st.effort &&
       next.modelName === st.modelName &&

@@ -3173,6 +3173,11 @@ export interface LaunchedLimits {
   context?: { value: number; from: string | null }
   /** `fallback`: Combwork's own output that wasn't below the effective context, replaced by the default for it. */
   output?: { value: number; from: string | null; fallback?: number }
+  /**
+   * The connection's models the launch-wide context also sizes (none mapped in this session's settings, none Claude Code
+   * reads as its own): a switch to one keeps the declared context, an estimate until Claude Code reports (HR1, round 1).
+   */
+  eligible?: string[]
 }
 
 export interface AutoCompactSetting {

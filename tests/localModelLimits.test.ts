@@ -4,8 +4,12 @@
 // that keep an output below its context. The window side: the default output, the fit advice, and the meter's window and
 // lines from a launch's record, never the connection now.
 import { describe, expect, it } from 'vitest'
-import { localLimitsFor, mapsModel } from '../src/main/providers/claude/localLimits'
-import { defaultOutput, launchedWindow, localLimitsLines, outputFits, staticSupport, tightFit } from '../src/shared/localModelLimits'
+import { lastModelArg, localLimitsFor, mapsModel } from '../src/main/providers/claude/localLimits'
+import { mkdirSync } from 'fs'
+import { join } from 'path'
+import { tempDir } from './tempDir'
+import { declaredFor, defaultOutput, launchedWindow, localLimitsLines, outputFits, staticSupport, tightFit } from '../src/shared/localModelLimits'
+import { autoCompactLine, contextLines } from '../src/shared/providers'
 import { providerDescriptor } from '../src/shared/providers'
 import { ADVANCED_DEFS, LOCAL_MODEL_ALIASES_ID, LOCAL_MODEL_SPELLINGS_ID } from '../src/shared/advanced'
 import { cleanModels, mergeListed } from '../src/shared/serverConnection'
@@ -38,7 +42,7 @@ describe("a local model's limits at launch (HI-2682)", () => {
   it("passes the connection's context, output, effort auto and no thinking for a custom spelling, recorded as Combwork's", () => {
     const r = run([{ id: 'qwen3.6:35b-a3b', context: 32768, output: 6000 }])
     expect(r.env).toEqual({ CLAUDE_CODE_MAX_CONTEXT_TOKENS: '32768', CLAUDE_CODE_MAX_OUTPUT_TOKENS: '6000', CLAUDE_CODE_EFFORT_LEVEL: 'auto', MAX_THINKING_TOKENS: '0' })
-    expect(r.record).toEqual({ model: 'qwen3.6:35b-a3b', connection: 'Local', applied: true, context: { value: 32768, from: null }, output: { value: 6000, from: null } })
+    expect(r.record).toEqual({ model: 'qwen3.6:35b-a3b', connection: 'Local', applied: true, eligible: ['qwen3.6:35b-a3b'], context: { value: 32768, from: null }, output: { value: 6000, from: null } })
   })
 
   it('with no context set: none passed (Claude Code assumes 200K), and the default output budget', () => {
@@ -101,6 +105,37 @@ describe("a local model's limits at launch (HI-2682)", () => {
     expect(() => run([{ id: 'qwen3.6:35b-a3b', context: 65536, output: 2000 }], { scopes: [scope('your .claude/settings.json', { env: { CLAUDE_CODE_MAX_CONTEXT_TOKENS: '2' } })] })).toThrow(/2 tokens, env in your \.claude\/settings\.json\) is too small/)
   })
 
+  it("the model is the command line's last --model, either form, the user's extra arguments winning (HR1, round 1)", () => {
+    expect(lastModelArg(['--verbose', '--model', 'a', '--model=b'])).toBe('b')
+    expect(lastModelArg(['--model=b', '--model', 'c'])).toBe('c')
+    expect(lastModelArg(['--verbose'])).toBeNull()
+    expect(lastModelArg(['--model'])).toBeNull()
+  })
+
+  it('through the real adapter: an extra --model runs another model, and its limits are that model’s, as buildCommand runs it', async () => {
+    const { claudeCode, launchModel } = await import('../src/main/providers/claude/adapter')
+    const base = tempDir('cw-locallimits-')
+    const home = join(base, 'home')
+    mkdirSync(home, { recursive: true })
+    const models = [{ id: 'local-a', context: 131072 }, { id: 'local-b', context: 32768 }]
+    for (const extraArgs of [['--model=local-b'], ['--model', 'local-a', '--model', 'local-b']]) {
+      const ctx = {
+        projectPath: join(base, 'project'), agentId: 'a1', executable: 'C:\\bin\\claude.exe', cwd: base, workspacePath: base, runId: 'r', sessionId: '00000000-0000-4000-8000-000000000000', resume: false, name: 'B1', skills: [], mcpServers: {},
+        model: 'local-a', effort: null, permissionMode: null, extraArgs, hookUrl: 'http://127.0.0.1:9/hook?run=r', hookAuthFile: join(base, 'auth.txt'), privateDir: join(base, `private-${extraArgs.length}`), guidance: '', allowBackgroundSessions: true, use200kContext: false,
+        env: { CLAUDE_CONFIG_DIR: home, ANTHROPIC_MODEL: 'local-a' } as Record<string, string>,
+        server: { models, connection: 'Local' }
+      } as Record<string, unknown>
+      await claudeCode.prepareLaunch(ctx as never)
+      const cmd = claudeCode.buildCommand(ctx.executable as string, ctx as never)
+      const ran = lastModelArg(cmd.args)
+      expect(ran).toBe('local-b')
+      expect(launchModel(ctx as never)).toBe(ran)
+      expect(cmd.env?.CLAUDE_CODE_MAX_CONTEXT_TOKENS).toBe('32768')
+      expect(cmd.env?.CLAUDE_CODE_MAX_OUTPUT_TOKENS).toBe('8192')
+      expect(ctx.localLimits).toMatchObject({ model: 'local-b', applied: true, context: { value: 32768 } })
+    }
+  })
+
   it('reads a mapping only of the ID, case aside', () => {
     expect(mapsModel({ modelOverrides: { 'claude-opus-4-8': 'Qwen3.6:35B-A3B' } }, 'qwen3.6:35b-a3b')).toBe(true)
     expect(mapsModel({ modelOverrides: { 'claude-opus-4-8': 'other' } }, 'qwen3.6:35b-a3b')).toBe(false)
@@ -144,6 +179,31 @@ describe("a model's limits in the window (HI-2682)", () => {
     expect(launchedWindow(limits, null, 'qwen3.8:27b')).toBeNull()
     expect(launchedWindow({ ...limits, applied: false }, null, null)).toBeNull()
     expect(launchedWindow(undefined, null, null)).toBeNull()
+  })
+
+  it('a switch to another of its connection’s eligible models keeps the declared context, an estimate; any other model is unknown (HR1, round 1)', () => {
+    const r = run([{ id: 'qwen3.6:35b-a3b', context: 32768 }, { id: 'qwen3.8:27b' }, { id: 'opus' }], { scopes: [scope('--settings', { modelOverrides: { 'claude-opus-4-8': 'mapped-one' } })] })
+    expect(r.record?.eligible).toEqual(['qwen3.6:35b-a3b', 'qwen3.8:27b'])
+    const limits = r.record!
+    expect(declaredFor(limits, 'qwen3.8:27b')).toBe(true)
+    expect(launchedWindow(limits, null, 'qwen3.8:27b')).toBe(32768)
+    expect(localLimitsLines(limits, null, 'qwen3.8:27b', tr)[0]).toMatch(/an estimate until Claude Code reports its window/)
+    expect(declaredFor(limits, 'opus')).toBe(false)
+    expect(launchedWindow(limits, null, 'opus')).toBeNull()
+    expect(localLimitsLines(limits, null, 'opus', tr)[0]).toBe('Context size 32,768 tokens (set on Local)')
+    expect(launchedWindow(limits, null, 'somebody-else')).toBeNull()
+  })
+
+  it("where a local model compacts: at its declared window, none of a Claude model's reserve; capped and percentage said; off kept; Claude unchanged (HR1, round 1)", () => {
+    expect(autoCompactLine('claude-code', 32768, { window: null, source: null }, tr, { declared: true })).toBe('Claude Code compacts by itself at about 32,768, the local model’s declared context')
+    expect(autoCompactLine('claude-code', 32768, { window: 200000, source: 'autoCompactWindow in your settings' }, tr, { declared: true })).toBe('Claude Code compacts by itself at about 32,768, the local model’s declared context (autoCompactWindow in your settings) (an estimate: an auto-compact window set too is taken as capped by the declared context)')
+    expect(autoCompactLine('claude-code', 32768, { window: null, percent: 80, source: 'CLAUDE_AUTOCOMPACT_PCT_OVERRIDE' }, tr, { declared: true })).toMatch(/at about 26,214, the local model’s declared context \(CLAUDE_AUTOCOMPACT_PCT_OVERRIDE, at 80% of it\)/)
+    expect(autoCompactLine('claude-code', 32768, { window: 'off', source: 'DISABLE_AUTO_COMPACT' }, tr, { declared: true })).toMatch(/doesn't compact by itself: auto-compaction is off \(DISABLE_AUTO_COMPACT\)/)
+    // A Claude model's (not declared): its reserve, as before, nothing at 32K.
+    expect(autoCompactLine('claude-code', 32768, { window: null, source: null }, tr)).toBeNull()
+    expect(autoCompactLine('claude-code', 200000, { window: null, source: null }, tr)).toMatch(/at about 167,000, its default for this window/)
+    // Through contextLines, as the footer calls it.
+    expect(contextLines({ provider: 'claude-code', contextTokens: 1000, contextWindow: 32768 }, { window: null, source: null }, tr, { declared: true }).at(-1)).toBe('Claude Code compacts by itself at about 32,768, the local model’s declared context')
   })
 
   it("the meter's lines say each value's source, an estimate until reported, a switch, a fallback, or why none was used", () => {

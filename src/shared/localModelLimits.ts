@@ -51,12 +51,22 @@ export const outputFits = (m: { context?: number; output?: number }): boolean =>
 const SAME = (a: string | null | undefined, b: string | null | undefined): boolean => !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase()
 
 /**
- * The window the meter uses before Claude Code reports one (HI-2682): the context this launch applied, only while the
- * session runs the model it started on (another model's window is Claude Code's to report); else null (unknown).
+ * Whether the launch's declared context sizes the model the session runs now (HI-2682): the one it started on, or another
+ * of its connection's that the launch found eligible (the variable is launch-wide; HR1's round 1). Others are Claude
+ * Code's to size: unknown until it reports.
+ */
+export function declaredFor(limits: LaunchedLimits | undefined, running: string | null | undefined): boolean {
+  if (!limits?.applied || !limits.context) return false
+  return !running || SAME(running, limits.model) || (limits.eligible ?? []).some((m) => SAME(m, running))
+}
+
+/**
+ * The window the meter uses before Claude Code reports one for the model it runs (HI-2682): the launch's declared
+ * context where it sizes that model (declaredFor), else null (unknown).
  */
 export function launchedWindow(limits: LaunchedLimits | undefined, reported: number | null | undefined, running: string | null | undefined): number | null {
-  if (reported || !limits?.applied || !limits.context) return null
-  return !running || SAME(running, limits.model) ? limits.context.value : null
+  if (reported) return null
+  return declaredFor(limits, running) ? limits!.context!.value : null
 }
 
 const L = {
@@ -75,7 +85,7 @@ export function localLimitsLines(limits: LaunchedLimits | undefined, reported: n
   const from = (f: string | null): string => (f ? tr(L.inFile, { file: f }) : tr(L.ours, { connection: limits.connection }))
   const switched = !!running && !SAME(running, limits.model)
   return [
-    ...(limits.context ? [tr(L.context, { value: limits.context.value, from: from(limits.context.from), estimate: !reported && !switched ? 'yes' : 'no' })] : []),
+    ...(limits.context ? [tr(L.context, { value: limits.context.value, from: from(limits.context.from), estimate: !reported && declaredFor(limits, running) ? 'yes' : 'no' })] : []),
     ...(limits.output ? [tr(L.output, { value: limits.output.value, from: from(limits.output.from), fallback: limits.output.fallback !== undefined ? fmt.number(limits.output.fallback) : 'none' })] : []),
     ...(switched ? [tr(L.switched, { model: limits.model })] : [])
   ]

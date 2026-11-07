@@ -31,6 +31,17 @@ const tokens = (v: string | undefined): number | null => {
   return Number.isInteger(n) && n > 0 ? n : null
 }
 
+/** The last model a command line names (`--model X` or `--model=X`; the CLI takes the last), or null (HI-2682). */
+export function lastModelArg(args: readonly string[]): string | null {
+  let model: string | null = null
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i]
+    if (a === '--model' && i + 1 < args.length) model = args[++i]
+    else if (a.startsWith('--model=')) model = a.slice('--model='.length)
+  }
+  return model?.trim() || null
+}
+
 /** Whether a settings file maps `id` to a Claude model: a modelOverrides value, or a modelPicker row for it with behavesAs. */
 export function mapsModel(json: unknown, id: string): boolean {
   if (!json || typeof json !== 'object') return false
@@ -87,11 +98,15 @@ export function localLimitsFor(o: { caps: ServerCaps; models: readonly ServerMod
     output = instead
     ours[l.outputEnv] = String(instead)
   }
+  // The connection's models the launch-wide context also sizes, should the session switch to one (none mapped, none Claude
+  // Code reads as its own): the meter's estimate for them until Claude Code reports (HR1's round 1).
+  const eligible = o.models.filter((m) => !o.test(m.id) && !o.scopes.some((s) => mapsModel(s.json, m.id))).map((m) => m.id)
   return {
     env: ours,
     record: {
       ...base,
       applied: true,
+      eligible,
       ...(context !== null ? { context: { value: context, from: contextFrom } } : {}),
       ...(output !== null ? { output: { value: output, from: outputFrom, ...(fallback !== undefined ? { fallback } : {}) } } : {})
     }
