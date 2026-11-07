@@ -456,9 +456,6 @@ const FORWARD_TEXT = {
   noGit: msg({ id: 'service.forward.noGit', defaultMessage: 'This project merges no work through Combwork’s merge queue, so it has nothing to bring up to date.', description: 'HI-2679: a forward merge asked of a project that isn’t a Git project merging through the queue.' })
 }
 
-/** One forward request at a time per project (HI-2679): the open-card check and its creation, in order. */
-const forwardTurns = new Map<string, Promise<unknown>>()
-
 /**
  * Brings `to` up to date with `from` (HI-2679, SPEC §16.9): a forward merge, the user's or the Assistant's alone (`actor`;
  * the Assistant's guard checked again inside each write). Both must be the project's existing targets, and different.
@@ -472,37 +469,35 @@ export async function forwardMerge(ws: WorkspaceService, projectPath: string, fr
   if (!t || !wf || wf.currentRuleset(false).options.finish !== 'combworkMerges') throw new ForwardRefused(FORWARD_TEXT.noGit, { kind: 'invalid' })
   const all = [t.default, ...t.others]
   if (from === to || !all.includes(from) || !all.includes(to)) throw new ForwardRefused(withValues(FORWARD_TEXT.notTargets, { from, to, targets: fmt.list(all) }), { kind: 'invalid' })
-  const key = projectPath.toLowerCase()
-  const turn = (forwardTurns.get(key) ?? Promise.resolve()).catch(() => undefined).then(async (): Promise<ForwardDone> => {
-    const [source, dest] = [await G.lineHead(projectPath, from), await G.lineHead(projectPath, to)]
-    for (const [branch, h] of [[from, source], [to, dest]] as const) if (!h || isUnknown(h)) throw new ForwardRefused(withValues(FORWARD_TEXT.missing, { branch, unknown: isUnknown(h) ? 'yes' : 'no' }), { kind: 'conflict' }) // i18n-ignore: select keys
-    const contained = await G.isAncestor(projectPath, source as string, dest as string)
-    if (contained === true) return { upToDate: true, from, to }
-    // One open for this pair: that one (not Done: queued, advancing, or returned for a Retry).
+  // Git's answers first, outside the board's lock: the heads, whether there is anything to bring in, the base.
+  const [source, dest] = [await G.lineHead(projectPath, from), await G.lineHead(projectPath, to)]
+  for (const [branch, h] of [[from, source], [to, dest]] as const) if (!h || isUnknown(h)) throw new ForwardRefused(withValues(FORWARD_TEXT.missing, { branch, unknown: isUnknown(h) ? 'yes' : 'no' }), { kind: 'conflict' }) // i18n-ignore: select keys
+  const contained = await G.isAncestor(projectPath, source as string, dest as string)
+  if (contained === true) return { upToDate: true, from, to }
+  const base = await G.mergeBase(projectPath, source as string, dest as string)
+  const { cardBatch, readTask, createTask, runIntent } = await import('../tasks')
+  const by = actor.kind === 'assistant' ? 'assistant' : 'user'
+  // One board change (HR3's round 1): the open card for the pair looked for, the caller's authority checked, the card made
+  // and started with its facts and entry, all in one transaction under the board's lock, which another Combwork on the
+  // board takes too. Refused or stopped part way, none of it is kept: no card without its forward facts, none twice.
+  const done = await cardBatch(ws, async (): Promise<ForwardDone> => {
+    // One open for this pair: that one (not Done: queued, advancing, or back for a Retry).
     const open = wf.store.cards().find((c) => {
-      const s = wf.state(c)
-      return !!s.forward && s.forward.from === from && s.forward.to === to && s.stage !== 'done'
+      const st = wf.state(c)
+      return !!st.forward && st.forward.from === from && st.forward.to === to && st.stage !== 'done'
     })
-    const { readTask, createTask, runIntent } = await import('../tasks')
     if (open) return { card: await readTask(open.id, { kind: 'user' }), queued: false, from, to }
     guard?.()
-    const by = actor.kind === 'assistant' ? 'assistant' : 'user'
-    const base = await G.mergeBase(projectPath, source as string, dest as string)
     const made = await createTask({ title: tr(FORWARD_TEXT.title, { from, to }), description: tr(FORWARD_TEXT.description, { from, to, source: (source as string).slice(0, 12), by: tr(by === 'user' ? FORWARD_TEXT.byUser : FORWARD_TEXT.byAssistant) }), project: basename(projectPath), labels: ['forward'] }, actor, { ...(guard ? { commit: guard } : {}) })
     // Stored by the start's own write, which records it.
     const ruleset = forwardOf(wf.currentRuleset(false), to)
     const r = await runIntent(wf, made.number, actor, (x) => x.forwardStart(made.number, { from, to, source: source as string, base: base && !isUnknown(base) ? base : (dest as string) }, by, ruleset, guard), undefined, guard)
-    // Its card started meanwhile (by nobody but this request: refused only in a race): said so, nothing queued twice.
+    // Refused (only in a race): thrown, so the card made just now goes with the rest of this change.
     if (isRefusal(r.reply)) throw new ForwardRefused(FORWARD_TEXT.raced, { kind: 'conflict' })
-    queueChanged(ws, projectPath, to)
     return { card: r.saved ?? made, queued: true, from, to }
   })
-  forwardTurns.set(key, turn)
-  try {
-    return await turn
-  } finally {
-    if (forwardTurns.get(key) === turn) forwardTurns.delete(key)
-  }
+  if ('card' in done && done.queued) queueChanged(ws, projectPath, to)
+  return done
 }
 
 /** HI-2679: a forward merge asked by a project agent (or a script): the user's and the Assistant's alone. */

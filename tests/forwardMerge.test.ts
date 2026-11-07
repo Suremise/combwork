@@ -93,6 +93,21 @@ describe('the forward request (HI-2679)', () => {
     const before = wf.store.cards().length
     await expect(inWorkspace(w, () => controls.forwardMerge(w, repo, 'main', '1.2.0', assistant, () => { throw new Error('Control turned off') }))).rejects.toThrow(/Control turned off/)
     expect(wf.store.cards().length).toBe(before)
+    // Withdrawn after the card is made, as it is started (HR3's round 1): one board change, so no card is left behind,
+    // and a later request makes one, whole.
+    for (const after of [2, 3]) {
+      let calls = 0
+      const late = () => {
+        if (++calls >= after) throw new Error('Control turned off meanwhile')
+      }
+      await expect(inWorkspace(w, () => controls.forwardMerge(w, repo, 'main', '1.2.0', assistant, late))).rejects.toThrow(/turned off meanwhile/)
+      expect(calls).toBeGreaterThanOrEqual(after)
+      expect(wf.store.cards().length).toBe(before)
+      expect((await inWorkspace(w, () => store.boardRead(w, (db) => db.prepare("SELECT count(*) AS n FROM cards WHERE title = 'Bring 1.2.0 up to date with main'").get()))) as { n: number }).toEqual({ n: 0 })
+    }
+    const made = await inWorkspace(w, () => controls.forwardMerge(w, repo, 'main', '1.2.0', assistant))
+    expect(made).toMatchObject({ queued: true })
+    expect(wf.store.cards().length).toBe(before + 1)
   })
 })
 

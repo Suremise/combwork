@@ -124,6 +124,29 @@ describe('a forward merge (HI-2679)', () => {
     expect(head(e, '1.2.0')).toBe(was)
   })
 
+  it("its advance declined (Ask each time on a checked-out destination) can go again: Retry, refs unchanged until then (HR3's round 1)", { timeout: GIT_HEAVY_MS }, async () => {
+    const e = project()
+    // 1.2.0 checked out in the project folder: the queue asks before updating it.
+    sh(e.project, 'checkout', '-q', '1.2.0')
+    const [dest, src] = [head(e, '1.2.0'), head(e, 'main')]
+    const { card, source } = await forward(e)
+    const q = () => e.queue({ checkedOutTarget: () => 'ask' })
+    expect(await q().drain('1.2.0')).toMatchObject([{ outcome: 'paused', reason: 'approval' }])
+    const request = e.wf.state(card).requests[0]
+    moved(await e.wf.answer(card.key, request.request, 'declined'))
+    await q().drain('1.2.0')
+    const s = e.wf.state(card)
+    expect([s.stage, s.entries.at(-1)?.state]).toEqual(['active', 'cancelled'])
+    expect([head(e, '1.2.0'), head(e, 'main')]).toEqual([dest, src])
+    // Retry: a new attempt; with the destination's folder updated automatically now (a restart: a new queue), merged.
+    moved(await e.wf.retryMerge(card.key, 'ready now', 'user', undefined, { source }))
+    expect(e.wf.state(card).entries.map((x) => x.state)).toEqual(['cancelled', 'open'])
+    expect(await e.queue({ checkedOutTarget: () => 'auto' }).drain('1.2.0')).toMatchObject([{ outcome: 'integrated' }])
+    expect(sh(e.project, 'rev-list', '--parents', '-n', '1', '1.2.0').split(' ').slice(1)).toEqual([dest, src])
+    expect(head(e, 'main')).toBe(src)
+    expect(e.wf.state(card).stage).toBe('done')
+  })
+
   it("refuses a project agent's every intent on it", async () => {
     const e = project()
     const { card } = await forward(e)

@@ -3531,7 +3531,9 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
 **Forward merges (HI-2679, design s10; Darren's decisions of 7 Nov on HI-2556's s14).** Bringing one of a project's
 targets up to date with another (Bring Up to Date… on the destination's queue card; `cw_queue` `forward`;
 `POST /v1/queue/forward`), the user's or the Assistant's alone, is an entry of the destination's queue on a card Combwork
-makes for it (`forwardMerge`, queueControls.ts; one per pair while open, requests taken in turn per project):
+makes for it (`forwardMerge`, queueControls.ts; one per pair while open). The open card looked for, the caller's
+authority checked, the card made and started with its facts and entry are one board change (one transaction, under the
+board's lock another Combwork takes too): refused or stopped part way, none of it is kept.
 - its authority is its `ForwardRequested` {from, to, source, by}, written only by that request, right after its
   `Started` {folder project, line **null**, target = to, builder combwork}: with no line, nothing that updates, attributes
   or cleans up a card's line can touch the source;
@@ -3542,7 +3544,7 @@ makes for it (`forwardMerge`, queueControls.ts; one per pair while open, request
 - each attempt's source is its entry's frozen `revision`: a source that moves while it waits changes nothing; found in
   the destination already, that very commit is recorded `Integrated` (by outside);
 - a conflict or a red check returns the card to Active (no builder is woken: it says so on itself), both branches as
-  they were; **Retry merge** freezes the source again at its head then (a new entry, its own checks); **Remove from
+  they were, and so does its advance declined (Ask each time on a checked-out destination); **Retry merge** freezes the source again at its head then (a new entry, its own checks); **Remove from
   queue** ends it in Done with `IntegrationCancelled`, never an `Integrated` (refused while it advances);
 - a project agent's every intent on it is refused (`forward.notAgents`).
 

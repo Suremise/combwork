@@ -2627,7 +2627,8 @@ export class Workflow {
       const fs = w.state()
       if (fs.forward) {
         const last = fs.entries.at(-1)
-        if (fs.stage !== 'active' || last?.state !== 'failed' || !forward?.source) return { rule: 'move.notFromHere', values: { card: card.key, stage: fs.stage, move: 'retry merge', moves: this.movesFrom(fs.stage, r, fs).join(', ') } } as GuardRefusal // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+        // Returned (a conflict, a red check) or its advance declined (Ask each time, HR3's round 1): either may go again.
+        if (fs.stage !== 'active' || (last?.state !== 'failed' && last?.state !== 'cancelled') || !forward?.source) return { rule: 'move.notFromHere', values: { card: card.key, stage: fs.stage, move: 'retry merge', moves: this.movesFrom(fs.stage, r, fs).join(', ') } } as GuardRefusal // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
         w.fact('Override', { rules: ['requeue.allowed'], move: 'retry merge', by, reason }) // i18n-ignore: a fact's kind and codes, not text
         this.enqueueForward(w, forward.source, 'retry')
         return null
