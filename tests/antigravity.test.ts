@@ -120,13 +120,25 @@ describe("the workspace's .agents config (what agy would load from it)", () => {
   it('its servers, the legacy folders too, from the folder and each --add-dir, each with its file and definition', async () => {
     const w = await workspaceServers([sub])
     expect([...w.keys()].sort()).toEqual(['legacy', 'sentinel', 'shared'])
-    expect(w.get('sentinel')).toEqual({ file: join(repo, '.agents', 'mcp_config.json'), def: { command: 'x' } })
-    expect(w.get('legacy')?.file).toBe(join(sub, '_agent', 'mcp_config.json'))
+    expect(w.get('sentinel')).toEqual([{ file: join(repo, '.agents', 'mcp_config.json'), def: { command: 'x' } }])
+    expect(w.get('legacy')?.[0].file).toBe(join(sub, '_agent', 'mcp_config.json'))
     const added = join(base, 'added')
     mkdirSync(join(added, '.git'), { recursive: true })
     mkdirSync(join(added, '.agents'), { recursive: true })
     writeFileSync(join(added, '.agents', 'mcp_config.json'), JSON.stringify({ mcpServers: { extra: { command: 'z' } } }))
     expect([...(await workspaceServers([sub, added])).keys()].sort()).toEqual(['extra', 'legacy', 'sentinel', 'shared'])
+  })
+
+  it('every definition of a name, from each file (which one agy uses isn’t known); own keys only, __proto__ too', async () => {
+    const two = join(base, 'two')
+    mkdirSync(join(two, '.git'), { recursive: true })
+    mkdirSync(join(two, '.agents'), { recursive: true })
+    mkdirSync(join(two, '_agents'), { recursive: true })
+    writeFileSync(join(two, '.agents', 'mcp_config.json'), JSON.stringify({ mcpServers: { s: { command: 'a' } } }))
+    writeFileSync(join(two, '_agents', 'mcp_config.json'), '{ "mcpServers": { "s": { "command": "b" }, "__proto__": { "command": "p" }, "constructor": { "command": "c" } } }')
+    const w = await workspaceServers([two])
+    expect(w.get('s')?.map((x) => x.def)).toEqual([{ command: 'a' }, { command: 'b' }])
+    expect([...w.keys()].sort()).toEqual(['__proto__', 'constructor', 's'])
   })
 
   it('a file it can’t read as JSON (or of the wrong shape) refuses: never read as empty', async () => {
@@ -146,7 +158,8 @@ describe("the workspace's .agents config (what agy would load from it)", () => {
 describe("an agent's private profile, written for each launch", () => {
   const tools = { command: 'C:\\Program Files\\Combwork\\Combwork.exe', args: ['C:\\Program Files\\Combwork\\resources\\app.asar.unpacked\\out\\main\\cw-mcp.js'], env: { ELECTRON_RUN_AS_NODE: '1', CW_API_TOKEN: 'launch-token', CW_PROJECT: 'alpha' } }
   const project = join('C:\\repo', '.agents', 'mcp_config.json')
-  const workspace = new Map([['sentinel', { file: project, def: { command: 'node', args: ['sentinel.js'] } }]])
+  const workspace = new Map([['sentinel', [{ file: project, def: { command: 'node', args: ['sentinel.js'] } }]]])
+  const one = (name: string, def: unknown, file = project) => new Map([[name, [{ file, def }]]])
 
   it("Combwork's servers with their own env (the launch's token)", () => {
     const made = profileConfig({ [TOOLS_SERVER]: tools, remote: { url: 'https://mcp.example/mcp', headers: { Authorization: 'Bearer t' } } }, new Map())
@@ -163,14 +176,43 @@ describe("an agent's private profile, written for each launch", () => {
     expect(profileConfig({}, workspace).refused?.has('sentinel')).toBe(true)
   })
 
-  it('given under its name counts only as the same server (were the given one to end, agy would start the project’s)', () => {
-    expect(profileConfig({ sentinel: { command: 'node', args: ['sentinel.js'], env: { K: 'v' } } }, workspace).refused).toBeUndefined()
+  it('given under its name counts only as the very same server (were the given one to end, agy would start the project’s)', () => {
+    // Identical in every field: allowed (an empty args, env or headers is the same as none).
+    expect(profileConfig({ sentinel: { command: 'node', args: ['sentinel.js'] } }, workspace).refused).toBeUndefined()
+    expect(profileConfig({ sentinel: { command: 'node', args: ['sentinel.js'], env: { M: 'a' } } }, one('sentinel', { command: 'node', args: ['sentinel.js'], env: { M: 'a' } })).refused).toBeUndefined()
+    expect(profileConfig({ r: { url: 'https://mcp.example/mcp' } }, one('r', { url: 'https://mcp.example/mcp', headers: {} })).refused).toBeUndefined()
+    // Other code: other arguments, or the same command and arguments with another environment (HR1: a server that loads
+    // process.env.MODULE runs other code), or an environment only one has.
     expect(profileConfig({ sentinel: { command: 'node', args: ['other.js'] } }, workspace).refused?.get('sentinel')).toBe(project)
+    expect(profileConfig({ sentinel: { command: 'node', args: ['server.cjs'], env: { MODULE: 'approved.cjs' } } }, one('sentinel', { command: 'node', args: ['server.cjs'], env: { MODULE: 'excluded.cjs' } })).refused?.has('sentinel')).toBe(true)
+    expect(profileConfig({ sentinel: { command: 'node', args: ['sentinel.js'], env: { K: 'v' } } }, workspace).refused?.has('sentinel')).toBe(true)
+    // Another account or scope: the same URL with other headers, or headers only one has.
+    expect(profileConfig({ r: { url: 'https://mcp.example/mcp', headers: { Authorization: 'Bearer mine' } } }, one('r', { url: 'https://mcp.example/mcp', headers: { Authorization: 'Bearer other' } })).refused?.has('r')).toBe(true)
+    expect(profileConfig({ r: { url: 'https://mcp.example/mcp' } }, one('r', { url: 'https://mcp.example/mcp', headers: { Authorization: 'Bearer other' } })).refused?.has('r')).toBe(true)
+    // A field Combwork doesn't give (another transport, working folder, anything unrecognised): not the same.
+    expect(profileConfig({ sentinel: { command: 'node', args: ['sentinel.js'] } }, one('sentinel', { command: 'node', args: ['sentinel.js'], cwd: 'C:\\elsewhere' })).refused?.has('sentinel')).toBe(true)
+    expect(profileConfig({ r: { url: 'https://mcp.example/mcp' } }, one('r', { url: 'https://mcp.example/mcp', type: 'sse' })).refused?.has('r')).toBe(true)
+    // Every definition of the name must be the same: one other among several refuses, naming its file.
+    const other = join('C:\\repo', '_agents', 'mcp_config.json')
+    const both = new Map([['sentinel', [{ file: project, def: { command: 'node', args: ['sentinel.js'] } }, { file: other, def: { command: 'node', args: ['evil.js'] } }]]])
+    expect(profileConfig({ sentinel: { command: 'node', args: ['sentinel.js'] } }, both).refused?.get('sentinel')).toBe(other)
     // Combwork's own server's name in a project's file is refused too, unless it is Combwork's server as given.
-    expect(profileConfig({ [TOOLS_SERVER]: tools }, new Map([[TOOLS_SERVER, { file: project, def: { command: 'evil.exe' } }]])).refused?.has(TOOLS_SERVER)).toBe(true)
-    expect(sameServer({ url: 'https://a' }, { url: 'https://a', headers: {} })).toBe(true)
+    expect(profileConfig({ [TOOLS_SERVER]: tools }, one(TOOLS_SERVER, { command: 'evil.exe' })).refused?.has(TOOLS_SERVER)).toBe(true)
     expect(sameServer({ url: 'https://a' }, { command: 'https://a' })).toBe(false)
     expect(sameServer({}, {})).toBe(false)
+    expect(sameServer({ env: { A: '1' } }, { env: { A: '1' } })).toBe(false)
+  })
+
+  it('a server named __proto__, constructor or toString is an entry like any other; nothing inherited counts as given', () => {
+    const given = JSON.parse('{"__proto__":{"command":"node","args":["p.cjs"]},"constructor":{"command":"node","args":["c.cjs"]},"toString":{"command":"node","args":["t.cjs"]}}')
+    const made = profileConfig(given, new Map())
+    // Serialised as written to the profile: each its own entry (compared as text, as an object literal's __proto__ sets a prototype).
+    expect(JSON.stringify(made.mcp)).toBe('{"mcpServers":{"__proto__":{"command":"node","args":["p.cjs"]},"constructor":{"command":"node","args":["c.cjs"]},"toString":{"command":"node","args":["t.cjs"]}}}')
+    expect(Object.keys(made.mcp.mcpServers as object).sort()).toEqual(['__proto__', 'constructor', 'toString'])
+    // A project's server of such a name, not given: refused, never taken for an inherited property.
+    for (const name of ['__proto__', 'constructor', 'toString', 'hasOwnProperty']) expect(profileConfig({}, one(name, { command: 'x' })).refused?.has(name), name).toBe(true)
+    // Given as the very same server under such a name: allowed.
+    expect(profileConfig(JSON.parse('{"constructor":{"command":"x"}}'), one('constructor', { command: 'x' })).refused).toBeUndefined()
   })
 
   it('agy’s form of a server: stdio or Streamable HTTP; one with neither is left out', () => {

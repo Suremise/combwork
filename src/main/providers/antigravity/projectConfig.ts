@@ -60,11 +60,12 @@ async function serversIn(file: string): Promise<[string, unknown][]> {
 export type WorkspaceServer = { file: string; def: unknown }
 
 /**
- * The MCP servers agy would load from these workspace folders (each scanned up to its repository root), by name, the first
- * definition of a name kept. An unreadable or invalid file throws UnreadableConfig.
+ * The MCP servers agy would load from these workspace folders (each scanned up to its repository root), by name, with
+ * every definition of a name (which one agy uses isn't known, so each counts). An unreadable or invalid file throws
+ * UnreadableConfig.
  */
-export async function workspaceServers(folders: readonly string[]): Promise<Map<string, WorkspaceServer>> {
-  const servers = new Map<string, WorkspaceServer>()
+export async function workspaceServers(folders: readonly string[]): Promise<Map<string, WorkspaceServer[]>> {
+  const servers = new Map<string, WorkspaceServer[]>()
   const seen = new Set<string>()
   for (const folder of folders) {
     for (const d of scannedFolders(folder)) {
@@ -73,7 +74,7 @@ export async function workspaceServers(folders: readonly string[]): Promise<Map<
         if (seen.has(base.toLowerCase())) continue
         seen.add(base.toLowerCase())
         const file = join(base, 'mcp_config.json')
-        for (const [n, def] of await serversIn(file)) if (!servers.has(n)) servers.set(n, { file, def })
+        for (const [n, def] of await serversIn(file)) servers.set(n, [...(servers.get(n) ?? []), { file, def }])
       }
     }
   }

@@ -59,29 +59,50 @@ export function agyServer(def: McpServerDef): Record<string, unknown> | null {
  * while that one runs (agy falls back to the project's when it ends, HI-2544's sentinel runs), and `disabled` still starts
  * it, so nothing short of not launching keeps it out (HR1, 02:27: fail closed).
  */
-export function profileConfig(given: Record<string, McpServerDef>, workspace: Map<string, WorkspaceServer>): { mcp: Record<string, unknown>; refused?: Map<string, string> } {
-  const servers: Record<string, unknown> = {}
+export function profileConfig(given: Record<string, McpServerDef>, workspace: Map<string, WorkspaceServer[]>): { mcp: Record<string, unknown>; refused?: Map<string, string> } {
+  // Null-prototype, own keys only: a server named __proto__, constructor or toString is an entry like any other, and
+  // nothing inherited ever counts as one the agent was given.
+  const servers: Record<string, unknown> = Object.create(null)
   for (const [name, def] of Object.entries(given)) {
     const s = agyServer(def)
     if (s) servers[name] = s
   }
-  // Given under its name counts only as the same server (what runs it): were Combwork's to end, agy's fallback would then
-  // start nothing the agent wasn't given.
-  const refused = new Map([...workspace].filter(([name, w]) => !servers[name] || !sameServer(servers[name], w.def)).map(([name, w]) => [name, w.file]))
+  // Given under its name counts only as the very same server, every definition of that name agy could load: were
+  // Combwork's to end, agy's fallback would then start nothing the agent wasn't given.
+  const refused = new Map<string, string>()
+  for (const [name, defs] of workspace) {
+    const bad = Object.hasOwn(servers, name) ? defs.find((w) => !sameServer(servers[name], w.def)) : defs[0]
+    if (bad) refused.set(name, bad.file)
+  }
   return { mcp: { mcpServers: servers }, ...(refused.size ? { refused } : {}) }
 }
 
-/** Whether two MCP server definitions start the same server: the same command and arguments, or the same URL. */
-export function sameServer(a: unknown, b: unknown): boolean {
-  const what = (d: unknown): string | null => {
-    if (!d || typeof d !== 'object') return null
-    const o = d as Record<string, unknown>
-    if (typeof o.url === 'string' && o.url) return JSON.stringify(['url', o.url])
-    if (typeof o.command === 'string' && o.command) return JSON.stringify(['cmd', o.command, Array.isArray(o.args) ? o.args : []])
-    return null
+/**
+ * A server definition in a canonical form, every field kept (its command, arguments, environment, URL, headers and any
+ * other), keys sorted; an empty `args`, `env` or `headers` is the same as none. Null for what isn't a server.
+ */
+function canonicalServer(d: unknown): string | null {
+  if (!d || typeof d !== 'object' || Array.isArray(d)) return null
+  const sorted = (v: unknown): unknown => {
+    if (Array.isArray(v)) return v.map(sorted)
+    if (v && typeof v === 'object') return Object.keys(v).sort().map((k) => [k, sorted((v as Record<string, unknown>)[k])])
+    return v
   }
-  const x = what(a)
-  return x !== null && x === what(b)
+  const empty = (k: string, v: unknown): boolean => ['args', 'env', 'headers'].includes(k) && ((Array.isArray(v) && !v.length) || (!!v && typeof v === 'object' && !Object.keys(v).length))
+  const o = d as Record<string, unknown>
+  // What runs nothing (no command, no URL) is never the same server as anything.
+  if (!(typeof o.command === 'string' && o.command) && !(typeof o.url === 'string' && o.url)) return null
+  return JSON.stringify(Object.keys(o).sort().filter((k) => !empty(k, o[k])).map((k) => [k, sorted(o[k])]))
+}
+
+/**
+ * Whether two MCP server definitions are the same server: equal in every field (command, arguments, environment, URL,
+ * headers and anything else), so neither runs other code, another account or another transport. Any difference, or a
+ * field only one has, is not the same.
+ */
+export function sameServer(a: unknown, b: unknown): boolean {
+  const x = canonicalServer(a)
+  return x !== null && x === canonicalServer(b)
 }
 
 /**
@@ -89,7 +110,7 @@ export function sameServer(a: unknown, b: unknown): boolean {
  * (Combwork's own command, posting to the hook server with the launch's token), and Combwork's own tools allowed.
  */
 export function launchSettings(ctx: Pick<LaunchContext, 'hookUrl' | 'hookAuthFile' | 'mcpServers' | 'trustedCombworkTools'>, preApprove: boolean): Record<string, unknown> {
-  const allow = !ctx.mcpServers[TOOLS_SERVER] || !preApprove ? [] : ctx.trustedCombworkTools ? ctx.trustedCombworkTools.map((t) => `mcp(${TOOLS_SERVER}:${t})`) : [`mcp(${TOOLS_SERVER})`]
+  const allow = !Object.hasOwn(ctx.mcpServers, TOOLS_SERVER) || !preApprove ? [] : ctx.trustedCombworkTools ? ctx.trustedCombworkTools.map((t) => `mcp(${TOOLS_SERVER}:${t})`) : [`mcp(${TOOLS_SERVER})`]
   return {
     statusLine: { type: 'command', command: hookForwardCommand(`${ctx.hookUrl}&statusline`, ctx.hookAuthFile) },
     ...(allow.length ? { permissions: { allow } } : {})
@@ -214,7 +235,7 @@ export class AntigravityAdapter implements ProviderAdapter {
     // A resume reopens only one of this agent's own conversations (in its profile), never another's or a missing one.
     if (ctx.resume && !(await this.ownsConversation(ctx.agentId, ctx.workspacePath, ctx.sessionId))) throw combworkError(REFUSED.notOwn, { provider: NAME, conversation: ctx.sessionId })
     const delivered = await syncAgentsSkills(ctx, NAME)
-    let workspace: Map<string, WorkspaceServer>
+    let workspace: Map<string, WorkspaceServer[]>
     try {
       workspace = await workspaceServers([ctx.cwd, ...(ctx.extraDirs ?? [])])
     } catch (e) {
