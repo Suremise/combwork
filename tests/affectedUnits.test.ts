@@ -315,6 +315,22 @@ describe('whatever it cannot follow selects every suite, saying why', () => {
     const script = { 'scripts/consumer.mjs': "import { workspace } from '../src/main/workspace.ts'\nexport const g = () => workspace[['set', 'X'].join('')](1)\n" }
     expect(allOf(WS, typed(script), typed({ ...script, ...member }))).toMatch(/scripts\/consumer\.mjs, outside tsconfig\.node\.json's program, loads src\/main\/workspace\.ts/)
   })
+  // HR3's round 2: the same, reached through another type of WorkspaceService, in either revision.
+  it('a computed key through an intersection, a constrained or unconstrained generic, a subclass or sub-interface: every suite', () => {
+    const forms = [
+      'export function g(ws: WorkspaceService & { tag: boolean }, k: keyof WorkspaceService): unknown {\n  return ws[k]\n}\n',
+      'export function g(ws: WorkspaceService & { tag: boolean }, k: keyof WorkspaceService): unknown {\n  const { [k]: fn } = ws\n  return fn\n}\n',
+      'export function g<T extends WorkspaceService>(ws: T, k: keyof WorkspaceService): unknown {\n  return ws[k]\n}\n',
+      'interface View extends WorkspaceService {\n  tag: boolean\n}\nexport function g(ws: View, k: keyof WorkspaceService): unknown {\n  return ws[k]\n}\n',
+      'export class View extends WorkspaceService {\n  tag = true\n}\nexport function g(ws: View, k: keyof WorkspaceService): unknown {\n  return ws[k]\n}\n',
+      'function pick<T>(x: T, k: keyof T): unknown {\n  return x[k]\n}\nexport const g = (ws: WorkspaceService, k: keyof WorkspaceService): unknown => pick(ws, k)\n'
+    ]
+    for (const body of forms) {
+      const other = { 'src/main/other.ts': `import { WorkspaceService } from './workspace'\n${body}` }
+      expect(allOf(WS, typed(other), typed({ ...other, ...member })), body).toMatch(/the WorkspaceService rule doesn't hold: src\/main\/other\.ts:\d+: .*(read|destructured) by a computed key.*\(base\)/)
+      expect(allOf(WS, typed(), typed({ ...other, ...member })), body).toMatch(/doesn't hold: src\/main\/other\.ts:\d+: .*\(head\)/)
+    }
+  })
   it('the workspace instance itself: every suite (its Proxy, C3)', () => {
     expect(allOf(WS, typed(), typed({ [WS]: workspaceTs().replace('export const workspace = new WorkspaceService()', 'export const workspace = new WorkspaceService() as WorkspaceService') }))).toMatch(/the workspace instance is a Proxy/)
   })

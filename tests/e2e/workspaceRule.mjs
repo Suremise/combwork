@@ -277,7 +277,8 @@ function censusIn(rev, root, scope, budget) {
     if (t.flags & F.UnionOrIntersection) hit = t.types.some((u) => holds(u, seen))
     else if (t.flags & F.Object) {
       const args = t.objectFlags & ts.ObjectFlags.Reference ? checker.getTypeArguments(t) : (t.aliasTypeArguments ?? [])
-      hit = args.some((u) => holds(u, seen))
+      // A class or interface extending a tracked one is one (`class View extends WorkspaceService`).
+      hit = direct(t) || args.some((u) => holds(u, seen))
       for (const sig of [...t.getCallSignatures(), ...t.getConstructSignatures()]) {
         if (hit) break
         hit = holds(sig.getReturnType(), seen) || sig.getParameters().some((p) => holds(checker.getTypeOfSymbol(p), seen))
@@ -296,6 +297,8 @@ function censusIn(rev, root, scope, budget) {
   }
   const erases = (t) => {
     if (!t) return 'no type'
+    // A tracked type keeps its type, a tracked type parameter included (a generic's T a WorkspaceService went into).
+    if (direct(t)) return null
     if (t.flags & (F.Any | F.Unknown | F.TypeParameter | F.NonPrimitive | F.Index | F.IndexedAccess | F.Conditional | F.Substitution)) return checker.typeToString(t)
     if (t.flags & F.Union) return t.types.map(erases).find(Boolean) ?? null
     if (t.flags & F.Object) {
@@ -305,8 +308,24 @@ function censusIn(rev, root, scope, budget) {
     return null
   }
   const objectPart = (t) => !!t && (t.flags & F.Object || (t.flags & F.Union && t.types.some((u) => u.flags & F.Object)))
-  // A tracked object itself, not a container of one.
-  const direct = (t) => !!t && (tracked.has(t) || (t.flags & F.Union && t.types.some((u) => tracked.has(u))))
+  // A tracked object itself, not a container of one: the type, a union or intersection with it, a type parameter
+  // constrained to it, a class or interface extending it (its base types, an instantiation's target's too).
+  const direct = (t, seen = new Set()) => {
+    if (!t || seen.has(t)) return false
+    seen.add(t)
+    if (tracked.has(t)) return true
+    if (t.flags & F.UnionOrIntersection) return t.types.some((u) => direct(u, seen))
+    if (t.flags & (F.TypeParameter | F.Index | F.IndexedAccess | F.Conditional | F.Substitution)) {
+      const c = checker.getBaseConstraintOfType(t)
+      return !!c && c !== t && direct(c, seen)
+    }
+    if (t.flags & F.Object) {
+      const target = t.objectFlags & ts.ObjectFlags.Reference && t.target ? t.target : t
+      if (target !== t && direct(target, seen)) return true
+      if (target.objectFlags & ts.ObjectFlags.ClassOrInterface) return (checker.getBaseTypes(target) ?? []).some((b) => direct(b, seen))
+    }
+    return false
+  }
   const short = (t) => checker.typeToString(t).slice(0, 60)
   // Where a value goes: null (its type is kept), { view } (a WorkspaceService put into another object type: tracked
   // too), or why it escapes.
@@ -318,6 +337,30 @@ function censusIn(rev, root, scope, budget) {
     if (holds(ctx)) return null
     if (direct(checker.getTypeAtLocation(n)) && objectPart(ctx)) return { view: ctx }
     return `goes into a ${short(ctx)} slot, which drops it`
+  }
+  // A tracked value passed to a parameter typed by the called function's own type parameter (`<T>(x: T, k: keyof T)`):
+  // inside, it is only T, so T is tracked from then on, as a view is ({ views }): every value typed T in that body is
+  // censused (a computed key on it, T into unknown…). Nothing to do when the type parameter is constrained to a
+  // tracked type (it is one there already), or for a library's function (not censused: its erasing parameters are
+  // caught as slots).
+  const generic = (call, arg) => {
+    const decl = checker.getResolvedSignature(call)?.declaration
+    if (!decl || !decl.typeParameters?.length || !decl.parameters) return null
+    const r = rel(decl.getSourceFile().fileName)
+    if (r == null || r.startsWith('node_modules/')) return null
+    const i = call.arguments ? call.arguments.indexOf(arg) : -1
+    const param = decl.parameters[Math.min(i, decl.parameters.length - 1)]
+    if (i < 0 || !param?.type) return null
+    const own = decl.typeParameters.filter((tp) => !direct(checker.getTypeAtLocation(tp)))
+    if (!own.length) return null
+    const byName = new Map(own.map((tp) => [tp.name.text, tp]))
+    const used = new Set()
+    const find = (n) => {
+      if (ts.isTypeReferenceNode(n) && ts.isIdentifier(n.typeName) && byName.has(n.typeName.text)) used.add(byName.get(n.typeName.text))
+      n.forEachChild(find)
+    }
+    find(param.type)
+    return used.size ? { views: [...used].map((tp) => checker.getTypeAtLocation(tp)) } : null
   }
   const position = (n) => {
     let q = n
@@ -364,7 +407,7 @@ function censusIn(rev, root, scope, budget) {
     if (ts.isPrefixUnaryExpression(p)) return p.operator === K.ExclamationToken ? null : 'is an operand'
     if (ts.isTypeOfExpression(p) || ts.isVoidExpression(p) || ts.isAwaitExpression(p) || ts.isExpressionStatement(p) || ts.isIfStatement(p) || ts.isWhileStatement(p) || ts.isDoStatement(p) || ts.isDeleteExpression(p) || ts.isCaseClause(p) || ts.isSwitchStatement(p)) return null
     if (ts.isVariableDeclaration(p)) return p.initializer === q && p.type ? slot(q) : null
-    if (ts.isCallExpression(p) || ts.isNewExpression(p)) return p.expression === q ? null : slot(q)
+    if (ts.isCallExpression(p) || ts.isNewExpression(p)) return p.expression === q ? null : (generic(p, q) ?? slot(q))
     if (ts.isReturnStatement(p) || ts.isArrowFunction(p) || ts.isArrayLiteralExpression(p) || ts.isPropertyAssignment(p) || ts.isShorthandPropertyAssignment(p) || ts.isPropertyDeclaration(p) || ts.isParameter(p) || ts.isYieldExpression(p) || ts.isBindingElement(p) || ts.isJsxExpression(p) || ts.isExportAssignment(p)) return slot(q)
     if (ts.isTemplateSpan(p) || ts.isTaggedTemplateExpression(p)) return 'is put into a template'
     if (ts.isThrowStatement(p)) return 'is thrown'
@@ -409,7 +452,7 @@ function censusIn(rev, root, scope, budget) {
         const pos = position(n)
         if (!pos) continue
         if (typeof pos === 'object') {
-          for (const v of pos.view.flags & F.Union ? pos.view.types.filter((u) => u.flags & F.Object) : [pos.view]) {
+          for (const v of pos.views ?? (pos.view.flags & F.Union ? pos.view.types.filter((u) => u.flags & F.Object) : [pos.view])) {
             if (!tracked.has(v)) {
               tracked.add(v)
               grew = true
@@ -433,7 +476,7 @@ function censusIn(rev, root, scope, budget) {
       if (!by) continue
       // An assignment's pattern has the type of what is assigned to it, a declaration's the pattern's own.
       const t = ts.isObjectLiteralExpression(n) ? checker.getTypeOfAssignmentPattern(n) : checker.getTypeAtLocation(n)
-      if (!direct(t) && !(t.flags & F.TypeParameter && direct(checker.getBaseConstraintOfType(t)))) continue
+      if (!direct(t)) continue
       const at = n.getStart(sf)
       escapes.push({ file, line: sf.getLineAndCharacterOfPosition(at).line + 1, text: n.getText(sf).replace(/\s+/g, ' ').slice(0, 80), why: `${short(t)} is destructured by ${by}`, inProxy: file === CLASS_FILE && proxy && at >= proxy.start && at < proxy.end })
     }

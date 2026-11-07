@@ -371,7 +371,8 @@ no longer does (`/*` and `*/` added around code). The IPC dispatch's own lines m
 (`CW_TEST_SLOW_IPC`, `FAIL_IPC`, `BLOCK_IPC`, `HOLD_IPC`: the suites that set the seam); the rest of it (the access
 check, the error path) is every suite. **`WorkspaceService`'s members are followed by name because of a rule**
 (HI-2678, Darren's R2; `workspaceRule.mjs`): no value holding a `WorkspaceService` (a view of one, a container, a
-callback returning one) goes where its type is lost (`any`, `unknown`, `object`, an index signature, a cast, a slot whose
+callback returning one; one by an intersection, a subclass or sub-interface, a type parameter constrained to it, or a
+generic's own type parameter it went into) goes where its type is lost (`any`, `unknown`, `object`, an index signature, a cast, a slot whose
 type drops it) or is read by a key the code doesn't spell (a computed key, a destructuring by one or into a rest, a
 spread, `for-in`), and no code outside the program (a script, a suite, a `.mjs` helper) may load `workspace.ts`: by an
 import, or by a loader the import graph can't read beside a path to it (selection's own tooling, which reads it as text,

@@ -104,6 +104,23 @@ describe('each escape breaks the rule, naming where', () => {
       expect(brokenBy(use(body))).toMatch(/is destructured by (a computed key|a rest)/)
     })
   }
+  // HR3's round 2: a WorkspaceService by another type, read by a computed key.
+  const forms: [string, string][] = [
+    ['an intersection with it', 'export function g(ws: WorkspaceService & { tag: boolean }, k: keyof WorkspaceService): unknown {\n  return ws[k]\n}\n'],
+    ['an intersection, destructured', 'export function g(ws: WorkspaceService & { tag: boolean }, k: keyof WorkspaceService): unknown {\n  const { [k]: fn } = ws\n  return fn\n}\n'],
+    ['a type parameter constrained to it', 'export function g<T extends WorkspaceService>(ws: T, k: keyof WorkspaceService): unknown {\n  return ws[k]\n}\n'],
+    ['an interface extending it', 'interface View extends WorkspaceService {\n  tag: boolean\n}\nexport function g(ws: View, k: keyof WorkspaceService): unknown {\n  return ws[k]\n}\n'],
+    ['a class extending it', 'class View extends WorkspaceService {\n  tag = true\n}\nexport function g(ws: View, k: keyof WorkspaceService): unknown {\n  return ws[k]\n}\nexport const v = new View()\n'],
+    ["an unconstrained generic's T it went into", 'function pick<T>(x: T, k: keyof T): unknown {\n  return x[k]\n}\nexport const g = (ws: WorkspaceService, k: keyof WorkspaceService): unknown => pick(ws, k)\n']
+  ]
+  for (const [what, body] of forms) {
+    it(`read through ${what}`, () => {
+      expect(brokenBy(use(body))).toMatch(/is read by a computed key|is destructured by a computed key/)
+    })
+  }
+  it("an unconstrained generic that only passes its T on, by name: the rule holds", () => {
+    holds(use('function firstOf<T>(list: readonly { owner: T }[]): T | undefined {\n  return list[0]?.owner\n}\nexport const g = (ws: WorkspaceService): string | null => firstOf([{ owner: ws }])?.path ?? null\n'))
+  })
   it('destructured by name, or by a literal key: its names are spelled', () => {
     holds(use("export function g(ws: WorkspaceService): unknown {\n  const { path, ['setAdvanced']: set } = ws\n  return [path, set]\n}\n"))
   })
