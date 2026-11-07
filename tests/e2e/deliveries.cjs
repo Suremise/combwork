@@ -99,7 +99,8 @@ async function start() {
   const startAssistant = async () => {
     const home = (await inv('workspace:refresh')).assistant.path
     await inv('session:start', home, { agentId: 'assistant' })
-    await until(async () => (await live(home, 'assistant'))?.status === 'ready', HUNG_MS)
+    // On the fake the Assistant's start is a turn of its own: idle once it is over (`finished`, never `ready`: HI-2688).
+    check('the Assistant starts', await lib.agentIdle(inv, 'assistant', HUNG_MS))
     return home
   }
   let home = await startAssistant()
