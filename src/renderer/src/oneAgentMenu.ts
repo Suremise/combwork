@@ -72,5 +72,7 @@ export function oneAgentMore(kind: OneAgentKind, project: ProjectInfo, sub: (ite
   const items = oneAgentEntries(kind, project)
   if (!items.length) return []
   const label = { resume: ONE_AGENT_TEXT.resumeOne, stop: ONE_AGENT_TEXT.stopOne, startNew: ONE_AGENT_TEXT.startNewOne, archive: ONE_AGENT_TEXT.archiveOne }[kind]
-  return [{ label: tr(label), icon: 'blank', more: true, ...extra, onClick: (k: boolean) => sub(items, k) }]
+  // In its action's colour, as the all-agents entry beside it (#344).
+  const action = ({ resume: 'resume', stop: 'stop', startNew: 'start', archive: 'archive-start' } as const)[kind]
+  return [{ label: tr(label), icon: 'blank', action, more: true, ...extra, onClick: (k: boolean) => sub(items, k) }]
 }
