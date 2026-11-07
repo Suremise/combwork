@@ -391,7 +391,8 @@ function failureOf(e: unknown): 'refused' | 'invalid' | 'failed' {
   const status = (e as { status?: unknown })?.status
   if (typeof status === 'number') return status === 409 || status === 401 || status === 403 ? 'refused' : status >= 500 ? 'failed' : 'invalid'
   if ((e as { noReply?: unknown })?.noReply) return 'failed'
-  return e instanceof Error && e.constructor === Error ? 'invalid' : 'failed'
+  // A plain Error, not a subclass: its prototype is Error's own (HI-2697: no `constructor`, which the test picker reads as code).
+  return e instanceof Error && Object.getPrototypeOf(e) === Error.prototype ? 'invalid' : 'failed'
 }
 
 /** How long a wait's reply may take: the wait as Combwork will hold it (at most `max`), and a minute to spare. */

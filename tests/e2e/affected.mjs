@@ -896,6 +896,8 @@ export const UNIT_SCANS = [
   { test: 'tests/checkRepo.test.ts', paths: ['tests/'], adds: true },
   { test: 'tests/checkRepo.test.ts', paths: ['tests/admission.test.ts', 'tests/bundled.test.ts', 'tests/e2esuites.test.ts', 'tests/folderProcesses.test.ts', 'tests/i18nCatalogues.test.ts'], lines: ['\\bdescribe\\(', '\\bit\\('] },
   // This table's own check: a test file added, or one starting to scan the repository.
+  // The hubs most tests reach must stay known to the unit picker's gate (HI-2697): their text, not their imports.
+  { test: 'tests/relatedTests.test.ts', paths: ['src/main/workflow/launcher.ts', 'src/main/workflow/gitHost.ts', 'src/main/mcp/cw-mcp.ts', 'src/renderer/src/commitLoop.tsx', 'src/renderer/src/commitWatch.ts', 'src/renderer/src/windowHealth.ts'] },
   { test: 'tests/focusedPick.test.ts', paths: ['tests/'], adds: true },
   { test: 'tests/focusedPick.test.ts', paths: ['tests/'], lines: ['ls-files', 'readdir', '\\bglob'] }
 ]

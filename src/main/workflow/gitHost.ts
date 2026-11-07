@@ -48,14 +48,15 @@ export const HOST = `
 // A process of its own, not Combwork's: its exit isn't one of Combwork's ways out (exitBy).
 const end = process.exit.bind(process)
 const cp = require('child_process')
-const QUIET = ${EXITED_QUIET_MS}, CHUNK = ${OUT_CHUNK}
+// Its numbers come as its arguments (hostArgs), so its text is fixed: the focused-test picker reads it (HI-2697).
+const [QUIET, CHUNK, HEAD, REQUEST_MAX] = process.argv.slice(1, 5).map(Number)
 const live = new Map()
 // Each running command's input, until its end (J) comes.
 const stdins = new Map()
 let got = Buffer.alloc(0), gated = false, closing = false, blocked = false
 const frame = (kind, id, payload) => {
   const body = Buffer.isBuffer(payload) ? payload : Buffer.from(String(payload), 'utf8')
-  const head = Buffer.alloc(${HEAD})
+  const head = Buffer.alloc(HEAD)
   head.write(kind, 0, 'latin1'); head.writeUInt32BE(id, 1); head.writeUInt32BE(body.length, 5)
   if (!process.stdout.write(Buffer.concat([head, body])) && !blocked) {
     // Backpressure: every command's output waits until the runner has read what was written, and no command's quiet
@@ -167,12 +168,12 @@ const take = (kind, id, body) => {
 }
 process.stdin.on('data', (d) => {
   got = got.length ? Buffer.concat([got, d]) : d
-  while (got.length >= ${HEAD}) {
+  while (got.length >= HEAD) {
     const kind = got.toString('latin1', 0, 1), id = got.readUInt32BE(1), len = got.readUInt32BE(5)
-    if (len > ${REQUEST_MAX}) end(65)
-    if (got.length < ${HEAD} + len) break
-    const body = got.subarray(${HEAD}, ${HEAD} + len)
-    got = got.subarray(${HEAD} + len)
+    if (len > REQUEST_MAX) end(65)
+    if (got.length < HEAD + len) break
+    const body = got.subarray(HEAD, HEAD + len)
+    got = got.subarray(HEAD + len)
     take(kind, id, body)
   }
 })
@@ -250,6 +251,11 @@ export class FrameDecoder {
   }
 }
 
+/** HOST's numbers, as its arguments (`process.argv[1..4]` under `-e`): its exit's quiet, its output's piece, a frame's head, a request's largest. */
+export function hostArgs(): string[] {
+  return [EXITED_QUIET_MS, OUT_CHUNK, HEAD, REQUEST_MAX].map(String)
+}
+
 /**
  * Starts a host, waiting for its gate: detached (outside Combwork's own job), hidden, as a launcher is (startLauncher), in
  * `base` (tests: their own) with Combwork's executable run as Node. Its commands get each request's own environment.
@@ -257,7 +263,7 @@ export class FrameDecoder {
 export function startGitHost(base: NodeJS.ProcessEnv = process.env): { child: ChildProcess; after: number; before: number } {
   const env: NodeJS.ProcessEnv = { ...base, ELECTRON_RUN_AS_NODE: '1' }
   const after = Date.now()
-  const child = spawn(process.execPath, ['-e', HOST], { env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, detached: true })
+  const child = spawn(process.execPath, ['-e', HOST, ...hostArgs()], { env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, detached: true })
   return { child, after, before: Date.now() }
 }
 
