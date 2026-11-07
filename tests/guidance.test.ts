@@ -892,9 +892,13 @@ describe("the repository's AGENTS.md", () => {
       /\*\*Merge checks\*\*, this repository's \(#1010\): a merge into main or an integration branch .* runs typecheck, lint and `npm run check:repo` .* and the cards' own focused e2e suites/,
       // HI-2244: where the full unit run happens, now that a merge doesn't run it.
       /The full unit run \(`npm test`\) is a release's checks \(Tests per card, below\), and on request/,
-      // HI-2477: two modes, lean while building (no full unit run per card), thorough when preparing a release.
-      /\*\*Tests per card\*\* \(HI-2003, HI-2477\): two modes\. \*\*While building\*\* is the default.*\*\*Preparing a release\*\* applies only when a release card or an RC is in hand/,
-      /No full unit run \(`npm test`\), before the first submit or after\./,
+      // HI-2477, HI-2658: a budget for each kind of change, lean by default (no full unit run per card), the release's only with one in hand.
+      /\*\*Tests per card: a budget for each kind of change\*\* \(HI-2003, HI-2477, HI-2658\)[^\n]*never to call unrun checks passed/,
+      /\*\*Small fix or feature in one area\*\* \(the default\), \*\*15–30 min\*\*; past 45, look at the scope[^\n]*No full unit run \(`npm test`\), first submit included\./,
+      /\*\*Docs or text, or a test-expectation fix\*\*, \*\*5–15 min\*\*/,
+      /\*\*Shared storage, concurrency, launch or workflow-safety change\*\*, \*\*30–60 min\*\*, its reason named on the card/,
+      /\*\*A merge into the integration branch\*\*, \*\*10–20 min\*\*/,
+      /\*\*Preparing a release\*\* applies only when a release card or an RC is in hand[^\n]*\*\*first RC\*\*, about \*\*2–3 hours\*\*[^\n]*\*\*RC fix round\*\*, \*\*15–45 min\*\*[^\n]*\*\*release of the tested candidate\*\*, \*\*15–30 min\*\*/,
       /It never asks for a full unit run or other wide re-runs\./,
       /\*\*Flake work:\*\* at most 2 spinner workers and 3 repeats per repro \(`--repeat 3`; the `investigate-flake` skill\)\. A flake seen only under a full run's load waits for the release window, unless it blocks merges\./,
       /never open the main checkout .* with one until the 1\.0 baseline is installed \(#1288\)/,
@@ -940,6 +944,10 @@ describe('RELEASING.md on the 1.0 path', () => {
     expect(checks).toMatch(/\*\*3 to 5 scenarios picked at random\*\* from the trial set, once each, with no repeats \(`npm run scenarios -- --provider <provider> --random 3`/)
     expect(checks).toMatch(/The release card names the seed or the ids/)
     expect(checks).toMatch(/The full set on every provider is not a release step/)
+    // HI-2658: each stage's budget, as AGENTS.md's.
+    expect(checks).toMatch(/\*\*The first release candidate\*\*, about \*\*2–3 hours\*\*/)
+    expect(checks).toMatch(/\*\*An RC fix round\*\*, \*\*15–45 min\*\*/)
+    expect(checks).toMatch(/\*\*The release of the tested candidate\*\*, \*\*15–30 min\*\*/)
     expect(readFileSync(join(ROOT, 'AGENTS.md'), 'utf8')).toMatch(/The full set is for guidance-wide changes only \(HI-2010, HI-2011, HI-2012\); a publishable RC gets 3 to 5 scenarios picked at random/)
     expect(path).toMatch(/`npm run dist -- --kind baseline` \(asked\)/)
     // #1534: where each build is recorded.
