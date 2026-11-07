@@ -283,6 +283,18 @@
     "defaultMessage": "The connection chosen for {agent} is for another CLI. Pick a {cli} connection in its Agent Settings.",
     "description": "Starting an agent ({agent}) is refused: the connection chosen for it belongs to another coding agent CLI. {cli} is the agent's CLI (\"Claude Code\")."
   },
+  "main.connections.launch.projectMissing": {
+    "defaultMessage": "{project}'s project.json is missing",
+    "description": "Why Combwork couldn't read what a change of launch settings or an agent's role affects (HI-2670), put into a longer error in place of {error}: an open project's settings file (project.json: a file name, keep it) isn't there. {project} is the project's name. Lower case, no full stop."
+  },
+  "main.connections.launch.projectUnreadable": {
+    "defaultMessage": "{project}'s project.json can't be read ({error})",
+    "description": "Why Combwork couldn't read what a change of launch settings or an agent's role affects (HI-2670), put into a longer error in place of {error}: an open project's settings file (project.json: a file name, keep it) can't be read. {project} is the project's name, {error} the system's reason. Lower case, no full stop."
+  },
+  "main.connections.launch.projectUnusable": {
+    "defaultMessage": "{project}'s project.json doesn't hold a list of agents Combwork can read",
+    "description": "Why Combwork couldn't read what a change of launch settings or an agent's role affects (HI-2670), put into a longer error in place of {error}: an open project's settings file (project.json: a file name, keep it) doesn't parse, or its agents aren't in the shape Combwork writes. {project} is the project's name. Lower case, no full stop."
+  },
   "main.connections.launch.projectsUnread": {
     "defaultMessage": "the projects of {workspace} aren't read yet",
     "description": "Why Combwork couldn't read what a change of a connection's launch settings affects (HI-2670), put into a longer error in place of {error}: an open workspace's projects ({workspace}: its folder) haven't been read yet. Lower case, no full stop."

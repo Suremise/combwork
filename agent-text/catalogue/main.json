@@ -214,6 +214,21 @@
     "note": "Starting an agent ({agent}) is refused: the connection chosen for it belongs to another coding agent CLI. {cli} is the agent's CLI (\"Claude Code\").",
     "audience": "both"
   },
+  "main.connections.launch.projectMissing": {
+    "text": "{project}'s project.json is missing",
+    "note": "Why Combwork couldn't read what a change of launch settings or an agent's role affects (HI-2670), put into a longer error in place of {error}: an open project's settings file (project.json: a file name, keep it) isn't there. {project} is the project's name. Lower case, no full stop.",
+    "audience": "both"
+  },
+  "main.connections.launch.projectUnreadable": {
+    "text": "{project}'s project.json can't be read ({error})",
+    "note": "Why Combwork couldn't read what a change of launch settings or an agent's role affects (HI-2670), put into a longer error in place of {error}: an open project's settings file (project.json: a file name, keep it) can't be read. {project} is the project's name, {error} the system's reason. Lower case, no full stop.",
+    "audience": "both"
+  },
+  "main.connections.launch.projectUnusable": {
+    "text": "{project}'s project.json doesn't hold a list of agents Combwork can read",
+    "note": "Why Combwork couldn't read what a change of launch settings or an agent's role affects (HI-2670), put into a longer error in place of {error}: an open project's settings file (project.json: a file name, keep it) doesn't parse, or its agents aren't in the shape Combwork writes. {project} is the project's name. Lower case, no full stop.",
+    "audience": "both"
+  },
   "main.connections.launch.projectsUnread": {
     "text": "the projects of {workspace} aren't read yet",
     "note": "Why Combwork couldn't read what a change of a connection's launch settings affects (HI-2670), put into a longer error in place of {error}: an open workspace's projects ({workspace}: its folder) haven't been read yet. Lower case, no full stop.",

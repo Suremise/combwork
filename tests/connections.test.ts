@@ -1621,4 +1621,24 @@ describe('HI-2670 (HR3 on s46): lock order, and what a change affects read as th
     // Readable again: it names a-one's card, and asks for confirmation.
     await expect(launchSettings.setConnectionLaunch(conn, { tools: false })).rejects.toThrow(/One \(.*doing\).*confirm: [0-9a-f]+/)
   })
+
+  it("a project.json that is missing for an open project refuses it too: unavailable is never empty (HR2 on s47)", async () => {
+    const account = await signedInConnection('Probe 2', 'probe2@example.com')
+    const conn = baseOf(account.id)
+    const p = join(wsPath, 'alpha')
+    const file = join(p, '.combwork', 'project.json')
+    await here(() => w.updateAgent(p, 'a-one', { connection: conn, workflowRole: 'builder' }))
+    const tasks = await import('../src/main/tasks')
+    const launchSettings = await import('../src/main/connectionLaunch')
+    await here(() => tasks.createTask({ title: 'Held while project.json is away', project: 'alpha', agent: 'a-one', column: 'doing' }, { kind: 'user' }))
+    const aside = `${file}.aside-hi2670`
+    renameSync(file, aside)
+    try {
+      await expect(launchSettings.setConnectionLaunch(conn, { tools: false })).rejects.toThrow(/couldn't read which agents, lanes and cards.*alpha's project\.json is missing/)
+      expect(accounts.getConnection(conn)?.launch).toBeUndefined()
+    } finally {
+      renameSync(aside, file)
+    }
+    await expect(launchSettings.setConnectionLaunch(conn, { tools: false })).rejects.toThrow(/One \(.*doing\).*confirm: [0-9a-f]+/)
+  })
 })

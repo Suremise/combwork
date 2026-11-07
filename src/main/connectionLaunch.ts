@@ -14,7 +14,7 @@ import { cleanLaunch, copyAppSwitches, launchesWithoutTools, launchPolicy, type 
 import { running } from '../shared/lanes'
 import { msg } from '../shared/i18n'
 import { agentWorkflowRole, inWorkflow, readToolsOffWith } from '../shared/workflow/roles'
-import type { AgentDef, Connection, ConnectionLaunch, ProjectConfig, ProviderId } from '../shared/types'
+import type { AgentDef, Connection, ConnectionLaunch, ProviderId } from '../shared/types'
 import { CW_DIR } from '../shared/defaults'
 import { accountById, allAccounts, allConnections, getConnection, NO_CONNECTION, updateConnection } from './accounts'
 import { boardRevision } from './boardStore'
@@ -110,8 +110,8 @@ async function connectionImpact(id: string): Promise<LaunchImpact> {
     if (!info) throw combworkError(PROJECTS_UNREAD, { workspace: ws.path })
     for (const p of info.projects) {
       const file = join(p.path, CW_DIR, 'project.json')
-      const cfg = await withFileLock(file, () => projectFileAsIs(file))
-      for (const a of cfg.agents ?? []) {
+      const agents = await withFileLock(file, () => projectAgentsAsIs(file, p.name))
+      for (const a of agents) {
         // Already out of the workflow by its own role: the change takes nothing from it.
         if (a.connection !== id || (a.workflowRole === 'independent')) continue
         const parts = await partsOf(ws, p.name, p.path, a)
@@ -124,20 +124,41 @@ async function connectionImpact(id: string): Promise<LaunchImpact> {
 
 const PROJECTS_UNREAD = msg({ id: 'main.connections.launch.projectsUnread', defaultMessage: "the projects of {workspace} aren't read yet", description: "Why Combwork couldn't read what a change of a connection's launch settings affects (HI-2670), put into a longer error in place of {error}: an open workspace's projects ({workspace}: its folder) haven't been read yet. Lower case, no full stop." })
 
+const PROJECT_MISSING = msg({ id: 'main.connections.launch.projectMissing', defaultMessage: "{project}'s project.json is missing", description: "Why Combwork couldn't read what a change of launch settings or an agent's role affects (HI-2670), put into a longer error in place of {error}: an open project's settings file (project.json: a file name, keep it) isn't there. {project} is the project's name. Lower case, no full stop." })
+const PROJECT_UNREADABLE = msg({ id: 'main.connections.launch.projectUnreadable', defaultMessage: "{project}'s project.json can't be read ({error})", description: "Why Combwork couldn't read what a change of launch settings or an agent's role affects (HI-2670), put into a longer error in place of {error}: an open project's settings file (project.json: a file name, keep it) can't be read. {project} is the project's name, {error} the system's reason. Lower case, no full stop." })
+const PROJECT_UNUSABLE = msg({ id: 'main.connections.launch.projectUnusable', defaultMessage: "{project}'s project.json doesn't hold a list of agents Combwork can read", description: "Why Combwork couldn't read what a change of launch settings or an agent's role affects (HI-2670), put into a longer error in place of {error}: an open project's settings file (project.json: a file name, keep it) doesn't parse, or its agents aren't in the shape Combwork writes. {project} is the project's name. Lower case, no full stop." })
+
 /**
- * A project's project.json exactly as it is (HR3 on s46), for what a change affects: never a kept file's stand-in (its
- * .bak while it is being saved, or the default for one damaged), which would read agents that are there as gone. None
- * there: no agents. One that can't be read or doesn't parse throws, and the change is refused.
+ * An open project's agents exactly as its project.json says (HI-2670's fail-closed read, the design on s47): read under its
+ * lock, never a kept file's stand-in (a .bak, a default). Only a file that parses to an object whose `agents` is an
+ * array of agents (each an object with an id, and a string role and connection where it has them), or that has no
+ * `agents`, says which agents are there; a missing file, one that can't be read, doesn't parse or isn't that shape
+ * throws, and the change is refused: unavailable is never empty.
  */
-async function projectFileAsIs(file: string): Promise<Partial<ProjectConfig>> {
+async function projectAgentsAsIs(file: string, project: string): Promise<AgentDef[]> {
   let text: string
   try {
     text = await readFile(file, 'utf8')
   } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return {}
-    throw e
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT') throw combworkError(PROJECT_MISSING, { project })
+    throw combworkError(PROJECT_UNREADABLE, { project, error: e instanceof Error ? e.message : String(e) })
   }
-  return JSON.parse(text) as Partial<ProjectConfig>
+  let cfg: unknown
+  try {
+    cfg = JSON.parse(text)
+  } catch {
+    throw combworkError(PROJECT_UNUSABLE, { project })
+  }
+  if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) throw combworkError(PROJECT_UNUSABLE, { project })
+  const agents = (cfg as { agents?: unknown }).agents
+  if (agents === undefined) return []
+  if (!Array.isArray(agents)) throw combworkError(PROJECT_UNUSABLE, { project })
+  const str = (v: unknown): boolean => v === undefined || typeof v === 'string'
+  for (const a of agents) {
+    const x = a as Record<string, unknown> | null
+    if (!x || typeof x !== 'object' || Array.isArray(x) || typeof x.id !== 'string' || !x.id || !str(x.connection) || !str(x.workflowRole) || !str(x.name)) throw combworkError(PROJECT_UNUSABLE, { project })
+  }
+  return agents as AgentDef[]
 }
 
 /** Whether a launch change turns a connection's Combwork tools off. */

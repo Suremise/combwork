@@ -14,6 +14,7 @@ const state = vi.hoisted(() => ({
   failCards: false,
   failLanes: false,
   failProject: '' as string,
+  files: {} as Record<string, string | null>,
   projects: [{ name: 'demo', path: 'C:/ws/demo' }] as { name: string; path: string }[],
   cards: [] as Partial<TaskCard>[],
   emitted: 0,
@@ -69,7 +70,7 @@ vi.mock('../src/main/tasks', () => ({
   }
 }))
 vi.mock('../src/main/workspace', () => ({
-  openWorkspaces: () => [{ path: 'C:/ws', info: () => ({ projects: state.projects }), projectConfigWrites: () => 0, refresh: async () => undefined }]
+  openWorkspaces: () => [{ path: 'C:/ws', info: () => (state.projects ? { projects: state.projects } : null), projectConfigWrites: () => 0, refresh: async () => undefined }]
 }))
 vi.mock('../src/main/fsutil', async (orig) => ({
   ...(await orig<typeof import('../src/main/fsutil')>()),
@@ -80,6 +81,11 @@ vi.mock('original-fs/promises', async (orig) => ({
   ...(await orig<typeof import('original-fs/promises')>()),
   readFile: async (file: string) => {
     if (state.failProject && file.includes(state.failProject)) throw Object.assign(new Error('project.json unreadable'), { code: 'EBUSY' })
+    // A project's file as a test writes it (HR2 on s47): missing, or any text.
+    for (const [name, text] of Object.entries(state.files)) if (file.includes(name)) {
+      if (text === null) throw Object.assign(new Error('ENOENT: no such file'), { code: 'ENOENT' })
+      return text
+    }
     return JSON.stringify({ agents: file.includes('demo') ? state.agents : [] })
   }
 }))
@@ -102,6 +108,7 @@ beforeEach(() => {
   state.failCards = false
   state.failLanes = false
   state.failProject = ''
+  state.files = {}
   state.projects = [{ name: 'demo', path: 'C:/ws/demo' }]
 })
 
@@ -263,5 +270,39 @@ describe('HR3 on s45: an affected set that can\'t be read never lets the change 
     state.failCards = true
     const hb1 = { id: 'b1', name: 'HB1', workflowRole: 'builder' as const, connection: 'c-1' }
     await expect(agentChangeCheck({ path: 'C:/ws', info: () => ({ projects: [] }), projectConfigWrites: () => 0 } as never, 'C:/ws/demo', 'demo', hb1, { workflowRole: 'independent' }, null)).rejects.toThrow(/couldn't read/)
+  })
+})
+
+describe("HR2 on s47: a project's agents count only as its project.json says, read as the file is", () => {
+  const two = (): void => void (state.projects = [{ name: 'demo', path: 'C:/ws/demo' }, { name: 'other', path: 'C:/ws/other' }])
+
+  for (const [what, text] of [
+    ['missing', null],
+    ["doesn't parse", '{'],
+    ['is not an object', '[]'],
+    ['has agents that are not a list', JSON.stringify({ agents: { b1: {} } })],
+    ['has an agent without an id', JSON.stringify({ agents: [{ name: 'Nameless', connection: 'c-1' }] })],
+    ['has an agent whose connection is not text', JSON.stringify({ agents: [{ id: 'z1', connection: 7 }] })]
+  ] as const) {
+    it(`refuses when another open project's project.json ${what}, changing nothing`, async () => {
+      two()
+      state.files = { other: text }
+      await expect(changeConnection('c-1', { values: { model: 'opus' }, launch: { tools: false } })).rejects.toThrow(/couldn't read which agents, lanes and cards.*other's project\.json/)
+      expect(state.connections[0]).toEqual({ id: 'c-1', account: 'acc', name: 'Claude' })
+      expect(state.valuesSaved).toEqual([])
+    })
+  }
+
+  it('takes a valid empty list, or no agents saved, as none there: only the builder on it is named', async () => {
+    two()
+    state.files = { other: JSON.stringify({ version: 2, agents: [] }) }
+    expect((await launchImpact('c-1', { tools: false }))!.agents.map((a) => a.agent)).toEqual(['HB1'])
+    state.files = { other: JSON.stringify({ version: 2 }) }
+    expect((await launchImpact('c-1', { tools: false }))!.agents.map((a) => a.agent)).toEqual(['HB1'])
+  })
+
+  it("refuses while a workspace's projects aren't read yet", async () => {
+    state.projects = null as never
+    await expect(launchImpact('c-1', { tools: false })).rejects.toThrow(/aren't read yet/)
   })
 })

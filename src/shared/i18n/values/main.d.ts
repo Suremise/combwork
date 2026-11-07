@@ -72,6 +72,9 @@ interface CombworkMessageValues {
   'main.connections.launch.offHere': { n: number; cli: string | number; names: string | number; agent: string | number }
   'main.connections.launch.offNoDefault': { agent: string | number; name: string | number; cli: string | number }
   'main.connections.launch.otherProvider': { agent: string | number; cli: string | number }
+  'main.connections.launch.projectMissing': { project: string | number }
+  'main.connections.launch.projectUnreadable': { project: string | number; error: string | number }
+  'main.connections.launch.projectUnusable': { project: string | number }
   'main.connections.launch.projectsUnread': { workspace: string | number }
   'main.connections.launch.signedOut': { name: string | number; agent: string | number }
   'main.connections.launch.unreadable': { error: string | number }

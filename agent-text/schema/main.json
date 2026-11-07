@@ -216,6 +216,22 @@
       "cli": "plain"
     }
   },
+  "main.connections.launch.projectMissing": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "main.connections.launch.projectUnreadable": {
+    "placeholders": {
+      "project": "plain",
+      "error": "plain"
+    }
+  },
+  "main.connections.launch.projectUnusable": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
   "main.connections.launch.projectsUnread": {
     "placeholders": {
       "workspace": "plain"
