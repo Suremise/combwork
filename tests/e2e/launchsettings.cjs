@@ -8,6 +8,8 @@
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
+const { createHash } = require('crypto')
+const { execFileSync } = require('child_process')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 30000
 
@@ -142,16 +144,28 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     check('…while Combwork still shows its status', !!(await lib.until(async () => ['ready', 'working', 'finished'].includes((await inv('session:live')).find((s) => s.agentId === 'a-hb1')?.status), HUNG_MS)))
     await inv('session:stop', alpha, 'a-hb1').catch(() => undefined)
 
-    // --- The Agent API turns everything on again: the agents' own roles are back.
-    const back = await api('PATCH', `/v1/connections/${conn.id}`, { launch: {} })
-    check('PATCH /v1/connections launch {} turns everything on again', back.status === 200 && !(await inv('connections:list')).connectionRows.find((c) => c.id === conn.id)?.launch, JSON.stringify(back))
+    // --- The Assistant's cw_connection (Change settings on) turns everything on again: the agents' own roles are back.
+    const assistantHome = (await inv('workspace:refresh')).assistant.path
+    await inv('session:start', assistantHome, { agentId: 'assistant' })
+    const asTokenFile = path.join(userData, 'assistant-api', `${createHash('sha256').update(ws.toLowerCase()).digest('hex').slice(0, 16)}.json`)
+    check('the Assistant starts, with its token', !!(await lib.until(async () => fs.existsSync(asTokenFile), HUNG_MS)))
+    const tool = (name, args) => {
+      const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) + '\n', env: lib.childEnv({ CW_API_URL: `http://127.0.0.1:${PORT}`, CW_WORKSPACE: ws, CW_ROLE: 'assistant', CW_ASSISTANT_CONTROL: 'projects', CW_API_TOKEN_FILE: asTokenFile, CW_API_TOKEN: '', CW_PROJECT: '' }), timeout: 60000 }).toString()
+      const r = JSON.parse(out.split('\n')[0]).result
+      return { text: r.content[0].text, isError: !!r.isError }
+    }
+    const back = tool('cw_connection', { action: 'update', connection: conn.id, launch: {} })
+    check("the Assistant's cw_connection with launch {} turns everything on again", !back.isError && !(await inv('connections:list')).connectionRows.find((c) => c.id === conn.id)?.launch, JSON.stringify(back))
     const again = await lib.until(async () => {
       const a = await agents()
       return a.HB1.role === 'builder' && a.HR1.role === 'reviewer' ? a : null
     }, HUNG_MS)
     check('…HB1 is a builder and HR1 a reviewer again', !!again, JSON.stringify(await agents()))
-    const refused = await api('PATCH', `/v1/connections/${conn.id}`, { launch: { tools: false } })
-    check('…turning its tools off again over the API is refused without confirm, naming HB1 and a fingerprint', refused.status === 409 && /HB1 \(DE-|HB1 \(/.test(JSON.stringify(refused.body)) && /confirm: [0-9a-f]+/.test(JSON.stringify(refused.body)), JSON.stringify(refused))
+    const refused = tool('cw_connection', { action: 'update', connection: conn.id, launch: { tools: false } })
+    const fingerprint = /confirm: ([0-9a-f]+)/.exec(refused.text)?.[1]
+    check('…turning its tools off again is refused without confirm, naming HB1 and a fingerprint', refused.isError && /HB1 \(/.test(refused.text) && !!fingerprint, JSON.stringify(refused))
+    const confirmed = tool('cw_connection', { action: 'update', connection: conn.id, launch: { tools: false }, confirm: fingerprint })
+    check('…and done with it', !confirmed.isError && (await inv('connections:list')).connectionRows.find((c) => c.id === conn.id)?.launch?.tools === false, JSON.stringify(confirmed))
   } finally {
     await app.close().catch(() => undefined)
   }
