@@ -159,6 +159,9 @@ const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '')
     await shots('local')
 
     // --- HI-2682: a local model's Context size and Output budget, in Edit Server….
+    // Two, still running from above, stopped first: its next start reads them.
+    await inv('session:stop', alpha, 'a-two')
+    await lib.until(async () => !(await live('a-two')), HUNG_MS)
     const olModel = async (id) => (await list()).connections.find((c) => c.id === ol.id)?.server?.models.find((m) => m.id === id)
     await row('Ollama').locator('[data-edit-server]').click()
     const edit = page.locator('.dialog', { has: page.locator('[data-save-server]') })
