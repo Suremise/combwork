@@ -3567,8 +3567,8 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
     const limit = body?.limitMinutes === undefined ? WATCH_DEFAULT_LIMIT_MINUTES : Number(body.limitMinutes)
     if (!Number.isFinite(limit) || limit < 1 || limit > WATCH_MAX_LIMIT_MINUTES) throw new HttpError(400, apiSaid(API.watch.limitMinutes, { max: String(WATCH_MAX_LIMIT_MINUTES) }))
     const r = await registerUsageWatch(ws, who!.projectPath, who!.agentId, usage, limit).catch((e: Error) => {
-      // agent-protocol: the start of the usage watch's own refusal (usageWatch.ts), matched for its status
-      throw httpFrom(e.message.startsWith('Not a project') ? 400 : 409, e)
+      // Its refusal's own status (HI-2704: not its words), else 409.
+      throw httpFrom(ownStatus(e) ?? 409, e)
     })
     const left = r.lanesLeft ? { lanesLeft: r.lanesLeft } : {}
     if ('already' in r) return { usageAlready: r.already, ...(r.replaced ? { replaced: r.replaced } : {}), ...left }
@@ -3607,7 +3607,8 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
       stillOpen()
     }
     const r = await registerLaneWatch(ws, who.projectPath, who.agentId, lc, limit, { ...extra, ...(laneAgents ? { agents: { agents: laneAgents, ignoreBackground: false } } : {}) }).catch((e: Error) => {
-      throw e instanceof HttpError ? e : httpFrom(/^(No such lane|Unknown task)/.test(e.message) ? 404 : /^(You can't watch yourself|Not a project)/.test(e.message) ? 400 : 409, e)
+      // A refusal's own status (HI-2704: not its words: an unknown lane or card 404, a project or agent it can't watch 400), else 409.
+      throw e instanceof HttpError ? e : httpFrom(ownStatus(e) ?? 409, e)
     })
     // HI-2521: a named lane that has already ended is the answer at once; no watch started, so no usage beside it.
     if ('already' in r) return { lanesAlready: r.already, ...(r.replaced ? { replaced: r.replaced } : {}) }
@@ -4791,8 +4792,19 @@ const KIND_STATUS = { invalid: 400, forbidden: 403, notFound: 404, conflict: 409
  * alone, never from a name or a quoted value in it (HI-2704). Errors that aren't Combwork's own go by statusFor().
  */
 function errorStatus(e: unknown): number {
-  if ((e instanceof CombworkError || e instanceof SaidError || e instanceof KindedError) && e.kind) return KIND_STATUS[e.kind]
+  const own = ownStatus(e)
+  if (own !== undefined) return own ?? 500
   return e instanceof HttpError ? e.status : e instanceof tasks.TaskPermissionError ? 403 : e instanceof tasks.TaskConflictError ? 409 : statusFor(e as Error)
+}
+
+/**
+ * A Combwork error's own status: its kind's, null for one with none (it answers 500, whatever its words), undefined for
+ * an error that isn't Combwork's. A route that wraps a service's refusals keeps it (HI-2704), its own status only for one
+ * with none.
+ */
+function ownStatus(e: unknown): number | null | undefined {
+  if (!(e instanceof CombworkError || e instanceof SaidError || e instanceof KindedError)) return undefined
+  return e.kind ? KIND_STATUS[e.kind] : null
 }
 
 /**

@@ -90,7 +90,8 @@ const T = {
   cardsTooMany: agentMsg({ id: 'wake.watch.cardsTooMany', text: 'This workspace already has {max} card watches, the most Combwork keeps: wait for some to end', note: 'HI-2691: a card watch refused: the workspace has as many as Combwork keeps. max: how many.' }),
   cardsFullWait: agentMsg({ id: 'wake.watch.cardsFullWait', text: 'Too many card watches to keep in this workspace: wait for some to end', note: 'HI-2691: a card watch refused: the watches would no longer fit what Combwork keeps.' }),
   notAProject: agentMsg({ id: 'wake.watch.notAProject', text: 'Not a project of this workspace: {project}', note: "HI-2691: a watch refused: the project it names (its path or name, as given) isn't one of this workspace's." }),
-  noSuchLane: agentMsg({ id: 'wake.watch.noSuchLane', text: 'No such {count, plural, one {lane} other {lanes}}: {lanes} (cw_lane list gives the lanes and their ids)', note: 'HI-2691: a lane watch refused: lanes it names are not known. count: how many; lanes: their ids, joined with ", ". servers.ts answers it 404 by its opening (/^No such lane/).' }),
+  noSuchLane: agentMsg({ id: 'wake.watch.noSuchLane', text: 'No such {count, plural, one {lane} other {lanes}}: {lanes} (cw_lane list gives the lanes and their ids)', note: 'HI-2691: a lane watch refused: lanes it names are not known. count: how many; lanes: their ids, joined with ", ". Answered 404 (its kind).' }),
+  self: agentMsg({ id: 'wake.watch.self', text: "You can't watch yourself: nothing would wake you", note: 'HI-2704: an agent or lane watch refused: it names the calling agent among the agents it watches. Answered 400.' }),
   itsBuilder: agentMsg({ id: 'wake.card.itsBuilder', text: 'its builder', note: 'HI-2143: who submitted a card again after the merge queue returned it, in a wake to whoever watches or reviews it, when the card names no agent.' })
 }
 
@@ -1457,8 +1458,7 @@ export async function registerAgentWatch(ws: WorkspaceService, projectPath: stri
   for (const a of cond.agents) {
     // agent-protocol: its status is its kind (HI-2704: servers.ts no longer reads its words)
     if (!mayWatch(ws, store.path, projectPath, a.projectPath)) throw saidError(T.notAProject, { project: a.project }, { kind: 'notFound' })
-    // agent-protocol: an English refusal with no kind (servers.ts has no pattern for it)
-    if (same(a.projectPath, projectPath) && a.agentId === agentId) throw new Error("You can't watch yourself: nothing would wake you")
+    if (same(a.projectPath, projectPath) && a.agentId === agentId) throw saidError(T.self, undefined, { kind: 'invalid' })
   }
   const result = await locked(store, async (): Promise<AgentWatchResult> => {
     await assertNotPlacing(ws, projectPath, agentId, scopeFor(ws, projectPath))
@@ -1569,8 +1569,8 @@ export type UsageWatchResult = ({ watching: TaskWatchInfo } | { already: string[
 export async function registerUsageWatch(ws: WorkspaceService, projectPath: string, agentId: string, usage: UsageWatch[], limitMinutes = WATCH_DEFAULT_LIMIT_MINUTES): Promise<UsageWatchResult> {
   await followAgent(projectPath, agentId)
   const store = await load(ws)
-  // agent-protocol: its status is its kind (HI-2704: servers.ts no longer reads its words)
-  if (!hostedIn(ws, store.path, projectPath)) throw saidError(T.notAProject, { project: projectPath }, { kind: 'notFound' })
+  // agent-protocol: its status is its kind: 400, as its route answered it before HI-2704
+  if (!hostedIn(ws, store.path, projectPath)) throw saidError(T.notAProject, { project: projectPath }, { kind: 'invalid' })
   const result = await locked(store, async (): Promise<UsageWatchResult> => {
     await assertNotPlacing(ws, projectPath, agentId, scopeFor(ws, projectPath))
     const already = usageHits(usage, (a) => config.get().connectionPlanUsage?.[a]?.limits, Date.now())
@@ -1950,21 +1950,19 @@ export async function registerLaneWatch(ws: WorkspaceService, projectPath: strin
   const waitsFrom = latestWaitSeq()
   await followAgent(projectPath, agentId)
   const store = await load(ws)
-  // agent-protocol: its status is its kind (HI-2704: servers.ts no longer reads its words)
-  if (!hostedIn(ws, store.path, projectPath)) throw saidError(T.notAProject, { project: projectPath }, { kind: 'notFound' })
+  // agent-protocol: its status is its kind: 400, as its route answered it before HI-2704
+  if (!hostedIn(ws, store.path, projectPath)) throw saidError(T.notAProject, { project: projectPath }, { kind: 'invalid' })
   const scope = scopeFor(ws, projectPath)
   const self = await boardName(ws, projectPath, agentId)
   for (const a of extra.agents?.agents ?? []) {
-    // agent-protocol: its status is its kind (HI-2704: servers.ts no longer reads its words)
-    if (!mayWatch(ws, store.path, projectPath, a.projectPath)) throw saidError(T.notAProject, { project: a.project }, { kind: 'notFound' })
-    // agent-protocol: an English refusal with no kind (servers.ts has no pattern for it)
-    if (same(a.projectPath, projectPath) && a.agentId === agentId) throw new Error("You can't watch yourself: nothing would wake you")
+    // agent-protocol: its status is its kind: 400, as its route answered it before HI-2704
+    if (!mayWatch(ws, store.path, projectPath, a.projectPath)) throw saidError(T.notAProject, { project: a.project }, { kind: 'invalid' })
+    if (same(a.projectPath, projectPath) && a.agentId === agentId) throw saidError(T.self, undefined, { kind: 'invalid' })
   }
   if (cond.ids !== 'all') {
     const known = (await listLanes(ws, { all: true })).filter((l) => scope === null || same(l.project, scope))
     const unknown = cond.ids.filter((id) => !known.some((l) => l.id === id))
-    // An English refusal with no kind (servers.ts has no pattern for it).
-    if (unknown.length) throw saidError(T.noSuchLane, { count: unknown.length, lanes: unknown.join(', ') })
+    if (unknown.length) throw saidError(T.noSuchLane, { count: unknown.length, lanes: unknown.join(', ') }, { kind: 'notFound' })
   }
   const result = await locked(store, async (): Promise<LaneWatchResult> => {
     await assertNotPlacing(ws, projectPath, agentId, scopeFor(ws, projectPath))

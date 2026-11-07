@@ -601,7 +601,7 @@
   },
   "wake.watch.noSuchLane": {
     "text": "No such {count, plural, one {lane} other {lanes}}: {lanes} (cw_lane list gives the lanes and their ids)",
-    "note": "HI-2691: a lane watch refused: lanes it names are not known. count: how many; lanes: their ids, joined with \", \". servers.ts answers it 404 by its opening (/^No such lane/)."
+    "note": "HI-2691: a lane watch refused: lanes it names are not known. count: how many; lanes: their ids, joined with \", \". Answered 404 (its kind)."
   },
   "wake.watch.notAProject": {
     "text": "Not a project of this workspace: {project}",
@@ -622,6 +622,10 @@
   "wake.watch.numberClash": {
     "text": "{n} is {key}'s number (#{n}), not {prefix}-{n}, which is another card. Name cards by key: \"{prefix}-{n}\" or \"{key}\".",
     "note": "A watch refused for naming a card by a plain number that reads as another card's key (2189 is HI-2182's number while HI-2189 is another card). n: the number; key: the card it is the number of; prefix: the project's key."
+  },
+  "wake.watch.self": {
+    "text": "You can't watch yourself: nothing would wake you",
+    "note": "HI-2704: an agent or lane watch refused: it names the calling agent among the agents it watches. Answered 400."
   },
   "wake.watch.tooBig": {
     "text": "Too many watches to keep in this workspace: wait for some to end",

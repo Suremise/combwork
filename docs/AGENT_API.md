@@ -84,6 +84,7 @@ An error's status is decided where Combwork makes it, from the error alone (HI-2
 - `{provider} is required to resume this conversation` (the provider isn't installed) answers **409**, as `… is required to run …` already did; it was 500.
 - An error that quotes another error (a template that couldn't be applied, `Nothing was changed: …`; a watch file Combwork couldn't save) answers its own status, whatever the quoted text says. One with none of its own is a **500**, as when it quotes anything else.
 - An internal error whose words read like a refusal (`… command line is too long`) answers **500**, not 400.
+- An agent watch (`"agents"`) naming the calling agent itself answers **400**, as a lane watch's already did; it was 500.
 
 ---
 
