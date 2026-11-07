@@ -558,7 +558,15 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
       }, entry).catch(() => undefined)
       await reviewRow.hover({ timeout: 2000 }).catch(() => undefined)
       return false
-    }, HUNG_MS)), `${await tipText()} (row ${JSON.stringify(await rowState())}, entries ${entry}, notices ${await page.locator('.toasts .toast').count()})`)
+    }, HUNG_MS)), `${await tipText()} (row ${JSON.stringify(await rowState())}, entries ${entry}, notices ${await page.locator('.toasts .toast').count()}, window ${JSON.stringify(await page.evaluate(async () => {
+      // HI-2703's evidence: every tip in the document, the window's state, how late a 350 ms timer runs, and what is under the pointer.
+      const t0 = performance.now()
+      const late = await new Promise((r) => setTimeout(() => r(Math.round(performance.now() - t0 - 350)), 350))
+      const row = document.querySelector('.progress-recent-item[data-run="a-review"] .progress-recent > .tip-wrap')
+      const rect = row?.getBoundingClientRect()
+      const under = rect ? document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2) : null
+      return { tips: [...document.querySelectorAll('.tip')].map((x) => `${x.parentElement?.tagName}>${(x.textContent ?? '').slice(0, 60)}`), visible: document.visibilityState, focus: document.hasFocus(), lateMs: late, rows: document.querySelectorAll('.progress-recent-item[data-run="a-review"]').length, under: under ? `${under.tagName}.${under.className}` : null }
+    }).catch((e) => String(e)))})`)
     await page.mouse.move(5, 5)
     await shoot('runs-by-card')
     // A card whose runs all passed shows its run too (HI-1925: nothing folded but details); a click on a heading folds nothing.
