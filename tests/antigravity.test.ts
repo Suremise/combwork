@@ -285,9 +285,9 @@ describe('launch settings and arguments (1.5.0)', () => {
     expect(s.statusLine.command.startsWith('curl')).toBe(true)
     expect(s.statusLine.command).toContain('run=r1&statusline')
     expect(s.statusLine.command).toContain('"@C:/Users/Jo Smith/launch/hook-auth.txt"')
-    expect(s.permissions?.allow).toEqual([`mcp(${TOOLS_SERVER})`])
+    expect(s.permissions?.allow).toEqual([`mcp(${TOOLS_SERVER}/*)`])
     expect((launchSettings(ctx, false) as { permissions?: unknown }).permissions).toBeUndefined()
-    expect((launchSettings({ ...ctx, trustedCombworkTools: ['cw_inbox'] }, true) as { permissions: { allow: string[] } }).permissions.allow).toEqual([`mcp(${TOOLS_SERVER}:cw_inbox)`])
+    expect((launchSettings({ ...ctx, trustedCombworkTools: ['cw_inbox'] }, true) as { permissions: { allow: string[] } }).permissions.allow).toEqual([`mcp(${TOOLS_SERVER}/cw_inbox)`])
   })
 
   const launch = { resume: false, sessionId: '', model: 'gemini-3.8-flash-low', effort: 'high', permissionMode: 'accept-edits', extraDirs: ['D:\\review copy'], extraArgs: ['--sandbox'], initialPrompt: 'Read the card' }

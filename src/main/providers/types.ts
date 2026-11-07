@@ -570,6 +570,38 @@ export interface ProviderAdapter {
    */
   statusLineSession?(body: Record<string, any>): string | null
   /**
+   * A permission prompt the CLI's status line says it shows, for a CLI that sends no hook for one (HI-2545: the Antigravity
+   * CLI's `tool_confirmation_pending`): the blocking ask, or null when none is pending. Combwork applies it as a hook's ask,
+   * in order with the launch's hooks, once when it begins (Combwork never answers it: the person does, in the CLI).
+   */
+  statusLineAsk?(body: Record<string, any>): Ask | null
+  /**
+   * Reads, before the hook is normalized, what it needs from the CLI's own records (HI-2545: the Antigravity CLI's user
+   * prompt, from its transcript, as its hooks carry none), adding it to `body`. Called in the launch's hook order, off
+   * main's thread for its reads and bounded in time; `launch` says whose hook it is (only that agent's own records are
+   * read). Absent: the hook is normalized as it came.
+   */
+  prepareHook?(body: Record<string, any>, launch: { agentId: string; workspacePath: string; sessionId: string | null; memo: Record<string, unknown>; alive: () => boolean }): Promise<void>
+  /**
+   * The raw events whose reply can carry a notice whatever they normalize to (HI-2545: the Antigravity CLI's PreInvocation
+   * and Stop, whose meaning prepareHook decides): their reply is decided in the launch's order (noticeIn), always settled.
+   */
+  readonly noticeEvents?: readonly string[]
+  /** Whether this prepared hook may carry a notice (absent: as the turn ledger says); `memo` the launch's. */
+  noticeWanted?(body: Record<string, any>, memo: Record<string, unknown>): boolean
+  /** A notice was put in this hook's reply (it won't carry another at its place). */
+  noticeGiven?(body: Record<string, any>, memo: Record<string, unknown>): void
+  /** How long the CLI waits for this event's reply: a notice decided later never reached it, so isn't given. Absent: no limit. */
+  noticeDeadlineMs?(event: string): number | null
+  /** The reply to a PreToolUse Combwork doesn't refuse, for a CLI that takes no answer as a denial (HI-2545: agy's `allow`). */
+  preToolUseDefault?(): Record<string, unknown>
+  /**
+   * Whether the status line says the CLI is idle, for a CLI that sends no hook when its turn ends some ways (HI-2545: a
+   * cancelled permission prompt in the Antigravity CLI): a running turn with no end heard within idleGraceMs is interrupted.
+   */
+  statusLineIdle?(body: Record<string, any>): boolean
+  idleGraceMs?(): number
+  /**
    * How a launch's CLI will compact by itself, read from its command, environment and the CLI's settings files (never
    * changed), for the model it runs as (`models`: the id it resolves to, then the choice). Absent: Combwork doesn't know.
    */

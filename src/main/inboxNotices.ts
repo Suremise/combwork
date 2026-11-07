@@ -6,8 +6,8 @@ import type { LiveSessionState } from '../shared/types'
 import { advanced } from './advanced'
 import { allows } from './assistantControl'
 import { agentReadsInbox, countable, inboxSwitch } from './deliveries'
-import { orphanLinesFor } from './orphanProcesses'
-import { sessions } from './sessions'
+import { orphanDraftFor } from './orphanProcesses'
+import { sessions, type NoticeDraft } from './sessions'
 import { workspaceFor } from './workspace'
 import { pausedFor } from './teamPause'
 
@@ -43,16 +43,29 @@ async function unreadFor(st: LiveSessionState): Promise<DeliveryRecord[]> {
 
 const item = (r: DeliveryRecord): NoticeItem => ({ id: r.id, kind: r.kind, ...(r.card ? { card: r.card } : {}) })
 
-/** The notice for a launch at a checkpoint or its turn's end; null when there is nothing (new) to tell. */
-export async function noticeFor(st: LiveSessionState, at: 'checkpoint' | 'drain'): Promise<string | null> {
+/**
+ * The notice for a launch at a checkpoint or its turn's end; null when there is nothing (new) to tell. What it tells is
+ * counted as told only by its `commit`, once a hook's reply carries it (HI-2545: one decided too late for its CLI, or no
+ * longer the launch's, is never given, so a later checkpoint still tells it).
+ */
+export async function noticeDraftFor(st: LiveSessionState, at: 'checkpoint' | 'drain'): Promise<NoticeDraft | null> {
   // What its commands left running (HI-2111), told once each, whatever its inbox has.
-  const orphans = orphanLinesFor(st.projectPath, st.agentId)
+  const orphans = orphanDraftFor(st.projectPath, st.agentId)
   const inbox = await inboxNoticeFor(st, at)
-  return [inbox, orphans].filter(Boolean).join(' ') || null
+  const text = [inbox?.text, orphans.text].filter(Boolean).join(' ')
+  return text
+    ? {
+        text,
+        commit: () => {
+          inbox?.commit()
+          orphans.commit()
+        }
+      }
+    : null
 }
 
 /** The notice for what the agent has unread (and the Assistant's unwatched lanes); null when there is nothing new. */
-async function inboxNoticeFor(st: LiveSessionState, at: 'checkpoint' | 'drain'): Promise<string | null> {
+async function inboxNoticeFor(st: LiveSessionState, at: 'checkpoint' | 'drain'): Promise<NoticeDraft | null> {
   // One that can't read an inbox (its Combwork tools off) is given no delivery (#650's decision): nothing to tell it here.
   if (!agentReadsInbox(st.projectPath, st.agentId)) return null
   // Its switch off (#1432): no notice there, so the turn goes on (or ends) as the CLI would; what is unread stays in the
@@ -60,12 +73,12 @@ async function inboxNoticeFor(st: LiveSessionState, at: 'checkpoint' | 'drain'):
   if (!(await inboxSwitch(st.projectPath, at === 'checkpoint' ? 'checkpoints' : 'stopContinuation'))) return null
   const lanes = at === 'drain' ? await unwatchedLanes(st) : ''
   const unread = await unreadFor(st)
-  if (!unread.length) return lanes || null
+  if (!unread.length) return lanes ? { text: lanes, commit: () => undefined } : null
   const seen = told.get(st) ?? new Set<string>()
   told.set(st, seen)
   if (at === 'checkpoint' && unread.every((r) => seen.has(r.id))) return null
-  for (const r of unread) seen.add(r.id)
-  return [inboxNotice(at, unread.map(item)), lanes].filter(Boolean).join(' ') || null
+  const text = [inboxNotice(at, unread.map(item)), lanes].filter(Boolean).join(' ')
+  return text ? { text, commit: () => unread.forEach((r) => seen.add(r.id)) } : null
 }
 
 /**
@@ -91,7 +104,14 @@ async function unwatchedLanes(st: LiveSessionState): Promise<string> {
   return unwatchedLanesNotice(lanes.filter((l) => !watched.includes(l.id)).map((l) => l.builder.name))
 }
 
-/** Wires the notices into the hook replies (once, at start). */
+/** The notice as noticeDraftFor makes it, counted as told at once (the text only). */
+export async function noticeFor(st: LiveSessionState, at: 'checkpoint' | 'drain'): Promise<string | null> {
+  const draft = await noticeDraftFor(st, at)
+  draft?.commit()
+  return draft?.text ?? null
+}
+
+/** Wires the notices into the hook replies (once, at start): drafted, told once a reply carries them. */
 export function initInboxNotices(): void {
-  sessions.inboxNotice = noticeFor
+  sessions.inboxNotice = noticeDraftFor
 }

@@ -14,6 +14,86 @@
     "note": "A setting's title (Settings → Accounts & Connections, HI-2107): the list of accounts, each with its connections.",
     "audience": "both"
   },
+  "settings.advanced.antigravity.hooks.editPathField.desc": {
+    "text": "The argument of agy's edit tools that names the file they edit. Wrong, Combwork can't tell which file an edit is of, and file locks don't apply to it.",
+    "note": "What the advanced setting \"Hooks: the file an edit names\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.editPathField.title": {
+    "text": "Hooks: the file an edit names",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.editTools.desc": {
+    "text": "agy's tools that edit a file. Combwork checks file locks on these. Missing one, its edits go ahead whoever holds the file.",
+    "note": "What the advanced setting \"Hooks: tools that edit a file\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.editTools.title": {
+    "text": "Hooks: tools that edit a file",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.knownEvents.desc": {
+    "text": "The hook events Combwork knows agy sends. With Settings → Advanced → Flight recorder: capture something unknown from a CLI on, a hook named outside this list saves a capture of the agent's recent events.",
+    "note": "What the advanced setting \"Hooks: known events\" is for (Settings → Advanced). Flight recorder: capture something unknown from a CLI is another setting's title: use it as Settings shows it. agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.knownEvents.title": {
+    "text": "Hooks: known events",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.knownFields.desc": {
+    "text": "The top-level fields Combwork knows agy sends in its hooks. With Settings → Advanced → Flight recorder: capture something unknown from a CLI on, a hook with a field outside this list saves a capture of the agent's recent events: often the first sign that an agy update changed something. Add a field here once you know it is harmless.",
+    "note": "What the advanced setting \"Hooks: known fields\" is for (Settings → Advanced). Flight recorder: capture something unknown from a CLI is another setting's title: use it as Settings shows it. agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.knownFields.title": {
+    "text": "Hooks: known fields",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.preToolUseTimeoutSeconds.desc": {
+    "text": "How long agy waits for Combwork's answer before a tool runs (an edit waits for a file lock). Too short, an edit of a locked file can go ahead before Combwork refuses it.",
+    "note": "What the advanced setting \"Hooks: before a tool, timeout\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.preToolUseTimeoutSeconds.title": {
+    "text": "Hooks: before a tool, timeout",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.timeoutSeconds.desc": {
+    "text": "How long agy waits for Combwork to take one of its hooks. Too short, Combwork misses what agy reports and an agent may look stuck.",
+    "note": "What the advanced setting \"Hooks: timeout\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.timeoutSeconds.title": {
+    "text": "Hooks: timeout",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.toolHooks.desc": {
+    "text": "Whether Combwork's hooks run before and after each of agy's tool calls: they show an agent working on a tool, and refuse an edit of a file another agent has locked. Turned off, Combwork follows agy's tools only by its status line, and file locks don't apply to Antigravity agents.",
+    "note": "What the advanced setting \"Hooks: before and after each tool\" does (Settings → Advanced). agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.toolHooks.title": {
+    "text": "Hooks: before and after each tool",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.userStepWaitSeconds.desc": {
+    "text": "How long Combwork waits for what began a turn to be in agy's transcript as the turn starts. Too short, a turn you began counts as one agy began itself.",
+    "note": "What the advanced setting \"Hooks: wait for the prompt in the transcript\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.userStepWaitSeconds.title": {
+    "text": "Hooks: wait for the prompt in the transcript",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
   "settings.advanced.antigravity.models.line.desc": {
     "text": "One line of agy models' list: the model's id (its first group), then its display name (its second). Combwork passes the id and shows the name.",
     "note": "What the advanced setting \"A model in agy models\" is (Settings → Advanced, under Antigravity CLI). agy models is a command: keep it.",
@@ -62,6 +142,36 @@
   "settings.advanced.antigravity.signIn.needed.title": {
     "text": "Not signed in (agy models)",
     "note": "An advanced setting's title (Settings → Advanced, under Antigravity CLI): the pattern of the CLI's message when it isn't signed in. agy models is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.confirmField.desc": {
+    "text": "The status line's field that is true while agy shows a permission prompt (agy sends no hook for one). Wrong, an agent waiting for your answer shows as working.",
+    "note": "What the advanced setting \"Status line: a permission prompt is showing\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.confirmField.title": {
+    "text": "Status line: a permission prompt is showing",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.idleGraceSeconds.desc": {
+    "text": "How long agy's status line must say idle, with no hook ending the turn, before Combwork takes the turn as interrupted (cancelling agy's permission prompt sends no hook). Too short, a turn whose end is on its way can show as interrupted; too long, a cancelled turn shows as working that much longer.",
+    "note": "What the advanced setting \"Status line: idle without a turn end\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.idleGraceSeconds.title": {
+    "text": "Status line: idle without a turn end",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.knownFields.desc": {
+    "text": "The top-level fields Combwork knows agy sends in its status line. With Settings → Advanced → Flight recorder: capture something unknown from a CLI on, a status line with a field outside this list saves a capture of the agent's recent events. Add a field here once you know it is harmless.",
+    "note": "What the advanced setting \"Status line: known fields\" is for (Settings → Advanced). Flight recorder: capture something unknown from a CLI is another setting's title: use it as Settings shows it. agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.knownFields.title": {
+    "text": "Status line: known fields",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.antigravity.transcript.modelChange.desc": {

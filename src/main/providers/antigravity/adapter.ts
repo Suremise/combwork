@@ -15,13 +15,14 @@ import { config } from '../../config'
 import { combworkError } from '../../combworkError'
 import { writeJsonAtomic } from '../../fsutil'
 import { compareVersions, exportSubtitleText, hookForwardCommand, syncAgentsSkills, toSpawnable, AGENTS_SKILLS } from '../common'
-import type { CatalogRead, CommandSpec, ConversationParserLike, ExternalSession, ImageLocation, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, UsageParser } from '../types'
+import type { Ask, CatalogRead, CommandSpec, ConversationParserLike, ExternalSession, ImageLocation, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, UsageParser } from '../types'
 import { antigravityEnv, brainDir, checkEnv, inProfile, inUserProfile, profilesRoot } from './home'
 import { antigravityInstallCommand, antigravityLoginCommand, antigravityReadiness, antigravityUpdateCommand, checkModels, locateAntigravity } from './install'
 import { UnreadableConfig, workspaceServers, type WorkspaceServer } from './projectConfig'
 import { agyStatusDetails } from './status'
 import { AntigravityConversationParser, AntigravityUsageParser, parseAgyTranscript } from './transcript'
 import { isConversationId, knownTitle, learnTitle, listConversations, mediaData, profileOf, subOf, trustedTranscript } from './conversations'
+import { AGY_ALLOW, agyHooks, agyLockReply, agyNoticeGiven, agyNoticeReply, agyNoticeWanted, agyStartContextReply, agyStatusAsk, agyStatusIdle, agyStopContinues, normalizeAgyHook, prepareAgyHook } from './hooks'
 
 // Google's Antigravity CLI (agy) as a Combwork provider (HI-2544, against 1.5.0; the runtime facts are HI-2543's).
 // Each agent runs in a private agy profile of its own (USERPROFILE: agy reads its home from it alone), kept between launches
@@ -29,7 +30,7 @@ import { isConversationId, knownTitle, learnTitle, listConversations, mediaData,
 // MCP servers (Combwork's, with the launch's token). A workspace folder's own MCP servers the agent wasn't given refuse the
 // launch (profileConfig: agy can't be kept from starting them). The user's own global agy customizations (~\.gemini) are
 // never read (Darren, 7 Nov: hidden for now).
-// Hooks are HI-2545's: until they land those parts return nothing. Transcripts and usage are HI-2546's (transcript.ts).
+// Hooks are HI-2545's (hooks.ts). Transcripts and usage are HI-2546's (transcript.ts, conversations.ts).
 
 const NAME = ANTIGRAVITY_DESCRIPTOR.name
 
@@ -111,12 +112,14 @@ export function sameServer(a: unknown, b: unknown): boolean {
 
 /**
  * agy's settings for one launch only (--settings, never saved): the status line that tells Combwork the conversation's id
- * (Combwork's own command, posting to the hook server with the launch's token), and Combwork's own tools allowed.
+ * and the session's state (Combwork's own command, posting to the hook server with the launch's token; shown under agy's
+ * own line, as Combwork's reply is empty), and Combwork's own tools allowed (agy's rule form, its permissions docs:
+ * `mcp(<server>/<tool>)`, or `mcp(<server>/*)` for all of a server's).
  */
 export function launchSettings(ctx: Pick<LaunchContext, 'hookUrl' | 'hookAuthFile' | 'mcpServers' | 'trustedCombworkTools'>, preApprove: boolean): Record<string, unknown> {
-  const allow = !Object.hasOwn(ctx.mcpServers, TOOLS_SERVER) || !preApprove ? [] : ctx.trustedCombworkTools ? ctx.trustedCombworkTools.map((t) => `mcp(${TOOLS_SERVER}:${t})`) : [`mcp(${TOOLS_SERVER})`]
+  const allow = !Object.hasOwn(ctx.mcpServers, TOOLS_SERVER) || !preApprove ? [] : ctx.trustedCombworkTools ? ctx.trustedCombworkTools.map((t) => `mcp(${TOOLS_SERVER}/${t})`) : [`mcp(${TOOLS_SERVER}/*)`]
   return {
-    statusLine: { type: 'command', command: hookForwardCommand(`${ctx.hookUrl}&statusline`, ctx.hookAuthFile) },
+    statusLine: { type: 'command', command: hookForwardCommand(`${ctx.hookUrl}&statusline`, ctx.hookAuthFile), stack_with_default: true },
     ...(allow.length ? { permissions: { allow } } : {})
   }
 }
@@ -234,6 +237,8 @@ export class AntigravityAdapter implements ProviderAdapter {
     await mkdir(join(profile, '.gemini', 'config'), { recursive: true })
     // The servers' env (and the launch's token) stays in the profile, under Combwork's own data: never the project.
     await writeJsonAtomic(join(profile, '.gemini', 'config', 'mcp_config.json'), made.mcp)
+    // Combwork's hooks, for this launch (its URL and token file): agy reads the profile's hooks.json, never the project's.
+    await writeJsonAtomic(join(profile, '.gemini', 'config', 'hooks.json'), agyHooks(ctx.hookUrl, ctx.hookAuthFile, advanced.get<boolean>('antigravity.hooks.toolHooks')))
     await writeJsonAtomic(join(ctx.privateDir, 'agy-settings.json'), launchSettings(ctx, launchOverrides(ctx.overrides, ANTIGRAVITY, 'preApproveCombworkTools')))
     return delivered
   }
@@ -251,27 +256,72 @@ export class AntigravityAdapter implements ProviderAdapter {
     return agyStatusDetails(body)
   }
 
+  /** A permission prompt only its status line tells of (agy sends no hook for one). */
+  statusLineAsk(body: Record<string, any>): Ask | null {
+    return agyStatusAsk(body)
+  }
+
   /** The conversation the status line names (statusLineConversation), for Combwork to learn a new launch's id. */
   statusLineSession(body: Record<string, any>): string | null {
     return statusLineConversation(body)
   }
 
-  // ---- Hooks (HI-2545): none yet.
-  normalizeHook(): NormalizedHook {
-    return { event: { kind: 'ignore' }, sessionId: null, transcriptPath: null, mode: null, editedPaths: [], ids: { turn: null, call: null, sub: null, continued: false } }
+  /** Whether its status line says agy is idle with no prompt pending (a cancelled prompt sends no hook: idleGrace). */
+  statusLineIdle(body: Record<string, any>): boolean {
+    return agyStatusIdle(body)
+  }
+
+  /** How long an idle status line waits for a hook to end the turn before the turn is taken as interrupted. */
+  idleGraceMs(): number {
+    return advanced.number('antigravity.statusLine.idleGraceSeconds') * 1000
+  }
+
+  // ---- Hooks (HI-2545, hooks.ts).
+  /** What each hook is, decided once in the launch's order from its raw fields and this agent's own transcript (s56). */
+  prepareHook(body: Record<string, any>, launch: { agentId: string; workspacePath: string; sessionId: string | null; memo: Record<string, unknown>; alive: () => boolean }): Promise<void> {
+    return prepareAgyHook(body, { profile: profileFolder(launch.agentId, launch.workspacePath), root: profilesRoot(), sessionId: launch.sessionId, memo: launch.memo, alive: launch.alive })
+  }
+
+  /** The events whose reply can carry a notice (recorded: PreInvocation's ephemeral message, Stop's continue). */
+  readonly noticeEvents = ['PreInvocation', 'Stop'] as const // i18n-ignore: a CLI's hook event names
+
+  /** Whether a PreInvocation may carry a checkpoint (prepared as one, not given one at its position yet). */
+  noticeWanted(body: Record<string, any>, memo: Record<string, unknown>): boolean {
+    return body.hook_event_name !== 'PreInvocation' || agyNoticeWanted(body, memo)
+  }
+
+  noticeGiven(body: Record<string, any>, memo: Record<string, unknown>): void {
+    agyNoticeGiven(body, memo)
+  }
+
+  /** How long agy waits for a hook's reply: a notice decided after it never counts as given (it never reached agy). */
+  noticeDeadlineMs(event: string): number | null {
+    return event === 'PreInvocation' || event === 'Stop' ? advanced.number('antigravity.hooks.timeoutSeconds') * 1000 : null
+  }
+
+  /** A tool Combwork doesn't refuse runs under agy's own permission check: `allow` (no answer denies it in 1.5.0). */
+  preToolUseDefault(): Record<string, unknown> {
+    return { ...AGY_ALLOW }
+  }
+
+  normalizeHook(body: Record<string, any>): NormalizedHook {
+    return normalizeAgyHook(body)
   }
 
   lockReply(d: LockDecision): Record<string, unknown> {
-    void d
-    return {}
+    return agyLockReply(d)
   }
 
-  noticeReply(): Record<string, unknown> | null {
-    return null
+  noticeReply(event: string, text: string): Record<string, unknown> | null {
+    return agyNoticeReply(event, text)
   }
 
-  stopContinues(): boolean {
-    return false
+  startContextReply(text: string): Record<string, unknown> {
+    return agyStartContextReply(text)
+  }
+
+  stopContinues(reply: Record<string, any>): boolean {
+    return agyStopContinues(reply)
   }
 
   canSwitchLive(target: PermissionMode, current: PermissionMode | undefined, launched: PermissionMode | null | undefined): boolean {

@@ -251,6 +251,10 @@ export async function startHookServer(): Promise<string> {
         obs = query.has('statusline') ? null : sessions.observeHook(run, {})
         throw e
       }
+      // A CLI whose hook bodies don't name their event (HI-2545: the Antigravity CLI): its hook command names it in the
+      // URL, as Combwork wrote it for the launch. Only a plain event name, and never in place of one the body carries.
+      const event = query.get('event')
+      if (body && typeof body === 'object' && !Array.isArray(body) && body.hook_event_name === undefined && event && /^[A-Za-z]{1,32}$/.test(event)) body.hook_event_name = event
       done = beginWork(hookLabel(query.has('statusline'), body))
       if (query.has('statusline')) {
         // The reply becomes Claude Code's status line, so send nothing; or, chaining the user's own status line (#1285),
