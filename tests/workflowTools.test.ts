@@ -223,7 +223,7 @@ describe("a busy agent's restart question (HR1's round 1): once while it still n
     let run = 'run-1'
     let outcome: 'busy' | 'same' | 'restarting' = 'busy'
     forgetAskedRestarts()
-    const spies = [
+    const spies: { mockRestore(): void }[] = [
       vi.spyOn(w, 'projectConfig').mockImplementation(async () => cfg),
       vi.spyOn(sessions, 'liveFor').mockImplementation(() => ({ runId: run }) as never),
       vi.spyOn(sessions, 'restartForTools').mockImplementation(async () => outcome)
