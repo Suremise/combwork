@@ -288,7 +288,7 @@ const codexLease = !fake && PROVIDERS[provider].provider === 'codex' ? await wai
 // another run's sessions there.
 const claudeLease = !fake && PROVIDERS[provider].provider === 'claude-code' ? await waitForTestHome('claude', CLAUDE_TEST_HOME, { kind: 'scenarios', root: lib.ROOT, what: `scenarios: ${chosen.length} (${provider})`, argv }) : null
 /** The real CLI's test home a trial runs in, reset before each trial unless --warm-homes (HI-2606), or null (a fake). */
-const realHome = claudeLease ? { cli: 'claude', home: CLAUDE_TEST_HOME } : codexLease ? { cli: 'codex', home: lib.CODEX_HOME } : null
+const realHome = claudeLease ? { cli: 'claude', home: CLAUDE_TEST_HOME, lease: claudeLease } : codexLease ? { cli: 'codex', home: lib.CODEX_HOME, lease: codexLease } : null
 
 // The source this run tests, taken before it starts (and checked again at the end).
 const sourceAtStart = sourceFingerprint()
@@ -363,7 +363,8 @@ for (const [i, { sc, sample, name }] of trials.entries()) {
   // can't be reset (signed out, still in use, its status unreadable) stops the run here, as a sign-in problem does.
   if (realHome && !warmHomes) {
     try {
-      const said = freshenedLine(realHome.cli, await freshenHome(realHome.cli, realHome.home))
+      // This run's own CLIs (an earlier trial's) are waited for: a scenario run starts nothing else (HR1 on s17).
+      const said = freshenedLine(realHome.cli, await freshenHome(realHome.cli, realHome.home, { lease: realHome.lease, self: { pid: process.pid, started: Math.floor(Date.now() - process.uptime() * 1000) } }))
       homeResets.push(`${sc.id}: ${said}`)
     } catch (e) {
       if (!(e instanceof HomeNotReady)) throw e

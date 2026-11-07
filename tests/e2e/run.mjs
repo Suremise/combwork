@@ -54,7 +54,7 @@ import { FAILED_KEEP_MS, finishRunDirs, keepSuiteFiles, logRetention, logsRootFo
 import { LANES, describeHolder, laneWaitLine, lanesFirst, laneWork, waitForLane } from './lanes.mjs'
 import { endLeftCopies } from './leftCopies.mjs'
 import { SIDE_E2E_JOBS, creditFor, preMerge, refusedLine, slotPool, waitForSlot, waitLine, waitSummary } from './slots.mjs'
-import { homesOf, leasesEnv, waitForTestHome } from './testHomeLock.mjs'
+import { homesOf, leasesEnv, noteConsumers, waitForTestHome } from './testHomeLock.mjs'
 import { freshenHome, freshenedLine, HomeNotReady } from './testHomes.mjs'
 import { autoClean, holdLane } from './clean.mjs'
 import { recycleBinCount, recycleBinLine } from './recycleBin.mjs'
@@ -66,7 +66,7 @@ const root = join(here, '..', '..')
 const lib = createRequire(import.meta.url)('./lib.cjs')
 const runContext = createRequire(import.meta.url)('./runContext.cjs')
 const { claimedByRuns, clearDir, evidenceFor, findBoard, finishSuiteDir, freshFolder, recordKept, releaseKept } = createRequire(import.meta.url)('./evidence.cjs')
-const { stopProcessesIn, endChildTree, endCopies, processes } = createRequire(import.meta.url)('./folderProcesses.cjs')
+const { stopProcessesIn, endChildTree, endCopies, processes, recordedCopies } = createRequire(import.meta.url)('./folderProcesses.cjs')
 /** The machine's processes now, or null (off Windows, or the listing failed): each user of it lists again when null. */
 const listOnce = () => {
   if (process.platform !== 'win32') return null
@@ -492,10 +492,11 @@ async function runOnce(k) {
     try {
       for (const cli of homesOf(s)) {
         const home = cli === 'claude' ? lib.CLAUDE_TEST_HOME : lib.CODEX_HOME
-        leases.push(await waitForTestHome(cli, home, { kind: 'e2e', root, what: `e2e: ${s.name}`, argv: args }))
+        const lease = await waitForTestHome(cli, home, { kind: 'e2e', root, what: `e2e: ${s.name}`, argv: args })
+        leases.push(lease)
         if (warmHomes || s.home === 'warm') continue
         try {
-          said.push(freshenedLine(cli, await freshenHome(cli, home)))
+          said.push(freshenedLine(cli, await freshenHome(cli, home, { lease })))
         } catch (e) {
           if (!(e instanceof HomeNotReady)) throw e
           // Shaped as a suite's own result (runner.mjs): a skip for its environment, else a failure, before it started.
@@ -508,6 +509,8 @@ async function runOnce(k) {
       running.add(s.name)
       report()
       const r = await run(s.name, port, leasesEnv(leases))
+      // What used the homes (its test copies of Combwork, and so their CLIs): the next reset waits for them (HR1 on s17).
+      if (leases.length && r.dir) for (const l of leases) noteConsumers(l, recordedCopies(r.dir))
       return said.length ? { ...r, out: `${said.join('\n')}\n${r.out}` } : r
     } finally {
       for (const l of leases.reverse()) l.release()

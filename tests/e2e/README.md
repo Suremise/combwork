@@ -577,7 +577,10 @@ credential goes in. It writes `report.md` (pass or fail per check, with screensh
   setup, Codex's downloaded packages, and `.claude.json`'s and `config.toml`'s account and onboarding fields stay (runs
   start signed in and onboarded). The sign-in is never copied, written or put back: copies of a home would share a
   rotating refresh token and sign each other out. A home that isn't signed in skips the suite for its environment; one
-  still in use (a CLI process naming a test path, a database held open) is waited for, then refused, never ended; one
+  still in use is waited for, then refused, never ended: in use means what used it under the lease (the test copies of
+  Combwork a suite started there, noted in the lease's holder record, `holder.state`) or, after taking over from a run
+  that didn't let the home go, what that run left, and every CLI those started; a nested run reusing its parent's lease
+  never resets. One
   whose status can't be read stops the suite. An entry `testHomeManifest.mjs` doesn't classify (a new CLI version's new
   file) is kept, never deleted, and named in the suite's log (Darren, 7 Nov): classify it there. `--warm-homes` (e2e
   and scenarios) skips the reset, keeping what earlier runs left, on purpose; a suite needing state from an earlier,
