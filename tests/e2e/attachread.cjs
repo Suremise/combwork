@@ -117,6 +117,9 @@ const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0
       return items.filter((i) => i.kind === 'tool' && i.tool.name.endsWith('cw_read_attachment')).map((i) => i.tool.result ?? '')
     }
     const ask = async (p, id, args) => {
+      // The last ask's reply is in the transcript while its turn still runs: a prompt typed then is dropped by the busy
+      // fake, and sendPrompt typed it again only after its 20 s (each such wait ran out, HI-2688). So idle first.
+      await lib.agentIdle(inv, id, HUNG_MS)
       const before = (await replies(p, id)).length
       const sent = await lib.sendPrompt(inv, lib.ptyKey(p, id), `cw cw_read_attachment ${JSON.stringify(args)}`, { submitted: async () => (await replies(p, id)).length > before })
       return sent ? (await until(async () => (await replies(p, id))[before], HUNG_MS)) ?? null : null
