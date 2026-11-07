@@ -4170,6 +4170,34 @@ module.exports.SCENARIOS = [
     ]
   },
   {
+    id: 'assistant-retarget-release',
+    title: "The Assistant asked to move alpha on to the next release (HI-2680): changes Work merges into, then moves the Todo cards still on the old one, by the preview its reply gave",
+    role: 'assistant',
+    control: 'agents',
+    changeSettings: true,
+    async setup(c) {
+      c.git('branch', '1.1.0')
+      c.git('branch', '1.2.0')
+      // Two Todo cards merging into 1.1.0 of their own (set while it was the other listed branch); alpha then merges into 1.1.0.
+      await pairInProject(c, { target: '1.2.0', otherTargets: ['1.1.0'] })
+      await c.card('a', { title: 'Add a dark mode toggle', description: 'A toggle in the settings page that switches the theme.' })
+      await c.card('b', { title: 'Remember the last opened file', description: 'Reopen the file that was open when the app closed.' })
+      for (const k of ['a', 'b']) await c.inv('tasks:setTarget', c.cards[k], '1.1.0')
+      await pairInProject(c, { target: '1.1.0', otherTargets: ['1.2.0'] })
+    },
+    prompt: "We've just released 1.1.0. Make alpha's work merge into 1.2.0 from now on, and move the Todo cards still set to 1.1.0 over to 1.2.0 too: I've checked them, go ahead.",
+    fake: 'cw cw_update_setting {"id":"project.workflow.target","value":"1.2.0","project":"alpha"} then cw cw_queue {"action":"retarget","project":"alpha","from":"1.1.0","target":"1.2.0"}',
+    expect: (o) => {
+      const queue = ran(o, 'cw_queue').filter((x) => argsOf(x).action === 'retarget')
+      return [
+        ["changed alpha's Work merges into to 1.2.0 with cw_update_setting", ran(o, 'cw_update_setting').some((x) => /workflow\.target/.test(String(argsOf(x).id)) && argsOf(x).value === '1.2.0'), o.combworkCalls.map((x) => `${x.tool} ${x.args}${x.ok ? '' : '!'}`).join(' | ')],
+        ['moved them with cw_queue retarget, naming the preview it was given and the items', queue.some((x) => String(argsOf(x).preview ?? '').startsWith('rt-') && (argsOf(x).items ?? []).length >= 2), queue.map((x) => x.args).join(' | ')],
+        ['both cards now follow 1.2.0 (no target of their own)', (o.cards.a?.target ?? null) === null && (o.cards.b?.target ?? null) === null, JSON.stringify([o.cards.a?.target, o.cards.b?.target])]
+      ]
+    },
+    fakeSkips: ['moved them with cw_queue retarget, naming the preview it was given and the items', 'both cards now follow 1.2.0 (no target of their own)']
+  },
+  {
     id: 'assistant-add-agent-connection',
     title: "The Assistant adds an agent on another agent's connection (HI-2108): names the connection, never a provider, model, effort, mode or context",
     role: 'assistant',
