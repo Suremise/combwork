@@ -741,6 +741,7 @@
   "assistant.undo.why.removedFromQueue": "Usunięcie z kolejki scalania zostaje w pracy karty: wraca do kolejki tylko przez „Ponów scalanie” albo nowe zatwierdzenie.",
   "assistant.undo.why.reportMerge": "Zgłoszone scalenie zostaje w pracy karty.",
   "assistant.undo.why.request": "Jego prośba do wykonawcy zostaje jako komentarz.",
+  "assistant.undo.why.retargeted": "Karty i sloty, które przeniósł na nowy cel projektu, nie wracają: ustaw ponownie „Scalanie do” karty, jeśli ma wrócić.",
   "assistant.undo.why.retriedMerge": "Jego „Ponów scalanie” zostaje w pracy karty.",
   "assistant.undo.why.slotReleased": "Zwolniony slot nie jest ponownie zachowany ani zajęty: następna praca, która potrzebuje slotu, może go wziąć.",
   "assistant.undo.why.start": "Rozpoczęcie zostaje w pracy karty: cofnięcie przenosi kartę z powrotem, ale nie odwołuje rozpoczęcia.",

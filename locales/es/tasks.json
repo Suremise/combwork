@@ -77,6 +77,7 @@
   "tasks.error.reviewTaken": "El agente {agent} ya está revisando la tarjeta {card} (desde {since} UTC).",
   "tasks.error.setAsideGone": "Esa tarjeta apartada ya no está, o no es una tarjeta: solo se puede descartar.",
   "tasks.error.staysInProject": "Las tarjetas se quedan en tu proyecto ({project}).",
+  "tasks.error.targetChanged": "Se fusiona en de {card} cambió desde que se listó, así que la tarjeta se queda como está.",
   "tasks.error.targetCheckedOut": "{unknown, select, yes {Combwork no puede saber si la rama anterior de {card} sigue en uso, así que su «Se fusiona en» no cambia.} other {La rama anterior de {card} sigue extraída en {folder}, así que su «Se fusiona en» no cambia. Vuelve a intentarlo cuando esa carpeta haya pasado a otra cosa.}}",
   "tasks.error.targetHasWork": "{unknown, select, yes {Combwork no puede saber si {card} tiene trabajo en su rama, así que su “Se fusiona en” se queda como está.} other {{card} tiene trabajo en su rama creada a partir de {target}, así que sigue fusionándose allí. Para moverla, crea una tarjeta nueva para ella en la otra rama y copia el cambio.}}",
   "tasks.error.targetLane": "{card} está en el carril de {builder}, que se fusiona en {target}: las tarjetas de un carril se fusionan donde se fusiona el carril. Sácala primero del carril.",

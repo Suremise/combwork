@@ -77,6 +77,7 @@
   "tasks.error.reviewTaken": "L’agent {agent} relit déjà la carte {card} (depuis {since} UTC).",
   "tasks.error.setAsideGone": "Cette carte mise de côté a disparu, ou n’est pas une carte : elle peut seulement être abandonnée.",
   "tasks.error.staysInProject": "Les cartes restent dans ton projet ({project}).",
+  "tasks.error.targetChanged": "Le champ Fusion dans de la carte {card} a changé depuis qu’elle a été listée, elle reste donc telle quelle.",
   "tasks.error.targetCheckedOut": "{unknown, select, yes {Combwork ne peut pas savoir si l’ancienne branche de {card} est encore utilisée, son « Fusion dans » reste donc tel quel.} other {L’ancienne branche de {card} est encore extraite dans {folder}, son « Fusion dans » reste donc tel quel. Réessaie quand ce dossier sera passé à autre chose.}}",
   "tasks.error.targetHasWork": "{unknown, select, yes {Combwork ne peut pas savoir si la carte {card} a du travail sur sa branche : son champ « Fusion dans » reste donc tel quel.} other {La carte {card} a du travail sur sa branche, créée à partir de {target} : elle continue donc d’y être fusionnée. Pour la déplacer, crée une nouvelle carte sur l’autre branche et copie la modification.}}",
   "tasks.error.targetLane": "La carte {card} est dans le couloir de {builder}, qui est fusionné dans {target} : les cartes d’un couloir sont fusionnées là où il l’est. Retire-la d’abord du couloir.",
