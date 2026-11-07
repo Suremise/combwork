@@ -348,6 +348,8 @@
   "main.server.key.inField": "A chave aparece {field, select, name {no nome} url {na URL base} other {na lista de modelos}}: tire-a de lá primeiro. Nada foi salvo.",
   "main.server.key.length": "Uma chave tem entre {min, number} e {max, number} caracteres. Confira o que foi colado.",
   "main.server.notServer": "Essa conexão não obtém o modelo de um servidor.",
+  "main.server.output.invalid": "Um orçamento de saída é um número inteiro de tokens, de 1 a {max, number}.",
+  "main.server.output.notBelow": "O orçamento de saída de {model} ({output, number} tokens) precisa ser menor que o tamanho do contexto dele ({context, number} tokens). Diminua primeiro o orçamento de saída ou deixe-o vazio para usar o padrão.",
   "main.server.setUp.noKey": "{name} ainda não tem chave. Adicione a chave primeiro e depois configure.",
   "main.server.unsupported": "{cli} não pode obter o modelo de um servidor no Combwork.",
   "main.server.url.extra": "A URL não pode ter uma consulta (?…) nem um fragmento (#…): informe a chave no campo próprio.",

@@ -96,7 +96,10 @@ export function cleanModels(models: readonly ServerModel[]): ServerModel[] {
     for (const a of as) taken.add(a)
     // The user's context for it (HI-2683), a positive whole number of tokens within CONTEXT_MAX, else none.
     const context = tokensOf(m.context)
-    out.push({ id, ...(as.length ? { as } : {}), ...(m.remote === true ? { remote: true as const } : {}), ...(context ? { context } : {}) })
+    // Its output budget (HI-2682), the same whole number of tokens; kept as stored (its fit with the context is checked
+    // where it is set and where a launch uses it, never by dropping it here).
+    const output = tokensOf(m.output)
+    out.push({ id, ...(as.length ? { as } : {}), ...(m.remote === true ? { remote: true as const } : {}), ...(context ? { context } : {}), ...(output ? { output } : {}) })
   }
   return out
 }
@@ -192,9 +195,11 @@ export function mergeListed(before: readonly ServerModel[], ids: readonly string
   const was = new Map(before.map((m) => [m.id, m]))
   const models = ids.map((id) => {
     const as = was.get(id)?.as
-    // The user's context for a model still listed is theirs, kept (HI-2683): a listing never sets it.
+    // The user's context and output budget for a model still listed are theirs, kept (HI-2683, HI-2682): a listing
+    // never sets them.
     const context = was.get(id)?.context
-    return { id, ...(as ? { as } : {}), ...(isRemote(id) ? { remote: true as const } : {}), ...(context ? { context } : {}) }
+    const output = was.get(id)?.output
+    return { id, ...(as ? { as } : {}), ...(isRemote(id) ? { remote: true as const } : {}), ...(context ? { context } : {}), ...(output ? { output } : {}) }
   })
   return { models: cleanModels(models), dropped: before.map((m) => m.id).filter((id) => !ids.includes(id)) }
 }

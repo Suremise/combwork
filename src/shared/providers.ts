@@ -226,6 +226,19 @@ export interface ServerCaps {
   /** How models are listed when the user asks, without a preset of its own: a path under the base URL, read as `data[].id`. */
   listing: ServerListing
   presets: readonly ServerPreset[]
+  /**
+   * HI-2682: a local model's context and output budget passed to the CLI at launch (none: the CLI takes none): the
+   * variables, the ones that turn its effort and thinking off for such a model, and the advanced settings (patterns)
+   * naming the IDs it sizes itself (its aliases; spellings such as claude-…, [1m] or a date), which get none.
+   */
+  localLimits?: {
+    contextEnv: string
+    outputEnv: string
+    /** Variables set as they are for such a model (effort sent as none, no thinking field). */
+    fixedEnv: Record<string, string>
+    aliasSetting: string
+    spellingSetting: string
+  }
 }
 
 /**

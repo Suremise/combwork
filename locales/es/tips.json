@@ -558,5 +558,7 @@
   "tips.serverDiagnostics.title": "¿Un agente en Ollama solo escribe texto?",
   "tips.serverDiagnostics.text": "Comprobar servidor… en una cuenta de servidor, en Configuración → Cuentas y conexiones, muestra el contexto real de su modelo y prueba una llamada a herramienta. Un contexto más pequeño que el prompt de Claude Code es la razón habitual por la que un modelo local escribe una llamada a herramienta en vez de hacerla.",
   "tips.retargetRelease.title": "Cuando sale una versión, pasa lo que queda a la siguiente",
-  "tips.retargetRelease.text": "¿Cambias El trabajo se fusiona en de 1.1.0 a 1.2.0? Guardar… lista las tarjetas Todo y los slots libres que siguen en 1.1.0 y pueden pasar a 1.2.0, y lo que se queda, con el motivo. Deja marcado Redirigir también lo que puede pasar para moverlos."
+  "tips.retargetRelease.text": "¿Cambias El trabajo se fusiona en de 1.1.0 a 1.2.0? Guardar… lista las tarjetas Todo y los slots libres que siguen en 1.1.0 y pueden pasar a 1.2.0, y lo que se queda, con el motivo. Deja marcado Redirigir también lo que puede pasar para moverlos.",
+  "tips.localModelLimits.text": "En los modelos de una cuenta de servidor (Configuración → Cuentas y conexiones, Editar servidor…), configura el tamaño de contexto y el presupuesto de salida: los agentes que se inicien en ese modelo compactarán en su contexto real, en vez de en 200.000 supuestos.",
+  "tips.localModelLimits.title": "Dile a Claude Code el contexto real de tu modelo local"
 }

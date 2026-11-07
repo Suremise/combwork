@@ -1511,5 +1511,18 @@
   "settings.connections.diag.why.unexpected": "予期しない応答です。",
   "settings.connections.diag.why.unreachable": "サーバーに接続できませんでした。ベースURLと、サーバーが動作しているかを確認してください。",
   "settings.connections.diag.why.wrongArgument": "モデルの呼び出しは有効でしたが、指示された内容に合っていませんでした（別の都市）。",
-  "settings.connections.diag.why.wrongTool": "モデルが提示されていないツールを呼び出しました。"
+  "settings.connections.diag.why.wrongTool": "モデルが提示されていないツールを呼び出しました。",
+  "settings.advanced.claude-code.localModel.aliases.desc": "Claude Codeが自身のエイリアスとして読むモデル名（opus、sonnet…）の正規表現。この名前のサーバー接続のモデルには、Claude Code自身がサイズを決めるため、Combworkはコンテキストサイズも出力上限も渡しません。誤っていると、これらの名前のローカルモデルがClaude Codeの知るモデルのように起動されるか、エイリアスにClaude Codeが無視する上限が渡されます。",
+  "settings.advanced.claude-code.localModel.aliases.title": "ローカルモデル：Claude Codeのエイリアス",
+  "settings.advanced.claude-code.localModel.spellings.desc": "Claude CodeがClaudeのモデルに対応付けるか、独自の規則でサイズを決めることがあるモデルIDの書き方（IDにclaude、[1m]の接尾辞、@の後の日付）の正規表現。このように書かれたサーバー接続のモデルには、Combworkはコンテキストサイズも出力上限も渡しません。誤っていると、Claude Codeが適用しない上限を渡すか、適用されるはずのローカルモデルを除外します。",
+  "settings.advanced.claude-code.localModel.spellings.title": "ローカルモデル：Claude Codeが自身でサイズを決めるID",
+  "settings.connections.server.context": "コンテキストサイズ",
+  "settings.connections.server.contextNone": "未設定：Claude Codeは200,000とみなします",
+  "settings.connections.server.limitsHint": "コンテキストサイズと出力上限は、エージェントがそのモデルで開始したときに使われます（Claude Codeが自身のものとして読むIDや、セッションの設定がIDをClaudeのモデルに対応付けている場合は除く）。変更は、そのエージェントの次回の開始時に適用されます。",
+  "settings.connections.server.notBelow": "出力上限はコンテキストサイズより小さくする必要があります。",
+  "settings.connections.server.output": "出力上限",
+  "settings.connections.server.outputDefault": "既定値：{n, number}",
+  "settings.connections.server.tight": "余裕が少なめ：Combworkのツールを含むClaude Codeの最初のリクエストは14,000～28,000トークンになることがあり、セッションが開始しないか、すぐに圧縮されることがあります。",
+  "settings.connections.server.tokens": "トークン",
+  "settings.connections.server.unsupported": "{why, select, alias {このモデルではサポートされていません：Claude CodeはこのIDを自身のエイリアスとして読みます。} other {このモデルではサポートされていません：claude、[1m]、日付の接尾辞を含むIDはここではサポートされていません。}}"
 }

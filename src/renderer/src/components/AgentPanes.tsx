@@ -40,6 +40,7 @@ import { chooseFocus } from '../deferredFocus'
 import { onStripMenu, takeStripMenu, type StripMenu } from '../stripMenus'
 import { ModeBadge } from './PermissionMode'
 import { contextLines, providerDescriptor, providerName } from '@shared/providers'
+import { launchedWindow, localLimitsLines } from '@shared/localModelLimits'
 import { safeguardText } from '@shared/safeguards'
 import { unpricedModel, unpricedText } from '@shared/prices'
 import { hooksMissingNote, hooksMissingText, retryWaitText, unknownStateText } from '@shared/runtime'
@@ -1585,7 +1586,10 @@ export function PaneFooter({
   const effort = onServer ? null : effortLabel(provider, live?.effort, chose.effort, chose.effortGlobal, modelCaps(provider, runModel, providers[provider], settings).defaultEffort, settings)
   const threshold = compactThreshold(project.config, settings?.sessions.compactSuggestTokens ?? 0)
   const ctx = usage?.contextTokens ?? 0
-  const pct = contextPercent(ctx, usage?.contextWindow)
+  // A local model's context as its launch applied it (HI-2682), until Claude Code reports its window: launch-global.
+  const running = live?.modelId || usage?.model || null
+  const windowShown = usage?.contextWindow ?? launchedWindow(live?.localLimits, usage?.contextWindow, running)
+  const pct = contextPercent(ctx, windowShown)
   const over = threshold > 0 && ctx >= threshold
   const cost = live?.costUsd ?? usage?.costUsd ?? null
   const estimated = live?.costUsd !== undefined ? !!live.costEstimated : !!usage?.costEstimated
@@ -1667,7 +1671,8 @@ export function PaneFooter({
             // A click opens the session in the Overview, with its compaction history (the Assistant's footer opens nothing).
             <span className="ctx-tip" style={{ whiteSpace: 'pre-line' }}>
               {[
-                ...contextLines(usage, live?.autoCompact, tr),
+                ...contextLines({ ...usage, contextWindow: windowShown }, live?.autoCompact, tr),
+                ...localLimitsLines(live?.localLimits, usage.contextWindow, running, tr),
                 tr(msg({ id: 'panes.footer.compactions', defaultMessage: '{n, plural, one {# compaction so far} other {# compactions so far}}{over, select, yes { — consider compacting} other {}}', description: "A line of the hover of a pane footer's context: how many times the conversation was compacted, and (over the user's threshold) a suggestion to compact." }), { n: usage.compactions.length, over: over ? 'yes' : 'no' }),
                 ...(bytes !== undefined && !long ? [tr(msg({ id: 'panes.footer.transcriptLine', defaultMessage: 'Transcript: {size}', description: "A line of the hover of a pane footer's context: the size of the conversation's transcript ({size}: \"12 MB\")." }), { size: formatSize(bytes) })] : []),
                 ...(usage.stale ? [tr(msg({ id: 'panes.footer.stale', defaultMessage: 'Couldn’t read it again just now: this may be behind.', description: "A line of the hover of a pane footer's context: Combwork couldn't read the usage again, so the numbers may be old." }))] : []),

@@ -348,6 +348,8 @@
   "main.server.key.inField": "Klucz występuje {field, select, name {w nazwie} url {w bazowym adresie URL} other {na liście modeli}}: najpierw go stamtąd usuń. Niczego nie zapisano.",
   "main.server.key.length": "Klucz ma od {min, number} do {max, number} znaków. Sprawdź, co zostało wklejone.",
   "main.server.notServer": "To połączenie nie pobiera modelu z serwera.",
+  "main.server.output.invalid": "Budżet wyjścia to całkowita liczba tokenów, od 1 do {max, number}.",
+  "main.server.output.notBelow": "Budżet wyjścia modelu {model} ({output, number} tokenów) musi być mniejszy niż jego rozmiar kontekstu ({context, number} tokenów). Najpierw obniż budżet wyjścia albo wyczyść go, aby użyć domyślnego.",
   "main.server.setUp.noKey": "Połączenie {name} nie ma jeszcze klucza. Najpierw dodaj klucz, a potem je skonfiguruj.",
   "main.server.unsupported": "{cli} nie może w Combwork pobierać modelu z serwera.",
   "main.server.url.extra": "Adres URL nie może zawierać zapytania (?…) ani fragmentu (#…): podaj klucz w osobnym polu.",

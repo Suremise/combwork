@@ -30,6 +30,8 @@ import { claudeTranscriptTurns } from './turns'
 import type { SafeguardEvent } from '../../../shared/safeguards'
 import { ConversationParser, claudeImageData } from './conversation'
 import { readClaudeModels } from './models'
+import { localLimitsFor } from './localLimits'
+import { localLimitsTest } from '../../localLimitsTest'
 import { ClaudeUsageParser, encodeProjectPath, parseTranscript, transcriptSubSession } from './usage'
 import { atMost } from '../../../shared/atMost'
 import { joined } from '../../../shared/coalesce'
@@ -449,6 +451,16 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     const started = performance.now()
     // A --settings of the user's is read first: one Combwork can't read stops the launch before anything changes (#330).
     const theirs = await userSettings(ctx.extraArgs, ctx.cwd)
+    // A local model's limits on a server connection (HI-2682), resolved in this launch's own settings scopes: added to its
+    // environment (never the user's config) and recorded as applied. A conflict a settings file causes refuses the launch.
+    const serverCaps = this.descriptor.capabilities.connections?.server
+    const test = ctx.server && serverCaps ? localLimitsTest(serverCaps) : null
+    if (ctx.server && serverCaps && test) {
+      const scopes = settingsScopes(ctx.cwd, ctx.env.CLAUDE_CONFIG_DIR || claudeHome(), ctx.extraArgs)
+      const got = localLimitsFor({ caps: serverCaps, models: ctx.server.models, connection: ctx.server.connection, agent: ctx.name, model: ctx.model, env: ctx.env, scopes, test })
+      Object.assign(ctx.env, got.env)
+      ctx.localLimits = got.record
+    }
     const dir = this.launchDir(ctx.projectPath, ctx.agentId)
     const pluginDir = join(dir, 'plugin')
     const skillsDir = join(pluginDir, 'skills')

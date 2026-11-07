@@ -2833,7 +2833,7 @@ class SessionManager {
     const tempDir = tempSetting ? await prepareAgentTemp({ setting: tempSetting, host: projectPath, agentId: agent.id, assistant: assistantHost, protect: [...(await protectedFolders(openWorkspaces())), projectPath, cwd] }) : null
     times?.mark('tempDir')
     const binPath = (env: Record<string, string>, dir: string | null): Record<string, string> => (policy.tools ? withBinOnPath(env, dir) : env)
-    const ctx = {
+    const ctx: LaunchContext = {
       projectPath,
       agentId: agent.id,
       executable: info.path,
@@ -2869,6 +2869,8 @@ class SessionManager {
       initialPrompt: policy.typing ? l.initialPrompt : undefined,
       allowBackgroundSessions: providerSettings(config.settings, adapter.id).allowBackgroundSessions,
       ...(conn ? { connectionHome: conn.folder } : {}),
+      // Its server connection's models (HI-2682): the adapter passes a local model's limits from them.
+      ...(conn?.server ? { server: { models: conn.server.models, connection: (eff.connectionId && eff.connection === conn.id ? eff.connectionName : null) ?? conn.name } } : {}),
       // On a connection, without the variables its CLI would read as a login in its place (HI-1757).
       // A server connection's own variables (HI-1772: its server, models and key) after those left out, for this launch only.
       tempDir,
@@ -2892,6 +2894,8 @@ class SessionManager {
     }
     const delivered = await adapter.prepareLaunch(ctx)
     times?.mark('prepareLaunch')
+    // A local model's limits as applied (HI-2682), for its context meter: this launch's, never read again.
+    state.localLimits = ctx.localLimits ?? undefined
     l.launchEnv = ctx.env
     // What the session got, measured on the copies its CLI reads (not their sources: a kept old copy is what it reads).
     const deliveredSizes = await deliveredSkillSizes(adapter, ctx, delivered).catch(() => ({ catalog: 0, bytes: 0, unmeasured: Object.values(delivered).filter((d) => d.revision).length }))

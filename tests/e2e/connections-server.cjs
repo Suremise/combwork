@@ -4,8 +4,11 @@
 // (base URL, the key as a bearer token, each Claude name's model) in its own folder; the footer shows the server's model
 // with the Claude names it stands in for. A refused key stops it as "Key refused"; a new key lets it carry on. A local
 // server (the Ollama preset, a stub here) needs no key: its models are read from it, and its launch gets the placeholder.
-// The key is in no log, config or diagnostics, and never in plain text in its store. Dummy keys only; the fake Claude
-// Code throughout. Screenshots in both themes.
+// The key is in no log, config or diagnostics, and never in plain text in its store. A local model's limits (HI-2682):
+// Edit Server…'s Context size and Output budget (an output not below the context said and refused, little room warned
+// of, the same context as Server diagnostics', both kept through Read Models), the launch's variables for a local ID
+// and none for a claude- one, and the footer's context from the launch until Claude Code reports its window. Dummy keys
+// only; the fake Claude Code throughout. Screenshots in both themes.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const http = require('http')
@@ -140,6 +143,7 @@ const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '')
     await inv('session:start', alpha, { agentId: 'a-two' })
     const local = await lib.until(async () => launchedIn(ol.id).find((l) => l.env.CW_AGENT === 'Two') ?? null, HUNG_MS)
     check('an agent on it launches with its base URL and the placeholder, no key', local?.env.ANTHROPIC_BASE_URL === `http://127.0.0.1:${port}` && local?.env.ANTHROPIC_AUTH_TOKEN === 'none' && local?.env.ANTHROPIC_MODEL === 'qwen3:8b', JSON.stringify(local?.env))
+    check('HI-2682: …with no limits set, the default output budget, effort auto and no thinking, and no context (Claude Code assumes 200K)', local?.env.CLAUDE_CODE_MAX_OUTPUT_TOKENS === '8192' && local?.env.CLAUDE_CODE_EFFORT_LEVEL === 'auto' && local?.env.MAX_THINKING_TOKENS === '0' && !('CLAUDE_CODE_MAX_CONTEXT_TOKENS' in (local?.env ?? {})), JSON.stringify(local?.env))
     // Its conversation runs only on a server on this PC: free (Darren, 27 Oct), whatever the CLI reports.
     await lib.until(async () => ['idle', 'ready'].includes((await live('a-two'))?.status), HUNG_MS)
     await lib.sendPrompt(inv, lib.ptyKey(alpha, 'a-two'), 'hello', { submitted: async () => !!(await live('a-two'))?.costFree })
@@ -153,6 +157,83 @@ const read = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '')
     await page.locator('.settings-nav .row[data-section="accounts"]').click()
     check('…its row says it is on this PC, with no key', !!(await lib.until(async () => (await row('Ollama').innerText().catch(() => '')).includes(`127.0.0.1:${port} · On this PC, no key`), HUNG_MS)))
     await shots('local')
+
+    // --- HI-2682: a local model's Context size and Output budget, in Edit Server….
+    const olModel = async (id) => (await list()).connections.find((c) => c.id === ol.id)?.server?.models.find((m) => m.id === id)
+    await row('Ollama').locator('[data-edit-server]').click()
+    const edit = page.locator('.dialog', { has: page.locator('[data-save-server]') })
+    await edit.waitFor({ timeout: HUNG_MS })
+    const limits = edit.locator('[data-model-limits="qwen3:8b"]')
+    check('HI-2682: each model row has Context size and Output budget, the defaults as their hints', (await limits.locator('[data-limit="output"] input').getAttribute('placeholder')) === 'Default: 8,192' && /Claude Code assumes 200,000/.test((await limits.locator('[data-limit="context"] input').getAttribute('placeholder')) ?? ''))
+    check('…the editor says when they are used, and that a change applies when its agents next start', /A change applies when its agents next start/.test(await edit.innerText()))
+    await limits.locator('[data-limit="context"] input').fill('32768')
+    await limits.locator('[data-limit="output"] input').fill('40000')
+    check('…an output not below the context is said at once', !!(await lib.until(async () => (await limits.locator('[data-limits-error]').count()) === 1, HUNG_MS)))
+    await edit.locator('[data-save-server]').click()
+    check('…and refused by the save, naming both, nothing saved', !!(await lib.until(async () => /\(40,000 tokens\) must be smaller than its context size \(32,768 tokens\)/.test(await edit.innerText()), HUNG_MS)) && !(await olModel('qwen3:8b'))?.context, await edit.innerText())
+    await limits.locator('[data-limit="output"] input').fill('6000')
+    check('…little room left (32,768 − 6,000) is warned of, not refused', !!(await lib.until(async () => (await limits.locator('[data-limits-tight]').count()) === 1 && (await limits.locator('[data-limits-error]').count()) === 0, HUNG_MS)))
+    await shots('limits')
+    await edit.locator('[data-save-server]').click()
+    await edit.waitFor({ state: 'detached', timeout: HUNG_MS })
+    check('…saved on the model', !!(await lib.until(async () => (await olModel('qwen3:8b'))?.context === 32768 && (await olModel('qwen3:8b'))?.output === 6000, HUNG_MS)), JSON.stringify(await olModel('qwen3:8b')))
+    // The same context in Server diagnostics (HI-2683's field), set there, and back in the editor.
+    await row('Ollama').locator('[data-check-server]').click()
+    const diagDialog = page.locator('.dialog', { has: page.locator('[data-context-mine]') })
+    await diagDialog.waitFor({ timeout: HUNG_MS })
+    check('…Server diagnostics shows the same context', !!(await lib.until(async () => (await diagDialog.locator('[data-context-mine]').inputValue()) === '32768', HUNG_MS)), await diagDialog.locator('[data-context-mine]').inputValue())
+    await diagDialog.locator('[data-context-mine]').fill('65536')
+    await diagDialog.locator('[data-save-context]').click()
+    check('…set there, it is the model’s, its output budget kept', !!(await lib.until(async () => (await olModel('qwen3:8b'))?.context === 65536 && (await olModel('qwen3:8b'))?.output === 6000, HUNG_MS)), JSON.stringify(await olModel('qwen3:8b')))
+    await page.keyboard.press('Escape')
+    await diagDialog.waitFor({ state: 'detached', timeout: HUNG_MS })
+    await row('Ollama').locator('[data-edit-server]').click()
+    await edit.waitFor({ timeout: HUNG_MS })
+    check('…and Edit Server… shows it', (await edit.locator('[data-model-limits="qwen3:8b"] [data-limit="context"] input').inputValue()) === '65536')
+    await page.keyboard.press('Escape')
+    await edit.waitFor({ state: 'detached', timeout: HUNG_MS })
+    await row('Ollama').locator('[data-read-models]').click()
+    check('…Read Models keeps both', !!(await lib.until(async () => (await olModel('qwen3:8b'))?.context === 65536 && (await olModel('qwen3:8b'))?.output === 6000 && asked.length >= 2, HUNG_MS)), JSON.stringify(await olModel('qwen3:8b')))
+    await closeSettings()
+    // Started again: the launch gets them; its footer's context from the launch until Claude Code reports its window.
+    await inv('session:start', alpha, { agentId: 'a-two' })
+    const limited = await lib.until(async () => launchedIn(ol.id).filter((l) => l.env.CW_AGENT === 'Two').find((l) => l.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS) ?? null, HUNG_MS)
+    check('HI-2682: started on it, Two gets its context and output budget, effort auto and no thinking', limited?.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS === '65536' && limited?.env.CLAUDE_CODE_MAX_OUTPUT_TOKENS === '6000' && limited?.env.CLAUDE_CODE_EFFORT_LEVEL === 'auto' && limited?.env.MAX_THINKING_TOKENS === '0', JSON.stringify(limited?.env))
+    check('…recorded on its session as applied, from the connection', !!(await lib.until(async () => (await live('a-two'))?.localLimits?.applied === true, HUNG_MS)) && JSON.stringify((await live('a-two')).localLimits) === JSON.stringify({ model: 'qwen3:8b', connection: 'Ollama', applied: true, context: { value: 65536, from: null }, output: { value: 6000, from: null } }), JSON.stringify((await live('a-two'))?.localLimits))
+    await lib.until(async () => ['idle', 'ready'].includes((await live('a-two'))?.status), HUNG_MS)
+    await lib.sendPrompt(inv, lib.ptyKey(alpha, 'a-two'), 'hello', { submitted: async () => ['working', 'finished'].includes((await live('a-two'))?.status) })
+    const ctxItem = twoPane.locator('.foot-ctx')
+    const ctxTip = async () => {
+      await page.mouse.move(5, 5)
+      return lib.hoverTip(page, ctxItem, (t) => /Context size 65,536 tokens/.test(t), HUNG_MS)
+    }
+    const estimated = await ctxTip()
+    check('…its footer: the launch’s context, an estimate until Claude Code reports, and its output budget, each from the connection', /of 65,536/.test(estimated) && /Context size 65,536 tokens \(set on Ollama\): an estimate until Claude Code reports its window/.test(estimated) && /Output budget 6,000 tokens \(set on Ollama\)/.test(estimated), estimated)
+    await shots('limits-footer')
+    await lib.until(async () => ['idle', 'ready', 'finished'].includes((await live('a-two'))?.status), HUNG_MS)
+    await lib.sendPrompt(inv, lib.ptyKey(alpha, 'a-two'), 'window 65536', { submitted: async () => (await live('a-two'))?.contextWindow === 65536 })
+    const reported = await lib.hoverTip(page, ctxItem, (t) => /Context size 65,536 tokens \(set on Ollama\)$/m.test(t), HUNG_MS)
+    check('…once Claude Code reports its window, no longer an estimate', /Context size 65,536 tokens \(set on Ollama\)$/m.test(reported) && !/an estimate until/.test(reported), reported)
+    await lib.until(async () => ['idle', 'ready', 'finished'].includes((await live('a-two'))?.status), HUNG_MS)
+    await inv('session:stop', alpha, 'a-two')
+    // A claude- spelling: unsupported in the editor, and its launch gets none of them, saying why.
+    await inv('connections:editServer', ol.id, { models: [...(await list()).connections.find((c) => c.id === ol.id).server.models, { id: 'claude-local', context: 32768 }] })
+    await inv('agents:update', alpha, 'a-two', { model: 'claude-local' })
+    await inv('session:start', alpha, { agentId: 'a-two' })
+    const unsupported = await lib.until(async () => launchedIn(ol.id).filter((l) => l.env.CW_AGENT === 'Two').find((l) => l.opts['--model'] === 'claude-local') ?? null, HUNG_MS)
+    check('HI-2682: a claude- spelling launches with none of them', !!unsupported && !('CLAUDE_CODE_MAX_CONTEXT_TOKENS' in unsupported.env) && !('CLAUDE_CODE_MAX_OUTPUT_TOKENS' in unsupported.env) && !('MAX_THINKING_TOKENS' in unsupported.env), JSON.stringify(unsupported?.env))
+    check('…its session says why', !!(await lib.until(async () => (await live('a-two'))?.localLimits?.why === 'spelling', HUNG_MS)), JSON.stringify((await live('a-two'))?.localLimits))
+    await inv('session:stop', alpha, 'a-two')
+    await inv('agents:update', alpha, 'a-two', { model: null })
+    await page.keyboard.press('Control+,')
+    await page.locator('.settings-nav .row[data-section="accounts"]').click()
+    await row('Ollama').locator('[data-edit-server]').click()
+    await edit.waitFor({ timeout: HUNG_MS })
+    const claudeRow = edit.locator('[data-model-limits="claude-local"]')
+    check('…in Edit Server… its fields are off, saying it is not supported, the value kept', !!(await lib.until(async () => (await claudeRow.locator('[data-limits-unsupported="spelling"]').count()) === 1, HUNG_MS)) && (await claudeRow.locator('[data-limit="context"] input').isDisabled()) && (await claudeRow.locator('[data-limit="context"] input').inputValue()) === '32768')
+    await shots('limits-unsupported')
+    await page.keyboard.press('Escape')
+    await edit.waitFor({ state: 'detached', timeout: HUNG_MS })
 
     // --- Ollama's preset (HI-1773): its Claude Code guide, and its recommended context length as advice.
     await page.locator('[data-add]').click()

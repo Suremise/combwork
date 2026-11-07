@@ -643,6 +643,22 @@
     "defaultMessage": "Hooks: timeout",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
+  "settings.advanced.claude-code.localModel.aliases.desc": {
+    "defaultMessage": "The model names Claude Code reads as its own aliases (opus, sonnet…), as a regular expression. A server connection's model named so gets no Context size or Output budget from Combwork, as Claude Code sizes it itself. Wrong, a local model with one of these names is launched as if Claude Code knew it, or an alias gets limits Claude Code ignores.",
+    "description": "What the advanced setting \"Local models: Claude Code’s aliases\" is for, and what goes wrong when it is wrong (Settings → Advanced). Context size and Output budget are fields of a server connection’s models: as translated there."
+  },
+  "settings.advanced.claude-code.localModel.aliases.title": {
+    "defaultMessage": "Local models: Claude Code’s aliases",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI: the model names Claude Code reads as its own aliases (opus, sonnet…)."
+  },
+  "settings.advanced.claude-code.localModel.spellings.desc": {
+    "defaultMessage": "Model ID spellings Claude Code may resolve to a Claude model or size by its own rules (claude in the ID, a [1m] suffix, a date after @), as a regular expression. A server connection's model spelt so gets no Context size or Output budget from Combwork. Wrong, Combwork passes limits Claude Code doesn't apply, or leaves out a local model it would.",
+    "description": "What the advanced setting \"Local models: IDs Claude Code sizes itself\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep [1m] and @ as they are. Context size and Output budget are fields of a server connection’s models: as translated there."
+  },
+  "settings.advanced.claude-code.localModel.spellings.title": {
+    "defaultMessage": "Local models: IDs Claude Code sizes itself",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI: model ID spellings (claude-…, [1m], a date suffix) Claude Code applies its own context rules to."
+  },
   "settings.advanced.claude-code.memory.realPath.desc": {
     "defaultMessage": "A connection's projects folder is a link to Claude Code's own, so Claude Code asked you before each memory it saved there. Each Claude Code agent on a connection is given its project's auto memory folder by its real path: the same folder, so it saves memories without asking, as it does without a connection. Nothing more is allowed, and nothing is written to Claude Code's files. Off, Claude Code asks before each memory on a connection.",
     "description": "What the advanced setting \"Auto memory by its real path on connections\" is for, and what happens when it is off (Settings → Advanced, HI-1899). Auto memory is Claude Code's own notes it keeps per project; a connection is an account Combwork signs a CLI in with; \"projects\" is a folder's name: keep it."
@@ -3687,9 +3703,17 @@
     "defaultMessage": "Runs in the cloud, not on this PC: its sessions aren't free (local).",
     "description": "Tooltip of \"cloud\" beside a model in a server connection's model list (an Ollama cloud model). \"free (local)\" is how Combwork shows the cost of sessions run only on this PC."
   },
+  "settings.connections.server.context": {
+    "defaultMessage": "Context size",
+    "description": "A field on a server connection's model (HI-2682): the context the model has on this server, in tokens. The same value as Server diagnostics' context size."
+  },
   "settings.connections.server.contextAdvice": {
     "defaultMessage": "{name} recommends a context length of {size, number} tokens or more for {cli}, especially in larger repositories. Set it in {name}'s own settings: Combwork doesn't change them.",
     "description": "Under a server connection's preset (Add Connection): the service ({name}: \"Ollama\") recommends a context window of at least {size} tokens (64,000) for the coding agent CLI ({cli}: \"Claude Code\"). Advice, not a requirement Combwork enforces."
+  },
+  "settings.connections.server.contextNone": {
+    "defaultMessage": "Not set: Claude Code assumes 200,000",
+    "description": "The placeholder of a server connection's model's empty Context size field (HI-2682): with none set, Claude Code assumes a 200K context."
   },
   "settings.connections.server.custom": {
     "defaultMessage": "Custom",
@@ -3751,6 +3775,10 @@
     "defaultMessage": "{name}'s API key",
     "description": "Title of the dialog asking a server connection's API key ({name}, its name)."
   },
+  "settings.connections.server.limitsHint": {
+    "defaultMessage": "Context size and Output budget are used when an agent starts on that model (not for IDs Claude Code reads as its own, nor where the session’s settings map the ID to a Claude model). A change applies when its agents next start.",
+    "description": "Under a server connection's model list (HI-2682): when the models' Context size and Output budget fields are used. Context size and Output budget are the fields' names."
+  },
   "settings.connections.server.local": {
     "defaultMessage": "{name} (on this PC)",
     "description": "A preset of a server connection that runs on the user's own computer ({name}: \"Ollama\")."
@@ -3778,6 +3806,18 @@
   "settings.connections.server.needsKey": {
     "defaultMessage": "Its server needs a key: agents on it are refused until one is added.",
     "description": "A warning on a server connection with no key whose server isn't on this computer."
+  },
+  "settings.connections.server.notBelow": {
+    "defaultMessage": "The output budget must be smaller than the context size.",
+    "description": "Under a server connection's model's fields (HI-2682): its output budget isn't smaller than its context size, so it can't be saved."
+  },
+  "settings.connections.server.output": {
+    "defaultMessage": "Output budget",
+    "description": "A field on a server connection's model (HI-2682): the most tokens the model may write in one reply."
+  },
+  "settings.connections.server.outputDefault": {
+    "defaultMessage": "Default: {n, number}",
+    "description": "The placeholder of a server connection's model's empty Output budget field (HI-2682): the budget used when none is set. {n} is a number of tokens."
   },
   "settings.connections.server.preset": {
     "defaultMessage": "Preset",
@@ -3846,6 +3886,18 @@
   "settings.connections.server.setUpFailed": {
     "defaultMessage": "Couldn't open the setup",
     "description": "An error's title: a connection's Set Up terminal couldn't be opened."
+  },
+  "settings.connections.server.tight": {
+    "defaultMessage": "Little room: Claude Code’s first request with Combwork’s tools can be 14,000–28,000 tokens, so a session may not start, or may compact at once.",
+    "description": "A warning under a server connection's model's fields (HI-2682): its context minus its output budget is small. Advice: saving is allowed."
+  },
+  "settings.connections.server.tokens": {
+    "defaultMessage": "tokens",
+    "description": "Beside a server connection's model's Context size and Output budget fields (HI-2682): the unit."
+  },
+  "settings.connections.server.unsupported": {
+    "defaultMessage": "{why, select, alias {Not supported for this model: Claude Code reads this ID as one of its aliases.} other {Not supported for this model: IDs with claude, [1m] or a date suffix aren’t supported here.}}",
+    "description": "Under a server connection's model whose Context size and Output budget fields are off (HI-2682), why. Keep [1m] and the select keys."
   },
   "settings.connections.server.why.failed": {
     "defaultMessage": "The server answered with an error ({status}). Try again later.",
