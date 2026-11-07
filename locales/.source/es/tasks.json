@@ -79,6 +79,7 @@
   "tasks.error.staysInProject": "Cards stay in your project ({project}).",
   "tasks.error.targetChanged": "{card}’s Merges into changed since it was listed, so it stays as it is.",
   "tasks.error.targetCheckedOut": "{unknown, select, yes {Combwork can’t tell whether {card}’s old branch is in use, so its Merges into stays as it is.} other {{card}’s old branch is still checked out in {folder}, so its Merges into stays as it is. Try again once that folder has moved on.}}",
+  "tasks.error.targetDefaultMoved": "Work merges into changed again while {card} was being moved, so it stays as it is.",
   "tasks.error.targetHasWork": "{unknown, select, yes {Combwork can’t tell whether {card} has work on its branch, so its Merges into stays as it is.} other {{card} has work on its branch made from {target}, so it keeps merging there. To move it, make a new card for it on the other branch and copy the change.}}",
   "tasks.error.targetLane": "{card} is in {builder}’s lane, which merges into {target}: a lane’s cards merge where it does. Take it out of the lane first.",
   "tasks.error.targetMissing": "{unknown, select, yes {Combwork can’t tell whether the branch {target} exists, so nothing was changed.} other {There is no branch {target} in this repository: make it first, then pick it.}}",

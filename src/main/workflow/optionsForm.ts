@@ -403,6 +403,10 @@ async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, ra
           await write()
         })
       )
+    } else if ((was.target || null) !== (will.target || null)) {
+      // HI-2680: Work merges into written in the board's write too, so a retarget's move (which checks it under the
+      // board's lock, `tasks.setTarget`'s `expectDefault`) and this change are serial.
+      await boardWrite(ws, write)
     } else await write()
     if (!namesOnly(plan.changed) && o.applyTo?.length && plan.changed.length) await applyToInFlight(ws, project, [...new Set(o.applyTo)], plan.changed)
   } else {

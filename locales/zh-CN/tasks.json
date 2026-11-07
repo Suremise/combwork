@@ -195,5 +195,6 @@
   "tasks.error.waitingNotYours": "只有 {card} 自己的代理、用户或助手才能将其标记为等待中或取消标记。",
   "tasks.error.waitingTooLong": "等待原因太长（最多 {max, number} 个字符）。",
   "tasks.history.notWaiting": "不再等待",
-  "tasks.history.waiting": "等待中：{reason}"
+  "tasks.history.waiting": "等待中：{reason}",
+  "tasks.error.targetDefaultMoved": "移动 {card} 时“工作合并到”再次更改，因此保持不变。"
 }

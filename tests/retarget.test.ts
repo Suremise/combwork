@@ -2,12 +2,12 @@
 // (what can follow the new target, what stays and why), the apply bound to it (each card only from the target it was
 // seen with, the project's target still the new one, the caller still allowed), and the finished branch kept in Other
 // branches work can merge into while anything records it, serial with a lane start on it.
-import { execFileSync } from 'child_process'
 import { mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { commit, gitRepo, sh } from './workflow/harness'
 
 const base = tempDir('cw-retarget-')
 mkdirSync(join(base, 'profile'), { recursive: true })
@@ -32,7 +32,6 @@ afterAll(async () => {
   store.closeAllBoards()
 })
 
-const git = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, stdio: 'pipe', encoding: 'utf8' }).trim()
 const user = { kind: 'user' } as const
 let n = 0
 const { platform: _p, ...pair } = preset('git', 'pair')
@@ -41,15 +40,14 @@ const { platform: _p, ...pair } = preset('git', 'pair')
 async function project(): Promise<{ w: WS; repo: string }> {
   const ws = join(base, `ws-${++n}`)
   const repo = join(ws, 'p')
+  mkdirSync(ws, { recursive: true })
+  // The harness's repository and git (its own identity set; no user config needed).
+  gitRepo(repo)
+  commit(repo, { '.gitignore': '.combwork/\n' }, 'ignore')
   mkdirSync(join(repo, '.combwork'), { recursive: true })
   mkdirSync(join(ws, '.combwork'), { recursive: true })
-  git(repo, 'init', '-q', '-b', 'main')
-  for (const [k, v] of [['user.name', 'Pat Builder'], ['user.email', 'pat@example.com'], ['core.autocrlf', 'false']]) git(repo, 'config', k, v)
-  writeFileSync(join(repo, '.gitignore'), '.combwork/\n')
-  git(repo, 'add', '-A')
-  git(repo, 'commit', '-qm', 'initial')
-  git(repo, 'branch', '1.1.0')
-  git(repo, 'branch', '1.2.0')
+  sh(repo, 'branch', '1.1.0')
+  sh(repo, 'branch', '1.2.0')
   writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }], workflow: { platform: 'git', preset: 'pair', options: { ...pair, target: '1.1.0', otherTargets: ['main', '1.2.0'] } } }))
   const w = createWorkspaceService()
   await w.open(ws)
@@ -121,6 +119,134 @@ describe('the retarget apply (HI-2680)', () => {
     const r3 = await inWorkspace(w, () => retarget.retargetApply(w, repo, p2, user, () => { throw new Error('Control turned off') }))
     expect(r3).toMatchObject({ moved: { cards: [] }, skipped: [{ card: more.number, why: 'refused' }] })
     expect(await ownOf(w, repo, more.number)).toBe('1.1.0')
+  })
+})
+
+describe("the apply's checks at each write, and its failures (HR1's HI-2680 round 1, findings 2 and 3)", () => {
+  it("a card's move checks the project's target under the board's lock: changed meanwhile, it stays", async () => {
+    const { w, repo } = await project()
+    const c = await card(w, 'One')
+    await own(w, repo, c.number, '1.1.0')
+    // Asked to move while the project's target is 1.1.0 still (as after a check made before the target moved on again).
+    await expect(inWorkspace(w, () => tasks.setTarget(c.number, '1.2.0', user, { expect: '1.1.0', expectDefault: '1.2.0' }))).rejects.toThrow(/Work merges into changed again while/)
+    expect(await ownOf(w, repo, c.number)).toBe('1.1.0')
+  })
+
+  it("a save changing Work merges into waits for the board's lock, so it and a card's move are serial", async () => {
+    const { w, repo } = await project()
+    let release!: () => void
+    const gate = new Promise<void>((r) => (release = r))
+    let entered!: () => void
+    const inLock = new Promise<void>((r) => (entered = r))
+    const held = store.boardWrite(w, async () => {
+      entered()
+      await gate
+    })
+    await inLock
+    const save = moveTarget(w, repo, '1.2.0')
+    let saved = false
+    void save.then(() => (saved = true))
+    // While the board's lock is held, the save hasn't written: the project's target is still 1.1.0.
+    await new Promise((r) => setImmediate(r))
+    expect(saved).toBe(false)
+    expect((await w.projectConfig(repo)).workflow?.options.target).toBe('1.1.0')
+    release()
+    await held
+    await save
+    expect((await w.projectConfig(repo)).workflow?.options.target).toBe('1.2.0')
+  })
+
+  it('a card refused at its write because the target moved on stops the rest (targetChanged), each said', async () => {
+    const { w, repo } = await project()
+    const cards = [await card(w, 'One'), await card(w, 'Two')]
+    for (const c of cards) await own(w, repo, c.number, '1.1.0')
+    const p = await inWorkspace(w, () => retarget.retargetPreview(w, repo, '1.1.0', '1.2.0'))
+    await moveTarget(w, repo, '1.2.0')
+    // The target moves on again after the check before the first card, before its write: the board's lock held (another
+    // board write under way) while the apply passes that check, the project file changed meanwhile, then released.
+    let release!: () => void
+    const gate = new Promise<void>((r) => (release = r))
+    const held = inWorkspace(w, () => tasks.boardLock(w, () => gate))
+    let checked!: () => void
+    const passed = new Promise<void>((r) => (checked = r))
+    let calls = 0
+    const apply = inWorkspace(w, () =>
+      retarget.retargetApply(w, repo, p, user, () => {
+        if (++calls === 1) checked()
+      })
+    )
+    await passed
+    await w.mutateProjectConfig(repo, (cfg) => ({ workflow: { ...cfg.workflow!, options: { ...cfg.workflow!.options, target: 'main', otherTargets: ['1.1.0', '1.2.0'] } } }))
+    release()
+    await held
+    const r = await apply
+    expect(r.moved.cards).toEqual([])
+    expect(r.skipped.map((s) => [s.card, s.why])).toEqual([
+      [cards[0].number, 'targetChanged'],
+      [cards[1].number, 'targetChanged']
+    ])
+    for (const c of cards) expect(await ownOf(w, repo, c.number)).toBe('1.1.0')
+  })
+
+  it('a slot failing part way leaves the cards already moved moved, and says the slot failed: never thrown', async () => {
+    const { w, repo } = await project()
+    const c = await card(w, 'One')
+    await own(w, repo, c.number, '1.1.0')
+    const p = await inWorkspace(w, () => retarget.retargetPreview(w, repo, '1.1.0', '1.2.0'))
+    await moveTarget(w, repo, '1.2.0')
+    const { poolFor } = await import('../src/main/slotsApp')
+    const pool = await poolFor(w, repo)
+    const real = pool.retarget.bind(pool)
+    pool.retarget = async () => {
+      throw new Error('database is locked')
+    }
+    try {
+      const withSlot = { ...p, slots: { move: [{ name: 'slot-a', folder: join(repo, '..', 'slot-a'), target: '1.1.0', head: 'abc1234' }], keep: [] } }
+      const r = await inWorkspace(w, () => retarget.retargetApply(w, repo, withSlot, user))
+      expect(r.moved.cards.map((x) => x.number)).toEqual([c.number])
+      expect(r.skipped).toEqual([expect.objectContaining({ slot: 'slot-a', why: 'failed', detail: 'database is locked' })])
+    } finally {
+      pool.retarget = real
+    }
+  })
+})
+
+describe("the Assistant's offered previews (HR1's HI-2680 round 1, finding 4)", () => {
+  it('are kept by id for their own project only, narrowed to the items named, unknown ones said', async () => {
+    const { w, repo } = await project()
+    const c = await card(w, 'Free')
+    await own(w, repo, c.number, '1.1.0')
+    const p = await inWorkspace(w, () => retarget.retargetPreview(w, repo, '1.1.0', '1.2.0'))
+    const id = retarget.offerRetarget(repo, p)
+    expect(retarget.offeredRetarget(id, repo)).toBe(p)
+    expect(retarget.offeredRetarget(id, join(repo, '..', 'other'))).toBeNull()
+    expect(retarget.offeredRetarget('rt-00000000', repo)).toBeNull()
+    // A day later: gone.
+    expect(retarget.offeredRetarget(id, repo, Date.now() + 25 * 60 * 60 * 1000)).toBeNull()
+    const key = p.cards.move[0].key
+    const { confirmed, unknown } = retarget.offeredItems(p, [key.toLowerCase(), 'slot-z', key])
+    expect(confirmed.cards.move.map((x) => x.number)).toEqual([c.number])
+    expect(unknown).toEqual(['slot-z'])
+  })
+
+  it('apply as offered: a card changed since the offer stays as it was changed', async () => {
+    const { w, repo } = await project()
+    const c = await card(w, 'Free')
+    await own(w, repo, c.number, '1.1.0')
+    const offered = await inWorkspace(w, () => retarget.retargetPreview(w, repo, '1.1.0', '1.2.0'))
+    await moveTarget(w, repo, '1.2.0')
+    // Set to main by hand after the offer: the apply checks it against the target the offer saw, so it stays.
+    await own(w, repo, c.number, 'main')
+    const r = await inWorkspace(w, () => retarget.retargetApply(w, repo, retarget.offeredItems(offered, [offered.cards.move[0].key]).confirmed, user))
+    expect(r).toMatchObject({ moved: { cards: [] }, skipped: [{ card: c.number, why: 'changed' }] })
+    expect(await ownOf(w, repo, c.number)).toBe('main')
+  })
+
+  it('at most 50 are kept, the oldest dropped first', () => {
+    const p = { from: 'a', to: 'b', cards: { move: [], keep: [] }, slots: { move: [], keep: [] }, lanes: [] }
+    const ids = Array.from({ length: 51 }, () => retarget.offerRetarget('C:/x/p', p))
+    expect(retarget.offeredRetarget(ids[0], 'C:/x/p')).toBeNull()
+    expect(retarget.offeredRetarget(ids[50], 'C:/x/p')).toBe(p)
   })
 })
 

@@ -8,6 +8,8 @@
 // says what happened to it.
 
 import { existsSync } from 'original-fs'
+import { randomBytes } from 'crypto'
+import { samePlace } from '../places'
 import * as G from '../platform/git'
 import { isUnknown } from '../platform/types'
 import type { WorkspaceService } from '../workspace'
@@ -22,6 +24,10 @@ import { hasOwnWork, projectTargets } from './targets'
 import type { RetargetPreview, RetargetResult } from '../../shared/types'
 import { combworkError } from '../combworkError'
 import { fmt, msg } from '../../shared/i18n'
+import { createLogger, userText } from '../logger'
+import type { RetargetEnd } from '../slots'
+
+const log = createLogger('retarget')
 
 /** Where a card in flight, a Todo card and a lane stand (codes the window and the tools say in words). */
 type KeepWhy = RetargetPreview['cards']['keep'][number]['why']
@@ -99,7 +105,10 @@ export async function retargetPreview(ws: WorkspaceService, projectPath: string,
  * Moves what a confirmed preview listed (HI-2680), each only as it was seen: a card from `from` (its own target as
  * expected, under the board's lock: `tasks.setTarget`'s), a slot from its recorded target, folder and head (the pool's
  * retarget). Before each, the project's target must still be `to` (else the rest stops: "the target changed
- * meanwhile") and `still()` (the caller's authority) must hold (else the rest stops). What happened to each is said.
+ * meanwhile") and `still()` (the caller's authority) must hold (else the rest stops), checked again at each one's write
+ * (a card's under the board's lock, which a save of Work merges into holds too; a slot's under the repository's lock,
+ * which every save holds). What happened to each is said, a failure part way included (HR1's round 1, finding 3): never
+ * thrown past the items already moved.
  */
 export async function retargetApply(ws: WorkspaceService, projectPath: string, preview: Pick<RetargetPreview, 'from' | 'to' | 'cards' | 'slots'>, actor: TaskActor, still: () => void = () => undefined): Promise<RetargetResult> {
   const { from, to } = preview
@@ -123,14 +132,17 @@ export async function retargetApply(ws: WorkspaceService, projectPath: string, p
       continue
     }
     try {
-      await setTarget(c.number, to, actor, { commit: still, expect: from })
+      await setTarget(c.number, to, actor, { commit: still, expect: from, expectDefault: to })
       out.moved.cards.push({ number: c.number, key: c.key })
     } catch (e) {
-      out.skipped.push({ card: c.number, key: c.key, why: 'changed', detail: (e as Error).message }) // i18n-ignore: a reason's code, said in words where it is shown
+      // Refused at its write: the target moved on again, the caller's authority withdrawn, or the card changed.
+      if (!(await targetNow())) stop = 'targetChanged'
+      else if (!allowed()) stop = 'refused'
+      out.skipped.push({ card: c.number, key: c.key, why: stop ?? 'changed', detail: (e as Error).message }) // i18n-ignore: a reason's code, said in words where it is shown
     }
   }
   const { poolFor } = await import('../slotsApp')
-  const pool = preview.slots.move.length ? await poolFor(ws, projectPath) : null
+  const pool = preview.slots.move.length ? await poolFor(ws, projectPath).catch((e: Error) => (log.warn(`Retarget: no slot pool for ${userText(projectPath)}: ${userText(e.message)}`), null)) : null
   for (const s of preview.slots.move) {
     if (!stop && !(await targetNow())) stop = 'targetChanged'
     if (!stop && !allowed()) stop = 'refused'
@@ -138,7 +150,11 @@ export async function retargetApply(ws: WorkspaceService, projectPath: string, p
       out.skipped.push({ slot: s.name, why: stop ?? 'changed' }) // i18n-ignore: a reason's code, said in words where it is shown
       continue
     }
-    const end = await pool.retarget(s.name, { folder: s.folder, target: s.target, head: s.head }, from, to, async () => allowed() && (await targetNow()))
+    const end = await pool.retarget(s.name, { folder: s.folder, target: s.target, head: s.head }, from, to, async () => allowed() && (await targetNow())).catch((e: Error): RetargetEnd => {
+      log.warn(`Retarget of slot ${userText(s.name)} failed: ${userText(e.message)}`)
+      return { kind: 'kept', why: 'failed', detail: e.message } // i18n-ignore: a reason's code, said in words where it is shown
+    })
+    if (end.kind === 'kept' && end.why === 'refused') stop = (await targetNow()) ? 'refused' : 'targetChanged'
     if (end.kind === 'moved') out.moved.slots.push(s.name)
     else if (end.kind === 'kept') out.skipped.push({ slot: s.name, why: end.why === 'refused' ? 'refused' : end.why === 'changed' ? 'changed' : end.why, ...(end.detail ? { detail: end.detail } : {}) }) // i18n-ignore: a reason's code, said in words where it is shown
     else out.skipped.push({ slot: s.name, why: end.state === 'gone' ? 'gone' : 'setAside', ...(end.detail ? { detail: end.detail } : {}) }) // i18n-ignore: a reason's code, said in words where it is shown
@@ -213,4 +229,37 @@ export async function refuseRemovedTargets(ws: WorkspaceService, projectPath: st
     const uses = await referencesTo(ws, projectPath, branch, slots)
     if (uses.length) throw combworkError(IN_USE, { branch, uses: fmt.list(uses) }, { kind: 'conflict' })
   }
+}
+
+/**
+ * Retarget previews offered to the Assistant (HR1's HI-2680 round 1, finding 4), held here by id: its apply moves only
+ * what the preview it was shown listed, each as it was seen then (a card from its target, a slot at its folder, recorded
+ * target and head), never a fresh preview's items. Bounded: the newest 50, each for a day (an offer gone: ask again).
+ */
+const OFFERS = new Map<string, { project: string; preview: RetargetPreview; at: number }>()
+const OFFERS_MAX = 50
+const OFFER_TTL = 24 * 60 * 60 * 1000
+
+/** Keeps `preview` (of the project at `projectPath`) for the Assistant's apply; its id. */
+export function offerRetarget(projectPath: string, preview: RetargetPreview, now = Date.now()): string {
+  for (const [id, o] of OFFERS) if (now - o.at > OFFER_TTL) OFFERS.delete(id)
+  while (OFFERS.size >= OFFERS_MAX) OFFERS.delete(OFFERS.keys().next().value!)
+  const id = `rt-${randomBytes(4).toString('hex')}`
+  OFFERS.set(id, { project: projectPath, preview, at: now })
+  return id
+}
+
+/** The preview offered as `id` for the project at `projectPath`, while it is kept: null once gone or another project's. */
+export function offeredRetarget(id: string, projectPath: string, now = Date.now()): RetargetPreview | null {
+  const o = OFFERS.get(id)
+  if (!o || now - o.at > OFFER_TTL || !samePlace(o.project, projectPath)) return null
+  return o.preview
+}
+
+/** An offered preview narrowed to the items named (card keys, slot names; case aside), and the names it doesn't list. */
+export function offeredItems(preview: RetargetPreview, items: readonly string[]): { confirmed: RetargetPreview; unknown: string[] } {
+  const named = new Set(items.map((x) => x.toLowerCase()))
+  const confirmed = { ...preview, cards: { move: preview.cards.move.filter((c) => named.has(c.key.toLowerCase())), keep: [] }, slots: { move: preview.slots.move.filter((s) => named.has(s.name.toLowerCase())), keep: [] } }
+  const listed = new Set([...confirmed.cards.move.map((c) => c.key.toLowerCase()), ...confirmed.slots.move.map((s) => s.name.toLowerCase())])
+  return { confirmed, unknown: [...new Set(items.filter((x) => !listed.has(x.toLowerCase())))] }
 }

@@ -556,5 +556,7 @@
   "tips.perfFailures.title": "Odrzucone to nie zepsute",
   "tips.perfFailures.text": "Wydajność → Niepowodzenia sortuje to, co się nie powiodło: prawdziwe błędy na czerwono, osobno od wywołań odrzuconych przez regułę przepływu pracy i błędnych wywołań. Odmowy i błędne wywołania według przyczyny pokazują, która reguła lub komunikat pojawiały się najczęściej: opis narzędzia do doprecyzowania.",
   "tips.serverDiagnostics.title": "Agent na Ollama tylko wypisuje tekst?",
-  "tips.serverDiagnostics.text": "Sprawdź serwer… przy koncie serwera w Ustawienia → Konta i połączenia pokazuje rzeczywisty kontekst jego modelu i testuje wywołanie narzędzia. Kontekst mniejszy niż prompt Claude Code to zwykły powód, dla którego model lokalny wypisuje wywołanie narzędzia zamiast je wykonać."
+  "tips.serverDiagnostics.text": "Sprawdź serwer… przy koncie serwera w Ustawienia → Konta i połączenia pokazuje rzeczywisty kontekst jego modelu i testuje wywołanie narzędzia. Kontekst mniejszy niż prompt Claude Code to zwykły powód, dla którego model lokalny wypisuje wywołanie narzędzia zamiast je wykonać.",
+  "tips.retargetRelease.title": "Po wydaniu przestaw resztę na następne",
+  "tips.retargetRelease.text": "Zmieniasz „Praca jest scalana do” z 1.1.0 na 1.2.0? Zapisz… pokazuje karty Todo i wolne sloty nadal na 1.1.0, które mogą przejść na 1.2.0, oraz to, co zostaje, z powodem. Zostaw zaznaczone „Przestaw też na nowy cel to, co może przejść”, aby je przestawić."
 }

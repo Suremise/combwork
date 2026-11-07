@@ -195,5 +195,6 @@
   "tasks.error.waitingNotYours": "Solo el propio agente de {card}, el usuario o el Asistente pueden marcarla como en espera o quitarlo.",
   "tasks.error.waitingTooLong": "El motivo de la espera es demasiado largo (como máximo {max, number} caracteres).",
   "tasks.history.notWaiting": "Ya no está en espera",
-  "tasks.history.waiting": "En espera: {reason}"
+  "tasks.history.waiting": "En espera: {reason}",
+  "tasks.error.targetDefaultMoved": "El trabajo se fusiona en volvió a cambiar mientras se movía {card}, así que la tarjeta se queda como está."
 }

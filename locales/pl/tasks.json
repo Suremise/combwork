@@ -195,5 +195,6 @@
   "tasks.error.waitingNotYours": "Tylko własny agent karty {card}, użytkownik lub Asystent może oznaczyć ją jako czekającą albo to wyłączyć.",
   "tasks.error.waitingTooLong": "Powód czekania jest za długi (najwyżej {max, number} znaków).",
   "tasks.history.notWaiting": "Już nie czeka",
-  "tasks.history.waiting": "Czeka: {reason}"
+  "tasks.history.waiting": "Czeka: {reason}",
+  "tasks.error.targetDefaultMoved": "„Praca jest scalana do” zmieniło się ponownie podczas przestawiania karty {card}, więc karta zostaje bez zmian."
 }

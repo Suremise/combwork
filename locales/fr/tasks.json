@@ -195,5 +195,6 @@
   "tasks.error.waitingNotYours": "Seul l’agent de {card}, l’utilisateur ou l’Assistant peut la marquer en attente ou lever cette attente.",
   "tasks.error.waitingTooLong": "La raison de l’attente est trop longue ({max, number} caractères au plus).",
   "tasks.history.notWaiting": "N’est plus en attente",
-  "tasks.history.waiting": "En attente : {reason}"
+  "tasks.history.waiting": "En attente : {reason}",
+  "tasks.error.targetDefaultMoved": "Le travail est fusionné dans a encore changé pendant le déplacement de la carte {card}, elle reste donc telle quelle."
 }

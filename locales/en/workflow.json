@@ -500,7 +500,7 @@
     "description": "HI-2680: a card, slot or lane the retarget leaves where it is, and why (a select: keep the keys). {what} is its name."
   },
   "workflow.form.retargetSkipped": {
-    "defaultMessage": "{what}: {why, select, targetChanged {the target changed meanwhile} refused {not allowed now} changed {it changed meanwhile} busy {in use} dirty {it has changes not committed} moved {it moved meanwhile} unmerged {it holds commits the old branch lacks} gone {its folder is gone} setAside {set aside: look at its folder} other {Combwork can’t tell}}",
+    "defaultMessage": "{what}: {why, select, targetChanged {the target changed meanwhile} refused {not allowed now} changed {it changed meanwhile} busy {in use} dirty {it has changes not committed} moved {it moved meanwhile} unmerged {it holds commits the old branch lacks} gone {its folder is gone} setAside {set aside until you remove it: look at its folder first} failed {it couldn’t be moved; Combwork looks at it again} other {Combwork can’t tell}}",
     "description": "HI-2680: a line of the notification after the retarget: a card or slot left where it was ({what}: its key or name), and why (a select: keep the keys)."
   },
   "workflow.form.retargetSlot": {

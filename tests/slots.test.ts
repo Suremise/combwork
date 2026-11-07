@@ -1584,6 +1584,74 @@ describe('moving a free slot onto another target (HI-2680)', { timeout: 90_000 }
     expect(w.store.slot(b.name)?.state).toBe('dirty')
   })
 
+  it('one set aside stays out of the pool, whatever its folder looks like later, until it is removed (HR1, round 1 finding 1)', async () => {
+    const w = world({ builders: 1 })
+    const { name, expect: was } = await free(w)
+    release(w, true)
+    // A clean folder at an unexpected head: set aside.
+    commit(was.folder, { 'stray.txt': 'stray\n' }, 'a stray commit')
+    expect(await w.pool.retarget(name, was, 'main', '1.2.0', ok)).toMatchObject({ kind: 'setAside', state: 'dirty', detail: 'other' })
+    expect(w.store.asideOf(name)).toMatchObject({ to: '1.2.0', seen: 'other' })
+    // Its folder put back clean at a merged commit: an ordinary look would call it ready. It stays set aside.
+    sh(was.folder, 'switch', '-q', '--detach', was.head)
+    await w.pool.refresh()
+    await w.pool.refresh()
+    expect(w.store.slot(name)).toMatchObject({ state: 'dirty', op: null })
+    // Never lent, by name or not, nor carried by an agent's session in its folder.
+    expect((await w.pool.lend({ agent: 'a2', card: 2 })).ok).toBe(false)
+    expect((await w.pool.lend({ agent: 'a2', card: 2, slot: name })).ok).toBe(false)
+    expect(await w.pool.carry('a2', { name, folder: was.folder, target: was.target })).toBeNull()
+    expect(w.store.slot(name)?.state).toBe('dirty')
+    // Removed deliberately: gone with it, and a new slot of that name starts with nothing set aside.
+    expect(await w.pool.remove(name)).toBeNull()
+    expect(w.store.asideOf(name)).toBeNull()
+    expect((await lent(w, { agent: 'a2', card: 2 })).slot.name).toBe(name)
+  })
+
+  it('a failure part way is never thrown: settled from the folder, or left recorded for the next look (HR1, round 1 finding 3)', async () => {
+    // Writing the switched marker fails after the checkout: settled from the folder (at the new head, not the old) → moved.
+    {
+      const w = world({ builders: 1 })
+      const { name, expect: was } = await free(w)
+      const head = release(w, true)
+      const real = w.store.retargetSwitched.bind(w.store)
+      w.store.retargetSwitched = async () => {
+        throw new Error('disk full')
+      }
+      expect(await w.pool.retarget(name, was, 'main', '1.2.0', ok)).toEqual({ kind: 'moved' })
+      w.store.retargetSwitched = real
+      expect(w.store.slot(name)).toMatchObject({ state: 'ready', target: '1.2.0', op: null })
+      expect(sh(was.folder, 'rev-parse', 'HEAD')).toBe(head)
+    }
+    // The final store write fails: said as failed, the slot held (never lent) with its intent, and the next look settles it.
+    {
+      const w = world({ builders: 1 })
+      const { name, expect: was } = await free(w)
+      release(w, true)
+      const real = w.store.endRetarget.bind(w.store)
+      w.store.endRetarget = async () => {
+        throw new Error('database is locked')
+      }
+      expect(await w.pool.retarget(name, was, 'main', '1.2.0', ok)).toMatchObject({ kind: 'kept', why: 'failed', detail: 'database is locked' })
+      w.store.endRetarget = real
+      expect(w.store.retargetOf(name)).toMatchObject({ stage: 'switched', to: '1.2.0' })
+      // Held by its operation till then (`startRetarget`'s reservation is what a lend's write checks).
+      expect(w.store.slot(name)?.op).toMatchObject({ kind: 'warm' })
+      await w.pool.refresh()
+      expect(w.store.slot(name)).toMatchObject({ state: 'ready', target: '1.2.0', op: null })
+      expect(w.store.retargetOf(name)).toBeNull()
+    }
+    // The recheck itself throws: nothing switched, back on its own target.
+    {
+      const w = world({ builders: 1 })
+      const { name, expect: was } = await free(w)
+      release(w, true)
+      expect(await w.pool.retarget(name, was, 'main', '1.2.0', () => { throw new Error('Control check failed') })).toMatchObject({ kind: 'kept', why: 'failed', detail: 'Control check failed' })
+      expect(w.store.slot(name)).toMatchObject({ state: 'ready', target: was.target, op: null })
+      expect(sh(was.folder, 'rev-parse', 'HEAD')).toBe(was.head)
+    }
+  })
+
   it('one that changed since the preview (its recorded target, or lent meanwhile) is left exactly as it is', async () => {
     const w = world({ builders: 1 })
     const { name, expect: was } = await free(w)

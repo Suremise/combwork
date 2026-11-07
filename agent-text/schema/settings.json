@@ -1984,6 +1984,7 @@
       "from": "plain",
       "to": "plain",
       "items": "plain",
+      "preview": "plain",
       "stay": "plural"
     }
   },

@@ -497,7 +497,7 @@ export class SlotStore {
         const held = req.card !== undefined ? (db.prepare('SELECT * FROM slot_leases WHERE card = ? AND ended_at IS NULL').get(req.card) as Row | undefined) : (db.prepare('SELECT * FROM slot_leases WHERE lane = ? AND ended_at IS NULL').get(req.lane!) as Row | undefined)
         if (held) return { ok: false as const, refusal: { why: 'inUse' as const, slot: held.slot as string, agent: held.agent as string, card: (held.card as number | null) ?? null, lane: (held.lane as string | null) ?? null } }
         const all = (db.prepare('SELECT * FROM slots WHERE project = ? ORDER BY name').all(this.project) as Row[]).map(slotOfRow)
-        const usable = (s: Slot): boolean => s.state === 'ready' && !s.warmError && !s.op && !s.job && !s.writer && !openLeaseIn(db, this.project, s.name)
+        const usable = (s: Slot): boolean => s.state === 'ready' && !s.warmError && !s.op && !s.job && !s.writer && !openLeaseIn(db, this.project, s.name) && !db.prepare('SELECT 1 FROM board_meta WHERE key = ?').get(asideKey(this.project, s.name))
         let slot: Slot | undefined
         let fresh = false
         // Names reserved by renames under way (#1441): never made by a lend, asked for by name or not.
@@ -520,6 +520,7 @@ export class SlotStore {
           if (all.length >= o.size) return { ok: false as const, refusal: { why: 'noSlot' as const, size: o.size } }
           name = req.slot ?? nextSlotName(new Set([...all.map((s) => s.name.toLowerCase()), ...reserved]), o.root)
           db.prepare("INSERT INTO slots (project, name, folder, state, port_base, target, created_at, used_at, op, op_kind, op_lease, op_pid, op_started) VALUES (?, ?, ?, 'creating', ?, ?, ?, ?, ?, 'warm', ?, ?, ?)").run(this.project, name, join(o.root, name), freePort(all), o.target, at, at, o.token, id, o.holder.pid, o.holder.started)
+          db.prepare('DELETE FROM board_meta WHERE key = ?').run(asideKey(this.project, name)) // a new row: no earlier slot's set-aside (HI-2680)
           fresh = true
         } else {
           name = slot.name
@@ -579,9 +580,13 @@ export class SlotStore {
     const had = this.slotIn(db, slot.name)
     if (deletingIn(db, this.project)) return null
     if (!had && (this.reservedIn(db).has(slot.name.toLowerCase()) || this.renamesIn(db).some((r) => samePlace(r.intent.to, slot.folder)))) return null
-    if (!had) db.prepare("INSERT INTO slots (project, name, folder, state, port_base, target, created_at, used_at) VALUES (?, ?, ?, 'lent', ?, ?, ?, ?)").run(this.project, slot.name, slot.folder, freePort(this.slotsIn(db)), slot.target, at, at)
-    else {
+    if (!had) {
+      db.prepare("INSERT INTO slots (project, name, folder, state, port_base, target, created_at, used_at) VALUES (?, ?, ?, 'lent', ?, ?, ?, ?)").run(this.project, slot.name, slot.folder, freePort(this.slotsIn(db)), slot.target, at, at)
+      db.prepare('DELETE FROM board_meta WHERE key = ?').run(asideKey(this.project, slot.name)) // a new row: no earlier slot's set-aside (HI-2680)
+    } else {
       if (!samePlace(had.folder, slot.folder)) return null
+      // Set aside by a retarget (HI-2680): never lent again until it is removed.
+      if (db.prepare('SELECT 1 FROM board_meta WHERE key = ?').get(asideKey(this.project, slot.name))) return null
       const took = db.prepare(`UPDATE slots SET state = 'lent', used_at = ? WHERE project = ? AND name = ? AND state <> 'removing' AND ${FREE}`).run(at, this.project, slot.name)
       if (Number(took.changes) !== 1) return null
     }
@@ -1005,11 +1010,26 @@ export class SlotStore {
    * HI-2680: a retarget ended by its operation, in one fenced write: `ready` on `target` (the new one, or back on the
    * recorded one), or set aside (`dirty`: never lent; `gone`); the operation and the intent cleared.
    */
-  async endRetarget(name: string, token: string, end: { state: 'ready'; target: string | null } | { state: 'dirty' | 'gone' }): Promise<void> {
+  async endRetarget(name: string, token: string, end: { state: 'ready'; target: string | null } | { state: 'dirty' | 'gone'; aside: SlotAside }): Promise<void> {
     await this.fenced(name, token, (db) => {
       if (end.state === 'ready') db.prepare('UPDATE slots SET target = ? WHERE project = ? AND name = ?').run(end.target, this.project, name)
+      // Set aside (HR1's HI-2680 round 1, finding 1): kept with why, so no later look makes it ready again; only its removal clears it.
+      else db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(asideKey(this.project, name), JSON.stringify(end.aside))
       this.setIn(db, name, end.state, {}, { op: null })
       db.prepare('DELETE FROM board_meta WHERE key = ?').run(retargetKey(this.project, name))
+    })
+  }
+
+  /** Why a slot was set aside by a retarget (HI-2680), while it is: never lent or made ready again until it is removed. */
+  asideOf(name: string): SlotAside | null {
+    return this.conn.read((db) => {
+      const v = (db.prepare('SELECT value FROM board_meta WHERE key = ?').get(asideKey(this.project, name)) as { value: string } | undefined)?.value
+      if (!v) return null
+      try {
+        return JSON.parse(v) as SlotAside
+      } catch {
+        return { to: '', seen: 'unreadable', at: '' }
+      }
     })
   }
 
@@ -1193,6 +1213,13 @@ export interface RetargetIntent {
   stage: 'reserved' | 'switched'
 }
 export const retargetKey = (project: string, slot: string): string => `slot_retarget:${project}:${slot}`
+/** A slot a retarget set aside (HI-2680): the target it was moving to, what its folder was found as, and when. */
+export interface SlotAside {
+  to: string
+  seen: string
+  at: string
+}
+export const asideKey = (project: string, slot: string): string => `slot_aside:${project}:${slot}`
 function retargetIntentOf(v: string): RetargetIntent | null {
   try {
     const i = JSON.parse(v) as Partial<RetargetIntent>
@@ -1203,7 +1230,7 @@ function retargetIntentOf(v: string): RetargetIntent | null {
 }
 
 /** What a slot's retarget ended as (HI-2680): moved to its new target, back as it was, or set aside (dirty or gone). */
-export type RetargetEnd = { kind: 'moved' } | { kind: 'kept'; why: 'changed' | 'busy' | 'dirty' | 'moved' | 'unmerged' | 'refused' | 'cantCheck'; detail?: string } | { kind: 'setAside'; state: 'dirty' | 'gone'; detail?: string }
+export type RetargetEnd = { kind: 'moved' } | { kind: 'kept'; why: 'changed' | 'busy' | 'dirty' | 'moved' | 'unmerged' | 'refused' | 'cantCheck' | 'failed'; detail?: string } | { kind: 'setAside'; state: 'dirty' | 'gone'; detail?: string }
 function recreateIntentOf(v: string): RecreateIntent | null {
   try {
     const i = JSON.parse(v) as Partial<RecreateIntent>
@@ -1528,6 +1555,8 @@ export class SlotPool {
     const seen = this.store.slot(name)
     if (this.closed || !seen || seen.op || seen.writer || this.store.openLease(name)) return
     if (seen.state === 'creating' || seen.state === 'removing') return
+    // Set aside by a retarget (HI-2680): stays as it is, whatever its folder now looks like, until it is removed.
+    if (this.store.asideOf(name)) return
     const token = newToken()
     let s: Slot = seen
     let to: SlotState = seen.state
@@ -1702,6 +1731,8 @@ export class SlotPool {
       if (!(await this.store.startRetarget(name, { folder: expect.folder, target: expect.target }, token, await this.deps.holder.self(), intent))) return { kind: 'kept', why: 'changed' }
       let why: Extract<RetargetEnd, { kind: 'kept' }>['why'] | null = null
       let detail: string | undefined
+      // A failure part way (git, the store, the caller's check; HR1's round 1, finding 3): settled from the folder as any exit.
+      const failed = (e: unknown): void => void ((why = 'failed'), (detail = e instanceof Error ? e.message : String(e)))
       await withRepoLocks([this.deps.project], async () => {
         const pre = await this.retargetable(expect.folder, expect.head, baseline)
         if (pre) return void ((why = pre.why), (detail = pre.detail))
@@ -1714,9 +1745,14 @@ export class SlotPool {
         const d = await G.dirty(expect.folder)
         if (isUnknown(head) || head !== toHead || isUnknown(d) || d.length) return
         await this.store.retargetSwitched(name, token)
-      }, { quiet: true, project: this.deps.project })
-      const end = await this.settleRetarget(name, token)
-      if (end.kind === 'moved' || end.kind === 'setAside') return end
+      }, { quiet: true, project: this.deps.project }).catch(failed)
+      // Its settle failing too: the intent and the operation stay recorded, so the next refresh, finding this operation
+      // over (its token no longer live), takes it over and settles it from the folder (`recover`); never lent meanwhile.
+      const end = await this.settleRetarget(name, token).catch((e: unknown): RetargetEnd => {
+        log.warn(`Slot ${userText(name)}'s retarget to ${userText(to)} couldn't be settled, left for the next look: ${userText(e instanceof Error ? e.message : String(e))}`)
+        return { kind: 'kept', why: 'failed', detail: e instanceof Error ? e.message : String(e) }
+      })
+      if (end.kind === 'moved' || end.kind === 'setAside' || (end.kind === 'kept' && end.why === 'failed')) return end
       return why ? { kind: 'kept', why, ...(detail ? { detail } : {}) } : end
     })
   }
@@ -1766,8 +1802,8 @@ export class SlotPool {
       return { kind: 'kept', why: 'changed' }
     }
     const state = seen === 'gone' ? 'gone' : 'dirty'
-    log.warn(`Slot ${userText(name)}'s retarget to ${userText(i.to)} ended ${seen}: set aside (${state})`)
-    await this.store.endRetarget(name, token, { state })
+    log.warn(`Slot ${userText(name)}'s retarget to ${userText(i.to)} ended ${seen}: set aside (${state}) until it is removed`)
+    await this.store.endRetarget(name, token, { state, aside: { to: i.to, seen, at: new Date(this.now()).toISOString() } })
     return { kind: 'setAside', state, detail: seen }
   }
 
@@ -2235,7 +2271,10 @@ export class SlotPool {
           const r = await git(this.deps.project, ['worktree', 'remove', slot.folder])
           if (!r.ok) return await keep({ why: 'gitRefused', detail: r.err.trim().split(/\r?\n/)[0] || sayStored(T.removeFailed) })
         } else await git(this.deps.project, ['worktree', 'prune'])
-        await this.store.fenced(name, token, (db) => db.prepare('DELETE FROM slots WHERE project = ? AND name = ?').run(this.store.project, name))
+        await this.store.fenced(name, token, (db) => {
+          db.prepare('DELETE FROM slots WHERE project = ? AND name = ?').run(this.store.project, name)
+          db.prepare('DELETE FROM board_meta WHERE key = ?').run(asideKey(this.store.project, name))
+        })
         log.info(`Removed slot ${userText(name)} (${userText(slot.folder)})`)
         return null
       } catch (e) {

@@ -195,5 +195,6 @@
   "tasks.error.waitingNotYours": "Nur der eigene Agent von {card}, der Benutzer oder der Assistent kann sie als wartend markieren oder das aufheben.",
   "tasks.error.waitingTooLong": "Der Grund für das Warten ist zu lang (höchstens {max, number} Zeichen).",
   "tasks.history.notWaiting": "Wartet nicht mehr",
-  "tasks.history.waiting": "Wartet: {reason}"
+  "tasks.history.waiting": "Wartet: {reason}",
+  "tasks.error.targetDefaultMoved": "„Arbeit wird gemergt in“ hat sich erneut geändert, während {card} umgestellt wurde, daher bleibt die Karte, wie sie ist."
 }

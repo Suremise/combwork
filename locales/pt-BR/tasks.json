@@ -195,5 +195,6 @@
   "tasks.error.waitingNotYours": "Só o próprio agente de {card}, o usuário ou o Assistente pode marcá-lo como aguardando ou encerrar isso.",
   "tasks.error.waitingTooLong": "O motivo da espera é longo demais (no máximo {max, number} caracteres).",
   "tasks.history.notWaiting": "Não está mais aguardando",
-  "tasks.history.waiting": "Aguardando: {reason}"
+  "tasks.history.waiting": "Aguardando: {reason}",
+  "tasks.error.targetDefaultMoved": "O trabalho é mesclado em mudou de novo enquanto {card} era movido, então ele fica como está."
 }

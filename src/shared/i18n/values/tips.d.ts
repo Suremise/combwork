@@ -434,6 +434,8 @@ interface CombworkMessageValues {
   'tips.resumeAfterUpdate.title': undefined
   'tips.resumeAll.text': undefined
   'tips.resumeAll.title': undefined
+  'tips.retargetRelease.text': undefined
+  'tips.retargetRelease.title': undefined
   'tips.retryWait.text': undefined
   'tips.retryWait.title': undefined
   'tips.reviewCopies.text': undefined

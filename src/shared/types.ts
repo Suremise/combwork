@@ -1640,7 +1640,7 @@ export interface RetargetResult {
   to: string
   moved: { cards: { number: number; key: string }[]; slots: string[] }
   /** A card's (`card`, `key`) or a slot's (`slot`), with why it didn't move. */
-  skipped: { card?: number; key?: string; slot?: string; why: 'targetChanged' | 'refused' | 'changed' | 'busy' | 'dirty' | 'moved' | 'unmerged' | 'cantCheck' | 'gone' | 'setAside'; detail?: string }[]
+  skipped: { card?: number; key?: string; slot?: string; why: 'targetChanged' | 'refused' | 'changed' | 'busy' | 'dirty' | 'moved' | 'unmerged' | 'cantCheck' | 'gone' | 'setAside' | 'failed'; detail?: string }[]
 }
 
 export interface KeptTargets {

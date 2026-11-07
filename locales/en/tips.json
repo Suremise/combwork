@@ -1731,6 +1731,14 @@
     "defaultMessage": "Resume all agents at once",
     "description": "A tip's title."
   },
+  "tips.retargetRelease.text": {
+    "defaultMessage": "Changing Work merges into from 1.1.0 to 1.2.0? Save… lists the Todo cards and free slots still on 1.1.0 that can follow 1.2.0, and what stays, with why. Leave Also retarget what can move ticked to move them.",
+    "description": "A tip (HI-2680). Work merges into, Save… and Also retarget what can move are names in Combwork's window: keep them as Combwork shows them. Keep 1.1.0 and 1.2.0 as they are."
+  },
+  "tips.retargetRelease.title": {
+    "defaultMessage": "When a release ships, move what’s left onto the next",
+    "description": "A tip's title (HI-2680): after a project's Work merges into moves on to the next release's branch."
+  },
   "tips.retryWait.text": {
     "defaultMessage": "When a Codex, Claude Code or Copilot agent's requests are refused, often by a rate limit, it waits and tries again while its screen says only Working. Combwork reads the wait from the agent's own records, and its status says so.",
     "description": "A tip (HI-1972, HI-1973). Codex, Claude Code and Copilot are product names; Working is what their screens show."

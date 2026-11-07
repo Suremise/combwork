@@ -394,7 +394,8 @@ export const API = {
     notAgents: agentMsg({ id: 'api.queue.notAgents', text: 'Project agents can\'t {what}: the merge queue\'s controls are the user\'s, and the Assistant\'s within Settings → Assistant → Control. Tell the user if it should be done.' }),
     projectRequired: agentMsg({ id: 'api.queue.projectRequired', text: 'project is required' }),
     targetArg: agentMsg({ id: 'api.queue.targetArg', text: 'target is a branch name' }),
-    retargetArgs: agentMsg({ id: 'api.queue.retargetArgs', text: 'from, to and items are required: the finished target, the new one, and the cards and slots to move (keys and names, as the target change listed them)' }),
+    retargetArgs: agentMsg({ id: 'api.queue.retargetArgs', text: "Give preview and items (the preview id and the cards and slots to move, as the target change's reply listed them), or from and to alone for a new preview (the finished target and the new one)" }),
+    retargetGone: agentMsg({ id: 'api.queue.retargetGone', text: "Preview {preview} isn't known any more (each is kept for a day, until Combwork restarts): ask for a new one with from and to, and show it to the user again" }),
     forwardArgs: agentMsg({ id: 'api.queue.forwardArgs', text: "from and to are required: the branch to bring in and the one to bring up to date, two of the project's targets" }),
     targetRequired: agentMsg({ id: 'api.queue.targetRequired', text: 'target is required: the branch the queue merges into{listed, select, yes { ({targets})} other {}}' })
   },

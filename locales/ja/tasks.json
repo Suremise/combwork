@@ -195,5 +195,6 @@
   "tasks.error.waitingNotYours": "{card} を待機中にしたり解除したりできるのは、そのカード自身のエージェント、ユーザー、アシスタントだけです。",
   "tasks.error.waitingTooLong": "待機の理由が長すぎます（最大 {max, number} 文字）。",
   "tasks.history.notWaiting": "待機を解除",
-  "tasks.history.waiting": "待機中：{reason}"
+  "tasks.history.waiting": "待機中：{reason}",
+  "tasks.error.targetDefaultMoved": "{card}を移している間に「マージ先」が再び変更されたため、そのままにします。"
 }

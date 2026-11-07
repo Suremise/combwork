@@ -426,7 +426,10 @@
     "text": "forward: the branch to bring in; target is the one brought up to date. Both the project's targets."
   },
   "tool.queue.arg.items": {
-    "text": "retarget: the card keys and slot names to move (from the target change reply); from is the finished target, target the new one."
+    "text": "retarget: the card keys and slot names to move, from the preview named."
+  },
+  "tool.queue.arg.preview": {
+    "text": "retarget: the preview id a target change's reply gave. Without it, from (the finished target) and target (the new one) give a new preview, moving nothing."
   },
   "tool.queue.arg.reason": {
     "text": "remove, retry: the user's reason, recorded with the override."
@@ -453,6 +456,10 @@
   "tool.queue.reply.retarget": {
     "text": "Moved to {to}: {moved}. Left where they were: {skipped}.",
     "note": "HI-2680: cw_queue retarget's reply. {moved} and {skipped} are lists (\"-\" for none)."
+  },
+  "tool.queue.reply.retargetPreview": {
+    "text": "Preview {preview}: can follow {to}: {move}. Stay: {stay}. To move them, ask the user, then retarget with preview and items.",
+    "note": "HI-2680: cw_queue retarget's reply without a preview. {move} and {stay} are lists (\"-\" for none)."
   },
   "tool.readAttachment.arg.name": {
     "text": "As cw_read_task lists it."

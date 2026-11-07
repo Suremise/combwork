@@ -331,6 +331,11 @@
       "folder": "plain"
     }
   },
+  "tasks.error.targetDefaultMoved": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
   "tasks.error.targetHasWork": {
     "placeholders": {
       "unknown": "select",
