@@ -38,6 +38,7 @@ export const SUITES = [
   { name: 'assistantcompact' },
   { name: 'assistantend' },
   { name: 'assistantimages' },
+  { name: 'assistantmemory' },
   { name: 'assistantmcp' },
   { name: 'assistantmode' },
   { name: 'assistantoverview' },

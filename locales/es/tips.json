@@ -55,6 +55,8 @@
   "tips.assistantLanes.title": "Una conversación nueva para cada carril",
   "tips.assistantMcp.textAdded": "El Asistente recibe un servidor MCP del espacio de trabajo solo cuando lo agregas para él, como para un proyecto: con + en Servidores MCP de su vista en la barra de actividad, o marcando Asistente en Agregar a… en la vista MCP. Un servidor con tus propias notas puede llegar al Asistente y a ningún proyecto.",
   "tips.assistantMcp.title": "Servidores MCP solo para el Asistente",
+  "tips.assistantMemory.text": "Además de su diario, el agente de código del Asistente guarda notas propias sobre cómo trabajar contigo. Memoria, en la vista del Asistente de la barra de actividad, las lista, primero MEMORY.md: abre una para leerla o corregirla.",
+  "tips.assistantMemory.title": "Mira lo que recuerda el agente de código del Asistente",
   "tips.assistantMessages.text": "El Asistente no puede dar una tarea nueva a un agente que espera o trabaja, pero puede dejarle un mensaje, como tu respuesta: se entrega en cuanto el agente puede recibirlo. Hasta entonces, su panel lo muestra como sin leer (✉); haz clic ahí para cancelarlo.",
   "tips.assistantMessages.title": "El Asistente puede llegar a un agente ocupado",
   "tips.assistantNoticeOpens.text": "Una notificación del Asistente o de un agente sobre un agente o una tarjeta lo abre al hacer clic: el panel del agente o la tarjeta. Las anteriores están en el panel Notificaciones y también se abren desde allí.",

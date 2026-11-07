@@ -4,6 +4,7 @@
 
 ### Added
 
+- **The Assistant's own memory, in the Assistant view** (HI-2666). Besides its journal, the Assistant's coding agent saves notes about working with you, kept for the workspace's folder: until now Combwork showed them nowhere. **Memory** in the Assistant view on the activity bar lists them, MEMORY.md first, in the same editor as a project's Memory tab, with the folder's path, **Copy Path** and **Open Folder**. It follows the coding agent the Assistant runs on now; for one other than Claude Code, it says that one's memory isn't shown here.
 - **Resume or stop just one agent from the project header** (HI-2665). Resume (n) and Stop (n) get a narrow ▾ on their right listing those agents, each with its state and role: choose one to resume or stop it alone, as its pane would (asking first when its pane does). An agent whose sign-in was refused says Resume tells it to carry on, and one that can't resume where it ran just now is greyed out with why. Agents ▾ gets Start New for One Agent ▸ and Archive and Start New for One Agent ▸, the narrow header's ⋯ gets Resume One Agent ▸ and Stop One Agent ▸, and so does a project's right-click menu in the sidebar, under Resume All and Stop All.
 
 ### Fixed

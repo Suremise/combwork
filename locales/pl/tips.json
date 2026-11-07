@@ -55,6 +55,8 @@
   "tips.assistantLanes.title": "Nowa rozmowa dla każdego toru",
   "tips.assistantMcp.textAdded": "Asystent dostaje serwer MCP obszaru roboczego dopiero wtedy, gdy dodasz go dla niego, tak jak dla projektu: przyciskiem + w sekcji Serwery MCP jego widoku na pasku aktywności albo zaznaczając Asystent w Dodaj do… w widoku MCP. Serwer z Twoimi notatkami może trafić do Asystenta i do żadnego projektu.",
   "tips.assistantMcp.title": "Serwery MCP tylko dla Asystenta",
+  "tips.assistantMemory.text": "Oprócz dziennika agent kodujący Asystenta zapisuje własne notatki o pracy z tobą. Pamięć w widoku Asystenta na pasku aktywności wymienia je, najpierw MEMORY.md: otwórz jedną, aby ją przeczytać lub poprawić.",
+  "tips.assistantMemory.title": "Zobacz, co pamięta agent kodujący Asystenta",
   "tips.assistantMessages.text": "Asystent nie może dać nowego zadania agentowi, który czeka lub pracuje, ale może zostawić mu wiadomość, na przykład Twoją odpowiedź: trafi do agenta, gdy tylko będzie mógł ją przyjąć. Do tego czasu panel agenta pokazuje ją jako nieprzeczytaną (✉); kliknij to, żeby ją anulować.",
   "tips.assistantMessages.title": "Asystent dotrze do zajętego agenta",
   "tips.assistantNoticeOpens.text": "Powiadomienie od Asystenta lub agenta dotyczące jednego agenta albo jednej karty otwiera po kliknięciu to, czego dotyczy: panel agenta albo kartę. Starsze są w panelu Powiadomienia i tam też się otwierają.",

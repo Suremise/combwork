@@ -711,6 +711,12 @@ export interface ProviderAdapter {
   // Project files
   /** `homes`: the connections' homes on in the project's workspace (HI-1755), whose user memory replaces the CLI's own home's. */
   memorySources(projectPath: string, homes?: readonly { id: string; name: string; home: string }[]): Promise<MemorySource[]>
+  /**
+   * The memory the CLI saves by itself for a folder (HI-2666: Claude Code's auto memory), where it keeps it: the folder
+   * (where it would write it, when none is there yet) and its Markdown files, its index first. Absent: Combwork doesn't
+   * show what this CLI saves, if anything.
+   */
+  autoMemory?(folder: string): Promise<{ folder: string; files: MemorySource[] }>
   /** Files in the CLI's own folder Combwork may show and edit (instructions, memory); false for anything else. */
   /** `homes`: the connections' homes (HI-1755) to allow in place of the CLI's own home. */
   fileAllowed(path: string, write: boolean, homes?: readonly string[]): boolean

@@ -311,7 +311,7 @@ interface State {
   /** What the Assistant view's main area shows: its conversations or the selected mode. */
   /** 'images' is its Attachments (#387; the id from before, kept). */
   /** The Assistant view's main area: its conversations, a mode, its attachments, its journal or the journal's weekly digests (#1033). */
-  assistantSection: 'conversations' | 'modes' | 'images' | 'journal' | 'digests'
+  assistantSection: 'conversations' | 'modes' | 'images' | 'journal' | 'digests' | 'memory'
   /** Bumped when this window's workspace's Assistant journal changes (#1033): its browser reads it again. */
   journalVersion: number
   /** The Combwork Assistant's panel is shown (per workspace, saved in the pane sizes as assistant-open:<path>). */
@@ -1353,7 +1353,7 @@ export function leaveSettingsForSidePanel(): void {
 let navigations = 0
 
 /** Shows the Combwork Assistant view (activity bar) on its conversations, its modes, its attachments ('images') or its journal. */
-export function showAssistantView(section: 'conversations' | 'modes' | 'images' | 'journal' | 'digests'): void {
+export function showAssistantView(section: 'conversations' | 'modes' | 'images' | 'journal' | 'digests' | 'memory'): void {
   set({ assistantSection: section })
   showView('assistant')
 }
