@@ -33,6 +33,7 @@ interface CombworkMessageValues {
   'workflow.form.allOff': undefined
   'workflow.form.allOffSummary': undefined
   'workflow.form.appliesNow': undefined
+  'workflow.form.appliesNowBranches': undefined
   'workflow.form.cantSave': undefined
   'workflow.form.carried': { agents: string | number }
   'workflow.form.changeLine': { option: string | number; from: string | number; to: string | number }
@@ -104,6 +105,7 @@ interface CombworkMessageValues {
   'workflow.form.off': undefined
   'workflow.form.on': undefined
   'workflow.form.openAdvanced': undefined
+  'workflow.form.otherTargets': undefined
   'workflow.form.overMax': { count: number; max: number }
   'workflow.form.paste': undefined
   'workflow.form.pasteApply': undefined
@@ -188,6 +190,8 @@ interface CombworkMessageValues {
   'workflow.option.noSelfReview.title': undefined
   'workflow.option.okBefore.desc': undefined
   'workflow.option.okBefore.title': undefined
+  'workflow.option.otherTargets.desc': undefined
+  'workflow.option.otherTargets.title': undefined
   'workflow.option.preChecks.desc': undefined
   'workflow.option.preChecks.title': undefined
   'workflow.option.pushTarget.desc': undefined

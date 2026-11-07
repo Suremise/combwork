@@ -334,6 +334,8 @@ interface CombworkMessageValues {
   'tips.mergeSlot.title': undefined
   'tips.mergeStrict.text': undefined
   'tips.mergeStrict.title': undefined
+  'tips.mergesInto.text': undefined
+  'tips.mergesInto.title': undefined
   'tips.messageReceipts.text': { minutes: number }
   'tips.messageReceipts.title': undefined
   'tips.modelFallbacks.text': undefined

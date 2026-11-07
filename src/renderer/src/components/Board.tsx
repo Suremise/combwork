@@ -19,6 +19,7 @@ import { CardWork, WorkBadges } from './CardWork'
 import { ForYouChip, ForYouSection } from './ForYou'
 import { KindField, KindMark, KindProposal } from './CardKind'
 import { ReviewSkipField, ReviewSkipMark, ReviewSkipProposal, useProjectReviews } from './CardReviewSkip'
+import { TargetField, TargetMark, useProjectTargets } from './CardTarget'
 import { askedByNow, useForYou } from '../forYou'
 import { useTeamPause, workspacePaused } from '../teamPause'
 import type { ForYouItem } from '@shared/workflow/workView'
@@ -777,11 +778,12 @@ const CardTile = memo(function CardTile({
           </Tooltip>
         )}
         <ReviewLine c={c} reviewer={reviewer} projectPath={projectPath} />
-        {(!!forYou?.length || work?.kind === 'no-code' || work?.kindProposed === 'no-code' || !!work?.reviewSkip || (work?.reviewSkipProposed ?? null) !== null) && (
+        {(!!forYou?.length || work?.kind === 'no-code' || work?.kindProposed === 'no-code' || !!work?.reviewSkip || (work?.reviewSkipProposed ?? null) !== null || !!work?.target) && (
           <div className="task-for-you-row">
             <ForYouChip items={forYou} />
             <KindMark b={work} />
             <ReviewSkipMark b={work} />
+            <TargetMark b={work} />
           </div>
         )}
         <WorkBadges b={work} card={c} />
@@ -1855,6 +1857,8 @@ export function TaskDialog() {
   const badge = useWorkBadges().get(card?.number ?? -1)
   // A new card's kind (#1277): no code, or code (the default).
   const [noCode, setNoCode] = useState(false)
+  // A new card's Merges into (HI-2556): '' for the project's own.
+  const [newTarget, setNewTarget] = useState('')
   // A new card's Review: Skip (#1625), and the user's optional note on why.
   const [skipReview, setSkipReview] = useState(false)
   const [skipNote, setSkipNote] = useState('')
@@ -1970,6 +1974,7 @@ export function TaskDialog() {
 
   // Whether the chosen project's rules review (#1625): Skip review is offered, and sent, only where they do.
   const projectReviews = useProjectReviews(projects.find((p) => p.name === project)?.path ?? null)
+  const projectTargets = useProjectTargets(projects.find((p) => p.name === project)?.path ?? null)
   if (open === null || (!isNew && (!card || !ready))) return null
   const close = (): void => set({ taskOpen: null })
   const proj = projects.find((p) => p.name === project) ?? null
@@ -2020,7 +2025,7 @@ export function TaskDialog() {
   const persist = async (hold = false): Promise<void> => {
     if (!title.trim()) throw new Error(tr(NEEDS_TITLE))
     if (isNew) {
-      const c = await call('tasks:create', { title, description, project, agent: agent || null, column, labels: labelList, ...(splitDocRefs(context).length ? { context: splitDocRefs(context) } : {}), ...(noCode ? { kind: 'no-code' as const } : {}), ...(skipReview && projectReviews === true ? { skipReview: skipNote.trim() } : {}) }, await attach.payload({ description }))
+      const c = await call('tasks:create', { title, description, project, agent: agent || null, column, labels: labelList, ...(splitDocRefs(context).length ? { context: splitDocRefs(context) } : {}), ...(noCode ? { kind: 'no-code' as const } : {}), ...(skipReview && projectReviews === true ? { skipReview: skipNote.trim() } : {}), ...(newTarget && projectTargets?.others.includes(newTarget) ? { target: newTarget } : {}) }, await attach.payload({ description }))
       attach.clear('description')
       const extra: TaskPatch = {}
       if (blocked.trim()) extra.blocked = blocked
@@ -2307,6 +2312,7 @@ export function TaskDialog() {
           </select>
           <KindField card={card} b={badge} noCode={noCode} setNoCode={setNoCode} readOnly={ro} />
           <ReviewSkipField card={card} b={badge} reviews={projectReviews} skip={skipReview} setSkip={setSkipReview} note={skipNote} setNote={setSkipNote} readOnly={ro} />
+          <TargetField card={card} b={badge} targets={projectTargets} value={newTarget} setValue={setNewTarget} readOnly={ro} />
           <label>{tr(msg({ id: 'board.dialog.labels', defaultMessage: 'Labels', description: "A field label in the card dialog: the card's labels." }))}</label>
           <input className="input" placeholder={tr(msg({ id: 'board.dialog.labelsPlaceholder', defaultMessage: 'Comma separated, e.g. bug, ui', description: "Placeholder of the card dialog's labels box: labels separated by commas (bug and ui are examples)." }))} value={labels} readOnly={ro} onChange={(e) => setLabels(e.target.value)} />
           <label>{tr(BLOCKED_FIELD)}</label>

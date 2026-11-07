@@ -356,6 +356,8 @@ export interface TaskView extends Omit<TaskCard, 'agent' | 'decisions' | 'held'>
   decisions?: Omit<TaskDecision, 'id'>[]
   agent: { id: string; name: string; status: string; backgroundTasks: number } | null
   stalled: string | null
+  /** Its own Merges into (HI-2556), when it has one: the branch its work merges into instead of the project's. */
+  target?: string
   /** With a review going on (TaskCard.review): why it has stalled (its reviewer removed or not running), if it has. */
   reviewStalled?: string
   /**

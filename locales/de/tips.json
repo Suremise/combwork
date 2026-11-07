@@ -332,6 +332,8 @@
   "tips.mergeSlot.title": "Agenten mergen der Reihe nach",
   "tips.mergeStrict.text": "Wenn Combwork mergt, kann Versionsverwaltung → Workflow verlangen, dass die Arbeit vor dem Merge auf dem Stand ihres Ziels ist: Die Merge-Warteschlange aktualisiert eine Karte in ihrem eigenen Ordner, nie auf dem Branch des Bearbeiters, und das Review zählt weiter, wenn es dieselbe Änderung ist.",
   "tips.mergeStrict.title": "Arbeit vor dem Merge auf dem neuesten Stand",
+  "tips.mergesInto.title": "An der nächsten Version neben dieser arbeiten",
+  "tips.mergesInto.text": "Trag einen Branch wie 1.2.0 unter Versionsverwaltung → Workflow → „Weitere Branches, in die Arbeit gemergt werden kann“ ein und wähl ihn dann in „Lane starten…“ als „Wird gemergt in“ einer Lane oder im Dialog einer Karte. Ihre Karten werden von ihm aus erstellt und über seine eigene Warteschlange in ihn gemergt.",
   "tips.messageReceipts.text": "Jede Nachricht, die der Assistent einem Agenten hinterlässt, hat eine ID und bleibt erhalten, auch über einen Neustart hinweg: Sie gilt als empfangen, sobald der Agent seinen Posteingang liest, und als bestätigt, sobald er danach gehandelt hat. Eine, die nach {minutes, plural, one {# Minute} other {# Minuten}} nicht bestätigt ist, erscheint in seinem Bereich als überfällig (✉).",
   "tips.messageReceipts.title": "Sehen, wo eine Nachricht steht",
   "tips.modelFallbacks.text": "Combwork fragt Claude Code und Codex, welche Modelle sie haben und welche Aufwandsstufen jedes kennt. Kann eine CLI das nicht sagen, kannst du die Listen für Modelle, Aufwand und Preise auf ihrer Einstellungsseite selbst bearbeiten.",

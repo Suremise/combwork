@@ -165,18 +165,18 @@ describe('Start Lane… with the reviewer pool (#1443)', () => {
   }
 
   it("offers the pool only where the project's rules have one, with the agents whose role reviews", async () => {
-    expect(await laneStartInfo(ws, 'D:\\ws\\alpha')).toEqual({ pool: null })
+    expect(await laneStartInfo(ws, 'D:\\ws\\alpha')).toEqual({ pool: null, targets: null })
     state.enforced = true
     state.options = { ...allOff('git'), review: 'agent', noSelfReview: true }
-    expect(await laneStartInfo(ws, 'D:\\ws\\alpha')).toEqual({ pool: null })
+    expect(await laneStartInfo(ws, 'D:\\ws\\alpha')).toEqual({ pool: null, targets: null })
     pool()
-    expect(await laneStartInfo(ws, 'D:\\ws\\alpha')).toEqual({ pool: [{ id: 'r1', name: 'R1' }, { id: 'r2', name: 'R2' }] })
+    expect(await laneStartInfo(ws, 'D:\\ws\\alpha')).toEqual({ pool: [{ id: 'r1', name: 'R1' }, { id: 'r2', name: 'R2' }], targets: null })
   })
 
   it('never offers a generalist in the pool, whatever its name (HI-686)', async () => {
     pool()
     const withGeneralist = { ...(ws as object), projectConfig: async () => ({ version: 2, agents: [{ id: 'b1', name: 'B1', workflowRole: 'builder' }, { id: 'r1', name: 'R1' }, { id: 'g1', name: 'GR1', workflowRole: 'generalist' }] }) } as never
-    expect(await laneStartInfo(withGeneralist, 'D:\\ws\\alpha')).toEqual({ pool: [{ id: 'r1', name: 'R1' }] })
+    expect(await laneStartInfo(withGeneralist, 'D:\\ws\\alpha')).toEqual({ pool: [{ id: 'r1', name: 'R1' }], targets: null })
   })
 
   it("records the lane with the pool and starts only its builder, whose brief names the pool's reviewers", async () => {

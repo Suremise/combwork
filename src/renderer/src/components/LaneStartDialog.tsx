@@ -48,6 +48,8 @@ const M = {
   intro: msg({ id: 'board.laneStart.intro', defaultMessage: 'The builder works through the cards in this order, one at a time, and the reviewer reviews each. Both start in a new conversation with a brief: the cards, where the builder works, what the project’s rules ask, and your note.', description: 'At the top of the Start Lane dialog. Glossary: lane, rule.' }),
   project: msg({ id: 'board.laneStart.project', defaultMessage: 'Project', description: "A field label in the Start Lane dialog: the project whose cards the lane works through." }),
   builder: msg({ id: 'board.laneStart.builder', defaultMessage: 'Builder', description: 'A field label in the Start Lane dialog: the agent that builds the cards. Glossary: builder.' }),
+  target: msg({ id: 'board.laneStart.target', defaultMessage: 'Merges into', description: 'HI-2556: a field label in the Start Lane dialog: the branch the lane’s cards are made from and merge into (Darren’s name for it).' }),
+  targetDefault: msg({ id: 'board.laneStart.targetDefault', defaultMessage: '{branch} (the project’s)', description: 'HI-2556: the first choice of the Start Lane dialog’s Merges into: the project’s Work merges into, {branch} its name.' }),
   reviewer: msg({ id: 'board.laneStart.reviewer', defaultMessage: 'Reviewer', description: 'A field label in the Start Lane dialog: the agent that reviews each card. Glossary: reviewer.' }),
   pool: msg({ id: 'board.laneStart.pool', defaultMessage: 'The reviewer pool ({agents})', description: 'A choice of the Start Lane dialog’s reviewer (#1443): the lane is reviewed by the project’s pool of reviewer agents ({agents}: their names, joined), each card going to the next free one. Glossary: reviewer pool.' }),
   poolNobody: msg({ id: 'board.laneStart.poolNobody', defaultMessage: 'nobody yet', description: 'In the Start Lane dialog’s reviewer choice “The reviewer pool (…)”, in place of the names: no agent of the project reviews yet.' }),
@@ -95,12 +97,15 @@ export function LaneStartDialog() {
   const [note, setNote] = useState('')
   const [waiting, setWaiting] = useState(false)
   const [applyNow, setApplyNow] = useState(false)
+  // Its Merges into (HI-2556): '' for the project's own.
+  const [target, setTarget] = useState('')
   const lanes = useStore((s) => s.lanes)
   // What the project's rules offer (#1443): the reviewer pool, read for the project chosen.
   const [info, setInfo] = useState<{ path: string; info: LaneStartInfo } | null>(null)
   const action = useBusy()
   const project: ProjectInfo | null = projects.find((p) => p.path === projectPath) ?? null
   const pool = info && info.path === projectPath ? info.info.pool : null
+  const targets = info && info.path === projectPath ? info.info.targets : null
 
   // Opened: its project and cards, its first builder and first reviewer (#1430).
   useEffect(() => {
@@ -129,10 +134,12 @@ export function LaneStartDialog() {
       .then((got) => {
         if (gone) return
         setInfo({ path: projectPath, info: got })
+        // A branch only another project lists is never kept (HI-2556).
+        setTarget((t) => (got.targets?.others.includes(t) ? t : ''))
         // The reviewer the builder starts with, now that the pool is known (opened, another project or builder chosen).
         setReviewer(reviewerFor(project, builder, !!got.pool))
       })
-      .catch(() => !gone && setInfo({ path: projectPath, info: { pool: null } }))
+      .catch(() => !gone && setInfo({ path: projectPath, info: { pool: null, targets: null } }))
     return () => {
       gone = true
     }
@@ -157,7 +164,7 @@ export function LaneStartDialog() {
   const go = async (): Promise<void> => {
     // Only for the request still open: a dialog closed or opened again since starts nothing.
     if (!project || !ready || !req || get().laneStartFor !== req) return
-    const out = await action.run('start', () => call('lanes:start', project.path, { builder, reviewer: pooled || !reviewer ? null : reviewer, ...(pooled ? { pool: true } : {}), cards, note, name, ...(applyNow && canApplyNow ? { applyNow: true } : {}) }))
+    const out = await action.run('start', () => call('lanes:start', project.path, { builder, reviewer: pooled || !reviewer ? null : reviewer, ...(pooled ? { pool: true } : {}), cards, note, name, ...(applyNow && canApplyNow ? { applyNow: true } : {}), ...(target && targets && !running ? { target } : {}) }))
     if (!out) return setWaiting(false)
     const r = out.value
     const pair = r.lane.reviewer ? `${r.lane.builder.name} / ${r.lane.reviewer.name}` : r.lane.pool && pool ? `${r.lane.builder.name} / ${tr(M.pool, { agents: poolNames(builder) })}` : r.lane.builder.name
@@ -267,6 +274,20 @@ export function LaneStartDialog() {
                 {pool && <option value={POOL}>{tr(M.pool, { agents: poolNames(builder) })}</option>}
                 {reviewers(project, builder).map(agentChoice)}
               </select>
+              {/* HI-2556: where its cards merge, when the project lists other branches; a running lane keeps its own. */}
+              {targets && !running && (
+                <>
+                  <label htmlFor="lane-start-target">{tr(M.target)}</label>
+                  <select id="lane-start-target" className="select" value={target} disabled={waiting} onChange={(e) => setTarget(e.target.value)} data-lane-target>
+                    <option value="">{tr(M.targetDefault, { branch: targets.default })}</option>
+                    {targets.others.map((b) => (
+                      <option key={b} value={b}>
+                        {b}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              )}
             </>
           )}
           <label>{tr(M.cards)}</label>

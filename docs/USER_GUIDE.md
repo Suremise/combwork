@@ -1122,6 +1122,15 @@ Combwork 1.0 keeps the board in a new format. The first time it opens a workspac
 - **How Combwork merges, asked once.** Combwork doesn't decide for you how an upgraded Git project's cards are merged. The first time one of its cards reaches the merge queue, the queue waits and asks under **For you** on that card: the **Merge style** (a merge commit, as until now, Squash, or Rebase) and the **Commit message** (the branch's own, chosen to start with, or Combwork's, as until now). **Save and Carry On Merging** saves both as the project's options, and the queue merges the card that way. Changing either in **Version Control → Workflow** answers it too.
 - **Choosing a preset afterwards.** Once the upgrade is done, a banner names the projects that kept working as before and offers the presets: **Choose…** opens the first one's **Version Control** tab at **Workflow**, **Not Now** dismisses it. Either way it isn't shown again in that workspace. A workspace made with 1.0 never shows it.
 
+### Merging into another branch <a id="merges-into"></a>
+
+A Git project's work goes to its **Work merges into** branch (Version Control → Workflow → Merging). To work on a next release (`1.2.0`) beside the one you're finishing (`1.1.0`), list the other branch under **Other branches work can merge into**, then point a lane or a card at it with its **Merges into**:
+
+- **A lane:** **Start Lane…** has **Merges into** when the project lists another branch: the project's branch, or one listed. The lane's cards are made from that branch and merge into it, through that branch's own merge queue with the same merge checks. Its header shows *into 1.2.0*. A lane keeps its branch until it ends; for another branch, start another lane. A lane is one branch: a card that merges into another can't join it.
+- **A card:** the card dialog's **Merges into**, while the card is in Todo and its branch has no work of its own (it was never started, or was put back with nothing on its branch). Once it has work, its branch was made from its target, so it stays: make a new card on the other branch and copy the change. In a lane, a card merges where its lane does. Its tile shows *Into 1.2.0*.
+- **Only listed branches** can be picked, so a typo makes no stray branch. The list isn't a rule: changing it applies at once, and nothing that already chose a branch moves.
+- **The Assistant** sets them too (a lane's `target` with `cw_lane`, a card's with `cw_create_task` and `cw_update_task`). Agents can't: where work merges is yours or the Assistant's.
+
 ### Workflow options <a id="workflow-options"></a>
 
 A project's workflow is how its cards move from Todo to Done: who reviews the work, which checks pass first, who merges it and where cards are built. Set it in the project's **Version Control** tab, in its first section, **Workflow** (until 1.0 it was in Project Settings, which now has an **Open Version Control** button there). Agents and the Assistant still read and change each option as a setting (`project.workflow.<option>`).

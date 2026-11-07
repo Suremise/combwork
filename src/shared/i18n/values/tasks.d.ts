@@ -79,6 +79,10 @@ interface CombworkMessageValues {
   'tasks.error.reviewTaken': { agent: string | number; card: string | number; since: string | number }
   'tasks.error.setAsideGone': undefined
   'tasks.error.staysInProject': { project: string | number }
+  'tasks.error.targetHasWork': { unknown: string; card: string | number; target: string | number }
+  'tasks.error.targetLane': { card: string | number; builder: string | number; target: string | number }
+  'tasks.error.targetNotAgents': undefined
+  'tasks.error.targetNotListed': { hasTargets: string; target: string | number; default: string | number; hasOthers: string; others: string | number }
   'tasks.error.tooLong': { what: string; max: number }
   'tasks.error.tooManyContext': { max: string | number }
   'tasks.error.tooManyDecisions': { max: string | number }
@@ -162,6 +166,7 @@ interface CombworkMessageValues {
   'tasks.history.takenFromAgent': undefined
   'tasks.history.takenFromOf': { agent: string | number; project: string | number }
   'tasks.history.takenFromOfWorkspace': { agent: string | number }
+  'tasks.history.target': { own: string; target: string | number }
   'tasks.history.toProject': { project: string | number }
   'tasks.history.toWorkspace': undefined
   'tasks.history.unarchived': undefined

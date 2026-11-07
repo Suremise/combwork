@@ -6,7 +6,7 @@
 
 import { createLogger, userText } from '../logger'
 import { compile } from '../../shared/workflow/compile'
-import { allOff, contradictions, CONTRADICTIONS, NAME_OPTIONS, ownsTarget, PREFERENCE_OPTIONS, takesOption, type Contradiction, type WorkflowOptions } from '../../shared/workflow/options'
+import { allOff, BRANCH_OPTIONS, contradictions, CONTRADICTIONS, NAME_OPTIONS, ownsTarget, PREFERENCE_OPTIONS, takesOption, type Contradiction, type WorkflowOptions } from '../../shared/workflow/options'
 import { PREFERENCE_DEFAULTS } from '../../shared/workflow/preferences'
 import { detect } from '../platform/registry'
 import { stageNameProblems, stageNameProblemText, type StageNameProblem } from '../../shared/workflow/stages'
@@ -44,7 +44,7 @@ const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v =
 const fits = (key: keyof WorkflowOptions, v: unknown): boolean => takesOption(key, v)
 
 /** Every option a level may set: the platform's (all-off's keys), and the names (N5) and preferences (HI-1766), which all-off leaves unset. */
-const optionKeys = (base: WorkflowOptions): string[] => [...new Set([...Object.keys(base).filter((k) => k !== 'platform'), ...NAME_OPTIONS, ...PREFERENCE_OPTIONS])]
+const optionKeys = (base: WorkflowOptions): string[] => [...new Set([...Object.keys(base).filter((k) => k !== 'platform'), ...NAME_OPTIONS, ...BRANCH_OPTIONS, ...PREFERENCE_OPTIONS])]
 
 /** The options a level sets for a platform, or why they can't be read. */
 function levelOf(raw: unknown, platform: PlatformId, known: Set<string>): { set: Partial<WorkflowOptions> } | { bad: string } {

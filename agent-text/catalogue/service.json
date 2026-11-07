@@ -679,6 +679,31 @@
     "note": "An error changing a workspace's lanes (card loops) while no workspace is open in the window.",
     "audience": "both"
   },
+  "service.lanes.targetBuilder": {
+    "text": "A lane’s Merges into is set by the user or the Assistant, not its builder.",
+    "note": "HI-2556: an error, a lane’s own builder agent named the branch its lane merges into; only the user or the Combwork Assistant (or a script) sets it.",
+    "audience": "both"
+  },
+  "service.lanes.targetCard": {
+    "text": "{card} merges into {cardTarget}, and this lane into {target}: a lane’s cards merge where it does. Leave it out, or start it in a lane of its own.",
+    "note": "HI-2556: an error putting a card whose own Merges into is another branch than the lane’s into that lane. {card} is the card’s key (HI-12); {cardTarget} and {target} are branch names.",
+    "audience": "both"
+  },
+  "service.lanes.targetFixed": {
+    "text": "{builder}’s lane merges into {target} until it ends: start a new lane for another branch.",
+    "note": "HI-2556: an error changing a running lane’s Merges into (fixed for its life). {builder} is the lane’s builder agent, {target} its branch.",
+    "audience": "both"
+  },
+  "service.lanes.targetNotListed": {
+    "text": "{hasTargets, select, yes {{target} isn’t a branch work can merge into here: name {default}{hasOthers, select, yes { or one of {others}} other {}}, or add it under Other branches work can merge into (Version Control → Workflow).} other {This project merges work into no branch Combwork can pick: a lane’s Merges into is for Git projects.}}",
+    "note": "HI-2556: an error starting a lane (a card loop) whose Merges into is a branch the project doesn’t list. {target} is the branch named, {default} the project’s Work merges into, {others} the others listed (a list). Other branches work can merge into and Version Control → Workflow are names in the window: as translated there. Keep the select keys.",
+    "audience": "both"
+  },
+  "service.lanes.targetRulesOff": {
+    "text": "A lane merges into another branch only while workflow rules are enforced (Settings → Advanced).",
+    "note": "HI-2556: an error starting a lane with a Merges into other than the project’s while the switch “Workflow rules are enforced” (Settings → Advanced) is off.",
+    "audience": "both"
+  },
   "service.lanes.teamPaused": {
     "text": "The team is paused (before an update): resume the team first, then start the lane.",
     "note": "An error starting a lane (a card loop) while the user or the Combwork Assistant has paused the whole team before an update (HI-2081): nothing of a lane starts until the team resumes (Resume the Team, in the Progress panel's Lanes).",

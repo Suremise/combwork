@@ -74,6 +74,9 @@
       "project": "plain"
     }
   },
+  "tool.arg.target": {
+    "placeholders": {}
+  },
   "tool.arg.workflowRole": {
     "placeholders": {}
   },

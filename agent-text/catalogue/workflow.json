@@ -387,6 +387,16 @@
     "note": "A workflow option (glossary 2.6, G10).",
     "audience": "both"
   },
+  "workflow.option.otherTargets.desc": {
+    "text": "Branches a lane or a card can merge into instead (its Merges into), each through its own merge queue with the same merge checks, separated by commas.",
+    "note": "What the workflow option “Other branches work can merge into” does (HI-2556). Merges into is the lane’s and card’s field: as translated there.",
+    "audience": "both"
+  },
+  "workflow.option.otherTargets.title": {
+    "text": "Other branches work can merge into",
+    "note": "A workflow option (HI-2556, G7b): branches besides “Work merges into” that a lane or a card can be set to merge into (its “Merges into”). Darren’s name for it.",
+    "audience": "both"
+  },
   "workflow.option.preChecks.desc": {
     "text": "A card goes to review only once each of these named commands has passed on its work.",
     "note": "What the workflow option “Checks pass before review” does.",

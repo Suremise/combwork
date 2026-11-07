@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- **Lanes and cards can merge into another branch** (HI-2556), so the next release (`1.2.0`) can be worked on beside the one being finished (`1.1.0`). List the branch under **Version Control → Workflow → Other branches work can merge into**, then pick it as a lane's **Merges into** in **Start Lane…**, or a card's in its dialog. The lane's cards are made from that branch and merge into it through its own merge queue, with the same merge checks. A lane keeps its branch until it ends, and a lane is one branch. A card's branch can change only while it has no work of its own, since no rebase is made. The lane's header and the card's tile show the branch when it isn't the project's. The Assistant sets them too (`target` on `cw_lane`, `cw_create_task` and `cw_update_task`, and the Agent API). Bringing a later branch up to date with an earlier one (HI-2679) and retargeting at release (HI-2680) come next.
+
 ### Fixed
 
 - **A short commit id names a revision** (HI-2671). `cw_submit`'s `revision` and a check's took only a commit's full 40-character id, so the short id agents see in `git log --oneline` was refused as "isn't what's checked out here", although it was. Now a commit's id or a start of it of 7 or more characters works, in any case. A revision that isn't the checkout is refused naming the commit that is checked out, and a short id git finds more than one commit for asks for more of it.

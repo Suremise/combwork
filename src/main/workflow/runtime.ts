@@ -11,7 +11,7 @@
 import { AsyncLocalStorage } from 'async_hooks'
 import { resolve as resolvePath } from 'path'
 import { agentActor, agentOf, answerFits, askedQuestion, approvedByUser, decisionAnswers, atRoundLimit, FOCUSED_SKIP_GATE, foldCard, LINE_GATE, loopStepSide, MERGE_CHOICE_GATE, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, SLOT_DIRTY_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type FinishStepId, type ForYouKind, type LoopStepId, type RoundChoice, type StageId } from '../../shared/workflow/facts'
-import { awaitsAgentMerge, baseRulesetId, compile, hasStage, skipReviewOf, type Ruleset } from '../../shared/workflow/compile'
+import { awaitsAgentMerge, baseRulesetId, compile, hasStage, skipReviewOf, targetedOf, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { nextStep, type NextStep } from '../../shared/workflow/nextStep'
 import { FOCUSED_PICK, reviewByYou, reviewerAgent, type WorkflowOptions } from '../../shared/workflow/options'
@@ -2677,9 +2677,14 @@ export class Workflow {
     this.store.saveLane(l)
   }
 
-  /** Starts a lane (lanes.ts's of that id, else a new one): its cards use the ruleset in force now until it ends. */
-  startLane(id: string, cards: number[], reviewer?: string, rounds?: number): LaneList {
-    return this.store.startLane(id, cards, this.currentRuleset().id, reviewer, rounds)
+  /**
+   * Starts a lane (lanes.ts's of that id, else a new one): its cards use the ruleset in force now until it ends; with a
+   * `target` other than G7's (HI-2556, its Merges into), that ruleset merging into it (`targetedOf`, stored too).
+   */
+  startLane(id: string, cards: number[], reviewer?: string, rounds?: number, target?: string | null): LaneList {
+    const r = targetedOf(this.currentRuleset(), target)
+    this.store.saveRuleset(r)
+    return this.store.startLane(id, cards, r.id, reviewer, rounds)
   }
 
   /** Changes a lane's list: never refused; queued while a card is in flight ("list changes after AM-2"). */
