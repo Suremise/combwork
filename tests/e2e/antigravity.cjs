@@ -123,6 +123,20 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   await page.keyboard.press('Escape')
   await page.getByText('alpha', { exact: true }).first().click()
 
+  // --- agy's first-run screens (HI-2547, Darren's (a)): Provider Setup says they are needed; Set up runs agy in a terminal
+  // in Combwork's check profile, where the user completes them (here the fake's "accept"); Combwork closes it once done,
+  // and each agent's profile then starts past them.
+  const setupShown = async () => JSON.stringify(await inv('provider:refresh', 'antigravity'))
+  check('Provider Setup says Antigravity needs its one-time setup', /one-time setup/.test(await setupShown()))
+  const setupKey = await inv('provider:task', 'antigravity', 'setup')
+  check('Set up runs agy in a terminal', setupKey === 'task:antigravity:setup', String(setupKey))
+  const shownScreen = await until(async () => entries('onboarding').find((o) => o.shown) ?? null, HUNG_MS)
+  check("…in Combwork's check profile, showing its first-run screens", !!shownScreen && /antigravity[\\/]check$/i.test(shownScreen.env?.USERPROFILE ?? ''), JSON.stringify(shownScreen))
+  await inv('pty:write', setupKey, 'accept')
+  await inv('pty:write', setupKey, '\r')
+  check('…the user completes them there (Combwork typed nothing into it)', !!(await until(async () => entries('onboarded').length === 1, HUNG_MS)))
+  check('…then Provider Setup no longer asks for it', !!(await until(async () => !/one-time setup/.test(await setupShown()), HUNG_MS)))
+
   // --- First conversation.
   const startNew = async (agentId = gem.id) => {
     const before = entries('session').length
@@ -147,6 +161,12 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   const first = await startNew()
   check("the conversation's id comes from its status line", /^[0-9a-f-]{36}$/.test(first.conv ?? '') && first.conv === first.launch?.conversation, JSON.stringify({ conv: first.conv, launch: first.launch?.conversation }))
   const e = first.launch?.env ?? {}
+  const agentScreens = entries('onboarding').filter((o) => (o.env?.USERPROFILE ?? '').toLowerCase() === (e.USERPROFILE ?? '').toLowerCase())
+  check("…past agy's first-run screens (Set up's, copied into its profile)", agentScreens.length > 0 && agentScreens.every((o) => !o.shown) && fs.existsSync(path.join(e.USERPROFILE, '.gemini', 'antigravity-cli', 'cache', 'onboarding.json')), JSON.stringify(agentScreens))
+  const launchFile = JSON.parse(fs.readFileSync(first.launch.args[first.launch.args.indexOf('--settings') + 1], 'utf8'))
+  const rules = path.join(e.USERPROFILE, '.gemini', 'GEMINI.md')
+  check("…Combwork's guidance in its own GEMINI.md (agy's auto-loaded rules file), never in the project", fs.existsSync(rules) && /cw_inbox/.test(fs.readFileSync(rules, 'utf8')) && !fs.existsSync(path.join(alpha, 'GEMINI.md')), fs.existsSync(rules) ? fs.readFileSync(rules, 'utf8').slice(0, 200) : 'none')
+  check('…its folder trusted for this launch (no trust question)', (launchFile.trustedWorkspaces ?? []).some((d) => d.toLowerCase() === alpha.toLowerCase()), JSON.stringify(launchFile.trustedWorkspaces))
   check('it runs in a private profile of its own (USERPROFILE), outside the workspace', !!e.USERPROFILE && !e.USERPROFILE.toLowerCase().startsWith(ws.toLowerCase()) && /antigravity[\\/]profiles[\\/]/i.test(e.USERPROFILE), JSON.stringify(e))
   check("…with HOME left the user's own (not the profile)", !!e.HOME && e.HOME !== e.USERPROFILE, JSON.stringify(e))
   check('…auto-update off', e.AGY_CLI_DISABLE_AUTO_UPDATE === 'true', JSON.stringify(e))

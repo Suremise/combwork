@@ -1,23 +1,26 @@
 import { createHash } from 'crypto'
 import { dirname, join, resolve } from 'path'
-import { existsSync } from 'original-fs'
-import { cp, mkdir, stat } from 'original-fs/promises'
+import { existsSync, mkdirSync, writeFileSync } from 'original-fs'
+import { cp, mkdir, stat, writeFile } from 'original-fs/promises'
 import type { AgentInstallInfo, McpServerDef, MemorySource, PathDataCopy, PermissionMode, ReadinessIssue, SessionUsage, SubSession } from '../../../shared/types'
 import { ANTIGRAVITY, ANTIGRAVITY_DESCRIPTOR, antigravityModeFlags } from '../../../shared/antigravity'
 import { ASSISTANT_AGENT_ID } from '../../../shared/assistant'
 import { TOOLS_SERVER } from '../../../shared/assistantTools'
 import { isProviderEnabled } from '../../../shared/providers'
-import { fmt, msg } from '../../../shared/i18n'
+import { fmt, msg, tr } from '../../../shared/i18n'
+import { release as osRelease } from 'os'
+import { execFile } from 'child_process'
 import { overrideId } from '../../../shared/advanced'
 import { advanced } from '../../advanced'
 import { launchOverrides } from '../../advancedValues'
 import { config } from '../../config'
 import { combworkError } from '../../combworkError'
 import { writeJsonAtomic } from '../../fsutil'
-import { compareVersions, exportSubtitleText, hookForwardCommand, syncAgentsSkills, toSpawnable, AGENTS_SKILLS } from '../common'
+import { compareVersions, exportSubtitleText, hookForwardCommand, installText, syncAgentsSkills, toSpawnable, AGENTS_SKILLS } from '../common'
 import type { Ask, CatalogRead, CommandSpec, ConversationParserLike, ExternalSession, ImageLocation, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, UsageParser } from '../types'
-import { antigravityEnv, brainDir, checkEnv, inProfile, inUserProfile, profilesRoot } from './home'
-import { antigravityInstallCommand, antigravityLoginCommand, antigravityReadiness, antigravityUpdateCommand, checkModels, locateAntigravity } from './install'
+import { antigravityEnv, brainDir, checkEnv, checkProfile, inProfile, inUserProfile, profilesRoot } from './home'
+import { antigravityCheckEnv, antigravityInstallCommand, antigravityLoginCommand, antigravityReadiness, antigravityUpdateCommand, checkModels, locateAntigravity } from './install'
+import { copyOnboarding, onboarded, onboardedNow } from './onboarding'
 import { UnreadableConfig, workspaceServers, type WorkspaceServer } from './projectConfig'
 import { agyStatusDetails } from './status'
 import { AntigravityConversationParser, AntigravityUsageParser, parseAgyTranscript } from './transcript'
@@ -34,11 +37,28 @@ import { AGY_ALLOW, agyHooks, agyLockReply, agyNoticeGiven, agyNoticeReply, agyN
 
 const NAME = ANTIGRAVITY_DESCRIPTOR.name
 
+const NOTICE = {
+  title: msg({ id: 'providers.antigravity.notice.title', defaultMessage: 'Antigravity can’t use everything this agent was given', description: "A notice as an Antigravity CLI agent starts: something it was given can't apply (an MCP server's transport, a permission mode on this Windows)." }),
+  sse: msg({ id: 'providers.antigravity.notice.sse', defaultMessage: '{count, plural, one {The MCP server {servers} uses} other {The MCP servers {servers} use}} the legacy HTTP+SSE transport, which Antigravity doesn’t support, so this agent runs without {count, plural, one {it} other {them}}. Change {count, plural, one {it} other {them}} to Streamable HTTP in MCP servers to use {count, plural, one {it} other {them}} here.', description: "Part of a notice as an Antigravity CLI agent starts: MCP servers it was given use a transport Antigravity can't use, so they're left out. {servers}: their names joined as a list; {count}: how many. HTTP+SSE and Streamable HTTP are transports' names, MCP servers a place in Combwork: keep them." }),
+  setup: msg({ id: 'providers.antigravity.notice.setup', defaultMessage: 'Antigravity isn’t set up yet, so this agent shows its first-run screens (a colour scheme, its terms) in its pane: complete them there, or once for every agent with Set up in Provider Setup.', description: "Part of a notice as an Antigravity CLI agent starts before the user completed Antigravity's first-run screens in Provider Setup. Set up and Provider Setup are Combwork's names: keep them." }),
+  auto: msg({ id: 'providers.antigravity.notice.auto', defaultMessage: 'Auto runs commands inside Antigravity’s own sandbox, which needs Windows 11 24H2 or later with the August 2026 update or later. This PC runs Windows build {version}, so Antigravity may refuse Auto or ask before commands. Choose another mode in Agent Settings, or update Windows.', description: "Part of a notice as an Antigravity CLI agent starts in Auto mode on a Windows that can't run its sandbox (older than 11 24H2 with the August 2026 update). {version}: the Windows build and revision, such as 26100.8000. Auto is a permission mode, Agent Settings a place in Combwork: keep them; Windows 11 24H2 is a version." }),
+  autoUnknown: msg({ id: 'providers.antigravity.notice.autoUnknown', defaultMessage: 'Auto runs commands inside Antigravity’s own sandbox, which needs Windows 11 24H2 or later with the August 2026 update or later. Combwork couldn’t read this PC’s Windows version, so it can’t tell whether Auto applies here: if Antigravity refuses Auto or asks before commands, choose another mode in Agent Settings, or update Windows.', description: "Part of a notice as an Antigravity CLI agent starts in Auto mode where Combwork couldn't read the Windows version, so it can't tell whether Antigravity's sandbox applies. Auto is a permission mode, Agent Settings a place in Combwork: keep them; Windows 11 24H2 is a version." })
+}
+
+/** Provider Setup's first-run step (HI-2547, Darren's (a)). */
+const SETUP = {
+  needed: msg({ id: 'providers.antigravity.setup.needed', defaultMessage: 'Antigravity needs a one-time setup: its first-run screens. Until then each new agent shows them in its pane.', description: "Provider Setup and Settings → Providers: Antigravity CLI's first-run screens (a colour scheme, its terms of service) aren't done yet." }),
+  action: msg({ id: 'providers.antigravity.setup.action', defaultMessage: 'Set up', description: "Provider Setup's button: opens Antigravity CLI's first-run screens in a terminal." }),
+  runs: msg({ id: 'providers.antigravity.setup.runs', defaultMessage: '**Set up** runs `agy` in a terminal: choose a colour scheme and read and accept its terms there, its data-use choice yours. Combwork types nothing into it, and closes it once you are done.', description: "Provider Setup, under Antigravity CLI's Set up: what it does. **…** marks bold text and `…` a command: keep the marks and the command." }),
+  copied: msg({ id: 'providers.antigravity.setup.copied', defaultMessage: 'Each Antigravity agent then starts past those screens: Combwork copies only that they are done into its private profile, never your own Antigravity settings.', description: "Provider Setup, under Antigravity CLI's Set up: what Combwork does with it." })
+}
+
 const REFUSED = {
   unreadable: msg({ id: 'providers.antigravity.unreadableConfig', defaultMessage: "{provider} didn't start: Combwork couldn't read {file} ({why}), which it would load. Fix or remove the file, then start the agent again.", description: "Why an Antigravity CLI agent didn't start (its pane): a config file in the project (an MCP server or hook list) couldn't be read, so Combwork couldn't keep what it holds out of the agent. {provider} is the CLI's name, {file} a path, {why} the error's own words." }),
   gone: msg({ id: 'providers.antigravity.conversationGone', defaultMessage: "{provider} didn't resume {conversation}: {provider} no longer has that conversation (it keeps it apart from its transcript, in the agent's profile, and it was removed). Start a new session instead.", description: "Why an Antigravity CLI agent didn't resume a conversation (its pane): the conversation's own store in the agent's profile is gone, though its transcript may be left. {provider} is the CLI's name, {conversation} the conversation's id." }),
   notOwn: msg({ id: 'providers.antigravity.notOwnConversation', defaultMessage: "{provider} didn't resume {conversation}: it isn't in this agent's own conversations (it may have been removed, or be another agent's). Start a new session instead.", description: "Why an Antigravity CLI agent didn't resume a conversation (its pane): the conversation isn't among this agent's own. {provider} is the CLI's name, {conversation} the conversation's id." }),
-  projectServers: msg({ id: 'providers.antigravity.projectServers', defaultMessage: "{provider} didn't start: {count, plural, one {{files} defines} other {{files} define}} MCP servers this agent wasn't given ({servers}), and {provider} would start them in its session. Combwork can't keep them out, so it doesn't start {provider} here. Remove them from that file, or give them to the agent in Combwork's MCP servers.", description: "Why an Antigravity CLI agent didn't start (its pane): a project or added folder's .agents config defines MCP servers the agent wasn't given, which Antigravity can't be kept from starting. {provider} is the CLI's name, {files} the config files' paths joined as a list, {count} how many files, {servers} the servers' names joined as a list. MCP servers is a place in Combwork." })
+  projectServers: msg({ id: 'providers.antigravity.projectServers', defaultMessage: "{provider} didn't start: {count, plural, one {{files} defines} other {{files} define}} MCP servers this agent wasn't given ({servers}), and {provider} would start them in its session. Combwork can't keep them out, so it doesn't start {provider} here. Remove them from that file, or give them to the agent in Combwork's MCP servers.", description: "Why an Antigravity CLI agent didn't start (its pane): a project or added folder's .agents config defines MCP servers the agent wasn't given, which Antigravity can't be kept from starting. {provider} is the CLI's name, {files} the config files' paths joined as a list, {count} how many files, {servers} the servers' names joined as a list. MCP servers is a place in Combwork." }),
+  tooLong: msg({ id: 'providers.antigravity.guidanceTooLong', defaultMessage: "{provider} didn't start: Combwork's guidance, this agent's instructions and the Workspace notes come to {size, number} bytes, and {provider} reads at most {max, number} bytes of its rules file, cutting off the rest. Shorten the agent's instructions (Agent Settings) or the Workspace notes, then start the agent again.", description: "Why an Antigravity CLI agent didn't start (its pane): what Combwork gives it as its rules file is over Antigravity's size limit, which would cut it off. {provider} is the CLI's name, {size} and {max} sizes in bytes. Agent Settings and Workspace notes are places in Combwork: keep them." })
 }
 
 /** An agent's private profile: kept per agent; the Assistant's (the same id in every workspace) per workspace too. */
@@ -52,9 +72,90 @@ export { isConversationId }
 
 /** An MCP server as agy's mcp_config.json has it (1.5.0: stdio command/args/env, or Streamable HTTP url/headers). */
 export function agyServer(def: McpServerDef): Record<string, unknown> | null {
+  // The legacy HTTP+SSE transport: agy 1.5.0's url servers are Streamable HTTP only (its mcp_servers.md), so none.
+  if (isLegacySse(def)) return null
   if (typeof def.url === 'string' && def.url) return { url: def.url, ...(def.headers ? { headers: def.headers } : {}) }
   if (typeof def.command === 'string' && def.command) return { command: def.command, ...(def.args?.length ? { args: def.args } : {}), ...(def.env ? { env: def.env } : {}) }
   return null
+}
+
+/** A server on the legacy HTTP+SSE transport (its type `sse`), which agy can't use. */
+export const isLegacySse = (def: McpServerDef): boolean => typeof def.type === 'string' && def.type.toLowerCase() === 'sse'
+
+/** The agent's servers agy can't use (legacy HTTP+SSE): left out of its profile, and the user told why (launchNotice). */
+export const legacySseServers = (given: Record<string, McpServerDef>): string[] => Object.entries(given).filter(([, d]) => isLegacySse(d)).map(([n]) => n)
+
+/** The rules file agy auto-loads from its home (HI-2547: `/context` lists ~\.gemini\GEMINI.md as a system file). */
+export const GUIDANCE_FILE = join('.gemini', 'GEMINI.md')
+
+/** What a launch puts in its profile's GEMINI.md: Combwork's guidance (with its tools), the launch's instructions, the notes. */
+export function launchGuidance(ctx: Pick<LaunchContext, 'guidance' | 'instructions' | 'notes' | 'mcpServers'>): string {
+  const parts = [Object.hasOwn(ctx.mcpServers, TOOLS_SERVER) ? ctx.guidance : '', ctx.instructions ?? '', ctx.notes ?? ''].map((t) => t.trim()).filter(Boolean)
+  return parts.length ? parts.join('\n\n') + '\n' : ''
+}
+
+/**
+ * The most a rules file of agy's may hold: Google's rules docs (Size limits and token budgets) say a rule file over 24,000
+ * UTF-8 bytes is truncated, so a launch whose GEMINI.md would be larger is refused rather than silently cut (HR1, HI-2547).
+ */
+export const RULES_MAX_BYTES = 24000
+
+/** The UTF-8 size of a launch's GEMINI.md (launchGuidance), as agy's limit counts it. */
+export const guidanceBytes = (text: string): number => Buffer.byteLength(text, 'utf8')
+
+/**
+ * What Antigravity's sandbox needs for Auto (Google's sandbox docs, the CLI tab): "Windows 11 24H2 or later with the August
+ * 2026 update or later". 24H2 (26100) and 25H2 (26200) share their updates; August 2026's (KB5121003, 11 Aug) is revision
+ * 9168 of both. A later feature update (above 26200) comes after it.
+ */
+export const AUTO_MIN_BUILD = 26100
+export const AUTO_SHARED_SERVICING = 26200
+export const AUTO_MIN_REVISION = 9168
+
+/** This PC's Windows version: its build and update revision (UBR), each null when it can't be read. */
+export interface WindowsVersion {
+  build: number | null
+  revision: number | null
+}
+
+/** Whether Auto's sandbox can apply on this Windows: `ok`, `old` (it can't), or `unknown` (Combwork couldn't tell). */
+export function autoSandbox(v: WindowsVersion): 'ok' | 'old' | 'unknown' {
+  if (v.build === null) return 'unknown'
+  if (v.build < AUTO_MIN_BUILD) return 'old'
+  if (v.build > AUTO_SHARED_SERVICING) return 'ok'
+  if (v.revision === null) return 'unknown'
+  return v.revision < AUTO_MIN_REVISION ? 'old' : 'ok'
+}
+
+/** A whole number from reg.exe's output for a value (REG_SZ decimal, or REG_DWORD hex), else null. */
+export function regNumber(out: string | null): number | null {
+  const v = out ? /REG_\w+\s+(\S+)\s*$/m.exec(out)?.[1] : undefined
+  if (!v) return null
+  const n = /^0x[0-9a-f]+$/i.test(v) ? parseInt(v, 16) : /^\d+$/.test(v) ? Number(v) : NaN
+  return Number.isSafeInteger(n) && n >= 0 ? n : null
+}
+
+const CURRENT_VERSION = 'HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion' // i18n-ignore: a registry key
+
+function regQuery(name: string): Promise<string | null> {
+  return new Promise((done) => {
+    execFile('reg', ['query', CURRENT_VERSION, '/v', name], { timeout: 5000, windowsHide: true }, (e, out) => done(e ? null : String(out)))
+  })
+}
+
+const autoMode = (ctx: Pick<LaunchContext, 'permissionMode'>): boolean => (ctx.permissionMode || ANTIGRAVITY_DESCRIPTOR.defaultPermissionMode) === 'auto'
+
+let windowsVersionRead: Promise<WindowsVersion> | null = null
+
+/** This PC's Windows version, read once (asynchronously, off main's thread) from the registry; os.release's build if not. */
+export function windowsVersion(): Promise<WindowsVersion> {
+  if (process.platform !== 'win32') return Promise.resolve({ build: null, revision: null })
+  windowsVersionRead ??= Promise.all([regQuery('CurrentBuildNumber'), regQuery('UBR')]).then(([b, r]) => {
+    const fromRelease = Number(osRelease().split('.')[2])
+    const build = regNumber(b) ?? (Number.isSafeInteger(fromRelease) && fromRelease > 0 ? fromRelease : null)
+    return { build, revision: regNumber(r) }
+  })
+  return windowsVersionRead
 }
 
 /**
@@ -116,11 +217,15 @@ export function sameServer(a: unknown, b: unknown): boolean {
  * own line, as Combwork's reply is empty), and Combwork's own tools allowed (agy's rule form, its permissions docs:
  * `mcp(<server>/<tool>)`, or `mcp(<server>/*)` for all of a server's).
  */
-export function launchSettings(ctx: Pick<LaunchContext, 'hookUrl' | 'hookAuthFile' | 'mcpServers' | 'trustedCombworkTools'>, preApprove: boolean): Record<string, unknown> {
+export function launchSettings(ctx: Pick<LaunchContext, 'hookUrl' | 'hookAuthFile' | 'mcpServers' | 'trustedCombworkTools'> & Partial<Pick<LaunchContext, 'cwd' | 'extraDirs'>>, preApprove: boolean): Record<string, unknown> {
   const allow = !Object.hasOwn(ctx.mcpServers, TOOLS_SERVER) || !preApprove ? [] : ctx.trustedCombworkTools ? ctx.trustedCombworkTools.map((t) => `mcp(${TOOLS_SERVER}/${t})`) : [`mcp(${TOOLS_SERVER}/*)`]
+  // The folders it works in (its own, and those it was given: a slot, a review copy), trusted for this launch only, so
+  // agy doesn't stop at its trust question in each (HI-2547; settings.json's trustedWorkspaces, never saved).
+  const trusted = [ctx.cwd, ...(ctx.extraDirs ?? [])].filter((d): d is string => !!d)
   return {
     statusLine: { type: 'command', command: hookForwardCommand(`${ctx.hookUrl}&statusline`, ctx.hookAuthFile), stack_with_default: true },
-    ...(allow.length ? { permissions: { allow } } : {})
+    ...(allow.length ? { permissions: { allow } } : {}),
+    ...(trusted.length ? { trustedWorkspaces: trusted } : {})
   }
 }
 
@@ -164,12 +269,45 @@ export class AntigravityAdapter implements ProviderAdapter {
     }
   }
 
-  locate(): Promise<AgentInstallInfo> {
-    return locateAntigravity(this.signInPattern())
+  /** Whether agy's first-run screens are done in the check profile (Provider Setup's Set up), as the last check found. */
+  private setUp: boolean | null = null
+  /** This PC's Windows version, read for a launch in Auto (launchNotice). */
+  private windows: WindowsVersion | null = null
+
+  async locate(): Promise<AgentInstallInfo> {
+    const info = await locateAntigravity(this.signInPattern())
+    this.setUp = info.found ? await onboarded(checkProfile()) : null
+    return info
   }
 
+  /** Its install and sign-in, then (HI-2547) its first-run screens, which the user completes once in Set up. */
   readiness(info: AgentInstallInfo): ReadinessIssue[] {
-    return antigravityReadiness(info)
+    const issues = antigravityReadiness(info)
+    if (!info.found || info.loggedIn === false || this.setUp !== false) return issues
+    return [
+      ...issues,
+      {
+        id: 'onboarding',
+        level: 'warning',
+        message: installText(SETUP.needed),
+        action: { label: installText(SETUP.action), task: 'setup' },
+        detail: [installText(SETUP.runs), installText(SETUP.copied)]
+      }
+    ]
+  }
+
+  /**
+   * agy's first-run screens, completed by the user in a terminal they watch (Combwork types nothing into it): agy in the
+   * check profile, in a folder of its own there, trusted for this run. Combwork closes it once they are done, and copies
+   * that into each agent's profile as it starts (copyOnboarding).
+   */
+  setupCommand(executable: string): CommandSpec {
+    const dir = join(checkProfile(), 'setup')
+    mkdirSync(dir, { recursive: true })
+    const settings = join(dir, 'agy-settings.json')
+    writeFileSync(settings, JSON.stringify({ trustedWorkspaces: [dir] }))
+    const s = toSpawnable(executable, ['--settings', settings])
+    return { ...s, env: antigravityCheckEnv(), cwd: dir, keys: [], done: () => onboardedNow(checkProfile()) }
   }
 
   /** No published release feed Combwork reads: agy's own `update` says. */
@@ -220,6 +358,11 @@ export class AntigravityAdapter implements ProviderAdapter {
     if (ctx.resume && !(await this.ownsConversation(ctx.agentId, ctx.workspacePath, ctx.sessionId))) throw combworkError(REFUSED.notOwn, { provider: NAME, conversation: ctx.sessionId })
     // Its transcript alone (the brain folder) isn't the conversation: agy resumes from its store, conversations\<id>.db.
     if (ctx.resume && !(await this.hasConversationStore(ctx.agentId, ctx.workspacePath, ctx.sessionId))) throw combworkError(REFUSED.gone, { provider: NAME, conversation: ctx.sessionId })
+    // The whole rules file within agy's limit, or no launch: agy would cut it off silently (HR1, HI-2547).
+    const guidance = launchGuidance(ctx)
+    const size = guidanceBytes(guidance)
+    if (size > RULES_MAX_BYTES) throw combworkError(REFUSED.tooLong, { provider: NAME, size, max: RULES_MAX_BYTES })
+    if (autoMode(ctx)) this.windows = await windowsVersion()
     const delivered = await syncAgentsSkills(ctx, NAME)
     let workspace: Map<string, WorkspaceServer[]>
     try {
@@ -235,12 +378,35 @@ export class AntigravityAdapter implements ProviderAdapter {
     }
     const profile = profileFolder(ctx.agentId, ctx.workspacePath)
     await mkdir(join(profile, '.gemini', 'config'), { recursive: true })
+    // agy's first-run screens, done once by the user in Set up: this profile starts past them (HI-2547).
+    await copyOnboarding(checkProfile(), profile)
+    // Combwork's guidance, the launch's instructions and the Workspace notes, in the profile's own ~\.gemini\GEMINI.md: the
+    // one rules file agy 1.5.0 auto-loads (HI-2547's listing check), private to this agent, never in the user's projects.
+    await writeFile(join(profile, GUIDANCE_FILE), guidance)
     // The servers' env (and the launch's token) stays in the profile, under Combwork's own data: never the project.
     await writeJsonAtomic(join(profile, '.gemini', 'config', 'mcp_config.json'), made.mcp)
     // Combwork's hooks, for this launch (its URL and token file): agy reads the profile's hooks.json, never the project's.
     await writeJsonAtomic(join(profile, '.gemini', 'config', 'hooks.json'), agyHooks(ctx.hookUrl, ctx.hookAuthFile, advanced.get<boolean>('antigravity.hooks.toolHooks')))
     await writeJsonAtomic(join(ctx.privateDir, 'agy-settings.json'), launchSettings(ctx, launchOverrides(ctx.overrides, ANTIGRAVITY, 'preApproveCombworkTools')))
     return delivered
+  }
+
+  /**
+   * What the user is told as an agent starts (HI-2547), said plainly rather than switched silently: the MCP servers left
+   * out (legacy HTTP+SSE), and Auto on a Windows whose build can't run Antigravity's sandbox.
+   */
+  launchNotice(ctx: LaunchContext): { title: string; message: string } | null {
+    const parts: string[] = []
+    const sse = legacySseServers(ctx.mcpServers)
+    if (sse.length) parts.push(tr(NOTICE.sse, { servers: fmt.list(sse), count: sse.length }))
+    if (autoMode(ctx)) {
+      const v = this.windows ?? { build: null, revision: null }
+      const can = autoSandbox(v)
+      if (can === 'old') parts.push(tr(NOTICE.auto, { version: v.revision === null ? String(v.build) : `${v.build}.${v.revision}` }))
+      if (can === 'unknown') parts.push(tr(NOTICE.autoUnknown))
+    }
+    if (this.setUp === false) parts.push(tr(NOTICE.setup))
+    return parts.length ? { title: tr(NOTICE.title), message: parts.join(' ') } : null
   }
 
   buildCommand(executable: string, ctx: LaunchContext): CommandSpec {

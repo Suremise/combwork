@@ -182,6 +182,8 @@ export interface CommandSpec {
   file: string
   args: string[]
   env?: Record<string, string>
+  /** The folder a setup task runs in (HI-2547: agy's first-run setup, in Combwork's check profile); absent: the user's home. */
+  cwd?: string
   /** Typed into the program once its interface is ready (e.g. Codex's /permissions menu for its sandbox setup). */
   keys?: KeySteps
   /** What its screen shows once the program is ready for `keys` (matched against the screen its output draws: KeyGate). */

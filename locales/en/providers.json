@@ -19,13 +19,53 @@
     "defaultMessage": "{provider} didn't resume {conversation}: {provider} no longer has that conversation (it keeps it apart from its transcript, in the agent's profile, and it was removed). Start a new session instead.",
     "description": "Why an Antigravity CLI agent didn't resume a conversation (its pane): the conversation's own store in the agent's profile is gone, though its transcript may be left. {provider} is the CLI's name, {conversation} the conversation's id."
   },
+  "providers.antigravity.guidanceTooLong": {
+    "defaultMessage": "{provider} didn't start: Combwork's guidance, this agent's instructions and the Workspace notes come to {size, number} bytes, and {provider} reads at most {max, number} bytes of its rules file, cutting off the rest. Shorten the agent's instructions (Agent Settings) or the Workspace notes, then start the agent again.",
+    "description": "Why an Antigravity CLI agent didn't start (its pane): what Combwork gives it as its rules file is over Antigravity's size limit, which would cut it off. {provider} is the CLI's name, {size} and {max} sizes in bytes. Agent Settings and Workspace notes are places in Combwork: keep them."
+  },
   "providers.antigravity.notOwnConversation": {
     "defaultMessage": "{provider} didn't resume {conversation}: it isn't in this agent's own conversations (it may have been removed, or be another agent's). Start a new session instead.",
     "description": "Why an Antigravity CLI agent didn't resume a conversation (its pane): the conversation isn't among this agent's own. {provider} is the CLI's name, {conversation} the conversation's id."
   },
+  "providers.antigravity.notice.auto": {
+    "defaultMessage": "Auto runs commands inside Antigravity’s own sandbox, which needs Windows 11 24H2 or later with the August 2026 update or later. This PC runs Windows build {version}, so Antigravity may refuse Auto or ask before commands. Choose another mode in Agent Settings, or update Windows.",
+    "description": "Part of a notice as an Antigravity CLI agent starts in Auto mode on a Windows that can't run its sandbox (older than 11 24H2 with the August 2026 update). {version}: the Windows build and revision, such as 26100.8000. Auto is a permission mode, Agent Settings a place in Combwork: keep them; Windows 11 24H2 is a version."
+  },
+  "providers.antigravity.notice.autoUnknown": {
+    "defaultMessage": "Auto runs commands inside Antigravity’s own sandbox, which needs Windows 11 24H2 or later with the August 2026 update or later. Combwork couldn’t read this PC’s Windows version, so it can’t tell whether Auto applies here: if Antigravity refuses Auto or asks before commands, choose another mode in Agent Settings, or update Windows.",
+    "description": "Part of a notice as an Antigravity CLI agent starts in Auto mode where Combwork couldn't read the Windows version, so it can't tell whether Antigravity's sandbox applies. Auto is a permission mode, Agent Settings a place in Combwork: keep them; Windows 11 24H2 is a version."
+  },
+  "providers.antigravity.notice.setup": {
+    "defaultMessage": "Antigravity isn’t set up yet, so this agent shows its first-run screens (a colour scheme, its terms) in its pane: complete them there, or once for every agent with Set up in Provider Setup.",
+    "description": "Part of a notice as an Antigravity CLI agent starts before the user completed Antigravity's first-run screens in Provider Setup. Set up and Provider Setup are Combwork's names: keep them."
+  },
+  "providers.antigravity.notice.sse": {
+    "defaultMessage": "{count, plural, one {The MCP server {servers} uses} other {The MCP servers {servers} use}} the legacy HTTP+SSE transport, which Antigravity doesn’t support, so this agent runs without {count, plural, one {it} other {them}}. Change {count, plural, one {it} other {them}} to Streamable HTTP in MCP servers to use {count, plural, one {it} other {them}} here.",
+    "description": "Part of a notice as an Antigravity CLI agent starts: MCP servers it was given use a transport Antigravity can't use, so they're left out. {servers}: their names joined as a list; {count}: how many. HTTP+SSE and Streamable HTTP are transports' names, MCP servers a place in Combwork: keep them."
+  },
+  "providers.antigravity.notice.title": {
+    "defaultMessage": "Antigravity can’t use everything this agent was given",
+    "description": "A notice as an Antigravity CLI agent starts: something it was given can't apply (an MCP server's transport, a permission mode on this Windows)."
+  },
   "providers.antigravity.projectServers": {
     "defaultMessage": "{provider} didn't start: {count, plural, one {{files} defines} other {{files} define}} MCP servers this agent wasn't given ({servers}), and {provider} would start them in its session. Combwork can't keep them out, so it doesn't start {provider} here. Remove them from that file, or give them to the agent in Combwork's MCP servers.",
     "description": "Why an Antigravity CLI agent didn't start (its pane): a project or added folder's .agents config defines MCP servers the agent wasn't given, which Antigravity can't be kept from starting. {provider} is the CLI's name, {files} the config files' paths joined as a list, {count} how many files, {servers} the servers' names joined as a list. MCP servers is a place in Combwork."
+  },
+  "providers.antigravity.setup.action": {
+    "defaultMessage": "Set up",
+    "description": "Provider Setup's button: opens Antigravity CLI's first-run screens in a terminal."
+  },
+  "providers.antigravity.setup.copied": {
+    "defaultMessage": "Each Antigravity agent then starts past those screens: Combwork copies only that they are done into its private profile, never your own Antigravity settings.",
+    "description": "Provider Setup, under Antigravity CLI's Set up: what Combwork does with it."
+  },
+  "providers.antigravity.setup.needed": {
+    "defaultMessage": "Antigravity needs a one-time setup: its first-run screens. Until then each new agent shows them in its pane.",
+    "description": "Provider Setup and Settings → Providers: Antigravity CLI's first-run screens (a colour scheme, its terms of service) aren't done yet."
+  },
+  "providers.antigravity.setup.runs": {
+    "defaultMessage": "**Set up** runs `agy` in a terminal: choose a colour scheme and read and accept its terms there, its data-use choice yours. Combwork types nothing into it, and closes it once you are done.",
+    "description": "Provider Setup, under Antigravity CLI's Set up: what it does. **…** marks bold text and `…` a command: keep the marks and the command."
   },
   "providers.antigravity.signIn.runs": {
     "defaultMessage": "**Sign in** runs `agy` in a terminal: sign in there. Combwork never signs in for you.",

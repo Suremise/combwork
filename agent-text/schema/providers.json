@@ -20,6 +20,13 @@
       "conversation": "plain"
     }
   },
+  "providers.antigravity.guidanceTooLong": {
+    "placeholders": {
+      "provider": "plain",
+      "size": "number",
+      "max": "number"
+    }
+  },
   "providers.antigravity.notOwnConversation": {
     "placeholders": {
       "provider": "plain",
@@ -33,6 +40,18 @@
       "files": "plain",
       "servers": "plain"
     }
+  },
+  "providers.antigravity.setup.action": {
+    "placeholders": {}
+  },
+  "providers.antigravity.setup.copied": {
+    "placeholders": {}
+  },
+  "providers.antigravity.setup.needed": {
+    "placeholders": {}
+  },
+  "providers.antigravity.setup.runs": {
+    "placeholders": {}
   },
   "providers.antigravity.unreadableConfig": {
     "placeholders": {

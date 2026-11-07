@@ -6,8 +6,18 @@ interface CombworkMessageValues {
   'providers.action.update': undefined
   'providers.antigravity.checkFailed': { provider: string | number; text: string | number }
   'providers.antigravity.conversationGone': { provider: string | number; conversation: string | number }
+  'providers.antigravity.guidanceTooLong': { provider: string | number; size: number; max: number }
   'providers.antigravity.notOwnConversation': { provider: string | number; conversation: string | number }
+  'providers.antigravity.notice.auto': { version: string | number }
+  'providers.antigravity.notice.autoUnknown': undefined
+  'providers.antigravity.notice.setup': undefined
+  'providers.antigravity.notice.sse': { count: number; servers: string | number }
+  'providers.antigravity.notice.title': undefined
   'providers.antigravity.projectServers': { provider: string | number; count: number; files: string | number; servers: string | number }
+  'providers.antigravity.setup.action': undefined
+  'providers.antigravity.setup.copied': undefined
+  'providers.antigravity.setup.needed': undefined
+  'providers.antigravity.setup.runs': undefined
   'providers.antigravity.signIn.runs': undefined
   'providers.antigravity.signIn.shared': undefined
   'providers.antigravity.unreadableConfig': { provider: string | number; file: string | number; why: string | number }
