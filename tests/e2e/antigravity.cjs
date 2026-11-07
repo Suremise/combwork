@@ -68,6 +68,8 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
     await inv('session:start', alpha, { agentId: gem.id })
     await until(async () => entries('session').length > before, HUNG_MS)
     const conv = await until(async () => (await live(gem.id))?.sessionId || null, HUNG_MS)
+    // Recorded as the agent's conversation (its Sessions entry) before anything stops it, as a real turn gives it time to.
+    await until(async () => (await inv('session:list', alpha)).some((s) => s.id === conv), HUNG_MS)
     return { conv, launch: entries('session').at(-1) }
   }
   const stop = async () => {
