@@ -316,7 +316,7 @@ const suiteClis = (dir) => {
  * runs up to a size, and a failed run a day: logs.mjs), so copies never pile up.
  */
 
-const run = (name, port, extraEnv = {}) =>
+const run = (name, port, extraEnv = {}, uses = null) =>
   new Promise((resolve) => {
     const started = Date.now()
     let dir = null
@@ -329,8 +329,11 @@ const run = (name, port, extraEnv = {}) =>
       resolve({ name, ok: false, failed: [`FAIL ${e.message}`], code: 2, out: `FAIL ${e.message}\n`, seconds: 0, dir: null, kept: null })
       return
     }
+    // What it uses a CLI test home with, noted before it can (HI-2606, HR1 on s29): its folder now, its process once spawned.
+    uses?.folder(dir)
     // No tip card over what a suite clicks, unless its profile turns tips on (tips does).
     const child = spawn(process.execPath, [join(here, `${name}.cjs`)], { cwd: root, env: suiteEnv(name, port, dir, extraEnv) })
+    uses?.spawned(child)
     let out = ''
     const add = (d) => (out += d)
     child.stdout.on('data', add)
@@ -508,8 +511,17 @@ async function runOnce(k) {
       // Only suites actually starting count as running in peer diagnostics; a queued Codex suite cannot collide.
       running.add(s.name)
       report()
-      const r = await run(s.name, port, leasesEnv(leases))
-      // What used the homes (its test copies of Combwork, and so their CLIs): the next reset waits for them (HR1 on s17).
+      // What uses the homes, noted before it does (HR1 on s29): the suite's folder (its test copies of Combwork record
+      // themselves there, and their CLIs name it), its process, and after it its recorded copies. A reset waits for each
+      // until it proves them gone, after this lease and a crash alike. Its process's start: spawn has just returned, within
+      // the 2 s a consumer's start is matched by (testHomes.mjs homeUsers).
+      const uses = leases.length
+        ? {
+            folder: (dir) => dir && leases.forEach((l) => noteConsumers(l, [{ folder: dir }])),
+            spawned: (child) => child.pid && leases.forEach((l) => noteConsumers(l, [{ pid: child.pid, started: Date.now() }]))
+          }
+        : null
+      const r = await run(s.name, port, leasesEnv(leases), uses)
       if (leases.length && r.dir) for (const l of leases) noteConsumers(l, recordedCopies(r.dir))
       return said.length ? { ...r, out: `${said.join('\n')}\n${r.out}` } : r
     } finally {

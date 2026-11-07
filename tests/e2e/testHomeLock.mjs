@@ -6,8 +6,8 @@
 // CW_TEST_HOME_LEASES (leasesEnv: a suite, a nested runner), and they reuse it instead of queueing behind their parent.
 // One order: Claude Code's home before Codex's. Asking for Claude Code's while Codex's is held (here or by a parent) is
 // refused, so two runs needing both can never hold one each and wait for the other.
-import { createHash } from 'crypto'
-import { mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'fs'
+import { createHash, randomBytes } from 'crypto'
+import { mkdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { createRequire } from 'module'
 import { describeClaim, waitForSlot } from './slots.mjs'
@@ -35,8 +35,9 @@ export function homeLockDir(cli, home, poolRoot = join(ctx.TEST_ROOT, `${cli}-ho
   return join(poolRoot, createHash('sha256').update(canonical).digest('hex').slice(0, 24))
 }
 
-/** What this process holds itself (for the order check), and what a parent passed it (reused). */
+/** What this process holds itself (for the order check). */
 const own = new Map()
+/** What a parent passed this process: `{ cli: { dir, gen, pid, started } }` (an older form, a bare folder, is never reused). */
 function inherited(env = process.env) {
   try {
     const v = JSON.parse(env[LEASES_VAR] || '{}')
@@ -45,17 +46,18 @@ function inherited(env = process.env) {
     return {}
   }
 }
-/** Every lease held in this run's tree: `{ cli: lockDir }`. */
+/** Every lease held in this run's tree, by CLI (its lock folder): for the order check. */
 export function heldLeases(env = process.env) {
-  return { ...inherited(env), ...Object.fromEntries(own) }
+  return { ...Object.fromEntries(Object.entries(inherited(env)).map(([c, v]) => [c, typeof v === 'object' ? v?.dir : v])), ...Object.fromEntries(own) }
 }
 /**
- * The variable a holder gives the children it starts for what holds the leases (a suite, a nested runner): never set on
- * this process's own environment, where suites running beside it would take it for theirs.
+ * The variable a holder gives the children it starts for what holds the leases (a suite, a nested runner): each lease's
+ * folder with its acquisition's generation and holder (HR1 on s29), never set on this process's own environment, where
+ * suites running beside it would take it for theirs.
  */
 export function leasesEnv(leases, env = process.env) {
   const held = { ...inherited(env) }
-  for (const l of leases) if (l?.cli && l.dir) held[l.cli] = l.dir
+  for (const l of leases) if (l?.cli && l.dir && l.gen) held[l.cli] = { dir: l.dir, gen: l.gen, pid: l.holderPid, started: l.holderStarted }
   return Object.keys(held).length ? { [LEASES_VAR]: JSON.stringify(held) } : {}
 }
 
@@ -70,46 +72,63 @@ function pidAlive(pid) {
 }
 
 /**
- * The lease's holder record (`holder.state` in its lock folder, HR1 on s17): who holds it (pid and start) and what it
- * noted using the home; removed when it lets go cleanly, so one found left is a holder that didn't. A run that takes
- * over from such a holder (`takeover`) may find that run's CLIs still using the home: its reset looks for them
- * (testHomes.mjs homeUsers).
+ * A home's lease state (`holder.state` in its lock folder; HR1 on s17 and s29): `holder`, who holds it now (pid, start,
+ * and the acquisition's random generation; null once let go), and `consumers`, what used the home and hasn't been proven
+ * gone: a suite's folder (registered before it starts), its process and its test copies of Combwork. Consumers outlive
+ * the lease that noted them, a clean release and a crash alike; only a reset that found none of them using the home
+ * clears them (clearConsumers). A holder left in the record by a run that ended without letting go is a consumer too.
  */
 export function holderOf(dir) {
   try {
-    return JSON.parse(readFileSync(join(dir, 'holder.state'), 'utf8'))
+    const s = JSON.parse(readFileSync(join(dir, 'holder.state'), 'utf8'))
+    return s && typeof s === 'object' ? { holder: s.holder ?? null, consumers: Array.isArray(s.consumers) ? s.consumers : [] } : null
   } catch {
     return null
   }
 }
-function writeHolder(dir, record) {
+function writeState(dir, state) {
   mkdirSync(dir, { recursive: true })
-  writeFileSync(join(dir, 'holder.state'), JSON.stringify(record))
+  const file = join(dir, 'holder.state')
+  // Nothing to keep: no record (a lock folder left as the slots leave it).
+  if (!state.holder && !state.consumers.length) return void rmSync(file, { force: true })
+  const tmp = `${file}.${process.pid}.tmp`
+  writeFileSync(tmp, JSON.stringify(state))
+  renameSync(tmp, file)
 }
+const key = (c) => (c.folder ? `f:${String(c.folder).toLowerCase()}` : `p:${c.pid}:${c.started}`)
 
 /**
- * Notes what used the home under this lease (HR1 on s17): the processes a suite started that ran a CLI there (its test
- * copies of Combwork, `{ pid, started }`), kept in the holder record, so the next reset (this run's, or one taking over
- * after it ended without letting go) waits for them and what they started, and nothing else.
+ * Notes what uses the home under this lease (HR1 on s17, s29), before it does: a suite's folder before the suite starts
+ * (the CLIs Combwork starts there name it on their command lines), the suite's process as soon as it is spawned, and its
+ * test copies of Combwork. Kept until a reset proves them gone.
  */
 export function noteConsumers(lease, roots) {
   if (!lease?.dir || lease.reused || !roots.length) return
-  const h = holderOf(lease.dir) ?? {}
-  const seen = new Set((h.consumers ?? []).map((c) => `${c.pid}:${c.started}`))
-  const consumers = [...(h.consumers ?? []), ...roots.filter((r) => !seen.has(`${r.pid}:${r.started}`)).map((r) => ({ pid: r.pid, started: r.started }))].slice(-50)
-  writeHolder(lease.dir, { ...h, consumers })
+  const s = holderOf(lease.dir) ?? { holder: null, consumers: [] }
+  const seen = new Set(s.consumers.map(key))
+  const add = roots.filter((r) => (r.folder || (r.pid > 0 && r.started > 0)) && !seen.has(key(r))).map((r) => (r.folder ? { folder: r.folder } : { pid: r.pid, started: r.started }))
+  writeState(lease.dir, { ...s, consumers: [...s.consumers, ...add].slice(-200) })
+}
+
+/** After a reset found none of them using the home: its consumers are let go (the holder stays as it is). */
+export function clearConsumers(lease) {
+  if (!lease?.dir || lease.reused) return
+  const s = holderOf(lease.dir) ?? { holder: null, consumers: [] }
+  writeState(lease.dir, { ...s, consumers: [] })
 }
 
 /**
  * Takes a CLI test home's lease (waiting in turn, as the slots do), or reuses the one a parent passed this process
- * (CW_TEST_HOME_LEASES), only while that parent still holds it (its holder record live): a stale token is taken for
- * nothing. A reused lease never lets its user reset the home (`reused`: testHomes.mjs refuses). Refused out of order:
- * Claude Code's while Codex's is held. `release()` lets it go (a reused one: nothing).
+ * (CW_TEST_HOME_LEASES) only while that exact acquisition still holds it: its generation, pid and start in the lease
+ * state (HR1 on s29). An older token is taken for nothing, even while another run holds the same home. A reused lease
+ * never lets its user reset the home (`reused`: testHomes.mjs refuses). Refused out of order: Claude Code's while
+ * Codex's is held. `release()` lets it go (a reused one: nothing), keeping its consumers.
  */
-export async function acquireTestHome(cli, home, { poolRoot, env = process.env, alive = pidAlive, owner = process.pid, ...options } = {}) {
+export async function acquireTestHome(cli, home, { poolRoot, env = process.env, alive = pidAlive, owner = process.pid, ownerStarted = Math.floor(Date.now() - process.uptime() * 1000), ...options } = {}) {
   const dir = homeLockDir(cli, home, poolRoot)
-  const holder = holderOf(dir)
-  if (inherited(env)[cli] === dir && holder && !holder.clean && alive(holder.pid)) return { release() {}, reused: true, waitedMs: 0, dir, cli }
+  const token = inherited(env)[cli]
+  const now = holderOf(dir)?.holder
+  if (token && typeof token === 'object' && token.dir === dir && now && token.gen === now.gen && token.pid === now.pid && token.started === now.started && alive(now.pid)) return { release() {}, reused: true, waitedMs: 0, dir, cli }
   const held = heldLeases(env)
   const after = HOME_ORDER.slice(HOME_ORDER.indexOf(cli) + 1).filter((c) => held[c])
   if (after.length) throw new Error(`${NAMES[cli]} is asked for while ${after.map((c) => NAMES[c]).join(' and ')} is held: test home leases are taken in the order ${HOME_ORDER.join(', then ')}`)
@@ -117,20 +136,25 @@ export async function acquireTestHome(cli, home, { poolRoot, env = process.env, 
   lease.dir = dir
   lease.cli = cli
   if (!lease.release) return lease
-  // The holder before this one ended without letting the home go: its CLIs may still be there.
-  const before = holderOf(dir)
-  if (before && !before.clean && before.pid !== owner) lease.takeover = { pid: before.pid, started: before.started, consumers: before.consumers ?? [] }
-  writeHolder(dir, { pid: owner, started: Math.floor(Date.now() - process.uptime() * 1000), clean: false })
+  const s = holderOf(dir) ?? { holder: null, consumers: [] }
+  // A holder still in the record ended without letting go: what it ran may still be using the home.
+  const consumers = s.holder && s.holder.pid !== owner ? [...s.consumers, { pid: s.holder.pid, started: s.holder.started }] : s.consumers
+  if (s.holder && s.holder.pid !== owner) lease.takeover = { pid: s.holder.pid, started: s.holder.started }
+  lease.gen = randomBytes(12).toString('hex')
+  lease.holderPid = owner
+  lease.holderStarted = ownerStarted
+  writeState(dir, { holder: { pid: owner, started: ownerStarted, gen: lease.gen }, consumers })
   own.set(cli, dir)
   const release = lease.release
   lease.release = () => {
     // waitForSlot registers this cleanup on exit. Suites release earlier too; don't accumulate exit listeners.
     process.off('exit', release)
     try {
-      // Let go cleanly: no record left (one left behind is a holder that didn't let go).
-      rmSync(join(dir, 'holder.state'), { force: true })
+      // Let go: no holder; what it noted using the home stays until a reset proves it gone.
+      const state = holderOf(dir) ?? { holder: null, consumers: [] }
+      if (state.holder?.gen === lease.gen) writeState(dir, { ...state, holder: null })
     } catch {
-      // Not removed: the next holder takes over as from one that didn't let go, and looks for what it left.
+      // Not written: the next holder takes this one for one that didn't let go, and waits for what it ran.
     }
     release()
     if (own.get(cli) === dir) own.delete(cli)

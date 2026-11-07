@@ -1,3 +1,4 @@
+import { spawn } from 'child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'fs'
 import { homedir } from 'os'
 import { join } from 'path'
@@ -8,7 +9,7 @@ import { assertTestHome, freshenHome, freshenedLine, homeUsers, HomeNotReady, MA
 // @ts-expect-error: plain .mjs module without types
 import { classify, UNCLASSIFIED } from './e2e/testHomeManifest.mjs'
 // @ts-expect-error: plain .mjs module without types
-import { acquireTestHome, homesOf, leasesEnv, LEASES_VAR, noteConsumers } from './e2e/testHomeLock.mjs'
+import { acquireTestHome, holderOf, homesOf, leasesEnv, LEASES_VAR, noteConsumers } from './e2e/testHomeLock.mjs'
 
 // The CLI test homes start each run fresh, keeping only the sign-in (HI-2606, design s17 with Darren's answers): fake
 // homes with known bytes, the CLIs' sign-in status scripted, nothing real read or signed in.
@@ -254,7 +255,9 @@ describe('HR1 on s17: who uses a home, and putting back only what the reset wrot
     noteConsumers(first, [{ pid: 710, started: 2000 }])
     const second = await acquireTestHome('claude', home, { poolRoot: p, wait: false, owner: 701, alive: (pid: number) => pid !== 700 })
     try {
-      expect(second.takeover).toMatchObject({ pid: 700, consumers: [{ pid: 710, started: 2000 }] })
+      expect(second.takeover).toMatchObject({ pid: 700 })
+      // What it noted, and itself, stay as consumers until a reset proves them gone.
+      expect(holderOf(second.dir).consumers).toEqual(expect.arrayContaining([{ pid: 710, started: 2000 }, expect.objectContaining({ pid: 700 })]))
       // The dead consumer's orphaned Claude Code (its parent field still 710) is a user.
       const users = homeUsers('claude', home, { lease: second, processes: () => [row(711, 710, 2500, 'claude.exe --resume x')] })
       expect(users.join()).toMatch(/claude\.exe \(pid 711/)
@@ -306,5 +309,125 @@ describe('HR1 on s17: who uses a home, and putting back only what the reset wrot
     writeFileSync(join(home, MARKER), '{}')
     await freshenHome('claude', home, deps(['in', 'in']))
     expect(JSON.parse(readFileSync(join(home, '.claude.json'), 'utf8')).userID).toBe('u')
+  })
+})
+
+describe('HR1 on s29: consumers noted before use, kept until a reset proves them gone; tokens bound to one acquisition', () => {
+  const lockPool = (): string => join(tmp, `locks-s29-${++n}`)
+  // A CLI that knows its home only from its environment: node, given nothing on its command line about the home.
+  const SLEEP = 'setInterval(() => {}, 1000)'
+  const spawned: number[] = []
+  afterAll(() => {
+    for (const pid of spawned) {
+      try {
+        process.kill(pid)
+      } catch {
+        // Gone already.
+      }
+    }
+  })
+  /** A parent that starts a detached CLI stand-in (its home only in its environment) and exits: the child's pid. */
+  const orphanFrom = (parentOut: string): { parent: { pid: number; started: number }; child: () => number } => {
+    const started = Date.now()
+    const parent = spawn(process.execPath, ['-e', `const c = require('child_process').spawn(process.execPath, ['-e', ${JSON.stringify(SLEEP)}], { detached: true, stdio: 'ignore', env: { ...process.env, CLAUDE_CONFIG_DIR: 'x' } }); c.unref(); require('fs').writeFileSync(${JSON.stringify(parentOut)}, String(c.pid))`], { stdio: 'ignore' })
+    return { parent: { pid: parent.pid!, started }, child: () => Number(readFileSync(parentOut, 'utf8')) }
+  }
+  const waitFor = async (fn: () => boolean): Promise<void> => {
+    const until = Date.now() + 20000
+    while (!fn() && Date.now() < until) await new Promise((r) => setTimeout(r, 50))
+  }
+
+  it('a suite that left a CLI behind keeps the home from being reset after its lease is let go, until that CLI ends', async () => {
+    const p = lockPool()
+    const lockHome = join(tmp, `life-${n}`)
+    const first = await acquireTestHome('claude', lockHome, { poolRoot: p, wait: false, alive: () => true })
+    const out = join(tmp, `child-${n}.txt`)
+    const { parent, child } = orphanFrom(out)
+    // Noted as the runner notes a suite: as soon as it is spawned.
+    noteConsumers(first, [parent])
+    await waitFor(() => existsSync(out) && Number(readFileSync(out, 'utf8')) > 0)
+    const orphan = child()
+    spawned.push(orphan)
+    // The suite (its parent) ends; the lease is let go as normal.
+    await waitFor(() => {
+      try {
+        process.kill(parent.pid, 0)
+        return false
+      } catch {
+        return true
+      }
+    })
+    first.release()
+    const second = await acquireTestHome('claude', lockHome, { poolRoot: p, wait: false, alive: () => true })
+    try {
+      const h = claudeHome()
+      const err = await freshenHome('claude', h, { status: async () => 'in', lease: second, waitMs: 0 }).catch((e: unknown) => e)
+      expect((err as { kind: string }).kind).toBe('busy')
+      expect((err as Error).message).toMatch(new RegExp(`pid ${orphan}`))
+      expect(existsSync(join(h, 'projects'))).toBe(true)
+      // Ended: proven gone, the reset goes ahead and lets the consumer go.
+      process.kill(orphan)
+      await waitFor(() => {
+        try {
+          process.kill(orphan, 0)
+          return false
+        } catch {
+          return true
+        }
+      })
+      await freshenHome('claude', h, { status: async () => 'in', lease: second, waitMs: 0 })
+      expect(existsSync(join(h, 'projects'))).toBe(false)
+      expect(holderOf(second.dir).consumers).toEqual([])
+    } finally {
+      second.release()
+    }
+  }, 60000)
+
+  it('a runner that ended without letting go leaves its holder as a consumer; a CLI naming the registered suite folder counts, whatever its parent chain', async () => {
+    const p = lockPool()
+    const lockHome = join(tmp, `life-${n}`)
+    const suite = join(tmp, `suite-${n}`)
+    mkdirSync(suite, { recursive: true })
+    const crashed = await acquireTestHome('claude', lockHome, { poolRoot: p, wait: false, owner: 4321, alive: () => true })
+    // Registered before the suite started; the runner then crashed (no release).
+    noteConsumers(crashed, [{ folder: suite }])
+    // A CLI whose own parent is long gone, launched with a path in the suite's folder (as Combwork passes --settings).
+    const cli = spawn(process.execPath, ['-e', SLEEP, join(suite, 'profile', 'settings.json')], { detached: true, stdio: 'ignore' })
+    spawned.push(cli.pid!)
+    const next = await acquireTestHome('claude', lockHome, { poolRoot: p, wait: false, alive: (pid: number) => pid !== 4321 })
+    try {
+      expect(next.takeover).toMatchObject({ pid: 4321 })
+      const err = await freshenHome('claude', claudeHome(), { status: async () => 'in', lease: next, waitMs: 0 }).catch((e: unknown) => e)
+      expect((err as Error).message).toMatch(new RegExp(`pid ${cli.pid}.*naming`))
+    } finally {
+      process.kill(cli.pid!)
+      next.release()
+    }
+  }, 60000)
+
+  it("an old run's token isn't reused while another acquisition holds the same home, nor one whose holder pid was reused", async () => {
+    const p = lockPool()
+    const lockHome = join(tmp, `life-${n}`)
+    const old = await acquireTestHome('claude', lockHome, { poolRoot: p, wait: false, alive: () => true })
+    const oldEnv = leasesEnv([old], {})
+    old.release()
+    const now = await acquireTestHome('claude', lockHome, { poolRoot: p, wait: false, alive: () => true })
+    try {
+      // The new holder is alive in the same folder; the old token's generation is another's.
+      const viaOld = await acquireTestHome('claude', lockHome, { poolRoot: p, wait: false, env: oldEnv, alive: () => true, owner: 999 })
+      expect(viaOld.reused).toBeUndefined()
+      viaOld.release?.()
+      // The current generation, but a holder start that isn't this holder's (its pid reused): not reused either.
+      const token = JSON.parse(leasesEnv([now], {})[LEASES_VAR])
+      token.claude.started -= 60000
+      const reusedPid = await acquireTestHome('claude', lockHome, { poolRoot: p, wait: false, env: { [LEASES_VAR]: JSON.stringify(token) }, alive: () => true, owner: 998 })
+      expect(reusedPid.reused).toBeUndefined()
+      reusedPid.release?.()
+      // The exact acquisition: reused, and it can't reset.
+      const exact = await acquireTestHome('claude', lockHome, { poolRoot: p, wait: false, env: leasesEnv([now], {}), alive: () => true })
+      expect(exact.reused).toBe(true)
+    } finally {
+      now.release()
+    }
   })
 })

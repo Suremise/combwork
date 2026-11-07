@@ -27,7 +27,7 @@ import { isAbsolute, join, relative, resolve, sep } from 'path'
 import { createRequire } from 'module'
 import { parse as parseToml, stringify as toToml } from 'smol-toml'
 import { classify, HOME_NAMES, KEPT_FIELDS, matches, SIGN_IN, UNCLASSIFIED } from './testHomeManifest.mjs'
-import { holderOf } from './testHomeLock.mjs'
+import { clearConsumers, holderOf } from './testHomeLock.mjs'
 
 const ctx = createRequire(import.meta.url)('./runContext.cjs')
 
@@ -85,32 +85,37 @@ const CLI_EXE = /^(claude|codex|node)(\.exe)?$/i
 const exeOf = (cmd) => /^\s*(?:"([^"]+)"|(\S+))/.exec(String(cmd ?? ''))?.slice(1).find(Boolean)?.split(/[\\/]/).pop() ?? ''
 
 /**
- * Who may still be using a home, from evidence tied to it (HR1 on s17), never a guess from command lines or names:
- * - what used it under this lease: the consumers the holder noted (a suite's test copies of Combwork,
- *   testHomeLock.mjs noteConsumers), and, given `self`, this process's own (a scenario run starts nothing else);
- * - after taking the lease over from a holder that ended without letting go (`lease.takeover`), that holder and the
- *   consumers it noted.
- * Each such process still running (the same pid and start), and every CLI it started since (a child, however it was told
- * the home: a command line, CLAUDE_CONFIG_DIR or CODEX_HOME), is a user. A process list that can't be read is itself
- * one: no reset without it. Never ends anything; a process of another home's is never looked at.
+ * Who may still be using a home, from evidence tied to it (HR1 on s17 and s29), never a guess from names:
+ * - the consumers its lease state keeps (testHomeLock.mjs), until a reset proves them gone:
+ *   - a suite's folder, registered before the suite starts: any process whose command line names it (Combwork's CLI
+ *     launches pass their settings, MCP config and hook files from its profile there), and the test copies of Combwork it
+ *     recorded there;
+ *   - a process (a suite, a test copy, a holder that ended without letting go): itself while running (the same pid and
+ *     start), and every CLI it started since, by its parent chain (a CLI told the home only by its environment too);
+ * - given `self`, this process's own CLI descendants (a scenario run starts nothing else).
+ * A process list that can't be read is itself a user: no reset without it. Never ends anything; a process of another
+ * home's is never looked at.
  */
 export function homeUsers(cli, home, { lease = null, processes = listProcesses, self = null } = {}) {
   const list = processes()
   if (!list) return ['the process list (it couldn\'t be read)']
   const fp = createRequire(import.meta.url)('./folderProcesses.cjs')
-  const record = lease?.dir ? holderOf(lease.dir) : null
-  const roots = [
-    ...(record?.consumers ?? []).map((c) => ({ ...c, why: 'a consumer noted under this lease' })),
-    ...(lease?.takeover ? [{ pid: lease.takeover.pid, started: lease.takeover.started, why: 'the run that held the home before and did not let it go' }, ...(lease.takeover.consumers ?? []).map((c) => ({ ...c, why: "that run's consumer" }))] : []),
-    ...(self ? [{ pid: self.pid, started: self.started, why: "this run's", own: true }] : [])
-  ]
+  const state = lease?.dir ? holderOf(lease.dir) : null
+  const roots = []
   const users = []
+  for (const c of state?.consumers ?? []) {
+    if (c.folder) {
+      for (const p of list) if (p.pid !== process.pid && fp.namesFolder(String(p.commandLine ?? ''), c.folder)) users.push(`${exeOf(p.commandLine) || 'a process'} (pid ${p.pid}, naming ${c.folder})`)
+      for (const copy of fp.recordedCopies(c.folder)) roots.push({ ...copy, why: `a test copy of Combwork from ${c.folder}` })
+    } else roots.push({ ...c, why: 'what used it under an earlier lease' })
+  }
+  if (self) roots.push({ pid: self.pid, started: self.started, why: "this run's", own: true })
   for (const r of roots) {
     const same = (p) => p.pid === r.pid && Math.abs(p.started - (r.started ?? p.started)) <= 2000
     if (!r.own && list.some(same)) users.push(`pid ${r.pid} (${r.why})`)
     for (const d of fp.descendantsIn(list, r.pid)) {
       const p = list.find((x) => x.pid === d.pid)
-      if (p && p.started >= (r.started ?? 0) - 2000 && CLI_EXE.test(exeOf(p.commandLine))) users.push(`${exeOf(p.commandLine)} (pid ${p.pid}, started by ${r.why})`)
+      if (p && p.started >= (r.started ?? 0) - 2000 && (CLI_EXE.test(exeOf(p.commandLine)) || !r.own)) users.push(`${exeOf(p.commandLine) || 'a process'} (pid ${p.pid}, started by ${r.why})`)
     }
   }
   return [...new Set(users)]
@@ -215,6 +220,8 @@ export async function freshenHome(cli, home, deps = {}) {
     busy = await users(cli, real)
   }
   if (busy.length) throw new HomeNotReady('busy', `${name}'s test home ${real} is still in use (${busy.join(', ')}): not reset; nothing was ended`)
+  // None of what used it is there any more: its consumers are let go (HR1 on s29: only a reset that proved them gone).
+  clearConsumers(lease)
 
   const before = await status(cli, real)
   if (before === 'out') throw new HomeNotReady('signedOut', `${name} isn't signed in to its test home ${real} (tests/e2e/README.md): not reset`)
