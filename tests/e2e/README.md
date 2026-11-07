@@ -387,6 +387,22 @@ relies on, a type's meaning) runs `--all`, said on the card. Add an area to `aff
 suite or a source file; `tests/e2esuites.test.ts` checks every suite and source file is covered. What only the unit
 tests use (`tests/*.test.ts` and their helpers in `tests/`, `vitest.config.ts`, CI's workflow: `UNIT_ONLY`) selects no
 suite, so an e2e suite or scenario must never load a `.ts` helper from `tests/` (the unit test fails if one does).
+The Windows Sandbox checks' own files (`tests/sandbox/`) are among them: no suite or scenario loads or reads them (the
+unit test checks), the Sandbox runs them on a packaged build, and `UNIT_SCANS` selects their unit tests (HI-2690).
+
+**A change of types only selects nothing** (HI-2690): a TypeScript file whose changed lines all lie in statements erased
+before anything runs (an interface, a type alias, an overload's signature, a type-only import or export, a `declare`
+value with none, a `declare` module, namespace or global holding only those), each line shared with no other
+statement, or a change of comments alone. It's proved node by node, never by a `.d.ts` extension: an enum of any kind (a
+const enum's values are inlined where it is used), a value, a mixed line or a file that doesn't parse select as usual.
+So does a file read as source data, one a suite, a scenario or a script names (`tipwindows` reads `tips.ts`, `viewer`
+reads `servers.ts`). Typecheck checks the types. **`servers.ts` stays every suite**: 109 files make Agent API requests,
+most through a helper whose path is `BASE + path`, which no selection can follow to the routes it reaches.
+
+**Why each suite**: `--affected` ends with a line a picked suite, `suite: reason; reason` (at most three, the first in
+the changed files' order): its own file, a file in its area, or a shared file's trail (`src/main/ipc.ts: 'advanced:set'
+→ tests/e2e/advanced.cjs`). A coverage ledger's boundary analysis can cite them. The picker writes them to stderr as
+`why …` lines; its JSON lines on stdout are unchanged.
 
 **The picker's unit tests** (`node tests/e2e/affected.mjs --pick`, the merge queue's focused tests) are a changed test
 file, those `UNIT_SCANS` names for a change, and those Vitest relates by import (`vitest list --changed`) **narrowed by
