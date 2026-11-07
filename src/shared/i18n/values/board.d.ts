@@ -964,7 +964,6 @@ interface CombworkMessageValues {
   'board.work.badgeStale': undefined
   'board.work.base': undefined
   'board.work.branch': undefined
-  'board.work.carriedIn': { target: string | number; card: string | number }
   'board.work.carriedOver': { from: string | number; to: string | number }
   'board.work.check': { name: string | number; result: string; counted: string }
   'board.work.failed': { error: string | number }
@@ -972,6 +971,7 @@ interface CombworkMessageValues {
   'board.work.filesNotRead': { note: string; why: string | number }
   'board.work.folder': undefined
   'board.work.folderGone': { folder: string | number }
+  'board.work.inTarget': { target: string | number }
   'board.work.integrated': { method: string; target: string | number; result: string | number }
   'board.work.leftTarget': { target: string | number; revision: string | number }
   'board.work.mergedInPart': { target: string | number }

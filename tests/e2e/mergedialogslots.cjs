@@ -5,7 +5,7 @@
 //   branch on it, which merges it into main (screenshots in both themes);
 // - a card started by B2 in its own worktree (fake Claude Code, by its token) and submitted, in Review: its line in the
 //   dialog says it is that card's work, with a link to the card, and Merge asks first; once confirmed the merge is
-//   observed outside the rules (Integrated, by outside, with the rules it skipped) and the card is Done.
+//   observed (HI-2709: an InTarget mark) and the card stays in Review, its review still to decide.
 // - both dialogs start from the project's merge style (HI-1765): Squash when it squashes, a merge commit when it
 //   merges or rebases, and a choice made before the style is read (held by CW_TEST_SLOW_IPC) stays.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
@@ -104,7 +104,7 @@ const git = (cwd, args) => lib.git(cwd, ['-c', `user.name=${fx.identity.name}`, 
     await dialog.locator('[data-action="merge"]').click()
     check("the slot's line is merged into main", !!(await until(async () => (await dialog.count()) === 0 && fs.existsSync(path.join(fx.alpha, 's.txt')), HUNG_MS)) && lib.git(fx.alpha, ['log', '-1', '--format=%s', 'main']).trim() === `Merge ${slotLine}`, lib.git(fx.alpha, ['log', '-3', '--oneline', 'main']))
 
-    // --- A card in Review: its line is its work; merged here only after asking, then outside the rules.
+    // --- A card in Review: its line is its work; merged here only after asking, then marked as in main (HI-2709).
     const b2 = await q.agent(fx, h, 'B2', { worktree: true })
     const n = (await inv('tasks:create', { title: 'Card in review', project: 'alpha' })).number
     const key = (await h.card(n)).key
@@ -187,9 +187,10 @@ const git = (cwd, args) => lib.git(cwd, ['-c', `user.name=${fx.identity.name}`, 
     await shoot(ask, '4-card-confirm')
     await ask.getByRole('button', { name: 'Merge Here' }).click()
     check("the card's line is merged into main", !!(await until(async () => fs.existsSync(path.join(fx.alpha, 'c.txt')), HUNG_MS)))
-    const outside = await until(async () => (await h.facts(n)).find((f) => f.kind === 'Integrated' && f.data.by === 'outside'), HUNG_MS)
-    check('…observed outside the rules: Integrated, by outside, naming the rules it skipped', !!outside && Array.isArray(outside.data.outsideRules) && outside.data.outsideRules.length > 0, JSON.stringify((await h.facts(n)).map((f) => [f.kind, f.data?.outsideRules])))
-    check('…and the card is Done', !!(await until(async () => (await h.card(n))?.column === 'done', HUNG_MS)), (await h.card(n))?.column)
+    // HI-2709: a merge outside its review never closes a card in Review: it is marked, and its review still decides.
+    const inMain = await until(async () => (await h.facts(n)).find((f) => f.kind === 'InTarget' && f.data.target === 'main'), HUNG_MS)
+    check('…observed: marked as already in main (InTarget), no Integrated', !!inMain && !(await h.facts(n)).some((f) => f.kind === 'Integrated'), JSON.stringify((await h.facts(n)).map((f) => f.kind)))
+    check('…and the card stays in Review', (await h.card(n))?.column === 'review', (await h.card(n))?.column)
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {

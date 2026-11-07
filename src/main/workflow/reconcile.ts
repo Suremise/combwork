@@ -22,8 +22,7 @@ import { samePath } from '../../shared/movePaths'
 import type { CardRecord } from './factStore'
 import type { Workflow, Write } from './runtime'
 import { staleWake } from './queueState'
-import { carriedProvenance, walkStillHolds } from './carriedWalk'
-import { carriedInNow } from '../../shared/workflow/workView'
+import { inTargetNow } from '../../shared/workflow/workView'
 
 export interface ReconcileHooks {
   /** Called after the platform was read and before the write: where a test lets another observer act first. */
@@ -33,11 +32,6 @@ export interface ReconcileHooks {
    * a caller keeping a checkpoint (the app's Done targets) doesn't move it past this card (HR4's #1217 round 2).
    */
   unknown?: (what: string) => void
-  /**
-   * HI-2709: told when a card's carried-code walk deferred (more merges to read, a read that couldn't be made, a merge
-   * in flight): the caller runs another bounded pass later, without waiting for an event.
-   */
-  again?: (why: 'more' | 'unknown' | 'busy') => void
 }
 
 const UNFINISHED = ['active', 'review', 'approved', 'merging']
@@ -383,33 +377,22 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
   }
 
   if (card.stage === 'review' && wf.ownLine(s) && s.latest?.revision && s.latest.base && s.latest.revision !== base) {
-    // HI-2709: carried into its target by another card's merge (marked for this submission and target): its review
-    // still decides, on every pass, before anything is read.
-    if (carriedInNow(s)) return
-    // Merged by hand before its review passed: Done, marked outside the rules (OP-25); never moved back. Only once the
-    // walk proves no queue merge carried it there (carriedWalk.ts); not proved yet, nothing is written.
-    const p = await carriedProvenance(wf, card, s)
-    if (p.kind === 'notContained') return
-    if (p.kind === 'defer') return hooks.again?.(p.why)
-    const sub = { id: s.latest.id, revision: s.latest.revision, base: s.latest.base, key: s.latest.key }
-    // A hand merge's method, asked at the head the walk was bound to.
-    const c = p.kind === 'outside' ? await G.contains(project, target, { base: sub.base, revision: sub.revision, key: sub.key }, p.snap.head) : null
-    if (p.kind === 'outside' && (isUnknown(c) || !c)) return hooks.again?.('unknown')
+    // HI-2709: its change found in its target before its review passed (merged by hand, or carried in another card's
+    // merge: HI-2684 carried HI-2682's) never closes it: a mark, and it stays in Review. Its review decides; once that
+    // passes, the queue (or the merge's report) finds the change in the target and closes it as merged. Marked once per
+    // submission, for the submission it was read for.
+    if (inTargetNow(s)) return
+    const sub = s.latest
+    const c = await G.contains(project, target, { base: sub.base!, revision: sub.revision!, key: sub.key })
+    if (isUnknown(c) || !c) return
     await hooks.afterRead?.()
-    // The head the walk was bound to, read again as the last await before the write (HR1's round 1 finding 2): changed
-    // or unreadable, nothing is written. The outside Done records this head, never one read after it.
-    const head = await G.lineHead(project, target)
-    if (isUnknown(head) || head !== p.snap.head) return hooks.again?.('unknown')
-    if (p.kind === 'carried') {
-      await wf.write(card, null, 'outside', (w) => {
-        if (!walkStillHolds(wf, w, s, p.snap)) return
-        const f = w.tx.appendObserved(card.id, { kind: 'CarriedIn', actor: 'outside', source: 'observed', dedupe: `carried:${s.cycle}:${sub.id}:${target}:${p.entry}`, data: { revision: sub.revision, target, by: p.by, entry: p.entry, submission: sub.id } }) // i18n-ignore: a fact's kind and codes, not text
-        if (f) w.written.push(f as Fact)
-      })
-      return
-    }
-    if (!c || isUnknown(c)) return
-    return integratedOutside(wf, card, s, sub.revision, c.method, ['review'], { holds: (w) => walkStillHolds(wf, w, s, p.snap), head })
+    await wf.write(card, null, 'outside', (w) => {
+      const now = w.state()
+      if (!sameCycle(w, s) || now.stage !== 'review' || now.latest?.id !== sub.id || (now.started?.target ?? '') !== target) return
+      const f = w.tx.appendObserved(card.id, { kind: 'InTarget', actor: 'outside', source: 'observed', dedupe: `intarget:${s.cycle}:${sub.id}`, data: { revision: sub.revision!, target, submission: sub.id } }) // i18n-ignore: a fact's kind and codes, not text
+      if (f) w.written.push(f as Fact)
+    })
+    return
   }
 
   if (card.stage === 'active' && wf.ownLine(s) && s.head && base && s.head !== base) {
@@ -465,15 +448,11 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
   }
 }
 
-/**
- * `proved` (HI-2709): a hand merge the carried-code walk proved, at the target's head it read last (`head`, recorded as
- * the result, never read again) and with what its write must still find (`holds`).
- */
-async function integratedOutside(wf: Workflow, card: CardRecord, s: CardState, revision: string, method: 'merge' | 'fastForward' | 'squash' | 'sameTree', outsideRules: string[], proved?: { holds: (w: Write) => boolean; head: string }): Promise<void> {
+async function integratedOutside(wf: Workflow, card: CardRecord, s: CardState, revision: string, method: 'merge' | 'fastForward' | 'squash' | 'sameTree', outsideRules: string[]): Promise<void> {
   const target = s.started!.target ?? ''
-  const th = proved ? proved.head : await G.lineHead(wf.cfg.project, target)
+  const th = await G.lineHead(wf.cfg.project, target)
   await wf.write(card, wf.rulesetOf(card, s), 'outside', (w) => {
-    if (!sameCycle(w, s) || (proved && !proved.holds(w))) return
+    if (!sameCycle(w, s)) return
     // Unique per cycle: two Combworks observing the same merge write one `Integrated` (§16.17).
     const f = w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { revision, target, result: !isUnknown(th) && th ? th : revision, method, by: 'outside', ...(outsideRules.length ? { outsideRules } : {}) } }) // i18n-ignore: a fact's kind and codes, not text
     if (f) w.written.push(f as Fact)

@@ -3851,10 +3851,6 @@
     "defaultMessage": "Branch",
     "description": "A label in the card dialog's Work section: the git branch the card's work is on follows."
   },
-  "board.work.carriedIn": {
-    "defaultMessage": "Its code reached {target} through {card}: its own review still decides.",
-    "description": "HI-2709: a mark in the card dialog's Work section: the card's submitted work is already in its target ({target}, a branch such as main) because the merge queue merged another card ({card}, its key, such as HI-12) that included it. This card stays in Review, and isn't taken as merged until its own review passes."
-  },
   "board.work.carriedOver": {
     "defaultMessage": "The pass for {from} carries over to {to}: the same change.",
     "description": "A mark in the card dialog's Work section: a pass for an earlier revision ({from}) still counts for a later one ({to}) with exactly the same changes. Glossary: carries over, same change."
@@ -3882,6 +3878,10 @@
   "board.work.folderGone": {
     "defaultMessage": "Its folder, {folder}, is no longer an agent’s worktree: its files can’t be opened here.",
     "description": "Under a revision's files in the card dialog's Work section: the folder the work was done in ({folder}, a path) isn't any agent's worktree now, so its files aren't opened in another folder instead."
+  },
+  "board.work.inTarget": {
+    "defaultMessage": "Its code is already in {target}: it stays in Review, and is closed as merged once its review passes.",
+    "description": "HI-2709: a mark in the card dialog's Work section, for a card in Review: its submitted work is already in its target ({target}, a branch such as main), merged by hand or inside another card's merge. It isn't taken as merged yet: its own review still decides, and once that passes the card is closed as merged."
   },
   "board.work.integrated": {
     "defaultMessage": "{method, select, merge {Merged into {target} as {result}} squash {Squashed into {target} as {result}} fastForward {{target} moved forward to {result}} sameTree {Already in {target} at {result}} other {Committed in {target} as {result}}}",

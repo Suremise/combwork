@@ -12,7 +12,7 @@ import { cardField, composeCard, decomposeCard, readCardRows, writeCardChanges, 
 import { moveCardsIntoTables } from './schema/cardsStep'
 import { addKey, cardKeys as keysOfCards, cardOfKey, cardPlace, changeKey, currentKeys, keysHeld, KEYS_STEP, moveKeys, movedCardNames, numberCard } from './schema/keysStep'
 import { LANE_RECORD_STEP, moveLaneRecords } from './schema/laneRecordStep'
-import { ACTIONS_DELIVERED_STEP, ASSISTANT_CHANGES_STEP, CARD_ATTACHMENTS_STEP, CARD_REVS_STEP, CARD_SEARCH_STEP, CARDS_STEP, FACTS_STEP, INTEGRATED_TARGET_STEP, QUERIES, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_RUNNERS_STEP, COPIES_STEP, QUEUE_SEEN_STEP, SESSION_LEASES_STEP, SKILL_COPIES_STEP, SLOTS_STEP, UNDO_OUTCOMES_STEP } from './schema/v1_0'
+import { ACTIONS_DELIVERED_STEP, ASSISTANT_CHANGES_STEP, CARD_ATTACHMENTS_STEP, CARD_REVS_STEP, CARD_SEARCH_STEP, CARDS_STEP, FACTS_STEP, QUERIES, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_RUNNERS_STEP, COPIES_STEP, QUEUE_SEEN_STEP, SESSION_LEASES_STEP, SKILL_COPIES_STEP, SLOTS_STEP, UNDO_OUTCOMES_STEP } from './schema/v1_0'
 import { NAMES_STEP } from './schema/namesStep'
 import { VALUES_STEP } from './schema/valuesStep'
 import { addCommentArchive, allArchivedComments, archivedCommentCount, archivedCommentRows, archiveCommentRows, COMMENT_ARCHIVE_STEP, mayHaveLostCards, type Evicted } from './schema/commentArchive'
@@ -349,16 +349,6 @@ export const BOARD_MIGRATIONS: Migration[] = [
     name: COMMENT_ARCHIVE_STEP.name,
     group: UPGRADE_GROUP_ID,
     up: (db) => addCommentArchive(db)
-  },
-  {
-    // HI-2709: the queue's merges by their target (schema/v1_0.ts INTEGRATED_TARGET_STEP), for reconcile's walk of which
-    // merge carried a card's code. In the 1.0 group, its last, as 25 to 27 are: a board the group upgraded takes it unasked.
-    version: 28,
-    name: INTEGRATED_TARGET_STEP.name,
-    group: UPGRADE_GROUP_ID,
-    up: (db) => {
-      for (const sql of INTEGRATED_TARGET_STEP.ddl) db.exec(sql)
-    }
   }
 ]
 
