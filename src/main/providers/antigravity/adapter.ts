@@ -7,7 +7,8 @@ import { ANTIGRAVITY, ANTIGRAVITY_DESCRIPTOR, antigravityModeFlags } from '../..
 import { ASSISTANT_AGENT_ID } from '../../../shared/assistant'
 import { TOOLS_SERVER } from '../../../shared/assistantTools'
 import { isProviderEnabled } from '../../../shared/providers'
-import { fmt, msg } from '../../../shared/i18n'
+import { fmt, msg, tr } from '../../../shared/i18n'
+import { release as osRelease } from 'os'
 import { overrideId } from '../../../shared/advanced'
 import { advanced } from '../../advanced'
 import { launchOverrides } from '../../advancedValues'
@@ -34,6 +35,12 @@ import { AGY_ALLOW, agyHooks, agyLockReply, agyNoticeGiven, agyNoticeReply, agyN
 
 const NAME = ANTIGRAVITY_DESCRIPTOR.name
 
+const NOTICE = {
+  title: msg({ id: 'providers.antigravity.notice.title', defaultMessage: 'Antigravity can’t use everything this agent was given', description: "A notice as an Antigravity CLI agent starts: something it was given can't apply (an MCP server's transport, a permission mode on this Windows)." }),
+  sse: msg({ id: 'providers.antigravity.notice.sse', defaultMessage: '{count, plural, one {The MCP server {servers} uses} other {The MCP servers {servers} use}} the legacy HTTP+SSE transport, which Antigravity doesn’t support, so this agent runs without {count, plural, one {it} other {them}}. Change {count, plural, one {it} other {them}} to Streamable HTTP in MCP servers to use {count, plural, one {it} other {them}} here.', description: "Part of a notice as an Antigravity CLI agent starts: MCP servers it was given use a transport Antigravity can't use, so they're left out. {servers}: their names joined as a list; {count}: how many. HTTP+SSE and Streamable HTTP are transports' names, MCP servers a place in Combwork: keep them." }),
+  auto: msg({ id: 'providers.antigravity.notice.auto', defaultMessage: 'Auto runs commands inside Antigravity’s own sandbox, which needs Windows 11 24H2 or later. This PC runs build {build}, so Antigravity may refuse Auto or ask before commands. Choose another mode in Agent Settings, or update Windows.', description: "Part of a notice as an Antigravity CLI agent starts in Auto mode on a Windows older than 11 24H2. {build}: the Windows build number. Auto is a permission mode, Agent Settings a place in Combwork: keep them; Windows 11 24H2 is a version." })
+}
+
 const REFUSED = {
   unreadable: msg({ id: 'providers.antigravity.unreadableConfig', defaultMessage: "{provider} didn't start: Combwork couldn't read {file} ({why}), which it would load. Fix or remove the file, then start the agent again.", description: "Why an Antigravity CLI agent didn't start (its pane): a config file in the project (an MCP server or hook list) couldn't be read, so Combwork couldn't keep what it holds out of the agent. {provider} is the CLI's name, {file} a path, {why} the error's own words." }),
   gone: msg({ id: 'providers.antigravity.conversationGone', defaultMessage: "{provider} didn't resume {conversation}: {provider} no longer has that conversation (it keeps it apart from its transcript, in the agent's profile, and it was removed). Start a new session instead.", description: "Why an Antigravity CLI agent didn't resume a conversation (its pane): the conversation's own store in the agent's profile is gone, though its transcript may be left. {provider} is the CLI's name, {conversation} the conversation's id." }),
@@ -52,9 +59,26 @@ export { isConversationId }
 
 /** An MCP server as agy's mcp_config.json has it (1.5.0: stdio command/args/env, or Streamable HTTP url/headers). */
 export function agyServer(def: McpServerDef): Record<string, unknown> | null {
+  // The legacy HTTP+SSE transport: agy 1.5.0's url servers are Streamable HTTP only (its mcp_servers.md), so none.
+  if (isLegacySse(def)) return null
   if (typeof def.url === 'string' && def.url) return { url: def.url, ...(def.headers ? { headers: def.headers } : {}) }
   if (typeof def.command === 'string' && def.command) return { command: def.command, ...(def.args?.length ? { args: def.args } : {}), ...(def.env ? { env: def.env } : {}) }
   return null
+}
+
+/** A server on the legacy HTTP+SSE transport (its type `sse`), which agy can't use. */
+export const isLegacySse = (def: McpServerDef): boolean => typeof def.type === 'string' && def.type.toLowerCase() === 'sse'
+
+/** The agent's servers agy can't use (legacy HTTP+SSE): left out of its profile, and the user told why (launchNotice). */
+export const legacySseServers = (given: Record<string, McpServerDef>): string[] => Object.entries(given).filter(([, d]) => isLegacySse(d)).map(([n]) => n)
+
+/** The Windows build Antigravity's sandbox needs (Windows 11 24H2: 26100), for Auto mode. */
+export const AUTO_MIN_BUILD = 26100
+
+/** This PC's Windows build (os.release's third part), or null when it can't be read. */
+export function windowsBuild(release: string = osRelease()): number | null {
+  const n = Number(release.split('.')[2])
+  return Number.isSafeInteger(n) && n > 0 ? n : null
 }
 
 /**
@@ -241,6 +265,19 @@ export class AntigravityAdapter implements ProviderAdapter {
     await writeJsonAtomic(join(profile, '.gemini', 'config', 'hooks.json'), agyHooks(ctx.hookUrl, ctx.hookAuthFile, advanced.get<boolean>('antigravity.hooks.toolHooks')))
     await writeJsonAtomic(join(ctx.privateDir, 'agy-settings.json'), launchSettings(ctx, launchOverrides(ctx.overrides, ANTIGRAVITY, 'preApproveCombworkTools')))
     return delivered
+  }
+
+  /**
+   * What the user is told as an agent starts (HI-2547), said plainly rather than switched silently: the MCP servers left
+   * out (legacy HTTP+SSE), and Auto on a Windows whose build can't run Antigravity's sandbox.
+   */
+  launchNotice(ctx: LaunchContext): { title: string; message: string } | null {
+    const parts: string[] = []
+    const sse = legacySseServers(ctx.mcpServers)
+    if (sse.length) parts.push(tr(NOTICE.sse, { servers: fmt.list(sse), count: sse.length }))
+    const build = windowsBuild()
+    if ((ctx.permissionMode || ANTIGRAVITY_DESCRIPTOR.defaultPermissionMode) === 'auto' && build !== null && build < AUTO_MIN_BUILD) parts.push(tr(NOTICE.auto, { build: String(build) }))
+    return parts.length ? { title: tr(NOTICE.title), message: parts.join(' ') } : null
   }
 
   buildCommand(executable: string, ctx: LaunchContext): CommandSpec {

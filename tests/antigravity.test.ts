@@ -21,7 +21,7 @@ const { ANTIGRAVITY_ENV_STRIP, antigravityEnv, checkEnv, checkProfile, inProfile
 const runContext = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
 const childBase = (): Record<string, string> => runContext.baseEnv() as Record<string, string>
 const { UnreadableConfig, scannedFolders, workspaceServers } = await import('../src/main/providers/antigravity/projectConfig')
-const { agyServer, antigravity, antigravityArgs, isConversationId, launchSettings, profileConfig, profileFolder, sameServer, statusLineConversation } = await import('../src/main/providers/antigravity/adapter')
+const { AUTO_MIN_BUILD, agyServer, antigravity, legacySseServers, windowsBuild, antigravityArgs, isConversationId, launchSettings, profileConfig, profileFolder, sameServer, statusLineConversation } = await import('../src/main/providers/antigravity/adapter')
 const { advanced } = await import('../src/main/advanced')
 const { ensurePcAccounts, homeAccount, pcAccountId, pcWideSignIn } = await import('../src/shared/connectionDefaults')
 const { TOOLS_SERVER } = await import('../src/shared/assistantTools')
@@ -216,6 +216,29 @@ describe("an agent's private profile, written for each launch", () => {
     expect(servers[TOOLS_SERVER]).toEqual({ command: tools.command, args: tools.args, env: tools.env })
     expect(servers.remote).toEqual({ url: 'https://mcp.example/mcp', headers: { Authorization: 'Bearer t' } })
     expect(made.refused).toBeUndefined()
+  })
+
+  it('a Streamable HTTP server goes as its url and headers; a legacy HTTP+SSE one is left out, and the user told why (HI-2547)', () => {
+    const given = { [TOOLS_SERVER]: tools, http: { type: 'http', url: 'https://a/mcp' }, old: { type: 'sse', url: 'https://b/sse' }, old2: { type: 'SSE', url: 'https://c/sse' } }
+    const servers = profileConfig(given, new Map()).mcp.mcpServers as Record<string, unknown>
+    expect(Object.keys(servers)).toEqual([TOOLS_SERVER, 'http'])
+    expect(servers.http).toEqual({ url: 'https://a/mcp' })
+    expect(agyServer({ type: 'sse', url: 'https://b/sse' })).toBeNull()
+    expect(legacySseServers(given)).toEqual(['old', 'old2'])
+    const notice = antigravity.launchNotice({ mcpServers: given, permissionMode: 'accept-edits' } as never)
+    expect(notice?.message).toMatch(/The MCP servers old and old2 use the legacy HTTP\+SSE transport/)
+    expect(antigravity.launchNotice({ mcpServers: { [TOOLS_SERVER]: tools }, permissionMode: 'accept-edits' } as never)).toBeNull()
+  })
+
+  it('Auto on a Windows older than 11 24H2 (build 26100) is said plainly as the agent starts, never switched silently', () => {
+    expect(windowsBuild('10.0.22631')).toBe(22631)
+    expect(windowsBuild('10.0.26200')).toBe(26200)
+    expect(windowsBuild('x')).toBeNull()
+    expect(AUTO_MIN_BUILD).toBe(26100)
+    const old = windowsBuild() !== null && windowsBuild()! < AUTO_MIN_BUILD
+    const notice = antigravity.launchNotice({ mcpServers: {}, permissionMode: 'auto' } as never)
+    expect(!!notice?.message.includes('Windows 11 24H2')).toBe(old)
+    expect(antigravity.launchNotice({ mcpServers: {}, permissionMode: 'ask' } as never)).toBeNull()
   })
 
   it("a project server the agent wasn't given refuses the launch, naming its file: nothing stands in for it", () => {
