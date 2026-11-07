@@ -2288,6 +2288,24 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   So a change of the target says which cards in flight and running lanes keep another one, with it: Workflow's Save…
   dialog (`WorkflowCheck.targets`) and the settings tool's reply (`keptTargets` in `optionsForm.ts`). Moving them onto the
   new target is HI-2556's.
+- **A lane's or card's Merges into** (HI-2556, OP-12 built; Darren's decisions of 7 Nov on design s14). One effective
+  target is decided at a card's start and recorded (`Started.target`): the card's own (`cards.target`), else its lane's,
+  else G7. From then on that one value is the branch it is made from, its queue and merge, its dependency check and its
+  slot. A **lane's** target is recorded in its ruleset: a lane started on another branch records the rules in force with
+  G7 set to it (`targetedOf`, id the base's with `~target:<branch>`), so its cards take it as any rule, and old rules
+  compare the base ids (`rulesBaseId`): a lane on 1.2.0 isn't on old rules for that. It is fixed for the lane's life
+  (a start naming another is refused), set by the user, the Assistant or a script, never its own builder, and only
+  with the rules enforced. **A lane is one target**: a card whose own target isn't its lane's is refused into it (on a
+  start, an edit or a placement), and a lane's card can't be set to another. A **card's** own target is the user's or the
+  Assistant's (`tasks.setTarget`, the card dialog, `cw_create_task`/`cw_update_task`, the Agent API's `target`), only
+  while its branch has no work (never started, or each line it had is gone or already in its target, and the folder it
+  worked in holds nothing uncommitted, tracked or not: its slot while still on its line, the project folder whatever is
+  there: `ownWork`): no rebase of started work. Its old lines, empty, are deleted with the change (`dropEmptyLines`,
+  each only at the head `ownWork` found empty, compare and swap: one moved since is refused and kept; refused while a
+  folder has one checked out; only its own slot lines, never a target), so its next start makes a fresh line from the
+  new target. Both name only
+  the default (stored as none) or a branch G7b lists that exists now (`pickTarget`, `branchExists`). A lane start's
+  target is checked before anything changes (an `applyNow` put back included), and again under the lanes' lock.
 - A ruleset can't run arbitrary code: pieces are looked up by id, and an unknown id or parameter refuses to compile
   (a ruleset from a newer Combwork opens read-only, like `combwork.db`, §4) [#1112 D].
 
@@ -2347,6 +2365,7 @@ Done for None: an `Accepted` revision (§16.3.3); with no review, the builder's 
 | G5 | **Who merges** | Combwork merges (queue) · The agent merges, Combwork checks · Committed is done (no merge) · Not checked | `done.contained`, the queue (§16.9). "Committed is done": the target is the branch the folder works on, so the card is Done once its rules pass (review, approval). "Not checked": Done isn't checked against the target. Combwork merges and the agent merges need G11 = slots; Committed is done needs G11 = project folder (§16.7.2). |
 | G6 | **Merge style** | Merge commit · Squash · Rebase and fast-forward | Owned here, not by the Merge dialog (OP-13). The merge queue's: where the agent merges, G6 isn't read. Rebase and fast-forward (#1184) lands a linear history (§16.9.1 step 4). |
 | G7 | **Work merges into** (target) | A branch, default the repository's default branch (`main`) | Per-card target allowed (OP-12). |
+| G7b | **Other branches work can merge into** (`otherTargets`, HI-2556) | Branch names, none by default | The branches besides G7 a lane's or card's **Merges into** may name. Not a rule: left out of every ruleset (`ruleOptions`), never set by a preset, never Custom, so a change applies at once. A pick is checked against it as it is made. |
 | G8 | **Work is up to date with <target> before it merges** (strict) | On / Off | `integrate.upToDate` |
 | G9 | **Checks pass on the merged result** | Named commands | `integrate.checksPassed` (Combwork merges only) |
 | G10 | **Your OK before merging** | Never · Cards with these labels (e.g. `ui`, `release`) · Every card | `approval.given` on integrate, and on report merge where the agent merges or merges aren't checked (#1592: G10 applies under Not checked too); Darren's UI-screenshot gate is "cards labelled ui" [note §6; OP-23] |
@@ -6449,7 +6468,7 @@ test only, in place of #1112 B's patch-id), OP-38, OP-40 and OP-41. The text of 
 | OP-9 | Override authority (note q7): user always, the Assistant within Control (reason required), agents never? | **Agreed [#1117 20 Oct].** Yes. |
 | OP-10 | Slot pinning (note q5): an agent keeps its slot for a lane? | **Agreed [#1117 20 Oct].** Yes. |
 | OP-11 | For you kinds (#439): Approve, Decide, Test, Sign in, Other as one ask-the-user intent? | **Agreed [#1117 20 Oct].** Yes; only Approve satisfies a gate. |
-| OP-12 | A per-card target (release and integration branches, RELEASING.md)? | **Agreed [#1117 20 Oct].** Yes: a card may name a target branch; set by the user or the Assistant; the lane's cards default to the lane's. |
+| OP-12 | A per-card target (release and integration branches, RELEASING.md)? | **Agreed [#1117 20 Oct].** Yes: a card may name a target branch; set by the user or the Assistant; the lane's cards default to the lane's. **Built [HI-2556]** (§16.5.4): G7b lists the branches; a lane's and a card's Merges into. Forward merges (HI-2679) and retargeting at release (HI-2680) follow. |
 | OP-13 | Who owns target and merge style (#1117 c1)? | **Agreed [#1117 20 Oct].** The Git options; a slot records only its base; the Merge dialog stays for merges outside cards. |
 | OP-14 | Commit trailer `Combwork-Card: AM-12`, and card references in intents? | **Agreed [#1117 20 Oct].** The trailer as written (under the old name until 1.1, renamed outright by HI-2588: Combwork no longer reads it); intents take `AM-12` or `#1061` and **refuse a plain number** in 1.0, since old skills and memory mean the global number (§16.12; HB3's finding 13). |
 | OP-15 | Undo retention? | **Agreed [#1117 20 Oct].** 7 days on disk. |

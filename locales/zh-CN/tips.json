@@ -336,6 +336,8 @@
   "tips.mergeSlot.title": "智能体轮流合并",
   "tips.mergeStrict.text": "由 Combwork 合并时，可在“版本控制”→“工作流程”中要求工作在合并前与目标分支保持同步：合并队列会在它自己的文件夹中更新卡片，绝不在构建者的分支上操作；如果是相同的变更，评审结果继续有效。",
   "tips.mergeStrict.title": "合并前与目标分支保持同步",
+  "tips.mergesInto.title": "在当前版本旁开发下一个版本",
+  "tips.mergesInto.text": "在“版本控制 → 工作流 → 工作可合并到的其他分支”中添加如 1.2.0 的分支，然后在“启动通道…”中将其选为通道的“合并到”，或在卡片对话框中为卡片选择它。其卡片从该分支创建，并通过它自己的队列合并到该分支。",
   "tips.messageReceipts.text": "助手给智能体留的每条消息都有 ID 并会保留，即使重启也不丢失：智能体读取收件箱后即为已接收，处理后确认即为已确认。{minutes, plural, other {# 分钟}}内未确认的消息会在其窗格中显示为逾期（✉）。",
   "tips.messageReceipts.title": "查看消息的送达情况",
   "tips.modelFallbacks.text": "Combwork 会询问 Claude Code 和 Codex 有哪些模型，以及每个模型支持哪些推理强度。如果 CLI 无法回答，可以自行编辑其设置页面上的模型、推理强度和价格列表。",

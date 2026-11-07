@@ -904,6 +904,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'tasks:setKind': (n, kind, opts) => tasks.setKind(n, kind, { kind: 'user' }, opts ?? {}),
     'tasks:confirmKind': (n, accept) => tasks.confirmKind(n, accept === true, { kind: 'user' }),
     'tasks:setReviewSkip': (n, skip, opts) => tasks.setReviewSkip(n, skip === true, { kind: 'user' }, { reason: opts?.reason }),
+    'tasks:setTarget': (n, target) => tasks.setTarget(n, typeof target === 'string' ? target.slice(0, 250) : null, { kind: 'user' }),
     // The window's change never skips a rule unasked (#1275): its moves go through tasks:move, which asks.
     'tasks:update': async (n, patch, more) => {
       const user = { kind: 'user' } as const
@@ -1578,7 +1579,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       const r = req && typeof req === 'object' ? req : ({} as LaneStartRequest)
       const cards = Array.isArray(r.cards) ? r.cards.filter((n: unknown): n is number => Number.isInteger(n) && (n as number) > 0).slice(0, 200) : []
       if (typeof r.builder !== 'string' || !r.builder) throw combworkError(M.laneBuilderRequired, undefined, { kind: 'invalid' })
-      return startLaneFromWindow(currentWorkspace(), workspace.assertProject(p), { builder: r.builder, reviewer: typeof r.reviewer === 'string' && r.reviewer ? r.reviewer : null, pool: r.pool === true, cards, note: typeof r.note === 'string' ? r.note.slice(0, 4000) : '', name: typeof r.name === 'string' ? r.name.slice(0, 200) : null, ...(r.applyNow === true ? { applyNow: true } : {}) })
+      return startLaneFromWindow(currentWorkspace(), workspace.assertProject(p), { builder: r.builder, reviewer: typeof r.reviewer === 'string' && r.reviewer ? r.reviewer : null, pool: r.pool === true, cards, note: typeof r.note === 'string' ? r.note.slice(0, 4000) : '', name: typeof r.name === 'string' ? r.name.slice(0, 200) : null, ...(r.applyNow === true ? { applyNow: true } : {}), ...(typeof r.target === 'string' && r.target ? { target: r.target.slice(0, 250) } : {}) })
     },
     'lanes:startInfo': (p) => laneStartInfo(currentWorkspace(), workspace.assertProject(p)),
     'costs:cards': (q) => {

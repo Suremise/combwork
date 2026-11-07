@@ -56,6 +56,9 @@
     "text": "Default: \"{project}\".",
     "note": "HI-2229: the Assistant has no project of its own (\"Default: this project.\" left it calling with none), so it gets arg.project."
   },
+  "tool.arg.target": {
+    "text": "Merges into: one of the project's Other branches work can merge into, or \"\" for its Work merges into. A lane's is fixed once started; a card's changes only while its branch has no work."
+  },
   "tool.arg.workflowRole": {
     "text": "Builds cards, reviews them, either (never its own), generalist (never in a lane), or independent (no part in the workflow). Default: from its name."
   },

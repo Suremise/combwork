@@ -107,7 +107,7 @@ import { cleanLaunch, policySummary, terminalPreset } from '../shared/launchPoli
 import { workspaceNotesFile } from './workspaceNotes'
 import { WORKSPACE_NOTES_PATH } from '../shared/workspaceNotes'
 import { cardStages } from './boardStore'
-import { cardFacts, cardKind, cardReviewSkip, factRow, forYouOfCards } from './workflow/cardWork'
+import { cardFacts, cardKind, cardReviewSkip, cardTarget, factRow, forYouOfCards } from './workflow/cardWork'
 import type { ForYouItem } from '../shared/workflow/workView'
 import { bracketFinished, bracketFor, bracketResolved, bracketStarted, cardRunRevision, takeResolved, type Bracket, type Recorded } from './workflow/runChecks'
 import { workflowSummary } from './workflow/optionsForm'
@@ -2083,8 +2083,8 @@ function laneProject(v: unknown): string {
 }
 
 /** A lane's numbers and texts from a request body (undefined: not given). */
-function laneArgs(body: any): { cards?: number[]; rounds?: number; waitMinutes?: number; name?: string | null; brief?: string } {
-  const out: { cards?: number[]; rounds?: number; waitMinutes?: number; name?: string | null; brief?: string } = {}
+function laneArgs(body: any): { cards?: number[]; rounds?: number; waitMinutes?: number; name?: string | null; brief?: string; target?: string | null } {
+  const out: { cards?: number[]; rounds?: number; waitMinutes?: number; name?: string | null; brief?: string; target?: string | null } = {}
   if (body?.cards !== undefined) {
     const c = laneCards(cardRefsIn(body.cards))
     if (typeof c === 'string') throw new HttpError(400, c)
@@ -2102,6 +2102,11 @@ function laneArgs(body: any): { cards?: number[]; rounds?: number; waitMinutes?:
     if (typeof body.brief !== 'string') throw new HttpError(400, say(API.lane.briefText))
     if (body.brief.length > LANE_BRIEF_MAX) throw new HttpError(400, say(API.lane.briefMax, { max: String(LANE_BRIEF_MAX) }))
     out.brief = body.brief
+  }
+  // Its Merges into (HI-2556): a branch name, or null or '' for the project's own; checked by the lane's start.
+  if (body?.target !== undefined) {
+    if (body.target !== null && typeof body.target !== 'string') throw new HttpError(400, say(API.lane.targetText))
+    out.target = body.target === null ? null : body.target.slice(0, 250)
   }
   return out
 }
@@ -2196,7 +2201,7 @@ async function laneStartCall(body: any, place?: lanes.LanePlace): Promise<LaneCh
     }
   }
   const started = async (commit?: () => void) => {
-    const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, ...(unknownReviewer !== undefined ? { unknownReviewer } : {}), cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, briefNotIn: sessions.liveFor(p, builder)?.sessionId ?? null, by: await laneBy(), ...(pool ? { pool: true } : {}), ...(applyNow ? { applyNow: true } : {}), ...(place ? { place } : {}), ...(a ? { ownBuilder: true } : {}), ...(commit ? { commit } : {}) })
+    const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, ...(unknownReviewer !== undefined ? { unknownReviewer } : {}), cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, ...(args.target !== undefined ? { target: args.target } : {}), briefNotIn: sessions.liveFor(p, builder)?.sessionId ?? null, by: await laneBy(), ...(pool ? { pool: true } : {}), ...(applyNow ? { applyNow: true } : {}), ...(place ? { place } : {}), ...(a ? { ownBuilder: true } : {}), ...(commit ? { commit } : {}) })
     // Its brief given where it goes (HI-1795): outside slots, delivered now (and again by laneBriefs' next look if not).
     // A new lane's brief carried from the builder's lane that had just ended (HI-2097) too.
     const rec = (await lanes.rawLanes(ws)).find((l) => l.id === r.lane.id)
@@ -2829,6 +2834,8 @@ async function taskView(c: TaskCard, agents =new Map<string, Promise<ReturnType<
   const k = cardKind(workspace, c.number)
   // Whether it skips review (#1625), and an agent's proposal of it not answered yet: additive, only when there is one.
   const rs = cardReviewSkip(workspace, c.number)
+  // Its own Merges into (HI-2556): additive, only when it has one.
+  const target = cardTarget(workspace, c.number)
   // Who merges it and where it is with the merge queue, by its own rules (#1354): additive, only when Combwork merges it.
   const merge = c.project && !c.archived ? await queueLineFor(c.project, c.number) : null
   // A code card's checks before review and how to run one (HI-2276): additive, only when its rules name some.
@@ -2836,7 +2843,7 @@ async function taskView(c: TaskCard, agents =new Map<string, Promise<ReturnType<
   const kept = attachmentsOf ? files.filter((a) => !!a.comment && attachmentsOf.has(a.comment)) : files
   const attachments = kept.length ? kept.map((a) => attachmentForAgents(a, c.comments)) : null
   const omitted = files.length - kept.length
-  return { ...(elsewhere.length ? { ...view, elsewhere } : view), ...(attachments ? { attachments } : {}), ...(omitted ? { attachmentsOmitted: omitted } : {}), ...(k ? { kind: k.kind, ...(k.kindProposed ? { kindProposed: k.kindProposed } : {}) } : {}), ...(rs?.skip ? { reviewSkipped: rs.skip } : {}), ...(rs?.proposed != null ? { reviewSkipProposed: rs.proposed } : {}), stage, ...(merge ? { merge } : {}), ...checks }
+  return { ...(elsewhere.length ? { ...view, elsewhere } : view), ...(attachments ? { attachments } : {}), ...(omitted ? { attachmentsOmitted: omitted } : {}), ...(k ? { kind: k.kind, ...(k.kindProposed ? { kindProposed: k.kindProposed } : {}) } : {}), ...(rs?.skip ? { reviewSkipped: rs.skip } : {}), ...(rs?.proposed != null ? { reviewSkipProposed: rs.proposed } : {}), ...(target ? { target } : {}), stage, ...(merge ? { merge } : {}), ...checks }
 }
 
 /** A card attachment as agents read it (HI-1700): its path, name and size, who added it and when, and where it came. */
@@ -3121,11 +3128,18 @@ async function placeOnLane(l: LanePlacement, card: number): Promise<{ lane: Lane
   }
 }
 
+/** A card's Merges into as a call gives it (HI-2556): a branch name, or null (or '') for the project's own. */
+function targetArg(v: unknown): string | null {
+  if (v === null || v === '') return null
+  if (typeof v !== 'string') throw new HttpError(400, say(API.lane.targetText))
+  return v.slice(0, 250)
+}
+
 route('POST', '/v1/tasks', async ({ body }) => {
   requireWorkspace()
   const title = String(body?.title ?? '').trim()
   if (!title) throw new HttpError(400, say(API.card.titleRequired))
-  const input = { title, description: body?.description, project: body?.project, agent: body?.agent, column: columnParam(body?.column), labels: body?.labels, blocked: body?.blocked, blockedBy: cardRefsIn(body?.blockedBy), links: cardRefsIn(body?.links), context: body?.context, ...(body?.kind !== undefined ? { kind: body.kind } : {}), ...(body?.skipReview !== undefined ? { skipReview: body.skipReview as string } : {}) }
+  const input = { title, description: body?.description, project: body?.project, agent: body?.agent, column: columnParam(body?.column), labels: body?.labels, blocked: body?.blocked, blockedBy: cardRefsIn(body?.blockedBy), links: cardRefsIn(body?.links), context: body?.context, ...(body?.kind !== undefined ? { kind: body.kind } : {}), ...(body?.skipReview !== undefined ? { skipReview: body.skipReview as string } : {}), ...(body?.target !== undefined ? { target: targetArg(body.target) } : {}) }
   const actor = await taskActor()
   // Placed on a lane as it is made (HI-2167): checked before the card is made; placed after, through cw_lane start's
   // own path, so nobody guesses its key.
@@ -3159,7 +3173,7 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
   const actor = await taskActor()
   // A decision that answers requests (HI-1932) is that change alone: checked against the body as sent, before any of
   // its other fields (its kind, skipping review, attachments: changed outside the patch) could be.
-  if (patch.answers !== undefined) tasks.checkDecisionAnswers(actor, body.answers, ['kind', 'confirmKind', 'skipReview', 'attachments'].some((k) => body[k] !== undefined))
+  if (patch.answers !== undefined) tasks.checkDecisionAnswers(actor, body.answers, ['kind', 'confirmKind', 'skipReview', 'target', 'attachments'].some((k) => body[k] !== undefined))
   const changes: string[] = []
   // Its kind (#1277): changed after it was made (the Assistant's, with override.reason), or an agent's proposal answered.
   const kind = body?.kind
@@ -3171,6 +3185,8 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
   if (kind !== undefined && patch.column === undefined) delete patch.override
   // Whether it skips review (#1625): the user's reason (the Assistant's), or false; checked before anything is written.
   const skipReview = body?.skipReview === undefined ? undefined : tasks.reviewSkipArg(body.skipReview)
+  // Its Merges into (HI-2556): a branch, or null for the project's own; checked by tasks.setTarget.
+  const target = body?.target === undefined ? undefined : targetArg(body.target)
   const write = async (commit?: () => void): Promise<TaskCard> => {
     if (confirmKind !== undefined) {
       await tasks.confirmKind(n, confirmKind, actor, { commit })
@@ -3184,6 +3200,10 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
       await tasks.setReviewSkip(n, skipReview !== false, actor, { commit, reason: skipReview || '' })
       changes.push(sayStored([skipReview !== false ? API.card.saidSkipsReview : API.card.saidReviewed]))
     }
+    if (target !== undefined) {
+      await tasks.setTarget(n, target, actor, { commit })
+      changes.push(sayStored([API.card.saidTarget, { own: target ? 'yes' : 'no', target: target ?? '' }]))
+    }
     // A change and its comment are saved together: a card watch woken by the change names this comment.
     const c = Object.keys(patch).length ? await tasks.updateTask(n, patch, actor, { said: changes, comment: comment || undefined, commit }) : comment ? await tasks.commentTask(n, comment, actor, { commit }) : await tasks.readTask(n, actor)
     if (comment) changes.push(say(API.card.saidCommented))
@@ -3193,7 +3213,7 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
   if (body?.attachments !== undefined && patch.project !== undefined) throw new HttpError(400, say(API.attachment.moveFirst))
   const paths = attachmentList(body)
   // A change of its kind with anything else is one board change (HR3's #1277 round 1): refused part way, none of it.
-  const once = (commit?: () => void): Promise<TaskCard> => (kind !== undefined || confirmKind !== undefined || skipReview !== undefined ? tasks.cardBatch(workspace, () => write(commit)) : write(commit))
+  const once = (commit?: () => void): Promise<TaskCard> => (kind !== undefined || confirmKind !== undefined || skipReview !== undefined || target !== undefined ? tasks.cardBatch(workspace, () => write(commit)) : write(commit))
   const apply = async (commit?: () => void): Promise<TaskCard> => {
     // Its files copied here, inside the operation (the Assistant's: once admitted), to the card's own project.
     const c = await withAttachments(paths, paths ? ((await tasks.readTask(n, actor)).project ?? null) : null, (files) => tasks.changeWithAttachments(actor, files, comment ? 'comment' : 'description', () => once(commit), commit))

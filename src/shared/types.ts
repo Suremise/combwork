@@ -4015,6 +4015,8 @@ export interface LaneInfo {
    * options from before a change until it ends. Never on an ended lane, nor one with none recorded (from before 1.0).
    */
   oldRules: boolean
+  /** Its Merges into (HI-2556): the branch its cards merge into, when it isn't the project's Work merges into. */
+  target?: string
   /**
    * A running lane's stages: its recorded ruleset's, in board order (#1421: HR4's round 1), which its cards in Todo take
    * too; null for an ended lane, or one with none recorded (its project's options now stand in).
@@ -4081,6 +4083,8 @@ export interface LaneStartRequest {
   name?: string | null
   /** For the builder's running lane with a card in flight: the list applied now, that card put back (HI-1995). */
   applyNow?: boolean
+  /** Its Merges into (HI-2556): one of LaneStartInfo.targets' others; null or absent, the project's own. */
+  target?: string | null
 }
 
 /**
@@ -4089,6 +4093,8 @@ export interface LaneStartRequest {
  */
 export interface LaneStartInfo {
   pool: { id: string; name: string }[] | null
+  /** The branches its Merges into offers (HI-2556): the project's Work merges into and the others it lists; null: none to pick. */
+  targets: { default: string; others: string[] } | null
 }
 
 /** What Start lane… did: the lane recorded, and how each agent started (failed: the lane stays, why said). */

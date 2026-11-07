@@ -655,6 +655,40 @@
   "service.lanes.noWorkspace": {
     "placeholders": {}
   },
+  "service.lanes.targetBuilder": {
+    "placeholders": {}
+  },
+  "service.lanes.targetCard": {
+    "placeholders": {
+      "card": "plain",
+      "cardTarget": "plain",
+      "target": "plain"
+    }
+  },
+  "service.lanes.targetFixed": {
+    "placeholders": {
+      "builder": "plain",
+      "target": "plain"
+    }
+  },
+  "service.lanes.targetMissing": {
+    "placeholders": {
+      "unknown": "select",
+      "target": "plain"
+    }
+  },
+  "service.lanes.targetNotListed": {
+    "placeholders": {
+      "hasTargets": "select",
+      "target": "plain",
+      "default": "plain",
+      "hasOthers": "select",
+      "others": "plain"
+    }
+  },
+  "service.lanes.targetRulesOff": {
+    "placeholders": {}
+  },
   "service.lanes.teamPaused": {
     "placeholders": {}
   },

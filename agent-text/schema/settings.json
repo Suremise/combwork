@@ -1859,6 +1859,9 @@
       "what": "plain"
     }
   },
+  "settings.agent.takes.otherTargets": {
+    "placeholders": {}
+  },
   "settings.agent.takes.preChecks": {
     "placeholders": {}
   },

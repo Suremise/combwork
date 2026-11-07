@@ -21,6 +21,7 @@ import { whyNoLine } from './lineWriter'
 import { sessions } from './sessions'
 import { getTask } from './tasks'
 import { resolvedOf } from './workflow/rulesets'
+import { projectTargets } from './workflow/targets'
 import { workflowEnforced } from './workflow/service'
 import type { WorkspaceService } from './workspace'
 import type { AgentDef, ProjectConfig } from '../shared/types'
@@ -167,7 +168,7 @@ export async function startLaneFromWindow(ws: WorkspaceService, projectPath: str
   const release = holdLaneStart(ws, project, builder.id)
   starting.add(key)
   try {
-    const recorded = await startLane(ws, { project, builder: builder.id, reviewer: reviewer?.id ?? null, ...(pool ? { pool: true } : {}), cards: cards.map((c) => c.number), name: req.name?.trim() || null, by: inDefaultDialect(() => say(A.byUser)), ...(req.applyNow ? { applyNow: true } : {}) })
+    const recorded = await startLane(ws, { project, builder: builder.id, reviewer: reviewer?.id ?? null, ...(pool ? { pool: true } : {}), cards: cards.map((c) => c.number), name: req.name?.trim() || null, by: inDefaultDialect(() => say(A.byUser)), ...(req.applyNow ? { applyNow: true } : {}), ...(req.target !== undefined ? { target: req.target } : {}) })
     const where = await builderWhere(projectPath, builder, options, noCodeOnly(ws, cards.map((c) => c.number)))
     if (where.inSlots) {
       // Its slot, lent before its agents start and kept for the whole lane (§16.10.2). None free: the lane is recorded
@@ -245,7 +246,9 @@ export async function laneStartInfo(ws: WorkspaceService, projectPath: string): 
   const cfg = await ws.projectConfig(projectPath)
   const platform = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.platform?.id
   const options = workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null
-  return { pool: poolOf(cfg, options)?.map((a) => ({ id: a.id, name: a.name })) ?? null }
+  // Its Merges into (HI-2556): offered only with the rules on and another branch listed.
+  const t = options ? await projectTargets(ws, projectPath).catch(() => null) : null
+  return { pool: poolOf(cfg, options)?.map((a) => ({ id: a.id, name: a.name })) ?? null, targets: t && t.others.length ? t : null }
 }
 
 /**

@@ -48,6 +48,11 @@ export interface WorkflowOptions {
   /** G7: the target line; empty means the repository's default branch. */
   target: string
   /**
+   * G7b, Other branches work can merge into (HI-2556): the branches besides G7 a lane or card may name as its Merges into.
+   * Not a rule (BRANCH_OPTIONS): left out of every ruleset, so a change applies at once; absent: none.
+   */
+  otherTargets?: string[]
+  /**
    * G7 named by the project's own options, not inherited from the workspace's or Combwork's (#1419, OP-29): never set by a
    * level, worked out as options are resolved, so a card or lane keeps it with the rest of its ruleset. The merge queue
    * merges a card of a project inside a larger repository only when its ruleset has it.
@@ -141,6 +146,12 @@ export const FOCUSED_RUN = 'focused.run'
 export const NAME_OPTIONS: readonly OptionKey[] = ['stageNames']
 
 /**
+ * The branches lanes and cards may pick (HI-2556: G7b), not rules: left out of a ruleset (a lane's or card's pick is
+ * checked against them as it is made), never set by a preset, never making the options Custom.
+ */
+export const BRANCH_OPTIONS: readonly OptionKey[] = ['otherTargets']
+
+/**
  * How agents work together, not rules (HI-1766): left out of every ruleset (so a change applies at once and marks
  * nothing "old rules"), never set by a preset or All off (but Maximum agents, `PRESET_PREFERENCES`), never making the
  * options Custom. A lane keeps the rounds and wait it registered with.
@@ -155,10 +166,10 @@ export type PreferenceKey = (typeof PREFERENCE_OPTIONS)[number]
 export const PRESET_PREFERENCES: readonly OptionKey[] = ['maxAgents']
 
 /** The options no preset sets (names and preferences): a choice of preset keeps a project's or level's own. */
-export const UNPRESET_OPTIONS: readonly OptionKey[] = [...NAME_OPTIONS, ...PREFERENCE_OPTIONS.filter((k) => !PRESET_PREFERENCES.includes(k))]
+export const UNPRESET_OPTIONS: readonly OptionKey[] = [...NAME_OPTIONS, ...BRANCH_OPTIONS, ...PREFERENCE_OPTIONS.filter((k) => !PRESET_PREFERENCES.includes(k))]
 
 /** The options that never make a preset Custom: the names and every preference, Maximum agents too. */
-const NOT_CUSTOM: readonly OptionKey[] = [...NAME_OPTIONS, ...PREFERENCE_OPTIONS]
+const NOT_CUSTOM: readonly OptionKey[] = [...NAME_OPTIONS, ...BRANCH_OPTIONS, ...PREFERENCE_OPTIONS]
 
 /** A preset's or All off's own options, with the draft's own names and preferences kept (HI-1766, #1417). */
 export function withUnpreset(chosen: Partial<WorkflowOptions>, own: Partial<WorkflowOptions>): Partial<WorkflowOptions> {
@@ -425,6 +436,7 @@ export const OPTION_TAKES: Record<OptionKey, (v: unknown) => boolean> = {
   reviewers: (v) => v === 1 || v === 2,
   noSelfReview: bool,
   preChecks: strings,
+  otherTargets: (v) => strings(v) && (v as string[]).every((b) => b.trim() === b && b.length > 0) && new Set(v as string[]).size === (v as string[]).length,
   sameness: oneOf<WorkflowOptions['sameness']>(['change', 'exact']),
   finish: oneOf<Finisher>(['combworkMerges', 'agentMerges', 'committed', 'notChecked', 'accept']),
   style: oneOf<WorkflowOptions['style']>(['merge', 'squash', 'rebase']),
@@ -479,7 +491,7 @@ export const FORM_GROUPS: Record<PlatformId, { id: FormGroupId; options: OptionK
     { id: 'team', options: ['maxAgents'] },
     { id: 'review', options: ['review', 'reviewers', 'reviewerMode', 'noSelfReview', 'sameness', 'okBefore'] },
     { id: 'checks', options: ['preChecks', 'mergeChecks', 'focusedTests', 'mergeInstall'] },
-    { id: 'merging', options: ['finish', 'style', 'target', 'strict', 'pushTarget', 'commitMessage', 'dependenciesDone'] },
+    { id: 'merging', options: ['finish', 'style', 'target', 'otherTargets', 'strict', 'pushTarget', 'commitMessage', 'dependenciesDone'] },
     { id: 'where', options: ['folder', 'slotsUpToDate', 'identity', 'stopOwnRuns', 'sharedFolderWarning', 'fileLocks'] },
     { id: 'loops', options: LOOP_OPTIONS },
     { id: 'stages', options: ['stageNames'] }

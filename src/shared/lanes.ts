@@ -2,6 +2,7 @@ import { currentCard, idleKey, laneCardState } from './laneBar'
 import type { DueDeps, LaneCard, LaneInfo, LaneSlotInfo, LaneState, LaneStatus, LaneWaitReason, TaskCard } from './types'
 import type { StageId } from './workflow/facts'
 import { cardRef } from './projectKeys'
+import { rulesBaseId, targetOfRulesetId } from './workflow/compile'
 import { unsubmittedText, type UnsubmittedCard } from './unsubmitted'
 import { agentMsg, say, type AgentMsg } from './agentText'
 
@@ -333,6 +334,8 @@ export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | 
     status,
     queued: running(rec) && rec.pending ? [...rec.pending] : null,
     oldRules: laneOldRules(rec, rulesetNow),
+    // Its Merges into (HI-2556): the other target its recorded ruleset marks; absent for the project's own.
+    ...(rec.ruleset && targetOfRulesetId(rec.ruleset) ? { target: targetOfRulesetId(rec.ruleset)! } : {}),
     stages: running(rec) && rec.ruleset && rulesetStages ? [...rulesetStages] : null,
     slot: running(rec) ? (slot?.slot ?? null) : null,
     slotInfo: running(rec) ? (slot?.info ?? null) : null,
@@ -345,7 +348,7 @@ export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | 
  * Whether a lane runs under old rules (#1421, §16.5.4): running, with a ruleset recorded when it started (none from
  * before 1.0, nor while rules weren't enforced) that isn't its project's now (`now`: main's; none known, no mark).
  */
-export const laneOldRules = (rec: Pick<LaneRecord, 'state' | 'ruleset'>, now: string | null | undefined): boolean => running(rec) && !!rec.ruleset && !!now && rec.ruleset !== now
+export const laneOldRules = (rec: Pick<LaneRecord, 'state' | 'ruleset'>, now: string | null | undefined): boolean => running(rec) && !!rec.ruleset && !!now && rulesBaseId(rec.ruleset) !== now
 
 /** What a lane's status reads of a card's facts (#1270): its stage, an open request for you, a stale pass, its rounds. */
 export interface LaneCardFacts {

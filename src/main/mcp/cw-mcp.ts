@@ -124,6 +124,7 @@ const T = {
   'lane.arg.builderJoin': agentMsg({ id: 'tool.lane.arg.builderJoin', text: "join: the builder's name." }),
   'lane.arg.reviewer': agentMsg({ id: 'tool.lane.arg.reviewer', text: 'Agent name or id.' }),
   'lane.arg.name': agentMsg({ id: 'tool.lane.arg.name', text: 'A short label for the lane.' }),
+  'arg.target': agentMsg({ id: 'tool.arg.target', text: "Merges into: one of the project's Other branches work can merge into, or \"\" for its Work merges into. A lane's is fixed once started; a card's changes only while its branch has no work." }),
   'lane.arg.brief': agentMsg({ id: 'tool.lane.arg.brief', text: "start: the builder's brief (at most 4000 characters)." }),
   'lane.arg.applyNow': agentMsg({ id: 'tool.lane.arg.applyNow', text: 'start: a changed list applies now, not after the card in flight.' }),
   'lane.arg.lane': agentMsg({ id: 'tool.lane.arg.lane', text: 'end: the lane id.' }),
@@ -933,7 +934,7 @@ const tools: Tool[] = [
       properties: {
         action: { type: 'string', enum: ['start', 'join', 'next', 'end', 'list'] },
         cards: cardsArg(say(T['lane.arg.cards'])),
-        ...(ASSISTANT ? { project: { type: 'string' }, builder: { type: 'string', description: say(T['lane.arg.builder']) }, pool: { type: 'boolean', description: say(T['lane.arg.pool']) } } : { builder: { type: 'string', description: say(T['lane.arg.builderJoin']) } }),
+        ...(ASSISTANT ? { project: { type: 'string' }, builder: { type: 'string', description: say(T['lane.arg.builder']) }, pool: { type: 'boolean', description: say(T['lane.arg.pool']) }, target: { type: 'string', description: say(T['arg.target']) } } : { builder: { type: 'string', description: say(T['lane.arg.builderJoin']) } }),
         reviewer: { type: 'string', description: say(T['lane.arg.reviewer']) },
         rounds: { type: 'number' },
         waitMinutes: { type: 'number' },
@@ -957,7 +958,7 @@ const tools: Tool[] = [
       }
       // An agent's lane is its project's, with itself as the builder (start) or the reviewer (join).
       const me = ASSISTANT ? {} : { project: PROJECT, ...(process.env.CW_AGENT_ID ? { [a.action === 'join' ? 'reviewer' : 'builder']: process.env.CW_AGENT_ID } : {}) }
-      if (a.action === 'start') return named((await api('POST', '/v1/lanes', { ...pick(['project', 'builder', 'reviewer', 'pool', 'cards', 'rounds', 'waitMinutes', 'name', 'brief', 'applyNow']), ...me })) as LaneChange, laneChangeText)
+      if (a.action === 'start') return named((await api('POST', '/v1/lanes', { ...pick(['project', 'builder', 'reviewer', 'pool', 'cards', 'rounds', 'waitMinutes', 'name', 'brief', 'applyNow', 'target']), ...me })) as LaneChange, laneChangeText)
       if (a.action === 'join') return named((await api('POST', '/v1/lanes/join', { ...pick(['project', 'builder', 'cards']), ...me })) as LaneChange, laneChangeText)
       if (a.action === 'next') return named((await api('GET', '/v1/lanes/next')) as Parameters<typeof laneNextText>[0], laneNextText)
       if (a.action !== 'end') throw new Error(say(T['lane.error.action']))
@@ -1122,6 +1123,7 @@ const tools: Tool[] = [
         context: contextArg,
         kind: { type: 'string', enum: ['code', 'no-code'], description: ASSISTANT ? say(T['createTask.arg.kind.assistant']) : say(T['createTask.arg.kind']) },
         skipReview: { type: 'string', description: ASSISTANT ? say(T['createTask.arg.skipReview.assistant']) : say(T['createTask.arg.skipReview']) },
+        ...(ASSISTANT ? { target: { type: 'string', description: say(T['arg.target']) } } : {}),
         attachments: attachmentsArg('description'),
         lane: {
           type: ['string', 'object'],
@@ -1131,7 +1133,7 @@ const tools: Tool[] = [
       },
       required: ['title']
     },
-    run: async (a) => createdLaneText((await api('POST', '/v1/tasks', { title: a.title, description: a.description, project: a.project ?? PROJECT, agent: a.agent, column: a.column, labels: a.labels, blocked: a.blocked, blockedBy: a.blockedBy, links: a.links, context: a.context, ...(a.kind !== undefined ? { kind: a.kind } : {}), ...(a.skipReview !== undefined ? { skipReview: a.skipReview } : {}), ...(a.attachments !== undefined ? { attachments: a.attachments } : {}), ...(a.lane !== undefined ? { lane: a.lane } : {}), reply: 'short' })) as TaskChange & { lane?: LaneChange; laneRefused?: string })
+    run: async (a) => createdLaneText((await api('POST', '/v1/tasks', { title: a.title, description: a.description, project: a.project ?? PROJECT, agent: a.agent, column: a.column, labels: a.labels, blocked: a.blocked, blockedBy: a.blockedBy, links: a.links, context: a.context, ...(a.kind !== undefined ? { kind: a.kind } : {}), ...(a.skipReview !== undefined ? { skipReview: a.skipReview } : {}), ...(a.target !== undefined ? { target: a.target } : {}), ...(a.attachments !== undefined ? { attachments: a.attachments } : {}), ...(a.lane !== undefined ? { lane: a.lane } : {}), reply: 'short' })) as TaskChange & { lane?: LaneChange; laneRefused?: string })
   },
   {
     name: 'cw_update_task',
@@ -1165,7 +1167,8 @@ const tools: Tool[] = [
               kind: { type: 'string', enum: ['code', 'no-code'], description: say(T['updateTask.arg.kind']) },
               confirmKind: { type: 'boolean', description: say(T['updateTask.arg.confirmKind']) },
               answers: { type: 'array', items: { type: 'string' }, description: say(T['updateTask.arg.answers']) },
-              skipReview: { type: ['string', 'boolean'], description: say(T['updateTask.arg.skipReview']) }
+              skipReview: { type: ['string', 'boolean'], description: say(T['updateTask.arg.skipReview']) },
+              target: { type: 'string', description: say(T['arg.target']) }
             }
           : { review: { type: 'string', enum: ['start', 'passed', 'failed'], description: say(T['updateTask.arg.review']) } })
       },
@@ -1173,7 +1176,7 @@ const tools: Tool[] = [
     },
     run: async (a) => {
       const body: Record<string, unknown> = { reply: 'short' }
-      for (const k of ['comment', 'column', 'position', 'before', 'blocked', 'waitingFor', 'title', 'description', 'project', 'agent', 'labels', 'addLabels', 'removeLabels', 'blockedBy', 'links', 'context', 'decision', 'review', 'override', 'kind', 'confirmKind', 'skipReview', 'answers', 'attachments']) if (a[k] !== undefined) body[k] = a[k]
+      for (const k of ['comment', 'column', 'position', 'before', 'blocked', 'waitingFor', 'title', 'description', 'project', 'agent', 'labels', 'addLabels', 'removeLabels', 'blockedBy', 'links', 'context', 'decision', 'review', 'override', 'kind', 'confirmKind', 'skipReview', 'target', 'answers', 'attachments']) if (a[k] !== undefined) body[k] = a[k]
       const text = changedText((await api('PATCH', `/v1/tasks/${enc(String(a.number))}`, body)) as TaskChange)
       // #1346 item 8: an Assistant with its journal on recorded six decisions and wrote none of them down.
       return ASSISTANT && JOURNAL && typeof a.decision === 'string' && a.decision.trim() ? `${text}\n${say(T['updateTask.reply.journalNote'])}` : text

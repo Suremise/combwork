@@ -498,6 +498,8 @@ const LEGEND = {
   line: msg({ id: 'board.lanes.legendLine', defaultMessage: '{category}: {stages}', description: "A line of the lanes' legend for screen readers (Progress panel): a category ({category}: its name, such as Approved) and the stages in it ({stages}: their names, a list, such as \"Approved and Merging\"). Glossary: stage, category." })
 }
 
+const LANE_TARGET = msg({ id: 'board.lanes.target', defaultMessage: 'into {branch}', description: 'HI-2556: a lane’s mark in its header (Progress panel), lower case: its cards merge into {branch} (a branch name), not the project’s Work merges into.' })
+const LANE_TARGET_TIP = msg({ id: 'board.lanes.targetTip', defaultMessage: 'This lane’s cards are made from {branch} and merge into it, not the project’s Work merges into, until the lane ends.', description: 'HI-2556: tooltip and accessible name of a lane header’s Merges into mark (Progress panel). {branch} is a branch name.' })
 const OLD_RULES = msg({ id: 'board.lanes.oldRules', defaultMessage: 'old rules', description: "A lane's mark in its header (Progress panel), lower case: the project's workflow options changed while the lane ran, and it keeps the ones it started with until it ends; its tooltip says so. Glossary: workflow options." })
 
 const PROJECT_LINK = msg({ id: 'board.lanes.projectLink', defaultMessage: '{project}: open its workflow in Version Control', description: "Accessible name and tooltip of the project's name in a lane's header (Progress panel): opens that project's Version Control tab (a tab's name) at its Workflow section. {project} is the project's name." })
@@ -649,7 +651,7 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced, exp
       {...(r
         ? {
             role: 'group',
-            'aria-label': [`${pair}${l.name ? `, ${l.name}` : ''}`, project?.name, word, why, oldRules && tr(OLD_RULES)].filter(Boolean).join(', '),
+            'aria-label': [`${pair}${l.name ? `, ${l.name}` : ''}`, project?.name, word, why, oldRules && tr(OLD_RULES), l.target && tr(LANE_TARGET, { branch: l.target })].filter(Boolean).join(', '),
             'aria-keyshortcuts': r.movable ? 'Alt+ArrowUp Alt+ArrowDown' : undefined,
             tabIndex: 0,
             draggable: r.movable,
@@ -774,6 +776,13 @@ function LaneRow({ lane: l, max, reorder: r, badges, runs, stages, enforced, exp
             <Tooltip content={oldRules} focus>
               <span className="progress-lane-state old-rules" data-mark="old-rules" tabIndex={0} role="note" aria-label={oldRules}>
                 {tr(OLD_RULES)}
+              </span>
+            </Tooltip>
+          )}
+          {l.target && (
+            <Tooltip content={tr(LANE_TARGET_TIP, { branch: l.target })} focus>
+              <span className="progress-lane-state lane-target" data-lane-target={l.target} tabIndex={0} role="note" aria-label={tr(LANE_TARGET_TIP, { branch: l.target })}>
+                {tr(LANE_TARGET, { branch: l.target })}
               </span>
             </Tooltip>
           )}

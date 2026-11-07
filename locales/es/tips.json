@@ -336,6 +336,8 @@
   "tips.mergeSlot.title": "Los agentes fusionan por turnos",
   "tips.mergeStrict.text": "Si Combwork fusiona, Control de versiones → Flujo de trabajo puede pedir que el trabajo esté al día con su destino antes de fusionarse: la cola de fusión actualiza la tarjeta en su propia carpeta, nunca en la rama del autor, y la revisión sigue valiendo si es el mismo cambio.",
   "tips.mergeStrict.title": "Trabajo al día antes de fusionarse",
+  "tips.mergesInto.title": "Trabaja en la próxima versión junto a esta",
+  "tips.mergesInto.text": "Añade una rama como 1.2.0 en Control de versiones → Flujo de trabajo → Otras ramas en las que se puede fusionar el trabajo, y elígela como «Se fusiona en» de un carril en Iniciar carril… o de una tarjeta en su diálogo. Sus tarjetas se crean a partir de ella y se fusionan en ella por su propia cola.",
   "tips.messageReceipts.text": "Cada mensaje que el Asistente deja a un agente tiene un id y se conserva, incluso tras un reinicio: se da por recibido cuando el agente lee su bandeja de entrada, y por confirmado cuando el agente actuó en consecuencia. Uno que no se confirma en {minutes, plural, one {# minuto} many {# minutos} other {# minutos}} aparece como atrasado (✉) en su panel.",
   "tips.messageReceipts.title": "Mira dónde está un mensaje",
   "tips.modelFallbacks.text": "Combwork pregunta a Claude Code y a Codex qué modelos tienen y qué niveles de esfuerzo admite cada uno. Si una CLI no puede decirlo, las listas de modelos, esfuerzo y precios de su página de configuración son tuyas para editarlas.",

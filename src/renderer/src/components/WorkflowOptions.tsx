@@ -73,6 +73,8 @@ const T = {
   identityValue: msg({ id: 'workflow.form.identityValue', defaultMessage: 'On, as {name} <{email}>', description: 'A value of “Commits use the project’s identity” in the list of what changes before saving workflow options: on, with the name and email commits use.' }),
   noneValue: msg({ id: 'workflow.form.noneValue', defaultMessage: 'None', description: 'An empty value in the list of what changes before saving workflow options: no checks, no commands, no folders.' }),
   noChecks: msg({ id: 'workflow.form.noChecks', defaultMessage: 'No checks.', description: 'Under “Checks pass before review” when it has none.' }),
+  otherTargets: msg({ id: 'workflow.form.otherTargets', defaultMessage: 'Branches, separated by commas (such as 1.2.0)', description: 'HI-2556: the placeholder of the field “Other branches work can merge into” (branch names besides Work merges into). Keep 1.2.0 as it is.' }),
+  appliesNowBranches: msg({ id: 'workflow.form.appliesNowBranches', defaultMessage: 'Only the other branches work can merge into change: they aren’t rules, so they apply now. A lane or card already merging into one keeps it.', description: 'HI-2556: the message of the dialog before saving workflow options when only “Other branches work can merge into” changes (or that and stage names).' }),
   folders: msg({ id: 'workflow.form.folders', defaultMessage: 'Folders and files, separated by commas', description: 'The placeholder of the field “What the work is” (folders and files left out).' }),
   carried: msg({ id: 'workflow.form.carried', defaultMessage: 'Agents’ old worktrees finish their current work first: {agents}. Then they work in slots too.', description: 'Under “Where cards are built” (G11) while agents still hold their worktrees from before 1.0 (#1441), kept until their current card or lane ends. {agents} is a list of agent names (glossary 2.5: slot).' }),
   readOnly: msg({ id: 'workflow.form.readOnly', defaultMessage: '{agents} can’t be given review copies by their coding agent, so they review the builder’s folder read-only.', description: 'Under “Reviewers” (G17) when some reviewing agents use a coding agent that Combwork can’t give review copies (folders at the exact revision, glossary 2.5: review copy). {agents} is a list of agent names.' }),
@@ -385,7 +387,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
     let stale = false
     const ok = await confirm({
       title: tr(T.confirmTitle),
-      message: tr(source.level ? T.levelConfirm : check.appliesNow ? T.appliesNow : T.confirmMessage),
+      message: tr(source.level ? T.levelConfirm : check.appliesNow ? (check.changed.includes('otherTargets') ? T.appliesNowBranches : T.appliesNow) : T.confirmMessage),
       wide: true,
       content: <SaveDetails changes={changes} check={check} picked={picked} title={(k) => tr(optionTitle(k, platform, effective.folder) ?? OPTION_TEXT[k]!.title)} />,
       confirmLabel: tr(T.save).replace(/…$/, ''),
@@ -608,6 +610,9 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
       }
       case 'excluded':
         return <DraftText value={effective.excluded.join(', ')} placeholder={tr(T.folders)} onCommit={(v) => set('excluded', list(v))} />
+      case 'otherTargets':
+        // HI-2556: branch names, comma separated, each once; none left inherits.
+        return <DraftText value={(effective.otherTargets ?? []).join(', ')} placeholder={tr(T.otherTargets)} onCommit={(v) => { const b = [...new Set(list(v))]; if (b.length) set('otherTargets', b); else inheritKey('otherTargets') }} />
       case 'stageNames':
         return <StageNamesEditor options={effective} onChange={(names) => (Object.keys(names).length ? set('stageNames', names) : inheritKey('stageNames'))} />
       default:

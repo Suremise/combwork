@@ -336,6 +336,8 @@
   "tips.mergeSlot.title": "Les agents fusionnent chacun leur tour",
   "tips.mergeStrict.text": "Quand Combwork fusionne, Gestion de versions → Flux de travail peut exiger que le travail soit à jour avec sa cible avant sa fusion : la file de fusion met la carte à jour dans son propre dossier, jamais sur la branche de l’auteur, et la relecture compte toujours si c’est la même modification.",
   "tips.mergeStrict.title": "Un travail à jour avant sa fusion",
+  "tips.mergesInto.title": "Travailler sur la prochaine version à côté de celle-ci",
+  "tips.mergesInto.text": "Ajoute une branche comme 1.2.0 dans Gestion de versions → Workflow → Autres branches dans lesquelles le travail peut être fusionné, puis choisis-la comme « Fusion dans » d’un couloir dans Démarrer un couloir…, ou d’une carte dans sa boîte de dialogue. Ses cartes partent d’elle et y sont fusionnées par sa propre file.",
   "tips.messageReceipts.text": "Chaque message que l’Assistant laisse à un agent a un identifiant et est conservé, même après un redémarrage : il est reçu quand l’agent lit sa boîte de réception, et l’agent en accuse réception une fois qu’il y a donné suite. Un message sans accusé de réception après {minutes, plural, one {# minute} many {# minutes} other {# minutes}} s’affiche comme en retard (✉) dans son volet.",
   "tips.messageReceipts.title": "Voir où en est un message",
   "tips.modelFallbacks.text": "Combwork demande à Claude Code et à Codex quels modèles ils ont et quels niveaux d’effort chacun accepte. Si une CLI ne peut pas le dire, tu peux modifier toi-même les listes de modèles, d’effort et de prix sur sa page de paramètres.",

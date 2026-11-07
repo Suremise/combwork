@@ -396,6 +396,12 @@
   "api.card.saidSkipsReview": {
     "placeholders": {}
   },
+  "api.card.saidTarget": {
+    "placeholders": {
+      "own": "select",
+      "target": "plain"
+    }
+  },
   "api.card.setReviewed": {
     "placeholders": {}
   },
@@ -1321,6 +1327,9 @@
     "placeholders": {}
   },
   "api.lane.projectRequired": {
+    "placeholders": {}
+  },
+  "api.lane.targetText": {
     "placeholders": {}
   },
   "api.lane.unknown": {

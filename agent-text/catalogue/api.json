@@ -291,6 +291,10 @@
   "api.card.saidSkipsReview": {
     "text": "Skips review"
   },
+  "api.card.saidTarget": {
+    "text": "{own, select, yes {Merges into {target}} other {Merges into the project's branch}}",
+    "note": "HI-2556: a card update set its Merges into: own yes, {target} (a branch); else the project's Work merges into."
+  },
   "api.card.setReviewed": {
     "text": "set it to be reviewed"
   },
@@ -888,6 +892,9 @@
   },
   "api.lane.projectRequired": {
     "text": "project is required"
+  },
+  "api.lane.targetText": {
+    "text": "target must be a branch name, or null for the project's own"
   },
   "api.lane.unknown": {
     "text": "No lane {lane}"
