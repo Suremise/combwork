@@ -354,6 +354,8 @@ interface CombworkMessageValues {
   'tips.noCodeCards.title': undefined
   'tips.off.message': undefined
   'tips.off.title': undefined
+  'tips.oneAgent.text': undefined
+  'tips.oneAgent.title': undefined
   'tips.outageResume.text': undefined
   'tips.outageResume.title': undefined
   'tips.overview.text': { key: string | number }

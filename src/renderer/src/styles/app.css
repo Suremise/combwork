@@ -1921,6 +1921,25 @@ textarea.input {
   flex: 0 0 auto;
   justify-content: flex-end;
 }
+/* Resume (n) and Stop (n) with their ▾ (HI-2665): one button to the eye, two to the keyboard; the ▾ narrow, joined on. */
+.split-btn {
+  display: inline-flex;
+  align-items: stretch;
+}
+/* Each button sits in its tooltip's wrap. */
+.split-btn.has-arrow > .tip-wrap:first-child > .btn {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.split-btn > .tip-wrap + .tip-wrap {
+  margin-left: -1px;
+}
+.split-btn .btn.split-arrow {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  padding-left: 3px;
+  padding-right: 3px;
+}
 
 .banner {
   display: flex;

@@ -350,6 +350,8 @@
   "tips.noCodeCards.title": "Karty bez kodu",
   "tips.off.message": "Nadal są w Pomoc → Wskazówki…, a w Ustawienia → Ogólne włączysz je z powrotem.",
   "tips.off.title": "Wskazówki są wyłączone",
+  "tips.oneAgent.text": "▾ obok Wznów (n) i Zatrzymaj (n) w nagłówku projektu wymienia tych agentów: wybierz jednego, aby działać tylko na nim. Agenci ▾ i menu kontekstowe projektu mają to samo dla Zacznij nową, Zarchiwizuj i zacznij nową, Wznów wszystkich agentów i Zatrzymaj wszystkich agentów.",
+  "tips.oneAgent.title": "Wznów lub zatrzymaj tylko jednego agenta",
   "tips.outageResume.text": "Włącz Ustawienia → Zaawansowane → Wznawiaj agentów po zerwaniu połączenia, a agent zatrzymany przez restart routera lub chwilowy zanik Wi-Fi poczeka na połączenie i sam ponownie wykona to, co zostało przerwane. Nigdy przy limicie użycia ani wygasłym logowaniu.",
   "tips.outageResume.title": "Agenci mogą kontynuować po zerwaniu połączenia",
   "tips.overview.text": "Przegląd obszaru roboczego pokazuje, ile zużył każdy projekt, co teraz działa i tablicę, dzień po dniu. {key}",
