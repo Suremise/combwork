@@ -1876,6 +1876,25 @@
       "max": "plain"
     }
   },
+  "settings.agent.tool.keptCard": {
+    "placeholders": {
+      "card": "plain",
+      "target": "plain"
+    }
+  },
+  "settings.agent.tool.keptLane": {
+    "placeholders": {
+      "named": "select",
+      "name": "plain",
+      "builder": "plain",
+      "target": "plain"
+    }
+  },
+  "settings.agent.tool.keptTargets": {
+    "placeholders": {
+      "list": "plain"
+    }
+  },
   "settings.agent.tool.levelsRefused": {
     "placeholders": {
       "problems": "plain"

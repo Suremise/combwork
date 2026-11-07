@@ -283,6 +283,18 @@
     "defaultMessage": "These options can’t be used, so every rule is off in this project:",
     "description": "A note atop Project Settings → Workflow: the saved options contradict each other or can’t be read; the reason follows."
   },
+  "workflow.form.keptCard": {
+    "defaultMessage": "{card} {title}: into {target}",
+    "description": "HI-2674: a card in flight keeping its target branch, in the dialog before saving workflow options. {card} is its key (HI-12), {target} a branch name."
+  },
+  "workflow.form.keptLane": {
+    "defaultMessage": "{named, select, yes {Lane {name} (builder {builder}), its cards still to start too: into {target}} other {Lane of builder {builder}, its cards still to start too: into {target}}}",
+    "description": "HI-2674: a running lane keeping its target branch, in the dialog before saving workflow options. {builder} is an agent’s name, {target} a branch name."
+  },
+  "workflow.form.keptTargets": {
+    "defaultMessage": "{n, plural, one {A target is set as a card or lane starts. This one keeps merging into its own, even if you tick it:} other {A target is set as a card or lane starts. These keep merging into their own, even if you tick them:}}",
+    "description": "HI-2674: in the dialog before saving workflow options that change Work merges into (the target branch), above the lanes and cards in flight that keep their own target. Ticking is the cards’ checkboxes above, which apply the other options."
+  },
   "workflow.form.labels": {
     "defaultMessage": "Labels, separated by commas",
     "description": "The placeholder of the labels field of “Your OK before merging”."

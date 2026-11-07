@@ -2266,6 +2266,12 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   and through approvals and quorum.
 - **Every card keeps the ruleset it started with** (`Started.ruleset`) until it's Done; a card in Todo uses the current
   one. A lane started under the old options keeps its ruleset until it ends ("old rules") [#1112 UI, #1122 c].
+- **A card's target is its start's** (`Started.target`, HI-2674): its queue entry takes that one, and neither a change of
+  G7 nor applying the options to the card (an Override) moves it; a running lane's cards still to start take what a
+  start under its ruleset, for its builder, would (`startTarget`: an empty G7 can give a builder worktree's base).
+  So a change of the target says which cards in flight and running lanes keep another one, with it: Workflow's Save…
+  dialog (`WorkflowCheck.targets`) and the settings tool's reply (`keptTargets` in `optionsForm.ts`). Moving them onto the
+  new target is HI-2556's.
 - A ruleset can't run arbitrary code: pieces are looked up by id, and an unknown id or parameter refuses to compile
   (a ruleset from a newer Combwork opens read-only, like `combwork.db`, §4) [#1112 D].
 

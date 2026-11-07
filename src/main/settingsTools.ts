@@ -6,14 +6,14 @@ import { advancedDef, advancedTakes } from '../shared/advanced'
 import { agentMsg, say } from '../shared/agentText'
 import { projectProviderConfig, providerSettings } from '../shared/providers'
 import { SETTINGS_CATALOG, agentSetting, checkSettingValue, effortTakes, settingDefault, settingEntry, settingHelps, settingKind, settingOptions, settingPatch, settingPath, settingReadOnly, settingValue, settingValueText, shownSettingPath, workflowTakes, PLATFORM_SETTING_KEY, type SettingContext, type SettingEntry, type SettingScope } from '../shared/settingsCatalog'
-import { checkOptions, problemText, workflowChanged } from './workflow/rulesets'
+import { checkOptions, problemText, resolvedOf, workflowChanged } from './workflow/rulesets'
 import { checkPlatformSwitch, oldRulesLine, setPlatform } from './workflow/platformSwitch'
 import { agentError, CombworkError } from './combworkError'
 import { levelOwn, setLevelOptions } from './workflow/levels'
 import { setSlotDefault } from './slotSettings'
 import { workflowWrite } from './workflow/writes'
 import { withRepoLocks } from './repoLock'
-import { problemEnglish, WorkflowRefused } from './workflow/optionsForm'
+import { keptTargets, problemEnglish, WorkflowRefused } from './workflow/optionsForm'
 import type { SettingDetail, SettingRow } from '../shared/toolReplies'
 import { language } from '../shared/i18n'
 import { docOutline } from '../shared/docSections'
@@ -43,6 +43,9 @@ const T = {
   levelsRefused: agentMsg({ id: 'settings.agent.tool.levelsRefused', text: "These workflow defaults can't be saved: {problems} Change the other options first, or tell the user.", note: "A workflow default at Combwork's or the workspace's level that contradicts the others (#1422). {problems} are the reasons, each a sentence." }),
   optionsRefused: agentMsg({ id: 'settings.agent.tool.optionsRefused', text: "These workflow options can't be saved: {problems} Change the other options first, or tell the user.", note: "A project's workflow option that contradicts the others (#1278). {problems} are the reasons, each a sentence." }),
   switchRefused: agentMsg({ id: 'settings.agent.tool.switchRefused', text: '{error} Tell the user, or leave it as it is.', note: "Switching a project's version control refused (#1419). {error} is why, a sentence." }),
+  keptTargets: agentMsg({ id: 'settings.agent.tool.keptTargets', text: 'It applies to cards started from now on outside running lanes. A target is set as a card or lane starts, so these keep merging into their own: {list}.', note: "HI-2674: a change of a project's target (G7), in place of \"It applies now\". {list}: settings.agent.tool.keptLane and keptCard items, joined with \"; \"." }),
+  keptLane: agentMsg({ id: 'settings.agent.tool.keptLane', text: 'lane {named, select, yes {"{name}" } other {}}({builder}) and its cards still to start, into {target}', note: 'HI-2674: a running lane keeping its target. {builder} is its builder agent\'s name; {target} a branch.' }),
+  keptCard: agentMsg({ id: 'settings.agent.tool.keptCard', text: '{card} into {target}', note: 'HI-2674: a card in flight keeping its target. {card} is its key (HI-12); {target} a branch.' }),
   noPlatform: agentMsg({ id: 'settings.agent.tool.noPlatform', text: '{project} has no version control recorded yet: its workflow options can be set once Combwork has detected it (reopen the project).', note: "A workflow option set on a project whose version control Combwork hasn't detected yet. {project} is the project's folder name." }),
   // What a setting takes (cw_read_setting).
   advanced: agentMsg({ id: 'settings.agent.tool.takes.advanced', text: "{takes} null: {scope, select, workspace {Settings → Advanced's value} other {Combwork's default}}.", note: "What an advanced setting takes (#367): {takes} is what its value takes; null puts back Settings → Advanced's value (a workspace's own) or Combwork's default." }),
@@ -274,7 +277,9 @@ export async function applySetting(
     // Its repository's lock first, as Project Settings' save takes it (#1642 round 5).
     const next = e.workflow ? await withRepoLocks([projectPath], () => workflowWrite(write), { quiet: true, project: projectPath }) : await write()
     if (e.workflow) workflowChanged(workspace, projectPath)
-    return { old, new: settingValue(e, config.settings, next) }
+    const now = settingValue(e, config.settings, next)
+    const note = e.workflow === 'target' && JSON.stringify(old) !== JSON.stringify(now) ? await keptTargetsNote(projectPath, next) : null
+    return { old, new: now, ...(note ? { note } : {}) }
   }
   if ('advanced' in change) {
     // Settings → Advanced's (advanced.json), or the workspace's own (workspace.json) (#367).
@@ -364,6 +369,17 @@ async function switchSetting(value: unknown, projectPath: string | null, guard?:
   } catch (err) {
     throw err instanceof CombworkError ? new SettingRefused(409, say(T.switchRefused, { error: agentError(err) })) : err
   }
+}
+
+/**
+ * HI-2674: after a change of a Git project's target, the running lanes and cards in flight that keep merging into
+ * another branch (keptTargets), in a line for the reply; null when there are none.
+ */
+async function keptTargetsNote(projectPath: string, cfg: ProjectConfig): Promise<string | null> {
+  if (cfg.workflow?.platform !== 'git') return null
+  const kept = await keptTargets(workspace, { path: projectPath, name: basename(projectPath) }, resolvedOf(workspace, projectPath, 'git', cfg).options.target ?? '')
+  const list = [...kept.lanes.map((l) => say(T.keptLane, { named: l.name ? 'yes' : 'no', name: l.name ?? '', builder: l.builder, target: l.target })), ...kept.cards.map((c) => say(T.keptCard, { card: c.key, target: c.target }))]
+  return list.length ? say(T.keptTargets, { list: list.join('; ') }) : null
 }
 
 /**

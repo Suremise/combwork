@@ -767,7 +767,9 @@
       "old": "plain",
       "new": "plain",
       "hasRestart": "select",
-      "restart": "plain"
+      "restart": "plain",
+      "hasNote": "select",
+      "note": "plain"
     }
   },
   "reply.setting.docs": {
