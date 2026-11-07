@@ -47,7 +47,9 @@ const check = (name, ok, extra = '') => {
   check('the Assistant view has a Memory section, last', sections.at(-1) === 'Memory', JSON.stringify(sections))
   await page.locator('.sidebar .row[data-section="memory"]').click()
   check('Its Memory lists MEMORY.md first, then the fact', !!(await until(async () => JSON.stringify(await rows()) === JSON.stringify(['MEMORY.md', 'release-cadence.md']), HUNG_MS)), JSON.stringify(await rows()))
-  check("…under a heading naming it the Assistant's, for this workspace", /The Assistant's Memory · This Workspace/.test(await view.locator('.pane-header').first().innerText()))
+  // Its text as written (the header draws it in capitals).
+  const heading = await view.locator('.pane-header').first().textContent()
+  check("…under a heading naming it the Assistant's, for this workspace", /The Assistant's Memory · This Workspace/.test(heading ?? ''), heading ?? '')
   const shown = await view.locator('.assistant-memory-folder').getAttribute('data-folder')
   check('its folder is the one in the suite’s Claude Code home, for the workspace’s folder', (shown ?? '').toLowerCase() === memDir.toLowerCase(), `${shown} vs ${memDir}`)
   // Copy Path: the folder's path on the clipboard.
@@ -72,7 +74,9 @@ const check = (name, ok, extra = '') => {
   await view.locator('.split-list .row', { hasText: 'release-cadence.md' }).click()
   await until(async () => /The user ships on Fridays\./.test(await text()), HUNG_MS)
   const fact = path.join(memDir, 'release-cadence.md')
-  await editor.locator('.monaco-editor .view-lines').first().click()
+  // Markdown opens in its preview: Edit, as in a project's Memory tab.
+  await editor.getByRole('button', { name: 'Edit' }).click()
+  await editor.locator('.monaco-editor .view-lines').first().click({ timeout: HUNG_MS })
   await page.keyboard.press('Control+End')
   await page.keyboard.type('And tags the release on Thursdays.')
   await editor.locator('.editor-toolbar button.primary').first().click()
