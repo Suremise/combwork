@@ -735,6 +735,7 @@
   "assistant.undo.why.projectOpened": "Um projeto que ele abriu continua aberto: feche-o se não for desejado.",
   "assistant.undo.why.prompt": "Um prompt enviado não pode ser retirado.",
   "assistant.undo.why.putBack": "O motivo dele fica como comentário.",
+  "assistant.undo.why.queueForwarded": "Um merge de atualização que ele pediu não é desfeito: remova-o da fila de merge se ele não deve ser feito.",
   "assistant.undo.why.queuePaused": "Uma fila de merge pausada continua pausada: retome-a se ela deve rodar.",
   "assistant.undo.why.queueResumed": "Uma fila de merge retomada não é pausada de novo: pause-a se ela não deve rodar.",
   "assistant.undo.why.removedFromQueue": "A remoção da fila de merge fica no trabalho do cartão: ele só volta à fila por “Tentar o merge de novo” ou por uma nova aprovação.",

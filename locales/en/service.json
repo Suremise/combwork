@@ -283,6 +283,42 @@
     "defaultMessage": "Path leads outside the project (through a link)",
     "description": "An error in the Files tab: a file's path goes through a link (a symbolic link or junction) to somewhere outside the project."
   },
+  "service.forward.byAssistant": {
+    "defaultMessage": "the Assistant",
+    "description": "HI-2679: who asked for a forward merge, in its card’s description: the Combwork Assistant."
+  },
+  "service.forward.byUser": {
+    "defaultMessage": "you",
+    "description": "HI-2679: who asked for a forward merge, in its card’s description: the user."
+  },
+  "service.forward.description": {
+    "defaultMessage": "Combwork merges {from} ({source}) into {to} through {to}’s merge queue, with its merge checks, as a merge commit. Asked by {by}. If it comes back (a conflict or a red check), Retry merge tries again with {from} as it is then; Remove from queue ends it, nothing merged.",
+    "description": "HI-2679: the description of the card Combwork makes for a forward merge. {from} and {to} are branch names, {source} a short commit id, {by} who asked (you, or the Assistant). Retry merge and Remove from queue are the card’s commands: as translated there."
+  },
+  "service.forward.missing": {
+    "defaultMessage": "{unknown, select, yes {Combwork can’t read the branch {branch}, so nothing was queued.} other {There is no branch {branch} in this repository, so nothing was queued.}}",
+    "description": "HI-2679: a forward merge refused: one of its branches doesn’t exist (or git couldn’t say). Keep the select keys."
+  },
+  "service.forward.noGit": {
+    "defaultMessage": "This project merges no work through Combwork’s merge queue, so it has nothing to bring up to date.",
+    "description": "HI-2679: a forward merge asked of a project that isn’t a Git project merging through the queue."
+  },
+  "service.forward.notAgents": {
+    "defaultMessage": "Only the user or the Assistant brings one branch up to date with another.",
+    "description": "HI-2679: a forward merge refused: asked by a project agent or a script."
+  },
+  "service.forward.notTargets": {
+    "defaultMessage": "{from} and {to} must be two different branches this project merges work into: {targets}.",
+    "description": "HI-2679: a forward merge refused: its branches aren’t two of the project’s (Work merges into, Other branches work can merge into). {targets} is the list of them."
+  },
+  "service.forward.raced": {
+    "defaultMessage": "The forward merge’s card changed while it was being queued, so nothing more was done: look at the card, then ask again if needed.",
+    "description": "HI-2679: a forward merge whose new card was changed (started, moved) before it could be queued; rare."
+  },
+  "service.forward.title": {
+    "defaultMessage": "Bring {to} up to date with {from}",
+    "description": "HI-2679: the title of the card Combwork makes for a forward merge: it merges branch {from} into branch {to} through {to}’s merge queue. Branch names."
+  },
   "service.fsutil.keptBusy": {
     "defaultMessage": "{file} is being saved by something else: nothing was changed. Try again in a moment.",
     "description": "An error: one of Combwork's settings or records files ({file}: its path) was still being written by another program (an editor, a script), so Combwork's change to it wasn't made."

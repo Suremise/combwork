@@ -121,6 +121,8 @@
   "tips.branchCards.title": "Veja de qual cartão é um branch",
   "tips.branchCleanup.text": "Controle de versão → Branches e remotes agrupa os branches em Em uso, Com merge e Sem merge. Limpar branches com merge feito… exclui os com merge que nada usa, e oferece à parte os dos seus remotes, nunca marcados.",
   "tips.branchCleanup.title": "Limpar branches com merge feito",
+  "tips.bringUpToDate.text": "O cartão da fila de merge de um branch mostra quando ele está atrás de outro branch do projeto. Atualizar… faz o merge desse outro branch nele pela fila, com as verificações de merge; o outro branch não muda.",
+  "tips.bringUpToDate.title": "Atualizar a próxima versão",
   "tips.cardAttachments.text": "Cole ou solte arquivos na descrição ou em um comentário de um cartão: eles ficam com o cartão quando você salva ou publica, aparecem nele e são listados para o agente que o inicia. O alfinete no chip de anexo de um painel copia um arquivo para o cartão do agente.",
   "tips.cardAttachments.title": "Mantenha uma captura com seu cartão",
   "tips.cardAttachmentsCleanup.text": "Os arquivos guardados com um cartão vão para a Lixeira 30 dias depois de ele ser arquivado. Escolha 3, 7 ou 90 dias, ou Nunca, em Configurações do projeto → Armazenamento, onde Limpar agora… remove na hora o que já venceu. Cartões abertos e concluídos mantêm os seus.",

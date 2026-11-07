@@ -735,6 +735,7 @@
   "assistant.undo.why.projectOpened": "開いたプロジェクトは開いたままです。不要なら閉じてください。",
   "assistant.undo.why.prompt": "送信済みのプロンプトは取り消せません。",
   "assistant.undo.why.putBack": "その理由はコメントとして残ります。",
+  "assistant.undo.why.queueForwarded": "依頼した最新化のマージは取り消されません。マージすべきでなければ、マージキューから外してください。",
   "assistant.undo.why.queuePaused": "一時停止したマージキューは停止したままです。動かす場合は再開してください。",
   "assistant.undo.why.queueResumed": "再開したマージキューは再び一時停止されません。動かさない場合は一時停止してください。",
   "assistant.undo.why.removedFromQueue": "マージキューから外したことはカードの作業に残ります。キューに戻るのは「マージを再試行」か新しい承認によってだけです。",

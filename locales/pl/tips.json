@@ -121,6 +121,8 @@
   "tips.branchCards.title": "Zobacz, do której karty należy gałąź",
   "tips.branchCleanup.text": "Kontrola wersji → Gałęzie i zdalne repozytoria grupuje gałęzie jako W użyciu, Scalone i Niescalone. Uporządkuj scalone gałęzie… usuwa scalone, których nic nie używa, a scalone na Twoich zdalnych repozytoriach proponuje osobno, nigdy niezaznaczone za Ciebie.",
   "tips.branchCleanup.title": "Uporządkuj scalone gałęzie",
+  "tips.bringUpToDate.text": "Karta kolejki scalania gałęzi pokazuje, kiedy gałąź jest za inną gałęzią projektu. Zaktualizuj… scala tamtą gałąź z nią przez jej kolejkę, ze sprawdzeniami przed scaleniem; tamta gałąź się nie zmienia.",
+  "tips.bringUpToDate.title": "Zaktualizuj następne wydanie",
   "tips.cardAttachments.text": "Wklej lub upuść pliki w opisie albo komentarzu karty: zostaną przy karcie po zapisaniu lub opublikowaniu, są w niej pokazane i wymienione agentowi, który ją rozpoczyna. Pinezka na chipie załącznika w panelu kopiuje plik na kartę agenta.",
   "tips.cardAttachments.title": "Zachowaj zrzut ekranu przy jego karcie",
   "tips.cardAttachmentsCleanup.text": "Pliki przechowywane z kartą trafiają do Kosza 30 dni po jej zarchiwizowaniu. Wybierz 3, 7 lub 90 dni albo Nigdy w Ustawieniach projektu → Miejsce na dysku, gdzie Wyczyść teraz… od razu usuwa to, na co już czas. Otwarte karty i karty z kolumny Gotowe zachowują swoje.",

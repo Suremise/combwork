@@ -959,6 +959,14 @@
     "defaultMessage": "Try again: Combwork reads it afresh.",
     "description": "The next step after a refusal because what a rule read changed meanwhile."
   },
+  "workflow.refused.forward.notAgents.message": {
+    "defaultMessage": "{card} brings one branch up to date with another: only the user or the Assistant acts on it.",
+    "description": "HI-2679: a refused intent: an agent acted on a forward-merge card (Combwork’s own card that merges one of the project’s target branches into another). {card} is its key (HI-12)."
+  },
+  "workflow.refused.forward.notAgents.next": {
+    "defaultMessage": "Leave it to the user or the Assistant.",
+    "description": "HI-2679: the next step after an agent was refused acting on a forward-merge card."
+  },
   "workflow.refused.integrate.approved.message": {
     "defaultMessage": "{card} at {revision} isn't approved: {why}",
     "description": "A refused merge: the revision lacks the passes or approvals its rules need. {why} is a whole sentence saying what's missing."
