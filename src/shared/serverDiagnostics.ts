@@ -103,9 +103,12 @@ export const TEST_CITY = 'Reykjavik' // i18n-ignore: a failure's code, not text 
 /** The test's tool, as the Anthropic Messages API takes it. */
 const TOOL = {
   name: TEST_TOOL,
+  // agent-protocol: the tool-call test's fixed payload to a model (HI-2683), judged exactly; never an agent's wording
   description: 'Get the current weather for a city.', // i18n-ignore: what the tool-call test sends the model (English, its own test text), never shown
+  // agent-protocol: the tool-call test's fixed payload to a model (HI-2683), judged exactly; never an agent's wording
   input_schema: { type: 'object', properties: { city: { type: 'string', description: 'The city name.' } }, required: ['city'] } // i18n-ignore: what the tool-call test sends the model (English, its own test text), never shown
 }
+// agent-protocol: the tool-call test's fixed payload to a model (HI-2683), judged exactly; never an agent's wording
 const PROMPT = `What is the weather in ${TEST_CITY} right now? Use the ${TEST_TOOL} tool, then tell me exactly what it returned, including its station code.` // i18n-ignore: what the tool-call test sends the model (English, its own test text), never shown
 /** The test's output budget: enough for a call or a short answer, with thinking off. */
 export const TEST_MAX_TOKENS = 1024
@@ -121,6 +124,7 @@ export function step1Body(model: string): Record<string, unknown> {
  */
 export function testResult(random: () => number = Math.random): { text: string; code: string } {
   const code = String(10000 + Math.floor(random() * 89999))
+  // agent-protocol: the tool-call test's fixed payload to a model (HI-2683), judged exactly; never an agent's wording
   return { text: `-7.3 °C, light snow, station code ${code}`, code } // i18n-ignore: what the tool-call test sends the model (English, its own test text), never shown
 }
 

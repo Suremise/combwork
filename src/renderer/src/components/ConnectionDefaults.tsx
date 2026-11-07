@@ -11,7 +11,7 @@ import { call, errorMessage } from '../api'
 import { notify, useLanguage, useStore } from '../store'
 import { EffortPicker, ModelPicker } from './ModelPicker'
 import { Icon, Modal } from './ui'
-import { M as CARD } from './accountCard'
+import { M as CARD } from './accountCard'
 import { ServerContextLine } from './ServerDiagnostics'
 
 /**

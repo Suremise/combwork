@@ -401,6 +401,16 @@
   "main.quit.closed": {
     "placeholders": {}
   },
+  "main.server.context.invalid": {
+    "placeholders": {
+      "max": "number"
+    }
+  },
+  "main.server.context.noModel": {
+    "placeholders": {
+      "model": "plain"
+    }
+  },
   "main.server.key.chars": {
     "placeholders": {}
   },

@@ -9,7 +9,7 @@ import { notify, set, setActivity, useStore } from '../store'
 import { cliReadyOf, connectionCli, connectionOf, firstReadyConnection, firstUsableConnection, offeredConnections, offHereChoice, orderedAccounts, type ConnectionShown } from '@shared/connectionLabel'
 
 export { cliReadyOf, connectionCli, firstReadyConnection, firstUsableConnection, offeredConnections }
-import { Icon, Tooltip } from './ui'
+import { Icon, Tooltip } from './ui'
 import { ServerContextLine } from './ServerDiagnostics'
 import { parseBaseUrl } from '@shared/serverConnection'
 
